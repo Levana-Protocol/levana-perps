@@ -1,4 +1,4 @@
-FROM ghcr.io/levana-protocol/levana-perps-multichain/localosmosis:size
+FROM ghcr.io/levana-protocol/levana-perps/localosmosis:size
 
 WORKDIR /osmosis
 
