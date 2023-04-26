@@ -161,6 +161,11 @@ impl PriceBaseInQuote {
     pub fn into_non_zero(&self) -> NonZero<Decimal256> {
         self.0
     }
+
+    /// Convert from a non-zero decimal.
+    pub fn from_non_zero(raw: NonZero<Decimal256>) -> Self {
+        Self(raw)
+    }
 }
 
 /// PriceBaseInQuote converted to USD
@@ -368,6 +373,60 @@ impl From<Price> for PriceKey {
     }
 }
 
+impl TryFrom<pyth_sdk_cw::Price> for Number {
+    type Error = anyhow::Error;
+    fn try_from(price: pyth_sdk_cw::Price) -> Result<Self, Self::Error> {
+        let n: Number = price.price.to_string().parse()?;
+
+        Ok(match price.expo.cmp(&0) {
+            std::cmp::Ordering::Equal => n,
+            std::cmp::Ordering::Greater => n * Number::from(10u128.pow(price.expo.unsigned_abs())),
+            std::cmp::Ordering::Less => n / Number::from(10u128.pow(price.expo.unsigned_abs())),
+        })
+    }
+}
+
+impl Number {
+    /// Converts a Number into a pyth price
+    /// the exponent will always be 0 or negative
+    pub fn to_pyth_price(
+        &self,
+        conf: u64,
+        publish_time: pyth_sdk_cw::UnixTimestamp,
+    ) -> Result<pyth_sdk_cw::Price> {
+        let s = self.to_string();
+        let (integer, decimal) = s.split_once('.').unwrap_or((&s, ""));
+        let price: i64 = format!("{}{}", integer, decimal).parse()?;
+        let mut expo: i32 = decimal.len() as i32;
+        if expo > 0 {
+            expo = -expo;
+        }
+
+        Ok(pyth_sdk_cw::Price {
+            price,
+            expo,
+            conf,
+            publish_time,
+        })
+    }
+}
+
+impl TryFrom<pyth_sdk_cw::Price> for PriceBaseInQuote {
+    type Error = anyhow::Error;
+
+    fn try_from(value: pyth_sdk_cw::Price) -> Result<Self, Self::Error> {
+        Self::try_from_number(value.try_into()?)
+    }
+}
+
+impl TryFrom<pyth_sdk_cw::Price> for PriceCollateralInUsd {
+    type Error = anyhow::Error;
+
+    fn try_from(value: pyth_sdk_cw::Price) -> Result<Self, Self::Error> {
+        Self::try_from_number(value.try_into()?)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -398,5 +457,50 @@ mod tests {
         go("\"-0\"").unwrap_err();
         go("\"0\"").unwrap_err();
         go("\"0.1\"").unwrap();
+    }
+
+    #[test]
+    fn pyth_price() {
+        let go = |price: i64, expo: i32, expected: &str| {
+            let pyth_price = pyth_sdk_cw::Price {
+                price,
+                expo,
+                conf: 0,
+                publish_time: 0,
+            };
+            let n = Number::from_str(expected).unwrap();
+            assert_eq!(Number::try_from(pyth_price).unwrap(), n);
+
+            // number-to-pyth-price only uses the `expo` field to add decimal places
+            // so we need to compare to the expected string via round-tripping
+            // which we can do since the above test already confirms the conversion is correct
+            assert_eq!(
+                Number::try_from(
+                    n.to_pyth_price(pyth_price.conf, pyth_price.publish_time)
+                        .unwrap()
+                )
+                .unwrap(),
+                n
+            );
+            if price > 0 {
+                assert_eq!(
+                    PriceBaseInQuote::try_from(pyth_price).unwrap(),
+                    PriceBaseInQuote::from_str(expected).unwrap()
+                );
+                assert_eq!(
+                    PriceCollateralInUsd::try_from(pyth_price).unwrap(),
+                    PriceCollateralInUsd::from_str(expected).unwrap()
+                );
+            }
+        };
+
+        go(123456789, 0, "123456789.0");
+        go(-123456789, 0, "-123456789.0");
+        go(123456789, -3, "123456.789");
+        go(123456789, 3, "123456789000.0");
+        go(-123456789, -3, "-123456.789");
+        go(-123456789, 3, "-123456789000.0");
+        go(12345600789, -5, "123456.00789");
+        go(1234560078900, -7, "123456.00789");
     }
 }

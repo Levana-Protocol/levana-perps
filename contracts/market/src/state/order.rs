@@ -2,13 +2,17 @@ use crate::state::{State, StateContext};
 use anyhow::{Context, Result};
 use cosmwasm_std::{Addr, Order, Storage};
 use cw_storage_plus::{Bound, Item, Map, PrefixBound};
-use msg::contracts::market::entry::{LimitOrderResp, LimitOrdersResp};
+use msg::contracts::market::entry::{
+    ExecutedLimitOrder, LimitOrderHistoryResp, LimitOrderResp, LimitOrderResult, LimitOrdersResp,
+};
 use msg::contracts::market::fees::events::TradeId;
 use msg::contracts::market::order::events::{
     CancelLimitOrderEvent, ExecuteLimitOrderEvent, PlaceLimitOrderEvent,
 };
 use msg::contracts::market::order::{LimitOrder, OrderId};
 use msg::prelude::*;
+
+use super::position::OpenPositionParams;
 
 /// Stores the last used [OrderId]
 const LAST_ORDER_ID: Item<OrderId> = Item::new(namespace::LAST_ORDER_ID);
@@ -22,6 +26,11 @@ const LIMIT_ORDERS_BY_PRICE_SHORT: Map<(PriceKey, OrderId), ()> =
     Map::new(namespace::LIMIT_ORDERS_BY_PRICE_SHORT);
 /// Indexes [LimitOrder]s by Addr
 const LIMIT_ORDERS_BY_ADDR: Map<(&Addr, OrderId), ()> = Map::new(namespace::LIMIT_ORDERS_BY_ADDR);
+/// Executed limit orders for history.
+///
+/// The [u64] is an [OrderId]. We use [u64] to match the rest of the history API helper functions.
+const EXECUTED_LIMIT_ORDERS: Map<(&Addr, u64), ExecutedLimitOrder> =
+    Map::new(namespace::EXECUTED_LIMIT_ORDERS);
 
 impl State<'_> {
     /// Sets a [LimitOrder]
@@ -40,8 +49,8 @@ impl State<'_> {
     ) -> Result<()> {
         let last_order_id = LAST_ORDER_ID
             .may_load(ctx.storage)?
-            .unwrap_or(OrderId(0u64));
-        let order_id = OrderId(last_order_id.u64() + 1);
+            .unwrap_or_else(|| OrderId::new(0));
+        let order_id = OrderId::new(last_order_id.u64() + 1);
         LAST_ORDER_ID.save(ctx.storage, &order_id)?;
 
         let order_fee = Collateral::try_from_number(
@@ -159,26 +168,49 @@ impl State<'_> {
 
         let market_type = self.market_type(ctx.storage)?;
 
-        //FIXME do something with the error so the user knows what's going on
-        let res = self.handle_position_open(
-            ctx,
-            order.owner,
-            order.collateral,
-            order.leverage,
-            order.direction.into_base(market_type),
-            order.max_gains,
-            None,
-            order.stop_loss_override,
-            order.take_profit_override,
-        );
+        let open_position_params = OpenPositionParams {
+            owner: order.owner.clone(),
+            collateral: order.collateral,
+            leverage: order.leverage,
+            direction: order.direction.into_base(market_type),
+            max_gains_in_quote: order.max_gains,
+            slippage_assert: None,
+            stop_loss_override: order.stop_loss_override,
+            take_profit_override: order.take_profit_override,
+        };
+        let res = self.validate_new_position(ctx.storage, open_position_params);
+
+        let res = match res {
+            Ok(validated_position) => {
+                let pos_id = self.open_validated_position(ctx, validated_position)?;
+                Ok(pos_id)
+            }
+            Err(e) => {
+                self.add_token_transfer_msg(ctx, &order.owner, order.collateral)?;
+                Err(e)
+            }
+        };
 
         ctx.response.add_event(ExecuteLimitOrderEvent {
             order_id,
-            pos_id: match res {
-                Ok(pos_id) => Some(pos_id),
-                Err(_) => None,
-            },
+            pos_id: res.as_ref().ok().copied(),
+            error: res.as_ref().err().map(|e| e.to_string()),
         });
+
+        EXECUTED_LIMIT_ORDERS.save(
+            ctx.storage,
+            (&order.owner, order_id.u64()),
+            &ExecutedLimitOrder {
+                order: order.clone(),
+                result: match res {
+                    Ok(position) => LimitOrderResult::Success { position },
+                    Err(e) => LimitOrderResult::Failure {
+                        reason: format!("{e:?}"),
+                    },
+                },
+                timestamp: self.now(),
+            },
+        )?;
 
         Ok(())
     }
@@ -359,5 +391,28 @@ impl State<'_> {
         LIMIT_ORDERS_BY_ADDR.remove(storage, (&order.owner, order.order_id));
 
         Ok(())
+    }
+
+    pub(crate) fn limit_order_get_history(
+        &self,
+        store: &dyn Storage,
+        addr: &Addr,
+        start_after: Option<u64>,
+        limit: Option<u32>,
+        order: Option<Order>,
+    ) -> Result<LimitOrderHistoryResp> {
+        let (orders, next_start_after) = self.get_history_helper(
+            EXECUTED_LIMIT_ORDERS,
+            store,
+            addr,
+            start_after,
+            limit,
+            order,
+        )?;
+
+        Ok(LimitOrderHistoryResp {
+            orders,
+            next_start_after,
+        })
     }
 }

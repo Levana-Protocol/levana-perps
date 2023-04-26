@@ -132,7 +132,7 @@ pub mod events {
 
         fn try_from(evt: Event) -> anyhow::Result<Self> {
             let get_position_id =
-                || -> anyhow::Result<PositionId> { Ok(PositionId(evt.u64_attr("pos-id")?)) };
+                || -> anyhow::Result<PositionId> { Ok(PositionId::new(evt.u64_attr("pos-id")?)) };
 
             let get_price_point_timestamp = || evt.timestamp_attr("price-point-timestamp");
 
@@ -160,7 +160,7 @@ pub mod events {
                     position: get_position_id()?,
                 }),
                 "limit-order" => Ok(CrankWorkInfo::LimitOrder {
-                    order_id: OrderId(evt.u64_attr("order-id")?),
+                    order_id: OrderId::new(evt.u64_attr("order-id")?),
                 }),
                 _ => Err(PerpError::unimplemented().into()),
             })

@@ -19,7 +19,7 @@ use cosmwasm_std::{
     to_binary, to_vec, Addr, Binary, ContractResult, CosmosMsg, Empty, QueryRequest, StdError,
     SystemResult, Uint128, WasmMsg, WasmQuery,
 };
-use cw_multi_test::{AppResponse, Executor};
+use cw_multi_test::{AppResponse, BankSudo, Executor, SudoMsg};
 use msg::bridge::{ClientToBridgeMsg, ClientToBridgeWrapper};
 use msg::contracts::cw20::entry::{
     BalanceResponse, ExecuteMsg as Cw20ExecuteMsg, QueryMsg as Cw20QueryMsg, TokenInfoResponse,
@@ -32,8 +32,9 @@ use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::crank::CrankWorkInfo;
 use msg::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
-    LimitOrderResp, LimitOrdersResp, LpActionHistoryResp, LpInfoResp, PositionActionHistoryResp,
-    QueryMsg, SlippageAssert, StatusResp, TradeHistorySummary, TraderActionHistoryResp,
+    LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpActionHistoryResp, LpInfoResp,
+    PositionActionHistoryResp, QueryMsg, SlippageAssert, StatusResp, TradeHistorySummary,
+    TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
 use msg::contracts::market::{
@@ -61,6 +62,7 @@ use msg::shutdown::{ShutdownEffect, ShutdownImpact};
 use msg::token::{Token, TokenInit};
 use rand::rngs::ThreadRng;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 use std::cell::{RefCell, RefMut};
 use std::rc::Rc;
 
@@ -238,6 +240,22 @@ impl PerpsMarket {
         )
     }
 
+    /// Mint some native coins of the given denom
+    pub fn exec_mint_native(
+        &self,
+        recipient: &Addr,
+        denom: impl Into<String>,
+        amount: impl Into<Uint128>,
+    ) -> Result<AppResponse> {
+        self.app().sudo(SudoMsg::Bank(BankSudo::Mint {
+            to_address: recipient.to_string(),
+            amount: vec![cosmwasm_std::Coin {
+                denom: denom.into(),
+                amount: amount.into(),
+            }],
+        }))
+    }
+
     pub fn query_collateral_balance(&self, user_addr: &Addr) -> Result<Number> {
         self.token
             .query_balance(&self.app().querier(), user_addr)
@@ -277,12 +295,7 @@ impl PerpsMarket {
         self.exec_funds(sender, msg, Number::ZERO)
     }
 
-    pub fn exec_funds(
-        &self,
-        sender: &Addr,
-        msg: &MarketExecuteMsg,
-        amount: Number,
-    ) -> Result<AppResponse> {
+    pub fn make_msg_with_funds(&self, msg: &MarketExecuteMsg, amount: Number) -> Result<WasmMsg> {
         let amount = Collateral::from_decimal256(
             amount
                 .try_into_positive_value()
@@ -291,28 +304,30 @@ impl PerpsMarket {
 
         let market_addr = self.addr.clone();
 
-        let resp = match NonZero::new(amount) {
-            None => {
-                let wasm_msg = WasmMsg::Execute {
-                    contract_addr: market_addr.to_string(),
-                    msg: to_binary(msg)?,
-                    funds: vec![],
-                };
-
-                self.exec_wasm_msg(sender, wasm_msg)?
-            }
+        Ok(match NonZero::new(amount) {
+            None => WasmMsg::Execute {
+                contract_addr: market_addr.to_string(),
+                msg: to_binary(msg)?,
+                funds: vec![],
+            },
             Some(amount) => {
-                let wasm_msg =
-                    self.token
-                        .into_market_execute_msg(&market_addr, amount.raw(), msg.clone())?;
-                self.exec_wasm_msg(sender, wasm_msg)?
+                self.token
+                    .into_market_execute_msg(&market_addr, amount.raw(), msg.clone())?
             }
-        };
-
-        Ok(resp)
+        })
     }
 
-    pub(crate) fn exec_wasm_msg(&self, sender: &Addr, msg: WasmMsg) -> Result<AppResponse> {
+    pub fn exec_funds(
+        &self,
+        sender: &Addr,
+        msg: &MarketExecuteMsg,
+        amount: Number,
+    ) -> Result<AppResponse> {
+        let wasm_msg = self.make_msg_with_funds(msg, amount)?;
+        self.exec_wasm_msg(sender, wasm_msg)
+    }
+
+    pub fn exec_wasm_msg(&self, sender: &Addr, msg: WasmMsg) -> Result<AppResponse> {
         let cosmos_msg = CosmosMsg::Wasm(msg);
         let res = self.app().execute(sender.clone(), cosmos_msg)?;
 
@@ -335,12 +350,15 @@ impl PerpsMarket {
     pub fn query_position(&self, position_id: PositionId) -> Result<PositionQueryResponse> {
         let PositionsResp {
             mut positions,
-            pending_close: _,
+            pending_close,
+            closed,
         } = self.query(&MarketQueryMsg::Positions {
             position_ids: vec![position_id],
             // Backwards compat in the tests
             skip_calc_pending_fees: true,
         })?;
+        anyhow::ensure!(pending_close.is_empty());
+        anyhow::ensure!(closed.is_empty());
         positions.pop().ok_or_else(|| anyhow!("no positions"))
     }
 
@@ -350,11 +368,14 @@ impl PerpsMarket {
     ) -> Result<PositionQueryResponse> {
         let PositionsResp {
             mut positions,
-            pending_close: _,
+            pending_close,
+            closed,
         } = self.query(&MarketQueryMsg::Positions {
             position_ids: vec![position_id],
             skip_calc_pending_fees: false,
         })?;
+        anyhow::ensure!(pending_close.is_empty());
+        anyhow::ensure!(closed.is_empty());
         positions.pop().ok_or_else(|| anyhow!("no positions"))
     }
 
@@ -364,12 +385,15 @@ impl PerpsMarket {
         skip_calc_pending_fees: bool,
     ) -> Result<ClosedPosition> {
         let PositionsResp {
-            positions: _,
+            positions,
             mut pending_close,
+            closed,
         } = self.query(&MarketQueryMsg::Positions {
             position_ids: vec![position_id],
             skip_calc_pending_fees,
         })?;
+        anyhow::ensure!(positions.is_empty());
+        anyhow::ensure!(closed.is_empty());
         pending_close
             .pop()
             .ok_or_else(|| anyhow!("no position pending close"))
@@ -380,16 +404,19 @@ impl PerpsMarket {
         let ids = self
             .query_position_token_ids(owner)?
             .into_iter()
-            .map(|id| Ok(PositionId(id.parse()?)))
+            .map(|id| Ok(id.parse()?))
             .collect::<Result<Vec<PositionId>>>()?;
 
         let PositionsResp {
             positions,
-            pending_close: _,
+            pending_close,
+            closed,
         } = self.query(&MarketQueryMsg::Positions {
             position_ids: ids,
             skip_calc_pending_fees: true,
         })?;
+        anyhow::ensure!(pending_close.is_empty());
+        anyhow::ensure!(closed.is_empty());
 
         Ok(positions)
     }
@@ -437,11 +464,29 @@ impl PerpsMarket {
         owner: &Addr,
         pos_id: PositionId,
     ) -> Result<ClosedPosition> {
-        self.query_closed_positions(owner, None, None, None)?
+        let PositionsResp {
+            positions,
+            pending_close,
+            mut closed,
+        } = self.query(&MarketQueryMsg::Positions {
+            position_ids: vec![pos_id],
+            skip_calc_pending_fees: true,
+        })?;
+        anyhow::ensure!(positions.is_empty());
+        anyhow::ensure!(pending_close.is_empty());
+        anyhow::ensure!(closed.len() == 1);
+        let closed1 = closed.pop().unwrap();
+
+        let closed2 = self
+            .query_closed_positions(owner, None, None, None)?
             .positions
             .into_iter()
             .find(|p| p.id == pos_id)
-            .ok_or_else(|| anyhow!("no position"))
+            .ok_or_else(|| anyhow!("no position"))?;
+
+        anyhow::ensure!(closed1 == closed2);
+
+        Ok(closed1)
     }
 
     pub fn query_liquidity_stats(&self) -> Result<LiquidityStats> {
@@ -514,6 +559,17 @@ impl PerpsMarket {
         // NOTE we're not doing any pagination. If you write a test that has
         // more than MAX_LIMIT entries, you'll need to add pagination.
         self.query(&MarketQueryMsg::LpActionHistory {
+            addr: addr.clone().into(),
+            start_after: None,
+            limit: None,
+            order: None,
+        })
+    }
+
+    pub fn query_limit_order_history(&self, addr: &Addr) -> Result<LimitOrderHistoryResp> {
+        // NOTE we're not doing any pagination. If you write a test that has
+        // more than MAX_LIMIT entries, you'll need to add pagination.
+        self.query(&MarketQueryMsg::LimitOrderHistory {
             addr: addr.clone().into(),
             start_after: None,
             limit: None,
@@ -699,8 +755,19 @@ impl PerpsMarket {
         )
     }
 
-    pub fn exec_reinvest_yield(&self, user_addr: &Addr, stake_to_xlp: bool) -> Result<AppResponse> {
-        self.exec(user_addr, &MarketExecuteMsg::ReinvestYield { stake_to_xlp })
+    pub fn exec_reinvest_yield(
+        &self,
+        user_addr: &Addr,
+        amount: Option<NonZero<Collateral>>,
+        stake_to_xlp: bool,
+    ) -> Result<AppResponse> {
+        self.exec(
+            user_addr,
+            &MarketExecuteMsg::ReinvestYield {
+                stake_to_xlp,
+                amount,
+            },
+        )
     }
 
     pub fn exec_stake_lp(&self, user_addr: &Addr, amount: Option<Number>) -> Result<AppResponse> {
@@ -739,12 +806,8 @@ impl PerpsMarket {
         self.exec(user_addr, &MarketExecuteMsg::CollectUnstakedLp {})
     }
 
-    pub fn exec_transfer_dao_fees(
-        &self,
-        sender: &Addr,
-        amount: Option<NonZero<Collateral>>,
-    ) -> Result<AppResponse> {
-        self.exec(sender, &MarketExecuteMsg::TransferDaoFees { amount })
+    pub fn exec_transfer_dao_fees(&self, sender: &Addr) -> Result<AppResponse> {
+        self.exec(sender, &MarketExecuteMsg::TransferDaoFees {})
     }
 
     // Taking TryInto impls allows us to avoid noise in the tests
@@ -811,7 +874,7 @@ impl PerpsMarket {
         let res = self.exec_wasm_msg(sender, msg)?;
         let pos_id = res.event_first_value("position-open", "pos-id")?.parse()?;
 
-        Ok((PositionId(pos_id), res))
+        Ok((pos_id, res))
     }
 
     pub fn exec_close_position(
@@ -862,21 +925,21 @@ impl PerpsMarket {
         &self,
         sender: &Addr,
         position_id: PositionId,
-        collateral_delta: Number,
+        collateral_delta: Signed<Collateral>,
         slippage_assert: Option<SlippageAssert>,
     ) -> Result<AppResponse> {
         let msg = self.token.into_market_execute_msg(
             &self.addr,
-            Collateral::try_from_number(collateral_delta)
-                .ok()
+            collateral_delta
+                .try_into_positive_value()
                 .unwrap_or_default(),
             if collateral_delta.is_negative() {
                 MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
                     id: position_id,
-                    amount: NonZero::new(Collateral::from_decimal256(
-                        collateral_delta.abs_unsigned(),
-                    ))
-                    .context("collateral_delta is 0")?,
+                    amount: collateral_delta
+                        .abs()
+                        .try_into_non_zero()
+                        .context("collateral_delta is 0")?,
                     slippage_assert,
                 }
             } else {
@@ -971,7 +1034,7 @@ impl PerpsMarket {
             .event_first_value(event_key::PLACE_LIMIT_ORDER, event_key::ORDER_ID)?
             .parse()?;
 
-        Ok((OrderId(order_id), res))
+        Ok((order_id, res))
     }
 
     pub fn exec_cancel_limit_order(&self, sender: &Addr, order_id: OrderId) -> Result<AppResponse> {
@@ -1081,6 +1144,48 @@ impl PerpsMarket {
             &Cw721ExecuteMsg::TransferNft {
                 recipient: to.clone().into(),
                 token_id: token_id.to_string(),
+            },
+        )
+    }
+
+    pub fn exec_liquidity_token_send(
+        &self,
+        kind: LiquidityTokenKind,
+        from: &Addr,
+        contract: &Addr,
+        amount: LpToken,
+        msg: &impl Serialize,
+    ) -> Result<AppResponse> {
+        let token_info = self.query_liquidity_token_info(kind)?;
+        self.exec_liquidity_token_send_raw(
+            kind,
+            from,
+            contract,
+            amount
+                .into_number()
+                .to_u128_with_precision(token_info.decimals as u32)
+                .context("couldnt convert liquidity token amount")?
+                .into(),
+            to_binary(msg)?,
+        )
+    }
+    fn exec_liquidity_token_send_raw(
+        &self,
+        kind: LiquidityTokenKind,
+        from: &Addr,
+        contract: &Addr,
+        amount: Uint128,
+        msg: Binary,
+    ) -> Result<AppResponse> {
+        let contract_addr = self.query_liquidity_token_addr(kind)?;
+
+        self.app().cw20_exec(
+            from,
+            &contract_addr,
+            &Cw20ExecuteMsg::Send {
+                contract: contract.clone().into(),
+                amount,
+                msg,
             },
         )
     }

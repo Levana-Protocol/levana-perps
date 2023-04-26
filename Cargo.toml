@@ -6,6 +6,12 @@ members = [
     "contracts/market",
     "contracts/position_token",
 
+    # Non-perps, mainnet contracts (i.e. gamification, governance, LVN, etc.)
+    "contracts/hatching", 
+
+    # Third-party, mainnet contracts (i.e. oracles)
+    "contracts/pyth_bridge", 
+
     # Testnet support contracts
     "contracts/cw20",
     "contracts/faucet",

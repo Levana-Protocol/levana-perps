@@ -330,4 +330,23 @@ impl Token {
             }
         }
     }
+
+    /// Validates that the given collateral doesn't require more precision
+    /// than what the token supports
+    pub fn validate_collateral(&self, value: NonZero<Collateral>) -> Result<NonZero<Collateral>> {
+        let value_decimal256 = value.into_decimal256();
+
+        if let Some(value_128) = self.into_u128(value_decimal256)? {
+            let value_truncated = self.from_u128(value_128)?;
+            if value_truncated == value_decimal256 {
+                return Ok(value);
+            }
+        }
+
+        Err(perp_anyhow!(
+            ErrorId::Conversion,
+            ErrorDomain::Wallet,
+            "Token Collateral must be as precise as the Token (is {}, only {} decimal places supported)", value, self.decimal_places()
+        ))
+    }
 }

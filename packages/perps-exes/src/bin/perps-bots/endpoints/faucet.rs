@@ -1,9 +1,15 @@
-use anyhow::Result;
-use axum::{Extension, Json};
-use cosmos::{Address, HasAddress, HasCosmos};
-use msg::contracts::faucet::entry::{ExecuteMsg, FaucetAsset};
+use std::sync::Arc;
 
-use crate::app::{App, FaucetBot};
+use anyhow::Result;
+use axum::{extract::State, Json};
+use cosmos::{Address, HasAddress};
+use msg::{
+    contracts::faucet::entry::{ExecuteMsg, FaucetAsset},
+    prelude::PerpError,
+};
+use serde_json::de::StrRead;
+
+use crate::app::App;
 
 #[derive(serde::Deserialize)]
 pub(crate) struct FaucetQuery {
@@ -21,7 +27,7 @@ pub(crate) enum FaucetResponse {
 }
 
 pub(crate) async fn bot(
-    Extension(app): Extension<App>,
+    State(app): State<Arc<App>>,
     Json(query): Json<FaucetQuery>,
 ) -> Json<FaucetResponse> {
     Json(match bot_inner(&app, query).await {
@@ -29,23 +35,60 @@ pub(crate) async fn bot(
         Err(e) => {
             log::error!("Faucet tap failed: {e:?}");
             FaucetResponse::Error {
-                message: e.to_string(),
+                message: e
+                    .downcast_ref::<tonic::Status>()
+                    .and_then(|status| parse_perp_error(status.message()))
+                    .map(|perp_error| perp_error.description)
+                    .unwrap_or_else(|| e.to_string()),
             }
         }
     })
 }
 
+// todo - this isn't only part of faucet, is used elsewhere too
+pub fn parse_perp_error(err: &str) -> Option<PerpError<serde_json::Value>> {
+    // This weird parsing to (1) strip off the content before the JSON body
+    // itself and (2) ignore the trailing data after the JSON data
+    let start = err.find(" {")?;
+    let err = &err[start..];
+    serde_json::Deserializer::new(StrRead::new(err))
+        .into_iter()
+        .next()?
+        .ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use msg::prelude::{ErrorDomain, ErrorId, PerpError};
+
+    use super::*;
+
+    #[test]
+    fn test_parse_perp_error() {
+        const INPUT: &str = "failed to execute message; message index: 0: {\n  \"id\": \"exceeded\",\n  \"domain\": \"faucet\",\n  \"description\": \"exceeded tap limit, wait 284911 more seconds\",\n  \"data\": {\n    \"wait_secs\": \"284911\"\n  }\n}: execute wasm contract failed [CosmWasm/wasmd@v0.29.2/x/wasm/keeper/keeper.go:425] With gas wanted: '0' and gas used: '115538' ";
+        let expected = PerpError {
+            id: ErrorId::Exceeded,
+            domain: ErrorDomain::Faucet,
+            description: "exceeded tap limit, wait 284911 more seconds".to_owned(),
+            data: None,
+        };
+        let mut actual = parse_perp_error(INPUT).unwrap();
+        actual.data = None;
+        assert_eq!(actual, expected);
+    }
+}
+
 async fn bot_inner(app: &App, query: FaucetQuery) -> Result<FaucetResponse> {
-    if !app.faucet_bot.is_valid_recaptcha(&query.hcaptcha).await? {
+    if !app.is_valid_recaptcha(&query.hcaptcha).await? {
         return Ok(FaucetResponse::Error {
             message: "Invalid hCaptcha".to_owned(),
         });
     }
-    let res = app
-        .faucet_bot
-        .faucet
+    let faucet = app.cosmos.make_contract(app.config.faucet);
+    let wallet = app.faucet_bot.wallet.write().await;
+    let res = faucet
         .execute(
-            &app.faucet_bot.wallet,
+            &wallet,
             vec![],
             ExecuteMsg::Tap {
                 assets: query
@@ -53,7 +96,7 @@ async fn bot_inner(app: &App, query: FaucetQuery) -> Result<FaucetResponse> {
                     .into_iter()
                     .map(|x| FaucetAsset::Cw20(x.get_address_string().into()))
                     .chain(std::iter::once(FaucetAsset::Native(
-                        app.faucet_bot.faucet.get_cosmos().get_gas_coin().clone(),
+                        app.cosmos.get_gas_coin().clone(),
                     )))
                     .collect(),
                 recipient: query.recipient.get_address_string().into(),
@@ -66,7 +109,7 @@ async fn bot_inner(app: &App, query: FaucetQuery) -> Result<FaucetResponse> {
     })
 }
 
-impl FaucetBot {
+impl App {
     pub(crate) async fn is_valid_recaptcha(&self, g_recaptcha_response: &str) -> Result<bool> {
         #[derive(serde::Serialize)]
         struct Body<'a> {
@@ -81,7 +124,7 @@ impl FaucetBot {
             .client
             .post("https://hcaptcha.com/siteverify")
             .form(&Body {
-                secret: &self.hcaptcha_secret,
+                secret: &self.faucet_bot.hcaptcha_secret,
                 response: g_recaptcha_response,
             })
             .send()

@@ -614,7 +614,7 @@ impl State<'_> {
             return Err(perp_anyhow!(
                 ErrorId::Auth,
                 ErrorDomain::Cw20,
-                "cannot increase allowance to own account"
+                "cannot decrease allowance to own account"
             ));
         }
 

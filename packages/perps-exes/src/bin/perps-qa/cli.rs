@@ -1,5 +1,5 @@
 use cosmos::{Address, CosmosNetwork, RawWallet};
-use msg::prelude::*;
+use msg::{contracts::market::position::PositionId, prelude::*};
 use perps_exes::{build_version, UpdatePositionCollateralImpact};
 
 #[derive(clap::Parser)]
@@ -50,7 +50,7 @@ pub(crate) enum Subcommand {
     /// Update Collateral
     UpdateCollateral {
         #[clap(long)]
-        position_id: u64,
+        position_id: PositionId,
         /// New Collateral amount.
         #[clap(long)]
         collateral: Collateral,
@@ -67,7 +67,7 @@ pub(crate) enum Subcommand {
     /// Close Position
     ClosePosition {
         #[clap(long)]
-        position_id: u64,
+        position_id: PositionId,
     },
     /// Fetch latest price
     FetchPrice {},
@@ -82,14 +82,14 @@ pub(crate) enum Subcommand {
     /// Position Details
     PositionDetail {
         #[clap(long)]
-        position_id: u64,
+        position_id: PositionId,
     },
     /// Tap Faucet
     TapFaucet {},
     /// Update Max Gains
     UpdateMaxGains {
         #[clap(long)]
-        position_id: u64,
+        position_id: PositionId,
         /// Max gains percentage
         #[clap(long, allow_hyphen_values = true)]
         max_gains: MaxGainsInQuote,
@@ -97,7 +97,7 @@ pub(crate) enum Subcommand {
     /// Update Leverage
     UpdateLeverage {
         #[clap(long)]
-        position_id: u64,
+        position_id: PositionId,
         /// Leverage
         #[clap(long, allow_hyphen_values = true)]
         leverage: LeverageToBase,
@@ -112,6 +112,11 @@ pub(crate) enum Subcommand {
     Stats {},
     /// Print the config file
     GetConfig {},
+    /// Generate a CSV file with historical max position sizes
+    CappingReport {
+        #[clap(flatten)]
+        inner: crate::capping::Opt,
+    },
 }
 
 #[derive(clap::Parser)]

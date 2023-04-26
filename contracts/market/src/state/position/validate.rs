@@ -149,57 +149,6 @@ impl State<'_> {
         }
     }
 
-    pub(crate) fn position_validate_liquidity(
-        &self,
-        store: &dyn Storage,
-        counter_collateral: Collateral,
-        notional_size: Signed<Notional>,
-        time: Option<Timestamp>,
-    ) -> Result<()> {
-        // validation logic
-        // https://www.notion.so/levana-protocol/Levana-Well-funded-Perpetuals-Whitepaper-9805a6eba56d429b839f5551dbb65c40#daef236b8a3b44f49b2eaefa51d2a87f
-
-        let price_point = self.spot_price(store, time)?;
-
-        // validate that there will be enough unlocked liquidity to bring
-        // the protocol into equillibrium even after this position is opened
-        let unlocked_liquidity = self.load_liquidity_stats(store)?.unlocked;
-
-        let carry_leverage = self.config.carry_leverage;
-
-        let net_open_interest = self.positions_net_open_interest(store)?;
-
-        let lhs = (unlocked_liquidity.into_signed() - counter_collateral.into_signed())
-            .try_map(|x| x.checked_mul_dec(carry_leverage))?;
-        let rhs =
-            price_point.notional_to_collateral((notional_size + net_open_interest).abs_unsigned());
-
-        if lhs < rhs.into_signed() {
-            Err(perp_anyhow!(
-                ErrorId::Liquidity,
-                ErrorDomain::Market,
-                r#"would not be able to bring protocol into balance
-
-                        {lhs} needs to be greater or equal to {rhs}
-
-                        unlocked liquidity: {unlocked_liquidity}
-                        net_open_interest: {net_open_interest}
-                        counter_collateral: {counter_collateral}
-                        carry_leverage: {carry_leverage}
-
-                        notional_size: {notional_size}
-                        notional spot price: {spot_price}
-
-                        so ({unlocked_liquidity} - {counter_collateral}) * {carry_leverage}
-                        needs to be greater or equal to ({notional_size} + {net_open_interest}) * {spot_price}
-                "#,
-                spot_price = price_point.price_notional
-            ))
-        } else {
-            Ok(())
-        }
-    }
-
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn validate_order_price(
         &self,
@@ -311,7 +260,7 @@ impl State<'_> {
 
     pub fn do_slippage_assert(
         &self,
-        ctx: &mut StateContext,
+        store: &dyn Storage,
         slippage_assert: SlippageAssert,
         delta_notional_size: Signed<Notional>,
         market_type: MarketType,
@@ -321,9 +270,9 @@ impl State<'_> {
             return Ok(());
         }
 
-        let price_point = self.spot_price(ctx.storage, None)?;
+        let price_point = self.spot_price(store, None)?;
         let delta_neutrality_fee = self.calc_delta_neutrality_fee(
-            ctx.storage,
+            store,
             delta_notional_size,
             price_point,
             delta_neutrality_fee_margin,

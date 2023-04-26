@@ -1,5 +1,9 @@
+use std::collections::HashMap;
+
 use anyhow::{Context, Result};
 use cosmos::{Address, Cosmos, CosmosNetwork, HasAddress, HasAddressType, Wallet};
+use msg::contracts::pyth_bridge::PythMarketPriceFeeds;
+use msg::prelude::MarketId;
 use perps_exes::config::{ChainConfig, Config, PartialDeploymentConfig};
 
 use crate::{cli::Opt, faucet::Faucet, tracker::Tracker};
@@ -15,12 +19,21 @@ pub(crate) struct BasicApp {
 /// Complete app for talking to a testnet with a specific contract family
 pub(crate) struct App {
     pub(crate) basic: BasicApp,
-    pub(crate) nibb: Address,
-    pub(crate) price: Address,
+    pub(crate) wallet_manager: Address,
+    pub(crate) price_admin: Address,
     pub(crate) trading_competition: bool,
     pub(crate) tracker: Tracker,
     pub(crate) faucet: Faucet,
     pub(crate) dev_settings: bool,
+    pub(crate) default_market_ids: Vec<MarketId>,
+    pub(crate) pyth_info: Option<PythInfo>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct PythInfo {
+    pub address: Address,
+    pub markets: HashMap<MarketId, PythMarketPriceFeeds>,
+    pub update_age_tolerance: u32,
 }
 
 impl Opt {
@@ -29,12 +42,15 @@ impl Opt {
         if let Some(grpc) = &self.cosmos_grpc {
             builder.grpc_url = grpc.clone();
         }
+        log::info!("Connecting to {}", builder.grpc_url);
+
         let cosmos = builder.build().await?;
         let wallet = self
             .wallet
             .context("No wallet provided on CLI")?
             .for_chain(network.get_address_type());
         let config = Config::load()?;
+
         Ok(BasicApp {
             cosmos,
             wallet,
@@ -48,28 +64,58 @@ impl Opt {
         let basic = self.load_basic_app(network).await?;
 
         let config = Config::load()?;
-        let PartialDeploymentConfig {
-            nibb_address: nibb,
-            price_address: price,
-            trading_competition,
-            dev_settings,
-            ..
-        } = config.deployments.get(suffix).with_context(|| {
+        let partial_deploy_config = config.deployments.get(suffix).with_context(|| {
             format!("No configuration for family {suffix}, user parameter was {family}")
         })?;
-        let nibb = match self.nibb_bot {
-            None => *nibb,
-            Some(nibb) => nibb,
-        };
+
+        let PartialDeploymentConfig {
+            wallet_manager_address,
+            price_address: price_admin,
+            trading_competition,
+            dev_settings,
+            default_market_ids,
+            ..
+        } = partial_deploy_config;
+
         let (tracker, faucet) = basic.get_tracker_faucet()?;
+
+        let pyth_address = basic
+            .chain_config
+            .as_ref()
+            .and_then(|c| c.pyth.as_ref().map(|p| p.address));
+
+        // only create pyth_info (with markets etc.) if we have a pyth address
+        let pyth_info = match pyth_address {
+            None => None,
+            Some(pyth_address) => {
+                // Pyth config validation
+                for (market_id, market_price_feeds) in &config.pyth_markets {
+                    if market_price_feeds.feeds_usd.is_none() && !market_id.is_notional_usd() {
+                        anyhow::bail!(
+                            "notional is not USD, so there MUST be a USD price feed. MarketId: {}",
+                            market_id
+                        );
+                    }
+                }
+
+                Some(PythInfo {
+                    address: pyth_address,
+                    markets: config.pyth_markets.clone(),
+                    update_age_tolerance: config.pyth_update_age_tolerance,
+                })
+            }
+        };
+
         Ok(App {
-            nibb: nibb.for_chain(network.get_address_type()),
-            price: price.for_chain(network.get_address_type()),
+            wallet_manager: wallet_manager_address.for_chain(network.get_address_type()),
+            price_admin: price_admin.for_chain(network.get_address_type()),
             trading_competition: *trading_competition,
             dev_settings: *dev_settings,
             tracker,
             faucet,
             basic,
+            default_market_ids: default_market_ids.clone(),
+            pyth_info,
         })
     }
 }

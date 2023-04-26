@@ -11,6 +11,7 @@ use cosmwasm_std::{Addr, Decimal256, StdResult};
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
 use shared::prelude::*;
 use std::fmt;
+use std::hash::Hash;
 use std::num::ParseIntError;
 use std::str::FromStr;
 
@@ -128,6 +129,8 @@ pub struct PositionsResp {
     /// The closed position information is not the final version of the data,
     /// the close process itself still needs to make final payments.
     pub pending_close: Vec<ClosedPosition>,
+    /// Positions which have already been closed.
+    pub closed: Vec<ClosedPosition>,
 }
 
 /// Query response representing current state of a position
@@ -420,22 +423,30 @@ impl Position {
         price_point: &PricePoint,
         market_type: MarketType,
     ) -> Result<Option<Price>> {
-        let take_profit_price = price_point.price_notional.into_number().checked_add(
+        let take_profit_price_raw = price_point.price_notional.into_number().checked_add(
             self.counter_collateral
                 .into_number()
                 .checked_div(self.notional_size.into_number())?,
         )?;
 
-        if take_profit_price.approx_eq(Number::ZERO) {
+        let take_profit_price = if take_profit_price_raw.approx_eq(Number::ZERO) {
+            None
+        } else {
+            debug_assert!(
+                take_profit_price_raw.is_positive_or_zero(),
+                "There should never be a calculated take profit price which is negative. In production, this is treated as 0 to indicate infinite max gains."
+            );
+            Price::try_from_number(take_profit_price_raw).ok()
+        };
+
+        match take_profit_price {
+            Some(price) => Ok(Some(price)),
+            None =>
             match market_type {
                 // Infinite max gains results in a notional take profit price of 0
                 MarketType::CollateralIsBase => Ok(None),
-                MarketType::CollateralIsQuote => Err(anyhow!("Calculated a take profit price of 0 in a collateral-is-quote market. Spot notional price: {}. Counter collateral: {}. Notional size: {}.", price_point.price_notional, self.counter_collateral,self.notional_size)),
+                MarketType::CollateralIsQuote => Err(anyhow!("Calculated a take profit price of {take_profit_price_raw} in a collateral-is-quote market. Spot notional price: {}. Counter collateral: {}. Notional size: {}.", price_point.price_notional, self.counter_collateral,self.notional_size)),
             }
-        } else if let Ok(price) = Price::try_from_number(take_profit_price) {
-            Ok(Some(price))
-        } else {
-            Err(anyhow!("Calculated a negative take profit price. Spot notional price: {}. Counter collateral: {}. Notional size: {}.", price_point.price_notional, self.counter_collateral,self.notional_size))
         }
     }
 
@@ -750,14 +761,32 @@ impl Position {
 
 /// PositionId
 #[cw_serde]
-#[derive(Copy, PartialOrd, Ord, Eq, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct PositionId(pub u64);
+#[derive(Copy, PartialOrd, Ord, Eq)]
+pub struct PositionId(Uint64);
+
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for PositionId {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        u64::arbitrary(u).map(PositionId::new)
+    }
+}
+
+#[allow(clippy::derive_hash_xor_eq)]
+impl Hash for PositionId {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.u64().hash(state);
+    }
+}
 
 impl PositionId {
+    /// Construct a new value from a [u64].
+    pub fn new(x: u64) -> Self {
+        PositionId(x.into())
+    }
+
     /// The underlying `u64` representation.
     pub fn u64(self) -> u64 {
-        self.0
+        self.0.u64()
     }
 }
 
@@ -768,13 +797,13 @@ impl<'a> PrimaryKey<'a> for PositionId {
     type SuperSuffix = Self;
 
     fn key(&self) -> Vec<Key> {
-        vec![Key::Val64(self.0.to_cw_bytes())]
+        vec![Key::Val64(self.0.u64().to_cw_bytes())]
     }
 }
 
 impl<'a> Prefixer<'a> for PositionId {
     fn prefix(&self) -> Vec<Key> {
-        vec![Key::Val64(self.0.to_cw_bytes())]
+        vec![Key::Val64(self.0.u64().to_cw_bytes())]
     }
 }
 
@@ -783,7 +812,7 @@ impl KeyDeserialize for PositionId {
 
     #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
-        u64::from_vec(value).map(PositionId)
+        u64::from_vec(value).map(|x| PositionId(Uint64::new(x)))
     }
 }
 
@@ -796,7 +825,7 @@ impl fmt::Display for PositionId {
 impl FromStr for PositionId {
     type Err = ParseIntError;
     fn from_str(src: &str) -> Result<Self, ParseIntError> {
-        u64::from_str(src).map(PositionId)
+        src.parse().map(|x| PositionId(Uint64::new(x)))
     }
 }
 
@@ -957,7 +986,7 @@ pub mod events {
 
         fn try_from(evt: Event) -> anyhow::Result<Self> {
             Ok(Self {
-                pos_id: PositionId(evt.u64_attr(event_key::POS_ID)?),
+                pos_id: PositionId::new(evt.u64_attr(event_key::POS_ID)?),
                 owner: evt.unchecked_addr_attr(event_key::POS_OWNER)?,
                 collaterals: PositionCollaterals {
                     deposit_collateral: evt.number_attr(event_key::DEPOSIT_COLLATERAL)?,
@@ -1114,7 +1143,7 @@ pub mod events {
                     _ => Err(PerpError::unimplemented().into()),
                 })?,
                 owner: evt.unchecked_addr_attr(event_key::POS_OWNER)?,
-                id: PositionId(evt.u64_attr(event_key::POS_ID)?),
+                id: PositionId::new(evt.u64_attr(event_key::POS_ID)?),
                 direction_to_base: evt.direction_attr(event_key::DIRECTION)?,
                 created_at: evt.timestamp_attr(event_key::CREATED_AT)?,
                 liquifunded_at: evt.timestamp_attr(event_key::LIQUIFUNDED_AT)?,

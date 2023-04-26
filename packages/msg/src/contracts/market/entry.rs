@@ -1,4 +1,5 @@
 //! Entrypoint messages for the market
+use super::order::LimitOrder;
 use super::position::{ClosedPosition, PositionId};
 use super::{config::ConfigUpdate, crank::CrankWorkInfo};
 use crate::contracts::market::order::OrderId;
@@ -206,6 +207,10 @@ pub enum ExecuteMsg {
         /// Defaults to `false`.
         #[serde(default)]
         stake_to_xlp: bool,
+        /// Amount of rewards to reinvest.
+        ///
+        /// If `None`, reinvests all pending rewards.
+        amount: Option<NonZero<Collateral>>,
     },
 
     /// Withdraw liquidity calculated from specified `lp_amount`
@@ -295,11 +300,8 @@ pub enum ExecuteMsg {
         rewards: Option<RawAddr>,
     },
 
-    /// Transfer protocol fees to the dao account
-    TransferDaoFees {
-        /// the amount to transfer. if None, then transfers all available
-        amount: Option<NonZero<Collateral>>,
-    },
+    /// Transfer all available protocol fees to the dao account
+    TransferDaoFees {},
 
     /// Begin force-closing all positions in the protocol.
     ///
@@ -516,6 +518,21 @@ pub enum QueryMsg {
         order: Option<OrderInMessage>,
     },
 
+    /// * returns [LimitOrderHistoryResp]
+    ///
+    /// Provides information on triggered limit orders.
+    #[returns(LimitOrderHistoryResp)]
+    LimitOrderHistory {
+        /// Trader's address for history we are querying
+        addr: RawAddr,
+        /// Last order ID we saw
+        start_after: Option<String>,
+        /// How many orders to query
+        limit: Option<u32>,
+        /// Order to sort the order IDs by
+        order: Option<OrderInMessage>,
+    },
+
     /// * returns [LpInfoResp]
     ///
     /// Provides the data needed by the earn page.
@@ -654,7 +671,7 @@ pub struct UnstakingStatus {
     /// Note that this value must be the sum of collected, available, and pending.
     pub xlp_unstaking: NonZero<LpToken>,
     /// Collateral, at current exchange rate, underlying the [UnstakingStatus::xlp_unstaking]
-    pub xlp_unstaking_collateral: NonZero<Collateral>,
+    pub xlp_unstaking_collateral: Collateral,
     /// Total amount of LP tokens that have been unstaked and collected
     pub collected: LpToken,
     /// Total amount of LP tokens that have been unstaked and not yet collected
@@ -670,10 +687,12 @@ pub struct LpHistorySummary {
     /// How much collateral was deposited in total
     pub deposit: Collateral,
     /// Value of the collateral in USD at time of deposit
+    #[serde(alias = "deposit_in_usd")]
     pub deposit_usd: Usd,
     /// Cumulative yield claimed by the provider
     pub r#yield: Collateral,
     /// Cumulative yield expressed in USD at time of claiming
+    #[serde(alias = "yield_in_usd")]
     pub yield_usd: Usd,
 }
 
@@ -700,6 +719,7 @@ pub struct LpAction {
     /// Amount of collateral
     pub collateral: Collateral,
     /// Value of that collateral in USD at the time
+    #[serde(alias = "collateral_in_usd")]
     pub collateral_usd: Usd,
 }
 
@@ -918,6 +938,7 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
             }),
             13 => Ok(ExecuteMsg::ReinvestYield {
                 stake_to_xlp: u.arbitrary()?,
+                amount: None,
             }),
             14 => Ok(ExecuteMsg::WithdrawLiquidity {
                 lp_amount: u.arbitrary()?,
@@ -943,9 +964,7 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
                 rewards: None,
             }),
 
-            22 => Ok(ExecuteMsg::TransferDaoFees {
-                amount: u.arbitrary()?,
-            }),
+            22 => Ok(ExecuteMsg::TransferDaoFees {}),
 
             23 => Ok(ExecuteMsg::CloseAllPositions {}),
             24 => Ok(ExecuteMsg::ProvideCrankFunds {}),
@@ -1002,6 +1021,9 @@ pub struct StatusResp {
     /// This is based on net notional and the sensitivity parameter
     pub instant_delta_neutrality_fee_value: Signed<Decimal256>,
 
+    /// Amount of collateral in the delta neutrality fee fund.
+    pub delta_neutrality_fee_fund: Collateral,
+
     /// Have we reached staleness of the protocol via old liquifundings? If so, contains [Option::Some], and the timestamp when that happened.
     pub stale_liquifunding: Option<Timestamp>,
     /// Is the last price update too old? If so, contains [Option::Some], and the timestamp when the price became too old.
@@ -1016,4 +1038,41 @@ impl StatusResp {
     pub fn is_stale(&self) -> bool {
         self.stale_liquifunding.is_some() || self.stale_price.is_some()
     }
+}
+
+/// Response for [QueryMsg::LimitOrderHistory]
+#[cw_serde]
+pub struct LimitOrderHistoryResp {
+    /// list of triggered limit orders that happened historically
+    pub orders: Vec<ExecutedLimitOrder>,
+    /// Next start_after value to continue pagination
+    ///
+    /// None means no more pagination
+    pub next_start_after: Option<String>,
+}
+
+/// History information on a limit order which was triggered.
+#[cw_serde]
+pub struct ExecutedLimitOrder {
+    /// The order itself
+    pub order: LimitOrder,
+    /// The result of triggering the order
+    pub result: LimitOrderResult,
+    /// When the order was triggered
+    pub timestamp: Timestamp,
+}
+
+/// The result of triggering a limit order
+#[cw_serde]
+pub enum LimitOrderResult {
+    /// Position was opened successfully
+    Success {
+        /// New position ID
+        position: PositionId,
+    },
+    /// Position failed to open
+    Failure {
+        /// Error message
+        reason: String,
+    },
 }

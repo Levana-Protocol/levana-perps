@@ -11,10 +11,10 @@ use msg::prelude::*;
 use crate::{
     cli::Opt,
     instantiate::{
-        InstantiateMarket, InstantiateParams, InstantiateResponse, MarketResponse, ProtocolCodeIds,
-        INITIAL_BALANCE_AMOUNT,
+        InstantiateMarket, InstantiateParams, InstantiateResponse, MarketResponse, PriceSource,
+        ProtocolCodeIds, INITIAL_BALANCE_AMOUNT,
     },
-    store_code::{CW20, FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN},
+    store_code::{CW20, FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN, PYTH_BRIDGE},
 };
 
 #[derive(clap::Parser)]
@@ -86,9 +86,11 @@ pub(crate) async fn go(
             "New CW20 address for {} is {cw20} with code ID {cw20_code_id}",
             market_id.get_collateral()
         );
+
         markets.push(InstantiateMarket {
             market_id,
-            cw20_source: crate::instantiate::Cw20Source::Existing(*cw20.get_address()),
+            cw20_source: crate::instantiate::Cw20Source::Existing(cw20.get_address()),
+            price_source: PriceSource::Manual,
         });
     }
 
@@ -109,6 +111,10 @@ pub(crate) async fn go(
             .cosmos
             .store_code_path(&basic.wallet, opt.get_contract_path(MARKET))
             .await?,
+        pyth_bridge_code_id: basic
+            .cosmos
+            .store_code_path(&basic.wallet, opt.get_contract_path(PYTH_BRIDGE))
+            .await?,
     };
 
     // And now instantiate the contracts
@@ -126,10 +132,11 @@ pub(crate) async fn go(
             ..ConfigUpdate::default()
         }),
         trading_competition: false,
-        nibb: *basic.wallet.address(),
-        price: *basic.wallet.address(),
+        faucet_admin: None,
+        price_admin: *basic.wallet.address(),
         is_prod: false,
         initial_borrow_fee_rate: "0.01".parse().unwrap(),
+        pyth_info: None,
     })
     .await?;
 

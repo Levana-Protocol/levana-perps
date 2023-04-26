@@ -67,7 +67,7 @@ impl PositionUpdateAddCollateralImpactSize {
         let res = market.exec_update_position_collateral_impact_size(
             &self.trader,
             self.pos_id,
-            self.amount.into_number(),
+            self.amount.into_signed(),
             self.slippage_assert.clone(),
         );
 
@@ -100,7 +100,7 @@ impl PositionUpdateRemoveCollateralImpactSize {
         let res = market.exec_update_position_collateral_impact_size(
             &self.trader,
             self.pos_id,
-            -self.amount.into_number(),
+            -self.amount.into_signed(),
             self.slippage_assert.clone(),
         );
 

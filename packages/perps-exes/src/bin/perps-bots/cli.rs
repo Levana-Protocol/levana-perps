@@ -77,24 +77,19 @@ impl Opt {
         Ok(wallet)
     }
 
-    pub(crate) fn get_crank_wallets(
+    pub(crate) fn get_crank_wallet(
         &self,
         address_type: AddressType,
         wallet_phrase_name: &str,
-        count: u32,
-    ) -> Result<Vec<Arc<Wallet>>> {
+    ) -> Result<Wallet> {
         let env_var = format!("LEVANA_BOTS_PHRASE_{}_CRANK", wallet_phrase_name);
         let phrase = get_env(&env_var)?;
         let seed = SeedPhrase::from_str(&phrase)?;
-        (0..count)
-            .map(|idx| {
-                seed.derive_cosmos_numbered(idx).map(|x| {
-                    let wallet = x.for_chain(address_type);
-                    log::info!("Crank bot wallet #{idx}: {wallet}");
-                    Arc::new(wallet)
-                })
-            })
-            .collect()
+        seed.derive_cosmos().map(|x| {
+            let wallet = x.for_chain(address_type);
+            log::info!("Crank bot wallet: {wallet}");
+            wallet
+        })
     }
 
     pub(crate) fn parse_deployment(&self) -> Result<(CosmosNetwork, &str)> {
@@ -144,6 +139,8 @@ pub(crate) fn get_deployment_config(
         tracker,
         faucet,
         explorer,
+        pyth,
+        watcher,
     } = config
         .chains
         .get(&network)
@@ -151,16 +148,15 @@ pub(crate) fn get_deployment_config(
     Ok(DeploymentConfig {
         tracker: *tracker,
         faucet: *faucet,
+        pyth: pyth.clone(),
         min_gas: config.min_gas,
+        min_gas_in_faucet: config.min_gas_in_faucet,
+        min_gas_in_gas_wallet: config.min_gas_in_gas_wallet,
         price_api: &config.price_api,
         explorer,
         contract_family: opt.deployment.clone(),
         network,
-        crank_wallets: opt.get_crank_wallets(
-            network.get_address_type(),
-            &wallet_phrase_name,
-            partial_config.crank.bot_count,
-        )?,
+        crank_wallet: opt.get_crank_wallet(network.get_address_type(), &wallet_phrase_name)?,
         price_wallet: if partial_config.price {
             Some(Arc::new(opt.get_wallet(
                 network.get_address_type(),
@@ -170,14 +166,17 @@ pub(crate) fn get_deployment_config(
         } else {
             None
         },
-        nibb: partial_config.nibb.map(Arc::new),
-        address_override: partial_config.address_override,
         wallet_manager: WalletManager::new(
-            opt.get_wallet_seed(&wallet_phrase_name, "NIBB")?,
+            opt.get_wallet_seed(&wallet_phrase_name, "WALLET_MANAGER")?,
             network.get_address_type(),
         )?,
+        balance: partial_config.balance,
         liquidity: partial_config.liquidity,
         utilization: partial_config.utilization,
         traders: partial_config.traders,
+        liquidity_config: config.liquidity.clone(),
+        utilization_config: config.utilization,
+        trader_config: config.trader,
+        watcher: watcher.clone(),
     })
 }

@@ -2,6 +2,7 @@ use std::{collections::HashSet, str::FromStr};
 
 use anyhow::{Context, Result};
 use cosmos::{Address, CodeId, HasAddress};
+use msg::contracts::pyth_bridge::PythMarketPriceFeeds;
 use msg::prelude::*;
 use msg::{
     contracts::{
@@ -12,6 +13,8 @@ use msg::{
     token::TokenInit,
 };
 
+use crate::app::PythInfo;
+use crate::store_code::PYTH_BRIDGE;
 use crate::{
     app::BasicApp,
     cli::Opt,
@@ -27,8 +30,8 @@ pub(crate) struct InstantiateOpt {
     #[clap(long, env = "PERPS_FAMILY")]
     pub(crate) family: String,
     /// Markets to instantiate
-    #[clap(long, env = "PERPS_MARKET_ID", default_value = "ATOM_USD")]
-    pub(crate) market_id: Vec<MarketId>,
+    #[clap(long, env = "PERPS_MARKET_ID")]
+    pub(crate) market_id: Option<Vec<MarketId>>,
     /// Is this a production deployment? Impacts labels used
     #[clap(long)]
     pub(crate) prod: bool,
@@ -48,10 +51,17 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateOpt) -> Result<()> {
         family: inst_opt.family,
         markets: inst_opt
             .market_id
+            .unwrap_or_else(|| app.default_market_ids.clone())
             .into_iter()
             .map(|market_id| InstantiateMarket {
-                market_id,
+                price_source: app
+                    .pyth_info
+                    .as_ref()
+                    .and_then(|pyth| pyth.markets.get(&market_id))
+                    .cloned()
+                    .map_or(PriceSource::Manual, PriceSource::Pyth),
                 cw20_source: Cw20Source::Faucet(app.faucet.clone()),
+                market_id,
             })
             .collect(),
         market_config_update: if app.dev_settings {
@@ -63,10 +73,11 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateOpt) -> Result<()> {
             None
         },
         trading_competition: app.trading_competition,
-        nibb: app.nibb,
-        price: app.price,
+        faucet_admin: Some(app.wallet_manager),
+        price_admin: app.price_admin,
         is_prod,
         initial_borrow_fee_rate: inst_opt.initial_borrow_fee_rate,
+        pyth_info: app.pyth_info.clone(),
     })
     .await?;
 
@@ -86,6 +97,11 @@ pub(crate) struct MarketResponse {
     pub(crate) cw20: Address,
 }
 
+pub(crate) enum PriceSource {
+    Manual,
+    Pyth(PythMarketPriceFeeds),
+}
+
 pub(crate) enum Cw20Source {
     Existing(Address),
     Faucet(Faucet),
@@ -101,6 +117,7 @@ pub(crate) struct ProtocolCodeIds {
     pub(crate) position_token_code_id: CodeId,
     pub(crate) liquidity_token_code_id: CodeId,
     pub(crate) market_code_id: CodeId,
+    pub(crate) pyth_bridge_code_id: CodeId,
 }
 
 /// Parameters to instantiate, used to avoid too many function parameters.
@@ -112,17 +129,20 @@ pub(crate) struct InstantiateParams<'a> {
     pub(crate) markets: Vec<InstantiateMarket>,
     pub(crate) market_config_update: Option<ConfigUpdate>,
     pub(crate) trading_competition: bool,
-    pub(crate) nibb: Address,
-    pub(crate) price: Address,
+    /// Address that should be set as a faucet admin
+    pub(crate) faucet_admin: Option<Address>,
+    pub(crate) price_admin: Address,
     /// Is this a production contract? If so, does not include the family in the label
     pub(crate) is_prod: bool,
     /// Initial borrow fee rate
     pub(crate) initial_borrow_fee_rate: Decimal256,
+    pub(crate) pyth_info: Option<PythInfo>,
 }
 
 pub(crate) struct InstantiateMarket {
     pub(crate) market_id: MarketId,
     pub(crate) cw20_source: Cw20Source,
+    pub(crate) price_source: PriceSource,
 }
 
 pub(crate) async fn instantiate(
@@ -138,12 +158,13 @@ pub(crate) async fn instantiate(
         code_id_source,
         market_config_update,
         trading_competition,
-        nibb,
-        price,
+        faucet_admin,
+        price_admin,
         is_prod,
         markets,
         family,
         initial_borrow_fee_rate,
+        pyth_info,
     }: InstantiateParams<'_>,
 ) -> Result<InstantiateResponse> {
     let (
@@ -153,6 +174,7 @@ pub(crate) async fn instantiate(
             position_token_code_id,
             liquidity_token_code_id,
             market_code_id,
+            pyth_bridge_code_id,
         },
     ) = match code_id_source {
         CodeIdSource::Tracker(tracker) => {
@@ -161,6 +183,7 @@ pub(crate) async fn instantiate(
                 position_token_code_id: tracker.require_code_by_type(opt, POSITION_TOKEN).await?,
                 liquidity_token_code_id: tracker.require_code_by_type(opt, LIQUIDITY_TOKEN).await?,
                 market_code_id: tracker.require_code_by_type(opt, MARKET).await?,
+                pyth_bridge_code_id: tracker.require_code_by_type(opt, PYTH_BRIDGE).await?,
             };
             (Some(tracker), ids)
         }
@@ -193,13 +216,42 @@ pub(crate) async fn instantiate(
         )
         .await?;
     log::info!("New factory deployed at {factory}");
-    to_log.push((factory_code_id.get_code_id(), *factory.get_address()));
+    to_log.push((factory_code_id.get_code_id(), factory.get_address()));
+
+    let pyth_bridge = match pyth_info {
+        None => {
+            log::info!("No Pyth info provided, skipping Pyth bridge instantiation");
+            None
+        }
+        Some(pyth_info) => {
+            let pyth_bridge = pyth_bridge_code_id
+                .instantiate(
+                    wallet,
+                    "Levana Perps Pyth Bridge".to_string(),
+                    vec![],
+                    msg::contracts::pyth_bridge::entry::InstantiateMsg {
+                        factory: factory.get_address().to_string().into(),
+                        pyth: pyth_info.address.to_string().into(),
+                        update_age_tolerance_seconds: pyth_info.update_age_tolerance,
+                    },
+                )
+                .await?;
+            log::info!(
+                "New Pyth bridge deployed at {pyth_bridge} w/ update age tolerance of {}",
+                pyth_info.update_age_tolerance
+            );
+            to_log.push((pyth_bridge_code_id.get_code_id(), pyth_bridge.get_address()));
+
+            Some(pyth_bridge)
+        }
+    };
 
     let mut market_res = Vec::<MarketResponse>::new();
 
     for InstantiateMarket {
         market_id,
         cw20_source,
+        price_source,
     } in markets
     {
         log::info!(
@@ -250,12 +302,23 @@ pub(crate) async fn instantiate(
                     (address, None)
                 };
 
+                if let Some(new_admin) = faucet_admin {
+                    // Try adding the wallet manager address as a faucet admin. Ignore errors, it
+                    // (probably) just means we've already added that address.
+                    log::info!(
+                        "Trying to set {new_admin} as a faucet admin on {}",
+                        faucet.get_address()
+                    );
+                    match faucet.add_admin(wallet, new_admin).await {
+                        Ok(res) => log::info!("Admin set in {}", res.txhash),
+                        Err(e) => log::info!(
+                            "Didn't succeed, probably because we're already an admin: {e:?}"
+                        ),
+                    }
+                }
+
                 let res = faucet
-                    .mint(
-                        wallet,
-                        cw20,
-                        make_initial_balances(&[*nibb.get_address(), *wallet.get_address()]),
-                    )
+                    .mint(wallet, cw20, make_initial_balances(&[wallet.get_address()]))
                     .await?;
                 log::info!("Minted in {}", res.txhash);
                 (cw20, trading_competition.map(|index| (index, faucet)))
@@ -264,6 +327,39 @@ pub(crate) async fn instantiate(
         log::info!("Using CW20 {cw20}");
 
         let cw20 = cosmos.make_contract(cw20);
+
+        let price_admin = match price_source {
+            PriceSource::Pyth(market_price_feeds) => match &pyth_bridge {
+                None => {
+                    log::warn!("Market {market_id} is configured for pyth, but there is no bridge, so using manual updates instead");
+                    price_admin.to_string().into()
+                }
+                Some(pyth_bridge) => {
+                    log::info!("Setting price feed for market {market_id} to use Pyth Oracle.");
+                    log::info!(
+                        "Main price feeds: {:?}, USD price feeds: {:?}",
+                        market_price_feeds.feeds,
+                        market_price_feeds.feeds_usd
+                    );
+                    pyth_bridge
+                        .execute(
+                            wallet,
+                            vec![],
+                            msg::contracts::pyth_bridge::entry::ExecuteMsg::SetMarketPriceFeeds {
+                                market_id: market_id.clone(),
+                                market_price_feeds,
+                            },
+                        )
+                        .await?;
+
+                    pyth_bridge.get_address_string().into()
+                }
+            },
+            PriceSource::Manual => {
+                log::info!("Setting price feed for market {market_id} to use manual updates");
+                price_admin.to_string().into()
+            }
+        };
 
         let res = factory
             .execute(
@@ -276,20 +372,20 @@ pub(crate) async fn instantiate(
                             addr: cw20.get_address_string().into(),
                         },
                         config: market_config_update.clone(),
-                        price_admin: price.to_string().into(),
+                        price_admin,
                         initial_borrow_fee_rate,
                     },
                 },
             )
             .await?;
-        log::info!("Market added at {}", res.txhash);
+        log::info!("Market {market_id} added at {}", res.txhash);
 
         let MarketInfoResponse { market_addr, .. } = factory
             .query(msg::contracts::factory::entry::QueryMsg::MarketInfo {
                 market_id: market_id.clone(),
             })
             .await?;
-        log::info!("New market address: {market_addr}");
+        log::info!("New market address for {market_id}: {market_addr}");
         let market_addr = Address::from_str(market_addr.as_str())?;
 
         if let Some((trading_competition_index, faucet)) = trading_competition {
@@ -310,11 +406,11 @@ pub(crate) async fn instantiate(
         market_res.push(MarketResponse {
             market_id,
             market_addr,
-            cw20: *cw20.get_address(),
+            cw20: cw20.get_address(),
         })
     }
 
-    let factory_addr = *factory.get_address();
+    let factory_addr = factory.get_address();
     for MarketInfo {
         market_id: _,
         market,
@@ -323,18 +419,18 @@ pub(crate) async fn instantiate(
         liquidity_token_xlp,
     } in Factory::from_contract(factory).get_markets().await?
     {
-        to_log.push((market_code_id.get_code_id(), *market.get_address()));
+        to_log.push((market_code_id.get_code_id(), market.get_address()));
         to_log.push((
             position_token_code_id.get_code_id(),
-            *position_token.get_address(),
+            position_token.get_address(),
         ));
         to_log.push((
             liquidity_token_code_id.get_code_id(),
-            *liquidity_token_lp.get_address(),
+            liquidity_token_lp.get_address(),
         ));
         to_log.push((
             liquidity_token_code_id.get_code_id(),
-            *liquidity_token_xlp.get_address(),
+            liquidity_token_xlp.get_address(),
         ));
     }
 

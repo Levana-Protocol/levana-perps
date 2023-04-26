@@ -2,7 +2,6 @@ use std::collections::hash_map::Entry;
 
 use crate::state::*;
 
-use cosmwasm_std::{Decimal256, MessageInfo};
 use cw_storage_plus::Item;
 use msg::{
     contracts::cw20::entry::{QueryMsg as Cw20QueryMsg, TokenInfoResponse},
@@ -83,48 +82,5 @@ impl State<'_> {
         }
 
         Ok(())
-    }
-
-    pub(crate) fn get_native_funds_amount(
-        &self,
-        store: &mut dyn Storage,
-        info: &MessageInfo,
-    ) -> Result<NonZero<Collateral>> {
-        let amount = match self.get_token(store)? {
-            Token::Native {
-                denom,
-                decimal_places,
-            } => {
-                let coin = info
-                    .funds
-                    .iter()
-                    .find(|coin| coin.denom == *denom)
-                    .ok_or_else(|| {
-                        perp_anyhow!(
-                            ErrorId::NativeFunds,
-                            ErrorDomain::Market,
-                            "no coins attached!"
-                        )
-                    })?;
-
-                let n = Decimal256::from_atomics(coin.amount, (*decimal_places).into())?;
-                let n = Collateral::from_decimal256(n);
-                match NonZero::new(n) {
-                    Some(n) => Ok(n),
-                    None => Err(perp_anyhow!(
-                        ErrorId::NativeFunds,
-                        ErrorDomain::Market,
-                        "no coin amount!"
-                    )),
-                }
-            }
-            Token::Cw20 { .. } => Err(perp_anyhow!(
-                ErrorId::NativeFunds,
-                ErrorDomain::Market,
-                "direct deposit cannot be done via cw20"
-            )),
-        }?;
-
-        Ok(amount)
     }
 }

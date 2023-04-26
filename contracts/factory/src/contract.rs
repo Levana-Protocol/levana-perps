@@ -182,10 +182,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 .collect::<Result<Vec<Addr>>>()?;
 
             for addr in addrs {
-                ctx.response.add_execute_submessage_oneshot(
-                    addr,
-                    &MarketExecuteMsg::TransferDaoFees { amount: None },
-                )?;
+                ctx.response
+                    .add_execute_submessage_oneshot(addr, &MarketExecuteMsg::TransferDaoFees {})?;
             }
         }
         ExecuteMsg::Shutdown {

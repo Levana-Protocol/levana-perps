@@ -1,32 +1,27 @@
 pub mod config;
-pub mod types;
+pub mod contracts;
+pub mod discovery;
+pub mod prelude;
 pub mod wallet_manager;
 
 use cosmos::{
     proto::cosmos::base::abci::v1beta1::TxResponse, Address, Contract, Cosmos, CosmosNetwork,
     HasAddress, HasAddressType, RawWallet, Wallet,
 };
-use msg::contracts::market::crank::CrankWorkInfo;
-use msg::contracts::market::entry::StatusResp;
-use msg::contracts::market::{config::Config, position::ClosedPosition};
+use msg::contracts::market::position::ClosedPosition;
 use msg::prelude::*;
 use msg::{
     contracts::{
-        cw20::entry::{BalanceResponse, ExecuteMsg as Cw20ExecuteMsg, QueryMsg as Cw20QueryMsg},
         factory::entry::MarketInfoResponse,
         faucet::entry::{ExecuteMsg as FaucetExecuteMsg, FaucetAsset},
         market::{
-            entry::{
-                ClosedPositionsResp, ExecuteMsg as MarketExecuteMsg, QueryMsg as MarketQueryMsg,
-                SlippageAssert,
-            },
-            liquidity::LiquidityStats,
-            position::{PositionId, PositionQueryResponse, PositionsResp},
+            entry::SlippageAssert,
+            position::{PositionId, PositionQueryResponse},
         },
-        position_token::entry::{NumTokensResponse, QueryMsg as PositionQueryMsg, TokensResponse},
     },
     token::Token,
 };
+use prelude::MarketContract;
 use std::time::Duration;
 
 /// Get the Git SHA from GitHub Actions env vars
@@ -39,11 +34,9 @@ pub struct PerpApp {
     pub wallet_address: Address,
     pub raw_wallet: RawWallet,
     pub wallet: Wallet,
-    cw20_contract: Contract,
-    pub market_contract: Contract,
+    pub market: MarketContract,
     faucet_contract: Option<Contract>,
-    cosmos: Cosmos,
-    token: Token,
+    pub cosmos: Cosmos,
 }
 
 pub struct PositionsInfo {
@@ -70,17 +63,6 @@ impl PerpApp {
 
         let faucet_contract = faucet_contract_addr.map(|x| cosmos.make_contract(x));
 
-        let status: StatusResp = market_contract
-            .query(msg::contracts::market::entry::QueryMsg::Status {})
-            .await?;
-        let cw20_contract = match &status.collateral {
-            Token::Cw20 {
-                addr,
-                decimal_places: _,
-            } => cosmos.make_contract(addr.as_str().parse()?),
-            Token::Native { .. } => anyhow::bail!("No support for native coins for the moment"),
-        };
-
         let wallet_address = *raw_wallet.for_chain(cosmos.get_address_type()).address();
         let address_type = cosmos.get_address_type();
         let wallet = raw_wallet.for_chain(address_type);
@@ -88,111 +70,21 @@ impl PerpApp {
             wallet_address,
             raw_wallet,
             wallet,
-            market_contract,
+            market: MarketContract::new(market_contract),
             faucet_contract,
-            cw20_contract,
             cosmos,
-            token: status.collateral,
         })
     }
 
-    pub async fn cw20_balance(&self) -> Result<BalanceResponse> {
-        let message = Cw20QueryMsg::Balance {
-            address: self.wallet_address.get_address_string().into(),
-        };
-        let response: BalanceResponse = self.cw20_contract.query(message).await?;
-        Ok(response)
-    }
-
-    pub async fn total_positions(&self) -> Result<u64> {
-        let query = MarketQueryMsg::NftProxy {
-            nft_msg: PositionQueryMsg::NumTokens {},
-        };
-        let response: NumTokensResponse = self.market_contract.query(query).await?;
-        Ok(response.count)
+    pub async fn cw20_balance(&self) -> Result<Collateral> {
+        let status = self.market.status().await?;
+        self.market
+            .get_collateral_balance(&status, &self.wallet)
+            .await
     }
 
     pub async fn all_open_positions(&self) -> Result<PositionsInfo> {
-        let mut start_after = None;
-        let mut tokens = vec![];
-        loop {
-            let query = MarketQueryMsg::NftProxy {
-                nft_msg: PositionQueryMsg::Tokens {
-                    owner: self.wallet_address.to_string().into(),
-                    start_after: start_after.clone(),
-                    limit: None,
-                },
-            };
-            let mut response: TokensResponse = self.market_contract.query(query).await?;
-            match response.tokens.last() {
-                Some(last_token) => start_after = Some(last_token.clone()),
-                None => break,
-            }
-            tokens.append(&mut response.tokens);
-        }
-        let positions = tokens
-            .iter()
-            .map(|item| {
-                item.parse()
-                    .map(PositionId)
-                    .map_err(|_| anyhow!("Invalid position ID: {item}"))
-            })
-            .collect::<Result<Vec<PositionId>>>()?;
-
-        let query = MarketQueryMsg::Positions {
-            position_ids: positions.clone(),
-            skip_calc_pending_fees: false,
-        };
-        let PositionsResp {
-            positions: response,
-            pending_close: _,
-        } = self.market_contract.query(query).await?;
-        assert_eq!(tokens.len(), response.len());
-        let position_response = PositionsInfo {
-            ids: positions,
-            info: response,
-        };
-        Ok(position_response)
-    }
-
-    pub async fn position_detail(&self, position_id: u64) -> Result<PositionQueryResponse> {
-        let query = MarketQueryMsg::Positions {
-            position_ids: vec![PositionId(position_id)],
-            skip_calc_pending_fees: false,
-        };
-        let PositionsResp {
-            positions: mut response,
-            pending_close: _,
-        } = self.market_contract.query(query).await?;
-        match response.pop() {
-            Some(position) => Ok(position),
-            None => Err(anyhow!("No position Id {position_id} found")),
-        }
-    }
-
-    /// Convert collateral into a u128
-    pub fn collateral_to_u128(&self, amount: NonZero<Collateral>) -> Result<u128> {
-        self.token
-            .into_u128(amount.into_decimal256())?
-            .with_context(|| format!("collateral_to_u128: invalid amount {amount}"))
-    }
-
-    /// Execute a message against the market with the given amount of funds send.
-    ///
-    /// In the future, check if this is native or CW20 and handle appropriately. For now, just handles CW20.
-    pub(crate) async fn market_execute_with_funds(
-        &self,
-        market_execute_msg: &MarketExecuteMsg,
-        amount: NonZero<Collateral>,
-    ) -> Result<TxResponse> {
-        let cw20_execute_msg = Cw20ExecuteMsg::Send {
-            contract: self.market_contract.get_address_string().into(),
-            amount: self.collateral_to_u128(amount)?.into(),
-            msg: serde_json::to_vec(market_execute_msg)?.into(),
-        };
-        self.cw20_contract
-            .execute(&self.wallet, vec![], cw20_execute_msg)
-            .await
+        self.market.all_open_positions(&self.wallet).await
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -206,114 +98,54 @@ impl PerpApp {
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
     ) -> Result<TxResponse> {
-        let open_message = MarketExecuteMsg::OpenPosition {
-            slippage_assert,
-            leverage,
-            direction,
-            max_gains,
-            stop_loss_override,
-            take_profit_override,
-        };
-        self.market_execute_with_funds(&open_message, collateral)
+        self.market
+            .open_position(
+                &self.wallet,
+                &self.market.status().await?,
+                collateral,
+                direction,
+                leverage,
+                max_gains,
+                slippage_assert,
+                stop_loss_override,
+                take_profit_override,
+            )
             .await
-            .with_context(|| format!("Opening position with parameters: {open_message:?}"))
     }
 
     pub async fn deposit_liquidity(&self, collateral: NonZero<Collateral>) -> Result<TxResponse> {
-        self.market_execute_with_funds(
-            &MarketExecuteMsg::DepositLiquidity {
-                stake_to_xlp: false,
-            },
-            collateral,
-        )
-        .await
-    }
-
-    pub async fn fetch_price(&self) -> Result<PricePoint> {
-        let query = MarketQueryMsg::SpotPrice { timestamp: None };
-        let response = self.market_contract.query(query).await?;
-        Ok(response)
+        self.market
+            .deposit(&self.wallet, &self.market.status().await?, collateral)
+            .await
     }
 
     pub async fn set_price(&self, price: PriceBaseInQuote) -> Result<TxResponse> {
-        let execute_msg = MarketExecuteMsg::SetPrice {
-            price,
-            price_usd: None,
-            execs: None,
-            rewards: None,
-        };
-        let response = self
-            .market_contract
-            .execute(&self.wallet, vec![], execute_msg)
-            .await?;
-        Ok(response)
+        self.market.set_price(&self.wallet, price).await
     }
 
-    pub async fn get_close_positions(&self) -> Result<Vec<ClosedPosition>> {
-        let owner = self.wallet_address.to_string();
-        let mut result = vec![];
-        let mut cursor = None;
-        loop {
-            let query_msg = MarketQueryMsg::ClosedPositionHistory {
-                owner: owner.clone().into(),
-                cursor,
-                limit: None,
-                order: None,
-            };
-            let ClosedPositionsResp {
-                mut positions,
-                cursor: new_cursor,
-            } = self.market_contract.query(query_msg).await?;
-            positions.sort_by(|a, b| a.id.cmp(&b.id));
-            result.append(&mut positions);
-            match new_cursor {
-                Some(new_cursor) => cursor = Some(new_cursor),
-                None => break,
-            }
-        }
-        Ok(result)
+    pub async fn get_closed_positions(&self) -> Result<Vec<ClosedPosition>> {
+        self.market.get_closed_positions(&self.wallet).await
     }
 
-    pub async fn close_position(&self, position_id: u64) -> Result<TxResponse> {
-        let execute_msg = MarketExecuteMsg::ClosePosition {
-            id: PositionId(position_id),
-            slippage_assert: None,
-        };
-        let response = self
-            .market_contract
-            .execute(&self.wallet, vec![], execute_msg)
-            .await?;
-        Ok(response)
-    }
-
-    pub async fn status(&self) -> Result<StatusResp> {
-        let query_msg = MarketQueryMsg::Status {};
-        self.market_contract.query(&query_msg).await
-    }
-
-    async fn crank_stats(&self) -> Result<Option<CrankWorkInfo>> {
-        self.status().await.map(|x| x.next_crank)
+    pub async fn close_position(&self, position_id: PositionId) -> Result<TxResponse> {
+        self.market.close_position(&self.wallet, position_id).await
     }
 
     pub async fn crank(&self) -> Result<()> {
-        while self.crank_stats().await?.is_some() {
-            log::info!("Crank started");
-            let execute_msg = MarketExecuteMsg::Crank {
-                execs: None,
-                rewards: None,
-            };
-            let tx = self
-                .market_contract
-                .execute(&self.wallet, vec![], execute_msg)
-                .await?;
-            log::info!("{}", tx.txhash);
-        }
-        log::info!("Cranking finished");
-        Ok(())
+        self.market.crank(&self.wallet).await
     }
 
     pub async fn tap_faucet(&self) -> Result<TxResponse> {
-        let cw20_address = FaucetAsset::Cw20(self.cw20_contract.get_address_string().into());
+        let cw20_address = match self.market.status().await?.collateral {
+            Token::Cw20 {
+                addr,
+                decimal_places: _,
+            } => FaucetAsset::Cw20(addr),
+            Token::Native {
+                denom,
+                decimal_places: _,
+            } => FaucetAsset::Native(denom),
+        };
         let execute_msg = FaucetExecuteMsg::Tap {
             assets: vec![cw20_address],
             recipient: self.wallet_address.get_address_string().into(),
@@ -328,36 +160,23 @@ impl PerpApp {
 
     pub async fn update_max_gains(
         &self,
-        id: u64,
+        id: PositionId,
         max_gains: MaxGainsInQuote,
     ) -> Result<TxResponse> {
-        let execute_msg = MarketExecuteMsg::UpdatePositionMaxGains {
-            id: PositionId(id),
-            max_gains,
-        };
-        let response = self
-            .market_contract
-            .execute(&self.wallet, vec![], execute_msg)
-            .await?;
-        Ok(response)
+        self.market
+            .update_max_gains(&self.wallet, id, max_gains)
+            .await
     }
 
     pub async fn update_leverage(
         &self,
-        id: u64,
+        id: PositionId,
         leverage: LeverageToBase,
         slippage_assert: Option<SlippageAssert>,
     ) -> Result<TxResponse> {
-        let execute_msg = MarketExecuteMsg::UpdatePositionLeverage {
-            id: PositionId(id),
-            leverage,
-            slippage_assert,
-        };
-        let response = self
-            .market_contract
-            .execute(&self.wallet, vec![], execute_msg)
-            .await?;
-        Ok(response)
+        self.market
+            .update_leverage(&self.wallet, id, leverage, slippage_assert)
+            .await
     }
 
     pub async fn wait_till_next_block(&self) -> Result<()> {
@@ -378,83 +197,14 @@ impl PerpApp {
 
     pub async fn update_collateral(
         &self,
-        position_id: u64,
+        id: PositionId,
         collateral: Collateral,
         impact: UpdatePositionCollateralImpact,
         slippage_assert: Option<SlippageAssert>,
     ) -> Result<TxResponse> {
-        let query = MarketQueryMsg::Positions {
-            position_ids: vec![PositionId(position_id)],
-            skip_calc_pending_fees: false,
-        };
-        let PositionsResp {
-            positions: mut response,
-            pending_close: _,
-        } = self.market_contract.query(query).await?;
-        let position = match response.pop() {
-            Some(position) => Ok(position),
-            None => Err(anyhow!("No position Id {position_id} found")),
-        }?;
-        let active_collateral = position.active_collateral.into_number();
-        if active_collateral == collateral.into_number() {
-            bail!("No updated required since collateral is same");
-        }
-        if collateral.into_number() > active_collateral {
-            log::info!("Increasing the collateral");
-
-            let execute_msg = match impact {
-                UpdatePositionCollateralImpact::Leverage => {
-                    MarketExecuteMsg::UpdatePositionAddCollateralImpactLeverage {
-                        id: PositionId(position_id),
-                    }
-                }
-                UpdatePositionCollateralImpact::PositionSize => {
-                    MarketExecuteMsg::UpdatePositionAddCollateralImpactSize {
-                        id: PositionId(position_id),
-                        slippage_assert,
-                    }
-                }
-            };
-
-            let diff_collateral = collateral.into_number().checked_sub(active_collateral)?;
-            let collateral = NonZero::<Collateral>::try_from_number(diff_collateral)
-                .context("diff_collateral is not greater than zero")?;
-
-            self.market_execute_with_funds(&execute_msg, collateral)
-                .await
-        } else {
-            log::info!("Decreasing the collateral");
-            let diff_collateral = active_collateral.checked_sub(collateral.into_number())?;
-            let amount = NonZero::<Collateral>::try_from_number(diff_collateral)
-                .with_context(|| format!("Invalid diff_collateral: {diff_collateral}"))?;
-            log::debug!("Diff collateral: {}", amount);
-            let execute_msg = match impact {
-                UpdatePositionCollateralImpact::Leverage => {
-                    MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage {
-                        id: PositionId(position_id),
-                        amount,
-                    }
-                }
-                UpdatePositionCollateralImpact::PositionSize => {
-                    MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
-                        id: PositionId(position_id),
-                        amount,
-                        slippage_assert,
-                    }
-                }
-            };
-            self.market_contract
-                .execute(&self.wallet, vec![], execute_msg)
-                .await
-        }
-    }
-
-    pub async fn liquidity_stats(&self) -> Result<LiquidityStats> {
-        self.status().await.map(|x| x.liquidity)
-    }
-
-    pub async fn get_config(&self) -> Result<Config> {
-        self.status().await.map(|x| x.config)
+        self.market
+            .update_collateral(&self.wallet, id, collateral, impact, slippage_assert)
+            .await
     }
 }
 

@@ -1,11 +1,10 @@
 mod liquifund;
 
-use anyhow::Context;
 use cosmwasm_std::Order;
 pub use liquifund::*;
 mod open;
 use msg::contracts::market::entry::{ClosedPositionCursor, ClosedPositionsResp};
-pub use open::*;
+pub(crate) use open::*;
 mod close;
 pub use close::*;
 mod update;
@@ -66,6 +65,9 @@ pub(super) const LIQUIDATION_PRICES_PENDING_REVERSE: Map<PositionId, Timestamp> 
 pub(super) const CLOSED_POSITION_HISTORY: Map<(&Addr, (Timestamp, PositionId)), ClosedPosition> =
     Map::new(namespace::CLOSED_POSITION_HISTORY);
 
+/// Direct lookup of closed positions by ID
+const CLOSED_POSITIONS: Map<PositionId, ClosedPosition> = Map::new(namespace::CLOSED_POSITIONS);
+
 /// When is the next time we should try to run the liquifunding process for this position?
 ///
 /// Invariant: we must have an entry here for every open position. There must be
@@ -90,14 +92,17 @@ pub enum PositionOrId {
 
 /// Gets a full position by id
 pub(crate) fn get_position(store: &dyn Storage, id: PositionId) -> Result<Position> {
-    OPEN_POSITIONS.load(store, id).map_err(|_| {
-        perp_anyhow!(
-            ErrorId::MissingPosition,
-            ErrorDomain::Market,
-            "position id: {}",
-            id
-        )
-    })
+    OPEN_POSITIONS
+        .may_load(store, id)
+        .map_err(|e| anyhow!("Could not parse position {id}: {e:?}"))?
+        .ok_or_else(|| {
+            perp_anyhow!(
+                ErrorId::MissingPosition,
+                ErrorDomain::Market,
+                "position id: {}",
+                id
+            )
+        })
 }
 
 impl PositionOrId {
@@ -229,33 +234,44 @@ impl State<'_> {
         })
     }
 
-    pub(crate) fn adjust_net_open_interest(
+    /// Validate that we can perform the net open interest adjustment described
+    pub(crate) fn check_adjust_net_open_interest(
         &self,
-        ctx: &mut StateContext,
+        store: &dyn Storage,
         notional_size_diff: Signed<Notional>,
         dir: DirectionToNotional,
         assert_delta_neutrality_fee_cap: bool,
-    ) -> Result<()> {
-        let net_notional_before_delta_neutrality = if assert_delta_neutrality_fee_cap {
-            Some(self.positions_net_open_interest(ctx.storage)?)
-        } else {
-            None
+    ) -> Result<AdjustOpenInterestResult> {
+        let long_before = self.open_long_interest(store)?;
+        let short_before = self.open_short_interest(store)?;
+
+        let long_after;
+        let short_after;
+        let adjust_res;
+        match dir {
+            DirectionToNotional::Long => {
+                long_after = long_before
+                    .checked_add_signed(notional_size_diff)
+                    .context("adjust_net_open_interest: long interest would be negative")?;
+                short_after = short_before;
+                adjust_res = AdjustOpenInterestResult::Long(long_after);
+            }
+            DirectionToNotional::Short => {
+                long_after = long_before;
+                short_after = short_before
+                    .checked_add_signed(-notional_size_diff)
+                    .context("adjust_net_open_interest: short interest would be negative")?;
+                adjust_res = AdjustOpenInterestResult::Short(short_after);
+            }
         };
 
-        let (item, amount) = match dir {
-            DirectionToNotional::Long => (OPEN_NOTIONAL_LONG_INTEREST, notional_size_diff),
-            DirectionToNotional::Short => (OPEN_NOTIONAL_SHORT_INTEREST, -notional_size_diff),
-        };
-
-        item.update(ctx.storage, |curr| {
-            curr.into_signed()
-                .checked_add(amount)?
-                .try_into_positive_value()
-                .context("adjust_net_open_interest: interest would be negative")
-        })?;
-
-        if let Some(net_notional_before) = net_notional_before_delta_neutrality {
-            let net_notional_after = self.positions_net_open_interest(ctx.storage)?;
+        if assert_delta_neutrality_fee_cap {
+            let net_notional_before = long_before
+                .into_signed()
+                .checked_sub(short_before.into_signed())?;
+            let net_notional_after = long_after
+                .into_signed()
+                .checked_sub(short_after.into_signed())?;
 
             let cap: Number = self.config.delta_neutrality_fee_cap.into();
             let sensitivity: Number = self.config.delta_neutrality_fee_sensitivity.into();
@@ -275,7 +291,7 @@ impl State<'_> {
 
             // these strings are just to make error messages easier to understand
             // since the UX is in terms of DirectionToBase, not DirectionToNotional
-            let market_type = self.market_type(ctx.storage)?;
+            let market_type = self.market_type(store)?;
             // May be different from dir, since updating/closing a position can
             // cause a notional size diff which is opposite to the position
             // direction.
@@ -322,7 +338,7 @@ impl State<'_> {
                 Ok(())
             };
 
-            res.map_err(|e| {
+            res.map(|()| adjust_res).map_err(|e| {
                 PerpError {
                     id: e.into(),
                     domain: ErrorDomain::Market,
@@ -332,8 +348,26 @@ impl State<'_> {
                 .into()
             })
         } else {
-            Ok(())
+            Ok(adjust_res)
         }
+    }
+
+    pub(crate) fn adjust_net_open_interest(
+        &self,
+        ctx: &mut StateContext,
+        notional_size_diff: Signed<Notional>,
+        dir: DirectionToNotional,
+        assert_delta_neutrality_fee_cap: bool,
+    ) -> Result<()> {
+        self.check_adjust_net_open_interest(
+            ctx.storage,
+            notional_size_diff,
+            dir,
+            assert_delta_neutrality_fee_cap,
+        )?
+        .store(ctx)?;
+
+        Ok(())
     }
 
     pub(crate) fn open_long_interest(&self, store: &dyn Storage) -> Result<Notional> {
@@ -394,10 +428,18 @@ impl State<'_> {
             let borrow_fees = borrow_fees.lp.checked_add(borrow_fees.xlp)?;
             let (funding_payments, _) =
                 self.calc_capped_funding_payment(store, &pos, pos.liquifunded_at, self.now())?;
+            let delta_neutrality_fee = self.calc_delta_neutrality_fee(
+                store,
+                -pos.notional_size,
+                spot_price,
+                Some(pos.liquidation_margin.delta_neutrality),
+            )?;
             pos.borrow_fee
                 .checked_add_assign(borrow_fees, &spot_price)?;
             pos.funding_fee
                 .checked_add_assign(funding_payments, &spot_price)?;
+            pos.delta_neutrality_fee
+                .checked_add_assign(delta_neutrality_fee, &spot_price)?;
 
             pos.liquidation_margin.borrow = pos
                 .liquidation_margin
@@ -411,12 +453,18 @@ impl State<'_> {
                 .checked_add_signed(-funding_payments)
                 .ok()
                 .unwrap_or_default();
+            pos.liquidation_margin
+                .delta_neutrality
+                .checked_add_signed(-delta_neutrality_fee)
+                .ok()
+                .unwrap_or_default();
 
             let active_collateral = pos
                 .active_collateral
                 .into_signed()
                 .checked_sub(borrow_fees.into_signed())?
-                .checked_sub(funding_payments)?;
+                .checked_sub(funding_payments)?
+                .checked_sub(delta_neutrality_fee)?;
             pos.active_collateral = match active_collateral.try_into_non_zero() {
                 Some(x) => x,
                 // This should never happen, since it would mean we have
@@ -530,7 +578,7 @@ impl State<'_> {
 }
 
 pub(crate) fn positions_init(store: &mut dyn Storage) -> Result<()> {
-    LAST_POSITION_ID.save(store, &PositionId(0))?;
+    LAST_POSITION_ID.save(store, &PositionId::new(0))?;
     OPEN_NOTIONAL_SHORT_INTEREST.save(store, &Notional::zero())?;
     OPEN_NOTIONAL_LONG_INTEREST.save(store, &Notional::zero())?;
     Ok(())
@@ -802,6 +850,29 @@ impl State<'_> {
             }
         };
 
+        Ok(())
+    }
+}
+
+/// Result of checking if we can adjust net open interest
+#[must_use]
+pub(crate) enum AdjustOpenInterestResult {
+    /// Set the long interest to this value
+    Long(Notional),
+    /// Set the short interest to this value
+    Short(Notional),
+}
+
+impl AdjustOpenInterestResult {
+    pub(crate) fn store(self, ctx: &mut StateContext) -> Result<()> {
+        match self {
+            AdjustOpenInterestResult::Long(long) => {
+                OPEN_NOTIONAL_LONG_INTEREST.save(ctx.storage, &long)?
+            }
+            AdjustOpenInterestResult::Short(short) => {
+                OPEN_NOTIONAL_SHORT_INTEREST.save(ctx.storage, &short)?
+            }
+        }
         Ok(())
     }
 }

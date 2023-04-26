@@ -46,7 +46,7 @@ pub(crate) async fn go(
     let app = PerpApp::new(
         opt.wallet.context("No wallet provided")?,
         factory,
-        Some(*app.faucet.get_address()),
+        Some(app.faucet.get_address()),
         market,
         app.basic.network,
     )
@@ -58,7 +58,7 @@ pub(crate) async fn go(
         iter_count += 1;
         log::info!("Setup iteration #{iter_count}");
 
-        let status = app.status().await?;
+        let status = app.market.status().await?;
 
         let total = status.liquidity.locked + status.liquidity.unlocked;
         log::info!("Total liquidity: {total}. Target liquidity: {target_liquidity}");

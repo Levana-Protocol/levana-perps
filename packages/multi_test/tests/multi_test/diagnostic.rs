@@ -1,3 +1,4 @@
+use anyhow::Context;
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, return_unless_market_collateral_base, PerpsApp,
 };
@@ -17,8 +18,13 @@ fn diagnostic_log_take_profit_less_than_collateral() {
 fn run_log(market: PerpsMarket, body: &str) {
     body.lines()
         .map(|line| line.trim())
-        .filter(|line| !line.is_empty())
-        .map(|line| serde_json::from_str::<ClientToBridgeWrapper>(line).unwrap())
+        .enumerate()
+        .filter(|(_, line)| !line.is_empty())
+        .map(|(linenum, line)| {
+            serde_json::from_str::<ClientToBridgeWrapper>(line)
+                .with_context(|| format!("Parsing line #{linenum}"))
+                .unwrap()
+        })
         .for_each(|wrapper| {
             market.handle_bridge_msg(
                 &wrapper,

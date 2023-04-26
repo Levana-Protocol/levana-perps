@@ -1,8 +1,12 @@
 use anyhow::Result;
-use cosmwasm_std::{to_binary, wasm_execute, CosmosMsg, Empty, Event, Response, SubMsg, WasmMsg};
+use cosmwasm_std::{
+    to_binary, wasm_execute, CosmosMsg, Empty, Event, IbcBasicResponse, IbcReceiveResponse,
+    Response, SubMsg, WasmMsg,
+};
 use cw2::ContractVersion;
 use serde::Serialize;
 
+use crate::ibc::{ack_fail, ack_success};
 #[cfg(debug_assertions)]
 use crate::prelude::*;
 
@@ -156,5 +160,33 @@ impl ResponseBuilder {
                 .events
                 .push(event.add_attributes(common_attrs.clone())),
         }
+    }
+
+    /// Turn the accumulated response into an IBC Basic response
+    pub fn into_ibc_response(self) -> IbcBasicResponse {
+        let mut resp = IbcBasicResponse::default();
+        resp.messages = self.resp.messages;
+        resp.attributes = self.resp.attributes;
+        resp.events = self.resp.events;
+
+        resp
+    }
+
+    /// Turn the accumulated response into an IBC Receive success response
+    pub fn into_ibc_recv_response_success(self) -> IbcReceiveResponse {
+        let mut resp = IbcReceiveResponse::default();
+        resp.messages = self.resp.messages;
+        resp.attributes = self.resp.attributes;
+        resp.events = self.resp.events;
+        resp.set_ack(ack_success())
+    }
+
+    /// Turn the accumulated response into an IBC Receive fail response
+    pub fn into_ibc_recv_response_fail(self, error: anyhow::Error) -> IbcReceiveResponse {
+        let mut resp = IbcReceiveResponse::default();
+        resp.messages = self.resp.messages;
+        resp.attributes = self.resp.attributes;
+        resp.events = self.resp.events;
+        resp.set_ack(ack_fail(error))
     }
 }

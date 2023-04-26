@@ -1,4 +1,6 @@
-use axum::{response::IntoResponse, Extension, Json};
+use std::sync::Arc;
+
+use axum::{extract::State, response::IntoResponse, Json};
 
 use crate::app::{factory::FactoryInfo, App, FrontendInfo};
 
@@ -10,7 +12,7 @@ struct FactoryResp<'a> {
     frontend_info: &'a FrontendInfo,
 }
 
-pub(crate) async fn factory(app: Extension<App>) -> impl IntoResponse {
+pub(crate) async fn factory(app: State<Arc<App>>) -> impl IntoResponse {
     let factory_info = app.get_factory_info();
     Json(FactoryResp {
         factory_info: &factory_info,

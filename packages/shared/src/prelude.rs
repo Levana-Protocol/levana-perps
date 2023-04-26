@@ -21,7 +21,7 @@ pub use crate::{
 };
 pub use anyhow::{anyhow, bail, Context, Result};
 pub use cosmwasm_schema::cw_serde;
-pub use cosmwasm_std::{Addr, Api, Decimal256, Event, Order, Storage};
+pub use cosmwasm_std::{Addr, Api, Decimal256, Event, Order, Storage, Uint64};
 pub use cw2::get_contract_version;
 pub use cw_storage_plus::{Bound, Item, Map};
 pub use std::fmt::Display;

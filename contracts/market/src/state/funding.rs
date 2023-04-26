@@ -236,9 +236,17 @@ impl State<'_> {
         let instant_open_long = self.open_long_interest(store)?;
         let funding_rate_sensitivity = config.funding_rate_sensitivity;
 
+        let total_interest = (instant_open_long + instant_open_short).into_decimal256();
+        let notional_high_cap = config.delta_neutrality_fee_sensitivity.into_decimal256()
+            * config.delta_neutrality_fee_cap.into_decimal256();
+        let funding_rate_sensitivity_from_delta_neutrality =
+            rf_per_annual_cap * total_interest / notional_high_cap;
+
+        let effective_funding_rate_sensitivity =
+            funding_rate_sensitivity.max(funding_rate_sensitivity_from_delta_neutrality);
         let rf_popular = || -> Result<Decimal256> {
             Ok(std::cmp::min(
-                funding_rate_sensitivity
+                effective_funding_rate_sensitivity
                     * (instant_net_open_interest.abs_unsigned().into_decimal256()
                         / (instant_open_long + instant_open_short).into_decimal256()),
                 rf_per_annual_cap,

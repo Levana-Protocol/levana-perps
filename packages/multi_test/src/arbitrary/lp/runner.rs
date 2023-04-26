@@ -226,35 +226,9 @@ impl LpYield {
                 trading_fee += pos.counter_collateral.into_number()
                     * market_config.trading_fee_counter_collateral.into_number();
 
-                // Calculate borrow fee
-                const NS_PER_YEAR: u128 = 31_536_000_000_000_000u128;
-
-                // for open positions, even though we may have jumped partially into a new liquifunding epoch
-                // we only get the yield from the previous completed liquifunding period
-                // this is *not* true for closed positions, which receive the partial amount
-                let n_liquifundings = self.time_jump_liquifundings.floor() as u128;
-                let time_jump_nanos = n_liquifundings
-                    * market_config.liquifunding_delay_seconds as u128
-                    * 1_000_000_000;
-
-                let rates = market.query_status().unwrap();
-                let accumulated_rate = rates.borrow_fee.into_number()
-                    * time_jump_nanos.to_string().parse::<Number>().unwrap();
-                let borrow_fee = accumulated_rate * pos.counter_collateral.into_number()
-                    / Number::from(NS_PER_YEAR);
-
                 assert_eq!(pos.trading_fee_collateral.into_number(), trading_fee);
-                // there is very small discrepency
-                // probably due to the slight difference between using the data series to
-                // accumulate the rate with small multiplications over time
-                // vs. a direct multiplication of the time jumped
-                // i.e. this fails: assert_eq!(pos.borrow_fee_collateral.into_number(), borrow_fee);
-                assert!(pos
-                    .borrow_fee_collateral
-                    .into_number()
-                    .approx_eq_eps(borrow_fee, Number::EPS_E17));
 
-                (trading_fee, borrow_fee)
+                (trading_fee, pos.borrow_fee_collateral.into_number())
             };
 
             // the total available yield is the sum of the trading fee and the borrow fee, minus the protocol tax

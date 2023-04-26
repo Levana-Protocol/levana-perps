@@ -1,14 +1,16 @@
-use axum::{extract::Path, response::IntoResponse, Extension};
+use std::sync::Arc;
 
-use crate::app::{status_collector::StatusCategory, App};
+use axum::{extract::State, http::HeaderMap, response::IntoResponse};
 
-pub(crate) async fn all(app: Extension<App>) -> impl IntoResponse {
-    app.get_status_collector().all()
-}
+use crate::app::App;
 
-pub(crate) async fn single(
-    app: Extension<App>,
-    Path(category): Path<StatusCategory>,
-) -> impl IntoResponse {
-    app.get_status_collector().single(category)
+pub(crate) async fn all(app: State<Arc<App>>, headers: HeaderMap) -> impl IntoResponse {
+    let wants_html = headers
+        .get("accept")
+        .map_or(false, |value| value.as_bytes().starts_with(b"text/html"));
+    if wants_html {
+        app.statuses.all_statuses_html()
+    } else {
+        app.statuses.all_statuses_text()
+    }
 }

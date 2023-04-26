@@ -108,9 +108,9 @@ typescript-schema-copy: typescript-schema
 	rm -rf ../webapp/src/apps/perps/sdk/types/.generated/
 	mv schema/typescript ../webapp/src/apps/perps/sdk/types/.generated/
 
-# Build binary in release mode
+# Build perps-qa binary in release mode
 cargo-release:
-    cargo build --release --bins --locked
+    cargo build --bin perps-qa --release --bins --locked
 
 # Build bots binary in release mode
 cargo-bots-release:
@@ -167,6 +167,16 @@ fuzz:
 # For right now, justfiles to not support parallel execution
 # so use npm-run-all to kick things off
 # build-type: release or dev
-# exec-type: sanity or performance 
+# exec-type: sanity or performance
 diagnostics-gui build-type exec-type:
 	cd ./packages/diagnostics && yarn serve:{{build-type}}:{{exec-type}}
+
+# Run bots directly (for dev purposes, not for production)
+bots:
+	cargo run --bin perps-bots
+
+# Deploy hatching contract 
+store-hatching:
+	cargo run --bin perps-deploy store-code --contracts=hatching --network=juno-testnet
+instantiate-hatching:
+	cargo run --bin perps-deploy instantiate-rewards --contracts=hatching --network=juno-testnet

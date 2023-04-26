@@ -1,5 +1,6 @@
 use levana_perpswap_multi_test::{
-    market_wrapper::PerpsMarket, response::CosmosResponseExt, time::TimeJump, PerpsApp,
+    market_wrapper::PerpsMarket, response::CosmosResponseExt,
+    return_unless_market_collateral_quote, time::TimeJump, PerpsApp,
 };
 use msg::contracts::market::config::ConfigUpdate;
 use msg::prelude::*;
@@ -356,4 +357,70 @@ fn negative_in_delta_neutrality_fee_single_update_perp_986() {
     open_short("1000.001").unwrap();
     open_long("1000").unwrap();
     open_long("0.001").unwrap();
+}
+
+#[test]
+fn artificial_slippage_charge_change_net_notional_sign() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    return_unless_market_collateral_quote!(market);
+    let trader = market.clone_trader(0).unwrap();
+    market
+        .exec_set_config(ConfigUpdate {
+            minimum_deposit_usd: Some(Usd::zero()),
+            delta_neutrality_fee_tax: Some(Decimal256::zero()),
+            ..Default::default()
+        })
+        .unwrap();
+
+    let (pos_id, res) = market
+        .exec_open_position(
+            &trader,
+            "100",
+            "10",
+            DirectionToBase::Long,
+            "1.0",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    let open_amount1 = res.first_delta_neutrality_fee_amount();
+    let status1 = market.query_status().unwrap();
+    let net_notional1 = status1.long_notional - status1.short_notional;
+    market.exec_close_position(&trader, pos_id, None).unwrap();
+
+    let (_, res) = market
+        .exec_open_position(
+            &trader,
+            "100",
+            "10",
+            DirectionToBase::Short,
+            "1.0",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    let open_amount2 = res.first_delta_neutrality_fee_amount();
+
+    let (_, res) = market
+        .exec_open_position(
+            &trader,
+            "200",
+            "10",
+            DirectionToBase::Long,
+            "1.0",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    let open_amount3 = res.first_delta_neutrality_fee_amount();
+    let status2 = market.query_status().unwrap();
+    let net_notional2 = status2.long_notional - status2.short_notional;
+    assert_eq!(net_notional1, net_notional2);
+    assert_eq!(open_amount1, open_amount2 + open_amount3);
 }

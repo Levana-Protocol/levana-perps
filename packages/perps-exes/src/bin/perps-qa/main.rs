@@ -1,15 +1,13 @@
+mod capping;
 mod cli;
-mod discovery;
 
 use crate::cli::Cmd;
 use anyhow::Result;
 use clap::Parser;
 use cosmos::Coin;
-use discovery::ConnectionInfo;
 use msg::contracts::market::entry::StatusResp;
 use msg::contracts::market::{entry::SlippageAssert, liquidity::LiquidityStats};
-use msg::prelude::*;
-use perps_exes::{types::money::notional_max_gain, PerpApp};
+use perps_exes::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -19,11 +17,19 @@ async fn main() -> Result<()> {
 async fn main_inner() -> Result<()> {
     let Cmd { opt, subcommand }: Cmd = Cmd::parse();
     opt.init_logger();
+    let client = reqwest::Client::new();
     let ConnectionInfo {
         network,
         factory_address,
         faucet_address,
-    } = opt.load_connection_info().await?;
+    } = ConnectionInfo::load(
+        &client,
+        &opt.contract_family,
+        opt.network,
+        opt.factory_contract_address,
+        opt.faucet_contract_address,
+    )
+    .await?;
 
     log::debug!("Factory address: {}", factory_address);
 
@@ -53,15 +59,15 @@ async fn main_inner() -> Result<()> {
                 println!("0");
             }
             let balance = perp_contract.cw20_balance().await?;
-            println!("Cw20 Balance: {}", balance.balance);
+            println!("Cw20 Balance: {}", balance);
         }
         cli::Subcommand::TotalPosition {} => {
-            let count = perp_contract.total_positions().await?;
+            let count = perp_contract.market.total_positions().await?;
             println!("Total Open positions in Contract: {count}");
         }
         cli::Subcommand::AllOpenPositions {} => {
             let positions = perp_contract.all_open_positions().await?;
-            let ids: Vec<_> = positions.ids.iter().map(|item| item.0).collect();
+            let ids: Vec<_> = positions.ids.iter().map(|item| item.u64()).collect();
             println!(
                 "{} Open Positions in this wallet: {:?}",
                 positions.ids.len(),
@@ -77,7 +83,7 @@ async fn main_inner() -> Result<()> {
                 long_positions.len(),
                 long_positions
                     .iter()
-                    .map(|item| item.id.0)
+                    .map(|item| item.id.u64())
                     .collect::<Vec<_>>()
             );
             println!(
@@ -85,7 +91,7 @@ async fn main_inner() -> Result<()> {
                 short_positions.len(),
                 short_positions
                     .iter()
-                    .map(|item| item.id.0)
+                    .map(|item| item.id.u64())
                     .collect::<Vec<_>>()
             );
         }
@@ -102,7 +108,13 @@ async fn main_inner() -> Result<()> {
             } else {
                 DirectionToBase::Long
             };
-            let max_gain = notional_max_gain(max_gains);
+            // Convert from percentage to ratio representation.
+            let max_gain = match max_gains {
+                MaxGainsInQuote::Finite(x) => MaxGainsInQuote::Finite(
+                    NonZero::new(x.raw() / Decimal256::from_str("100").unwrap()).unwrap(),
+                ),
+                MaxGainsInQuote::PosInfinity => MaxGainsInQuote::PosInfinity,
+            };
             log::debug!("Collateral: {collateral}");
             log::debug!("Max gains: {:?}", max_gain);
             log::debug!("Leverage: {:?}", leverage);
@@ -138,7 +150,7 @@ async fn main_inner() -> Result<()> {
             log::debug!("Raw log: {}", tx.raw_log);
         }
         cli::Subcommand::FetchPrice {} => {
-            let price = perp_contract.fetch_price().await?;
+            let price = perp_contract.market.current_price().await?;
             println!(
                 "Latest price of base asset (in quote): {}",
                 price.price_base
@@ -162,12 +174,12 @@ async fn main_inner() -> Result<()> {
             perp_contract.crank().await?;
         }
         cli::Subcommand::AllClosePositions {} => {
-            let closed_positions = perp_contract.get_close_positions().await?;
-            let positions: Vec<_> = closed_positions.iter().map(|item| item.id.0).collect();
+            let closed_positions = perp_contract.get_closed_positions().await?;
+            let positions: Vec<_> = closed_positions.iter().map(|item| item.id.u64()).collect();
             println!("{} Closed positions: {:?}", positions.len(), positions);
         }
         cli::Subcommand::PositionDetail { position_id } => {
-            let position = perp_contract.position_detail(position_id).await?;
+            let position = perp_contract.market.position_detail(position_id).await?;
             let liquidation_price = position
                 .liquidation_price_base
                 .map_or("No price found".to_owned(), |item| item.to_string());
@@ -246,7 +258,7 @@ async fn main_inner() -> Result<()> {
                         total_xlp,
                     },
                 ..
-            } = perp_contract.status().await?;
+            } = perp_contract.market.status().await?;
 
             println!("Locked collateral: {locked}");
             println!("Unlocked collateral: {unlocked}");
@@ -275,7 +287,7 @@ async fn main_inner() -> Result<()> {
             );
         }
         cli::Subcommand::GetConfig {} => {
-            let config = perp_contract.get_config().await?;
+            let config = perp_contract.market.status().await?.config;
             println!("{config:?}");
         }
         cli::Subcommand::DepositLiquidity { fund } => {
@@ -283,6 +295,7 @@ async fn main_inner() -> Result<()> {
             println!("Transaction hash: {}", tx.txhash);
             log::debug!("Raw log: {}", tx.raw_log);
         }
+        cli::Subcommand::CappingReport { inner } => inner.go(perp_contract).await?,
     }
     Ok(())
 }

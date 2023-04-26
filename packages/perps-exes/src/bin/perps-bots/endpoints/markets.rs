@@ -1,15 +1,13 @@
-use std::fmt::Display;
+use std::{fmt::Display, sync::Arc};
 
 use anyhow::Result;
-use axum::Extension;
-use msg::{
-    contracts::market::entry::StatusResp,
-    prelude::{MarketId, UnsignedDecimal},
-};
+use axum::extract::State;
+use msg::contracts::market::entry::StatusResp;
+use perps_exes::prelude::*;
 
-use crate::{app::App, market_contract::MarketContract};
+use crate::app::App;
 
-pub(crate) async fn markets(app: Extension<App>) -> String {
+pub(crate) async fn markets(app: State<Arc<App>>) -> String {
     match go(&app).await {
         Ok(x) => x.to_string(),
         Err(e) => format!("{e:?}"),
@@ -41,6 +39,9 @@ impl Display for Markets {
             writeln!(f, "Total short interest (in USD): {}", status.short_usd)?;
 
             writeln!(f, "Protocol fees collected: {}", status.fees.protocol)?;
+            writeln!(f, "Borrow fee total: {}", status.borrow_fee)?;
+            writeln!(f, "Borrow fee LP   : {}", status.borrow_fee_lp)?;
+            writeln!(f, "Borrow fee xLP  : {}", status.borrow_fee_xlp)?;
             writeln!(f, "\n\n")?;
         }
         Ok(())

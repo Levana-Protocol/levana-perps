@@ -136,7 +136,7 @@ impl State<'_> {
 
     fn nft_token_full(&self, store: &dyn Storage, token_id: String) -> Result<FullTokenInfo> {
         let market_id = self.market_id(store)?;
-        let position_id = PositionId(token_id.parse()?);
+        let position_id = token_id.parse()?;
         let approvals = self.nft_token_approvals(store, token_id)?;
         let position = get_position(store, position_id)?;
 
@@ -227,7 +227,7 @@ impl State<'_> {
         token_id: String,
         include_expired: bool,
     ) -> Result<OwnerOfResponse> {
-        let position = get_position(store, PositionId(token_id.parse()?))?;
+        let position = get_position(store, token_id.parse()?)?;
         let approvals = self.nft_token_approvals(store, token_id)?;
 
         Ok(OwnerOfResponse {
@@ -276,7 +276,7 @@ impl State<'_> {
         spender: Addr,
         include_expired: bool,
     ) -> Result<ApprovalResponse> {
-        let owner = get_position(store, PositionId(token_id.parse()?))?.owner;
+        let owner = get_position(store, token_id.parse()?)?.owner;
         let approvals = self.nft_token_approvals(store, token_id)?;
 
         // token owner has absolute approval
@@ -533,7 +533,7 @@ impl State<'_> {
         msg_sender: &Addr,
         token_id: &str,
     ) -> Result<()> {
-        let owner = get_position(store, PositionId(token_id.parse()?))?.owner;
+        let owner = get_position(store, token_id.parse()?)?.owner;
         // owner can approve
         if owner == *msg_sender {
             return Ok(());
@@ -587,7 +587,7 @@ impl State<'_> {
         // ensure we have permissions
         self.nft_check_can_send(ctx.storage, msg_sender, &token_id, &approvals)?;
 
-        let mut pos = get_position(ctx.storage, PositionId(token_id.parse()?))?;
+        let mut pos = get_position(ctx.storage, token_id.parse()?)?;
         // remove old position.owner
         OWNER_TO_TOKEN_IDS.remove(ctx.storage, (&pos.owner, token_id.clone()));
         // add to new position owner
@@ -617,7 +617,7 @@ impl State<'_> {
         token_id: &str,
         approvals: &[Approval],
     ) -> Result<()> {
-        let owner = get_position(store, PositionId(token_id.parse()?))?.owner;
+        let owner = get_position(store, token_id.parse()?)?.owner;
         // owner and market contract can always send
         let market_addr = self.env.contract.address.clone();
         if owner == *msg_sender || market_addr == *msg_sender {

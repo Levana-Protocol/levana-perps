@@ -142,7 +142,7 @@ pub mod events {
 
         fn try_from(evt: Event) -> anyhow::Result<Self> {
             Ok(PositionActionEvent {
-                pos_id: PositionId(evt.u64_attr(event_key::POS_ID)?),
+                pos_id: PositionId::new(evt.u64_attr(event_key::POS_ID)?),
                 action: PositionAction {
                     kind: evt.map_attr_result(event_key::POSITION_ACTION_KIND, |s| match s {
                         "open" => Ok(PositionActionKind::Open),

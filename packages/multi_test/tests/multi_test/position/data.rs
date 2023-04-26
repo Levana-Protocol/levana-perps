@@ -21,7 +21,7 @@ fn position_data_long() {
 
     let pos = Position {
         owner: Addr::unchecked("trader".to_string()),
-        id: PositionId(123),
+        id: PositionId::new(123),
         deposit_collateral: SignedCollateralAndUsd::new("10".parse().unwrap(), &price_point),
         active_collateral: "10".parse().unwrap(),
         counter_collateral: "25".parse().unwrap(),
@@ -89,7 +89,7 @@ fn position_data_short() {
 
     let pos = Position {
         owner: Addr::unchecked("trader".to_string()),
-        id: PositionId(123),
+        id: PositionId::new(123),
         deposit_collateral: SignedCollateralAndUsd::new("1000".parse().unwrap(), &price_point),
         active_collateral: "1000".parse().unwrap(),
         counter_collateral: "500".parse().unwrap(),
@@ -155,7 +155,7 @@ fn position_data_infinite_max_gains() {
 
     let pos = Position {
         owner: Addr::unchecked("trader".to_string()),
-        id: PositionId(123),
+        id: PositionId::new(123),
         deposit_collateral: SignedCollateralAndUsd::new("1000".parse().unwrap(), &price_point),
         active_collateral: "1000".parse().unwrap(),
         counter_collateral: "2000".parse().unwrap(),
@@ -190,7 +190,7 @@ fn position_data_infinite_max_gains() {
 fn position_data_open_flip_short() {
     let pos = Position {
         owner: Addr::unchecked("trader".to_string()),
-        id: PositionId(123),
+        id: PositionId::new(123),
         deposit_collateral: Default::default(),
         active_collateral: "100".parse().unwrap(),
         counter_collateral: "200".parse().unwrap(),
@@ -254,7 +254,7 @@ fn position_data_open_flip_short() {
 fn position_data_open_flip_long() {
     let pos = Position {
         owner: Addr::unchecked("trader".to_string()),
-        id: PositionId(123),
+        id: PositionId::new(123),
         deposit_collateral: Default::default(),
         active_collateral: "100".parse().unwrap(),
         counter_collateral: "200".parse().unwrap(),

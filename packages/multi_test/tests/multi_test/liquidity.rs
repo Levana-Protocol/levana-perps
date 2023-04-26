@@ -1,6 +1,9 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::str::FromStr;
 
-use cosmwasm_std::{Addr, Decimal256, Uint256};
+use cosmwasm_std::{Addr, Decimal256, Uint128, Uint256};
+use levana_perpswap_multi_test::arbitrary::lp::data::LpYield;
 use levana_perpswap_multi_test::config::DEFAULT_MARKET;
 use levana_perpswap_multi_test::return_unless_market_collateral_quote;
 use levana_perpswap_multi_test::time::TimeJump;
@@ -685,8 +688,10 @@ fn lp_info_api() {
         .exec_deposit_liquidity_full(&new_lp, Number::ONE, true)
         .unwrap();
 
-    market.exec_reinvest_yield(&new_lp, true).unwrap();
-    market.exec_reinvest_yield(&new_lp, false).unwrap_err();
+    market.exec_reinvest_yield(&new_lp, None, true).unwrap();
+    market
+        .exec_reinvest_yield(&new_lp, None, false)
+        .unwrap_err();
 }
 
 #[test]
@@ -938,4 +943,458 @@ fn liquidity_deposit_withdraw_fractional() {
     market
         .exec_withdraw_liquidity(&new_lp, Some("15.293221".parse().unwrap()))
         .unwrap();
+}
+
+#[test]
+fn reinvest_partial() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    // Get some xLP and no LP
+    let new_lp = Addr::unchecked("new-lp");
+    market
+        .exec_mint_and_deposit_liquidity(&new_lp, "100".parse().unwrap())
+        .unwrap();
+
+    // Have a trader open a position and keep it running for a while for borrow fees
+    let trader = market.clone_trader(0).unwrap();
+    let _ = market
+        .exec_open_position(
+            &trader,
+            "10",
+            "10",
+            DirectionToBase::Long,
+            "5",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    for _ in 0..100 {
+        market.set_time(TimeJump::Hours(6)).unwrap();
+        market.exec_refresh_price().unwrap();
+        market.exec_crank_till_finished(&trader).unwrap();
+    }
+
+    // Should have some yield
+    let lp_info = market.query_lp_info(&new_lp).unwrap();
+    assert_ne!(lp_info.available_yield, Collateral::zero());
+
+    // Reinvest half
+    let balance_before = market.query_collateral_balance(&new_lp).unwrap();
+    let third = NonZero::new(
+        lp_info
+            .available_yield
+            .div_non_zero_dec("3".parse().unwrap()),
+    )
+    .unwrap();
+    market
+        .exec_reinvest_yield(&new_lp, Some(third), false)
+        .unwrap();
+
+    let balance_after = market.query_collateral_balance(&new_lp).unwrap();
+    let two_thirds = lp_info.available_yield - third.raw();
+
+    // Use approximate equals because we don't handle the "dust" (collateral below the precision of the CW20);
+    let diff = balance_after - balance_before;
+    assert!(
+        diff.approx_eq_eps(two_thirds.into_number(), Number::EPS_E6),
+        "{diff} != {two_thirds}"
+    );
+
+    // Nothing left to reinvest
+    market
+        .exec_reinvest_yield(&new_lp, None, false)
+        .unwrap_err();
+}
+
+#[test]
+fn lp_transfer() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let cranker = Addr::unchecked("cranker");
+
+    let claim_yield = |lp: &Addr| -> Number {
+        let wallet_balance_before_claim = market.query_collateral_balance(lp).unwrap();
+        let _ = market.exec_claim_yield(lp);
+        let wallet_balance_after_claim = market.query_collateral_balance(lp).unwrap();
+
+        wallet_balance_after_claim - wallet_balance_before_claim
+    };
+
+    // Get some LP
+    let lp1 = Addr::unchecked("new-lp-1");
+    let lp2 = Addr::unchecked("new-lp-2");
+    let amount = Number::from(100u64);
+
+    market
+        .exec_mint_and_deposit_liquidity(&lp1, amount)
+        .unwrap();
+
+    let info1 = market.query_lp_info(&lp1).unwrap();
+    assert!(info1.lp_amount > LpToken::zero());
+    assert_eq!(info1.xlp_amount, LpToken::zero());
+
+    let info2 = market.query_lp_info(&lp2).unwrap();
+    assert_eq!(info2.lp_amount, LpToken::zero());
+    assert_eq!(info2.xlp_amount, LpToken::zero());
+
+    // No yield to anyone initially
+    assert_eq!(info1.available_yield, Collateral::zero());
+    assert_eq!(info2.available_yield, Collateral::zero());
+
+    market
+        .exec_liquidity_token_transfer(LiquidityTokenKind::Lp, &lp1, &lp2, amount)
+        .unwrap();
+
+    // lp amount transferred
+    let info1 = market.query_lp_info(&lp1).unwrap();
+    assert_eq!(info1.lp_amount, LpToken::zero());
+    assert_eq!(info1.xlp_amount, LpToken::zero());
+
+    let info2 = market.query_lp_info(&lp2).unwrap();
+    assert!(info2.lp_amount > LpToken::zero());
+    assert_eq!(info2.xlp_amount, LpToken::zero());
+
+    // Still no yield
+    assert_eq!(info1.available_yield, Collateral::zero());
+    assert_eq!(info2.available_yield, Collateral::zero());
+
+    // Have a trader open a position and keep it running for a while for borrow fees
+    let trader = market.clone_trader(0).unwrap();
+    market
+        .exec_open_position(
+            &trader,
+            "10",
+            "10",
+            DirectionToBase::Long,
+            "5",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    market.exec_refresh_price().unwrap();
+    market.set_time(TimeJump::Liquifundings(1)).unwrap();
+    market.exec_refresh_price().unwrap();
+    market.exec_crank_till_finished(&cranker).unwrap();
+
+    // Get info
+    let info1 = market.query_lp_info(&lp1).unwrap();
+    let info2 = market.query_lp_info(&lp2).unwrap();
+
+    // LP1 should not have any yield
+    assert_eq!(info1.available_yield, Collateral::zero());
+
+    // But LP2 should
+    assert_ne!(info2.available_yield, Collateral::zero());
+
+    // Neither has xLP or LP yield
+    assert_eq!(info1.xlp_amount, LpToken::zero());
+    assert_eq!(info1.available_yield_xlp, Collateral::zero());
+    assert_eq!(info2.xlp_amount, LpToken::zero());
+    assert_eq!(info2.available_yield_xlp, Collateral::zero());
+
+    // LP1 cannot claim anything
+    assert_eq!(claim_yield(&lp1), Number::zero());
+
+    // LP2 can
+    assert_ne!(claim_yield(&lp2), Number::zero());
+
+    // LP1 cannot stake
+    market.exec_stake_lp(&lp1, None).unwrap_err();
+
+    // LP2 can
+    market.exec_stake_lp(&lp2, None).unwrap();
+
+    // accummulate more fees
+    market.exec_refresh_price().unwrap();
+    market.set_time(TimeJump::Liquifundings(1)).unwrap();
+    market.exec_refresh_price().unwrap();
+    market.exec_crank_till_finished(&cranker).unwrap();
+
+    // Get info
+    let info1 = market.query_lp_info(&lp1).unwrap();
+    let info2 = market.query_lp_info(&lp2).unwrap();
+
+    // LP1 should not have any yield
+    assert_eq!(info1.available_yield, Collateral::zero());
+
+    // But LP2 should
+    assert_ne!(info2.available_yield, Collateral::zero());
+
+    // LP1 does not have XLP
+    assert_eq!(info1.xlp_amount, LpToken::zero());
+    assert_eq!(info1.available_yield_xlp, Collateral::zero());
+
+    // LP2 does
+    assert_ne!(info2.xlp_amount, LpToken::zero());
+    assert_ne!(info2.available_yield_xlp, Collateral::zero());
+
+    // LP1 cannot claim anything
+    assert_eq!(claim_yield(&lp1), Number::zero());
+
+    // LP2 can
+    assert_ne!(claim_yield(&lp2), Number::zero());
+
+    // Nothing left for LP2 to claim
+    assert_eq!(claim_yield(&lp2), Number::zero());
+}
+
+#[test]
+fn rewards_while_unstaking() {
+    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    market.automatic_time_jump_enabled = false;
+
+    let trader = market.clone_trader(0).unwrap();
+    let cranker = Addr::unchecked("cranker");
+    let justlp = Addr::unchecked("justlp");
+    let justxlp = Addr::unchecked("justxlp");
+    let unstaking = Addr::unchecked("unstaking");
+
+    // Have all three wallets deposit, open a position, and crank for a while to
+    // get different LP vs xLP rates.
+    for addr in [&justlp, &justxlp, &unstaking] {
+        market
+            .exec_mint_and_deposit_liquidity(addr, "1000".parse().unwrap())
+            .unwrap();
+    }
+    for addr in [&justxlp, &unstaking] {
+        market.exec_stake_lp(addr, None).unwrap();
+    }
+    market
+        .exec_open_position(
+            &trader,
+            "100",
+            "5",
+            DirectionToBase::Long,
+            "2",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    market.set_time(TimeJump::Liquifundings(3)).unwrap();
+    market.exec_refresh_price().unwrap();
+    market.set_time(TimeJump::Blocks(1)).unwrap();
+    market.exec_crank_till_finished(&cranker).unwrap();
+
+    let status = market.query_status().unwrap();
+    let per_lp_token = status.borrow_fee_lp / status.liquidity.total_lp.into_decimal256();
+    let per_xlp_token = status.borrow_fee_xlp / status.liquidity.total_xlp.into_decimal256();
+    assert!(
+        per_lp_token < per_xlp_token,
+        "Borrow fee per LP token {per_lp_token} not less than per xLP token {per_xlp_token}",
+    );
+
+    let justlp_info = market.query_lp_info(&justlp).unwrap();
+    assert_eq!(justlp_info.available_yield_xlp, Collateral::zero());
+    assert_ne!(justlp_info.available_yield_lp, Collateral::zero());
+    let justxlp_info = market.query_lp_info(&justxlp).unwrap();
+    assert_ne!(justxlp_info.available_yield_xlp, Collateral::zero());
+    assert_eq!(justxlp_info.available_yield_lp, Collateral::zero());
+    let unstaking_info = market.query_lp_info(&unstaking).unwrap();
+    assert_eq!(
+        unstaking_info.available_yield_lp,
+        justxlp_info.available_yield_lp
+    );
+    assert_eq!(
+        unstaking_info.available_yield_xlp,
+        justxlp_info.available_yield_xlp
+    );
+
+    for addr in [&justlp, &justxlp, &unstaking] {
+        market.exec_claim_yield(addr).unwrap();
+        assert_eq!(
+            market.query_lp_info(addr).unwrap().available_yield,
+            Collateral::zero()
+        );
+    }
+
+    // Now begin an unstaking process for the unstaking wallet and ensure the
+    // unstaking wallet acts like the justlp wallet for rewards.
+    market.exec_unstake_xlp(&unstaking, None).unwrap();
+
+    // Get more yields
+    market
+        .exec_open_position(
+            &trader,
+            "100",
+            "5",
+            DirectionToBase::Short,
+            "2",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    market.set_time(TimeJump::Liquifundings(3)).unwrap();
+    market.exec_crank_till_finished(&cranker).unwrap();
+
+    let justlp_info = market.query_lp_info(&justlp).unwrap();
+    assert_eq!(justlp_info.available_yield_xlp, Collateral::zero());
+    assert_ne!(justlp_info.available_yield_lp, Collateral::zero());
+    let justxlp_info = market.query_lp_info(&justxlp).unwrap();
+    assert_ne!(justxlp_info.available_yield_xlp, Collateral::zero());
+    assert_eq!(justxlp_info.available_yield_lp, Collateral::zero());
+
+    let unstaking_info = market.query_lp_info(&unstaking).unwrap();
+    assert_eq!(
+        unstaking_info.available_yield_lp,
+        justlp_info.available_yield_lp
+    );
+    assert_eq!(
+        unstaking_info.available_yield_xlp,
+        justlp_info.available_yield_xlp
+    );
+}
+
+#[test]
+fn transfer_while_unstaking() {
+    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    market.automatic_time_jump_enabled = false;
+
+    let trader = market.clone_trader(0).unwrap();
+    let unstaking = Addr::unchecked("unstaking");
+
+    market
+        .exec_mint_and_deposit_liquidity(&unstaking, "1000".parse().unwrap())
+        .unwrap();
+    market.exec_stake_lp(&unstaking, None).unwrap();
+    market.exec_unstake_xlp(&unstaking, None).unwrap();
+
+    // Transfering some xLP should be impossible
+    market
+        .exec_liquidity_token_transfer(
+            LiquidityTokenKind::Xlp,
+            &unstaking,
+            &trader,
+            "0.001".parse().unwrap(),
+        )
+        .unwrap_err();
+
+    // Transfer LP should also be impossible right now since we haven't unstaked anything yet
+    market
+        .exec_liquidity_token_transfer(
+            LiquidityTokenKind::Lp,
+            &unstaking,
+            &trader,
+            "0.001".parse().unwrap(),
+        )
+        .unwrap_err();
+
+    // Wait some blocks
+    market.set_time(TimeJump::Hours(24)).unwrap();
+
+    // Now transferring some LP should be possible
+    market
+        .exec_liquidity_token_transfer(
+            LiquidityTokenKind::Lp,
+            &unstaking,
+            &trader,
+            "1".parse().unwrap(),
+        )
+        .unwrap();
+
+    // But still no xLP
+    market
+        .exec_liquidity_token_transfer(
+            LiquidityTokenKind::Xlp,
+            &unstaking,
+            &trader,
+            "0.001".parse().unwrap(),
+        )
+        .unwrap_err();
+
+    // Now wait the rest of the period and transfer the remaining LP
+    market.set_time(TimeJump::Hours(24 * 20)).unwrap();
+    market
+        .exec_liquidity_token_transfer(
+            LiquidityTokenKind::Lp,
+            &unstaking,
+            &trader,
+            "999".parse().unwrap(),
+        )
+        .unwrap();
+    market
+        .exec_liquidity_token_transfer(
+            LiquidityTokenKind::Lp,
+            &unstaking,
+            &trader,
+            "0.00001".parse().unwrap(),
+        )
+        .unwrap_err();
+    market
+        .exec_liquidity_token_transfer(
+            LiquidityTokenKind::Xlp,
+            &unstaking,
+            &trader,
+            "0.001".parse().unwrap(),
+        )
+        .unwrap_err();
+}
+
+#[test]
+fn xlp_balance_is_transferable() {
+    // We want to ensure that however many xLP tokens the liquidity token
+    // contract says we have, we're able to transfer that amount.
+    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    market.automatic_time_jump_enabled = false;
+
+    let trader = market.clone_trader(0).unwrap();
+    let unstaking = Addr::unchecked("unstaking");
+
+    market
+        .exec_mint_and_deposit_liquidity(&unstaking, "1000".parse().unwrap())
+        .unwrap();
+    market.exec_stake_lp(&unstaking, None).unwrap();
+    market
+        .exec_unstake_xlp(&unstaking, Some("500".parse().unwrap()))
+        .unwrap();
+
+    assert_eq!(
+        market
+            .query_liquidity_token_balance_raw(LiquidityTokenKind::Xlp, &unstaking)
+            .unwrap(),
+        Uint128::new(500_000_000)
+    );
+    market
+        .exec_liquidity_token_transfer(
+            LiquidityTokenKind::Xlp,
+            &unstaking,
+            &trader,
+            "500".parse().unwrap(),
+        )
+        .unwrap();
+
+    assert_eq!(
+        market
+            .query_liquidity_token_balance_raw(LiquidityTokenKind::Xlp, &unstaking)
+            .unwrap(),
+        Uint128::new(0)
+    );
+    market
+        .exec_liquidity_token_transfer(
+            LiquidityTokenKind::Xlp,
+            &unstaking,
+            &trader,
+            "0.0001".parse().unwrap(),
+        )
+        .unwrap_err();
+}
+
+#[test]
+fn lp_yield_perp_1023() {
+    let market = PerpsMarket::lp_prep(PerpsApp::new_cell().unwrap()).unwrap();
+    let lp_yield = LpYield {
+        pos_collateral: "812.965262".parse().unwrap(),
+        pos_direction: DirectionToBase::Long,
+        lp_deposit: "23.39196".parse().unwrap(),
+        time_jump_liquifundings: 8.999921109112767,
+        close_position: false,
+        market: Rc::new(RefCell::new(market)),
+    };
+
+    lp_yield.run().unwrap();
 }

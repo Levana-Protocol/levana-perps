@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Levana Perps Bots Status</title>
+
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.4.1/dist/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
+
+    <style>
+        .status-error {
+            color: red;
+        }
+
+        .status-error-no-alert {
+            color: #f88;
+        }
+
+        .status-out-of-date {
+            color: orangered;
+        }
+
+        .status-out-of-date-no-alert {
+            color: orange;
+        }
+
+        .status-success {
+            color: green;
+        }
+
+        div.panel {
+            padding: 0 1em;
+        }
+
+        pre {
+            white-space: pre-wrap;
+        }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+    <div class="row">
+      <div class="col-md-10 col-md-offset-1">
+        <h1>Levana Perps Bots Status</h1>
+
+        <table class="table">
+            <thead>
+                <th>Task</th>
+                <th>Status</th>
+            </thead>
+            <tbody>
+              {% for status in statuses %}
+                <tr>
+                  <td>
+                    <a class="status-{{ status.short.css_class() }}" href="#{{ status.label.ident() }}">{{ status.label }}</a>
+                  </td>
+                  <td>
+                    {{ status.short.as_str() }}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+        </table>
+
+        {% for status in statuses %}
+          <div class="panel panel-default">
+            <h2 id="{{ status.label.ident() }}">{{ status.label }}</h2>
+            <p>Status: {{ status.short.as_str() }}</p>
+            {% if let Some(started) = status.status.current_run_started.as_ref() %}
+              <p>Currently running, started at {{ started }}</p>
+            {% endif %}
+
+            <pre>{% match status.status.last_result.as_ref() %}{% when Ok(s) %}{{ s }}{% when Err(e) %}{{ e }}{% endmatch %}</pre>
+
+            {% if let Some(retrying) = status.status.last_retry_error.as_ref() %}
+              <p>Currently retrying, last error message:</p>
+              <pre>{{ retrying }}</pre>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+    </div>
+  </body>
+</html>

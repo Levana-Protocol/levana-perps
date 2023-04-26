@@ -1,129 +1,162 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use cosmos::{
-    proto::cosmwasm::wasm::v1::MsgExecuteContract, Cosmos, HasAddress, TxBuilder, Wallet,
-};
-use parking_lot::RwLock;
-use perps_exes::config::DeploymentConfig;
+use axum::async_trait;
+use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, HasAddress, TxBuilder, Wallet};
+use msg::prelude::ErrorId;
 use rust_decimal::Decimal;
-use tokio::sync::Mutex;
 
-use crate::util::markets::{get_markets, Market};
-
-use super::{
-    factory::FactoryInfo,
-    status_collector::{Status, StatusCategory, StatusCollector},
+use crate::{
+    endpoints::faucet::parse_perp_error,
+    util::{
+        markets::{get_markets, Market, PriceApi},
+        oracle::Pyth,
+    },
+    watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
 };
 
+use super::{App, AppBuilder};
+
+#[derive(Clone)]
 struct Worker {
     wallet: Arc<Wallet>,
-    cosmos: Cosmos,
-    client: reqwest::Client,
-    config: Arc<DeploymentConfig>,
-    factory: Arc<RwLock<Arc<FactoryInfo>>>,
 }
 
 /// Start the background thread to keep options pools up to date.
-impl StatusCollector {
-    pub(super) async fn start_price(
-        &self,
-        cosmos: Cosmos,
-        client: reqwest::Client,
-        config: Arc<DeploymentConfig>,
-        factory: Arc<RwLock<Arc<FactoryInfo>>>,
-        wallet: Arc<Wallet>,
-        gas_wallet: Arc<Mutex<Wallet>>,
-    ) -> Result<()> {
-        self.track_gas_funds(
-            *wallet.address(),
-            "oracle-bot",
-            config.min_gas.price,
-            gas_wallet,
-        );
-
-        let worker = Arc::new(Worker {
-            wallet,
-            cosmos,
-            client,
-            config,
-            factory,
-        });
-
-        self.add_status_checks(StatusCategory::Price, UPDATE_DELAY_SECONDS, move || {
-            worker.clone().single_update()
-        });
-
-        Ok(())
+impl AppBuilder {
+    pub(super) async fn start_price(&mut self, wallet: Arc<Wallet>) -> Result<()> {
+        self.watch_periodic(crate::watcher::TaskLabel::Price, Worker { wallet })
     }
 }
 
-const UPDATE_DELAY_SECONDS: u64 = 60;
-const TOO_OLD_SECONDS: i64 = 180;
+#[async_trait]
+impl WatchedTask for Worker {
+    async fn run_single(&self, app: &App, _heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
+        app.single_update(&self.wallet).await
+    }
+}
 
-impl Worker {
-    async fn single_update(self: Arc<Self>) -> Vec<(String, Status)> {
+impl App {
+    async fn single_update(&self, wallet: &Wallet) -> Result<WatchedTaskOutput> {
         let mut statuses = vec![];
         let mut builder = TxBuilder::default();
-        let mut has_tx = false;
-        let factory = self.factory.read().factory;
+        let factory = self.get_factory_info().factory;
+        let factory = self.cosmos.make_contract(factory);
 
-        let (markets, status) = match get_markets(&self.cosmos, factory).await {
-            Ok(markets) => {
-                let status = Status::success(format!("Loaded markets: {markets:?}"), None);
-                (markets, status)
-            }
-            Err(e) => (
-                vec![],
-                Status::error(format!("Unable to load markets: {e:?}")),
-            ),
-        };
-        statuses.push(("load-markets".to_owned(), status));
+        let markets = get_markets(&self.cosmos, &factory).await?;
 
-        for market in markets {
-            statuses.push((
-                format!("market-{}", market.market_id),
-                match self.get_tx(&market).await {
-                    Err(e) => Status::error(format!("{e:?}")),
-                    Ok((status, msg)) => {
-                        has_tx = true;
+        anyhow::ensure!(!markets.is_empty(), "Cannot have empty markets vec");
+
+        for market in &markets {
+            let price_apis = &market
+                .get_price_api(wallet, &self.cosmos, &self.config)
+                .await?;
+            match price_apis {
+                PriceApi::Manual { symbol, symbol_usd } => {
+                    let (status, msg) = self
+                        .get_tx_symbol(wallet, market, symbol, symbol_usd)
+                        .await?;
+                    statuses.push(format!("{}: {status}", market.market_id));
+                    builder.add_message_mut(msg);
+                }
+
+                PriceApi::Pyth(pyth) => {
+                    let msgs = self.get_txs_pyth(wallet, market, pyth).await?;
+                    for msg in msgs {
                         builder.add_message_mut(msg);
-                        Status::success(status, Some(TOO_OLD_SECONDS))
                     }
-                },
-            ));
+                    statuses.push(format!("{}: got pyth contract messages", market.market_id));
+                }
+            }
         }
 
-        statuses.push((
-            "broadcast".to_owned(),
-            if has_tx {
-                match builder.sign_and_broadcast(&self.cosmos, &self.wallet).await {
-                    Ok(res) => Status::success(
-                        format!("Prices updated in oracles with txhash {}", res.txhash),
-                        Some(TOO_OLD_SECONDS),
-                    ),
-                    Err(e) => Status::error(format!("{e:?}")),
-                }
-            } else {
-                Status::error("No updated prices")
-            },
-        ));
+        let broadcast_status = match builder.sign_and_broadcast(&self.cosmos, wallet).await {
+            Ok(res) => {
+                // just for logging pyth prices
+                for market in &markets {
+                    match &market
+                        .get_price_api(wallet, &self.cosmos, &self.config)
+                        .await?
+                    {
+                        PriceApi::Manual { .. } => {}
 
-        statuses
+                        PriceApi::Pyth(pyth) => {
+                            let market_price = pyth.query_price(120).await?;
+                            statuses.push(format!(
+                                "{} updated pyth price: {:?}",
+                                market.market_id, market_price
+                            ));
+                        }
+                    }
+                }
+
+                format!("Prices updated in oracles with txhash {}", res.txhash)
+            }
+            Err(e) => {
+                let maybe_tonic_error = e.downcast_ref::<tonic::Status>();
+                let maybe_perp_error =
+                    maybe_tonic_error.and_then(|status| parse_perp_error(status.message()));
+
+                let price_exists_error = maybe_perp_error.as_ref().and_then(|perp_err| {
+                    if perp_err.id == ErrorId::PriceAlreadyExists {
+                        Some(perp_err)
+                    } else {
+                        None
+                    }
+                });
+
+                let price_too_old_error = maybe_perp_error.as_ref().and_then(|perp_err| {
+                    if perp_err.id == ErrorId::PriceTooOld {
+                        Some(perp_err)
+                    } else {
+                        None
+                    }
+                });
+
+                if let Some(err) = price_exists_error {
+                    format!("This price point already exists: {:?}", err)
+                } else if let Some(err) = price_too_old_error {
+                    format!("The price is too old: {:?}", err)
+                } else {
+                    anyhow::bail!(
+                        "is tonic error: {}, is perp error: {}, raw error: {e:?}",
+                        maybe_tonic_error.is_some(),
+                        maybe_perp_error.is_some()
+                    );
+                }
+            }
+        };
+        statuses.push(broadcast_status);
+
+        Ok(WatchedTaskOutput {
+            skip_delay: false,
+            message: statuses.join("\n"),
+        })
     }
 
-    async fn get_tx(&self, market: &Market) -> Result<(String, MsgExecuteContract)> {
-        let price = self.get_current_price(&market.price_api_symbol).await?;
-        let price_usd = match &market.collateral_price_api_symbol {
+    async fn get_tx_symbol(
+        &self,
+        wallet: &Wallet,
+        market: &Market,
+        price_api_symbol: &str,
+        collateral_price_api_symbol: &Option<String>,
+    ) -> Result<(String, MsgExecuteContract)> {
+        let price = self.get_current_price_symbol(price_api_symbol).await?;
+        let price_usd = match collateral_price_api_symbol {
             Some(symbol) if symbol.as_str() == "USDC_USD" => Some("1".parse()?),
-            Some(symbol) => Some(self.get_current_price(symbol).await?.to_string().parse()?),
+            Some(symbol) => Some(
+                self.get_current_price_symbol(symbol)
+                    .await?
+                    .to_string()
+                    .parse()?,
+            ),
             None => None,
         };
 
         Ok((
             format!("Updated price for {}: {}", market.market_id, price),
             MsgExecuteContract {
-                sender: self.wallet.get_address_string(),
+                sender: wallet.get_address_string(),
                 contract: market.market.get_address_string(),
                 msg: serde_json::to_vec(&msg::contracts::market::entry::ExecuteMsg::SetPrice {
                     price: price.to_string().parse()?,
@@ -136,7 +169,7 @@ impl Worker {
         ))
     }
 
-    async fn get_current_price(&self, price_api_symbol: &str) -> Result<Decimal> {
+    async fn get_current_price_symbol(&self, price_api_symbol: &str) -> Result<Decimal> {
         #[derive(serde::Deserialize)]
         struct Latest {
             latest_price: Decimal,
@@ -155,5 +188,22 @@ impl Worker {
             .json()
             .await?;
         Ok(latest_price)
+    }
+
+    async fn get_txs_pyth(
+        &self,
+        wallet: &Wallet,
+        market: &Market,
+        pyth: &Pyth,
+    ) -> Result<Vec<MsgExecuteContract>> {
+        let vaas = pyth.get_wormhole_proofs(&self.client).await?;
+        let oracle_msg = pyth
+            .get_oracle_update_msg(wallet.get_address_string(), vaas)
+            .await?;
+        let bridge_msg = pyth
+            .get_bridge_update_msg(wallet.get_address_string(), market.market_id.clone())
+            .await?;
+
+        Ok(vec![oracle_msg, bridge_msg])
     }
 }

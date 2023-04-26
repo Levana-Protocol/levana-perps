@@ -248,38 +248,14 @@ impl State<'_> {
         Ok(())
     }
 
-    pub(crate) fn transfer_fees_to_dao(
-        &self,
-        ctx: &mut StateContext,
-        amount: Option<NonZero<Collateral>>,
-    ) -> Result<()> {
+    pub(crate) fn transfer_fees_to_dao(&self, ctx: &mut StateContext) -> Result<()> {
         let mut fees_before = ALL_FEES
             .may_load(ctx.storage)?
             .context("ALL_FEES is empty")?;
-        let amount = match amount {
-            None => {
-                let ret = NonZero::new(fees_before.protocol)
-                    .context("No DAO fees available to transfer")?;
-                fees_before.protocol = Collateral::zero();
-                ALL_FEES.save(ctx.storage, &fees_before)?;
-                ret
-            }
-            Some(amount) => {
-                let updated_fees = match fees_before.protocol.checked_sub(amount.raw()) {
-                    Err(_) => perp_bail!(
-                        ErrorId::Exceeded,
-                        ErrorDomain::Market,
-                        "not enough funds. requested {} but only {} available",
-                        amount,
-                        fees_before.protocol
-                    ),
-                    Ok(x) => x,
-                };
-                fees_before.protocol = updated_fees;
-                ALL_FEES.save(ctx.storage, &fees_before)?;
-                amount
-            }
-        };
+        let amount =
+            NonZero::new(fees_before.protocol).context("No DAO fees available to transfer")?;
+        fees_before.protocol = Collateral::zero();
+        ALL_FEES.save(ctx.storage, &fees_before)?;
 
         let dao_addr: Addr = load_external_item(
             &self.querier,

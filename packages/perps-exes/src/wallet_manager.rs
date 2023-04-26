@@ -26,6 +26,7 @@ struct Inner {
     address_type: AddressType,
     next_index: AtomicU32,
     send_request: mpsc::Sender<MintRequest>,
+    minter_address: Address,
 }
 
 struct MintRequest {
@@ -59,6 +60,7 @@ impl WalletManager {
                 address_type,
                 next_index: AtomicU32::new(1),
                 send_request,
+                minter_address: *minter.address(),
             }),
         };
         tokio::task::spawn(background(recv_request, minter));
@@ -107,6 +109,11 @@ impl WalletManager {
             })
             .await?;
         wait_for_it.await?
+    }
+
+    /// Get the address of the minter itself.
+    pub fn get_minter_address(&self) -> Address {
+        self.inner.minter_address
     }
 }
 
@@ -164,6 +171,9 @@ async fn process_requests(
             funds: vec![],
         });
     }
-    tx_builder.sign_and_broadcast(cosmos, minter).await?;
+    tx_builder
+        .sign_and_broadcast(cosmos, minter)
+        .await
+        .with_context(|| format!("Error processing token requests with minter {minter}"))?;
     Ok(())
 }

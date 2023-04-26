@@ -7,11 +7,16 @@ fn pending_fees_in_query() {
     market.automatic_time_jump_enabled = false;
     let trader = market.clone_trader(0).unwrap();
 
+    market
+        .exec_mint_and_deposit_liquidity(&trader, "1000000".parse().unwrap())
+        .unwrap();
+
     // Need to open two positions so that there are funding payments to be made.
+    // Make it large enough to cause delta neutrality fees to be meaningful.
     market
         .exec_open_position(
             &trader,
-            "6",
+            "6000",
             "15",
             DirectionToBase::Long,
             "3",
@@ -61,10 +66,19 @@ fn pending_fees_in_query() {
         pos_no_pending_fees.liquidation_margin
     );
 
+    market.exec_refresh_price().unwrap();
+    market.exec_crank_till_finished(&trader).unwrap();
+    market.set_time(TimeJump::Blocks(1)).unwrap();
+
     let pos = market.query_position_with_pending_fees(pos_id).unwrap();
     assert_ne!(pos.borrow_fee_collateral, Collateral::zero());
     assert_ne!(pos.borrow_fee_usd, Usd::zero());
     assert_ne!(pos.funding_fee_collateral, Signed::<Collateral>::zero());
     assert_ne!(pos.funding_fee_usd, Signed::<Usd>::zero());
     assert_ne!(pos_orig.liquidation_margin, pos.liquidation_margin);
+
+    // Actually close and make sure it matches
+    market.exec_close_position(&trader, pos_id, None).unwrap();
+    let closed = market.query_closed_position(&trader, pos_id).unwrap();
+    assert_eq!(closed.pnl_collateral, pos.pnl_collateral);
 }

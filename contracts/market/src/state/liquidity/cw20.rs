@@ -145,11 +145,16 @@ impl State<'_> {
         addr: &Addr,
         kind: LiquidityTokenKind,
     ) -> Result<BalanceResponse> {
-        let info = self.lp_info(store, addr)?;
-        let balance = lp_token_into_uint_128(match kind {
-            LiquidityTokenKind::Lp => info.lp_amount,
-            LiquidityTokenKind::Xlp => info.xlp_amount,
-        })?;
+        let amount = match kind {
+            LiquidityTokenKind::Lp => self.lp_info(store, addr)?.lp_amount,
+            // For xLP tokens, we do _not_ use the lp_info method, since that
+            // includes xLP in the process of being unstaked, and those balances
+            // cannot be transferred. Instead, we return the raw stored xLP
+            // amount, which represents how much xLP will be left after
+            // completing the current unstaking process.
+            LiquidityTokenKind::Xlp => self.load_liquidity_stats_addr_default(store, addr)?.xlp,
+        };
+        let balance = lp_token_into_uint_128(amount)?;
         Ok(BalanceResponse { balance })
     }
 
@@ -351,10 +356,6 @@ impl State<'_> {
             by: None,
         });
 
-        if kind == LiquidityTokenKind::Xlp {
-            self.liquidity_stop_unstaking_xlp(ctx, &owner)?;
-        }
-
         let amount = uint_128_into_lp_token(amount.u128())?.into_signed();
 
         self.liquidity_token_balance_change_inner(ctx, &owner, -amount, kind)?;
@@ -413,10 +414,6 @@ impl State<'_> {
                 msg,
             }),
         )?;
-
-        if kind == LiquidityTokenKind::Xlp {
-            self.liquidity_stop_unstaking_xlp(ctx, &owner)?;
-        }
 
         // move the tokens to the contract
         let amount = uint_128_into_lp_token(amount.u128())?.into_signed();
@@ -526,7 +523,7 @@ impl State<'_> {
             return Err(perp_anyhow!(
                 ErrorId::Auth,
                 ErrorDomain::Cw20,
-                "cannot increase allowance to own account"
+                "cannot decrease allowance to own account"
             ));
         }
 

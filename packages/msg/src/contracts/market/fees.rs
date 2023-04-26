@@ -178,10 +178,10 @@ pub mod events {
 
         fn try_from(evt: Event) -> anyhow::Result<Self> {
             let trade_id = match evt.try_u64_attr("pos-id")? {
-                Some(pos_id) => TradeId::Position(PositionId(pos_id)),
+                Some(pos_id) => TradeId::Position(PositionId::new(pos_id)),
                 None => {
                     let order_id = evt.u64_attr("order-id")?;
-                    TradeId::LimitOrder(OrderId(order_id))
+                    TradeId::LimitOrder(OrderId::new(order_id))
                 }
             };
 
@@ -226,7 +226,7 @@ pub mod events {
 
         fn try_from(evt: Event) -> anyhow::Result<Self> {
             Ok(FundingPaymentEvent {
-                pos_id: PositionId(evt.u64_attr("pos-id")?),
+                pos_id: PositionId::new(evt.u64_attr("pos-id")?),
                 amount: evt.number_attr("amount")?,
                 amount_usd: evt.number_attr("amount-usd")?,
                 direction: evt.direction_attr(event_key::DIRECTION)?,
@@ -359,10 +359,10 @@ pub mod events {
 
         fn try_from(evt: Event) -> anyhow::Result<Self> {
             let trade_id = match evt.try_u64_attr("pos-id")? {
-                Some(pos_id) => TradeId::Position(PositionId(pos_id)),
+                Some(pos_id) => TradeId::Position(PositionId::new(pos_id)),
                 None => {
                     let order_id = evt.u64_attr("order-id")?;
-                    TradeId::LimitOrder(OrderId(order_id))
+                    TradeId::LimitOrder(OrderId::new(order_id))
                 }
             };
 

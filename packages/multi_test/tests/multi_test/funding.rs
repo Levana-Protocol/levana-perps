@@ -1,7 +1,7 @@
 use levana_perpswap_multi_test::return_unless_market_collateral_quote;
 use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::contracts::market::config::ConfigUpdate;
+use msg::contracts::market::config::{Config, ConfigUpdate};
 use msg::prelude::*;
 
 #[test]
@@ -503,4 +503,92 @@ fn insolvency_crank_stall_perp_787() {
     market.exec_refresh_price().unwrap();
     // boom
     market.exec_crank_till_finished(&cranker).unwrap();
+}
+
+#[test]
+fn funding_rates_capped() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    let trader = market.clone_trader(0).unwrap();
+    market
+        .exec_mint_and_deposit_liquidity(&trader, "1000000000".parse().unwrap())
+        .unwrap();
+
+    // Temporarily set delta_neutrality_fee_sensitivity very high to open very large positions without hitting validation errors.
+    market
+        .exec_set_config(ConfigUpdate {
+            delta_neutrality_fee_sensitivity: Some("1000000000000".parse().unwrap()),
+            ..Default::default()
+        })
+        .unwrap();
+
+    market
+        .exec_open_position(
+            &trader,
+            "1000000",
+            "10",
+            DirectionToBase::Long,
+            "1",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    market
+        .exec_open_position(
+            &trader,
+            "2000000",
+            "10",
+            DirectionToBase::Short,
+            "1",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    market
+        .exec_set_config(ConfigUpdate {
+            delta_neutrality_fee_sensitivity: Some(
+                Config::default().delta_neutrality_fee_sensitivity,
+            ),
+            ..Default::default()
+        })
+        .unwrap();
+    market.exec_crank_till_finished(&trader).unwrap();
+
+    let rates = market.query_status().unwrap();
+
+    // Much higher sensitivity after hitting the cap will result in capped funding rates.
+    match market.id.get_market_type() {
+        MarketType::CollateralIsQuote => {
+            assert_eq!(rates.long_funding.to_string(), "-1.8");
+            assert_eq!(rates.short_funding.to_string(), "0.9");
+            assert_eq!(rates.borrow_fee.to_string(), "0.01");
+        }
+        MarketType::CollateralIsBase => {
+            let expected_long_rate = Number::from_str("-2.2").unwrap();
+            assert!(
+                rates
+                    .long_funding
+                    .approx_eq_eps(expected_long_rate, Number::EPS_E6),
+                "long_funding_base {} does not equal {}",
+                rates.long_funding,
+                expected_long_rate
+            );
+
+            let expected_short_rate = Number::from_str("0.9").unwrap();
+            assert!(
+                rates
+                    .short_funding
+                    .approx_eq_eps(expected_short_rate, Number::EPS_E6),
+                "short_funding_base {} does not equal {}",
+                rates.short_funding,
+                expected_short_rate
+            );
+
+            assert_eq!(rates.borrow_fee, Decimal256::from_str("0.01").unwrap());
+        }
+    }
 }

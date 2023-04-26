@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use anyhow::Result;
 use cosmos::{Cosmos, CosmosNetwork, Wallet};
 use msg::contracts::tracker::entry::CodeIdResp;
@@ -12,6 +14,49 @@ pub(crate) struct StoreCodeOpt {
     /// Network to use. Either this or family must be provided.
     #[clap(long, env = "COSMOS_NETWORK", global = true)]
     network: Option<CosmosNetwork>,
+
+    /// Contract types to store. If not provided, the perps protocol suite of contracts will be stored.
+    #[clap(
+        long,
+        env = "CONTRACTS",
+        default_value = "perps-protocol",
+        global = true
+    )]
+    contracts: Contracts,
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum Contracts {
+    PerpsProtocol,
+    Hatching,
+}
+
+impl FromStr for Contracts {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "perps-protocol" => Ok(Contracts::PerpsProtocol),
+            "hatching" => Ok(Contracts::Hatching),
+            _ => Err(anyhow::anyhow!("Unknown contracts: {s}")),
+        }
+    }
+}
+
+impl Contracts {
+    pub fn names(&self) -> &[&str] {
+        match self {
+            Contracts::PerpsProtocol => &[
+                CW20,
+                FACTORY,
+                LIQUIDITY_TOKEN,
+                MARKET,
+                POSITION_TOKEN,
+                PYTH_BRIDGE,
+            ],
+            Contracts::Hatching => &[HATCHING],
+        }
+    }
 }
 
 pub(crate) const CW20: &str = "cw20";
@@ -19,10 +64,17 @@ pub(crate) const FACTORY: &str = "factory";
 pub(crate) const LIQUIDITY_TOKEN: &str = "liquidity_token";
 pub(crate) const MARKET: &str = "market";
 pub(crate) const POSITION_TOKEN: &str = "position_token";
+pub(crate) const PYTH_BRIDGE: &str = "pyth_bridge";
+pub(crate) const HATCHING: &str = "hatching";
 
-const PROTOCOL_CONTRACT_TYPES: [&str; 4] = [FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN];
-
-pub(crate) async fn go(opt: Opt, StoreCodeOpt { family, network }: StoreCodeOpt) -> Result<()> {
+pub(crate) async fn go(
+    opt: Opt,
+    StoreCodeOpt {
+        family,
+        network,
+        contracts,
+    }: StoreCodeOpt,
+) -> Result<()> {
     let network = match (family, network) {
         (None, None) => anyhow::bail!("Please specify either family or network"),
         (None, Some(network)) => network,
@@ -46,7 +98,7 @@ pub(crate) async fn go(opt: Opt, StoreCodeOpt { family, network }: StoreCodeOpt)
         &basic.cosmos,
         &basic.wallet,
         &tracker,
-        &PROTOCOL_CONTRACT_TYPES,
+        contracts.names(),
     )
     .await
 }

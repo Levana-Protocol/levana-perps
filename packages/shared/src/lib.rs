@@ -14,6 +14,7 @@ pub mod result;
 pub(crate) mod addr;
 pub(crate) mod auth;
 pub mod direction;
+pub mod ibc;
 pub mod leverage;
 /// Feature-gated logging functionality
 pub mod log;

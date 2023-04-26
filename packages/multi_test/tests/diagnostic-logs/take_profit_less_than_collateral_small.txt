@@ -33,4 +33,4 @@
 {"msg_id":64,"user":"user","msg":"Crank"}
 {"msg_id":68,"user":"user","msg":{"MintCollateral":{"amount":"51.44805922012537"}}}
 {"msg_id":69,"user":"user","msg":{"MintAndDepositLp":{"amount":"56.954946575175863202"}}}
-{"msg_id":70,"user":"user","msg":{"ExecMarket":{"exec_msg":{"update_position_add_collateral_impact_leverage":{"id":3}},"funds":"51.44805922012537"}}}
+{"msg_id":70,"user":"user","msg":{"ExecMarket":{"exec_msg":{"update_position_add_collateral_impact_leverage":{"id":"3"}},"funds":"51.44805922012537"}}}

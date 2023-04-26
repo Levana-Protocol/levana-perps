@@ -1,3 +1,4 @@
+use crate::state::position::CLOSED_POSITIONS;
 use crate::state::{position::CLOSED_POSITION_HISTORY, *};
 use anyhow::Context;
 use msg::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
@@ -61,13 +62,15 @@ impl State<'_> {
             pos.active_collateral.into_signed() + exposure
                 >= pos.liquidation_margin.delta_neutrality.into_signed()
         );
-        let delta_neutrality_fee = self.charge_delta_neutrality_fee_no_update(
-            ctx,
-            &pos,
-            notional_size_return,
-            settlement_price,
-            DeltaNeutralityFeeReason::PositionClose,
-        )?;
+        let delta_neutrality_fee = self
+            .charge_delta_neutrality_fee_no_update(
+                ctx.storage,
+                &pos,
+                notional_size_return,
+                settlement_price,
+                DeltaNeutralityFeeReason::PositionClose,
+            )?
+            .store(self, ctx)?;
         pos.add_delta_neutrality_fee(delta_neutrality_fee, &settlement_price)?;
 
         // Reduce net open interest. This needs to happen _after_ delta
@@ -172,9 +175,22 @@ impl State<'_> {
             &closed_position,
         )?;
 
+        CLOSED_POSITIONS.save(ctx.storage, pos.id, &closed_position)?;
+
         ctx.response_mut()
             .add_event(PositionCloseEvent { closed_position });
 
         Ok(())
+    }
+
+    /// Load a closed position by ID, if available
+    pub(crate) fn load_closed_position(
+        &self,
+        store: &dyn Storage,
+        pos_id: PositionId,
+    ) -> Result<Option<ClosedPosition>> {
+        CLOSED_POSITIONS
+            .may_load(store, pos_id)
+            .map_err(|e| e.into())
     }
 }

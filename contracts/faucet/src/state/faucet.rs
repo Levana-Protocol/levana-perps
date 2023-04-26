@@ -1,6 +1,6 @@
 use crate::state::*;
 use anyhow::Result;
-use cosmwasm_std::{Addr, BankMsg, Coin, CosmosMsg};
+use cosmwasm_std::{Addr, BankMsg, Coin, CosmosMsg, Uint128};
 use cw_storage_plus::{Item, Map};
 use msg::contracts::{
     cw20::entry::{ExecuteMsg as Cw20ExecuteMsg, QueryMsg as Cw20QueryMsg, TokenInfoResponse},
@@ -43,16 +43,17 @@ impl State<'_> {
                 let tap_limit = Duration::from_seconds(u64::from(tap_limit));
 
                 if elapsed < tap_limit {
-                    let time_remaining = (tap_limit - elapsed).as_ms_number_lossy();
+                    let time_remaining = tap_limit - elapsed;
 
                     perp_bail_data!(
                         ErrorId::Exceeded,
                         ErrorDomain::Faucet,
                         FaucetError {
-                            wait_secs: time_remaining
+                            wait_secs: time_remaining.as_ms_number_lossy()
+                                / Number::from_str("1000").unwrap()
                         },
-                        "exceeded tap limit, wait {} more seconds",
-                        time_remaining
+                        "You can tap the faucet again in {}",
+                        PrettyTimeRemaining(time_remaining),
                     )
                 }
             }
@@ -216,5 +217,60 @@ impl State<'_> {
                 .save(ctx.storage, denom, &amount)
                 .map_err(|err| err.into()),
         }
+    }
+}
+
+struct PrettyTimeRemaining(Duration);
+
+impl Display for PrettyTimeRemaining {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let secs = self.0.as_ms_decimal_lossy() / Decimal256::from_str("1000").unwrap();
+        let secs = match Uint128::try_from(secs.to_uint_floor()) {
+            Err(_) => return f.write_str("a really long time"),
+            Ok(secs) => secs.u128(),
+        }
+        .max(1);
+        let minutes = if secs < 60 {
+            return write!(f, "{}s", secs);
+        } else {
+            secs / 60
+        };
+        debug_assert!(minutes > 0);
+        let hours = minutes / 60;
+        let minutes = minutes % 60;
+        let days = hours / 24;
+        let hours = hours % 24;
+
+        let mut need_space = false;
+        for (number, letter) in [(days, 'd'), (hours, 'h'), (minutes, 'm')] {
+            if number > 0 {
+                if need_space {
+                    write!(f, " {number}{letter}")?;
+                } else {
+                    need_space = true;
+                    write!(f, "{number}{letter}")?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use msg::prelude::Duration;
+
+    fn go(seconds: u64) -> String {
+        super::PrettyTimeRemaining(Duration::from_seconds(seconds)).to_string()
+    }
+    #[test]
+    fn display_pretty_time() {
+        assert_eq!(go(5), "5s");
+        assert_eq!(go(300), "5m");
+        assert_eq!(go(3600), "1h");
+        assert_eq!(go(3660), "1h 1m");
+        // Spec implies we shouldn't show seconds in general
+        assert_eq!(go(3661), "1h 1m");
+        assert_eq!(go(90061), "1d 1h 1m");
     }
 }

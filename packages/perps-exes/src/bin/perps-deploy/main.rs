@@ -8,6 +8,7 @@ mod factory;
 mod faucet;
 mod init_chain;
 mod instantiate;
+mod instantiate_rewards;
 mod local_deploy;
 mod localtest;
 mod migrate;
@@ -36,6 +37,7 @@ async fn main_inner() -> anyhow::Result<()> {
         Subcommand::OnChainTests { inner } => localtest::go(opt, inner).await?,
         Subcommand::InitChain { inner } => init_chain::go(opt, inner).await?,
         Subcommand::SetupMarket { inner } => setup_market::go(opt, inner).await?,
+        Subcommand::InstantiateRewards { inner } => instantiate_rewards::go(opt, inner).await?,
     }
 
     Ok(())

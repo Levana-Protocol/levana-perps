@@ -36,7 +36,7 @@ fn delta_neutrality_ratio_event() {
     DeltaNeutralityRatioEvent::try_from(res.event_first("delta-neutrality-ratio").unwrap())
         .unwrap();
 
-    let res = market.exec_reinvest_yield(&trader, true).unwrap();
+    let res = market.exec_reinvest_yield(&trader, None, true).unwrap();
     DeltaNeutralityRatioEvent::try_from(res.event_first("delta-neutrality-ratio").unwrap())
         .unwrap();
 

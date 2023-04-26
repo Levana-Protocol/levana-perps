@@ -49,6 +49,29 @@ pub(super) struct YieldPerToken {
 }
 
 /// Liquidity information per individual liquidity provider
+///
+/// When the liquidity provider is not in the process of unstaking xLP into LP,
+/// the fields `lp` and `xlp` below are straightforward: they represent the
+/// total number of LP and xLP tokens held by this provider, respectively.
+///
+/// However, during an unstaking process, it's a bit different. When a wallet
+/// begins unstaking, we immediately deduct the total amount to be unstaked from
+/// the `xlp` field and set it as [UnstakingInfo::xlp_amount]. We also update
+/// the protocol-wide totals of LP and xLP to reflect this change.
+///
+/// In order to calculate the instantaneous true LP and xLP balances during unstaking, we have the following rules:
+///
+/// * Let `uncollected` be the total amount of LP that could be collected by hasn't been yet
+///
+/// * `real_lp = self.lp + uncollected`
+///
+/// * `real_xlp = self.xlp + self.unstaking.xlp_amount - self.unstaking.collected - uncollected`
+///
+/// The purpose of all this is to allow a linear unstaking process from xLP and
+/// LP, and to ensure that during that unstaking process the wallet receives
+/// yields as if all unstaking xLP is already LP. Without that behavior,
+/// liquidity providers could preemptively unstake all their xLP and keep higher
+/// rewards without a lockup period.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct LiquidityStatsByAddr {
     pub(crate) lp: LpToken,
@@ -76,10 +99,14 @@ impl LiquidityStatsByAddr {
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        // Sanity check: if you have no xLP you cannot be unstaking
-        debug_assert!(!self.xlp.is_zero() || self.unstaking.is_none());
+        #[cfg(debug_assertions)]
+        if let Some(unstaking) = &self.unstaking {
+            // If we ever collect the entire amount, unstaking should be removed.
+            debug_assert!(unstaking.collected < unstaking.xlp_amount.raw());
+        }
         self.lp.is_zero()
             && self.xlp.is_zero()
+            && self.unstaking.is_none()
             && self.lp_accrued_yield.is_zero()
             && self.xlp_accrued_yield.is_zero()
             && self.crank_rewards.is_zero()
@@ -207,9 +234,26 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         lp_addr: &Addr,
+        amount: Option<NonZero<Collateral>>,
         stake_to_xlp: bool,
     ) -> Result<()> {
         let yield_to_reinvest = self.liquidity_claim_yield(ctx, lp_addr, false)?;
+
+        let yield_to_reinvest = match amount {
+            None => yield_to_reinvest,
+            Some(amount) => {
+                let remainder = match yield_to_reinvest.raw().checked_sub(amount.raw()) {
+                    Ok(remainder) => remainder,
+                    Err(_) => anyhow::bail!(
+                        "Requested to reinvest {amount}, but only have {yield_to_reinvest}"
+                    ),
+                };
+                if let Some(remainder) = NonZero::new(remainder) {
+                    self.add_token_transfer_msg(ctx, lp_addr, remainder)?;
+                }
+                amount
+            }
+        };
 
         let lp_shares =
             self.liquidity_deposit_inner(ctx, lp_addr, yield_to_reinvest, stake_to_xlp)?;
@@ -370,7 +414,7 @@ impl State<'_> {
         let total_collateral = liquidity_stats
             .locked
             .checked_add(liquidity_stats.unlocked)?;
-        let liquidity_to_return = liquidity_stats.lp_to_collateral(shares_to_withdraw)?;
+        let liquidity_to_return = liquidity_stats.lp_to_collateral_non_zero(shares_to_withdraw)?;
 
         if liquidity_to_return.raw() > liquidity_stats.unlocked {
             return Err(perp_anyhow!(
@@ -454,9 +498,9 @@ impl State<'_> {
         lp_addr: &Addr,
         xlp_amount: Option<NonZero<LpToken>>,
     ) -> Result<()> {
-        self.perform_lp_book_keeping(ctx, lp_addr)?;
+        let mut addr_stats = self.liquidity_stop_unstaking_xlp(ctx, lp_addr, false, false)?;
+        debug_assert_eq!(addr_stats.unstaking, None);
 
-        let mut addr_stats = self.load_liquidity_stats_addr(ctx.storage, lp_addr)?;
         let owned_xlp = NonZero::new(addr_stats.xlp)
             .with_context(|| format!("Wallet {lp_addr} does not have any xLP tokens to unstake"))?;
         let xlp_amount = match xlp_amount {
@@ -473,11 +517,17 @@ impl State<'_> {
             unstake_duration: Duration::from_seconds(self.config.unstake_period_seconds.into()),
             last_collected: self.now(),
         });
+        addr_stats.xlp = addr_stats.xlp.checked_sub(xlp_amount.raw())?;
         self.save_liquidity_stats_addr(ctx.storage, lp_addr, &addr_stats)?;
 
+        // Immediately convert the totals to treat the unstaking xLP as LP for rewards purposes
+        let mut stats = self.load_liquidity_stats(ctx.storage)?;
+        stats.total_lp = stats.total_lp.checked_add(xlp_amount.raw())?;
+        stats.total_xlp = stats.total_xlp.checked_sub(xlp_amount.raw())?;
+        self.save_liquidity_stats(ctx.storage, &stats)?;
+
         // for historical events, need to express it as collateral
-        let liquidity_stats = self.load_liquidity_stats(ctx.storage)?;
-        let xlp_collateral_value = liquidity_stats.lp_to_collateral(xlp_amount)?;
+        let xlp_collateral_value = stats.lp_to_collateral_non_zero(xlp_amount)?;
 
         self.lp_history_add_unstake_xlp(ctx, lp_addr, xlp_amount, xlp_collateral_value)?;
 
@@ -489,14 +539,42 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         lp_addr: &Addr,
-    ) -> Result<()> {
-        self.collect_unstaked_lp(ctx, lp_addr)?;
+        fail_on_no_unstaking: bool,
+        save_new_stats: bool,
+    ) -> Result<LiquidityStatsByAddr> {
+        self.perform_lp_book_keeping(ctx, lp_addr)?;
         let mut addr_stats = self.load_liquidity_stats_addr(ctx.storage, lp_addr)?;
-        debug_assert_ne!(addr_stats.unstaking, None);
-        addr_stats.unstaking = None;
-        self.save_liquidity_stats_addr(ctx.storage, lp_addr, &addr_stats)?;
 
-        Ok(())
+        let old_unstaking = addr_stats.unstaking.take();
+
+        match old_unstaking {
+            Some(old_unstaking) => {
+                let xlp_to_restore = old_unstaking
+                    .xlp_amount
+                    .raw()
+                    .checked_sub(old_unstaking.collected)?;
+
+                if !xlp_to_restore.is_zero() {
+                    let mut stats = self.load_liquidity_stats(ctx.storage)?;
+                    stats.total_lp = stats.total_lp.checked_sub(xlp_to_restore)?;
+                    stats.total_xlp = stats.total_xlp.checked_add(xlp_to_restore)?;
+                    self.save_liquidity_stats(ctx.storage, &stats)?;
+
+                    addr_stats.xlp = addr_stats.xlp.checked_add(xlp_to_restore)?;
+                }
+            }
+            None => {
+                if fail_on_no_unstaking {
+                    anyhow::bail!("Cannot stop unstaking, not currently unstaking xLP")
+                }
+            }
+        }
+
+        if save_new_stats {
+            self.save_liquidity_stats_addr(ctx.storage, lp_addr, &addr_stats)?;
+        }
+
+        Ok(addr_stats)
     }
 
     /// Update the amount of locked liquidity. Note, this does not update unlocked.
@@ -532,18 +610,29 @@ impl State<'_> {
         Ok(())
     }
 
+    /// Check that there is sufficient unlocked liquidity
+    pub(crate) fn check_unlocked_liquidity(
+        &self,
+        stats: &LiquidityStats,
+        amount: NonZero<Collateral>,
+    ) -> Result<()> {
+        if amount.raw() > stats.unlocked {
+            Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed lock! not enough unlocked liquidity in the protocol! (asked for {}, only {} available)", amount, stats.unlocked))
+        } else {
+            Ok(())
+        }
+    }
+
     pub(crate) fn liquidity_lock(
         &self,
         ctx: &mut StateContext,
         amount: NonZero<Collateral>,
     ) -> Result<()> {
         let mut stats = self.load_liquidity_stats(ctx.storage)?;
-        if amount.raw() > stats.unlocked {
-            return Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed lock! not enough unlocked liquidity in the protocol! (asked for {}, only {} available)", amount, stats.unlocked));
-        } else {
-            stats.locked = stats.locked.checked_add(amount.raw())?;
-            stats.unlocked = stats.unlocked.checked_sub(amount.raw())?;
-        }
+        self.check_unlocked_liquidity(&stats, amount)?;
+
+        stats.locked = stats.locked.checked_add(amount.raw())?;
+        stats.unlocked = stats.unlocked.checked_sub(amount.raw())?;
         self.save_liquidity_stats(ctx.storage, &stats)?;
 
         // Technically the total pool size has not changed
@@ -676,8 +765,22 @@ impl State<'_> {
 
         let start_yield = YIELD_PER_TIME_PER_TOKEN.load(store, addr_stats.last_accrue_key)?;
 
+        let lp_amount = match &addr_stats.unstaking {
+            Some(unstaking) => {
+                // If we're in the middle of unstaking, treat the entire pending
+                // unstake amount as LP for the purposes of rewards.
+                addr_stats.lp.checked_add(
+                    unstaking
+                        .xlp_amount
+                        .raw()
+                        .checked_sub(unstaking.collected)?,
+                )?
+            }
+            None => addr_stats.lp,
+        };
+
         let lp_yield_per_token_sum = end_yield.lp.checked_sub(start_yield.lp)?;
-        let lp_accrued = lp_yield_per_token_sum.checked_mul_dec(addr_stats.lp.into_decimal256())?;
+        let lp_accrued = lp_yield_per_token_sum.checked_mul_dec(lp_amount.into_decimal256())?;
         let xlp_yield_per_token_sum = end_yield.xlp.checked_sub(start_yield.xlp)?;
         let xlp_accrued =
             xlp_yield_per_token_sum.checked_mul_dec(addr_stats.xlp.into_decimal256())?;
@@ -764,22 +867,17 @@ impl State<'_> {
         };
 
         addr_stats.lp = addr_stats.lp.checked_add(unstaked_lp.raw())?;
-        addr_stats.xlp = addr_stats.xlp.checked_sub(unstaked_lp.raw())?;
 
         self.save_liquidity_stats_addr(ctx.storage, lp_addr, &addr_stats)?;
 
-        let mut stats = self.load_liquidity_stats(ctx.storage)?;
-        stats.total_lp = stats.total_lp.checked_add(unstaked_lp.raw())?;
-        stats.total_xlp = stats.total_xlp.checked_sub(unstaked_lp.raw())?;
-        self.save_liquidity_stats(ctx.storage, &stats)?;
-
         // the pool size has _not_ changed here, so do not emit the event
 
+        let stats = self.load_liquidity_stats(ctx.storage)?;
         self.lp_history_add_collect_lp(
             ctx,
             lp_addr,
             unstaked_lp,
-            stats.lp_to_collateral(unstaked_lp)?,
+            stats.lp_to_collateral_non_zero(unstaked_lp)?,
         )?;
 
         Ok(true)
@@ -799,19 +897,23 @@ impl State<'_> {
             .checked_add(available_yield_xlp)?
             .checked_add(addr_stats.crank_rewards)?;
 
-        let (lp_amount, xlp_unstaked, unstaking) = match addr_stats.unstaking {
-            None => (addr_stats.lp, LpToken::zero(), None),
+        let (lp_amount, xlp_amount, unstaking) = match addr_stats.unstaking {
+            None => (addr_stats.lp, addr_stats.xlp, None),
             Some(unstaking_info) => {
                 let unstaked_lp = self.calculate_unstaked_lp(&unstaking_info)?;
                 (
                     addr_stats.lp.checked_add(unstaked_lp)?,
-                    unstaked_lp,
+                    addr_stats
+                        .xlp
+                        .checked_add(unstaking_info.xlp_amount.raw())?
+                        .checked_sub(unstaking_info.collected)?
+                        .checked_sub(unstaked_lp)?,
                     Some(UnstakingStatus {
                         start: unstaking_info.unstake_started,
                         end: unstaking_info.unstake_started + unstaking_info.unstake_duration,
                         xlp_unstaking: unstaking_info.xlp_amount,
                         xlp_unstaking_collateral: stats
-                            .lp_to_collateral(unstaking_info.xlp_amount)?,
+                            .lp_to_collateral(unstaking_info.xlp_amount.raw())?,
                         collected: unstaking_info.collected,
                         available: unstaked_lp,
                         pending: unstaking_info
@@ -824,8 +926,6 @@ impl State<'_> {
             }
         };
 
-        let xlp_amount = addr_stats.xlp.checked_sub(xlp_unstaked)?;
-
         // Handle the degenerate case where all liquidity has been drained from
         // the pool. In such as case: we reset all balances to 0, except for the
         // available yield.
@@ -835,18 +935,13 @@ impl State<'_> {
             (lp_amount, xlp_amount, unstaking)
         };
 
-        let lp_to_collateral = |lp: LpToken| match NonZero::new(lp) {
-            None => Ok(Collateral::zero()),
-            Some(lp) => stats.lp_to_collateral(lp).map(NonZero::raw),
-        };
-
         let history = self.lp_history_get_summary(store, lp_addr)?;
 
         Ok(LpInfoResp {
             lp_amount,
-            lp_collateral: lp_to_collateral(lp_amount)?,
+            lp_collateral: stats.lp_to_collateral(lp_amount)?,
             xlp_amount,
-            xlp_collateral: lp_to_collateral(xlp_amount)?,
+            xlp_collateral: stats.lp_to_collateral(xlp_amount)?,
             available_yield,
             available_yield_lp,
             available_yield_xlp,

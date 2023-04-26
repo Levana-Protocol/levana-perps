@@ -298,6 +298,9 @@ fn liquidity_balances(
         anyhow::ensure!(!value.is_empty());
         sum_lp += value.lp;
         sum_xlp += value.xlp;
+        if let Some(unstaking) = value.unstaking {
+            sum_lp += unstaking.xlp_amount.raw() - unstaking.collected;
+        }
     }
     anyhow::ensure!(total_lp == sum_lp);
     anyhow::ensure!(total_xlp == sum_xlp);

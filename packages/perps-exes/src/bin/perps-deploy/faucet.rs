@@ -11,7 +11,7 @@ use msg::contracts::{
 pub(crate) struct Faucet(Contract);
 
 impl HasAddress for Faucet {
-    fn get_address(&self) -> &Address {
+    fn get_address(&self) -> Address {
         self.0.get_address()
     }
 }
@@ -111,6 +111,22 @@ impl Faucet {
                     name: name.into(),
                     trading_competition_index,
                     market: market.get_address_string().into(),
+                }),
+            )
+            .await
+    }
+
+    pub(crate) async fn add_admin(
+        &self,
+        wallet: &Wallet,
+        new_admin: impl HasAddress,
+    ) -> Result<TxResponse> {
+        self.0
+            .execute(
+                wallet,
+                vec![],
+                ExecuteMsg::OwnerMsg(OwnerMsg::AddAdmin {
+                    admin: new_admin.get_address_string().into(),
                 }),
             )
             .await

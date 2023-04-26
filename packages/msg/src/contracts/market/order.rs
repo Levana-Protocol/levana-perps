@@ -3,6 +3,7 @@ use cosmwasm_std::{Addr, StdResult};
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
 use shared::prelude::*;
 use std::fmt;
+use std::hash::Hash;
 use std::num::ParseIntError;
 
 /// A limit order
@@ -30,14 +31,32 @@ pub struct LimitOrder {
 
 /// A unique numeric ID for each order in the protocol.
 #[cw_serde]
-#[derive(Copy, PartialOrd, Ord, Eq, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct OrderId(pub u64);
+#[derive(Copy, PartialOrd, Ord, Eq)]
+pub struct OrderId(Uint64);
+
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for OrderId {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        u64::arbitrary(u).map(|x| OrderId(Uint64::new(x)))
+    }
+}
+
+#[allow(clippy::derive_hash_xor_eq)]
+impl Hash for OrderId {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.u64().hash(state);
+    }
+}
 
 impl OrderId {
+    /// Construct a new value from a [u64].
+    pub fn new(x: u64) -> Self {
+        OrderId(x.into())
+    }
+
     /// Get the underlying `u64` representation of the order ID.
     pub fn u64(self) -> u64 {
-        self.0
+        self.0.u64()
     }
 }
 
@@ -48,13 +67,13 @@ impl<'a> PrimaryKey<'a> for OrderId {
     type SuperSuffix = Self;
 
     fn key(&self) -> Vec<Key> {
-        vec![Key::Val64(self.0.to_cw_bytes())]
+        vec![Key::Val64(self.0.u64().to_cw_bytes())]
     }
 }
 
 impl<'a> Prefixer<'a> for OrderId {
     fn prefix(&self) -> Vec<Key> {
-        vec![Key::Val64(self.0.to_cw_bytes())]
+        vec![Key::Val64(self.0.u64().to_cw_bytes())]
     }
 }
 
@@ -63,7 +82,7 @@ impl KeyDeserialize for OrderId {
 
     #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
-        u64::from_vec(value).map(OrderId)
+        u64::from_vec(value).map(|x| OrderId(Uint64::new(x)))
     }
 }
 
@@ -76,7 +95,7 @@ impl fmt::Display for OrderId {
 impl FromStr for OrderId {
     type Err = ParseIntError;
     fn from_str(src: &str) -> Result<Self, ParseIntError> {
-        u64::from_str(src).map(OrderId)
+        src.parse().map(|x| OrderId(Uint64::new(x)))
     }
 }
 
@@ -128,13 +147,6 @@ pub mod events {
                 .add_attribute(event_key::ORDER_ID, src.order_id.to_string())
                 .add_attribute(event_key::POS_OWNER, src.owner.to_string())
                 .add_attribute(event_key::TRIGGER_PRICE, src.trigger_price.to_string())
-                .add_attribute(
-                    event_key::MARKET_TYPE,
-                    match src.market_type {
-                        CollateralIsQuote => event_val::NOTIONAL_BASE,
-                        CollateralIsBase => event_val::COLLATERAL_BASE,
-                    },
-                )
                 .add_attribute(event_key::DEPOSIT_COLLATERAL, src.collateral.to_string())
                 .add_attribute(
                     event_key::DEPOSIT_COLLATERAL_USD,
@@ -184,7 +196,7 @@ pub mod events {
                 )?,
                 direction: evt.direction_attr(event_key::DIRECTION)?,
                 max_gains: MaxGainsInQuote::from_str(&(evt.string_attr(event_key::MAX_GAINS)?))?,
-                order_id: OrderId(evt.u64_attr(event_key::ORDER_ID)?),
+                order_id: OrderId::new(evt.u64_attr(event_key::ORDER_ID)?),
                 owner: evt.unchecked_addr_attr(event_key::POS_OWNER)?,
                 trigger_price: PriceBaseInQuote::try_from_number(
                     evt.number_attr(event_key::TRIGGER_PRICE)?,
@@ -223,7 +235,7 @@ pub mod events {
 
         fn try_from(evt: Event) -> Result<Self, Self::Error> {
             Ok(Self {
-                order_id: OrderId(evt.u64_attr(event_key::ORDER_ID)?),
+                order_id: OrderId::new(evt.u64_attr(event_key::ORDER_ID)?),
             })
         }
     }
@@ -234,16 +246,22 @@ pub mod events {
         pub order_id: OrderId,
         /// ID of the position, if it successfully opened
         pub pos_id: Option<PositionId>,
+        /// The error message for a failed limit order, if it failed
+        pub error: Option<String>,
     }
 
     impl PerpEvent for ExecuteLimitOrderEvent {}
     impl From<ExecuteLimitOrderEvent> for Event {
         fn from(src: ExecuteLimitOrderEvent) -> Self {
-            let mut event = Event::new(event_key::PLACE_LIMIT_ORDER)
+            let mut event = Event::new(event_key::EXECUTE_LIMIT_ORDER)
                 .add_attribute(event_key::ORDER_ID, src.order_id.to_string());
 
             if let Some(pos_id) = src.pos_id {
                 event = event.add_attribute(event_key::POS_ID, pos_id.to_string());
+            }
+
+            if let Some(error) = src.error {
+                event = event.add_attribute(event_key::EXECUTE_LIMIT_ORDER_ERROR, error);
             }
 
             event
@@ -254,8 +272,9 @@ pub mod events {
 
         fn try_from(evt: Event) -> Result<Self, Self::Error> {
             Ok(Self {
-                order_id: OrderId(evt.u64_attr(event_key::ORDER_ID)?),
-                pos_id: evt.try_u64_attr(event_key::POS_ID)?.map(PositionId),
+                order_id: OrderId::new(evt.u64_attr(event_key::ORDER_ID)?),
+                pos_id: evt.try_u64_attr(event_key::POS_ID)?.map(PositionId::new),
+                error: evt.try_map_attr(event_key::EXECUTE_LIMIT_ORDER_ERROR, |x| x.to_owned()),
             })
         }
     }

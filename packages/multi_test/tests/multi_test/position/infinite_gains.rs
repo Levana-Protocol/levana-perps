@@ -144,3 +144,48 @@ fn infinite_gains_are_infinite_perp_898() {
     // Confirm the position is still open
     market.query_position(pos_id).unwrap();
 }
+
+#[test]
+fn update_stop_loss_inf_max_gains_perp_1071() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    // Only works in collateral-is-base markets, since otherwise we can have infinite max gains.
+    return_unless_market_collateral_base!(market);
+    let trader = market.clone_trader(0).unwrap();
+
+    let (pos_id, _) = market
+        .exec_open_position(
+            &trader,
+            "100",
+            "20",
+            DirectionToBase::Long,
+            "+Inf",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    // Open a larger short position and run a few liquifundings so that our
+    // position ends up making some funding fees. Now the calculated take profit
+    // should be negative.
+    market
+        .exec_open_position(
+            &trader,
+            "300",
+            "30",
+            DirectionToBase::Short,
+            "1.0",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    market.set_time(TimeJump::Liquifundings(3)).unwrap();
+    market.exec_crank_till_finished(&trader).unwrap();
+    market.exec_set_price("2.0".parse().unwrap()).unwrap();
+
+    market
+        .exec_set_trigger_order(&trader, pos_id, Some("0.99".parse().unwrap()), None)
+        .unwrap();
+}

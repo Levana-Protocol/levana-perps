@@ -17,7 +17,6 @@ Command line tool providing functionality for working with perps, providing depl
     * Provide the `--family` flag to indicate the family of contracts (e.g., `dragondev`)
     * Will instantiate fresh copies of `faucet`, `cw20`, and `factory`
     * Adds a new market (which causes a new market, position token, and both LP and xLP liquidity tokens)
-    * Sends CW20 tokens to the nibb bot for the contract family specified
     * Sets the price admin on the factory contract to the price admin bot for the contract family specified
     * (Both above points leverage `assets/config.yaml`)
     * Logs all the new contracts in the `tracker`
@@ -44,7 +43,7 @@ The `assets/config.yaml` file contains contains information for individual track
 * Determine a name for the family, e.g. `osmoqa`
 * Generate a new set of seed phrases for the bots which will run on these contracts
     * You can use the `cosmos` CLI to generate these seed phrases, e.g. `cosmos gen-wallet osmo` will generate a new seed phrase and print the Osmosis address
-    * You will need three new seed phrases: the price admin (aka oracle), nibb bot (aka balancer), and crank bot
+    * You will need three new seed phrases: the price admin (aka oracle), bot wallet manager, and crank bot
     * You will need the public addresses of the first two for updating the config here
 *   Within `assets/config.yaml`, add a stanza like the following:
 
@@ -52,7 +51,7 @@ The `assets/config.yaml` file contains contains information for individual track
     families:
       osmoqa:
         network: osmosis-testnet
-        nibb: osmo1.... # from the gen-wallet above
+        wallet-manager-address: osmo1.... # from the gen-wallet above
         price: osmo1... # from the gen-wallet above, but for price admin
         # faucet and cw20 are a bit complicated right now
         # For non-trading-competition, you can copy-paste one of the values

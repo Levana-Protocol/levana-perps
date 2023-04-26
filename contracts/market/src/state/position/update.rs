@@ -7,6 +7,7 @@ use msg::contracts::market::fees::events::FeeSource;
 use msg::contracts::market::position::events::{
     calculate_position_collaterals, PositionAttributes, PositionTradingFee,
 };
+use msg::contracts::market::position::MaybeClosedPosition;
 use msg::contracts::market::position::{events::PositionUpdateEvent, Position, PositionId};
 
 impl State<'_> {
@@ -278,7 +279,6 @@ impl State<'_> {
         let spot_price = self.spot_price(ctx.storage, None)?;
         let mut pos = get_position(ctx.storage, id)?;
 
-        let now = self.now();
         let original_pos = pos.clone();
 
         if notional_size.into_number().approx_eq(Number::ZERO) {
@@ -346,22 +346,17 @@ impl State<'_> {
         // Validation
 
         let notional_size_diff = pos.notional_size - original_pos.notional_size;
-        self.position_validate_liquidity(
-            ctx.storage,
-            Collateral::zero(),
-            notional_size_diff,
-            Some(now),
-        )?;
 
         // Storage and external
 
         self.charge_delta_neutrality_fee(
-            ctx,
+            ctx.storage,
             &mut pos,
             notional_size_diff,
             spot_price,
             DeltaNeutralityFeeReason::PositionUpdate,
-        )?;
+        )?
+        .store(self, ctx)?;
         self.position_save(ctx, &mut pos, &spot_price, true, true)?;
         self.adjust_net_open_interest(ctx, notional_size_diff, pos.direction(), true)?;
         self.add_delta_neutrality_ratio_event(
@@ -394,7 +389,6 @@ impl State<'_> {
         let spot_price = self.spot_price(ctx.storage, None)?;
         let mut pos = get_position(ctx.storage, id)?;
 
-        let now = self.now();
         let original_pos = pos.clone();
 
         // Update
@@ -419,10 +413,7 @@ impl State<'_> {
         pos.active_collateral = pos.active_collateral.checked_add_signed(collateral_delta)?;
         pos.deposit_collateral
             .checked_add_assign(collateral_delta, &spot_price)?;
-
-        let old_notional_size_in_collateral = pos
-            .notional_size
-            .map(|x| spot_price.notional_to_collateral(x));
+        let old_notional_size_in_collateral = pos.notional_size_in_collateral(&spot_price);
         let new_notional_size_in_collateral =
             old_notional_size_in_collateral.try_map(|x| x.checked_mul_dec(scale_factor.raw()))?;
         pos.notional_size =
@@ -465,22 +456,17 @@ impl State<'_> {
             .checked_add_assign(trading_fee_delta, &spot_price)?;
 
         let notional_size_diff = pos.notional_size - original_pos.notional_size;
-        self.position_validate_liquidity(
-            ctx.storage,
-            Collateral::zero(),
-            notional_size_diff,
-            Some(now),
-        )?;
 
         // Storage and external
 
         self.charge_delta_neutrality_fee(
-            ctx,
+            ctx.storage,
             &mut pos,
             notional_size_diff,
             spot_price,
             DeltaNeutralityFeeReason::PositionUpdate,
-        )?;
+        )?
+        .store(self, ctx)?;
         self.position_save(ctx, &mut pos, &spot_price, true, true)?;
         self.adjust_net_open_interest(ctx, notional_size_diff, pos.direction(), true)?;
         self.add_delta_neutrality_ratio_event(
@@ -522,7 +508,6 @@ impl State<'_> {
         let spot_price = self.spot_price(ctx.storage, None)?;
         let mut pos = get_position(ctx.storage, id)?;
 
-        let now = self.now();
         let original_pos = pos.clone();
 
         let old_counter_collateral = pos.counter_collateral;
@@ -555,12 +540,6 @@ impl State<'_> {
 
         let notional_size_diff = pos.notional_size - original_pos.notional_size;
         debug_assert!(notional_size_diff.is_zero());
-        self.position_validate_liquidity(
-            ctx.storage,
-            Collateral::zero(),
-            notional_size_diff,
-            Some(now),
-        )?;
 
         // Storage and external
 
@@ -595,9 +574,17 @@ impl State<'_> {
         pos.take_profit_override_notional =
             take_profit_override.map(|x| x.into_notional_price(market_type));
 
-        self.position_save(ctx, &mut pos, &price, true, false)?;
-
-        self.position_validate_trigger_orders(&pos, market_type, price)?;
+        // We need to validate the trigger prices against up-to-date information
+        // based on a liquifunding, so we perform a liquifunding right now. We
+        // then validate the updated position.
+        let last_liquifund = pos.liquifunded_at;
+        match self.position_liquifund(ctx, pos, last_liquifund, self.now(), false)? {
+            MaybeClosedPosition::Open(mut pos) => {
+                self.position_validate_trigger_orders(&pos, market_type, price)?;
+                self.position_save(ctx, &mut pos, &price, true, false)?;
+            }
+            MaybeClosedPosition::Close(_) => anyhow::bail!("Cannot update trigger orders since the position will be closed on next liquifunding"),
+        }
 
         Ok(())
     }

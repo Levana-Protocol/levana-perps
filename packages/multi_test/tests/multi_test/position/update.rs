@@ -119,6 +119,197 @@ fn position_update_collateral_impact_leverage() {
     }
 }
 
+#[test]
+fn position_update_collateral_impact_size() {
+    let perform_update = |direction: DirectionToBase,
+                          collateral_delta: Signed<Collateral>,
+                          expected_size: Number| {
+        let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+        let trader = market.clone_trader(0).unwrap();
+        let initial_collateral = Collateral::from_str("100").unwrap();
+
+        let (pos_id, _) = market
+            .exec_open_position(
+                &trader,
+                initial_collateral.into_number(),
+                "10",
+                direction,
+                "1.0",
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        market
+            .exec_update_position_collateral_impact_size(&trader, pos_id, collateral_delta, None)
+            .unwrap();
+
+        let updated_pos = market.query_position(pos_id).unwrap();
+
+        assert_eq!(
+            updated_pos.deposit_collateral,
+            initial_collateral.into_signed() + collateral_delta
+        );
+
+        assert!(
+            updated_pos
+                .notional_size
+                .into_number()
+                .approx_eq_eps(expected_size.into_number(), Number::EPS_E6),
+            "direction: {:?}, expected_size: {}, actual_size: {}",
+            direction,
+            expected_size,
+            updated_pos.notional_size
+        );
+    };
+
+    // Test add collateral
+
+    let collateral_delta = Signed::<Collateral>::from_str("50").unwrap();
+    match DefaultMarket::market_type() {
+        MarketType::CollateralIsQuote => {
+            perform_update(
+                DirectionToBase::Long,
+                collateral_delta,
+                "1502.815769".parse().unwrap(),
+            );
+            perform_update(
+                DirectionToBase::Short,
+                collateral_delta,
+                "-1502.815769".parse().unwrap(),
+            );
+        }
+        MarketType::CollateralIsBase => {
+            perform_update(
+                DirectionToBase::Long,
+                collateral_delta,
+                "-1352.256803".parse().unwrap(),
+            );
+            perform_update(
+                DirectionToBase::Short,
+                collateral_delta,
+                "1653.449158".parse().unwrap(),
+            );
+        }
+    }
+
+    // Test remove collateral
+
+    let collateral_delta = Signed::<Collateral>::from_str("-50").unwrap();
+    match DefaultMarket::market_type() {
+        MarketType::CollateralIsQuote => {
+            perform_update(
+                DirectionToBase::Long,
+                collateral_delta,
+                "497.184231".parse().unwrap(),
+            );
+            perform_update(
+                DirectionToBase::Short,
+                collateral_delta,
+                "-497.184231".parse().unwrap(),
+            );
+        }
+        MarketType::CollateralIsBase => {
+            perform_update(
+                DirectionToBase::Long,
+                collateral_delta,
+                "-447.743196".parse().unwrap(),
+            );
+            perform_update(
+                DirectionToBase::Short,
+                collateral_delta,
+                "546.550841".parse().unwrap(),
+            );
+        }
+    }
+}
+
+#[test]
+fn position_update_max_gains() {
+    let perform_update = |direction: DirectionToBase,
+                          max_gains: MaxGainsInQuote,
+                          expected_counter_collateral: Number| {
+        let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+        let trader = market.clone_trader(0).unwrap();
+        let initial_collateral = Collateral::from_str("100").unwrap();
+
+        let (pos_id, _) = market
+            .exec_open_position(
+                &trader,
+                initial_collateral.into_number(),
+                "10",
+                direction,
+                "3.0",
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        market
+            .exec_update_position_max_gains(&trader, pos_id, max_gains)
+            .unwrap();
+
+        let updated_pos = market.query_position(pos_id).unwrap();
+
+        assert!(
+            updated_pos
+                .counter_collateral
+                .into_number()
+                .approx_eq_eps(expected_counter_collateral.into_number(), Number::EPS_E6),
+            "direction: {:?}, expected_counter_collateral: {}, actual_counter_collateral: {}",
+            direction,
+            expected_counter_collateral,
+            updated_pos.counter_collateral
+        );
+    };
+
+    // Test increase max gains
+
+    let max_gains = MaxGainsInQuote::from_str("5").unwrap();
+    match DefaultMarket::market_type() {
+        MarketType::CollateralIsQuote => {
+            perform_update(DirectionToBase::Long, max_gains, "496.7".parse().unwrap());
+            perform_update(DirectionToBase::Short, max_gains, "496.7".parse().unwrap());
+        }
+        MarketType::CollateralIsBase => {
+            perform_update(
+                DirectionToBase::Long,
+                max_gains,
+                "298.986218".parse().unwrap(),
+            );
+            perform_update(
+                DirectionToBase::Short,
+                max_gains,
+                "1080.875983".parse().unwrap(),
+            );
+        }
+    }
+
+    // Test decrease max gains
+
+    let max_gains = MaxGainsInQuote::from_str("2").unwrap();
+    match DefaultMarket::market_type() {
+        MarketType::CollateralIsQuote => {
+            perform_update(DirectionToBase::Long, max_gains, "198.68".parse().unwrap());
+            perform_update(DirectionToBase::Short, max_gains, "198.68".parse().unwrap());
+        }
+        MarketType::CollateralIsBase => {
+            perform_update(
+                DirectionToBase::Long,
+                max_gains,
+                "149.366921".parse().unwrap(),
+            );
+            perform_update(
+                DirectionToBase::Short,
+                max_gains,
+                "271.992263".parse().unwrap(),
+            );
+        }
+    }
+}
+
 fn position_update_open_interest_inner(
     market: PerpsMarket,
     direction: DirectionToBase,
@@ -357,9 +548,6 @@ fn position_update_leverage() {
 fn position_update_collateral() {}
 
 #[test]
-fn position_update_max_gains() {}
-
-#[test]
 fn test_position_update_max_leverage_fail() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
@@ -494,7 +682,12 @@ fn position_update_abs_notional_size() {
 
                 let update_res = match change_kind {
                     ChangeKind::Collateral(delta) => market
-                        .exec_update_position_collateral_impact_size(&trader, pos_id, delta, None)
+                        .exec_update_position_collateral_impact_size(
+                            &trader,
+                            pos_id,
+                            Signed::<Collateral>::from_number(delta),
+                            None,
+                        )
                         .unwrap(),
                     ChangeKind::Leverage(leverage) => market
                         .exec_update_position_leverage(&trader, pos_id, leverage.into(), None)
@@ -696,4 +889,35 @@ fn update_after_liquidation_fails_perp_873() {
     market.exec_crank_till_finished(&trader).unwrap();
     let closed = market.query_closed_position(&trader, pos_id).unwrap();
     assert_position_liquidated(&closed).unwrap();
+}
+
+#[test]
+fn position_update_collateral_remove_tiny() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    let (pos_id, _) = market
+        .exec_open_position(
+            &trader,
+            "100",
+            "10",
+            DirectionToBase::Long,
+            "1.0",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    // We can't remove amounts of collateral so tiny that it would require
+    // more precision than what the token can express
+    let collateral_delta = "-0.000000001".parse().unwrap();
+
+    market
+        .exec_update_position_collateral_impact_leverage(&trader, pos_id, collateral_delta)
+        .unwrap_err();
+
+    market
+        .exec_update_position_collateral_impact_size(&trader, pos_id, collateral_delta, None)
+        .unwrap_err();
 }

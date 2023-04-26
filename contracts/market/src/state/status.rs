@@ -4,6 +4,7 @@ use cosmwasm_std::Storage;
 use msg::contracts::market::entry::StatusResp;
 
 use super::{fees::all_fees, stale::ProtocolStaleness, State};
+use crate::state::delta_neutrality_fee::DELTA_NEUTRALITY_FUND;
 
 impl State<'_> {
     pub(crate) fn status(&self, store: &dyn Storage) -> Result<StatusResp> {
@@ -48,6 +49,9 @@ impl State<'_> {
             .checked_sub(short_notional.into_signed())?
             .into_number()
             .checked_div(self.config.delta_neutrality_fee_sensitivity.into_signed())?;
+        let delta_neutrality_fee_fund = DELTA_NEUTRALITY_FUND
+            .may_load(store)?
+            .unwrap_or(Collateral::zero());
 
         let ProtocolStaleness {
             stale_liquifunding,
@@ -75,6 +79,7 @@ impl State<'_> {
             long_usd,
             short_usd,
             instant_delta_neutrality_fee_value,
+            delta_neutrality_fee_fund,
             stale_liquifunding,
             stale_price: old_price,
             fees,

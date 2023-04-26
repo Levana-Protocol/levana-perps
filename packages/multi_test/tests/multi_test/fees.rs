@@ -42,7 +42,7 @@ fn test_fees_inner(market: PerpsMarket, direction: DirectionToBase, expected_fee
     assert_fees_eq(Collateral::zero(), Collateral::zero());
 
     // make sure we error when we try to transfer empty fees
-    market.exec_transfer_dao_fees(&cranker, None).unwrap_err();
+    market.exec_transfer_dao_fees(&cranker).unwrap_err();
     assert_dao_eq(Collateral::zero());
     assert_fees_eq(Collateral::zero(), Collateral::zero());
 
@@ -60,27 +60,7 @@ fn test_fees_inner(market: PerpsMarket, direction: DirectionToBase, expected_fee
     assert_eq!(fees_after_open.protocol, expected_protocol_fees);
     assert_eq!(fees_after_open.wallets, expected_lp_fees);
 
-    // try and fail to transfer too much
-    let too_much_amount = expected_protocol_fees
-        .checked_add("1".parse().unwrap())
-        .unwrap();
-    market
-        .exec_transfer_dao_fees(&cranker, Some(NonZero::new(too_much_amount).unwrap()))
-        .unwrap_err();
-
-    // transfer part of the amount
-    let partial_amount = expected_protocol_fees
-        .checked_mul_dec("0.25".parse().unwrap())
-        .unwrap();
-    market
-        .exec_transfer_dao_fees(&cranker, Some(NonZero::new(partial_amount).unwrap()))
-        .unwrap();
-
-    let remaining_amount = expected_protocol_fees - partial_amount;
-    assert_dao_eq(partial_amount);
-    assert_fees_eq(remaining_amount, expected_lp_fees); // LP is unchanged
-
-    // transfer the rest of the fees (by way of factory to test submsg pipeline)
+    // transfer the fees (by way of factory to test submsg pipeline)
     market
         .exec_factory(&FactoryExecuteMsg::TransferAllDaoFees {})
         .unwrap();
@@ -88,7 +68,7 @@ fn test_fees_inner(market: PerpsMarket, direction: DirectionToBase, expected_fee
     assert_fees_eq(Collateral::zero(), expected_lp_fees); // LP is unchanged
 
     // make sure we error when we try to transfer empty fees
-    market.exec_transfer_dao_fees(&cranker, None).unwrap_err();
+    market.exec_transfer_dao_fees(&cranker).unwrap_err();
     assert_dao_eq(expected_protocol_fees); // full original amount
     assert_fees_eq(Collateral::zero(), expected_lp_fees); // LP is unchanged
 }

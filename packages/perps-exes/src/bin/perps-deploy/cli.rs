@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use cosmos::{RawAddress, RawWallet};
+use cosmos::RawWallet;
 use perps_exes::build_version;
 
 use crate::localtest;
@@ -28,10 +28,15 @@ pub(crate) enum Subcommand {
         #[clap(flatten)]
         inner: crate::store_code::StoreCodeOpt,
     },
-    /// Instantiate the contracts
+    /// Instantiate perps contracts
     Instantiate {
         #[clap(flatten)]
         inner: crate::instantiate::InstantiateOpt,
+    },
+    /// Instantiate rewards contracts
+    InstantiateRewards {
+        #[clap(flatten)]
+        inner: crate::instantiate_rewards::InstantiateRewardsOpt,
     },
     /// Migrate existing contracts
     Migrate {
@@ -72,9 +77,6 @@ pub(crate) struct Opt {
     /// Directory containing the generated WASM files.
     #[clap(long, default_value = "./wasm/artifacts", env = "PERPS_WASM_DIR")]
     wasm_dir: PathBuf,
-    /// Nibb bot address, will fall back to a default if not provided
-    #[clap(long, global = true, env = "PERPS_NIBB_BOT")]
-    pub(crate) nibb_bot: Option<RawAddress>,
 }
 
 impl Opt {

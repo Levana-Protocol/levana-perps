@@ -32,8 +32,14 @@ impl LiquidityStats {
     ///
     /// This method can fail due to arithmetic overflow. It can also fail if
     /// invariants are violated, specifically if there is 0 collateral in the
-    /// pool when this is called.
-    pub fn lp_to_collateral(&self, lp: NonZero<LpToken>) -> Result<NonZero<Collateral>> {
+    /// pool when this is called with a non-zero amount of LP.
+    ///
+    /// Note that even with a non-zero input value for `lp`, due to rounding
+    /// errors this function may return 0 collateral.
+    pub fn lp_to_collateral(&self, lp: LpToken) -> Result<Collateral> {
+        if lp.is_zero() {
+            return Ok(Collateral::zero());
+        }
         let total_collateral = self.total_collateral();
 
         anyhow::ensure!(
@@ -43,13 +49,20 @@ impl LiquidityStats {
         let total_tokens = self.total_tokens();
         debug_assert_ne!(total_tokens, LpToken::zero());
 
-        NonZero::new(Collateral::from_decimal256(
+        Ok(Collateral::from_decimal256(
             total_collateral
                 .into_decimal256()
                 .checked_mul(lp.into_decimal256())?
                 .checked_div(total_tokens.into_decimal256())?,
         ))
-        .context("LiquidityStats::lp_to_collateral: impossible! ended up with 0 collateral")
+    }
+
+    /// Same as [Self::lp_to_collateral], but treats round-to-zero as an error.
+    pub fn lp_to_collateral_non_zero(&self, lp: NonZero<LpToken>) -> Result<NonZero<Collateral>> {
+        self.lp_to_collateral(lp.raw()).and_then(|c| {
+            NonZero::new(c)
+                .context("lp_to_collateral_non_zero: amount of backing collateral rounded to 0")
+        })
     }
 
     /// Calculate how many LP tokens would be produced from the given collateral.

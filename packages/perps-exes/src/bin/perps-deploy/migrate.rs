@@ -71,6 +71,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         )
         .await?;
     log::info!("Update position token ID in factory: {}", res.txhash);
+
     factory
         .migrate(
             &app.basic.wallet,
@@ -95,83 +96,97 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
     } in factory.get_markets().await?
     {
         log::info!("Performing migrations for market {market_id}");
-        market
-            .migrate(
-                &app.basic.wallet,
-                market_code_id.get_code_id(),
-                msg::contracts::market::entry::MigrateMsg {},
-            )
-            .await?;
-        log::info!("Market contract for {market_id} migrated");
-        match app
-            .tracker
-            .migrate(
-                &app.basic.wallet,
-                market_code_id.get_code_id(),
-                market.get_address(),
-            )
-            .await
-        {
-            Err(e) => log::warn!(
-                "Unable to log tracker update for market contract {}: {e:?}",
-                market.get_address()
-            ),
-            Ok(res) => log::info!(
-                "Logged market {market_id} update in tracker at: {}",
-                res.txhash
-            ),
-        }
-
-        position_token
-            .migrate(
-                &app.basic.wallet,
-                position_token_code_id.get_code_id(),
-                msg::contracts::position_token::entry::MigrateMsg {},
-            )
-            .await?;
-        log::info!("Position token contract for {market_id} migrated");
-        match app
-            .tracker
-            .migrate(
-                &app.basic.wallet,
-                position_token_code_id.get_code_id(),
-                position_token.get_address(),
-            )
-            .await
-        {
-            Err(e) => {
-                log::warn!("Unable to migrate position token contract {position_token}: {e:?}")
-            }
-            Ok(res) => log::info!(
-                "Logged position token {market_id} update in tracker at: {}",
-                res.txhash
-            ),
-        }
-
-        for (kind, lt) in [("LP", liquidity_token_lp), ("xLP", liquidity_token_xlp)] {
-            lt.migrate(
-                &app.basic.wallet,
-                liquidity_token_code_id.get_code_id(),
-                msg::contracts::position_token::entry::MigrateMsg {},
-            )
-            .await?;
-            log::info!("{kind} liquidity token contract for {market_id} migrated");
+        let current_market_code_id = market.info().await?.code_id;
+        if current_market_code_id == market_code_id.get_code_id() {
+            log::info!("Skipping market contract migration");
+        } else {
+            market
+                .migrate(
+                    &app.basic.wallet,
+                    market_code_id.get_code_id(),
+                    msg::contracts::market::entry::MigrateMsg {},
+                )
+                .await?;
+            log::info!("Market contract for {market_id} migrated");
             match app
                 .tracker
                 .migrate(
                     &app.basic.wallet,
-                    liquidity_token_code_id.get_code_id(),
-                    lt.get_address(),
+                    market_code_id.get_code_id(),
+                    market.get_address(),
+                )
+                .await
+            {
+                Err(e) => log::warn!(
+                    "Unable to log tracker update for market contract {}: {e:?}",
+                    market.get_address()
+                ),
+                Ok(res) => log::info!(
+                    "Logged market {market_id} update in tracker at: {}",
+                    res.txhash
+                ),
+            }
+        }
+
+        let current_position_code_id = position_token.info().await?.code_id;
+        if current_position_code_id == position_token_code_id.get_code_id() {
+            log::info!("Skipping migration of position token contract");
+        } else {
+            position_token
+                .migrate(
+                    &app.basic.wallet,
+                    position_token_code_id.get_code_id(),
+                    msg::contracts::position_token::entry::MigrateMsg {},
+                )
+                .await?;
+            log::info!("Position token contract for {market_id} migrated");
+            match app
+                .tracker
+                .migrate(
+                    &app.basic.wallet,
+                    position_token_code_id.get_code_id(),
+                    position_token.get_address(),
                 )
                 .await
             {
                 Err(e) => {
-                    log::warn!("Unable to migrate {kind} liquidity token contract {lt}: {e:?}")
+                    log::warn!("Unable to migrate position token contract {position_token}: {e:?}")
                 }
                 Ok(res) => log::info!(
-                    "Logged {kind} liquidity token {market_id} update in tracker at: {}",
+                    "Logged position token {market_id} update in tracker at: {}",
                     res.txhash
                 ),
+            }
+        }
+
+        for (kind, lt) in [("LP", liquidity_token_lp), ("xLP", liquidity_token_xlp)] {
+            if lt.info().await?.code_id == liquidity_token_code_id.get_code_id() {
+                log::info!("Skipping liquidity token contract migration for {market_id}");
+            } else {
+                lt.migrate(
+                    &app.basic.wallet,
+                    liquidity_token_code_id.get_code_id(),
+                    msg::contracts::position_token::entry::MigrateMsg {},
+                )
+                .await?;
+                log::info!("{kind} liquidity token contract for {market_id} migrated");
+                match app
+                    .tracker
+                    .migrate(
+                        &app.basic.wallet,
+                        liquidity_token_code_id.get_code_id(),
+                        lt.get_address(),
+                    )
+                    .await
+                {
+                    Err(e) => {
+                        log::warn!("Unable to migrate {kind} liquidity token contract {lt}: {e:?}")
+                    }
+                    Ok(res) => log::info!(
+                        "Logged {kind} liquidity token {market_id} update in tracker at: {}",
+                        res.txhash
+                    ),
+                }
             }
         }
     }

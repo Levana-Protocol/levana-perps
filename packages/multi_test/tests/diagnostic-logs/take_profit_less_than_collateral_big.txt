@@ -113,7 +113,7 @@
 {"msg_id":265,"user":"user","msg":{"ExecMarket":{"exec_msg":{"update_position_add_collateral_impact_leverage":{"id":8}},"funds":"12.11540626987405"}}}
 {"msg_id":268,"user":"user","msg":"RefreshPrice"}
 {"msg_id":270,"user":"user","msg":"Crank"}
-{"msg_id":274,"user":"user","msg":{"ExecMarket":{"exec_msg":{"update_position_remove_collateral_impact_leverage":{"id":3,"amount":"17.811700102651777"}},"funds":null}}}
+{"msg_id":274,"user":"user","msg":{"ExecMarket":{"exec_msg":{"update_position_remove_collateral_impact_leverage":{"id":"3","amount":"17.811700102651777"}},"funds":null}}}
 {"msg_id":277,"user":"user","msg":"RefreshPrice"}
 {"msg_id":279,"user":"user","msg":"Crank"}
 {"msg_id":283,"user":"user","msg":{"ExecMarket":{"exec_msg":{"update_position_leverage":{"id":5,"leverage":"7.661952361306041","slippage_assert":null}},"funds":null}}}

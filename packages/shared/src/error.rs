@@ -23,19 +23,16 @@ pub struct PerpError<T = ()> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorId {
-    InvalidDeposit,
     InvalidWithdrawal,
     InvalidStakeLp,
     InvalidAmount,
     SlippageAssert,
     PriceAlreadyExists,
     PriceNotFound,
-    CloseDataNotFound,
+    PriceTooOld,
     Liquidity,
     MissingPosition,
     LeverageValidation,
-    Liquidation,
-    PositionOpen,
     PositionUpdate,
     NativeFunds,
     Cw20Funds,
@@ -43,14 +40,11 @@ pub enum ErrorId {
     Expired,
     MsgValidation,
     Conversion,
-    Ordering,
     Config,
     InternalReply,
-    Precision,
     Exceeded,
     Any,
     Stale,
-    PositionNotOpen,
     InsufficientMargin,
     InvalidLiquidityTokenMsg,
     AddressAlreadyExists,
@@ -60,9 +54,10 @@ pub enum ErrorId {
     DeltaNeutralityFeeNewlyShort,
     DeltaNeutralityFeeLongToShort,
     DeltaNeutralityFeeShortToLong,
-    PositionPendingLiquidation,
     MinimumDeposit,
     DirectionToBaseFlipped,
+    MissingFunds,
+    UnnecessaryFunds,
 }
 
 /// Source within the protocol for the error
@@ -79,6 +74,7 @@ pub enum ErrorDomain {
     Factory,
     Default,
     Faucet,
+    Pyth,
 }
 
 /// Generate a [PerpError] value

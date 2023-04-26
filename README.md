@@ -24,10 +24,18 @@ This is perps v2, following a completely new financial model, without a vAMM
 
 It's also an updated dev environment, with multichain support and a native SDK in both Typescript and Rust/WASM (no Rust binary sdk yet..)
 
-- [DEV FRONTEND](https://levana-perps-multichain.vercel.app/)
-- [MSG DOCS (cosmos)](http://levana-dev-docs.s3-website.ap-northeast-2.amazonaws.com/levana-perps-multichain/docs/api/cosmos/msg/doc/levana_perpswap_cosmos_msg/)
-- [SHARED DOCS (cosmos)](http://levana-dev-docs.s3-website.ap-northeast-2.amazonaws.com/levana-perps-multichain/docs/api/cosmos/shared/doc/levana_perpswap_cosmos_shared/)
-- [Slides describing the platform](https://levana-sandbox-audit-slides.s3.eu-west-3.amazonaws.com/slides/index.html) (primarily intended for audit)
+- Long-form documentation
+    - [Whitepaper](https://www.notion.so/levana-protocol/Levana-Well-funded-Perpetuals-Whitepaper-9805a6eba56d429b839f5551dbb65c40)
+    - [High level overview](https://docs.levana.exchange/high-level-overview)
+    - [Slides describing the platform](https://docs.levana.exchange/slides/) (primarily intended for audit)
+    - [API tutorial in TypeScript](https://docs.levana.exchange/api-tutorial-ts/introduction)
+- References docs
+    - [`msg` crate](http://levana-dev-docs.s3-website.ap-northeast-2.amazonaws.com/levana-perps-multichain/docs/api/cosmos/msg/doc/levana_perpswap_cosmos_msg/)
+    - [`shared` crate](http://levana-dev-docs.s3-website.ap-northeast-2.amazonaws.com/levana-perps-multichain/docs/api/cosmos/shared/doc/levana_perpswap_cosmos_shared/)
+- Web interfaces
+    - [Develop frontend](https://levana-web-app-develop.vercel.app/)
+    - [Staging frontend](https://levana-web-app-staging.vercel.app/)
+    - [Public beta](https://beta.levana.exchange/)
 
 # PREREQUISITES
 

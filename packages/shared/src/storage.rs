@@ -32,6 +32,75 @@ where
     Ok(next_id)
 }
 
+/// Helper to paginate over [MonotonicMultilevelMap]
+pub fn collect_monotonic_multilevel_map<'a, K, T>(
+    store: &dyn Storage,
+    m: MonotonicMultilevelMap<'a, K, T>,
+    k: K,
+    after_id: Option<u64>,
+    limit: Option<u32>,
+    order: Order,
+) -> Result<Vec<(u64, T)>>
+where
+    K: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize,
+    T: serde::Serialize + serde::de::DeserializeOwned,
+{
+    let iter = m
+        .prefix(k)
+        .range(store, after_id.map(Bound::exclusive), None, order)
+        .map(|res| res.map_err(|err| err.into()));
+
+    match limit {
+        Some(limit) => iter.take(limit.try_into()?).collect(),
+        None => iter.collect(),
+    }
+}
+
+/// A [Map] where the key monotonically increases.
+///
+/// This represents a common pattern where we want to store data with unique keys
+/// The [u64] key is guaranteed to monotonically increase over time per pushed value.
+pub type MonotonicMap<'a, T> = Map<'a, u64, T>;
+
+/// Push a new value to a [MonotonicMap].
+pub fn push_to_monotonic_map<'a, T>(
+    store: &mut dyn Storage,
+    m: MonotonicMap<'a, T>,
+    t: &T,
+) -> Result<u64>
+where
+    T: serde::Serialize + serde::de::DeserializeOwned,
+{
+    let next_id = m
+        .keys(store, None, None, cosmwasm_std::Order::Descending)
+        .next()
+        .transpose()?
+        .map_or(0, |x| x + 1);
+    m.save(store, next_id, t)?;
+    Ok(next_id)
+}
+
+/// Helper to paginate over [MonotonicMap]
+pub fn collect_monotonic_map<T>(
+    store: &dyn Storage,
+    m: MonotonicMap<T>,
+    after_id: Option<u64>,
+    limit: Option<u32>,
+    order: Order,
+) -> Result<Vec<(u64, T)>>
+where
+    T: serde::Serialize + serde::de::DeserializeOwned,
+{
+    let iter = m
+        .range(store, after_id.map(Bound::exclusive), None, order)
+        .map(|res| res.map_err(|err| err.into()));
+
+    match limit {
+        Some(limit) => iter.take(limit.try_into()?).collect(),
+        None => iter.collect(),
+    }
+}
+
 /// Load an [cw_storage_plus::Item] stored in an external contract
 pub fn load_external_item<T: serde::de::DeserializeOwned>(
     querier: &QuerierWrapper<Empty>,
