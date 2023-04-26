@@ -1,0 +1,59 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Roboto:wght@300;400&display=swap");
+
+.reveal-viewport {
+    background-color: #000;
+    background-image: url(https://www.levana.finance/images/logo.svg);
+    background-size: 10%;
+    background-repeat: no-repeat;
+    background-position: 3% 96%;
+    font-family: Poppins, Calibri, Candara, Segoe, Segoe UI, Optima, Arial, sans-serif;
+}
+
+@media screen {
+    .reveal {
+        font-size: 30px;
+    }
+}
+
+@media print {
+    .reveal-viewport {
+        background-color: #fff;
+    }
+
+    .reveal {
+        color: #000;
+    }
+}
+
+.reveal .slides {
+    text-align: left;
+}
+
+.reveal h1, .reveal h2, .reveal h3, .reveal h4, .reveal h5, .reveal h6 {
+    font-family: "Poppins";
+    font-weight: bold;
+    color: #7600dd;
+    text-align: center;
+    text-transform: none;
+}
+
+.reveal h1 {
+    font-size: 1.5em;
+}
+
+.reveal h2 {
+    font-size: 1.3em;
+}
+
+.reveal h3 {
+    font-size: 1.2em;
+    text-decoration: underline;
+}
+
+.reveal h4 {
+    font-size: 1.2em;
+}
+
+b, strong, code {
+    color: #7600dd;
+}

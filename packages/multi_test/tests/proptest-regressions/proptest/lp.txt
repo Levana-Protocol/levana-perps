@@ -1,0 +1,10 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc c8561f2b1ba6e96f7bf88d30026ba21886044ccae5c4d850839be66c53a57459 # shrinks to strategy = Lp { collateral: "10", time_jump: FractionalLiquifundings(0.25), stake_to_xlp: false, market-id: "ATOM_USD", market-type: CollateralIsBase }
+cc 27102ee9724c52c2dac5bed47021519296e3ada958b40b742c1d8d87167eb191 # shrinks to strategy = Lp { collateral: "15.2932205", time_jump: FractionalLiquifundings(0.25), stake_to_xlp: true, market-id: "ATOM_USD", market-type: CollateralIsBase }
+cc 2df309f3aea4478ddbf0da0005871d47127bcd20aafdaf80e46b7fffdeeac513 # shrinks to strategy = Lp { pos_collateral: "0.1", pos_direction: Long, lp_deposit: "0.1", time_jump: "1", market-id: "ATOM_USD", market-type: CollateralIsBase }
+cc 4f05d9e1bcff5e0c41e166cb80dffc5e15ed3af3f61f2569144966aa779d8090 # shrinks to strategy = Lp { pos_collateral: "757.571913", pos_direction: Short, lp_deposit: "2.744112", time_jump: "3.9838277631781667", close_position: "false", market-id: "ATOM_USD", market-type: CollateralIsBase }

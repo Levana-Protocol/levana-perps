@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 79fd389ea25076108503248b1da8d07d33759c80aa023d8bcda3e69d211f9726 # shrinks to lifecycle = PositionLifecycle { strict: true, open: PositionOpen { collateral: "10", slippage_assert: None, leverage: "1.1", direction: Long, max_gains: "1.1", stop_loss_override: None, take_profit_override: None }, update: UpdatePositionMaxGains { max_gains: "1.9293447" } }
+cc 0199e09cbe10880aed6e13c9a3ab2446ecd9672446c2660f99c070e8a9f852d4 # shrinks to lifecycle = PositionLifecycle { strict: true, market_type: CollateralIsQuote, open: PositionOpen { collateral: "46.708088", slippage_assert: None, leverage: "6.769898", direction: Long, max_gains: "9.275468", stop_loss_override: None, take_profit_override: None }, update: UpdatePositionRemoveCollateralImpactLeverage { amount: "0.1" } }

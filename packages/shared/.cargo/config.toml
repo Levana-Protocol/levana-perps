@@ -1,0 +1,4 @@
+[alias]
+generate-docs = "doc --no-deps"
+watch-test = ["watch", "-x", "test -- --nocapture"]
+watch-clippy = ["watch", "-x", "clippy --tests"]

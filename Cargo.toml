@@ -1,0 +1,38 @@
+[workspace]
+members = [
+    # Real protocol, mainnet contracts
+    "contracts/factory",
+    "contracts/liquidity_token",
+    "contracts/market",
+    "contracts/position_token",
+
+    # Testnet support contracts
+    "contracts/cw20",
+    "contracts/faucet",
+    "contracts/tracker",
+
+    # Code used by the smart contracts
+    "packages/msg",
+    "packages/shared",
+
+    # Code used for testing the smart contracts off chain
+    "packages/multi_test",
+    "packages/fuzz",
+
+    # Diagnostics gui 
+    "packages/diagnostics",
+    
+    # Helper executables for testing, deploying, and running bots
+    "packages/perps-exes",
+]
+
+[profile.release]
+opt-level = 'z'
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+codegen-units = 1
+panic = 'abort'
+incremental = false
+overflow-checks = true

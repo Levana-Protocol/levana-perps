@@ -1,0 +1,1 @@
+pub(crate) const DEFAULT_CLOSED_POSITION_HISTORY_LIMIT: u32 = 100;

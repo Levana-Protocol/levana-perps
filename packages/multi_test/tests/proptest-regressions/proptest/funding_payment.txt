@@ -1,0 +1,9 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 6a0fa4e63636c94c382d89ffa7722ea85520afad38f164de2d12a9509a5f8824 # shrinks to strategy = FundingPayment { long_collateral: "100", short_collateral: "100", price: "0.9", time_jump: FractionalLiquifundings(0.25), market-id: "ATOM_USD", market-type: CollateralIsBase }
+cc f0d46ee72fc1161b9c994d7e9a70788cd9f1ec6b349a80b7c6459e705825c0ec # shrinks to strategy = FundingPayment { long_collateral: "10", short_collateral: "10", time_jump: FractionalLiquifundings(0.25), market-id: "ATOM_USD", market-type: CollateralIsBase }
+cc 262443a14e3e6f49b7753662ac7bb60c36ec7de73a301b385497be29d3b9452e # shrinks to strategy = FundingPayment { long_collateral: "10", short_collateral: "10", time_jump: FractionalLiquifundings(0.25), market-id: "ATOM_USD", market-type: CollateralIsBase }

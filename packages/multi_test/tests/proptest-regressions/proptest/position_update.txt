@@ -1,0 +1,20 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc df81c29f7334180b22339a5ea3b12be699a13208771925d5bfb70124fc90f6e4 # shrinks to update = PositionUpdateMaxGains { max_gains: "10.766897029133913", pos_id: PositionId(1), market_id: "ATOM_USD+", trader: "trader-0" }
+cc 3f50465e588f265549b79ded63884ee93191197b3155f1910d44bb5785c5ef11 # shrinks to update = PositionUpdateLeverage { leverage: "34.01894", slippage_assert: None, pos_id: PositionId(1), market_id: "ATOM_USD+", trader: "trader-0" }
+cc 6c5cbe75044463ca3babbfb559011db1c9a07d30cfb5168d80acaf8b613b234c # shrinks to update = PositionUpdateRemoveCollateralImpactLeverage { amount: "32.97583", pos_id: PositionId(1), market_id: "ATOM_USD+", trader: "trader-0" }
+cc 70735b5d5c63f1809ba518187de596a7ac45c2a3f0ad70c206967aa6911906d3 # shrinks to update = PositionUpdateAddCollateralImpactSize { amount: "10", slippage_assert: Some(SlippageAssert { price: PriceBaseInQuote(NonZero(Decimal256(Uint256(2000000000000000000)))), tolerance: 0 }), pos_id: PositionId(1), market_id: "ATOM_USD+", trader: "trader-0" }
+cc 2cef8483ead7974978ecdb77a0f64981d67a69cd981dae13a50544e178341493 # shrinks to update = PositionUpdateRemoveCollateralImpactSize { amount: "49.915707", slippage_assert: None, pos_id: PositionId(1), market_id: "ATOM_USD+", trader: "trader-0" }
+cc 039bd338310cd67e519ea29fd2835f5d26975e7106c657e31fb307a4bb714501 # shrinks to update = PositionUpdateAddCollateralImpactLeverage { amount: "10", pos_id: PositionId(1), market_id: "ATOM_USD+", trader: "trader-0" }
+cc 17c0b07716400d0a5ee1796a02f707b711335d7bf324bfda2c5408688f8a061a # shrinks to update = PositionUpdateAddCollateralImpactSize { amount: "10", slippage_assert: None, pos_id: PositionId(1), market_id: "ATOM_USD+", trader: "trader-0" }
+cc 45de02e6b202921cd1fe308b2251337d80287b187124d821ba4fe007d984f145 # shrinks to update = PositionUpdateAddCollateralImpactSize { amount: "10", slippage_assert: Some(SlippageAssert { price: PriceBaseInQuote(NonZero(Decimal256(Uint256(2000000000000000000)))), tolerance: 100000 }), pos_id: PositionId(1), market_id: "ATOM_USD+", trader: "trader-0" }
+cc 04b4649e8c83497c486457b4b1817589276a8825d24c6198d4cdcb5d2e1be936 # shrinks to update = PositionUpdateAddCollateralImpactLeverage { amount: "10", pos_id: PositionId(1), market_id: "ATOM_USD+", trader: "trader-0" }
+cc 71c87a32cd6de4c7987d964b8d02ed64c62782ebfdcba3d9b22985ae585a81f8 # shrinks to update = PositionUpdateAddCollateralImpactLeverage { amount: "10", pos_id: PositionId(1), market_id: "ATOM_USD+", trader: "trader-0" }
+cc 996d1cc4bd5a27f9ea0344e3bd8946dd5b414c164c63ad6f2a90eb068d0c2775 # shrinks to update = PositionUpdateAddCollateralImpactLeverage { amount: "10", pos_id: PositionId(1), market_id: "ATOM_USD+", trader: "trader-0" }
+cc 1cc04701e61fc358775ba206db3d794e67aa5fd2c743d49f8f350ddf587bdd84 # shrinks to update = PositionUpdateAddCollateralImpactLeverage { amount: "10", pos_id: PositionId(1), market_id: "ATOM_USD+", trader: "trader-0" }
+cc 1426aaec4486004402cb8d594c7305abc06981107beccd6cfb9e5dc9d4e671fc # shrinks to update = PositionUpdateAddCollateralImpactLeverage { amount: "10", pos_id: PositionId(1), market_id: "ATOM_USD+", trader: "trader-0" }
+cc e23a661b7cb2910fdb99cc0f7e32770e8b1ad0f75ad6450abf3b200f1b69b2cc # shrinks to update = PositionUpdateAddCollateralImpactLeverage { amount: "10", pos_id: PositionId(1), market_id: "ATOM_USD+", trader: "trader-0" }

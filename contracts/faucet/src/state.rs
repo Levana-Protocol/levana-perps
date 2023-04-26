@@ -1,0 +1,54 @@
+// re-exporting
+mod faucet;
+pub use faucet::*;
+pub(crate) mod owner;
+use msg::prelude::*;
+mod trading_competition;
+pub use trading_competition::*;
+pub(crate) mod tokens;
+use cosmwasm_std::{Api, Deps, DepsMut, Empty, Env, QuerierWrapper, Storage};
+
+pub(crate) struct State<'a> {
+    pub(crate) api: &'a dyn Api,
+    pub(crate) querier: QuerierWrapper<'a, Empty>,
+    pub(crate) env: Env,
+}
+
+pub(crate) struct StateContext<'a> {
+    pub(crate) storage: &'a mut dyn Storage,
+    pub(crate) response: ResponseBuilder,
+}
+
+impl<'a> State<'a> {
+    pub(crate) fn new(deps: Deps<'a>, env: Env) -> (Self, &dyn Storage) {
+        (
+            State {
+                api: deps.api,
+                env,
+                querier: deps.querier,
+            },
+            deps.storage,
+        )
+    }
+
+    pub(crate) fn now(&self) -> Timestamp {
+        self.env.block.time.into()
+    }
+}
+
+impl<'a> StateContext<'a> {
+    pub(crate) fn new(deps: DepsMut<'a>, env: Env) -> Result<(State<'a>, Self)> {
+        let contract_version = get_contract_version(deps.storage)?;
+        Ok((
+            State {
+                api: deps.api,
+                env,
+                querier: deps.querier,
+            },
+            StateContext {
+                storage: deps.storage,
+                response: ResponseBuilder::new(contract_version),
+            },
+        ))
+    }
+}

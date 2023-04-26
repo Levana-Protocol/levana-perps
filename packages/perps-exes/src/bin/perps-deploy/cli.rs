@@ -1,0 +1,106 @@
+use std::path::PathBuf;
+
+use anyhow::Result;
+use cosmos::{RawAddress, RawWallet};
+use perps_exes::build_version;
+
+use crate::localtest;
+
+#[derive(clap::Parser)]
+#[clap(version = build_version())]
+pub(crate) struct Cmd {
+    #[clap(flatten)]
+    pub opt: Opt,
+    #[clap(subcommand)]
+    pub(crate) subcommand: Subcommand,
+}
+
+#[derive(clap::Parser)]
+pub(crate) enum Subcommand {
+    /// Do a complete local deployment
+    LocalDeploy {
+        #[clap(flatten)]
+        inner: crate::local_deploy::LocalDeployOpt,
+    },
+    /// Store the contracts and notify the tracker. Skips any contracts that are
+    /// already uploaded.
+    StoreCode {
+        #[clap(flatten)]
+        inner: crate::store_code::StoreCodeOpt,
+    },
+    /// Instantiate the contracts
+    Instantiate {
+        #[clap(flatten)]
+        inner: crate::instantiate::InstantiateOpt,
+    },
+    /// Migrate existing contracts
+    Migrate {
+        #[clap(flatten)]
+        inner: crate::migrate::MigrateOpt,
+    },
+    /// On Chain tests
+    OnChainTests {
+        #[clap(flatten)]
+        inner: localtest::TestsOpt,
+    },
+    /// Instantiate chain-wide contracts as a one time setup
+    InitChain {
+        #[clap(flatten)]
+        inner: crate::init_chain::InitChainOpt,
+    },
+    /// Perform post-deploy market setup for public facing markets
+    ///
+    /// This is responsible for activities like depositing collateral and
+    /// opening enough positions to create a 90% utilization ratio.
+    SetupMarket {
+        #[clap(flatten)]
+        inner: crate::setup_market::SetupMarketOpt,
+    },
+}
+
+#[derive(clap::Parser, Clone)]
+pub(crate) struct Opt {
+    /// Override gRPC endpoint
+    #[clap(long, env = "COSMOS_GRPC", global = true)]
+    pub(crate) cosmos_grpc: Option<String>,
+    /// Mnemonic phrase for the Wallet
+    #[clap(long, env = "COSMOS_WALLET")]
+    pub(crate) wallet: Option<RawWallet>,
+    /// Turn on verbose logging
+    #[clap(long, short, global = true)]
+    verbose: bool,
+    /// Directory containing the generated WASM files.
+    #[clap(long, default_value = "./wasm/artifacts", env = "PERPS_WASM_DIR")]
+    wasm_dir: PathBuf,
+    /// Nibb bot address, will fall back to a default if not provided
+    #[clap(long, global = true, env = "PERPS_NIBB_BOT")]
+    pub(crate) nibb_bot: Option<RawAddress>,
+}
+
+impl Opt {
+    pub(crate) fn init_logger(&self) {
+        let env = env_logger::Env::default().default_filter_or(if self.verbose {
+            format!("{}=debug,cosmos=debug,info", env!("CARGO_CRATE_NAME"))
+        } else {
+            "info".to_owned()
+        });
+        env_logger::Builder::from_env(env).init();
+    }
+
+    /// Get the gitrev from the gitrev file in the wasmdir
+    pub(crate) fn get_gitrev(&self) -> Result<String> {
+        let mut path = self.wasm_dir.to_owned();
+        path.push("gitrev");
+        Ok(String::from_utf8(fs_err::read(&path)?)?
+            .chars()
+            .take_while(|c| !c.is_ascii_whitespace())
+            .collect::<String>())
+    }
+
+    /// Get the file path of a specific contract type
+    pub(crate) fn get_contract_path(&self, contract_type: &str) -> PathBuf {
+        let mut path = self.wasm_dir.to_owned();
+        path.push(format!("levana_perpswap_cosmos_{contract_type}.wasm"));
+        path
+    }
+}

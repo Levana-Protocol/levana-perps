@@ -1,0 +1,46 @@
+export COSMOS_WALLET := "bottom loan skill merry east cradle onion journey palm apology verb edit desert impose absurd oil bubble sweet glove shallow size build burst effort"
+export LEVANA_PERP_FACTORY_CONTRACT_ADDRESS := "osmo1nc5tatafv6eyq7llkr2gv50ff9e22mnf70qgjlv737ktmt4eswrqvlx82r"
+export LEVANA_PERP_FAUCET_CONTRACT_ADDRESS := "osmo14hj2tavq8fpesdwxxcu44rty3hh90vhujrvcmstl4zr3txmfvw9sq2r9g9"
+export COSMOS_GRPC := "http://localhost:9090"
+export COSMOS_NETWORK := "osmosis-local"
+
+# List all recipes
+defaults:
+    just --list --unsorted
+
+# cargo compile
+cargo-compile:
+    cargo test --no-run --locked
+
+# cargo tesst
+cargo-test-check:
+    cargo test --locked
+
+# cargo clippy check
+cargo-clippy-check:
+    cargo clippy -- -Dwarnings
+
+# cargo fmt check
+cargo-fmt-check:
+    cargo fmt --all --check
+
+# Run cargo fmt
+cargo-fmt:
+    cargo fmt --all
+
+# Build binary in release mode
+cargo-release:
+    cargo build --release --locked
+
+# Sanity test the binary
+test:
+    perps-qa print-balances
+    perps-qa total-position
+    perps-qa fetch-price
+    perps-qa all-open-positions
+    perps-qa all-close-positions
+
+# Sanity test with write operations
+other-test:
+	perps-qa open-position --collateral 5 --leverage 4 --max-gains 14 --current-price 9.98 --max-slippage 1
+	perps-qa open-position --collateral 5 --leverage 4 --max-gains 14 --current-price 9.98 --max-slippage 1 --short

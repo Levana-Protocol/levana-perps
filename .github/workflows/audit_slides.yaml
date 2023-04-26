@@ -1,0 +1,29 @@
+name: Audit slides
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - "docs/slides/**"
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: "16"
+          cache: "npm"
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.SLIDES_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.SLIDES_AWS_SECRET_ACCESS_KEY }}
+          aws-region: "eu-west-3"
+      - run: |
+          set -eux -o pipefail
+          npm install -g reveal-md
+          cd docs/
+          reveal-md slides/ --static --css slides/assets/style.css --highlight-theme github
+          cd _static
+          aws s3 sync . s3://levana-sandbox-audit-slides/slides/
