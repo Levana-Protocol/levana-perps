@@ -1,0 +1,21 @@
+name: Committer Check
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Get PR Commits
+        id: "get-pr-commits"
+        uses: tim-actions/get-pr-commits@master
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - run: |
+          set -eux -o pipefail
+          for c in ${{ get-pr-commits.commits }}; do
+            echo "xxx${c}xxx"
+          done
