@@ -136,7 +136,7 @@ impl AppBuilder {
     pub(crate) async fn wait(mut self) -> Result<()> {
         // Gas task must always be launched last so that it includes all wallets specified above
         let gas_check = self.gas_check.build(self.app.clone());
-        self.launch_gas_task(gas_check).await?;
+        self.launch_gas_task(gas_check)?;
 
         self.watcher.wait(&self.app).await
     }

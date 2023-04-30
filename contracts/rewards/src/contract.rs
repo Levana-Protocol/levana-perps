@@ -1,5 +1,5 @@
-use super::state::config::init_config;
 use super::state::*;
+use crate::state::config::{load_config, update_config};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -8,14 +8,14 @@ use cosmwasm_std::{
     IbcPacketTimeoutMsg, IbcReceiveResponse, MessageInfo, QueryResponse, Response,
 };
 use cw2::{get_contract_version, set_contract_version};
-use msg::contracts::hatching::entry::{
-    ExecuteMsg, HatchStatusResp, InstantiateMsg, MaybeHatchStatusResp, MigrateMsg, QueryMsg,
+use msg::contracts::rewards::entry::QueryMsg::{Config as ConfigQuery, RewardsInfo};
+use msg::contracts::rewards::entry::{
+    ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg, RewardsInfoResp,
 };
 use semver::Version;
 use shared::prelude::*;
 
-// version info for migration info
-const CONTRACT_NAME: &str = "hatching";
+const CONTRACT_NAME: &str = "rewards";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -26,8 +26,7 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-    init_config(deps.storage, deps.api, &msg)?;
+    update_config(deps.storage, msg.config)?;
 
     let (_, ctx) = StateContext::new(deps, env)?;
 
@@ -39,11 +38,23 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
     match msg {
-        ExecuteMsg::Hatch { eggs, dusts } => {
-            state.hatch(&mut ctx, info.sender, eggs, dusts)?;
+        ExecuteMsg::DistributeRewards { address, amount } => {
+            state.distribute_rewards(&mut ctx, address.validate(state.api)?, amount)?;
         }
-        ExecuteMsg::RetryHatch { id } => {
-            state.retry_hatch(&mut ctx, id.parse()?)?;
+        ExecuteMsg::UpdateConfig { config } => {
+            let current_config = load_config(ctx.storage)?;
+
+            assert_auth(
+                &current_config.factory_addr,
+                &state.querier,
+                &info.sender,
+                AuthCheck::Owner,
+            )?;
+
+            update_config(ctx.storage, config)?;
+        }
+        ExecuteMsg::Claim {} => {
+            state.claim_rewards(&mut ctx, info.sender)?;
         }
     }
 
@@ -55,27 +66,35 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
     let (state, store) = State::new(deps, env)?;
 
     match msg {
-        QueryMsg::Config {} => state.config.query_result(),
-        QueryMsg::OldestHatchStatus { details } => MaybeHatchStatusResp {
-            resp: state
-                .get_oldest_hatch_status(store, details)?
-                .map(HatchStatusResp::from),
-        }
-        .query_result(),
+        RewardsInfo { addr } => {
+            let addr = addr.validate(state.api)?;
+            let rewards_info = state.load_rewards(store, &addr)?;
 
-        QueryMsg::HatchStatusById { details, id } => MaybeHatchStatusResp {
-            resp: state
-                .get_hatch_status_by_id(store, id.parse()?, details)?
-                .map(HatchStatusResp::from),
-        }
-        .query_result(),
+            let res = match rewards_info {
+                None => RewardsInfoResp::new(),
+                Some(rewards_info) => {
+                    let unlocked = rewards_info.calculate_unlocked_rewards(state.now())?;
+                    let locked = rewards_info
+                        .amount
+                        .checked_sub(unlocked)?
+                        .checked_sub(rewards_info.claimed)?;
 
-        QueryMsg::HatchStatusByOwner { details, owner } => MaybeHatchStatusResp {
-            resp: state
-                .get_hatch_status_by_owner(store, &owner.validate(deps.api)?, details)?
-                .map(HatchStatusResp::from),
+                    RewardsInfoResp {
+                        locked,
+                        unlocked,
+                        start: rewards_info.start,
+                        end: rewards_info.start + rewards_info.duration,
+                    }
+                }
+            };
+
+            res.query_result()
         }
-        .query_result(),
+
+        ConfigQuery {} => {
+            let config = load_config(store)?;
+            config.query_result()
+        }
     }
 }
 

@@ -7,7 +7,10 @@ members = [
     "contracts/position_token",
 
     # Non-perps, mainnet contracts (i.e. gamification, governance, LVN, etc.)
-    "contracts/hatching", 
+    "contracts/hatching",
+    "contracts/rewards",
+    "contracts/ibc_execute",
+    "contracts/farming",
 
     # Third-party, mainnet contracts (i.e. oracles)
     "contracts/pyth_bridge", 

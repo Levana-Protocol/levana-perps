@@ -1,12 +1,15 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, str::FromStr};
 
 use crate::{
     app::BasicApp,
     cli::Opt,
-    store_code::{Contracts, HATCHING},
+    store_code::{Contracts, HATCHING, IBC_EXECUTE},
 };
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use cosmos::{Contract, CosmosNetwork, HasAddress};
+use cosmwasm_std::IbcOrder;
+use msg::contracts::hatching::ibc::IbcChannelVersion;
+use serde::{Deserialize, Serialize};
 
 #[derive(clap::Parser)]
 pub(crate) struct InstantiateRewardsOpt {
@@ -19,6 +22,24 @@ pub(crate) struct InstantiateRewardsOpt {
     /// Is this a production deployment? Impacts labels used
     #[clap(long)]
     pub(crate) prod: bool,
+    /// If deploying ibc_execute, specify the target contract it's proxying
+    #[clap(long)]
+    pub(crate) ibc_execute_proxy: Option<IbcExecuteProxy>,
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub(crate) enum IbcExecuteProxy {
+    NftMint,
+}
+impl FromStr for IbcExecuteProxy {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "nft-mint" => Ok(IbcExecuteProxy::NftMint),
+            _ => Err(anyhow::anyhow!("Unknown ibc execute proxy: {s}")),
+        }
+    }
 }
 
 pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> {
@@ -26,6 +47,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
         network,
         contracts,
         prod,
+        ibc_execute_proxy,
     } = inst_opt;
 
     let basic = opt.load_basic_app(network).await?;
@@ -37,14 +59,60 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
         Contracts::PerpsProtocol => {
             bail!("Cannot instantiate perps-protocol with instantiate-rewards, use regular instantiate instead");
         }
-        Contracts::Hatching => {
-            let code_id = tracker.require_code_by_type(&opt, HATCHING).await?;
+        Contracts::IbcExecute => {
+            match ibc_execute_proxy
+                .context("Must specify --ibc-execute-proxy when instantiating ibc-execute")?
+            {
+                IbcExecuteProxy::NftMint => {
+                    let mint_contract =
+                        instantiate_testnet_nft_contract(&basic, "Levana Baby Dragons Mock")
+                            .await?;
 
+                    let ibc_contract = tracker
+                        .require_code_by_type(&opt, IBC_EXECUTE)
+                        .await?
+                        .instantiate(
+                            &basic.wallet,
+                            format!("Levana IbcExecute{label_suffix}"),
+                            vec![],
+                            msg::contracts::ibc_execute::entry::InstantiateMsg {
+                                contract: mint_contract.get_address_string().into(),
+                                ibc_channel_version: IbcChannelVersion::NftMint
+                                    .as_str()
+                                    .to_string(),
+                                ibc_channel_order: IbcOrder::Unordered,
+                            },
+                        )
+                        .await?;
+
+                    // Add the ibc contract as a minter to the mint contract
+                    #[derive(Serialize, Deserialize)]
+                    #[serde(rename_all = "snake_case")]
+                    enum NftExecuteMsg {
+                        AddMinters { minters: HashSet<String> },
+                    }
+                    let mut minters = HashSet::new();
+                    minters.insert(ibc_contract.get_address_string());
+                    mint_contract
+                        .execute(&basic.wallet, vec![], NftExecuteMsg::AddMinters { minters })
+                        .await?;
+
+                    let info = ibc_contract.info().await?;
+
+                    log::info!(
+                        "ibc-execute for minting contract deployed at {}",
+                        ibc_contract.get_address_string()
+                    );
+                    log::info!("ibc-execute for minting ibc port is {}", info.ibc_port_id);
+                }
+            };
+        }
+        Contracts::Hatching => {
             let burn_egg_contract = if network == CosmosNetwork::JunoMainnet {
                 // eggs are in dragon contract
                 "juno1a90f8jdwm4h43yzqgj4xqzcfxt4l98ev970vwz6l9m02wxlpqd2squuv6k".to_string()
             } else {
-                instantiate_testnet_nft_contract(&basic, "Levana Dragons Mock")
+                instantiate_testnet_nft_contract(&basic, "Levana Egg/Dragons Mock")
                     .await?
                     .get_address_string()
             };
@@ -53,19 +121,20 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                 // dust is in loot contract
                 "juno1gmnkf4fs0qrwxdjcwngq3n2gpxm7t24g8n4hufhyx58873he85ss8q9va4".to_string()
             } else {
-                instantiate_testnet_nft_contract(&basic, "Levana Loot Mock")
+                instantiate_testnet_nft_contract(&basic, "Levana Dust/Loot Mock")
                     .await?
                     .get_address_string()
             };
 
+            let code_id = tracker.require_code_by_type(&opt, HATCHING).await?;
             let contract = code_id
                 .instantiate(
                     &basic.wallet,
                     format!("Levana Hatching{label_suffix}"),
                     vec![],
                     msg::contracts::hatching::entry::InstantiateMsg {
-                        burn_egg_contract,
-                        burn_dust_contract,
+                        burn_egg_contract: burn_egg_contract.into(),
+                        burn_dust_contract: burn_dust_contract.into(),
                     },
                 )
                 .await?;
@@ -88,7 +157,11 @@ async fn instantiate_testnet_nft_contract(
 
     // was created by downloading the wasm from mainnet dragon contract
     // and uploading it to testnet
-    const CODE_ID: u64 = 1668;
+    let code_id: u64 = match app.network {
+        CosmosNetwork::JunoTestnet => 1668,
+        CosmosNetwork::StargazeTestnet => 2075,
+        _ => bail!("nft contract is only supported on stargaze and juno testnets for now"),
+    };
 
     // just copy/pasted from levanamessages::nft
     #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -119,7 +192,7 @@ async fn instantiate_testnet_nft_contract(
 
     let contract = app
         .cosmos
-        .make_code_id(CODE_ID)
+        .make_code_id(code_id)
         .instantiate(
             &app.wallet,
             label.clone(),

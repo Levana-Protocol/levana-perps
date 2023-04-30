@@ -1,0 +1,133 @@
+use cosmwasm_std::{
+    from_binary, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcOrder,
+    IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg,
+};
+use msg::contracts::hatching::ibc::IbcChannelVersion;
+use msg::contracts::rewards::entry::ExecuteMsg;
+use shared::{
+    ibc::{
+        ack_success,
+        event::{IbcChannelCloseEvent, IbcChannelConnectEvent},
+    },
+    prelude::*,
+};
+
+use super::{State, StateContext};
+
+impl State<'_> {
+    pub(crate) fn handle_ibc_channel_open(&self, msg: IbcChannelOpenMsg) -> Result<()> {
+        validate_channel(msg.channel(), msg.counterparty_version())?;
+        Ok(())
+    }
+
+    pub(crate) fn handle_ibc_channel_connect(
+        &mut self,
+        ctx: &mut StateContext,
+        msg: IbcChannelConnectMsg,
+    ) -> Result<()> {
+        let _version = validate_channel(msg.channel(), msg.counterparty_version())?;
+
+        //todo fill in match version?
+
+        // self.save_config(ctx)?;
+
+        ctx.response_mut().add_event(IbcChannelConnectEvent {
+            channel: msg.channel(),
+        });
+
+        Ok(())
+    }
+
+    pub(crate) fn handle_ibc_channel_close(
+        &mut self,
+        ctx: &mut StateContext,
+        msg: IbcChannelCloseMsg,
+    ) -> Result<()> {
+        // closing an unknown channel shouldn't happen, but if it does, we can treat it as a noop
+        // if let Ok(version) = IbcChannelVersion::from_str(msg.channel().version.as_str()) {
+        //     match version {
+        //         IbcChannelVersion::NftMint => {
+        //             self.config.nft_mint_channel = None;
+        //         }
+        //         IbcChannelVersion::LvnGrant => {
+        //             self.config.lvn_grant_channel = None;
+        //         }
+        //     }
+        //
+        //     self.save_config(ctx)?;
+        // }
+
+        //todo fill in channel close?
+
+        ctx.response_mut().add_event(IbcChannelCloseEvent {
+            channel: msg.channel(),
+        });
+        Ok(())
+    }
+
+    pub(crate) fn handle_ibc_packet_receive(
+        &self,
+        ctx: &mut StateContext,
+        msg: IbcPacketReceiveMsg,
+    ) -> Result<()> {
+        from_binary(&msg.packet.data)
+            .map_err(|err| err.into())
+            .and_then(|msg| {
+                match msg {
+                    ExecuteMsg::DistributeRewards { address, amount } => {
+                        let address = address.validate(self.api)?;
+                        self.distribute_rewards(ctx, address, amount)?
+                    }
+                    _ => {
+                        bail!("unsupported msg")
+                    }
+                }
+                Ok(())
+            })
+    }
+
+    pub(crate) fn handle_ibc_packet_ack(
+        &self,
+        _ctx: &mut StateContext,
+        ack: IbcPacketAckMsg,
+    ) -> Result<()> {
+        if ack.acknowledgement.data != ack_success() {
+            bail!("packet failed on the other chain");
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn handle_ibc_packet_timeout(&self, _msg: IbcPacketTimeoutMsg) -> Result<()> {
+        // This is called if the relayer detects a timeout
+        Ok(())
+    }
+}
+
+pub fn validate_channel(
+    channel: &IbcChannel,
+    counterparty_version: Option<&str>,
+) -> Result<IbcChannelVersion> {
+    let version = IbcChannelVersion::from_str(&channel.version)?;
+
+    if let Some(counterparty_version) = counterparty_version {
+        let counterparty_version = IbcChannelVersion::from_str(counterparty_version)?;
+        if counterparty_version != version {
+            bail!(
+                "counterparty version {:?} is different than channel version {:?}",
+                counterparty_version,
+                version
+            );
+        }
+    }
+
+    if channel.order != IbcOrder::Unordered {
+        bail!(
+            "Expected ibc channel ordering to be {:?}, but instead it's {:?}",
+            IbcOrder::Unordered,
+            channel.order
+        );
+    }
+
+    Ok(version)
+}

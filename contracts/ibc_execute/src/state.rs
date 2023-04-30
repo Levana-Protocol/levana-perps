@@ -1,15 +1,7 @@
-mod ibc;
-pub use ibc::*;
-mod nft_mint;
-pub use nft_mint::*;
-mod lvn;
-mod nft_burn;
-pub use lvn::*;
-mod hatch;
-pub use hatch::*;
 pub mod config;
+pub mod ibc;
 
-use msg::contracts::hatching::config::Config;
+use msg::contracts::ibc_execute::config::Config;
 
 use cw2::get_contract_version;
 use shared::prelude::*;
@@ -19,10 +11,9 @@ use cosmwasm_std::{Api, Deps, DepsMut, Empty, Env, QuerierWrapper, Storage};
 use self::config::load_config;
 
 pub(crate) struct State<'a> {
-    #[allow(dead_code)]
-    pub(crate) api: &'a dyn Api,
-    pub(crate) env: Env,
-    pub(crate) querier: QuerierWrapper<'a, Empty>,
+    pub(crate) _api: &'a dyn Api,
+    pub(crate) _env: Env,
+    pub(crate) _querier: QuerierWrapper<'a, Empty>,
     pub(crate) config: Config,
 }
 
@@ -36,16 +27,12 @@ impl<'a> State<'a> {
         Ok((
             State {
                 config: load_config(deps.storage)?,
-                api: deps.api,
-                env,
-                querier: deps.querier,
+                _api: deps.api,
+                _env: env,
+                _querier: deps.querier,
             },
             deps.storage,
         ))
-    }
-
-    pub(crate) fn now(&self) -> Timestamp {
-        self.env.block.time.into()
     }
 }
 
@@ -55,9 +42,9 @@ impl<'a> StateContext<'a> {
         Ok((
             State {
                 config: load_config(deps.storage)?,
-                api: deps.api,
-                env,
-                querier: deps.querier,
+                _api: deps.api,
+                _env: env,
+                _querier: deps.querier,
             },
             StateContext {
                 storage: deps.storage,

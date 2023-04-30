@@ -288,6 +288,8 @@ unsigned!(Base);
 unsigned!(Quote);
 unsigned!(Usd);
 unsigned!(LpToken);
+unsigned!(FarmingToken);
+unsigned!(LvnToken);
 
 /// Wrap up any [UnsignedDecimal] to provide negative values too.
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -578,6 +580,11 @@ impl<T: UnsignedDecimal> NonZero<T> {
     /// Try to convert a general purpose [Number] into this type.
     pub fn try_from_number(src: Signed<Decimal256>) -> Option<Self> {
         T::try_from_number(src).ok().and_then(NonZero::new)
+    }
+
+    /// Try to convert a general purpose [Decimal256] into this type.
+    pub fn try_from_decimal(src: Decimal256) -> Option<Self> {
+        NonZero::new(T::from_decimal256(src))
     }
 
     /// Try to convert a signed value into a non-zero.

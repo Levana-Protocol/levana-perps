@@ -1,3 +1,5 @@
+use crate::state::ibc::init_ibc;
+
 use super::state::config::init_config;
 use super::state::*;
 #[cfg(not(feature = "library"))]
@@ -8,14 +10,12 @@ use cosmwasm_std::{
     IbcPacketTimeoutMsg, IbcReceiveResponse, MessageInfo, QueryResponse, Response,
 };
 use cw2::{get_contract_version, set_contract_version};
-use msg::contracts::hatching::entry::{
-    ExecuteMsg, HatchStatusResp, InstantiateMsg, MaybeHatchStatusResp, MigrateMsg, QueryMsg,
-};
+use msg::contracts::ibc_execute::entry::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 use semver::Version;
 use shared::prelude::*;
 
 // version info for migration info
-const CONTRACT_NAME: &str = "hatching";
+const CONTRACT_NAME: &str = "ibc_execute";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -28,6 +28,7 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     init_config(deps.storage, deps.api, &msg)?;
+    init_ibc(deps.storage, &msg)?;
 
     let (_, ctx) = StateContext::new(deps, env)?;
 
@@ -35,47 +36,18 @@ pub fn instantiate(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
-    let (state, mut ctx) = StateContext::new(deps, env)?;
-
-    match msg {
-        ExecuteMsg::Hatch { eggs, dusts } => {
-            state.hatch(&mut ctx, info.sender, eggs, dusts)?;
-        }
-        ExecuteMsg::RetryHatch { id } => {
-            state.retry_hatch(&mut ctx, id.parse()?)?;
-        }
-    }
+pub fn execute(deps: DepsMut, env: Env, _info: MessageInfo, _msg: ExecuteMsg) -> Result<Response> {
+    let (_state, ctx) = StateContext::new(deps, env)?;
 
     Ok(ctx.response.into_response())
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
-    let (state, store) = State::new(deps, env)?;
+    let (state, _ctx) = State::new(deps, env)?;
 
     match msg {
         QueryMsg::Config {} => state.config.query_result(),
-        QueryMsg::OldestHatchStatus { details } => MaybeHatchStatusResp {
-            resp: state
-                .get_oldest_hatch_status(store, details)?
-                .map(HatchStatusResp::from),
-        }
-        .query_result(),
-
-        QueryMsg::HatchStatusById { details, id } => MaybeHatchStatusResp {
-            resp: state
-                .get_hatch_status_by_id(store, id.parse()?, details)?
-                .map(HatchStatusResp::from),
-        }
-        .query_result(),
-
-        QueryMsg::HatchStatusByOwner { details, owner } => MaybeHatchStatusResp {
-            resp: state
-                .get_hatch_status_by_owner(store, &owner.validate(deps.api)?, details)?
-                .map(HatchStatusResp::from),
-        }
-        .query_result(),
     }
 }
 
@@ -125,8 +97,8 @@ pub fn ibc_channel_open(
     env: Env,
     msg: IbcChannelOpenMsg,
 ) -> Result<IbcChannelOpenResponse> {
-    let (state, _) = StateContext::new(deps, env)?;
-    state.handle_ibc_channel_open(msg)?;
+    let (state, ctx) = StateContext::new(deps, env)?;
+    state.handle_ibc_channel_open(ctx.storage, msg)?;
     Ok(None)
 }
 

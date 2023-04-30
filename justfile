@@ -180,3 +180,7 @@ store-hatching:
 	cargo run --bin perps-deploy store-code --contracts=hatching --network=juno-testnet
 instantiate-hatching:
 	cargo run --bin perps-deploy instantiate-rewards --contracts=hatching --network=juno-testnet
+store-ibc-execute:
+	cargo run --bin perps-deploy store-code --contracts=ibc-execute --network=stargaze-testnet
+instantiate-nft-mint:
+	cargo run --bin perps-deploy instantiate-rewards --contracts=ibc-execute --ibc-execute-proxy=nft-mint --network=stargaze-testnet

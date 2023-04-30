@@ -1,12 +1,13 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
+use shared::storage::RawAddr;
 
 use super::HatchStatus;
 
 /// Instantiate message
 #[cw_serde]
 pub struct InstantiateMsg {
-    pub burn_egg_contract: String,
-    pub burn_dust_contract: String,
+    pub burn_egg_contract: RawAddr,
+    pub burn_dust_contract: RawAddr,
 }
 
 #[cw_serde]
@@ -34,7 +35,7 @@ pub enum QueryMsg {
 
     /// * returns [MaybeHatchStatusResp]
     #[returns(MaybeHatchStatusResp)]
-    HatchStatusByOwner { owner: String, details: bool },
+    HatchStatusByOwner { owner: RawAddr, details: bool },
 
     /// * returns [MaybeHatchStatusResp]
     #[returns(MaybeHatchStatusResp)]

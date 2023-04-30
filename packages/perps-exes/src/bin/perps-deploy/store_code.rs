@@ -29,6 +29,7 @@ pub(crate) struct StoreCodeOpt {
 pub enum Contracts {
     PerpsProtocol,
     Hatching,
+    IbcExecute,
 }
 
 impl FromStr for Contracts {
@@ -38,6 +39,7 @@ impl FromStr for Contracts {
         match s {
             "perps-protocol" => Ok(Contracts::PerpsProtocol),
             "hatching" => Ok(Contracts::Hatching),
+            "ibc-execute" => Ok(Contracts::IbcExecute),
             _ => Err(anyhow::anyhow!("Unknown contracts: {s}")),
         }
     }
@@ -55,6 +57,7 @@ impl Contracts {
                 PYTH_BRIDGE,
             ],
             Contracts::Hatching => &[HATCHING],
+            Contracts::IbcExecute => &[IBC_EXECUTE],
         }
     }
 }
@@ -66,6 +69,7 @@ pub(crate) const MARKET: &str = "market";
 pub(crate) const POSITION_TOKEN: &str = "position_token";
 pub(crate) const PYTH_BRIDGE: &str = "pyth_bridge";
 pub(crate) const HATCHING: &str = "hatching";
+pub(crate) const IBC_EXECUTE: &str = "ibc_execute";
 
 pub(crate) async fn go(
     opt: Opt,

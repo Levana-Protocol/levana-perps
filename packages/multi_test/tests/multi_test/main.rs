@@ -17,6 +17,7 @@ pub mod nft;
 pub mod order;
 pub mod position;
 pub mod proptest;
+pub mod rewards;
 pub mod sanity;
 pub mod shutdown;
 pub mod staleness;

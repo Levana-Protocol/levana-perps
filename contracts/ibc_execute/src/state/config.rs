@@ -1,7 +1,4 @@
-use msg::contracts::hatching::{
-    config::{Config, ConfigNftBurnContracts},
-    entry::InstantiateMsg,
-};
+use msg::contracts::ibc_execute::{config::Config, entry::InstantiateMsg};
 use shared::prelude::*;
 
 use super::{State, StateContext};
@@ -24,12 +21,8 @@ pub(crate) fn init_config(
     CONFIG.save(
         store,
         &Config {
-            nft_burn_contracts: ConfigNftBurnContracts {
-                egg: msg.burn_egg_contract.validate(api)?,
-                dust: msg.burn_dust_contract.validate(api)?,
-            },
-            nft_mint_channel: None,
-            lvn_grant_channel: None,
+            ibc_channel: None,
+            contract: msg.contract.validate(api)?,
         },
     )?;
 

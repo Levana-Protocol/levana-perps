@@ -74,10 +74,7 @@ pub(crate) struct GasCheck {
 }
 
 impl AppBuilder {
-    pub(crate) async fn launch_gas_task(&mut self, gas_check: GasCheck) -> Result<()> {
-        // Do an initial gas check to make sure everything is OK
-        gas_check.single_gas_check().await?;
-
+    pub(crate) fn launch_gas_task(&mut self, gas_check: GasCheck) -> Result<()> {
         self.watch_periodic(crate::watcher::TaskLabel::GasCheck, gas_check)
     }
 }

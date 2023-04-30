@@ -1,25 +1,14 @@
-mod ibc;
-pub use ibc::*;
-mod nft_mint;
-pub use nft_mint::*;
-mod lvn;
-mod nft_burn;
-pub use lvn::*;
-mod hatch;
-pub use hatch::*;
 pub mod config;
-
-use msg::contracts::hatching::config::Config;
-
-use cw2::get_contract_version;
-use shared::prelude::*;
-
-use cosmwasm_std::{Api, Deps, DepsMut, Empty, Env, QuerierWrapper, Storage};
+pub mod distribution;
+mod ibc;
 
 use self::config::load_config;
+use cosmwasm_std::{Api, Deps, DepsMut, Empty, Env, QuerierWrapper, Storage};
+use cw2::get_contract_version;
+use msg::contracts::rewards::config::Config;
+use shared::prelude::*;
 
 pub(crate) struct State<'a> {
-    #[allow(dead_code)]
     pub(crate) api: &'a dyn Api,
     pub(crate) env: Env,
     pub(crate) querier: QuerierWrapper<'a, Empty>,
@@ -35,10 +24,10 @@ impl<'a> State<'a> {
     pub(crate) fn new(deps: Deps<'a>, env: Env) -> Result<(Self, &dyn Storage)> {
         Ok((
             State {
-                config: load_config(deps.storage)?,
                 api: deps.api,
                 env,
                 querier: deps.querier,
+                config: load_config(deps.storage)?,
             },
             deps.storage,
         ))
@@ -54,10 +43,10 @@ impl<'a> StateContext<'a> {
         let contract_version = get_contract_version(deps.storage)?;
         Ok((
             State {
-                config: load_config(deps.storage)?,
                 api: deps.api,
                 env,
                 querier: deps.querier,
+                config: load_config(deps.storage)?,
             },
             StateContext {
                 storage: deps.storage,
