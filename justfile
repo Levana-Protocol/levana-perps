@@ -119,11 +119,11 @@ cargo-bots-release:
 # Build bots docker image
 build-bots-image:
 	cp target/x86_64-unknown-linux-musl/release/perps-bots .ci/bots
-	cd .ci/bots && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps-multichain/bots:{{GIT_SHA}}
+	cd .ci/bots && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/bots:{{GIT_SHA}}
 
 # Push bots docker image
 push-bots-image:
-	docker push ghcr.io/levana-protocol/levana-perps-multichain/bots:{{GIT_SHA}}
+	docker push ghcr.io/levana-protocol/levana-perps/bots:{{GIT_SHA}}
 
 # Deploy to dragonfire
 deploy-dragonfire:
