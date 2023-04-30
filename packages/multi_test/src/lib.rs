@@ -71,6 +71,7 @@ pub(crate) enum PerpsContract {
     LiquidityToken,
     Cw20,
     Rewards,
+    Farming,
 }
 
 impl PerpsApp {
@@ -88,6 +89,7 @@ impl PerpsApp {
         let position_token_code_id = app.store_code(contract_position_token());
         let liquidity_token_code_id = app.store_code(contract_liquidity_token());
         let rewards_code_id = app.store_code(contract_rewards());
+        let farming_code_id = app.store_code(contract_farming());
 
         let factory_addr = app.instantiate_contract(
             factory_code_id,
@@ -132,6 +134,7 @@ impl PerpsApp {
                 (PerpsContract::PositionToken, position_token_code_id),
                 (PerpsContract::LiquidityToken, liquidity_token_code_id),
                 (PerpsContract::Rewards, rewards_code_id),
+                (PerpsContract::Farming, farming_code_id),
             ]
             .into(),
             app,
@@ -321,6 +324,14 @@ pub(crate) fn contract_rewards() -> Box<dyn Contract<Empty>> {
         rewards::contract::instantiate,
         rewards::contract::execute,
         rewards::contract::query,
+    ))
+}
+
+pub(crate) fn contract_farming() -> Box<dyn Contract<Empty>> {
+    Box::new(LocalContractWrapper::new(
+        farming::lifecycle::instantiate,
+        farming::execute::execute,
+        farming::query::query,
     ))
 }
 

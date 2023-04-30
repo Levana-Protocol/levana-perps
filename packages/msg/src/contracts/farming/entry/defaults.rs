@@ -8,12 +8,12 @@ use crate::contracts::farming::entry::LockdropBucket;
 use super::LockdropBucketConfig;
 
 /// Default number of seconds in a lockdrop month
-pub(super) fn lockdrop_month_seconds() -> u32 {
+pub fn lockdrop_month_seconds() -> u32 {
     86400
 }
 
 /// Default buckets for the lockdrop
-pub(super) fn lockdrop_buckets() -> Vec<LockdropBucketConfig> {
+pub fn lockdrop_buckets() -> Vec<LockdropBucketConfig> {
     fn go(months: u32, multiplier: &str) -> LockdropBucketConfig {
         LockdropBucketConfig {
             bucket: LockdropBucket(months),
@@ -31,11 +31,11 @@ pub(super) fn lockdrop_buckets() -> Vec<LockdropBucketConfig> {
 }
 
 /// Default bonus ratio
-pub(super) fn bonus_ratio() -> NonZero<Decimal256> {
+pub fn bonus_ratio() -> NonZero<Decimal256> {
     "0.05".parse().unwrap()
 }
 
 /// Default immediate unlock ratio
-pub(super) fn lockdrop_immediate_unlock_ratio() -> Decimal256 {
+pub fn lockdrop_immediate_unlock_ratio() -> Decimal256 {
     "0.25".parse().unwrap()
 }

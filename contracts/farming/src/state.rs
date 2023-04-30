@@ -1,22 +1,34 @@
+pub(crate) mod farming;
+pub(crate) mod market_info;
+
 use crate::prelude::*;
-use cosmwasm_std::{Api, Deps, DepsMut, Env, Storage};
+use cosmwasm_std::{Api, Deps, DepsMut, Empty, Env, QuerierWrapper, Storage};
 
 pub(crate) struct State<'a> {
-    #[allow(dead_code)] // FIXME remove before production
     pub(crate) api: &'a dyn Api,
-    #[allow(dead_code)] // FIXME remove before production
+    #[allow(dead_code)]
     pub(crate) env: Env,
+    pub(crate) market_info: MarketInfo,
+    #[allow(dead_code)]
+    pub(crate) querier: QuerierWrapper<'a, Empty>,
 }
 
 pub(crate) struct StateContext<'a> {
-    #[allow(dead_code)] // FIXME remove before production
     pub(crate) storage: &'a mut dyn Storage,
     pub(crate) response: ResponseBuilder,
 }
 
 impl<'a> State<'a> {
-    pub(crate) fn new(deps: Deps<'a>, env: Env) -> (Self, &dyn Storage) {
-        (State { api: deps.api, env }, deps.storage)
+    pub(crate) fn new(deps: Deps<'a>, env: Env) -> Result<(Self, &dyn Storage)> {
+        Ok((
+            State {
+                api: deps.api,
+                querier: deps.querier,
+                env,
+                market_info: MarketInfo::load(deps.storage)?,
+            },
+            deps.storage,
+        ))
     }
 }
 
@@ -24,7 +36,12 @@ impl<'a> StateContext<'a> {
     pub(crate) fn new(deps: DepsMut<'a>, env: Env) -> Result<(State<'a>, Self)> {
         let contract_version = get_contract_version(deps.storage)?;
         Ok((
-            State { api: deps.api, env },
+            State {
+                api: deps.api,
+                env,
+                querier: deps.querier,
+                market_info: MarketInfo::load(deps.storage)?,
+            },
             StateContext {
                 storage: deps.storage,
                 response: ResponseBuilder::new(contract_version),

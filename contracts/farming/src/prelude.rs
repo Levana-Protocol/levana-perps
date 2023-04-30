@@ -1,3 +1,4 @@
+pub(crate) use crate::state::market_info::MarketInfo;
 pub(crate) use crate::state::*;
 pub(crate) use cosmwasm_std::entry_point;
 pub(crate) use cosmwasm_std::{DepsMut, Env, MessageInfo, QueryResponse, Response};
