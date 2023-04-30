@@ -96,6 +96,7 @@ impl Opt {
         const NETWORKS: &[(CosmosNetwork, &str)] = &[
             (CosmosNetwork::OsmosisTestnet, "osmo"),
             (CosmosNetwork::Dragonfire, "dragon"),
+            (CosmosNetwork::SeiTestnet, "sei"),
         ];
         for (network, prefix) in NETWORKS {
             if let Some(suffix) = self.deployment.strip_prefix(prefix) {
@@ -141,6 +142,9 @@ pub(crate) fn get_deployment_config(
         explorer,
         pyth,
         watcher,
+        min_gas,
+        min_gas_in_faucet,
+        min_gas_in_gas_wallet,
     } = config
         .chains
         .get(&network)
@@ -149,9 +153,9 @@ pub(crate) fn get_deployment_config(
         tracker: *tracker,
         faucet: *faucet,
         pyth: pyth.clone(),
-        min_gas: config.min_gas,
-        min_gas_in_faucet: config.min_gas_in_faucet,
-        min_gas_in_gas_wallet: config.min_gas_in_gas_wallet,
+        min_gas: *min_gas,
+        min_gas_in_faucet: *min_gas_in_faucet,
+        min_gas_in_gas_wallet: *min_gas_in_gas_wallet,
         price_api: &config.price_api,
         explorer,
         contract_family: opt.deployment.clone(),

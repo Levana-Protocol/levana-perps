@@ -64,9 +64,12 @@ impl Opt {
         let basic = self.load_basic_app(network).await?;
 
         let config = Config::load()?;
-        let partial_deploy_config = config.deployments.get(suffix).with_context(|| {
-            format!("No configuration for family {suffix}, user parameter was {family}")
-        })?;
+        let partial_deploy_config = match config.overrides.get(family) {
+            Some(x) => x,
+            None => config.deployments.get(suffix).with_context(|| {
+                format!("No configuration for family {suffix}, user parameter was {family}")
+            })?,
+        };
 
         let PartialDeploymentConfig {
             wallet_manager_address,
@@ -121,9 +124,10 @@ impl Opt {
 }
 
 pub(crate) fn get_suffix_network(family: &str) -> Result<(&str, CosmosNetwork)> {
-    const PREFIXES: [(&str, CosmosNetwork); 2] = [
+    const PREFIXES: [(&str, CosmosNetwork); 3] = [
         ("osmo", CosmosNetwork::OsmosisTestnet),
         ("dragon", CosmosNetwork::Dragonfire),
+        ("sei", CosmosNetwork::SeiTestnet),
     ];
 
     for (prefix, network) in PREFIXES {

@@ -11,15 +11,10 @@ use crate::wallet_manager::WalletManager;
 pub struct Config {
     pub chains: HashMap<CosmosNetwork, ChainConfig>,
     pub deployments: HashMap<String, PartialDeploymentConfig>,
+    pub overrides: HashMap<String, PartialDeploymentConfig>,
     pub price_api: String,
     pub pyth_markets: HashMap<MarketId, PythMarketPriceFeeds>,
     pub pyth_update_age_tolerance: u32,
-    /// Minimum gas required in wallet managed by perps bots
-    pub min_gas: u128,
-    /// Minimum gas required in the faucet contract
-    pub min_gas_in_faucet: u128,
-    /// Minimum gas required in the gas wallet
-    pub min_gas_in_gas_wallet: u128,
     pub liquidity: LiquidityConfig,
     pub utilization: UtilizationConfig,
     pub trader: TraderConfig,
@@ -33,6 +28,12 @@ pub struct ChainConfig {
     pub pyth: Option<PythChainConfig>,
     pub explorer: String,
     pub watcher: WatcherConfig,
+    /// Minimum gas required in wallet managed by perps bots
+    pub min_gas: u128,
+    /// Minimum gas required in the faucet contract
+    pub min_gas_in_faucet: u128,
+    /// Minimum gas required in the gas wallet
+    pub min_gas_in_gas_wallet: u128,
 }
 
 #[derive(serde::Deserialize, Clone, Debug)]
