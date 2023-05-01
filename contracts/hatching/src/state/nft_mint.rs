@@ -56,7 +56,7 @@ pub(crate) fn get_nfts_to_mint(
 #[serde(rename_all = "snake_case")]
 pub(crate) enum NftExecuteMsg {
     /// Mint a new NFT, can only be called by the contract minter
-    Mint(Box<MintMsg>),
+    Mint(MintMsg),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -111,10 +111,10 @@ fn babydragon_nft_execute_msg(owner: String, hatch_id: u64, egg: &NftHatchInfo) 
     metadata.description = Some("A cute little baby dragon fresh out of the cave".to_string());
     metadata.attributes = Some(attributes.into_iter().collect());
 
-    NftExecuteMsg::Mint(Box::new(MintMsg {
+    NftExecuteMsg::Mint(MintMsg {
         token_id: egg.token_id.to_string(),
         owner,
         token_uri: None,
         extension: metadata,
-    }))
+    })
 }
