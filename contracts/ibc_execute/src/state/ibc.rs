@@ -1,8 +1,8 @@
 use cosmwasm_std::{
-    IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcOrder,
-    IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg, WasmMsg,
+    from_binary, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcOrder,
+    IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg,
 };
-use msg::contracts::ibc_execute::entry::InstantiateMsg;
+use msg::contracts::ibc_execute::entry::{IbcProxyContractMessages, InstantiateMsg};
 use serde::{Deserialize, Serialize};
 use shared::{
     ibc::event::{IbcChannelCloseEvent, IbcChannelConnectEvent},
@@ -106,11 +106,10 @@ impl State<'_> {
         ctx: &mut StateContext,
         msg: IbcPacketReceiveMsg,
     ) -> Result<()> {
-        ctx.response_mut().add_message(WasmMsg::Execute {
-            contract_addr: self.config.contract.to_string(),
-            msg: msg.packet.data,
-            funds: vec![],
-        });
+        // The other side *must* send this data type
+        let msgs: IbcProxyContractMessages = from_binary(&msg.packet.data)?;
+
+        self.send(ctx, msgs.0)?;
 
         Ok(())
     }

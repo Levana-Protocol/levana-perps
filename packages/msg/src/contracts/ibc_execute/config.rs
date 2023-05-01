@@ -9,4 +9,7 @@ pub struct Config {
 
     /// The contract we pass messages through to
     pub contract: Addr,
+
+    /// The admin for sending direct execute messages
+    pub admin: Addr,
 }

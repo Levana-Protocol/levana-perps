@@ -1,5 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::IbcOrder;
+use cosmwasm_std::{Binary, IbcOrder};
 use shared::storage::RawAddr;
 
 /// Instantiate message
@@ -14,7 +14,10 @@ pub struct InstantiateMsg {
 }
 
 #[cw_serde]
-pub enum ExecuteMsg {}
+pub enum ExecuteMsg {
+    /// Admin-only, send a message directly, bypassing the need for IBC
+    Send { msgs: Vec<Binary> },
+}
 
 #[cw_serde]
 #[derive(QueryResponses)]
@@ -27,3 +30,7 @@ pub enum QueryMsg {
 /// Placeholder migration message
 #[cw_serde]
 pub struct MigrateMsg {}
+
+/// The wrapper for messages we receive and pass through
+#[cw_serde]
+pub struct IbcProxyContractMessages(pub Vec<Binary>);

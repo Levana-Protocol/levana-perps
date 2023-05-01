@@ -36,12 +36,6 @@ impl FromStr for IbcChannelVersion {
 
 #[cw_serde]
 pub enum IbcExecuteMsg {
-    MintNfts {
-        owner: String,
-        nfts: Vec<NftToMint>,
-        hatch_id: String,
-    },
-
     GrantLvn {
         address: String,
         amount: NumberGtZero,

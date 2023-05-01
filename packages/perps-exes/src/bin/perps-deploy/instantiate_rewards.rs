@@ -85,12 +85,6 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                         )
                         .await?;
 
-                    // Add the ibc contract as a minter to the mint contract
-                    #[derive(Serialize, Deserialize)]
-                    #[serde(rename_all = "snake_case")]
-                    enum NftExecuteMsg {
-                        AddMinters { minters: HashSet<String> },
-                    }
                     let mut minters = HashSet::new();
                     minters.insert(ibc_contract.get_address_string());
                     mint_contract
@@ -133,11 +127,33 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                     format!("Levana Hatching{label_suffix}"),
                     vec![],
                     msg::contracts::hatching::entry::InstantiateMsg {
-                        burn_egg_contract: burn_egg_contract.into(),
-                        burn_dust_contract: burn_dust_contract.into(),
+                        burn_egg_contract: burn_egg_contract.clone().into(),
+                        burn_dust_contract: burn_dust_contract.clone().into(),
                     },
                 )
                 .await?;
+
+            if network != CosmosNetwork::JunoMainnet {
+                log::info!("giving hatching contract burn permissions");
+                let mut minters = HashSet::new();
+                minters.insert(contract.get_address_string());
+                basic
+                    .cosmos
+                    .make_contract(burn_egg_contract.parse()?)
+                    .execute(
+                        &basic.wallet,
+                        vec![],
+                        NftExecuteMsg::AddMinters {
+                            minters: minters.clone(),
+                        },
+                    )
+                    .await?;
+                basic
+                    .cosmos
+                    .make_contract(burn_dust_contract.parse()?)
+                    .execute(&basic.wallet, vec![], NftExecuteMsg::AddMinters { minters })
+                    .await?;
+            }
 
             let info = contract.info().await?;
 
@@ -214,4 +230,10 @@ async fn instantiate_testnet_nft_contract(
     );
 
     Ok(contract)
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum NftExecuteMsg {
+    AddMinters { minters: HashSet<String> },
 }
