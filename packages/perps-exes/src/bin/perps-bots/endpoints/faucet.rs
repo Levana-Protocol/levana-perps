@@ -95,6 +95,7 @@ async fn bot_inner(app: &App, query: FaucetQuery) -> Result<FaucetResponse> {
                     .cw20s
                     .into_iter()
                     .map(|x| FaucetAsset::Cw20(x.get_address_string().into()))
+                    // This will end up as a no-op if the faucet gas a gas allowance set.
                     .chain(std::iter::once(FaucetAsset::Native(
                         app.cosmos.get_gas_coin().clone(),
                     )))
