@@ -2,7 +2,10 @@ use cosmwasm_std::{
     from_binary, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcOrder,
     IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg,
 };
-use msg::contracts::hatching::ibc::{IbcChannelVersion, IbcExecuteMsg};
+use msg::contracts::{
+    hatching::ibc::{IbcChannelVersion, IbcExecuteMsg},
+    ibc_execute::entry::IbcProxyContractMessages,
+};
 use shared::{
     ibc::{
         ack_success,
@@ -11,7 +14,7 @@ use shared::{
     prelude::*,
 };
 
-use super::{State, StateContext};
+use super::{nft_mint::NftExecuteMsg, State, StateContext};
 
 impl State<'_> {
     pub(crate) fn handle_ibc_channel_open(&self, msg: IbcChannelOpenMsg) -> Result<()> {
@@ -86,25 +89,30 @@ impl State<'_> {
             bail!("packet failed on the other chain");
         }
 
-        from_binary(&ack.original_packet.data)
-            .map_err(|err| err.into())
-            .and_then(|msg| {
-                match msg {
-                    IbcExecuteMsg::MintNfts { hatch_id, .. } => {
-                        self.update_hatch_status(ctx, hatch_id.parse()?, |mut status| {
-                            status.nft_mint_completed = true;
-                            Ok(status)
-                        })?;
-                    }
-                    IbcExecuteMsg::GrantLvn { hatch_id, .. } => {
-                        self.update_hatch_status(ctx, hatch_id.parse()?, |mut status| {
-                            status.lvn_grant_completed = true;
-                            Ok(status)
-                        })?;
-                    }
+        if let Ok(msgs) = from_binary::<IbcProxyContractMessages>(&ack.original_packet.data) {
+            // get the hatch id from the first minted NFT. They're all the same
+            // also there *must* be at least one NFT minted, since an empty list
+            // is never sent in the first place
+            match from_binary::<NftExecuteMsg>(&msgs.0[0])? {
+                NftExecuteMsg::Mint(msg) => {
+                    self.update_hatch_status(ctx, msg.extract_hatch_id()?, |mut status| {
+                        status.nft_mint_completed = true;
+                        Ok(status)
+                    })?;
                 }
-                Ok(())
-            })
+            }
+        } else if let Ok(msg) = from_binary::<IbcExecuteMsg>(&ack.original_packet.data) {
+            match msg {
+                IbcExecuteMsg::GrantLvn { hatch_id, .. } => {
+                    self.update_hatch_status(ctx, hatch_id.parse()?, |mut status| {
+                        status.lvn_grant_completed = true;
+                        Ok(status)
+                    })?;
+                }
+            }
+        }
+
+        Ok(())
     }
 
     pub(crate) fn handle_ibc_packet_timeout(&self, _msg: IbcPacketTimeoutMsg) -> Result<()> {
