@@ -1,4 +1,5 @@
 use crate::state::{
+    gas_coin::{clear_gas_allowance, get_gas_allowance, set_gas_allowance},
     owner::{add_admin, get_all_admins, is_admin, remove_admin},
     tokens::{
         get_cw20_code_id, get_next_index, get_token, set_cw20_code_id, set_next_token, TokenInfo,
@@ -9,13 +10,15 @@ use super::state::*;
 use anyhow::{anyhow, Context, Result};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response, Storage};
+use cosmwasm_std::{
+    Coin, Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response, Storage,
+};
 use cw2::{get_contract_version, set_contract_version};
 use msg::contracts::{
     cw20::{entry::InstantiateMinter, Cw20Coin},
     faucet::entry::{
-        ConfigResponse, ExecuteMsg, GetTokenResponse, InstantiateMsg, MigrateMsg,
-        NextTradingIndexResponse, OwnerMsg, QueryMsg,
+        ConfigResponse, ExecuteMsg, FaucetAsset, GasAllowance, GasAllowanceResp, GetTokenResponse,
+        InstantiateMsg, MigrateMsg, NextTradingIndexResponse, OwnerMsg, QueryMsg,
     },
 };
 use semver::Version;
@@ -33,6 +36,7 @@ pub fn instantiate(
     InstantiateMsg {
         tap_limit,
         cw20_code_id,
+        gas_allowance,
     }: InstantiateMsg,
 ) -> Result<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
@@ -41,6 +45,9 @@ pub fn instantiate(
     add_admin(ctx.storage, &info.sender)?;
     state.set_tap_limit(&mut ctx, tap_limit)?;
     set_cw20_code_id(ctx.storage, cw20_code_id)?;
+    if let Some(gas_allowance) = gas_allowance {
+        set_gas_allowance(ctx.storage, &gas_allowance)?;
+    }
 
     Ok(ctx.response.into_response())
 }
@@ -72,6 +79,33 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             if amount.is_some() {
                 validate_owner(ctx.storage, &info)?;
             }
+
+            let assets = match get_gas_allowance(ctx.storage)? {
+                None => assets,
+                Some(GasAllowance { denom, amount }) => {
+                    let Coin {
+                        denom: curr_denom,
+                        amount: curr_amount,
+                    } = state.querier.query_balance(&recipient, &denom)?;
+                    debug_assert_eq!(denom, curr_denom);
+                    if curr_amount < amount {
+                        state.tap(
+                            &mut ctx,
+                            FaucetAsset::Native(curr_denom),
+                            &recipient,
+                            Some(Decimal256::from_atomics(amount - curr_amount, 6)?.into_signed()),
+                        )?;
+                    }
+
+                    assets
+                        .into_iter()
+                        .filter(|asset| match asset {
+                            FaucetAsset::Cw20(_) => true,
+                            FaucetAsset::Native(requested_denom) => &denom != requested_denom,
+                        })
+                        .collect()
+                }
+            };
 
             if !is_admin(ctx.storage, &info.sender) {
                 for asset in &assets {
@@ -166,6 +200,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                         )?;
                     }
                 }
+                OwnerMsg::SetGasAllowance { allowance } => {
+                    set_gas_allowance(ctx.storage, &allowance)?
+                }
+                OwnerMsg::ClearGasAllowance {} => clear_gas_allowance(ctx.storage),
             }
         }
     }
@@ -215,6 +253,14 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             next_index: get_next_index(deps.storage, &name)?,
         }
         .query_result(),
+        QueryMsg::GetGasAllowance {} => get_gas_allowance(deps.storage)?
+            .map_or(GasAllowanceResp::Disabled {}, |x| {
+                GasAllowanceResp::Enabled {
+                    denom: x.denom,
+                    amount: x.amount,
+                }
+            })
+            .query_result(),
     }
 }
 

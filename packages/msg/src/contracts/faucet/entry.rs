@@ -1,5 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Addr;
+use cosmwasm_std::{Addr, Uint128};
 use shared::prelude::*;
 
 use crate::contracts::cw20::Cw20Coin;
@@ -10,6 +10,8 @@ pub struct InstantiateMsg {
     pub tap_limit: Option<u32>,
     /// Code ID of the CW20 contract we'll deploy
     pub cw20_code_id: u64,
+    /// Configuration of the gas coin allowance
+    pub gas_allowance: Option<GasAllowance>,
 }
 
 #[cw_serde]
@@ -73,6 +75,10 @@ pub enum OwnerMsg {
         cw20: String,
         balances: Vec<Cw20Coin>,
     },
+    SetGasAllowance {
+        allowance: GasAllowance,
+    },
+    ClearGasAllowance {},
 }
 
 #[cw_serde]
@@ -98,6 +104,10 @@ pub enum QueryMsg {
     /// * returns [NextTradingIndexResponse]
     #[returns(NextTradingIndexResponse)]
     NextTradingIndex { name: String },
+
+    /// * returns [GasAllowanceResp]
+    #[returns(GasAllowanceResp)]
+    GetGasAllowance {},
 }
 
 #[cw_serde]
@@ -120,4 +130,16 @@ pub struct ConfigResponse {
     pub admins: Vec<Addr>,
     /// Given in seconds
     pub tap_limit: Option<u32>,
+}
+
+#[cw_serde]
+pub struct GasAllowance {
+    pub denom: String,
+    pub amount: Uint128,
+}
+
+#[cw_serde]
+pub enum GasAllowanceResp {
+    Enabled { denom: String, amount: Uint128 },
+    Disabled {},
 }

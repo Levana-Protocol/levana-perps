@@ -7,6 +7,7 @@ mod trading_competition;
 pub use trading_competition::*;
 pub(crate) mod tokens;
 use cosmwasm_std::{Api, Deps, DepsMut, Empty, Env, QuerierWrapper, Storage};
+pub(crate) mod gas_coin;
 
 pub(crate) struct State<'a> {
     pub(crate) api: &'a dyn Api,
