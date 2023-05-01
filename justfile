@@ -184,11 +184,13 @@ instantiate-rewards:
 	just instantiate-nft-mint
 create-rewards-channels juno-port stargaze-port osmosis-port:
 	just create-nft-mint-relayer-channel hatching-nft {{juno-port}} {{stargaze-port}} 
+	# TODO - add lvn
 	# just create-lvn-grant-relayer-channel lvn-mint {{juno-port}} {{osmosis-port}} 
 rewards-test:
 	just hatch-egg-test
 rewards-relayer-start:
 	rly start hatching-nft --debug
+	# TODO - add lvn
 	# rly start lvn-mint --debug
 
 # Rewards subcommands
