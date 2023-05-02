@@ -90,10 +90,11 @@ impl State<'_> {
         }
 
         if let Ok(msgs) = from_binary::<IbcProxyContractMessages>(&ack.original_packet.data) {
+            // there should be at least one message, since an empty list
+            // is never sent to the in the first place, but better safe than sorry
+            let first_message = msgs.0.get(0).context("no ibc proxy contract messages")?;
             // get the hatch id from the first minted NFT. They're all the same
-            // also there *must* be at least one NFT minted, since an empty list
-            // is never sent in the first place
-            match from_binary::<NftExecuteMsg>(&msgs.0[0])? {
+            match from_binary::<NftExecuteMsg>(first_message)? {
                 NftExecuteMsg::Mint(msg) => {
                     self.update_hatch_status(ctx, msg.extract_hatch_id()?, |mut status| {
                         status.nft_mint_completed = true;
