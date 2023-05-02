@@ -23,7 +23,7 @@ pub fn instantiate(
     MarketInfo::save(deps.querier, deps.storage, factory, market_id)?;
 
     let (_state, mut ctx) = StateContext::new(deps, env)?;
-    ctx.response.add_event(NewFarming {});
+    ctx.response.add_event(NewFarmingEvent {});
 
     Ok(ctx.response.into_response())
 }

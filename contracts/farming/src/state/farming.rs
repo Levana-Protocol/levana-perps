@@ -90,7 +90,7 @@ impl State<'_> {
         ctx: &mut StateContext,
         farmer: &Addr,
         xlp: LpToken,
-    ) -> Result<()> {
+    ) -> Result<FarmingToken> {
         // FIXME ensure that we're in the active state
         let mut totals = self.get_farming_totals(ctx.storage)?;
         let new_farming = totals.xlp_to_farming(xlp)?;
@@ -100,7 +100,7 @@ impl State<'_> {
         let mut raw = self.load_raw_farmer_stats(ctx.storage, farmer)?;
         raw.farming_tokens = raw.farming_tokens.checked_add(new_farming)?;
         self.save_raw_farmer_stats(ctx, farmer, &raw)?;
-        Ok(())
+        Ok(new_farming)
     }
 
     /// Update internal farming token balances to indicate a withdrawal of the given number of farming tokens.
@@ -111,7 +111,7 @@ impl State<'_> {
         ctx: &mut StateContext,
         farmer: &Addr,
         amount: Option<NonZero<FarmingToken>>,
-    ) -> Result<LpToken> {
+    ) -> Result<(LpToken, FarmingToken)> {
         // FIXME ensure that we're in the active state
         let mut totals = self.get_farming_totals(ctx.storage)?;
         let mut raw = self.load_raw_farmer_stats(ctx.storage, farmer)?;
@@ -137,6 +137,6 @@ impl State<'_> {
         raw.farming_tokens = raw.farming_tokens.checked_sub(amount)?;
         self.save_raw_farmer_stats(ctx, farmer, &raw)?;
 
-        Ok(removed_xlp)
+        Ok((removed_xlp, amount))
     }
 }
