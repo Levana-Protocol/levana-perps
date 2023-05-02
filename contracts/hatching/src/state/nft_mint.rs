@@ -61,16 +61,13 @@ pub(crate) enum NftExecuteMsg {
     Mint(MintMsg),
 }
 
+// NOTE - this is currently
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub(crate) struct MintMsg {
     /// Unique ID of the NFT
     pub token_id: String,
     /// The owner of the newly minted NFT
     pub owner: String,
-    /// Universal resource identifier for this NFT
-    /// Should point to a JSON file that conforms to the ERC721
-    /// Metadata JSON Schema
-    pub token_uri: Option<String>,
     /// Any custom extension used by this contract
     pub extension: Metadata,
 }
@@ -116,7 +113,6 @@ fn babydragon_nft_mint_msg(owner: String, hatch_id: u64, egg: &NftHatchInfo) -> 
     MintMsg {
         token_id: egg.token_id.to_string(),
         owner,
-        token_uri: None,
         extension: metadata,
     }
 }
