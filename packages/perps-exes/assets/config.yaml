@@ -36,8 +36,8 @@ chains:
         delay: !constant 60
         out-of-date: 180
   osmosis-testnet:
-    tracker: osmo1d5frqwav454tkdvg0qx09ykg66ywad0an8ftqxqwv9vxkq8mmf8qkafx4z
-    faucet: osmo1yr6jzx0j99tzfd7j0jypkn8v7mr806pda6fsgfzsyhdvvefw8d2ss0ftsd
+    tracker: osmo1l3ypxctzcdev9dmyydlzrflqz52f0wsqmzkuyq9dvpdnqx69wvvq9zszh2
+    faucet: osmo1ycrm74p7uc976hu2z428l27vxj8l44zu0x0yqjr8gh775qr6gtnq9f3zsz
     #pyth:
     #  address: osmo1kgd93ztuz8mzvsr8v3p65f5chhd6vclrjg528w0tvaujkllff0kqnc5mw6
     #  endpoint: "https://xc-testnet.pyth.network/"
