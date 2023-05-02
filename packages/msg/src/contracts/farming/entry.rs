@@ -148,9 +148,9 @@ pub enum QueryMsg {
     Version {},
     /// Get various information about the state of the contract
     ///
-    /// * returns [StateResp]
-    #[returns(StateResp)]
-    State {},
+    /// * returns [StatusResp]
+    #[returns(StatusResp)]
+    Status {},
     /// Get stats on a specific farmer.
     ///
     /// * returns [FarmerStats]
@@ -171,10 +171,10 @@ pub enum QueryMsg {
     },
 }
 
-/// What is the current status of the farming contract
+/// What is the current period of the farming contract
 #[cw_serde]
 #[derive(Copy)]
-pub enum FarmingStatus {
+pub enum FarmingPeriod {
     /// Contract has been instantiate but lockdrop has not started.
     Inactive,
     /// Lockdrop period is running.
@@ -187,11 +187,11 @@ pub enum FarmingStatus {
     Launched,
 }
 
-/// Overall state of the contract, returned from [QueryMsg::State]
+/// Overall state of the contract, returned from [QueryMsg::Status]
 #[cw_serde]
-pub struct StateResp {
+pub struct StatusResp {
     /// Current status of the contract
-    pub status: FarmingStatus,
+    pub status: FarmingPeriod,
     /// Total farming tokens across the entire protocol.
     pub farming_tokens: FarmingToken,
     /// Total xLP held by the farming contract
@@ -215,7 +215,7 @@ pub struct StateResp {
     /// This is the sum of unclaimed LVN from lockdrop and emissions, plus any
     /// remaining emissions for the active emissions.
     ///
-    /// If this number is less than [StateResp::lvn_held], the contract is insolvent and needs to be provided with more funds.
+    /// If this number is less than [StatusResp::lvn_held], the contract is insolvent and needs to be provided with more funds.
     pub lvn_owed: LvnToken,
     /// Current emissions plan
     pub emissions: Option<Emissions>,
