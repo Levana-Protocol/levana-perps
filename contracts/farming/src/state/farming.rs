@@ -24,11 +24,8 @@ struct FarmingTotals {
 
 impl FarmingTotals {
     fn xlp_to_farming(&self, xlp: LpToken) -> Result<FarmingToken> {
+        anyhow::ensure!(self.farming.is_zero() == self.xlp.is_zero(), "We must either have no farming and no xLP tokens, or have some of both");
         Ok(if self.farming.is_zero() {
-            anyhow::ensure!(
-                self.xlp.is_zero(),
-                "Cannot have farming tokens with no xLP tokens"
-            );
             FarmingToken::from_decimal256(xlp.into_decimal256())
         } else {
             FarmingToken::from_decimal256(
