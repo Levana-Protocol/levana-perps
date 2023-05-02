@@ -1,9 +1,8 @@
 mod ibc;
 pub use ibc::*;
-mod nft_mint;
-pub use nft_mint::*;
 mod lvn;
 mod nft_burn;
+pub mod nft_mint;
 pub use lvn::*;
 mod hatch;
 pub use hatch::*;

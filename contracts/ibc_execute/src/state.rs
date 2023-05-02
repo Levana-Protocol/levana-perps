@@ -1,5 +1,6 @@
 pub mod config;
 pub mod ibc;
+pub mod send;
 
 use msg::contracts::ibc_execute::config::Config;
 

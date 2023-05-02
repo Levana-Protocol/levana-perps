@@ -16,11 +16,13 @@ impl State<'_> {
 pub(crate) fn init_config(
     store: &mut dyn Storage,
     api: &dyn Api,
+    admin: Addr,
     msg: &InstantiateMsg,
 ) -> Result<()> {
     CONFIG.save(
         store,
         &Config {
+            admin,
             ibc_channel: None,
             contract: msg.contract.validate(api)?,
         },

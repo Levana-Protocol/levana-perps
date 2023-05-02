@@ -22,12 +22,12 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    init_config(deps.storage, deps.api, &msg)?;
+    init_config(deps.storage, deps.api, info.sender, &msg)?;
     init_ibc(deps.storage, &msg)?;
 
     let (_, ctx) = StateContext::new(deps, env)?;
@@ -36,8 +36,18 @@ pub fn instantiate(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn execute(deps: DepsMut, env: Env, _info: MessageInfo, _msg: ExecuteMsg) -> Result<Response> {
-    let (_state, ctx) = StateContext::new(deps, env)?;
+pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
+    let (state, mut ctx) = StateContext::new(deps, env)?;
+
+    match msg {
+        ExecuteMsg::Send { msgs } => {
+            if info.sender != state.config.admin {
+                bail!("only admin can send messages directly - use IBC instead");
+            } else {
+                state.send(&mut ctx, msgs)?;
+            }
+        }
+    }
 
     Ok(ctx.response.into_response())
 }

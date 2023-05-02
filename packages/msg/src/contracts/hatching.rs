@@ -4,11 +4,11 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Addr;
 use shared::prelude::*;
 
-use super::position_token::Metadata;
 pub mod config;
 pub mod entry;
 pub mod events;
 pub mod ibc;
+pub mod nft;
 
 #[cw_serde]
 pub struct HatchStatus {
@@ -20,7 +20,8 @@ pub struct HatchStatus {
 
 #[cw_serde]
 pub struct HatchDetails {
-    pub owner: Addr,
+    pub original_owner: Addr,
+    pub nft_mint_owner: String,
     pub hatch_time: Timestamp,
     pub eggs: Vec<NftHatchInfo>,
     pub dusts: Vec<NftHatchInfo>,
@@ -33,7 +34,7 @@ pub struct NftHatchInfo {
     pub lvn: NumberGtZero,
     pub token_id: String,
     pub burn_kind: NftBurnKind,
-    pub burn_metadata: Metadata,
+    pub burn_metadata: nft::Metadata,
     pub rarity: NftRarity,
 }
 

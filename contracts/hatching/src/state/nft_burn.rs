@@ -1,9 +1,7 @@
 use super::{State, StateContext};
-use msg::contracts::{
-    hatching::{NftBurnKind, NftHatchInfo, NftRarity},
-    // position_token expands the cw721 contract with additional functionality
-    // so we can just re-use the message types
-    position_token::{entry::AllNftInfoResponse, Metadata},
+use msg::contracts::hatching::{
+    nft::{AllNftInfoResponse, Metadata},
+    NftBurnKind, NftHatchInfo, NftRarity,
 };
 use serde::{Deserialize, Serialize};
 use shared::prelude::*;
@@ -127,7 +125,7 @@ mod tests {
     use crate::state::nft_burn::extract_nft_info;
 
     use super::NftBurnKind;
-    use msg::contracts::position_token::{Metadata, Trait};
+    use msg::contracts::hatching::nft::{Metadata, Trait};
 
     #[test]
     fn hatchable_nft() {

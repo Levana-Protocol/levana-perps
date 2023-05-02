@@ -2420,6 +2420,7 @@ dependencies = [
  "cosmwasm-std",
  "csv",
  "cw-multi-test",
+ "cw-utils",
  "dotenv",
  "env_logger 0.10.0",
  "fs-err",

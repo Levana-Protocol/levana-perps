@@ -14,6 +14,8 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     /// hatch and get rewards
     Hatch {
+        /// Must be a valid address on the target minting network
+        nft_mint_owner: String,
         eggs: Vec<String>,
         dusts: Vec<String>,
     },
