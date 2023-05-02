@@ -39,19 +39,21 @@ impl State<'_> {
 // NFTs are minted via sending an IBC message to a proxy contract on the other chain
 // The proxy contract receives the IbcProxyContractMessages wrapper, unpacks it,
 // and forwards the inner NFT execute messages (encoded as Binary) to the NFT contract
-pub(crate) fn get_nfts_to_mint(
+pub(crate) fn get_nft_mint_proxy_messages(
     details: &HatchDetails,
-    hatch_id: u64,
 ) -> Result<IbcProxyContractMessages> {
     let nft_mint_owner = details.nft_mint_owner.to_string();
     Ok(IbcProxyContractMessages(
-        details
-            .eggs
-            .iter()
-            .map(|egg| babydragon_nft_mint_msg(nft_mint_owner.clone(), hatch_id, egg))
+        get_nft_mint_iter(details)
+            .map(|egg| babydragon_nft_mint_msg(nft_mint_owner.clone(), egg))
             .map(|mint_msg| to_binary(&NftExecuteMsg::Mint(mint_msg)).map_err(|err| err.into()))
             .collect::<Result<Vec<_>>>()?,
     ))
+}
+
+// extracts only those NFTs that are mintable
+pub(crate) fn get_nft_mint_iter(details: &HatchDetails) -> impl Iterator<Item = &NftHatchInfo> {
+    details.eggs.iter()
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -72,32 +74,13 @@ pub(crate) struct MintMsg {
     pub extension: Metadata,
 }
 
-impl MintMsg {
-    pub fn extract_hatch_id(&self) -> Result<u64> {
-        self.extension
-            .attributes
-            .as_ref()
-            .context("no attributes")?
-            .iter()
-            .find_map(|trait_| {
-                if trait_.trait_type == "Hatch Id" {
-                    trait_.value.parse::<u64>().ok()
-                } else {
-                    None
-                }
-            })
-            .context("no hatch id")
-    }
-}
-
-fn babydragon_nft_mint_msg(owner: String, hatch_id: u64, egg: &NftHatchInfo) -> MintMsg {
+fn babydragon_nft_mint_msg(owner: String, egg: &NftHatchInfo) -> MintMsg {
     let mut metadata = Metadata::default();
 
     // TODO - finalize the real NFT metadata
     let attributes = [
         ("Spirit Level", egg.spirit_level.to_string()),
         ("Egg Id", egg.token_id.to_string()),
-        ("Hatch Id", hatch_id.to_string()),
     ]
     .map(|(trait_type, value)| Trait {
         display_type: None,

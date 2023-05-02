@@ -47,14 +47,14 @@ pub(crate) struct HatchEggOpt {
     #[clap(
         long,
         env = "HATCH_ADDRESS",
-        default_value = "juno1z5l48ekcdda6m34e6lclx98vxvj40frxaym50fc6v0gz43u4d35sdx5vur"
+        default_value = "juno17hgh0p226hl0h8c77nl4p6d4jhkgwdxznrht27gzyekkgrprsh6qsx4fn4"
     )]
     pub hatch_address: Address,
     // this is the address for the NFT minting itself (i.e. Levana Baby Dragons), not the ibc execute proxy contract
     #[clap(
         long,
         env = "NFT_MINT_ADDRESS",
-        default_value = "stars16p8642y87m0sefc37t4fl4sprmasxcn774wc9m558p80afpl03us70mr4j"
+        default_value = "stars167awkhtm96aelu0t2gcls723ar4guclnxf5x636fdlfdms0gvyxqkgxlpe"
     )]
     pub nft_mint_address: Address,
 

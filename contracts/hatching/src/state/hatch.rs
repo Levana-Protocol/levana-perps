@@ -1,4 +1,8 @@
-use super::{get_lvn_to_grant, nft_mint::get_nfts_to_mint, State, StateContext};
+use super::{
+    get_lvn_to_grant,
+    nft_mint::{get_nft_mint_iter, get_nft_mint_proxy_messages},
+    State, StateContext,
+};
 use msg::contracts::hatching::{
     events::{HatchCompleteEvent, HatchRetryEvent, HatchStartEvent},
     HatchDetails, HatchStatus, NftBurnKind, NftHatchInfo,
@@ -11,6 +15,7 @@ use shared::{
 const HATCH_ID_BY_ADDR: Map<&Addr, u64> = Map::new("hatch-id-addr");
 const HATCH_STATUS: MonotonicMap<HatchStatus> = Map::new("hatch-status");
 const HATCH_DETAILS: Map<u64, HatchDetails> = Map::new("hatch-details");
+const HATCH_ID_BY_TOKEN_ID: Map<&str, u64> = Map::new("hatch-id-token-id");
 
 impl State<'_> {
     pub(crate) fn hatch(
@@ -51,11 +56,14 @@ impl State<'_> {
             dusts,
         };
 
-        let nfts_to_mint = get_nfts_to_mint(&details, id)?;
+        let nfts_to_mint = get_nft_mint_proxy_messages(&details)?;
         if nfts_to_mint.0.is_empty() {
             // no nfts to mint, mark as completed
             status.nft_mint_completed = true;
         } else {
+            for nft in get_nft_mint_iter(&details) {
+                HATCH_ID_BY_TOKEN_ID.save(ctx.storage, &nft.token_id, &id)?;
+            }
             self.send_mint_nfts_ibc_message(ctx, nfts_to_mint)?;
         }
 
@@ -102,7 +110,7 @@ impl State<'_> {
         let status = HATCH_STATUS.load(ctx.storage, id)?;
 
         if !status.nft_mint_completed {
-            self.send_mint_nfts_ibc_message(ctx, get_nfts_to_mint(&details, id)?)?;
+            self.send_mint_nfts_ibc_message(ctx, get_nft_mint_proxy_messages(&details)?)?;
         }
 
         if !status.lvn_grant_completed {
@@ -188,5 +196,15 @@ impl State<'_> {
             .may_load(store, owner)?
             .and_then(|id| self.get_hatch_status_by_id(store, id, details).transpose())
             .transpose()
+    }
+
+    pub(crate) fn get_hatch_id_from_token_id(
+        &self,
+        store: &dyn Storage,
+        token_id: &str,
+    ) -> Result<u64> {
+        HATCH_ID_BY_TOKEN_ID
+            .load(store, token_id)
+            .map_err(|err| err.into())
     }
 }
