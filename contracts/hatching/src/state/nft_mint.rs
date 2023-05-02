@@ -36,7 +36,9 @@ impl State<'_> {
     }
 }
 
-// NFTs are minted via direct proxy
+// NFTs are minted via sending an IBC message to a proxy contract on the other chain
+// The proxy contract receives the IbcProxyContractMessages wrapper, unpacks it,
+// and forwards the inner NFT execute messages (encoded as Binary) to the NFT contract
 pub(crate) fn get_nfts_to_mint(
     details: &HatchDetails,
     hatch_id: u64,
@@ -46,8 +48,8 @@ pub(crate) fn get_nfts_to_mint(
         details
             .eggs
             .iter()
-            .map(|egg| babydragon_nft_execute_msg(nft_mint_owner.clone(), hatch_id, egg))
-            .map(|exec_msg| to_binary(&exec_msg).map_err(|err| err.into()))
+            .map(|egg| babydragon_nft_mint_msg(nft_mint_owner.clone(), hatch_id, egg))
+            .map(|mint_msg| to_binary(&NftExecuteMsg::Mint(mint_msg)).map_err(|err| err.into()))
             .collect::<Result<Vec<_>>>()?,
     ))
 }
@@ -91,7 +93,7 @@ impl MintMsg {
     }
 }
 
-fn babydragon_nft_execute_msg(owner: String, hatch_id: u64, egg: &NftHatchInfo) -> NftExecuteMsg {
+fn babydragon_nft_mint_msg(owner: String, hatch_id: u64, egg: &NftHatchInfo) -> MintMsg {
     let mut metadata = Metadata::default();
 
     // TODO - finalize the real NFT metadata
@@ -111,10 +113,10 @@ fn babydragon_nft_execute_msg(owner: String, hatch_id: u64, egg: &NftHatchInfo) 
     metadata.description = Some("A cute little baby dragon fresh out of the cave".to_string());
     metadata.attributes = Some(attributes.into_iter().collect());
 
-    NftExecuteMsg::Mint(MintMsg {
+    MintMsg {
         token_id: egg.token_id.to_string(),
         owner,
         token_uri: None,
         extension: metadata,
-    })
+    }
 }
