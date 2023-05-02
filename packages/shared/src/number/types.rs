@@ -9,7 +9,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use cosmwasm_std::{Decimal256, OverflowError, Uint256};
+use cosmwasm_std::{Decimal256, OverflowError, Uint128, Uint256};
 
 /// needed to get around the orphan rule
 #[cfg(feature = "arbitrary")]
@@ -709,5 +709,53 @@ impl<T: UnsignedDecimal> Signed<T> {
     /// Multiply by a raw number
     pub fn checked_mul_number(self, rhs: Signed<Decimal256>) -> Result<Self> {
         self.into_number().checked_mul(rhs).map(Self::from_number)
+    }
+}
+
+/// How much to divide an atomic value by to get to an LP token amount.
+const LP_TOKEN_DIVIDER: u64 = 1_000_000_000_000;
+
+impl LpToken {
+    /// The hard-coded precision of the LP and xLP token contracts.
+    pub const PRECISION: u8 = 6;
+
+    /// Convert into a u128 representation for contract interactions.
+    ///
+    /// Note that this is a lossy conversion, and will truncate some data.
+    pub fn into_u128(self) -> Result<u128> {
+        Ok(Uint128::try_from(
+            self.into_decimal256()
+                .atomics()
+                .checked_div(LP_TOKEN_DIVIDER.into())?,
+        )?
+        .u128())
+    }
+
+    /// Convert from a u128 representation.
+    pub fn from_u128(x: u128) -> Result<Self> {
+        Ok(LpToken::from_decimal256(Decimal256::from_atomics(
+            x,
+            Self::PRECISION.into(),
+        )?))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lp_token_u128_roundtrip() {
+        assert_eq!(
+            LpToken::from_str("12.3456789")
+                .unwrap()
+                .into_u128()
+                .unwrap(),
+            12345678
+        );
+        assert_eq!(
+            LpToken::from_str("12.345678").unwrap(),
+            LpToken::from_u128(12345678).unwrap(),
+        );
     }
 }

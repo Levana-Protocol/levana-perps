@@ -14,11 +14,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             msg,
         } => {
             let sender = sender.validate(state.api)?;
-            let get_lp_token = || {
-                anyhow::Ok(LpToken::from_decimal256(Decimal256::from_atomics(
-                    amount, 6,
-                )?))
-            };
+            let get_lp_token = || LpToken::from_u128(amount.u128());
             let msg = from_binary(&msg)?;
             let received = Some(if info.sender == state.market_info.lp_addr {
                 Received::Lp(get_lp_token()?)
@@ -99,7 +95,7 @@ impl State<'_> {
     ) -> Result<()> {
         let token = Token::Cw20 {
             addr: self.market_info.xlp_addr.clone().into(),
-            decimal_places: 6,
+            decimal_places: LpToken::PRECISION,
         };
 
         let xlp = self.farming_withdraw(ctx, farmer, amount)?;
