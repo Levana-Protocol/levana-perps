@@ -96,12 +96,16 @@ impl State<'_> {
             // get the hatch id from the first minted NFT. They're all the same
             match from_binary::<NftExecuteMsg>(first_message)? {
                 NftExecuteMsg::Mint(msg) => {
-                    self.update_hatch_status(ctx, msg.extract_hatch_id()?, |mut status| {
+                    let hatch_id = self.get_hatch_id_from_token_id(ctx.storage, &msg.token_id)?;
+                    self.update_hatch_status(ctx, hatch_id, |mut status| {
                         status.nft_mint_completed = true;
                         Ok(status)
                     })?;
                 }
             }
+
+            // NOTE: we could clear all the token id -> hatch id mappings here, but it's not necessary
+            // and preserving it could possibly be useful for debugging
         } else if let Ok(msg) = from_binary::<IbcExecuteMsg>(&ack.original_packet.data) {
             match msg {
                 IbcExecuteMsg::GrantLvn { hatch_id, .. } => {
