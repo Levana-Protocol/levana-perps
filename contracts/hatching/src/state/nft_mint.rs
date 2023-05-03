@@ -5,7 +5,7 @@ use msg::contracts::{
         nft::{Metadata, Trait},
         HatchDetails, NftHatchInfo,
     },
-    ibc_execute::entry::IbcProxyContractMessages,
+    ibc_execute_proxy::entry::IbcProxyContractMessages,
 };
 use serde::{Deserialize, Serialize};
 use shared::{ibc::TIMEOUT_SECONDS, prelude::*};

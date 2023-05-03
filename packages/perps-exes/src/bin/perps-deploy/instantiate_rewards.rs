@@ -3,7 +3,7 @@ use std::{collections::HashSet, str::FromStr};
 use crate::{
     app::BasicApp,
     cli::Opt,
-    store_code::{Contracts, HATCHING, IBC_EXECUTE},
+    store_code::{Contracts, HATCHING, IBC_EXECUTE_PROXY},
 };
 use anyhow::{bail, Context, Result};
 use cosmos::{Contract, CosmosNetwork, HasAddress};
@@ -22,21 +22,21 @@ pub(crate) struct InstantiateRewardsOpt {
     /// Is this a production deployment? Impacts labels used
     #[clap(long)]
     pub(crate) prod: bool,
-    /// If deploying ibc_execute, specify the target contract it's proxying
+    /// If deploying ibc_execute_proxy, specify the target contract it's proxying
     #[clap(long)]
-    pub(crate) ibc_execute_proxy: Option<IbcExecuteProxy>,
+    pub(crate) ibc_execute_proxy_target: Option<IbcExecuteProxyTarget>,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub(crate) enum IbcExecuteProxy {
+pub(crate) enum IbcExecuteProxyTarget {
     NftMint,
 }
-impl FromStr for IbcExecuteProxy {
+impl FromStr for IbcExecuteProxyTarget {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "nft-mint" => Ok(IbcExecuteProxy::NftMint),
+            "nft-mint" => Ok(IbcExecuteProxyTarget::NftMint),
             _ => Err(anyhow::anyhow!("Unknown ibc execute proxy: {s}")),
         }
     }
@@ -47,11 +47,11 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
         network,
         contracts,
         prod,
-        ibc_execute_proxy,
+        ibc_execute_proxy_target: ibc_execute_proxy,
     } = inst_opt;
 
     let basic = opt.load_basic_app(network).await?;
-    let (tracker, _) = basic.get_tracker_faucet()?;
+    let (tracker, _) = basic.get_tracker_and_faucet()?;
 
     let label_suffix = if prod { "" } else { " (testnet)" };
 
@@ -59,23 +59,23 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
         Contracts::PerpsProtocol => {
             bail!("Cannot instantiate perps-protocol with instantiate-rewards, use regular instantiate instead");
         }
-        Contracts::IbcExecute => {
+        Contracts::IbcExecuteProxy => {
             match ibc_execute_proxy
                 .context("Must specify --ibc-execute-proxy when instantiating ibc-execute")?
             {
-                IbcExecuteProxy::NftMint => {
+                IbcExecuteProxyTarget::NftMint => {
                     let mint_contract =
                         instantiate_testnet_nft_contract(&basic, "Levana Baby Dragons Mock")
                             .await?;
 
                     let ibc_contract = tracker
-                        .require_code_by_type(&opt, IBC_EXECUTE)
+                        .require_code_by_type(&opt, IBC_EXECUTE_PROXY)
                         .await?
                         .instantiate(
                             &basic.wallet,
                             format!("Levana IbcExecute{label_suffix}"),
                             vec![],
-                            msg::contracts::ibc_execute::entry::InstantiateMsg {
+                            msg::contracts::ibc_execute_proxy::entry::InstantiateMsg {
                                 contract: mint_contract.get_address_string().into(),
                                 ibc_channel_version: IbcChannelVersion::NftMint
                                     .as_str()

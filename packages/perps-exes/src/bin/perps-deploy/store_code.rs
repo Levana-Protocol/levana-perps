@@ -29,7 +29,7 @@ pub(crate) struct StoreCodeOpt {
 pub enum Contracts {
     PerpsProtocol,
     Hatching,
-    IbcExecute,
+    IbcExecuteProxy,
 }
 
 impl FromStr for Contracts {
@@ -39,7 +39,7 @@ impl FromStr for Contracts {
         match s {
             "perps-protocol" => Ok(Contracts::PerpsProtocol),
             "hatching" => Ok(Contracts::Hatching),
-            "ibc-execute" => Ok(Contracts::IbcExecute),
+            "ibc-execute-proxy" => Ok(Contracts::IbcExecuteProxy),
             _ => Err(anyhow::anyhow!("Unknown contracts: {s}")),
         }
     }
@@ -57,7 +57,7 @@ impl Contracts {
                 PYTH_BRIDGE,
             ],
             Contracts::Hatching => &[HATCHING],
-            Contracts::IbcExecute => &[IBC_EXECUTE],
+            Contracts::IbcExecuteProxy => &[IBC_EXECUTE_PROXY],
         }
     }
 }
@@ -69,7 +69,7 @@ pub(crate) const MARKET: &str = "market";
 pub(crate) const POSITION_TOKEN: &str = "position_token";
 pub(crate) const PYTH_BRIDGE: &str = "pyth_bridge";
 pub(crate) const HATCHING: &str = "hatching";
-pub(crate) const IBC_EXECUTE: &str = "ibc_execute";
+pub(crate) const IBC_EXECUTE_PROXY: &str = "ibc_execute_proxy";
 
 pub(crate) async fn go(
     opt: Opt,
@@ -95,7 +95,7 @@ pub(crate) async fn go(
     };
 
     let basic = opt.load_basic_app(network).await?;
-    let (tracker, _) = basic.get_tracker_faucet()?;
+    let (tracker, _) = basic.get_tracker_and_faucet()?;
 
     store_code(
         &opt,
