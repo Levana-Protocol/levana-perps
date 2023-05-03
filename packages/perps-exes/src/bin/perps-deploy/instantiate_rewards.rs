@@ -199,7 +199,10 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
 
             if network != CosmosNetwork::OsmosisMainnet {
                 let amount = "1000".to_string();
-                log::info!("giving {amount} of {lvn_denom} to the rewards contract");
+                log::info!(
+                    "giving {amount} of {lvn_denom} to {}",
+                    contract.get_address()
+                );
                 let coin = Coin {
                     denom: lvn_denom,
                     amount: "10000".to_string(),
