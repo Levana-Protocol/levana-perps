@@ -3,11 +3,12 @@ use std::{collections::HashSet, str::FromStr};
 use crate::{
     app::BasicApp,
     cli::Opt,
-    store_code::{Contracts, HATCHING, IBC_EXECUTE_PROXY},
+    store_code::{Contracts, HATCHING, IBC_EXECUTE_PROXY, LVN_REWARDS},
 };
 use anyhow::{bail, Context, Result};
+use cosmos::Coin;
 use cosmos::{Contract, CosmosNetwork, HasAddress};
-use cosmwasm_std::IbcOrder;
+use cosmwasm_std::{Addr, IbcOrder};
 use msg::contracts::hatching::ibc::IbcChannelVersion;
 use serde::{Deserialize, Serialize};
 
@@ -25,6 +26,12 @@ pub(crate) struct InstantiateRewardsOpt {
     /// If deploying ibc_execute_proxy, specify the target contract it's proxying
     #[clap(long)]
     pub(crate) ibc_execute_proxy_target: Option<IbcExecuteProxyTarget>,
+    /// If deploying ibc_execute_proxy, specify the target contract it's proxying
+    #[clap(
+        long,
+        default_value = "factory/osmo12g96ahplpf78558cv5pyunus2m66guykt96lvc/lvn1"
+    )]
+    pub(crate) lvn_denom: String,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -48,6 +55,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
         contracts,
         prod,
         ibc_execute_proxy_target: ibc_execute_proxy,
+        lvn_denom,
     } = inst_opt;
 
     let basic = opt.load_basic_app(network).await?;
@@ -159,6 +167,52 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
 
             log::info!("new hatching deployed at {}", contract.get_address_string());
             log::info!("hatching ibc port is {}", info.ibc_port_id);
+        }
+        Contracts::LvnRewards => {
+            let code_id = tracker.require_code_by_type(&opt, LVN_REWARDS).await?;
+            let contract = code_id
+                .instantiate(
+                    &basic.wallet,
+                    format!("Levana Rewards{label_suffix}"),
+                    vec![],
+                    msg::contracts::rewards::entry::InstantiateMsg {
+                        config: msg::contracts::rewards::config::Config {
+                            token_denom: lvn_denom.clone(),
+                            // FIXME: these are all placeholder values for now
+                            immediately_transferable: "10".parse()?,
+                            unlock_duration_seconds: 60 * 60 * 24 * 7,
+                            factory_addr: Addr::unchecked(
+                                "osmo17pxfdfeqwvrktzr7m76jdgksw2gsfqc95dqx6z6qqegcpuuv0xlqkpzej5",
+                            ),
+                        },
+                    },
+                )
+                .await?;
+
+            let info = contract.info().await?;
+
+            log::info!(
+                "new lvn rewards deployed at {}",
+                contract.get_address_string()
+            );
+            log::info!("lvn rewards ibc port is {}", info.ibc_port_id);
+
+            if network != CosmosNetwork::OsmosisMainnet {
+                log::info!(
+                    "{} has {:#?}",
+                    basic.wallet.address(),
+                    basic.cosmos.all_balances(basic.wallet.address()).await?
+                );
+                log::info!("giving some {lvn_denom} to the rewards contract");
+                let coin = Coin {
+                    denom: lvn_denom,
+                    amount: "10000".to_string(),
+                };
+                basic
+                    .wallet
+                    .send_coins(&basic.cosmos, contract.get_address(), vec![coin])
+                    .await?;
+            }
         }
     }
 

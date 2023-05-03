@@ -30,6 +30,7 @@ pub enum Contracts {
     PerpsProtocol,
     Hatching,
     IbcExecuteProxy,
+    LvnRewards,
 }
 
 impl FromStr for Contracts {
@@ -40,6 +41,7 @@ impl FromStr for Contracts {
             "perps-protocol" => Ok(Contracts::PerpsProtocol),
             "hatching" => Ok(Contracts::Hatching),
             "ibc-execute-proxy" => Ok(Contracts::IbcExecuteProxy),
+            "lvn-rewards" => Ok(Contracts::LvnRewards),
             _ => Err(anyhow::anyhow!("Unknown contracts: {s}")),
         }
     }
@@ -58,6 +60,7 @@ impl Contracts {
             ],
             Contracts::Hatching => &[HATCHING],
             Contracts::IbcExecuteProxy => &[IBC_EXECUTE_PROXY],
+            Contracts::LvnRewards => &[LVN_REWARDS],
         }
     }
 }
@@ -70,6 +73,7 @@ pub(crate) const POSITION_TOKEN: &str = "position_token";
 pub(crate) const PYTH_BRIDGE: &str = "pyth_bridge";
 pub(crate) const HATCHING: &str = "hatching";
 pub(crate) const IBC_EXECUTE_PROXY: &str = "ibc_execute_proxy";
+pub(crate) const LVN_REWARDS: &str = "rewards";
 
 pub(crate) async fn go(
     opt: Opt,
