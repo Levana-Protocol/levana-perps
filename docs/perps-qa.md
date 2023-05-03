@@ -73,7 +73,7 @@ export COSMOS_WALLET="REDACTED"
 ```
 
 To get the wallet mnemonic for the QA contract which has the ability
-to set price, contact Sibi.
+to set price, contact admin.
 
 You can use a different contract family by running:
 
