@@ -1,5 +1,5 @@
 //! Entrypoint messages for the farming contract.
-mod defaults;
+pub mod defaults;
 
 use crate::prelude::*;
 use cosmwasm_schema::QueryResponses;
@@ -10,8 +10,10 @@ use cosmwasm_std::{Binary, Uint128};
 pub struct InstantiateMsg {
     /// Owner wallet allowed to perform [ExecuteMsg::Owner] actions.
     pub owner: RawAddr,
-    /// Market contract we work with
-    pub market: RawAddr,
+    /// Factory contract we work with
+    pub factory: RawAddr,
+    /// Market ID within the factory
+    pub market_id: MarketId,
     /// How many seconds a a lockdrop "month" lasts.
     #[serde(default = "defaults::lockdrop_month_seconds")]
     pub lockdrop_month_seconds: u32,
@@ -193,6 +195,10 @@ pub struct StateResp {
     /// Total farming tokens across the entire protocol.
     pub farming_tokens: FarmingToken,
     /// Total xLP held by the farming contract
+    ///
+    /// Note that this number may be different from querying the xLP token
+    /// balance since this number won't reflect xLP directly transferred into
+    /// this contract.
     pub xlp: LpToken,
     /// The lockdrop bucket information.
     pub lockdrop_buckets: Vec<LockdropBucketStats>,

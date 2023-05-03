@@ -3,10 +3,25 @@ use cosmwasm_std::entry_point;
 use cosmwasm_std::{Deps, Env};
 
 #[entry_point]
-pub fn query(deps: Deps, env: Env, _msg: QueryMsg) -> Result<QueryResponse> {
-    let (_state, _store) = State::new(deps, env);
-    todo!() // FIXME
-            // match msg {
-            //     QueryMsg::Version {} => get_contract_version(store)?.query_result(),
-            // }
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
+    let (state, store) = State::new(deps, env)?;
+    match msg {
+        QueryMsg::Version {} => todo!(),
+        QueryMsg::State {} => todo!(),
+        QueryMsg::FarmerStats { addr } => {
+            let farmer = addr.validate(state.api)?;
+            let raw = state.load_raw_farmer_stats(store, &farmer)?;
+            FarmerStats {
+                farming_tokens: raw.farming_tokens,
+                // FIXME lockdrop support
+                farming_tokens_available: raw.farming_tokens,
+                lockdrops: vec![],
+                lockdrop_available: "0".parse().unwrap(),
+                lockdrop_locked: "0".parse().unwrap(),
+                emissions: "0".parse().unwrap(),
+            }
+            .query_result()
+        }
+        QueryMsg::Farmers { .. } => todo!(),
+    }
 }

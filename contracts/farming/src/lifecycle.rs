@@ -10,12 +10,21 @@ pub fn instantiate(
     deps: DepsMut,
     env: Env,
     _info: MessageInfo,
-    InstantiateMsg { .. }: InstantiateMsg, // FIXME
+    InstantiateMsg {
+        // FIXME remove the ..
+        factory,
+        market_id,
+        ..
+    }: InstantiateMsg,
 ) -> Result<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
+    let factory = factory.validate(deps.api)?;
+    MarketInfo::save(deps.querier, deps.storage, factory, market_id)?;
+
     let (_state, mut ctx) = StateContext::new(deps, env)?;
     ctx.response.add_event(NewFarming {});
+
     Ok(ctx.response.into_response())
 }
 

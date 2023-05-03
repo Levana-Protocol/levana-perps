@@ -1,6 +1,7 @@
 use crate::state::*;
 use cosmwasm_std::QueryResponse;
 use msg::contracts::{
+    cw20::{Cw20ReceiveMsg, ReceiverExecuteMsg},
     factory::entry::{MarketInfoResponse, QueryMsg as FactoryQueryMsg},
     liquidity_token::entry::{
         ExecuteMsg as LiquidityTokenExecuteMsg, QueryMsg as LiquidityTokenQueryMsg,
@@ -52,6 +53,26 @@ impl State<'_> {
         sender: Addr,
         msg: LiquidityTokenExecuteMsg,
     ) -> Result<()> {
+        let (msg, send) = match msg {
+            // Send needs special handling to ensure the messages to the destination contract come from the proxy, not the market
+            LiquidityTokenExecuteMsg::Send {
+                contract,
+                amount,
+                msg,
+            } => {
+                let send = ReceiverExecuteMsg::Receive(Cw20ReceiveMsg {
+                    sender: sender.clone().into(),
+                    amount,
+                    msg,
+                });
+                let msg = LiquidityTokenExecuteMsg::Transfer {
+                    recipient: contract.clone(),
+                    amount,
+                };
+                (msg, Some((contract, send)))
+            }
+            msg => (msg, None),
+        };
         ctx.response.add_execute_submessage_oneshot(
             self.market_addr(ctx.storage)?,
             &MarketExecuteMsg::LiquidityTokenProxy {
@@ -59,6 +80,15 @@ impl State<'_> {
                 kind: get_kind(ctx.storage)?,
                 msg,
             },
-        )
+        )?;
+
+        // We need to sequence this submessage after the previous one to ensure the
+        // receiving contract has the expected balance.
+        if let Some((contract, send)) = send {
+            ctx.response
+                .add_execute_submessage_oneshot(contract, &send)?;
+        }
+
+        Ok(())
     }
 }

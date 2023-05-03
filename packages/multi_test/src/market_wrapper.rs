@@ -28,6 +28,10 @@ use msg::contracts::factory::entry::{
     ExecuteMsg as FactoryExecuteMsg, MarketInfoResponse, QueryMsg as FactoryQueryMsg,
     ShutdownStatus,
 };
+use msg::contracts::farming::entry::FarmerStats;
+use msg::contracts::farming::entry::{
+    ExecuteMsg as FarmingExecuteMsg, QueryMsg as FarmingQueryMsg,
+};
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::crank::CrankWorkInfo;
 use msg::contracts::market::entry::{
@@ -75,6 +79,8 @@ pub struct PerpsMarket {
     pub addr: Addr,
     /// When enabled, time will jump by one block on every exec
     pub automatic_time_jump_enabled: bool,
+    /// Address of the farming contract
+    farming_addr: Addr,
 }
 
 impl PerpsMarket {
@@ -140,11 +146,12 @@ impl PerpsMarket {
 
         let factory_addr = app.borrow().factory_addr.clone();
 
+        let protocol_owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
         let market_addr = app
             .borrow_mut()
             .execute_contract(
-                Addr::unchecked(&TEST_CONFIG.protocol_owner),
-                factory_addr,
+                protocol_owner.clone(),
+                factory_addr.clone(),
                 &market_msg,
                 &[],
             )?
@@ -167,12 +174,36 @@ impl PerpsMarket {
             .query_wasm_smart::<StatusResp>(market_addr.clone(), &MarketQueryMsg::Status {})?
             .collateral;
 
+        let farming_code_id = app.borrow().code_id(crate::PerpsContract::Farming)?;
+        let farming_addr = app.borrow_mut().instantiate_contract(
+            farming_code_id,
+            protocol_owner.clone(),
+            &msg::contracts::farming::entry::InstantiateMsg {
+                owner: protocol_owner.clone().into(),
+                factory: factory_addr.into(),
+                market_id: id.clone(),
+                lockdrop_month_seconds:
+                    msg::contracts::farming::entry::defaults::lockdrop_month_seconds(),
+                lockdrop_buckets: msg::contracts::farming::entry::defaults::lockdrop_buckets(),
+                bonus_ratio: msg::contracts::farming::entry::defaults::bonus_ratio(),
+                bonus_addr: protocol_owner.clone().into(),
+                lockdrop_lvn_unlock_seconds:
+                    msg::contracts::farming::entry::defaults::lockdrop_month_seconds(),
+                lockdrop_immediate_unlock_ratio:
+                    msg::contracts::farming::entry::defaults::lockdrop_immediate_unlock_ratio(),
+            },
+            &[],
+            "Farming Contract".to_owned(),
+            Some(protocol_owner.into_string()),
+        )?;
+
         let mut _self = Self {
             app,
             id,
             token,
             addr: market_addr,
             automatic_time_jump_enabled: true,
+            farming_addr,
         };
 
         _self.exec_set_price_with_usd(initial_price, collateral_in_usd)?;
@@ -1208,6 +1239,7 @@ impl PerpsMarket {
                 .into(),
         )
     }
+
     pub(crate) fn exec_liquidity_token_transfer_raw(
         &self,
         kind: LiquidityTokenKind,
@@ -1332,5 +1364,61 @@ impl PerpsMarket {
                 on_time_jump(self.set_time(TimeJump::Seconds(*seconds)).map(|_| *seconds));
             }
         }
+    }
+
+    pub fn exec_farming_deposit_xlp(
+        &self,
+        wallet: &Addr,
+        amount: NonZero<LpToken>,
+    ) -> Result<AppResponse> {
+        self.exec_liquidity_token_send(
+            LiquidityTokenKind::Xlp,
+            wallet,
+            &self.farming_addr,
+            amount.raw(),
+            &FarmingExecuteMsg::Deposit {},
+        )
+    }
+
+    fn exec_farming(&self, wallet: &Addr, msg: &FarmingExecuteMsg) -> Result<AppResponse> {
+        let farming_addr = self.farming_addr.clone();
+
+        let msg = WasmMsg::Execute {
+            contract_addr: farming_addr.into_string(),
+            msg: to_binary(msg)?,
+            funds: vec![],
+        };
+        self.exec_wasm_msg(wallet, msg)
+    }
+
+    pub fn exec_farming_withdraw_xlp(
+        &self,
+        wallet: &Addr,
+        amount: NonZero<FarmingToken>,
+    ) -> Result<AppResponse> {
+        self.exec_farming(
+            wallet,
+            &FarmingExecuteMsg::Withdraw {
+                amount: Some(amount),
+            },
+        )
+    }
+
+    fn query_farming<T: DeserializeOwned>(
+        &self,
+        msg: &msg::contracts::farming::entry::QueryMsg,
+    ) -> Result<T> {
+        let farming_addr = self.farming_addr.clone();
+
+        self.app()
+            .wrap()
+            .query_wasm_smart(farming_addr, &msg)
+            .map_err(|err| err.into())
+    }
+
+    pub fn query_farming_farmer_stats(&self, wallet: &Addr) -> Result<FarmerStats> {
+        self.query_farming(&FarmingQueryMsg::FarmerStats {
+            addr: wallet.into(),
+        })
     }
 }

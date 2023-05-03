@@ -2161,6 +2161,7 @@ dependencies = [
  "dotenv",
  "levana_perpswap_cosmos_cw20",
  "levana_perpswap_cosmos_factory",
+ "levana_perpswap_cosmos_farming",
  "levana_perpswap_cosmos_liquidity_token",
  "levana_perpswap_cosmos_market",
  "levana_perpswap_cosmos_msg",
