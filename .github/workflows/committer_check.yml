@@ -14,11 +14,13 @@ jobs:
         uses: tim-actions/get-pr-commits@master
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      - run: |
+      - env:
+          COMMITS: ${{ steps.get-pr-commits.outputs.commits }}
+        run: |
           set -eux -o pipefail
-          jq -r '.[] | .commit.committer.name' <<< '${{ steps.get-pr-commits.outputs.commits }}' | while read -r n; do
+          jq -r '.[] | .commit.committer.name' <<< "${COMMITS}" | while read -r n; do
             [ "${n#lvn-}" != "${n}" ] || [ "${n%-lvn}" != "${n}" ]
           done
-          jq -r '.[] | .commit.committer.email' <<< '${{ steps.get-pr-commits.outputs.commits }}' | while read -r e; do
+          jq -r '.[] | .commit.committer.email' <<< "${COMMITS}" | while read -r e; do
             [ "${e#*@}" == 'levana.exchange' ]
           done
