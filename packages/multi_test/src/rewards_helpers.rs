@@ -3,9 +3,11 @@ use anyhow::Result;
 use cosmwasm_std::{Addr, Decimal256};
 use cw_multi_test::{AppResponse, Executor};
 use msg::contracts::rewards::config::Config;
-use msg::contracts::rewards::entry::ExecuteMsg::{Claim, DistributeRewards, UpdateConfig};
+use msg::contracts::rewards::entry::ExecuteMsg::{
+    Claim, ConfigUpdate as ConfigUpdateMsg, DistributeRewards,
+};
 use msg::contracts::rewards::entry::QueryMsg::{Config as ConfigQuery, RewardsInfo};
-use msg::contracts::rewards::entry::RewardsInfoResp;
+use msg::contracts::rewards::entry::{ConfigUpdate, RewardsInfoResp};
 use msg::prelude::RawAddr;
 use msg::token::Token;
 
@@ -19,13 +21,13 @@ impl PerpsApp {
 
     pub fn setup_rewards_contract(&mut self) {
         let rewards_addr = self.rewards_addr.clone();
-        let factory_addr = self.factory_addr.clone();
+        let factory_addr = self.factory_addr.clone().into_string();
 
         self.execute_contract(
             Addr::unchecked(&TEST_CONFIG.protocol_owner),
             rewards_addr.clone(),
-            &UpdateConfig {
-                config: Config {
+            &ConfigUpdateMsg {
+                config: ConfigUpdate {
                     immediately_transferable: "0.25".parse().unwrap(),
                     token_denom: TEST_CONFIG.rewards_token_denom.clone(),
                     unlock_duration_seconds: 60,
@@ -67,7 +69,7 @@ impl PerpsApp {
         self.execute_contract(recipient.clone(), rewards_addr, &Claim {}, &[])
     }
 
-    pub fn query_rewards_info(&self, addr: impl Into<RawAddr>) -> Result<RewardsInfoResp> {
+    pub fn query_rewards_info(&self, addr: impl Into<RawAddr>) -> Result<Option<RewardsInfoResp>> {
         self.wrap()
             .query_wasm_smart(
                 self.rewards_addr.clone(),
@@ -91,8 +93,12 @@ impl PerpsApp {
             .map_err(|e| e.into())
     }
 
-    pub fn update_rewards_config(&mut self, sender: Addr, config: Config) -> Result<AppResponse> {
+    pub fn update_rewards_config(
+        &mut self,
+        sender: Addr,
+        config: ConfigUpdate,
+    ) -> Result<AppResponse> {
         let rewards_addr = self.rewards_addr.clone();
-        self.execute_contract(sender, rewards_addr, &UpdateConfig { config }, &[])
+        self.execute_contract(sender, rewards_addr, &ConfigUpdateMsg { config }, &[])
     }
 }

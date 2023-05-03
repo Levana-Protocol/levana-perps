@@ -4,7 +4,7 @@ use cosmwasm_std::{
 };
 use msg::contracts::{
     hatching::ibc::{IbcChannelVersion, IbcExecuteMsg},
-    ibc_execute::entry::IbcProxyContractMessages,
+    ibc_execute_proxy::entry::IbcProxyContractMessages,
 };
 use shared::{
     ibc::{

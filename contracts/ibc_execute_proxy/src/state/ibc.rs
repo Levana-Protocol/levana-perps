@@ -2,7 +2,7 @@ use cosmwasm_std::{
     from_binary, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcOrder,
     IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg,
 };
-use msg::contracts::ibc_execute::entry::{IbcProxyContractMessages, InstantiateMsg};
+use msg::contracts::ibc_execute_proxy::entry::{IbcProxyContractMessages, InstantiateMsg};
 use serde::{Deserialize, Serialize};
 use shared::{
     ibc::event::{IbcChannelCloseEvent, IbcChannelConnectEvent},

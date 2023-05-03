@@ -14,6 +14,8 @@ use msg::contracts::hatching::{
     config::Config as HatchConfig,
     entry::{ExecuteMsg as HatchExecMsg, MaybeHatchStatusResp, QueryMsg as HatchQueryMsg},
 };
+use msg::contracts::rewards::entry::ExecuteMsg::Claim;
+use msg::contracts::rewards::entry::{QueryMsg::RewardsInfo, RewardsInfoResp};
 use perps_exes::prelude::*;
 
 struct Hatch {
@@ -60,6 +62,7 @@ struct NftMint {
     pub wallet: Wallet,
     pub contract: Contract,
 }
+
 impl NftMint {
     pub async fn new(opt: &HatchEggOpt) -> Result<Self> {
         let cosmos = opt.nft_mint_network.builder().build().await?;
@@ -76,6 +79,48 @@ impl NftMint {
     }
 }
 
+struct Rewards {
+    pub cosmos: Cosmos,
+    pub wallet: Wallet,
+    pub contract: Contract,
+}
+
+impl Rewards {
+    pub async fn new(opt: &HatchEggOpt) -> Result<Self> {
+        let cosmos = opt.lvn_rewards_network.builder().build().await?;
+        let address_type = cosmos.get_address_type();
+        let wallet = opt.lvn_rewards_wallet.for_chain(address_type);
+
+        let contract = Contract::new(cosmos.clone(), opt.lvn_rewards_address);
+
+        Ok(Self {
+            cosmos,
+            wallet,
+            contract,
+        })
+    }
+}
+
+async fn get_lvn_balance(rewards: &Rewards, denom: &String) -> Result<u128> {
+    let balances = rewards
+        .cosmos
+        .all_balances(rewards.wallet.address())
+        .await?;
+
+    let amount = balances
+        .iter()
+        .find_map(|coin| {
+            if coin.denom == *denom {
+                coin.amount.parse::<u128>().ok()
+            } else {
+                None
+            }
+        })
+        .unwrap_or_default();
+
+    Ok(amount)
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let Cmd {
@@ -86,9 +131,19 @@ async fn main() -> Result<()> {
     global_opt.init_logger();
 
     match subcommand {
+        /*  This test covers egg hatching and reward distribution. The process uses IBC messaging
+           spanning three chains.
+
+           1. Hatching dragon eggs on juno
+           2. Minting NFTs on stargaze
+           3. Rewarding users with LVN tokens on osmosis
+        */
         Subcommand::HatchEgg { hatch_egg_opt: opt } => {
             let hatch = Hatch::new(&opt).await?;
             let nft_mint = NftMint::new(&opt).await?;
+            let rewards = Rewards::new(&opt).await?;
+
+            let lvn_balance_before = get_lvn_balance(&rewards, &opt.reward_token_denom).await?;
 
             let hatch_status: MaybeHatchStatusResp = hatch
                 .contract
@@ -97,6 +152,38 @@ async fn main() -> Result<()> {
                     details: false,
                 })
                 .await?;
+
+            // Clear out pre-existing rewards
+
+            log::info!("Clearing our rewards for {}...", rewards.wallet.address());
+            loop {
+                let res = rewards
+                    .contract
+                    .query::<Option<RewardsInfoResp>>(RewardsInfo {
+                        addr: rewards.wallet.address().to_string().into(),
+                    })
+                    .await?;
+
+                match res {
+                    None => {
+                        log::info!("...rewards are clear");
+                        break;
+                    }
+                    Some(_) => {
+                        log::info!("...found rewards, claiming...");
+                        rewards
+                            .contract
+                            .execute(&rewards.wallet, vec![], Claim {})
+                            .await?;
+                    }
+                }
+
+                // hardcoding sleep to 10 seconds since that's what `ConfigUpdate.unlock_duration_seconds`
+                // is set to when deploying the test rewards contract
+                tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+            }
+
+            // Hatch the egg or retry hatching if the process started
 
             let resp = if let Some(hatch_status) = hatch_status.resp {
                 log::info!(
@@ -116,14 +203,16 @@ async fn main() -> Result<()> {
                     .await?
             } else {
                 let token_id = Utc::now().timestamp_millis().to_string();
-
                 let spirit_level: Number = "1.23".parse().unwrap();
+
+                // mint the egg NFT
 
                 log::info!(
                     "minting mock nft egg w/ id {} and spirit level {}",
                     token_id,
                     spirit_level
                 );
+
                 hatch
                     .burn_egg_contract
                     .execute(
@@ -145,6 +234,7 @@ async fn main() -> Result<()> {
                         include_expired: None,
                     })
                     .await?;
+
                 // make sure the owner is correct
                 assert_eq!(nft_info.access.owner, hatch.wallet.address().to_string());
 
@@ -175,6 +265,8 @@ async fn main() -> Result<()> {
                     hatch.config.nft_mint_channel.unwrap()
                 );
 
+                // hatch the egg
+
                 hatch
                     .contract
                     .execute(
@@ -182,6 +274,7 @@ async fn main() -> Result<()> {
                         vec![],
                         HatchExecMsg::Hatch {
                             nft_mint_owner: nft_mint.wallet.address().to_string(),
+                            lvn_grant_address: rewards.wallet.address().to_string(),
                             eggs: vec![token_id.clone()],
                             dusts: vec![],
                         },
@@ -207,26 +300,85 @@ async fn main() -> Result<()> {
                 })
                 .unwrap();
 
+            let mut mint_success = false;
+            let mut reward_success = false;
+
             loop {
-                log::info!("checking if token {} was minted yet...", token_id);
-                match nft_mint
-                    .contract
-                    .query::<mock_nft::AllNftInfoResponse>(mock_nft::QueryMsg::AllNftInfo {
-                        token_id: token_id.clone(),
-                        include_expired: None,
-                    })
-                    .await
-                {
-                    Ok(resp) => {
-                        log::info!("Token was minted!");
-                        log::info!("{:#?}", resp);
-                        break;
+                if !mint_success {
+                    log::info!("checking if token {} was minted yet...", token_id);
+                    match nft_mint
+                        .contract
+                        .query::<mock_nft::AllNftInfoResponse>(mock_nft::QueryMsg::AllNftInfo {
+                            token_id: token_id.clone(),
+                            include_expired: None,
+                        })
+                        .await
+                    {
+                        Ok(resp) => {
+                            log::info!("Token was minted!");
+                            log::info!("{:#?}", resp);
+
+                            //todo maybe check ownership of NFT on minting chain (aka stargaze)
+
+                            mint_success = true
+                        }
+                        Err(_) => {
+                            log::info!("Token not minted yet");
+                        }
                     }
-                    Err(_) => {
-                        log::info!("Token not minted yet, waiting 5 seconds...");
-                        tokio::time::sleep(tokio::time::Duration::from_secs(opt.ibc_sleep_seconds))
-                            .await;
+                }
+
+                if !reward_success {
+                    log::info!("checking if LVN rewards have been transferred to rewards contract and recipient...");
+                    match rewards
+                        .contract
+                        .query::<Option<RewardsInfoResp>>(RewardsInfo {
+                            addr: rewards.wallet.address().to_string().into(),
+                        })
+                        .await
+                    {
+                        Ok(resp) => {
+                            match resp {
+                                None => {
+                                    log::info!("No rewards found yet");
+                                }
+                                Some(resp) => {
+                                    log::info!(
+                                        "Rewards found for {}, {:#?}",
+                                        rewards.wallet.address(),
+                                        resp
+                                    );
+
+                                    // After confirming the rewards contract has received the rewards,
+                                    // check the recipient to see if they've received the portion that's
+                                    // immediately transferred
+
+                                    let lvn_balance_after =
+                                        get_lvn_balance(&rewards, &opt.reward_token_denom).await?;
+                                    let diff = lvn_balance_after - lvn_balance_before;
+                                    assert!(
+                                        diff > 0,
+                                        "lvn balance before: {}, lvn balance after: {}",
+                                        lvn_balance_before,
+                                        lvn_balance_after
+                                    );
+
+                                    log::info!("recipient received {} lvn tokens", diff);
+                                    reward_success = true;
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("Error querying rewards contract {}", e)
+                        }
                     }
+                }
+
+                if mint_success && reward_success {
+                    break;
+                } else {
+                    tokio::time::sleep(tokio::time::Duration::from_secs(opt.ibc_sleep_seconds))
+                        .await;
                 }
             }
         }

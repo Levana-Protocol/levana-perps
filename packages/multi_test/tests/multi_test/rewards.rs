@@ -1,7 +1,7 @@
 use cosmwasm_std::{Addr, Decimal256};
 use levana_perpswap_multi_test::time::{BlockInfoChange, NANOS_PER_SECOND};
 use levana_perpswap_multi_test::{config::TEST_CONFIG, PerpsApp};
-use msg::contracts::rewards::config::Config;
+use msg::contracts::rewards::entry::ConfigUpdate;
 use std::str::FromStr;
 
 #[test]
@@ -15,7 +15,10 @@ fn test_distribute_rewards_unlock() {
 
     // Assert values after initial distribution
 
-    let res = app.query_rewards_info(&recipient).unwrap();
+    let res = app
+        .query_rewards_info(&recipient)
+        .unwrap()
+        .expect("expected rewards info");
 
     assert_eq!(res.locked, Decimal256::from_str("75").unwrap());
     assert_eq!(res.unlocked, Decimal256::zero());
@@ -25,7 +28,10 @@ fn test_distribute_rewards_unlock() {
     let change = BlockInfoChange::from_nanos(20 * NANOS_PER_SECOND);
     app.set_block_info(change);
 
-    let res = app.query_rewards_info(&recipient).unwrap();
+    let res = app
+        .query_rewards_info(&recipient)
+        .unwrap()
+        .expect("expected rewards info");
 
     assert_eq!(res.locked, Decimal256::from_str("50").unwrap());
     assert_eq!(res.unlocked, Decimal256::from_str("25").unwrap());
@@ -35,7 +41,10 @@ fn test_distribute_rewards_unlock() {
     let change = BlockInfoChange::from_nanos(40 * NANOS_PER_SECOND);
     app.set_block_info(change);
 
-    let res = app.query_rewards_info(&recipient).unwrap();
+    let res = app
+        .query_rewards_info(&recipient)
+        .unwrap()
+        .expect("expected rewards info");
 
     assert_eq!(res.locked, Decimal256::zero());
     assert_eq!(res.unlocked, Decimal256::from_str("75").unwrap());
@@ -100,12 +109,22 @@ fn test_multiple_distributions() {
     let change = BlockInfoChange::from_nanos(20 * NANOS_PER_SECOND);
     app.set_block_info(change);
 
+    let balance_before = app.query_rewards_balance(&recipient).unwrap();
+    assert!(balance_before > Decimal256::zero());
+
     // Second distribution
     app.distribute_rewards(&recipient, "100").unwrap();
 
+    let balance_after = app.query_rewards_balance(&recipient).unwrap();
+
     // Assert
 
-    let res = app.query_rewards_info(&recipient).unwrap();
+    assert!(balance_after > balance_before);
+
+    let res = app
+        .query_rewards_info(&recipient)
+        .unwrap()
+        .expect("expected rewards info");
 
     assert_eq!(res.unlocked, Decimal256::zero());
     assert_eq!(res.locked, Decimal256::from_str("95").unwrap());
@@ -129,9 +148,11 @@ fn test_update_config() {
 
     app.distribute_rewards(&recipient, "100").unwrap();
 
-    let new_config = Config {
+    let new_config = ConfigUpdate {
         immediately_transferable: Decimal256::from_str("0.5").unwrap(),
-        ..config
+        token_denom: config.token_denom,
+        unlock_duration_seconds: config.unlock_duration_seconds,
+        factory_addr: config.factory_addr.into_string(),
     };
 
     // Assert err on update config with unauthorized addr

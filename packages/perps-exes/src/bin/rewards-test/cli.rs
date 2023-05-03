@@ -31,36 +31,66 @@ pub(crate) struct HatchEggOpt {
     /// Mnemonic phrase for the hatching wallet
     #[clap(long, env = "MOCK_NFT_ADMIN_COSMOS_WALLET")]
     pub mock_nft_admin_wallet: RawWallet,
+
     /// Network to use for hatching
     #[clap(long, env = "HATCH_COSMOS_NETWORK")]
     pub hatch_network: CosmosNetwork,
+
     /// Mnemonic phrase for the hatching wallet
     #[clap(long, env = "HATCH_COSMOS_WALLET")]
     pub hatch_wallet: RawWallet,
+
     /// Network to use for the minted nft rewards
     #[clap(long, env = "NFT_MINT_COSMOS_NETWORK")]
     pub nft_mint_network: CosmosNetwork,
+
     /// Mnemonic phrase for the minted nft rewards wallet
     #[clap(long, env = "NFT_MINT_COSMOS_WALLET")]
     pub nft_mint_wallet: RawWallet,
+
+    /// Network to use for LVN rewards
+    #[clap(long, env = "LVN_REWARDS_COSMOS_NETWORK")]
+    pub lvn_rewards_network: CosmosNetwork,
+
+    /// Mnemonic phrase for the lvn rewards wallet. This is the wallet that is receiving rewards.
+    #[clap(long, env = "LVN_REWARDS_COSMOS_WALLET")]
+    pub lvn_rewards_wallet: RawWallet,
+
     /// hatching contract address
     #[clap(
         long,
         env = "HATCH_ADDRESS",
-        default_value = "juno17hgh0p226hl0h8c77nl4p6d4jhkgwdxznrht27gzyekkgrprsh6qsx4fn4"
+        default_value = "juno1vv7jdzgnx5qr8x3h3j564g0wp22a7fhxunvamlqunprklmwu5x0s4h02ff"
     )]
     pub hatch_address: Address,
+
     // this is the address for the NFT minting itself (i.e. Levana Baby Dragons), not the ibc execute proxy contract
     #[clap(
         long,
         env = "NFT_MINT_ADDRESS",
-        default_value = "stars167awkhtm96aelu0t2gcls723ar4guclnxf5x636fdlfdms0gvyxqkgxlpe"
+        default_value = "stars126ucy5awfnqx909mevlz6x4r69u5e9ekhjrvkrypfnap747jvlyqcw80wv"
     )]
     pub nft_mint_address: Address,
+
+    /// LVN Rewards contract address
+    #[clap(
+        long,
+        env = "LVN_REWARDS_ADDRESS",
+        default_value = "osmo1ss99t8fqwgvtt2vny46tfncv53ydwmk6eswrdd7qpvs8zmwfr5msradgyq"
+    )]
+    pub lvn_rewards_address: Address,
 
     // Amount of time to sleep before checking for ibc updates
     #[clap(long, default_value = "5")]
     pub ibc_sleep_seconds: u64,
+
+    /// Reward token denom
+    #[clap(
+        long,
+        env = "REWARD_TOKEN_DENOM",
+        default_value = "factory/osmo12g96ahplpf78558cv5pyunus2m66guykt96lvc/lvn1"
+    )]
+    pub reward_token_denom: String,
 }
 
 impl Opt {

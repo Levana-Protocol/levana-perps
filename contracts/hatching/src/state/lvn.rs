@@ -8,7 +8,7 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         hatch_id: u64,
-        owner: &Addr,
+        lvn_grant_address: String,
         amount: NumberGtZero,
     ) -> Result<()> {
         // outbound IBC message, where packet is then received on other chain
@@ -22,7 +22,7 @@ impl State<'_> {
             .clone();
 
         let msg = IbcExecuteMsg::GrantLvn {
-            address: owner.to_string(),
+            address: lvn_grant_address,
             amount,
             hatch_id: hatch_id.to_string(),
         };

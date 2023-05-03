@@ -8,7 +8,7 @@ use shared::time::Timestamp;
 #[cw_serde]
 pub struct InstantiateMsg {
     /// Configuration
-    pub config: Config,
+    pub config: ConfigUpdate,
 }
 
 /// Execute message
@@ -25,7 +25,7 @@ pub enum ExecuteMsg {
     },
 
     /// Update config
-    UpdateConfig { config: Config },
+    ConfigUpdate { config: ConfigUpdate },
 
     /// Claim rewards
     Claim {},
@@ -35,10 +35,11 @@ pub enum ExecuteMsg {
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    /// * returns [RewardsInfoResp]
+    /// * returns and optional [RewardsInfoResp]
     ///
-    /// Rewards information for a given address
-    #[returns(RewardsInfoResp)]
+    /// Rewards information for a given address. If there are no rewards for the specified addr,
+    /// `None` is returned
+    #[returns(Option<RewardsInfoResp>)]
     RewardsInfo { addr: RawAddr },
 
     /// * returns [Config]
@@ -79,6 +80,19 @@ impl Default for RewardsInfoResp {
     fn default() -> Self {
         Self::new()
     }
+}
+
+#[cw_serde]
+pub struct ConfigUpdate {
+    /// The portion of rewards that are sent to the user immediately after receiving LVN tokens.
+    /// Defined as a ratio between 0 and 1.
+    pub immediately_transferable: Decimal256,
+    /// The denom for the LVN token which will be used for rewards
+    pub token_denom: String,
+    /// The amount of time it takes rewards to unlock linearly, defined in seconds
+    pub unlock_duration_seconds: u32,
+    /// The factory contract addr, used for auth
+    pub factory_addr: String,
 }
 
 pub mod events {

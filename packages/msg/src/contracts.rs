@@ -4,7 +4,7 @@ pub mod factory;
 pub mod farming;
 pub mod faucet;
 pub mod hatching;
-pub mod ibc_execute;
+pub mod ibc_execute_proxy;
 pub mod liquidity_token;
 pub mod market;
 pub mod position_token;

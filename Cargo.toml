@@ -9,7 +9,7 @@ members = [
     # Non-perps, mainnet contracts (i.e. gamification, governance, LVN, etc.)
     "contracts/hatching",
     "contracts/rewards",
-    "contracts/ibc_execute",
+    "contracts/ibc_execute_proxy",
     "contracts/farming",
 
     # Third-party, mainnet contracts (i.e. oracles)

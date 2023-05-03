@@ -2,7 +2,7 @@ pub mod config;
 pub mod ibc;
 pub mod send;
 
-use msg::contracts::ibc_execute::config::Config;
+use msg::contracts::ibc_execute_proxy::config::Config;
 
 use cw2::get_contract_version;
 use shared::prelude::*;

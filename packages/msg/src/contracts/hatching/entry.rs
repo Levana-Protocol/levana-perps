@@ -16,6 +16,7 @@ pub enum ExecuteMsg {
     Hatch {
         /// Must be a valid address on the target minting network
         nft_mint_owner: String,
+        lvn_grant_address: String,
         eggs: Vec<String>,
         dusts: Vec<String>,
     },
