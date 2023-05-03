@@ -8,7 +8,7 @@ use crate::{
 use anyhow::{bail, Context, Result};
 use cosmos::Coin;
 use cosmos::{Contract, CosmosNetwork, HasAddress};
-use cosmwasm_std::{Addr, IbcOrder};
+use cosmwasm_std::IbcOrder;
 use msg::contracts::hatching::ibc::IbcChannelVersion;
 use serde::{Deserialize, Serialize};
 
@@ -176,14 +176,14 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                     format!("Levana Rewards{label_suffix}"),
                     vec![],
                     msg::contracts::rewards::entry::InstantiateMsg {
-                        config: msg::contracts::rewards::config::Config {
+                        config: msg::contracts::rewards::entry::ConfigUpdate {
                             token_denom: lvn_denom.clone(),
                             // FIXME: these are all placeholder values for now
                             immediately_transferable: "10".parse()?,
                             unlock_duration_seconds: 60 * 60 * 24 * 7,
-                            factory_addr: Addr::unchecked(
-                                "osmo17pxfdfeqwvrktzr7m76jdgksw2gsfqc95dqx6z6qqegcpuuv0xlqkpzej5",
-                            ),
+                            factory_addr:
+                                "osmo17pxfdfeqwvrktzr7m76jdgksw2gsfqc95dqx6z6qqegcpuuv0xlqkpzej5"
+                                    .to_string(),
                         },
                     },
                 )
@@ -198,12 +198,8 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
             log::info!("lvn rewards ibc port is {}", info.ibc_port_id);
 
             if network != CosmosNetwork::OsmosisMainnet {
-                log::info!(
-                    "{} has {:#?}",
-                    basic.wallet.address(),
-                    basic.cosmos.all_balances(basic.wallet.address()).await?
-                );
-                log::info!("giving some {lvn_denom} to the rewards contract");
+                let amount = "1000".to_string();
+                log::info!("giving {amount} of {lvn_denom} to the rewards contract");
                 let coin = Coin {
                     denom: lvn_denom,
                     amount: "10000".to_string(),
