@@ -25,11 +25,15 @@ impl State<'_> {
         ctx: &mut StateContext,
         msg: IbcChannelConnectMsg,
     ) -> Result<()> {
-        let _version = validate_channel(msg.channel(), msg.counterparty_version())?;
+        let channel = validate_channel(msg.channel(), msg.counterparty_version())?;
 
-        //todo fill in match version?
-
-        // self.save_config(ctx)?;
+        match channel {
+            IbcChannelVersion::LvnGrant => {
+                self.config.lvn_grant_channel = Some(msg.channel().clone());
+                self.save_config(ctx.storage)?;
+            }
+            _ => bail!("Unknown channel: {:?}", channel),
+        }
 
         ctx.response_mut().add_event(IbcChannelConnectEvent {
             channel: msg.channel(),
@@ -44,24 +48,21 @@ impl State<'_> {
         msg: IbcChannelCloseMsg,
     ) -> Result<()> {
         // closing an unknown channel shouldn't happen, but if it does, we can treat it as a noop
-        // if let Ok(version) = IbcChannelVersion::from_str(msg.channel().version.as_str()) {
-        //     match version {
-        //         IbcChannelVersion::NftMint => {
-        //             self.config.nft_mint_channel = None;
-        //         }
-        //         IbcChannelVersion::LvnGrant => {
-        //             self.config.lvn_grant_channel = None;
-        //         }
-        //     }
-        //
-        //     self.save_config(ctx)?;
-        // }
+        if let Ok(channel) = IbcChannelVersion::from_str(msg.channel().version.as_str()) {
+            match channel {
+                IbcChannelVersion::LvnGrant => {
+                    self.config.lvn_grant_channel = None;
+                }
+                _ => bail!("Unknown channel: {:?}", channel),
+            }
 
-        //todo fill in channel close?
+            self.save_config(ctx.storage)?;
+        }
 
         ctx.response_mut().add_event(IbcChannelCloseEvent {
             channel: msg.channel(),
         });
+
         Ok(())
     }
 

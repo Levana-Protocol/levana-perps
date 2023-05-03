@@ -1,7 +1,7 @@
 use cosmwasm_std::{Addr, Decimal256};
 use levana_perpswap_multi_test::time::{BlockInfoChange, NANOS_PER_SECOND};
 use levana_perpswap_multi_test::{config::TEST_CONFIG, PerpsApp};
-use msg::contracts::rewards::config::Config;
+use msg::contracts::rewards::entry::ConfigUpdate;
 use std::str::FromStr;
 
 #[test]
@@ -129,9 +129,11 @@ fn test_update_config() {
 
     app.distribute_rewards(&recipient, "100").unwrap();
 
-    let new_config = Config {
+    let new_config = ConfigUpdate {
         immediately_transferable: Decimal256::from_str("0.5").unwrap(),
-        ..config
+        token_denom: config.token_denom,
+        unlock_duration_seconds: config.unlock_duration_seconds,
+        factory_addr: config.factory_addr.into_string(),
     };
 
     // Assert err on update config with unauthorized addr

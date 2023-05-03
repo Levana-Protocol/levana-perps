@@ -20,7 +20,7 @@ use cosmwasm_std::{
 };
 use cw_multi_test::{App, AppResponse, BankSudo, Contract, Executor, SudoMsg};
 use dotenv::dotenv;
-use msg::contracts::rewards::config::Config;
+use msg::contracts::rewards::entry::ConfigUpdate;
 use msg::prelude::*;
 use msg::token::Token;
 use rand::rngs::ThreadRng;
@@ -114,11 +114,11 @@ impl PerpsApp {
             rewards_code_id,
             Addr::unchecked(&TEST_CONFIG.protocol_owner),
             &msg::contracts::rewards::entry::InstantiateMsg {
-                config: Config {
+                config: ConfigUpdate {
                     immediately_transferable: Decimal256::from_str("0.25")?,
                     token_denom: TEST_CONFIG.rewards_token_denom.clone(),
                     unlock_duration_seconds: 60,
-                    factory_addr: factory_addr.clone(),
+                    factory_addr: factory_addr.clone().into_string(),
                 },
             },
             &[],

@@ -1,5 +1,5 @@
 use super::state::*;
-use crate::state::config::{load_config, update_config};
+use crate::state::config::{config_init, load_config, update_config};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -26,7 +26,7 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    update_config(deps.storage, msg.config)?;
+    config_init(deps.api, deps.storage, msg.config)?;
 
     let (_, ctx) = StateContext::new(deps, env)?;
 
@@ -41,7 +41,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         ExecuteMsg::DistributeRewards { address, amount } => {
             state.distribute_rewards(&mut ctx, address.validate(state.api)?, amount)?;
         }
-        ExecuteMsg::UpdateConfig { config } => {
+        ExecuteMsg::ConfigUpdate { config } => {
             let current_config = load_config(ctx.storage)?;
 
             assert_auth(
@@ -51,7 +51,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 AuthCheck::Owner,
             )?;
 
-            update_config(ctx.storage, config)?;
+            update_config(state, ctx.storage, config)?;
         }
         ExecuteMsg::Claim {} => {
             state.claim_rewards(&mut ctx, info.sender)?;

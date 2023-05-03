@@ -8,7 +8,7 @@ use shared::time::Timestamp;
 #[cw_serde]
 pub struct InstantiateMsg {
     /// Configuration
-    pub config: Config,
+    pub config: ConfigUpdate,
 }
 
 /// Execute message
@@ -25,7 +25,7 @@ pub enum ExecuteMsg {
     },
 
     /// Update config
-    UpdateConfig { config: Config },
+    ConfigUpdate { config: ConfigUpdate },
 
     /// Claim rewards
     Claim {},
@@ -79,6 +79,14 @@ impl Default for RewardsInfoResp {
     fn default() -> Self {
         Self::new()
     }
+}
+
+#[cw_serde]
+pub struct ConfigUpdate {
+    pub immediately_transferable: Decimal256,
+    pub token_denom: String,
+    pub unlock_duration_seconds: u32,
+    pub factory_addr: String,
 }
 
 pub mod events {

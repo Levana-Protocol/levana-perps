@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Decimal256};
+use cosmwasm_std::{Addr, Decimal256, IbcChannel};
 
 #[cw_serde]
 pub struct Config {
@@ -12,4 +12,6 @@ pub struct Config {
     pub unlock_duration_seconds: u32,
     /// The factory contract addr, used for auth
     pub factory_addr: Addr,
+    /// The IBC channel on which LVN rewards are received
+    pub lvn_grant_channel: Option<IbcChannel>,
 }
