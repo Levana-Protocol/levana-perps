@@ -179,9 +179,11 @@ bots:
 store-rewards:
 	just store-hatching
 	just store-ibc-execute
+	just store-lvn-rewards
 instantiate-rewards:
 	just instantiate-hatching
 	just instantiate-nft-mint
+	just instantiate-lvn-rewards
 create-rewards-channels juno-port stargaze-port osmosis-port:
 	just create-nft-mint-relayer-channel hatching-nft {{juno-port}} {{stargaze-port}} 
 	# TODO - add lvn
@@ -196,8 +198,12 @@ rewards-relayer-start:
 # Rewards subcommands
 store-hatching:
 	cargo run --bin perps-deploy store-code --contracts=hatching --network=juno-testnet
+store-lvn-rewards:
+	cargo run --bin perps-deploy store-code --contracts=lvn-rewards --network=osmosis-testnet
 instantiate-hatching:
 	cargo run --bin perps-deploy instantiate-rewards --contracts=hatching --network=juno-testnet
+instantiate-lvn-rewards:
+	cargo run --bin perps-deploy instantiate-rewards --contracts=lvn-rewards --network=osmosis-testnet
 store-ibc-execute:
 	cargo run --bin perps-deploy store-code --contracts=ibc-execute-proxy --network=stargaze-testnet
 instantiate-nft-mint:
