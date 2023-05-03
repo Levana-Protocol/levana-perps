@@ -713,6 +713,9 @@ impl<T: UnsignedDecimal> Signed<T> {
 }
 
 /// How much to divide an atomic value by to get to an LP token amount.
+/// The token uses 6 digits of precision, and Decimal256 uses 18 digits of precision.
+/// So to truncate the Decimal256's atomic representation to the Uint128 representation,
+/// we need to remove 12 digits (18 - 6).
 const LP_TOKEN_DIVIDER: u64 = 1_000_000_000_000;
 
 impl LpToken {
