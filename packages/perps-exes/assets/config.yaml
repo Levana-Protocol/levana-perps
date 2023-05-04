@@ -38,9 +38,9 @@ chains:
   osmosis-testnet:
     tracker: osmo1l3ypxctzcdev9dmyydlzrflqz52f0wsqmzkuyq9dvpdnqx69wvvq9zszh2
     faucet: osmo1ycrm74p7uc976hu2z428l27vxj8l44zu0x0yqjr8gh775qr6gtnq9f3zsz
-    #pyth:
-    #  address: osmo1kgd93ztuz8mzvsr8v3p65f5chhd6vclrjg528w0tvaujkllff0kqnc5mw6
-    #  endpoint: "https://xc-testnet.pyth.network/"
+    pyth:
+     address: osmo12u2vqdecdte84kg6c3d40nwzjsya59hsj048n687m9q3t6wdmqgsq6zrlx 
+     endpoint: "https://xc-mainnet.pyth.network"
     explorer: "https://testnet.mintscan.io/osmosis-testnet/txs/"
     watcher:
       retries: 4
@@ -151,29 +151,29 @@ pyth-update-age-tolerance: 120
 pyth-markets:
   ATOM_USD:
     feeds: [
-      { id: "61226d39beea19d334f17c2febce27e12646d84675924ebb02b9cdaea68727e3", inverted: false }
+      { id: "b00b60f88b03a6a625a8d1c048c3f66653edf217439983d037e7222c4e612819", inverted: false }
     ]
   OSMO_USDC:
     feeds: [
       # OSMO/USD
-      { id: "d9437c194a4b00ba9d7652cd9af3905e73ee15a2ca4152ac1f8d430cc322b857", inverted: false },
+      { id: "5867f5683c757393a0670ef0f701490950fe93fdb006d181c8265a831ac0c5c6", inverted: false },
       # inverted USDC/USD 
-      { id: "41f3625971ca2ed2263e78573fe5ce23e13d2558ed3f2e47ab0f84fb9e7ae722", inverted: true }
+      { id: "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a", inverted: true }
     ]
     # OSMO_USD (snake_case for compatibility with instantiate message)
     feeds_usd: [
-      {id: "d9437c194a4b00ba9d7652cd9af3905e73ee15a2ca4152ac1f8d430cc322b857", inverted: false }
+      {id: "5867f5683c757393a0670ef0f701490950fe93fdb006d181c8265a831ac0c5c6", inverted: false }
     ]
   ETH_BTC:
     feeds: [
       # ETH/USD
-      {id: "ca80ba6dc32e08d06f1aa886011eed1d77c77be9eb761cc10d72b7d0a2fd57a6", inverted: false },
+      {id: "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace", inverted: false },
       # inverted BTC/USD
-      {id: "f9c0172ba10dfa4d19088d94f5bf61d3b54d5bd7483a322a982e1373ee8ea31b", inverted: true }
+      {id: "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43", inverted: true }
     ]
     # ETH_USD (snake_case for compatibility with instantiate message)
     feeds_usd: [
-      {id: "ca80ba6dc32e08d06f1aa886011eed1d77c77be9eb761cc10d72b7d0a2fd57a6", inverted: false }
+      {id: "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace", inverted: false }
     ]
 min-gas: 1000000
 min-gas-in-faucet: 10000000000
