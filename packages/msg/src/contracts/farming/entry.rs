@@ -190,8 +190,8 @@ pub enum FarmingPeriod {
 /// Overall state of the contract, returned from [QueryMsg::Status]
 #[cw_serde]
 pub struct StatusResp {
-    /// Current status of the contract
-    pub status: FarmingPeriod,
+    /// Current period of the contract
+    pub period: FarmingPeriod,
     /// Total farming tokens across the entire protocol.
     pub farming_tokens: FarmingToken,
     /// Total xLP held by the farming contract
