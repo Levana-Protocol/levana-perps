@@ -30,8 +30,8 @@ It's also an updated dev environment, with multichain support and a native SDK i
     - [Slides describing the platform](https://docs.levana.exchange/slides/) (primarily intended for audit)
     - [API tutorial in TypeScript](https://docs.levana.exchange/api-tutorial-ts/introduction)
 - References docs
-    - [`msg` crate](http://levana-dev-docs.s3-website.ap-northeast-2.amazonaws.com/levana-perps-multichain/docs/api/cosmos/msg/doc/levana_perpswap_cosmos_msg/)
-    - [`shared` crate](http://levana-dev-docs.s3-website.ap-northeast-2.amazonaws.com/levana-perps-multichain/docs/api/cosmos/shared/doc/levana_perpswap_cosmos_shared/)
+    - [`msg` crate](https://apidocs.levana.exchange/msg/doc/levana_perpswap_cosmos_msg/)
+    - [`shared` crate](https://apidocs.levana.exchange/shared/doc/levana_perpswap_cosmos_shared/)
 - Web interfaces
     - [Develop frontend](https://levana-web-app-develop.vercel.app/)
     - [Staging frontend](https://levana-web-app-staging.vercel.app/)
