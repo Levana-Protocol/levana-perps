@@ -40,7 +40,7 @@ chains:
     faucet: osmo1ycrm74p7uc976hu2z428l27vxj8l44zu0x0yqjr8gh775qr6gtnq9f3zsz
     pyth:
      address: osmo12u2vqdecdte84kg6c3d40nwzjsya59hsj048n687m9q3t6wdmqgsq6zrlx 
-     endpoint: "https://xc-mainnet.pyth.network"
+     endpoint: "https://xc-mainnet.pyth.network/"
     explorer: "https://testnet.mintscan.io/osmosis-testnet/txs/"
     watcher:
       retries: 4
