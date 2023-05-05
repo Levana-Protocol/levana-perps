@@ -229,14 +229,19 @@ impl AppBuilder {
                                 out_of_date,
                             };
                         } else {
-                            let mut guard = task_status.write();
-                            let old = &*guard;
-                            *guard = TaskStatus {
-                                last_result: old.last_result.clone(),
-                                last_retry_error: Some(format!("{err:?}")).into(),
-                                current_run_started: None,
-                                out_of_date,
-                            };
+                            {
+                                let mut guard = task_status.write();
+                                let old = &*guard;
+                                *guard = TaskStatus {
+                                    last_result: old.last_result.clone(),
+                                    last_retry_error: Some(format!("{err:?}")).into(),
+                                    current_run_started: None,
+                                    out_of_date,
+                                };
+                            }
+
+                            let millis = (retries * 200).try_into().ok().unwrap_or(600);
+                            tokio::time::sleep(tokio::time::Duration::from_millis(millis)).await;
                         }
                     }
                 }
