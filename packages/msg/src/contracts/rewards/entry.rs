@@ -35,10 +35,11 @@ pub enum ExecuteMsg {
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    /// * returns [RewardsInfoResp]
+    /// * returns and optional [RewardsInfoResp]
     ///
-    /// Rewards information for a given address
-    #[returns(RewardsInfoResp)]
+    /// Rewards information for a given address. If there are no rewards for the specified addr,
+    /// `None` is returned
+    #[returns(Option<RewardsInfoResp>)]
     RewardsInfo { addr: RawAddr },
 
     /// * returns [Config]

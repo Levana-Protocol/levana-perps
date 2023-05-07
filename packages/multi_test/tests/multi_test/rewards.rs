@@ -15,7 +15,10 @@ fn test_distribute_rewards_unlock() {
 
     // Assert values after initial distribution
 
-    let res = app.query_rewards_info(&recipient).unwrap();
+    let res = app
+        .query_rewards_info(&recipient)
+        .unwrap()
+        .expect("expected rewards info");
 
     assert_eq!(res.locked, Decimal256::from_str("75").unwrap());
     assert_eq!(res.unlocked, Decimal256::zero());
@@ -25,7 +28,10 @@ fn test_distribute_rewards_unlock() {
     let change = BlockInfoChange::from_nanos(20 * NANOS_PER_SECOND);
     app.set_block_info(change);
 
-    let res = app.query_rewards_info(&recipient).unwrap();
+    let res = app
+        .query_rewards_info(&recipient)
+        .unwrap()
+        .expect("expected rewards info");
 
     assert_eq!(res.locked, Decimal256::from_str("50").unwrap());
     assert_eq!(res.unlocked, Decimal256::from_str("25").unwrap());
@@ -35,7 +41,10 @@ fn test_distribute_rewards_unlock() {
     let change = BlockInfoChange::from_nanos(40 * NANOS_PER_SECOND);
     app.set_block_info(change);
 
-    let res = app.query_rewards_info(&recipient).unwrap();
+    let res = app
+        .query_rewards_info(&recipient)
+        .unwrap()
+        .expect("expected rewards info");
 
     assert_eq!(res.locked, Decimal256::zero());
     assert_eq!(res.unlocked, Decimal256::from_str("75").unwrap());
@@ -105,7 +114,10 @@ fn test_multiple_distributions() {
 
     // Assert
 
-    let res = app.query_rewards_info(&recipient).unwrap();
+    let res = app
+        .query_rewards_info(&recipient)
+        .unwrap()
+        .expect("expected rewards info");
 
     assert_eq!(res.unlocked, Decimal256::zero());
     assert_eq!(res.locked, Decimal256::from_str("95").unwrap());

@@ -69,7 +69,7 @@ impl PerpsApp {
         self.execute_contract(recipient.clone(), rewards_addr, &Claim {}, &[])
     }
 
-    pub fn query_rewards_info(&self, addr: impl Into<RawAddr>) -> Result<RewardsInfoResp> {
+    pub fn query_rewards_info(&self, addr: impl Into<RawAddr>) -> Result<Option<RewardsInfoResp>> {
         self.wrap()
             .query_wasm_smart(
                 self.rewards_addr.clone(),

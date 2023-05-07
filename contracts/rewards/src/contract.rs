@@ -71,7 +71,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             let rewards_info = state.load_rewards(store, &addr)?;
 
             let res = match rewards_info {
-                None => RewardsInfoResp::new(),
+                None => None,
                 Some(rewards_info) => {
                     let unlocked = rewards_info.calculate_unlocked_rewards(state.now())?;
                     let locked = rewards_info
@@ -79,12 +79,12 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                         .checked_sub(unlocked)?
                         .checked_sub(rewards_info.claimed)?;
 
-                    RewardsInfoResp {
+                    Some(RewardsInfoResp {
                         locked,
                         unlocked,
                         start: rewards_info.start,
                         end: rewards_info.start + rewards_info.duration,
-                    }
+                    })
                 }
             };
 
