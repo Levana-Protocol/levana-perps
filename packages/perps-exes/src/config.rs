@@ -1,3 +1,5 @@
+mod defaults;
+
 use std::{collections::HashMap, sync::Arc};
 
 use cosmos::{Address, CosmosNetwork, RawAddress, Wallet};
@@ -27,12 +29,16 @@ pub struct ChainConfig {
     pub faucet: Address,
     pub pyth: Option<PythChainConfig>,
     pub explorer: String,
+    #[serde(default)]
     pub watcher: WatcherConfig,
     /// Minimum gas required in wallet managed by perps bots
+    #[serde(default = "defaults::min_gas")]
     pub min_gas: u128,
     /// Minimum gas required in the faucet contract
+    #[serde(default = "defaults::min_gas_in_faucet")]
     pub min_gas_in_faucet: u128,
     /// Minimum gas required in the gas wallet
+    #[serde(default = "defaults::min_gas_in_gas_wallet")]
     pub min_gas_in_gas_wallet: u128,
 }
 
@@ -145,18 +151,77 @@ impl Config {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct WatcherConfig {
     /// How many times to retry before giving up
+    #[serde(default = "defaults::retries")]
     pub retries: usize,
     /// How many seconds to delay between retries
+    #[serde(default = "defaults::delay_between_retries")]
     pub delay_between_retries: u32,
+    #[serde(default = "defaults::balance")]
     pub balance: TaskConfig,
+    #[serde(default = "defaults::gas_check")]
     pub gas_check: TaskConfig,
+    #[serde(default = "defaults::liquidity")]
     pub liquidity: TaskConfig,
+    #[serde(default = "defaults::trader")]
     pub trader: TaskConfig,
+    #[serde(default = "defaults::utilization")]
     pub utilization: TaskConfig,
+    #[serde(default = "defaults::track_balance")]
     pub track_balance: TaskConfig,
+    #[serde(default = "defaults::crank")]
     pub crank: TaskConfig,
+    #[serde(default = "defaults::get_factory")]
     pub get_factory: TaskConfig,
+    #[serde(default = "defaults::price")]
     pub price: TaskConfig,
+}
+
+impl Default for WatcherConfig {
+    fn default() -> Self {
+        Self {
+            retries: 6,
+            delay_between_retries: 20,
+            balance: TaskConfig {
+                delay: Delay::Constant(20),
+                out_of_date: 180,
+            },
+            gas_check: TaskConfig {
+                delay: Delay::Constant(60),
+                out_of_date: 180,
+            },
+            liquidity: TaskConfig {
+                delay: Delay::Constant(120),
+                out_of_date: 180,
+            },
+            trader: TaskConfig {
+                delay: Delay::Random {
+                    low: 120,
+                    high: 1200,
+                },
+                out_of_date: 180,
+            },
+            utilization: TaskConfig {
+                delay: Delay::Constant(120),
+                out_of_date: 120,
+            },
+            track_balance: TaskConfig {
+                delay: Delay::Constant(60),
+                out_of_date: 60,
+            },
+            crank: TaskConfig {
+                delay: Delay::Constant(30),
+                out_of_date: 60,
+            },
+            get_factory: TaskConfig {
+                delay: Delay::Constant(60),
+                out_of_date: 180,
+            },
+            price: TaskConfig {
+                delay: Delay::Constant(60),
+                out_of_date: 180,
+            },
+        }
+    }
 }
 
 #[derive(serde::Deserialize, Clone, Copy, Debug)]
