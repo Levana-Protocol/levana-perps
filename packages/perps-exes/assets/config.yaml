@@ -89,7 +89,7 @@ chains:
     min-gas-in-faucet: 10000000000
     min-gas-in-gas-wallet: 10000000000
     watcher:
-      retries: 4
+      retries: 20
       delay-between-retries: 20
       balance:
         delay: !constant 20
