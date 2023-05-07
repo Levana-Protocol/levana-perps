@@ -93,9 +93,9 @@ deployments:
     liquidity: true
     utilization: true
     balance: true
-    traders: 0
+    traders: 100
     default-market-ids:
-      - ETH_USD
+      - ATOM_USD
   dev:
     wallet-manager-address: osmo1lkc7lnq204m4yeydcdg94stkm50jjyglh7ucel
     price-address: osmo1q47uh5e2v8gfr3efy03xs9m0qrz3d2g2fpdc7l
