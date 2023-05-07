@@ -31,8 +31,13 @@ impl Display for Markets {
             writeln!(
                 f,
                 "Utilization ratio: {}",
-                status.liquidity.locked.into_decimal256()
-                    / status.liquidity.total_collateral().into_decimal256()
+                status
+                    .liquidity
+                    .locked
+                    .into_decimal256()
+                    .checked_div(status.liquidity.total_collateral().into_decimal256())
+                    .ok()
+                    .unwrap_or_default()
             )?;
 
             writeln!(f, "Total long  interest (in USD): {}", status.long_usd)?;
