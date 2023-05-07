@@ -251,9 +251,8 @@ fn counter_to_deposit(
                     );
                 }
 
-                let deposit = counter
-                    .into_number()
-                    .checked_div(leverage_notional.into_number().abs())?;
+                let deposit = (counter.into_number() * max_gains_multiple)
+                    .checked_div(max_gains_in_notional.into_number())?;
 
                 NonZero::<Collateral>::try_from_number(deposit).with_context(|| {
                     format!("Calculated an invalid deposit collateral: {deposit}")
