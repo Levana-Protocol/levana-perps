@@ -228,17 +228,20 @@ fn counter_to_deposit(
                     anyhow::bail!("Infinite max gains are only allowed on Long positions");
                 }
 
+                let leverage_notional = leverage.into_signed(direction).into_notional(market_type);
+
                 NonZero::new(Collateral::from_decimal256(
                     counter
                         .into_decimal256()
-                        // FIXME should this be using leverage to base or leverage to notional?
-                        .checked_div(leverage.into_decimal256())?,
+                        .checked_div(leverage_notional.into_number().abs_unsigned())?,
                 ))
                 .context("counter_to_deposit: got a 0 deposit collateral")?
             }
             MaxGainsInQuote::Finite(max_gains_in_notional) => {
+                let leverage_notional = leverage.into_signed(direction).into_notional(market_type);
                 let max_gains_multiple = Number::ONE
-                    - (max_gains_in_notional.into_number() + Number::ONE) / leverage.into_number();
+                    - (max_gains_in_notional.into_number() + Number::ONE)
+                        / leverage_notional.into_number().abs();
 
                 if max_gains_multiple.approx_lt_relaxed(Number::ZERO) {
                     perp_bail!(
@@ -248,8 +251,9 @@ fn counter_to_deposit(
                     );
                 }
 
-                let deposit = counter.into_number() * max_gains_multiple
-                    / max_gains_in_notional.into_number();
+                let deposit = counter
+                    .into_number()
+                    .checked_div(leverage_notional.into_number().abs())?;
 
                 NonZero::<Collateral>::try_from_number(deposit).with_context(|| {
                     format!("Calculated an invalid deposit collateral: {deposit}")
