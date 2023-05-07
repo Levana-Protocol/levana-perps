@@ -3,7 +3,7 @@ use std::fmt::{Display, Write};
 use std::pin::Pin;
 use std::{collections::HashMap, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use axum::async_trait;
 use axum::http::HeaderValue;
 use axum::response::IntoResponse;
@@ -46,9 +46,14 @@ impl Display for TaskLabel {
     }
 }
 
+struct ToSpawn {
+    future: Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>,
+    label: TaskLabel,
+}
+
 #[derive(Default)]
 pub(crate) struct Watcher {
-    to_spawn: Vec<Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>>,
+    to_spawn: Vec<ToSpawn>,
     set: JoinSet<Result<()>>,
     statuses: StatusMap,
 }
@@ -130,8 +135,12 @@ impl Watcher {
             .statuses
             .set(self.statuses)
             .map_err(|_| anyhow::anyhow!("app.statuses.statuses set twice"))?;
-        for task in self.to_spawn {
-            self.set.spawn(task);
+        for ToSpawn { future, label } in self.to_spawn {
+            self.set.spawn(async move {
+                future
+                    .await
+                    .with_context(|| format!("Failure while running: {label}"))
+            });
         }
 
         while let Some(res) = self.set.join_next().await {
@@ -173,7 +182,7 @@ impl AppBuilder {
             }
         }
         let app = self.app.clone();
-        self.watcher.to_spawn.push(Box::pin(async move {
+        let future = Box::pin(async move {
             let mut retries = 0;
             loop {
                 {
@@ -248,7 +257,8 @@ impl AppBuilder {
                     }
                 }
             }
-        }));
+        });
+        self.watcher.to_spawn.push(ToSpawn { future, label });
         Ok(())
     }
 }
