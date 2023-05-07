@@ -240,8 +240,10 @@ impl AppBuilder {
                                 };
                             }
 
-                            let millis = (retries * 200).try_into().ok().unwrap_or(600);
-                            tokio::time::sleep(tokio::time::Duration::from_millis(millis)).await;
+                            tokio::time::sleep(tokio::time::Duration::from_secs(
+                                app.config.watcher.delay_between_retries.into(),
+                            ))
+                            .await;
                         }
                     }
                 }

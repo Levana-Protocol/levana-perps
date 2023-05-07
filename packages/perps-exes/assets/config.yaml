@@ -1,40 +1,19 @@
 chains:
+  sei-testnet:
+    tracker: sei14k4xcy6dfdyqvpvx6njxptry2urcp98f74lv49m36u7gkdkv7s6qleq4tp
+    faucet: sei1czf3age49j99yrkxynmetysh3p2x8tp429mv23jme7zj8hytwhesnqngza
+    explorer: "https://testnet-explorer.brocha.in/sei%20atlantic%202/tx/"
+    # Lower gas requirements, we don't have much available on Sei
+    min-gas: 1000000
+    min-gas-in-faucet: 100000000
+    min-gas-in-gas-wallet: 3000000000
+    watcher:
+      # Nodes seem to crash often, let's see if this helps
+      retries: 20
   dragonfire:
     tracker: levana18cszlvm6pze0x9sz32qnjq4vtd45xehqs8dq7cwy8yhq35wfnn3q6s5ylj
     faucet: levana1qg5ega6dykkxc307y25pecuufrjkxkaggkkxh7nad0vhyhtuhw3s7ff6rr
     explorer: "https://bigdipper.dragonfire.sandbox.levana.finance/transactions/"
-    watcher:
-      retries: 4
-      delay-between-retries: 20
-      balance:
-        delay: !constant 20
-        out-of-date: 180
-      gas-check:
-        delay: !constant 60
-        out-of-date: 180
-      liquidity:
-        delay: !constant 120
-        out-of-date: 60
-      trader:
-        delay: !random
-          low: 120
-          high: 1200
-        out-of-date: 60
-      utilization:
-        delay: !constant 120
-        out-of-date: 120
-      track-balance:
-        delay: !constant 60
-        out-of-date: 60
-      crank:
-        delay: !constant 30
-        out-of-date: 60
-      get-factory:
-        delay: !constant 60
-        out-of-date: 180
-      price:
-        delay: !constant 60
-        out-of-date: 180
   osmosis-testnet:
     tracker: osmo1l3ypxctzcdev9dmyydlzrflqz52f0wsqmzkuyq9dvpdnqx69wvvq9zszh2
     faucet: osmo1ycrm74p7uc976hu2z428l27vxj8l44zu0x0yqjr8gh775qr6gtnq9f3zsz
@@ -43,109 +22,15 @@ chains:
      endpoint: "https://xc-mainnet.pyth.network/"
     explorer: "https://testnet.mintscan.io/osmosis-testnet/txs/"
     watcher:
-      retries: 4
-      delay-between-retries: 20
-      balance:
-        delay: !constant 20
-        out-of-date: 180
-      gas-check:
-        delay: !constant 60
-        out-of-date: 180
-      liquidity:
-        delay: !constant 120
-        out-of-date: 60
-      trader:
-        delay: !random
-          low: 120
-          high: 1200
-        out-of-date: 60
-      utilization:
-        delay: !constant 120
-        out-of-date: 120
-      track-balance:
-        delay: !constant 60
-        out-of-date: 60
-      crank:
-        delay: !constant 30
-        out-of-date: 60
-      get-factory:
-        delay: !constant 60
-        out-of-date: 180
-      price:
-        delay: !constant 60
-        out-of-date: 180
+      retries: 20
   juno-testnet:
     tracker: juno1u23qyg0j4y5mzhessf0kcnjuqwg48kpufj5vujsq7kxxgxfnv5pqjmkmr4
     faucet: juno15rwad8twfrj34q7ep2sgrz3lqqs7vj939z9p4kccvfu9qm6mn55qxn7gy3
     explorer: "https://testnet.mintscan.io/juno-testnet/txs/"
-    watcher:
-      retries: 4
-      delay-between-retries: 20
-      balance:
-        delay: !constant 20
-        out-of-date: 180
-      gas-check:
-        delay: !constant 60
-        out-of-date: 180
-      liquidity:
-        delay: !constant 120
-        out-of-date: 60
-      trader:
-        delay: !random
-          low: 120
-          high: 1200
-        out-of-date: 60
-      utilization:
-        delay: !constant 120
-        out-of-date: 120
-      track-balance:
-        delay: !constant 60
-        out-of-date: 60
-      crank:
-        delay: !constant 30
-        out-of-date: 60
-      get-factory:
-        delay: !constant 60
-        out-of-date: 180
-      price:
-        delay: !constant 60
-        out-of-date: 180
   stargaze-testnet:
     tracker: stars1vfa0a8846ay2l2ehmqtwxgpcxzes9m598kw6mjh50zgnqhxgwmys7fkew3 
     faucet: stars1pnlmx33qgx7822t7tc73znu0ddkxzcg29rshpls6acdlrrr7snkst4xwq6
     explorer: "https://testnet-explorer.publicawesome.dev/stargaze/tx/"
-    watcher:
-      retries: 4
-      delay-between-retries: 20
-      balance:
-        delay: !constant 20
-        out-of-date: 180
-      gas-check:
-        delay: !constant 60
-        out-of-date: 180
-      liquidity:
-        delay: !constant 120
-        out-of-date: 60
-      trader:
-        delay: !random
-          low: 120
-          high: 1200
-        out-of-date: 60
-      utilization:
-        delay: !constant 120
-        out-of-date: 120
-      track-balance:
-        delay: !constant 60
-        out-of-date: 60
-      crank:
-        delay: !constant 30
-        out-of-date: 60
-      get-factory:
-        delay: !constant 60
-        out-of-date: 180
-      price:
-        delay: !constant 60
-        out-of-date: 180
 price-api: "https://price-api.sandbox.levana.finance/"
 pyth-update-age-tolerance: 120
 pyth-markets:
@@ -175,9 +60,6 @@ pyth-markets:
     feeds_usd: [
       {id: "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace", inverted: false }
     ]
-min-gas: 1000000
-min-gas-in-faucet: 10000000000
-min-gas-in-gas-wallet: 10000000000
 liquidity:
   markets:
     ATOM_USD:
@@ -187,6 +69,9 @@ liquidity:
       min: 100000
       max: 100000000
     ETH_BTC:
+      min: 1000
+      max: 1000000
+    ETH_USD:
       min: 1000
       max: 1000000
   min-util: 0.85
@@ -275,3 +160,15 @@ deployments:
       - ATOM_USD
       - OSMO_USDC
       - ETH_BTC
+overrides:
+  seibeta:
+    wallet-manager-address: osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k
+    price-address: osmo1dfagdh540vrqqnuet5rqvdg3uldhhgdxpttmzl
+    price: true
+    crank: true
+    liquidity: true
+    utilization: true
+    balance: true
+    traders: 0
+    default-market-ids:
+      - ETH_USD
