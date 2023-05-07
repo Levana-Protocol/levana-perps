@@ -241,7 +241,7 @@ fn counter_to_deposit(
                 let leverage_notional = leverage.into_signed(direction).into_notional(market_type);
                 let max_gains_multiple = Number::ONE
                     - (max_gains_in_notional.into_number() + Number::ONE)
-                        / leverage_notional.into_number().abs();
+                        .checked_div(leverage_notional.into_number().abs())?;
 
                 if max_gains_multiple.approx_lt_relaxed(Number::ZERO) {
                     perp_bail!(
