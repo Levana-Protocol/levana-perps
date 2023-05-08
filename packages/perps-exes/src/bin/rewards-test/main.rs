@@ -131,7 +131,7 @@ async fn main() -> Result<()> {
     global_opt.init_logger();
 
     match subcommand {
-        /*  This test covers egg hatching and reward distribution. The process uses IBC messaging
+        /*  This test covers egg hatching and reward grants. The process uses IBC messaging
            spanning three chains.
 
            1. Hatching dragon eggs on juno

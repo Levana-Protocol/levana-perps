@@ -14,13 +14,13 @@ pub struct InstantiateMsg {
 /// Execute message
 #[cw_serde]
 pub enum ExecuteMsg {
-    /// Distribute rewards to LPs. A percentage of the rewards will be
+    /// Grant rewards to LPs. A percentage of the rewards will be
     /// transferred to the user immediately. The remainder will unlock linearly over a preconfigured
     /// duration. These values are defined in [Config].
     // FIXME, once integration is done, use IBC receive
-    DistributeRewards {
+    GrantRewards {
         address: RawAddr,
-        /// The total amount of rewards to distribute
+        /// The total amount of rewards to grant
         amount: NonZero<LvnToken>,
     },
 
@@ -100,24 +100,24 @@ pub mod events {
     use cosmwasm_std::{Addr, Decimal256, Event};
     use shared::prelude::*;
 
-    /// Event when rewards are distributed
-    pub struct DistributeRewardsEvent {
+    /// Event when rewards are granted
+    pub struct GrantRewardsEvent {
         /// The recipient of the rewards
         pub address: Addr,
         /// The amount of tokens
         pub amount: Decimal256,
     }
 
-    impl PerpEvent for DistributeRewardsEvent {}
-    impl From<DistributeRewardsEvent> for Event {
-        fn from(src: DistributeRewardsEvent) -> Self {
-            Event::new(event_key::DISTRIBUTE_REWARDS).add_attributes([
+    impl PerpEvent for GrantRewardsEvent {}
+    impl From<GrantRewardsEvent> for Event {
+        fn from(src: GrantRewardsEvent) -> Self {
+            Event::new(event_key::GRANT_REWARDS).add_attributes([
                 ("recipient", src.address.to_string()),
                 ("amount", src.amount.to_string()),
             ])
         }
     }
-    impl TryFrom<Event> for DistributeRewardsEvent {
+    impl TryFrom<Event> for GrantRewardsEvent {
         type Error = anyhow::Error;
 
         fn try_from(evt: Event) -> Result<Self, Self::Error> {

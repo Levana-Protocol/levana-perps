@@ -1,14 +1,14 @@
 use crate::state::{State, StateContext};
 use cosmwasm_std::{Addr, CosmosMsg, Decimal256};
 use cw_storage_plus::Map;
-use msg::contracts::rewards::entry::events::{ClaimRewardsEvent, DistributeRewardsEvent};
+use msg::contracts::rewards::entry::events::{ClaimRewardsEvent, GrantRewardsEvent};
 use msg::token::Token;
 use serde::{Deserialize, Serialize};
 use shared::prelude::*;
 
 const REWARDS: Map<&Addr, RewardsInfo> = Map::new("rewards");
 
-/// A struct containing information pertaining to rewards distributed to a single user
+/// A struct containing information pertaining to rewards granted to a single user
 #[derive(Serialize, Deserialize, Debug)]
 pub(crate) struct RewardsInfo {
     /// The amount of tokens rewarded to the user
@@ -122,7 +122,7 @@ impl State<'_> {
 
         REWARDS.save(ctx.storage, &addr, &rewards_info)?;
 
-        ctx.response.add_event(DistributeRewardsEvent {
+        ctx.response.add_event(GrantRewardsEvent {
             address: addr,
             amount: amount.into_decimal256(),
         });

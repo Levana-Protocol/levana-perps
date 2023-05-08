@@ -38,7 +38,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
     match msg {
-        ExecuteMsg::DistributeRewards { address, amount } => {
+        ExecuteMsg::GrantRewards { address, amount } => {
             state.grant_rewards(&mut ctx, address.validate(state.api)?, amount)?;
         }
         ExecuteMsg::ConfigUpdate { config } => {

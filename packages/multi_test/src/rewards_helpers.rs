@@ -4,7 +4,7 @@ use cosmwasm_std::{Addr, Decimal256};
 use cw_multi_test::{AppResponse, Executor};
 use msg::contracts::rewards::config::Config;
 use msg::contracts::rewards::entry::ExecuteMsg::{
-    Claim, ConfigUpdate as ConfigUpdateMsg, DistributeRewards,
+    Claim, ConfigUpdate as ConfigUpdateMsg, GrantRewards,
 };
 use msg::contracts::rewards::entry::QueryMsg::{Config as ConfigQuery, RewardsInfo};
 use msg::contracts::rewards::entry::{ConfigUpdate, RewardsInfoResp};
@@ -46,7 +46,7 @@ impl PerpsApp {
         .unwrap();
     }
 
-    pub fn distribute_rewards(
+    pub fn grant_rewards(
         &mut self,
         recipient: impl Into<RawAddr>,
         amount: &str,
@@ -56,7 +56,7 @@ impl PerpsApp {
         self.execute_contract(
             Addr::unchecked("sender"),
             rewards_addr,
-            &DistributeRewards {
+            &GrantRewards {
                 address: recipient.into(),
                 amount: amount.parse().unwrap(),
             },
