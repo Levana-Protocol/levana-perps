@@ -14,8 +14,8 @@ use msg::contracts::hatching::{
     config::Config as HatchConfig,
     entry::{ExecuteMsg as HatchExecMsg, MaybeHatchStatusResp, QueryMsg as HatchQueryMsg},
 };
-use msg::contracts::rewards::entry::QueryMsg::RewardsInfo;
-use msg::contracts::rewards::entry::RewardsInfoResp;
+use msg::contracts::rewards::entry::ExecuteMsg::Claim;
+use msg::contracts::rewards::entry::{QueryMsg::RewardsInfo, RewardsInfoResp};
 use perps_exes::prelude::*;
 
 struct Hatch {
@@ -81,10 +81,8 @@ impl NftMint {
 
 struct Rewards {
     pub cosmos: Cosmos,
-    #[allow(dead_code)]
     pub wallet: Wallet,
     pub contract: Contract,
-    pub recipient_address: String,
 }
 
 impl Rewards {
@@ -99,9 +97,6 @@ impl Rewards {
             cosmos,
             wallet,
             contract,
-
-            // hardcoded test wallet, can be replaced with any osmosis testnet wallet
-            recipient_address: "osmo15nmps68jewayw8zskyjr2k7pd0wumly8g98tns".to_string(),
         })
     }
 }
@@ -109,7 +104,7 @@ impl Rewards {
 async fn get_lvn_balance(rewards: &Rewards, denom: &String) -> Result<u128> {
     let balances = rewards
         .cosmos
-        .all_balances(rewards.recipient_address.clone())
+        .all_balances(rewards.wallet.address())
         .await?;
 
     let amount = balances
@@ -148,8 +143,6 @@ async fn main() -> Result<()> {
             let nft_mint = NftMint::new(&opt).await?;
             let rewards = Rewards::new(&opt).await?;
 
-            // Hatch the egg or retry hatching if the process started
-
             let lvn_balance_before = get_lvn_balance(&rewards, &opt.reward_token_denom).await?;
 
             let hatch_status: MaybeHatchStatusResp = hatch
@@ -159,6 +152,39 @@ async fn main() -> Result<()> {
                     details: false,
                 })
                 .await?;
+
+            // Clear out pre-existing rewards
+
+            log::info!("Clearing our rewards for {}...", rewards.wallet.address());
+            loop {
+                let res = rewards
+                    .contract
+                    .query::<Option<RewardsInfoResp>>(RewardsInfo {
+                        addr: rewards.wallet.address().to_string().into(),
+                    })
+                    .await?;
+
+                match res {
+                    None => {
+                        log::info!("...rewards are clear");
+                        break;
+                    },
+                    Some(_) => {
+                        log::info!("...found rewards, claiming...");
+                        rewards
+                            .contract
+                            .execute(&rewards.wallet, vec![], Claim {})
+                            .await?;
+                    }
+                }
+
+                // hardcoding sleep to 10 seconds since that's what `ConfigUpdate.unlock_duration_seconds`
+                // is set to when deploying the test rewards contract
+                tokio::time::sleep(tokio::time::Duration::from_secs(10))
+                    .await;
+            }
+
+            // Hatch the egg or retry hatching if the process started
 
             let resp = if let Some(hatch_status) = hatch_status.resp {
                 log::info!(
@@ -249,7 +275,7 @@ async fn main() -> Result<()> {
                         vec![],
                         HatchExecMsg::Hatch {
                             nft_mint_owner: nft_mint.wallet.address().to_string(),
-                            lvn_grant_address: rewards.recipient_address.clone(),
+                            lvn_grant_address: rewards.wallet.address().to_string(),
                             eggs: vec![token_id.clone()],
                             dusts: vec![],
                         },
@@ -308,7 +334,7 @@ async fn main() -> Result<()> {
                     match rewards
                         .contract
                         .query::<Option<RewardsInfoResp>>(RewardsInfo {
-                            addr: rewards.recipient_address.clone().into(),
+                            addr: rewards.wallet.address().to_string().into(),
                         })
                         .await
                     {
@@ -319,8 +345,8 @@ async fn main() -> Result<()> {
                                 }
                                 Some(resp) => {
                                     log::info!(
-                                        "Rewards found for {}, {:?}",
-                                        rewards.recipient_address.clone(),
+                                        "Rewards found for {}, {:#?}",
+                                        rewards.wallet.address(),
                                         resp
                                     );
 
@@ -328,9 +354,17 @@ async fn main() -> Result<()> {
                                     // check the recipient to see if they've received the portion that's
                                     // immediately transferred
 
-                                    let lvn_balance_after = get_lvn_balance(&rewards, &opt.reward_token_denom).await?;
-                                    assert!(lvn_balance_after - lvn_balance_before > 0, "lvn balance before: {}, lvn balance after: {}", lvn_balance_before, lvn_balance_after);
+                                    let lvn_balance_after =
+                                        get_lvn_balance(&rewards, &opt.reward_token_denom).await?;
+                                    let diff = lvn_balance_after - lvn_balance_before;
+                                    assert!(
+                                         diff > 0,
+                                        "lvn balance before: {}, lvn balance after: {}",
+                                        lvn_balance_before,
+                                        lvn_balance_after
+                                    );
 
+                                    log::info!("recipient received {} lvn tokens", diff);
                                     reward_success = true;
                                 }
                             }

@@ -52,7 +52,7 @@ pub(crate) struct HatchEggOpt {
     #[clap(long, env = "LVN_REWARDS_COSMOS_NETWORK")]
     pub lvn_rewards_network: CosmosNetwork,
 
-    /// Mnemonic phrase for the lvn rewards wallet
+    /// Mnemonic phrase for the lvn rewards wallet. This is the wallet that is receiving rewards.
     #[clap(long, env = "LVN_REWARDS_COSMOS_WALLET")]
     pub lvn_rewards_wallet: RawWallet,
 
