@@ -81,8 +81,10 @@ impl NftMint {
 
 struct Rewards {
     pub cosmos: Cosmos,
+    #[allow(dead_code)]
     pub wallet: Wallet,
     pub contract: Contract,
+    pub recipient_address: String,
 }
 
 impl Rewards {
@@ -97,8 +99,31 @@ impl Rewards {
             cosmos,
             wallet,
             contract,
+
+            // hardcoded test wallet, can be replaced with any osmosis testnet wallet
+            recipient_address: "osmo15nmps68jewayw8zskyjr2k7pd0wumly8g98tns".to_string(),
         })
     }
+}
+
+async fn get_lvn_balance(rewards: &Rewards, denom: &String) -> Result<u128> {
+    let balances = rewards
+        .cosmos
+        .all_balances(rewards.recipient_address.clone())
+        .await?;
+
+    let amount = balances
+        .iter()
+        .find_map(|coin| {
+            if coin.denom == *denom {
+                coin.amount.parse::<u128>().ok()
+            } else {
+                None
+            }
+        })
+        .unwrap_or_default();
+
+    Ok(amount)
 }
 
 #[tokio::main]
@@ -124,6 +149,8 @@ async fn main() -> Result<()> {
             let rewards = Rewards::new(&opt).await?;
 
             // Hatch the egg or retry hatching if the process started
+
+            let lvn_balance_before = get_lvn_balance(&rewards, &opt.reward_token_denom).await?;
 
             let hatch_status: MaybeHatchStatusResp = hatch
                 .contract
@@ -222,6 +249,7 @@ async fn main() -> Result<()> {
                         vec![],
                         HatchExecMsg::Hatch {
                             nft_mint_owner: nft_mint.wallet.address().to_string(),
+                            lvn_grant_address: rewards.recipient_address.clone(),
                             eggs: vec![token_id.clone()],
                             dusts: vec![],
                         },
@@ -280,7 +308,7 @@ async fn main() -> Result<()> {
                     match rewards
                         .contract
                         .query::<Option<RewardsInfoResp>>(RewardsInfo {
-                            addr: rewards.wallet.to_string().into(),
+                            addr: rewards.recipient_address.clone().into(),
                         })
                         .await
                     {
@@ -290,29 +318,18 @@ async fn main() -> Result<()> {
                                     log::info!("No rewards found yet");
                                 }
                                 Some(resp) => {
-                                    log::info!("Rewards found for {}, {:?}", rewards.wallet, resp);
+                                    log::info!(
+                                        "Rewards found for {}, {:?}",
+                                        rewards.recipient_address.clone(),
+                                        resp
+                                    );
 
                                     // After confirming the rewards contract has received the rewards,
                                     // check the recipient to see if they've received the portion that's
                                     // immediately transferred
 
-                                    let balances = rewards
-                                        .cosmos
-                                        .all_balances(rewards.wallet.to_string())
-                                        .await?;
-
-                                    let amount = balances
-                                        .iter()
-                                        .find_map(|coin| {
-                                            if coin.denom == opt.reward_token_denom {
-                                                coin.amount.parse::<u128>().ok()
-                                            } else {
-                                                None
-                                            }
-                                        })
-                                        .unwrap_or_default();
-
-                                    assert!(amount > 0);
+                                    let lvn_balance_after = get_lvn_balance(&rewards, &opt.reward_token_denom).await?;
+                                    assert!(lvn_balance_after - lvn_balance_before > 0, "lvn balance before: {}, lvn balance after: {}", lvn_balance_before, lvn_balance_after);
 
                                     reward_success = true;
                                 }

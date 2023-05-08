@@ -178,9 +178,8 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                     msg::contracts::rewards::entry::InstantiateMsg {
                         config: msg::contracts::rewards::entry::ConfigUpdate {
                             token_denom: lvn_denom.clone(),
-                            // FIXME: these are all placeholder values for now
-                            immediately_transferable: "10".parse()?,
-                            unlock_duration_seconds: 60 * 60 * 24 * 7,
+                            immediately_transferable: "0.25".parse()?,
+                            unlock_duration_seconds: 10,
                             factory_addr:
                                 "osmo17pxfdfeqwvrktzr7m76jdgksw2gsfqc95dqx6z6qqegcpuuv0xlqkpzej5"
                                     .to_string(),

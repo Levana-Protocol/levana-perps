@@ -25,6 +25,7 @@ pub struct HatchDetails {
     pub hatch_time: Timestamp,
     pub eggs: Vec<NftHatchInfo>,
     pub dusts: Vec<NftHatchInfo>,
+    pub lvn_grant_address: String,
     // TODO: profile, etc (PERP-1154)
 }
 

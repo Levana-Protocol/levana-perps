@@ -39,7 +39,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
     match msg {
         ExecuteMsg::DistributeRewards { address, amount } => {
-            state.distribute_rewards(&mut ctx, address.validate(state.api)?, amount)?;
+            state.grant_rewards(&mut ctx, address.validate(state.api)?, amount)?;
         }
         ExecuteMsg::ConfigUpdate { config } => {
             let current_config = load_config(ctx.storage)?;

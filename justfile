@@ -186,8 +186,7 @@ instantiate-rewards:
 	just instantiate-lvn-rewards
 create-rewards-channels juno-port stargaze-port osmosis-port:
 	just create-nft-mint-relayer-channel hatching-nft {{juno-port}} {{stargaze-port}} 
-	# TODO - add lvn
-	# just create-lvn-grant-relayer-channel lvn-mint {{juno-port}} {{osmosis-port}} 
+	just create-lvn-grant-relayer-channel lvn-mint {{juno-port}} {{osmosis-port}}
 rewards-test:
 	just hatch-egg-test
 rewards-relayer-start:
@@ -209,7 +208,7 @@ store-ibc-execute:
 instantiate-nft-mint:
 	cargo run --bin perps-deploy instantiate-rewards --contracts=ibc-execute-proxy --ibc-execute-proxy-target=nft-mint --network=stargaze-testnet
 hatch-egg-test:
-	cargo run --bin rewards-test hatch-egg --hatch-network=juno-testnet --nft-mint-network=stargaze-testnet
+	cargo run --bin rewards-test hatch-egg --hatch-network=juno-testnet --nft-mint-network=stargaze-testnet --lvn-rewards-network=osmosis-testnet
 create-nft-mint-relayer-channel path-name juno-port stargaze-port:
 	rly transact channel {{path-name}} --src-port {{juno-port}} --dst-port {{stargaze-port}} --order unordered --version nft-mint-001 --debug --override
 create-lvn-grant-relayer-channel path-name juno-port osmosis-port:

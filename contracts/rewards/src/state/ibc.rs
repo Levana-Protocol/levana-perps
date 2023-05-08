@@ -2,8 +2,7 @@ use cosmwasm_std::{
     from_binary, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcOrder,
     IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg,
 };
-use msg::contracts::hatching::ibc::IbcChannelVersion;
-use msg::contracts::rewards::entry::ExecuteMsg;
+use msg::contracts::hatching::ibc::{IbcChannelVersion, IbcExecuteMsg};
 use shared::{
     ibc::{
         ack_success,
@@ -75,12 +74,14 @@ impl State<'_> {
             .map_err(|err| err.into())
             .and_then(|msg| {
                 match msg {
-                    ExecuteMsg::DistributeRewards { address, amount } => {
-                        let address = address.validate(self.api)?;
-                        self.distribute_rewards(ctx, address, amount)?
-                    }
-                    _ => {
-                        bail!("unsupported msg")
+                    IbcExecuteMsg::GrantLvn {
+                        address, amount, ..
+                    } => {
+                        let address = self.api.addr_validate(&address)?;
+                        let amount =
+                            NonZero::<LvnToken>::try_from_decimal(amount.into_decimal256())
+                                .with_context(|| "unable to convert rewards into LvnToken")?;
+                        self.grant_rewards(ctx, address, amount)?
                     }
                 }
                 Ok(())
