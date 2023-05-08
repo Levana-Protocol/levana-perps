@@ -70,13 +70,12 @@ impl State<'_> {
         }
 
         match get_lvn_to_grant(&details)? {
-            Some(amount) => {
-                self.send_grant_lvn_ibc_message(ctx, id, lvn_grant_address, amount)?;
-                status.lvn_grant_completed = true;
-            }
             None => {
                 // no lvn to send, mark as completed
                 status.lvn_grant_completed = true;
+            }
+            Some(amount) => {
+                self.send_grant_lvn_ibc_message(ctx, id, lvn_grant_address, amount)?;
             }
         }
 
