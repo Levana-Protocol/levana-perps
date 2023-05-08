@@ -1,8 +1,9 @@
 use cosmos::{Address, Contract, Cosmos, HasAddress, Wallet};
 use msg::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
 use msg::prelude::*;
-use perps_exes::config::DeploymentConfig;
 use std::fmt::Debug;
+
+use crate::config::BotConfig;
 
 use super::oracle::Pyth;
 
@@ -84,7 +85,7 @@ impl Market {
         &self,
         wallet: &Wallet,
         cosmos: &Cosmos,
-        config: &DeploymentConfig,
+        config: &BotConfig,
     ) -> Result<PriceApi> {
         let Self {
             price_admin,

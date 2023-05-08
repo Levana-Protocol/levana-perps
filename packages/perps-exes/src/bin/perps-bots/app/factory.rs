@@ -11,8 +11,8 @@ use msg::{
     },
     token::Token,
 };
-use perps_exes::config::DeploymentConfig;
 
+use crate::config::BotConfig;
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
 use super::{App, AppBuilder};
@@ -65,10 +65,7 @@ async fn update(app: &App) -> Result<WatchedTaskOutput> {
     Ok(output)
 }
 
-pub(crate) async fn get_factory_info(
-    cosmos: &Cosmos,
-    config: &DeploymentConfig,
-) -> Result<FactoryInfo> {
+pub(crate) async fn get_factory_info(cosmos: &Cosmos, config: &BotConfig) -> Result<FactoryInfo> {
     let (factory, gitrev) = get_contract(cosmos, config, "factory")
         .await
         .context("Unable to get 'factory' contract")?;
@@ -88,7 +85,7 @@ pub(crate) async fn get_factory_info(
 
 pub(crate) async fn get_contract(
     cosmos: &Cosmos,
-    config: &DeploymentConfig,
+    config: &BotConfig,
     contract_type: &str,
 ) -> Result<(Address, Option<String>)> {
     let tracker = cosmos.make_contract(config.tracker);

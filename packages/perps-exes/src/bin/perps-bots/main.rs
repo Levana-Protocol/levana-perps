@@ -7,6 +7,7 @@ use tower_http::cors::CorsLayer;
 
 mod app;
 mod cli;
+pub(crate) mod config;
 mod endpoints;
 mod util;
 pub(crate) mod watcher;
