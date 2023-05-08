@@ -18,9 +18,6 @@ jobs:
           COMMITS: ${{ steps.get-pr-commits.outputs.commits }}
         run: |
           set -eux -o pipefail
-          jq -r '.[] | .commit.committer.name' <<< "${COMMITS}" | while read -r n; do
-            [ "${n#lvn-}" != "${n}" ] || [ "${n%-lvn}" != "${n}" ]
-          done
           jq -r '.[] | .commit.committer.email' <<< "${COMMITS}" | while read -r e; do
             [ "${e#*@}" == 'levana.exchange' ]
           done
