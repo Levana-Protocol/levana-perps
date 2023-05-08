@@ -88,8 +88,22 @@ fn extract_nft_info(token_id: String, meta: Metadata) -> Result<NftHatchInfo> {
                 .value
                 .parse()?;
 
-            // TODO: parse from attributes - see PERP-1153
-            let rarity = NftRarity::Common;
+            let rarity: NftRarity = attributes
+                .iter()
+                .find_map(|a| {
+                    if a.trait_type == "Rarity" {
+                        match a.value.as_str() {
+                            "Legendary" => Some(NftRarity::Legendary),
+                            "Ancient" => Some(NftRarity::Ancient),
+                            "Rare" => Some(NftRarity::Rare),
+                            "Common" => Some(NftRarity::Common),
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .ok_or_else(|| anyhow!("NFT is not hatchable (no rarity)"))?;
 
             let lvn_multiplier = match (kind, rarity) {
                 (NftBurnKind::Egg, NftRarity::Legendary) => "3.13",
@@ -125,32 +139,64 @@ mod tests {
     use crate::state::nft_burn::extract_nft_info;
 
     use super::NftBurnKind;
-    use msg::contracts::hatching::nft::{Metadata, Trait};
+    use msg::contracts::hatching::{
+        nft::{Metadata, Trait},
+        NftRarity,
+    };
 
     #[test]
     fn hatchable_nft() {
         for kind in &[NftBurnKind::Egg, NftBurnKind::Dust] {
-            for spirit_level in &["1.0", "0.1", "1.23", "0.01", "00.02"] {
-                let meta = mock_metadata(Some(*kind), Some(*spirit_level));
-                let info = extract_nft_info("token_id".to_string(), meta).unwrap();
-                assert_eq!(info.burn_kind, *kind);
-                assert_eq!(info.spirit_level, spirit_level.parse().unwrap());
+            for rarity in &[
+                NftRarity::Common,
+                NftRarity::Rare,
+                NftRarity::Ancient,
+                NftRarity::Legendary,
+            ] {
+                for spirit_level in &["1.0", "0.1", "1.23", "0.01", "00.02"] {
+                    let meta = mock_metadata(Some(*kind), Some(*spirit_level), Some(*rarity));
+                    let info = extract_nft_info("token_id".to_string(), meta).unwrap();
+                    assert_eq!(info.burn_kind, *kind);
+                    assert_eq!(info.spirit_level, spirit_level.parse().unwrap());
+                }
             }
 
             // disallow 0 spirit levels from being hatched
             extract_nft_info(
                 "token_id".to_string(),
-                mock_metadata(Some(*kind), Some("0.0")),
+                mock_metadata(Some(*kind), Some("0.0"), Some(NftRarity::Common)),
             )
             .unwrap_err();
-            extract_nft_info("token_id".to_string(), mock_metadata(Some(*kind), None)).unwrap_err();
+            extract_nft_info(
+                "token_id".to_string(),
+                mock_metadata(Some(*kind), None, None),
+            )
+            .unwrap_err();
         }
 
         // disallow non-egg or dust nfts
-        extract_nft_info("token_id".to_string(), mock_metadata(None, Some("1.23"))).unwrap_err();
+        extract_nft_info(
+            "token_id".to_string(),
+            mock_metadata(None, Some("1.23"), None),
+        )
+        .unwrap_err();
+
+        // explicit sanity check for LVN calculation
+        let meta = mock_metadata(
+            Some(NftBurnKind::Egg),
+            Some("1.23"),
+            Some(NftRarity::Ancient),
+        );
+        let info = extract_nft_info("token_id".to_string(), meta).unwrap();
+        // 1.23 * 2.89 = 3.5547
+        assert_eq!(info.lvn, "3.5547".parse().unwrap());
     }
 
-    fn mock_metadata(kind: Option<NftBurnKind>, spirit_level: Option<&str>) -> Metadata {
+    fn mock_metadata(
+        kind: Option<NftBurnKind>,
+        spirit_level: Option<&str>,
+        rarity: Option<NftRarity>,
+    ) -> Metadata {
         let mut meta: Metadata = serde_json::from_str(match kind {
             Some(NftBurnKind::Egg) => EGG_META,
             Some(NftBurnKind::Dust) => DUST_META,
@@ -163,6 +209,14 @@ mod tests {
                 display_type: None,
                 trait_type: "Spirit Level".to_string(),
                 value: value.to_string(),
+            });
+        }
+
+        if let Some(value) = rarity {
+            meta.attributes.as_mut().unwrap().push(Trait {
+                display_type: None,
+                trait_type: "Rarity".to_string(),
+                value: format!("{:?}", value),
             });
         }
 
@@ -180,11 +234,6 @@ mod tests {
                 "display_type":null,
                 "trait_type":"Type",
                 "value":"Meteor Dust"
-            },
-            {
-                "display_type":null,
-                "trait_type":"Rarity",
-                "value":"Rare"
             },
             {
                 "display_type":null,
@@ -233,11 +282,6 @@ mod tests {
                 "display_type":null,
                 "trait_type":"Stage",
                 "value":"Nested Egg"
-            },
-            {
-                "display_type":null,
-                "trait_type":"Rarity",
-                "value":"Rare"
             },
             {
                 "display_type":null,
