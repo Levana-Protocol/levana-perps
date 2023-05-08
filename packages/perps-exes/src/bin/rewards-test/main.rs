@@ -328,8 +328,14 @@ async fn main() -> Result<()> {
                                     // check the recipient to see if they've received the portion that's
                                     // immediately transferred
 
-                                    let lvn_balance_after = get_lvn_balance(&rewards, &opt.reward_token_denom).await?;
-                                    assert!(lvn_balance_after - lvn_balance_before > 0, "lvn balance before: {}, lvn balance after: {}", lvn_balance_before, lvn_balance_after);
+                                    let lvn_balance_after =
+                                        get_lvn_balance(&rewards, &opt.reward_token_denom).await?;
+                                    assert!(
+                                        lvn_balance_after - lvn_balance_before > 0,
+                                        "lvn balance before: {}, lvn balance after: {}",
+                                        lvn_balance_before,
+                                        lvn_balance_after
+                                    );
 
                                     reward_success = true;
                                 }
