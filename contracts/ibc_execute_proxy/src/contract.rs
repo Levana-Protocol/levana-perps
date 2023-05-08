@@ -10,12 +10,12 @@ use cosmwasm_std::{
     IbcPacketTimeoutMsg, IbcReceiveResponse, MessageInfo, QueryResponse, Response,
 };
 use cw2::{get_contract_version, set_contract_version};
-use msg::contracts::ibc_execute::entry::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
+use msg::contracts::ibc_execute_proxy::entry::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 use semver::Version;
 use shared::prelude::*;
 
 // version info for migration info
-const CONTRACT_NAME: &str = "ibc_execute";
+const CONTRACT_NAME: &str = "ibc_execute_proxy";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg_attr(not(feature = "library"), entry_point)]

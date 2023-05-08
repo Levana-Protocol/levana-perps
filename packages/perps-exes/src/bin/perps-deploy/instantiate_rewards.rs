@@ -3,9 +3,10 @@ use std::{collections::HashSet, str::FromStr};
 use crate::{
     app::BasicApp,
     cli::Opt,
-    store_code::{Contracts, HATCHING, IBC_EXECUTE},
+    store_code::{Contracts, HATCHING, IBC_EXECUTE_PROXY, LVN_REWARDS},
 };
 use anyhow::{bail, Context, Result};
+use cosmos::Coin;
 use cosmos::{Contract, CosmosNetwork, HasAddress};
 use cosmwasm_std::IbcOrder;
 use msg::contracts::hatching::ibc::IbcChannelVersion;
@@ -22,21 +23,27 @@ pub(crate) struct InstantiateRewardsOpt {
     /// Is this a production deployment? Impacts labels used
     #[clap(long)]
     pub(crate) prod: bool,
-    /// If deploying ibc_execute, specify the target contract it's proxying
+    /// If deploying ibc_execute_proxy, specify the target contract it's proxying
     #[clap(long)]
-    pub(crate) ibc_execute_proxy: Option<IbcExecuteProxy>,
+    pub(crate) ibc_execute_proxy_target: Option<IbcExecuteProxyTarget>,
+    /// If deploying ibc_execute_proxy, specify the target contract it's proxying
+    #[clap(
+        long,
+        default_value = "factory/osmo12g96ahplpf78558cv5pyunus2m66guykt96lvc/lvn1"
+    )]
+    pub(crate) lvn_denom: String,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub(crate) enum IbcExecuteProxy {
+pub(crate) enum IbcExecuteProxyTarget {
     NftMint,
 }
-impl FromStr for IbcExecuteProxy {
+impl FromStr for IbcExecuteProxyTarget {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "nft-mint" => Ok(IbcExecuteProxy::NftMint),
+            "nft-mint" => Ok(IbcExecuteProxyTarget::NftMint),
             _ => Err(anyhow::anyhow!("Unknown ibc execute proxy: {s}")),
         }
     }
@@ -47,11 +54,12 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
         network,
         contracts,
         prod,
-        ibc_execute_proxy,
+        ibc_execute_proxy_target: ibc_execute_proxy,
+        lvn_denom,
     } = inst_opt;
 
     let basic = opt.load_basic_app(network).await?;
-    let (tracker, _) = basic.get_tracker_faucet()?;
+    let (tracker, _) = basic.get_tracker_and_faucet()?;
 
     let label_suffix = if prod { "" } else { " (testnet)" };
 
@@ -59,23 +67,23 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
         Contracts::PerpsProtocol => {
             bail!("Cannot instantiate perps-protocol with instantiate-rewards, use regular instantiate instead");
         }
-        Contracts::IbcExecute => {
+        Contracts::IbcExecuteProxy => {
             match ibc_execute_proxy
                 .context("Must specify --ibc-execute-proxy when instantiating ibc-execute")?
             {
-                IbcExecuteProxy::NftMint => {
+                IbcExecuteProxyTarget::NftMint => {
                     let mint_contract =
                         instantiate_testnet_nft_contract(&basic, "Levana Baby Dragons Mock")
                             .await?;
 
                     let ibc_contract = tracker
-                        .require_code_by_type(&opt, IBC_EXECUTE)
+                        .require_code_by_type(&opt, IBC_EXECUTE_PROXY)
                         .await?
                         .instantiate(
                             &basic.wallet,
                             format!("Levana IbcExecute{label_suffix}"),
                             vec![],
-                            msg::contracts::ibc_execute::entry::InstantiateMsg {
+                            msg::contracts::ibc_execute_proxy::entry::InstantiateMsg {
                                 contract: mint_contract.get_address_string().into(),
                                 ibc_channel_version: IbcChannelVersion::NftMint
                                     .as_str()
@@ -159,6 +167,50 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
 
             log::info!("new hatching deployed at {}", contract.get_address_string());
             log::info!("hatching ibc port is {}", info.ibc_port_id);
+        }
+        Contracts::LvnRewards => {
+            let code_id = tracker.require_code_by_type(&opt, LVN_REWARDS).await?;
+            let contract = code_id
+                .instantiate(
+                    &basic.wallet,
+                    format!("Levana Rewards{label_suffix}"),
+                    vec![],
+                    msg::contracts::rewards::entry::InstantiateMsg {
+                        config: msg::contracts::rewards::entry::ConfigUpdate {
+                            token_denom: lvn_denom.clone(),
+                            immediately_transferable: "0.25".parse()?,
+                            unlock_duration_seconds: 10,
+                            factory_addr:
+                                "osmo17pxfdfeqwvrktzr7m76jdgksw2gsfqc95dqx6z6qqegcpuuv0xlqkpzej5"
+                                    .to_string(),
+                        },
+                    },
+                )
+                .await?;
+
+            let info = contract.info().await?;
+
+            log::info!(
+                "new lvn rewards deployed at {}",
+                contract.get_address_string()
+            );
+            log::info!("lvn rewards ibc port is {}", info.ibc_port_id);
+
+            if network != CosmosNetwork::OsmosisMainnet {
+                let amount = "1000".to_string();
+                log::info!(
+                    "giving {amount} of {lvn_denom} to {}",
+                    contract.get_address()
+                );
+                let coin = Coin {
+                    denom: lvn_denom,
+                    amount: "10000".to_string(),
+                };
+                basic
+                    .wallet
+                    .send_coins(&basic.cosmos, contract.get_address(), vec![coin])
+                    .await?;
+            }
         }
     }
 

@@ -1,21 +1,24 @@
 use cosmwasm_std::{Addr, Decimal256};
 use levana_perpswap_multi_test::time::{BlockInfoChange, NANOS_PER_SECOND};
 use levana_perpswap_multi_test::{config::TEST_CONFIG, PerpsApp};
-use msg::contracts::rewards::config::Config;
+use msg::contracts::rewards::entry::ConfigUpdate;
 use std::str::FromStr;
 
 #[test]
-fn test_distribute_rewards_unlock() {
+fn test_grant_rewards_unlock() {
     let app_cell = PerpsApp::new_cell().unwrap();
     let app = &mut *app_cell.borrow_mut();
     let recipient = Addr::unchecked("recipient");
 
     app.setup_rewards_contract();
-    app.distribute_rewards(&recipient, "100").unwrap();
+    app.grant_rewards(&recipient, "100").unwrap();
 
-    // Assert values after initial distribution
+    // Assert values after initial grant
 
-    let res = app.query_rewards_info(&recipient).unwrap();
+    let res = app
+        .query_rewards_info(&recipient)
+        .unwrap()
+        .expect("expected rewards info");
 
     assert_eq!(res.locked, Decimal256::from_str("75").unwrap());
     assert_eq!(res.unlocked, Decimal256::zero());
@@ -25,7 +28,10 @@ fn test_distribute_rewards_unlock() {
     let change = BlockInfoChange::from_nanos(20 * NANOS_PER_SECOND);
     app.set_block_info(change);
 
-    let res = app.query_rewards_info(&recipient).unwrap();
+    let res = app
+        .query_rewards_info(&recipient)
+        .unwrap()
+        .expect("expected rewards info");
 
     assert_eq!(res.locked, Decimal256::from_str("50").unwrap());
     assert_eq!(res.unlocked, Decimal256::from_str("25").unwrap());
@@ -35,26 +41,29 @@ fn test_distribute_rewards_unlock() {
     let change = BlockInfoChange::from_nanos(40 * NANOS_PER_SECOND);
     app.set_block_info(change);
 
-    let res = app.query_rewards_info(&recipient).unwrap();
+    let res = app
+        .query_rewards_info(&recipient)
+        .unwrap()
+        .expect("expected rewards info");
 
     assert_eq!(res.locked, Decimal256::zero());
     assert_eq!(res.unlocked, Decimal256::from_str("75").unwrap());
 }
 
 #[test]
-fn test_distribute_rewards_claim() {
+fn test_grant_rewards_claim() {
     let app_cell = PerpsApp::new_cell().unwrap();
     let app = &mut *app_cell.borrow_mut();
     let recipient = Addr::unchecked("recipient");
 
     app.setup_rewards_contract();
 
-    // Assert error before distribution
+    // Assert error before grant
     app.claim_rewards(&recipient).unwrap_err();
 
-    app.distribute_rewards(&recipient, "100").unwrap();
+    app.grant_rewards(&recipient, "100").unwrap();
 
-    // Assert error after distribution but no available rewards
+    // Assert error after grant but no available rewards
     app.claim_rewards(&recipient).unwrap_err();
 
     // Assert success after some rewards have unlocked
@@ -87,30 +96,40 @@ fn test_distribute_rewards_claim() {
 }
 
 #[test]
-fn test_multiple_distributions() {
+fn test_multiple_grants() {
     let app_cell = PerpsApp::new_cell().unwrap();
     let app = &mut *app_cell.borrow_mut();
     let recipient = Addr::unchecked("recipient");
 
     app.setup_rewards_contract();
 
-    // Initial distribution
-    app.distribute_rewards(&recipient, "40").unwrap();
+    // Initial grant
+    app.grant_rewards(&recipient, "40").unwrap();
 
     let change = BlockInfoChange::from_nanos(20 * NANOS_PER_SECOND);
     app.set_block_info(change);
 
-    // Second distribution
-    app.distribute_rewards(&recipient, "100").unwrap();
+    let balance_before = app.query_rewards_balance(&recipient).unwrap();
+    assert!(balance_before > Decimal256::zero());
+
+    // Second grant
+    app.grant_rewards(&recipient, "100").unwrap();
+
+    let balance_after = app.query_rewards_balance(&recipient).unwrap();
 
     // Assert
 
-    let res = app.query_rewards_info(&recipient).unwrap();
+    assert!(balance_after > balance_before);
+
+    let res = app
+        .query_rewards_info(&recipient)
+        .unwrap()
+        .expect("expected rewards info");
 
     assert_eq!(res.unlocked, Decimal256::zero());
     assert_eq!(res.locked, Decimal256::from_str("95").unwrap());
 
-    // No need to manually claim since the second distribution triggered an automatic claim
+    // No need to manually claim since the second grant triggered an automatic claim
 
     let balance = app.query_rewards_balance(&recipient).unwrap();
     assert_eq!(balance, "45".parse::<Decimal256>().unwrap());
@@ -125,13 +144,15 @@ fn test_update_config() {
 
     app.setup_rewards_contract();
 
-    // Initial distribution
+    // Initial grant
 
-    app.distribute_rewards(&recipient, "100").unwrap();
+    app.grant_rewards(&recipient, "100").unwrap();
 
-    let new_config = Config {
+    let new_config = ConfigUpdate {
         immediately_transferable: Decimal256::from_str("0.5").unwrap(),
-        ..config
+        token_denom: config.token_denom,
+        unlock_duration_seconds: config.unlock_duration_seconds,
+        factory_addr: config.factory_addr.into_string(),
     };
 
     // Assert err on update config with unauthorized addr
@@ -145,11 +166,11 @@ fn test_update_config() {
     // Confirm update worked
 
     let balance_before = app.query_rewards_balance(&recipient).unwrap();
-    app.distribute_rewards(&recipient, "100").unwrap();
+    app.grant_rewards(&recipient, "100").unwrap();
     let balance_after = app.query_rewards_balance(&recipient).unwrap();
 
     // Since `immediately_transferable` was updated to 50%, the user should receive half
-    // of the distribution amount immediately, as opposed to 25% as previously configured.
+    // of the granted amount immediately, as opposed to 25% as previously configured.
 
     assert_eq!(
         balance_after - balance_before,

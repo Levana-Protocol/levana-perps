@@ -25,6 +25,7 @@ impl State<'_> {
         nft_mint_owner: String,
         eggs: Vec<String>,
         dusts: Vec<String>,
+        lvn_grant_address: String,
     ) -> Result<()> {
         if let Some(id) = HATCH_ID_BY_ADDR.may_load(ctx.storage, &original_owner)? {
             bail!("hatch already exists for {}, id: {}", original_owner, id);
@@ -54,6 +55,7 @@ impl State<'_> {
             hatch_time: self.now(),
             eggs,
             dusts,
+            lvn_grant_address: lvn_grant_address.clone(),
         };
 
         let nfts_to_mint = get_nft_mint_proxy_messages(&details)?;
@@ -68,14 +70,12 @@ impl State<'_> {
         }
 
         match get_lvn_to_grant(&details)? {
-            Some(_amount) => {
-                // FIXME: uncomment this when we have a LVN mint contract to connect
-                //self.send_grant_lvn_ibc_message(ctx, id, &owner, amount)?;
-                status.lvn_grant_completed = true;
-            }
             None => {
                 // no lvn to send, mark as completed
                 status.lvn_grant_completed = true;
+            }
+            Some(amount) => {
+                self.send_grant_lvn_ibc_message(ctx, id, lvn_grant_address, amount)?;
             }
         }
 
@@ -115,7 +115,7 @@ impl State<'_> {
 
         if !status.lvn_grant_completed {
             let amount = get_lvn_to_grant(&details)?.context("re-granting 0 lvn")?;
-            self.send_grant_lvn_ibc_message(ctx, id, &details.original_owner, amount)?;
+            self.send_grant_lvn_ibc_message(ctx, id, details.lvn_grant_address.clone(), amount)?;
         }
 
         ctx.response_mut()

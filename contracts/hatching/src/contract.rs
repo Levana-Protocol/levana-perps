@@ -40,11 +40,19 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
     match msg {
         ExecuteMsg::Hatch {
+            lvn_grant_address,
             eggs,
             dusts,
             nft_mint_owner,
         } => {
-            state.hatch(&mut ctx, info.sender, nft_mint_owner, eggs, dusts)?;
+            state.hatch(
+                &mut ctx,
+                info.sender,
+                nft_mint_owner,
+                eggs,
+                dusts,
+                lvn_grant_address,
+            )?;
         }
         ExecuteMsg::RetryHatch { id } => {
             state.retry_hatch(&mut ctx, id.parse()?)?;

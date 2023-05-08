@@ -73,7 +73,7 @@ impl Opt {
             ..
         } = partial.config;
 
-        let (tracker, faucet) = basic.get_tracker_faucet()?;
+        let (tracker, faucet) = basic.get_tracker_and_faucet()?;
 
         let pyth_address = basic
             .chain_config
@@ -134,7 +134,7 @@ pub(crate) fn get_suffix_network(family: &str) -> Result<(&str, CosmosNetwork)> 
 }
 
 impl BasicApp {
-    pub(crate) fn get_tracker_faucet(&self) -> Result<(Tracker, Faucet)> {
+    pub(crate) fn get_tracker_and_faucet(&self) -> Result<(Tracker, Faucet)> {
         let ChainConfig {
             tracker, faucet, ..
         } = self

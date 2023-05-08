@@ -2,8 +2,7 @@ use cosmwasm_std::{
     from_binary, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcOrder,
     IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg,
 };
-use msg::contracts::hatching::ibc::IbcChannelVersion;
-use msg::contracts::rewards::entry::ExecuteMsg;
+use msg::contracts::hatching::ibc::{IbcChannelVersion, IbcExecuteMsg};
 use shared::{
     ibc::{
         ack_success,
@@ -25,11 +24,15 @@ impl State<'_> {
         ctx: &mut StateContext,
         msg: IbcChannelConnectMsg,
     ) -> Result<()> {
-        let _version = validate_channel(msg.channel(), msg.counterparty_version())?;
+        let channel = validate_channel(msg.channel(), msg.counterparty_version())?;
 
-        //todo fill in match version?
-
-        // self.save_config(ctx)?;
+        match channel {
+            IbcChannelVersion::LvnGrant => {
+                self.config.lvn_grant_channel = Some(msg.channel().clone());
+                self.save_config(ctx.storage)?;
+            }
+            _ => bail!("Unknown channel: {:?}", channel),
+        }
 
         ctx.response_mut().add_event(IbcChannelConnectEvent {
             channel: msg.channel(),
@@ -44,24 +47,21 @@ impl State<'_> {
         msg: IbcChannelCloseMsg,
     ) -> Result<()> {
         // closing an unknown channel shouldn't happen, but if it does, we can treat it as a noop
-        // if let Ok(version) = IbcChannelVersion::from_str(msg.channel().version.as_str()) {
-        //     match version {
-        //         IbcChannelVersion::NftMint => {
-        //             self.config.nft_mint_channel = None;
-        //         }
-        //         IbcChannelVersion::LvnGrant => {
-        //             self.config.lvn_grant_channel = None;
-        //         }
-        //     }
-        //
-        //     self.save_config(ctx)?;
-        // }
+        if let Ok(channel) = IbcChannelVersion::from_str(msg.channel().version.as_str()) {
+            match channel {
+                IbcChannelVersion::LvnGrant => {
+                    self.config.lvn_grant_channel = None;
+                }
+                _ => bail!("Unknown channel: {:?}", channel),
+            }
 
-        //todo fill in channel close?
+            self.save_config(ctx.storage)?;
+        }
 
         ctx.response_mut().add_event(IbcChannelCloseEvent {
             channel: msg.channel(),
         });
+
         Ok(())
     }
 
@@ -74,12 +74,14 @@ impl State<'_> {
             .map_err(|err| err.into())
             .and_then(|msg| {
                 match msg {
-                    ExecuteMsg::DistributeRewards { address, amount } => {
-                        let address = address.validate(self.api)?;
-                        self.distribute_rewards(ctx, address, amount)?
-                    }
-                    _ => {
-                        bail!("unsupported msg")
+                    IbcExecuteMsg::GrantLvn {
+                        address, amount, ..
+                    } => {
+                        let address = self.api.addr_validate(&address)?;
+                        let amount =
+                            NonZero::<LvnToken>::try_from_decimal(amount.into_decimal256())
+                                .with_context(|| "unable to convert rewards into LvnToken")?;
+                        self.grant_rewards(ctx, address, amount)?
                     }
                 }
                 Ok(())

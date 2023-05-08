@@ -1,4 +1,4 @@
-use msg::contracts::ibc_execute::{config::Config, entry::InstantiateMsg};
+use msg::contracts::ibc_execute_proxy::{config::Config, entry::InstantiateMsg};
 use shared::prelude::*;
 
 use super::{State, StateContext};

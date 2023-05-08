@@ -88,7 +88,7 @@ pub(crate) const AVAILABLE: &str = "available";
 pub(crate) const REQUESTED: &str = "requested";
 pub(crate) const DESC: &str = "desc";
 
-pub(crate) const DISTRIBUTE_REWARDS: &str = "distribute-rewards";
+pub(crate) const GRANT_REWARDS: &str = "grant-rewards";
 pub(crate) const CLAIM_REWARDS: &str = "claim-rewards";
 pub(crate) const REWARDS_RECIPIENT: &str = "rewards-recipient";
 pub(crate) const REWARDS_AMOUNT: &str = "rewards-amount";

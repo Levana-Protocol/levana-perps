@@ -1,6 +1,6 @@
 pub mod config;
-pub mod distribution;
 mod ibc;
+pub mod rewards;
 
 use self::config::load_config;
 use cosmwasm_std::{Api, Deps, DepsMut, Empty, Env, QuerierWrapper, Storage};

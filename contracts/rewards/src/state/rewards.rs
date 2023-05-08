@@ -1,14 +1,14 @@
 use crate::state::{State, StateContext};
 use cosmwasm_std::{Addr, CosmosMsg, Decimal256};
 use cw_storage_plus::Map;
-use msg::contracts::rewards::entry::events::{ClaimRewardsEvent, DistributeRewardsEvent};
+use msg::contracts::rewards::entry::events::{ClaimRewardsEvent, GrantRewardsEvent};
 use msg::token::Token;
 use serde::{Deserialize, Serialize};
 use shared::prelude::*;
 
 const REWARDS: Map<&Addr, RewardsInfo> = Map::new("rewards");
 
-/// A struct containing information pertaining to rewards distributed to a single user
+/// A struct containing information pertaining to rewards granted to a single user
 #[derive(Serialize, Deserialize, Debug)]
 pub(crate) struct RewardsInfo {
     /// The amount of tokens rewarded to the user
@@ -70,10 +70,10 @@ impl State<'_> {
         Ok(rewards)
     }
 
-    pub(crate) fn distribute_rewards(
+    pub(crate) fn grant_rewards(
         &self,
         ctx: &mut StateContext,
-        address: Addr,
+        addr: Addr,
         amount: NonZero<LvnToken>,
     ) -> Result<()> {
         let transfer_amount = amount
@@ -81,7 +81,7 @@ impl State<'_> {
             .checked_mul(self.config.immediately_transferable)?;
         let locked_amount = amount.into_decimal256().checked_sub(transfer_amount)?;
 
-        let rewards_info = self.load_rewards(ctx.storage, &address)?;
+        let rewards_info = self.load_rewards(ctx.storage, &addr)?;
         let (transfer_amount, locked_amount) = match rewards_info {
             None => (transfer_amount, locked_amount),
             Some(rewards_info) => {
@@ -106,7 +106,7 @@ impl State<'_> {
 
         ctx.response_mut().add_message(self.create_transfer_msg(
             self.config.token_denom.clone(),
-            &address,
+            &addr,
             transfer_amount,
         )?);
 
@@ -120,10 +120,10 @@ impl State<'_> {
             last_claimed: self.now(),
         };
 
-        REWARDS.save(ctx.storage, &address, &rewards_info)?;
+        REWARDS.save(ctx.storage, &addr, &rewards_info)?;
 
-        ctx.response.add_event(DistributeRewardsEvent {
-            address,
+        ctx.response.add_event(GrantRewardsEvent {
+            address: addr,
             amount: amount.into_decimal256(),
         });
 

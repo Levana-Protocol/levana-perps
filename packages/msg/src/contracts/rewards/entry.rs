@@ -8,24 +8,24 @@ use shared::time::Timestamp;
 #[cw_serde]
 pub struct InstantiateMsg {
     /// Configuration
-    pub config: Config,
+    pub config: ConfigUpdate,
 }
 
 /// Execute message
 #[cw_serde]
 pub enum ExecuteMsg {
-    /// Distribute rewards to LPs. A percentage of the rewards will be
+    /// Grant rewards to LPs. A percentage of the rewards will be
     /// transferred to the user immediately. The remainder will unlock linearly over a preconfigured
     /// duration. These values are defined in [Config].
     // FIXME, once integration is done, use IBC receive
-    DistributeRewards {
+    GrantRewards {
         address: RawAddr,
-        /// The total amount of rewards to distribute
+        /// The total amount of rewards to grant
         amount: NonZero<LvnToken>,
     },
 
     /// Update config
-    UpdateConfig { config: Config },
+    ConfigUpdate { config: ConfigUpdate },
 
     /// Claim rewards
     Claim {},
@@ -35,10 +35,11 @@ pub enum ExecuteMsg {
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    /// * returns [RewardsInfoResp]
+    /// * returns and optional [RewardsInfoResp]
     ///
-    /// Rewards information for a given address
-    #[returns(RewardsInfoResp)]
+    /// Rewards information for a given address. If there are no rewards for the specified addr,
+    /// `None` is returned
+    #[returns(Option<RewardsInfoResp>)]
     RewardsInfo { addr: RawAddr },
 
     /// * returns [Config]
@@ -81,29 +82,42 @@ impl Default for RewardsInfoResp {
     }
 }
 
+#[cw_serde]
+pub struct ConfigUpdate {
+    /// The portion of rewards that are sent to the user immediately after receiving LVN tokens.
+    /// Defined as a ratio between 0 and 1.
+    pub immediately_transferable: Decimal256,
+    /// The denom for the LVN token which will be used for rewards
+    pub token_denom: String,
+    /// The amount of time it takes rewards to unlock linearly, defined in seconds
+    pub unlock_duration_seconds: u32,
+    /// The factory contract addr, used for auth
+    pub factory_addr: String,
+}
+
 pub mod events {
     use crate::constants::event_key;
     use cosmwasm_std::{Addr, Decimal256, Event};
     use shared::prelude::*;
 
-    /// Event when rewards are distributed
-    pub struct DistributeRewardsEvent {
+    /// Event when rewards are granted
+    pub struct GrantRewardsEvent {
         /// The recipient of the rewards
         pub address: Addr,
         /// The amount of tokens
         pub amount: Decimal256,
     }
 
-    impl PerpEvent for DistributeRewardsEvent {}
-    impl From<DistributeRewardsEvent> for Event {
-        fn from(src: DistributeRewardsEvent) -> Self {
-            Event::new(event_key::DISTRIBUTE_REWARDS).add_attributes([
+    impl PerpEvent for GrantRewardsEvent {}
+    impl From<GrantRewardsEvent> for Event {
+        fn from(src: GrantRewardsEvent) -> Self {
+            Event::new(event_key::GRANT_REWARDS).add_attributes([
                 ("recipient", src.address.to_string()),
                 ("amount", src.amount.to_string()),
             ])
         }
     }
-    impl TryFrom<Event> for DistributeRewardsEvent {
+    impl TryFrom<Event> for GrantRewardsEvent {
         type Error = anyhow::Error;
 
         fn try_from(evt: Event) -> Result<Self, Self::Error> {
