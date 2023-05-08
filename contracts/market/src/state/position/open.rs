@@ -79,9 +79,6 @@ impl State<'_> {
             leverage_to_notional,
         )?;
 
-        let notional_size_in_collateral =
-            notional_size.map(|x| price_point.notional_to_collateral(x));
-
         // FEES
         // https://www.notion.so/levana-protocol/Levana-Well-funded-Perpetuals-Whitepaper-9805a6eba56d429b839f5551dbb65c40#75bb26a1439c4a81894c2aa399471263
 

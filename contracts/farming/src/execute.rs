@@ -82,7 +82,18 @@ impl State<'_> {
             Received::Xlp(xlp) => xlp,
         };
 
-        self.farming_deposit(ctx, farmer, xlp)?;
+        let farming = self.farming_deposit(ctx, farmer, xlp)?;
+
+        ctx.response.add_event(DepositEvent {
+            farmer: farmer.clone(),
+            farming,
+            xlp,
+            source: match received {
+                Received::Collateral(_) => DepositSource::Collateral,
+                Received::Lp(_) => DepositSource::Lp,
+                Received::Xlp(_) => DepositSource::Xlp,
+            },
+        });
 
         Ok(())
     }
@@ -98,7 +109,7 @@ impl State<'_> {
             decimal_places: LpToken::PRECISION,
         };
 
-        let xlp = self.farming_withdraw(ctx, farmer, amount)?;
+        let (xlp, farming) = self.farming_withdraw(ctx, farmer, amount)?;
         let msg = msg::contracts::liquidity_token::entry::ExecuteMsg::Transfer {
             recipient: farmer.into(),
             amount: token
@@ -108,6 +119,11 @@ impl State<'_> {
         };
         ctx.response
             .add_execute_submessage_oneshot(&self.market_info.xlp_addr, &msg)?;
+        ctx.response.add_event(WithdrawEvent {
+            farmer: farmer.clone(),
+            farming,
+            xlp,
+        });
         Ok(())
     }
 }
