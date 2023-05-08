@@ -85,7 +85,11 @@ pub(crate) struct HatchEggOpt {
     pub ibc_sleep_seconds: u64,
 
     /// Reward token denom
-    #[clap(long, env = "REWARD_TOKEN_DENOM")]
+    #[clap(
+        long,
+        env = "REWARD_TOKEN_DENOM",
+        default_value = "factory/osmo12g96ahplpf78558cv5pyunus2m66guykt96lvc/lvn1"
+    )]
     pub reward_token_denom: String,
 }
 
