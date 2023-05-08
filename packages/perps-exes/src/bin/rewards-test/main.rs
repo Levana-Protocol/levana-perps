@@ -168,7 +168,7 @@ async fn main() -> Result<()> {
                     None => {
                         log::info!("...rewards are clear");
                         break;
-                    },
+                    }
                     Some(_) => {
                         log::info!("...found rewards, claiming...");
                         rewards
@@ -180,8 +180,7 @@ async fn main() -> Result<()> {
 
                 // hardcoding sleep to 10 seconds since that's what `ConfigUpdate.unlock_duration_seconds`
                 // is set to when deploying the test rewards contract
-                tokio::time::sleep(tokio::time::Duration::from_secs(10))
-                    .await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
             }
 
             // Hatch the egg or retry hatching if the process started
@@ -358,7 +357,7 @@ async fn main() -> Result<()> {
                                         get_lvn_balance(&rewards, &opt.reward_token_denom).await?;
                                     let diff = lvn_balance_after - lvn_balance_before;
                                     assert!(
-                                         diff > 0,
+                                        diff > 0,
                                         "lvn balance before: {}, lvn balance after: {}",
                                         lvn_balance_before,
                                         lvn_balance_after
