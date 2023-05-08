@@ -109,10 +109,17 @@ fn test_multiple_distributions() {
     let change = BlockInfoChange::from_nanos(20 * NANOS_PER_SECOND);
     app.set_block_info(change);
 
+    let balance_before = app.query_rewards_balance(&recipient).unwrap();
+    assert!(balance_before > Decimal256::zero());
+
     // Second distribution
     app.distribute_rewards(&recipient, "100").unwrap();
 
+    let balance_after = app.query_rewards_balance(&recipient).unwrap();
+
     // Assert
+
+    assert!(balance_after > balance_before);
 
     let res = app
         .query_rewards_info(&recipient)
