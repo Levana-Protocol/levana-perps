@@ -8,12 +8,10 @@ use cosmos::CosmosNetwork;
 use cosmos::HasAddressType;
 use cosmos::Wallet;
 use parking_lot::RwLock;
-use perps_exes::config::Config;
-use perps_exes::prelude::DeploymentConfig;
 use reqwest::Client;
 
-use crate::cli::get_deployment_config;
 use crate::cli::Opt;
+use crate::config::BotConfig;
 use crate::watcher::TaskStatuses;
 use crate::watcher::Watcher;
 
@@ -26,7 +24,7 @@ pub(crate) struct App {
     pub(crate) frontend_info: FrontendInfo,
     pub(crate) faucet_bot: FaucetBot,
     pub(crate) cosmos: Cosmos,
-    pub(crate) config: DeploymentConfig,
+    pub(crate) config: BotConfig,
     pub(crate) client: Client,
     pub(crate) bind: SocketAddr,
     pub(crate) statuses: TaskStatuses,
@@ -54,19 +52,16 @@ pub(crate) struct AppBuilder {
 
 impl Opt {
     pub(crate) async fn into_app_builder(self) -> Result<AppBuilder> {
-        let opt = self;
-        let config = Config::load()?;
-        let deployment_config = get_deployment_config(config, &opt)?;
-        let config = deployment_config;
+        let config = self.get_bot_config()?;
         let mut builder = config.network.builder();
-        if let Some(grpc) = &opt.grpc_url {
+        if let Some(grpc) = &self.grpc_url {
             builder.grpc_url = grpc.clone();
         }
         let cosmos = builder.build().await?;
         let client = Client::builder().user_agent("perps-bots").build()?;
 
-        let faucet_bot_wallet = opt.get_faucet_bot_wallet(cosmos.get_address_type())?;
-        let gas_wallet = opt.get_gas_wallet(cosmos.get_address_type())?;
+        let faucet_bot_wallet = self.get_faucet_bot_wallet(cosmos.get_address_type())?;
+        let gas_wallet = self.get_gas_wallet(cosmos.get_address_type())?;
 
         let frontend_info = FrontendInfo {
             network: config.network,
@@ -83,12 +78,12 @@ impl Opt {
             frontend_info,
             faucet_bot: FaucetBot {
                 wallet: tokio::sync::RwLock::new(faucet_bot_wallet),
-                hcaptcha_secret: opt.hcaptcha_secret,
+                hcaptcha_secret: self.hcaptcha_secret,
             },
             cosmos,
             config,
             client,
-            bind: opt.bind,
+            bind: self.bind,
             statuses: TaskStatuses::default(),
         };
         let app = Arc::new(app);

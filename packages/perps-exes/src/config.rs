@@ -1,19 +1,17 @@
 mod defaults;
 
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
-use cosmos::{Address, CosmosNetwork, RawAddress, Wallet};
+use cosmos::{Address, CosmosNetwork, RawAddress};
 use msg::{contracts::pyth_bridge::PythMarketPriceFeeds, prelude::*};
 use once_cell::sync::OnceCell;
-
-use crate::wallet_manager::WalletManager;
 
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Config {
     pub chains: HashMap<CosmosNetwork, ChainConfig>,
-    pub deployments: HashMap<String, PartialDeploymentConfig>,
-    pub overrides: HashMap<String, PartialDeploymentConfig>,
+    deployments: HashMap<String, DeploymentConfig>,
+    overrides: HashMap<String, DeploymentConfig>,
     pub price_api: String,
     pub pyth_markets: HashMap<MarketId, PythMarketPriceFeeds>,
     pub pyth_update_age_tolerance: u32,
@@ -47,30 +45,6 @@ pub struct ChainConfig {
 pub struct PythChainConfig {
     pub address: Address,
     pub endpoint: String,
-}
-
-pub struct DeploymentConfig {
-    pub tracker: Address,
-    pub faucet: Address,
-    pub pyth: Option<PythChainConfig>,
-    pub min_gas: u128,
-    pub min_gas_in_faucet: u128,
-    pub min_gas_in_gas_wallet: u128,
-    pub price_api: &'static str,
-    pub explorer: &'static str,
-    pub contract_family: String,
-    pub network: CosmosNetwork,
-    pub price_wallet: Option<Arc<Wallet>>,
-    pub crank_wallet: Wallet,
-    pub wallet_manager: WalletManager,
-    pub liquidity: bool,
-    pub utilization: bool,
-    pub balance: bool,
-    pub traders: usize,
-    pub liquidity_config: LiquidityConfig,
-    pub utilization_config: UtilizationConfig,
-    pub trader_config: TraderConfig,
-    pub watcher: WatcherConfig,
 }
 
 #[derive(serde::Deserialize, Clone, Debug)]
@@ -115,7 +89,7 @@ pub struct LiquidityBounds {
 
 #[derive(serde::Deserialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct PartialDeploymentConfig {
+pub struct DeploymentConfig {
     #[serde(default)]
     pub crank: bool,
     pub price: bool,
@@ -145,6 +119,56 @@ impl Config {
             serde_yaml::from_slice(CONFIG_YAML).context("Could not parse config.yaml")
         })
     }
+
+    /// Provide the deployment name, such as osmodev, dragonqa, or seibeta
+    pub fn get_deployment_info(&self, deployment: &str) -> Result<DeploymentInfo> {
+        let (network, suffix) = parse_deployment(deployment)?;
+        let wallet_phrase_name = suffix.to_ascii_uppercase();
+        let partial_config = self.deployments.get(suffix).with_context(|| {
+            format!(
+                "No config found for {}. Valid configs: {}",
+                suffix,
+                self.deployments
+                    .keys()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        })?;
+        let partial = self
+            .overrides
+            .get(deployment)
+            .unwrap_or(partial_config)
+            .clone();
+        Ok(DeploymentInfo {
+            config: partial,
+            network,
+            wallet_phrase_name,
+        })
+    }
+}
+
+pub struct DeploymentInfo {
+    pub config: DeploymentConfig,
+    pub network: CosmosNetwork,
+    pub wallet_phrase_name: String,
+}
+
+fn parse_deployment(deployment: &str) -> Result<(CosmosNetwork, &str)> {
+    const NETWORKS: &[(CosmosNetwork, &str)] = &[
+        (CosmosNetwork::OsmosisTestnet, "osmo"),
+        (CosmosNetwork::Dragonfire, "dragon"),
+        (CosmosNetwork::SeiTestnet, "sei"),
+    ];
+    for (network, prefix) in NETWORKS {
+        if let Some(suffix) = deployment.strip_prefix(prefix) {
+            return Ok((*network, suffix));
+        }
+    }
+    Err(anyhow::anyhow!(
+        "Could not parse deployment: {}",
+        deployment
+    ))
 }
 
 #[derive(serde::Deserialize, Clone, Debug)]
