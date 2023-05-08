@@ -8,7 +8,7 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         hatch_id: u64,
-        lvn_granteegst_address: String,
+        lvn_grantee_address: String,
         amount: NumberGtZero,
     ) -> Result<()> {
         // outbound IBC message, where packet is then received on other chain
