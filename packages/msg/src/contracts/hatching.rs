@@ -26,7 +26,7 @@ pub struct HatchDetails {
     pub eggs: Vec<NftHatchInfo>,
     pub dusts: Vec<NftHatchInfo>,
     pub lvn_grant_address: String,
-    // TODO: profile, etc (PERP-1154)
+    pub profile: Option<ProfileInfo>,
 }
 
 #[cw_serde]
@@ -37,6 +37,12 @@ pub struct NftHatchInfo {
     pub burn_kind: NftBurnKind,
     pub burn_metadata: nft::Metadata,
     pub rarity: NftRarity,
+}
+
+#[cw_serde]
+pub struct ProfileInfo {
+    pub spirit_level: NumberGtZero,
+    pub lvn: NumberGtZero,
 }
 
 #[cw_serde]

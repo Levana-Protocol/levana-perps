@@ -8,6 +8,7 @@ use super::HatchStatus;
 pub struct InstantiateMsg {
     pub burn_egg_contract: RawAddr,
     pub burn_dust_contract: RawAddr,
+    pub profile_contract: RawAddr,
 }
 
 #[cw_serde]

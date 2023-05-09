@@ -41,6 +41,8 @@ impl State<'_> {
             .map(|token_id| self.burn_nft(ctx, original_owner.clone(), NftBurnKind::Dust, token_id))
             .collect::<Result<Vec<NftHatchInfo>>>()?;
 
+        let profile = self.drain_profile(ctx, original_owner.clone())?;
+
         let mut status = HatchStatus {
             nft_mint_completed: false,
             lvn_grant_completed: false,
@@ -55,6 +57,7 @@ impl State<'_> {
             hatch_time: self.now(),
             eggs,
             dusts,
+            profile,
             lvn_grant_address: lvn_grant_address.clone(),
         };
 
