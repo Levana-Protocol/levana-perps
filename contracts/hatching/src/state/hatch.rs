@@ -18,6 +18,7 @@ const HATCH_DETAILS: Map<u64, HatchDetails> = Map::new("hatch-details");
 const HATCH_ID_BY_TOKEN_ID: Map<&str, u64> = Map::new("hatch-id-token-id");
 
 impl State<'_> {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn hatch(
         &self,
         ctx: &mut StateContext,
@@ -25,6 +26,7 @@ impl State<'_> {
         nft_mint_owner: String,
         eggs: Vec<String>,
         dusts: Vec<String>,
+        profile: bool,
         lvn_grant_address: String,
     ) -> Result<()> {
         if let Some(id) = HATCH_ID_BY_ADDR.may_load(ctx.storage, &original_owner)? {
@@ -41,7 +43,11 @@ impl State<'_> {
             .map(|token_id| self.burn_nft(ctx, original_owner.clone(), NftBurnKind::Dust, token_id))
             .collect::<Result<Vec<NftHatchInfo>>>()?;
 
-        let profile = self.drain_profile(ctx, original_owner.clone())?;
+        let profile = if profile {
+            self.drain_profile(ctx, original_owner.clone())?
+        } else {
+            None
+        };
 
         let mut status = HatchStatus {
             nft_mint_completed: false,

@@ -43,6 +43,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             lvn_grant_address,
             eggs,
             dusts,
+            profile,
             nft_mint_owner,
         } => {
             state.hatch(
@@ -51,6 +52,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 nft_mint_owner,
                 eggs,
                 dusts,
+                profile,
                 lvn_grant_address,
             )?;
         }

@@ -17,9 +17,14 @@ pub enum ExecuteMsg {
     Hatch {
         /// Must be a valid address on the target minting network
         nft_mint_owner: String,
+        /// Must be a valid address on the target lvn network
         lvn_grant_address: String,
+        /// list of egg nft token ids to hatch
         eggs: Vec<String>,
+        /// list of dust nft token ids to hatch
         dusts: Vec<String>,
+        /// whether to also "hatch" the profile, i.e. drain the spirit level into lvn
+        profile: bool,
     },
 
     /// Retry a hatch that's stuck

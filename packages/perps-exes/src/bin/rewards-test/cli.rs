@@ -28,9 +28,13 @@ pub(crate) struct Opt {
 
 #[derive(clap::Parser)]
 pub(crate) struct HatchEggOpt {
-    /// Mnemonic phrase for the hatching wallet
-    #[clap(long, env = "MOCK_NFT_ADMIN_COSMOS_WALLET")]
-    pub mock_nft_admin_wallet: RawWallet,
+    /// Mnemonic phrase for the nft mint admin wallet
+    #[clap(long, env = "NFT_MINT_ADMIN_COSMOS_WALLET")]
+    pub nft_mint_admin_wallet: RawWallet,
+
+    /// Mnemonic phrase for the profile admin wallet
+    #[clap(long, env = "PROFILE_ADMIN_COSMOS_WALLET")]
+    pub profile_admin_wallet: RawWallet,
 
     /// Network to use for hatching
     #[clap(long, env = "HATCH_COSMOS_NETWORK")]
@@ -60,7 +64,7 @@ pub(crate) struct HatchEggOpt {
     #[clap(
         long,
         env = "HATCH_ADDRESS",
-        default_value = "juno1v5cf5a05275e8kr3pa2wtrfl63qemjxaf2kkl3v5nfhec89dx0xqhn20kt"
+        default_value = "juno1xk606fm6qn0kcqn2szmme30aadlx6tm5gsahtkdh90x38vxwmp2qvu2aa3"
     )]
     pub hatch_address: Address,
 
@@ -68,7 +72,7 @@ pub(crate) struct HatchEggOpt {
     #[clap(
         long,
         env = "NFT_MINT_ADDRESS",
-        default_value = "stars1x3hdj33zwvsxmwnat4snk3f4w6504l0zr3g5z3rs7ajzqpsu8cms40pjad"
+        default_value = "stars1tjgl6d38szstkrxl49ejqdr68yqw7gwh45q9cv6mer0xz66vwglqcpjfa8"
     )]
     pub nft_mint_address: Address,
 
@@ -76,7 +80,7 @@ pub(crate) struct HatchEggOpt {
     #[clap(
         long,
         env = "LVN_REWARDS_ADDRESS",
-        default_value = "osmo1jf4796kx7xufu8s4xnjvq92gqxehv5g0ml7662stp69as3sg5wdsyqcpjx"
+        default_value = "osmo17dheewa887keawx5mnngjnkm3283nr263yda66t43zwj2h9tyx3qekpglf"
     )]
     pub lvn_rewards_address: Address,
 

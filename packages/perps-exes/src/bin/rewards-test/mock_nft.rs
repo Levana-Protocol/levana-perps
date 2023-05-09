@@ -4,7 +4,7 @@
 use std::collections::HashSet;
 
 use cw_utils::Expiration;
-use perps_exes::prelude::Number;
+use msg::{contracts::hatching::NftRarity, prelude::NumberGtZero};
 use serde::{Deserialize, Serialize};
 
 pub use cosmwasm_std::Binary;
@@ -238,13 +238,24 @@ pub struct MinterResponse {
 }
 
 impl Metadata {
-    pub fn new_egg(spirit_level: Number) -> Self {
+    pub fn new_egg(spirit_level: NumberGtZero, rarity: NftRarity) -> Self {
         let mut m: Self = serde_json::from_str(EGG_META).unwrap();
 
         m.attributes.push(Trait {
             display_type: None,
             trait_type: "Spirit Level".to_string(),
             value: spirit_level.to_string(),
+        });
+
+        m.attributes.push(Trait {
+            display_type: None,
+            trait_type: "Rarity".to_string(),
+            value: match rarity {
+                NftRarity::Common => "Common".to_string(),
+                NftRarity::Rare => "Rare".to_string(),
+                NftRarity::Ancient => "Ancient".to_string(),
+                NftRarity::Legendary => "Legendary".to_string(),
+            },
         });
 
         m
@@ -261,11 +272,6 @@ static EGG_META: &str = r#"{
             "display_type":null,
             "trait_type":"Stage",
             "value":"Nested Egg"
-        },
-        {
-            "display_type":null,
-            "trait_type":"Rarity",
-            "value":"Rare"
         },
         {
             "display_type":null,
