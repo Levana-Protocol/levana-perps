@@ -1,4 +1,4 @@
-use super::{State, StateContext};
+use super::{config::lvn_from_nft_spirit_level, State, StateContext};
 use msg::contracts::hatching::{
     nft::{AllNftInfoResponse, Metadata},
     NftBurnKind, NftHatchInfo, NftRarity,
@@ -105,22 +105,7 @@ fn extract_nft_info(token_id: String, meta: Metadata) -> Result<NftHatchInfo> {
                 })
                 .ok_or_else(|| anyhow!("NFT is not hatchable (no rarity)"))?;
 
-            let lvn_multiplier = match (kind, rarity) {
-                (NftBurnKind::Egg, NftRarity::Legendary) => "3.13",
-                (NftBurnKind::Egg, NftRarity::Ancient) => "2.89",
-                (NftBurnKind::Egg, NftRarity::Rare) => "2.65",
-                (NftBurnKind::Egg, NftRarity::Common) => "2.41",
-                (NftBurnKind::Dust, NftRarity::Legendary) => "2.77",
-                (NftBurnKind::Dust, NftRarity::Ancient) => "2.65",
-                (NftBurnKind::Dust, NftRarity::Rare) => "2.53",
-                (NftBurnKind::Dust, NftRarity::Common) => "2.17",
-            };
-            let lvn_multiplier: NumberGtZero = lvn_multiplier.parse()?;
-
-            let lvn = NumberGtZero::try_from_number(
-                spirit_level.into_number() * lvn_multiplier.into_number(),
-            )
-            .context("cannot have non-zero lvn")?;
+            let lvn = lvn_from_nft_spirit_level(spirit_level, kind, rarity)?;
 
             Ok(NftHatchInfo {
                 spirit_level,
@@ -136,7 +121,7 @@ fn extract_nft_info(token_id: String, meta: Metadata) -> Result<NftHatchInfo> {
 
 #[cfg(test)]
 mod tests {
-    use crate::state::nft_burn::extract_nft_info;
+    use crate::state::{config::lvn_from_nft_spirit_level, nft_burn::extract_nft_info};
 
     use super::NftBurnKind;
     use msg::contracts::hatching::{
@@ -156,8 +141,11 @@ mod tests {
                 for spirit_level in &["1.0", "0.1", "1.23", "0.01", "00.02"] {
                     let meta = mock_metadata(Some(*kind), Some(*spirit_level), Some(*rarity));
                     let info = extract_nft_info("token_id".to_string(), meta).unwrap();
+
                     assert_eq!(info.burn_kind, *kind);
                     assert_eq!(info.spirit_level, spirit_level.parse().unwrap());
+                    lvn_from_nft_spirit_level(spirit_level.parse().unwrap(), *kind, *rarity)
+                        .unwrap();
                 }
             }
 
@@ -190,6 +178,15 @@ mod tests {
         let info = extract_nft_info("token_id".to_string(), meta).unwrap();
         // 1.23 * 2.89 = 3.5547
         assert_eq!(info.lvn, "3.5547".parse().unwrap());
+        assert_eq!(
+            info.lvn,
+            lvn_from_nft_spirit_level(
+                "1.23".parse().unwrap(),
+                NftBurnKind::Egg,
+                NftRarity::Ancient
+            )
+            .unwrap()
+        );
     }
 
     fn mock_metadata(

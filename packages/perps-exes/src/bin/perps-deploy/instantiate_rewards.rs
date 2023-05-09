@@ -131,13 +131,20 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
             let profile_contract = if network == CosmosNetwork::JunoMainnet {
                 "juno12fdnmycnuvhua3y9pzxweu2eqqv77k454h0w8vwjjajvjrawuaksfn88u9".to_string()
             } else {
-                let dragon_riders_contract = instantiate_testnet_nft_contract(&basic, "Levana Dragon Riders Mock")
-                    .await?
-                    .get_address_string();
+                let dragon_riders_contract =
+                    instantiate_testnet_nft_contract(&basic, "Levana Dragon Riders Mock")
+                        .await?
+                        .get_address_string();
 
-                instantiate_testnet_profile_contract(&basic, "Levana Profile Mock", &burn_egg_contract, &burn_dust_contract, &dragon_riders_contract)
-                    .await?
-                    .get_address_string()
+                instantiate_testnet_profile_contract(
+                    &basic,
+                    "Levana Profile Mock",
+                    &burn_egg_contract,
+                    &burn_dust_contract,
+                    &dragon_riders_contract,
+                )
+                .await?
+                .get_address_string()
             };
 
             let code_id = tracker.require_code_by_type(&opt, HATCHING).await?;
@@ -175,15 +182,12 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                     .execute(&basic.wallet, vec![], NftExecuteMsg::AddMinters { minters })
                     .await?;
 
-
                 log::info!("giving hatching contract profile admin permissions");
 
                 #[derive(Serialize, Deserialize)]
                 #[serde(rename_all = "snake_case")]
                 enum ProfileExecuteMsg {
-                    Admin {
-                        message: ProfileAdminExecuteMsg,
-                    },
+                    Admin { message: ProfileAdminExecuteMsg },
                 }
                 #[derive(Serialize, Deserialize)]
                 #[serde(rename_all = "snake_case")]
@@ -193,10 +197,15 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                 basic
                     .cosmos
                     .make_contract(profile_contract.parse()?)
-                    .execute(&basic.wallet, vec![], ProfileExecuteMsg::Admin{ 
-                        message: ProfileAdminExecuteMsg::AddAdmin { 
-                            addr: contract.get_address_string()
-                    }})
+                    .execute(
+                        &basic.wallet,
+                        vec![],
+                        ProfileExecuteMsg::Admin {
+                            message: ProfileAdminExecuteMsg::AddAdmin {
+                                addr: contract.get_address_string(),
+                            },
+                        },
+                    )
                     .await?;
             }
 
@@ -320,7 +329,6 @@ async fn instantiate_testnet_nft_contract(
 
     Ok(contract)
 }
-
 
 async fn instantiate_testnet_profile_contract(
     app: &BasicApp,

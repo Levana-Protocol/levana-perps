@@ -1,4 +1,3 @@
-use crate::contracts::rewards::config::Config;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::Decimal256;
 use shared::prelude::*;
@@ -42,10 +41,10 @@ pub enum QueryMsg {
     #[returns(Option<RewardsInfoResp>)]
     RewardsInfo { addr: RawAddr },
 
-    /// * returns [Config]
+    /// * returns [super::config::Config]
     ///
     /// Rewards configuration
-    #[returns(Config)]
+    #[returns(super::config::Config)]
     Config {},
 }
 
