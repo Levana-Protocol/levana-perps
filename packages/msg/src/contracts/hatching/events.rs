@@ -67,5 +67,11 @@ fn mixin_hatch_event(
             );
     }
 
+    if let Some(profile) = details.profile {
+        event = event
+            .add_attribute("profile-lvn", profile.lvn.to_string())
+            .add_attribute("profile-spirit-level", profile.spirit_level.to_string())
+    }
+
     event
 }

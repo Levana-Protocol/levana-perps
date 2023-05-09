@@ -7,6 +7,8 @@ pub use lvn::*;
 mod hatch;
 pub use hatch::*;
 pub mod config;
+mod profile;
+pub use profile::*;
 
 use msg::contracts::hatching::config::Config;
 

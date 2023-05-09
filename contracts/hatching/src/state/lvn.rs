@@ -49,5 +49,9 @@ pub fn get_lvn_to_grant(details: &HatchDetails) -> Result<Option<NumberGtZero>> 
         total = total.checked_add(dust.lvn.into_decimal256())?;
     }
 
+    if let Some(profile) = &details.profile {
+        total = total.checked_add(profile.lvn.into_decimal256())?;
+    }
+
     Ok(NumberGtZero::new(total))
 }

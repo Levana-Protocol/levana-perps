@@ -128,6 +128,25 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                     .get_address_string()
             };
 
+            let profile_contract = if network == CosmosNetwork::JunoMainnet {
+                "juno12fdnmycnuvhua3y9pzxweu2eqqv77k454h0w8vwjjajvjrawuaksfn88u9".to_string()
+            } else {
+                let dragon_riders_contract =
+                    instantiate_testnet_nft_contract(&basic, "Levana Dragon Riders Mock")
+                        .await?
+                        .get_address_string();
+
+                instantiate_testnet_profile_contract(
+                    &basic,
+                    "Levana Profile Mock",
+                    &burn_egg_contract,
+                    &burn_dust_contract,
+                    &dragon_riders_contract,
+                )
+                .await?
+                .get_address_string()
+            };
+
             let code_id = tracker.require_code_by_type(&opt, HATCHING).await?;
             let contract = code_id
                 .instantiate(
@@ -137,12 +156,13 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                     msg::contracts::hatching::entry::InstantiateMsg {
                         burn_egg_contract: burn_egg_contract.clone().into(),
                         burn_dust_contract: burn_dust_contract.clone().into(),
+                        profile_contract: profile_contract.clone().into(),
                     },
                 )
                 .await?;
 
             if network != CosmosNetwork::JunoMainnet {
-                log::info!("giving hatching contract burn permissions");
+                log::info!("giving hatching contract nft burn permissions");
                 let mut minters = HashSet::new();
                 minters.insert(contract.get_address_string());
                 basic
@@ -160,6 +180,32 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                     .cosmos
                     .make_contract(burn_dust_contract.parse()?)
                     .execute(&basic.wallet, vec![], NftExecuteMsg::AddMinters { minters })
+                    .await?;
+
+                log::info!("giving hatching contract profile admin permissions");
+
+                #[derive(Serialize, Deserialize)]
+                #[serde(rename_all = "snake_case")]
+                enum ProfileExecuteMsg {
+                    Admin { message: ProfileAdminExecuteMsg },
+                }
+                #[derive(Serialize, Deserialize)]
+                #[serde(rename_all = "snake_case")]
+                pub enum ProfileAdminExecuteMsg {
+                    AddAdmin { addr: String },
+                }
+                basic
+                    .cosmos
+                    .make_contract(profile_contract.parse()?)
+                    .execute(
+                        &basic.wallet,
+                        vec![],
+                        ProfileExecuteMsg::Admin {
+                            message: ProfileAdminExecuteMsg::AddAdmin {
+                                addr: contract.get_address_string(),
+                            },
+                        },
+                    )
                     .await?;
             }
 
@@ -271,6 +317,63 @@ async fn instantiate_testnet_nft_contract(
                 minter: vec![app.wallet.get_address_string()].into_iter().collect(),
                 allow_burn: true,
                 royalties: RoyaltyInfo::NoRoyalties {},
+            },
+        )
+        .await?;
+
+    log::info!(
+        "instantiated {} at {}",
+        label,
+        contract.get_address_string()
+    );
+
+    Ok(contract)
+}
+
+async fn instantiate_testnet_profile_contract(
+    app: &BasicApp,
+    label: impl Into<String>,
+    eggs_contract: impl Into<String>,
+    dust_contract: impl Into<String>,
+    dragon_riders_contract: impl Into<String>,
+) -> Result<Contract> {
+    let label: String = label.into();
+
+    // was created by downloading the wasm from mainnet dragon contract
+    // and uploading it to testnet
+    let code_id: u64 = match app.network {
+        CosmosNetwork::JunoTestnet => 1820,
+        _ => bail!("profile contract is only supported on juno testnet for now"),
+    };
+
+    // just copy/pasted from levanamessages::nft
+    #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+    pub struct InstantiateMsg {
+        /// Address of the Dragon NFT contract
+        pub dragons: String,
+        /// Address of the Loot NFT contract
+        pub loot: String,
+        /// Address of the Dragon Rider NFT contract
+        pub dragon_rider: String,
+        /// Primary admin of this contract
+        pub admin: String,
+        /// The wallet which receives funds during a withdrawal
+        pub withdraw_dest: String,
+    }
+
+    let contract = app
+        .cosmos
+        .make_code_id(code_id)
+        .instantiate(
+            &app.wallet,
+            label.clone(),
+            vec![],
+            InstantiateMsg {
+                dragons: eggs_contract.into(),
+                loot: dust_contract.into(),
+                dragon_rider: dragon_riders_contract.into(),
+                admin: app.wallet.get_address_string(),
+                withdraw_dest: app.wallet.get_address_string(),
             },
         )
         .await?;
