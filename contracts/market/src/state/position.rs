@@ -92,13 +92,18 @@ pub enum PositionOrId {
 
 /// Gets a full position by id
 pub(crate) fn get_position(store: &dyn Storage, id: PositionId) -> Result<Position> {
+    #[derive(serde::Serialize)]
+    struct Data {
+        position: PositionId,
+    }
     OPEN_POSITIONS
         .may_load(store, id)
         .map_err(|e| anyhow!("Could not parse position {id}: {e:?}"))?
         .ok_or_else(|| {
-            perp_anyhow!(
+            perp_anyhow_data!(
                 ErrorId::MissingPosition,
                 ErrorDomain::Market,
+                Data { position: id },
                 "position id: {}",
                 id
             )
