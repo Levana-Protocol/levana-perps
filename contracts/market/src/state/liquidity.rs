@@ -244,9 +244,22 @@ impl State<'_> {
             Some(amount) => {
                 let remainder = match yield_to_reinvest.raw().checked_sub(amount.raw()) {
                     Ok(remainder) => remainder,
-                    Err(_) => anyhow::bail!(
-                        "Requested to reinvest {amount}, but only have {yield_to_reinvest}"
-                    ),
+                    Err(_) => {
+                        #[derive(serde::Serialize)]
+                        struct Data {
+                            requested_to_reinvest: NonZero<Collateral>,
+                            available_yield: NonZero<Collateral>,
+                        }
+                        perp_bail_data!(
+                            ErrorId::InsufficientForReinvest,
+                            ErrorDomain::Market,
+                            Data {
+                                requested_to_reinvest: amount,
+                                available_yield: yield_to_reinvest
+                            },
+                            "Requested to reinvest {amount}, but only have {yield_to_reinvest}"
+                        );
+                    }
                 };
                 if let Some(remainder) = NonZero::new(remainder) {
                     self.add_token_transfer_msg(ctx, lp_addr, remainder)?;
@@ -687,8 +700,14 @@ impl State<'_> {
         self.perform_lp_book_keeping(ctx, lp_addr)?;
         let mut addr_stats = self.load_liquidity_stats_addr(ctx.storage, lp_addr)?;
         let total_yield = addr_stats.total_yield()?;
-        let total_yield =
-            NonZero::new(total_yield).context("liquidity_claim_yield: total yield is 0")?;
+        let total_yield = match NonZero::new(total_yield) {
+            Some(total_yield) => total_yield,
+            None => perp_bail!(
+                ErrorId::NoYieldToClaim,
+                ErrorDomain::Market,
+                "liquidity_claim_yield: total yield is 0"
+            ),
+        };
 
         addr_stats.lp_accrued_yield = Collateral::zero();
         addr_stats.xlp_accrued_yield = Collateral::zero();
