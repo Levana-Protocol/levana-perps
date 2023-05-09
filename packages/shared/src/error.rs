@@ -58,6 +58,8 @@ pub enum ErrorId {
     DirectionToBaseFlipped,
     MissingFunds,
     UnnecessaryFunds,
+    NoYieldToClaim,
+    InsufficientForReinvest,
 }
 
 /// Source within the protocol for the error
