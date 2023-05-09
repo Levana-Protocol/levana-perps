@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use axum::async_trait;
 use chrono::{DateTime, Utc};
 use cosmos::{Address, Cosmos};
+use msg::contracts::faucet::entry::GasAllowanceResp;
 use msg::prelude::*;
 use msg::{
     contracts::{
@@ -27,6 +28,7 @@ pub(crate) struct FactoryInfo {
     pub(crate) cw20s: Vec<Cw20>,
     pub(crate) markets: HashMap<MarketId, Address>,
     pub(crate) gitrev: Option<String>,
+    pub(crate) faucet_gas_amount: Option<String>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -72,6 +74,13 @@ pub(crate) async fn get_factory_info(cosmos: &Cosmos, config: &BotConfig) -> Res
     let (cw20s, markets) = get_tokens_markets(cosmos, factory)
         .await
         .with_context(|| format!("Unable to get_tokens_market for factory {factory}"))?;
+    let faucet_gas_amount = match get_faucet_gas_amount(cosmos, config.faucet).await {
+        Ok(x) => x,
+        Err(e) => {
+            log::warn!("Error on get_faucet_gas_amount: {e:?}");
+            None
+        }
+    };
     Ok(FactoryInfo {
         factory,
         faucet: config.faucet,
@@ -80,6 +89,7 @@ pub(crate) async fn get_factory_info(cosmos: &Cosmos, config: &BotConfig) -> Res
         cw20s,
         markets,
         gitrev,
+        faucet_gas_amount,
     })
 }
 
@@ -175,4 +185,20 @@ async fn get_tokens_markets(
             }
         }
     }
+}
+
+async fn get_faucet_gas_amount(cosmos: &Cosmos, faucet: Address) -> Result<Option<String>> {
+    let contract = cosmos.make_contract(faucet);
+    Ok(
+        match contract
+            .query(msg::contracts::faucet::entry::QueryMsg::GetGasAllowance {})
+            .await?
+        {
+            GasAllowanceResp::Disabled {} => None,
+            GasAllowanceResp::Enabled { denom: _, amount } => {
+                // Somewhat hacky, but leverage the existing code on LpToken
+                Some(LpToken::from_u128(amount.u128())?.to_string())
+            }
+        },
+    )
 }
