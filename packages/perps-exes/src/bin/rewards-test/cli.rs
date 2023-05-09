@@ -60,7 +60,7 @@ pub(crate) struct HatchEggOpt {
     #[clap(
         long,
         env = "HATCH_ADDRESS",
-        default_value = "juno1vv7jdzgnx5qr8x3h3j564g0wp22a7fhxunvamlqunprklmwu5x0s4h02ff"
+        default_value = "juno1v5cf5a05275e8kr3pa2wtrfl63qemjxaf2kkl3v5nfhec89dx0xqhn20kt"
     )]
     pub hatch_address: Address,
 
@@ -68,7 +68,7 @@ pub(crate) struct HatchEggOpt {
     #[clap(
         long,
         env = "NFT_MINT_ADDRESS",
-        default_value = "stars126ucy5awfnqx909mevlz6x4r69u5e9ekhjrvkrypfnap747jvlyqcw80wv"
+        default_value = "stars1x3hdj33zwvsxmwnat4snk3f4w6504l0zr3g5z3rs7ajzqpsu8cms40pjad"
     )]
     pub nft_mint_address: Address,
 
@@ -76,7 +76,7 @@ pub(crate) struct HatchEggOpt {
     #[clap(
         long,
         env = "LVN_REWARDS_ADDRESS",
-        default_value = "osmo1ss99t8fqwgvtt2vny46tfncv53ydwmk6eswrdd7qpvs8zmwfr5msradgyq"
+        default_value = "osmo1jf4796kx7xufu8s4xnjvq92gqxehv5g0ml7662stp69as3sg5wdsyqcpjx"
     )]
     pub lvn_rewards_address: Address,
 
