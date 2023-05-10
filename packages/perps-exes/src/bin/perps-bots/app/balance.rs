@@ -148,12 +148,20 @@ async fn single_market(
         .notional_to_collateral(Notional::from_decimal256(net_notional.abs_unsigned()))
         .into_decimal256()
         / Decimal256::two();
+    log::info!("collateral_for_balance: {}", collateral_for_balance);
 
     let needed_collateral = Collateral::from_decimal256(
         collateral_for_balance
             .min(max_available_liquidity)
             // arbitrary limit, we don't want to open positions that are too large
-            .min("10000".parse().unwrap()),
+            .min(
+                match status.market_id.get_collateral() {
+                    "ETH" => "300",
+                    _ => "10000",
+                }
+                .parse()
+                .unwrap(),
+            ),
     );
 
     log::info!(
