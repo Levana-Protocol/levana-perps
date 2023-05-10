@@ -109,7 +109,7 @@ impl App {
             .client
             .post("https://hcaptcha.com/siteverify")
             .form(&Body {
-                secret: &self.faucet_bot.get_hcaptcha_secret(),
+                secret: self.faucet_bot.get_hcaptcha_secret(),
                 response: g_recaptcha_response,
             })
             .send()

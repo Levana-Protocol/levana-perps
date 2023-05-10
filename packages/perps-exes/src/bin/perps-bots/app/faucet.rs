@@ -162,7 +162,7 @@ impl FaucetBotRunner {
                 &self.wallet,
                 vec![],
                 ExecuteMsg::Multitap {
-                    recipients: reqs.into_iter().map(|x| x.into()).collect(),
+                    recipients: reqs.iter().map(|x| x.into()).collect(),
                 },
             )
             .await
@@ -180,7 +180,7 @@ impl From<&TapRequest> for MultitapRecipient {
         MultitapRecipient {
             addr: recipient.get_address_string().into(),
             assets: cw20s
-                .into_iter()
+                .iter()
                 .map(|addr| FaucetAsset::Cw20(addr.get_address_string().into()))
                 .collect(),
         }
