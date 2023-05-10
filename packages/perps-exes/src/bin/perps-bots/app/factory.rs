@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use axum::async_trait;
 use chrono::{DateTime, Utc};
 use cosmos::{Address, Cosmos};
-use msg::contracts::faucet::entry::GasAllowanceResp;
+use msg::contracts::faucet::entry::{GasAllowanceResp, TapAmountResponse};
 use msg::prelude::*;
 use msg::{
     contracts::{
@@ -29,6 +29,7 @@ pub(crate) struct FactoryInfo {
     pub(crate) markets: HashMap<MarketId, Address>,
     pub(crate) gitrev: Option<String>,
     pub(crate) faucet_gas_amount: Option<String>,
+    pub(crate) faucet_collateral_amount: HashMap<&'static str, Decimal256>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -81,6 +82,13 @@ pub(crate) async fn get_factory_info(cosmos: &Cosmos, config: &BotConfig) -> Res
             None
         }
     };
+    let faucet_collateral_amount = match get_faucet_collateral_amount(cosmos, config.faucet).await {
+        Ok(x) => x,
+        Err(e) => {
+            log::warn!("Error on get_faucet_collateral_amount: {e:?}");
+            HashMap::new()
+        }
+    };
     Ok(FactoryInfo {
         factory,
         faucet: config.faucet,
@@ -90,6 +98,7 @@ pub(crate) async fn get_factory_info(cosmos: &Cosmos, config: &BotConfig) -> Res
         markets,
         gitrev,
         faucet_gas_amount,
+        faucet_collateral_amount,
     })
 }
 
@@ -201,4 +210,25 @@ async fn get_faucet_gas_amount(cosmos: &Cosmos, faucet: Address) -> Result<Optio
             }
         },
     )
+}
+async fn get_faucet_collateral_amount(
+    cosmos: &Cosmos,
+    faucet: Address,
+) -> Result<HashMap<&'static str, Decimal256>> {
+    let mut res = HashMap::new();
+    let contract = cosmos.make_contract(faucet);
+    for name in ["ATOM", "ETH", "BTC", "USDC"] {
+        match contract
+            .query(msg::contracts::faucet::entry::QueryMsg::TapAmountByName {
+                name: name.to_owned(),
+            })
+            .await?
+        {
+            TapAmountResponse::CanTap { amount } => {
+                res.insert(name, amount);
+            }
+            TapAmountResponse::CannotTap {} => (),
+        }
+    }
+    Ok(res)
 }

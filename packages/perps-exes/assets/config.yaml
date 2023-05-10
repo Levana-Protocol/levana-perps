@@ -93,7 +93,7 @@ deployments:
     liquidity: true
     utilization: true
     balance: true
-    traders: 100
+    traders: 10
     default-market-ids:
       - ATOM_USD
   dev:
@@ -105,7 +105,7 @@ deployments:
     liquidity: true
     utilization: true
     balance: true
-    traders: 30
+    traders: 10
     default-market-ids:
       - ATOM_USD
   trade:
@@ -129,7 +129,7 @@ deployments:
     liquidity: true
     utilization: true
     balance: true
-    traders: 50
+    traders: 10
     default-market-ids:
       - ATOM_USD
       - OSMO_USDC
@@ -169,6 +169,6 @@ overrides:
     liquidity: true
     utilization: true
     balance: true
-    traders: 0
+    traders: 1
     default-market-ids:
       - ETH_USD

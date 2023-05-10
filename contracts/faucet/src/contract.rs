@@ -18,7 +18,8 @@ use msg::contracts::{
     cw20::{entry::InstantiateMinter, Cw20Coin},
     faucet::entry::{
         ConfigResponse, ExecuteMsg, FaucetAsset, GasAllowance, GasAllowanceResp, GetTokenResponse,
-        InstantiateMsg, MigrateMsg, NextTradingIndexResponse, OwnerMsg, QueryMsg,
+        InstantiateMsg, IsAdminResponse, MigrateMsg, NextTradingIndexResponse, OwnerMsg, QueryMsg,
+        TapAmountResponse, TapEligibleResponse,
     },
 };
 use semver::Version;
@@ -121,6 +122,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
             state.save_last_tap(&mut ctx, &recipient)?;
         }
+        ExecuteMsg::Multitap { recipients } => {
+            state.multitap(&mut ctx, recipients)?;
+        }
         ExecuteMsg::OwnerMsg(owner_msg) => {
             validate_owner(ctx.storage, &info)?;
 
@@ -204,6 +208,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     set_gas_allowance(ctx.storage, &allowance)?
                 }
                 OwnerMsg::ClearGasAllowance {} => clear_gas_allowance(ctx.storage),
+                OwnerMsg::SetMultitapAmount { name, amount } => {
+                    state.set_multitap_amount(&mut ctx, &name, amount)?
+                }
             }
         }
     }
@@ -261,6 +268,44 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 }
             })
             .query_result(),
+        QueryMsg::IsTapEligible { addr } => {
+            let addr = addr.validate(deps.api)?;
+            let (state, store) = State::new(deps, env);
+            match state.validate_tap_faucet_error(store, &addr)? {
+                Ok(()) => TapEligibleResponse::Eligible {},
+                Err(e) => TapEligibleResponse::Ineligible {
+                    seconds: e.wait_secs,
+                    message: format!(
+                        "You can tap the faucet again in {}",
+                        PrettyTimeRemaining(e.wait_secs)
+                    ),
+                },
+            }
+            .query_result()
+        }
+        QueryMsg::IsAdmin { addr } => {
+            let addr = addr.validate(deps.api)?;
+            IsAdminResponse {
+                is_admin: is_admin(deps.storage, &addr),
+            }
+            .query_result()
+        }
+        QueryMsg::TapAmount { asset } => {
+            let (state, store) = State::new(deps, env);
+            match state.get_multitap_amount(store, &asset)? {
+                Some(amount) => TapAmountResponse::CanTap { amount },
+                None => TapAmountResponse::CannotTap {},
+            }
+            .query_result()
+        }
+        QueryMsg::TapAmountByName { name } => {
+            let (state, store) = State::new(deps, env);
+            match state.get_multitap_amount_by_name(store, &name)? {
+                Some(amount) => TapAmountResponse::CanTap { amount },
+                None => TapAmountResponse::CannotTap {},
+            }
+            .query_result()
+        }
     }
 }
 

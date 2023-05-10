@@ -4,5 +4,5 @@ use shared::prelude::*;
 
 #[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
 pub struct FaucetError {
-    pub wait_secs: Number,
+    pub wait_secs: Decimal256,
 }
