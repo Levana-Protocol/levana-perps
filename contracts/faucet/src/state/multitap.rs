@@ -40,6 +40,7 @@ impl State<'_> {
         if self.validate_tap_faucet_error(ctx.storage, &addr)?.is_err() {
             return Ok(());
         }
+        self.save_last_tap(ctx, &addr)?;
 
         // Top off the gas
         if let Some(GasAllowance { denom, amount }) = gas_allowance {
