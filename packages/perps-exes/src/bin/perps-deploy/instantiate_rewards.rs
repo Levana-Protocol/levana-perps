@@ -252,10 +252,19 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                     denom: lvn_denom,
                     amount: "10000".to_string(),
                 };
+
+                // gas is wildly underestimated on osmosis testnet at least
+                // bump up the multiplier to make sure we have enough
+                // then set it back when we're done sending coins
+                let original_gas_multiplier = basic.cosmos.get_gas_multiplier();
+                basic.cosmos.set_gas_multiplier(1.5);
+
                 basic
                     .wallet
-                    .send_coins(&basic.cosmos, contract.get_address(), vec![coin])
+                    .send_coins(&basic.cosmos, contract.get_address(), vec![coin.clone()])
                     .await?;
+
+                basic.cosmos.set_gas_multiplier(original_gas_multiplier);
             }
         }
     }
