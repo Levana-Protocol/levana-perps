@@ -88,10 +88,6 @@ pub enum OwnerMsg {
         allowance: GasAllowance,
     },
     ClearGasAllowance {},
-    /// Set the tap amount used in multitap when the asset type is unknown
-    SetMultitapFallbackAmount {
-        amount: Decimal256,
-    },
     /// Set the tap amount for a named asset
     SetMultitapAmount {
         name: String,

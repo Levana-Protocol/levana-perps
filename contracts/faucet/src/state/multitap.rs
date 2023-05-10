@@ -10,7 +10,6 @@ use msg::prelude::*;
 use super::gas_coin::get_gas_allowance;
 use super::{State, StateContext};
 
-const FALLBACK_AMOUNT: Item<Decimal256> = Item::new("FALLBACK_AMOUNT");
 const NAMED_AMOUNT: Map<&str, Decimal256> = Map::new("NAMED_AMOUNT");
 
 impl State<'_> {
@@ -70,28 +69,10 @@ impl State<'_> {
         addr: &Addr,
         asset: FaucetAsset,
     ) -> Result<()> {
-        match self.get_multitap_amount_for_asset(ctx.storage, &asset)? {
+        match self.get_multitap_amount(ctx.storage, &asset)? {
             Some(amount) => self.tap(ctx, asset, addr, Some(amount.into_signed())),
             None => Ok(()),
         }
-    }
-
-    pub(crate) fn get_multitap_fallback_amount(&self, store: &dyn Storage) -> Result<Decimal256> {
-        FALLBACK_AMOUNT
-            .may_load(store)
-            .map_err(|e| e.into())
-            // Using 1000 since it was the original amount
-            .map(|x| x.unwrap_or_else(|| "1000".parse().unwrap()))
-    }
-
-    pub(crate) fn set_multitap_fallback_amount(
-        &self,
-        ctx: &mut StateContext,
-        amount: Decimal256,
-    ) -> Result<()> {
-        FALLBACK_AMOUNT
-            .save(ctx.storage, &amount)
-            .map_err(|e| e.into())
     }
 
     pub(crate) fn set_multitap_amount(
@@ -108,17 +89,6 @@ impl State<'_> {
     pub(crate) fn get_multitap_amount(
         &self,
         store: &dyn Storage,
-        name: &str,
-    ) -> Result<Decimal256> {
-        Ok(match NAMED_AMOUNT.may_load(store, name)? {
-            Some(x) => x,
-            None => self.get_multitap_fallback_amount(store)?,
-        })
-    }
-
-    pub(crate) fn get_multitap_amount_for_asset(
-        &self,
-        store: &dyn Storage,
         asset: &FaucetAsset,
     ) -> Result<Option<Decimal256>> {
         Ok(match asset {
@@ -126,7 +96,19 @@ impl State<'_> {
                 let addr = addr.validate(self.api)?;
                 match super::tokens::TOKEN_INFO.may_load(store, &addr)? {
                     None => None,
-                    Some(info) => Some(self.get_multitap_amount(store, &info.name)?),
+                    Some(info) => {
+                        let name = &info.name;
+                        match NAMED_AMOUNT.may_load(store, name)? {
+                            Some(amount) => Some(amount),
+                            None => match name.as_str() {
+                                "ATOM" => Some("1000".parse().unwrap()),
+                                "ETH" => Some("1".parse().unwrap()),
+                                "BTC" => Some("1".parse().unwrap()),
+                                "USDC" => Some("10000".parse().unwrap()),
+                                _ => None,
+                            },
+                        }
+                    }
                 }
             }
             // This may change in the future, but no tapping of native coins for the moment

@@ -208,9 +208,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     set_gas_allowance(ctx.storage, &allowance)?
                 }
                 OwnerMsg::ClearGasAllowance {} => clear_gas_allowance(ctx.storage),
-                OwnerMsg::SetMultitapFallbackAmount { amount } => {
-                    state.set_multitap_fallback_amount(&mut ctx, amount)?
-                }
                 OwnerMsg::SetMultitapAmount { name, amount } => {
                     state.set_multitap_amount(&mut ctx, &name, amount)?
                 }
@@ -295,7 +292,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
         }
         QueryMsg::TapAmount { asset } => {
             let (state, store) = State::new(deps, env);
-            match state.get_multitap_amount_for_asset(store, &asset)? {
+            match state.get_multitap_amount(store, &asset)? {
                 Some(amount) => TapAmountResponse::CanTap { amount },
                 None => TapAmountResponse::CannotTap {},
             }
