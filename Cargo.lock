@@ -706,7 +706,7 @@ checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 [[package]]
 name = "cosmos"
 version = "0.1.0"
-source = "git+https://github.com/Levana-Protocol/levana-cosmos-rs.git?branch=sei-gas-hack#dd534cddc0b8feac80b36264f2d6cc3926c2ccb8"
+source = "git+https://github.com/Levana-Protocol/levana-cosmos-rs.git?branch=develop#395486691ae12655573d7f69143be3baae0ca288"
 dependencies = [
  "anyhow",
  "bech32",
@@ -720,6 +720,7 @@ dependencies = [
  "log",
  "once_cell",
  "prost 0.11.9",
+ "prost-types",
  "rand 0.8.5",
  "serde",
  "serde_json",
