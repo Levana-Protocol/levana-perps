@@ -90,6 +90,7 @@ async fn bot_inner(app: &App, query: FaucetQuery) -> Result<FaucetResponse> {
         .execute(
             &wallet,
             vec![],
+            // FIXME move to multitap
             ExecuteMsg::Tap {
                 assets: query
                     .cw20s

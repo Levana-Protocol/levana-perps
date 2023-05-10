@@ -34,7 +34,12 @@ impl State<'_> {
             .map_err(|err| err.into())
     }
 
-    pub(crate) fn validate_tap(&self, store: &dyn Storage, recipient: &Addr) -> Result<()> {
+    /// Like [Self::validate_tap] but uses a [FaucetError]
+    pub(crate) fn validate_tap_faucet_error(
+        &self,
+        store: &dyn Storage,
+        recipient: &Addr,
+    ) -> Result<Result<(), FaucetError>> {
         let now = self.now();
 
         if let Some(tap_limit) = self.tap_limit(store)? {
@@ -45,21 +50,28 @@ impl State<'_> {
                 if elapsed < tap_limit {
                     let time_remaining = tap_limit - elapsed;
 
-                    perp_bail_data!(
-                        ErrorId::Exceeded,
-                        ErrorDomain::Faucet,
-                        FaucetError {
-                            wait_secs: time_remaining.as_ms_number_lossy()
-                                / Number::from_str("1000").unwrap()
-                        },
-                        "You can tap the faucet again in {}",
-                        PrettyTimeRemaining(time_remaining),
-                    )
+                    return Ok(Err(FaucetError {
+                        wait_secs: time_remaining.as_ms_decimal_lossy()
+                            / Decimal256::from_str("1000").unwrap(),
+                    }));
                 }
             }
         }
 
-        Ok(())
+        Ok(Ok(()))
+    }
+
+    pub(crate) fn validate_tap(&self, store: &dyn Storage, recipient: &Addr) -> Result<()> {
+        self.validate_tap_faucet_error(store, recipient)?
+            .map_err(|e| {
+                perp_anyhow_data!(
+                    ErrorId::Exceeded,
+                    ErrorDomain::Faucet,
+                    e,
+                    "You can tap the faucet again in {}",
+                    PrettyTimeRemaining(e.wait_secs),
+                )
+            })
     }
 
     // only available in mutable for now, simplifies caching mechanism
@@ -220,12 +232,11 @@ impl State<'_> {
     }
 }
 
-struct PrettyTimeRemaining(Duration);
+struct PrettyTimeRemaining(Decimal256);
 
 impl Display for PrettyTimeRemaining {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let secs = self.0.as_ms_decimal_lossy() / Decimal256::from_str("1000").unwrap();
-        let secs = match Uint128::try_from(secs.to_uint_floor()) {
+        let secs = match Uint128::try_from(self.0.to_uint_floor()) {
             Err(_) => return f.write_str("a really long time"),
             Ok(secs) => secs.u128(),
         }
@@ -258,10 +269,8 @@ impl Display for PrettyTimeRemaining {
 
 #[cfg(test)]
 mod tests {
-    use msg::prelude::Duration;
-
     fn go(seconds: u64) -> String {
-        super::PrettyTimeRemaining(Duration::from_seconds(seconds)).to_string()
+        super::PrettyTimeRemaining(seconds.to_string().parse().unwrap()).to_string()
     }
     #[test]
     fn display_pretty_time() {

@@ -21,7 +21,16 @@ pub enum ExecuteMsg {
         recipient: RawAddr,
         amount: Option<Number>,
     },
+    Multitap {
+        recipients: Vec<MultitapRecipient>,
+    },
     OwnerMsg(OwnerMsg),
+}
+
+#[cw_serde]
+pub struct MultitapRecipient {
+    pub addr: RawAddr,
+    pub assets: Vec<FaucetAsset>,
 }
 
 #[cw_serde]
@@ -79,6 +88,15 @@ pub enum OwnerMsg {
         allowance: GasAllowance,
     },
     ClearGasAllowance {},
+    /// Set the tap amount used in multitap when the asset type is unknown
+    SetMultitapFallbackAmount {
+        amount: Decimal256,
+    },
+    /// Set the tap amount for a named asset
+    SetMultitapAmount {
+        name: String,
+        amount: Decimal256,
+    },
 }
 
 #[cw_serde]
@@ -108,6 +126,18 @@ pub enum QueryMsg {
     /// * returns [GasAllowanceResp]
     #[returns(GasAllowanceResp)]
     GetGasAllowance {},
+
+    /// * returns [TapEligibleResponse]
+    #[returns(TapEligibleResponse)]
+    IsTapEligible { addr: RawAddr },
+
+    /// * returns [IsAdminResponse]
+    #[returns(IsAdminResponse)]
+    IsAdmin { addr: RawAddr },
+
+    /// * returns [TapAmountResponse]
+    #[returns(TapAmountResponse)]
+    TapAmount { asset: FaucetAsset },
 }
 
 #[cw_serde]
@@ -142,4 +172,21 @@ pub struct GasAllowance {
 pub enum GasAllowanceResp {
     Enabled { denom: String, amount: Uint128 },
     Disabled {},
+}
+
+#[cw_serde]
+pub enum TapEligibleResponse {
+    Eligible {},
+    Ineligible { seconds: u32 },
+}
+
+#[cw_serde]
+pub struct IsAdminResponse {
+    pub is_admin: bool,
+}
+
+#[cw_serde]
+pub enum TapAmountResponse {
+    CannotTap {},
+    CanTap { amount: Decimal256 },
 }
