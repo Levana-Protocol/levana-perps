@@ -37,10 +37,14 @@ impl State<'_> {
         // inner result to see if the wallet is eligible for tapping. If not, we simply
         // skip. This allows multitapping from the faucet bot to be resilient in the
         // face of getting invalid addresses in its queue.
-        if self.validate_tap_faucet_error(ctx.storage, &addr)?.is_err() {
+        if let Err(e) = self.validate_tap_faucet_error(ctx.storage, &addr)? {
+            ctx.response
+                .add_event(Event::new(&addr).add_attribute("wait_secs", e.wait_secs.to_string()));
             return Ok(());
         }
         self.save_last_tap(ctx, &addr)?;
+        ctx.response
+            .add_event(Event::new(&addr).add_attribute("success", "success"));
 
         // Top off the gas
         if let Some(GasAllowance { denom, amount }) = gas_allowance {

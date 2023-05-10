@@ -274,7 +274,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             match state.validate_tap_faucet_error(store, &addr)? {
                 Ok(()) => TapEligibleResponse::Eligible {},
                 Err(e) => TapEligibleResponse::Ineligible {
-                    seconds: e.wait_secs.to_string().parse()?,
+                    seconds: e.wait_secs,
                     message: format!(
                         "You can tap the faucet again in {}",
                         PrettyTimeRemaining(e.wait_secs)
