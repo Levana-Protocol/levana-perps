@@ -4,13 +4,13 @@ impl State<'_> {
     pub(crate) fn get_status(&self, store: &dyn Storage) -> Result<StatusResp> {
         let period = self.get_period(store)?;
         let farming_totals = self.get_farming_totals(store)?;
-        let launched = self.get_launch_start(store).ok();
+        let launched_time = self.get_launch_start_time(store).ok();
 
         Ok(StatusResp {
             period,
             farming_tokens: farming_totals.farming,
             xlp: farming_totals.xlp,
-            launched,
+            launched: launched_time,
 
             // TODO: add these
             lockdrop_buckets: Vec::new(),

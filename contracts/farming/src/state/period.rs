@@ -16,12 +16,11 @@ impl State<'_> {
                 let now = self.now();
 
                 match epoch {
-                    FarmingEpoch::Lockdrop {
-                        start,
-                        sunset_start,
-                        review_start,
-                    } => {
+                    FarmingEpoch::Lockdrop { start } => {
                         debug_assert!(now >= start);
+
+                        let sunset_start = start + LOCKDROP_START_DURATION;
+                        let review_start = sunset_start + LOCKDROP_SUNSET_DURATION;
 
                         if now < sunset_start {
                             Ok(FarmingPeriod::Lockdrop)
@@ -51,16 +50,7 @@ impl State<'_> {
             );
         }
 
-        let start = self.now();
-        let sunset_start = start + LOCKDROP_START_DURATION;
-        let review_start = sunset_start + LOCKDROP_SUNSET_DURATION;
-
-        FarmingEpoch::Lockdrop {
-            start,
-            sunset_start,
-            review_start,
-        }
-        .save(ctx.storage)?;
+        FarmingEpoch::Lockdrop { start: self.now() }.save(ctx.storage)?;
 
         Ok(())
     }
@@ -80,7 +70,7 @@ impl State<'_> {
         Ok(())
     }
 
-    pub(crate) fn get_launch_start(&self, store: &dyn Storage) -> Result<Timestamp> {
+    pub(crate) fn get_launch_start_time(&self, store: &dyn Storage) -> Result<Timestamp> {
         match FarmingEpoch::may_load(store)? {
             None => bail!("Lockdrop has not started yet."),
             Some(epoch) => match epoch {
@@ -97,17 +87,12 @@ impl State<'_> {
 // 1. Manual triggers from an admin to start the lockdrop and review
 // 2. The passage of time
 //
-// So we track the epochs internally, and then calculate the period from that
+// So we track the manually triggered epochs internally
+// and then calculate the period from that
 #[derive(Serialize, Deserialize, Debug)]
 enum FarmingEpoch {
-    Lockdrop {
-        start: Timestamp,
-        sunset_start: Timestamp,
-        review_start: Timestamp,
-    },
-    Launch {
-        start: Timestamp,
-    },
+    Lockdrop { start: Timestamp },
+    Launch { start: Timestamp },
 }
 
 impl FarmingEpoch {
