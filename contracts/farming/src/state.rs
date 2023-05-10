@@ -1,7 +1,8 @@
+pub(crate) mod auth;
 pub(crate) mod farming;
 pub(crate) mod market_info;
 pub(crate) mod period;
-pub(crate) mod auth;
+pub(crate) mod status;
 
 use crate::prelude::*;
 use cosmwasm_std::{Api, Deps, DepsMut, Empty, Env, QuerierWrapper, Storage};

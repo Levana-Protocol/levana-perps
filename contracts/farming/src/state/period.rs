@@ -1,64 +1,93 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::prelude::*;
 
 // TODO: configurable?
 // 12 days
-const LOCKDROP_START_DURATION:Duration = Duration::from_seconds(60 * 60 * 24 * 12);
+const LOCKDROP_START_DURATION: Duration = Duration::from_seconds(60 * 60 * 24 * 12);
 // 2 days
-const LOCKDROP_SUNSET_DURATION:Duration = Duration::from_seconds(60 * 60 * 24 * 2);
+const LOCKDROP_SUNSET_DURATION: Duration = Duration::from_seconds(60 * 60 * 24 * 2);
 
 impl State<'_> {
-    pub fn get_period(&self, store: &dyn Storage) -> Result<FarmingPeriod> {
+    pub(crate) fn get_period(&self, store: &dyn Storage) -> Result<FarmingPeriod> {
         match FarmingEpoch::may_load(store)? {
             None => Ok(FarmingPeriod::Inactive),
             Some(epoch) => {
                 let now = self.now();
 
                 match epoch {
-                    FarmingEpoch::Lockdrop { start, sunset_start, review_start } => {
-                        if now < start {
-                            bail!("Lockdrop has both started and not started yet, that's weird!");
-                        } else if now < sunset_start {
+                    FarmingEpoch::Lockdrop {
+                        start,
+                        sunset_start,
+                        review_start,
+                    } => {
+                        debug_assert!(now >= start);
+
+                        if now < sunset_start {
                             Ok(FarmingPeriod::Lockdrop)
                         } else if now < review_start {
                             Ok(FarmingPeriod::Sunset)
                         } else {
                             Ok(FarmingPeriod::Review)
                         }
-                    },
-                    FarmingEpoch::Launch => Ok(FarmingPeriod::Launched)
+                    }
+                    FarmingEpoch::Launch { start } => {
+                        debug_assert!(now >= start);
+
+                        Ok(FarmingPeriod::Launched)
+                    }
                 }
             }
         }
     }
 
-    pub fn start_lockdrop_period(&self, ctx: &mut StateContext) -> Result<()> {
-        if self.get_period(ctx.storage)? != FarmingPeriod::Inactive {
-            bail!("Lockdrop has already started.");
+    pub(crate) fn start_lockdrop_period(&self, ctx: &mut StateContext) -> Result<()> {
+        let period = self.get_period(ctx.storage)?;
+
+        if period != FarmingPeriod::Inactive {
+            bail!(
+                "Cannot start lockdrop, it has already started, currently in {:?}.",
+                period
+            );
         }
 
         let start = self.now();
         let sunset_start = start + LOCKDROP_START_DURATION;
         let review_start = sunset_start + LOCKDROP_SUNSET_DURATION;
 
-        FarmingEpoch::Lockdrop { 
+        FarmingEpoch::Lockdrop {
             start,
             sunset_start,
-            review_start
-        }.save(ctx.storage)?;
+            review_start,
+        }
+        .save(ctx.storage)?;
 
         Ok(())
     }
 
-    pub fn start_launch_period(&self, ctx: &mut StateContext) -> Result<()> {
-        if self.get_period(ctx.storage)? != FarmingPeriod::Review {
-            bail!("Lockdrop has not finished yet.");
+    pub(crate) fn start_launch_period(&self, ctx: &mut StateContext) -> Result<()> {
+        let period = self.get_period(ctx.storage)?;
+
+        if period != FarmingPeriod::Review {
+            bail!(
+                "Cannot launch, lockdrop has not finished yet, currently in {:?}.",
+                period
+            );
         }
 
-        FarmingEpoch::Launch.save(ctx.storage)?;
+        FarmingEpoch::Launch { start: self.now() }.save(ctx.storage)?;
 
         Ok(())
+    }
+
+    pub(crate) fn get_launch_start(&self, store: &dyn Storage) -> Result<Timestamp> {
+        match FarmingEpoch::may_load(store)? {
+            None => bail!("Lockdrop has not started yet."),
+            Some(epoch) => match epoch {
+                FarmingEpoch::Lockdrop { .. } => bail!("Lockdrop has not finished yet."),
+                FarmingEpoch::Launch { start } => Ok(start),
+            },
+        }
     }
 }
 
@@ -76,11 +105,13 @@ enum FarmingEpoch {
         sunset_start: Timestamp,
         review_start: Timestamp,
     },
-    Launch
+    Launch {
+        start: Timestamp,
+    },
 }
 
 impl FarmingEpoch {
-    const ITEM:Item<'static, Self> = Item::new("farming-epoch");
+    const ITEM: Item<'static, Self> = Item::new("farming-epoch");
 
     pub fn may_load(store: &dyn Storage) -> Result<Option<Self>> {
         Self::ITEM.may_load(store).map_err(|err| err.into())
