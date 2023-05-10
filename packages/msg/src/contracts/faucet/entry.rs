@@ -134,6 +134,10 @@ pub enum QueryMsg {
     /// * returns [TapAmountResponse]
     #[returns(TapAmountResponse)]
     TapAmount { asset: FaucetAsset },
+
+    /// * returns [TapAmountResponse]
+    #[returns(TapAmountResponse)]
+    TapAmountByName { name: String },
 }
 
 #[cw_serde]

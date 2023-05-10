@@ -96,23 +96,28 @@ impl State<'_> {
                 let addr = addr.validate(self.api)?;
                 match super::tokens::TOKEN_INFO.may_load(store, &addr)? {
                     None => None,
-                    Some(info) => {
-                        let name = &info.name;
-                        match NAMED_AMOUNT.may_load(store, name)? {
-                            Some(amount) => Some(amount),
-                            None => match name.as_str() {
-                                "ATOM" => Some("1000".parse().unwrap()),
-                                "ETH" => Some("1".parse().unwrap()),
-                                "BTC" => Some("1".parse().unwrap()),
-                                "USDC" => Some("10000".parse().unwrap()),
-                                _ => None,
-                            },
-                        }
-                    }
+                    Some(info) => self.get_multitap_amount_by_name(store, &info.name)?,
                 }
             }
             // This may change in the future, but no tapping of native coins for the moment
             FaucetAsset::Native(_) => None,
+        })
+    }
+
+    pub(crate) fn get_multitap_amount_by_name(
+        &self,
+        store: &dyn Storage,
+        name: &str,
+    ) -> Result<Option<Decimal256>> {
+        Ok(match NAMED_AMOUNT.may_load(store, name)? {
+            Some(amount) => Some(amount),
+            None => match name {
+                "ATOM" => Some("1000".parse().unwrap()),
+                "ETH" => Some("1".parse().unwrap()),
+                "BTC" => Some("1".parse().unwrap()),
+                "USDC" => Some("10000".parse().unwrap()),
+                _ => None,
+            },
         })
     }
 }

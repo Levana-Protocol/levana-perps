@@ -298,6 +298,14 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             }
             .query_result()
         }
+        QueryMsg::TapAmountByName { name } => {
+            let (state, store) = State::new(deps, env);
+            match state.get_multitap_amount_by_name(store, &name)? {
+                Some(amount) => TapAmountResponse::CanTap { amount },
+                None => TapAmountResponse::CannotTap {},
+            }
+            .query_result()
+        }
     }
 }
 
