@@ -53,6 +53,9 @@ impl Opt {
         if let Some(grpc) = &self.grpc_url {
             builder.grpc_url = grpc.clone();
         }
+        if let Some(gas_multiplier) = config.gas_multiplier {
+            builder.set_gas_multiplier(gas_multiplier);
+        }
         let cosmos = builder.build().await?;
         let client = Client::builder().user_agent("perps-bots").build()?;
 
