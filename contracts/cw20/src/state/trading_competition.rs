@@ -22,7 +22,7 @@ impl State<'_> {
             None => return Ok(()),
         };
 
-        if sender == &market_address {
+        if sender == market_address {
             return Ok(());
         }
 
