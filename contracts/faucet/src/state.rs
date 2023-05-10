@@ -1,6 +1,6 @@
 // re-exporting
 mod faucet;
-pub use faucet::*;
+pub(crate) use faucet::*;
 pub(crate) mod owner;
 use msg::prelude::*;
 mod trading_competition;

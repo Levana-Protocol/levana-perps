@@ -17,6 +17,7 @@ use crate::watcher::Watcher;
 
 use super::factory::get_factory_info;
 use super::factory::FactoryInfo;
+use super::faucet::FaucetBot;
 use super::gas_check::GasCheckBuilder;
 
 pub(crate) struct App {
@@ -36,11 +37,6 @@ pub(crate) struct FrontendInfo {
     network: CosmosNetwork,
     price_api: &'static str,
     explorer: &'static str,
-}
-
-pub(crate) struct FaucetBot {
-    pub(crate) wallet: tokio::sync::RwLock<Wallet>,
-    pub(crate) hcaptcha_secret: String,
 }
 
 /// Helper data structure for building up an application.
@@ -73,13 +69,13 @@ impl Opt {
         log::info!("Discovered factory contract: {}", factory.factory);
         log::info!("Discovered faucet contract: {}", factory.faucet);
 
+        let (faucet_bot, faucet_bot_runner) =
+            FaucetBot::new(faucet_bot_wallet, self.hcaptcha_secret);
+
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
             frontend_info,
-            faucet_bot: FaucetBot {
-                wallet: tokio::sync::RwLock::new(faucet_bot_wallet),
-                hcaptcha_secret: self.hcaptcha_secret,
-            },
+            faucet_bot,
             cosmos,
             config,
             client,
@@ -87,11 +83,13 @@ impl Opt {
             statuses: TaskStatuses::default(),
         };
         let app = Arc::new(app);
-        Ok(AppBuilder {
+        let mut builder = AppBuilder {
             app,
             watcher: Watcher::default(),
             gas_check: GasCheckBuilder::new(Arc::new(gas_wallet)),
-        })
+        };
+        builder.launch_faucet_task(faucet_bot_runner);
+        Ok(builder)
     }
 }
 

@@ -2,11 +2,8 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::{extract::State, Json};
-use cosmos::{Address, HasAddress};
-use msg::{
-    contracts::faucet::entry::{ExecuteMsg, FaucetAsset},
-    prelude::PerpError,
-};
+use cosmos::Address;
+use msg::prelude::PerpError;
 use serde_json::de::StrRead;
 
 use crate::app::App;
@@ -78,36 +75,22 @@ mod tests {
     }
 }
 
-async fn bot_inner(app: &App, query: FaucetQuery) -> Result<FaucetResponse> {
-    if !app.is_valid_recaptcha(&query.hcaptcha).await? {
+async fn bot_inner(
+    app: &App,
+    FaucetQuery {
+        cw20s,
+        recipient,
+        hcaptcha,
+    }: FaucetQuery,
+) -> Result<FaucetResponse> {
+    if !app.is_valid_recaptcha(&hcaptcha).await? {
         return Ok(FaucetResponse::Error {
             message: "Invalid hCaptcha".to_owned(),
         });
     }
-    let faucet = app.cosmos.make_contract(app.config.faucet);
-    let wallet = app.faucet_bot.wallet.write().await;
-    let res = faucet
-        .execute(
-            &wallet,
-            vec![],
-            // FIXME move to multitap
-            ExecuteMsg::Tap {
-                assets: query
-                    .cw20s
-                    .into_iter()
-                    .map(|x| FaucetAsset::Cw20(x.get_address_string().into()))
-                    // This will end up as a no-op if the faucet gas a gas allowance set.
-                    .chain(std::iter::once(FaucetAsset::Native(
-                        app.cosmos.get_gas_coin().clone(),
-                    )))
-                    .collect(),
-                recipient: query.recipient.get_address_string().into(),
-                amount: None,
-            },
-        )
-        .await?;
+    let txhash = app.faucet_bot.tap(app, recipient, cw20s).await?;
     Ok(FaucetResponse::Success {
-        message: format!("Successfully tapped faucet in txhash {}", res.txhash),
+        message: format!("Successfully tapped faucet in txhash {}", txhash),
     })
 }
 
@@ -126,7 +109,7 @@ impl App {
             .client
             .post("https://hcaptcha.com/siteverify")
             .form(&Body {
-                secret: &self.faucet_bot.hcaptcha_secret,
+                secret: &self.faucet_bot.get_hcaptcha_secret(),
                 response: g_recaptcha_response,
             })
             .send()

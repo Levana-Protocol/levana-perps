@@ -278,6 +278,10 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 Ok(()) => TapEligibleResponse::Eligible {},
                 Err(e) => TapEligibleResponse::Ineligible {
                     seconds: e.wait_secs.to_string().parse()?,
+                    message: format!(
+                        "You can tap the faucet again in {}",
+                        PrettyTimeRemaining(e.wait_secs)
+                    ),
                 },
             }
             .query_result()

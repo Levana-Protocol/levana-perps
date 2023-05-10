@@ -232,7 +232,7 @@ impl State<'_> {
     }
 }
 
-struct PrettyTimeRemaining(Decimal256);
+pub(crate) struct PrettyTimeRemaining(pub(crate) Decimal256);
 
 impl Display for PrettyTimeRemaining {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

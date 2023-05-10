@@ -177,7 +177,7 @@ pub enum GasAllowanceResp {
 #[cw_serde]
 pub enum TapEligibleResponse {
     Eligible {},
-    Ineligible { seconds: u32 },
+    Ineligible { seconds: u32, message: String },
 }
 
 #[cw_serde]
