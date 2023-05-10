@@ -9,7 +9,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     InstantiateMsg {
         // FIXME remove the ..
         factory,
@@ -22,7 +22,10 @@ pub fn instantiate(
     let factory = factory.validate(deps.api)?;
     MarketInfo::save(deps.querier, deps.storage, factory, market_id)?;
 
-    let (_state, mut ctx) = StateContext::new(deps, env)?;
+    let (state, mut ctx) = StateContext::new(deps, env)?;
+
+    state.set_admin(&mut ctx, &info.sender)?;
+
     ctx.response.add_event(NewFarmingEvent {});
 
     Ok(ctx.response.into_response())
