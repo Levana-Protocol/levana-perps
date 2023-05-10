@@ -39,13 +39,13 @@ pub fn assert_auth(
         AuthCheck::Owner => {
             let owner_addr: Addr =
                 load_external_item(querier, factory_addr, namespace::OWNER_ADDR.as_bytes())?;
-            addr == &owner_addr
+            addr == owner_addr
         }
         AuthCheck::Addr(role_addr) => addr == role_addr,
         AuthCheck::WindDown => {
             let wind_down_addr: Addr =
                 load_external_item(querier, factory_addr, namespace::WIND_DOWN_ADDR.as_bytes())?;
-            addr == &wind_down_addr
+            addr == wind_down_addr
         }
     };
 

@@ -695,7 +695,7 @@ impl State<'_> {
             .marketing
             .as_ref()
             .ok_or_else(|| perp_anyhow!(ErrorId::Auth, ErrorDomain::Cw20, ""))?
-            != &sender
+            != sender
         {
             return Err(perp_anyhow!(ErrorId::Auth, ErrorDomain::Cw20, ""));
         }
@@ -740,7 +740,7 @@ impl State<'_> {
             .marketing
             .as_ref()
             .ok_or_else(|| perp_anyhow!(ErrorId::Auth, ErrorDomain::Cw20, ""))?
-            != &sender
+            != sender
         {
             return Err(perp_anyhow!(ErrorId::Auth, ErrorDomain::Cw20, ""));
         }
