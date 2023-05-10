@@ -261,7 +261,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
 
                 basic
                     .wallet
-                    .send_coins(&basic.cosmos, contract.get_address(), vec![coin.clone()])
+                    .send_coins(&basic.cosmos, contract.get_address(), vec![coin])
                     .await?;
 
                 basic.cosmos.set_gas_multiplier(original_gas_multiplier);
