@@ -60,7 +60,7 @@ impl State<'_> {
 
         if period != FarmingPeriod::Review {
             bail!(
-                "Cannot launch, lockdrop has not finished yet, currently in {:?}.",
+                "Can only launch while in review period, currently in {:?}.",
                 period
             );
         }
