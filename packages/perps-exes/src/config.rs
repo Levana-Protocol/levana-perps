@@ -38,6 +38,8 @@ pub struct ChainConfig {
     /// Minimum gas required in the gas wallet
     #[serde(default = "defaults::min_gas_in_gas_wallet")]
     pub min_gas_in_gas_wallet: u128,
+    /// Override the gas multiplier
+    pub gas_multiplier: Option<f64>,
 }
 
 #[derive(serde::Deserialize, Clone, Debug)]

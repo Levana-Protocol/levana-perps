@@ -34,6 +34,7 @@ pub(crate) struct BotConfig {
     pub(crate) utilization_config: UtilizationConfig,
     pub(crate) trader_config: TraderConfig,
     pub(crate) watcher: WatcherConfig,
+    pub(crate) gas_multiplier: Option<f64>,
 }
 
 impl Opt {
@@ -53,6 +54,7 @@ impl Opt {
             min_gas,
             min_gas_in_faucet,
             min_gas_in_gas_wallet,
+            gas_multiplier,
         } = config
             .chains
             .get(&network)
@@ -90,6 +92,7 @@ impl Opt {
             utilization_config: config.utilization,
             trader_config: config.trader,
             watcher: watcher.clone(),
+            gas_multiplier: *gas_multiplier,
         })
     }
 }

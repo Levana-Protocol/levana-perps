@@ -23,6 +23,7 @@ chains:
     explorer: "https://testnet.mintscan.io/osmosis-testnet/txs/"
     watcher:
       retries: 20
+    gas-multiplier: 1.5
   juno-testnet:
     tracker: juno1u23qyg0j4y5mzhessf0kcnjuqwg48kpufj5vujsq7kxxgxfnv5pqjmkmr4
     faucet: juno15rwad8twfrj34q7ep2sgrz3lqqs7vj939z9p4kccvfu9qm6mn55qxn7gy3
