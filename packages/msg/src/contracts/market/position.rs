@@ -997,7 +997,7 @@ pub mod events {
                 market_type: evt.map_attr_result(event_key::MARKET_TYPE, |s| match s {
                     event_val::NOTIONAL_BASE => Ok(MarketType::CollateralIsQuote),
                     event_val::COLLATERAL_BASE => Ok(MarketType::CollateralIsBase),
-                    _ => Err(PerpError::unimplemented().into()),
+                    _ => Err(anyhow!("Unknown market type: {s}")),
                 })?,
                 notional_size: evt.number_attr(event_key::NOTIONAL_SIZE)?,
                 notional_size_in_collateral: evt
@@ -1140,7 +1140,7 @@ pub mod events {
                         LiquidationReason::TakeProfit,
                     )),
                     event_val::DIRECT => Ok(PositionCloseReason::Direct),
-                    _ => Err(PerpError::unimplemented().into()),
+                    _ => Err(anyhow!("Unknown reason: {s}")),
                 })?,
                 owner: evt.unchecked_addr_attr(event_key::POS_OWNER)?,
                 id: PositionId::new(evt.u64_attr(event_key::POS_ID)?),

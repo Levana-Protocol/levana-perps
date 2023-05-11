@@ -140,7 +140,7 @@ pub mod events {
                 match evt.string_attr("liquidation-reason")?.as_str() {
                     "liquidated" => Ok(LiquidationReason::Liquidated),
                     "take-profit" => Ok(LiquidationReason::MaxGains),
-                    _ => Err(PerpError::unimplemented().into()),
+                    s => Err(anyhow!("{s}")),
                 }
             };
 
@@ -162,7 +162,7 @@ pub mod events {
                 "limit-order" => Ok(CrankWorkInfo::LimitOrder {
                     order_id: OrderId::new(evt.u64_attr("order-id")?),
                 }),
-                _ => Err(PerpError::unimplemented().into()),
+                _ => Err(anyhow!("Unknown kind: {s}")),
             })
         }
     }

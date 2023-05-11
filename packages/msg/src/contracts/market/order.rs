@@ -181,7 +181,7 @@ pub mod events {
                 market_type: evt.map_attr_result(event_key::MARKET_TYPE, |s| match s {
                     event_val::NOTIONAL_BASE => Ok(CollateralIsQuote),
                     event_val::COLLATERAL_BASE => Ok(CollateralIsBase),
-                    _ => Err(PerpError::unimplemented().into()),
+                    _ => Err(anyhow!("Unknown market type: {s}")),
                 })?,
                 collateral: evt
                     .string_attr(event_key::DEPOSIT_COLLATERAL)?

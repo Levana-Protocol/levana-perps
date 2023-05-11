@@ -1,12 +1,9 @@
 //! Error handling helpers for within the perps protocol
-use crate::{
-    event::CosmwasmEventExt,
-    storage::{AuthCheck, Timestamp},
-};
-use cosmwasm_std::{Addr, Event};
+use crate::storage::{AuthCheck, Timestamp};
+use cosmwasm_std::Addr;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, fmt};
+use std::borrow::Cow;
 
 /// Unique identifier for an error within perps
 #[allow(missing_docs)]
