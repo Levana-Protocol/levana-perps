@@ -3,11 +3,12 @@ use crate::storage::{AuthCheck, Timestamp};
 use cosmwasm_std::Addr;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::borrow::Cow;
 
 /// Unique identifier for an error within perps
 #[allow(missing_docs)]
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, thiserror::Error)]
+#[derive(Debug, Clone, Serialize, Deserialize, thiserror::Error, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum PerpError {
     #[error("failed auth, actual address: {addr}, check against: {check}")]
@@ -22,7 +23,7 @@ pub enum PerpError {
     TimestampSubtractUnderflow {
         lhs: Timestamp,
         rhs: Timestamp,
-        desc: &'static str,
+        desc: String,
     },
 
     #[cfg(test)]
@@ -149,6 +150,14 @@ impl From<anyhow::Error> for WrappedPerpError {
     }
 }
 
+impl WrappedPerpError {
+    /// Returns either the original [PerpError] or an [anyhow::Error]
+    pub fn try_into_perp_error(self) -> Option<PerpError> {
+        let value = json!({self.id: self.data});
+        serde_json::from_value::<PerpError>(value).ok()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -159,7 +168,7 @@ mod tests {
             number: 42,
             string: "fortytwo".to_owned(),
         };
-        let anyhow_error = anyhow::Error::from(perp_error);
+        let anyhow_error = anyhow::Error::from(perp_error.clone());
         let actual = WrappedPerpError::from(anyhow_error);
         #[derive(serde::Serialize)]
         struct Data {
@@ -179,6 +188,8 @@ mod tests {
             serde_json::to_string(&actual).unwrap(),
             serde_json::to_string(&expected).unwrap()
         );
+        assert_eq!(actual.try_into_perp_error().unwrap(), perp_error);
+        assert_eq!(expected.try_into_perp_error().unwrap(), perp_error);
     }
 
     #[test]
@@ -194,5 +205,7 @@ mod tests {
             serde_json::to_string(&actual).unwrap(),
             serde_json::to_string(&expected).unwrap()
         );
+        assert_eq!(actual.try_into_perp_error(), None);
+        assert_eq!(expected.try_into_perp_error(), None);
     }
 }

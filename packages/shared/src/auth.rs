@@ -8,6 +8,7 @@ use cosmwasm_std::{Addr, Empty, QuerierWrapper};
 
 /// Check that an addr satisfies auth checks
 #[cw_serde]
+#[derive(Eq)]
 pub enum AuthCheck {
     /// The owner addr for runtime administration. not necessarily the same as migration admin
     Owner,

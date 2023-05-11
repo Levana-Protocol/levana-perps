@@ -99,7 +99,7 @@ impl Timestamp {
             None => Err(PerpError::TimestampSubtractUnderflow {
                 lhs: self,
                 rhs,
-                desc,
+                desc: desc.to_owned(),
             }
             .into()),
         }
