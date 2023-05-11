@@ -141,9 +141,11 @@ pub mod events {
         type Error = anyhow::Error;
 
         fn try_from(evt: Event) -> anyhow::Result<Self> {
+            let pos_id = PositionId::new(evt.u64_attr(event_key::POS_ID)?);
             Ok(PositionActionEvent {
-                pos_id: PositionId::new(evt.u64_attr(event_key::POS_ID)?),
+                pos_id,
                 action: PositionAction {
+                    id: Some(pos_id),
                     kind: evt.map_attr_result(event_key::POSITION_ACTION_KIND, |s| match s {
                         "open" => Ok(PositionActionKind::Open),
                         "update" => Ok(PositionActionKind::Update),

@@ -88,6 +88,7 @@ impl State<'_> {
         old_owner: Addr,
     ) -> Result<()> {
         let action = PositionAction {
+            id: Some(pos.id),
             kind: PositionActionKind::Transfer,
             timestamp: self.now(),
             collateral: pos.active_collateral.raw(),
@@ -236,6 +237,7 @@ impl State<'_> {
         let trade_fee_usd = trading_fee.map(|x| price_point.collateral_to_usd(x));
 
         let action = PositionAction {
+            id: Some(pos.id),
             kind,
             timestamp: self.now(),
             collateral: pos.active_collateral.raw(),
@@ -273,6 +275,7 @@ impl State<'_> {
         price_point: &PricePoint,
     ) -> Result<()> {
         let action = PositionAction {
+            id: Some(pos.id),
             kind: PositionActionKind::Close,
             timestamp: self.now(),
             collateral: active_collateral,
