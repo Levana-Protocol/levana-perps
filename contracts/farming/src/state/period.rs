@@ -56,16 +56,10 @@ impl State<'_> {
             );
         }
 
-        let start = match start {
-            None => self.now(),
-            Some(start) => {
-                if start < self.now() {
-                    bail!("Cannot start lockdrop in the past.");
-                }
-
-                start
-            }
-        };
+        let start = start.unwrap_or_else(|| self.now());
+        if start < self.now() {
+            bail!("Cannot start lockdrop in the past.");
+        }
 
         FarmingEpoch::Lockdrop { start }.save(ctx.storage)?;
 
@@ -86,16 +80,10 @@ impl State<'_> {
             );
         }
 
-        let start = match start {
-            None => self.now(),
-            Some(start) => {
-                if start < self.now() {
-                    bail!("Cannot start launch in the past.");
-                }
-
-                start
-            }
-        };
+        let start = start.unwrap_or_else(|| self.now());
+        if start < self.now() {
+            bail!("Cannot start launch in the past.");
+        }
 
         FarmingEpoch::Launch { start }.save(ctx.storage)?;
 
