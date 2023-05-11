@@ -10,13 +10,13 @@ const LOCKDROP_SUNSET_DURATION: Duration = Duration::from_seconds(60 * 60 * 24 *
 
 impl State<'_> {
     pub(crate) fn get_period(&self, store: &dyn Storage) -> Result<FarmingPeriod> {
-        match FarmingEpoch::may_load(store)? {
+        match FarmingEpochStartTime::may_load(store)? {
             None => Ok(FarmingPeriod::Inactive),
             Some(epoch) => {
                 let now = self.now();
 
                 match epoch {
-                    FarmingEpoch::Lockdrop { start } => {
+                    FarmingEpochStartTime::Lockdrop(start) => {
                         let sunset_start = start + LOCKDROP_START_DURATION;
                         let review_start = sunset_start + LOCKDROP_SUNSET_DURATION;
 
@@ -30,7 +30,7 @@ impl State<'_> {
                             Ok(FarmingPeriod::Review)
                         }
                     }
-                    FarmingEpoch::Launch { start } => {
+                    FarmingEpochStartTime::Launch(start) => {
                         if now < start {
                             Ok(FarmingPeriod::LaunchScheduled)
                         } else {
@@ -61,7 +61,7 @@ impl State<'_> {
             bail!("Cannot start lockdrop in the past.");
         }
 
-        FarmingEpoch::Lockdrop { start }.save(ctx.storage)?;
+        FarmingEpochStartTime::Lockdrop(start).save(ctx.storage)?;
 
         Ok(())
     }
@@ -85,17 +85,17 @@ impl State<'_> {
             bail!("Cannot start launch in the past.");
         }
 
-        FarmingEpoch::Launch { start }.save(ctx.storage)?;
+        FarmingEpochStartTime::Launch(start).save(ctx.storage)?;
 
         Ok(())
     }
 
     pub(crate) fn get_schedule_countdown(&self, store: &dyn Storage) -> Result<Option<Duration>> {
-        let start = match FarmingEpoch::may_load(store)? {
+        let start = match FarmingEpochStartTime::may_load(store)? {
             None => None,
             Some(epoch) => match epoch {
-                FarmingEpoch::Lockdrop { start } => Some(start),
-                FarmingEpoch::Launch { start } => Some(start),
+                FarmingEpochStartTime::Lockdrop(start) => Some(start),
+                FarmingEpochStartTime::Launch(start) => Some(start),
             },
         };
 
@@ -112,11 +112,11 @@ impl State<'_> {
         }
     }
     pub(crate) fn get_launch_start_time(&self, store: &dyn Storage) -> Result<Timestamp> {
-        match FarmingEpoch::may_load(store)? {
+        match FarmingEpochStartTime::may_load(store)? {
             None => bail!("Lockdrop has not started yet."),
             Some(epoch) => match epoch {
-                FarmingEpoch::Lockdrop { .. } => bail!("Lockdrop has not finished yet."),
-                FarmingEpoch::Launch { start } => Ok(start),
+                FarmingEpochStartTime::Lockdrop(_) => bail!("Lockdrop has not finished yet."),
+                FarmingEpochStartTime::Launch(start) => Ok(start),
             },
         }
     }
@@ -131,12 +131,12 @@ impl State<'_> {
 /// So we track the manually triggered epochs *internally*
 /// and then calculate the period from that
 #[derive(Serialize, Deserialize, Debug)]
-enum FarmingEpoch {
-    Lockdrop { start: Timestamp },
-    Launch { start: Timestamp },
+enum FarmingEpochStartTime {
+    Lockdrop(Timestamp),
+    Launch(Timestamp),
 }
 
-impl FarmingEpoch {
+impl FarmingEpochStartTime {
     const ITEM: Item<'static, Self> = Item::new("farming-epoch");
 
     pub fn may_load(store: &dyn Storage) -> Result<Option<Self>> {
