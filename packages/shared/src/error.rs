@@ -78,6 +78,7 @@ pub enum ErrorDomain {
     Default,
     Faucet,
     Pyth,
+    Farming,
 }
 
 /// Generate a [PerpError] value

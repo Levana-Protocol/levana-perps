@@ -50,7 +50,16 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     };
 
     match msg {
-        ExecuteMsg::Owner(_) => todo!(),
+        ExecuteMsg::Owner(owner_msg) => {
+            state.validate_admin(ctx.storage, &sender)?;
+            match owner_msg {
+                OwnerExecuteMsg::StartLockdropPeriod {} => state.start_lockdrop_period(&mut ctx)?,
+                OwnerExecuteMsg::StartLaunchPeriod {} => state.start_launch_period(&mut ctx)?,
+                OwnerExecuteMsg::SetEmissions { .. } => todo!(),
+                OwnerExecuteMsg::ClearEmissions {} => todo!(),
+                OwnerExecuteMsg::UpdateConfig { .. } => todo!(),
+            }
+        }
         ExecuteMsg::Receive { .. } => anyhow::bail!("Cannot have double-wrapped Receive"),
         ExecuteMsg::LockdropDeposit { .. } => todo!(),
         ExecuteMsg::LockdropWithdraw { .. } => todo!(),

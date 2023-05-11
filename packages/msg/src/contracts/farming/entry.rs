@@ -98,8 +98,10 @@ pub enum ExecuteMsg {
 /// Messages that require owner permissions.
 #[cw_serde]
 pub enum OwnerExecuteMsg {
+    /// Start the lockdrop period
+    StartLockdropPeriod {},
     /// Finish the review period and launch the primary contract
-    EndReviewPeriod {},
+    StartLaunchPeriod {},
     /// Change the active emissions
     SetEmissions {
         /// When to start the emissions.

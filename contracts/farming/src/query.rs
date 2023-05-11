@@ -7,7 +7,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
     let (state, store) = State::new(deps, env)?;
     match msg {
         QueryMsg::Version {} => todo!(),
-        QueryMsg::Status {} => todo!(),
+        QueryMsg::Status {} => state.get_status(store)?.query_result(),
         QueryMsg::FarmerStats { addr } => {
             let farmer = addr.validate(state.api)?;
             let raw = state.load_raw_farmer_stats(store, &farmer)?;

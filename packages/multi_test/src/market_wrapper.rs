@@ -28,9 +28,11 @@ use msg::contracts::factory::entry::{
     ExecuteMsg as FactoryExecuteMsg, MarketInfoResponse, QueryMsg as FactoryQueryMsg,
     ShutdownStatus,
 };
-use msg::contracts::farming::entry::FarmerStats;
 use msg::contracts::farming::entry::{
     ExecuteMsg as FarmingExecuteMsg, QueryMsg as FarmingQueryMsg,
+};
+use msg::contracts::farming::entry::{
+    FarmerStats, OwnerExecuteMsg as FarmingOwnerExecuteMsg, StatusResp as FarmingStatusResp,
 };
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::crank::CrankWorkInfo;
@@ -1404,6 +1406,20 @@ impl PerpsMarket {
         )
     }
 
+    pub fn exec_farming_start_lockdrop(&self) -> Result<AppResponse> {
+        self.exec_farming(
+            &Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::StartLockdropPeriod {}),
+        )
+    }
+
+    pub fn exec_farming_start_launch(&self) -> Result<AppResponse> {
+        self.exec_farming(
+            &Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::StartLaunchPeriod {}),
+        )
+    }
+
     fn query_farming<T: DeserializeOwned>(
         &self,
         msg: &msg::contracts::farming::entry::QueryMsg,
@@ -1420,5 +1436,9 @@ impl PerpsMarket {
         self.query_farming(&FarmingQueryMsg::FarmerStats {
             addr: wallet.into(),
         })
+    }
+
+    pub fn query_farming_stats(&self) -> FarmingStatusResp {
+        self.query_farming(&FarmingQueryMsg::Status {}).unwrap()
     }
 }
