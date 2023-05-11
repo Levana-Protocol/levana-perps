@@ -81,14 +81,14 @@ impl State<'_> {
     }
 }
 
-// The FarmingPeriod is what we really care about
-// however, it's a function of two states:
-//
-// 1. Manual triggers from an admin to start the lockdrop and review
-// 2. The passage of time
-//
-// So we track the manually triggered epochs internally
-// and then calculate the period from that
+/// The FarmingPeriod is what we really care about
+/// however, it's a function of two states:
+///
+/// 1. Manual triggers from an admin to start the lockdrop and review
+/// 2. The passage of time
+///
+/// So we track the manually triggered epochs *internally*
+/// and then calculate the period from that
 #[derive(Serialize, Deserialize, Debug)]
 enum FarmingEpoch {
     Lockdrop { start: Timestamp },
