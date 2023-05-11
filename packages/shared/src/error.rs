@@ -1,237 +1,201 @@
 //! Error handling helpers for within the perps protocol
-use crate::event::CosmwasmEventExt;
-use cosmwasm_std::Event;
+use crate::{
+    event::CosmwasmEventExt,
+    storage::{AuthCheck, Timestamp},
+};
+use cosmwasm_std::{Addr, Event};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::fmt;
-
-/// An error message for the perps protocol
-#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
-pub struct PerpError<T = ()> {
-    /// Unique identifier for this error
-    pub id: ErrorId,
-    /// Where in the protocol the error came from
-    pub domain: ErrorDomain,
-    /// User friendly description
-    pub description: String,
-    /// Optional additional information
-    pub data: Option<T>,
-}
+use std::{borrow::Cow, fmt};
 
 /// Unique identifier for an error within perps
 #[allow(missing_docs)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, thiserror::Error)]
 #[serde(rename_all = "snake_case")]
-pub enum ErrorId {
-    InvalidWithdrawal,
-    InvalidStakeLp,
-    InvalidAmount,
-    SlippageAssert,
-    PriceAlreadyExists,
-    PriceNotFound,
-    PriceTooOld,
-    Liquidity,
-    MissingPosition,
-    LeverageValidation,
-    PositionUpdate,
-    NativeFunds,
-    Cw20Funds,
-    Auth,
-    Expired,
-    MsgValidation,
-    Conversion,
-    Config,
-    InternalReply,
-    Exceeded,
-    Any,
-    Stale,
-    InsufficientMargin,
-    InvalidLiquidityTokenMsg,
-    AddressAlreadyExists,
-    DeltaNeutralityFeeAlreadyLong,
-    DeltaNeutralityFeeAlreadyShort,
-    DeltaNeutralityFeeNewlyLong,
-    DeltaNeutralityFeeNewlyShort,
-    DeltaNeutralityFeeLongToShort,
-    DeltaNeutralityFeeShortToLong,
-    MinimumDeposit,
-    DirectionToBaseFlipped,
-    MissingFunds,
-    UnnecessaryFunds,
-    NoYieldToClaim,
-    InsufficientForReinvest,
-    TimestampSubtractUnderflow,
+pub enum PerpError {
+    #[error("failed auth, actual address: {addr}, check against: {check}")]
+    Auth { addr: Addr, check: AuthCheck },
+    #[error("Collateral-is-quote markets do not support infinite max gains")]
+    InfiniteMaxGainsCollateralIsQuote {},
+    #[error("Infinite max gains are only allowed on Long positions")]
+    InfiniteMaxGainsShort {},
+    #[error("Max gains too large")]
+    MaxGainsTooLarge {},
+    #[error("Invalid timestamp subtraction during. Action: {desc}. Values: {self} - {rhs}")]
+    TimestampSubtractUnderflow {
+        lhs: Timestamp,
+        rhs: Timestamp,
+        desc: &'static str,
+    },
+
+    #[cfg(test)]
+    #[error("This is a test. Number is {number}. String is {string}.")]
+    SomeTest { number: u32, string: String },
+    // #[error("FIXME")]
+    // InvalidWithdrawal {},
+    // #[error("FIXME")]
+    // InvalidStakeLp {},
+    // #[error("FIXME")]
+    // InvalidAmount {},
+    // #[error("FIXME")]
+    // SlippageAssert {},
+    // #[error("FIXME")]
+    // PriceAlreadyExists {},
+    // #[error("FIXME")]
+    // PriceNotFound {},
+    // #[error("FIXME")]
+    // PriceTooOld {},
+    // #[error("FIXME")]
+    // Liquidity {},
+    // #[error("FIXME")]
+    // MissingPosition {},
+    // #[error("FIXME")]
+    // LeverageValidation {},
+    // #[error("FIXME")]
+    // PositionUpdate {},
+    // #[error("FIXME")]
+    // NativeFunds {},
+    // #[error("FIXME")]
+    // Cw20Funds {},
+
+    // #[error("FIXME")]
+    // Expired {},
+    // #[error("FIXME")]
+    // MsgValidation {},
+    // #[error("FIXME")]
+    // Conversion {},
+    // #[error("FIXME")]
+    // Config {},
+    // #[error("FIXME")]
+    // InternalReply {},
+    // #[error("FIXME")]
+    // Exceeded {},
+    // #[error("FIXME")]
+    // Any {},
+    // #[error("FIXME")]
+    // Stale {},
+    // #[error("FIXME")]
+    // InsufficientMargin {},
+    // #[error("FIXME")]
+    // InvalidLiquidityTokenMsg {},
+    // #[error("FIXME")]
+    // AddressAlreadyExists {},
+    // #[error("FIXME")]
+    // DeltaNeutralityFeeAlreadyLong {},
+    // #[error("FIXME")]
+    // DeltaNeutralityFeeAlreadyShort {},
+    // #[error("FIXME")]
+    // DeltaNeutralityFeeNewlyLong {},
+    // #[error("FIXME")]
+    // DeltaNeutralityFeeNewlyShort {},
+    // #[error("FIXME")]
+    // DeltaNeutralityFeeLongToShort {},
+    // #[error("FIXME")]
+    // DeltaNeutralityFeeShortToLong {},
+    // #[error("FIXME")]
+    // MinimumDeposit {},
+    // #[error("FIXME")]
+    // DirectionToBaseFlipped {},
+    // #[error("FIXME")]
+    // MissingFunds {},
+    // #[error("FIXME")]
+    // UnnecessaryFunds {},
+    // #[error("FIXME")]
+    // NoYieldToClaim {},
+    // #[error("FIXME")]
+    // InsufficientForReinvest {},
+    // #[error("FIXME")]
+    // TimestampSubtractUnderflow {},
 }
 
-/// Source within the protocol for the error
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-#[allow(missing_docs)]
-pub enum ErrorDomain {
-    Market,
-    SpotPrice,
-    PositionToken,
-    LiquidityToken,
-    Cw20,
-    Wallet,
-    Factory,
-    Default,
-    Faucet,
-    Pyth,
+/// A standardized format for errors from the smart contracts.
+#[derive(serde::Serialize)]
+pub struct WrappedPerpError {
+    id: Cow<'static, str>,
+    description: String,
+    data: serde_json::Value,
 }
 
-/// Generate a [PerpError] value
-#[macro_export]
-macro_rules! perp_error {
-    ($id:expr, $domain:expr, $($t:tt)*) => {{
-        $crate::error::PerpError {
-            id: $id,
-            domain: $domain,
-            description: format!($($t)*),
-            data: None as Option<()>,
-        }
-    }};
-}
-
-/// Generate a [PerpError] value with additional optional data
-#[macro_export]
-macro_rules! perp_error_data {
-    ($id:expr, $domain:expr, $data:expr, $($t:tt)*) => {{
-        $crate::error::PerpError {
-            id: $id,
-            domain: $domain,
-            description: format!($($t)*),
-            data: Some($data),
-        }
-    }};
-}
-
-/// Generate a [PerpError] and then wrap it up in an anyhow error
-#[macro_export]
-macro_rules! perp_anyhow {
-    ($id:expr, $domain:expr, $($t:tt)*) => {{
-        anyhow::Error::new($crate::error::PerpError {
-            id: $id,
-            domain: $domain,
-            description: format!($($t)*),
-            data: None as Option<()>,
-        })
-    }};
-}
-
-/// Like [perp_anyhow] but accepts optional extra data
-#[macro_export]
-macro_rules! perp_anyhow_data {
-    ($id:expr, $domain:expr, $data:expr, $($t:tt)*) => {{
-        anyhow::Error::new($crate::error::PerpError {
-            id: $id,
-            domain: $domain,
-            description: format!($($t)*),
-            data: Some($data),
-        })
-    }};
-}
-
-/// Ensure a condition is true, otherwise returns from the function with an error.
-#[macro_export]
-macro_rules! perp_ensure {
-    ($val:expr, $id:expr, $domain:expr, $($t:tt)*) => {{
-        if !$val {
-            return Err(anyhow::Error::new($crate::error::PerpError {
-                id: $id,
-                domain: $domain,
-                description: format!($($t)*),
-                data: None as Option<()>,
-            }));
-        }
-    }};
-}
-
-/// Return early with the given perp error
-#[macro_export]
-macro_rules! perp_bail {
-    ($id:expr, $domain:expr, $($t:tt)*) => {{
-        return Err(anyhow::Error::new($crate::error::PerpError {
-            id: $id,
-            domain: $domain,
-            description: format!($($t)*),
-            data: None as Option<()>,
-        }));
-    }};
-}
-
-/// Like [perp_bail] but takes extra optional data
-#[macro_export]
-macro_rules! perp_bail_data {
-    ($id:expr, $domain:expr, $data:expr,  $($t:tt)*) => {{
-        return Err(anyhow::Error::new($crate::error::PerpError {
-            id: $id,
-            domain: $domain,
-            description: format!($($t)*),
-            data: Some($data),
-        }));
-    }};
-}
-
-impl<T: Serialize> fmt::Display for PerpError<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            serde_json::to_string_pretty(&self).map_err(|_| fmt::Error)?
-        )
-    }
-}
-
-impl<T: Serialize> fmt::Debug for PerpError<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            serde_json::to_string_pretty(&self).map_err(|_| fmt::Error)?
-        )
-    }
-}
-
-impl PerpError {
-    /// Include error information into an event
-    pub fn mixin_event(&self, evt: Event) -> Event {
-        // these unwraps are okay, just a shorthand helper to get the enum variants as a string
-        let evt = evt.add_attributes([
-            ("error-id", serde_json::to_string(&self.id).unwrap()),
-            ("error-domain", serde_json::to_string(&self.domain).unwrap()),
-            ("error-description", self.description.to_string()),
-        ]);
-
-        match &self.data {
-            None => evt,
-            // this should only fail if the inner to_vec of serde fails. that's a (very unlikely) genuine panic situation
-            Some(data) => evt.add_attribute("error-data", serde_json::to_string(data).unwrap()),
+impl WrappedPerpError {
+    fn from_anyhow_raw(e: anyhow::Error) -> Self {
+        WrappedPerpError {
+            id: "unknown".into(),
+            description: e.to_string(),
+            data: serde_json::Value::Null,
         }
     }
 
-    /// Generate an error saying something is unimplemented
-    pub fn unimplemented() -> Self {
-        Self {
-            id: ErrorId::Any,
-            domain: ErrorDomain::Default,
-            description: "unimplemented".to_string(),
-            data: None,
+    fn from_perp_error(e: &anyhow::Error) -> Option<Self> {
+        let e = e.downcast_ref::<PerpError>()?;
+        let description = e.to_string();
+        let value = serde_json::to_value(e.clone()).ok()?;
+        let mut pairs = match value {
+            serde_json::Value::Object(o) => o,
+            _ => return None,
         }
-    }
-}
-
-impl TryFrom<Event> for PerpError {
-    type Error = anyhow::Error;
-
-    fn try_from(evt: Event) -> anyhow::Result<Self> {
-        Ok(Self {
-            id: evt.json_attr("error-id")?,
-            domain: evt.json_attr("error-domain")?,
-            description: evt.string_attr("error-description")?,
-            data: evt.try_json_attr("error-data")?,
+        .into_iter();
+        let (id, data) = pairs.next()?;
+        if pairs.next().is_some() {
+            return None;
+        }
+        Some(WrappedPerpError {
+            id: id.into(),
+            description,
+            data,
         })
     }
 }
 
-impl<T: Serialize> std::error::Error for PerpError<T> {}
+impl From<anyhow::Error> for WrappedPerpError {
+    fn from(e: anyhow::Error) -> Self {
+        Self::from_perp_error(&e).unwrap_or_else(|| Self::from_anyhow_raw(e))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn from_perp_error() {
+        let perp_error = PerpError::SomeTest {
+            number: 42,
+            string: "fortytwo".to_owned(),
+        };
+        let anyhow_error = anyhow::Error::from(perp_error);
+        let actual = WrappedPerpError::from(anyhow_error);
+        #[derive(serde::Serialize)]
+        struct Data {
+            number: u32,
+            string: String,
+        }
+        let expected = WrappedPerpError {
+            id: "some_test".into(),
+            description: "This is a test. Number is 42. String is fortytwo.".to_owned(),
+            data: serde_json::to_value(Data {
+                number: 42,
+                string: "fortytwo".to_owned(),
+            })
+            .unwrap(),
+        };
+        assert_eq!(
+            serde_json::to_string(&actual).unwrap(),
+            serde_json::to_string(&expected).unwrap()
+        );
+    }
+
+    #[test]
+    fn from_anyhow_error() {
+        let anyhow_error = anyhow::anyhow!("Some other error");
+        let actual = WrappedPerpError::from(anyhow_error);
+        let expected = WrappedPerpError {
+            id: "unknown".into(),
+            description: "Some other error".to_owned(),
+            data: serde_json::Value::Null,
+        };
+        assert_eq!(
+            serde_json::to_string(&actual).unwrap(),
+            serde_json::to_string(&expected).unwrap()
+        );
+    }
+}

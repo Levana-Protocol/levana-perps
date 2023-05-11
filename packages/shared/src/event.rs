@@ -8,8 +8,6 @@ use anyhow::Context;
 use cosmwasm_std::Event;
 use serde::de::DeserializeOwned;
 
-use crate::error::{ErrorDomain, ErrorId};
-use crate::perp_anyhow;
 /// Marker trait to ensure all events are covered here
 /// by way of state.add_event()
 pub trait PerpEvent: Into<Event> {}
@@ -141,12 +139,7 @@ pub trait CosmwasmEventExt {
     fn map_attr_ok<B>(&self, key: &str, f: impl Fn(&str) -> B) -> anyhow::Result<B> {
         match self.try_map_attr(key, f) {
             Some(x) => Ok(x),
-            None => Err(perp_anyhow!(
-                ErrorId::Any,
-                ErrorDomain::Default,
-                "no such key {}",
-                key
-            )),
+            None => Err(anyhow!("no such key {}", key)),
         }
     }
 

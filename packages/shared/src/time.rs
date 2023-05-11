@@ -1,9 +1,6 @@
 //! Types to represent timestamps and durations.
+use crate::error::PerpError;
 use crate::prelude::*;
-use crate::{
-    error::{ErrorDomain, ErrorId, PerpError},
-    perp_error,
-};
 use anyhow::Result;
 use cosmwasm_std::{Decimal256, Timestamp as CWTimestamp};
 use cw_storage_plus::{KeyDeserialize, Prefixer, PrimaryKey};
@@ -90,7 +87,7 @@ impl Timestamp {
     /// Subtract two timestamps to get the duration between them.
     ///
     /// Will fail if the right hand side is greater than the left hand side.
-    pub fn checked_sub(self, rhs: Self, desc: &str) -> Result<Duration> {
+    pub fn checked_sub(self, rhs: Self, desc: &'static str) -> Result<Duration> {
         #[derive(serde::Serialize)]
         struct Data {
             lhs: Timestamp,
@@ -99,16 +96,12 @@ impl Timestamp {
         }
         match self.0.checked_sub(rhs.0) {
             Some(x) => Ok(Duration(x)),
-            None => Err(perp_anyhow_data!(
-                ErrorId::TimestampSubtractUnderflow,
-                ErrorDomain::Default,
-                Data {
-                    lhs: self,
-                    rhs,
-                    desc: desc.to_owned()
-                },
-                "Invalid timestamp subtraction during. Action: {desc}. Values: {self} - {rhs}"
-            )),
+            None => Err(PerpError::TimestampSubtractUnderflow {
+                lhs: self,
+                rhs,
+                desc,
+            }
+            .into()),
         }
     }
 }
@@ -244,17 +237,11 @@ impl Div<Duration> for Duration {
 }
 
 impl FromStr for Timestamp {
-    type Err = PerpError;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let err = |msg: &str| -> PerpError {
-            perp_error!(
-                ErrorId::Conversion,
-                ErrorDomain::Default,
-                "error converting {} to Timestamp, {}",
-                s,
-                msg
-            )
+        let err = |msg: &str| -> anyhow::Error {
+            anyhow!("error converting {} to Timestamp, {}", s, msg)
         };
 
         let (seconds, nanos) = s

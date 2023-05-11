@@ -1,8 +1,7 @@
 use std::fmt::Display;
 
-use crate::error::{ErrorDomain, ErrorId};
 use crate::storage::load_external_item;
-use crate::{namespace, perp_anyhow};
+use crate::{namespace, storage::PerpError};
 use anyhow::Result;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Empty, QuerierWrapper};
@@ -52,12 +51,10 @@ pub fn assert_auth(
     if success {
         Ok(())
     } else {
-        Err(perp_anyhow!(
-            ErrorId::Auth,
-            ErrorDomain::Default,
-            "failed auth, actual address: {}, check against: {}",
-            addr,
-            check
-        ))
+        Err(PerpError::Auth {
+            addr: addr.clone(),
+            check,
+        }
+        .into())
     }
 }
