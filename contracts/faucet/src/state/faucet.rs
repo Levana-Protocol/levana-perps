@@ -44,7 +44,7 @@ impl State<'_> {
 
         if let Some(tap_limit) = self.tap_limit(store)? {
             if let Some(last_tap) = self.last_tap_timestamp(store, recipient)? {
-                let elapsed = now - last_tap;
+                let elapsed = now.checked_sub(last_tap, "validate_tap_faucet_error")?;
                 let tap_limit = Duration::from_seconds(u64::from(tap_limit));
 
                 if elapsed < tap_limit {
