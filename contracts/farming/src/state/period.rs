@@ -17,12 +17,12 @@ impl State<'_> {
 
                 match epoch {
                     FarmingEpoch::Lockdrop { start } => {
-                        debug_assert!(now >= start);
-
                         let sunset_start = start + LOCKDROP_START_DURATION;
                         let review_start = sunset_start + LOCKDROP_SUNSET_DURATION;
 
-                        if now < sunset_start {
+                        if now < start {
+                            Ok(FarmingPeriod::LockdropScheduled)
+                        } else if now < sunset_start {
                             Ok(FarmingPeriod::Lockdrop)
                         } else if now < review_start {
                             Ok(FarmingPeriod::Sunset)
@@ -31,16 +31,22 @@ impl State<'_> {
                         }
                     }
                     FarmingEpoch::Launch { start } => {
-                        debug_assert!(now >= start);
-
-                        Ok(FarmingPeriod::Launched)
+                        if now < start {
+                            Ok(FarmingPeriod::LaunchScheduled)
+                        } else {
+                            Ok(FarmingPeriod::Launched)
+                        }
                     }
                 }
             }
         }
     }
 
-    pub(crate) fn start_lockdrop_period(&self, ctx: &mut StateContext) -> Result<()> {
+    pub(crate) fn start_lockdrop_period(
+        &self,
+        ctx: &mut StateContext,
+        start: Option<Timestamp>,
+    ) -> Result<()> {
         let period = self.get_period(ctx.storage)?;
 
         if period != FarmingPeriod::Inactive {
@@ -50,12 +56,27 @@ impl State<'_> {
             );
         }
 
-        FarmingEpoch::Lockdrop { start: self.now() }.save(ctx.storage)?;
+        let start = match start {
+            None => self.now(),
+            Some(start) => {
+                if start < self.now() {
+                    bail!("Cannot start lockdrop in the past.");
+                }
+
+                start
+            }
+        };
+
+        FarmingEpoch::Lockdrop { start }.save(ctx.storage)?;
 
         Ok(())
     }
 
-    pub(crate) fn start_launch_period(&self, ctx: &mut StateContext) -> Result<()> {
+    pub(crate) fn start_launch_period(
+        &self,
+        ctx: &mut StateContext,
+        start: Option<Timestamp>,
+    ) -> Result<()> {
         let period = self.get_period(ctx.storage)?;
 
         if period != FarmingPeriod::Review {
@@ -65,11 +86,43 @@ impl State<'_> {
             );
         }
 
-        FarmingEpoch::Launch { start: self.now() }.save(ctx.storage)?;
+        let start = match start {
+            None => self.now(),
+            Some(start) => {
+                if start < self.now() {
+                    bail!("Cannot start launch in the past.");
+                }
+
+                start
+            }
+        };
+
+        FarmingEpoch::Launch { start }.save(ctx.storage)?;
 
         Ok(())
     }
 
+    pub(crate) fn get_schedule_countdown(&self, store: &dyn Storage) -> Result<Option<Duration>> {
+        let start = match FarmingEpoch::may_load(store)? {
+            None => None,
+            Some(epoch) => match epoch {
+                FarmingEpoch::Lockdrop { start } => Some(start),
+                FarmingEpoch::Launch { start } => Some(start),
+            },
+        };
+
+        match start {
+            Some(start) => {
+                let now = self.now();
+                if start >= now {
+                    Ok(Some(start.checked_sub(now, "farming schedule countdown")?))
+                } else {
+                    Ok(None)
+                }
+            }
+            None => Ok(None),
+        }
+    }
     pub(crate) fn get_launch_start_time(&self, store: &dyn Storage) -> Result<Timestamp> {
         match FarmingEpoch::may_load(store)? {
             None => bail!("Lockdrop has not started yet."),

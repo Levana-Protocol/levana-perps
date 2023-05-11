@@ -53,8 +53,12 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         ExecuteMsg::Owner(owner_msg) => {
             state.validate_admin(ctx.storage, &sender)?;
             match owner_msg {
-                OwnerExecuteMsg::StartLockdropPeriod {} => state.start_lockdrop_period(&mut ctx)?,
-                OwnerExecuteMsg::StartLaunchPeriod {} => state.start_launch_period(&mut ctx)?,
+                OwnerExecuteMsg::StartLockdropPeriod { start } => {
+                    state.start_lockdrop_period(&mut ctx, start)?
+                }
+                OwnerExecuteMsg::StartLaunchPeriod { start } => {
+                    state.start_launch_period(&mut ctx, start)?
+                }
                 OwnerExecuteMsg::SetEmissions { .. } => todo!(),
                 OwnerExecuteMsg::ClearEmissions {} => todo!(),
                 OwnerExecuteMsg::UpdateConfig { .. } => todo!(),

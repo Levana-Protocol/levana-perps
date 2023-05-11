@@ -99,9 +99,15 @@ pub enum ExecuteMsg {
 #[cw_serde]
 pub enum OwnerExecuteMsg {
     /// Start the lockdrop period
-    StartLockdropPeriod {},
+    StartLockdropPeriod {
+        /// If specified, the lockdrop period will start at this time.
+        start: Option<Timestamp>,
+    },
     /// Finish the review period and launch the primary contract
-    StartLaunchPeriod {},
+    StartLaunchPeriod {
+        /// If specified, the lockdrop period will start at this time.
+        start: Option<Timestamp>,
+    },
     /// Change the active emissions
     SetEmissions {
         /// When to start the emissions.
@@ -179,12 +185,16 @@ pub enum QueryMsg {
 pub enum FarmingPeriod {
     /// Contract has been instantiate but lockdrop has not started.
     Inactive,
+    /// Lockdrop has been scheduled to start
+    LockdropScheduled,
     /// Lockdrop period is running.
     Lockdrop,
     /// Sunset period is running.
     Sunset,
     /// Sunset completed, waiting for review before launching.
     Review,
+    /// Launch has been scheduled to start
+    LaunchScheduled,
     /// Normal contract operations.
     Launched,
 }
@@ -208,6 +218,8 @@ pub struct StatusResp {
     pub bonus: Collateral,
     /// If known, the timestamp when the protocol launched
     pub launched: Option<Timestamp>,
+    /// If a lockdrop or launch is scheduled, the remaining countdown
+    pub schedule_countdown: Option<Duration>,
     /// If known, the timestamp when all lockdrop LVN rewards are available
     pub lockdrop_rewards_unlocked: Option<Timestamp>,
     /// Total amount of LVN currently held by the contract
