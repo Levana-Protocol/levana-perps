@@ -815,13 +815,19 @@ impl State<'_> {
     /// Returns the amount of LP that has unstaked and can now be collected after an xLP unstaking
     /// process has begun
     pub(crate) fn calculate_unstaked_lp(&self, unstaking_info: &UnstakingXlp) -> Result<LpToken> {
-        let elapsed_since_start = self.now() - unstaking_info.unstake_started;
+        let elapsed_since_start = self.now().checked_sub(
+            unstaking_info.unstake_started,
+            "calculate_unstaked_lp: elapsed_since_start",
+        )?;
 
         let amount = if elapsed_since_start >= unstaking_info.unstake_duration {
             unstaking_info.xlp_amount.into_number() - unstaking_info.collected.into_number()
         } else {
-            let elapsed_since_last_collected =
-                (self.now() - unstaking_info.last_collected).as_nanos();
+            let elapsed_since_last_collected = (self.now().checked_sub(
+                unstaking_info.last_collected,
+                "calculate_unstaked_lp, elapsed_since_last_collected",
+            )?)
+            .as_nanos();
             let elapsed_ratio: Number = Number::from(elapsed_since_last_collected)
                 .checked_div(unstaking_info.unstake_duration.as_nanos().into())?;
             elapsed_ratio.checked_mul(unstaking_info.xlp_amount.into_number())?

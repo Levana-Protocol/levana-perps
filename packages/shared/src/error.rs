@@ -60,6 +60,7 @@ pub enum ErrorId {
     UnnecessaryFunds,
     NoYieldToClaim,
     InsufficientForReinvest,
+    TimestampSubtractUnderflow,
 }
 
 /// Source within the protocol for the error

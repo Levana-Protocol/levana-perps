@@ -142,7 +142,8 @@ impl State<'_> {
         let (previous_rate_time, previous_rate) = self.get_current_borrow_fee_rate_annual(store)?;
         let now = self.now();
         let nanos_since_last_rate = if previous_rate_time < now {
-            (now - previous_rate_time).as_nanos()
+            (now.checked_sub(previous_rate_time, "derive_instant_borrow_fee_rate_annual")?)
+                .as_nanos()
         } else {
             0
         };
