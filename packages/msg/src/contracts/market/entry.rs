@@ -595,6 +595,10 @@ pub struct TraderActionHistoryResp {
 /// A distinct position history action
 #[cw_serde]
 pub struct PositionAction {
+    /// ID of the position impacted
+    ///
+    /// For ease of migration, we allow for a missing position ID.
+    pub id: Option<PositionId>,
     /// Kind of action taken by the trader
     pub kind: PositionActionKind,
     /// Timestamp when the action occurred
