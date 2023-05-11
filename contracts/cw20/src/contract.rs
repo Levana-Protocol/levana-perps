@@ -11,13 +11,13 @@ use shared::{attr_map, prelude::*};
 const CONTRACT_NAME: &str = "levana.finance:cw20";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[entry_point]
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
-) -> Result<Response> {
+) -> Result<Response, PerpError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let (state, mut ctx) = StateContext::new(deps, env)?;
@@ -27,8 +27,13 @@ pub fn instantiate(
     Ok(ctx.response.into_response())
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
+#[entry_point]
+pub fn execute(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: ExecuteMsg,
+) -> Result<Response, PerpError> {
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
     state.assert_trading_competition(&mut ctx, &info.sender, &msg)?;
@@ -167,8 +172,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     Ok(ctx.response.into_response())
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
+#[entry_point]
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse, PerpError> {
     let (state, store) = State::new(deps, env)?;
 
     match msg {
@@ -230,8 +235,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
     }
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response> {
+#[entry_point]
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, PerpError> {
     // let (state, mut ctx) = StateContext::new(deps, env)?;
 
     let old_cw2 = get_contract_version(deps.storage)?;

@@ -4,6 +4,7 @@ use cosmwasm_std::{DepsMut, Env, MessageInfo, Response, StdError, StdResult};
 use cw2::{get_contract_version, set_contract_version};
 use msg::contracts::tracker::entry::{InstantiateMsg, MigrateMsg};
 use msg::contracts::tracker::events::NewTracker;
+use msg::prelude::WrappedPerpError;
 
 use crate::state::ADMINS;
 
@@ -17,7 +18,7 @@ pub fn instantiate(
     _env: Env,
     info: MessageInfo,
     InstantiateMsg {}: InstantiateMsg,
-) -> Result<Response> {
+) -> Result<Response, WrappedPerpError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     ADMINS.save(deps.storage, &info.sender, &())?;
@@ -31,7 +32,11 @@ pub fn instantiate(
 }
 
 #[entry_point]
-pub fn migrate(deps: DepsMut, _env: Env, MigrateMsg {}: MigrateMsg) -> StdResult<Response> {
+pub fn migrate(
+    deps: DepsMut,
+    _env: Env,
+    MigrateMsg {}: MigrateMsg,
+) -> StdResult<Response, WrappedPerpError> {
     let version = get_contract_version(deps.storage)?;
     if version.contract != CONTRACT_NAME {
         return Err(StdError::generic_err("Can only upgrade from same type"));

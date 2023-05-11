@@ -1,9 +1,8 @@
 use crate::prelude::*;
-use cosmwasm_std::entry_point;
 use cosmwasm_std::{Deps, Env};
 
 #[entry_point]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse, WrappedPerpError> {
     let (state, store) = State::new(deps, env)?;
     match msg {
         QueryMsg::Version {} => todo!(),

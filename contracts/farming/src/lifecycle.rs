@@ -16,7 +16,7 @@ pub fn instantiate(
         market_id,
         ..
     }: InstantiateMsg,
-) -> Result<Response> {
+) -> Result<Response, PerpError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let factory = factory.validate(deps.api)?;
@@ -29,7 +29,7 @@ pub fn instantiate(
 }
 
 #[entry_point]
-pub fn migrate(deps: DepsMut, _env: Env, MigrateMsg {}: MigrateMsg) -> Result<Response> {
+pub fn migrate(deps: DepsMut, _env: Env, MigrateMsg {}: MigrateMsg) -> Result<Response, PerpError> {
     let old_cw2 = get_contract_version(deps.storage)?;
     let old_version: Version = old_cw2
         .version

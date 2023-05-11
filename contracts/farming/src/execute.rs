@@ -4,7 +4,12 @@ use msg::token::Token;
 use crate::prelude::*;
 
 #[entry_point]
-pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
+pub fn execute(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: ExecuteMsg,
+) -> Result<Response, PerpError> {
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
     let (msg, received, sender) = match msg {

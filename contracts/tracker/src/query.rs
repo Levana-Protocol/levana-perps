@@ -2,11 +2,12 @@ use anyhow::Result;
 use cosmwasm_std::{entry_point, to_binary, Addr, Storage};
 use cosmwasm_std::{Binary, Deps, Env};
 use msg::contracts::tracker::entry::{CodeIdResp, ContractResp, QueryMsg};
+use msg::prelude::WrappedPerpError;
 
 use crate::state::{CODE_BY_HASH, CODE_BY_ID, CONTRACT_BY_ADDR, CONTRACT_BY_FAMILY};
 
 #[entry_point]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary, WrappedPerpError> {
     Ok(match msg {
         QueryMsg::CodeById { code_id } => code_id_resp(deps.storage, Some(code_id))?,
         QueryMsg::CodeByHash { hash } => {

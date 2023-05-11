@@ -3,6 +3,7 @@ use cosmwasm_std::entry_point;
 use cosmwasm_std::{DepsMut, Env, MessageInfo, Response};
 use msg::contracts::tracker::entry::ExecuteMsg;
 use msg::contracts::tracker::events::{InstantiateEvent, MigrateEvent, NewCodeIdEvent};
+use msg::prelude::WrappedPerpError;
 
 use crate::state::{
     CodeIdInfo, ContractInfo, ADMINS, CODE_BY_HASH, CODE_BY_ID, CONTRACT_BY_ADDR,
@@ -10,7 +11,12 @@ use crate::state::{
 };
 
 #[entry_point]
-pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
+pub fn execute(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: ExecuteMsg,
+) -> Result<Response, WrappedPerpError> {
     anyhow::ensure!(
         ADMINS.has(deps.storage, &info.sender)
             || deps

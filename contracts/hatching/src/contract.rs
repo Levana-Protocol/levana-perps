@@ -18,13 +18,13 @@ use shared::prelude::*;
 const CONTRACT_NAME: &str = "hatching";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[entry_point]
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
-) -> Result<Response> {
+) -> Result<Response, WrappedPerpError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     init_config(deps.storage, deps.api, &msg)?;
@@ -34,8 +34,13 @@ pub fn instantiate(
     Ok(ctx.response.into_response())
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
+#[entry_point]
+pub fn execute(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: ExecuteMsg,
+) -> Result<Response, WrappedPerpError> {
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
     match msg {
@@ -64,8 +69,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     Ok(ctx.response.into_response())
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
+#[entry_point]
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse, WrappedPerpError> {
     let (state, store) = State::new(deps, env)?;
 
     match msg {
@@ -93,8 +98,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
     }
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, env: Env, _msg: MigrateMsg) -> Result<Response> {
+#[entry_point]
+pub fn migrate(deps: DepsMut, env: Env, _msg: MigrateMsg) -> Result<Response, WrappedPerpError> {
     // Note, we use _state instead of state to avoid warnings when compiling without the sanity
     // feature
     let (_state, ctx) = StateContext::new(deps, env)?;
@@ -133,45 +138,45 @@ pub fn migrate(deps: DepsMut, env: Env, _msg: MigrateMsg) -> Result<Response> {
 }
 
 /// Handles the `OpenInit` and `OpenTry` parts of the IBC handshake.
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[entry_point]
 pub fn ibc_channel_open(
     deps: DepsMut,
     env: Env,
     msg: IbcChannelOpenMsg,
-) -> Result<IbcChannelOpenResponse> {
+) -> Result<IbcChannelOpenResponse, WrappedPerpError> {
     let (state, _) = StateContext::new(deps, env)?;
     state.handle_ibc_channel_open(msg)?;
     Ok(None)
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[entry_point]
 pub fn ibc_channel_connect(
     deps: DepsMut,
     env: Env,
     msg: IbcChannelConnectMsg,
-) -> Result<IbcBasicResponse> {
+) -> Result<IbcBasicResponse, WrappedPerpError> {
     let (mut state, mut ctx) = StateContext::new(deps, env)?;
     state.handle_ibc_channel_connect(&mut ctx, msg)?;
     Ok(ctx.response.into_ibc_response())
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[entry_point]
 pub fn ibc_channel_close(
     deps: DepsMut,
     env: Env,
     msg: IbcChannelCloseMsg,
-) -> Result<IbcBasicResponse> {
+) -> Result<IbcBasicResponse, WrappedPerpError> {
     let (mut state, mut ctx) = StateContext::new(deps, env)?;
     state.handle_ibc_channel_close(&mut ctx, msg)?;
     Ok(ctx.response.into_ibc_response())
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[entry_point]
 pub fn ibc_packet_receive(
     deps: DepsMut,
     env: Env,
     msg: IbcPacketReceiveMsg,
-) -> Result<IbcReceiveResponse> {
+) -> Result<IbcReceiveResponse, WrappedPerpError> {
     let (state, mut ctx) = StateContext::new(deps, env)?;
     let resp = state.handle_ibc_packet_receive(&mut ctx, msg);
 
@@ -186,19 +191,23 @@ pub fn ibc_packet_receive(
     }
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn ibc_packet_ack(deps: DepsMut, env: Env, ack: IbcPacketAckMsg) -> Result<IbcBasicResponse> {
+#[entry_point]
+pub fn ibc_packet_ack(
+    deps: DepsMut,
+    env: Env,
+    ack: IbcPacketAckMsg,
+) -> Result<IbcBasicResponse, WrappedPerpError> {
     let (state, mut ctx) = StateContext::new(deps, env)?;
     state.handle_ibc_packet_ack(&mut ctx, ack)?;
     Ok(ctx.response.into_ibc_response())
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[entry_point]
 pub fn ibc_packet_timeout(
     deps: DepsMut,
     env: Env,
     msg: IbcPacketTimeoutMsg,
-) -> Result<IbcBasicResponse> {
+) -> Result<IbcBasicResponse, WrappedPerpError> {
     let (state, ctx) = StateContext::new(deps, env)?;
     state.handle_ibc_packet_timeout(msg)?;
     Ok(ctx.response.into_ibc_response())

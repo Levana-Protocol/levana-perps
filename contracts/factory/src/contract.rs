@@ -48,7 +48,7 @@ use shared::prelude::*;
 const CONTRACT_NAME: &str = "levana.finance:factory";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[entry_point]
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
@@ -64,7 +64,7 @@ pub fn instantiate(
         wind_down,
         label_suffix,
     }: InstantiateMsg,
-) -> Result<Response> {
+) -> Result<Response, PerpError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     set_market_code_id(deps.storage, market_code_id.parse()?)?;
@@ -83,8 +83,13 @@ pub fn instantiate(
     Ok(ctx.response.into_response())
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
+#[entry_point]
+pub fn execute(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: ExecuteMsg,
+) -> Result<Response, PerpError> {
     if msg.requires_owner() && info.sender != get_owner(deps.storage)? {
         perp_bail!(
             ErrorId::Auth,
@@ -196,8 +201,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     Ok(ctx.response.into_response())
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
+#[entry_point]
+pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, PerpError> {
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
     match ReplyId::try_from(msg.id) {
@@ -318,8 +323,8 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
     Ok(ctx.response.into_response())
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
+#[entry_point]
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse, PerpError> {
     let (state, store) = State::new(deps, env);
     match msg {
         QueryMsg::Version {} => get_contract_version(store)?.query_result(),
@@ -381,8 +386,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
     }
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response> {
+#[entry_point]
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, PerpError> {
     let old_cw2 = get_contract_version(deps.storage)?;
     let old_version: Version = old_cw2
         .version

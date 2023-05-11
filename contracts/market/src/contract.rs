@@ -13,7 +13,6 @@ use crate::state::{
 };
 
 use crate::prelude::*;
-#[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Response};
 use cw2::{get_contract_version, set_contract_version};
@@ -35,7 +34,7 @@ use shared::price::Price;
 const CONTRACT_NAME: &str = "levana.finance:market";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[entry_point]
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
@@ -47,7 +46,7 @@ pub fn instantiate(
         token,
         initial_borrow_fee_rate,
     }: InstantiateMsg,
-) -> Result<Response> {
+) -> Result<Response, WrappedPerpError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     set_factory_addr(deps.storage, &factory.validate(deps.api)?)?;
@@ -68,8 +67,13 @@ pub fn instantiate(
     ctx.into_response(&state)
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
+#[entry_point]
+pub fn execute(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: ExecuteMsg,
+) -> Result<Response, WrappedPerpError> {
     let (mut state, mut ctx) = StateContext::new(deps, env)?;
     #[cfg(feature = "sanity")]
     state.sanity_check(ctx.storage);
@@ -418,8 +422,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     ctx.into_response(&state)
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
+#[entry_point]
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse, WrappedPerpError> {
     let (state, store) = State::new(deps, env)?;
     #[cfg(feature = "sanity")]
     state.sanity_check(deps.storage);
@@ -601,8 +605,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
     }
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, env: Env, _msg: MigrateMsg) -> Result<Response> {
+#[entry_point]
+pub fn migrate(deps: DepsMut, env: Env, _msg: MigrateMsg) -> Result<Response, WrappedPerpError> {
     let (_state, ctx) = StateContext::new(deps, env)?;
 
     // Note, we use _state instead of state to avoid warnings when compiling without the sanity
