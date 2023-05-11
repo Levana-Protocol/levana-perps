@@ -28,7 +28,7 @@ impl RewardsInfo {
         let unlocked = if from >= self.start + self.duration {
             self.amount.checked_sub(self.claimed)?
         } else {
-            let elapsed = from - self.last_claimed;
+            let elapsed = from.checked_sub(self.last_claimed, "calculate_unlocked_rewards")?;
             let duration = Decimal256::from_atomics(self.duration.as_nanos(), 0)?;
 
             Decimal256::from_atomics(elapsed.as_nanos(), 0)?

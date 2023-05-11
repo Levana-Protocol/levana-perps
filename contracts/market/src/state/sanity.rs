@@ -66,7 +66,9 @@ fn next_last_liquifunding(store: &dyn Storage, env: &Env) -> Result<()> {
     for pair in NEXT_LIQUIFUNDING.keys(store, None, None, cosmwasm_std::Order::Ascending) {
         let (timestamp, position_id) = pair?;
         let position = OPEN_POSITIONS.load(store, position_id)?;
-        anyhow::ensure!(timestamp < now || (timestamp - now) <= delay);
+        anyhow::ensure!(
+            timestamp < now || (timestamp.checked_sub(now, "next_last_liquifunding (1)")?) <= delay
+        );
         anyhow::ensure!(position.liquifunded_at + delay == timestamp);
         next_count += 1;
     }
@@ -81,7 +83,10 @@ fn next_last_liquifunding(store: &dyn Storage, env: &Env) -> Result<()> {
     for pair in NEXT_STALE.keys(store, None, None, cosmwasm_std::Order::Ascending) {
         let (timestamp, position_id) = pair?;
         let position = OPEN_POSITIONS.load(store, position_id)?;
-        anyhow::ensure!(timestamp < now || (timestamp - now) <= delay_and_stale);
+        anyhow::ensure!(
+            timestamp < now
+                || (timestamp.checked_sub(now, "next_last_liquifunding (2)")?) <= delay_and_stale
+        );
         anyhow::ensure!(position.liquifunded_at + delay_and_stale == timestamp);
         next_stale_count += 1;
     }
