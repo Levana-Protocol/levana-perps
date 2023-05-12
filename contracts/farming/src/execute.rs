@@ -9,7 +9,7 @@ pub fn execute(
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
-) -> Result<Response, PerpError> {
+) -> Result<Response, WrappedPerpError> {
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
     let (msg, received, sender) = match msg {

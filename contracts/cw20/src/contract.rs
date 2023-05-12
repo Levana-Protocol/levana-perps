@@ -17,7 +17,7 @@ pub fn instantiate(
     env: Env,
     _info: MessageInfo,
     msg: InstantiateMsg,
-) -> Result<Response, PerpError> {
+) -> Result<Response, WrappedPerpError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let (state, mut ctx) = StateContext::new(deps, env)?;
@@ -33,7 +33,7 @@ pub fn execute(
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
-) -> Result<Response, PerpError> {
+) -> Result<Response, WrappedPerpError> {
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
     state.assert_trading_competition(&mut ctx, &info.sender, &msg)?;
@@ -46,7 +46,8 @@ pub fn execute(
                 return Err(anyhow!(
                     "Cannot SetMarket, sender is {}, minter is {minter_addr}",
                     info.sender
-                ));
+                )
+                .into());
             }
 
             state.set_market_addr(&mut ctx, &addr.validate(state.api)?)?;
@@ -171,7 +172,7 @@ pub fn execute(
 }
 
 #[entry_point]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse, PerpError> {
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse, WrappedPerpError> {
     let (state, store) = State::new(deps, env)?;
 
     match msg {
@@ -231,10 +232,11 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse, PerpE
 
         QueryMsg::Version {} => get_contract_version(store)?.query_result(),
     }
+    .map_err(|e| e.into())
 }
 
 #[entry_point]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, PerpError> {
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, WrappedPerpError> {
     // let (state, mut ctx) = StateContext::new(deps, env)?;
 
     let old_cw2 = get_contract_version(deps.storage)?;
@@ -251,13 +253,15 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, P
             "mismatched contract migration name (from {} to {})",
             old_cw2.contract,
             CONTRACT_NAME
-        ))
+        )
+        .into())
     } else if old_version > new_version {
         Err(anyhow!(
             "cannot migrate contract from newer to older (from {} to {})",
             old_cw2.version,
             CONTRACT_VERSION
-        ))
+        )
+        .into())
     } else {
         set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 

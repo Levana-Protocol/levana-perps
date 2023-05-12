@@ -511,11 +511,7 @@ impl State<'_> {
 
         if let Some(limit) = self.minter_cap(ctx.storage)? {
             if config.total_supply > limit {
-                return Err(perp_anyhow!(
-                    ErrorId::Cw20Funds,
-                    ErrorDomain::Cw20,
-                    "amount cannot be zero"
-                ));
+                return Err(anyhow!("amount cannot be zero"));
             }
         }
         TOKEN_INFO.save(ctx.storage, &config)?;
@@ -547,11 +543,7 @@ impl State<'_> {
         });
 
         if spender == owner {
-            return Err(perp_anyhow!(
-                ErrorId::Auth,
-                ErrorDomain::Cw20,
-                "cannot increase allowance to own account"
-            ));
+            return Err(anyhow!("cannot increase allowance to own account"));
         }
 
         let update_fn = |allow: Option<AllowanceResponse>| -> Result<_> {
@@ -585,11 +577,7 @@ impl State<'_> {
         });
 
         if spender == owner {
-            return Err(perp_anyhow!(
-                ErrorId::Auth,
-                ErrorDomain::Cw20,
-                "cannot decrease allowance to own account"
-            ));
+            return Err(anyhow!("cannot decrease allowance to own account"));
         }
 
         let key = (&owner, &spender);
@@ -631,18 +619,14 @@ impl State<'_> {
             match current {
                 Some(mut a) => {
                     if a.expires.is_expired(&block) {
-                        Err(perp_anyhow!(ErrorId::Expired, ErrorDomain::Cw20, ""))
+                        Err(anyhow!("expired"))
                     } else {
                         // deduct the allowance if enough
                         a.allowance = a.allowance.checked_sub(amount)?;
                         Ok(a)
                     }
                 }
-                None => Err(perp_anyhow!(
-                    ErrorId::Auth,
-                    ErrorDomain::Cw20,
-                    "no allowance"
-                )),
+                None => Err(anyhow!("no allowance")),
             }
         };
         ALLOWANCES.update(ctx.storage, (owner, spender), update_fn)?;
@@ -665,13 +649,8 @@ impl State<'_> {
 
         let mut marketing_info = MARKETING_INFO.load(ctx.storage)?;
 
-        if marketing_info
-            .marketing
-            .as_ref()
-            .ok_or_else(|| perp_anyhow!(ErrorId::Auth, ErrorDomain::Cw20, ""))?
-            != sender
-        {
-            return Err(perp_anyhow!(ErrorId::Auth, ErrorDomain::Cw20, ""));
+        if marketing_info.marketing.as_ref().context("No auth")? != sender {
+            return Err(anyhow!("auth"));
         }
 
         match project {

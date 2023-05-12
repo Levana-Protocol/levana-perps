@@ -16,7 +16,7 @@ pub fn instantiate(
         market_id,
         ..
     }: InstantiateMsg,
-) -> Result<Response, PerpError> {
+) -> Result<Response, WrappedPerpError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let factory = factory.validate(deps.api)?;
@@ -29,7 +29,11 @@ pub fn instantiate(
 }
 
 #[entry_point]
-pub fn migrate(deps: DepsMut, _env: Env, MigrateMsg {}: MigrateMsg) -> Result<Response, PerpError> {
+pub fn migrate(
+    deps: DepsMut,
+    _env: Env,
+    MigrateMsg {}: MigrateMsg,
+) -> Result<Response, WrappedPerpError> {
     let old_cw2 = get_contract_version(deps.storage)?;
     let old_version: Version = old_cw2
         .version
@@ -44,13 +48,15 @@ pub fn migrate(deps: DepsMut, _env: Env, MigrateMsg {}: MigrateMsg) -> Result<Re
             "mismatched contract migration name (from {} to {})",
             old_cw2.contract,
             CONTRACT_NAME
-        ))
+        )
+        .into())
     } else if old_version > new_version {
         Err(anyhow!(
             "cannot migrate contract from newer to older (from {} to {})",
             old_cw2.version,
             CONTRACT_VERSION
-        ))
+        )
+        .into())
     } else {
         set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
         Ok(attr_map! {

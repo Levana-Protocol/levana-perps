@@ -64,7 +64,7 @@ pub fn instantiate(
         wind_down,
         label_suffix,
     }: InstantiateMsg,
-) -> Result<Response, PerpError> {
+) -> Result<Response, WrappedPerpError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     set_market_code_id(deps.storage, market_code_id.parse()?)?;
@@ -89,7 +89,7 @@ pub fn execute(
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
-) -> Result<Response, PerpError> {
+) -> Result<Response, WrappedPerpError> {
     if msg.requires_owner() && info.sender != get_owner(deps.storage)? {
         perp_bail!(
             ErrorId::Auth,
@@ -202,7 +202,7 @@ pub fn execute(
 }
 
 #[entry_point]
-pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, PerpError> {
+pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, WrappedPerpError> {
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
     match ReplyId::try_from(msg.id) {
@@ -324,7 +324,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, PerpError>
 }
 
 #[entry_point]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse, PerpError> {
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse, WrappedPerpError> {
     let (state, store) = State::new(deps, env);
     match msg {
         QueryMsg::Version {} => get_contract_version(store)?.query_result(),
@@ -387,7 +387,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse, PerpE
 }
 
 #[entry_point]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, PerpError> {
+pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, WrappedPerpError> {
     let old_cw2 = get_contract_version(deps.storage)?;
     let old_version: Version = old_cw2
         .version
