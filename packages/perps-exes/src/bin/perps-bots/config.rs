@@ -36,6 +36,7 @@ pub(crate) struct BotConfig {
     pub(crate) watcher: WatcherConfig,
     pub(crate) gas_multiplier: Option<f64>,
     pub(crate) rpc_nodes: Vec<Arc<String>>,
+    pub(crate) ignore_stale: bool,
 }
 
 impl Opt {
@@ -96,6 +97,7 @@ impl Opt {
             watcher: watcher.clone(),
             gas_multiplier: *gas_multiplier,
             rpc_nodes: rpc_nodes.iter().map(|x| Arc::new(x.clone())).collect(),
+            ignore_stale: partial.ignore_stale,
         })
     }
 }

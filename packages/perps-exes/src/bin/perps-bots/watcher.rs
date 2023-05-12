@@ -27,6 +27,7 @@ use crate::app::{factory::FactoryInfo, App};
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
 pub(crate) enum TaskLabel {
     GetFactory,
+    Stale,
     Crank,
     Price,
     TrackBalance,
@@ -89,6 +90,7 @@ impl TaskLabel {
     fn task_config_for(&self, config: &WatcherConfig) -> TaskConfig {
         match self {
             TaskLabel::Balance => config.balance,
+            TaskLabel::Stale => config.stale,
             TaskLabel::GasCheck => config.gas_check,
             TaskLabel::Liquidity => config.liquidity,
             TaskLabel::Trader { index: _ } => config.trader,
@@ -111,6 +113,7 @@ impl TaskLabel {
             TaskLabel::Utilization => false,
             TaskLabel::Balance => false,
             TaskLabel::Trader { index: _ } => false,
+            TaskLabel::Stale => true,
         }
     }
 
@@ -125,6 +128,7 @@ impl TaskLabel {
             TaskLabel::Utilization => "utilization".into(),
             TaskLabel::Balance => "balance".into(),
             TaskLabel::Trader { index } => format!("trader-{index}").into(),
+            TaskLabel::Stale => "stale".into(),
         }
     }
 }

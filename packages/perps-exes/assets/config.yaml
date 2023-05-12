@@ -167,6 +167,7 @@ deployments:
     dev-settings: true
     price: false
     crank: true
+    ignore-stale: true
     default-market-ids:
       - ATOM_USD
       - OSMO_USDC
