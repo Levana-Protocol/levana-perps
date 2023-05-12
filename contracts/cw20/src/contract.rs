@@ -43,9 +43,7 @@ pub fn execute(
             let minter_addr = state.minter_addr(ctx.storage)?;
 
             if minter_addr != info.sender {
-                return Err(perp_anyhow!(
-                    ErrorId::Auth,
-                    ErrorDomain::Cw20,
+                return Err(anyhow!(
                     "Cannot SetMarket, sender is {}, minter is {minter_addr}",
                     info.sender
                 ));

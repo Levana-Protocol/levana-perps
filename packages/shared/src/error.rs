@@ -1,7 +1,6 @@
 //! Error handling helpers for within the perps protocol
 use crate::storage::{AuthCheck, Timestamp};
 use cosmwasm_std::Addr;
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::borrow::Cow;

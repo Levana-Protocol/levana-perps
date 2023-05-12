@@ -174,11 +174,7 @@ impl State<'_> {
                 mime_type: "image/png".to_owned(),
                 data: logo,
             }),
-            Logo::Url(_) => Err(perp_anyhow!(
-                ErrorId::MsgValidation,
-                ErrorDomain::Cw20,
-                "logo"
-            )),
+            Logo::Url(_) => Err(anyhow!("logo")),
         }
     }
 
@@ -209,11 +205,7 @@ impl State<'_> {
         if let Some(minter_cap) = minter.cap {
             MINTER_CAP.save(ctx.storage, &minter_cap)?;
             if total_supply > minter_cap {
-                return Err(perp_anyhow!(
-                    ErrorId::MsgValidation,
-                    ErrorDomain::Cw20,
-                    "initial supply greater than cap"
-                ));
+                return Err(anyhow!("initial supply greater than cap"));
             }
         }
 
@@ -265,11 +257,7 @@ impl State<'_> {
         });
 
         if amount == Uint128::zero() {
-            return Err(perp_anyhow!(
-                ErrorId::Cw20Funds,
-                ErrorDomain::Cw20,
-                "amount cannot be zero"
-            ));
+            return Err(anyhow!("amount cannot be zero"));
         }
 
         BALANCES.update(
@@ -345,11 +333,7 @@ impl State<'_> {
         });
 
         if amount == Uint128::zero() {
-            return Err(perp_anyhow!(
-                ErrorId::Cw20Funds,
-                ErrorDomain::Cw20,
-                "amount cannot be zero"
-            ));
+            return Err(anyhow!("amount cannot be zero"));
         }
 
         // lower balance
@@ -420,11 +404,7 @@ impl State<'_> {
         });
 
         if amount == Uint128::zero() {
-            return Err(perp_anyhow!(
-                ErrorId::Cw20Funds,
-                ErrorDomain::Cw20,
-                "amount cannot be zero"
-            ));
+            return Err(anyhow!("amount cannot be zero"));
         }
 
         // move the tokens to the contract
@@ -512,22 +492,16 @@ impl State<'_> {
         });
 
         if amount == Uint128::zero() {
-            return Err(perp_anyhow!(
-                ErrorId::Cw20Funds,
-                ErrorDomain::Cw20,
-                "amount cannot be zero"
-            ));
+            return Err(anyhow!("amount cannot be zero"));
         }
 
         let mut config = TOKEN_INFO
             .may_load(ctx.storage)?
-            .ok_or_else(|| perp_anyhow!(ErrorId::Auth, ErrorDomain::Cw20, ""))?;
+            .context("TOKEN_INFO is empty")?;
 
         let minter = self.minter_addr(ctx.storage)?;
         if minter != sender {
-            return Err(perp_anyhow!(
-                ErrorId::Auth,
-                ErrorDomain::Cw20,
+            return Err(anyhow!(
                 "Cannot mint, sender is {sender}, minter is {minter}"
             ));
         }
