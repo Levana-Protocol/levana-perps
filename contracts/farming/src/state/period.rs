@@ -8,6 +8,9 @@ const LOCKDROP_START_DURATION: Duration = Duration::from_seconds(60 * 60 * 24 * 
 // 2 days
 const LOCKDROP_SUNSET_DURATION: Duration = Duration::from_seconds(60 * 60 * 24 * 2);
 
+// Almost all the times flow naturally from the epoch timestamps
+// Review start time is an exception, so we stash it
+const REVIEW_START_TIME: Item<Timestamp> = Item::new("review-start-time");
 // The current farming period, without the baggage of FarmingPeriodResp
 // used for internal contract logic only
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -66,7 +69,7 @@ impl State<'_> {
                             })
                         } else {
                             Ok(FarmingPeriodResp::Review {
-                                started_at: Some(review_start),
+                                started_at: review_start,
                                 launch_start: None,
                             })
                         }
@@ -75,7 +78,7 @@ impl State<'_> {
                         // A scheduled launch doesn't change the current period until it starts
                         if now < start {
                             Ok(FarmingPeriodResp::Review {
-                                started_at: None,
+                                started_at: REVIEW_START_TIME.load(store)?,
                                 launch_start: Some(start),
                             })
                         } else {
@@ -117,24 +120,31 @@ impl State<'_> {
         ctx: &mut StateContext,
         start: Option<Timestamp>,
     ) -> Result<()> {
-        let period = self.get_period(ctx.storage)?;
+        let period_resp = self.get_period_resp(ctx.storage)?;
+        match period_resp {
+            FarmingPeriodResp::Review { started_at, .. } => {
+                // this will remain the consistent review start time until the launch starts
+                // but it's perhaps a bit more optimal to only save if we need to
+                if REVIEW_START_TIME.may_load(ctx.storage)?.is_none() {
+                    REVIEW_START_TIME.save(ctx.storage, &started_at)?;
+                }
 
-        // We allow rescheduling a launch if it hasn't started yet, but not if it's already started
-        if period != FarmingPeriod::Review {
-            bail!(
-                "Can only launch while in review period, currently in {:?}.",
-                period
-            );
+                let start = start.unwrap_or_else(|| self.now());
+                if start < self.now() {
+                    bail!("Cannot start launch in the past.");
+                }
+
+                FarmingEpochStartTime::Launch(start).save(ctx.storage)?;
+
+                Ok(())
+            }
+            _ => {
+                bail!(
+                    "Can only launch while in review period, currently in {:?}.",
+                    FarmingPeriod::from(period_resp)
+                );
+            }
         }
-
-        let start = start.unwrap_or_else(|| self.now());
-        if start < self.now() {
-            bail!("Cannot start launch in the past.");
-        }
-
-        FarmingEpochStartTime::Launch(start).save(ctx.storage)?;
-
-        Ok(())
     }
 }
 
@@ -147,7 +157,9 @@ impl State<'_> {
 /// So we track the manually triggered epochs *internally*
 /// and then calculate the period from that
 ///
-/// see get_period() for the calculation
+/// see get_period() for the calculation, which also takes into account
+/// scheduled changes (i.e. where the epoch timestamp is in the future)
+///
 #[derive(Serialize, Deserialize, Debug)]
 enum FarmingEpochStartTime {
     Lockdrop(Timestamp),

@@ -96,8 +96,9 @@ fn farming_period() {
     assert_unable_to_start_launch_or_lockdrop();
 
     // jump 4.5 days (18 days into the lockdrop) - now in review
+    let review_start = lockdrop_start + LOCKDROP_START_DURATION + LOCKDROP_SUNSET_DURATION;
     let review_period = FarmingPeriodResp::Review {
-        started_at: Some(lockdrop_start + LOCKDROP_START_DURATION + LOCKDROP_SUNSET_DURATION),
+        started_at: review_start,
         launch_start: None,
     };
     market.set_time(TimeJump::Hours((24 * 4) + 12)).unwrap();
@@ -110,10 +111,10 @@ fn farming_period() {
     market.exec_farming_start_lockdrop(None).unwrap_err();
 
     // schedule a launch 10 days from now
+    // the review_start time remains consistent from when we started review, however
     let launch_start = market.now() + Duration::from_seconds(60 * 60 * 24 * 10);
     let review_period = FarmingPeriodResp::Review {
-        // we lose the info about when review started (who cares anyway, it can be indexed with events if we *really* need it)
-        started_at: None,
+        started_at: review_start,
         launch_start: Some(launch_start),
     };
     market
@@ -123,10 +124,10 @@ fn farming_period() {
     market.exec_farming_start_lockdrop(None).unwrap_err();
 
     // actually, make it 3 days from now
+    // the review_start time remains consistent from when we started review, however
     let launch_start = market.now() + Duration::from_seconds(60 * 60 * 24 * 3);
     let review_period = FarmingPeriodResp::Review {
-        // we lose the info about when review started (who cares anyway, it can be indexed with events if we *really* need it)
-        started_at: None,
+        started_at: review_start,
         launch_start: Some(launch_start),
     };
     market

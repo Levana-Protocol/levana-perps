@@ -235,8 +235,8 @@ pub enum FarmingPeriodResp {
     },
     /// Sunset completed, waiting for manual review before launching.
     Review {
-        /// If known, review started at this time
-        started_at: Option<Timestamp>,
+        /// review started at this time
+        started_at: Timestamp,
         /// If set, launch has been scheduled to start at this time
         launch_start: Option<Timestamp>,
     },
