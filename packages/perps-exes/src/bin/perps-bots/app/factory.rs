@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use axum::async_trait;
 use chrono::{DateTime, Utc};
@@ -30,6 +31,16 @@ pub(crate) struct FactoryInfo {
     pub(crate) gitrev: Option<String>,
     pub(crate) faucet_gas_amount: Option<String>,
     pub(crate) faucet_collateral_amount: HashMap<&'static str, Decimal256>,
+    pub(crate) rpc: RpcInfo,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) struct RpcInfo {
+    pub(crate) endpoint: String,
+    pub(crate) rpc_height: u64,
+    pub(crate) grpc_height: u64,
+    pub(crate) latest_height: u64,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -56,7 +67,7 @@ impl WatchedTask for FactoryUpdate {
 }
 
 async fn update(app: &App) -> Result<WatchedTaskOutput> {
-    let info = get_factory_info(&app.cosmos, &app.config).await?;
+    let info = get_factory_info(&app.cosmos, &app.config, &app.client).await?;
     let output = WatchedTaskOutput {
         skip_delay: false,
         message: format!(
@@ -68,7 +79,11 @@ async fn update(app: &App) -> Result<WatchedTaskOutput> {
     Ok(output)
 }
 
-pub(crate) async fn get_factory_info(cosmos: &Cosmos, config: &BotConfig) -> Result<FactoryInfo> {
+pub(crate) async fn get_factory_info(
+    cosmos: &Cosmos,
+    config: &BotConfig,
+    client: &reqwest::Client,
+) -> Result<FactoryInfo> {
     let (factory, gitrev) = get_contract(cosmos, config, "factory")
         .await
         .context("Unable to get 'factory' contract")?;
@@ -89,6 +104,7 @@ pub(crate) async fn get_factory_info(cosmos: &Cosmos, config: &BotConfig) -> Res
             HashMap::new()
         }
     };
+    let rpc = get_rpc_info(cosmos, config, client).await?;
     Ok(FactoryInfo {
         factory,
         faucet: config.faucet,
@@ -99,6 +115,7 @@ pub(crate) async fn get_factory_info(cosmos: &Cosmos, config: &BotConfig) -> Res
         gitrev,
         faucet_gas_amount,
         faucet_collateral_amount,
+        rpc,
     })
 }
 
@@ -231,4 +248,94 @@ async fn get_faucet_collateral_amount(
         }
     }
     Ok(res)
+}
+
+async fn get_rpc_info(
+    cosmos: &Cosmos,
+    config: &BotConfig,
+    client: &reqwest::Client,
+) -> Result<RpcInfo> {
+    let grpc = cosmos.get_latest_block_info().await?;
+
+    let mut handles = vec![];
+    for node in &config.rpc_nodes {
+        handles.push(tokio::task::spawn(get_height(node.clone(), client.clone())));
+    }
+
+    let mut results = vec![];
+    for handle in handles {
+        match handle.await {
+            Ok(Ok(pair)) => results.push(pair),
+            Ok(Err(e)) => log::warn!("{e:?}"),
+            Err(e) => log::warn!("{e:?}"),
+        }
+    }
+
+    results.sort_by_key(|x| x.1);
+    let (endpoint, rpc_height) = match results.into_iter().rev().next() {
+        Some(pair) => pair,
+        // All nodes are broken
+        None => match config.rpc_nodes.first() {
+            Some(node) => (node.clone(), 0),
+            None => anyhow::bail!("Config includes no RPC nodes"),
+        },
+    };
+
+    let grpc_height = grpc.height.try_into()?;
+
+    Ok(RpcInfo {
+        endpoint: (*endpoint).clone(),
+        rpc_height,
+        grpc_height,
+        latest_height: rpc_height.max(grpc_height),
+    })
+}
+
+async fn get_height(node: Arc<String>, client: reqwest::Client) -> Result<(Arc<String>, u64)> {
+    let node_clone = node.clone();
+    tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
+        let url = format!("{node}/status");
+        let value = client
+            .get(url)
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<serde_json::Value>()
+            .await?;
+        let height = get_latest_block_height(value)
+            .context("Could not find latest block height in JSON response")?;
+        anyhow::Ok((node, height))
+    })
+    .await
+    .context("Timed out")
+    .and_then(|x| x)
+    .with_context(|| format!("Error getting height from {node_clone}"))
+}
+
+fn get_latest_block_height(value: serde_json::Value) -> Option<u64> {
+    let mut values = vec![value];
+
+    while let Some(value) = values.pop() {
+        match value {
+            serde_json::Value::Null => (),
+            serde_json::Value::Bool(_) => (),
+            serde_json::Value::Number(_) => (),
+            serde_json::Value::String(_) => (),
+            serde_json::Value::Array(mut xs) => values.append(&mut xs),
+            serde_json::Value::Object(o) => {
+                for (key, value) in o.into_iter() {
+                    if key == "latest_block_height" {
+                        if let serde_json::Value::String(x) = &value {
+                            if let Ok(x) = x.parse() {
+                                return Some(x);
+                            }
+                        }
+                    }
+                    values.push(value);
+                }
+            }
+        }
+    }
+
+    None
 }

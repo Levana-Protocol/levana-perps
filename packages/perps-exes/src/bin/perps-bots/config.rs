@@ -35,6 +35,7 @@ pub(crate) struct BotConfig {
     pub(crate) trader_config: TraderConfig,
     pub(crate) watcher: WatcherConfig,
     pub(crate) gas_multiplier: Option<f64>,
+    pub(crate) rpc_nodes: Vec<Arc<String>>,
 }
 
 impl Opt {
@@ -55,6 +56,7 @@ impl Opt {
             min_gas_in_faucet,
             min_gas_in_gas_wallet,
             gas_multiplier,
+            rpc_nodes,
         } = config
             .chains
             .get(&network)
@@ -93,6 +95,7 @@ impl Opt {
             trader_config: config.trader,
             watcher: watcher.clone(),
             gas_multiplier: *gas_multiplier,
+            rpc_nodes: rpc_nodes.iter().map(|x| Arc::new(x.clone())).collect(),
         })
     }
 }
