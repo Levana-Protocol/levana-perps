@@ -11,6 +11,7 @@ const LOCKDROP_SUNSET_DURATION: Duration = Duration::from_seconds(60 * 60 * 24 *
 // Almost all the times flow naturally from the epoch timestamps
 // Review start time is an exception, so we stash it
 const REVIEW_START_TIME: Item<Timestamp> = Item::new("review-start-time");
+
 // The current farming period, without the baggage of FarmingPeriodResp
 // used for internal contract logic only
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -78,6 +79,9 @@ impl State<'_> {
                         // A scheduled launch doesn't change the current period until it starts
                         if now < start {
                             Ok(FarmingPeriodResp::Review {
+                                // in this case we can't calculate the review start time
+                                // rather, we use it from the stashed value
+                                // which definitively exists if we're in this branch
                                 started_at: REVIEW_START_TIME.load(store)?,
                                 launch_start: Some(start),
                             })
@@ -125,6 +129,8 @@ impl State<'_> {
             FarmingPeriodResp::Review { started_at, .. } => {
                 // this will remain the consistent review start time until the launch starts
                 // but it's perhaps a bit more optimal to only save if we need to
+                // since writes are probably more expensive than reads
+                // and it's a bit easier to see that it stays consistent this way
                 if REVIEW_START_TIME.may_load(ctx.storage)?.is_none() {
                     REVIEW_START_TIME.save(ctx.storage, &started_at)?;
                 }
