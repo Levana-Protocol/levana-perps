@@ -109,7 +109,20 @@ fn farming_period() {
     assert_eq!(get_period(), review_period);
     market.exec_farming_start_lockdrop(None).unwrap_err();
 
-    // schedule a launch 3 days from now
+    // schedule a launch 10 days from now
+    let launch_start = market.now() + Duration::from_seconds(60 * 60 * 24 * 10);
+    let review_period = FarmingPeriodResp::Review {
+        // we lose the info about when review started (who cares anyway, it can be indexed with events if we *really* need it)
+        started_at: None,
+        launch_start: Some(launch_start),
+    };
+    market
+        .exec_farming_start_launch(Some(launch_start))
+        .unwrap();
+    assert_eq!(get_period(), review_period);
+    market.exec_farming_start_lockdrop(None).unwrap_err();
+
+    // actually, make it 3 days from now
     let launch_start = market.now() + Duration::from_seconds(60 * 60 * 24 * 3);
     let review_period = FarmingPeriodResp::Review {
         // we lose the info about when review started (who cares anyway, it can be indexed with events if we *really* need it)
