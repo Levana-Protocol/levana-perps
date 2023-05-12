@@ -182,8 +182,8 @@ pub enum QueryMsg {
 /// Overall state of the contract, returned from [QueryMsg::Status]
 #[cw_serde]
 pub struct StatusResp {
-    /// The current farming period
-    pub period: FarmingPeriod,
+    /// The current farming period, with additional information
+    pub period: FarmingPeriodResp,
     /// Total farming tokens across the entire protocol.
     pub farming_tokens: FarmingToken,
     /// Total xLP held by the farming contract
@@ -211,9 +211,9 @@ pub struct StatusResp {
     pub emissions: Option<Emissions>,
 }
 
-/// The current farming period
+/// The current farming period, with additional information.
 #[cw_serde]
-pub enum FarmingPeriod {
+pub enum FarmingPeriodResp {
     /// Contract has been instantiated but lockdrop has not started.
     Inactive {
         /// If set, lockdrop has been scheduled to start at this time

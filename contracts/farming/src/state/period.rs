@@ -8,10 +8,37 @@ const LOCKDROP_START_DURATION: Duration = Duration::from_seconds(60 * 60 * 24 * 
 // 2 days
 const LOCKDROP_SUNSET_DURATION: Duration = Duration::from_seconds(60 * 60 * 24 * 2);
 
+// The current farming period, without the baggage of FarmingPeriodResp
+// used for internal contract logic only
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum FarmingPeriod {
+    Inactive,
+    Lockdrop,
+    Sunset,
+    Review,
+    Launched,
+}
+
+impl From<FarmingPeriodResp> for FarmingPeriod {
+    fn from(resp: FarmingPeriodResp) -> Self {
+        match resp {
+            FarmingPeriodResp::Inactive { .. } => FarmingPeriod::Inactive,
+            FarmingPeriodResp::Lockdrop { .. } => FarmingPeriod::Lockdrop,
+            FarmingPeriodResp::Sunset { .. } => FarmingPeriod::Sunset,
+            FarmingPeriodResp::Review { .. } => FarmingPeriod::Review,
+            FarmingPeriodResp::Launched { .. } => FarmingPeriod::Launched,
+        }
+    }
+}
+
 impl State<'_> {
     pub(crate) fn get_period(&self, store: &dyn Storage) -> Result<FarmingPeriod> {
+        self.get_period_resp(store).map(Into::into)
+    }
+
+    pub(crate) fn get_period_resp(&self, store: &dyn Storage) -> Result<FarmingPeriodResp> {
         match FarmingEpochStartTime::may_load(store)? {
-            None => Ok(FarmingPeriod::Inactive {
+            None => Ok(FarmingPeriodResp::Inactive {
                 lockdrop_start: None,
             }),
             Some(epoch) => {
@@ -24,21 +51,21 @@ impl State<'_> {
 
                         if now < start {
                             // A scheduled lockdrop doesn't change the current period until it starts
-                            Ok(FarmingPeriod::Inactive {
+                            Ok(FarmingPeriodResp::Inactive {
                                 lockdrop_start: Some(start),
                             })
                         } else if now < sunset_start {
-                            Ok(FarmingPeriod::Lockdrop {
+                            Ok(FarmingPeriodResp::Lockdrop {
                                 started_at: start,
                                 sunset_start,
                             })
                         } else if now < review_start {
-                            Ok(FarmingPeriod::Sunset {
+                            Ok(FarmingPeriodResp::Sunset {
                                 started_at: sunset_start,
                                 review_start,
                             })
                         } else {
-                            Ok(FarmingPeriod::Review {
+                            Ok(FarmingPeriodResp::Review {
                                 started_at: Some(review_start),
                                 launch_start: None,
                             })
@@ -47,12 +74,12 @@ impl State<'_> {
                     FarmingEpochStartTime::Launch(start) => {
                         // A scheduled launch doesn't change the current period until it starts
                         if now < start {
-                            Ok(FarmingPeriod::Review {
+                            Ok(FarmingPeriodResp::Review {
                                 started_at: None,
                                 launch_start: Some(start),
                             })
                         } else {
-                            Ok(FarmingPeriod::Launched { started_at: start })
+                            Ok(FarmingPeriodResp::Launched { started_at: start })
                         }
                     }
                 }
@@ -68,11 +95,7 @@ impl State<'_> {
         let period = self.get_period(ctx.storage)?;
 
         // We allow rescheduling a lockdrop if it hasn't started yet, but not if it's already started
-        if std::mem::discriminant(&period)
-            != std::mem::discriminant(&FarmingPeriod::Inactive {
-                lockdrop_start: None,
-            })
-        {
+        if period != FarmingPeriod::Inactive {
             bail!(
                 "Cannot schedule a lockdrop, it has already started, currently in {:?}.",
                 period
@@ -97,12 +120,7 @@ impl State<'_> {
         let period = self.get_period(ctx.storage)?;
 
         // We allow rescheduling a launch if it hasn't started yet, but not if it's already started
-        if std::mem::discriminant(&period)
-            != std::mem::discriminant(&FarmingPeriod::Review {
-                started_at: None,
-                launch_start: None,
-            })
-        {
+        if period != FarmingPeriod::Review {
             bail!(
                 "Can only launch while in review period, currently in {:?}.",
                 period

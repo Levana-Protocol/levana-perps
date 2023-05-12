@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 impl State<'_> {
     pub(crate) fn get_status(&self, store: &dyn Storage) -> Result<StatusResp> {
-        let period = self.get_period(store)?;
+        let period = self.get_period_resp(store)?;
         let farming_totals = self.get_farming_totals(store)?;
 
         Ok(StatusResp {
