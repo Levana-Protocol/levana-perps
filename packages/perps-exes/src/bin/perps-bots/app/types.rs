@@ -68,7 +68,7 @@ impl Opt {
             explorer: config.explorer,
         };
 
-        let factory = get_factory_info(&cosmos, &config).await?;
+        let factory = get_factory_info(&cosmos, &config, &client).await?;
         log::info!("Discovered factory contract: {}", factory.factory);
         log::info!("Discovered faucet contract: {}", factory.faucet);
 
