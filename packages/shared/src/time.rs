@@ -204,6 +204,14 @@ impl Add<Duration> for Timestamp {
     }
 }
 
+impl Sub<Duration> for Timestamp {
+    type Output = Timestamp;
+
+    fn sub(self, rhs: Duration) -> Self::Output {
+        Timestamp(self.0 - rhs.0)
+    }
+}
+
 impl Sub<Duration> for Duration {
     type Output = Duration;
 

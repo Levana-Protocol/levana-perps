@@ -11,7 +11,9 @@ const LOCKDROP_SUNSET_DURATION: Duration = Duration::from_seconds(60 * 60 * 24 *
 impl State<'_> {
     pub(crate) fn get_period(&self, store: &dyn Storage) -> Result<FarmingPeriod> {
         match FarmingEpochStartTime::may_load(store)? {
-            None => Ok(FarmingPeriod::Inactive),
+            None => Ok(FarmingPeriod::Inactive {
+                lockdrop_start: None,
+            }),
             Some(epoch) => {
                 let now = self.now();
 
@@ -21,20 +23,36 @@ impl State<'_> {
                         let review_start = sunset_start + LOCKDROP_SUNSET_DURATION;
 
                         if now < start {
-                            Ok(FarmingPeriod::LockdropScheduled)
+                            // A scheduled lockdrop doesn't change the current period until it starts
+                            Ok(FarmingPeriod::Inactive {
+                                lockdrop_start: Some(start),
+                            })
                         } else if now < sunset_start {
-                            Ok(FarmingPeriod::Lockdrop)
+                            Ok(FarmingPeriod::Lockdrop {
+                                started_at: start,
+                                sunset_start,
+                            })
                         } else if now < review_start {
-                            Ok(FarmingPeriod::Sunset)
+                            Ok(FarmingPeriod::Sunset {
+                                started_at: sunset_start,
+                                review_start,
+                            })
                         } else {
-                            Ok(FarmingPeriod::Review)
+                            Ok(FarmingPeriod::Review {
+                                started_at: Some(review_start),
+                                launch_start: None,
+                            })
                         }
                     }
                     FarmingEpochStartTime::Launch(start) => {
+                        // A scheduled launch doesn't change the current period until it starts
                         if now < start {
-                            Ok(FarmingPeriod::LaunchScheduled)
+                            Ok(FarmingPeriod::Review {
+                                started_at: None,
+                                launch_start: Some(start),
+                            })
                         } else {
-                            Ok(FarmingPeriod::Launched)
+                            Ok(FarmingPeriod::Launched { started_at: start })
                         }
                     }
                 }
@@ -49,9 +67,14 @@ impl State<'_> {
     ) -> Result<()> {
         let period = self.get_period(ctx.storage)?;
 
-        if period != FarmingPeriod::Inactive {
+        // We allow rescheduling a lockdrop if it hasn't started yet, but not if it's already started
+        if std::mem::discriminant(&period)
+            != std::mem::discriminant(&FarmingPeriod::Inactive {
+                lockdrop_start: None,
+            })
+        {
             bail!(
-                "Cannot start lockdrop, it has already started, currently in {:?}.",
+                "Cannot schedule a lockdrop, it has already started, currently in {:?}.",
                 period
             );
         }
@@ -73,7 +96,13 @@ impl State<'_> {
     ) -> Result<()> {
         let period = self.get_period(ctx.storage)?;
 
-        if period != FarmingPeriod::Review {
+        // We allow rescheduling a launch if it hasn't started yet, but not if it's already started
+        if std::mem::discriminant(&period)
+            != std::mem::discriminant(&FarmingPeriod::Review {
+                started_at: None,
+                launch_start: None,
+            })
+        {
             bail!(
                 "Can only launch while in review period, currently in {:?}.",
                 period
@@ -89,37 +118,6 @@ impl State<'_> {
 
         Ok(())
     }
-
-    pub(crate) fn get_schedule_countdown(&self, store: &dyn Storage) -> Result<Option<Duration>> {
-        let start = match FarmingEpochStartTime::may_load(store)? {
-            None => None,
-            Some(epoch) => match epoch {
-                FarmingEpochStartTime::Lockdrop(start) => Some(start),
-                FarmingEpochStartTime::Launch(start) => Some(start),
-            },
-        };
-
-        match start {
-            Some(start) => {
-                let now = self.now();
-                if start >= now {
-                    Ok(Some(start.checked_sub(now, "farming schedule countdown")?))
-                } else {
-                    Ok(None)
-                }
-            }
-            None => Ok(None),
-        }
-    }
-    pub(crate) fn get_launch_start_time(&self, store: &dyn Storage) -> Result<Timestamp> {
-        match FarmingEpochStartTime::may_load(store)? {
-            None => bail!("Lockdrop has not started yet."),
-            Some(epoch) => match epoch {
-                FarmingEpochStartTime::Lockdrop(_) => bail!("Lockdrop has not finished yet."),
-                FarmingEpochStartTime::Launch(start) => Ok(start),
-            },
-        }
-    }
 }
 
 /// The FarmingPeriod is what we really care about
@@ -130,6 +128,8 @@ impl State<'_> {
 ///
 /// So we track the manually triggered epochs *internally*
 /// and then calculate the period from that
+///
+/// see get_period() for the calculation
 #[derive(Serialize, Deserialize, Debug)]
 enum FarmingEpochStartTime {
     Lockdrop(Timestamp),
