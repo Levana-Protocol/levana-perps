@@ -100,12 +100,12 @@ pub enum ExecuteMsg {
 pub enum OwnerExecuteMsg {
     /// Start the lockdrop period
     StartLockdropPeriod {
-        /// If specified, the lockdrop period will start at this time.
+        /// If specified, lockdrop will start at this time.
         start: Option<Timestamp>,
     },
     /// Finish the review period and launch the primary contract
     StartLaunchPeriod {
-        /// If specified, the lockdrop period will start at this time.
+        /// If specified, launch will start at this time.
         start: Option<Timestamp>,
     },
     /// Change the active emissions
