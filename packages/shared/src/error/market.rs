@@ -13,7 +13,6 @@
 //!
 //! Instead, in the short term, we use this module to provide well-typed
 //! `thiserror` error values that can be converted to `PerpError` values.
-use serde_json::json;
 
 use crate::prelude::*;
 
@@ -80,30 +79,23 @@ impl MarketError {
     pub fn try_from_anyhow(err: &anyhow::Error) -> Result<Self> {
         (|| {
             let err = err
-                .downcast_ref::<PerpError<serde_json::Value>>()
-                .context("Not a PerpError")?;
-            let id = match serde_json::to_value(err.id)? {
-                serde_json::Value::String(id) => id,
-                v => anyhow::bail!("Error IDs must be a String, got {v:?} for {:?}", err.id),
-            };
-            let value = json!({id: err.data});
-            serde_json::from_value(value).context("Could not convert from JSON serialization")
+                .downcast_ref::<PerpError<MarketError>>()
+                .context("Not a PerpError<MarketError>")?;
+            err.data
+                .clone()
+                .context("PerpError<MarketError> without a data field")
         })()
         .with_context(|| format!("try_from_anyhow failed on: {err:?}"))
     }
 
     /// Convert into a `PerpError`.
-    fn into_perp_error(self, description: String) -> PerpError<serde_json::Value> {
+    fn into_perp_error(self, description: String) -> PerpError<MarketError> {
         let id = self.get_error_id();
-        let raw = format!("{self:?}");
         PerpError {
             id,
             domain: ErrorDomain::Market,
             description,
-            data: Some(match self.get_data().ok() {
-                Some(x) => x,
-                None => serde_json::json!({ "bad-data": raw }),
-            }),
+            data: Some(self),
         }
     }
 
@@ -122,24 +114,10 @@ impl MarketError {
             MarketError::MinimumDeposit { .. } => ErrorId::MinimumDeposit,
         }
     }
-
-    /// Get the data payload for the error message.
-    fn get_data(self) -> Result<serde_json::Value> {
-        let value = serde_json::to_value(self)?;
-        let mut pairs = match value {
-            serde_json::Value::Object(o) => o.into_iter(),
-            _ => anyhow::bail!("Expected an Object"),
-        };
-        let (_id, data) = pairs.next().context("Empty object")?;
-        anyhow::ensure!(pairs.next().is_none(), "Too many pairs");
-        Ok(data)
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
-
     use super::*;
 
     #[test]
@@ -152,15 +130,10 @@ mod tests {
             id: ErrorId::WithdrawTooMuch,
             domain: ErrorDomain::Market,
             description: "Unable to withdraw 100. Only 50 LP tokens held.".to_owned(),
-            data: Some(json!({
-                "requested": "100",
-                "available": "50"
-            })),
+            data: Some(market_error.clone()),
         };
         let anyhow_error = market_error.clone().into_anyhow();
-        let actual = anyhow_error
-            .downcast_ref::<PerpError<serde_json::Value>>()
-            .unwrap();
+        let actual = anyhow_error.downcast_ref::<PerpError<_>>().unwrap();
         assert_eq!(&expected, actual);
 
         let market_error2 = MarketError::try_from_anyhow(&anyhow_error).unwrap();
