@@ -99,15 +99,7 @@ pub(crate) fn get_position(store: &dyn Storage, id: PositionId) -> Result<Positi
     OPEN_POSITIONS
         .may_load(store, id)
         .map_err(|e| anyhow!("Could not parse position {id}: {e:?}"))?
-        .ok_or_else(|| {
-            perp_anyhow_data!(
-                ErrorId::MissingPosition,
-                ErrorDomain::Market,
-                Data { position: id },
-                "position id: {}",
-                id
-            )
-        })
+        .ok_or_else(|| MarketError::MissingPosition { id: id.to_string() }.into_anyhow())
 }
 
 impl PositionOrId {

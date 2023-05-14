@@ -2,6 +2,7 @@ pub use super::{addr::*, debug_log, debug_log_any, log::*, number::*, result::*}
 pub use crate::attr_map;
 pub use crate::cosmwasm::*;
 pub use crate::direction::{DirectionToBase, DirectionToNotional};
+pub use crate::error::market::MarketError;
 pub use crate::event::{CosmwasmEventExt, PerpEvent};
 pub use crate::leverage::*;
 pub use crate::market_type::{MarketId, MarketType};

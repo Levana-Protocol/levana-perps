@@ -58,11 +58,13 @@ impl State<'_> {
         let counter_collateral = match market_type {
             MarketType::CollateralIsQuote => {
                 let max_gains_in_collateral = match max_gains_in_quote {
-                    MaxGainsInQuote::PosInfinity => perp_bail!(
-                        ErrorId::LeverageValidation,
-                        ErrorDomain::Market,
-                        "Normal markets do not support infinite max gains"
-                    ),
+                    MaxGainsInQuote::PosInfinity => {
+                        return Err(MarketError::InvalidInfiniteMaxGains {
+                            market_type,
+                            direction: pos.direction().into_base(market_type),
+                        }
+                        .into());
+                    }
                     MaxGainsInQuote::Finite(x) => x,
                 };
 

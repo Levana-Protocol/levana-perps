@@ -36,14 +36,13 @@ impl State<'_> {
         };
 
         if is_out_of_range {
-            Err(perp_anyhow!(
-                ErrorId::LeverageValidation,
-                ErrorDomain::Market,
-                "trader leverage {new_leverage} is out of range ({}..{}]{}",
-                Number::ZERO,
-                max_allowed_leverage,
-                Currently(current_leverage),
-            ))
+            Err(MarketError::TraderLeverageOutOfRange {
+                low_allowed: Decimal256::zero(),
+                high_allowed: max_allowed_leverage,
+                new_leverage,
+                current_leverage,
+            }
+            .into())
         } else {
             Ok(())
         }
@@ -79,14 +78,13 @@ impl State<'_> {
         };
 
         if is_out_of_range {
-            Err(perp_anyhow!(
-                ErrorId::LeverageValidation,
-                ErrorDomain::Market,
-                "counter_leverage {counter_leverage} is out of range [{:?}..{:?}]{}, check max_gains param",
-                Number::ONE,
-                max_allowed_leverage,
-                Currently(current_leverage.map(|x| x.into_number().abs()))
-            ))
+            Err(MarketError::CounterLeverageOutOfRange {
+                low_allowed: Decimal256::one(),
+                high_allowed: max_allowed_leverage.abs_unsigned(),
+                new_leverage: counter_leverage.abs_unsigned(),
+                current_leverage: current_leverage.map(|x| x.abs_unsigned()),
+            }
+            .into())
         } else {
             Ok(())
         }
@@ -138,12 +136,12 @@ impl State<'_> {
                 .minimum_deposit_usd
                 .checked_mul_dec(real_minimum_ratio)?
         {
-            Err(PerpError {
-                id: ErrorId::MinimumDeposit,
-                domain: ErrorDomain::Market,
-                description: format!("Deposit collateral is too small. Deposited {deposit_collateral}, or {deposit} USD. Minimum is {} USD", self.config.minimum_deposit_usd),
-                data: None::<()>,
-            }.into())
+            Err(MarketError::MinimumDeposit {
+                deposit_collateral,
+                deposit_usd: deposit,
+                minimum_usd: self.config.minimum_deposit_usd,
+            }
+            .into())
         } else {
             Ok(())
         }
