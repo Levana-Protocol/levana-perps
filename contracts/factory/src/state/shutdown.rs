@@ -42,9 +42,7 @@ pub(crate) fn shutdown(
     } else if wind_down == info.sender {
         ShutdownWallet::WindDown
     } else {
-        perp_bail!(
-            ErrorId::Auth,
-            ErrorDomain::Factory,
+        bail!(
             "Shutdown actions can only be called by kill switch ({kill_switch}) and wind down ({wind_down}) wallets, executed by {}",
             info.sender
         );

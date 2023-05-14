@@ -40,9 +40,7 @@ impl State<'_> {
         if market_address.as_str() == recipient {
             Ok(())
         } else {
-            Err(perp_anyhow!(
-                ErrorId::Auth,
-                ErrorDomain::Cw20,
+            Err(anyhow!(
                 "failed auth, market: {}, sender_addr: {}, recipient: {:?}, reason: trading competition",
                 market_address,
                 sender,

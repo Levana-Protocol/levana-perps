@@ -37,20 +37,15 @@ pub enum ReplyId {
 }
 
 impl TryFrom<u64> for ReplyId {
-    type Error = PerpError<u64>;
+    type Error = anyhow::Error;
 
-    fn try_from(value: u64) -> Result<Self, PerpError<u64>> {
+    fn try_from(value: u64) -> Result<Self> {
         match value {
             0 => Ok(ReplyId::InstantiateMarket),
             1 => Ok(ReplyId::InstantiatePositionToken),
             2 => Ok(ReplyId::InstantiateLiquidityTokenLp),
             3 => Ok(ReplyId::InstantiateLiquidityTokenXlp),
-            _ => Err(PerpError {
-                id: ErrorId::InternalReply,
-                domain: ErrorDomain::Factory,
-                description: format!("{value} is not a valid reply id"),
-                data: Some(value),
-            }),
+            _ => Err(anyhow!("{value} is not a valid reply id")),
         }
     }
 }

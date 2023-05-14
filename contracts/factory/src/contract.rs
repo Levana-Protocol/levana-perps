@@ -91,12 +91,7 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, WrappedPerpError> {
     if msg.requires_owner() && info.sender != get_owner(deps.storage)? {
-        perp_bail!(
-            ErrorId::Auth,
-            ErrorDomain::Default,
-            "{} is not the auth contract owner",
-            info.sender
-        )
+        return Err(anyhow!("{} is not the auth contract owner", info.sender).into());
     }
 
     let (state, mut ctx) = StateContext::new(deps, env)?;
@@ -113,7 +108,7 @@ pub fn execute(
                 },
         } => {
             if get_market_addr(ctx.storage, &market_id).is_ok() {
-                return Err(anyhow!("market already exists for {market_id}"));
+                return Err(anyhow!("market already exists for {market_id}").into());
             }
             let migration_admin: Addr = get_admin_migration(ctx.storage)?;
 
@@ -311,12 +306,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, WrappedPer
             }
         }
         _ => {
-            return Err(perp_anyhow!(
-                ErrorId::InternalReply,
-                ErrorDomain::Factory,
-                "not a valid reply id: {}",
-                msg.id
-            ));
+            return Err(anyhow!("not a valid reply id: {}", msg.id).into());
         }
     }
 
@@ -384,6 +374,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse, Wrapp
             get_shutdown_status(store, &market_id)?.query_result()
         }
     }
+    .map_err(|e| e.into())
 }
 
 #[entry_point]
@@ -402,13 +393,15 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, W
             "mismatched contract migration name (from {} to {})",
             old_cw2.contract,
             CONTRACT_NAME
-        ))
+        )
+        .into())
     } else if old_version > new_version {
         Err(anyhow!(
             "cannot migrate contract from newer to older (from {} to {})",
             old_cw2.version,
             CONTRACT_VERSION
-        ))
+        )
+        .into())
     } else {
         set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 

@@ -692,10 +692,10 @@ impl State<'_> {
         if marketing_info
             .marketing
             .as_ref()
-            .ok_or_else(|| perp_anyhow!(ErrorId::Auth, ErrorDomain::Cw20, ""))?
+            .context("No marketing info")?
             != sender
         {
-            return Err(perp_anyhow!(ErrorId::Auth, ErrorDomain::Cw20, ""));
+            return Err(anyhow!("sender != marketing"));
         }
 
         LOGO.save(ctx.storage, &logo)?;
@@ -720,9 +720,7 @@ impl State<'_> {
         let old_minter_addr = self.minter_addr(ctx.storage)?;
 
         if old_minter_addr != sender {
-            return Err(perp_anyhow!(
-                ErrorId::Auth,
-                ErrorDomain::Cw20,
+            return Err(anyhow!(
                 "Not the minter! Sender is {sender}, minter is {old_minter_addr}"
             ));
         }

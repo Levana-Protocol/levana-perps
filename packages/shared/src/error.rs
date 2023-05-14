@@ -18,7 +18,7 @@ use crate::storage::{AuthCheck, Timestamp};
 use cosmwasm_std::Addr;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::borrow::Cow;
+use std::{borrow::Cow, num::ParseIntError};
 
 /// Unique identifier for an error within perps
 #[allow(missing_docs)]
@@ -166,6 +166,12 @@ impl From<anyhow::Error> for WrappedPerpError {
 
 impl From<cosmwasm_std::StdError> for WrappedPerpError {
     fn from(e: cosmwasm_std::StdError) -> Self {
+        anyhow::Error::from(e).into()
+    }
+}
+
+impl From<ParseIntError> for WrappedPerpError {
+    fn from(e: ParseIntError) -> Self {
         anyhow::Error::from(e).into()
     }
 }
