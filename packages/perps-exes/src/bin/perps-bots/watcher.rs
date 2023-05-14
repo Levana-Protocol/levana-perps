@@ -31,6 +31,7 @@ pub(crate) enum TaskLabel {
     Crank,
     Price,
     TrackBalance,
+    Stats,
     GasCheck,
     Liquidity,
     Utilization,
@@ -99,6 +100,7 @@ impl TaskLabel {
             TaskLabel::Crank => config.crank,
             TaskLabel::GetFactory => config.get_factory,
             TaskLabel::Price => config.price,
+            TaskLabel::Stats => config.stats,
         }
     }
 
@@ -114,6 +116,7 @@ impl TaskLabel {
             TaskLabel::Balance => false,
             TaskLabel::Trader { index: _ } => false,
             TaskLabel::Stale => true,
+            TaskLabel::Stats => true,
         }
     }
 
@@ -129,6 +132,7 @@ impl TaskLabel {
             TaskLabel::Balance => "balance".into(),
             TaskLabel::Trader { index } => format!("trader-{index}").into(),
             TaskLabel::Stale => "stale".into(),
+            TaskLabel::Stats => "stats".into(),
         }
     }
 }
