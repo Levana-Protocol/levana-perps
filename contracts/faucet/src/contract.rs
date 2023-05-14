@@ -17,9 +17,9 @@ use cw2::{get_contract_version, set_contract_version};
 use msg::contracts::{
     cw20::{entry::InstantiateMinter, Cw20Coin},
     faucet::entry::{
-        ConfigResponse, ExecuteMsg, FaucetAsset, GasAllowance, GasAllowanceResp, GetTokenResponse,
-        InstantiateMsg, IsAdminResponse, MigrateMsg, NextTradingIndexResponse, OwnerMsg, QueryMsg,
-        TapAmountResponse, TapEligibleResponse,
+        ConfigResponse, ExecuteMsg, FaucetAsset, FundsSentResponse, GasAllowance, GasAllowanceResp,
+        GetTokenResponse, InstantiateMsg, IsAdminResponse, MigrateMsg, NextTradingIndexResponse,
+        OwnerMsg, QueryMsg, TapAmountResponse, TapEligibleResponse,
     },
 };
 use semver::Version;
@@ -305,6 +305,12 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 None => TapAmountResponse::CannotTap {},
             }
             .query_result()
+        }
+        QueryMsg::FundsSent { asset, timestamp } => {
+            let (state, store) = State::new(deps, env);
+            let amount =
+                state.get_history(store, &asset, timestamp.unwrap_or_else(|| state.now()))?;
+            FundsSentResponse { amount }.query_result()
         }
     }
 }

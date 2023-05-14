@@ -138,6 +138,13 @@ pub enum QueryMsg {
     /// * returns [TapAmountResponse]
     #[returns(TapAmountResponse)]
     TapAmountByName { name: String },
+
+    /// Find out the cumulative amount of funds transferred at a given timestamp.
+    #[returns(FundsSentResponse)]
+    FundsSent {
+        asset: FaucetAsset,
+        timestamp: Option<Timestamp>,
+    },
 }
 
 #[cw_serde]
@@ -192,4 +199,9 @@ pub struct IsAdminResponse {
 pub enum TapAmountResponse {
     CannotTap {},
     CanTap { amount: Decimal256 },
+}
+
+#[cw_serde]
+pub struct FundsSentResponse {
+    pub amount: Decimal256,
 }
