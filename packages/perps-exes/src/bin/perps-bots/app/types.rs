@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -32,6 +33,7 @@ pub(crate) struct App {
     pub(crate) bind: SocketAddr,
     pub(crate) statuses: TaskStatuses,
     pub(crate) live_since: DateTime<Utc>,
+    pub(crate) gases: RwLock<HashMap<Address, Vec<u128>>>,
 }
 
 #[derive(serde::Serialize)]
@@ -95,6 +97,7 @@ impl Opt {
             bind: self.bind,
             statuses: TaskStatuses::default(),
             live_since: Utc::now(),
+            gases: RwLock::new(HashMap::new()),
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {

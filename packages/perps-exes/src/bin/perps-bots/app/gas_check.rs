@@ -83,8 +83,8 @@ impl AppBuilder {
 
 #[async_trait]
 impl WatchedTask for GasCheck {
-    async fn run_single(&mut self, _app: &App, _heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
-        self.single_gas_check().await
+    async fn run_single(&mut self, app: &App, _heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
+        self.single_gas_check(app).await
     }
 }
 
@@ -95,7 +95,7 @@ fn pretty_gas(x: u128) -> Decimal256 {
 }
 
 impl GasCheck {
-    async fn single_gas_check(&self) -> Result<WatchedTaskOutput> {
+    async fn single_gas_check(&self, app: &App) -> Result<WatchedTaskOutput> {
         let mut balances = vec![];
         let mut errors = vec![];
         let mut to_refill = vec![];
@@ -114,6 +114,16 @@ impl GasCheck {
                     continue;
                 }
             };
+            let mut gases = app.gases.write();
+            gases
+                .entry(*address)
+                .and_modify(|v| {
+                    v.push(gas);
+                    if v.len() >= 1000 {
+                        v.remove(0);
+                    }
+                })
+                .or_insert_with(|| vec![gas]);
             if gas >= *min_gas {
                 balances.push(format!(
                     "Sufficient gas in {name} ({address}). Found: {}.",
