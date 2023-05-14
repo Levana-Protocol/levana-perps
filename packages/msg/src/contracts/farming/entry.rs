@@ -25,12 +25,14 @@ pub struct InstantiateMsg {
     pub bonus_ratio: NonZero<Decimal256>,
     /// The address that receives bonus transfers.
     pub bonus_addr: RawAddr,
-    /// How long LVN rewards from the lockdrop take to linearly unstake
+    /// How long LVN rewards from the lockdrop take to linearly unlock
     #[serde(default = "defaults::lockdrop_month_seconds")]
     pub lockdrop_lvn_unlock_seconds: u32,
     /// What ratio of lockdrop LVN becomes available immediately on launch
     #[serde(default = "defaults::lockdrop_immediate_unlock_ratio")]
     pub lockdrop_immediate_unlock_ratio: Decimal256,
+    /// The denomination of the LVN token that's used for rewards
+    pub lvn_token_denom: String,
 }
 
 /// Migrate a farming contract.

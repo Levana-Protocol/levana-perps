@@ -14,6 +14,7 @@ pub fn instantiate(
         // FIXME remove the ..
         factory,
         market_id,
+        lvn_token_denom,
         ..
     }: InstantiateMsg,
 ) -> Result<Response> {
@@ -22,7 +23,9 @@ pub fn instantiate(
     let factory = factory.validate(deps.api)?;
     MarketInfo::save(deps.querier, deps.storage, factory, market_id)?;
 
-    let (_state, mut ctx) = StateContext::new(deps, env)?;
+    let (state, mut ctx) = StateContext::new(deps, env)?;
+
+    state.save_lvn_token(&mut ctx, lvn_token_denom)?;
     ctx.response.add_event(NewFarmingEvent {});
 
     Ok(ctx.response.into_response())

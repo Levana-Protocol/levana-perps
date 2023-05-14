@@ -1,4 +1,4 @@
-use cosmwasm_std::from_binary;
+use cosmwasm_std::{BankMsg, CosmosMsg, from_binary};
 use msg::token::Token;
 
 use crate::prelude::*;
@@ -59,7 +59,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             state.deposit(&mut ctx, &sender, received)?;
         }
         ExecuteMsg::Withdraw { amount } => state.withdraw(&mut ctx, &sender, amount)?,
-        ExecuteMsg::ClaimLvn {} => todo!(),
+        ExecuteMsg::ClaimLvn {} => state.claim_lvn(&mut ctx, &sender)?,
         ExecuteMsg::Reinvest {} => todo!(),
         ExecuteMsg::TransferBonus {} => todo!(),
     }
@@ -124,6 +124,28 @@ impl State<'_> {
             farming,
             xlp,
         });
+        Ok(())
+    }
+
+    fn claim_lvn(&self, ctx: &mut StateContext, farmer: &Addr) -> Result<()> {
+        let lockdrop_amount = self.collect_lockdrop_rewards(ctx, farmer)?;
+        let emissions_amount = self.collect_lvn_emissions(ctx, farmer)?;
+        let total = lockdrop_amount.checked_add(emissions_amount)?;
+        let amount = NumberGtZero::new(total.into_decimal256())
+            .context("Unable to convert amount into NumberGtZero")?;
+        let coin = self
+            .load_lvn_token(ctx)?
+            .into_native_coin(amount.into_number_gt_zero())?
+            .context("Invalid LVN transfer amount calculated")?;
+
+        let transfer_msg = CosmosMsg::Bank(BankMsg::Send {
+            to_address: farmer.to_string(),
+            amount: vec!(coin),
+        });
+
+        ctx.response
+            .add_message(transfer_msg);
+
         Ok(())
     }
 }

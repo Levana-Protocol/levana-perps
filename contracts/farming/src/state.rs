@@ -1,5 +1,6 @@
 pub(crate) mod farming;
 pub(crate) mod market_info;
+pub(crate) mod rewards;
 
 use crate::prelude::*;
 use cosmwasm_std::{Api, Deps, DepsMut, Empty, Env, QuerierWrapper, Storage};
@@ -29,6 +30,10 @@ impl<'a> State<'a> {
             },
             deps.storage,
         ))
+    }
+
+    pub(crate) fn now(&self) -> Timestamp {
+        self.env.block.time.into()
     }
 }
 

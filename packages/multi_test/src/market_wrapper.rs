@@ -191,6 +191,7 @@ impl PerpsMarket {
                     msg::contracts::farming::entry::defaults::lockdrop_month_seconds(),
                 lockdrop_immediate_unlock_ratio:
                     msg::contracts::farming::entry::defaults::lockdrop_immediate_unlock_ratio(),
+                lvn_token_denom: TEST_CONFIG.rewards_token_denom.clone(),
             },
             &[],
             "Farming Contract".to_owned(),

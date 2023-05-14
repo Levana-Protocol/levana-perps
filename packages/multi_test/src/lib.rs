@@ -190,7 +190,7 @@ impl PerpsApp {
             Token::Native { .. } => self.app.sudo(SudoMsg::Bank(BankSudo::Mint {
                 to_address: recipient.to_string(),
                 amount: vec![token
-                    .into_native_coin(amount.raw())?
+                    .into_native_coin(amount.into_number_gt_zero())?
                     .ok_or_else(|| anyhow!("no coin!"))?],
             })),
         }
