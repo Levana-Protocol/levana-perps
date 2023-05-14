@@ -234,6 +234,10 @@ impl PerpsMarket {
         self.app().log_block_time_changes = flag;
     }
 
+    pub fn now(&self) -> Timestamp {
+        self.app().block_info().time.into()
+    }
+
     pub fn clone_trader(&self, index: usize) -> Result<Addr> {
         let (addr, _) = self.app().get_user(
             &format!("trader-{}", index),
@@ -1406,17 +1410,17 @@ impl PerpsMarket {
         )
     }
 
-    pub fn exec_farming_start_lockdrop(&self) -> Result<AppResponse> {
+    pub fn exec_farming_start_lockdrop(&self, start: Option<Timestamp>) -> Result<AppResponse> {
         self.exec_farming(
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
-            &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::StartLockdropPeriod {}),
+            &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::StartLockdropPeriod { start }),
         )
     }
 
-    pub fn exec_farming_start_launch(&self) -> Result<AppResponse> {
+    pub fn exec_farming_start_launch(&self, start: Option<Timestamp>) -> Result<AppResponse> {
         self.exec_farming(
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
-            &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::StartLaunchPeriod {}),
+            &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::StartLaunchPeriod { start }),
         )
     }
 

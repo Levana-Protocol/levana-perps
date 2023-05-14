@@ -155,7 +155,9 @@ impl<'a> Prefixer<'a> for Timestamp {
 }
 
 /// A duration of time measured in nanoseconds
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, JsonSchema,
+)]
 pub struct Duration(u64);
 
 impl Duration {
