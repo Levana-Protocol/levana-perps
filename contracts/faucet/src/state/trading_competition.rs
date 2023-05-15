@@ -28,10 +28,7 @@ impl State<'_> {
             Some(token_info) => token_info,
             None => return Ok(None),
         };
-        Ok(match token_info.trading_competition_index {
-            Some(_) => Some(cw20),
-            None => None,
-        })
+        Ok(token_info.trading_competition_index.map(|_| cw20))
     }
 
     pub(crate) fn already_tapped_trading_competition(
@@ -57,9 +54,8 @@ impl State<'_> {
         recipient: &Addr,
         asset: &FaucetAsset,
     ) -> Result<()> {
-        match self.get_trading_competition_cw20(ctx.storage, asset)? {
-            Some(cw20) => TAPPED_ONCE.save(ctx.storage, (recipient, &cw20), &())?,
-            None => (),
+        if let Some(cw20) = self.get_trading_competition_cw20(ctx.storage, asset)? {
+            TAPPED_ONCE.save(ctx.storage, (recipient, &cw20), &())?;
         }
         Ok(())
     }
