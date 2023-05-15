@@ -4,7 +4,7 @@ pub(crate) use faucet::*;
 pub(crate) mod owner;
 use msg::prelude::*;
 mod trading_competition;
-pub use trading_competition::*;
+pub(crate) use trading_competition::*;
 pub(crate) mod tokens;
 use cosmwasm_std::{Api, Deps, DepsMut, Empty, Env, QuerierWrapper, Storage};
 pub(crate) mod gas_coin;
