@@ -5,7 +5,7 @@ chains:
     explorer: "https://testnet-explorer.brocha.in/sei%20atlantic%202/tx/"
     # Lower gas requirements, we don't have much available on Sei
     min-gas: 1000000
-    min-gas-in-faucet: 100000000
+    min-gas-in-faucet: 2000000000
     min-gas-in-gas-wallet: 3000000000
     watcher:
       # Nodes seem to crash often, let's see if this helps
@@ -182,5 +182,17 @@ overrides:
     utilization: true
     balance: true
     traders: 1
+    default-market-ids:
+      - ETH_USD
+  seitrade:
+    wallet-manager-address: osmo19a93ag7hf49zqemds0x8nutldv7288drj6fw74
+    price-address: osmo1uvllz6r8aye35rm38jdcjwe7r73wgcxvtsu4c6
+    dev-settings: false
+    price: true
+    crank: true
+    liquidity: true
+    utilization: true
+    balance: true
+    traders: 0
     default-market-ids:
       - ETH_USD
