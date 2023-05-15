@@ -13,7 +13,7 @@ chains:
     rpc-nodes:
     - https://sei.kingnodes.com/
     - https://sei-testnet-rpc.polkachu.com/
-    - https://sei-a2-rpc.brocha.in/
+    #- https://sei-a2-rpc.brocha.in/
   dragonfire:
     tracker: levana18cszlvm6pze0x9sz32qnjq4vtd45xehqs8dq7cwy8yhq35wfnn3q6s5ylj
     faucet: levana1qg5ega6dykkxc307y25pecuufrjkxkaggkkxh7nad0vhyhtuhw3s7ff6rr
