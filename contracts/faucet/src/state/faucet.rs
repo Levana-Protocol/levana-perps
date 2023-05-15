@@ -4,7 +4,7 @@ use cosmwasm_std::{Addr, BankMsg, Coin, CosmosMsg, Uint128};
 use cw_storage_plus::{Item, Map};
 use msg::contracts::{
     cw20::entry::{ExecuteMsg as Cw20ExecuteMsg, QueryMsg as Cw20QueryMsg, TokenInfoResponse},
-    faucet::{entry::FaucetAsset, error::FaucetError, events::TapEvent},
+    faucet::{entry::FaucetAsset, events::TapEvent},
 };
 use msg::prelude::*;
 use shared::namespace;
@@ -18,6 +18,12 @@ const NATIVE_TAP_AMOUNT: Map<String, Number> = Map::new(namespace::NATIVE_TAP_AM
 const DEFAULT_CW20_TAP_AMOUNT: &str = "1000";
 const DEFAULT_NATIVE_TAP_AMOUNT: &str = "10";
 const NATIVE_DECIMAL_PLACES: u32 = 6; // differs per denom?
+
+#[derive(serde::Serialize)]
+pub(crate) enum FaucetError {
+    TooSoon { wait_secs: Decimal256 },
+    AlreadyTapped { cw20: Addr },
+}
 
 impl State<'_> {
     pub(crate) fn tap_limit(&self, store: &dyn Storage) -> Result<Option<u32>> {
@@ -39,8 +45,19 @@ impl State<'_> {
         &self,
         store: &dyn Storage,
         recipient: &Addr,
+        assets: &[FaucetAsset],
     ) -> Result<Result<(), FaucetError>> {
         let now = self.now();
+
+        for asset in assets {
+            match self.already_tapped_trading_competition(store, recipient, asset)? {
+                AlreadyTappedTradingCompetition::NotTradingCompetition => (),
+                AlreadyTappedTradingCompetition::AlreadyTapped(cw20) => {
+                    return Ok(Err(FaucetError::AlreadyTapped { cw20 }))
+                }
+                AlreadyTappedTradingCompetition::DidNotTap(_) => (),
+            }
+        }
 
         if let Some(tap_limit) = self.tap_limit(store)? {
             if let Some(last_tap) = self.last_tap_timestamp(store, recipient)? {
@@ -50,7 +67,7 @@ impl State<'_> {
                 if elapsed < tap_limit {
                     let time_remaining = tap_limit - elapsed;
 
-                    return Ok(Err(FaucetError {
+                    return Ok(Err(FaucetError::TooSoon {
                         wait_secs: time_remaining.as_ms_decimal_lossy()
                             / Decimal256::from_str("1000").unwrap(),
                     }));
@@ -61,16 +78,26 @@ impl State<'_> {
         Ok(Ok(()))
     }
 
-    pub(crate) fn validate_tap(&self, store: &dyn Storage, recipient: &Addr) -> Result<()> {
-        self.validate_tap_faucet_error(store, recipient)?
-            .map_err(|e| {
-                perp_anyhow_data!(
+    pub(crate) fn validate_tap(
+        &self,
+        store: &dyn Storage,
+        recipient: &Addr,
+        assets: &[FaucetAsset],
+    ) -> Result<()> {
+        self.validate_tap_faucet_error(store, recipient, assets)?
+            .map_err(|e| match e {
+                FaucetError::TooSoon { wait_secs } => perp_anyhow_data!(
                     ErrorId::Exceeded,
                     ErrorDomain::Faucet,
                     e,
                     "You can tap the faucet again in {}",
-                    PrettyTimeRemaining(e.wait_secs),
-                )
+                    PrettyTimeRemaining(wait_secs),
+                ),
+                FaucetError::AlreadyTapped { cw20: _ } => perp_anyhow!(
+                    ErrorId::Exceeded,
+                    ErrorDomain::Faucet,
+                    "You cannot tap a trading competition faucet more than once"
+                ),
             })
     }
 

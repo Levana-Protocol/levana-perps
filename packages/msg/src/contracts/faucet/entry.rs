@@ -125,7 +125,11 @@ pub enum QueryMsg {
 
     /// * returns [TapEligibleResponse]
     #[returns(TapEligibleResponse)]
-    IsTapEligible { addr: RawAddr },
+    IsTapEligible {
+        addr: RawAddr,
+        #[serde(default)]
+        assets: Vec<FaucetAsset>,
+    },
 
     /// * returns [IsAdminResponse]
     #[returns(IsAdminResponse)]

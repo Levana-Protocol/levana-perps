@@ -131,6 +131,7 @@ deployments:
     traders: 10
     default-market-ids:
       - ATOM_USD
+    trading-competition: true
   ci:
     wallet-manager-address: osmo1ghgpnmxgt6xz463423hhnx8zp99dwt563wnllv
     price-address: osmo1pcma8fhzddx6j0uylpcll4ut673t3qqulpu56l
@@ -196,3 +197,4 @@ overrides:
     traders: 0
     default-market-ids:
       - ETH_USD
+    trading-competition: true
