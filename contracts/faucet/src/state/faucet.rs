@@ -84,6 +84,9 @@ impl State<'_> {
         recipient: &Addr,
         assets: &[FaucetAsset],
     ) -> Result<()> {
+        // See docs on validate_tap_faucet_error. Outer Err means there was some
+        // problem with storage, inner error indicates whether the wallet can
+        // tap or not.
         self.validate_tap_faucet_error(store, recipient, assets)?
             .map_err(|e| match e {
                 FaucetError::TooSoon { wait_secs } => perp_anyhow_data!(
