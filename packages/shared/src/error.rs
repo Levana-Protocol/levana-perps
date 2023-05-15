@@ -1,4 +1,6 @@
 //! Error handling helpers for within the perps protocol
+pub(crate) mod market;
+
 use crate::event::CosmwasmEventExt;
 use cosmwasm_std::Event;
 use schemars::JsonSchema;
@@ -23,7 +25,6 @@ pub struct PerpError<T = ()> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorId {
-    InvalidWithdrawal,
     InvalidStakeLp,
     InvalidAmount,
     SlippageAssert,
@@ -31,8 +32,6 @@ pub enum ErrorId {
     PriceNotFound,
     PriceTooOld,
     Liquidity,
-    MissingPosition,
-    LeverageValidation,
     PositionUpdate,
     NativeFunds,
     Cw20Funds,
@@ -54,13 +53,22 @@ pub enum ErrorId {
     DeltaNeutralityFeeNewlyShort,
     DeltaNeutralityFeeLongToShort,
     DeltaNeutralityFeeShortToLong,
-    MinimumDeposit,
     DirectionToBaseFlipped,
     MissingFunds,
     UnnecessaryFunds,
     NoYieldToClaim,
     InsufficientForReinvest,
     TimestampSubtractUnderflow,
+
+    // Errors that come from MarketError
+    InvalidInfiniteMaxGains,
+    MaxGainsTooLarge,
+    WithdrawTooMuch,
+    InsufficientLiquidityForWithdrawl,
+    MissingPosition,
+    TraderLeverageOutOfRange,
+    CounterLeverageOutOfRange,
+    MinimumDeposit,
 }
 
 /// Source within the protocol for the error

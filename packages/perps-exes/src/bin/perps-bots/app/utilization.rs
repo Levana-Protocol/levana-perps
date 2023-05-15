@@ -244,11 +244,7 @@ fn counter_to_deposit(
                         .checked_div(leverage_notional.into_number().abs())?;
 
                 if max_gains_multiple.approx_lt_relaxed(Number::ZERO) {
-                    perp_bail!(
-                        ErrorId::LeverageValidation,
-                        ErrorDomain::Market,
-                        "Max gains too large"
-                    );
+                    return Err(MarketError::MaxGainsTooLarge {}.into());
                 }
 
                 let deposit = (counter.into_number() * max_gains_multiple)
