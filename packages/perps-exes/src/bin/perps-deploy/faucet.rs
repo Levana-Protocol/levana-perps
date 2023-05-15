@@ -53,7 +53,9 @@ impl Faucet {
         let tap_amount = match name.as_str() {
             "ATOM" => "1000",
             "USDC" => "20000",
-            "BTC" => "15",
+            "BTC" => "1",
+            // This is going to end up being ignored I think...
+            "ETH" => "2",
             name => anyhow::bail!("Unknown collateral type: {name}"),
         }
         .parse()?;
