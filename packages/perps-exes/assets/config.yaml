@@ -184,3 +184,15 @@ overrides:
     traders: 1
     default-market-ids:
       - ETH_USD
+  seitrade:
+    wallet-manager-address: osmo19a93ag7hf49zqemds0x8nutldv7288drj6fw74
+    price-address: osmo1uvllz6r8aye35rm38jdcjwe7r73wgcxvtsu4c6
+    dev-settings: false
+    price: true
+    crank: true
+    liquidity: true
+    utilization: true
+    balance: true
+    traders: 0
+    default-market-ids:
+      - ETH_USD
