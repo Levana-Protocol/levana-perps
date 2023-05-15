@@ -18,7 +18,7 @@ use crate::prelude::*;
 
 /// An error type for known market errors with potentially special error handling.
 #[derive(thiserror::Error, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Clone)]
-#[serde(rename_all = "snake_case", untagged)]
+#[serde(rename_all = "snake_case", tag = "error_id")]
 #[allow(missing_docs)]
 pub enum MarketError {
     #[error(
