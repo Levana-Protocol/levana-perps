@@ -59,3 +59,7 @@ pub(super) fn price() -> TaskConfig {
 pub(super) fn stale() -> TaskConfig {
     super::WatcherConfig::default().stale
 }
+
+pub(super) fn stats() -> TaskConfig {
+    super::WatcherConfig::default().stats
+}

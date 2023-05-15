@@ -206,6 +206,8 @@ pub struct WatcherConfig {
     pub price: TaskConfig,
     #[serde(default = "defaults::stale")]
     pub stale: TaskConfig,
+    #[serde(default = "defaults::stats")]
+    pub stats: TaskConfig,
 }
 
 impl Default for WatcherConfig {
@@ -253,6 +255,10 @@ impl Default for WatcherConfig {
                 out_of_date: 180,
             },
             stale: TaskConfig {
+                delay: Delay::Constant(30),
+                out_of_date: 180,
+            },
+            stats: TaskConfig {
                 delay: Delay::Constant(30),
                 out_of_date: 180,
             },

@@ -9,6 +9,8 @@ use axum::async_trait;
 use cosmos::{
     proto::cosmos::bank::v1beta1::MsgSend, Address, Coin, Cosmos, HasAddress, TxBuilder, Wallet,
 };
+use cosmwasm_std::Decimal256;
+use msg::prelude::{LpToken, UnsignedDecimal};
 
 use super::AppBuilder;
 
@@ -86,8 +88,15 @@ impl WatchedTask for GasCheck {
     }
 }
 
+fn pretty_gas(x: u128) -> Decimal256 {
+    LpToken::from_u128(x)
+        .ok()
+        .map_or_else(Decimal256::zero, |x| x.into_decimal256())
+}
+
 impl GasCheck {
     async fn single_gas_check(&self) -> Result<WatchedTaskOutput> {
+        let mut balances = vec![];
         let mut errors = vec![];
         let mut to_refill = vec![];
         for Tracked {
@@ -99,14 +108,25 @@ impl GasCheck {
         {
             let gas = get_gas_balance(&self.app.cosmos, *address).await?;
             if gas >= *min_gas {
+                balances.push(format!(
+                    "Sufficient gas in {name} ({address}). Found: {}.",
+                    pretty_gas(gas)
+                ));
                 continue;
             }
 
             if *should_refill {
                 to_refill.push((*address, *min_gas));
+                balances.push(format!(
+                    "Topping off gas in {name} ({address}). Found: {}. Wanted: {}.",
+                    pretty_gas(gas),
+                    pretty_gas(*min_gas)
+                ))
             } else {
                 errors.push(format!(
-                    "Insufficient gas in {name} ({address}). Found: {gas}. Wanted: {min_gas}."
+                    "Insufficient gas in {name} ({address}). Found: {}. Wanted: {}.",
+                    pretty_gas(gas),
+                    pretty_gas(*min_gas)
                 ));
             }
         }
@@ -141,10 +161,11 @@ impl GasCheck {
 
         if errors.is_empty() {
             Ok(WatchedTaskOutput {
-                message: format!("Enough gas in all wallets, checked {}", self.to_track.len()),
+                message: balances.join("\n"),
                 skip_delay: false,
             })
         } else {
+            errors.append(&mut balances);
             let errors = errors.join("\n");
             Err(anyhow::anyhow!("{errors}"))
         }
