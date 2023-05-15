@@ -3,7 +3,8 @@ pub mod defaults;
 
 use crate::prelude::*;
 use cosmwasm_schema::QueryResponses;
-use cosmwasm_std::{Binary, Uint128};
+use cosmwasm_std::{Binary, StdResult, Uint128};
+use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
 
 /// Instantiate a new farming contract.
 #[cw_serde]
@@ -56,7 +57,7 @@ pub enum ExecuteMsg {
     /// Valid during the [FarmingStatus::Lockdrop] and [FarmingStatus::Sunset] periods.
     LockdropDeposit {
         /// Which bucket to deposit into
-        bucket: LockdropBucket,
+        bucket_id: LockdropBucketId,
     },
     /// Withdraw from a lockdrop bucket
     ///
@@ -65,7 +66,7 @@ pub enum ExecuteMsg {
     /// deposits.
     LockdropWithdraw {
         /// Which bucket to withdraw from
-        bucket: LockdropBucket,
+        bucket_id: LockdropBucketId,
         /// Amount of collateral to withdraw
         amount: NonZero<Collateral>,
     },
@@ -247,20 +248,60 @@ pub enum FarmingPeriodResp {
     },
 }
 
-/// A lockdrop bucket, given in number of "months."
+/// A lockdrop bucket id
+///
+/// The inner value is given in number of "months."
 ///
 /// Note that months actually means 30 days, where each day is exactly 24 hours,
 /// or 86,400 seconds. (Yes, thanks to leap seconds days can have slightly more
 /// than 86,400 seconds.)
 #[cw_serde]
 #[derive(Copy)]
-pub struct LockdropBucket(pub u32);
+pub struct LockdropBucketId(pub u32);
 
+impl<'a> PrimaryKey<'a> for LockdropBucketId {
+    type Prefix = ();
+    type SubPrefix = ();
+    type Suffix = Self;
+    type SuperSuffix = Self;
+
+    fn key(&self) -> Vec<Key> {
+        vec![Key::Val32(self.0.to_cw_bytes())]
+    }
+}
+
+impl<'a> Prefixer<'a> for LockdropBucketId {
+    fn prefix(&self) -> Vec<Key> {
+        vec![Key::Val32(self.0.to_cw_bytes())]
+    }
+}
+
+impl KeyDeserialize for LockdropBucketId {
+    type Output = LockdropBucketId;
+
+    #[inline(always)]
+    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
+        u32::from_vec(value).map(LockdropBucketId)
+    }
+}
+
+impl std::fmt::Display for LockdropBucketId {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl FromStr for LockdropBucketId {
+    type Err = std::num::ParseIntError;
+    fn from_str(src: &str) -> Result<Self, std::num::ParseIntError> {
+        src.parse().map(LockdropBucketId)
+    }
+}
 /// Configuration information for a single lockdrop bucket.
 #[cw_serde]
 pub struct LockdropBucketConfig {
-    /// The bucket duration
-    pub bucket: LockdropBucket,
+    /// The bucket id/duration
+    pub bucket_id: LockdropBucketId,
     /// The reward multiplier used
     pub multiplier: NonZero<Decimal256>,
 }
@@ -268,8 +309,8 @@ pub struct LockdropBucketConfig {
 /// When a lockdrop bucket will unlock.
 #[cw_serde]
 pub struct LockdropBucketStats {
-    /// The bucket duration
-    pub bucket: LockdropBucket,
+    /// The bucket id/duration
+    pub bucket_id: LockdropBucketId,
     /// The reward multiplier used
     pub multiplier: NonZero<Decimal256>,
     /// Total amount deposited
@@ -302,8 +343,8 @@ pub struct FarmerStats {
 /// Information on an individual farmers lockdrop stats.
 #[cw_serde]
 pub struct FarmerLockdropStats {
-    /// The bucket duration
-    pub bucket: LockdropBucket,
+    /// The bucket id/duration
+    pub bucket_id: LockdropBucketId,
     /// Total deposit in this bucket
     ///
     /// Note: this number will also always be the same as the number of farming

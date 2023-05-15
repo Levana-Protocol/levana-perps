@@ -1,5 +1,6 @@
 pub(crate) mod auth;
 pub(crate) mod farming;
+pub(crate) mod lockdrop;
 pub(crate) mod market_info;
 pub(crate) mod period;
 pub(crate) mod status;

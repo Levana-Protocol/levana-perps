@@ -27,9 +27,12 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                         decimal_places: _,
                     } => {
                         if addr.as_str() == info.sender.as_str() {
-                            Received::Collateral(Collateral::from_decimal256(
-                                state.market_info.collateral.from_u128(amount.into())?,
-                            ))
+                            Received::Collateral(
+                                NonZero::<Collateral>::try_from_decimal(
+                                    state.market_info.collateral.from_u128(amount.into())?,
+                                )
+                                .context("collateral must be non-zero")?,
+                            )
                         } else {
                             anyhow::bail!("Invalid Receive called from contract {}", info.sender)
                         }
@@ -49,7 +52,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         }
     };
 
-    state.validate_period_msg(ctx.storage, &msg)?;
+    state.validate_period_msg(ctx.storage, &sender, &msg)?;
 
     match msg {
         ExecuteMsg::Owner(owner_msg) => {
@@ -67,8 +70,16 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             }
         }
         ExecuteMsg::Receive { .. } => anyhow::bail!("Cannot have double-wrapped Receive"),
-        ExecuteMsg::LockdropDeposit { .. } => todo!(),
-        ExecuteMsg::LockdropWithdraw { .. } => todo!(),
+        ExecuteMsg::LockdropDeposit { bucket_id } => {
+            if let Some(Received::Collateral(amount)) = received {
+                state.lockdrop_deposit(&mut ctx, sender, bucket_id, amount)?;
+            } else {
+                anyhow::bail!("Must send collateral for a lockdrop deposit");
+            }
+        }
+        ExecuteMsg::LockdropWithdraw { bucket_id, amount } => {
+            state.lockdrop_withdraw(&mut ctx, sender, bucket_id, amount)?;
+        }
         ExecuteMsg::Deposit {} => {
             let received = received.context("Must send collateral, LP, or xLP for a deposit")?;
             state.deposit(&mut ctx, &sender, received)?;
@@ -84,7 +95,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
 #[derive(Debug, Clone, Copy)]
 enum Received {
-    Collateral(Collateral),
+    Collateral(NonZero<Collateral>),
     Lp(LpToken),
     Xlp(LpToken),
 }

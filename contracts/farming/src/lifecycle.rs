@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, state::lockdrop::LockdropBuckets};
 use semver::Version;
 
 // version info for migration info
@@ -10,17 +10,13 @@ pub fn instantiate(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    InstantiateMsg {
-        // FIXME remove the ..
-        factory,
-        market_id,
-        ..
-    }: InstantiateMsg,
+    msg: InstantiateMsg,
 ) -> Result<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    let factory = factory.validate(deps.api)?;
-    MarketInfo::save(deps.querier, deps.storage, factory, market_id)?;
+    let factory = msg.factory.validate(deps.api)?;
+    MarketInfo::save(deps.querier, deps.storage, factory, msg.market_id.clone())?;
+    LockdropBuckets::init(deps.storage, &msg)?;
 
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
