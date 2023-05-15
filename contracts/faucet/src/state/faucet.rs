@@ -193,6 +193,12 @@ impl State<'_> {
             }
         }
 
+        let amount_unsigned = amount
+            .try_into_non_zero()
+            .context("Tried to tap a negative value")?
+            .raw();
+        self.add_history(ctx, &asset, amount_unsigned)?;
+
         ctx.response.add_event(TapEvent {
             asset,
             recipient: recipient.clone(),
