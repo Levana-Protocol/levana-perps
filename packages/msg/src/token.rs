@@ -94,7 +94,7 @@ impl Token {
     ) -> Result<Option<CosmosMsg>> {
         match self {
             Self::Native { .. } => {
-                let coin = self.into_native_coin(amount)?;
+                let coin = self.into_native_coin(amount.raw())?;
 
                 match coin {
                     Some(coin) => Ok(Some(CosmosMsg::Bank(BankMsg::Send {
@@ -190,7 +190,7 @@ impl Token {
     ///
     /// when we know for a fact we have a WalletSource::native
     /// we can get a Coin from a Number amount
-    pub fn into_native_coin(&self, amount: NonZero<Collateral>) -> Result<Option<Coin>> {
+    pub fn into_native_coin(&self, amount: Collateral) -> Result<Option<Coin>> {
         match self {
             Self::Native { denom, .. } => {
                 Ok(self
@@ -216,7 +216,7 @@ impl Token {
     pub fn into_cw20_execute_send_msg<T: Serialize>(
         &self,
         contract: &Addr,
-        amount: NonZero<Collateral>,
+        amount: Collateral,
         submsg: &T,
     ) -> Result<Option<Cw20ExecuteMsg>> {
         match self {
@@ -263,7 +263,6 @@ impl Token {
             })),
         }
     }
-
     /// perps-specific use-case for executing a market message with funds
     pub fn into_market_execute_msg(
         &self,
@@ -271,16 +270,15 @@ impl Token {
         amount: Collateral,
         execute_msg: MarketExecuteMsg,
     ) -> Result<WasmMsg> {
-        let amount = NonZero::<Collateral>::new(amount).context("amount cannot be zero")?;
-        self.into_execute_msg(market_addr, amount, execute_msg)
+        self.into_execute_msg(market_addr, amount, &execute_msg)
     }
 
-    /// create an execution message with funds
+    /// helper to create an execute message with funds
     pub fn into_execute_msg<T: Serialize + std::fmt::Debug>(
         &self,
         contract_addr: &Addr,
-        amount: NonZero<Collateral>,
-        execute_msg: T,
+        amount: Collateral,
+        execute_msg: &T,
     ) -> Result<WasmMsg> {
         match self.clone() {
             Self::Cw20 { addr, .. } => {

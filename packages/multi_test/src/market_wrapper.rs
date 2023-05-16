@@ -1431,7 +1431,7 @@ impl PerpsMarket {
     ) -> Result<AppResponse> {
         let msg = self.token.into_execute_msg(
             &self.farming_addr,
-            amount,
+            amount.raw(),
             &FarmingExecuteMsg::LockdropDeposit { bucket_id },
         )?;
 
