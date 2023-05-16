@@ -50,7 +50,7 @@ impl State<'_> {
             .map(|res| {
                 let (bucket_id, balance) = res?;
                 let total =
-                    NonZero::new(balance.total()?).context("non-zero totals should be removed")?;
+                    NonZero::new(balance.total()?).context("zero totals should be removed")?;
 
                 Ok(FarmerLockdropStats {
                     bucket_id,
