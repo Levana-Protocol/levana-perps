@@ -18,8 +18,8 @@ use msg::contracts::{
     cw20::{entry::InstantiateMinter, Cw20Coin},
     faucet::entry::{
         ConfigResponse, ExecuteMsg, FaucetAsset, FundsSentResponse, GasAllowance, GasAllowanceResp,
-        GetTokenResponse, InstantiateMsg, IsAdminResponse, MigrateMsg, NextTradingIndexResponse,
-        OwnerMsg, QueryMsg, TapAmountResponse, TapEligibleResponse,
+        GetTokenResponse, IneligibleReason, InstantiateMsg, IsAdminResponse, MigrateMsg,
+        NextTradingIndexResponse, OwnerMsg, QueryMsg, TapAmountResponse, TapEligibleResponse,
     },
 };
 use semver::Version;
@@ -276,14 +276,16 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 Err(FaucetError::TooSoon { wait_secs }) => TapEligibleResponse::Ineligible {
                     seconds: wait_secs,
                     message: format!(
-                        "You can tap the faucet again in {}",
+                        "You can only tap the faucet again in {}",
                         PrettyTimeRemaining(wait_secs)
                     ),
+                    reason: IneligibleReason::TooSoon,
                 },
                 Err(FaucetError::AlreadyTapped { cw20: _ }) => TapEligibleResponse::Ineligible {
                     seconds: Decimal256::zero(),
-                    message: "You cannot tap a trading competition faucet more than once"
+                    message: "During the trading competition there is a limit of one faucet tap per person"
                         .to_owned(),
+                    reason: IneligibleReason::AlreadyTapped,
                 },
             }
             .query_result()

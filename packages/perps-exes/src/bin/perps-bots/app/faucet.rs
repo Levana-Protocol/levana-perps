@@ -67,6 +67,7 @@ impl FaucetBot {
             TapEligibleResponse::Eligible {} => (),
             TapEligibleResponse::Ineligible {
                 seconds: _,
+                reason: _,
                 message,
             } => anyhow::bail!("{message}"),
         }

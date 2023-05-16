@@ -191,7 +191,14 @@ pub enum TapEligibleResponse {
     Ineligible {
         seconds: Decimal256,
         message: String,
+        reason: IneligibleReason,
     },
+}
+
+#[cw_serde]
+pub enum IneligibleReason {
+    TooSoon,
+    AlreadyTapped,
 }
 
 #[cw_serde]
