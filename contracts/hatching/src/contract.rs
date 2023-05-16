@@ -90,6 +90,15 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 .map(HatchStatusResp::from),
         }
         .query_result(),
+
+        QueryMsg::PotentialHatchInfo {
+            owner,
+            eggs,
+            dusts,
+            profile,
+        } => state
+            .get_potential_hatch_info(&owner.validate(deps.api)?, eggs, dusts, profile)?
+            .query_result(),
     }
 }
 
