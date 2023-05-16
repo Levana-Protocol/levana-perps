@@ -41,7 +41,9 @@ impl State<'_> {
 
         let is_valid = match msg {
             ExecuteMsg::Owner(_) => true,
-            ExecuteMsg::Receive { .. } => true,
+            ExecuteMsg::Receive { .. } => {
+                anyhow::bail!("Cannot have double-wrapped Receive");
+            }
             ExecuteMsg::LockdropDeposit { .. } => {
                 period == FarmingPeriod::Lockdrop || period == FarmingPeriod::Sunset
             }
@@ -50,6 +52,10 @@ impl State<'_> {
                     FarmingPeriod::Lockdrop => true,
                     FarmingPeriod::Sunset => {
                         // TODO - check that amount is no more than half the bucket
+                        true
+                    }
+                    FarmingPeriod::Launched => {
+                        // TODO - check that the lockdrop has finished for this bucket
                         true
                     }
                     _ => false,
