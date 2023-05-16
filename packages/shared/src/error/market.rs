@@ -36,7 +36,7 @@ pub enum MarketError {
         available: NonZero<LpToken>,
     },
     #[error("Insufficient unlocked liquidity for withdrawal. Requested {requested_collateral} ({requested_lp} LP tokens), only {unlocked} liquidity available.")]
-    InsufficientLiquidityForWithdrawl {
+    InsufficientLiquidityForWithdrawal {
         requested_lp: NonZero<LpToken>,
         requested_collateral: NonZero<Collateral>,
         unlocked: Collateral,
@@ -105,8 +105,8 @@ impl MarketError {
             MarketError::InvalidInfiniteMaxGains { .. } => ErrorId::InvalidInfiniteMaxGains,
             MarketError::MaxGainsTooLarge {} => ErrorId::MaxGainsTooLarge,
             MarketError::WithdrawTooMuch { .. } => ErrorId::WithdrawTooMuch,
-            MarketError::InsufficientLiquidityForWithdrawl { .. } => {
-                ErrorId::InsufficientLiquidityForWithdrawl
+            MarketError::InsufficientLiquidityForWithdrawal { .. } => {
+                ErrorId::InsufficientLiquidityForWithdrawal
             }
             MarketError::MissingPosition { .. } => ErrorId::MissingPosition,
             MarketError::TraderLeverageOutOfRange { .. } => ErrorId::TraderLeverageOutOfRange,

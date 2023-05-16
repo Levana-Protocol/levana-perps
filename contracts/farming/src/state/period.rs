@@ -47,7 +47,9 @@ impl State<'_> {
 
         let is_valid = match msg {
             ExecuteMsg::Owner(_) => true,
-            ExecuteMsg::Receive { .. } => true,
+            ExecuteMsg::Receive { .. } => {
+                anyhow::bail!("Cannot have double-wrapped Receive");
+            }
             ExecuteMsg::LockdropDeposit { .. } => {
                 period == FarmingPeriod::Lockdrop || period == FarmingPeriod::Sunset
             }

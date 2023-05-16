@@ -114,7 +114,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 }
             }
 
-            state.validate_tap(ctx.storage, &recipient)?;
+            state.validate_tap(ctx.storage, &recipient, &assets)?;
 
             for asset in assets {
                 state.tap(&mut ctx, asset, &recipient, amount)?;
@@ -268,17 +268,22 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 }
             })
             .query_result(),
-        QueryMsg::IsTapEligible { addr } => {
+        QueryMsg::IsTapEligible { addr, assets } => {
             let addr = addr.validate(deps.api)?;
             let (state, store) = State::new(deps, env);
-            match state.validate_tap_faucet_error(store, &addr)? {
+            match state.validate_tap_faucet_error(store, &addr, &assets)? {
                 Ok(()) => TapEligibleResponse::Eligible {},
-                Err(e) => TapEligibleResponse::Ineligible {
-                    seconds: e.wait_secs,
+                Err(FaucetError::TooSoon { wait_secs }) => TapEligibleResponse::Ineligible {
+                    seconds: wait_secs,
                     message: format!(
                         "You can tap the faucet again in {}",
-                        PrettyTimeRemaining(e.wait_secs)
+                        PrettyTimeRemaining(wait_secs)
                     ),
+                },
+                Err(FaucetError::AlreadyTapped { cw20: _ }) => TapEligibleResponse::Ineligible {
+                    seconds: Decimal256::zero(),
+                    message: "You cannot tap a trading competition faucet more than once"
+                        .to_owned(),
                 },
             }
             .query_result()

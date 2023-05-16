@@ -2,6 +2,9 @@ chains:
   sei-testnet:
     tracker: sei14k4xcy6dfdyqvpvx6njxptry2urcp98f74lv49m36u7gkdkv7s6qleq4tp
     faucet: sei1czf3age49j99yrkxynmetysh3p2x8tp429mv23jme7zj8hytwhesnqngza
+    pyth:
+     address: sei1977nnu5jqatteqgve8tx7nzu9y7eh6cvq0e4g6xjx8tf5wm4nkmsfljunh
+     endpoint: "https://xc-mainnet.pyth.network/"
     explorer: "https://testnet-explorer.brocha.in/sei%20atlantic%202/tx/"
     # Lower gas requirements, we don't have much available on Sei
     min-gas: 1000000
@@ -13,7 +16,7 @@ chains:
     rpc-nodes:
     - https://sei.kingnodes.com/
     - https://sei-testnet-rpc.polkachu.com/
-    - https://sei-a2-rpc.brocha.in/
+    #- https://sei-a2-rpc.brocha.in/
   dragonfire:
     tracker: levana18cszlvm6pze0x9sz32qnjq4vtd45xehqs8dq7cwy8yhq35wfnn3q6s5ylj
     faucet: levana1qg5ega6dykkxc307y25pecuufrjkxkaggkkxh7nad0vhyhtuhw3s7ff6rr
@@ -131,6 +134,7 @@ deployments:
     traders: 10
     default-market-ids:
       - ATOM_USD
+    trading-competition: true
   ci:
     wallet-manager-address: osmo1ghgpnmxgt6xz463423hhnx8zp99dwt563wnllv
     price-address: osmo1pcma8fhzddx6j0uylpcll4ut673t3qqulpu56l
@@ -196,3 +200,4 @@ overrides:
     traders: 0
     default-market-ids:
       - ETH_USD
+    trading-competition: true

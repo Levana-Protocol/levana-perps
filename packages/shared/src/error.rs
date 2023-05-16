@@ -64,7 +64,7 @@ pub enum ErrorId {
     InvalidInfiniteMaxGains,
     MaxGainsTooLarge,
     WithdrawTooMuch,
-    InsufficientLiquidityForWithdrawl,
+    InsufficientLiquidityForWithdrawal,
     MissingPosition,
     TraderLeverageOutOfRange,
     CounterLeverageOutOfRange,

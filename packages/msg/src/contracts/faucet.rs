@@ -3,5 +3,4 @@
 //!
 //! This is used by perps on testnet, not in production.
 pub mod entry;
-pub mod error;
 pub mod events;
