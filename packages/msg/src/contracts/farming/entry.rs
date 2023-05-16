@@ -350,11 +350,15 @@ pub struct FarmerLockdropStats {
     /// Note: this number will also always be the same as the number of farming
     /// tokens received for this collateral, since on protocol launch we
     /// guarantee a 1:1 ratio between collateral and farming tokens.
-    pub total: Collateral,
+    pub total: NonZero<Collateral>,
     /// Total deposit before the sunset period began
-    pub total_before_sunset: Collateral,
+    pub deposit_before_sunset: Collateral,
+    /// Total deposit after the sunset period began
+    pub deposit_after_sunset: Collateral,
+    /// Total withdrawals that have occurred before the sunset period
+    pub withdrawal_before_sunset: Collateral,
     /// Total withdrawals that have occurred during the sunset period
-    pub sunset_withdrawals: Collateral,
+    pub withdrawal_after_sunset: Collateral,
 }
 
 /// Returned from [QueryMsg::Farmers]

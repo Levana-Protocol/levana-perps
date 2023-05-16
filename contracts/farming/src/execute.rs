@@ -47,7 +47,34 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             (msg, received, sender)
         }
         msg => {
-            let received = None;
+            let token = state.market_info.collateral.clone();
+            let received = match &token {
+                Token::Native { denom, .. } => info
+                    .funds
+                    .iter()
+                    .find_map(|coin| {
+                        if coin.denom == *denom {
+                            let amount = token
+                                .from_u128(coin.amount.u128())
+                                .ok()
+                                .and_then(NonZero::<Collateral>::try_from_decimal)
+                                .map(Received::Collateral);
+
+                            match amount {
+                                Some(amount) => Some(Ok(amount)),
+                                None => Some(Err(anyhow::anyhow!(
+                                    "Invalid collateral amount {}",
+                                    coin.amount
+                                ))),
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .transpose()?,
+                Token::Cw20 { .. } => None,
+            };
+
             (msg, received, info.sender)
         }
     };
