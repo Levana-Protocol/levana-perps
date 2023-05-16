@@ -428,7 +428,7 @@ impl State<'_> {
         let liquidity_to_return = liquidity_stats.lp_to_collateral_non_zero(shares_to_withdraw)?;
 
         if liquidity_to_return.raw() > liquidity_stats.unlocked {
-            return Err(MarketError::InsufficientLiquidityForWithdrawl {
+            return Err(MarketError::InsufficientLiquidityForWithdrawal {
                 requested_lp: shares_to_withdraw,
                 requested_collateral: liquidity_to_return,
                 unlocked: liquidity_stats.unlocked,
