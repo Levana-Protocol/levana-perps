@@ -1,23 +1,3 @@
-# Table Of Contents
-
-<!--toc:start-->
-- [Table Of Contents](#table-of-contents)
-- [Introduction](#introduction)
-- [PREREQUISITES](#prerequisites)
-- [Testing](#testing)
-  - [On-chain w/ LocalOsmosis](#on-chain-w-localosmosis)
-  - [On-chain w/ wasmd](#on-chain-w-wasmd)
-  - [Proptests and Fuzz testing](#proptests-and-fuzz-testing)
-- [Getting started with various chains](#getting-started-with-various-chains)
-  - [Faucets](#faucets)
-- [MISC](#misc)
-- [Deploying](#deploying)
-- [Basic wasmd setup](#basic-wasmd-setup)
-- [Coverage](#coverage)
-  - [Installation](#installation)
-  - [Usage](#usage)
-<!--toc:end-->
-
 # Introduction
 
 This is perps v2, following a completely new financial model, without a vAMM
@@ -68,16 +48,16 @@ It's also an updated dev environment, with multichain support and a native SDK i
 
 ## Proptests and Fuzz testing
 
-* `cargo test --features proptest` runs prop tests 
+* `cargo test --features proptest` runs prop tests
 * `cargo install cargo-fuzz` to install the fuzz testing tool
 * `just fuzz`
 
-## Diagnostics GUI 
+## Diagnostics GUI
 
 * [install trunk.rs](https://trunkrs.dev/#install) - install the Trunk builder for frontend rust/wasm
 * `yarn install` in `packages/diagnostics` - install the yarn dependencies
 * `just diagnostics-gui [dev/release] [sanity/performance]` - run things
-  
+
   where `sanity` means to run with sanity checks, `performance` means without, `dev` means to run debug builds, and `release` means to run production builds
 
   so for example, `just diagnostics-gui dev sanity` will capture all the debug info, but be slow, while `just diagnostics-gui release performance` will miss some debug info and assertions, but run fast
