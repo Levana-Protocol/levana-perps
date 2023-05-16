@@ -82,7 +82,7 @@ fn farming_lockdrop_basic() {
     let farmer_bucket_stats = &farmer_stats.lockdrops[0];
     assert_eq!(farmer_bucket_stats.total, "157".parse().unwrap());
 
-    // move to review period
+    // move waaay into review period
     market.set_time(TimeJump::Hours(24 * 365)).unwrap();
 
     // cannot withdraw anything
@@ -98,22 +98,68 @@ fn farming_lockdrop_basic() {
         .exec_farming_lockdrop_withdraw(&farmer, "1".parse().unwrap(), buckets[0].bucket_id)
         .unwrap_err();
 
-    // final stats are what we expect
+    // when lockdrop expires, we can withdraw
+    market.set_time(TimeJump::Seconds(86401)).unwrap();
+    market
+        .exec_farming_lockdrop_withdraw(&farmer, "1".parse().unwrap(), buckets[0].bucket_id)
+        .unwrap();
+
+    // stats are what we expect
     let farmer_bucket_stats = market
         .query_farming_farmer_stats(&farmer)
         .unwrap()
         .lockdrops
         .pop()
         .unwrap();
+
     assert_eq!(
         farmer_bucket_stats,
         FarmerLockdropStats {
             bucket_id: buckets[0].bucket_id,
-            total: "157".parse().unwrap(),
+            total: "156".parse().unwrap(),
             deposit_before_sunset: "140".parse().unwrap(),
             deposit_after_sunset: "100".parse().unwrap(),
             withdrawal_before_sunset: "40".parse().unwrap(),
             withdrawal_after_sunset: "43".parse().unwrap(),
+            withdrawal_after_launch: "1".parse().unwrap(),
         }
     );
+
+    // in fact we can withdraw a *lot*
+    market
+        .exec_farming_lockdrop_withdraw(&farmer, "150".parse().unwrap(), buckets[0].bucket_id)
+        .unwrap();
+
+    // stats are what we expect
+    let farmer_bucket_stats = market
+        .query_farming_farmer_stats(&farmer)
+        .unwrap()
+        .lockdrops
+        .pop()
+        .unwrap();
+
+    assert_eq!(
+        farmer_bucket_stats,
+        FarmerLockdropStats {
+            bucket_id: buckets[0].bucket_id,
+            total: "6".parse().unwrap(),
+            deposit_before_sunset: "140".parse().unwrap(),
+            deposit_after_sunset: "100".parse().unwrap(),
+            withdrawal_before_sunset: "40".parse().unwrap(),
+            withdrawal_after_sunset: "43".parse().unwrap(),
+            withdrawal_after_launch: "151".parse().unwrap(),
+        }
+    );
+
+    // in fact we can withdraw *everything*
+    market
+        .exec_farming_lockdrop_withdraw(&farmer, "6".parse().unwrap(), buckets[0].bucket_id)
+        .unwrap();
+
+    // and we're no longer part of the lockdrop
+    assert!(market
+        .query_farming_farmer_stats(&farmer)
+        .unwrap()
+        .lockdrops
+        .is_empty());
 }

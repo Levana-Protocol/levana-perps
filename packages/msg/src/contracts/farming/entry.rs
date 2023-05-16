@@ -359,6 +359,8 @@ pub struct FarmerLockdropStats {
     pub withdrawal_before_sunset: Collateral,
     /// Total withdrawals that have occurred during the sunset period
     pub withdrawal_after_sunset: Collateral,
+    /// Total withdrawals that have occurred post-launch
+    pub withdrawal_after_launch: Collateral,
 }
 
 /// Returned from [QueryMsg::Farmers]

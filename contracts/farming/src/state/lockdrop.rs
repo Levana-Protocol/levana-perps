@@ -59,6 +59,7 @@ impl State<'_> {
                     deposit_after_sunset: balance.deposit_after_sunset,
                     withdrawal_before_sunset: balance.withdrawal_before_sunset,
                     withdrawal_after_sunset: balance.withdrawal_after_sunset,
+                    withdrawal_after_launch: balance.withdrawal_after_launch,
                 })
             })
             .collect()
@@ -111,12 +112,15 @@ struct Balance {
     deposit_after_sunset: Collateral,
     withdrawal_before_sunset: Collateral,
     withdrawal_after_sunset: Collateral,
+    withdrawal_after_launch: Collateral,
 }
 
 impl Balance {
     pub fn total(&self) -> Result<Collateral> {
         let total_deposit = self.deposit_before_sunset + self.deposit_after_sunset;
-        let total_withdrawal = self.withdrawal_before_sunset + self.withdrawal_after_sunset;
+        let total_withdrawal = self.withdrawal_before_sunset
+            + self.withdrawal_after_sunset
+            + self.withdrawal_after_launch;
         let total = total_deposit.checked_sub(total_withdrawal)?;
 
         Ok(total)
@@ -172,7 +176,7 @@ impl LockdropBuckets {
         storage: &mut dyn Storage,
         bucket_id: LockdropBucketId,
         user: &Addr,
-        amount: Number,
+        mut amount: Number,
         period: FarmingPeriod,
     ) -> Result<()> {
         if amount.is_zero() {
@@ -183,31 +187,30 @@ impl LockdropBuckets {
             .may_load(storage, (user, bucket_id))?
             .unwrap_or_default();
 
-        let new = match (period, amount.is_negative()) {
-            (FarmingPeriod::Lockdrop, true) => {
-                let amount = amount.abs();
-                Balance {
-                    withdrawal_before_sunset: Collateral::try_from_number(
-                        old.withdrawal_before_sunset
-                            .into_number()
-                            .checked_add(amount)
-                            .context("Withdrawal overflow")?,
-                    )?,
-                    ..old
-                }
-            }
-            (FarmingPeriod::Sunset, true) => {
-                let amount = amount.abs();
-                Balance {
-                    withdrawal_after_sunset: Collateral::try_from_number(
-                        old.withdrawal_after_sunset
-                            .into_number()
-                            .checked_add(amount)
-                            .context("Sunset withdrawal overflow")?,
-                    )?,
-                    ..old
-                }
-            }
+        let is_withdrawal = amount.is_negative();
+        if is_withdrawal {
+            amount = amount.abs();
+        }
+
+        let new = match (period, is_withdrawal) {
+            (FarmingPeriod::Lockdrop, true) => Balance {
+                withdrawal_before_sunset: Collateral::try_from_number(
+                    old.withdrawal_before_sunset
+                        .into_number()
+                        .checked_add(amount)
+                        .context("Withdrawal overflow")?,
+                )?,
+                ..old
+            },
+            (FarmingPeriod::Sunset, true) => Balance {
+                withdrawal_after_sunset: Collateral::try_from_number(
+                    old.withdrawal_after_sunset
+                        .into_number()
+                        .checked_add(amount)
+                        .context("Sunset withdrawal overflow")?,
+                )?,
+                ..old
+            },
             (FarmingPeriod::Lockdrop, false) => Balance {
                 deposit_before_sunset: Collateral::try_from_number(
                     old.deposit_before_sunset
@@ -226,8 +229,20 @@ impl LockdropBuckets {
                 )?,
                 ..old
             },
-            _ => {
+            (FarmingPeriod::Launched, true) => Balance {
+                withdrawal_after_launch: Collateral::try_from_number(
+                    old.withdrawal_after_launch
+                        .into_number()
+                        .checked_add(amount)
+                        .context("Withdrawal after launch overflow")?,
+                )?,
+                ..old
+            },
+            (_, false) => {
                 bail!("can only deposit during lockdrop or sunset");
+            }
+            (_, true) => {
+                bail!("can only withdraw during lockdrop, sunset, or launch");
             }
         };
 
