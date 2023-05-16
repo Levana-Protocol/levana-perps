@@ -18,6 +18,13 @@ fn deposit_xlp() {
     assert_ne!(info1.xlp_amount, LpToken::zero());
     assert_eq!(stats1.farming_tokens, FarmingToken::zero());
 
+    // Start the lockdrop
+    market.exec_farming_start_lockdrop(None).unwrap();
+    // Finish lockdrop
+    market.set_time(TimeJump::Hours(24 * 365)).unwrap();
+    // Start the launch
+    market.exec_farming_start_launch(None).unwrap();
+
     // Deposit the xLP in the farming contract
     market
         .exec_farming_deposit_xlp(

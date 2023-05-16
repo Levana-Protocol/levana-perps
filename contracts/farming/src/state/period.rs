@@ -36,6 +36,45 @@ impl From<FarmingPeriodResp> for FarmingPeriod {
 }
 
 impl State<'_> {
+    pub(crate) fn validate_period_msg(&self, store: &dyn Storage, msg: &ExecuteMsg) -> Result<()> {
+        let period = self.get_period(store)?;
+
+        let is_valid = match msg {
+            ExecuteMsg::Owner(_) => true,
+            ExecuteMsg::Receive { .. } => {
+                anyhow::bail!("Cannot have double-wrapped Receive");
+            }
+            ExecuteMsg::LockdropDeposit { .. } => {
+                period == FarmingPeriod::Lockdrop || period == FarmingPeriod::Sunset
+            }
+            ExecuteMsg::LockdropWithdraw { .. } => {
+                match period {
+                    FarmingPeriod::Lockdrop => true,
+                    FarmingPeriod::Sunset => {
+                        // TODO - check that amount is no more than half the bucket
+                        true
+                    }
+                    FarmingPeriod::Launched => {
+                        // TODO - check that the lockdrop has finished for this bucket
+                        true
+                    }
+                    _ => false,
+                }
+            }
+            ExecuteMsg::Deposit { .. }
+            | ExecuteMsg::Withdraw { .. }
+            | ExecuteMsg::ClaimLvn {}
+            | ExecuteMsg::Reinvest {}
+            | ExecuteMsg::TransferBonus {} => period == FarmingPeriod::Launched,
+        };
+
+        if !is_valid {
+            Err(anyhow::anyhow!("Not allowed during {:?}", period))
+        } else {
+            Ok(())
+        }
+    }
+
     pub(crate) fn get_period(&self, store: &dyn Storage) -> Result<FarmingPeriod> {
         self.get_period_resp(store).map(Into::into)
     }

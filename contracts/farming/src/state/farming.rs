@@ -91,7 +91,6 @@ impl State<'_> {
         farmer: &Addr,
         xlp: LpToken,
     ) -> Result<FarmingToken> {
-        // FIXME ensure that we're in the active state
         let mut totals = self.get_farming_totals(ctx.storage)?;
         let new_farming = totals.xlp_to_farming(xlp)?;
         totals.xlp = totals.xlp.checked_add(xlp)?;
@@ -112,7 +111,6 @@ impl State<'_> {
         farmer: &Addr,
         amount: Option<NonZero<FarmingToken>>,
     ) -> Result<(LpToken, FarmingToken)> {
-        // FIXME ensure that we're in the active state
         let mut totals = self.get_farming_totals(ctx.storage)?;
         let mut raw = self.load_raw_farmer_stats(ctx.storage, farmer)?;
 

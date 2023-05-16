@@ -49,6 +49,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         }
     };
 
+    state.validate_period_msg(ctx.storage, &msg)?;
+
     match msg {
         ExecuteMsg::Owner(owner_msg) => {
             state.validate_admin(ctx.storage, &sender)?;
