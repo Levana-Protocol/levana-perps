@@ -1,4 +1,5 @@
 //! Market-wide configuration
+mod defaults;
 use shared::prelude::*;
 
 /// Configuration info for the vAMM
@@ -70,12 +71,14 @@ pub struct Config {
     /// Minimum deposit collateral, given in USD
     pub minimum_deposit_usd: Usd,
     /// How many positions can sit in "unpend" before we disable new open/update positions for congestion.
+    #[serde(default = "defaults::unpend_limit")]
     pub unpend_limit: u32,
     /// The liquifunding delay fuzz factor, in seconds.
     ///
     /// Up to how many seconds will we perform a liquifunding early. This will
     /// be part of a semi-randomly generated value and will allow us to schedule
     /// liquifundings arbitrarily to smooth out spikes in traffic.
+    #[serde(default = "defaults::liquifunding_delay_fuzz_seconds")]
     pub liquifunding_delay_fuzz_seconds: u32,
 }
 
