@@ -22,12 +22,6 @@ pub(crate) struct StateContext<'a> {
     pub(crate) response: ResponseBuilder,
 }
 
-impl StateContext<'_> {
-    pub(crate) fn response_mut(&mut self) -> &mut ResponseBuilder {
-        &mut self.response
-    }
-}
-
 impl<'a> State<'a> {
     pub(crate) fn new(deps: Deps<'a>, env: Env) -> Result<(Self, &dyn Storage)> {
         Ok((

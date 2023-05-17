@@ -44,7 +44,8 @@ impl State<'_> {
             .collateral
             .into_transfer_msg(&user, amount)?
             .context("invalid transfer msg")?;
-        ctx.response_mut().add_message(msg);
+
+        ctx.response.add_message(msg);
 
         Ok(())
     }
