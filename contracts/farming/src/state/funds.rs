@@ -1,3 +1,4 @@
+use cosmwasm_std::from_binary;
 use msg::token::Token;
 
 use crate::prelude::*;
@@ -12,10 +13,10 @@ pub(crate) enum Received {
 impl State<'_> {
     pub(crate) fn funds_received(
         &self,
-        info: &MessageInfo,
-        msg: &ExecuteMsg,
-    ) -> Result<Option<Received>> {
-        let received = match msg {
+        info: MessageInfo,
+        msg: ExecuteMsg,
+    ) -> Result<(Addr, Option<Received>, ExecuteMsg)> {
+        let received = match &msg {
             ExecuteMsg::Receive { amount, .. } => {
                 if !info.funds.is_empty() {
                     bail!("No native funds should be sent alongside CW20");
@@ -73,14 +74,22 @@ impl State<'_> {
 
         // early-exit if a message doesn't require funds and the user sent (be nice)
         // or if a message does require funds and the user didn't send any
-        let requires_funds = msg_requires_funds(msg);
+        let requires_funds = msg_requires_funds(&msg);
         if requires_funds && received.is_none() {
             anyhow::bail!("{:?} requires funds", msg);
         } else if !requires_funds && received.is_some() {
             anyhow::bail!("{:?} doesn't require any funds", msg);
         }
 
-        Ok(received)
+        // replace the sender and msg with the cw20 if need-be
+        let (sender, msg) = match msg {
+            ExecuteMsg::Receive { sender, msg, .. } => {
+                (sender.validate(self.api)?, from_binary(&msg)?)
+            }
+            _ => (info.sender, msg),
+        };
+
+        Ok((sender, received, msg))
     }
 }
 

@@ -1,4 +1,3 @@
-use cosmwasm_std::from_binary;
 use msg::token::Token;
 
 use crate::{prelude::*, state::funds::Received};
@@ -7,14 +6,7 @@ use crate::{prelude::*, state::funds::Received};
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
-    let received = state.funds_received(&info, &msg)?;
-
-    let (sender, msg) = match msg {
-        ExecuteMsg::Receive { sender, msg, .. } => {
-            (sender.validate(state.api)?, from_binary(&msg)?)
-        }
-        _ => (info.sender, msg),
-    };
+    let (sender, received, msg) = state.funds_received(info, msg)?;
 
     state.validate_period_msg(ctx.storage, &sender, &msg)?;
 
