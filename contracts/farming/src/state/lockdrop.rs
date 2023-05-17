@@ -77,6 +77,9 @@ impl State<'_> {
             FarmingPeriodResp::Sunset { .. } => {
                 let balance = LockdropBuckets::get_balance(storage, bucket_id, user)?;
 
+                // INVARIANT: the max that can ever be withdrawn during sunset period is half_balance_before_sunset
+                // multiple withdrawals accumulate in withdrawal_after_sunset, but this max is never surpassed
+                // therefore the available `amount` can never be negative
                 let balance_before_sunset =
                     balance.deposit_before_sunset - balance.withdrawal_before_sunset;
                 let half_balance_before_sunset =
