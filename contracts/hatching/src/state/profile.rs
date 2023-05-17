@@ -10,42 +10,42 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         owner: &Addr,
-    ) -> Result<Option<ProfileInfo>> {
-        if let Some(profile_info) = self.get_profile_info(owner)? {
-            // remove spirit level from profile contract
-            #[derive(Serialize, Deserialize)]
-            #[serde(rename_all = "snake_case")]
-            enum ProfileExecuteMsg {
-                Admin { message: ProfileAdminExecuteMsg },
-            }
-            #[derive(Serialize, Deserialize)]
-            #[serde(rename_all = "snake_case")]
-            pub enum ProfileAdminExecuteMsg {
-                RemoveSpiritLevel { wallets: Vec<RemoveSpiritLevel> },
-            }
+    ) -> Result<ProfileInfo> {
+        let profile_info = self
+            .get_profile_info(owner)?
+            .context("no profile with spirit level")?;
 
-            #[derive(Serialize, Deserialize)]
-            #[serde(rename_all = "snake_case")]
-            pub struct RemoveSpiritLevel {
-                pub wallet: String,
-                pub spirit_level: Option<String>,
-            }
-            ctx.response_mut().add_execute_submessage_oneshot(
-                self.config.profile_contract.clone(),
-                &ProfileExecuteMsg::Admin {
-                    message: ProfileAdminExecuteMsg::RemoveSpiritLevel {
-                        wallets: vec![RemoveSpiritLevel {
-                            wallet: owner.to_string(),
-                            spirit_level: Some(profile_info.spirit_level.to_string()),
-                        }],
-                    },
-                },
-            )?;
-
-            Ok(Some(profile_info))
-        } else {
-            Ok(None)
+        // remove spirit level from profile contract
+        #[derive(Serialize, Deserialize)]
+        #[serde(rename_all = "snake_case")]
+        enum ProfileExecuteMsg {
+            Admin { message: ProfileAdminExecuteMsg },
         }
+        #[derive(Serialize, Deserialize)]
+        #[serde(rename_all = "snake_case")]
+        pub enum ProfileAdminExecuteMsg {
+            RemoveSpiritLevel { wallets: Vec<RemoveSpiritLevel> },
+        }
+
+        #[derive(Serialize, Deserialize)]
+        #[serde(rename_all = "snake_case")]
+        pub struct RemoveSpiritLevel {
+            pub wallet: String,
+            pub spirit_level: Option<String>,
+        }
+        ctx.response_mut().add_execute_submessage_oneshot(
+            self.config.profile_contract.clone(),
+            &ProfileExecuteMsg::Admin {
+                message: ProfileAdminExecuteMsg::RemoveSpiritLevel {
+                    wallets: vec![RemoveSpiritLevel {
+                        wallet: owner.to_string(),
+                        spirit_level: Some(profile_info.spirit_level.to_string()),
+                    }],
+                },
+            },
+        )?;
+
+        Ok(profile_info)
     }
 
     pub(crate) fn get_profile_info(&self, owner: &Addr) -> Result<Option<ProfileInfo>> {

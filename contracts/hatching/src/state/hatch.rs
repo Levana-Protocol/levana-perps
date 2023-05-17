@@ -45,7 +45,7 @@ impl State<'_> {
             .collect::<Result<Vec<NftHatchInfo>>>()?;
 
         let profile = if profile {
-            self.drain_profile(ctx, &original_owner)?
+            Some(self.drain_profile(ctx, &original_owner)?)
         } else {
             None
         };
