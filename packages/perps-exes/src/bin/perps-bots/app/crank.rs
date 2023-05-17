@@ -2,6 +2,7 @@ use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, Contract};
 use msg::contracts::market;
+use msg::contracts::market::crank::CrankWorkInfo;
 use perps_exes::prelude::MarketId;
 
 use crate::watcher::{WatchedTaskOutput, WatchedTaskPerMarket};
@@ -35,6 +36,12 @@ impl WatchedTaskPerMarket for Worker {
     }
 }
 
+// Start off big and go down quickly. Once we get to the range of numbers we
+// expect to always work, move down more incrementally to find the sweet spot.
+const CRANK_EXECS: &[u32] = &[
+    1024, 512, 256, 128, 64, 40, 35, 30, 25, 20, 15, 10, 7, 6, 5, 4, 3, 2, 1,
+];
+
 impl App {
     async fn crank(&self, addr: Address) -> Result<WatchedTaskOutput> {
         let market = self.cosmos.make_contract(addr);
@@ -48,6 +55,22 @@ impl App {
             Some(work) => work,
         };
 
+        for execs in CRANK_EXECS {
+            match self.try_with_execs(addr, &work, Some(*execs)).await {
+                Ok(x) => return Ok(x),
+                Err(e) => log::warn!("Cranking with execs=={execs} failed: {e:?}"),
+            }
+        }
+
+        self.try_with_execs(addr, &work, None).await
+    }
+
+    async fn try_with_execs(
+        &self,
+        addr: Address,
+        work: &CrankWorkInfo,
+        execs: Option<u32>,
+    ) -> Result<WatchedTaskOutput> {
         let txres = self
             .cosmos
             .make_contract(addr)
@@ -55,7 +78,7 @@ impl App {
                 &self.config.crank_wallet,
                 vec![],
                 market::entry::ExecuteMsg::Crank {
-                    execs: None,
+                    execs,
                     rewards: None,
                 },
             )
