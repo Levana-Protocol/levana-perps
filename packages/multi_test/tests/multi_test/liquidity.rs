@@ -189,6 +189,8 @@ fn liquidity_claim_yield_from_borrow_fee() {
             borrow_fee_rate_min_annualized: Some("0.01".parse().unwrap()),
             borrow_fee_rate_max_annualized: Some("0.01".parse().unwrap()),
             delta_neutrality_fee_tax: Some(Decimal256::zero()),
+            // We need precise liquifunding periods for this test so remove randomization
+            liquifunding_delay_fuzz_seconds: Some(0),
             ..Default::default()
         })
         .unwrap();

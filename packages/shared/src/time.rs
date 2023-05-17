@@ -19,7 +19,7 @@ use std::ops::{Add, Div, Mul, Sub};
 /// directly (instead of a [Timestamp] or [cosmwasm_std::Uint64]) to make it
 /// easier to derive some impls. The result is that we need to explicitly
 /// implement [Serialize] and [Deserialize] to keep the stringy representation.
-#[derive(Debug, Clone, Default, Copy, Eq, PartialEq, Ord, PartialOrd, JsonSchema)]
+#[derive(Debug, Clone, Default, Copy, Eq, PartialEq, Ord, PartialOrd, JsonSchema, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Timestamp(#[schemars(with = "String")] u64);
 

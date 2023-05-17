@@ -8,13 +8,13 @@ use msg::contracts::market::{
 
 use shared::prelude::*;
 
-use super::position::{get_position, NEXT_LIQUIFUNDING, NEXT_STALE, OPEN_POSITIONS};
+use super::position::{get_position, ActionType, NEXT_LIQUIFUNDING, NEXT_STALE, OPEN_POSITIONS};
 
 /// The last price point timestamp for which the cranking process was completed.
 ///
 /// If this is unavailable, we've never completed cranking, and we should find
 /// the very first price timestamp.
-const LAST_CRANK_COMPLETED: Item<Timestamp> = Item::new(namespace::LAST_CRANK_COMPLETED);
+pub(super) const LAST_CRANK_COMPLETED: Item<Timestamp> = Item::new(namespace::LAST_CRANK_COMPLETED);
 
 pub(crate) fn crank_init(store: &mut dyn Storage, env: &Env) -> Result<()> {
     LAST_CRANK_COMPLETED
@@ -184,7 +184,14 @@ impl State<'_> {
                 let pos = get_position(ctx.storage, position)?;
                 let starts_at = pos.liquifunded_at;
                 let ends_at = pos.next_liquifunding;
-                self.position_liquifund_store(ctx, pos, starts_at, ends_at, true)?;
+                self.position_liquifund_store(
+                    ctx,
+                    pos,
+                    starts_at,
+                    ends_at,
+                    true,
+                    ActionType::Crank,
+                )?;
             }
             CrankWorkInfo::UnpendLiquidationPrices { position } => {
                 self.unpend_liquidation_prices(ctx, position)?;
