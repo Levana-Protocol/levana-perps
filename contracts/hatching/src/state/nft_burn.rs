@@ -10,7 +10,36 @@ impl State<'_> {
     pub(crate) fn burn_nft(
         &self,
         ctx: &mut StateContext,
-        owner: Addr,
+        owner: &Addr,
+        kind: NftBurnKind,
+        token_id: String,
+    ) -> Result<NftHatchInfo> {
+        let nft_info = self.get_nft_info(owner, kind, token_id)?;
+
+        #[derive(Serialize, Deserialize)]
+        #[serde(rename_all = "snake_case")]
+        enum NftExecuteMsg {
+            Burn { token_id: String },
+        }
+
+        let contract = match kind {
+            NftBurnKind::Egg => &self.config.nft_burn_contracts.egg,
+            NftBurnKind::Dust => &self.config.nft_burn_contracts.dust,
+        };
+
+        ctx.response_mut().add_execute_submessage_oneshot(
+            contract,
+            &NftExecuteMsg::Burn {
+                token_id: nft_info.token_id.clone(),
+            },
+        )?;
+
+        Ok(nft_info)
+    }
+
+    pub(crate) fn get_nft_info(
+        &self,
+        owner: &Addr,
         kind: NftBurnKind,
         token_id: String,
     ) -> Result<NftHatchInfo> {
@@ -18,12 +47,6 @@ impl State<'_> {
         #[serde(rename_all = "snake_case")]
         enum NftQueryMsg {
             AllNftInfo { token_id: String },
-            NftInfo { token_id: String },
-        }
-        #[derive(Serialize, Deserialize)]
-        #[serde(rename_all = "snake_case")]
-        enum NftExecuteMsg {
-            Burn { token_id: String },
         }
 
         let contract = match kind {
@@ -45,13 +68,6 @@ impl State<'_> {
                 owner
             );
         }
-
-        ctx.response_mut().add_execute_submessage_oneshot(
-            contract,
-            &NftExecuteMsg::Burn {
-                token_id: token_id.clone(),
-            },
-        )?;
 
         let info = extract_nft_info(token_id, res.info.extension)?;
 

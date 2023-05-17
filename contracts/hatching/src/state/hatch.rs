@@ -4,6 +4,7 @@ use super::{
     State, StateContext,
 };
 use msg::contracts::hatching::{
+    entry::PotentialHatchInfo,
     events::{HatchCompleteEvent, HatchRetryEvent, HatchStartEvent},
     HatchDetails, HatchStatus, NftBurnKind, NftHatchInfo,
 };
@@ -35,16 +36,16 @@ impl State<'_> {
 
         let eggs = eggs
             .into_iter()
-            .map(|token_id| self.burn_nft(ctx, original_owner.clone(), NftBurnKind::Egg, token_id))
+            .map(|token_id| self.burn_nft(ctx, &original_owner, NftBurnKind::Egg, token_id))
             .collect::<Result<Vec<NftHatchInfo>>>()?;
 
         let dusts = dusts
             .into_iter()
-            .map(|token_id| self.burn_nft(ctx, original_owner.clone(), NftBurnKind::Dust, token_id))
+            .map(|token_id| self.burn_nft(ctx, &original_owner, NftBurnKind::Dust, token_id))
             .collect::<Result<Vec<NftHatchInfo>>>()?;
 
         let profile = if profile {
-            self.drain_profile(ctx, original_owner.clone())?
+            Some(self.drain_profile(ctx, &original_owner)?)
         } else {
             None
         };
@@ -215,5 +216,35 @@ impl State<'_> {
         HATCH_ID_BY_TOKEN_ID
             .load(store, token_id)
             .map_err(|err| err.into())
+    }
+
+    pub(crate) fn get_potential_hatch_info(
+        &self,
+        owner: &Addr,
+        eggs: Vec<String>,
+        dusts: Vec<String>,
+        profile: bool,
+    ) -> Result<PotentialHatchInfo> {
+        let eggs = eggs
+            .into_iter()
+            .map(|token_id| self.get_nft_info(owner, NftBurnKind::Egg, token_id))
+            .collect::<Result<Vec<NftHatchInfo>>>()?;
+
+        let dusts = dusts
+            .into_iter()
+            .map(|token_id| self.get_nft_info(owner, NftBurnKind::Dust, token_id))
+            .collect::<Result<Vec<NftHatchInfo>>>()?;
+
+        let profile = if profile {
+            self.get_profile_info(owner)?
+        } else {
+            None
+        };
+
+        Ok(PotentialHatchInfo {
+            eggs,
+            dusts,
+            profile,
+        })
     }
 }
