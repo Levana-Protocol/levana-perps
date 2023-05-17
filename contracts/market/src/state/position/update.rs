@@ -10,6 +10,8 @@ use msg::contracts::market::position::events::{
 use msg::contracts::market::position::MaybeClosedPosition;
 use msg::contracts::market::position::{events::PositionUpdateEvent, Position, PositionId};
 
+use super::ActionType;
+
 impl State<'_> {
     pub(crate) fn update_leverage_new_notional_size(
         &self,
@@ -254,7 +256,7 @@ impl State<'_> {
 
         // Storage and external
         self.position_update_emit_event(ctx, &original_pos, pos.clone(), spot_price)?;
-        self.position_save(ctx, &mut pos, &spot_price, true, true)?;
+        self.position_save(ctx, &mut pos, &spot_price, true, true, ActionType::User)?;
 
         // Validate
         self.position_validate_leverage_data(market_type, &pos, &spot_price, Some(&original_pos))?;
@@ -359,7 +361,7 @@ impl State<'_> {
             DeltaNeutralityFeeReason::PositionUpdate,
         )?
         .store(self, ctx)?;
-        self.position_save(ctx, &mut pos, &spot_price, true, true)?;
+        self.position_save(ctx, &mut pos, &spot_price, true, true, ActionType::User)?;
         self.adjust_net_open_interest(ctx, notional_size_diff, pos.direction(), true)?;
         self.add_delta_neutrality_ratio_event(
             ctx,
@@ -469,7 +471,7 @@ impl State<'_> {
             DeltaNeutralityFeeReason::PositionUpdate,
         )?
         .store(self, ctx)?;
-        self.position_save(ctx, &mut pos, &spot_price, true, true)?;
+        self.position_save(ctx, &mut pos, &spot_price, true, true, ActionType::User)?;
         self.adjust_net_open_interest(ctx, notional_size_diff, pos.direction(), true)?;
         self.add_delta_neutrality_ratio_event(
             ctx,
@@ -538,7 +540,7 @@ impl State<'_> {
         pos.trading_fee
             .checked_add_assign(trading_fee_delta, &spot_price)?;
 
-        self.position_save(ctx, &mut pos, &spot_price, true, true)?;
+        self.position_save(ctx, &mut pos, &spot_price, true, true, ActionType::User)?;
 
         let notional_size_diff = pos.notional_size - original_pos.notional_size;
         debug_assert!(notional_size_diff.is_zero());
@@ -583,7 +585,7 @@ impl State<'_> {
         match self.position_liquifund(ctx, pos, last_liquifund, self.now(), false)? {
             MaybeClosedPosition::Open(mut pos) => {
                 self.position_validate_trigger_orders(&pos, market_type, price)?;
-                self.position_save(ctx, &mut pos, &price, true, false)?;
+                self.position_save(ctx, &mut pos, &price, true, false, ActionType::User)?;
             }
             MaybeClosedPosition::Close(_) => anyhow::bail!("Cannot update trigger orders since the position will be closed on next liquifunding"),
         }

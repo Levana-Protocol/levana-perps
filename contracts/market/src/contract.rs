@@ -7,7 +7,7 @@ use crate::state::{
     fees::fees_init,
     liquidity::{liquidity_init, yield_init},
     meta::meta_init,
-    position::{get_position, positions_init, PositionOrId},
+    position::{get_position, positions_init, ActionType, PositionOrId},
     set_factory_addr,
     token::token_init,
 };
@@ -109,7 +109,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         let pos = get_position(ctx.storage, id)?;
 
         let starts_at = pos.liquifunded_at;
-        state.position_liquifund_store(ctx, pos, starts_at, now, false)?;
+        state.position_liquifund_store(ctx, pos, starts_at, now, false, ActionType::User)?;
 
         Ok(())
     }

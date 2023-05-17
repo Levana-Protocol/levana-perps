@@ -63,6 +63,8 @@ pub enum MarketError {
         deposit_usd: Usd,
         minimum_usd: Usd,
     },
+    #[error("Cannot open or update positions currently, the position queue size is {current_queue}, while the allowed size is {max_size}. Please try again later")]
+    Congestion { current_queue: u32, max_size: u32 },
 }
 
 impl MarketError {
@@ -112,6 +114,7 @@ impl MarketError {
             MarketError::TraderLeverageOutOfRange { .. } => ErrorId::TraderLeverageOutOfRange,
             MarketError::CounterLeverageOutOfRange { .. } => ErrorId::CounterLeverageOutOfRange,
             MarketError::MinimumDeposit { .. } => ErrorId::MinimumDeposit,
+            MarketError::Congestion { .. } => ErrorId::Congestion,
         }
     }
 }

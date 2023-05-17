@@ -69,6 +69,7 @@ pub enum ErrorId {
     TraderLeverageOutOfRange,
     CounterLeverageOutOfRange,
     MinimumDeposit,
+    Congestion,
 }
 
 /// Source within the protocol for the error
