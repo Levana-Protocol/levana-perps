@@ -29,7 +29,7 @@ use msg::contracts::factory::entry::{
     ShutdownStatus,
 };
 use msg::contracts::farming::entry::{
-    ExecuteMsg as FarmingExecuteMsg, QueryMsg as FarmingQueryMsg,
+    ExecuteMsg as FarmingExecuteMsg, LockdropBucketId, QueryMsg as FarmingQueryMsg,
 };
 use msg::contracts::farming::entry::{
     FarmerStats, OwnerExecuteMsg as FarmingOwnerExecuteMsg, StatusResp as FarmingStatusResp,
@@ -1421,6 +1421,32 @@ impl PerpsMarket {
         self.exec_farming(
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
             &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::StartLaunchPeriod { start }),
+        )
+    }
+    pub fn exec_farming_lockdrop_deposit(
+        &self,
+        wallet: &Addr,
+        amount: NonZero<Collateral>,
+        bucket_id: LockdropBucketId,
+    ) -> Result<AppResponse> {
+        let msg = self.token.into_execute_msg(
+            &self.farming_addr,
+            amount.raw(),
+            &FarmingExecuteMsg::LockdropDeposit { bucket_id },
+        )?;
+
+        self.exec_wasm_msg(wallet, msg)
+    }
+
+    pub fn exec_farming_lockdrop_withdraw(
+        &self,
+        wallet: &Addr,
+        amount: NonZero<Collateral>,
+        bucket_id: LockdropBucketId,
+    ) -> Result<AppResponse> {
+        self.exec_farming(
+            wallet,
+            &FarmingExecuteMsg::LockdropWithdraw { amount, bucket_id },
         )
     }
 

@@ -3,7 +3,7 @@
 use cosmwasm_std::Decimal256;
 use shared::storage::NonZero;
 
-use crate::contracts::farming::entry::LockdropBucket;
+use crate::contracts::farming::entry::LockdropBucketId;
 
 use super::LockdropBucketConfig;
 
@@ -16,7 +16,7 @@ pub fn lockdrop_month_seconds() -> u32 {
 pub fn lockdrop_buckets() -> Vec<LockdropBucketConfig> {
     fn go(months: u32, multiplier: &str) -> LockdropBucketConfig {
         LockdropBucketConfig {
-            bucket: LockdropBucket(months),
+            bucket_id: LockdropBucketId(months),
             multiplier: multiplier.parse().unwrap(),
         }
     }

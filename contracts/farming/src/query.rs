@@ -13,9 +13,9 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             let raw = state.load_raw_farmer_stats(store, &farmer)?;
             FarmerStats {
                 farming_tokens: raw.farming_tokens,
-                // FIXME lockdrop support
+                lockdrops: state.get_farmer_lockdrop_stats(store, &farmer)?,
                 farming_tokens_available: raw.farming_tokens,
-                lockdrops: vec![],
+                // FIXME emissions support
                 lockdrop_available: "0".parse().unwrap(),
                 lockdrop_locked: "0".parse().unwrap(),
                 emissions: "0".parse().unwrap(),
