@@ -57,6 +57,14 @@ pub(super) const PRICE_TRIGGER_ASC: Map<(PriceKey, PositionId), LiquidationReaso
 pub(super) const LIQUIDATION_PRICES_PENDING: Map<(Timestamp, PositionId), ()> =
     Map::new(namespace::LIQUIDATION_PRICES_PENDING);
 
+/// How many positions are sitting in the pending queue.
+///
+/// Note that during migration of data, this field may start off empty. The rest
+/// of the code needs to account for that possibility, and if trying to subtract
+/// from 0, should simply provide 0 as the value here.
+pub(super) const LIQUIDATION_PRICES_PENDING_COUNT: Item<u32> =
+    Item::new(namespace::LIQUIDATION_PRICES_PENDING_COUNT);
+
 /// Timestamp of the last time the liquidation prices were set.
 pub(super) const LIQUIDATION_PRICES_PENDING_REVERSE: Map<PositionId, Timestamp> =
     Map::new(namespace::LIQUIDATION_PRICES_PENDING_REVERSE);
@@ -99,15 +107,7 @@ pub(crate) fn get_position(store: &dyn Storage, id: PositionId) -> Result<Positi
     OPEN_POSITIONS
         .may_load(store, id)
         .map_err(|e| anyhow!("Could not parse position {id}: {e:?}"))?
-        .ok_or_else(|| {
-            perp_anyhow_data!(
-                ErrorId::MissingPosition,
-                ErrorDomain::Market,
-                Data { position: id },
-                "position id: {}",
-                id
-            )
-        })
+        .ok_or_else(|| MarketError::MissingPosition { id: id.to_string() }.into_anyhow())
 }
 
 impl PositionOrId {
@@ -580,6 +580,46 @@ impl State<'_> {
                 }
             }))
     }
+
+    /// Decrement the pending position count by one.
+    fn decrement_pending_count(&self, ctx: &mut StateContext) -> Result<()> {
+        let new = LIQUIDATION_PRICES_PENDING_COUNT
+            .may_load(ctx.storage)?
+            .unwrap_or_default()
+            .checked_sub(1)
+            .unwrap_or_default();
+        LIQUIDATION_PRICES_PENDING_COUNT.save(ctx.storage, &new)?;
+        Ok(())
+    }
+
+    /// Increment the pending count
+    ///
+    /// If this is a user driven action (like open or update), we block this
+    /// action if we've already hit our congestion limit. For automated actions
+    /// like cranked liquifundings, we always let the unpending occur.
+    fn increment_pending_count(
+        &self,
+        ctx: &mut StateContext,
+        action_type: ActionType,
+    ) -> Result<()> {
+        let old = LIQUIDATION_PRICES_PENDING_COUNT
+            .may_load(ctx.storage)?
+            .unwrap_or_default();
+
+        if action_type == ActionType::User && old >= self.config.unpend_limit {
+            return Err(MarketError::Congestion {
+                current_queue: old,
+                max_size: self.config.unpend_limit,
+            }
+            .into_anyhow());
+        }
+
+        // If we hit the numeric overflow, then (1) that's insane and (2) just keep the old value, we're allowed to undercount this.
+        if let Some(new) = old.checked_add(1) {
+            LIQUIDATION_PRICES_PENDING_COUNT.save(ctx.storage, &new)?;
+        }
+        Ok(())
+    }
 }
 
 pub(crate) fn positions_init(store: &mut dyn Storage) -> Result<()> {
@@ -638,6 +678,7 @@ impl State<'_> {
         price_point: &PricePoint,
         is_update: bool,
         recalc_liquidation_margin: bool,
+        action_type: ActionType,
     ) -> Result<()> {
         if is_update {
             self.position_remove(ctx, pos.id)?;
@@ -685,7 +726,7 @@ impl State<'_> {
         OPEN_POSITIONS.save(ctx.storage, pos.id, pos)?;
         NEXT_LIQUIFUNDING.save(ctx.storage, (pos.next_liquifunding, pos.id), &())?;
         NEXT_STALE.save(ctx.storage, (pos.stale_at, pos.id), &())?;
-        self.store_liquidation_prices(ctx, pos)?;
+        self.store_liquidation_prices(ctx, pos, action_type)?;
 
         self.increase_total_funding_margin(ctx, pos.liquidation_margin.funding)?;
 
@@ -697,8 +738,13 @@ impl State<'_> {
         if let Some(updated_at) =
             LIQUIDATION_PRICES_PENDING_REVERSE.may_load(ctx.storage, pos.id)?
         {
-            LIQUIDATION_PRICES_PENDING_REVERSE.remove(ctx.storage, pos.id);
-            LIQUIDATION_PRICES_PENDING.remove(ctx.storage, (updated_at, pos.id));
+            if LIQUIDATION_PRICES_PENDING.has(ctx.storage, (updated_at, pos.id)) {
+                self.decrement_pending_count(ctx)?;
+                LIQUIDATION_PRICES_PENDING_REVERSE.remove(ctx.storage, pos.id);
+                LIQUIDATION_PRICES_PENDING.remove(ctx.storage, (updated_at, pos.id));
+            } else {
+                debug_assert!(!LIQUIDATION_PRICES_PENDING_REVERSE.has(ctx.storage, pos.id))
+            }
         }
 
         match pos.direction() {
@@ -754,13 +800,19 @@ impl State<'_> {
     /// [LIQUIDATION_PRICES_PENDING] queue so that historical price updates
     /// can't trigger liquidation/take profit.  Actually adding them will then
     /// occur in the crank.
-    fn store_liquidation_prices(&self, ctx: &mut StateContext, pos: &Position) -> Result<()> {
+    fn store_liquidation_prices(
+        &self,
+        ctx: &mut StateContext,
+        pos: &Position,
+        action_type: ActionType,
+    ) -> Result<()> {
         if self.is_crank_up_to_date(ctx.storage)? {
             self.store_liquidation_prices_inner(ctx, pos)?;
         } else {
             let now = self.now();
             LIQUIDATION_PRICES_PENDING_REVERSE.save(ctx.storage, pos.id, &now)?;
             LIQUIDATION_PRICES_PENDING.save(ctx.storage, (now, pos.id), &())?;
+            self.increment_pending_count(ctx, action_type)?;
         }
 
         Ok(())
@@ -775,6 +827,7 @@ impl State<'_> {
         let updated_at = LIQUIDATION_PRICES_PENDING_REVERSE.load(ctx.storage, posid)?;
         LIQUIDATION_PRICES_PENDING_REVERSE.remove(ctx.storage, posid);
         LIQUIDATION_PRICES_PENDING.remove(ctx.storage, (updated_at, posid));
+        self.decrement_pending_count(ctx)?;
 
         let pos = OPEN_POSITIONS.load(ctx.storage, posid)?;
         self.store_liquidation_prices_inner(ctx, &pos)
@@ -880,4 +933,14 @@ impl AdjustOpenInterestResult {
         }
         Ok(())
     }
+}
+
+/// What kind of an action triggered this transaction?
+#[derive(PartialEq, Eq)]
+pub(crate) enum ActionType {
+    /// An automated crank action
+    Crank,
+    /// A user driven action like opening a position, setting trigger orders,
+    /// etc
+    User,
 }

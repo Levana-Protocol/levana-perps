@@ -121,6 +121,8 @@ impl State<'_> {
                 .map(|x| x.into_notional_price(market_type)),
         };
 
+        self.set_next_liquifunding_and_stale_at(&mut pos, liquifunded_at);
+
         let trade_volume_usd = trade_volume_usd(&pos, price_point, market_type)?;
 
         // Validate leverage before removing trading fees from active collateral
@@ -212,7 +214,14 @@ impl State<'_> {
         self.liquidity_lock(ctx, pos.counter_collateral)?;
 
         // Save the position, setting liquidation margin and prices
-        self.position_save(ctx, &mut pos, &price_point, false, true)?;
+        self.position_save(
+            ctx,
+            &mut pos,
+            &price_point,
+            false,
+            true,
+            super::ActionType::User,
+        )?;
 
         // mint the nft
         self.nft_mint(ctx, pos.owner.clone(), pos.id.to_string())?;

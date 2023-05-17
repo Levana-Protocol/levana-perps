@@ -40,6 +40,8 @@ pub struct ChainConfig {
     pub min_gas_in_gas_wallet: u128,
     /// Override the gas multiplier
     pub gas_multiplier: Option<f64>,
+    /// Potential RPC endpoints to use
+    pub rpc_nodes: Vec<String>,
 }
 
 #[derive(serde::Deserialize, Clone, Debug)]
@@ -110,6 +112,8 @@ pub struct DeploymentConfig {
     #[serde(default)]
     pub traders: usize,
     pub default_market_ids: Vec<MarketId>,
+    #[serde(default)]
+    pub ignore_stale: bool,
 }
 
 const CONFIG_YAML: &[u8] = include_bytes!("../assets/config.yaml");
@@ -200,6 +204,10 @@ pub struct WatcherConfig {
     pub get_factory: TaskConfig,
     #[serde(default = "defaults::price")]
     pub price: TaskConfig,
+    #[serde(default = "defaults::stale")]
+    pub stale: TaskConfig,
+    #[serde(default = "defaults::stats")]
+    pub stats: TaskConfig,
 }
 
 impl Default for WatcherConfig {
@@ -244,6 +252,14 @@ impl Default for WatcherConfig {
             },
             price: TaskConfig {
                 delay: Delay::Constant(60),
+                out_of_date: 180,
+            },
+            stale: TaskConfig {
+                delay: Delay::Constant(30),
+                out_of_date: 180,
+            },
+            stats: TaskConfig {
+                delay: Delay::Constant(30),
                 out_of_date: 180,
             },
         }

@@ -125,7 +125,11 @@ pub enum QueryMsg {
 
     /// * returns [TapEligibleResponse]
     #[returns(TapEligibleResponse)]
-    IsTapEligible { addr: RawAddr },
+    IsTapEligible {
+        addr: RawAddr,
+        #[serde(default)]
+        assets: Vec<FaucetAsset>,
+    },
 
     /// * returns [IsAdminResponse]
     #[returns(IsAdminResponse)]
@@ -138,6 +142,13 @@ pub enum QueryMsg {
     /// * returns [TapAmountResponse]
     #[returns(TapAmountResponse)]
     TapAmountByName { name: String },
+
+    /// Find out the cumulative amount of funds transferred at a given timestamp.
+    #[returns(FundsSentResponse)]
+    FundsSent {
+        asset: FaucetAsset,
+        timestamp: Option<Timestamp>,
+    },
 }
 
 #[cw_serde]
@@ -180,7 +191,14 @@ pub enum TapEligibleResponse {
     Ineligible {
         seconds: Decimal256,
         message: String,
+        reason: IneligibleReason,
     },
+}
+
+#[cw_serde]
+pub enum IneligibleReason {
+    TooSoon,
+    AlreadyTapped,
 }
 
 #[cw_serde]
@@ -192,4 +210,9 @@ pub struct IsAdminResponse {
 pub enum TapAmountResponse {
     CannotTap {},
     CanTap { amount: Decimal256 },
+}
+
+#[cw_serde]
+pub struct FundsSentResponse {
+    pub amount: Decimal256,
 }

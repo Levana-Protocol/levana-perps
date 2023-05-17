@@ -401,13 +401,11 @@ impl State<'_> {
             None => old_lp,
             Some(lp_amount) => {
                 if lp_amount > old_lp {
-                    perp_bail!(
-                        ErrorId::InvalidWithdrawal,
-                        ErrorDomain::Market,
-                        "unable to withdraw {}, current allocation: {}",
-                        lp_amount,
-                        old_lp
-                    )
+                    return Err(MarketError::WithdrawTooMuch {
+                        requested: lp_amount,
+                        available: old_lp,
+                    }
+                    .into());
                 }
 
                 lp_amount
@@ -430,13 +428,12 @@ impl State<'_> {
         let liquidity_to_return = liquidity_stats.lp_to_collateral_non_zero(shares_to_withdraw)?;
 
         if liquidity_to_return.raw() > liquidity_stats.unlocked {
-            return Err(perp_anyhow!(
-                ErrorId::InvalidWithdrawal,
-                ErrorDomain::Market,
-                "unable to withdraw, allotted liquidity: {}, available liquidity: {}",
-                liquidity_to_return,
-                liquidity_stats.unlocked
-            ));
+            return Err(MarketError::InsufficientLiquidityForWithdrawal {
+                requested_lp: shares_to_withdraw,
+                requested_collateral: liquidity_to_return,
+                unlocked: liquidity_stats.unlocked,
+            }
+            .into());
         }
 
         debug_assert!(total_collateral >= liquidity_to_return.raw());

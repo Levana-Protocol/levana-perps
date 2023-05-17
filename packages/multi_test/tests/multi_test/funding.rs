@@ -209,6 +209,8 @@ fn funding_payment_typical() {
     market
         .exec_set_config(ConfigUpdate {
             liquifunding_delay_seconds: Some(40 * 60),
+            // We need precise liquifunding periods for this test so remove randomization
+            liquifunding_delay_fuzz_seconds: Some(0),
             staleness_seconds: Some(20 * 60),
             ..Default::default()
         })
@@ -349,6 +351,8 @@ fn funding_borrow_fee() {
     market
         .exec_set_config(ConfigUpdate {
             liquifunding_delay_seconds: Some(60 * 60),
+            // We need precise liquifunding periods for this test so remove randomization
+            liquifunding_delay_fuzz_seconds: Some(0),
             staleness_seconds: Some(20 * 60),
             ..Default::default()
         })

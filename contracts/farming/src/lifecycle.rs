@@ -9,7 +9,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     InstantiateMsg {
         // FIXME remove the ..
         factory,
@@ -25,7 +25,9 @@ pub fn instantiate(
 
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
+    state.set_admin(&mut ctx, &info.sender)?;
     state.save_lvn_token(&mut ctx, lvn_token_denom)?;
+
     ctx.response.add_event(NewFarmingEvent {});
 
     Ok(ctx.response.into_response())

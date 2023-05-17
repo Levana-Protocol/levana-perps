@@ -100,8 +100,16 @@ pub enum ExecuteMsg {
 /// Messages that require owner permissions.
 #[cw_serde]
 pub enum OwnerExecuteMsg {
+    /// Start the lockdrop period
+    StartLockdropPeriod {
+        /// If specified, lockdrop will start at this time.
+        start: Option<Timestamp>,
+    },
     /// Finish the review period and launch the primary contract
-    EndReviewPeriod {},
+    StartLaunchPeriod {
+        /// If specified, launch will start at this time.
+        start: Option<Timestamp>,
+    },
     /// Change the active emissions
     SetEmissions {
         /// When to start the emissions.
@@ -173,27 +181,11 @@ pub enum QueryMsg {
     },
 }
 
-/// What is the current period of the farming contract
-#[cw_serde]
-#[derive(Copy)]
-pub enum FarmingPeriod {
-    /// Contract has been instantiate but lockdrop has not started.
-    Inactive,
-    /// Lockdrop period is running.
-    Lockdrop,
-    /// Sunset period is running.
-    Sunset,
-    /// Sunset completed, waiting for review before launching.
-    Review,
-    /// Normal contract operations.
-    Launched,
-}
-
 /// Overall state of the contract, returned from [QueryMsg::Status]
 #[cw_serde]
 pub struct StatusResp {
-    /// Current period of the contract
-    pub period: FarmingPeriod,
+    /// The current farming period, with additional information
+    pub period: FarmingPeriodResp,
     /// Total farming tokens across the entire protocol.
     pub farming_tokens: FarmingToken,
     /// Total xLP held by the farming contract
@@ -206,8 +198,6 @@ pub struct StatusResp {
     pub lockdrop_buckets: Vec<LockdropBucketStats>,
     /// The amount of collateral in the bonus fund
     pub bonus: Collateral,
-    /// If known, the timestamp when the protocol launched
-    pub launched: Option<Timestamp>,
     /// If known, the timestamp when all lockdrop LVN rewards are available
     pub lockdrop_rewards_unlocked: Option<Timestamp>,
     /// Total amount of LVN currently held by the contract
@@ -221,6 +211,42 @@ pub struct StatusResp {
     pub lvn_owed: LvnToken,
     /// Current emissions plan
     pub emissions: Option<Emissions>,
+}
+
+/// The current farming period, with additional information.
+#[cw_serde]
+pub enum FarmingPeriodResp {
+    /// Contract has been instantiated but lockdrop has not started.
+    Inactive {
+        /// If set, lockdrop has been scheduled to start at this time
+        lockdrop_start: Option<Timestamp>,
+    },
+    /// Currently in the lockdrop period
+    Lockdrop {
+        /// Lockdrop started at this time
+        started_at: Timestamp,
+        /// Sunset will start at this time
+        sunset_start: Timestamp,
+    },
+    /// Currently in the sunset period
+    Sunset {
+        /// Sunset started at this time
+        started_at: Timestamp,
+        /// Sunset will end at this time, and manual review period will begin
+        review_start: Timestamp,
+    },
+    /// Sunset completed, waiting for manual review before launching.
+    Review {
+        /// review started at this time
+        started_at: Timestamp,
+        /// If set, launch has been scheduled to start at this time
+        launch_start: Option<Timestamp>,
+    },
+    /// Normal contract operations.
+    Launched {
+        /// Launch started at this time
+        started_at: Timestamp,
+    },
 }
 
 /// A lockdrop bucket, given in number of "months."

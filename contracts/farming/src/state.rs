@@ -1,13 +1,15 @@
+pub(crate) mod auth;
 pub(crate) mod farming;
 pub(crate) mod market_info;
 pub(crate) mod rewards;
+pub(crate) mod period;
+pub(crate) mod status;
 
 use crate::prelude::*;
 use cosmwasm_std::{Api, Deps, DepsMut, Empty, Env, QuerierWrapper, Storage};
 
 pub(crate) struct State<'a> {
     pub(crate) api: &'a dyn Api,
-    #[allow(dead_code)]
     pub(crate) env: Env,
     pub(crate) market_info: MarketInfo,
     #[allow(dead_code)]

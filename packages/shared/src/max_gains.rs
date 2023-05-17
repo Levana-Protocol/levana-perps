@@ -124,16 +124,19 @@ impl MaxGainsInQuote {
         notional_size_in_collateral: Signed<Collateral>,
         leverage_to_notional: SignedLeverageToNotional,
     ) -> Result<NonZero<Collateral>> {
+        let direction_to_base = leverage_to_notional.direction().into_base(market_type);
         Ok(match market_type {
             MarketType::CollateralIsQuote => match self {
                 MaxGainsInQuote::Finite(max_gains_in_collateral) => {
                     collateral.checked_mul_non_zero(max_gains_in_collateral)?
                 }
-                MaxGainsInQuote::PosInfinity => perp_bail!(
-                    ErrorId::LeverageValidation,
-                    ErrorDomain::Market,
-                    "Collateral-is-quote markets do not support infinite max gains"
-                ),
+                MaxGainsInQuote::PosInfinity => {
+                    return Err(MarketError::InvalidInfiniteMaxGains {
+                        market_type,
+                        direction: direction_to_base,
+                    }
+                    .into_anyhow());
+                }
             },
             MarketType::CollateralIsBase => {
                 match self {
@@ -144,11 +147,11 @@ impl MaxGainsInQuote {
                         // Collateral-is-quote market). Note, the error message purposefully describes
                         // this as a "Long" position to keep things clear and consistent for the user.
                         if leverage_to_notional.direction() == DirectionToNotional::Long {
-                            perp_bail!(
-                                ErrorId::LeverageValidation,
-                                ErrorDomain::Market,
-                                "Infinite max gains are only allowed on Long positions"
-                            );
+                            return Err(MarketError::InvalidInfiniteMaxGains {
+                                market_type,
+                                direction: direction_to_base,
+                            }
+                            .into_anyhow());
                         }
 
                         NonZero::new(notional_size_in_collateral.abs_unsigned())
@@ -160,11 +163,7 @@ impl MaxGainsInQuote {
                                 / leverage_to_notional.into_number();
 
                         if max_gains_multiple.approx_lt_relaxed(Number::ZERO) {
-                            perp_bail!(
-                                ErrorId::LeverageValidation,
-                                ErrorDomain::Market,
-                                "Max gains too large"
-                            );
+                            return Err(MarketError::MaxGainsTooLarge {}.into());
                         }
 
                         let counter_collateral = collateral.into_number()

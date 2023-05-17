@@ -37,12 +37,22 @@ impl State<'_> {
         // inner result to see if the wallet is eligible for tapping. If not, we simply
         // skip. This allows multitapping from the faucet bot to be resilient in the
         // face of getting invalid addresses in its queue.
-        if let Err(e) = self.validate_tap_faucet_error(ctx.storage, &addr)? {
-            ctx.response
-                .add_event(Event::new(&addr).add_attribute("wait_secs", e.wait_secs.to_string()));
+        if let Err(e) = self.validate_tap_faucet_error(ctx.storage, &addr, &assets)? {
+            match e {
+                super::FaucetError::TooSoon { wait_secs } => ctx
+                    .response
+                    .add_event(Event::new(&addr).add_attribute("wait_secs", wait_secs.to_string())),
+                super::FaucetError::AlreadyTapped { cw20 } => ctx.response.add_event(
+                    Event::new(&addr).add_attribute("already_tapped", cw20.into_string()),
+                ),
+            }
             return Ok(());
         }
         self.save_last_tap(ctx, &addr)?;
+
+        for asset in &assets {
+            self.set_tapped_trading_competition(ctx, &addr, asset)?;
+        }
         ctx.response
             .add_event(Event::new(&addr).add_attribute("success", "success"));
 

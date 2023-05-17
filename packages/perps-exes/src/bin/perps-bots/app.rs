@@ -5,6 +5,8 @@ pub(crate) mod faucet;
 mod gas_check;
 mod liquidity;
 mod price;
+mod stale;
+mod stats;
 mod trader;
 mod types;
 mod utilization;
@@ -40,6 +42,12 @@ impl AppBuilder {
         }
 
         self.start_crank_bot().await?;
+
+        if !self.app.config.ignore_stale {
+            self.track_stale()?;
+        }
+
+        self.track_stats()?;
 
         let balance_wallet = self.get_track_wallet("balance")?;
         if self.app.config.balance {

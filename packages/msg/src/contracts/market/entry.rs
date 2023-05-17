@@ -999,6 +999,10 @@ pub struct StatusResp {
     pub liquidity: super::liquidity::LiquidityStats,
     /// Next bit of crank work available, if any
     pub next_crank: Option<CrankWorkInfo>,
+    /// Timestamp of the last completed crank
+    pub last_crank_completed: Option<Timestamp>,
+    /// Size of the unpend queue
+    pub unpend_queue_size: u32,
     /// Overall borrow fee rate (annualized), combining LP and xLP
     pub borrow_fee: Decimal256,
     /// LP component of [Self::borrow_fee]
@@ -1032,6 +1036,8 @@ pub struct StatusResp {
     pub stale_liquifunding: Option<Timestamp>,
     /// Is the last price update too old? If so, contains [Option::Some], and the timestamp when the price became too old.
     pub stale_price: Option<Timestamp>,
+    /// Are we in the congested state where new positions cannot be opened?
+    pub congested: bool,
 
     /// Fees held by the market contract
     pub fees: Fees,

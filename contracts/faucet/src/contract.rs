@@ -17,9 +17,9 @@ use cw2::{get_contract_version, set_contract_version};
 use msg::contracts::{
     cw20::{entry::InstantiateMinter, Cw20Coin},
     faucet::entry::{
-        ConfigResponse, ExecuteMsg, FaucetAsset, GasAllowance, GasAllowanceResp, GetTokenResponse,
-        InstantiateMsg, IsAdminResponse, MigrateMsg, NextTradingIndexResponse, OwnerMsg, QueryMsg,
-        TapAmountResponse, TapEligibleResponse,
+        ConfigResponse, ExecuteMsg, FaucetAsset, FundsSentResponse, GasAllowance, GasAllowanceResp,
+        GetTokenResponse, IneligibleReason, InstantiateMsg, IsAdminResponse, MigrateMsg,
+        NextTradingIndexResponse, OwnerMsg, QueryMsg, TapAmountResponse, TapEligibleResponse,
     },
 };
 use semver::Version;
@@ -114,7 +114,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 }
             }
 
-            state.validate_tap(ctx.storage, &recipient)?;
+            state.validate_tap(ctx.storage, &recipient, &assets)?;
 
             for asset in assets {
                 state.tap(&mut ctx, asset, &recipient, amount)?;
@@ -268,17 +268,24 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 }
             })
             .query_result(),
-        QueryMsg::IsTapEligible { addr } => {
+        QueryMsg::IsTapEligible { addr, assets } => {
             let addr = addr.validate(deps.api)?;
             let (state, store) = State::new(deps, env);
-            match state.validate_tap_faucet_error(store, &addr)? {
+            match state.validate_tap_faucet_error(store, &addr, &assets)? {
                 Ok(()) => TapEligibleResponse::Eligible {},
-                Err(e) => TapEligibleResponse::Ineligible {
-                    seconds: e.wait_secs,
+                Err(FaucetError::TooSoon { wait_secs }) => TapEligibleResponse::Ineligible {
+                    seconds: wait_secs,
                     message: format!(
-                        "You can tap the faucet again in {}",
-                        PrettyTimeRemaining(e.wait_secs)
+                        "You can only tap the faucet again in {}",
+                        PrettyTimeRemaining(wait_secs)
                     ),
+                    reason: IneligibleReason::TooSoon,
+                },
+                Err(FaucetError::AlreadyTapped { cw20: _ }) => TapEligibleResponse::Ineligible {
+                    seconds: Decimal256::zero(),
+                    message: "During the trading competition there is a limit of one faucet tap per person"
+                        .to_owned(),
+                    reason: IneligibleReason::AlreadyTapped,
                 },
             }
             .query_result()
@@ -305,6 +312,12 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 None => TapAmountResponse::CannotTap {},
             }
             .query_result()
+        }
+        QueryMsg::FundsSent { asset, timestamp } => {
+            let (state, store) = State::new(deps, env);
+            let amount =
+                state.get_history(store, &asset, timestamp.unwrap_or_else(|| state.now()))?;
+            FundsSentResponse { amount }.query_result()
         }
     }
 }

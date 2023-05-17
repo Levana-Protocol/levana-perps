@@ -28,14 +28,14 @@ impl RawFarmerStats {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Default, Debug)]
-struct FarmingTotals {
+pub(crate) struct FarmingTotals {
     /// Total amount of xLP controlled by this contract.
     ///
     /// We could in theory query the xLP balance instead of storing it. However,
     /// that gets hairy quickly when users deposit xLP, since querying the xLP
     /// token balance will not give the correct response for calculations.
-    xlp: LpToken,
-    farming: FarmingToken,
+    pub xlp: LpToken,
+    pub farming: FarmingToken,
 }
 
 impl FarmingTotals {
@@ -71,7 +71,7 @@ impl FarmingTotals {
 
 impl State<'_> {
     /// Get the total amount of xLP held by this contract
-    fn get_farming_totals(&self, store: &dyn Storage) -> Result<FarmingTotals> {
+    pub(crate) fn get_farming_totals(&self, store: &dyn Storage) -> Result<FarmingTotals> {
         TOTALS
             .may_load(store)
             .map_err(|e| e.into())
@@ -107,7 +107,6 @@ impl State<'_> {
         farmer: &Addr,
         xlp: LpToken,
     ) -> Result<FarmingToken> {
-        // FIXME ensure that we're in the active state
         let mut totals = self.get_farming_totals(ctx.storage)?;
         let new_farming = totals.xlp_to_farming(xlp)?;
         totals.xlp = totals.xlp.checked_add(xlp)?;
@@ -128,7 +127,6 @@ impl State<'_> {
         farmer: &Addr,
         amount: Option<NonZero<FarmingToken>>,
     ) -> Result<(LpToken, FarmingToken)> {
-        // FIXME ensure that we're in the active state
         let mut totals = self.get_farming_totals(ctx.storage)?;
         let mut raw = self.load_raw_farmer_stats(ctx.storage, farmer)?;
 

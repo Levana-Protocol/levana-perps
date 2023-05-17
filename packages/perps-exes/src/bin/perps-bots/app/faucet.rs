@@ -57,12 +57,17 @@ impl FaucetBot {
         match contract
             .query(QueryMsg::IsTapEligible {
                 addr: recipient.get_address_string().into(),
+                assets: cw20s
+                    .iter()
+                    .map(|addr| FaucetAsset::Cw20(addr.get_address_string().into()))
+                    .collect(),
             })
             .await?
         {
             TapEligibleResponse::Eligible {} => (),
             TapEligibleResponse::Ineligible {
                 seconds: _,
+                reason: _,
                 message,
             } => anyhow::bail!("{message}"),
         }
