@@ -55,7 +55,7 @@ impl App {
                 &self.config.crank_wallet,
                 vec![],
                 market::entry::ExecuteMsg::Crank {
-                    execs: None,
+                    execs: Some(40),
                     rewards: None,
                 },
             )
