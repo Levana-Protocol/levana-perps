@@ -1,82 +1,19 @@
 use cosmwasm_std::from_binary;
 use msg::token::Token;
 
-use crate::prelude::*;
+use crate::{prelude::*, state::funds::Received};
 
 #[entry_point]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
-    let (msg, received, sender) = match msg {
-        ExecuteMsg::Receive {
-            sender,
-            amount,
-            msg,
-        } => {
-            let sender = sender.validate(state.api)?;
-            let get_lp_token = || LpToken::from_u128(amount.u128());
-            let msg = from_binary(&msg)?;
-            let received = Some(if info.sender == state.market_info.lp_addr {
-                Received::Lp(get_lp_token()?)
-            } else if info.sender == state.market_info.xlp_addr {
-                Received::Xlp(get_lp_token()?)
-            } else {
-                match &state.market_info.collateral {
-                    Token::Cw20 {
-                        addr,
-                        decimal_places: _,
-                    } => {
-                        if addr.as_str() == info.sender.as_str() {
-                            Received::Collateral(
-                                NonZero::<Collateral>::try_from_decimal(
-                                    state.market_info.collateral.from_u128(amount.into())?,
-                                )
-                                .context("collateral must be non-zero")?,
-                            )
-                        } else {
-                            anyhow::bail!("Invalid Receive called from contract {}", info.sender)
-                        }
-                    }
-                    Token::Native { .. } => anyhow::bail!(
-                        "Invalid Receive for native collateral market from contract {}",
-                        info.sender
-                    ),
-                }
-            });
+    let received = state.funds_received(&info, &msg)?;
 
-            (msg, received, sender)
+    let (sender, msg) = match msg {
+        ExecuteMsg::Receive { sender, msg, .. } => {
+            (sender.validate(state.api)?, from_binary(&msg)?)
         }
-        msg => {
-            let token = state.market_info.collateral.clone();
-            let received = match &token {
-                Token::Native { denom, .. } => info
-                    .funds
-                    .iter()
-                    .find_map(|coin| {
-                        if coin.denom == *denom {
-                            let amount = token
-                                .from_u128(coin.amount.u128())
-                                .ok()
-                                .and_then(NonZero::<Collateral>::try_from_decimal)
-                                .map(Received::Collateral);
-
-                            match amount {
-                                Some(amount) => Some(Ok(amount)),
-                                None => Some(Err(anyhow::anyhow!(
-                                    "Invalid collateral amount {}",
-                                    coin.amount
-                                ))),
-                            }
-                        } else {
-                            None
-                        }
-                    })
-                    .transpose()?,
-                Token::Cw20 { .. } => None,
-            };
-
-            (msg, received, info.sender)
-        }
+        _ => (info.sender, msg),
     };
 
     state.validate_period_msg(ctx.storage, &sender, &msg)?;
@@ -118,13 +55,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     }
 
     Ok(ctx.response.into_response())
-}
-
-#[derive(Debug, Clone, Copy)]
-enum Received {
-    Collateral(NonZero<Collateral>),
-    Lp(LpToken),
-    Xlp(LpToken),
 }
 
 impl State<'_> {
