@@ -38,6 +38,14 @@ impl State<'_> {
             -amount.into_number(),
             period,
         )?;
+
+        let msg = self
+            .market_info
+            .collateral
+            .into_transfer_msg(&user, amount)?
+            .context("invalid transfer msg")?;
+        ctx.response_mut().add_message(msg);
+
         Ok(())
     }
 
