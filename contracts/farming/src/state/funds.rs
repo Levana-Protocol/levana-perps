@@ -17,6 +17,9 @@ impl State<'_> {
     ) -> Result<Option<Received>> {
         let received = match msg {
             ExecuteMsg::Receive { amount, .. } => {
+                if !info.funds.is_empty() {
+                    bail!("No native funds should be sent alongside CW20");
+                }
                 let get_lp_token = || LpToken::from_u128(amount.u128());
                 let received = if info.sender == self.market_info.lp_addr {
                     Received::Lp(get_lp_token()?)
