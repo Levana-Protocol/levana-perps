@@ -4,7 +4,7 @@ pub mod defaults;
 use crate::prelude::*;
 use cosmwasm_schema::QueryResponses;
 use cosmwasm_std::{Binary, StdResult, Uint128};
-use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
+use cw_storage_plus::{Key, KeyDeserialize, Prefixer, PrimaryKey};
 
 /// Instantiate a new farming contract.
 #[cw_serde]
@@ -266,13 +266,13 @@ impl<'a> PrimaryKey<'a> for LockdropBucketId {
     type SuperSuffix = Self;
 
     fn key(&self) -> Vec<Key> {
-        vec![Key::Val32(self.0.to_cw_bytes())]
+        self.0.key()
     }
 }
 
 impl<'a> Prefixer<'a> for LockdropBucketId {
     fn prefix(&self) -> Vec<Key> {
-        vec![Key::Val32(self.0.to_cw_bytes())]
+        self.0.key()
     }
 }
 
