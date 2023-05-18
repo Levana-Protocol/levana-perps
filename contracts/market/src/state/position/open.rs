@@ -223,9 +223,9 @@ impl State<'_> {
             false,
             true,
             if is_market {
-                PositionSaveReason::Open
+                PositionSaveReason::OpenMarket
             } else {
-                PositionSaveReason::LimitOrder
+                PositionSaveReason::ExecuteLimitOrder
             },
         )?;
 

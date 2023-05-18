@@ -1383,40 +1383,40 @@ pub mod events {
     #[derive(Clone, Copy, PartialEq, Eq, Debug)]
     pub enum PositionSaveReason {
         /// Newly opened position via market order
-        Open,
+        OpenMarket,
         /// Update to an existing position
         Update,
         /// The crank processed this position for liquifunding
         Crank,
-        /// A limit order was triggered
-        LimitOrder,
+        /// A limit order was executed
+        ExecuteLimitOrder,
         /// User attempted to set a trigger price on an existing position
         SetTrigger,
     }
 
     impl PositionSaveReason {
-        /// Does this reason respect the unpend queue limit?
+        /// Get the [CongestionReason] for this value.
         ///
-        /// If true, when we're at the congestion limit of the unpend queue, we
-        /// will not allow the position save to succeed. When false, the
-        /// position save is allowed to proceed regardless.
-        pub fn respects_congestion_limit(self) -> bool {
+        /// If this user action can result in a congestion error message,
+        /// provide the [CongestionReason] value. If [None], then this
+        /// [PositionSaveReason] cannot be blocked because of congestion.
+        pub fn into_congestion_reason(self) -> Option<CongestionReason> {
             match self {
-                PositionSaveReason::Open => true,
-                PositionSaveReason::Update => true,
-                PositionSaveReason::Crank => false,
-                PositionSaveReason::LimitOrder => false,
-                PositionSaveReason::SetTrigger => true,
+                PositionSaveReason::OpenMarket => Some(CongestionReason::OpenMarket),
+                PositionSaveReason::Update => Some(CongestionReason::Update),
+                PositionSaveReason::Crank => None,
+                PositionSaveReason::ExecuteLimitOrder => None,
+                PositionSaveReason::SetTrigger => Some(CongestionReason::SetTrigger),
             }
         }
 
         /// Represent as a string
         pub fn as_str(self) -> &'static str {
             match self {
-                PositionSaveReason::Open => "open",
+                PositionSaveReason::OpenMarket => "open",
                 PositionSaveReason::Update => "update",
                 PositionSaveReason::Crank => "crank",
-                PositionSaveReason::LimitOrder => "limit-order",
+                PositionSaveReason::ExecuteLimitOrder => "limit-order",
                 PositionSaveReason::SetTrigger => "set-trigger",
             }
         }

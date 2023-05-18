@@ -609,12 +609,15 @@ impl State<'_> {
             .may_load(ctx.storage)?
             .unwrap_or_default();
 
-        if reason.respects_congestion_limit() && old >= self.config.unpend_limit {
-            return Err(MarketError::Congestion {
-                current_queue: old,
-                max_size: self.config.unpend_limit,
+        if old >= self.config.unpend_limit {
+            if let Some(reason) = reason.into_congestion_reason() {
+                return Err(MarketError::Congestion {
+                    current_queue: old,
+                    max_size: self.config.unpend_limit,
+                    reason,
+                }
+                .into_anyhow());
             }
-            .into_anyhow());
         }
 
         // If we hit the numeric overflow, then (1) that's insane and (2) just keep the old value, we're allowed to undercount this.
@@ -629,7 +632,11 @@ impl State<'_> {
     /// This is used to prevent users from placing more limit orders while the
     /// market is congested. Placing additional limit orders can open a spam
     /// attack vector when the market is in the congested state.
-    pub(crate) fn ensure_not_congested(&self, store: &dyn Storage) -> Result<()> {
+    pub(crate) fn ensure_not_congested(
+        &self,
+        store: &dyn Storage,
+        reason: CongestionReason,
+    ) -> Result<()> {
         let count = LIQUIDATION_PRICES_PENDING_COUNT
             .may_load(store)?
             .unwrap_or_default();
@@ -638,6 +645,7 @@ impl State<'_> {
             Err(MarketError::Congestion {
                 current_queue: count,
                 max_size: self.config.unpend_limit,
+                reason,
             }
             .into_anyhow())
         } else {

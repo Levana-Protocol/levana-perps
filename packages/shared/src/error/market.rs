@@ -64,7 +64,25 @@ pub enum MarketError {
         minimum_usd: Usd,
     },
     #[error("Cannot open or update positions currently, the position queue size is {current_queue}, while the allowed size is {max_size}. Please try again later")]
-    Congestion { current_queue: u32, max_size: u32 },
+    Congestion {
+        current_queue: u32,
+        max_size: u32,
+        reason: CongestionReason,
+    },
+}
+
+/// What was the user doing when they hit the congestion error message?
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CongestionReason {
+    /// Opening a new position via market order
+    OpenMarket,
+    /// Placing a new limit order
+    PlaceLimit,
+    /// Updating an existing position
+    Update,
+    /// Setting a trigger price on an existing position
+    SetTrigger,
 }
 
 impl MarketError {
