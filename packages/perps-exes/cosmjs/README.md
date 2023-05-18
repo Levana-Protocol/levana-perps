@@ -4,4 +4,4 @@
 1. `yarn install`
 
 ## Run
-2. `yarn upload`
+2. `yarn upload:sei` or `yarn upload:osmosis`
