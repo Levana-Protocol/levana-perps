@@ -3,12 +3,15 @@ use cosmwasm_std::Order;
 use cw_storage_plus::{Bound, PrefixBound};
 use msg::contracts::market::{
     crank::{events::CrankExecBatchEvent, CrankWorkInfo},
-    position::{ClosePositionInstructions, MaybeClosedPosition, PositionCloseReason},
+    position::{
+        events::PositionSaveReason, ClosePositionInstructions, MaybeClosedPosition,
+        PositionCloseReason,
+    },
 };
 
 use shared::prelude::*;
 
-use super::position::{get_position, ActionType, NEXT_LIQUIFUNDING, NEXT_STALE, OPEN_POSITIONS};
+use super::position::{get_position, NEXT_LIQUIFUNDING, NEXT_STALE, OPEN_POSITIONS};
 
 /// The last price point timestamp for which the cranking process was completed.
 ///
@@ -190,7 +193,7 @@ impl State<'_> {
                     starts_at,
                     ends_at,
                     true,
-                    ActionType::Crank,
+                    PositionSaveReason::Crank,
                 )?;
             }
             CrankWorkInfo::UnpendLiquidationPrices { position } => {

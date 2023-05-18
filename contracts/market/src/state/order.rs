@@ -47,6 +47,7 @@ impl State<'_> {
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
     ) -> Result<()> {
+        self.ensure_not_congested(ctx.storage)?;
         let last_order_id = LAST_ORDER_ID
             .may_load(ctx.storage)?
             .unwrap_or_else(|| OrderId::new(0));
@@ -182,7 +183,7 @@ impl State<'_> {
 
         let res = match res {
             Ok(validated_position) => {
-                let pos_id = self.open_validated_position(ctx, validated_position)?;
+                let pos_id = self.open_validated_position(ctx, validated_position, false)?;
                 Ok(pos_id)
             }
             Err(e) => {

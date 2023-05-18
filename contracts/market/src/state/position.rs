@@ -3,7 +3,10 @@ mod liquifund;
 use cosmwasm_std::Order;
 pub use liquifund::*;
 mod open;
-use msg::contracts::market::entry::{ClosedPositionCursor, ClosedPositionsResp};
+use msg::contracts::market::{
+    entry::{ClosedPositionCursor, ClosedPositionsResp},
+    position::events::{PositionSaveEvent, PositionSaveReason},
+};
 pub(crate) use open::*;
 mod close;
 pub use close::*;
@@ -600,13 +603,13 @@ impl State<'_> {
     fn increment_pending_count(
         &self,
         ctx: &mut StateContext,
-        action_type: ActionType,
+        reason: PositionSaveReason,
     ) -> Result<()> {
         let old = LIQUIDATION_PRICES_PENDING_COUNT
             .may_load(ctx.storage)?
             .unwrap_or_default();
 
-        if action_type == ActionType::User && old >= self.config.unpend_limit {
+        if reason.respects_congestion_limit() && old >= self.config.unpend_limit {
             return Err(MarketError::Congestion {
                 current_queue: old,
                 max_size: self.config.unpend_limit,
@@ -619,6 +622,27 @@ impl State<'_> {
             LIQUIDATION_PRICES_PENDING_COUNT.save(ctx.storage, &new)?;
         }
         Ok(())
+    }
+
+    /// Ensure that we're not in a congested state.
+    ///
+    /// This is used to prevent users from placing more limit orders while the
+    /// market is congested. Placing additional limit orders can open a spam
+    /// attack vector when the market is in the congested state.
+    pub(crate) fn ensure_not_congested(&self, store: &dyn Storage) -> Result<()> {
+        let count = LIQUIDATION_PRICES_PENDING_COUNT
+            .may_load(store)?
+            .unwrap_or_default();
+
+        if count >= self.config.unpend_limit {
+            Err(MarketError::Congestion {
+                current_queue: count,
+                max_size: self.config.unpend_limit,
+            }
+            .into_anyhow())
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -678,7 +702,7 @@ impl State<'_> {
         price_point: &PricePoint,
         is_update: bool,
         recalc_liquidation_margin: bool,
-        action_type: ActionType,
+        reason: PositionSaveReason,
     ) -> Result<()> {
         if is_update {
             self.position_remove(ctx, pos.id)?;
@@ -726,9 +750,15 @@ impl State<'_> {
         OPEN_POSITIONS.save(ctx.storage, pos.id, pos)?;
         NEXT_LIQUIFUNDING.save(ctx.storage, (pos.next_liquifunding, pos.id), &())?;
         NEXT_STALE.save(ctx.storage, (pos.stale_at, pos.id), &())?;
-        self.store_liquidation_prices(ctx, pos, action_type)?;
+        let used_pending_queue = self.store_liquidation_prices(ctx, pos, reason)?;
 
         self.increase_total_funding_margin(ctx, pos.liquidation_margin.funding)?;
+
+        ctx.response.add_event(PositionSaveEvent {
+            id: pos.id,
+            reason,
+            used_pending_queue,
+        });
 
         Ok(())
     }
@@ -800,22 +830,24 @@ impl State<'_> {
     /// [LIQUIDATION_PRICES_PENDING] queue so that historical price updates
     /// can't trigger liquidation/take profit.  Actually adding them will then
     /// occur in the crank.
+    ///
+    /// Returns [true] if we used the unpend queue, [false] otherwise.
     fn store_liquidation_prices(
         &self,
         ctx: &mut StateContext,
         pos: &Position,
-        action_type: ActionType,
-    ) -> Result<()> {
+        reason: PositionSaveReason,
+    ) -> Result<bool> {
         if self.is_crank_up_to_date(ctx.storage)? {
             self.store_liquidation_prices_inner(ctx, pos)?;
+            Ok(false)
         } else {
             let now = self.now();
             LIQUIDATION_PRICES_PENDING_REVERSE.save(ctx.storage, pos.id, &now)?;
             LIQUIDATION_PRICES_PENDING.save(ctx.storage, (now, pos.id), &())?;
-            self.increment_pending_count(ctx, action_type)?;
+            self.increment_pending_count(ctx, reason)?;
+            Ok(true)
         }
-
-        Ok(())
     }
 
     /// Take a single position from [LIQUIDATION_PRICES_PENDING] and moves it to the real data structures.
@@ -933,14 +965,4 @@ impl AdjustOpenInterestResult {
         }
         Ok(())
     }
-}
-
-/// What kind of an action triggered this transaction?
-#[derive(PartialEq, Eq)]
-pub(crate) enum ActionType {
-    /// An automated crank action
-    Crank,
-    /// A user driven action like opening a position, setting trigger orders,
-    /// etc
-    User,
 }

@@ -1365,4 +1365,78 @@ pub mod events {
             })
         }
     }
+
+    /// Emitted each time a position is saved
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub struct PositionSaveEvent {
+        /// ID of the position
+        pub id: PositionId,
+        /// Reason the position was saved
+        pub reason: PositionSaveReason,
+        /// Was the position put on the pending queue?
+        ///
+        /// This occurs when the crank has fallen behind
+        pub used_pending_queue: bool,
+    }
+
+    /// Why was a position saved?
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub enum PositionSaveReason {
+        /// Newly opened position via market order
+        Open,
+        /// Update to an existing position
+        Update,
+        /// The crank processed this position for liquifunding
+        Crank,
+        /// A limit order was triggered
+        LimitOrder,
+        /// User attempted to set a trigger price on an existing position
+        SetTrigger,
+    }
+
+    impl PositionSaveReason {
+        /// Does this reason respect the unpend queue limit?
+        ///
+        /// If true, when we're at the congestion limit of the unpend queue, we
+        /// will not allow the position save to succeed. When false, the
+        /// position save is allowed to proceed regardless.
+        pub fn respects_congestion_limit(self) -> bool {
+            match self {
+                PositionSaveReason::Open => true,
+                PositionSaveReason::Update => true,
+                PositionSaveReason::Crank => false,
+                PositionSaveReason::LimitOrder => false,
+                PositionSaveReason::SetTrigger => true,
+            }
+        }
+
+        /// Represent as a string
+        pub fn as_str(self) -> &'static str {
+            match self {
+                PositionSaveReason::Open => "open",
+                PositionSaveReason::Update => "update",
+                PositionSaveReason::Crank => "crank",
+                PositionSaveReason::LimitOrder => "limit-order",
+                PositionSaveReason::SetTrigger => "set-trigger",
+            }
+        }
+    }
+
+    impl From<PositionSaveEvent> for Event {
+        fn from(
+            PositionSaveEvent {
+                id,
+                reason,
+                used_pending_queue,
+            }: PositionSaveEvent,
+        ) -> Self {
+            Event::new("position-save")
+                .add_attribute("id", id.0)
+                .add_attribute("reason", reason.as_str())
+                .add_attribute(
+                    "used-pending-queue",
+                    if used_pending_queue { "true" } else { "false" },
+                )
+        }
+    }
 }
