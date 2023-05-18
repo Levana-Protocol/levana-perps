@@ -23,6 +23,12 @@ pub(crate) struct StoreCodeOpt {
         global = true
     )]
     contracts: Contracts,
+
+    /// Use the following market contract code ID instead of uploading.
+    ///
+    /// Useful because some networks currently aren't working well with uploads
+    #[clap(long)]
+    market_code_id: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -81,6 +87,7 @@ pub(crate) async fn go(
         family,
         network,
         contracts,
+        market_code_id,
     }: StoreCodeOpt,
 ) -> Result<()> {
     let network = match (family, network) {
@@ -107,6 +114,7 @@ pub(crate) async fn go(
         &basic.wallet,
         &tracker,
         contracts.names(),
+        market_code_id,
     )
     .await
 }
@@ -117,6 +125,7 @@ pub(crate) async fn store_code(
     wallet: &Wallet,
     tracker: &Tracker,
     contract_types: &[&str],
+    market_code_id: Option<u64>,
 ) -> Result<()> {
     let gitrev = opt.get_gitrev()?;
     log::info!("Compiled WASM comes from gitrev {gitrev}");
@@ -127,7 +136,13 @@ pub(crate) async fn store_code(
         match tracker.get_code_by_hash(hash.clone()).await? {
             CodeIdResp::NotFound {} => {
                 log::info!("Contract {ct} has SHA256 {hash} and is not on blockchain, uploading");
-                let code_id = cosmos.store_code_path(wallet, &path).await?.get_code_id();
+                let code_id = match market_code_id {
+                    Some(code_id) if ct == "market" => {
+                        log::info!("Using override market code ID of: {code_id}");
+                        code_id
+                    }
+                    _ => cosmos.store_code_path(wallet, &path).await?.get_code_id(),
+                };
                 log::info!("Upload complete, new code ID is {code_id}, logging with the tracker");
                 let res = tracker
                     .store_code(wallet, ct.to_owned(), code_id, hash, gitrev.clone())
