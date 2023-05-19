@@ -77,16 +77,16 @@ impl Opt {
 
         builder.grpc_url = "https://grpc.atlantic-2.seinetwork.io/".to_owned();
         builders.add(builder.clone());
-        builder.config.rpc_url = Some("https://sei-testnet-rpc.polkachu.com/".to_owned());
-        builders.add(builder.clone());
+        // builder.config.rpc_url = Some("https://sei-testnet-rpc.polkachu.com/".to_owned());
+        // builders.add(builder.clone());
 
-        builder.config.rpc_url = None;
+        // builder.config.rpc_url = None;
         builder.grpc_url = "https://sei-grpc.kingnodes.com:443".to_owned();
         builders.add(builder.clone());
-        builder.config.rpc_url = Some("https://sei.kingnodes.com/".to_owned());
-        builders.add(builder.clone());
-        builder.config.rpc_url = Some("https://sei-testnet-rpc.polkachu.com/".to_owned());
-        builders.add(builder);
+        // builder.config.rpc_url = Some("https://sei.kingnodes.com/".to_owned());
+        // builders.add(builder.clone());
+        // builder.config.rpc_url = Some("https://sei-testnet-rpc.polkachu.com/".to_owned());
+        // builders.add(builder);
 
         builders.build_lazy()
     }
