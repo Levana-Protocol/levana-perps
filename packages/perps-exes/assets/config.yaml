@@ -185,7 +185,7 @@ overrides:
     liquidity: true
     utilization: true
     balance: true
-    traders: 1
+    traders: 0
     default-market-ids:
       - ETH_USD
   seitrade:
