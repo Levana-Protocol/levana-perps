@@ -39,23 +39,27 @@ impl WatchedTaskPerMarket for Stale {
 async fn check_stale_single(cosmos: &Cosmos, addr: Address) -> Result<String> {
     let market = MarketContract::new(cosmos.make_contract(addr));
     let status = market.status().await?;
+    let last_crank_completed = status
+        .last_crank_completed
+        .context("No cranks completed yet")?;
+    let last_crank_completed = cosmwasm_std::Timestamp::from(last_crank_completed);
+    let last_crank_completed = Utc
+        .timestamp_opt(last_crank_completed.seconds().try_into()?, 0)
+        .single()
+        .context("Could not convert last_crank_completed into DateTime<Utc>")?;
     if status.is_stale() {
-        Err(anyhow!("Protocol is in stale state"))
+        Err(anyhow!(
+            "Protocol is in stale state. Last completed crank timestamp: {}",
+            last_crank_completed
+        ))
     } else if status.congested {
         Err(anyhow!(
-            "Protocol is congested, unpend queue size: {}. Maximum allowed size: {}.",
+            "Protocol is congested, unpend queue size: {}. Maximum allowed size: {}. Last completed crank timestamp: {}",
             status.unpend_queue_size,
-            status.config.unpend_limit
+            status.config.unpend_limit,
+            last_crank_completed
         ))
     } else {
-        let last_crank_completed = status
-            .last_crank_completed
-            .context("No cranks completed yet")?;
-        let last_crank_completed = cosmwasm_std::Timestamp::from(last_crank_completed);
-        let last_crank_completed = Utc
-            .timestamp_opt(last_crank_completed.seconds().try_into()?, 0)
-            .single()
-            .context("Could not convert last_crank_completed into DateTime<Utc>")?;
         Ok(format!(
             "Protocol is neither stale nor congested. Last completed crank timestamp: {}",
             last_crank_completed

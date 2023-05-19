@@ -42,6 +42,7 @@ csv = "1"
 tonic = "0.8.3"
 askama = "0.12"
 cw-utils = "1.0.1"
+thiserror = "1"
 
 [features]
 default = []
