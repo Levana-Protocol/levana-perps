@@ -2451,6 +2451,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sha2 0.10.6",
+ "thiserror",
  "tokio",
  "tokio-tungstenite",
  "tokio-util",
