@@ -68,7 +68,7 @@ impl State<'_> {
                     msg,
                 });
                 // However, the actual balances are kept on the market contract, and so we also need to transfer the balance
-                // from the market to the destination contract
+                // from the sender (set in MarketExecuteMsg::LiquidityTokenProxy) to the destination contract
                 let msg = LiquidityTokenExecuteMsg::Transfer {
                     recipient: contract.clone(),
                     amount,
@@ -91,6 +91,7 @@ impl State<'_> {
 
                 // but the balance must be updated on the market contract. In this case going through "transfer from"
                 // which will ensure the correct approval gating etc.
+                // as above, the sender is set in MarketExecuteMsg::LiquidityTokenProxy
                 let msg = LiquidityTokenExecuteMsg::TransferFrom {
                     owner,
                     recipient: contract.clone(),
