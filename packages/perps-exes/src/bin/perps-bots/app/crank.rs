@@ -42,11 +42,7 @@ impl WatchedTaskPerMarket for Worker {
     }
 }
 
-// Start off big and go down quickly. Once we get to the range of numbers we
-// expect to always work, move down more incrementally to find the sweet spot.
-const CRANK_EXECS: &[u32] = &[
-    1024, 512, 256, 128, 64, 40, 35, 30, 25, 20, 15, 10, 7, 6, 5, 4, 3, 2, 1,
-];
+const CRANK_EXECS: &[u32] = &[30, 25, 20, 15, 10, 7, 6, 5, 4, 3, 2, 1];
 
 impl App {
     async fn crank(&self, crank_wallet: &Wallet, addr: Address) -> Result<WatchedTaskOutput> {
