@@ -24,7 +24,7 @@ pub(crate) struct BotConfig {
     pub(crate) contract_family: String,
     pub(crate) network: CosmosNetwork,
     pub(crate) price_wallet: Option<Arc<Wallet>>,
-    pub(crate) crank_wallet: Wallet,
+    pub(crate) crank_wallet: Option<Wallet>,
     pub(crate) wallet_manager: WalletManager,
     pub(crate) liquidity: bool,
     pub(crate) utilization: bool,
@@ -73,7 +73,11 @@ impl Opt {
             explorer,
             contract_family: self.deployment.clone(),
             network,
-            crank_wallet: self.get_crank_wallet(network.get_address_type(), &wallet_phrase_name)?,
+            crank_wallet: if partial.crank {
+                Some(self.get_crank_wallet(network.get_address_type(), &wallet_phrase_name)?)
+            } else {
+                None
+            },
             price_wallet: if partial.price {
                 Some(Arc::new(self.get_wallet(
                     network.get_address_type(),
