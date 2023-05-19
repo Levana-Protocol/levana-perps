@@ -127,7 +127,7 @@ pub(crate) enum FaucetTapError {
     },
     #[error("The faucet server was unable to execute against the faucet smart contract.")]
     Contract { inner: String },
-    #[error("The faucet server was unable to query the captcha service. Please try again laster.")]
+    #[error("The faucet server was unable to query the captcha service. Please try again later.")]
     CannotQueryCaptcha {},
     #[error("The captcha provided was invalid, please try again.")]
     InvalidCaptcha {},
