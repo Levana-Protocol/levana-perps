@@ -4,6 +4,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use cosmos::Address;
 use cosmos::Cosmos;
+use cosmos::CosmosBuilders;
 use cosmos::CosmosNetwork;
 use cosmos::HasAddressType;
 use cosmos::Wallet;
@@ -47,17 +48,53 @@ pub(crate) struct AppBuilder {
 }
 
 impl Opt {
-    pub(crate) async fn into_app_builder(self) -> Result<AppBuilder> {
-        let config = self.get_bot_config()?;
+    async fn make_cosmos(&self, config: &BotConfig, client: &Client) -> Result<Cosmos> {
+        if config.network == CosmosNetwork::SeiTestnet {
+            return Ok(self.make_sei_cosmos(config, client));
+        }
         let mut builder = config.network.builder();
         if let Some(grpc) = &self.grpc_url {
             builder.grpc_url = grpc.clone();
         }
         if let Some(gas_multiplier) = config.gas_multiplier {
-            builder.set_gas_multiplier(gas_multiplier);
+            builder.config.gas_estimate_multiplier = gas_multiplier;
         }
-        let cosmos = builder.build().await?;
+        builder.build().await
+    }
+
+    fn make_sei_cosmos(&self, config: &BotConfig, client: &Client) -> Cosmos {
+        let mut builder = CosmosNetwork::SeiTestnet.builder();
+        if let Some(gas_multiplier) = config.gas_multiplier {
+            builder.config.gas_estimate_multiplier = gas_multiplier;
+        }
+        builder.config.client = Some(client.clone());
+
+        let mut builders = CosmosBuilders::from(builder.clone());
+
+        if let Some(grpc) = &self.grpc_url {
+            builder.grpc_url = grpc.clone();
+        }
+
+        builder.grpc_url = "https://grpc.atlantic-2.seinetwork.io/".to_owned();
+        builders.add(builder.clone());
+        builder.config.rpc_url = Some("https://sei-testnet-rpc.polkachu.com/".to_owned());
+        builders.add(builder.clone());
+
+        builder.config.rpc_url = None;
+        builder.grpc_url = "https://sei-grpc.kingnodes.com:443".to_owned();
+        builders.add(builder.clone());
+        builder.config.rpc_url = Some("https://sei.kingnodes.com/".to_owned());
+        builders.add(builder.clone());
+        builder.config.rpc_url = Some("https://sei-testnet-rpc.polkachu.com/".to_owned());
+        builders.add(builder);
+
+        builders.build_lazy()
+    }
+
+    pub(crate) async fn into_app_builder(self) -> Result<AppBuilder> {
+        let config = self.get_bot_config()?;
         let client = Client::builder().user_agent("perps-bots").build()?;
+        let cosmos = self.make_cosmos(&config, &client).await?;
 
         let faucet_bot_wallet = self.get_faucet_bot_wallet(cosmos.get_address_type())?;
         let gas_wallet = self.get_gas_wallet(cosmos.get_address_type())?;
