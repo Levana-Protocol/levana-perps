@@ -77,7 +77,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     // update borrow fee rate gradually
     state
         .accumulate_borrow_fee_rate(&mut ctx, state.now())
-        .context("accumulate_borrow_fee_rate failed")?;
+        .map_err(|e| anyhow::anyhow!("accumulate_borrow_fee_rate failed: {e:?}"))?;
 
     fn handle_update_position_shared(
         state: &State,
