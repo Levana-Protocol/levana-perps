@@ -61,8 +61,10 @@ async fn check_stale_single(cosmos: &Cosmos, addr: Address) -> Result<String> {
         ))
     } else {
         Ok(format!(
-            "Protocol is neither stale nor congested. Last completed crank timestamp: {}",
-            last_crank_completed
+            "Protocol is neither stale nor congested. Last completed crank timestamp: {}. Unpend queue size: {}/{}.",
+            last_crank_completed,
+            status.unpend_queue_size,
+            status.config.unpend_limit,
         ))
     }
 }
