@@ -13,6 +13,7 @@ pub mod history;
 pub mod liquidation_price;
 pub mod liquidity;
 pub mod logging;
+pub mod lp_cw20;
 pub mod multi_market;
 pub mod nft;
 pub mod order;

@@ -9,6 +9,7 @@ pub mod position_helpers;
 pub mod response;
 //pub mod test_strategies;
 pub mod arbitrary;
+pub mod contracts;
 pub mod rewards_helpers;
 pub mod time;
 
