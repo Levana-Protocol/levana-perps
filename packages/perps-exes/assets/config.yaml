@@ -12,7 +12,7 @@ chains:
     min-gas-in-gas-wallet: 3000000000
     watcher:
       # Nodes seem to crash often, let's see if this helps
-      retries: 4
+      retries: 10
     rpc-nodes:
     - https://sei.kingnodes.com/
     - https://sei-testnet-rpc.polkachu.com/
