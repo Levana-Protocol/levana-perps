@@ -11,6 +11,7 @@ use chrono::{DateTime, Duration, Utc};
 use cosmos::Address;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
+use perps_exes::build_version;
 use perps_exes::{
     config::{TaskConfig, WatcherConfig},
     prelude::MarketId,
@@ -369,16 +370,36 @@ impl TaskStatuses {
         all_statuses
     }
 
-    pub(crate) fn all_statuses_html(&self) -> axum::response::Response {
+    pub(crate) fn all_statuses_html(&self, app: &App) -> axum::response::Response {
         use askama::Template;
         #[derive(Template)]
         #[template(path = "status.html")]
-        struct MyTemplate {
+        struct MyTemplate<'a> {
             statuses: Vec<RenderedStatus>,
+            family: &'a str,
+            build_version: &'a str,
+            grpc: &'a str,
+            grpc_height: u64,
+            rpc: &'a str,
+            rpc_height: u64,
+            live_since: DateTime<Utc>,
         }
         let statuses = self.all_statuses();
         let alert = statuses.iter().any(|x| x.short.alert());
-        let mut res = MyTemplate { statuses }.render().unwrap().into_response();
+        let factory = app.get_factory_info();
+        let mut res = MyTemplate {
+            statuses,
+            family: &app.config.contract_family,
+            build_version: build_version(),
+            grpc: &app.cosmos.get_first_builder().grpc_url,
+            grpc_height: factory.rpc.grpc_height,
+            rpc: &factory.rpc.endpoint,
+            rpc_height: factory.rpc.rpc_height,
+            live_since: app.live_since,
+        }
+        .render()
+        .unwrap()
+        .into_response();
         res.headers_mut().append(
             CONTENT_TYPE,
             HeaderValue::from_static("text/html; charset=utf-8"),

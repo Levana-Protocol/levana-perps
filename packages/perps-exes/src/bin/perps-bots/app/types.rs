@@ -2,6 +2,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use anyhow::Result;
+use chrono::DateTime;
+use chrono::Utc;
 use cosmos::Address;
 use cosmos::Cosmos;
 use cosmos::CosmosNetwork;
@@ -29,6 +31,7 @@ pub(crate) struct App {
     pub(crate) client: Client,
     pub(crate) bind: SocketAddr,
     pub(crate) statuses: TaskStatuses,
+    pub(crate) live_since: DateTime<Utc>,
 }
 
 #[derive(serde::Serialize)]
@@ -88,6 +91,7 @@ impl Opt {
             client,
             bind: self.bind,
             statuses: TaskStatuses::default(),
+            live_since: Utc::now(),
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {
