@@ -58,6 +58,8 @@ pub struct RewardsInfoResp {
     pub locked: Decimal256,
     /// The amount of tokens that are unlocked but have not yet been claimed
     pub unlocked: Decimal256,
+    /// The total amount of tokens that have been claimed
+    pub claimed: Decimal256,
     /// The start time of the unlocked period
     pub start: Timestamp,
     /// The end time of the unlocking period
@@ -69,6 +71,7 @@ impl RewardsInfoResp {
         RewardsInfoResp {
             locked: Decimal256::zero(),
             unlocked: Decimal256::zero(),
+            claimed: Decimal256::zero(),
             start: Timestamp::from_seconds(0),
             end: Timestamp::from_seconds(0),
         }

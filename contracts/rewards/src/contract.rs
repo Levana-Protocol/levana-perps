@@ -72,20 +72,26 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
 
             let res = match rewards_info {
                 None => None,
-                Some(rewards_info) => {
-                    let unlocked = rewards_info.calculate_unlocked_rewards(state.now())?;
-                    let locked = rewards_info
-                        .amount
-                        .checked_sub(unlocked)?
-                        .checked_sub(rewards_info.claimed)?;
+                Some(rewards_info) => match rewards_info.vesting_rewards {
+                    None => None,
+                    Some(vesting_rewards) => {
+                        let unlocked = vesting_rewards.calculate_unlocked_rewards(state.now())?;
+                        let locked = vesting_rewards
+                            .amount
+                            .checked_sub(unlocked)?
+                            .checked_sub(vesting_rewards.claimed)?;
 
-                    Some(RewardsInfoResp {
-                        locked,
-                        unlocked,
-                        start: rewards_info.start,
-                        end: rewards_info.start + rewards_info.duration,
-                    })
-                }
+                        Some(RewardsInfoResp {
+                            locked,
+                            unlocked,
+                            claimed: rewards_info
+                                .total_amount
+                                .checked_add(vesting_rewards.claimed)?,
+                            start: vesting_rewards.start,
+                            end: vesting_rewards.start + vesting_rewards.duration,
+                        })
+                    }
+                },
             };
 
             res.query_result()
