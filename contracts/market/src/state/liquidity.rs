@@ -7,6 +7,7 @@ use cosmwasm_std::Order;
 pub use cw20::*;
 use cw_storage_plus::Map;
 use msg::contracts::liquidity_token::LiquidityTokenKind;
+use msg::contracts::market::config::MaxLiquidity;
 use msg::contracts::market::entry::{LpInfoResp, UnstakingStatus};
 use msg::contracts::market::liquidity::events::{
     DeltaNeutralityRatioEvent, DepositEvent, LockEvent, UnlockEvent, WithdrawEvent,
@@ -345,13 +346,15 @@ impl State<'_> {
         amount: NonZero<Collateral>,
         is_xlp: bool,
     ) -> Result<NonZero<LpToken>> {
+        let mut liquidity_stats = self.load_liquidity_stats(ctx.storage)?;
+        self.ensure_max_liquidity(ctx, amount, &liquidity_stats)?;
+
         // Handle yield
 
         self.perform_lp_book_keeping(ctx, lp_addr)?;
 
         // Update liquidity and calculate shares
 
-        let mut liquidity_stats = self.load_liquidity_stats(ctx.storage)?;
         let new_shares = liquidity_stats.collateral_to_lp(amount)?;
         liquidity_stats.total_lp += new_shares.raw();
         liquidity_stats.unlocked += amount.raw();
@@ -971,5 +974,35 @@ impl State<'_> {
             unstaking,
             history,
         })
+    }
+
+    /// Ensure that we have not exceeded max liquidity.
+    fn ensure_max_liquidity(
+        &self,
+        ctx: &mut StateContext,
+        deposit: NonZero<Collateral>,
+        stats: &LiquidityStats,
+    ) -> Result<()> {
+        let max = match self.config.max_liquidity {
+            MaxLiquidity::Unlimited {} => return Ok(()),
+            MaxLiquidity::Usd { amount } => amount.raw(),
+        };
+        let price = self.spot_price(ctx.storage, None)?;
+        let deposit = price.collateral_to_usd(deposit.raw());
+        let current = stats.total_collateral();
+        let current = price.collateral_to_usd(current);
+
+        let new_total = current.checked_add(deposit)?;
+        if new_total > max {
+            Err(MarketError::MaxLiquidity {
+                price_collateral_in_usd: price.price_usd,
+                current,
+                deposit,
+                max,
+            }
+            .into_anyhow())
+        } else {
+            Ok(())
+        }
     }
 }
