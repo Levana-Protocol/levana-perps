@@ -96,6 +96,9 @@ pub struct LiquidityBounds {
 pub struct DeploymentConfig {
     #[serde(default)]
     pub crank: bool,
+    /// How many ultracrank wallets to set up
+    #[serde(default)]
+    pub ultra_crank: u32,
     pub price: bool,
     pub wallet_manager_address: RawAddress,
     pub price_address: RawAddress,
@@ -208,6 +211,8 @@ pub struct WatcherConfig {
     pub stale: TaskConfig,
     #[serde(default = "defaults::stats")]
     pub stats: TaskConfig,
+    #[serde(default = "defaults::ultra_crank")]
+    pub ultra_crank: TaskConfig,
 }
 
 impl Default for WatcherConfig {
@@ -260,6 +265,10 @@ impl Default for WatcherConfig {
             },
             stats: TaskConfig {
                 delay: Delay::Constant(30),
+                out_of_date: 180,
+            },
+            ultra_crank: TaskConfig {
+                delay: Delay::Constant(120),
                 out_of_date: 180,
             },
         }

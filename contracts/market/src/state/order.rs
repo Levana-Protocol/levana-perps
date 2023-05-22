@@ -47,7 +47,9 @@ impl State<'_> {
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
     ) -> Result<()> {
+        self.ensure_not_stale(ctx.storage)?;
         self.ensure_not_congested(ctx.storage, CongestionReason::PlaceLimit)?;
+
         let last_order_id = LAST_ORDER_ID
             .may_load(ctx.storage)?
             .unwrap_or_else(|| OrderId::new(0));
@@ -122,15 +124,25 @@ impl State<'_> {
 
     /// Returns the next long or short [LimitOrder] whose trigger price is above the specified price
     /// for long orders or below the specified price for short orders.
+    ///
+    /// The provided price comes from the current price point we're cranking. We
+    /// also consider the most recent price within the protocol, since that
+    /// price will be used when actually opening the position. Only if the
+    /// trigger price is above both of those prices (for longs, below for
+    /// shorts) do we open the order.
     pub(crate) fn limit_order_triggered_order(
         &self,
         storage: &dyn Storage,
         price: Price,
     ) -> Result<Option<OrderId>> {
+        let current = self
+            .spot_price_latest_opt(storage)?
+            .map_or(price, |x| x.price_notional);
+
         let order = LIMIT_ORDERS_BY_PRICE_LONG
             .prefix_range(
                 storage,
-                Some(PrefixBound::inclusive(PriceKey::from(price))),
+                Some(PrefixBound::inclusive(PriceKey::from(price.max(current)))),
                 None,
                 Order::Ascending,
             )
@@ -142,7 +154,7 @@ impl State<'_> {
                 .prefix_range(
                     storage,
                     None,
-                    Some(PrefixBound::inclusive(PriceKey::from(price))),
+                    Some(PrefixBound::inclusive(PriceKey::from(price.min(current)))),
                     Order::Descending,
                 )
                 .next(),
@@ -166,6 +178,20 @@ impl State<'_> {
     ) -> Result<()> {
         let order = LIMIT_ORDERS.load(ctx.storage, order_id)?;
         self.limit_order_remove(ctx.storage, &order)?;
+
+        #[cfg(debug_assertions)]
+        {
+            let current_price = self.spot_price(ctx.storage, None)?;
+            let trigger = order
+                .trigger_price
+                .into_notional_price(current_price.market_type);
+            match order.direction {
+                DirectionToNotional::Long => debug_assert!(trigger >= current_price.price_notional),
+                DirectionToNotional::Short => {
+                    debug_assert!(trigger <= current_price.price_notional)
+                }
+            }
+        }
 
         let market_type = self.market_type(ctx.storage)?;
 

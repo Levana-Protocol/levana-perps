@@ -63,3 +63,7 @@ pub(super) fn stale() -> TaskConfig {
 pub(super) fn stats() -> TaskConfig {
     super::WatcherConfig::default().stats
 }
+
+pub(super) fn ultra_crank() -> TaskConfig {
+    super::WatcherConfig::default().ultra_crank
+}

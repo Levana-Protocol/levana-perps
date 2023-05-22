@@ -70,6 +70,7 @@ pub enum ErrorId {
     CounterLeverageOutOfRange,
     MinimumDeposit,
     Congestion,
+    MaxLiquidity,
 }
 
 /// Source within the protocol for the error

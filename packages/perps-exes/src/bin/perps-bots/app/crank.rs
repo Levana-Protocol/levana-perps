@@ -1,6 +1,6 @@
 use anyhow::Result;
 use axum::async_trait;
-use cosmos::{Address, Contract};
+use cosmos::{Address, Contract, Wallet};
 use msg::contracts::market;
 use msg::contracts::market::crank::CrankWorkInfo;
 use perps_exes::prelude::MarketId;
@@ -11,15 +11,21 @@ use super::factory::FactoryInfo;
 use super::{App, AppBuilder};
 
 #[derive(Clone)]
-struct Worker {}
+struct Worker {
+    crank_wallet: Wallet,
+}
 
 /// Start the background thread to turn the crank on the crank bots.
 impl AppBuilder {
-    pub(super) async fn start_crank_bot(&mut self) -> Result<()> {
-        self.refill_gas(*self.app.config.crank_wallet.address(), "crank-bot")?;
+    pub(super) fn start_crank_bot(&mut self) -> Result<()> {
+        if let Some(crank_wallet) = self.app.config.crank_wallet.clone() {
+            self.refill_gas(*crank_wallet.address(), "crank-bot")?;
 
-        let worker = Worker {};
-        self.watch_periodic(crate::watcher::TaskLabel::Crank, worker)
+            let worker = Worker { crank_wallet };
+            self.watch_periodic(crate::watcher::TaskLabel::Crank, worker)
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -32,18 +38,14 @@ impl WatchedTaskPerMarket for Worker {
         _market: &MarketId,
         addr: Address,
     ) -> Result<WatchedTaskOutput> {
-        app.crank(addr).await
+        app.crank(&self.crank_wallet, addr).await
     }
 }
 
-// Start off big and go down quickly. Once we get to the range of numbers we
-// expect to always work, move down more incrementally to find the sweet spot.
-const CRANK_EXECS: &[u32] = &[
-    1024, 512, 256, 128, 64, 40, 35, 30, 25, 20, 15, 10, 7, 6, 5, 4, 3, 2, 1,
-];
+const CRANK_EXECS: &[u32] = &[30, 25, 20, 15, 10, 7, 6, 5, 4, 3, 2, 1];
 
 impl App {
-    async fn crank(&self, addr: Address) -> Result<WatchedTaskOutput> {
+    async fn crank(&self, crank_wallet: &Wallet, addr: Address) -> Result<WatchedTaskOutput> {
         let market = self.cosmos.make_contract(addr);
         let work = match self.check_crank(&market).await? {
             None => {
@@ -56,17 +58,21 @@ impl App {
         };
 
         for execs in CRANK_EXECS {
-            match self.try_with_execs(addr, &work, Some(*execs)).await {
+            match self
+                .try_with_execs(crank_wallet, addr, &work, Some(*execs))
+                .await
+            {
                 Ok(x) => return Ok(x),
                 Err(e) => log::warn!("Cranking with execs=={execs} failed: {e:?}"),
             }
         }
 
-        self.try_with_execs(addr, &work, None).await
+        self.try_with_execs(crank_wallet, addr, &work, None).await
     }
 
     async fn try_with_execs(
         &self,
+        crank_wallet: &Wallet,
         addr: Address,
         work: &CrankWorkInfo,
         execs: Option<u32>,
@@ -75,7 +81,7 @@ impl App {
             .cosmos
             .make_contract(addr)
             .execute(
-                &self.config.crank_wallet,
+                crank_wallet,
                 vec![],
                 market::entry::ExecuteMsg::Crank {
                     execs,

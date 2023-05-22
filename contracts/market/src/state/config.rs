@@ -52,6 +52,7 @@ pub(crate) fn update_config(
         minimum_deposit_usd: minimum_deposit,
         unpend_limit,
         liquifunding_delay_fuzz_seconds,
+        max_liquidity,
     }: ConfigUpdate,
 ) -> Result<()> {
     if let Some(x) = trading_fee_notional_size {
@@ -157,6 +158,9 @@ pub(crate) fn update_config(
     }
     if let Some(x) = liquifunding_delay_fuzz_seconds {
         config.liquifunding_delay_fuzz_seconds = x;
+    }
+    if let Some(x) = max_liquidity {
+        config.max_liquidity = x;
     }
 
     config.validate()?;

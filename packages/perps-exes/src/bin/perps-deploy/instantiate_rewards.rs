@@ -6,7 +6,7 @@ use crate::{
     store_code::{Contracts, HATCHING, IBC_EXECUTE_PROXY, LVN_REWARDS},
 };
 use anyhow::{bail, Context, Result};
-use cosmos::Coin;
+use cosmos::{Coin, CosmosBuilder};
 use cosmos::{Contract, CosmosNetwork, HasAddress};
 use cosmwasm_std::IbcOrder;
 use msg::contracts::hatching::ibc::IbcChannelVersion;
@@ -256,15 +256,14 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                 // gas is wildly underestimated on osmosis testnet at least
                 // bump up the multiplier to make sure we have enough
                 // then set it back when we're done sending coins
-                let original_gas_multiplier = basic.cosmos.get_gas_multiplier();
-                basic.cosmos.set_gas_multiplier(1.5);
+                let mut builder = CosmosBuilder::clone(&*basic.cosmos.get_first_builder());
+                builder.config.gas_estimate_multiplier = 1.5;
+                let cosmos = builder.build_lazy();
 
                 basic
                     .wallet
-                    .send_coins(&basic.cosmos, contract.get_address(), vec![coin])
+                    .send_coins(&cosmos, contract.get_address(), vec![coin])
                     .await?;
-
-                basic.cosmos.set_gas_multiplier(original_gas_multiplier);
             }
         }
     }

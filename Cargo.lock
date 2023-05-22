@@ -706,9 +706,10 @@ checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 [[package]]
 name = "cosmos"
 version = "0.1.0"
-source = "git+https://github.com/Levana-Protocol/levana-cosmos-rs.git?branch=develop#22f94d0229564e6662cae1459f50f63c5666919a"
+source = "git+https://github.com/Levana-Protocol/levana-cosmos-rs.git?rev=bb3502600ad4df48567e02a48d36a64d59839a5f#bb3502600ad4df48567e02a48d36a64d59839a5f"
 dependencies = [
  "anyhow",
+ "base64 0.21.0",
  "bech32",
  "bitcoin",
  "chrono",
@@ -719,9 +720,11 @@ dependencies = [
  "hkd32",
  "log",
  "once_cell",
+ "parking_lot",
  "prost 0.11.9",
  "prost-types",
  "rand 0.8.5",
+ "reqwest",
  "serde",
  "serde_json",
  "sha2 0.10.6",

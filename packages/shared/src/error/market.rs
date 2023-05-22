@@ -69,6 +69,13 @@ pub enum MarketError {
         max_size: u32,
         reason: CongestionReason,
     },
+    #[error("Deposit would exceed maximum liquidity allowed. Current liquidity: {current} USD. Deposit size: {deposit} USD. Maximum allowed: {max} USD.")]
+    MaxLiquidity {
+        price_collateral_in_usd: PriceCollateralInUsd,
+        current: Usd,
+        deposit: Usd,
+        max: Usd,
+    },
 }
 
 /// What was the user doing when they hit the congestion error message?
@@ -133,6 +140,7 @@ impl MarketError {
             MarketError::CounterLeverageOutOfRange { .. } => ErrorId::CounterLeverageOutOfRange,
             MarketError::MinimumDeposit { .. } => ErrorId::MinimumDeposit,
             MarketError::Congestion { .. } => ErrorId::Congestion,
+            MarketError::MaxLiquidity { .. } => ErrorId::MaxLiquidity,
         }
     }
 }
