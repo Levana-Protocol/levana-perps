@@ -21,7 +21,9 @@ impl AppBuilder {
     pub(super) fn start_ultra_crank_bot(&mut self) -> Result<()> {
         let ultra_crank_wallets = self.app.config.ultra_crank_wallets.clone();
         for (index, wallet) in ultra_crank_wallets.into_iter().enumerate() {
-            self.refill_gas(*wallet.address(), format!("ultra-crank-bot-{}", index))?;
+            // People like things that start at 1, not 0
+            let index = index + 1;
+            self.refill_gas(*wallet.address(), format!("ultra-crank-bot-{index}"))?;
             let worker = Worker { wallet };
             self.watch_periodic(crate::watcher::TaskLabel::UltraCrank { index }, worker)?;
         }
