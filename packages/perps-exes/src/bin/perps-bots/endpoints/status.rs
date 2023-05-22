@@ -9,7 +9,7 @@ pub(crate) async fn all(app: State<Arc<App>>, headers: HeaderMap) -> impl IntoRe
         .get("accept")
         .map_or(false, |value| value.as_bytes().starts_with(b"text/html"));
     if wants_html {
-        app.statuses.all_statuses_html()
+        app.statuses.all_statuses_html(&app.0)
     } else {
         app.statuses.all_statuses_text()
     }

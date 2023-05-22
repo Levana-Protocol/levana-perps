@@ -11,6 +11,7 @@ use chrono::{DateTime, Duration, Utc};
 use cosmos::Address;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
+use perps_exes::build_version;
 use perps_exes::{
     config::{TaskConfig, WatcherConfig},
     prelude::MarketId,
@@ -36,6 +37,7 @@ pub(crate) enum TaskLabel {
     Liquidity,
     Utilization,
     Balance,
+    UltraCrank { index: usize },
     Trader { index: usize },
 }
 
@@ -43,6 +45,7 @@ impl Display for TaskLabel {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             TaskLabel::Trader { index } => write!(f, "Trader #{index}"),
+            TaskLabel::UltraCrank { index } => write!(f, "Ultra crank #{index}"),
             x => write!(f, "{x:?}"),
         }
     }
@@ -93,6 +96,7 @@ impl TaskLabel {
             TaskLabel::Balance => config.balance,
             TaskLabel::Stale => config.stale,
             TaskLabel::GasCheck => config.gas_check,
+            TaskLabel::UltraCrank { index: _ } => config.ultra_crank,
             TaskLabel::Liquidity => config.liquidity,
             TaskLabel::Trader { index: _ } => config.trader,
             TaskLabel::Utilization => config.utilization,
@@ -111,6 +115,7 @@ impl TaskLabel {
             TaskLabel::Price => true,
             TaskLabel::TrackBalance => true,
             TaskLabel::GasCheck => true,
+            TaskLabel::UltraCrank { index: _ } => false,
             TaskLabel::Liquidity => false,
             TaskLabel::Utilization => false,
             TaskLabel::Balance => false,
@@ -133,6 +138,7 @@ impl TaskLabel {
             TaskLabel::Trader { index } => format!("trader-{index}").into(),
             TaskLabel::Stale => "stale".into(),
             TaskLabel::Stats => "stats".into(),
+            TaskLabel::UltraCrank { index } => format!("ultra-crank-{index}").into(),
         }
     }
 }
@@ -369,16 +375,36 @@ impl TaskStatuses {
         all_statuses
     }
 
-    pub(crate) fn all_statuses_html(&self) -> axum::response::Response {
+    pub(crate) fn all_statuses_html(&self, app: &App) -> axum::response::Response {
         use askama::Template;
         #[derive(Template)]
         #[template(path = "status.html")]
-        struct MyTemplate {
+        struct MyTemplate<'a> {
             statuses: Vec<RenderedStatus>,
+            family: &'a str,
+            build_version: &'a str,
+            grpc: &'a str,
+            grpc_height: u64,
+            rpc: &'a str,
+            rpc_height: u64,
+            live_since: DateTime<Utc>,
         }
         let statuses = self.all_statuses();
         let alert = statuses.iter().any(|x| x.short.alert());
-        let mut res = MyTemplate { statuses }.render().unwrap().into_response();
+        let factory = app.get_factory_info();
+        let mut res = MyTemplate {
+            statuses,
+            family: &app.config.contract_family,
+            build_version: build_version(),
+            grpc: &app.cosmos.get_first_builder().grpc_url,
+            grpc_height: factory.rpc.grpc_height,
+            rpc: &factory.rpc.endpoint,
+            rpc_height: factory.rpc.rpc_height,
+            live_since: app.live_since,
+        }
+        .render()
+        .unwrap()
+        .into_response();
         res.headers_mut().append(
             CONTENT_TYPE,
             HeaderValue::from_static("text/html; charset=utf-8"),

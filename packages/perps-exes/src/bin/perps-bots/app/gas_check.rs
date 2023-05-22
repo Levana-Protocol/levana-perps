@@ -106,7 +106,13 @@ impl GasCheck {
             should_refill,
         } in &self.to_track
         {
-            let gas = get_gas_balance(&self.app.cosmos, *address).await?;
+            let gas = match get_gas_balance(&self.app.cosmos, *address).await {
+                Ok(gas) => gas,
+                Err(e) => {
+                    errors.push(format!("Unable to query gas balance for {address}: {e:?}"));
+                    continue;
+                }
+            };
             if gas >= *min_gas {
                 balances.push(format!(
                     "Sufficient gas in {name} ({address}). Found: {}.",

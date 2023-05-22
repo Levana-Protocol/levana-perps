@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "upload:sei": "ts-node ./src/upload.ts --target=sei-testnet --contract=market",
-    "upload:osmosis": "ts-node ./src/upload.ts --target=osmosis-testnet --contract=market"
+    "upload:osmosis": "ts-node ./src/upload.ts --target=osmosis-testnet --contract=market",
+    "crank": "ts-node ./src/crank.ts --target=sei-testnet"
   },
   "dependencies": {
     "@cosmjs/cosmwasm-stargate": "^0.30.1",
