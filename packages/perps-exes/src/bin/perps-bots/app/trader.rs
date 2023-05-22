@@ -32,7 +32,7 @@ impl AppBuilder {
 #[async_trait]
 impl WatchedTaskPerMarket for Trader {
     async fn run_single_market(
-        &self,
+        &mut self,
         _app: &App,
         factory: &FactoryInfo,
         _market: &MarketId,

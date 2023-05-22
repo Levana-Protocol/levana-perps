@@ -20,7 +20,7 @@ struct Stats;
 #[async_trait]
 impl WatchedTaskPerMarket for Stats {
     async fn run_single_market(
-        &self,
+        &mut self,
         app: &App,
         _factory: &FactoryInfo,
         _market: &MarketId,

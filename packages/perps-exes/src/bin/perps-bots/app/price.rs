@@ -31,7 +31,7 @@ impl AppBuilder {
 
 #[async_trait]
 impl WatchedTask for Worker {
-    async fn run_single(&self, app: &App, _heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
+    async fn run_single(&mut self, app: &App, _heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
         app.single_update(&self.wallet).await
     }
 }

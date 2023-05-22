@@ -21,7 +21,7 @@ struct Stale;
 #[async_trait]
 impl WatchedTaskPerMarket for Stale {
     async fn run_single_market(
-        &self,
+        &mut self,
         app: &App,
         _factory: &FactoryInfo,
         _market: &MarketId,

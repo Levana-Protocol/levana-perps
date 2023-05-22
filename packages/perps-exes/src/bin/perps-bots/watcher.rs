@@ -177,7 +177,7 @@ impl AppBuilder {
         self.watcher.set.spawn(task);
     }
 
-    pub(crate) fn watch_periodic<T>(&mut self, label: TaskLabel, task: T) -> Result<()>
+    pub(crate) fn watch_periodic<T>(&mut self, label: TaskLabel, mut task: T) -> Result<()>
     where
         T: WatchedTask,
     {
@@ -284,7 +284,7 @@ pub(crate) struct WatchedTaskOutput {
 
 #[async_trait]
 pub(crate) trait WatchedTask: Send + Sync + 'static {
-    async fn run_single(&self, app: &App, heartbeat: Heartbeat) -> Result<WatchedTaskOutput>;
+    async fn run_single(&mut self, app: &App, heartbeat: Heartbeat) -> Result<WatchedTaskOutput>;
 }
 
 pub(crate) struct Heartbeat {
@@ -307,7 +307,7 @@ impl Heartbeat {
 #[async_trait]
 pub(crate) trait WatchedTaskPerMarket: Send + Sync + 'static {
     async fn run_single_market(
-        &self,
+        &mut self,
         app: &App,
         factory_info: &FactoryInfo,
         market: &MarketId,
@@ -317,7 +317,7 @@ pub(crate) trait WatchedTaskPerMarket: Send + Sync + 'static {
 
 #[async_trait]
 impl<T: WatchedTaskPerMarket> WatchedTask for T {
-    async fn run_single(&self, app: &App, heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
+    async fn run_single(&mut self, app: &App, heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
         let factory = app.get_factory_info();
         let mut successes = vec![];
         let mut errors = vec![];
