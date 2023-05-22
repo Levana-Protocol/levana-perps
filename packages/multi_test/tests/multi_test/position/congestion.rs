@@ -9,6 +9,8 @@ fn test_congestion_block() {
     let trader = market.clone_trader(0).unwrap();
 
     // Do a price update without cranking to force unpending the position
+    // Since we're always off-by-one on which price update we use, we need to insert two price updates.
+    market.exec_set_price("1.02".parse().unwrap()).unwrap();
     market.exec_set_price("1.02".parse().unwrap()).unwrap();
 
     // We can open up a bunch of positions without a crank...
