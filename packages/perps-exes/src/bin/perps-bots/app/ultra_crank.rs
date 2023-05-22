@@ -83,7 +83,7 @@ impl App {
             .await?;
         Ok(WatchedTaskOutput {
             skip_delay: true,
-            message: format!("Completed any ultracrank in {}", res.txhash),
+            message: format!("Completed an ultracrank in {}", res.txhash),
         })
     }
 }
