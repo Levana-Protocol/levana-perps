@@ -81,6 +81,7 @@ pub struct Config {
     #[serde(default = "defaults::liquifunding_delay_fuzz_seconds")]
     pub liquifunding_delay_fuzz_seconds: u32,
     /// The maximum amount of liquidity that can be deposited into the market.
+    #[serde(default)]
     pub max_liquidity: MaxLiquidity,
 }
 
@@ -99,6 +100,12 @@ pub enum MaxLiquidity {
         /// Amount in USD
         amount: NonZero<Usd>,
     },
+}
+
+impl Default for MaxLiquidity {
+    fn default() -> Self {
+        MaxLiquidity::Unlimited {}
+    }
 }
 
 impl Default for Config {
