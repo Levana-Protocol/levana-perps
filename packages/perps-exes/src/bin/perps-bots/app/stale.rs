@@ -1,5 +1,6 @@
 use anyhow::Result;
 use axum::async_trait;
+use chrono::{DateTime, Utc};
 use cosmos::{Address, Cosmos};
 use msg::prelude::*;
 use perps_exes::{contracts::MarketContract, timestamp_to_date_time};
@@ -42,24 +43,42 @@ async fn check_stale_single(cosmos: &Cosmos, addr: Address) -> Result<String> {
         .last_crank_completed
         .context("No cranks completed yet")?;
     let last_crank_completed = timestamp_to_date_time(last_crank_completed)?;
+    let mk_message = |msg| Msg {
+        msg,
+        last_crank_completed,
+        unpend_queue_size: status.unpend_queue_size,
+        unpend_limit: status.config.unpend_limit,
+    };
     if status.is_stale() {
-        Err(anyhow!(
-            "Protocol is in stale state. Last completed crank timestamp: {}",
-            last_crank_completed
-        ))
+        Err(mk_message("Protocol is in stale state").to_anyhow())
     } else if status.congested {
-        Err(anyhow!(
-            "Protocol is congested, unpend queue size: {}. Maximum allowed size: {}. Last completed crank timestamp: {}",
-            status.unpend_queue_size,
-            status.config.unpend_limit,
-            last_crank_completed
-        ))
+        Err(mk_message("Protocol is in congested state").to_anyhow())
     } else {
-        Ok(format!(
-            "Protocol is neither stale nor congested. Last completed crank timestamp: {}. Unpend queue size: {}/{}.",
+        Ok(mk_message("Protocol is neither stale nor congested").to_string())
+    }
+}
+
+struct Msg<'a> {
+    msg: &'a str,
+    last_crank_completed: DateTime<Utc>,
+    unpend_queue_size: u32,
+    unpend_limit: u32,
+}
+
+impl Display for Msg<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let Msg {
+            msg,
             last_crank_completed,
-            status.unpend_queue_size,
-            status.config.unpend_limit,
-        ))
+            unpend_queue_size,
+            unpend_limit,
+        } = self;
+        write!(f, "{msg}. Last completed crank timestamp: {last_crank_completed}. Unpend queue size: {unpend_queue_size}/{unpend_limit}.")
+    }
+}
+
+impl Msg<'_> {
+    fn to_anyhow(&self) -> anyhow::Error {
+        anyhow!("{}", self)
     }
 }
