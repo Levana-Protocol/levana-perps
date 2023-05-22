@@ -116,9 +116,7 @@ impl State<'_> {
                     .checked_sub(vesting_rewards.claimed)?
                     .checked_add(locked_amount)?;
 
-                total_claimed = total_claimed
-                    .checked_add(unlocked)?
-                    .checked_add(rewards_info.total_claimed)?;
+                total_claimed = total_claimed.checked_add(unlocked)?
             }
         }
 
@@ -171,7 +169,7 @@ impl State<'_> {
                     vesting_rewards.claimed = vesting_rewards.claimed.checked_add(unlocked)?;
                     vesting_rewards.last_claimed = self.now();
 
-                    if vesting_rewards.claimed == vesting_rewards.amount {
+                    if vesting_rewards.claimed >= vesting_rewards.amount {
                         rewards_info.vesting_rewards = None;
                     } else {
                         rewards_info.vesting_rewards = Some(vesting_rewards);

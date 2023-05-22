@@ -71,9 +71,13 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             let rewards_info = state.load_rewards(store, &addr)?;
 
             let res = match rewards_info {
-                None => None,
+                None => RewardsInfoResp::default(),
                 Some(rewards_info) => match rewards_info.vesting_rewards {
-                    None => None,
+                    None => RewardsInfoResp {
+                        total_rewards: rewards_info.total_rewards,
+                        total_claimed: rewards_info.total_claimed,
+                        ..RewardsInfoResp::default()
+                    },
                     Some(vesting_rewards) => {
                         let unlocked = vesting_rewards.calculate_unlocked_rewards(state.now())?;
                         let locked = vesting_rewards
@@ -81,14 +85,14 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                             .checked_sub(unlocked)?
                             .checked_sub(vesting_rewards.claimed)?;
 
-                        Some(RewardsInfoResp {
+                        RewardsInfoResp {
                             locked,
                             unlocked,
                             total_rewards: rewards_info.total_rewards,
                             total_claimed: rewards_info.total_claimed,
-                            start: vesting_rewards.start,
-                            end: vesting_rewards.start + vesting_rewards.duration,
-                        })
+                            start: Some(vesting_rewards.start),
+                            end: Some(vesting_rewards.start + vesting_rewards.duration),
+                        }
                     }
                 },
             };

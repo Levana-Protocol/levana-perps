@@ -63,9 +63,9 @@ pub struct RewardsInfoResp {
     /// The total amount of tokens that have been claimed by this user
     pub total_claimed: Decimal256,
     /// The start time of the unlocked period
-    pub start: Timestamp,
+    pub start: Option<Timestamp>,
     /// The end time of the unlocking period
-    pub end: Timestamp,
+    pub end: Option<Timestamp>,
 }
 
 impl RewardsInfoResp {
@@ -75,8 +75,8 @@ impl RewardsInfoResp {
             unlocked: Decimal256::zero(),
             total_rewards: Decimal256::zero(),
             total_claimed: Decimal256::zero(),
-            start: Timestamp::from_seconds(0),
-            end: Timestamp::from_seconds(0),
+            start: None,
+            end: None,
         }
     }
 }
