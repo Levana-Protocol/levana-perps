@@ -80,6 +80,25 @@ pub struct Config {
     /// liquifundings arbitrarily to smooth out spikes in traffic.
     #[serde(default = "defaults::liquifunding_delay_fuzz_seconds")]
     pub liquifunding_delay_fuzz_seconds: u32,
+    /// The maximum amount of liquidity that can be deposited into the market.
+    pub max_liquidity: MaxLiquidity,
+}
+
+/// Maximum liquidity for deposit.
+///
+/// Note that this limit can be exceeded due to changes in collateral asset
+/// price or impairment.
+#[cw_serde]
+pub enum MaxLiquidity {
+    /// No bounds on how much liquidity can be deposited.
+    Unlimited {},
+    /// Only allow the given amount in USD.
+    ///
+    /// The exchange rate at time of deposit will be used.
+    Usd {
+        /// Amount in USD
+        amount: NonZero<Usd>,
+    },
 }
 
 impl Default for Config {
@@ -119,6 +138,7 @@ impl Default for Config {
             minimum_deposit_usd: "5".parse().unwrap(),
             unpend_limit: 50,
             liquifunding_delay_fuzz_seconds: 60 * 60 * 4,
+            max_liquidity: MaxLiquidity::Unlimited {},
         }
     }
 }
@@ -311,6 +331,7 @@ pub struct ConfigUpdate {
     pub minimum_deposit_usd: Option<Usd>,
     pub unpend_limit: Option<u32>,
     pub liquifunding_delay_fuzz_seconds: Option<u32>,
+    pub max_liquidity: Option<MaxLiquidity>,
 }
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for ConfigUpdate {
@@ -344,6 +365,7 @@ impl<'a> arbitrary::Arbitrary<'a> for ConfigUpdate {
             minimum_deposit_usd: u.arbitrary()?,
             unpend_limit: None,
             liquifunding_delay_fuzz_seconds: None,
+            max_liquidity: None,
         })
     }
 }
@@ -379,6 +401,7 @@ impl From<Config> for ConfigUpdate {
             minimum_deposit_usd: Some(src.minimum_deposit_usd),
             unpend_limit: Some(src.unpend_limit),
             liquifunding_delay_fuzz_seconds: Some(src.liquifunding_delay_fuzz_seconds),
+            max_liquidity: Some(src.max_liquidity),
         }
     }
 }
