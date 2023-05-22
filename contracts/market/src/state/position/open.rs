@@ -155,6 +155,12 @@ impl State<'_> {
 
         self.check_unlocked_liquidity(&self.load_liquidity_stats(store)?, pos.counter_collateral)?;
 
+        pos.liquidation_margin = pos.liquidation_margin(
+            price_point.price_notional,
+            &price_point,
+            &self.config,
+        )?;
+
         // Check for sufficient margin
         perp_ensure!(
             pos.active_collateral.raw() >= pos.liquidation_margin.total(),
