@@ -1,4 +1,4 @@
-use cosmwasm_std::{BankMsg, CosmosMsg, from_binary};
+use cosmwasm_std::{from_binary, BankMsg, CosmosMsg};
 use msg::token::Token;
 
 use crate::prelude::*;
@@ -61,7 +61,21 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 OwnerExecuteMsg::StartLaunchPeriod { start } => {
                     state.start_launch_period(&mut ctx, start)?
                 }
-                OwnerExecuteMsg::SetEmissions { .. } => todo!(),
+                OwnerExecuteMsg::SetEmissions {
+                    start,
+                    duration,
+                    lvn,
+                } => {
+                    let start = start.unwrap_or_else(|| state.now());
+                    let emissions = Emissions {
+                        start,
+                        end: start + Duration::from_seconds(duration as u64),
+                        lvn,
+                    };
+
+                    //FIXME handle case where there're pre-existing emissions.
+                    state.save_lvn_emissions(&mut ctx, emissions)?;
+                }
                 OwnerExecuteMsg::ClearEmissions {} => todo!(),
                 OwnerExecuteMsg::UpdateConfig { .. } => todo!(),
             }
@@ -132,13 +146,14 @@ impl State<'_> {
                 .context("Invalid transfer amount calculated")?
                 .into(),
         };
-        ctx.response
+        ctx.response_mut()
             .add_execute_submessage_oneshot(&self.market_info.xlp_addr, &msg)?;
-        ctx.response.add_event(WithdrawEvent {
+        ctx.response_mut().add_event(WithdrawEvent {
             farmer: farmer.clone(),
             farming,
             xlp,
         });
+
         Ok(())
     }
 
@@ -150,16 +165,15 @@ impl State<'_> {
             .context("Unable to convert amount into NumberGtZero")?;
         let coin = self
             .load_lvn_token(ctx)?
-            .into_native_coin(amount.into_number_gt_zero())?
+            .into_native_coin(amount)?
             .context("Invalid LVN transfer amount calculated")?;
 
         let transfer_msg = CosmosMsg::Bank(BankMsg::Send {
             to_address: farmer.to_string(),
-            amount: vec!(coin),
+            amount: vec![coin],
         });
 
-        ctx.response
-            .add_message(transfer_msg);
+        ctx.response_mut().add_message(transfer_msg);
 
         Ok(())
     }

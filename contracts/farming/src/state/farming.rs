@@ -18,11 +18,16 @@ pub(crate) struct RawFarmerStats {
     pub(crate) lockdrop_amount_collected: LvnToken,
     /// The amount of farming tokens owned by this farmer that came from xLP deposits
     pub(crate) xlp_farming_tokens: FarmingToken,
+    /// The prefix sum of the last time the farmer collected.
+    /// See [REWARDS_PER_TIME_PER_TOKEN] for more explanation of prefix sums.
+    pub(crate) xlp_last_collected_prefix_sum: LvnToken,
 }
 
 impl RawFarmerStats {
-    pub(crate) fn total(&self) -> Result<FarmingToken> {
-        let total = self.lockdrop_farming_tokens.checked_add(self.xlp_farming_tokens)?;
+    pub(crate) fn total_xlp(&self) -> Result<FarmingToken> {
+        let total = self
+            .lockdrop_farming_tokens
+            .checked_add(self.xlp_farming_tokens)?;
         Ok(total)
     }
 }
@@ -71,11 +76,20 @@ impl FarmingTotals {
 
 impl State<'_> {
     /// Get the total amount of xLP held by this contract
-    pub(crate) fn get_farming_totals(&self, store: &dyn Storage) -> Result<FarmingTotals> {
+    pub(crate) fn load_farming_totals(&self, store: &dyn Storage) -> Result<FarmingTotals> {
         TOTALS
             .may_load(store)
             .map_err(|e| e.into())
             .map(|x| x.unwrap_or_default())
+    }
+
+    pub(crate) fn save_farming_totals(
+        &self,
+        store: &mut dyn Storage,
+        totals: &FarmingTotals,
+    ) -> Result<()> {
+        TOTALS.save(store, totals)?;
+        Ok(())
     }
 
     /// Load the raw farmer stats for the given farmer.
@@ -107,14 +121,19 @@ impl State<'_> {
         farmer: &Addr,
         xlp: LpToken,
     ) -> Result<FarmingToken> {
-        let mut totals = self.get_farming_totals(ctx.storage)?;
+        let mut totals = self.load_farming_totals(ctx.storage)?;
         let new_farming = totals.xlp_to_farming(xlp)?;
+
         totals.xlp = totals.xlp.checked_add(xlp)?;
         totals.farming = totals.farming.checked_add(new_farming)?;
-        TOTALS.save(ctx.storage, &totals)?;
+        self.save_farming_totals(ctx.storage, &totals)?;
+
         let mut raw = self.load_raw_farmer_stats(ctx.storage, farmer)?;
         raw.xlp_farming_tokens = raw.xlp_farming_tokens.checked_add(new_farming)?;
         self.save_raw_farmer_stats(ctx, farmer, &raw)?;
+
+        self.update_rewards_per_token(ctx)?;
+
         Ok(new_farming)
     }
 
@@ -127,7 +146,7 @@ impl State<'_> {
         farmer: &Addr,
         amount: Option<NonZero<FarmingToken>>,
     ) -> Result<(LpToken, FarmingToken)> {
-        let mut totals = self.get_farming_totals(ctx.storage)?;
+        let mut totals = self.load_farming_totals(ctx.storage)?;
         let mut raw = self.load_raw_farmer_stats(ctx.storage, farmer)?;
 
         let amount = match amount {
@@ -146,10 +165,12 @@ impl State<'_> {
 
         totals.farming = totals.farming.checked_sub(amount)?;
         totals.xlp = totals.xlp.checked_sub(removed_xlp)?;
-        TOTALS.save(ctx.storage, &totals)?;
+        self.save_farming_totals(ctx.storage, &totals)?;
 
         raw.xlp_farming_tokens = raw.xlp_farming_tokens.checked_sub(amount)?;
         self.save_raw_farmer_stats(ctx, farmer, &raw)?;
+
+        self.update_rewards_per_token(ctx)?;
 
         Ok((removed_xlp, amount))
     }

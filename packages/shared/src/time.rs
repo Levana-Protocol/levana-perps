@@ -5,7 +5,7 @@ use crate::{
     perp_error,
 };
 use anyhow::Result;
-use cosmwasm_std::{Decimal256, OverflowError, OverflowOperation, Timestamp as CWTimestamp};
+use cosmwasm_std::{Decimal256, Timestamp as CWTimestamp};
 use cw_storage_plus::{KeyDeserialize, Prefixer, PrimaryKey};
 use schemars::JsonSchema;
 use serde::de::Visitor;

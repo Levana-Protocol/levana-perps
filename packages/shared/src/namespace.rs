@@ -126,3 +126,7 @@ pub const PYTH_MARKET_PRICE_FEEDS: &str = "ds";
 pub const PYTH_UPDATE_AGE_TOLERANCE: &str = "dt";
 pub const PYTH_PREV_MARKET_PRICE: &str = "du";
 pub const LIQUIDATION_PRICES_PENDING_COUNT: &str = "dv";
+pub const LVN_TOKEN: &str = "dw";
+pub const LVN_LOCKDROP_REWARDS: &str = "dx";
+pub const REWARDS_PER_TIME_PER_TOKEN: &str = "dy";
+pub const LVN_EMISSIONS: &str = "dz";

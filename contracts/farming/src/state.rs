@@ -1,8 +1,8 @@
 pub(crate) mod auth;
 pub(crate) mod farming;
 pub(crate) mod market_info;
-pub(crate) mod rewards;
 pub(crate) mod period;
+pub(crate) mod rewards;
 pub(crate) mod status;
 
 use crate::prelude::*;
@@ -54,5 +54,9 @@ impl<'a> StateContext<'a> {
                 response: ResponseBuilder::new(contract_version),
             },
         ))
+    }
+
+    pub(crate) fn response_mut(&mut self) -> &mut ResponseBuilder {
+        &mut self.response
     }
 }

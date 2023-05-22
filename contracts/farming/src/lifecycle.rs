@@ -27,6 +27,7 @@ pub fn instantiate(
 
     state.set_admin(&mut ctx, &info.sender)?;
     state.save_lvn_token(&mut ctx, lvn_token_denom)?;
+    state.rewards_init(ctx.storage)?;
 
     ctx.response.add_event(NewFarmingEvent {});
 

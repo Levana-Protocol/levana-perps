@@ -22,6 +22,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             }
             .query_result()
         }
+
         QueryMsg::Farmers { .. } => todo!(),
     }
 }
