@@ -14,6 +14,7 @@ use super::{App, AppBuilder};
 #[derive(Clone)]
 struct Worker {
     wallet: Wallet,
+    activated: bool,
 }
 
 /// Start the background thread to monitor and use ultra cranking.
@@ -24,7 +25,10 @@ impl AppBuilder {
             // People like things that start at 1, not 0
             let index = index + 1;
             self.refill_gas(*wallet.address(), format!("ultra-crank-bot-{index}"))?;
-            let worker = Worker { wallet };
+            let worker = Worker {
+                wallet,
+                activated: false,
+            };
             self.watch_periodic(crate::watcher::TaskLabel::UltraCrank { index }, worker)?;
         }
         Ok(())
@@ -34,18 +38,24 @@ impl AppBuilder {
 #[async_trait]
 impl WatchedTaskPerMarket for Worker {
     async fn run_single_market(
-        &self,
+        &mut self,
         app: &App,
         _factory: &FactoryInfo,
         _market: &MarketId,
         addr: Address,
     ) -> Result<WatchedTaskOutput> {
-        app.ultra_crank(addr, &self.wallet).await
+        app.ultra_crank(addr, &self.wallet, &mut self.activated)
+            .await
     }
 }
 
 impl App {
-    async fn ultra_crank(&self, addr: Address, wallet: &Wallet) -> Result<WatchedTaskOutput> {
+    async fn ultra_crank(
+        &self,
+        addr: Address,
+        wallet: &Wallet,
+        activated: &mut bool,
+    ) -> Result<WatchedTaskOutput> {
         let market = self.cosmos.make_contract(addr);
         let market::entry::StatusResp {
             next_crank,
@@ -53,6 +63,7 @@ impl App {
             ..
         } = market.query(market::entry::QueryMsg::Status {}).await?;
         if next_crank.is_none() {
+            *activated = false;
             return Ok(WatchedTaskOutput {
                 skip_delay: false,
                 message: "No crank messages waiting".to_owned(),
@@ -63,7 +74,9 @@ impl App {
         let age = Utc::now()
             .signed_duration_since(last_crank_completed)
             .num_seconds();
-        if age < self.config.seconds_till_ultra.into() {
+        if age >= self.config.seconds_till_ultra.into() {
+            *activated = true;
+        } else if !*activated {
             return Ok(WatchedTaskOutput {
                 skip_delay: false,
                 message: format!("Crank is only {age} seconds out of date, not doing anything"),
