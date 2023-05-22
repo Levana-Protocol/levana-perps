@@ -1,4 +1,5 @@
 use levana_perpswap_multi_test::market_wrapper::PerpsMarket;
+use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::PerpsApp;
 use msg::contracts::market::config::ConfigUpdate;
 use msg::contracts::market::entry::{LimitOrderHistoryResp, LimitOrderResult};
@@ -681,4 +682,29 @@ fn lagging_crank_perp_1350_short() {
         .entry_price_base
         .into_number()
         .approx_eq("15".parse().unwrap()));
+}
+
+#[test]
+fn cannot_place_when_stale() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    market.set_time(TimeJump::Staleness(1)).unwrap();
+    assert!(market.query_status().unwrap().is_stale());
+    let err = market
+        .exec_place_limit_order(
+            &trader,
+            // So much collateral that we can't open it because of insufficient liquidity
+            "10".try_into().unwrap(),
+            "0.99".try_into().unwrap(),
+            "10".try_into().unwrap(),
+            DirectionToBase::Long,
+            "1".try_into().unwrap(),
+            None,
+            None,
+        )
+        .unwrap_err()
+        .downcast::<PerpError>()
+        .unwrap();
+    assert_eq!(err.id, ErrorId::Stale);
 }
