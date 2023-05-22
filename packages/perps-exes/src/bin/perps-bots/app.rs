@@ -9,6 +9,7 @@ mod stale;
 mod stats;
 mod trader;
 mod types;
+mod ultra_crank;
 mod utilization;
 
 use anyhow::Result;
@@ -41,7 +42,10 @@ impl AppBuilder {
             self.start_price(price_wallet).await?;
         }
 
-        self.start_crank_bot().await?;
+        self.start_crank_bot()?;
+        if !self.app.config.ultra_crank_wallets.is_empty() {
+            self.start_ultra_crank_bot()?;
+        }
 
         if !self.app.config.ignore_stale {
             self.track_stale()?;

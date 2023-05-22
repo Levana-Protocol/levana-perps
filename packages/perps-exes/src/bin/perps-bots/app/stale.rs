@@ -1,9 +1,8 @@
 use anyhow::Result;
 use axum::async_trait;
-use chrono::{TimeZone, Utc};
 use cosmos::{Address, Cosmos};
 use msg::prelude::*;
-use perps_exes::contracts::MarketContract;
+use perps_exes::{contracts::MarketContract, timestamp_to_date_time};
 
 use crate::watcher::{TaskLabel, WatchedTaskOutput, WatchedTaskPerMarket};
 
@@ -42,11 +41,7 @@ async fn check_stale_single(cosmos: &Cosmos, addr: Address) -> Result<String> {
     let last_crank_completed = status
         .last_crank_completed
         .context("No cranks completed yet")?;
-    let last_crank_completed = cosmwasm_std::Timestamp::from(last_crank_completed);
-    let last_crank_completed = Utc
-        .timestamp_opt(last_crank_completed.seconds().try_into()?, 0)
-        .single()
-        .context("Could not convert last_crank_completed into DateTime<Utc>")?;
+    let last_crank_completed = timestamp_to_date_time(last_crank_completed)?;
     if status.is_stale() {
         Err(anyhow!(
             "Protocol is in stale state. Last completed crank timestamp: {}",

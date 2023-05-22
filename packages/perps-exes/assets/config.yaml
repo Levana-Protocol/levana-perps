@@ -182,6 +182,7 @@ overrides:
     wallet-manager-address: osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k
     price-address: osmo1dfagdh540vrqqnuet5rqvdg3uldhhgdxpttmzl
     price: true
+    ultra-crank: 4
     crank: true
     liquidity: true
     utilization: true

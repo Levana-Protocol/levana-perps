@@ -17,7 +17,7 @@ struct Worker {
 
 /// Start the background thread to turn the crank on the crank bots.
 impl AppBuilder {
-    pub(super) async fn start_crank_bot(&mut self) -> Result<()> {
+    pub(super) fn start_crank_bot(&mut self) -> Result<()> {
         if let Some(crank_wallet) = self.app.config.crank_wallet.clone() {
             self.refill_gas(*crank_wallet.address(), "crank-bot")?;
 

@@ -79,11 +79,12 @@ impl Opt {
         &self,
         address_type: AddressType,
         wallet_phrase_name: &str,
+        index: u32,
     ) -> Result<Wallet> {
         let env_var = format!("LEVANA_BOTS_PHRASE_{}_CRANK", wallet_phrase_name);
         let phrase = get_env(&env_var)?;
         let seed = SeedPhrase::from_str(&phrase)?;
-        seed.derive_cosmos().map(|x| {
+        seed.derive_cosmos_numbered(index).map(|x| {
             let wallet = x.for_chain(address_type);
             log::info!("Crank bot wallet: {wallet}");
             wallet

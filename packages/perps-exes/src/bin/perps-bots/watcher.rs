@@ -37,6 +37,7 @@ pub(crate) enum TaskLabel {
     Liquidity,
     Utilization,
     Balance,
+    UltraCrank { index: usize },
     Trader { index: usize },
 }
 
@@ -44,6 +45,7 @@ impl Display for TaskLabel {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             TaskLabel::Trader { index } => write!(f, "Trader #{index}"),
+            TaskLabel::UltraCrank { index } => write!(f, "Ultra crank #{index}"),
             x => write!(f, "{x:?}"),
         }
     }
@@ -94,6 +96,7 @@ impl TaskLabel {
             TaskLabel::Balance => config.balance,
             TaskLabel::Stale => config.stale,
             TaskLabel::GasCheck => config.gas_check,
+            TaskLabel::UltraCrank { index: _ } => config.ultra_crank,
             TaskLabel::Liquidity => config.liquidity,
             TaskLabel::Trader { index: _ } => config.trader,
             TaskLabel::Utilization => config.utilization,
@@ -112,6 +115,7 @@ impl TaskLabel {
             TaskLabel::Price => true,
             TaskLabel::TrackBalance => true,
             TaskLabel::GasCheck => true,
+            TaskLabel::UltraCrank { index: _ } => false,
             TaskLabel::Liquidity => false,
             TaskLabel::Utilization => false,
             TaskLabel::Balance => false,
@@ -134,6 +138,7 @@ impl TaskLabel {
             TaskLabel::Trader { index } => format!("trader-{index}").into(),
             TaskLabel::Stale => "stale".into(),
             TaskLabel::Stats => "stats".into(),
+            TaskLabel::UltraCrank { index } => format!("ultra-crank-{index}").into(),
         }
     }
 }
