@@ -104,8 +104,8 @@ impl State<'_> {
             .as_nanos();
 
             total_user_rewards
-                .checked_mul_dec(Decimal256::raw(elapsed_since_last_collected.into()))?
-                .checked_div_dec(Decimal256::raw(unlock_duration.as_nanos().into()))?
+                .checked_mul_dec(Decimal256::from_ratio(elapsed_since_last_collected, 1u64))?
+                .checked_div_dec(Decimal256::from_ratio(unlock_duration.as_nanos(), 1u64))?
                 // using min as an added precaution to make sure it never goes above the total due to rounding errors
                 .min(total_user_rewards)
         };
