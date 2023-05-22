@@ -11,9 +11,11 @@ const REWARDS: Map<&Addr, RewardsInfo> = Map::new("rewards-info");
 /// A struct containing information pertaining to rewards
 #[derive(Serialize, Deserialize, Debug)]
 pub(crate) struct RewardsInfo {
-    /// The total amount of tokens rewarded to the user across all their hatchings.
-    /// This does not include rewards in the current vesting period
-    pub total_amount: Decimal256,
+    /// The total amount of tokens rewarded to the user across all their hatchings
+    pub total_rewards: Decimal256,
+    /// The total amount of tokens claimed by the user across all their hatchings
+    pub total_claimed: Decimal256,
+    /// Information related to the tokens currently vesting
     pub vesting_rewards: Option<VestingRewards>,
 }
 
@@ -90,7 +92,8 @@ impl State<'_> {
             .into_decimal256()
             .checked_mul(self.config.immediately_transferable)?;
         let mut locked_amount = amount.into_decimal256().checked_sub(transfer_amount)?;
-        let mut total_amount = transfer_amount;
+        let mut total_rewards = amount.into_decimal256();
+        let mut total_claimed = transfer_amount;
         let rewards_info = self.load_rewards(ctx.storage, &addr)?;
 
         /*  Handling the case where the specified address already has vesting rewards by:
@@ -100,7 +103,8 @@ impl State<'_> {
               new rewards
         */
         if let Some(rewards_info) = rewards_info {
-            total_amount = total_amount.checked_add(rewards_info.total_amount)?;
+            total_rewards = total_rewards.checked_add(rewards_info.total_rewards)?;
+            total_claimed = total_claimed.checked_add(rewards_info.total_claimed)?;
 
             if let Some(vesting_rewards) = rewards_info.vesting_rewards {
                 let unlocked = vesting_rewards.calculate_unlocked_rewards(self.now())?;
@@ -112,9 +116,9 @@ impl State<'_> {
                     .checked_sub(vesting_rewards.claimed)?
                     .checked_add(locked_amount)?;
 
-                total_amount = total_amount
+                total_claimed = total_claimed
                     .checked_add(unlocked)?
-                    .checked_add(vesting_rewards.claimed)?;
+                    .checked_add(rewards_info.total_claimed)?;
             }
         }
 
@@ -127,7 +131,8 @@ impl State<'_> {
         };
 
         let rewards_info = RewardsInfo {
-            total_amount,
+            total_rewards,
+            total_claimed,
             vesting_rewards: Some(vesting_rewards),
         };
 
@@ -161,13 +166,12 @@ impl State<'_> {
                         bail!("There are no outstanding rewards for {}", address);
                     }
 
+                    rewards_info.total_claimed =
+                        rewards_info.total_claimed.checked_add(unlocked)?;
                     vesting_rewards.claimed = vesting_rewards.claimed.checked_add(unlocked)?;
                     vesting_rewards.last_claimed = self.now();
 
                     if vesting_rewards.claimed == vesting_rewards.amount {
-                        rewards_info.total_amount = rewards_info
-                            .total_amount
-                            .checked_add(vesting_rewards.amount)?;
                         rewards_info.vesting_rewards = None;
                     } else {
                         rewards_info.vesting_rewards = Some(vesting_rewards);

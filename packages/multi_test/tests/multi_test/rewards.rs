@@ -211,7 +211,8 @@ fn test_subsequent_grants() {
         .unwrap()
         .expect("expected rewards info");
 
-    assert_eq!(res.claimed, Decimal256::from_str("150").unwrap());
+    assert_eq!(res.total_rewards, Decimal256::from_str("200").unwrap());
+    assert_eq!(res.total_claimed, Decimal256::from_str("150").unwrap());
     assert_eq!(res.locked, Decimal256::from_str("25").unwrap());
     assert_eq!(res.unlocked, Decimal256::from_str("25").unwrap());
 }

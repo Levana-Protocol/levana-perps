@@ -84,9 +84,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                         Some(RewardsInfoResp {
                             locked,
                             unlocked,
-                            claimed: rewards_info
-                                .total_amount
-                                .checked_add(vesting_rewards.claimed)?,
+                            total_rewards: rewards_info.total_rewards,
+                            total_claimed: rewards_info.total_claimed,
                             start: vesting_rewards.start,
                             end: vesting_rewards.start + vesting_rewards.duration,
                         })
