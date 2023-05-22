@@ -133,14 +133,14 @@ impl State<'_> {
         storage: &dyn Storage,
         price: Price,
     ) -> Result<Option<OrderId>> {
-        let current = self.spot_price(storage, None)?;
+        let current = self
+            .spot_price_latest_opt(storage)?
+            .map_or(price, |x| x.price_notional);
 
         let order = LIMIT_ORDERS_BY_PRICE_LONG
             .prefix_range(
                 storage,
-                Some(PrefixBound::inclusive(PriceKey::from(
-                    price.max(current.price_notional),
-                ))),
+                Some(PrefixBound::inclusive(PriceKey::from(price.max(current)))),
                 None,
                 Order::Ascending,
             )
@@ -152,9 +152,7 @@ impl State<'_> {
                 .prefix_range(
                     storage,
                     None,
-                    Some(PrefixBound::inclusive(PriceKey::from(
-                        price.min(current.price_notional),
-                    ))),
+                    Some(PrefixBound::inclusive(PriceKey::from(price.min(current)))),
                     Order::Descending,
                 )
                 .next(),
