@@ -568,3 +568,117 @@ fn poc_set_other_users_trigger_order_high() {
         .unwrap();
     assert_eq!(err.id, ErrorId::Auth);
 }
+
+#[test]
+fn lagging_crank_perp_1350_long() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+    let cranker = market.clone_trader(1).unwrap();
+
+    // Start off with a price of 10. Place a limit order with a trigger of 7.
+    // Then price drops to 6, and climbs to 8, before any cranking happens. We
+    // need to guarantee that the position doesn't get opened under those
+    // circumstances. Later, when it drops back down to 5, we should enter at 5.
+    market.exec_set_price("10".parse().unwrap()).unwrap();
+    market.exec_crank_till_finished(&cranker).unwrap();
+
+    market
+        .exec_place_limit_order(
+            &trader,
+            "10".try_into().unwrap(),
+            "7".try_into().unwrap(),
+            "10".try_into().unwrap(),
+            DirectionToBase::Long,
+            "1".try_into().unwrap(),
+            None,
+            None,
+        )
+        .unwrap();
+
+    let resp = market
+        .query_limit_orders(&trader, None, Some(5u32), None)
+        .unwrap();
+    assert_eq!(resp.orders.len(), 1);
+
+    market.exec_set_price("6".parse().unwrap()).unwrap();
+    market.exec_set_price("8".parse().unwrap()).unwrap();
+    market.exec_crank_till_finished(&cranker).unwrap();
+
+    let resp = market
+        .query_limit_orders(&trader, None, Some(5u32), None)
+        .unwrap();
+    assert_eq!(resp.orders.len(), 1);
+
+    market.exec_set_price("5".parse().unwrap()).unwrap();
+    market.exec_crank_till_finished(&cranker).unwrap();
+
+    let resp = market
+        .query_limit_orders(&trader, None, Some(5u32), None)
+        .unwrap();
+    assert_eq!(resp.orders.len(), 0);
+
+    let mut positions = market.query_positions(&trader).unwrap();
+    assert_eq!(positions.len(), 1);
+    let position = positions.pop().unwrap();
+    assert!(position
+        .entry_price_base
+        .into_number()
+        .approx_eq("5".parse().unwrap()));
+}
+
+#[test]
+fn lagging_crank_perp_1350_short() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+    let cranker = market.clone_trader(1).unwrap();
+
+    // Start off with a price of 10. Place a limit order with a trigger of 13.
+    // Then price climbs to 14, and drops to 12, before any cranking happens. We
+    // need to guarantee that the position doesn't get opened under those
+    // circumstances. Later, when it climbs back up to 15, we should enter at 15.
+    market.exec_set_price("10".parse().unwrap()).unwrap();
+    market.exec_crank_till_finished(&cranker).unwrap();
+
+    market
+        .exec_place_limit_order(
+            &trader,
+            "10".try_into().unwrap(),
+            "13".try_into().unwrap(),
+            "10".try_into().unwrap(),
+            DirectionToBase::Short,
+            "1".try_into().unwrap(),
+            None,
+            None,
+        )
+        .unwrap();
+
+    let resp = market
+        .query_limit_orders(&trader, None, Some(5u32), None)
+        .unwrap();
+    assert_eq!(resp.orders.len(), 1);
+
+    market.exec_set_price("14".parse().unwrap()).unwrap();
+    market.exec_set_price("12".parse().unwrap()).unwrap();
+    market.exec_crank_till_finished(&cranker).unwrap();
+
+    let resp = market
+        .query_limit_orders(&trader, None, Some(5u32), None)
+        .unwrap();
+    assert_eq!(resp.orders.len(), 1);
+
+    market.exec_set_price("15".parse().unwrap()).unwrap();
+    market.exec_crank_till_finished(&cranker).unwrap();
+
+    let resp = market
+        .query_limit_orders(&trader, None, Some(5u32), None)
+        .unwrap();
+    assert_eq!(resp.orders.len(), 0);
+
+    let mut positions = market.query_positions(&trader).unwrap();
+    assert_eq!(positions.len(), 1);
+    let position = positions.pop().unwrap();
+    assert!(position
+        .entry_price_base
+        .into_number()
+        .approx_eq("15".parse().unwrap()));
+}
