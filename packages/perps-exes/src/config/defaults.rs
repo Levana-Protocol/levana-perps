@@ -67,3 +67,8 @@ pub(super) fn stats() -> TaskConfig {
 pub(super) fn ultra_crank() -> TaskConfig {
     super::WatcherConfig::default().ultra_crank
 }
+
+pub(super) fn seconds_till_ultra() -> u32 {
+    // 8 minutes
+    60 * 8
+}

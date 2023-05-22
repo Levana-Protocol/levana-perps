@@ -99,6 +99,9 @@ pub struct DeploymentConfig {
     /// How many ultracrank wallets to set up
     #[serde(default)]
     pub ultra_crank: u32,
+    /// How many seconds behind we need to be before we kick in the ultracrank
+    #[serde(default = "defaults::seconds_till_ultra")]
+    pub seconds_till_ultra: u32,
     pub price: bool,
     pub wallet_manager_address: RawAddress,
     pub price_address: RawAddress,

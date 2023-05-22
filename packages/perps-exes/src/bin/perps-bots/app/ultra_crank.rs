@@ -44,8 +44,6 @@ impl WatchedTaskPerMarket for Worker {
     }
 }
 
-const MINUTES_TILL_ULTRA: i64 = 20;
-
 impl App {
     async fn ultra_crank(&self, addr: Address, wallet: &Wallet) -> Result<WatchedTaskOutput> {
         let market = self.cosmos.make_contract(addr);
@@ -64,11 +62,11 @@ impl App {
         let last_crank_completed = timestamp_to_date_time(last_crank_completed)?;
         let age = Utc::now()
             .signed_duration_since(last_crank_completed)
-            .num_minutes();
-        if age < MINUTES_TILL_ULTRA {
+            .num_seconds();
+        if age < self.config.seconds_till_ultra.into() {
             return Ok(WatchedTaskOutput {
                 skip_delay: false,
-                message: format!("Crank is only {age} minutes out of date, not doing anything"),
+                message: format!("Crank is only {age} seconds out of date, not doing anything"),
             });
         }
         let res = market
