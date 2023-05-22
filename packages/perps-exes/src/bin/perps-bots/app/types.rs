@@ -58,6 +58,7 @@ impl Opt {
         if let Some(gas_multiplier) = config.gas_multiplier {
             builder.config.gas_estimate_multiplier = gas_multiplier;
         }
+        builder.set_referer_header("https://bots.levana.exchange/".to_owned());
         builder.build().await
     }
 
