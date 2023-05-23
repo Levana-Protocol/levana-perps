@@ -328,10 +328,10 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
                     skip_delay,
                     message,
                 }) => {
-                    successes.push(format!("{market}: {message}"));
+                    successes.push(format!("{market} {addr}: {message}"));
                     total_skip_delay = skip_delay || total_skip_delay;
                 }
-                Err(e) => errors.push(format!("{market}: {e:?}")),
+                Err(e) => errors.push(format!("{market} {addr}: {e:?}")),
             }
             heartbeat.reset_too_old();
         }
