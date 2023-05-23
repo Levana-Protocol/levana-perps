@@ -65,18 +65,14 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     start,
                     duration,
                     lvn,
-                } => {
-                    let start = start.unwrap_or_else(|| state.now());
-                    let emissions = Emissions {
-                        start,
-                        end: start + Duration::from_seconds(duration as u64),
-                        lvn,
-                    };
-
-                    //FIXME handle case where there're pre-existing emissions.
-                    state.save_lvn_emissions(&mut ctx, emissions)?;
-                }
-                OwnerExecuteMsg::ClearEmissions {} => todo!(),
+                } => state.set_emissions(
+                    &mut ctx,
+                    start.unwrap_or_else(|| state.now()),
+                    Duration::from_seconds(duration as u64),
+                    lvn,
+                )?,
+                OwnerExecuteMsg::ClearEmissions {} => state.clear_emissions(&mut ctx)?,
+                OwnerExecuteMsg::ReclaimEmissions { .. } => todo!(),
                 OwnerExecuteMsg::UpdateConfig { .. } => todo!(),
             }
         }
@@ -174,6 +170,31 @@ impl State<'_> {
         });
 
         ctx.response_mut().add_message(transfer_msg);
+
+        Ok(())
+    }
+
+    fn set_emissions(
+        &self,
+        ctx: &mut StateContext,
+        start: Timestamp,
+        duration: Duration,
+        lvn: NonZero<LvnToken>,
+    ) -> Result<()> {
+        let emissions = Emissions {
+            start,
+            end: start + duration,
+            lvn,
+        };
+
+        self.save_lvn_emissions(ctx, Some(emissions))?;
+
+        Ok(())
+    }
+
+    fn clear_emissions(&self, ctx: &mut StateContext) -> Result<()> {
+        self.update_rewards_per_token(ctx)?;
+        self.save_lvn_emissions(ctx, None)?;
 
         Ok(())
     }

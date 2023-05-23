@@ -2,6 +2,7 @@ use crate::prelude::*;
 use crate::state::farming::RawFarmerStats;
 use cw_storage_plus::Item;
 use msg::token::Token;
+use std::cmp::min;
 
 /// The LVN token used for rewards
 const LVN_TOKEN: Item<Token> = Item::new(namespace::LVN_TOKEN);
@@ -58,9 +59,26 @@ impl State<'_> {
     pub(crate) fn save_lvn_emissions(
         &self,
         ctx: &mut StateContext,
-        emissions: Emissions,
+        emissions: Option<Emissions>,
     ) -> Result<()> {
-        LVN_EMISSIONS.save(ctx.storage, &emissions)?;
+        match emissions {
+            None => LVN_EMISSIONS.remove(ctx.storage),
+            Some(emissions) => {
+                let prev_emissions = LVN_EMISSIONS.may_load(ctx.storage)?;
+
+                match prev_emissions {
+                    None => LVN_EMISSIONS.save(ctx.storage, &emissions)?,
+                    Some(prev_emissions) => {
+                        anyhow::ensure!(
+                            self.now() > prev_emissions.end,
+                            "Unable to save new emissions while previous emissions are ongoing"
+                        );
+                        LVN_EMISSIONS.save(ctx.storage, &emissions)?;
+                    }
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -144,9 +162,9 @@ impl State<'_> {
             self.latest_reward_per_token(ctx.storage)?;
         let total_farming_tokens = self.load_farming_totals(ctx.storage)?.farming;
         let total_lvn = emissions.lvn.raw();
-        let elapsed_time = self
-            .now()
-            .checked_sub(latest_timestamp, "calculate_rewards_per_farming_token")?;
+        let end_time = min(self.now(), emissions.end);
+        let elapsed_time =
+            end_time.checked_sub(latest_timestamp, "calculate_rewards_per_farming_token")?;
         let elapsed_time = Decimal256::from_ratio(elapsed_time.as_nanos(), 1u64);
         let elapsed_ratio = elapsed_time.checked_div(emissions_duration)?;
         let reward_per_token = total_lvn
@@ -155,6 +173,17 @@ impl State<'_> {
         let new_rewards_per_token = latest_rewards_per_token.checked_add(reward_per_token)?;
 
         Ok(new_rewards_per_token)
+    }
+
+    pub(crate) fn perform_farming_bookkeeping(
+        &self,
+        ctx: &mut StateContext,
+        addr: &Addr,
+    ) -> Result<()> {
+        self.update_accrued_rewards(ctx, addr)?;
+        self.update_rewards_per_token(ctx)?;
+
+        Ok(())
     }
 
     /// Calculates the amount of unlocked rewards are available since the last collection occurred
@@ -171,10 +200,24 @@ impl State<'_> {
         Ok(unlocked_rewards)
     }
 
-    /// Updates the rewards per farming token ratio since the last update
+    /// Updates the rewards per farming token ratio
     pub(crate) fn update_rewards_per_token(&self, ctx: &mut StateContext) -> Result<()> {
         let rewards_per_token = self.calculate_rewards_per_token(ctx)?;
         REWARDS_PER_TIME_PER_TOKEN.save(ctx.storage, self.now(), &rewards_per_token)?;
+
+        Ok(())
+    }
+
+    /// Allocates accrued rewards to the specified user
+    pub(crate) fn update_accrued_rewards(&self, ctx: &mut StateContext, addr: &Addr) -> Result<()> {
+        let mut farmer_stats = self.load_raw_farmer_stats(ctx.storage, addr)?;
+        let end_prefix_sum = self.calculate_rewards_per_token(ctx)?;
+        let accrued_rewards = self.calculate_unlocked_rewards(&farmer_stats, end_prefix_sum)?;
+
+        farmer_stats.accrued_rewards = farmer_stats.accrued_rewards.checked_add(accrued_rewards)?;
+        farmer_stats.xlp_last_collected_prefix_sum = end_prefix_sum;
+
+        self.save_raw_farmer_stats(ctx, addr, &farmer_stats)?;
 
         Ok(())
     }
@@ -196,8 +239,10 @@ impl State<'_> {
         let unlocked_rewards = self.calculate_unlocked_rewards(&farmer_stats, end_prefix_sum)?;
 
         farmer_stats.xlp_last_collected_prefix_sum = end_prefix_sum;
+        farmer_stats.accrued_rewards = LvnToken::zero();
+
         self.save_raw_farmer_stats(ctx, addr, &farmer_stats)?;
 
-        Ok(unlocked_rewards)
+        Ok(unlocked_rewards.checked_add(farmer_stats.accrued_rewards)?)
     }
 }

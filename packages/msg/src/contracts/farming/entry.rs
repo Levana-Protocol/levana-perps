@@ -123,6 +123,12 @@ pub enum OwnerExecuteMsg {
     },
     /// Clear the active emissions
     ClearEmissions {},
+    /// Reclaim unused LVN tokens from a previous emissions.
+    /// Returns an error if there's an ongoing emissions period.
+    ReclaimEmissions {
+        /// The destination address for the unused tokens
+        addr: String,
+    },
     /// Update the configuration set in the [InstantiateMsg]
     ///
     /// Note that, by design, not all fields from [InstantiateMsg] can be
