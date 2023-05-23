@@ -126,7 +126,7 @@ impl Default for Config {
             price_update_too_old_seconds: 60 * 30,
             staleness_seconds: 60 * 60 * 2,
             protocol_tax: "0.3".parse().unwrap(),
-            unstake_period_seconds: 60 * 60 * 24 * 21, // 21 days
+            unstake_period_seconds: 60 * 60 * 24 * 45, // 45 days
             target_utilization: "0.9".parse().unwrap(),
             // Try to realize the bias over a 3 day period.
             //
