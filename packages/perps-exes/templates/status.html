@@ -51,6 +51,7 @@
           <li>gRPC endpoint: {{grpc}} (height: {{grpc_height}})</li>
           <li>RPC endpoint: {{rpc}} (height: {{rpc_height}})</li>
           <li>Bot live since: {{live_since}}</li>
+          <li>Current time: {{now}}</li>
         </ul>
 
         <table class="table">
@@ -75,16 +76,16 @@
         {% for status in statuses %}
           <div class="panel panel-default">
             <h2 id="{{ status.label.ident() }}">{{ status.label }}</h2>
-            <p>Status: {{ status.short.as_str() }}</p>
+            <p>Status: {{ status.short.as_str() }} <i>{{ status.status.last_result.since() }}</i></p>
             {% if let Some(started) = status.status.current_run_started.as_ref() %}
               <p>Currently running, started at {{ started }}</p>
             {% endif %}
 
-            <pre>{% match status.status.last_result.as_ref() %}{% when Ok(s) %}{{ s }}{% when Err(e) %}{{ e }}{% endmatch %}</pre>
+            <pre>{% match status.status.last_result.value.as_ref() %}{% when Ok(s) %}{{ s }}{% when Err(e) %}{{ e }}{% endmatch %}</pre>
 
             {% if let Some(retrying) = status.status.last_retry_error.as_ref() %}
-              <p>Currently retrying, last error message:</p>
-              <pre>{{ retrying }}</pre>
+              <p>Currently retrying, last error message <i>{{ retrying.since() }}</i></p>
+              <pre>{{ retrying.value }}</pre>
             {% endif %}
           </div>
         {% endfor %}

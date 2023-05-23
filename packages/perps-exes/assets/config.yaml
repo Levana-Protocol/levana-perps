@@ -14,7 +14,8 @@ chains:
       # Nodes seem to crash often, let's see if this helps
       retries: 10
     rpc-nodes:
-    - https://rpc.atlantic-2.seinetwork.io/
+    - https://rpc-sei-testnet.rhinostake.com/
+    #- https://rpc.atlantic-2.seinetwork.io/
     #- https://sei.kingnodes.com/
     #- https://sei-testnet-rpc.polkachu.com/
     #- https://sei-a2-rpc.brocha.in/
