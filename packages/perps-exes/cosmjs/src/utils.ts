@@ -10,10 +10,13 @@ import {
     Event,
     QueryClient,
     createProtobufRpcClient,
-    ProtobufRpcClient
+    ProtobufRpcClient,
+    StdFee
 } from "@cosmjs/stargate"
-import { DirectSecp256k1HdWallet, Registry } from "@cosmjs/proto-signing"
+import { Coin, DirectSecp256k1HdWallet, Registry } from "@cosmjs/proto-signing"
 import { ENV_SEED_PHRASE, NETWORKS } from "./config";
+import { QueryClientImpl } from "cosmjs-types/cosmwasm/wasm/v1/query";
+import { fromUtf8, toUtf8 } from "@cosmjs/encoding";
 
 
 
@@ -22,7 +25,8 @@ export interface Wallet {
     client: SigningCosmWasmClient,
     address: string,
     account: Account,
-    rpcClient: ProtobufRpcClient
+    rpcClient: ProtobufRpcClient,
+    queryService: QueryClientImpl,
 }
 
 type RegistryUpdater = (registry:Registry) => void;
@@ -73,6 +77,7 @@ export async function getWallet(config, registryUpdater?:RegistryUpdater):Promis
 
     const queryClient:QueryClient = (client as any).forceGetQueryClient();
     const rpcClient:ProtobufRpcClient = createProtobufRpcClient(queryClient);
+    const queryService = new QueryClientImpl(rpcClient);
 
     return { 
         client, 
@@ -80,6 +85,7 @@ export async function getWallet(config, registryUpdater?:RegistryUpdater):Promis
         signer, 
         account, 
         rpcClient,
+        queryService,
     };
 }
 
@@ -120,13 +126,35 @@ export async function uploadContract(wallet, contract_path) {
     return codeId;
 }
 
-
 export async function queryContract(wallet, contractAddress, msg) {
-    return await wallet.client.queryContractSmart(contractAddress, msg);
+    const queryContractSimple = async () => {
+        return await wallet.client.queryContractSmart(contractAddress, msg);
+    }
+
+    // the hard manual way with protobuf definitions 
+    const queryContractManual = async () => {
+        const request = { address: contractAddress, queryData: toUtf8(JSON.stringify(msg)) };
+        const resp = await wallet.queryService.SmartContractState(request);
+
+        // By convention, smart queries must return a valid JSON document (see https://github.com/CosmWasm/cosmwasm/issues/144)
+        let responseText: string;
+        try {
+            responseText = fromUtf8(resp.data);
+        } catch (error) {
+            throw new Error(`Could not UTF-8 decode smart query response from contract: ${error}`);
+        }
+        try {
+            return JSON.parse(responseText);
+        } catch (error) {
+            throw new Error(`Could not JSON parse smart query response from contract: ${error}`);
+        }
+    }
+
+    return await queryContractSimple();
 }
 
-export async function execContract(wallet, contractAddress, msg) {
-    return await wallet.client.execContract(contractAddress, msg);
+export async function execContract(wallet, contractAddress, msg, fee: StdFee | "auto" | number, memo = "", funds?: readonly Coin[]) {
+    return await wallet.client.execute(contractAddress, msg, fee, memo, funds);
 }
 
 export async function getNetworkConfig() {
