@@ -40,6 +40,7 @@ pub(crate) struct FrontendInfo {
     network: CosmosNetwork,
     price_api: &'static str,
     explorer: &'static str,
+    maintenance: Option<String>,
 }
 
 /// Helper data structure for building up an application.
@@ -74,6 +75,7 @@ impl Opt {
             network: config.network,
             price_api: config.price_api,
             explorer: config.explorer,
+            maintenance: self.maintenance.filter(|s| !s.is_empty()),
         };
 
         let factory = get_factory_info(&cosmos, &config, &client).await?;
