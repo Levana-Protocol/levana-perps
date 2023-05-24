@@ -130,3 +130,4 @@ pub const LVN_TOKEN: &str = "dw";
 pub const LVN_LOCKDROP_REWARDS: &str = "dx";
 pub const REWARDS_PER_TIME_PER_TOKEN: &str = "dy";
 pub const LVN_EMISSIONS: &str = "dz";
+pub const LOCKDROP_CONFIG: &str = "ea";

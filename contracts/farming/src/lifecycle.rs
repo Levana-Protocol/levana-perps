@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::state::rewards::LockdropConfig;
 use semver::Version;
 
 // version info for migration info
@@ -9,12 +10,16 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
-    info: MessageInfo,
+    _info: MessageInfo,
     InstantiateMsg {
-        // FIXME remove the ..
+        owner,
         factory,
         market_id,
+        lockdrop_buckets,
+        lockdrop_lvn_unlock_seconds,
+        lockdrop_immediate_unlock_ratio,
         lvn_token_denom,
+        // FIXME remove the ..
         ..
     }: InstantiateMsg,
 ) -> Result<Response> {
@@ -24,10 +29,18 @@ pub fn instantiate(
     MarketInfo::save(deps.querier, deps.storage, factory, market_id)?;
 
     let (state, mut ctx) = StateContext::new(deps, env)?;
-
-    state.set_admin(&mut ctx, &info.sender)?;
+    let admin = owner.validate(state.api)?;
+    state.set_admin(&mut ctx, &admin)?;
     state.save_lvn_token(&mut ctx, lvn_token_denom)?;
     state.rewards_init(ctx.storage)?;
+    state.save_lockdrop_config(
+        ctx.storage,
+        LockdropConfig {
+            lockdrop_buckets,
+            lockdrop_lvn_unlock_seconds: Duration::from_seconds(lockdrop_lvn_unlock_seconds as u64),
+            lockdrop_immediate_unlock_ratio,
+        },
+    )?;
 
     ctx.response.add_event(NewFarmingEvent {});
 

@@ -22,7 +22,7 @@ pub(crate) struct RawFarmerStats {
     /// See [REWARDS_PER_TIME_PER_TOKEN] for more explanation of prefix sums.
     pub(crate) xlp_last_collected_prefix_sum: LvnToken,
     /// The amount of LVN tokens that have accrued from emissions but have not yet been collected
-    pub(crate) accrued_rewards: LvnToken,
+    pub(crate) accrued_emissions: LvnToken,
 }
 
 impl RawFarmerStats {
@@ -134,7 +134,7 @@ impl State<'_> {
 
         let mut raw = self.load_raw_farmer_stats(ctx.storage, farmer)?;
         raw.xlp_farming_tokens = raw.xlp_farming_tokens.checked_add(new_farming)?;
-        //FIXME need to update xlp_last_collected_prefix_sum if is 0?
+
         self.save_raw_farmer_stats(ctx, farmer, &raw)?;
 
         Ok(new_farming)

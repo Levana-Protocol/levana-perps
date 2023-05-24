@@ -15,7 +15,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             let prefix_sum = state.calculate_rewards_per_token_per_time(store)?;
             let emission_rewards = state
                 .calculate_unlocked_rewards(&farmer_stats, prefix_sum)?
-                .checked_add(farmer_stats.accrued_rewards)?;
+                .checked_add(farmer_stats.accrued_emissions)?;
 
             FarmerStats {
                 farming_tokens: farmer_stats.total_farming_tokens()?,

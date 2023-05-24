@@ -18,18 +18,15 @@ fn test_emissions() {
     market.set_time(TimeJump::Hours(24 * 365)).unwrap();
     market.exec_farming_start_launch(None).unwrap();
 
-    market.exec_farming_set_emissions(
-        market.now(),
-        20,
-        "200".parse().unwrap()
-    ).unwrap();
+    market
+        .exec_farming_set_emissions(market.now(), 20, "200".parse().unwrap())
+        .unwrap();
 
     // Test claim farming rewards
 
-    market.exec_farming_deposit_xlp(
-        &lp,
-        NonZero::new("100".parse().unwrap()).unwrap(),
-    ).unwrap();
+    market
+        .exec_farming_deposit_xlp(&lp, NonZero::new("100".parse().unwrap()).unwrap())
+        .unwrap();
 
     market.set_time(TimeJump::Seconds(5)).unwrap();
     let stats = market.query_farming_farmer_stats(&lp).unwrap();
@@ -44,7 +41,7 @@ fn test_emissions() {
 fn test_emissions_multiple_lps() {
     struct Lp<'a> {
         addr: Addr,
-        amount: &'a str
+        amount: &'a str,
     }
 
     // market Setup
@@ -57,9 +54,18 @@ fn test_emissions_multiple_lps() {
     let lp2 = market.clone_lp(2).unwrap();
 
     let lps = [
-        Lp { addr: lp0, amount: "100" },
-        Lp { addr: lp1, amount: "100" },
-        Lp { addr: lp2, amount: "200" },
+        Lp {
+            addr: lp0,
+            amount: "100",
+        },
+        Lp {
+            addr: lp1,
+            amount: "100",
+        },
+        Lp {
+            addr: lp2,
+            amount: "200",
+        },
     ];
 
     for lp in &lps {
@@ -75,31 +81,32 @@ fn test_emissions_multiple_lps() {
     market.set_time(TimeJump::Hours(24 * 365)).unwrap();
     market.exec_farming_start_launch(None).unwrap();
 
-    market.exec_farming_set_emissions(
-        market.now(),
-        20,
-        "200".parse().unwrap()
-    ).unwrap();
+    market
+        .exec_farming_set_emissions(market.now(), 20, "200".parse().unwrap())
+        .unwrap();
 
     // lp0
-    market.exec_farming_deposit_xlp(
-        &lps[0].addr,
-        lps[0].amount.parse().unwrap(),
-    ).unwrap();
+    market
+        .exec_farming_deposit_xlp(&lps[0].addr, lps[0].amount.parse().unwrap())
+        .unwrap();
 
     // lp1
     market.set_time(TimeJump::Seconds(5)).unwrap();
-    market.exec_farming_deposit_xlp(
-        &lps[1].addr,
-        NonZero::new(lps[1].amount.parse().unwrap()).unwrap(),
-    ).unwrap();
+    market
+        .exec_farming_deposit_xlp(
+            &lps[1].addr,
+            NonZero::new(lps[1].amount.parse().unwrap()).unwrap(),
+        )
+        .unwrap();
 
     // lp2
     market.set_time(TimeJump::Seconds(5)).unwrap();
-    market.exec_farming_deposit_xlp(
-        &lps[2].addr,
-        NonZero::new(lps[2].amount.parse().unwrap()).unwrap(),
-    ).unwrap();
+    market
+        .exec_farming_deposit_xlp(
+            &lps[2].addr,
+            NonZero::new(lps[2].amount.parse().unwrap()).unwrap(),
+        )
+        .unwrap();
 
     // Test halfway through emissions
 
@@ -113,7 +120,7 @@ fn test_emissions_multiple_lps() {
 
     // Test after emissions complete
 
-     market.set_time(TimeJump::Seconds(10)).unwrap();
+    market.set_time(TimeJump::Seconds(10)).unwrap();
 
     let lp0_stats = market.query_farming_farmer_stats(&lps[0].addr).unwrap();
     let lp1_stats = market.query_farming_farmer_stats(&lps[1].addr).unwrap();
