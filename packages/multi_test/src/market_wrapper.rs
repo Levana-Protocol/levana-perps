@@ -1373,6 +1373,8 @@ impl PerpsMarket {
         }
     }
 
+    /***** FARMING *****/
+
     pub fn exec_farming_deposit_xlp(
         &self,
         wallet: &Addr,
@@ -1423,6 +1425,33 @@ impl PerpsMarket {
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
             &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::StartLaunchPeriod { start }),
         )
+    }
+
+    pub fn exec_farming_set_emissions(
+        &self,
+        start: Timestamp,
+        duration: u32,
+        lvn_amount: NonZero<LvnToken>,
+    ) -> Result<AppResponse> {
+        self.exec_farming(
+            &Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::SetEmissions {
+                start: Some(start),
+                duration,
+                lvn: lvn_amount,
+            }),
+        )
+    }
+
+    pub fn exec_farming_clear_emissions(&self) -> Result<AppResponse> {
+        self.exec_farming(
+            &Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::ClearEmissions {}),
+        )
+    }
+
+    pub fn exec_farming_claim_rewards(&self, sender: &Addr) -> Result<AppResponse> {
+        self.exec_farming(sender, &FarmingExecuteMsg::ClaimLvn {})
     }
 
     fn query_farming<T: DeserializeOwned>(

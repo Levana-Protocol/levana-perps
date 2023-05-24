@@ -26,7 +26,7 @@ pub(crate) struct RawFarmerStats {
 }
 
 impl RawFarmerStats {
-    pub(crate) fn total_xlp(&self) -> Result<FarmingToken> {
+    pub(crate) fn total_farming_tokens(&self) -> Result<FarmingToken> {
         let total = self
             .lockdrop_farming_tokens
             .checked_add(self.xlp_farming_tokens)?;

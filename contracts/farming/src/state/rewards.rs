@@ -2,7 +2,7 @@ use crate::prelude::*;
 use crate::state::farming::RawFarmerStats;
 use cw_storage_plus::Item;
 use msg::token::Token;
-use std::cmp::min;
+use std::cmp::{max, min};
 
 /// The LVN token used for rewards
 const LVN_TOKEN: Item<Token> = Item::new(namespace::LVN_TOKEN);
@@ -37,7 +37,7 @@ const LVN_EMISSIONS: Item<Emissions> = Item::new(namespace::LVN_EMISSIONS);
 impl State<'_> {
     pub(crate) fn rewards_init(&self, store: &mut dyn Storage) -> Result<()> {
         REWARDS_PER_TIME_PER_TOKEN
-            .save(store, Timestamp::from_nanos(0), &LvnToken::zero())
+            .save(store, self.now(), &LvnToken::zero())
             .map_err(|e| e.into())
     }
 
@@ -147,9 +147,9 @@ impl State<'_> {
     }
 
     /// Calculates rewards per farming tokens ratio since the last update
-    fn calculate_rewards_per_token(&self, ctx: &StateContext) -> Result<LvnToken> {
+    pub fn calculate_rewards_per_token_per_time(&self, store: &dyn Storage) -> Result<LvnToken> {
         let emissions = self
-            .may_load_lvn_emissions(ctx.storage)?
+            .may_load_lvn_emissions(store)?
             .with_context(|| "There are no active emissions")?;
         let emissions_duration = Decimal256::from_ratio(
             emissions
@@ -158,19 +158,26 @@ impl State<'_> {
                 .as_nanos(),
             1u64,
         );
-        let (latest_timestamp, latest_rewards_per_token) =
-            self.latest_reward_per_token(ctx.storage)?;
-        let total_farming_tokens = self.load_farming_totals(ctx.storage)?.farming;
-        let total_lvn = emissions.lvn.raw();
-        let end_time = min(self.now(), emissions.end);
-        let elapsed_time =
-            end_time.checked_sub(latest_timestamp, "calculate_rewards_per_farming_token")?;
-        let elapsed_time = Decimal256::from_ratio(elapsed_time.as_nanos(), 1u64);
-        let elapsed_ratio = elapsed_time.checked_div(emissions_duration)?;
-        let reward_per_token = total_lvn
-            .checked_div_dec(total_farming_tokens.into_decimal256())?
-            .checked_mul_dec(elapsed_ratio)?;
-        let new_rewards_per_token = latest_rewards_per_token.checked_add(reward_per_token)?;
+        let (latest_timestamp, latest_rewards_per_token) = self.latest_reward_per_token(store)?;
+        let total_farming_tokens = self.load_farming_totals(store)?.farming;
+
+        let rewards_per_token = if total_farming_tokens.is_zero() {
+            LvnToken::zero()
+        } else {
+            let total_lvn = emissions.lvn.raw();
+            let start_time = max(latest_timestamp, emissions.start);
+            let end_time = min(self.now(), emissions.end);
+            let elapsed_time =
+                end_time.checked_sub(start_time, "calculate_rewards_per_farming_token")?;
+            let elapsed_time = Decimal256::from_ratio(elapsed_time.as_nanos(), 1u64);
+            let elapsed_ratio = elapsed_time.checked_div(emissions_duration)?;
+
+            total_lvn
+                .checked_div_dec(total_farming_tokens.into_decimal256())?
+                .checked_mul_dec(elapsed_ratio)?
+        };
+
+        let new_rewards_per_token = latest_rewards_per_token.checked_add(rewards_per_token)?;
 
         Ok(new_rewards_per_token)
     }
@@ -186,7 +193,8 @@ impl State<'_> {
         Ok(())
     }
 
-    /// Calculates the amount of unlocked rewards are available since the last collection occurred
+    /// Calculates the amount of unlocked rewards that are available from the last time rewards
+    /// were claimed or accrued
     pub(crate) fn calculate_unlocked_rewards(
         &self,
         farmer_stats: &RawFarmerStats,
@@ -195,15 +203,19 @@ impl State<'_> {
         let start_prefix_sum = farmer_stats.xlp_last_collected_prefix_sum;
         let unlocked_rewards = end_prefix_sum
             .checked_sub(start_prefix_sum)?
-            .checked_mul_dec(farmer_stats.total_xlp()?.into_decimal256())?;
+            .checked_mul_dec(farmer_stats.total_farming_tokens()?.into_decimal256())?;
 
         Ok(unlocked_rewards)
     }
 
     /// Updates the rewards per farming token ratio
     pub(crate) fn update_rewards_per_token(&self, ctx: &mut StateContext) -> Result<()> {
-        let rewards_per_token = self.calculate_rewards_per_token(ctx)?;
-        REWARDS_PER_TIME_PER_TOKEN.save(ctx.storage, self.now(), &rewards_per_token)?;
+        let rewards_per_token = self.calculate_rewards_per_token_per_time(ctx.storage)?;
+        let (_, latest) = self.latest_reward_per_token(ctx.storage)?;
+
+        if rewards_per_token > latest {
+            REWARDS_PER_TIME_PER_TOKEN.save(ctx.storage, self.now(), &rewards_per_token)?;
+        }
 
         Ok(())
     }
@@ -211,7 +223,7 @@ impl State<'_> {
     /// Allocates accrued rewards to the specified user
     pub(crate) fn update_accrued_rewards(&self, ctx: &mut StateContext, addr: &Addr) -> Result<()> {
         let mut farmer_stats = self.load_raw_farmer_stats(ctx.storage, addr)?;
-        let end_prefix_sum = self.calculate_rewards_per_token(ctx)?;
+        let end_prefix_sum = self.calculate_rewards_per_token_per_time(ctx.storage)?;
         let accrued_rewards = self.calculate_unlocked_rewards(&farmer_stats, end_prefix_sum)?;
 
         farmer_stats.accrued_rewards = farmer_stats.accrued_rewards.checked_add(accrued_rewards)?;
@@ -235,7 +247,7 @@ impl State<'_> {
             return Ok(LvnToken::zero());
         }
 
-        let end_prefix_sum = self.calculate_rewards_per_token(ctx)?;
+        let end_prefix_sum = self.calculate_rewards_per_token_per_time(ctx.storage)?;
         let unlocked_rewards = self.calculate_unlocked_rewards(&farmer_stats, end_prefix_sum)?;
 
         farmer_stats.xlp_last_collected_prefix_sum = end_prefix_sum;

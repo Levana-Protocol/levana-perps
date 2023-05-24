@@ -304,7 +304,7 @@ pub struct FarmerStats {
     /// Total lockdrop LVN rewards that are pending unlock
     pub lockdrop_locked: LvnToken,
     /// LVN emissions available for claiming
-    pub emissions: LvnToken,
+    pub emission_rewards: LvnToken,
 }
 
 /// Information on an individual farmers lockdrop stats.
