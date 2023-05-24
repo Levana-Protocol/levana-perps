@@ -23,8 +23,8 @@ pub(crate) enum FarmingPeriod {
     Launched,
 }
 
-impl From<FarmingPeriodResp> for FarmingPeriod {
-    fn from(resp: FarmingPeriodResp) -> Self {
+impl From<&FarmingPeriodResp> for FarmingPeriod {
+    fn from(resp: &FarmingPeriodResp) -> Self {
         match resp {
             FarmingPeriodResp::Inactive { .. } => FarmingPeriod::Inactive,
             FarmingPeriodResp::Lockdrop { .. } => FarmingPeriod::Lockdrop,
@@ -36,8 +36,14 @@ impl From<FarmingPeriodResp> for FarmingPeriod {
 }
 
 impl State<'_> {
-    pub(crate) fn validate_period_msg(&self, store: &dyn Storage, msg: &ExecuteMsg) -> Result<()> {
-        let period = self.get_period(store)?;
+    pub(crate) fn validate_period_msg(
+        &self,
+        store: &dyn Storage,
+        user: &Addr,
+        msg: &ExecuteMsg,
+    ) -> Result<()> {
+        let period_resp = self.get_period_resp(store)?;
+        let period = (&period_resp).into();
 
         let is_valid = match msg {
             ExecuteMsg::Owner(_) => true,
@@ -47,20 +53,20 @@ impl State<'_> {
             ExecuteMsg::LockdropDeposit { .. } => {
                 period == FarmingPeriod::Lockdrop || period == FarmingPeriod::Sunset
             }
-            ExecuteMsg::LockdropWithdraw { .. } => {
-                match period {
-                    FarmingPeriod::Lockdrop => true,
-                    FarmingPeriod::Sunset => {
-                        // TODO - check that amount is no more than half the bucket
-                        true
-                    }
-                    FarmingPeriod::Launched => {
-                        // TODO - check that the lockdrop has finished for this bucket
-                        true
-                    }
-                    _ => false,
+            ExecuteMsg::LockdropWithdraw { bucket_id, amount } => match period {
+                FarmingPeriod::Lockdrop => true,
+                FarmingPeriod::Sunset | FarmingPeriod::Launched => {
+                    self.validate_lockdrop_withdrawal(
+                        store,
+                        &period_resp,
+                        user,
+                        *bucket_id,
+                        *amount,
+                    )?;
+                    true
                 }
-            }
+                FarmingPeriod::Inactive | FarmingPeriod::Review => false,
+            },
             ExecuteMsg::Deposit { .. }
             | ExecuteMsg::Withdraw { .. }
             | ExecuteMsg::ClaimLvn {}
@@ -76,7 +82,7 @@ impl State<'_> {
     }
 
     pub(crate) fn get_period(&self, store: &dyn Storage) -> Result<FarmingPeriod> {
-        self.get_period_resp(store).map(Into::into)
+        self.get_period_resp(store).map(|p| (&p).into())
     }
 
     pub(crate) fn get_period_resp(&self, store: &dyn Storage) -> Result<FarmingPeriodResp> {
@@ -186,7 +192,7 @@ impl State<'_> {
             _ => {
                 bail!(
                     "Can only launch while in review period, currently in {:?}.",
-                    FarmingPeriod::from(period_resp)
+                    FarmingPeriod::from(&period_resp)
                 );
             }
         }

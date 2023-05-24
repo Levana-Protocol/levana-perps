@@ -12,10 +12,12 @@ chains:
     min-gas-in-gas-wallet: 3000000000
     watcher:
       # Nodes seem to crash often, let's see if this helps
-      retries: 20
+      retries: 10
     rpc-nodes:
-    - https://sei.kingnodes.com/
-    - https://sei-testnet-rpc.polkachu.com/
+    #- https://rpc-sei-testnet.rhinostake.com/
+    - https://rpc.atlantic-2.seinetwork.io/
+    #- https://sei.kingnodes.com/
+    #- https://sei-testnet-rpc.polkachu.com/
     #- https://sei-a2-rpc.brocha.in/
   dragonfire:
     tracker: levana18cszlvm6pze0x9sz32qnjq4vtd45xehqs8dq7cwy8yhq35wfnn3q6s5ylj
@@ -181,11 +183,12 @@ overrides:
     wallet-manager-address: osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k
     price-address: osmo1dfagdh540vrqqnuet5rqvdg3uldhhgdxpttmzl
     price: true
+    ultra-crank: 20
     crank: true
     liquidity: true
     utilization: true
     balance: true
-    traders: 1
+    traders: 0
     default-market-ids:
       - ETH_USD
   seitrade:

@@ -1,9 +1,9 @@
 use anyhow::Result;
 use axum::async_trait;
-use chrono::{TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use cosmos::{Address, Cosmos};
 use msg::prelude::*;
-use perps_exes::contracts::MarketContract;
+use perps_exes::{contracts::MarketContract, timestamp_to_date_time};
 
 use crate::watcher::{TaskLabel, WatchedTaskOutput, WatchedTaskPerMarket};
 
@@ -21,7 +21,7 @@ struct Stale;
 #[async_trait]
 impl WatchedTaskPerMarket for Stale {
     async fn run_single_market(
-        &self,
+        &mut self,
         app: &App,
         _factory: &FactoryInfo,
         _market: &MarketId,
@@ -39,26 +39,46 @@ impl WatchedTaskPerMarket for Stale {
 async fn check_stale_single(cosmos: &Cosmos, addr: Address) -> Result<String> {
     let market = MarketContract::new(cosmos.make_contract(addr));
     let status = market.status().await?;
+    let last_crank_completed = status
+        .last_crank_completed
+        .context("No cranks completed yet")?;
+    let last_crank_completed = timestamp_to_date_time(last_crank_completed)?;
+    let mk_message = |msg| Msg {
+        msg,
+        last_crank_completed,
+        unpend_queue_size: status.unpend_queue_size,
+        unpend_limit: status.config.unpend_limit,
+    };
     if status.is_stale() {
-        Err(anyhow!("Protocol is in stale state"))
+        Err(mk_message("Protocol is in stale state").to_anyhow())
     } else if status.congested {
-        Err(anyhow!(
-            "Protocol is congested, unpend queue size: {}. Maximum allowed size: {}.",
-            status.unpend_queue_size,
-            status.config.unpend_limit
-        ))
+        Err(mk_message("Protocol is in congested state").to_anyhow())
     } else {
-        let last_crank_completed = status
-            .last_crank_completed
-            .context("No cranks completed yet")?;
-        let last_crank_completed = cosmwasm_std::Timestamp::from(last_crank_completed);
-        let last_crank_completed = Utc
-            .timestamp_opt(last_crank_completed.seconds().try_into()?, 0)
-            .single()
-            .context("Could not convert last_crank_completed into DateTime<Utc>")?;
-        Ok(format!(
-            "Protocol is neither stale nor congested. Last completed crank timestamp: {}",
-            last_crank_completed
-        ))
+        Ok(mk_message("Protocol is neither stale nor congested").to_string())
+    }
+}
+
+struct Msg<'a> {
+    msg: &'a str,
+    last_crank_completed: DateTime<Utc>,
+    unpend_queue_size: u32,
+    unpend_limit: u32,
+}
+
+impl Display for Msg<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let Msg {
+            msg,
+            last_crank_completed,
+            unpend_queue_size,
+            unpend_limit,
+        } = self;
+        write!(f, "{msg}. Last completed crank timestamp: {last_crank_completed}. Unpend queue size: {unpend_queue_size}/{unpend_limit}.")
+    }
+}
+
+impl Msg<'_> {
+    fn to_anyhow(&self) -> anyhow::Error {
+        anyhow!("{}", self)
     }
 }

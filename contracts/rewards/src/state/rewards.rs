@@ -6,24 +6,36 @@ use msg::token::Token;
 use serde::{Deserialize, Serialize};
 use shared::prelude::*;
 
-const REWARDS: Map<&Addr, RewardsInfo> = Map::new("rewards");
+const REWARDS: Map<&Addr, RewardsInfo> = Map::new("rewards-info");
 
-/// A struct containing information pertaining to rewards granted to a single user
+/// A struct containing information pertaining to rewards
 #[derive(Serialize, Deserialize, Debug)]
 pub(crate) struct RewardsInfo {
-    /// The amount of tokens rewarded to the user
+    /// The total amount of tokens rewarded to the user across all their hatchings
+    pub total_rewards: Decimal256,
+    /// The total amount of tokens claimed by the user across all their hatchings
+    pub total_claimed: Decimal256,
+    /// Information related to the tokens currently vesting
+    pub vesting_rewards: Option<VestingRewards>,
+}
+
+/// A struct containing information pertaining to rewards from the current vesting period
+#[derive(Serialize, Deserialize, Debug)]
+pub(crate) struct VestingRewards {
+    /// The total amount of tokens rewarded to the user for the current vesting period
     pub amount: Decimal256,
-    /// The start time of the unlocking period
+    /// The start time of the current vesting period
     pub start: Timestamp,
-    /// The duration of the unlocking period
+    /// The duration of the current vesting period
     pub duration: Duration,
-    /// The amount of tokens that have already been claimed (and transferred) to the user
+    /// The amount of tokens from the current vesting period that have already been claimed
+    /// (and transferred) to the user
     pub claimed: Decimal256,
     /// The timestamp of the last time the user claimed rewards
     pub last_claimed: Timestamp,
 }
 
-impl RewardsInfo {
+impl VestingRewards {
     pub fn calculate_unlocked_rewards(&self, from: Timestamp) -> Result<Decimal256> {
         let unlocked = if from >= self.start + self.duration {
             self.amount.checked_sub(self.claimed)?
@@ -76,43 +88,39 @@ impl State<'_> {
         addr: Addr,
         amount: NonZero<LvnToken>,
     ) -> Result<()> {
-        let transfer_amount = amount
+        let mut transfer_amount = amount
             .into_decimal256()
             .checked_mul(self.config.immediately_transferable)?;
-        let locked_amount = amount.into_decimal256().checked_sub(transfer_amount)?;
-
+        let mut locked_amount = amount.into_decimal256().checked_sub(transfer_amount)?;
+        let mut total_rewards = amount.into_decimal256();
+        let mut total_claimed = transfer_amount;
         let rewards_info = self.load_rewards(ctx.storage, &addr)?;
-        let (transfer_amount, locked_amount) = match rewards_info {
-            None => (transfer_amount, locked_amount),
-            Some(rewards_info) => {
-                /*  Handling the case where the specified address already has vesting rewards by
-                   1. Combining whatever has been unlocked with the immediately transferable part of
-                      the new rewards
-                   2. Combining the (locked) remainder of the existing rewards with the rest of the
-                      new rewards
-                */
 
-                let unlocked = rewards_info.calculate_unlocked_rewards(self.now())?;
-                let new_transfer_amount = transfer_amount.checked_add(unlocked)?;
-                let new_locked_amount = rewards_info
+        /*  Handling the case where the specified address already has vesting rewards by:
+           1. Combining whatever has been unlocked with the immediately transferable part of
+              the new rewards
+           2. Combining the (locked) remainder of the existing rewards with the rest of the
+              new rewards
+        */
+        if let Some(rewards_info) = rewards_info {
+            total_rewards = total_rewards.checked_add(rewards_info.total_rewards)?;
+            total_claimed = total_claimed.checked_add(rewards_info.total_claimed)?;
+
+            if let Some(vesting_rewards) = rewards_info.vesting_rewards {
+                let unlocked = vesting_rewards.calculate_unlocked_rewards(self.now())?;
+
+                transfer_amount = transfer_amount.checked_add(unlocked)?;
+                locked_amount = vesting_rewards
                     .amount
                     .checked_sub(unlocked)?
-                    .checked_sub(rewards_info.claimed)?
+                    .checked_sub(vesting_rewards.claimed)?
                     .checked_add(locked_amount)?;
 
-                (new_transfer_amount, new_locked_amount)
+                total_claimed = total_claimed.checked_add(unlocked)?
             }
-        };
+        }
 
-        ctx.response_mut().add_message(self.create_transfer_msg(
-            self.config.token_denom.clone(),
-            &addr,
-            transfer_amount,
-        )?);
-
-        // Store the remainder of the rewards
-
-        let rewards_info = RewardsInfo {
+        let vesting_rewards = VestingRewards {
             amount: locked_amount,
             start: self.now(),
             duration: Duration::from_seconds(self.config.unlock_duration_seconds.into()),
@@ -120,7 +128,19 @@ impl State<'_> {
             last_claimed: self.now(),
         };
 
+        let rewards_info = RewardsInfo {
+            total_rewards,
+            total_claimed,
+            vesting_rewards: Some(vesting_rewards),
+        };
+
         REWARDS.save(ctx.storage, &addr, &rewards_info)?;
+
+        ctx.response_mut().add_message(self.create_transfer_msg(
+            self.config.token_denom.clone(),
+            &addr,
+            transfer_amount,
+        )?);
 
         ctx.response.add_event(GrantRewardsEvent {
             address: addr,
@@ -135,33 +155,40 @@ impl State<'_> {
 
         match rewards_info {
             None => bail!("There are no outstanding rewards for {}", address),
-            Some(mut rewards_info) => {
-                let unlocked = rewards_info.calculate_unlocked_rewards(self.now())?;
+            Some(mut rewards_info) => match rewards_info.vesting_rewards {
+                None => bail!("There are no outstanding rewards for {}", address),
+                Some(mut vesting_rewards) => {
+                    let unlocked = vesting_rewards.calculate_unlocked_rewards(self.now())?;
 
-                if unlocked.is_zero() {
-                    bail!("There are no outstanding rewards for {}", address);
-                }
+                    if unlocked.is_zero() {
+                        bail!("There are no outstanding rewards for {}", address);
+                    }
 
-                ctx.response_mut().add_message(self.create_transfer_msg(
-                    self.config.token_denom.clone(),
-                    &address,
-                    unlocked,
-                )?);
+                    rewards_info.total_claimed =
+                        rewards_info.total_claimed.checked_add(unlocked)?;
+                    vesting_rewards.claimed = vesting_rewards.claimed.checked_add(unlocked)?;
+                    vesting_rewards.last_claimed = self.now();
 
-                rewards_info.claimed = rewards_info.claimed.checked_add(unlocked)?;
-                rewards_info.last_claimed = self.now();
+                    if vesting_rewards.claimed >= vesting_rewards.amount {
+                        rewards_info.vesting_rewards = None;
+                    } else {
+                        rewards_info.vesting_rewards = Some(vesting_rewards);
+                    }
 
-                if rewards_info.claimed == rewards_info.amount {
-                    REWARDS.remove(ctx.storage, &address);
-                } else {
                     REWARDS.save(ctx.storage, &address, &rewards_info)?;
-                }
 
-                ctx.response.add_event(ClaimRewardsEvent {
-                    address,
-                    amount: unlocked,
-                });
-            }
+                    ctx.response_mut().add_message(self.create_transfer_msg(
+                        self.config.token_denom.clone(),
+                        &address,
+                        unlocked,
+                    )?);
+
+                    ctx.response.add_event(ClaimRewardsEvent {
+                        address,
+                        amount: unlocked,
+                    });
+                }
+            },
         };
 
         Ok(())

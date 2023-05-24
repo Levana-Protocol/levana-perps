@@ -29,7 +29,7 @@ use msg::contracts::factory::entry::{
     ShutdownStatus,
 };
 use msg::contracts::farming::entry::{
-    ExecuteMsg as FarmingExecuteMsg, QueryMsg as FarmingQueryMsg,
+    ExecuteMsg as FarmingExecuteMsg, LockdropBucketId, QueryMsg as FarmingQueryMsg,
 };
 use msg::contracts::farming::entry::{
     FarmerStats, OwnerExecuteMsg as FarmingOwnerExecuteMsg, StatusResp as FarmingStatusResp,
@@ -139,6 +139,8 @@ impl PerpsMarket {
                     // testing specifically for it.
                     crank_fee_charged: Some(Usd::zero()),
                     crank_fee_reward: Some(Usd::zero()),
+                    // Easier to just go back to the original default than update tests
+                    unstake_period_seconds: Some(60 * 60 * 24 * 21),
                     ..Default::default()
                 }),
                 price_admin: DEFAULT_MARKET.price_admin.clone().into(),
@@ -1207,6 +1209,30 @@ impl PerpsMarket {
             to_binary(msg)?,
         )
     }
+
+    pub fn exec_liquidity_token_send_from(
+        &self,
+        kind: LiquidityTokenKind,
+        wallet: &Addr,
+        owner: &Addr,
+        contract: &Addr,
+        amount: LpToken,
+        msg: &impl Serialize,
+    ) -> Result<AppResponse> {
+        let token_info = self.query_liquidity_token_info(kind)?;
+        self.exec_liquidity_token_send_from_raw(
+            kind,
+            wallet,
+            owner,
+            contract,
+            amount
+                .into_number()
+                .to_u128_with_precision(token_info.decimals as u32)
+                .context("couldnt convert liquidity token amount")?
+                .into(),
+            to_binary(msg)?,
+        )
+    }
     fn exec_liquidity_token_send_raw(
         &self,
         kind: LiquidityTokenKind,
@@ -1221,6 +1247,29 @@ impl PerpsMarket {
             from,
             &contract_addr,
             &Cw20ExecuteMsg::Send {
+                contract: contract.clone().into(),
+                amount,
+                msg,
+            },
+        )
+    }
+
+    fn exec_liquidity_token_send_from_raw(
+        &self,
+        kind: LiquidityTokenKind,
+        wallet: &Addr,
+        owner: &Addr,
+        contract: &Addr,
+        amount: Uint128,
+        msg: Binary,
+    ) -> Result<AppResponse> {
+        let contract_addr = self.query_liquidity_token_addr(kind)?;
+
+        self.app().cw20_exec(
+            wallet,
+            &contract_addr,
+            &Cw20ExecuteMsg::SendFrom {
+                owner: owner.into(),
                 contract: contract.clone().into(),
                 amount,
                 msg,
@@ -1262,6 +1311,32 @@ impl PerpsMarket {
             &Cw20ExecuteMsg::Transfer {
                 recipient: recipient.into(),
                 amount,
+            },
+        )
+    }
+    pub fn exec_liquidity_token_increase_allowance(
+        &self,
+        kind: LiquidityTokenKind,
+        wallet: &Addr,
+        spender: &Addr,
+        amount: Number,
+    ) -> Result<AppResponse> {
+        let contract_addr = self.query_liquidity_token_addr(kind)?;
+
+        let token_info = self.query_liquidity_token_info(kind)?;
+
+        let amount = amount
+            .to_u128_with_precision(token_info.decimals as u32)
+            .context("couldnt convert liquidity token amount")?
+            .into();
+
+        self.app().cw20_exec(
+            wallet,
+            &contract_addr,
+            &Cw20ExecuteMsg::IncreaseAllowance {
+                spender: spender.into(),
+                amount,
+                expires: None,
             },
         )
     }
@@ -1424,6 +1499,32 @@ impl PerpsMarket {
         self.exec_farming(
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
             &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::StartLaunchPeriod { start }),
+        )
+    }
+    pub fn exec_farming_lockdrop_deposit(
+        &self,
+        wallet: &Addr,
+        amount: NonZero<Collateral>,
+        bucket_id: LockdropBucketId,
+    ) -> Result<AppResponse> {
+        let msg = self.token.into_execute_msg(
+            &self.farming_addr,
+            amount.raw(),
+            &FarmingExecuteMsg::LockdropDeposit { bucket_id },
+        )?;
+
+        self.exec_wasm_msg(wallet, msg)
+    }
+
+    pub fn exec_farming_lockdrop_withdraw(
+        &self,
+        wallet: &Addr,
+        amount: NonZero<Collateral>,
+        bucket_id: LockdropBucketId,
+    ) -> Result<AppResponse> {
+        self.exec_farming(
+            wallet,
+            &FarmingExecuteMsg::LockdropWithdraw { amount, bucket_id },
         )
     }
 

@@ -11,6 +11,7 @@ use chrono::{DateTime, Duration, Utc};
 use cosmos::Address;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
+use perps_exes::build_version;
 use perps_exes::{
     config::{TaskConfig, WatcherConfig},
     prelude::MarketId,
@@ -36,6 +37,7 @@ pub(crate) enum TaskLabel {
     Liquidity,
     Utilization,
     Balance,
+    UltraCrank { index: usize },
     Trader { index: usize },
 }
 
@@ -43,6 +45,7 @@ impl Display for TaskLabel {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             TaskLabel::Trader { index } => write!(f, "Trader #{index}"),
+            TaskLabel::UltraCrank { index } => write!(f, "Ultra crank #{index}"),
             x => write!(f, "{x:?}"),
         }
     }
@@ -69,10 +72,22 @@ pub(crate) struct TaskStatuses {
 
 #[derive(Clone)]
 pub(crate) struct TaskStatus {
-    last_result: Arc<Result<String, String>>,
-    last_retry_error: Arc<Option<String>>,
+    last_result: TaskResult,
+    last_retry_error: Option<TaskError>,
     current_run_started: Option<DateTime<Utc>>,
     out_of_date: Duration,
+}
+
+#[derive(Clone)]
+pub(crate) struct TaskResult {
+    pub(crate) value: Arc<Result<String, String>>,
+    pub(crate) updated: DateTime<Utc>,
+}
+
+#[derive(Clone)]
+pub(crate) struct TaskError {
+    pub(crate) value: Arc<String>,
+    pub(crate) updated: DateTime<Utc>,
 }
 
 impl TaskStatus {
@@ -93,6 +108,7 @@ impl TaskLabel {
             TaskLabel::Balance => config.balance,
             TaskLabel::Stale => config.stale,
             TaskLabel::GasCheck => config.gas_check,
+            TaskLabel::UltraCrank { index: _ } => config.ultra_crank,
             TaskLabel::Liquidity => config.liquidity,
             TaskLabel::Trader { index: _ } => config.trader,
             TaskLabel::Utilization => config.utilization,
@@ -111,6 +127,7 @@ impl TaskLabel {
             TaskLabel::Price => true,
             TaskLabel::TrackBalance => true,
             TaskLabel::GasCheck => true,
+            TaskLabel::UltraCrank { index: _ } => false,
             TaskLabel::Liquidity => false,
             TaskLabel::Utilization => false,
             TaskLabel::Balance => false,
@@ -133,6 +150,7 @@ impl TaskLabel {
             TaskLabel::Trader { index } => format!("trader-{index}").into(),
             TaskLabel::Stale => "stale".into(),
             TaskLabel::Stats => "stats".into(),
+            TaskLabel::UltraCrank { index } => format!("ultra-crank-{index}").into(),
         }
     }
 }
@@ -171,15 +189,18 @@ impl AppBuilder {
         self.watcher.set.spawn(task);
     }
 
-    pub(crate) fn watch_periodic<T>(&mut self, label: TaskLabel, task: T) -> Result<()>
+    pub(crate) fn watch_periodic<T>(&mut self, label: TaskLabel, mut task: T) -> Result<()>
     where
         T: WatchedTask,
     {
         let config = label.task_config_for(&self.app.config.watcher);
         let out_of_date = chrono::Duration::seconds(config.out_of_date.into());
         let task_status = Arc::new(RwLock::new(TaskStatus {
-            last_result: Ok("Task has not yet completed a single run".to_owned()).into(),
-            last_retry_error: None.into(),
+            last_result: TaskResult {
+                value: Ok("Task has not yet completed a single run".to_owned()).into(),
+                updated: Utc::now(),
+            },
+            last_retry_error: None,
             current_run_started: None,
             out_of_date,
         }));
@@ -218,8 +239,11 @@ impl AppBuilder {
                     }) => {
                         log::info!("{label}: Success! {message}");
                         *task_status.write() = TaskStatus {
-                            last_result: Ok(message).into(),
-                            last_retry_error: None.into(),
+                            last_result: TaskResult {
+                                value: Ok(message).into(),
+                                updated: Utc::now(),
+                            },
+                            last_retry_error: None,
                             current_run_started: None,
                             out_of_date,
                         };
@@ -240,8 +264,11 @@ impl AppBuilder {
                         if retries >= app.config.watcher.retries {
                             retries = 0;
                             *task_status.write() = TaskStatus {
-                                last_result: Err(format!("{err:?}")).into(),
-                                last_retry_error: None.into(),
+                                last_result: TaskResult {
+                                    value: Err(format!("{err:?}")).into(),
+                                    updated: Utc::now(),
+                                },
+                                last_retry_error: None,
                                 current_run_started: None,
                                 out_of_date,
                             };
@@ -251,7 +278,10 @@ impl AppBuilder {
                                 let old = &*guard;
                                 *guard = TaskStatus {
                                     last_result: old.last_result.clone(),
-                                    last_retry_error: Some(format!("{err:?}")).into(),
+                                    last_retry_error: Some(TaskError {
+                                        value: format!("{err:?}").into(),
+                                        updated: Utc::now(),
+                                    }),
                                     current_run_started: None,
                                     out_of_date,
                                 };
@@ -278,7 +308,7 @@ pub(crate) struct WatchedTaskOutput {
 
 #[async_trait]
 pub(crate) trait WatchedTask: Send + Sync + 'static {
-    async fn run_single(&self, app: &App, heartbeat: Heartbeat) -> Result<WatchedTaskOutput>;
+    async fn run_single(&mut self, app: &App, heartbeat: Heartbeat) -> Result<WatchedTaskOutput>;
 }
 
 pub(crate) struct Heartbeat {
@@ -301,7 +331,7 @@ impl Heartbeat {
 #[async_trait]
 pub(crate) trait WatchedTaskPerMarket: Send + Sync + 'static {
     async fn run_single_market(
-        &self,
+        &mut self,
         app: &App,
         factory_info: &FactoryInfo,
         market: &MarketId,
@@ -311,7 +341,7 @@ pub(crate) trait WatchedTaskPerMarket: Send + Sync + 'static {
 
 #[async_trait]
 impl<T: WatchedTaskPerMarket> WatchedTask for T {
-    async fn run_single(&self, app: &App, heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
+    async fn run_single(&mut self, app: &App, heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
         let factory = app.get_factory_info();
         let mut successes = vec![];
         let mut errors = vec![];
@@ -322,10 +352,10 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
                     skip_delay,
                     message,
                 }) => {
-                    successes.push(format!("{market}: {message}"));
+                    successes.push(format!("{market} {addr}: {message}"));
                     total_skip_delay = skip_delay || total_skip_delay;
                 }
-                Err(e) => errors.push(format!("{market}: {e:?}")),
+                Err(e) => errors.push(format!("{market} {addr}: {e:?}")),
             }
             heartbeat.reset_too_old();
         }
@@ -369,16 +399,38 @@ impl TaskStatuses {
         all_statuses
     }
 
-    pub(crate) fn all_statuses_html(&self) -> axum::response::Response {
+    pub(crate) fn all_statuses_html(&self, app: &App) -> axum::response::Response {
         use askama::Template;
         #[derive(Template)]
         #[template(path = "status.html")]
-        struct MyTemplate {
+        struct MyTemplate<'a> {
             statuses: Vec<RenderedStatus>,
+            family: &'a str,
+            build_version: &'a str,
+            grpc: &'a str,
+            grpc_height: u64,
+            rpc: &'a str,
+            rpc_height: u64,
+            live_since: DateTime<Utc>,
+            now: DateTime<Utc>,
         }
         let statuses = self.all_statuses();
         let alert = statuses.iter().any(|x| x.short.alert());
-        let mut res = MyTemplate { statuses }.render().unwrap().into_response();
+        let factory = app.get_factory_info();
+        let mut res = MyTemplate {
+            statuses,
+            family: &app.config.contract_family,
+            build_version: build_version(),
+            grpc: &app.cosmos.get_first_builder().grpc_url,
+            grpc_height: factory.rpc.grpc_height,
+            rpc: &factory.rpc.endpoint,
+            rpc_height: factory.rpc.rpc_height,
+            live_since: app.live_since,
+            now: Utc::now(),
+        }
+        .render()
+        .unwrap()
+        .into_response();
         res.headers_mut().append(
             CONTENT_TYPE,
             HeaderValue::from_static("text/html; charset=utf-8"),
@@ -425,7 +477,7 @@ enum ShortStatus {
 
 impl TaskStatus {
     fn short(&self, label: TaskLabel) -> ShortStatus {
-        match self.last_result.as_ref() {
+        match self.last_result.value.as_ref() {
             Ok(_) => {
                 if self.is_out_of_date() {
                     if label.triggers_alert() {
@@ -502,7 +554,7 @@ impl ResponseBuilder {
         }
 
         writeln!(&mut self.buffer)?;
-        match last_result.as_ref() {
+        match last_result.value.as_ref() {
             Ok(msg) => {
                 writeln!(&mut self.buffer, "{msg}")?;
             }
@@ -512,11 +564,12 @@ impl ResponseBuilder {
         }
         writeln!(&mut self.buffer)?;
 
-        if let Some(err) = &*last_retry_error {
+        if let Some(err) = last_retry_error {
             writeln!(&mut self.buffer)?;
             writeln!(
                 &mut self.buffer,
-                "Currently retrying, last attempt failed with:\n\n{err:?}"
+                "Currently retrying, last attempt failed with:\n\n{}",
+                err.value
             )?;
             writeln!(&mut self.buffer)?;
         }
@@ -531,5 +584,53 @@ impl ResponseBuilder {
             *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
         }
         res
+    }
+}
+
+impl TaskResult {
+    fn since(&self) -> Since {
+        Since(self.updated)
+    }
+}
+
+impl TaskError {
+    fn since(&self) -> Since {
+        Since(self.updated)
+    }
+}
+
+struct Since(DateTime<Utc>);
+
+impl Display for Since {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let duration = Utc::now().signed_duration_since(self.0);
+        let secs = duration.num_seconds();
+
+        match secs.cmp(&0) {
+            std::cmp::Ordering::Less => write!(f, "{}", self.0),
+            std::cmp::Ordering::Equal => write!(f, "just now ({})", self.0),
+            std::cmp::Ordering::Greater => {
+                let minutes = secs / 60;
+                let secs = secs % 60;
+                let hours = minutes / 60;
+                let minutes = minutes % 60;
+                let days = hours / 24;
+                let hours = hours % 24;
+
+                let mut need_space = false;
+                for (number, letter) in [(days, 'd'), (hours, 'h'), (minutes, 'm'), (secs, 's')] {
+                    if number > 0 {
+                        if need_space {
+                            write!(f, " {number}{letter}")?;
+                        } else {
+                            need_space = true;
+                            write!(f, "{number}{letter}")?;
+                        }
+                    }
+                }
+
+                write!(f, " ({})", self.0)
+            }
+        }
     }
 }

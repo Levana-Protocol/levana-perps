@@ -177,3 +177,42 @@ fn test_update_config() {
         "50".parse::<Decimal256>().unwrap()
     )
 }
+
+#[test]
+fn test_subsequent_grants() {
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let app = &mut *app_cell.borrow_mut();
+    let recipient = Addr::unchecked("recipient");
+
+    app.setup_rewards_contract();
+
+    // Initial grant
+    app.grant_rewards(&recipient, "100").unwrap();
+
+    // Jump ahead to after rewards have fully unlocked and claim rewards
+    let change = BlockInfoChange::from_nanos(100 * NANOS_PER_SECOND);
+    app.set_block_info(change);
+    app.claim_rewards(&recipient).unwrap();
+
+    // Subsequent grant
+    app.grant_rewards(&recipient, "100").unwrap();
+
+    // Jump ahead 1/3 of the unlocking period (defaulted to 60 seconds) and claim
+    let change = BlockInfoChange::from_nanos(20 * NANOS_PER_SECOND);
+    app.set_block_info(change);
+    app.claim_rewards(&recipient).unwrap();
+
+    // Unlock some more rewards and assert
+    let change = BlockInfoChange::from_nanos(20 * NANOS_PER_SECOND);
+    app.set_block_info(change);
+
+    let res = app
+        .query_rewards_info(&recipient)
+        .unwrap()
+        .expect("expected rewards info");
+
+    assert_eq!(res.total_rewards, Decimal256::from_str("200").unwrap());
+    assert_eq!(res.total_claimed, Decimal256::from_str("150").unwrap());
+    assert_eq!(res.locked, Decimal256::from_str("25").unwrap());
+    assert_eq!(res.unlocked, Decimal256::from_str("25").unwrap());
+}

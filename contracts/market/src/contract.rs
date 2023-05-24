@@ -7,7 +7,7 @@ use crate::state::{
     fees::fees_init,
     liquidity::{liquidity_init, yield_init},
     meta::meta_init,
-    position::{get_position, positions_init, ActionType, PositionOrId},
+    position::{get_position, positions_init, PositionOrId},
     set_factory_addr,
     token::token_init,
 };
@@ -20,7 +20,7 @@ use cw2::{get_contract_version, set_contract_version};
 use msg::{
     contracts::market::{
         entry::{DeltaNeutralityFeeResp, InstantiateMsg, MigrateMsg},
-        position::{PositionId, PositionOrPendingClose, PositionsResp},
+        position::{events::PositionSaveReason, PositionId, PositionOrPendingClose, PositionsResp},
     },
     shutdown::ShutdownImpact,
 };
@@ -77,7 +77,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     // update borrow fee rate gradually
     state
         .accumulate_borrow_fee_rate(&mut ctx, state.now())
-        .context("accumulate_borrow_fee_rate failed")?;
+        .map_err(|e| anyhow::anyhow!("accumulate_borrow_fee_rate failed: {e:?}"))?;
 
     fn handle_update_position_shared(
         state: &State,
@@ -109,7 +109,14 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         let pos = get_position(ctx.storage, id)?;
 
         let starts_at = pos.liquifunded_at;
-        state.position_liquifund_store(ctx, pos, starts_at, now, false, ActionType::User)?;
+        state.position_liquifund_store(
+            ctx,
+            pos,
+            starts_at,
+            now,
+            false,
+            PositionSaveReason::Update,
+        )?;
 
         Ok(())
     }

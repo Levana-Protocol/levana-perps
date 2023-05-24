@@ -80,6 +80,36 @@ pub struct Config {
     /// liquifundings arbitrarily to smooth out spikes in traffic.
     #[serde(default = "defaults::liquifunding_delay_fuzz_seconds")]
     pub liquifunding_delay_fuzz_seconds: u32,
+    /// The maximum amount of liquidity that can be deposited into the market.
+    #[serde(default)]
+    pub max_liquidity: MaxLiquidity,
+    /// Disable the ability to proxy CW721 execution messages for positions.
+    /// Even if this is true, queries will still work as usual.
+    #[serde(default)]
+    pub disable_position_nft_exec: bool,
+}
+
+/// Maximum liquidity for deposit.
+///
+/// Note that this limit can be exceeded due to changes in collateral asset
+/// price or impairment.
+#[cw_serde]
+pub enum MaxLiquidity {
+    /// No bounds on how much liquidity can be deposited.
+    Unlimited {},
+    /// Only allow the given amount in USD.
+    ///
+    /// The exchange rate at time of deposit will be used.
+    Usd {
+        /// Amount in USD
+        amount: NonZero<Usd>,
+    },
+}
+
+impl Default for MaxLiquidity {
+    fn default() -> Self {
+        MaxLiquidity::Unlimited {}
+    }
 }
 
 impl Default for Config {
@@ -100,7 +130,7 @@ impl Default for Config {
             price_update_too_old_seconds: 60 * 30,
             staleness_seconds: 60 * 60 * 2,
             protocol_tax: "0.3".parse().unwrap(),
-            unstake_period_seconds: 60 * 60 * 24 * 21, // 21 days
+            unstake_period_seconds: 60 * 60 * 24 * 45, // 45 days
             target_utilization: "0.9".parse().unwrap(),
             // Try to realize the bias over a 3 day period.
             //
@@ -119,6 +149,8 @@ impl Default for Config {
             minimum_deposit_usd: "5".parse().unwrap(),
             unpend_limit: 50,
             liquifunding_delay_fuzz_seconds: 60 * 60 * 4,
+            max_liquidity: MaxLiquidity::Unlimited {},
+            disable_position_nft_exec: false,
         }
     }
 }
@@ -311,6 +343,8 @@ pub struct ConfigUpdate {
     pub minimum_deposit_usd: Option<Usd>,
     pub unpend_limit: Option<u32>,
     pub liquifunding_delay_fuzz_seconds: Option<u32>,
+    pub max_liquidity: Option<MaxLiquidity>,
+    pub disable_position_nft_exec: Option<bool>,
 }
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for ConfigUpdate {
@@ -344,6 +378,8 @@ impl<'a> arbitrary::Arbitrary<'a> for ConfigUpdate {
             minimum_deposit_usd: u.arbitrary()?,
             unpend_limit: None,
             liquifunding_delay_fuzz_seconds: None,
+            max_liquidity: None,
+            disable_position_nft_exec: None,
         })
     }
 }
@@ -379,6 +415,8 @@ impl From<Config> for ConfigUpdate {
             minimum_deposit_usd: Some(src.minimum_deposit_usd),
             unpend_limit: Some(src.unpend_limit),
             liquifunding_delay_fuzz_seconds: Some(src.liquifunding_delay_fuzz_seconds),
+            max_liquidity: Some(src.max_liquidity),
+            disable_position_nft_exec: Some(src.disable_position_nft_exec),
         }
     }
 }

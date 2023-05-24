@@ -3,11 +3,11 @@ use std::sync::Arc;
 use anyhow::Result;
 use axum::async_trait;
 use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, HasAddress, TxBuilder, Wallet};
-use msg::prelude::ErrorId;
+use msg::prelude::{ErrorId, PerpError};
 use rust_decimal::Decimal;
+use serde_json::de::StrRead;
 
 use crate::{
-    endpoints::faucet::parse_perp_error,
     util::{
         markets::{get_markets, Market, PriceApi},
         oracle::Pyth,
@@ -31,7 +31,7 @@ impl AppBuilder {
 
 #[async_trait]
 impl WatchedTask for Worker {
-    async fn run_single(&self, app: &App, _heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
+    async fn run_single(&mut self, app: &App, _heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
         app.single_update(&self.wallet).await
     }
 }
@@ -205,5 +205,38 @@ impl App {
             .await?;
 
         Ok(vec![oracle_msg, bridge_msg])
+    }
+}
+
+// todo - this can be moved somewhere more general
+fn parse_perp_error(err: &str) -> Option<PerpError<serde_json::Value>> {
+    // This weird parsing to (1) strip off the content before the JSON body
+    // itself and (2) ignore the trailing data after the JSON data
+    let start = err.find(" {")?;
+    let err = &err[start..];
+    serde_json::Deserializer::new(StrRead::new(err))
+        .into_iter()
+        .next()?
+        .ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use msg::prelude::{ErrorDomain, ErrorId, PerpError};
+
+    use super::*;
+
+    #[test]
+    fn test_parse_perp_error() {
+        const INPUT: &str = "failed to execute message; message index: 0: {\n  \"id\": \"exceeded\",\n  \"domain\": \"faucet\",\n  \"description\": \"exceeded tap limit, wait 284911 more seconds\",\n  \"data\": {\n    \"wait_secs\": \"284911\"\n  }\n}: execute wasm contract failed [CosmWasm/wasmd@v0.29.2/x/wasm/keeper/keeper.go:425] With gas wanted: '0' and gas used: '115538' ";
+        let expected = PerpError {
+            id: ErrorId::Exceeded,
+            domain: ErrorDomain::Faucet,
+            description: "exceeded tap limit, wait 284911 more seconds".to_owned(),
+            data: None,
+        };
+        let mut actual = parse_perp_error(INPUT).unwrap();
+        actual.data = None;
+        assert_eq!(actual, expected);
     }
 }

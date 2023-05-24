@@ -1,5 +1,6 @@
-use crate::prelude::*;
 use crate::state::rewards::LockdropConfig;
+use crate::{prelude::*, state::lockdrop::LockdropBuckets};
+
 use semver::Version;
 
 // version info for migration info
@@ -11,34 +12,27 @@ pub fn instantiate(
     deps: DepsMut,
     env: Env,
     _info: MessageInfo,
-    InstantiateMsg {
-        owner,
-        factory,
-        market_id,
-        lockdrop_buckets,
-        lockdrop_lvn_unlock_seconds,
-        lockdrop_immediate_unlock_ratio,
-        lvn_token_denom,
-        // FIXME remove the ..
-        ..
-    }: InstantiateMsg,
+    msg: InstantiateMsg,
 ) -> Result<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    let factory = factory.validate(deps.api)?;
-    MarketInfo::save(deps.querier, deps.storage, factory, market_id)?;
+    let factory = msg.factory.validate(deps.api)?;
+    MarketInfo::save(deps.querier, deps.storage, factory, msg.market_id.clone())?;
+    LockdropBuckets::init(deps.storage, &msg)?;
 
     let (state, mut ctx) = StateContext::new(deps, env)?;
-    let admin = owner.validate(state.api)?;
+    let admin = msg.owner.validate(state.api)?;
     state.set_admin(&mut ctx, &admin)?;
-    state.save_lvn_token(&mut ctx, lvn_token_denom)?;
+    state.save_lvn_token(&mut ctx, msg.lvn_token_denom)?;
     state.rewards_init(ctx.storage)?;
     state.save_lockdrop_config(
         ctx.storage,
         LockdropConfig {
-            lockdrop_buckets,
-            lockdrop_lvn_unlock_seconds: Duration::from_seconds(lockdrop_lvn_unlock_seconds as u64),
-            lockdrop_immediate_unlock_ratio,
+            lockdrop_buckets: msg.lockdrop_buckets,
+            lockdrop_lvn_unlock_seconds: Duration::from_seconds(
+                msg.lockdrop_lvn_unlock_seconds as u64,
+            ),
+            lockdrop_immediate_unlock_ratio: msg.lockdrop_immediate_unlock_ratio,
         },
     )?;
 

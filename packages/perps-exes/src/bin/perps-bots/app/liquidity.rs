@@ -28,7 +28,7 @@ impl AppBuilder {
 #[async_trait]
 impl WatchedTaskPerMarket for Liquidity {
     async fn run_single_market(
-        &self,
+        &mut self,
         _app: &App,
         factory: &FactoryInfo,
         market: &MarketId,

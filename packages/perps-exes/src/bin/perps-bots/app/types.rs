@@ -2,6 +2,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use anyhow::Result;
+use chrono::DateTime;
+use chrono::Utc;
 use cosmos::Address;
 use cosmos::Cosmos;
 use cosmos::CosmosNetwork;
@@ -29,6 +31,7 @@ pub(crate) struct App {
     pub(crate) client: Client,
     pub(crate) bind: SocketAddr,
     pub(crate) statuses: TaskStatuses,
+    pub(crate) live_since: DateTime<Utc>,
 }
 
 #[derive(serde::Serialize)]
@@ -37,6 +40,7 @@ pub(crate) struct FrontendInfo {
     network: CosmosNetwork,
     price_api: &'static str,
     explorer: &'static str,
+    maintenance: Option<String>,
 }
 
 /// Helper data structure for building up an application.
@@ -47,17 +51,22 @@ pub(crate) struct AppBuilder {
 }
 
 impl Opt {
-    pub(crate) async fn into_app_builder(self) -> Result<AppBuilder> {
-        let config = self.get_bot_config()?;
+    async fn make_cosmos(&self, config: &BotConfig) -> Result<Cosmos> {
         let mut builder = config.network.builder();
         if let Some(grpc) = &self.grpc_url {
             builder.grpc_url = grpc.clone();
         }
         if let Some(gas_multiplier) = config.gas_multiplier {
-            builder.set_gas_multiplier(gas_multiplier);
+            builder.config.gas_estimate_multiplier = gas_multiplier;
         }
-        let cosmos = builder.build().await?;
+        builder.set_referer_header("https://bots.levana.exchange/".to_owned());
+        builder.build().await
+    }
+
+    pub(crate) async fn into_app_builder(self) -> Result<AppBuilder> {
+        let config = self.get_bot_config()?;
         let client = Client::builder().user_agent("perps-bots").build()?;
+        let cosmos = self.make_cosmos(&config).await?;
 
         let faucet_bot_wallet = self.get_faucet_bot_wallet(cosmos.get_address_type())?;
         let gas_wallet = self.get_gas_wallet(cosmos.get_address_type())?;
@@ -66,6 +75,7 @@ impl Opt {
             network: config.network,
             price_api: config.price_api,
             explorer: config.explorer,
+            maintenance: self.maintenance.filter(|s| !s.is_empty()),
         };
 
         let factory = get_factory_info(&cosmos, &config, &client).await?;
@@ -84,6 +94,7 @@ impl Opt {
             client,
             bind: self.bind,
             statuses: TaskStatuses::default(),
+            live_since: Utc::now(),
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {

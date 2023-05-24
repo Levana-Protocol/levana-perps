@@ -5,7 +5,8 @@ use msg::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
 use msg::contracts::market::entry::{PositionActionKind, SlippageAssert};
 use msg::contracts::market::fees::events::FeeSource;
 use msg::contracts::market::position::events::{
-    calculate_position_collaterals, PositionAttributes, PositionOpenEvent, PositionTradingFee,
+    calculate_position_collaterals, PositionAttributes, PositionOpenEvent, PositionSaveReason,
+    PositionTradingFee,
 };
 use msg::contracts::market::position::{
     CollateralAndUsd, LiquidationMargin, SignedCollateralAndUsd,
@@ -154,6 +155,9 @@ impl State<'_> {
 
         self.check_unlocked_liquidity(&self.load_liquidity_stats(store)?, pos.counter_collateral)?;
 
+        pos.liquidation_margin =
+            pos.liquidation_margin(price_point.price_notional, &price_point, &self.config)?;
+
         // Check for sufficient margin
         perp_ensure!(
             pos.active_collateral.raw() >= pos.liquidation_margin.total(),
@@ -191,6 +195,7 @@ impl State<'_> {
             delta_neutrality_fee,
             open_interest,
         }: ValidatedPosition,
+        is_market: bool,
     ) -> Result<PositionId> {
         self.trade_history_add_volume(ctx, &pos.owner, trade_volume_usd)?;
         open_interest.store(ctx)?;
@@ -220,7 +225,11 @@ impl State<'_> {
             &price_point,
             false,
             true,
-            super::ActionType::User,
+            if is_market {
+                PositionSaveReason::OpenMarket
+            } else {
+                PositionSaveReason::ExecuteLimitOrder
+            },
         )?;
 
         // mint the nft
@@ -308,6 +317,6 @@ impl State<'_> {
             },
         )?;
 
-        self.open_validated_position(ctx, validated_position)
+        self.open_validated_position(ctx, validated_position, true)
     }
 }

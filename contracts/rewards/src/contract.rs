@@ -71,21 +71,30 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             let rewards_info = state.load_rewards(store, &addr)?;
 
             let res = match rewards_info {
-                None => None,
-                Some(rewards_info) => {
-                    let unlocked = rewards_info.calculate_unlocked_rewards(state.now())?;
-                    let locked = rewards_info
-                        .amount
-                        .checked_sub(unlocked)?
-                        .checked_sub(rewards_info.claimed)?;
+                None => RewardsInfoResp::default(),
+                Some(rewards_info) => match rewards_info.vesting_rewards {
+                    None => RewardsInfoResp {
+                        total_rewards: rewards_info.total_rewards,
+                        total_claimed: rewards_info.total_claimed,
+                        ..RewardsInfoResp::default()
+                    },
+                    Some(vesting_rewards) => {
+                        let unlocked = vesting_rewards.calculate_unlocked_rewards(state.now())?;
+                        let locked = vesting_rewards
+                            .amount
+                            .checked_sub(unlocked)?
+                            .checked_sub(vesting_rewards.claimed)?;
 
-                    Some(RewardsInfoResp {
-                        locked,
-                        unlocked,
-                        start: rewards_info.start,
-                        end: rewards_info.start + rewards_info.duration,
-                    })
-                }
+                        RewardsInfoResp {
+                            locked,
+                            unlocked,
+                            total_rewards: rewards_info.total_rewards,
+                            total_claimed: rewards_info.total_claimed,
+                            start: Some(vesting_rewards.start),
+                            end: Some(vesting_rewards.start + vesting_rewards.duration),
+                        }
+                    }
+                },
             };
 
             res.query_result()

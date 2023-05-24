@@ -1,6 +1,7 @@
 // re-exporting
 pub(crate) mod all_contracts;
 pub(crate) mod auth;
+pub(crate) mod code_ids;
 pub(crate) mod label;
 pub(crate) mod liquidity_token;
 pub(crate) mod market;

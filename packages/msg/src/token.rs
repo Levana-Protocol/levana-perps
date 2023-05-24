@@ -263,7 +263,6 @@ impl Token {
             })),
         }
     }
-
     /// perps-specific use-case for executing a market message with funds
     pub fn into_market_execute_msg(
         &self,
@@ -271,15 +270,25 @@ impl Token {
         amount: Collateral,
         execute_msg: MarketExecuteMsg,
     ) -> Result<WasmMsg> {
+        self.into_execute_msg(market_addr, amount, &execute_msg)
+    }
+
+    /// helper to create an execute message with funds
+    pub fn into_execute_msg<T: Serialize + std::fmt::Debug>(
+        &self,
+        contract_addr: &Addr,
+        amount: Collateral,
+        execute_msg: &T,
+    ) -> Result<WasmMsg> {
         match self.clone() {
             Self::Cw20 { addr, .. } => {
                 let msg = self
-                    .into_cw20_execute_send_msg(market_addr, amount, &execute_msg)
+                    .into_cw20_execute_send_msg(contract_addr, amount, &execute_msg)
                     .map_err(|err| {
                         perp_anyhow!(
                             ErrorId::Conversion,
                             ErrorDomain::Wallet,
-                            "{} (market exec inner msg: {:?})!",
+                            "{} (exec inner msg: {:?})!",
                             err.downcast_ref::<PerpError>().unwrap().description,
                             execute_msg
                         )
@@ -295,7 +304,7 @@ impl Token {
                         // no funds, so just send the execute_msg directly
                         // to the contract
                         Ok(WasmMsg::Execute {
-                            contract_addr: market_addr.to_string(),
+                            contract_addr: contract_addr.to_string(),
                             msg: to_binary(&execute_msg)?,
                             funds: Vec::new(),
                         })
@@ -309,7 +318,7 @@ impl Token {
                     perp_anyhow!(
                         ErrorId::Conversion,
                         ErrorDomain::Wallet,
-                        "{} (market exec inner msg: {:?})!",
+                        "{} (exec inner msg: {:?})!",
                         err.downcast_ref::<PerpError>().unwrap().description,
                         execute_msg
                     )
@@ -325,7 +334,7 @@ impl Token {
                 };
 
                 Ok(WasmMsg::Execute {
-                    contract_addr: market_addr.to_string(),
+                    contract_addr: contract_addr.to_string(),
                     msg: execute_msg,
                     funds,
                 })

@@ -1,55 +1,15 @@
-use cosmwasm_std::{from_binary, BankMsg, CosmosMsg};
+use cosmwasm_std::{BankMsg, CosmosMsg};
 use msg::token::Token;
 
-use crate::prelude::*;
+use crate::{prelude::*, state::funds::Received};
 
 #[entry_point]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
-    let (msg, received, sender) = match msg {
-        ExecuteMsg::Receive {
-            sender,
-            amount,
-            msg,
-        } => {
-            let sender = sender.validate(state.api)?;
-            let get_lp_token = || LpToken::from_u128(amount.u128());
-            let msg = from_binary(&msg)?;
-            let received = Some(if info.sender == state.market_info.lp_addr {
-                Received::Lp(get_lp_token()?)
-            } else if info.sender == state.market_info.xlp_addr {
-                Received::Xlp(get_lp_token()?)
-            } else {
-                match &state.market_info.collateral {
-                    Token::Cw20 {
-                        addr,
-                        decimal_places: _,
-                    } => {
-                        if addr.as_str() == info.sender.as_str() {
-                            Received::Collateral(Collateral::from_decimal256(
-                                state.market_info.collateral.from_u128(amount.into())?,
-                            ))
-                        } else {
-                            anyhow::bail!("Invalid Receive called from contract {}", info.sender)
-                        }
-                    }
-                    Token::Native { .. } => anyhow::bail!(
-                        "Invalid Receive for native collateral market from contract {}",
-                        info.sender
-                    ),
-                }
-            });
+    let (sender, received, msg) = state.funds_received(info, msg)?;
 
-            (msg, received, sender)
-        }
-        msg => {
-            let received = None;
-            (msg, received, info.sender)
-        }
-    };
-
-    state.validate_period_msg(ctx.storage, &msg)?;
+    state.validate_period_msg(ctx.storage, &sender, &msg)?;
 
     match msg {
         ExecuteMsg::Owner(owner_msg) => {
@@ -77,8 +37,16 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             }
         }
         ExecuteMsg::Receive { .. } => anyhow::bail!("Cannot have double-wrapped Receive"),
-        ExecuteMsg::LockdropDeposit { .. } => todo!(),
-        ExecuteMsg::LockdropWithdraw { .. } => todo!(),
+        ExecuteMsg::LockdropDeposit { bucket_id } => {
+            if let Some(Received::Collateral(amount)) = received {
+                state.lockdrop_deposit(&mut ctx, sender, bucket_id, amount)?;
+            } else {
+                anyhow::bail!("Must send collateral for a lockdrop deposit");
+            }
+        }
+        ExecuteMsg::LockdropWithdraw { bucket_id, amount } => {
+            state.lockdrop_withdraw(&mut ctx, sender, bucket_id, amount)?;
+        }
         ExecuteMsg::Deposit {} => {
             let received = received.context("Must send collateral, LP, or xLP for a deposit")?;
             state.deposit(&mut ctx, &sender, received)?;
@@ -90,13 +58,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     }
 
     Ok(ctx.response.into_response())
-}
-
-#[derive(Debug, Clone, Copy)]
-enum Received {
-    Collateral(Collateral),
-    Lp(LpToken),
-    Xlp(LpToken),
 }
 
 impl State<'_> {

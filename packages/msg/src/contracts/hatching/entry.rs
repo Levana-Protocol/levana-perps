@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use shared::storage::RawAddr;
 
-use super::HatchStatus;
+use super::{HatchStatus, NftHatchInfo, ProfileInfo};
 
 /// Instantiate message
 #[cw_serde]
@@ -38,6 +38,20 @@ pub enum QueryMsg {
     #[returns(super::config::Config)]
     Config {},
 
+    /// Query what a hatch would look like
+    /// * returns [PotentialHatchInfo]
+    #[returns(PotentialHatchInfo)]
+    PotentialHatchInfo {
+        /// The owner
+        owner: RawAddr,
+        /// list of egg nft token ids to hatch
+        eggs: Vec<String>,
+        /// list of dust nft token ids to hatch
+        dusts: Vec<String>,
+        /// whether to also "hatch" the profile, i.e. drain the spirit level into lvn
+        profile: bool,
+    },
+
     /// * returns [MaybeHatchStatusResp]
     #[returns(MaybeHatchStatusResp)]
     OldestHatchStatus { details: bool },
@@ -69,6 +83,13 @@ impl From<(u64, HatchStatus)> for HatchStatusResp {
             status,
         }
     }
+}
+
+#[cw_serde]
+pub struct PotentialHatchInfo {
+    pub eggs: Vec<NftHatchInfo>,
+    pub dusts: Vec<NftHatchInfo>,
+    pub profile: Option<ProfileInfo>,
 }
 
 /// Placeholder migration message

@@ -24,7 +24,8 @@ pub(crate) struct BotConfig {
     pub(crate) contract_family: String,
     pub(crate) network: CosmosNetwork,
     pub(crate) price_wallet: Option<Arc<Wallet>>,
-    pub(crate) crank_wallet: Wallet,
+    pub(crate) crank_wallet: Option<Wallet>,
+    pub(crate) ultra_crank_wallets: Vec<Wallet>,
     pub(crate) wallet_manager: WalletManager,
     pub(crate) liquidity: bool,
     pub(crate) utilization: bool,
@@ -37,6 +38,7 @@ pub(crate) struct BotConfig {
     pub(crate) gas_multiplier: Option<f64>,
     pub(crate) rpc_nodes: Vec<Arc<String>>,
     pub(crate) ignore_stale: bool,
+    pub(crate) seconds_till_ultra: u32,
 }
 
 impl Opt {
@@ -73,7 +75,16 @@ impl Opt {
             explorer,
             contract_family: self.deployment.clone(),
             network,
-            crank_wallet: self.get_crank_wallet(network.get_address_type(), &wallet_phrase_name)?,
+            crank_wallet: if partial.crank {
+                Some(self.get_crank_wallet(network.get_address_type(), &wallet_phrase_name, 0)?)
+            } else {
+                None
+            },
+            ultra_crank_wallets: (1..=partial.ultra_crank)
+                .map(|index| {
+                    self.get_crank_wallet(network.get_address_type(), &wallet_phrase_name, index)
+                })
+                .collect::<Result<_>>()?,
             price_wallet: if partial.price {
                 Some(Arc::new(self.get_wallet(
                     network.get_address_type(),
@@ -98,6 +109,7 @@ impl Opt {
             gas_multiplier: *gas_multiplier,
             rpc_nodes: rpc_nodes.iter().map(|x| Arc::new(x.clone())).collect(),
             ignore_stale: partial.ignore_stale,
+            seconds_till_ultra: partial.seconds_till_ultra,
         })
     }
 }

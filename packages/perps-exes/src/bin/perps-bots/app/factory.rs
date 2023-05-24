@@ -61,7 +61,7 @@ struct FactoryUpdate;
 
 #[async_trait]
 impl WatchedTask for FactoryUpdate {
-    async fn run_single(&self, app: &App, _heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
+    async fn run_single(&mut self, app: &App, _heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
         update(app).await
     }
 }
@@ -294,7 +294,11 @@ async fn get_rpc_info(
 async fn get_height(node: Arc<String>, client: reqwest::Client) -> Result<(Arc<String>, u64)> {
     let node_clone = node.clone();
     tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
-        let url = format!("{node}/status");
+        let url = if node.ends_with('/') {
+            format!("{node}status")
+        } else {
+            format!("{node}/status")
+        };
         let value = client
             .get(url)
             .send()
@@ -338,4 +342,16 @@ fn get_latest_block_height(value: serde_json::Value) -> Option<u64> {
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_latest_height() {
+        const CONTENT: &str = r##"{"node_info":{"protocol_version":{"p2p":"8","block":"11","app":"0"},"id":"73204da3017b5d4e3756bde40274f55582936c69","listen_addr":"tcp://0.0.0.0:26656","network":"atlantic-2","version":"0.35.0-unreleased","channels":"40202122233038606162630070717273","moniker":"sei-rpc-i-050ef1199438a66dd","other":{"tx_index":"on","rpc_address":"tcp://0.0.0.0:26657"}},"application_info":{"version":"0"},"sync_info":{"latest_block_hash":"04BC42640308B4DEEF82C6E60CF8D7BFBC81EF7CABC56C0D1889D094DE0B470C","latest_app_hash":"632940CAFB3D21EEEFA347A263A22054A41D316AD2A61D89736ADBA16633991B","latest_block_height":"10998863","latest_block_time":"2023-05-21T08:10:46.345466442Z","earliest_block_hash":"24A7ECEE6B8BDE9A251676ACDBCAB7732C6704EFE1BF053449CE3BDB356A1FFA","earliest_app_hash":"93A7AB57325A7D465AC0A96CC84C3031210C47511623AB09CCF5CF8B7A704288","earliest_block_height":"10763999","earliest_block_time":"2023-05-19T19:53:34.042614538Z","max_peer_block_height":"10998858","catching_up":false,"total_synced_time":"0","remaining_time":"0","total_snapshots":"0","chunk_process_avg_time":"0","snapshot_height":"0","snapshot_chunks_count":"0","snapshot_chunks_total":"0","backfilled_blocks":"0","backfill_blocks_total":"0"},"validator_info":{"address":"BDF7022B1D6ED6BA3F93A79D4B97789F0B683161","pub_key":{"type":"tendermint/PubKeyEd25519","value":"h5xev2hlkao0xiNc2Xx/za5/ETDEbV7YxGamO7CDRBI="},"voting_power":"0"}}"##;
+        let value: serde_json::Value = serde_json::from_str(CONTENT).unwrap();
+        assert_eq!(get_latest_block_height(value), Some(10998863));
+    }
 }

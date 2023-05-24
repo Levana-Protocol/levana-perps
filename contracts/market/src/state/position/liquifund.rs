@@ -5,10 +5,9 @@ use std::{
 
 use crate::prelude::*;
 use msg::contracts::market::position::{
-    ClosePositionInstructions, LiquidationReason, MaybeClosedPosition, PositionCloseReason,
+    events::PositionSaveReason, ClosePositionInstructions, LiquidationReason, MaybeClosedPosition,
+    PositionCloseReason,
 };
-
-use super::ActionType;
 
 impl State<'_> {
     /// Same as [State::position_liquifund], but update the stored data with the resulting [MaybeClosedPosition].
@@ -19,10 +18,10 @@ impl State<'_> {
         starts_at: Timestamp,
         ends_at: Timestamp,
         charge_crank_fee: bool,
-        action_type: ActionType,
+        reason: PositionSaveReason,
     ) -> Result<()> {
         let mcp = self.position_liquifund(ctx, pos, starts_at, ends_at, charge_crank_fee)?;
-        self.process_maybe_closed_position(ctx, mcp, ends_at, action_type)
+        self.process_maybe_closed_position(ctx, mcp, ends_at, reason)
     }
 
     fn process_maybe_closed_position(
@@ -30,12 +29,12 @@ impl State<'_> {
         ctx: &mut StateContext,
         mcp: MaybeClosedPosition,
         ends_at: Timestamp,
-        action_type: ActionType,
+        reason: PositionSaveReason,
     ) -> Result<()> {
         match mcp {
             MaybeClosedPosition::Open(mut position) => {
                 let price_point = self.spot_price(ctx.storage, Some(ends_at))?;
-                self.position_save(ctx, &mut position, &price_point, true, false, action_type)?;
+                self.position_save(ctx, &mut position, &price_point, true, false, reason)?;
                 Ok(())
             }
             MaybeClosedPosition::Close(close_position_instructions) => {

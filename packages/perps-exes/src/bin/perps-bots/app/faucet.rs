@@ -5,7 +5,7 @@ use cosmos::{
 };
 use msg::{
     contracts::faucet::entry::{
-        ExecuteMsg, FaucetAsset, MultitapRecipient, QueryMsg, TapEligibleResponse,
+        ExecuteMsg, FaucetAsset, IneligibleReason, MultitapRecipient, QueryMsg, TapEligibleResponse,
     },
     prelude::*,
 };
@@ -52,7 +52,7 @@ impl FaucetBot {
         app: &App,
         recipient: Address,
         cw20s: Vec<Address>,
-    ) -> Result<Arc<String>> {
+    ) -> Result<Arc<String>, FaucetTapError> {
         let contract = app.cosmos.make_contract(app.config.faucet);
         match contract
             .query(QueryMsg::IsTapEligible {
@@ -62,14 +62,22 @@ impl FaucetBot {
                     .map(|addr| FaucetAsset::Cw20(addr.get_address_string().into()))
                     .collect(),
             })
-            .await?
-        {
+            .await
+            .map_err(|e| FaucetTapError::QueryEligibility {
+                inner: format!("{e:?}"),
+            })? {
             TapEligibleResponse::Eligible {} => (),
             TapEligibleResponse::Ineligible {
-                seconds: _,
-                reason: _,
+                seconds,
+                reason,
                 message,
-            } => anyhow::bail!("{message}"),
+            } => {
+                return Err(FaucetTapError::Ineligible {
+                    seconds,
+                    message,
+                    reason,
+                })
+            }
         }
         let (tx, rx) = tokio::sync::oneshot::channel();
         let req = TapRequest {
@@ -78,20 +86,20 @@ impl FaucetBot {
             tx,
         };
         if let Err(e) = self.tx.try_send(req) {
-            return Err(match e {
-                TrySendError::Full(_) => {
-                    anyhow::anyhow!("Too many faucet requests in the queue, please try again later")
-                }
-                TrySendError::Closed(_) => {
-                    anyhow::anyhow!("Internal server error, faucet queue is already closed")
-                }
+            return Err(match &e {
+                TrySendError::Full(_) => FaucetTapError::TooManyRequests {},
+                TrySendError::Closed(_) => FaucetTapError::ClosedChannel {
+                    is_oneshot: false,
+                    receive: false,
+                },
             });
         }
         match rx.await {
             Ok(res) => res,
-            Err(e) => Err(anyhow::anyhow!(
-                "Internal server error, please try tapping again: {e}"
-            )),
+            Err(_) => Err(FaucetTapError::ClosedChannel {
+                is_oneshot: true,
+                receive: true,
+            }),
         }
     }
 }
@@ -99,7 +107,30 @@ impl FaucetBot {
 struct TapRequest {
     recipient: Address,
     cw20s: Vec<Address>,
-    tx: tokio::sync::oneshot::Sender<Result<Arc<String>>>,
+    tx: tokio::sync::oneshot::Sender<Result<Arc<String>, FaucetTapError>>,
+}
+
+#[derive(serde::Serialize, thiserror::Error, Debug)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum FaucetTapError {
+    #[error("Unable to query tap eligibility from chain.")]
+    QueryEligibility { inner: String },
+    #[error("Internal server error. A channel was closed prematurely.")]
+    ClosedChannel { is_oneshot: bool, receive: bool },
+    #[error("Too many faucet requests in the queue, please try again later.")]
+    TooManyRequests {},
+    #[error("Wallet is ineligible to tap the faucet: {message}")]
+    Ineligible {
+        seconds: Decimal256,
+        message: String,
+        reason: IneligibleReason,
+    },
+    #[error("The faucet server was unable to execute against the faucet smart contract.")]
+    Contract { inner: String },
+    #[error("The faucet server was unable to query the captcha service. Please try again later.")]
+    CannotQueryCaptcha {},
+    #[error("The captcha provided was invalid, please try again.")]
+    InvalidCaptcha {},
 }
 
 pub struct FaucetBotRunner {
@@ -148,9 +179,10 @@ impl FaucetBotRunner {
                     log::error!("{e:?}");
                     retries += 1;
                     if retries >= 10 {
-                        let msg = format!("Error occurred while transacting against the faucet contract, please try again later: {e:?}");
                         for req in reqs {
-                            if let Err(e) = req.tx.send(Err(anyhow::anyhow!("{msg}"))) {
+                            if let Err(e) = req.tx.send(Err(FaucetTapError::Contract {
+                                inner: e.to_string(),
+                            })) {
                                 log::warn!("Faucet tapper no longer waiting: {e:?}");
                             }
                         }
@@ -191,26 +223,3 @@ impl From<&TapRequest> for MultitapRecipient {
         }
     }
 }
-
-// let faucet = app.cosmos.make_contract(app.config.faucet);
-// let wallet = app.faucet_bot.wallet.write().await;
-// let res = faucet
-//     .execute(
-//         &wallet,
-//         vec![],
-//         // FIXME move to multitap
-//         ExecuteMsg::Tap {
-//             assets: query
-//                 .cw20s
-//                 .into_iter()
-//                 .map(|x| FaucetAsset::Cw20(x.get_address_string().into()))
-//                 // This will end up as a no-op if the faucet gas a gas allowance set.
-//                 .chain(std::iter::once(FaucetAsset::Native(
-//                     app.cosmos.get_gas_coin().clone(),
-//                 )))
-//                 .collect(),
-//             recipient: query.recipient.get_address_string().into(),
-//             amount: None,
-//         },
-//     )
-//     .await?;

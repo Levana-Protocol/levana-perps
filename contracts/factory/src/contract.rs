@@ -5,6 +5,7 @@ use crate::state::{
         get_wind_down, set_admin_market_price, set_admin_migration, set_dao, set_kill_switch,
         set_owner, set_wind_down,
     },
+    code_ids::get_code_ids,
     label::{get_label_suffix, set_label_suffix},
     liquidity_token::{
         liquidity_token_addr, liquidity_token_code_id, save_liquidity_token_addr,
@@ -378,6 +379,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
         QueryMsg::ShutdownStatus { market_id } => {
             get_shutdown_status(store, &market_id)?.query_result()
         }
+
+        QueryMsg::CodeIds {} => get_code_ids(store)?.query_result(),
     }
 }
 

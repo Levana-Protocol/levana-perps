@@ -34,11 +34,11 @@ pub enum ExecuteMsg {
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    /// * returns and optional [RewardsInfoResp]
+    /// * returns [RewardsInfoResp]
     ///
     /// Rewards information for a given address. If there are no rewards for the specified addr,
     /// `None` is returned
-    #[returns(Option<RewardsInfoResp>)]
+    #[returns(RewardsInfoResp)]
     RewardsInfo { addr: RawAddr },
 
     /// * returns [super::config::Config]
@@ -58,10 +58,14 @@ pub struct RewardsInfoResp {
     pub locked: Decimal256,
     /// The amount of tokens that are unlocked but have not yet been claimed
     pub unlocked: Decimal256,
+    /// The total amount of tokens rewarded to this user
+    pub total_rewards: Decimal256,
+    /// The total amount of tokens that have been claimed by this user
+    pub total_claimed: Decimal256,
     /// The start time of the unlocked period
-    pub start: Timestamp,
+    pub start: Option<Timestamp>,
     /// The end time of the unlocking period
-    pub end: Timestamp,
+    pub end: Option<Timestamp>,
 }
 
 impl RewardsInfoResp {
@@ -69,8 +73,10 @@ impl RewardsInfoResp {
         RewardsInfoResp {
             locked: Decimal256::zero(),
             unlocked: Decimal256::zero(),
-            start: Timestamp::from_seconds(0),
-            end: Timestamp::from_seconds(0),
+            total_rewards: Decimal256::zero(),
+            total_claimed: Decimal256::zero(),
+            start: None,
+            end: None,
         }
     }
 }
