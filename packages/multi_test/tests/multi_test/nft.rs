@@ -139,7 +139,7 @@ fn nft_transfer_gate() {
     // disable nft execution
     market
         .exec_set_config(ConfigUpdate {
-            allow_position_nft_exec: Some(false),
+            disable_position_nft_exec: Some(true),
             ..Default::default()
         })
         .unwrap();
@@ -163,7 +163,7 @@ fn nft_transfer_gate() {
     // re-enable nft execution
     market
         .exec_set_config(ConfigUpdate {
-            allow_position_nft_exec: Some(true),
+            disable_position_nft_exec: Some(false),
             ..Default::default()
         })
         .unwrap();

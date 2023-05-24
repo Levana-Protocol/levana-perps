@@ -414,7 +414,7 @@ pub(crate) async fn instantiate(
                     msg::contracts::market::entry::ExecuteMsg::Owner(
                         ExecuteOwnerMsg::ConfigUpdate {
                             update: ConfigUpdate {
-                                allow_position_nft_exec: Some(false),
+                                disable_position_nft_exec: Some(true),
                                 ..Default::default()
                             },
                         },

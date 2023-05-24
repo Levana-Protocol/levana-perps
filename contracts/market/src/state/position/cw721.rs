@@ -331,7 +331,7 @@ impl State<'_> {
         msg_sender: Addr,
         msg: ExecuteMsg,
     ) -> Result<()> {
-        if !self.config.allow_position_nft_exec {
+        if self.config.disable_position_nft_exec {
             return Err(perp_anyhow!(
                 ErrorId::Auth,
                 ErrorDomain::PositionToken,
