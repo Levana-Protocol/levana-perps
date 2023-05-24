@@ -19,7 +19,7 @@ use cosmwasm_std::{Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Respons
 use cw2::{get_contract_version, set_contract_version};
 use msg::{
     contracts::market::{
-        entry::{DeltaNeutralityFeeResp, InstantiateMsg, MigrateMsg},
+        entry::{DeltaNeutralityFeeResp, InstantiateMsg, MigrateMsg, SpotPriceHistoryResp},
         position::{events::PositionSaveReason, PositionId, PositionOrPendingClose, PositionsResp},
     },
     shutdown::ShutdownImpact,
@@ -437,6 +437,20 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
         QueryMsg::Status {} => state.status(store)?.query_result(),
 
         QueryMsg::SpotPrice { timestamp } => state.spot_price(store, timestamp)?.query_result(),
+        QueryMsg::SpotPriceHistory {
+            start_after,
+            limit,
+            order,
+        } => {
+            let price_points = state.historical_spot_prices(
+                store,
+                start_after,
+                limit.map(|l| l.try_into()).transpose()?,
+                order.map(|o| o.into()),
+            )?;
+
+            SpotPriceHistoryResp { price_points }.query_result()
+        }
 
         QueryMsg::Positions {
             position_ids,
