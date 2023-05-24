@@ -105,3 +105,82 @@ fn nft_transfer() {
         .exec_position_token_transfer(&token_id, &trader_2, &trader_1)
         .unwrap();
 }
+
+#[test]
+fn nft_transfer_gate() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader_1 = market.clone_trader(1).unwrap();
+    let trader_2 = market.clone_trader(2).unwrap();
+
+    market
+        .exec_open_position(
+            &trader_1,
+            "100",
+            "10",
+            DirectionToBase::Long,
+            "1",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    // confirm that owner is trader_1
+    let mut nft_ids = market.query_position_token_ids(&trader_1).unwrap();
+    assert_eq!(nft_ids.len(), 1);
+    assert_eq!(0, market.query_position_token_ids(&trader_2).unwrap().len());
+
+    let token_id = nft_ids.pop().unwrap();
+    assert_eq!(
+        trader_1,
+        market.query_position_token_owner(&token_id).unwrap()
+    );
+
+    // disable nft execution
+    market
+        .exec_set_config(ConfigUpdate {
+            allow_position_nft_exec: Some(false),
+            ..Default::default()
+        })
+        .unwrap();
+
+    // should not be allowed to transfer to trader_2
+    market
+        .exec_position_token_transfer(&token_id, &trader_1, &trader_2)
+        .unwrap_err();
+
+    // confirm that owner is still trader_1
+    let mut nft_ids = market.query_position_token_ids(&trader_1).unwrap();
+    assert_eq!(nft_ids.len(), 1);
+    assert_eq!(0, market.query_position_token_ids(&trader_2).unwrap().len());
+
+    let token_id = nft_ids.pop().unwrap();
+    assert_eq!(
+        trader_1,
+        market.query_position_token_owner(&token_id).unwrap()
+    );
+
+    // re-enable nft execution
+    market
+        .exec_set_config(ConfigUpdate {
+            allow_position_nft_exec: Some(true),
+            ..Default::default()
+        })
+        .unwrap();
+
+    // can now transfer to trader_2
+    market
+        .exec_position_token_transfer(&token_id, &trader_1, &trader_2)
+        .unwrap();
+
+    // confirm that owner is trader_2
+    let mut nft_ids = market.query_position_token_ids(&trader_2).unwrap();
+    assert_eq!(nft_ids.len(), 1);
+    assert_eq!(0, market.query_position_token_ids(&trader_1).unwrap().len());
+
+    let token_id = nft_ids.pop().unwrap();
+    assert_eq!(
+        trader_2,
+        market.query_position_token_owner(&token_id).unwrap()
+    );
+}

@@ -83,6 +83,9 @@ pub struct Config {
     /// The maximum amount of liquidity that can be deposited into the market.
     #[serde(default)]
     pub max_liquidity: MaxLiquidity,
+    /// Allow the ability to proxy CW721 execution messages for positions.
+    /// Even if this is false, queries will still work as usual.
+    pub allow_position_nft_exec: bool,
 }
 
 /// Maximum liquidity for deposit.
@@ -146,6 +149,7 @@ impl Default for Config {
             unpend_limit: 50,
             liquifunding_delay_fuzz_seconds: 60 * 60 * 4,
             max_liquidity: MaxLiquidity::Unlimited {},
+            allow_position_nft_exec: true,
         }
     }
 }
@@ -339,6 +343,7 @@ pub struct ConfigUpdate {
     pub unpend_limit: Option<u32>,
     pub liquifunding_delay_fuzz_seconds: Option<u32>,
     pub max_liquidity: Option<MaxLiquidity>,
+    pub allow_position_nft_exec: Option<bool>,
 }
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for ConfigUpdate {
@@ -373,6 +378,7 @@ impl<'a> arbitrary::Arbitrary<'a> for ConfigUpdate {
             unpend_limit: None,
             liquifunding_delay_fuzz_seconds: None,
             max_liquidity: None,
+            allow_position_nft_exec: None,
         })
     }
 }
@@ -409,6 +415,7 @@ impl From<Config> for ConfigUpdate {
             unpend_limit: Some(src.unpend_limit),
             liquifunding_delay_fuzz_seconds: Some(src.liquifunding_delay_fuzz_seconds),
             max_liquidity: Some(src.max_liquidity),
+            allow_position_nft_exec: Some(src.allow_position_nft_exec),
         }
     }
 }
