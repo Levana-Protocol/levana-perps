@@ -39,8 +39,8 @@ use msg::contracts::market::crank::CrankWorkInfo;
 use msg::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
     LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpActionHistoryResp, LpInfoResp,
-    PositionActionHistoryResp, QueryMsg, SlippageAssert, StatusResp, TradeHistorySummary,
-    TraderActionHistoryResp,
+    PositionActionHistoryResp, QueryMsg, SlippageAssert, SpotPriceHistoryResp, StatusResp,
+    TradeHistorySummary, TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
 use msg::contracts::market::{
@@ -625,6 +625,17 @@ impl PerpsMarket {
             notional_delta: Signed::<Notional>::from_number(notional_delta),
             pos_delta_neutrality_fee_margin,
         })
+    }
+
+    pub fn query_spot_price_history(&self) -> Result<Vec<PricePoint>> {
+        // NOTE we're not doing any pagination, it will load everything
+        let resp: SpotPriceHistoryResp = self.query(&MarketQueryMsg::SpotPriceHistory {
+            start_after: None,
+            limit: None,
+            order: Some(OrderInMessage::Ascending),
+        })?;
+
+        Ok(resp.price_points)
     }
 
     // market executions
