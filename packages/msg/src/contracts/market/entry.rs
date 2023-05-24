@@ -403,7 +403,7 @@ pub enum QueryMsg {
     /// * returns [LimitOrderResp]
     ///
     /// Returns the specified Limit Order
-    #[returns(Option<LimitOrderResp>)]
+    #[returns(LimitOrderResp)]
     LimitOrder {
         /// Limit order ID to query
         order_id: OrderId,
