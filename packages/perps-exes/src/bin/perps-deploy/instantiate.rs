@@ -2,6 +2,7 @@ use std::{collections::HashSet, str::FromStr};
 
 use anyhow::{Context, Result};
 use cosmos::{Address, CodeId, HasAddress};
+use msg::contracts::market::entry::ExecuteOwnerMsg;
 use msg::contracts::pyth_bridge::PythMarketPriceFeeds;
 use msg::prelude::*;
 use msg::{
@@ -402,6 +403,27 @@ pub(crate) async fn instantiate(
                 .await?;
             log::info!(
                 "Set market on the new trading competition CW20 at {}",
+                res.txhash
+            );
+
+            let res = cosmos
+                .make_contract(market_addr)
+                .execute(
+                    wallet,
+                    vec![],
+                    msg::contracts::market::entry::ExecuteMsg::Owner(
+                        ExecuteOwnerMsg::ConfigUpdate {
+                            update: ConfigUpdate {
+                                allow_position_nft_exec: Some(false),
+                                ..Default::default()
+                            },
+                        },
+                    ),
+                )
+                .await?;
+
+            log::info!(
+                "Disabled NFT executions for new trading competition at {}",
                 res.txhash
             );
         }
