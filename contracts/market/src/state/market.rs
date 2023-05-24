@@ -97,8 +97,6 @@ impl State<'_> {
         }
     }
 
-    /// Returns the spot price for the provided timestamp.
-    /// If no timestamp is provided, it returns the latest spot price.
     pub(crate) fn historical_spot_prices(
         &self,
         store: &dyn Storage,
