@@ -116,23 +116,6 @@ impl Opt {
     }
 }
 
-pub(crate) fn get_suffix_network(family: &str) -> Result<(&str, CosmosNetwork)> {
-    const PREFIXES: [(&str, CosmosNetwork); 3] = [
-        ("osmo", CosmosNetwork::OsmosisTestnet),
-        ("dragon", CosmosNetwork::Dragonfire),
-        ("sei", CosmosNetwork::SeiTestnet),
-    ];
-
-    for (prefix, network) in PREFIXES {
-        if let Some(suffix) = family.strip_prefix(prefix) {
-            return Ok((suffix, network));
-        }
-    }
-    Err(anyhow::anyhow!(
-        "Family does not contain known prefix: {family}"
-    ))
-}
-
 impl BasicApp {
     pub(crate) fn get_tracker_and_faucet(&self) -> Result<(Tracker, Faucet)> {
         let ChainConfig {
