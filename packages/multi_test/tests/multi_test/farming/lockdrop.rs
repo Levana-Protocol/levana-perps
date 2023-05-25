@@ -99,7 +99,9 @@ fn farming_lockdrop_basic() {
         .unwrap_err();
 
     // when lockdrop expires, we can withdraw
-    market.set_time(TimeJump::Seconds(86401)).unwrap();
+    market
+        .set_time(TimeJump::Seconds(86400 * buckets[0].bucket_id.0 as i64))
+        .unwrap();
     market
         .exec_farming_lockdrop_withdraw(&farmer, "1".parse().unwrap(), buckets[0].bucket_id)
         .unwrap();
