@@ -23,6 +23,9 @@ pub(crate) struct Opt {
     /// Maintenance mode to use. Empty string is treated as no maintenance mode.
     #[clap(long, env = "LEVANA_BOTS_MAINTENANCE")]
     pub(crate) maintenance: Option<String>,
+    /// Override the number of trading bots to run
+    #[clap(long, env = "LEVANA_BOTS_TRADERS")]
+    pub(crate) traders: Option<usize>,
 }
 
 impl Opt {

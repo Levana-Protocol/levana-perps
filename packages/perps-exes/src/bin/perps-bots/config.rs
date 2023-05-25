@@ -101,7 +101,7 @@ impl Opt {
             balance: partial.balance,
             liquidity: partial.liquidity,
             utilization: partial.utilization,
-            traders: partial.traders,
+            traders: self.traders.unwrap_or(partial.traders),
             liquidity_config: config.liquidity.clone(),
             utilization_config: config.utilization,
             trader_config: config.trader,
