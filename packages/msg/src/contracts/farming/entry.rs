@@ -17,7 +17,6 @@ pub struct InstantiateMsg {
     pub market_id: MarketId,
     /// How many seconds a lockdrop "month" lasts.
     #[serde(default = "defaults::lockdrop_month_seconds")]
-    //todo what is lockdrop_month_seconds needed for, isn't lockdrop_lvn_unlock_seconds enough?
     pub lockdrop_month_seconds: u32,
     /// Lockdrop buckets supported by this contracts
     #[serde(default = "defaults::lockdrop_buckets")]
