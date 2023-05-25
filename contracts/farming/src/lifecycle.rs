@@ -28,7 +28,6 @@ pub fn instantiate(
     state.save_lockdrop_config(
         ctx.storage,
         LockdropConfig {
-            lockdrop_buckets: msg.lockdrop_buckets,
             lockdrop_lvn_unlock_seconds: Duration::from_seconds(
                 msg.lockdrop_lvn_unlock_seconds as u64,
             ),

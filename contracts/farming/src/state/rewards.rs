@@ -36,7 +36,6 @@ const LVN_EMISSIONS: Item<Emissions> = Item::new(namespace::LVN_EMISSIONS);
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub(crate) struct LockdropConfig {
-    pub lockdrop_buckets: Vec<LockdropBucketConfig>,
     pub lockdrop_lvn_unlock_seconds: Duration,
     pub lockdrop_immediate_unlock_ratio: Decimal256,
 }
