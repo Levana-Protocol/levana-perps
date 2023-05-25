@@ -312,26 +312,25 @@ impl Token {
                 }
             }
             Self::Native { .. } => {
-                let amount = NumberGtZero::new(amount.into_decimal256())
-                    .context("Unable to convert amount into NumberGtZero")?;
-                let coin = self.into_native_coin(amount).map_err(|err| {
-                    perp_anyhow!(
-                        ErrorId::Conversion,
-                        ErrorDomain::Wallet,
-                        "{} (exec inner msg: {:?})!",
-                        err.downcast_ref::<PerpError>().unwrap().description,
-                        execute_msg
-                    )
-                })?;
+                let funds = if amount.is_zero() {
+                    Vec::new()
+                } else {
+                    let amount = NumberGtZero::new(amount.into_decimal256())
+                        .context("Unable to convert amount into NumberGtZero")?;
+                    let coin = self.into_native_coin(amount).map_err(|err| {
+                        perp_anyhow!(
+                            ErrorId::Conversion,
+                            ErrorDomain::Wallet,
+                            "{} (exec inner msg: {:?})!",
+                            err.downcast_ref::<PerpError>().unwrap().description,
+                            execute_msg
+                        )
+                    })?.unwrap();
+
+                    vec![coin]
+                };
 
                 let execute_msg = to_binary(&execute_msg)?;
-
-                let funds = match coin {
-                    Some(coin) => {
-                        vec![coin]
-                    }
-                    None => Vec::new(),
-                };
 
                 Ok(WasmMsg::Execute {
                     contract_addr: contract_addr.to_string(),

@@ -115,8 +115,8 @@ impl State<'_> {
     }
 
     fn claim_lvn(&self, ctx: &mut StateContext, farmer: &Addr) -> Result<()> {
-        let lockdrop_amount = self.collect_lockdrop_rewards(ctx, farmer)?;
-        let emissions_amount = self.collect_lvn_emissions(ctx, farmer)?;
+        let lockdrop_amount = self.claim_lockdrop_rewards(ctx, farmer)?;
+        let emissions_amount = self.claim_lvn_emissions(ctx, farmer)?;
         let total = lockdrop_amount.checked_add(emissions_amount)?;
         let amount = NumberGtZero::new(total.into_decimal256())
             .context("Unable to convert amount into NumberGtZero")?;
@@ -154,7 +154,10 @@ impl State<'_> {
     }
 
     fn clear_emissions(&self, ctx: &mut StateContext) -> Result<()> {
-        self.update_rewards_per_token(ctx)?;
+        if let Some(emissions) = self.may_load_lvn_emissions(ctx.storage)? {
+            self.update_rewards_per_token(ctx, &emissions)?;
+        }
+
         self.save_lvn_emissions(ctx, None)?;
 
         Ok(())

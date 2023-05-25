@@ -16,9 +16,9 @@ const LVN_LOCKDROP_REWARDS: Item<LvnToken> = Item::new(namespace::LVN_LOCKDROP_R
 /// REWARDS_PER_TIME_PER_TOKEN is structured as a prefix sum data series where each value in the map
 /// represents part of a formula that is used to calculate how many reward tokens a farmer gets at
 /// any given time. The value is calculated as follows:
-/// ```
+///
 /// total_rewards / total_farming_tokens * elapsed_ratio
-/// ```
+///
 /// where
 /// * total_rewards - the total amount of LVN included in the current emissions period
 /// * total_farming_tokens - the total amount of farming tokens currently minted (see [RawFarmerStats])
@@ -112,7 +112,7 @@ impl State<'_> {
 
     /// Calculates how many reward tokens the user can collect from the lockdrop
     /// and updates internal storage accordingly
-    pub(crate) fn collect_lockdrop_rewards(
+    pub(crate) fn claim_lockdrop_rewards(
         &self,
         ctx: &mut StateContext,
         farmer: &Addr,
@@ -175,10 +175,7 @@ impl State<'_> {
     }
 
     /// Calculates rewards per farming tokens ratio since the last update
-    pub fn calculate_rewards_per_token_per_time(&self, store: &dyn Storage) -> Result<LvnToken> {
-        let emissions = self
-            .may_load_lvn_emissions(store)?
-            .with_context(|| "There are no active emissions")?;
+    pub fn calculate_rewards_per_token_per_time(&self, store: &dyn Storage, emissions: &Emissions) -> Result<LvnToken> {
         let emissions_duration = Decimal256::from_ratio(
             emissions
                 .end
@@ -210,13 +207,15 @@ impl State<'_> {
         Ok(new_rewards_per_token)
     }
 
-    pub(crate) fn perform_farming_bookkeeping(
+    pub(crate) fn farming_perform_emissions_bookkeeping(
         &self,
         ctx: &mut StateContext,
         addr: &Addr,
     ) -> Result<()> {
-        self.update_accrued_rewards(ctx, addr)?;
-        self.update_rewards_per_token(ctx)?;
+        if let Some(emissions) = self.may_load_lvn_emissions(ctx.storage)? {
+            self.update_accrued_rewards(ctx, addr, &emissions)?;
+            self.update_rewards_per_token(ctx, &emissions)?;
+        }
 
         Ok(())
     }
@@ -225,10 +224,12 @@ impl State<'_> {
     /// were claimed or accrued
     pub(crate) fn calculate_unlocked_rewards(
         &self,
+        store: &dyn Storage,
         farmer_stats: &RawFarmerStats,
-        end_prefix_sum: LvnToken,
+        emissions: &Emissions,
     ) -> Result<LvnToken> {
-        let start_prefix_sum = farmer_stats.xlp_last_collected_prefix_sum;
+        let start_prefix_sum = farmer_stats.xlp_last_claimed_prefix_sum;
+        let end_prefix_sum = self.calculate_rewards_per_token_per_time(store, emissions)?;
         let unlocked_rewards = end_prefix_sum
             .checked_sub(start_prefix_sum)?
             .checked_mul_dec(farmer_stats.total_farming_tokens()?.into_decimal256())?;
@@ -237,8 +238,8 @@ impl State<'_> {
     }
 
     /// Updates the rewards per farming token ratio
-    pub(crate) fn update_rewards_per_token(&self, ctx: &mut StateContext) -> Result<()> {
-        let rewards_per_token = self.calculate_rewards_per_token_per_time(ctx.storage)?;
+    pub(crate) fn update_rewards_per_token(&self, ctx: &mut StateContext, emissions: &Emissions) -> Result<()> {
+        let rewards_per_token = self.calculate_rewards_per_token_per_time(ctx.storage, emissions)?;
         let (_, latest) = self.latest_reward_per_token(ctx.storage)?;
 
         if rewards_per_token > latest {
@@ -249,42 +250,52 @@ impl State<'_> {
     }
 
     /// Allocates accrued rewards to the specified user
-    pub(crate) fn update_accrued_rewards(&self, ctx: &mut StateContext, addr: &Addr) -> Result<()> {
+    pub(crate) fn update_accrued_rewards(&self, ctx: &mut StateContext, addr: &Addr, emissions: &Emissions) -> Result<()> {
         let mut farmer_stats = self.load_raw_farmer_stats(ctx.storage, addr)?;
-        let end_prefix_sum = self.calculate_rewards_per_token_per_time(ctx.storage)?;
-        let accrued_rewards = self.calculate_unlocked_rewards(&farmer_stats, end_prefix_sum)?;
+        let accrued_rewards = self.calculate_unlocked_rewards(ctx.storage, &farmer_stats, emissions)?;
 
         farmer_stats.accrued_emissions = farmer_stats
             .accrued_emissions
             .checked_add(accrued_rewards)?;
-        farmer_stats.xlp_last_collected_prefix_sum = end_prefix_sum;
+        let end_prefix_sum = self.calculate_rewards_per_token_per_time(ctx.storage, emissions)?;
+        farmer_stats.xlp_last_claimed_prefix_sum = end_prefix_sum;
 
         self.save_raw_farmer_stats(ctx, addr, &farmer_stats)?;
 
         Ok(())
     }
 
-    /// Calculates how many reward tokens the user can collect from LVN emissions
+    /// Calculates how many reward tokens the user can claim from LVN emissions
     /// and updates internal storage accordingly
-    pub(crate) fn collect_lvn_emissions(
+    pub(crate) fn claim_lvn_emissions(
         &self,
         ctx: &mut StateContext,
         addr: &Addr,
     ) -> Result<LvnToken> {
         let mut farmer_stats = self.load_raw_farmer_stats(ctx.storage, addr)?;
 
-        if farmer_stats.xlp_farming_tokens.is_zero() {
-            return Ok(LvnToken::zero());
-        }
+        let emissions = self.may_load_lvn_emissions(ctx.storage)?;
+        let unlocked_rewards = match emissions {
+            None => LvnToken::zero(),
+            Some(emissions) => {
+                if farmer_stats.xlp_farming_tokens.is_zero() {
+                    LvnToken::zero()
+                } else {
+                    let unlocked = self.calculate_unlocked_rewards(ctx.storage, &farmer_stats, &emissions)?;
+                    let end_prefix_sum = self.calculate_rewards_per_token_per_time(ctx.storage, &emissions)?;
 
-        let end_prefix_sum = self.calculate_rewards_per_token_per_time(ctx.storage)?;
-        let unlocked_rewards = self.calculate_unlocked_rewards(&farmer_stats, end_prefix_sum)?;
+                    farmer_stats.xlp_last_claimed_prefix_sum = end_prefix_sum;
 
-        farmer_stats.xlp_last_collected_prefix_sum = end_prefix_sum;
+                    unlocked
+                }
+            }
+        };
+
+        let rewards = unlocked_rewards.checked_add(farmer_stats.accrued_emissions)?;
+
         farmer_stats.accrued_emissions = LvnToken::zero();
-
         self.save_raw_farmer_stats(ctx, addr, &farmer_stats)?;
 
-        Ok(unlocked_rewards.checked_add(farmer_stats.accrued_emissions)?)
+        Ok(rewards)
     }
 }

@@ -12,10 +12,15 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
         QueryMsg::FarmerStats { addr } => {
             let farmer = addr.validate(state.api)?;
             let farmer_stats = state.load_raw_farmer_stats(store, &farmer)?;
-            let prefix_sum = state.calculate_rewards_per_token_per_time(store)?;
-            let emission_rewards = state
-                .calculate_unlocked_rewards(&farmer_stats, prefix_sum)?
-                .checked_add(farmer_stats.accrued_emissions)?;
+            let emissions = state.may_load_lvn_emissions(store)?;
+
+            let unlocked = match emissions {
+                None => LvnToken::zero(),
+                Some(emissions) =>state
+                    .calculate_unlocked_rewards(store, &farmer_stats, &emissions)?
+            };
+
+            let emission_rewards = unlocked.checked_add(farmer_stats.accrued_emissions)?;
 
             FarmerStats {
                 farming_tokens: farmer_stats.total_farming_tokens()?,
