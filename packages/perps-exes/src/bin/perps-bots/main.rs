@@ -44,7 +44,7 @@ impl AppBuilder {
                 .route("/api/faucet", post(endpoints::faucet::bot))
                 .route("/status", get(endpoints::status::all))
                 .route("/markets", get(endpoints::markets::markets))
-                .route("/debug/gses", get(endpoints::debug::gases))
+                .route("/debug/gas-usage", get(endpoints::debug::gases))
                 .with_state(app)
                 .layer(
                     CorsLayer::new()
