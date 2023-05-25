@@ -16,8 +16,9 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
 
             let unlocked = match emissions {
                 None => LvnToken::zero(),
-                Some(emissions) =>state
-                    .calculate_unlocked_rewards(store, &farmer_stats, &emissions)?
+                Some(emissions) => {
+                    state.calculate_unlocked_rewards(store, &farmer_stats, &emissions)?
+                }
             };
 
             let emission_rewards = unlocked.checked_add(farmer_stats.accrued_emissions)?;

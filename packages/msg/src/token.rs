@@ -317,15 +317,18 @@ impl Token {
                 } else {
                     let amount = NumberGtZero::new(amount.into_decimal256())
                         .context("Unable to convert amount into NumberGtZero")?;
-                    let coin = self.into_native_coin(amount).map_err(|err| {
-                        perp_anyhow!(
-                            ErrorId::Conversion,
-                            ErrorDomain::Wallet,
-                            "{} (exec inner msg: {:?})!",
-                            err.downcast_ref::<PerpError>().unwrap().description,
-                            execute_msg
-                        )
-                    })?.unwrap();
+                    let coin = self
+                        .into_native_coin(amount)
+                        .map_err(|err| {
+                            perp_anyhow!(
+                                ErrorId::Conversion,
+                                ErrorDomain::Wallet,
+                                "{} (exec inner msg: {:?})!",
+                                err.downcast_ref::<PerpError>().unwrap().description,
+                                execute_msg
+                            )
+                        })?
+                        .unwrap();
 
                     vec![coin]
                 };
