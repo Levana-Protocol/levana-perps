@@ -4,7 +4,7 @@ chains:
     faucet: sei1czf3age49j99yrkxynmetysh3p2x8tp429mv23jme7zj8hytwhesnqngza
     pyth:
      address: sei1977nnu5jqatteqgve8tx7nzu9y7eh6cvq0e4g6xjx8tf5wm4nkmsfljunh
-     endpoint: "https://xc-mainnet.pyth.network/"
+     endpoint: "https://pyth.sandbox.levana.finance/"
     explorer: "https://testnet-explorer.brocha.in/sei%20atlantic%202/tx/"
     # Lower gas requirements, we don't have much available on Sei
     min-gas: 1000000
