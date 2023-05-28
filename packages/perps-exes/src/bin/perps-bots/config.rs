@@ -49,6 +49,10 @@ impl Opt {
             network,
             wallet_phrase_name,
         } = config.get_deployment_info(&self.deployment)?;
+        let partial = match &self.deployment_config {
+            Some(s) => serde_yaml::from_str(s)?,
+            None => partial,
+        };
         let ChainConfig {
             tracker,
             faucet,

@@ -26,6 +26,9 @@ pub(crate) struct Opt {
     /// Override the number of trading bots to run
     #[clap(long, env = "LEVANA_BOTS_TRADERS")]
     pub(crate) traders: Option<usize>,
+    /// Override the contents of the DeploymentConfig in YAML format
+    #[clap(long, env = "LEVANA_BOTS_DEPLOYMENT_CONFIG")]
+    pub(crate) deployment_config: Option<String>,
 }
 
 impl Opt {
