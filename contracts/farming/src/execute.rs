@@ -103,9 +103,9 @@ impl State<'_> {
                 .context("Invalid transfer amount calculated")?
                 .into(),
         };
-        ctx.response_mut()
+        ctx.response
             .add_execute_submessage_oneshot(&self.market_info.xlp_addr, &msg)?;
-        ctx.response_mut().add_event(WithdrawEvent {
+        ctx.response.add_event(WithdrawEvent {
             farmer: farmer.clone(),
             farming,
             xlp,

@@ -163,7 +163,7 @@ impl State<'_> {
             amount: vec![coin],
         });
 
-        ctx.response_mut().add_message(transfer_msg);
+        ctx.response.add_message(transfer_msg);
 
         Ok(())
     }
@@ -328,7 +328,7 @@ impl State<'_> {
             amount: vec![coin],
         });
 
-        ctx.response_mut().add_message(transfer_msg);
+        ctx.response.add_message(transfer_msg);
 
         Ok(())
     }

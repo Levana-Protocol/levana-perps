@@ -57,8 +57,4 @@ impl<'a> StateContext<'a> {
             },
         ))
     }
-
-    pub(crate) fn response_mut(&mut self) -> &mut ResponseBuilder {
-        &mut self.response
-    }
 }
