@@ -15,8 +15,8 @@ chains:
       retries: 10
     rpc-nodes:
     #- https://rpc-sei-testnet.rhinostake.com/
-    - https://rpc.atlantic-2.seinetwork.io/
-    #- https://sei.kingnodes.com/
+    #- https://rpc.atlantic-2.seinetwork.io/
+    - https://sei.kingnodes.com/
     #- https://sei-testnet-rpc.polkachu.com/
     #- https://sei-a2-rpc.brocha.in/
   dragonfire:

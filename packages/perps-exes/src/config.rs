@@ -120,6 +120,8 @@ pub struct DeploymentConfig {
     pub default_market_ids: Vec<MarketId>,
     #[serde(default)]
     pub ignore_stale: bool,
+    #[serde(default)]
+    pub execs_per_price: Option<u32>,
 }
 
 const CONFIG_YAML: &[u8] = include_bytes!("../assets/config.yaml");

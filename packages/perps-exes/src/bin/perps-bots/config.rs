@@ -39,6 +39,7 @@ pub(crate) struct BotConfig {
     pub(crate) rpc_nodes: Vec<Arc<String>>,
     pub(crate) ignore_stale: bool,
     pub(crate) seconds_till_ultra: u32,
+    pub(crate) execs_per_price: Option<u32>,
 }
 
 impl Opt {
@@ -49,6 +50,10 @@ impl Opt {
             network,
             wallet_phrase_name,
         } = config.get_deployment_info(&self.deployment)?;
+        let partial = match &self.deployment_config {
+            Some(s) => serde_yaml::from_str(s)?,
+            None => partial,
+        };
         let ChainConfig {
             tracker,
             faucet,
@@ -107,9 +112,13 @@ impl Opt {
             trader_config: config.trader,
             watcher: watcher.clone(),
             gas_multiplier: *gas_multiplier,
-            rpc_nodes: rpc_nodes.iter().map(|x| Arc::new(x.clone())).collect(),
+            rpc_nodes: match &self.rpc_url {
+                None => rpc_nodes.iter().map(|x| Arc::new(x.clone())).collect(),
+                Some(rpc) => vec![rpc.clone().into()],
+            },
             ignore_stale: partial.ignore_stale,
             seconds_till_ultra: partial.seconds_till_ultra,
+            execs_per_price: partial.execs_per_price,
         })
     }
 }
