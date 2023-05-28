@@ -99,6 +99,7 @@ impl GasCheck {
         let mut balances = vec![];
         let mut errors = vec![];
         let mut to_refill = vec![];
+        let mut skip_delay = false;
         for Tracked {
             name,
             address,
@@ -127,7 +128,12 @@ impl GasCheck {
                     "Topping off gas in {name} ({address}). Found: {}. Wanted: {}.",
                     pretty_gas(gas),
                     pretty_gas(*min_gas)
-                ))
+                ));
+                if to_refill.len() >= 20 {
+                    balances.push("Already have 20 wallets to fill up, stopping there".to_owned());
+                    skip_delay = true;
+                    break;
+                }
             } else {
                 errors.push(format!(
                     "Insufficient gas in {name} ({address}). Found: {}. Wanted: {}.",
@@ -168,7 +174,7 @@ impl GasCheck {
         if errors.is_empty() {
             Ok(WatchedTaskOutput {
                 message: balances.join("\n"),
-                skip_delay: false,
+                skip_delay,
             })
         } else {
             errors.append(&mut balances);
