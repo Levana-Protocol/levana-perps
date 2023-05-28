@@ -39,6 +39,7 @@ pub(crate) struct BotConfig {
     pub(crate) rpc_nodes: Vec<Arc<String>>,
     pub(crate) ignore_stale: bool,
     pub(crate) seconds_till_ultra: u32,
+    pub(crate) execs_per_price: Option<u32>,
 }
 
 impl Opt {
@@ -114,6 +115,7 @@ impl Opt {
             rpc_nodes: rpc_nodes.iter().map(|x| Arc::new(x.clone())).collect(),
             ignore_stale: partial.ignore_stale,
             seconds_till_ultra: partial.seconds_till_ultra,
+            execs_per_price: partial.execs_per_price,
         })
     }
 }

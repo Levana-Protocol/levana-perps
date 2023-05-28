@@ -161,7 +161,7 @@ impl App {
                 msg: serde_json::to_vec(&msg::contracts::market::entry::ExecuteMsg::SetPrice {
                     price: price.to_string().parse()?,
                     price_usd,
-                    execs: None,
+                    execs: self.config.execs_per_price,
                     rewards: None,
                 })?,
                 funds: vec![],
