@@ -27,7 +27,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 farming_tokens: farmer_stats.total_farming_tokens()?,
                 lockdrops: state.get_farmer_lockdrop_stats(store, &farmer)?,
                 farming_tokens_available: "0".parse().unwrap(),
-                // FIXME emissions support
+                // FIXME lockdrop support
                 lockdrop_available: "0".parse().unwrap(),
                 lockdrop_locked: "0".parse().unwrap(),
                 emission_rewards,

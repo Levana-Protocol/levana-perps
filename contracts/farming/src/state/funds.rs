@@ -98,7 +98,8 @@ fn msg_requires_funds(msg: &ExecuteMsg) -> bool {
         ExecuteMsg::Owner(_)
         | ExecuteMsg::LockdropWithdraw { .. }
         | ExecuteMsg::Withdraw { .. }
-        | ExecuteMsg::ClaimLvn { .. }
+        | ExecuteMsg::ClaimEmissions { .. }
+        | ExecuteMsg::ClaimLockdropRewards { .. }
         | ExecuteMsg::Reinvest { .. }
         | ExecuteMsg::TransferBonus { .. } => false,
 

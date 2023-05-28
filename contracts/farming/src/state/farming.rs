@@ -18,10 +18,10 @@ pub(crate) struct RawFarmerStats {
     pub(crate) lockdrop_amount_collected: LvnToken,
     /// The amount of farming tokens owned by this farmer that came from xLP deposits
     pub(crate) xlp_farming_tokens: FarmingToken,
-    /// The prefix sum of the last time the farmer collected.
+    /// The prefix sum of the last time the farmer claimed.
     /// See [REWARDS_PER_TIME_PER_TOKEN] for more explanation of prefix sums.
     pub(crate) xlp_last_claimed_prefix_sum: LvnToken,
-    /// The amount of LVN tokens that have accrued from emissions but have not yet been collected
+    /// The amount of LVN tokens that have accrued from emissions but have not yet been claimed
     pub(crate) accrued_emissions: LvnToken,
 }
 

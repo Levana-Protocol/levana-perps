@@ -3,6 +3,7 @@ use crate::state::farming::RawFarmerStats;
 use cw_storage_plus::Item;
 use msg::token::Token;
 use std::cmp::{max, min};
+use cosmwasm_std::{BankMsg, CosmosMsg};
 
 /// The LVN token used for rewards
 const LVN_TOKEN: Item<Token> = Item::new(namespace::LVN_TOKEN);
@@ -109,13 +110,13 @@ impl State<'_> {
         Ok(lockdrop_config)
     }
 
-    /// Calculates how many reward tokens the user can collect from the lockdrop
-    /// and updates internal storage accordingly
+    /// Calculates how many reward tokens can be claimed from the lockdrop and transfers them to the
+    /// specified user
     pub(crate) fn claim_lockdrop_rewards(
         &self,
         ctx: &mut StateContext,
         farmer: &Addr,
-    ) -> Result<LvnToken> {
+    ) -> Result<()> {
         let period = self.get_period_resp(ctx.storage)?;
         let lockdrop_start = match period {
             FarmingPeriodResp::Launched { started_at } => started_at,
@@ -155,13 +156,27 @@ impl State<'_> {
                 .min(total_user_rewards)
         };
 
-        // Lastly, update internal storage
+        // Update internal storage & transfer
 
         stats.lockdrop_amount_collected.checked_add(amount)?;
         stats.lockdrop_last_collected = self.now();
         self.save_raw_farmer_stats(ctx, farmer, &stats)?;
 
-        Ok(amount)
+        let amount = NumberGtZero::new(amount.into_decimal256())
+            .context("Unable to convert amount into NumberGtZero")?;
+        let coin = self
+            .load_lvn_token(ctx)?
+            .into_native_coin(amount)?
+            .context("Invalid LVN transfer amount calculated")?;
+
+        let transfer_msg = CosmosMsg::Bank(BankMsg::Send {
+            to_address: farmer.to_string(),
+            amount: vec![coin],
+        });
+
+        ctx.response_mut().add_message(transfer_msg);
+
+        Ok(())
     }
 
     /// Get the latest key and value from [REWARDS_PER_TIME_PER_TOKEN].
@@ -285,7 +300,7 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         addr: &Addr,
-    ) -> Result<LvnToken> {
+    ) -> Result<()> {
         let mut farmer_stats = self.load_raw_farmer_stats(ctx.storage, addr)?;
 
         let emissions = self.may_load_lvn_emissions(ctx.storage)?;
@@ -307,11 +322,25 @@ impl State<'_> {
             }
         };
 
-        let rewards = unlocked_rewards.checked_add(farmer_stats.accrued_emissions)?;
+        let amount = unlocked_rewards.checked_add(farmer_stats.accrued_emissions)?;
 
         farmer_stats.accrued_emissions = LvnToken::zero();
         self.save_raw_farmer_stats(ctx, addr, &farmer_stats)?;
 
-        Ok(rewards)
+        let amount = NumberGtZero::new(amount.into_decimal256())
+            .context("Unable to convert amount into NumberGtZero")?;
+        let coin = self
+            .load_lvn_token(ctx)?
+            .into_native_coin(amount)?
+            .context("Invalid LVN transfer amount calculated")?;
+
+        let transfer_msg = CosmosMsg::Bank(BankMsg::Send {
+            to_address: addr.to_string(),
+            amount: vec![coin],
+        });
+
+        ctx.response_mut().add_message(transfer_msg);
+
+        Ok(())
     }
 }

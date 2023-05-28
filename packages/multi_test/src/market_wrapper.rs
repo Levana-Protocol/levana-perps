@@ -1551,8 +1551,12 @@ impl PerpsMarket {
         )
     }
 
-    pub fn exec_farming_claim_rewards(&self, sender: &Addr) -> Result<AppResponse> {
-        self.exec_farming(sender, &FarmingExecuteMsg::ClaimLvn {})
+    pub fn exec_farming_claim_lockdrop_rewards(&self, sender: &Addr) -> Result<AppResponse> {
+        self.exec_farming(sender, &FarmingExecuteMsg::ClaimLockdropRewards {})
+    }
+
+    pub fn exec_farming_claim_emissions(&self, sender: &Addr) -> Result<AppResponse> {
+        self.exec_farming(sender, &FarmingExecuteMsg::ClaimEmissions {})
     }
 
     fn query_farming<T: DeserializeOwned>(

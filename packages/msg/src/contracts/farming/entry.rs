@@ -88,8 +88,10 @@ pub enum ExecuteMsg {
         /// withdraws all.
         amount: Option<NonZero<FarmingToken>>,
     },
-    /// Claim any pending LVN rewards
-    ClaimLvn {},
+    /// Claim lockdrop rewards
+    ClaimLockdropRewards {},
+    /// Claim LVN emissions
+    ClaimEmissions {},
     /// Claim real yield from the market contract and reinvest as xLP.
     ///
     /// The bonus ratio will be taken off of this first.
