@@ -112,7 +112,10 @@ impl Opt {
             trader_config: config.trader,
             watcher: watcher.clone(),
             gas_multiplier: *gas_multiplier,
-            rpc_nodes: rpc_nodes.iter().map(|x| Arc::new(x.clone())).collect(),
+            rpc_nodes: match &self.rpc_url {
+                None => rpc_nodes.iter().map(|x| Arc::new(x.clone())).collect(),
+                Some(rpc) => vec![rpc.clone().into()],
+            },
             ignore_stale: partial.ignore_stale,
             seconds_till_ultra: partial.seconds_till_ultra,
             execs_per_price: partial.execs_per_price,
