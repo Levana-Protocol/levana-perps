@@ -1,4 +1,7 @@
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::{HashSet, VecDeque},
+    sync::Arc,
+};
 
 use crate::{
     app::App,
@@ -6,6 +9,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use axum::async_trait;
+use chrono::Utc;
 use cosmos::{
     proto::cosmos::bank::v1beta1::MsgSend, Address, Coin, Cosmos, HasAddress, TxBuilder, Wallet,
 };
@@ -83,8 +87,8 @@ impl AppBuilder {
 
 #[async_trait]
 impl WatchedTask for GasCheck {
-    async fn run_single(&mut self, _app: &App, _heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
-        self.single_gas_check().await
+    async fn run_single(&mut self, app: &App, _heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
+        self.single_gas_check(app).await
     }
 }
 
@@ -95,11 +99,12 @@ fn pretty_gas(x: u128) -> Decimal256 {
 }
 
 impl GasCheck {
-    async fn single_gas_check(&self) -> Result<WatchedTaskOutput> {
+    async fn single_gas_check(&self, app: &App) -> Result<WatchedTaskOutput> {
         let mut balances = vec![];
         let mut errors = vec![];
         let mut to_refill = vec![];
         let mut skip_delay = false;
+        let now = Utc::now();
         for Tracked {
             name,
             address,
@@ -114,6 +119,20 @@ impl GasCheck {
                     continue;
                 }
             };
+            let mut gases = app.gases.write();
+            gases
+                .entry(*address)
+                .and_modify(|v| {
+                    v.push_back((now, gas));
+                    if v.len() >= 1000 {
+                        v.pop_front();
+                    }
+                })
+                .or_insert_with(|| {
+                    let mut def = VecDeque::new();
+                    def.push_back((now, gas));
+                    def
+                });
             if gas >= *min_gas {
                 balances.push(format!(
                     "Sufficient gas in {name} ({address}). Found: {}.",
@@ -142,19 +161,27 @@ impl GasCheck {
                 ));
             }
         }
-
         if !to_refill.is_empty() {
             let mut builder = TxBuilder::default();
             let denom = self.app.cosmos.get_gas_coin();
-            for (address, amount) in to_refill {
-                builder.add_message_mut(MsgSend {
-                    from_address: self.gas_wallet.get_address_string(),
-                    to_address: address.get_address_string(),
-                    amount: vec![Coin {
-                        denom: denom.clone(),
-                        amount: amount.to_string(),
-                    }],
-                })
+            {
+                let mut gases = app.gases.write();
+                for (address, amount) in to_refill {
+                    builder.add_message_mut(MsgSend {
+                        from_address: self.gas_wallet.get_address_string(),
+                        to_address: address.get_address_string(),
+                        amount: vec![Coin {
+                            denom: denom.clone(),
+                            amount: amount.to_string(),
+                        }],
+                    });
+                    gases.entry(address).and_modify(|v| {
+                        for tg in v.iter_mut() {
+                            let (t, g) = *tg;
+                            *tg = (t, g + amount);
+                        }
+                    });
+                }
             }
 
             match builder
