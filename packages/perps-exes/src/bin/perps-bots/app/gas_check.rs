@@ -118,9 +118,9 @@ impl GasCheck {
             gases
                 .entry(*address)
                 .and_modify(|v| {
-                    v.push(gas);
+                    v.push_back(gas);
                     if v.len() >= 1000 {
-                        v.remove(0);
+                        v.pop_front();
                     }
                 })
                 .or_insert_with(|| vec![gas]);

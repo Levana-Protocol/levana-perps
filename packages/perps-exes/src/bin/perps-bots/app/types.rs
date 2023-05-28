@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -33,7 +33,7 @@ pub(crate) struct App {
     pub(crate) bind: SocketAddr,
     pub(crate) statuses: TaskStatuses,
     pub(crate) live_since: DateTime<Utc>,
-    pub(crate) gases: RwLock<HashMap<Address, Vec<u128>>>,
+    pub(crate) gases: RwLock<HashMap<Address, VecDeque<u128>>>,
 }
 
 #[derive(serde::Serialize)]
