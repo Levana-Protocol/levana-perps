@@ -23,6 +23,7 @@ use super::factory::FactoryInfo;
 use super::faucet::FaucetBot;
 use super::gas_check::GasCheckBuilder;
 
+pub(crate) type GasRecords = VecDeque<(DateTime<Utc>, u128)>;
 pub(crate) struct App {
     factory: RwLock<Arc<FactoryInfo>>,
     pub(crate) frontend_info: FrontendInfo,
@@ -33,7 +34,7 @@ pub(crate) struct App {
     pub(crate) bind: SocketAddr,
     pub(crate) statuses: TaskStatuses,
     pub(crate) live_since: DateTime<Utc>,
-    pub(crate) gases: RwLock<HashMap<Address, VecDeque<u128>>>,
+    pub(crate) gases: RwLock<HashMap<Address, GasRecords>>,
 }
 
 #[derive(serde::Serialize)]
