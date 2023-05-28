@@ -121,13 +121,25 @@ impl State<'_> {
         duration: Duration,
         lvn: NonZero<LvnToken>,
     ) -> Result<()> {
-        let emissions = Emissions {
+        let old_emissions = self.may_load_lvn_emissions(ctx.storage)?;
+        let new_emissions = Emissions {
             start,
             end: start + duration,
             lvn,
         };
 
-        self.save_lvn_emissions(ctx, Some(emissions))?;
+        match old_emissions {
+            None => self.save_lvn_emissions(ctx.storage, Some(new_emissions))?,
+            Some(old_emissions) => {
+                anyhow::ensure!(
+                    self.now() > old_emissions.end,
+                    "Unable to save new emissions while previous emissions are ongoing"
+                );
+
+                self.update_rewards_per_token(ctx, &old_emissions)?;
+                self.save_lvn_emissions(ctx.storage, Some(new_emissions))?;
+            }
+        }
 
         Ok(())
     }
@@ -137,7 +149,7 @@ impl State<'_> {
             self.update_rewards_per_token(ctx, &emissions)?;
         }
 
-        self.save_lvn_emissions(ctx, None)?;
+        self.save_lvn_emissions(ctx.storage, None)?;
 
         Ok(())
     }

@@ -67,24 +67,13 @@ impl State<'_> {
 
     pub(crate) fn save_lvn_emissions(
         &self,
-        ctx: &mut StateContext,
+        store: &mut dyn Storage,
         emissions: Option<Emissions>,
     ) -> Result<()> {
         match emissions {
-            None => LVN_EMISSIONS.remove(ctx.storage),
+            None => LVN_EMISSIONS.remove(store),
             Some(emissions) => {
-                let prev_emissions = LVN_EMISSIONS.may_load(ctx.storage)?;
-
-                match prev_emissions {
-                    None => LVN_EMISSIONS.save(ctx.storage, &emissions)?,
-                    Some(prev_emissions) => {
-                        anyhow::ensure!(
-                            self.now() > prev_emissions.end,
-                            "Unable to save new emissions while previous emissions are ongoing"
-                        );
-                        LVN_EMISSIONS.save(ctx.storage, &emissions)?;
-                    }
-                }
+                LVN_EMISSIONS.save(store, &emissions)?
             }
         }
 
