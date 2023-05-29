@@ -37,8 +37,8 @@ const LVN_EMISSIONS: Item<Emissions> = Item::new(namespace::LVN_EMISSIONS);
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub(crate) struct LockdropConfig {
-    pub lockdrop_lvn_unlock_seconds: Duration,
-    pub lockdrop_immediate_unlock_ratio: Decimal256,
+    pub(crate) lockdrop_lvn_unlock_seconds: Duration,
+    pub(crate) lockdrop_immediate_unlock_ratio: Decimal256,
 }
 
 const LOCKDROP_CONFIG: Item<LockdropConfig> = Item::new(namespace::LOCKDROP_CONFIG);
@@ -115,7 +115,7 @@ impl State<'_> {
         // First get the total amount of LVN tokens rewarded to this lockdrop participant
 
         let total_lockdrop_rewards = LVN_LOCKDROP_REWARDS.load(ctx.storage)?;
-        let mut stats = self.load_raw_farmer_stats(ctx.storage, farmer)?; //todo should lockdrop stats be stored separately?
+        let mut stats = self.load_raw_farmer_stats(ctx.storage, farmer)?;
         let total_user_rewards = total_lockdrop_rewards
             .checked_mul_dec(stats.lockdrop_farming_tokens.into_decimal256())?;
 
@@ -135,12 +135,12 @@ impl State<'_> {
             )?)
             .as_nanos();
 
-            total_user_rewards
-                .checked_mul_dec(Decimal256::from_ratio(elapsed_since_last_collected, 1u64))?
-                .checked_div_dec(Decimal256::from_ratio(
-                    lockdrop_config.lockdrop_lvn_unlock_seconds.as_nanos(),
-                    1u64,
-                ))?
+            let elapsed_ratio = Decimal256::from_ratio(
+                elapsed_since_last_collected,
+                lockdrop_config.lockdrop_lvn_unlock_seconds.as_nanos()
+            );
+
+            total_user_rewards.checked_mul_dec(elapsed_ratio)?
                 // using min as an added precaution to make sure it never goes above the total due to rounding errors
                 .min(total_user_rewards)
         };
@@ -252,11 +252,8 @@ impl State<'_> {
     ) -> Result<()> {
         let rewards_per_token =
             self.calculate_rewards_per_token_per_time(ctx.storage, emissions)?;
-        let (_, latest) = self.latest_reward_per_token(ctx.storage)?;
 
-        if rewards_per_token > latest {
-            REWARDS_PER_TIME_PER_TOKEN.save(ctx.storage, self.now(), &rewards_per_token)?;
-        }
+        REWARDS_PER_TIME_PER_TOKEN.save(ctx.storage, self.now(), &rewards_per_token)?;
 
         Ok(())
     }
@@ -283,8 +280,8 @@ impl State<'_> {
         Ok(())
     }
 
-    /// Calculates how many reward tokens the user can claim from LVN emissions
-    /// and updates internal storage accordingly
+    /// Calculates how many tokens the user can claim from LVN emissions
+    /// and transfers them to the specified user
     pub(crate) fn claim_lvn_emissions(
         &self,
         ctx: &mut StateContext,
