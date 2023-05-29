@@ -429,7 +429,7 @@ impl State<'_> {
             .split()
             .0;
 
-        if calc_pending_fees {
+        let dnf_on_close_collateral = if calc_pending_fees {
             // Calculate pending fees
             let (borrow_fees, _) =
                 self.calc_capped_borrow_fee_payment(store, &pos, pos.liquifunded_at, self.now())?;
@@ -484,7 +484,10 @@ impl State<'_> {
                     "0.00001".parse().unwrap()
                 }
             };
-        }
+            Some(delta_neutrality_fee)
+        } else {
+            None
+        };
 
         let start_price = self.spot_price(store, Some(pos.liquifunded_at))?;
         pos.into_query_response_extrapolate_exposure(
@@ -495,6 +498,7 @@ impl State<'_> {
             config,
             market_type,
             original_direction_to_base,
+            dnf_on_close_collateral,
         )
     }
 
