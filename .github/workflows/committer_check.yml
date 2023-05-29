@@ -19,8 +19,8 @@ jobs:
         run: |
           set -eux -o pipefail
           jq -r '.[] | .commit.committer.email' <<< "${COMMITS}" | while read -r e; do
-            [ "${e#*@}" == 'levana.exchange' ] || [ "${e}" == 'noreply@github.com' ]
+            [ "${e#*@}" == 'levana.exchange' ] || [ "${e}" == 'noreply@github.com' ] || [ "${e#*@}" == 'users.noreply.github.com' ]
           done
           jq -r '.[] | .commit.author.email' <<< "${COMMITS}" | while read -r e; do
-            [ "${e#*@}" == 'levana.exchange' ]
+            [ "${e#*@}" == 'levana.exchange' ] || [ "${e#*@}" == 'users.noreply.github.com' ]
           done
