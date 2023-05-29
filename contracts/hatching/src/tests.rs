@@ -2,7 +2,7 @@ use crate::state::{config::lvn_from_nft_spirit_level, nft_burn::extract_nft_info
 
 use msg::contracts::hatching::{
     nft::{Metadata, Trait},
-    NftRarity, NftBurnKind,
+    NftRarity, NftBurnKind, dragon_mint::DragonMintExtra,
 };
 use shared::time::Timestamp;
 
@@ -76,11 +76,18 @@ fn egg_to_dragon() {
     let now = Timestamp::from_seconds(1685362658);
     let burn_meta = mock_metadata(Some(NftBurnKind::Egg), Some("1.23"), Some(NftRarity::Common));
     let info = extract_nft_info("42".to_string(), burn_meta, now).unwrap();
-    let mint_meta = babydragon_nft_mint_msg("alice".to_string(), &info).unwrap().extension;
+    let extra = DragonMintExtra {
+        id: "42".to_string(),
+        cid: "somehashhere".to_string(),
+        eye_color: "Blue".to_string(),
+        kind: "Wyvern".to_string(),
+    };
+    let mint_meta = babydragon_nft_mint_msg("alice".to_string(), &info, extra.clone()).unwrap().extension;
 
     let expected_mint_meta: Metadata = serde_json::from_str(EXPECTED_DRAGON_META).unwrap();
     assert_eq!(mint_meta.name, expected_mint_meta.name);
     assert_eq!(mint_meta.description, expected_mint_meta.description);
+    assert_eq!(mint_meta.image, expected_mint_meta.image);
 
     let mut attributes = mint_meta.attributes.unwrap();
     let mut expected_attributes = expected_mint_meta.attributes.unwrap();
@@ -88,6 +95,22 @@ fn egg_to_dragon() {
     expected_attributes.sort_by(|a, b| a.trait_type.cmp(&b.trait_type));
 
     assert_eq!(attributes, expected_attributes);
+
+    assert_eq!(attributes.iter().find_map(|a| {
+        if a.trait_type == "Eye Color" {
+            Some(&a.value)
+        } else {
+            None
+        }
+    }), Some(&extra.eye_color));
+
+    assert_eq!(attributes.iter().find_map(|a| {
+        if a.trait_type == "Dragon Type" {
+            Some(&a.value)
+        } else {
+            None
+        }
+    }), Some(&extra.kind));
 }
 
 fn mock_metadata(
@@ -256,7 +279,7 @@ static OTHER_META: &str = r#"{
 
 
 static EXPECTED_DRAGON_META: &str = r#"{
-    "image":"ipfs://blah",
+    "image":"ipfs://somehashhere",
     "image_data":null,
     "external_url":null,
     "description": "The mighty Levana dragon is a creature of legend, feared and respected by all who know of it. This dragon is a rare and valuable collectible, a symbol of power, strength, and wisdom. It is a reminder that even in the darkest of times, there is always hope.",
@@ -332,6 +355,11 @@ static EXPECTED_DRAGON_META: &str = r#"{
             "display_type":null,
             "trait_type":"Spirit Level",
             "value":"1.23"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Eye Color",
+            "value":"Blue"
         }
     ],
     "background_color":null,

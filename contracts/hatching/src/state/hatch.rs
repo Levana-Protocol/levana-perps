@@ -1,6 +1,6 @@
 use super::{
     get_lvn_to_grant,
-    nft_mint::{get_nft_mint_iter, get_nft_mint_proxy_messages},
+    nft_mint::{get_nft_mint_iter},
     State, StateContext,
 };
 use msg::contracts::hatching::{
@@ -68,7 +68,7 @@ impl State<'_> {
             lvn_grant_address: lvn_grant_address.clone(),
         };
 
-        let nfts_to_mint = get_nft_mint_proxy_messages(&details)?;
+        let nfts_to_mint = self.get_nft_mint_proxy_messages(ctx.storage, &details)?;
         if nfts_to_mint.0.is_empty() {
             // no nfts to mint, mark as completed
             status.nft_mint_completed = true;
@@ -120,7 +120,7 @@ impl State<'_> {
         let status = HATCH_STATUS.load(ctx.storage, id)?;
 
         if !status.nft_mint_completed {
-            self.send_mint_nfts_ibc_message(ctx, get_nft_mint_proxy_messages(&details)?)?;
+            self.send_mint_nfts_ibc_message(ctx, self.get_nft_mint_proxy_messages(ctx.storage, &details)?)?;
         }
 
         if !status.lvn_grant_completed {
