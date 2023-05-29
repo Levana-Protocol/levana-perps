@@ -398,7 +398,9 @@ impl PerpsMarket {
         })?;
         anyhow::ensure!(pending_close.is_empty());
         anyhow::ensure!(closed.is_empty());
-        positions.pop().ok_or_else(|| anyhow!("no positions"))
+        let pos = positions.pop().ok_or_else(|| anyhow!("no positions"))?;
+        anyhow::ensure!(pos.dnf_on_close_collateral == None);
+        Ok(pos)
     }
 
     pub fn query_position_with_pending_fees(
@@ -415,7 +417,9 @@ impl PerpsMarket {
         })?;
         anyhow::ensure!(pending_close.is_empty());
         anyhow::ensure!(closed.is_empty());
-        positions.pop().ok_or_else(|| anyhow!("no positions"))
+        let pos = positions.pop().ok_or_else(|| anyhow!("no positions"))?;
+        anyhow::ensure!(pos.dnf_on_close_collateral != None);
+        Ok(pos)
     }
 
     pub fn query_position_pending_close(

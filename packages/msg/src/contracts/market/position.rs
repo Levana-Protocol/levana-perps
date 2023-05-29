@@ -201,6 +201,14 @@ pub struct PositionQueryResponse {
     /// Unrealized PnL on this position, in USD, using cost-basis analysis.
     pub pnl_usd: Signed<Usd>,
 
+    /// DNF that would be charged (positive) or received (negative) if position was closed now.
+    ///
+    /// This is only set if the query parameter `skip_calc_pending_fees` is set
+    /// to `false`. In that case, this value is already included in
+    /// `pnl_collateral` and `pnl_usd`. If we skip calculating pending fees,
+    /// this value will be set to `None`.
+    pub dnf_on_close_collateral: Option<Signed<Collateral>>,
+
     /// Notional size of the position
     pub notional_size: Signed<Notional>,
     /// Notional size converted to collateral at the current price
@@ -520,6 +528,7 @@ impl Position {
         config: &Config,
         market_type: MarketType,
         original_direction_to_base: DirectionToBase,
+        dnf_on_close_collateral: Option<Signed<Collateral>>,
     ) -> Result<PositionOrPendingClose> {
         // We always use the current spot price for the current_price_point
         // parameter to liquidation_margin. It's used exclusively to calculate
@@ -561,7 +570,7 @@ impl Position {
 
         match result {
             MaybeClosedPosition::Open(position) => position
-                .into_query_response(end_price, entry_price, market_type)
+                .into_query_response(end_price, entry_price, market_type, dnf_on_close_collateral)
                 .map(|pos| PositionOrPendingClose::Open(Box::new(pos))),
             MaybeClosedPosition::Close(ClosePositionInstructions {
                 pos,
@@ -633,6 +642,7 @@ impl Position {
         end_price: PricePoint,
         entry_price: Price,
         market_type: MarketType,
+        dnf_on_close_collateral: Option<Signed<Collateral>>,
     ) -> Result<PositionQueryResponse> {
         let (direction_to_base, leverage) = self
             .active_leverage_to_notional(&end_price)
@@ -696,6 +706,7 @@ impl Position {
             deposit_collateral_usd: deposit_collateral.usd(),
             pnl_collateral,
             pnl_usd,
+            dnf_on_close_collateral,
             notional_size,
             notional_size_in_collateral,
             position_size_base,
