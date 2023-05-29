@@ -10,6 +10,9 @@ chains:
     watcher:
       # Nodes seem to crash often, let's see if this helps
       retries: 10
+      trader:
+        delay: !constant 2
+        out-of-date: 180
     rpc-nodes:
     - http://fake-rpc-node/
   sei-testnet:
@@ -196,12 +199,12 @@ overrides:
     wallet-manager-address: osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k
     price-address: osmo1dfagdh540vrqqnuet5rqvdg3uldhhgdxpttmzl
     price: true
-    ultra-crank: 20
+    ultra-crank: 0
     crank: true
     liquidity: true
     utilization: true
     balance: true
-    traders: 400
+    traders: 10000
     default-market-ids:
       - ETH_USD
   seibeta:
