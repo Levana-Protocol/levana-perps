@@ -87,14 +87,7 @@ fn egg_to_dragon() {
     attributes.sort_by(|a, b| a.trait_type.cmp(&b.trait_type));
     expected_attributes.sort_by(|a, b| a.trait_type.cmp(&b.trait_type));
 
-
-    for attribute in attributes {
-        if !expected_attributes.contains(&attribute) {
-            panic!("unexpected attribute: {:?}", attribute);
-        }
-    }
-
-    //assert_eq!(attributes, expected_attributes);
+    assert_eq!(attributes, expected_attributes);
 }
 
 fn mock_metadata(
