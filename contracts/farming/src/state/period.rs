@@ -56,9 +56,9 @@ impl State<'_> {
                     // appropriate business logic
                     OwnerExecuteMsg::UpdateConfig { .. }
                     | OwnerExecuteMsg::StartLaunchPeriod { .. }
-                    | OwnerExecuteMsg::StartLockdropPeriod { .. } => true
+                    | OwnerExecuteMsg::StartLockdropPeriod { .. } => true,
                 }
-            },
+            }
             ExecuteMsg::Receive { .. } => {
                 anyhow::bail!("Cannot have double-wrapped Receive");
             }

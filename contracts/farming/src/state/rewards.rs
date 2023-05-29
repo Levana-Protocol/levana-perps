@@ -1,9 +1,9 @@
 use crate::prelude::*;
 use crate::state::farming::RawFarmerStats;
+use cosmwasm_std::{BankMsg, CosmosMsg};
 use cw_storage_plus::Item;
 use msg::token::Token;
 use std::cmp::{max, min};
-use cosmwasm_std::{BankMsg, CosmosMsg};
 
 /// The LVN token used for rewards
 const LVN_TOKEN: Item<Token> = Item::new(namespace::LVN_TOKEN);
@@ -72,9 +72,7 @@ impl State<'_> {
     ) -> Result<()> {
         match emissions {
             None => LVN_EMISSIONS.remove(store),
-            Some(emissions) => {
-                LVN_EMISSIONS.save(store, &emissions)?
-            }
+            Some(emissions) => LVN_EMISSIONS.save(store, &emissions)?,
         }
 
         Ok(())
@@ -137,10 +135,11 @@ impl State<'_> {
 
             let elapsed_ratio = Decimal256::from_ratio(
                 elapsed_since_last_collected,
-                lockdrop_config.lockdrop_lvn_unlock_seconds.as_nanos()
+                lockdrop_config.lockdrop_lvn_unlock_seconds.as_nanos(),
             );
 
-            total_user_rewards.checked_mul_dec(elapsed_ratio)?
+            total_user_rewards
+                .checked_mul_dec(elapsed_ratio)?
                 // using min as an added precaution to make sure it never goes above the total due to rounding errors
                 .min(total_user_rewards)
         };
@@ -190,7 +189,8 @@ impl State<'_> {
                 .as_nanos(),
             1u64,
         );
-        let (latest_timestamp, latest_rewards_per_token) = self.latest_emissions_per_token(store)?;
+        let (latest_timestamp, latest_rewards_per_token) =
+            self.latest_emissions_per_token(store)?;
         let total_farming_tokens = self.load_farming_totals(store)?.farming;
 
         let rewards_per_token = if total_farming_tokens.is_zero() {
@@ -283,11 +283,7 @@ impl State<'_> {
 
     /// Calculates how many tokens the user can claim from LVN emissions
     /// and transfers them to the specified user
-    pub(crate) fn claim_lvn_emissions(
-        &self,
-        ctx: &mut StateContext,
-        addr: &Addr,
-    ) -> Result<()> {
+    pub(crate) fn claim_lvn_emissions(&self, ctx: &mut StateContext, addr: &Addr) -> Result<()> {
         let mut farmer_stats = self.load_raw_farmer_stats(ctx.storage, addr)?;
 
         let emissions = self.may_load_lvn_emissions(ctx.storage)?;

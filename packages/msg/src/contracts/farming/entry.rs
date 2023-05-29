@@ -133,7 +133,7 @@ pub enum OwnerExecuteMsg {
         addr: String,
         /// The amount of tokens to reclaim
         /// A value of None will reclaim all unused emission tokens
-        amount: Option<LvnToken>
+        amount: Option<LvnToken>,
     },
     /// Update the configuration set in the [InstantiateMsg]
     ///
