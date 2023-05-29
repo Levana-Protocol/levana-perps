@@ -136,7 +136,7 @@ impl State<'_> {
                     "Unable to save new emissions while previous emissions are ongoing"
                 );
 
-                self.update_rewards_per_token(ctx, &old_emissions)?;
+                self.update_emissions_per_token(ctx, &old_emissions)?;
                 self.save_lvn_emissions(ctx.storage, Some(new_emissions))?;
             }
         }
@@ -146,7 +146,7 @@ impl State<'_> {
 
     fn clear_emissions(&self, ctx: &mut StateContext) -> Result<()> {
         if let Some(emissions) = self.may_load_lvn_emissions(ctx.storage)? {
-            self.update_rewards_per_token(ctx, &emissions)?;
+            self.update_emissions_per_token(ctx, &emissions)?;
         }
 
         self.save_lvn_emissions(ctx.storage, None)?;
