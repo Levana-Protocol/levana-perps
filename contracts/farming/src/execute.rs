@@ -27,7 +27,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 } => state.set_emissions(
                     &mut ctx,
                     start.unwrap_or_else(|| state.now()),
-                    Duration::from_seconds(duration as u64),
+                    Duration::from_seconds(duration.into()),
                     lvn,
                 )?,
                 OwnerExecuteMsg::ClearEmissions {} => state.clear_emissions(&mut ctx)?,

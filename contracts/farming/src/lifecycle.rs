@@ -29,7 +29,7 @@ pub fn instantiate(
         ctx.storage,
         LockdropConfig {
             lockdrop_lvn_unlock_seconds: Duration::from_seconds(
-                msg.lockdrop_lvn_unlock_seconds as u64,
+                msg.lockdrop_lvn_unlock_seconds.into(),
             ),
             lockdrop_immediate_unlock_ratio: msg.lockdrop_immediate_unlock_ratio,
         },
