@@ -12,6 +12,8 @@ use serde::de::Visitor;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Div, Mul, Sub};
+#[cfg(feature = "chrono")]
+use chrono::{DateTime, Utc, TimeZone };
 
 /// Essentially a newtype wrapper for [Timestamp] providing additional impls.
 ///
@@ -110,6 +112,21 @@ impl Timestamp {
                 "Invalid timestamp subtraction during. Action: {desc}. Values: {self} - {rhs}"
             )),
         }
+    }
+
+    #[cfg(feature = "chrono")]
+    /// Convert into a chrono DateTime<Utc>
+    pub fn try_into_chrono_datetime(self) -> Result<DateTime<Utc>> {
+
+        let secs = self.0 / 1_000_000_000;
+        let nanos = self.0 % 1_000_000_000;
+
+        Utc.timestamp_opt(
+            secs.try_into()?,
+            nanos.try_into()?,
+        )
+        .single()
+        .context("Could not convert {self} into DateTime<Utc>")
     }
 }
 

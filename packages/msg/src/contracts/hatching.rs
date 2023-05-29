@@ -37,6 +37,7 @@ pub struct NftHatchInfo {
     pub burn_kind: NftBurnKind,
     pub burn_metadata: nft::Metadata,
     pub rarity: NftRarity,
+    pub hatch_time: Timestamp,
 }
 
 #[cw_serde]

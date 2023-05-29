@@ -69,13 +69,13 @@ impl State<'_> {
             );
         }
 
-        let info = extract_nft_info(token_id, res.info.extension)?;
+        let info = extract_nft_info(token_id, res.info.extension, self.now())?;
 
         Ok(info)
     }
 }
 
-pub(crate) fn extract_nft_info(token_id: String, meta: Metadata) -> Result<NftHatchInfo> {
+pub(crate) fn extract_nft_info(token_id: String, meta: Metadata, now: Timestamp) -> Result<NftHatchInfo> {
     let kind = {
         let name = match &meta.name {
             Some(name) => name.to_lowercase(),
@@ -130,6 +130,7 @@ pub(crate) fn extract_nft_info(token_id: String, meta: Metadata) -> Result<NftHa
                 token_id,
                 burn_kind: kind,
                 burn_metadata: meta,
+                hatch_time: now,
             })
         }
     }

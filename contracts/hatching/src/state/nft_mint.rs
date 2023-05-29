@@ -46,7 +46,7 @@ pub(crate) fn get_nft_mint_proxy_messages(
     Ok(IbcProxyContractMessages(
         get_nft_mint_iter(details)
             .map(|egg| babydragon_nft_mint_msg(nft_mint_owner.clone(), egg))
-            .map(|mint_msg| to_binary(&NftExecuteMsg::Mint(mint_msg)).map_err(|err| err.into()))
+            .map(|mint_msg| to_binary(&NftExecuteMsg::Mint(mint_msg?)).map_err(|err| err.into()))
             .collect::<Result<Vec<_>>>()?,
     ))
 }
@@ -74,28 +74,43 @@ pub(crate) struct MintMsg {
     pub extension: Metadata,
 }
 
-fn babydragon_nft_mint_msg(owner: String, egg: &NftHatchInfo) -> MintMsg {
+pub(crate) fn babydragon_nft_mint_msg(owner: String, egg: &NftHatchInfo) -> Result<MintMsg> {
     let mut metadata = Metadata::default();
 
-    // TODO - finalize the real NFT metadata
-    let attributes = [
-        ("Spirit Level", egg.spirit_level.to_string()),
-        ("Egg Id", egg.token_id.to_string()),
-    ]
-    .map(|(trait_type, value)| Trait {
-        display_type: None,
-        trait_type: trait_type.to_string(),
-        value,
-    });
+    let hatching_date = egg.hatch_time.try_into_chrono_datetime()?.format("%Y-%m-%d").to_string();
+
+    let mut attributes:Vec<Trait> = egg
+        .burn_metadata
+        .attributes
+        .as_ref()
+        .ok_or_else(|| anyhow!("no attributes"))?
+        .iter()
+        .filter(|attr| {
+            attr.trait_type != "Nesting Date"
+        })
+        .cloned()
+        .collect();
+
+    attributes.extend(
+        [
+            ("Hatching Date", hatching_date),
+        ]
+        .into_iter()
+        .map(|(trait_type, value)| Trait {
+            display_type: None,
+            trait_type: trait_type.to_string(),
+            value,
+        })
+    );
 
     metadata.image = Some(format!("ipfs://example/{}.png", egg.token_id));
-    metadata.name = Some(format!("Baby Dragon {}", egg.token_id));
-    metadata.description = Some("A cute little baby dragon fresh out of the cave".to_string());
-    metadata.attributes = Some(attributes.into_iter().collect());
+    metadata.name = Some(format!("Levana Dragon: #{}", egg.token_id));
+    metadata.description = Some("The mighty Levana dragon is a creature of legend, feared and respected by all who know of it. This dragon is a rare and valuable collectible, a symbol of power, strength, and wisdom. It is a reminder that even in the darkest of times, there is always hope.".to_string());
+    metadata.attributes = Some(attributes);
 
-    MintMsg {
+    Ok(MintMsg {
         token_id: egg.token_id.to_string(),
         owner,
         extension: metadata,
-    }
+    })
 }

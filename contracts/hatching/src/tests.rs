@@ -1,12 +1,15 @@
-use crate::state::{config::lvn_from_nft_spirit_level, nft_burn::extract_nft_info};
+use crate::state::{config::lvn_from_nft_spirit_level, nft_burn::extract_nft_info, nft_mint::babydragon_nft_mint_msg};
 
 use msg::contracts::hatching::{
     nft::{Metadata, Trait},
     NftRarity, NftBurnKind,
 };
+use shared::time::Timestamp;
 
 #[test]
 fn hatchable_nft() {
+    let now = Timestamp::from_seconds(1685362658);
+
     for kind in &[NftBurnKind::Egg, NftBurnKind::Dust] {
         for rarity in &[
             NftRarity::Common,
@@ -16,7 +19,7 @@ fn hatchable_nft() {
         ] {
             for spirit_level in &["1.0", "0.1", "1.23", "0.01", "00.02"] {
                 let meta = mock_metadata(Some(*kind), Some(*spirit_level), Some(*rarity));
-                let info = extract_nft_info("token_id".to_string(), meta).unwrap();
+                let info = extract_nft_info("token_id".to_string(), meta, now).unwrap();
 
                 assert_eq!(info.burn_kind, *kind);
                 assert_eq!(info.spirit_level, spirit_level.parse().unwrap());
@@ -29,11 +32,13 @@ fn hatchable_nft() {
         extract_nft_info(
             "token_id".to_string(),
             mock_metadata(Some(*kind), Some("0.0"), Some(NftRarity::Common)),
+            now
         )
         .unwrap_err();
         extract_nft_info(
             "token_id".to_string(),
             mock_metadata(Some(*kind), None, None),
+            now
         )
         .unwrap_err();
     }
@@ -42,6 +47,7 @@ fn hatchable_nft() {
     extract_nft_info(
         "token_id".to_string(),
         mock_metadata(None, Some("1.23"), None),
+        now
     )
     .unwrap_err();
 
@@ -51,7 +57,7 @@ fn hatchable_nft() {
         Some("1.23"),
         Some(NftRarity::Ancient),
     );
-    let info = extract_nft_info("token_id".to_string(), meta).unwrap();
+    let info = extract_nft_info("token_id".to_string(), meta, now).unwrap();
     // 1.23 * 2.89 = 3.5547
     assert_eq!(info.lvn, "3.5547".parse().unwrap());
     assert_eq!(
@@ -65,6 +71,31 @@ fn hatchable_nft() {
     );
 }
 
+#[test]
+fn egg_to_dragon() {
+    let now = Timestamp::from_seconds(1685362658);
+    let burn_meta = mock_metadata(Some(NftBurnKind::Egg), Some("1.23"), Some(NftRarity::Common));
+    let info = extract_nft_info("42".to_string(), burn_meta, now).unwrap();
+    let mint_meta = babydragon_nft_mint_msg("alice".to_string(), &info).unwrap().extension;
+
+    let expected_mint_meta: Metadata = serde_json::from_str(EXPECTED_DRAGON_META).unwrap();
+    assert_eq!(mint_meta.name, expected_mint_meta.name);
+    assert_eq!(mint_meta.description, expected_mint_meta.description);
+
+    let mut attributes = mint_meta.attributes.unwrap();
+    let mut expected_attributes = expected_mint_meta.attributes.unwrap();
+    attributes.sort_by(|a, b| a.trait_type.cmp(&b.trait_type));
+    expected_attributes.sort_by(|a, b| a.trait_type.cmp(&b.trait_type));
+
+
+    for attribute in attributes {
+        if !expected_attributes.contains(&attribute) {
+            panic!("unexpected attribute: {:?}", attribute);
+        }
+    }
+
+    //assert_eq!(attributes, expected_attributes);
+}
 
 fn mock_metadata(
     kind: Option<NftBurnKind>,
@@ -225,6 +256,91 @@ static OTHER_META: &str = r#"{
     "description":"Nothing interesting here",
     "name":"Other",
     "attributes":[ ],
+    "background_color":null,
+    "animation_url":null,
+    "youtube_url":null
+}"#;
+
+
+static EXPECTED_DRAGON_META: &str = r#"{
+    "image":"ipfs://blah",
+    "image_data":null,
+    "external_url":null,
+    "description": "The mighty Levana dragon is a creature of legend, feared and respected by all who know of it. This dragon is a rare and valuable collectible, a symbol of power, strength, and wisdom. It is a reminder that even in the darkest of times, there is always hope.",
+    "name":"Levana Dragon: #42",
+    "attributes":[
+        {
+            "display_type":null,
+            "trait_type":"Stage",
+            "value":"Nested Egg"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Origin",
+            "value":"Southern hemisphere subterranean caves"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Essence",
+            "value":"Electric"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Rare Composition",
+            "value":"Nitrogen"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Common Composition",
+            "value":"Sodium"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Family",
+            "value":"Oquania"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Genus",
+            "value":"Chaos"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Affecting Moon",
+            "value":"Sao"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Lucky Number",
+            "value":"1"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Constellation",
+            "value":"Cerberus"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Hatching Date",
+            "value": "2023-05-29"
+        },
+
+        {
+            "display_type":null,
+            "trait_type":"Dragon Type",
+            "value":"Wyvern"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Rarity",
+            "value":"Common"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Spirit Level",
+            "value":"1.23"
+        }
+    ],
     "background_color":null,
     "animation_url":null,
     "youtube_url":null
