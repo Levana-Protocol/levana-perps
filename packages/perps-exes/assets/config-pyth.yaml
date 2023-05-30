@@ -27,3 +27,8 @@ markets:
     feeds_usd: [
       {id: "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace", inverted: false }
     ]
+  ETH_USD:
+    feeds: [
+      # ETH/USD
+      {id: "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace", inverted: false }
+    ]

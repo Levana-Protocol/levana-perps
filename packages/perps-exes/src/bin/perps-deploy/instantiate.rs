@@ -442,6 +442,7 @@ pub(crate) async fn instantiate(
         position_token,
         liquidity_token_lp,
         liquidity_token_xlp,
+        price_admin: _,
     } in Factory::from_contract(factory).get_markets().await?
     {
         to_log.push((market_code_id.get_code_id(), market.get_address()));

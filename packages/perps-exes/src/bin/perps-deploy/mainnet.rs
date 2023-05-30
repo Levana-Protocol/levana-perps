@@ -2,9 +2,13 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, HasAddress};
-use perps_exes::prelude::*;
+use msg::{
+    contracts::market::{config::ConfigUpdate, entry::NewMarketParams},
+    token::TokenInit,
+};
+use perps_exes::{config::PythConfig, prelude::*};
 
-use crate::{cli::Opt, init_chain::TRACKER, util::get_hash_for_path};
+use crate::{cli::Opt, factory::Factory, init_chain::TRACKER, util::get_hash_for_path};
 
 #[derive(clap::Parser)]
 pub(crate) struct MainnetOpt {
@@ -49,6 +53,16 @@ enum Sub {
         #[clap(flatten)]
         inner: InstantiateFactoryOpts,
     },
+    /// Add a new market to an existing factory
+    AddMarket {
+        #[clap(flatten)]
+        inner: AddMarketOpts,
+    },
+    /// Set the Pyth price feeds for an already deployed market, mostly useful if a prior add-market failed to do this
+    SetPythFeeds {
+        #[clap(flatten)]
+        inner: SetPythFeedsOpts,
+    },
 }
 
 pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
@@ -68,6 +82,8 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
         Sub::InstantiateFactory { inner } => {
             instantiate_factory(opt, inner).await?;
         }
+        Sub::AddMarket { inner } => add_market(opt, inner).await?,
+        Sub::SetPythFeeds { inner } => set_pyth_feeds(opt, inner).await?,
     }
     Ok(())
 }
@@ -141,6 +157,41 @@ impl CodeIds {
         serde_yaml::to_writer(&mut file, self)
             .with_context(|| format!("Error saving CodeIds to {}", Self::PATH))
     }
+
+    fn get(
+        &self,
+        contract_type: ContractType,
+        opt: &Opt,
+        network: CosmosNetwork,
+    ) -> Result<StoredCodeId> {
+        let contract_path = opt.get_contract_path(contract_type.as_str());
+        let hash = get_hash_for_path(&contract_path)?;
+        let stored_contract = self.hashes.get(&hash).with_context(|| {
+            format!("Mainnet code IDs list does not include hash {hash}, do you need to store?")
+        })?;
+        anyhow::ensure!(stored_contract.contract_type == contract_type, "Mismatched contract type for SHA256 {hash}. Expected: {contract_type:?}. Found in file: {:?}", stored_contract.contract_type);
+        let code_id = stored_contract.code_ids.get(&network).with_context(|| format!("Mainnet code IDs list does not include hash {hash} on network {network}, do you need to store?")).copied()?;
+        anyhow::Ok(StoredCodeId {
+            gitrev: &stored_contract.gitrev,
+            hash,
+            code_id,
+        })
+    }
+
+    fn get_simple(
+        &self,
+        contract_type: ContractType,
+        opt: &Opt,
+        network: CosmosNetwork,
+    ) -> Result<u64> {
+        self.get(contract_type, opt, network).map(|x| x.code_id)
+    }
+}
+
+struct StoredCodeId<'a> {
+    gitrev: &'a str,
+    hash: String,
+    code_id: u64,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -260,6 +311,7 @@ struct MainnetFactories {
 struct MainnetFactory {
     address: Address,
     network: CosmosNetwork,
+    label: String,
     instantiate_code_id: u64,
     instantiate_at: DateTime<Utc>,
     gitrev: String,
@@ -305,26 +357,19 @@ async fn instantiate_factory(
         "Factory ID already in use: {id}"
     );
 
-    let get_code_id = |contract_type: ContractType| {
-        let contract_path = opt.get_contract_path(contract_type.as_str());
-        let hash = get_hash_for_path(&contract_path)?;
-        let stored_contract = code_ids.hashes.get(&hash).with_context(|| {
-            format!("Mainnet code IDs list does not include hash {hash}, do you need to store?")
-        })?;
-        anyhow::ensure!(stored_contract.contract_type == contract_type, "Mismatched contract type for SHA256 {hash}. Expected: {contract_type:?}. Found in file: {:?}", stored_contract.contract_type);
-        let code_id = stored_contract.code_ids.get(&network).with_context(|| format!("Mainnet code IDs list does not include hash {hash} on network {network}, do you need to store?")).copied()?;
-        anyhow::Ok((&stored_contract.gitrev, hash, code_id))
-    };
-
-    let (gitrev, hash, factory_code_id) = get_code_id(ContractType::Factory)?;
-    let (_, _, market) = get_code_id(ContractType::Market)?;
-    let (_, _, position) = get_code_id(ContractType::PositionToken)?;
-    let (_, _, liquidity) = get_code_id(ContractType::LiquidityToken)?;
+    let StoredCodeId {
+        gitrev,
+        hash,
+        code_id: factory_code_id,
+    } = code_ids.get(ContractType::Factory, &opt, network)?;
+    let market = code_ids.get_simple(ContractType::Market, &opt, network)?;
+    let position = code_ids.get_simple(ContractType::PositionToken, &opt, network)?;
+    let liquidity = code_ids.get_simple(ContractType::LiquidityToken, &opt, network)?;
     let factory = app.cosmos.make_code_id(factory_code_id);
     let factory = factory
         .instantiate(
             &app.wallet,
-            factory_label,
+            factory_label.clone(),
             vec![],
             msg::contracts::factory::entry::InstantiateMsg {
                 market_code_id: market.to_string(),
@@ -346,13 +391,188 @@ async fn instantiate_factory(
         MainnetFactory {
             address: factory.get_address(),
             network: network,
+            label: factory_label,
             instantiate_code_id: factory_code_id,
             instantiate_at: Utc::now(),
-            gitrev: gitrev.clone(),
+            gitrev: gitrev.to_owned(),
             hash,
         },
     );
     factories.save()?;
+
+    Ok(())
+}
+
+#[derive(clap::Parser)]
+struct AddMarketOpts {
+    /// Unique label used internally for this factory
+    #[clap(long)]
+    factory_id: String,
+    /// New market ID to add
+    #[clap(long)]
+    market_id: MarketId,
+    /// Denom of the native coin used for collateral
+    #[clap(long)]
+    collateral: String,
+    /// Initial borrow fee rate
+    #[clap(long, default_value = "0.2")]
+    initial_borrow_fee_rate: Decimal256,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+struct MarketConfigUpdates {
+    markets: HashMap<MarketId, ConfigUpdate>,
+}
+
+impl MarketConfigUpdates {
+    const PATH: &str = "packages/perps-exes/assets/market-config-updates.yaml";
+
+    fn load() -> Result<Self> {
+        let mut file = fs_err::File::open(Self::PATH)?;
+        serde_yaml::from_reader(&mut file)
+            .with_context(|| format!("Error loading MarketConfigUpdates from {}", Self::PATH))
+    }
+}
+
+async fn add_market(
+    opt: Opt,
+    AddMarketOpts {
+        factory_id,
+        market_id,
+        collateral,
+        initial_borrow_fee_rate,
+    }: AddMarketOpts,
+) -> Result<()> {
+    let market_config_update = {
+        let mut market_config_updates = MarketConfigUpdates::load()?;
+        market_config_updates
+            .markets
+            .remove(&market_id)
+            .with_context(|| format!("No config update found for market ID: {market_id}"))?
+    };
+
+    let pyth_config = PythConfig::load()?
+        .markets
+        .get(&market_id)
+        .with_context(|| format!("No Pyth config found for market {market_id}"))?;
+
+    let code_ids = CodeIds::load()?;
+    let factories = MainnetFactories::load()?;
+    let factory = factories
+        .factories
+        .get(&factory_id)
+        .with_context(|| format!("Unknown mainnet factory ID: {factory_id}"))?;
+    let app = opt.load_app_mainnet(Some(factory.network), None).await?;
+
+    log::info!("Deploying a new Pyth bridge");
+    let pyth_bridge = code_ids.get_simple(ContractType::PythBridge, &opt, factory.network)?;
+    let pyth_bridge = app
+        .cosmos
+        .make_code_id(pyth_bridge)
+        .instantiate(
+            &app.wallet,
+            format!("{} - {market_id} Pyth bridge", factory.label),
+            vec![],
+            msg::contracts::pyth_bridge::entry::InstantiateMsg {
+                factory: factory.address.get_address_string().into(),
+                pyth: app.pyth.address.get_address_string().into(),
+                update_age_tolerance_seconds: app.pyth.update_age_tolerance,
+            },
+        )
+        .await?;
+    log::info!("New Pyth bridge contract: {pyth_bridge}");
+
+    log::info!("Calling AddMarket on the factory");
+    let factory = app.cosmos.make_contract(factory.address);
+    let res = factory
+        .execute(
+            &app.wallet,
+            vec![],
+            msg::contracts::factory::entry::ExecuteMsg::AddMarket {
+                new_market: NewMarketParams {
+                    market_id: market_id.clone(),
+                    token: TokenInit::Native { denom: collateral },
+                    config: Some(market_config_update),
+                    price_admin: pyth_bridge.get_address_string().into(),
+                    initial_borrow_fee_rate,
+                },
+            },
+        )
+        .await?;
+    log::info!("New market added in transaction: {}", res.txhash);
+
+    log::info!("Setting price feed for market {market_id} to use Pyth Oracle.");
+    log::info!(
+        "Main price feeds: {:?}, USD price feeds: {:?}",
+        pyth_config.feeds,
+        pyth_config.feeds_usd
+    );
+    let res = pyth_bridge
+        .execute(
+            &app.wallet,
+            vec![],
+            msg::contracts::pyth_bridge::entry::ExecuteMsg::SetMarketPriceFeeds {
+                market_id,
+                market_price_feeds: pyth_config.clone(),
+            },
+        )
+        .await?;
+    log::info!("Called SetMarketPriceFeeds in {}", res.txhash);
+
+    Ok(())
+}
+
+#[derive(clap::Parser)]
+struct SetPythFeedsOpts {
+    /// Unique label used internally for this factory
+    #[clap(long)]
+    factory_id: String,
+    /// New market ID to add
+    #[clap(long)]
+    market_id: MarketId,
+}
+
+async fn set_pyth_feeds(
+    opt: Opt,
+    SetPythFeedsOpts {
+        factory_id,
+        market_id,
+    }: SetPythFeedsOpts,
+) -> Result<()> {
+    let pyth_config = PythConfig::load()?
+        .markets
+        .get(&market_id)
+        .with_context(|| format!("No Pyth config found for market {market_id}"))?;
+
+    let factories = MainnetFactories::load()?;
+    let factory = factories
+        .factories
+        .get(&factory_id)
+        .with_context(|| format!("Unknown mainnet factory ID: {factory_id}"))?;
+    let app = opt.load_app_mainnet(Some(factory.network), None).await?;
+
+    let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
+    let pyth_bridge = factory.get_market(market_id.clone()).await?.price_admin;
+    let pyth_bridge = app.cosmos.make_contract(pyth_bridge);
+
+    log::info!("Setting price feed for market {market_id} to use Pyth Oracle using Pyth bridge {pyth_bridge}.");
+    log::info!(
+        "Main price feeds: {:?}, USD price feeds: {:?}",
+        pyth_config.feeds,
+        pyth_config.feeds_usd
+    );
+    let res = pyth_bridge
+        .execute(
+            &app.wallet,
+            vec![],
+            msg::contracts::pyth_bridge::entry::ExecuteMsg::SetMarketPriceFeeds {
+                market_id,
+                market_price_feeds: pyth_config.clone(),
+            },
+        )
+        .await?;
+    log::info!("Called SetMarketPriceFeeds in {}", res.txhash);
 
     Ok(())
 }
