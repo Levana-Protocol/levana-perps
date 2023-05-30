@@ -119,11 +119,11 @@ cargo-bots-release:
 # Build bots docker image
 build-bots-image:
 	cp target/x86_64-unknown-linux-musl/release/perps-bots .ci/bots
-	cd .ci/bots && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps-multichain/bots:{{GIT_SHA}}
+	cd .ci/bots && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/bots:{{GIT_SHA}}
 
 # Push bots docker image
 push-bots-image:
-	docker push ghcr.io/levana-protocol/levana-perps-multichain/bots:{{GIT_SHA}}
+	docker push ghcr.io/levana-protocol/levana-perps/bots:{{GIT_SHA}}
 
 # Deploy to dragonfire
 deploy-dragonfire:
@@ -175,8 +175,41 @@ diagnostics-gui build-type exec-type:
 bots:
 	cargo run --bin perps-bots
 
-# Deploy hatching contract 
+# Rewards
+store-rewards:
+	just store-hatching
+	just store-ibc-execute
+	just store-lvn-rewards
+instantiate-rewards:
+	just instantiate-hatching
+	just instantiate-nft-mint
+	just instantiate-lvn-rewards
+create-rewards-channels juno-port stargaze-port osmosis-port:
+	just create-nft-mint-relayer-channel hatching-nft {{juno-port}} {{stargaze-port}} 
+	just create-lvn-grant-relayer-channel lvn-mint {{juno-port}} {{osmosis-port}}
+rewards-test:
+	just hatch-egg-test
+rewards-relayer-start:
+	rly start hatching-nft --debug
+	# TODO - add lvn
+	# rly start lvn-mint --debug
+
+# Rewards subcommands
 store-hatching:
 	cargo run --bin perps-deploy store-code --contracts=hatching --network=juno-testnet
+store-lvn-rewards:
+	cargo run --bin perps-deploy store-code --contracts=lvn-rewards --network=osmosis-testnet
 instantiate-hatching:
 	cargo run --bin perps-deploy instantiate-rewards --contracts=hatching --network=juno-testnet
+instantiate-lvn-rewards:
+	cargo run --bin perps-deploy instantiate-rewards --contracts=lvn-rewards --network=osmosis-testnet
+store-ibc-execute:
+	cargo run --bin perps-deploy store-code --contracts=ibc-execute-proxy --network=stargaze-testnet
+instantiate-nft-mint:
+	cargo run --bin perps-deploy instantiate-rewards --contracts=ibc-execute-proxy --ibc-execute-proxy-target=nft-mint --network=stargaze-testnet
+hatch-egg-test:
+	cargo run --bin rewards-test hatch-egg --hatch-network=juno-testnet --nft-mint-network=stargaze-testnet --lvn-rewards-network=osmosis-testnet
+create-nft-mint-relayer-channel path-name juno-port stargaze-port:
+	rly transact channel {{path-name}} --src-port {{juno-port}} --dst-port {{stargaze-port}} --order unordered --version nft-mint-001 --debug --override
+create-lvn-grant-relayer-channel path-name juno-port osmosis-port:
+	rly transact channel {{path-name}} --src-port {{juno-port}} --dst-port {{osmosis-port}} --order unordered --version lvn-grant-001 --debug --override

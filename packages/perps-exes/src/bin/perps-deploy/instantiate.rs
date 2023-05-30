@@ -2,6 +2,7 @@ use std::{collections::HashSet, str::FromStr};
 
 use anyhow::{Context, Result};
 use cosmos::{Address, CodeId, HasAddress};
+use msg::contracts::market::entry::ExecuteOwnerMsg;
 use msg::contracts::pyth_bridge::PythMarketPriceFeeds;
 use msg::prelude::*;
 use msg::{
@@ -305,15 +306,18 @@ pub(crate) async fn instantiate(
                 if let Some(new_admin) = faucet_admin {
                     // Try adding the wallet manager address as a faucet admin. Ignore errors, it
                     // (probably) just means we've already added that address.
-                    log::info!(
-                        "Trying to set {new_admin} as a faucet admin on {}",
-                        faucet.get_address()
-                    );
-                    match faucet.add_admin(wallet, new_admin).await {
-                        Ok(res) => log::info!("Admin set in {}", res.txhash),
-                        Err(e) => log::info!(
-                            "Didn't succeed, probably because we're already an admin: {e:?}"
-                        ),
+                    if faucet.is_admin(new_admin).await? {
+                        log::info!(
+                            "{new_admin} is already a faucet admin for {}",
+                            faucet.get_address()
+                        );
+                    } else {
+                        log::info!(
+                            "Trying to set {new_admin} as a faucet admin on {}",
+                            faucet.get_address()
+                        );
+                        let res = faucet.add_admin(wallet, new_admin).await?;
+                        log::info!("Admin set in {}", res.txhash);
                     }
                 }
 
@@ -399,6 +403,27 @@ pub(crate) async fn instantiate(
                 .await?;
             log::info!(
                 "Set market on the new trading competition CW20 at {}",
+                res.txhash
+            );
+
+            let res = cosmos
+                .make_contract(market_addr)
+                .execute(
+                    wallet,
+                    vec![],
+                    msg::contracts::market::entry::ExecuteMsg::Owner(
+                        ExecuteOwnerMsg::ConfigUpdate {
+                            update: ConfigUpdate {
+                                disable_position_nft_exec: Some(true),
+                                ..Default::default()
+                            },
+                        },
+                    ),
+                )
+                .await?;
+
+            log::info!(
+                "Disabled NFT executions for new trading competition at {}",
                 res.txhash
             );
         }

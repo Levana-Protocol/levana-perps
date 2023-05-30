@@ -9,7 +9,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use cosmwasm_std::{Decimal256, OverflowError, Uint256};
+use cosmwasm_std::{Decimal256, OverflowError, Uint128, Uint256};
 
 /// needed to get around the orphan rule
 #[cfg(feature = "arbitrary")]
@@ -288,6 +288,8 @@ unsigned!(Base);
 unsigned!(Quote);
 unsigned!(Usd);
 unsigned!(LpToken);
+unsigned!(FarmingToken);
+unsigned!(LvnToken);
 
 /// Wrap up any [UnsignedDecimal] to provide negative values too.
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -580,6 +582,11 @@ impl<T: UnsignedDecimal> NonZero<T> {
         T::try_from_number(src).ok().and_then(NonZero::new)
     }
 
+    /// Try to convert a general purpose [Decimal256] into this type.
+    pub fn try_from_decimal(src: Decimal256) -> Option<Self> {
+        NonZero::new(T::from_decimal256(src))
+    }
+
     /// Try to convert a signed value into a non-zero.
     pub fn try_from_signed(src: Signed<T>) -> Result<Self> {
         src.try_into_positive_value()
@@ -702,5 +709,56 @@ impl<T: UnsignedDecimal> Signed<T> {
     /// Multiply by a raw number
     pub fn checked_mul_number(self, rhs: Signed<Decimal256>) -> Result<Self> {
         self.into_number().checked_mul(rhs).map(Self::from_number)
+    }
+}
+
+/// How much to divide an atomic value by to get to an LP token amount.
+/// The token uses 6 digits of precision, and Decimal256 uses 18 digits of precision.
+/// So to truncate the Decimal256's atomic representation to the Uint128 representation,
+/// we need to remove 12 digits (18 - 6).
+const LP_TOKEN_DIVIDER: u64 = 1_000_000_000_000;
+
+impl LpToken {
+    /// The hard-coded precision of the LP and xLP token contracts.
+    pub const PRECISION: u8 = 6;
+
+    /// Convert into a u128 representation for contract interactions.
+    ///
+    /// Note that this is a lossy conversion, and will truncate some data.
+    pub fn into_u128(self) -> Result<u128> {
+        Ok(Uint128::try_from(
+            self.into_decimal256()
+                .atomics()
+                .checked_div(LP_TOKEN_DIVIDER.into())?,
+        )?
+        .u128())
+    }
+
+    /// Convert from a u128 representation.
+    pub fn from_u128(x: u128) -> Result<Self> {
+        Ok(LpToken::from_decimal256(Decimal256::from_atomics(
+            x,
+            Self::PRECISION.into(),
+        )?))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lp_token_u128_roundtrip() {
+        assert_eq!(
+            LpToken::from_str("12.3456789")
+                .unwrap()
+                .into_u128()
+                .unwrap(),
+            12345678
+        );
+        assert_eq!(
+            LpToken::from_str("12.345678").unwrap(),
+            LpToken::from_u128(12345678).unwrap(),
+        );
     }
 }

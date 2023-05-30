@@ -9,6 +9,8 @@ pub mod position_helpers;
 pub mod response;
 //pub mod test_strategies;
 pub mod arbitrary;
+pub mod contracts;
+pub mod rewards_helpers;
 pub mod time;
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -19,6 +21,7 @@ use cosmwasm_std::{
 };
 use cw_multi_test::{App, AppResponse, BankSudo, Contract, Executor, SudoMsg};
 use dotenv::dotenv;
+use msg::contracts::rewards::entry::ConfigUpdate;
 use msg::prelude::*;
 use msg::token::Token;
 use rand::rngs::ThreadRng;
@@ -42,6 +45,7 @@ pub struct PerpsApp {
     pub users: HashSet<Addr>,
     pub factory_addr: Addr,
     pub log_block_time_changes: bool,
+    pub rewards_addr: Addr,
 }
 
 impl Deref for PerpsApp {
@@ -67,6 +71,8 @@ pub(crate) enum PerpsContract {
     PositionToken,
     LiquidityToken,
     Cw20,
+    Rewards,
+    Farming,
 }
 
 impl PerpsApp {
@@ -83,6 +89,8 @@ impl PerpsApp {
         let cw20_code_id = app.store_code(contract_cw20());
         let position_token_code_id = app.store_code(contract_position_token());
         let liquidity_token_code_id = app.store_code(contract_liquidity_token());
+        let rewards_code_id = app.store_code(contract_rewards());
+        let farming_code_id = app.store_code(contract_farming());
 
         let factory_addr = app.instantiate_contract(
             factory_code_id,
@@ -103,6 +111,22 @@ impl PerpsApp {
             Some(TEST_CONFIG.migration_admin.clone()),
         )?;
 
+        let rewards_addr = app.instantiate_contract(
+            rewards_code_id,
+            Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &msg::contracts::rewards::entry::InstantiateMsg {
+                config: ConfigUpdate {
+                    immediately_transferable: Decimal256::from_str("0.25")?,
+                    token_denom: TEST_CONFIG.rewards_token_denom.clone(),
+                    unlock_duration_seconds: 60,
+                    factory_addr: factory_addr.clone().into_string(),
+                },
+            },
+            &[],
+            "rewards",
+            Some(TEST_CONFIG.migration_admin.clone()),
+        )?;
+
         let mut _self = PerpsApp {
             code_ids: [
                 (PerpsContract::Factory, factory_code_id),
@@ -110,6 +134,8 @@ impl PerpsApp {
                 (PerpsContract::Cw20, cw20_code_id),
                 (PerpsContract::PositionToken, position_token_code_id),
                 (PerpsContract::LiquidityToken, liquidity_token_code_id),
+                (PerpsContract::Rewards, rewards_code_id),
+                (PerpsContract::Farming, farming_code_id),
             ]
             .into(),
             app,
@@ -118,18 +144,14 @@ impl PerpsApp {
             rng: rand::thread_rng(),
             users: HashSet::new(),
             log_block_time_changes: false,
+            rewards_addr,
         };
 
         Ok(_self)
     }
 
     // returned bool is true iff it's a newly created user
-    pub(crate) fn get_user(
-        &mut self,
-        name: &str,
-        token: &Token,
-        funds: Number,
-    ) -> Result<(Addr, bool)> {
+    pub fn get_user(&mut self, name: &str, token: &Token, funds: Number) -> Result<(Addr, bool)> {
         let addr = Addr::unchecked(name);
         if self.users.contains(&addr) {
             Ok((addr, false))
@@ -150,7 +172,7 @@ impl PerpsApp {
      * * `addr` - Receiver of minted coins
      * * `coins` - Coins to mint
      */
-    pub(crate) fn mint_token(
+    pub fn mint_token(
         &mut self,
         recipient: &Addr,
         token: &Token,
@@ -191,7 +213,7 @@ impl PerpsApp {
         self.app.wrap()
     }
 
-    pub(crate) fn set_block_info(&mut self, change: BlockInfoChange) {
+    pub fn set_block_info(&mut self, change: BlockInfoChange) {
         self.app.update_block(|block_info| {
             let BlockInfoChange { height, nanos } = change;
             let time_before = block_info.time;
@@ -296,6 +318,22 @@ pub(crate) fn contract_factory() -> Box<dyn Contract<Empty>> {
         )
         .with_reply(factory::contract::reply),
     )
+}
+
+pub(crate) fn contract_rewards() -> Box<dyn Contract<Empty>> {
+    Box::new(LocalContractWrapper::new(
+        rewards::contract::instantiate,
+        rewards::contract::execute,
+        rewards::contract::query,
+    ))
+}
+
+pub(crate) fn contract_farming() -> Box<dyn Contract<Empty>> {
+    Box::new(LocalContractWrapper::new(
+        farming::lifecycle::instantiate,
+        farming::execute::execute,
+        farming::query::query,
+    ))
 }
 
 // struct to satisfy the `Contract` trait

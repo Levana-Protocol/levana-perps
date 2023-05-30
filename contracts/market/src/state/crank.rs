@@ -3,7 +3,10 @@ use cosmwasm_std::Order;
 use cw_storage_plus::{Bound, PrefixBound};
 use msg::contracts::market::{
     crank::{events::CrankExecBatchEvent, CrankWorkInfo},
-    position::{ClosePositionInstructions, MaybeClosedPosition, PositionCloseReason},
+    position::{
+        events::PositionSaveReason, ClosePositionInstructions, MaybeClosedPosition,
+        PositionCloseReason,
+    },
 };
 
 use shared::prelude::*;
@@ -14,7 +17,7 @@ use super::position::{get_position, NEXT_LIQUIFUNDING, NEXT_STALE, OPEN_POSITION
 ///
 /// If this is unavailable, we've never completed cranking, and we should find
 /// the very first price timestamp.
-const LAST_CRANK_COMPLETED: Item<Timestamp> = Item::new(namespace::LAST_CRANK_COMPLETED);
+pub(super) const LAST_CRANK_COMPLETED: Item<Timestamp> = Item::new(namespace::LAST_CRANK_COMPLETED);
 
 pub(crate) fn crank_init(store: &mut dyn Storage, env: &Env) -> Result<()> {
     LAST_CRANK_COMPLETED
@@ -35,19 +38,28 @@ impl State<'_> {
     /// liquidation prices to the liquidation data structures, bypassing the
     /// unpending queue.
     pub(crate) fn is_crank_up_to_date(&self, store: &dyn Storage) -> Result<bool> {
-        // Specifically using pattern matching to make the overly-conservative
-        // behavior clearer.
-        #[allow(clippy::redundant_pattern_matching)]
         Ok(match self.next_crank_timestamp(store)? {
             // No price point exists after the last crank completed, therefore
             // we're fully up to date
             None => true,
-            // There is a price point that still needs to be calculated. We
-            // _could_ be more lax and consider the protocol up to date if the
-            // next crank is for the most recent price point. However, to be
-            // more conservative, we'll only consider it up to date if all price
-            // points are processed.
-            Some(_) => false,
+            Some(next_crank_timestamp) => {
+                // There is a price point that still needs to be calculated. We
+                // never crank the very latest price point, so check if there's
+                // a newer price point. If there is, we're falling behind on the
+                // crank. If the next price update available is the most recent
+                // price update: we're fully up to date.
+                let latest_price = self.spot_price_latest_opt(store)?;
+                match latest_price {
+                    // This should really never happen since we know there's at
+                    // least one price point available by the return from
+                    // next_crank_timestamp. But if it does, we'll default to
+                    // being not up to date.
+                    None => false,
+                    // Only consider the crank up to date if the two timestamps
+                    // match.
+                    Some(latest_price) => latest_price.timestamp == next_crank_timestamp.timestamp,
+                }
+            }
         })
     }
 
@@ -184,7 +196,14 @@ impl State<'_> {
                 let pos = get_position(ctx.storage, position)?;
                 let starts_at = pos.liquifunded_at;
                 let ends_at = pos.next_liquifunding;
-                self.position_liquifund_store(ctx, pos, starts_at, ends_at, true)?;
+                self.position_liquifund_store(
+                    ctx,
+                    pos,
+                    starts_at,
+                    ends_at,
+                    true,
+                    PositionSaveReason::Crank,
+                )?;
             }
             CrankWorkInfo::UnpendLiquidationPrices { position } => {
                 self.unpend_liquidation_prices(ctx, position)?;

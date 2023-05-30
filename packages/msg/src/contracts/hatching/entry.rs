@@ -1,20 +1,30 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
+use shared::storage::RawAddr;
 
-use super::HatchStatus;
+use super::{HatchStatus, NftHatchInfo, ProfileInfo};
 
 /// Instantiate message
 #[cw_serde]
 pub struct InstantiateMsg {
-    pub burn_egg_contract: String,
-    pub burn_dust_contract: String,
+    pub burn_egg_contract: RawAddr,
+    pub burn_dust_contract: RawAddr,
+    pub profile_contract: RawAddr,
 }
 
 #[cw_serde]
 pub enum ExecuteMsg {
     /// hatch and get rewards
     Hatch {
+        /// Must be a valid address on the target minting network
+        nft_mint_owner: String,
+        /// Must be a valid address on the target lvn network
+        lvn_grant_address: String,
+        /// list of egg nft token ids to hatch
         eggs: Vec<String>,
+        /// list of dust nft token ids to hatch
         dusts: Vec<String>,
+        /// whether to also "hatch" the profile, i.e. drain the spirit level into lvn
+        profile: bool,
     },
 
     /// Retry a hatch that's stuck
@@ -28,13 +38,27 @@ pub enum QueryMsg {
     #[returns(super::config::Config)]
     Config {},
 
+    /// Query what a hatch would look like
+    /// * returns [PotentialHatchInfo]
+    #[returns(PotentialHatchInfo)]
+    PotentialHatchInfo {
+        /// The owner
+        owner: RawAddr,
+        /// list of egg nft token ids to hatch
+        eggs: Vec<String>,
+        /// list of dust nft token ids to hatch
+        dusts: Vec<String>,
+        /// whether to also "hatch" the profile, i.e. drain the spirit level into lvn
+        profile: bool,
+    },
+
     /// * returns [MaybeHatchStatusResp]
     #[returns(MaybeHatchStatusResp)]
     OldestHatchStatus { details: bool },
 
     /// * returns [MaybeHatchStatusResp]
     #[returns(MaybeHatchStatusResp)]
-    HatchStatusByOwner { owner: String, details: bool },
+    HatchStatusByOwner { owner: RawAddr, details: bool },
 
     /// * returns [MaybeHatchStatusResp]
     #[returns(MaybeHatchStatusResp)]
@@ -59,6 +83,13 @@ impl From<(u64, HatchStatus)> for HatchStatusResp {
             status,
         }
     }
+}
+
+#[cw_serde]
+pub struct PotentialHatchInfo {
+    pub eggs: Vec<NftHatchInfo>,
+    pub dusts: Vec<NftHatchInfo>,
+    pub profile: Option<ProfileInfo>,
 }
 
 /// Placeholder migration message

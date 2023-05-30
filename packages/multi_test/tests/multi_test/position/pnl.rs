@@ -253,6 +253,8 @@ fn position_pnl_long_and_short_precise() {
     market
         .exec_set_config(ConfigUpdate {
             liquifunding_delay_seconds: Some(60 * 60),
+            // We need precise liquifunding periods for this test so remove randomization
+            liquifunding_delay_fuzz_seconds: Some(0),
             delta_neutrality_fee_tax: Some(Decimal256::zero()),
             ..Default::default()
         })

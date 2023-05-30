@@ -1,13 +1,14 @@
 mod ibc;
 pub use ibc::*;
-mod nft_mint;
-pub use nft_mint::*;
 mod lvn;
 mod nft_burn;
+pub mod nft_mint;
 pub use lvn::*;
 mod hatch;
 pub use hatch::*;
 pub mod config;
+mod profile;
+pub use profile::*;
 
 use msg::contracts::hatching::config::Config;
 
@@ -19,6 +20,7 @@ use cosmwasm_std::{Api, Deps, DepsMut, Empty, Env, QuerierWrapper, Storage};
 use self::config::load_config;
 
 pub(crate) struct State<'a> {
+    #[allow(dead_code)]
     pub(crate) api: &'a dyn Api,
     pub(crate) env: Env,
     pub(crate) querier: QuerierWrapper<'a, Empty>,

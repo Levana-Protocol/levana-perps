@@ -7,6 +7,7 @@ use tower_http::cors::CorsLayer;
 
 mod app;
 mod cli;
+pub(crate) mod config;
 mod endpoints;
 mod util;
 pub(crate) mod watcher;
@@ -43,6 +44,7 @@ impl AppBuilder {
                 .route("/api/faucet", post(endpoints::faucet::bot))
                 .route("/status", get(endpoints::status::all))
                 .route("/markets", get(endpoints::markets::markets))
+                .route("/debug/gas-usage", get(endpoints::debug::gases))
                 .with_state(app)
                 .layer(
                     CorsLayer::new()

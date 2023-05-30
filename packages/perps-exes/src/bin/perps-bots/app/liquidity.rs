@@ -28,7 +28,7 @@ impl AppBuilder {
 #[async_trait]
 impl WatchedTaskPerMarket for Liquidity {
     async fn run_single_market(
-        &self,
+        &mut self,
         _app: &App,
         factory: &FactoryInfo,
         market: &MarketId,
@@ -59,7 +59,7 @@ async fn single_market(
         .liquidity_config
         .markets
         .get(market_id)
-        .context("No bounds available for market {market_id}")?;
+        .with_context(|| format!("No bounds available for market {market_id}"))?;
     let min_liquidity = bounds.min;
     let max_liquidity = bounds.max;
     let util = if total.is_zero() {
@@ -86,10 +86,19 @@ async fn single_market(
         )
     })?;
 
-    let action = if let Ok(want_to_remove) = lp_info.lp_collateral.checked_sub(max_liquidity) {
-        Action::Withdraw(want_to_remove.min(status.liquidity.unlocked))
-    } else if let Ok(missing) = min_liquidity.checked_sub(lp_info.lp_collateral) {
-        Action::Deposit(missing + Collateral::one())
+    let action = if let Some(want_to_remove) = lp_info
+        .lp_collateral
+        .checked_sub(max_liquidity)
+        .ok()
+        .and_then(NonZero::new)
+    {
+        Action::Withdraw(want_to_remove.raw().min(status.liquidity.unlocked))
+    } else if let Some(missing) = min_liquidity
+        .checked_sub(lp_info.lp_collateral)
+        .ok()
+        .and_then(NonZero::new)
+    {
+        Action::Deposit(missing.raw() + Collateral::one())
     } else if util < low_util {
         Action::Withdraw(total.checked_sub(target_liquidity)?)
     } else if util > high_util {

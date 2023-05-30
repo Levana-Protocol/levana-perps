@@ -230,6 +230,7 @@ fn position_data_open_flip_short() {
             },
             entry_price,
             MarketType::CollateralIsBase,
+            None,
         )
         .unwrap();
 
@@ -295,6 +296,7 @@ fn position_data_open_flip_long() {
             },
             entry_price,
             MarketType::CollateralIsBase,
+            None,
         )
         .unwrap();
 

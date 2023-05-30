@@ -8,8 +8,9 @@ use msg::{
     },
     prelude::*,
 };
-use perps_exes::config::DeploymentConfig;
 use pyth_sdk_cw::PriceIdentifier;
+
+use crate::config::BotConfig;
 
 #[derive(Clone)]
 pub(crate) struct Pyth {
@@ -39,7 +40,7 @@ impl std::fmt::Debug for Pyth {
 impl Pyth {
     pub async fn new(
         cosmos: &Cosmos,
-        config: &DeploymentConfig,
+        config: &BotConfig,
         bridge_addr: Address,
         market_id: MarketId,
     ) -> Result<Self> {

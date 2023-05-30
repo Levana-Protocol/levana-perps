@@ -1,15 +1,18 @@
 mod balance;
 mod crank;
 pub(crate) mod factory;
+pub(crate) mod faucet;
 mod gas_check;
 mod liquidity;
 mod price;
+mod stale;
+mod stats;
 mod trader;
 mod types;
+mod ultra_crank;
 mod utilization;
 
 use anyhow::Result;
-use cosmos::HasAddress;
 pub(crate) use types::*;
 
 impl AppBuilder {
@@ -30,7 +33,7 @@ impl AppBuilder {
             self.app.config.wallet_manager.get_minter_address(),
             "wallet-manager",
         )?;
-        let faucet_bot_address = self.app.faucet_bot.wallet.read().await.get_address();
+        let faucet_bot_address = self.app.faucet_bot.get_wallet_address();
         self.refill_gas(faucet_bot_address, "faucet-bot")?;
 
         let price_wallet = self.app.config.price_wallet.clone();
@@ -39,7 +42,14 @@ impl AppBuilder {
             self.start_price(price_wallet).await?;
         }
 
-        self.start_crank_bot().await?;
+        self.start_crank_bot()?;
+        self.start_ultra_crank_bot()?;
+
+        if !self.app.config.ignore_stale {
+            self.track_stale()?;
+        }
+
+        self.track_stats()?;
 
         let balance_wallet = self.get_track_wallet("balance")?;
         if self.app.config.balance {

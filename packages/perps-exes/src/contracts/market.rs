@@ -152,7 +152,9 @@ impl MarketContract {
         };
         self.exec_with_funds(wallet, status, deposit, &msg)
             .await
-            .with_context(|| format!("Opening position with parameters {msg:?}"))
+            .with_context(|| {
+                format!("Opening position with collateral {deposit} and parameters {msg:?}")
+            })
     }
 
     pub async fn get_some_positions(

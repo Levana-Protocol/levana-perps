@@ -19,8 +19,8 @@ use cosmwasm_std::{Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Respons
 use cw2::{get_contract_version, set_contract_version};
 use msg::{
     contracts::market::{
-        entry::{DeltaNeutralityFeeResp, InstantiateMsg, MigrateMsg},
-        position::{PositionId, PositionOrPendingClose, PositionsResp},
+        entry::{DeltaNeutralityFeeResp, InstantiateMsg, MigrateMsg, SpotPriceHistoryResp},
+        position::{events::PositionSaveReason, PositionId, PositionOrPendingClose, PositionsResp},
     },
     shutdown::ShutdownImpact,
 };
@@ -77,7 +77,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     // update borrow fee rate gradually
     state
         .accumulate_borrow_fee_rate(&mut ctx, state.now())
-        .context("accumulate_borrow_fee_rate failed")?;
+        .map_err(|e| anyhow::anyhow!("accumulate_borrow_fee_rate failed: {e:?}"))?;
 
     fn handle_update_position_shared(
         state: &State,
@@ -109,7 +109,14 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         let pos = get_position(ctx.storage, id)?;
 
         let starts_at = pos.liquifunded_at;
-        state.position_liquifund_store(ctx, pos, starts_at, now, false)?;
+        state.position_liquifund_store(
+            ctx,
+            pos,
+            starts_at,
+            now,
+            false,
+            PositionSaveReason::Update,
+        )?;
 
         Ok(())
     }
@@ -430,6 +437,20 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
         QueryMsg::Status {} => state.status(store)?.query_result(),
 
         QueryMsg::SpotPrice { timestamp } => state.spot_price(store, timestamp)?.query_result(),
+        QueryMsg::SpotPriceHistory {
+            start_after,
+            limit,
+            order,
+        } => {
+            let price_points = state.historical_spot_prices(
+                store,
+                start_after,
+                limit.map(|l| l.try_into()).transpose()?,
+                order.map(|o| o.into()),
+            )?;
+
+            SpotPriceHistoryResp { price_points }.query_result()
+        }
 
         QueryMsg::Positions {
             position_ids,

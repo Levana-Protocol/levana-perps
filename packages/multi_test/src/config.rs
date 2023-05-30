@@ -1,6 +1,7 @@
 use msg::prelude::*;
 use once_cell::sync::Lazy;
 use std::env;
+use std::string::ToString;
 
 // Global config
 pub struct TestConfig {
@@ -12,6 +13,7 @@ pub struct TestConfig {
     pub wind_down: String,
     pub cw20_decimals: u8,
     pub new_user_funds: Number,
+    pub rewards_token_denom: String,
 }
 
 pub static TEST_CONFIG: Lazy<TestConfig> = Lazy::new(|| TestConfig {
@@ -29,6 +31,7 @@ pub static TEST_CONFIG: Lazy<TestConfig> = Lazy::new(|| TestConfig {
         .unwrap_or_else(|_| "1000000000000".to_string())
         .try_into()
         .unwrap(),
+    rewards_token_denom: "REWARDS_DENOM".to_string(),
 });
 
 // Config/defaults for the typical scenario of creating a single market at a time

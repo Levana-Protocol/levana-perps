@@ -65,8 +65,8 @@ impl State<'_> {
                     "{}-{}",
                     self.market_id(store)?,
                     match kind {
-                        LiquidityTokenKind::Lp => "lp",
-                        LiquidityTokenKind::Xlp => "xlp",
+                        LiquidityTokenKind::Lp => "LEVLP",
+                        LiquidityTokenKind::Xlp => "LEVxLP",
                     }
                 );
                 let liquidity_stats = self.load_liquidity_stats(store)?;

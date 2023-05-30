@@ -50,6 +50,10 @@ pub(crate) fn update_config(
         crank_fee_charged,
         crank_fee_reward,
         minimum_deposit_usd: minimum_deposit,
+        unpend_limit,
+        liquifunding_delay_fuzz_seconds,
+        max_liquidity,
+        disable_position_nft_exec,
     }: ConfigUpdate,
 ) -> Result<()> {
     if let Some(x) = trading_fee_notional_size {
@@ -149,6 +153,18 @@ pub(crate) fn update_config(
     }
     if let Some(x) = minimum_deposit {
         config.minimum_deposit_usd = x;
+    }
+    if let Some(x) = unpend_limit {
+        config.unpend_limit = x;
+    }
+    if let Some(x) = liquifunding_delay_fuzz_seconds {
+        config.liquifunding_delay_fuzz_seconds = x;
+    }
+    if let Some(x) = max_liquidity {
+        config.max_liquidity = x;
+    }
+    if let Some(x) = disable_position_nft_exec {
+        config.disable_position_nft_exec = x;
     }
 
     config.validate()?;

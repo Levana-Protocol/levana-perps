@@ -7,7 +7,10 @@ use msg::{contracts::market::entry::StatusResp, prelude::*};
 use perps_exes::prelude::*;
 use rand::Rng;
 
-use crate::watcher::{WatchedTaskOutput, WatchedTaskPerMarket};
+use crate::{
+    config::BotConfig,
+    watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
+};
 
 use super::{factory::FactoryInfo, App, AppBuilder};
 
@@ -29,7 +32,7 @@ impl AppBuilder {
 #[async_trait]
 impl WatchedTaskPerMarket for Trader {
     async fn run_single_market(
-        &self,
+        &mut self,
         _app: &App,
         factory: &FactoryInfo,
         _market: &MarketId,
@@ -43,7 +46,7 @@ pub(crate) struct EnsureCollateral<'a> {
     pub(crate) market: &'a MarketContract,
     pub(crate) wallet: &'a Wallet,
     pub(crate) status: &'a StatusResp,
-    pub(crate) config: &'a DeploymentConfig,
+    pub(crate) config: &'a BotConfig,
     pub(crate) cosmos: &'a Cosmos,
     pub(crate) min: Collateral,
     pub(crate) to_mint: Collateral,

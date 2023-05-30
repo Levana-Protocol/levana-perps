@@ -12,6 +12,17 @@ impl From<HatchStartEvent> for cosmwasm_std::Event {
     }
 }
 
+pub struct HatchRetryEvent {
+    pub id: u64,
+    pub details: HatchDetails,
+}
+impl PerpEvent for HatchRetryEvent {}
+impl From<HatchRetryEvent> for cosmwasm_std::Event {
+    fn from(src: HatchRetryEvent) -> Self {
+        mixin_hatch_event(cosmwasm_std::Event::new("hatch-retry"), src.id, src.details)
+    }
+}
+
 pub struct HatchCompleteEvent {
     pub id: u64,
     pub details: HatchDetails,
@@ -36,7 +47,8 @@ fn mixin_hatch_event(
         .add_attribute("hatch-id", hatch_id.to_string())
         .add_attribute("eggs-len", details.eggs.len().to_string())
         .add_attribute("dusts-len", details.dusts.len().to_string())
-        .add_attribute("owner", details.owner.to_string());
+        .add_attribute("original-owner", details.original_owner.to_string())
+        .add_attribute("nft-mint-owner", details.nft_mint_owner.to_string());
 
     for (i, egg) in details.eggs.into_iter().enumerate() {
         event = event
@@ -53,6 +65,12 @@ fn mixin_hatch_event(
                 format!("dust-spirit-level-{i}"),
                 dust.spirit_level.to_string(),
             );
+    }
+
+    if let Some(profile) = details.profile {
+        event = event
+            .add_attribute("profile-lvn", profile.lvn.to_string())
+            .add_attribute("profile-spirit-level", profile.spirit_level.to_string())
     }
 
     event

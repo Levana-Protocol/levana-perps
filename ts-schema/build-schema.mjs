@@ -69,7 +69,7 @@ async function generateTs(srcFolder, targetFolder, combineFolder = false) {
             if (!contract_name || contract_name === "") {
                 const ts = await compileFromFile(src);
                 const basename = path.basename(src);
-                const dest = path.resolve(`${targetFolder}/${basename.replace(".json", ".d.ts")}`);
+                const dest = path.resolve(`${targetFolder}/${basename.replace(".json", ".ts")}`);
                 fsExtra.writeFileSync(dest, ts);
             } else {
                 // The top-level export is not a valid JSON schema
@@ -78,7 +78,7 @@ async function generateTs(srcFolder, targetFolder, combineFolder = false) {
                     if (data?.hasOwnProperty("$schema")) {
                         const name = `${contract_name}_${key}`;
                         const ts = await compile(data, name);
-                        const dest = path.resolve(`${targetFolder}/${name}.d.ts`);
+                        const dest = path.resolve(`${targetFolder}/${name}.ts`);
 
                         fsExtra.writeFileSync(dest, ts);
                     }
@@ -89,7 +89,7 @@ async function generateTs(srcFolder, targetFolder, combineFolder = false) {
                         if (data?.hasOwnProperty("$schema")) {
                             const name = `${contract_name}_response_to_${key}`;
                             const ts = await compile(data, name);
-                            const dest = path.resolve(`${targetFolder}/${name}.d.ts`);
+                            const dest = path.resolve(`${targetFolder}/${name}.ts`);
 
                             fsExtra.writeFileSync(dest, ts);
                         }

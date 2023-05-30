@@ -39,22 +39,13 @@ impl State<'_> {
             market_type,
         })
     }
-
     fn spot_price_inner(
         &self,
         store: &dyn Storage,
         timestamp: Timestamp,
         inclusive: bool,
     ) -> Result<PricePoint> {
-        let max = if inclusive {
-            Bound::inclusive(timestamp)
-        } else {
-            Bound::exclusive(timestamp)
-        };
-
-        let (timestamp, price_storage) = PRICES
-            .range(store, None, Some(max), Order::Descending)
-            .next()
+        self.spot_price_inner_opt(store, timestamp, inclusive)?
             .ok_or_else(|| {
                 perp_error!(
                     ErrorId::PriceNotFound,
@@ -62,8 +53,32 @@ impl State<'_> {
                     "there is no spot price for timestamp {}",
                     timestamp
                 )
-            })??;
-        self.make_price_point(store, timestamp, price_storage)
+                .into()
+            })
+    }
+
+    fn spot_price_inner_opt(
+        &self,
+        store: &dyn Storage,
+        timestamp: Timestamp,
+        inclusive: bool,
+    ) -> Result<Option<PricePoint>> {
+        let max = if inclusive {
+            Bound::inclusive(timestamp)
+        } else {
+            Bound::exclusive(timestamp)
+        };
+
+        match PRICES
+            .range(store, None, Some(max), Order::Descending)
+            .next()
+        {
+            None => Ok(None),
+            Some(Err(e)) => Err(e.into()),
+            Some(Ok((timestamp, price_storage))) => self
+                .make_price_point(store, timestamp, price_storage)
+                .map(Some),
+        }
     }
 
     /// Returns the spot price for the provided timestamp.
@@ -79,6 +94,49 @@ impl State<'_> {
                 .get_or_try_init(|| self.spot_price_inner(store, self.now(), false))
                 .copied(),
             Some(time) => self.spot_price_inner(store, time, false),
+        }
+    }
+
+    pub(crate) fn historical_spot_prices(
+        &self,
+        store: &dyn Storage,
+        start_after: Option<Timestamp>,
+        limit: Option<usize>,
+        order: Option<Order>,
+    ) -> Result<Vec<PricePoint>> {
+        let iter = PRICES
+            .range(
+                store,
+                start_after.map(Bound::exclusive),
+                None,
+                order.unwrap_or(Order::Descending),
+            )
+            .map(|res| {
+                let (timestamp, price_storage) = res?;
+                self.make_price_point(store, timestamp, price_storage)
+            });
+
+        let prices = match limit {
+            None => iter.collect::<Result<Vec<_>>>()?,
+            Some(limit) => iter.take(limit).collect::<Result<Vec<_>>>()?,
+        };
+
+        Ok(prices)
+    }
+
+    /// Get the latest spot price, if one is set.
+    pub(crate) fn spot_price_latest_opt(&self, store: &dyn Storage) -> Result<Option<PricePoint>> {
+        if let Some(x) = self.spot_price_cache.get() {
+            return Ok(Some(*x));
+        }
+
+        match self.spot_price_inner_opt(store, self.now(), false) {
+            Ok(Some(x)) => {
+                self.spot_price_cache.set(x).ok();
+                Ok(Some(x))
+            }
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 

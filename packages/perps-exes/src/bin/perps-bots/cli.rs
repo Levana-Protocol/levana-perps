@@ -1,10 +1,8 @@
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use std::{net::SocketAddr, str::FromStr};
 
 use anyhow::{Context, Result};
-use cosmos::{AddressType, CosmosNetwork, HasAddressType, SeedPhrase, Wallet};
+use cosmos::{AddressType, SeedPhrase, Wallet};
 use perps_exes::build_version;
-use perps_exes::config::{ChainConfig, Config, DeploymentConfig};
-use perps_exes::wallet_manager::WalletManager;
 
 #[derive(clap::Parser)]
 #[clap(version = build_version())]
@@ -19,9 +17,21 @@ pub(crate) struct Opt {
     /// Override the gRPC URL
     #[clap(long, env = "COSMOS_GRPC")]
     pub(crate) grpc_url: Option<String>,
+    /// Override the RPC URL
+    #[clap(long, env = "COSMOS_RPC")]
+    pub(crate) rpc_url: Option<String>,
     /// hCaptcha secret key
     #[clap(long, env = "LEVANA_BOTS_HCAPTCHA_SECRET")]
     pub(crate) hcaptcha_secret: String,
+    /// Maintenance mode to use. Empty string is treated as no maintenance mode.
+    #[clap(long, env = "LEVANA_BOTS_MAINTENANCE")]
+    pub(crate) maintenance: Option<String>,
+    /// Override the number of trading bots to run
+    #[clap(long, env = "LEVANA_BOTS_TRADERS")]
+    pub(crate) traders: Option<usize>,
+    /// Override the contents of the DeploymentConfig in YAML format
+    #[clap(long, env = "LEVANA_BOTS_DEPLOYMENT_CONFIG")]
+    pub(crate) deployment_config: Option<String>,
 }
 
 impl Opt {
@@ -81,102 +91,19 @@ impl Opt {
         &self,
         address_type: AddressType,
         wallet_phrase_name: &str,
+        index: u32,
     ) -> Result<Wallet> {
         let env_var = format!("LEVANA_BOTS_PHRASE_{}_CRANK", wallet_phrase_name);
         let phrase = get_env(&env_var)?;
         let seed = SeedPhrase::from_str(&phrase)?;
-        seed.derive_cosmos().map(|x| {
+        seed.derive_cosmos_numbered(index).map(|x| {
             let wallet = x.for_chain(address_type);
             log::info!("Crank bot wallet: {wallet}");
             wallet
         })
     }
-
-    pub(crate) fn parse_deployment(&self) -> Result<(CosmosNetwork, &str)> {
-        const NETWORKS: &[(CosmosNetwork, &str)] = &[
-            (CosmosNetwork::OsmosisTestnet, "osmo"),
-            (CosmosNetwork::Dragonfire, "dragon"),
-        ];
-        for (network, prefix) in NETWORKS {
-            if let Some(suffix) = self.deployment.strip_prefix(prefix) {
-                return Ok((*network, suffix));
-            }
-        }
-        Err(anyhow::anyhow!(
-            "Could not parse deployment: {}",
-            self.deployment
-        ))
-    }
 }
 
 fn get_env(key: &str) -> Result<String> {
     std::env::var(key).with_context(|| format!("Unable to load enviornment variable {key}"))
-}
-
-pub(crate) fn get_deployment_config(
-    config: &'static Config,
-    opt: &Opt,
-) -> Result<DeploymentConfig> {
-    let (network, suffix) = opt.parse_deployment()?;
-    let wallet_phrase_name = suffix.to_ascii_uppercase();
-    let partial_config = config
-        .deployments
-        .get(suffix)
-        .with_context(|| {
-            format!(
-                "No config found for {}. Valid configs: {}",
-                suffix,
-                config
-                    .deployments
-                    .keys()
-                    .map(|s| s.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )
-        })?
-        .clone();
-    let ChainConfig {
-        tracker,
-        faucet,
-        explorer,
-        pyth,
-        watcher,
-    } = config
-        .chains
-        .get(&network)
-        .with_context(|| format!("No chain config found for network {}", network))?;
-    Ok(DeploymentConfig {
-        tracker: *tracker,
-        faucet: *faucet,
-        pyth: pyth.clone(),
-        min_gas: config.min_gas,
-        min_gas_in_faucet: config.min_gas_in_faucet,
-        min_gas_in_gas_wallet: config.min_gas_in_gas_wallet,
-        price_api: &config.price_api,
-        explorer,
-        contract_family: opt.deployment.clone(),
-        network,
-        crank_wallet: opt.get_crank_wallet(network.get_address_type(), &wallet_phrase_name)?,
-        price_wallet: if partial_config.price {
-            Some(Arc::new(opt.get_wallet(
-                network.get_address_type(),
-                &wallet_phrase_name,
-                "PRICE",
-            )?))
-        } else {
-            None
-        },
-        wallet_manager: WalletManager::new(
-            opt.get_wallet_seed(&wallet_phrase_name, "WALLET_MANAGER")?,
-            network.get_address_type(),
-        )?,
-        balance: partial_config.balance,
-        liquidity: partial_config.liquidity,
-        utilization: partial_config.utilization,
-        traders: partial_config.traders,
-        liquidity_config: config.liquidity.clone(),
-        utilization_config: config.utilization,
-        trader_config: config.trader,
-        watcher: watcher.clone(),
-    })
 }

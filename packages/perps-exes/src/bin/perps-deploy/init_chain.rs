@@ -1,5 +1,6 @@
 use anyhow::Result;
 use cosmos::CosmosNetwork;
+use msg::contracts::faucet::entry::GasAllowance;
 
 use crate::cli::Opt;
 use crate::store_code::CW20;
@@ -15,6 +16,9 @@ pub(crate) struct InitChainOpt {
     /// Gas to send to faucet on initialization, given in coins (e.g. 1 == 1000000uatom)
     #[clap(long, default_value = "20000")]
     gas_to_send: u128,
+    /// Amount of gas (in microunits) to send with a faucet tap
+    #[clap(long, default_value = "1000000")]
+    gas_allowance: u128,
 }
 
 const FAUCET: &str = "faucet";
@@ -26,9 +30,11 @@ pub(crate) async fn go(
         network,
         tap_limit,
         gas_to_send,
+        gas_allowance,
     }: InitChainOpt,
 ) -> Result<()> {
     let app = opt.load_basic_app(network).await?;
+    let gas_coin = app.cosmos.get_gas_coin().clone();
 
     log::info!("Storing code...");
     let cw20_code_id = app
@@ -67,6 +73,10 @@ pub(crate) async fn go(
             msg::contracts::faucet::entry::InstantiateMsg {
                 tap_limit: Some(tap_limit),
                 cw20_code_id: cw20_code_id.get_code_id(),
+                gas_allowance: Some(GasAllowance {
+                    denom: gas_coin,
+                    amount: gas_allowance.into(),
+                }),
             },
         )
         .await?;

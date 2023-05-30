@@ -1,35 +1,40 @@
+use std::collections::{HashMap, VecDeque};
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 use anyhow::Result;
+use chrono::DateTime;
+use chrono::Utc;
 use cosmos::Address;
 use cosmos::Cosmos;
 use cosmos::CosmosNetwork;
 use cosmos::HasAddressType;
 use cosmos::Wallet;
 use parking_lot::RwLock;
-use perps_exes::config::Config;
-use perps_exes::prelude::DeploymentConfig;
 use reqwest::Client;
 
-use crate::cli::get_deployment_config;
 use crate::cli::Opt;
+use crate::config::BotConfig;
 use crate::watcher::TaskStatuses;
 use crate::watcher::Watcher;
 
 use super::factory::get_factory_info;
 use super::factory::FactoryInfo;
+use super::faucet::FaucetBot;
 use super::gas_check::GasCheckBuilder;
 
+pub(crate) type GasRecords = VecDeque<(DateTime<Utc>, u128)>;
 pub(crate) struct App {
     factory: RwLock<Arc<FactoryInfo>>,
     pub(crate) frontend_info: FrontendInfo,
     pub(crate) faucet_bot: FaucetBot,
     pub(crate) cosmos: Cosmos,
-    pub(crate) config: DeploymentConfig,
+    pub(crate) config: BotConfig,
     pub(crate) client: Client,
     pub(crate) bind: SocketAddr,
     pub(crate) statuses: TaskStatuses,
+    pub(crate) live_since: DateTime<Utc>,
+    pub(crate) gases: RwLock<HashMap<Address, GasRecords>>,
 }
 
 #[derive(serde::Serialize)]
@@ -38,11 +43,7 @@ pub(crate) struct FrontendInfo {
     network: CosmosNetwork,
     price_api: &'static str,
     explorer: &'static str,
-}
-
-pub(crate) struct FaucetBot {
-    pub(crate) wallet: tokio::sync::RwLock<Wallet>,
-    pub(crate) hcaptcha_secret: String,
+    maintenance: Option<String>,
 }
 
 /// Helper data structure for building up an application.
@@ -53,50 +54,60 @@ pub(crate) struct AppBuilder {
 }
 
 impl Opt {
-    pub(crate) async fn into_app_builder(self) -> Result<AppBuilder> {
-        let opt = self;
-        let config = Config::load()?;
-        let deployment_config = get_deployment_config(config, &opt)?;
-        let config = deployment_config;
+    async fn make_cosmos(&self, config: &BotConfig) -> Result<Cosmos> {
         let mut builder = config.network.builder();
-        if let Some(grpc) = &opt.grpc_url {
+        if let Some(grpc) = &self.grpc_url {
             builder.grpc_url = grpc.clone();
         }
-        let cosmos = builder.build().await?;
-        let client = Client::builder().user_agent("perps-bots").build()?;
+        if let Some(gas_multiplier) = config.gas_multiplier {
+            builder.config.gas_estimate_multiplier = gas_multiplier;
+        }
+        builder.set_referer_header("https://bots.levana.exchange/".to_owned());
+        builder.build().await
+    }
 
-        let faucet_bot_wallet = opt.get_faucet_bot_wallet(cosmos.get_address_type())?;
-        let gas_wallet = opt.get_gas_wallet(cosmos.get_address_type())?;
+    pub(crate) async fn into_app_builder(self) -> Result<AppBuilder> {
+        let config = self.get_bot_config()?;
+        let client = Client::builder().user_agent("perps-bots").build()?;
+        let cosmos = self.make_cosmos(&config).await?;
+
+        let faucet_bot_wallet = self.get_faucet_bot_wallet(cosmos.get_address_type())?;
+        let gas_wallet = self.get_gas_wallet(cosmos.get_address_type())?;
 
         let frontend_info = FrontendInfo {
             network: config.network,
             price_api: config.price_api,
             explorer: config.explorer,
+            maintenance: self.maintenance.filter(|s| !s.is_empty()),
         };
 
-        let factory = get_factory_info(&cosmos, &config).await?;
+        let factory = get_factory_info(&cosmos, &config, &client).await?;
         log::info!("Discovered factory contract: {}", factory.factory);
         log::info!("Discovered faucet contract: {}", factory.faucet);
+
+        let (faucet_bot, faucet_bot_runner) =
+            FaucetBot::new(faucet_bot_wallet, self.hcaptcha_secret);
 
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
             frontend_info,
-            faucet_bot: FaucetBot {
-                wallet: tokio::sync::RwLock::new(faucet_bot_wallet),
-                hcaptcha_secret: opt.hcaptcha_secret,
-            },
+            faucet_bot,
             cosmos,
             config,
             client,
-            bind: opt.bind,
+            bind: self.bind,
             statuses: TaskStatuses::default(),
+            live_since: Utc::now(),
+            gases: RwLock::new(HashMap::new()),
         };
         let app = Arc::new(app);
-        Ok(AppBuilder {
+        let mut builder = AppBuilder {
             app,
             watcher: Watcher::default(),
             gas_check: GasCheckBuilder::new(Arc::new(gas_wallet)),
-        })
+        };
+        builder.launch_faucet_task(faucet_bot_runner);
+        Ok(builder)
     }
 }
 
@@ -136,7 +147,7 @@ impl AppBuilder {
     pub(crate) async fn wait(mut self) -> Result<()> {
         // Gas task must always be launched last so that it includes all wallets specified above
         let gas_check = self.gas_check.build(self.app.clone());
-        self.launch_gas_task(gas_check).await?;
+        self.launch_gas_task(gas_check)?;
 
         self.watcher.wait(&self.app).await
     }

@@ -28,13 +28,19 @@ use msg::contracts::factory::entry::{
     ExecuteMsg as FactoryExecuteMsg, MarketInfoResponse, QueryMsg as FactoryQueryMsg,
     ShutdownStatus,
 };
+use msg::contracts::farming::entry::{
+    ExecuteMsg as FarmingExecuteMsg, LockdropBucketId, QueryMsg as FarmingQueryMsg,
+};
+use msg::contracts::farming::entry::{
+    FarmerStats, OwnerExecuteMsg as FarmingOwnerExecuteMsg, StatusResp as FarmingStatusResp,
+};
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::crank::CrankWorkInfo;
 use msg::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
     LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpActionHistoryResp, LpInfoResp,
-    PositionActionHistoryResp, QueryMsg, SlippageAssert, StatusResp, TradeHistorySummary,
-    TraderActionHistoryResp,
+    PositionActionHistoryResp, QueryMsg, SlippageAssert, SpotPriceHistoryResp, StatusResp,
+    TradeHistorySummary, TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
 use msg::contracts::market::{
@@ -75,6 +81,8 @@ pub struct PerpsMarket {
     pub addr: Addr,
     /// When enabled, time will jump by one block on every exec
     pub automatic_time_jump_enabled: bool,
+    /// Address of the farming contract
+    farming_addr: Addr,
 }
 
 impl PerpsMarket {
@@ -131,6 +139,8 @@ impl PerpsMarket {
                     // testing specifically for it.
                     crank_fee_charged: Some(Usd::zero()),
                     crank_fee_reward: Some(Usd::zero()),
+                    // Easier to just go back to the original default than update tests
+                    unstake_period_seconds: Some(60 * 60 * 24 * 21),
                     ..Default::default()
                 }),
                 price_admin: DEFAULT_MARKET.price_admin.clone().into(),
@@ -140,11 +150,12 @@ impl PerpsMarket {
 
         let factory_addr = app.borrow().factory_addr.clone();
 
+        let protocol_owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
         let market_addr = app
             .borrow_mut()
             .execute_contract(
-                Addr::unchecked(&TEST_CONFIG.protocol_owner),
-                factory_addr,
+                protocol_owner.clone(),
+                factory_addr.clone(),
                 &market_msg,
                 &[],
             )?
@@ -167,12 +178,36 @@ impl PerpsMarket {
             .query_wasm_smart::<StatusResp>(market_addr.clone(), &MarketQueryMsg::Status {})?
             .collateral;
 
+        let farming_code_id = app.borrow().code_id(crate::PerpsContract::Farming)?;
+        let farming_addr = app.borrow_mut().instantiate_contract(
+            farming_code_id,
+            protocol_owner.clone(),
+            &msg::contracts::farming::entry::InstantiateMsg {
+                owner: protocol_owner.clone().into(),
+                factory: factory_addr.into(),
+                market_id: id.clone(),
+                lockdrop_month_seconds:
+                    msg::contracts::farming::entry::defaults::lockdrop_month_seconds(),
+                lockdrop_buckets: msg::contracts::farming::entry::defaults::lockdrop_buckets(),
+                bonus_ratio: msg::contracts::farming::entry::defaults::bonus_ratio(),
+                bonus_addr: protocol_owner.clone().into(),
+                lockdrop_lvn_unlock_seconds:
+                    msg::contracts::farming::entry::defaults::lockdrop_month_seconds(),
+                lockdrop_immediate_unlock_ratio:
+                    msg::contracts::farming::entry::defaults::lockdrop_immediate_unlock_ratio(),
+            },
+            &[],
+            "Farming Contract".to_owned(),
+            Some(protocol_owner.into_string()),
+        )?;
+
         let mut _self = Self {
             app,
             id,
             token,
             addr: market_addr,
             automatic_time_jump_enabled: true,
+            farming_addr,
         };
 
         _self.exec_set_price_with_usd(initial_price, collateral_in_usd)?;
@@ -199,6 +234,10 @@ impl PerpsMarket {
 
     pub fn set_log_block_time_changes(&self, flag: bool) {
         self.app().log_block_time_changes = flag;
+    }
+
+    pub fn now(&self) -> Timestamp {
+        self.app().block_info().time.into()
     }
 
     pub fn clone_trader(&self, index: usize) -> Result<Addr> {
@@ -359,7 +398,9 @@ impl PerpsMarket {
         })?;
         anyhow::ensure!(pending_close.is_empty());
         anyhow::ensure!(closed.is_empty());
-        positions.pop().ok_or_else(|| anyhow!("no positions"))
+        let pos = positions.pop().ok_or_else(|| anyhow!("no positions"))?;
+        anyhow::ensure!(pos.dnf_on_close_collateral == None);
+        Ok(pos)
     }
 
     pub fn query_position_with_pending_fees(
@@ -376,7 +417,9 @@ impl PerpsMarket {
         })?;
         anyhow::ensure!(pending_close.is_empty());
         anyhow::ensure!(closed.is_empty());
-        positions.pop().ok_or_else(|| anyhow!("no positions"))
+        let pos = positions.pop().ok_or_else(|| anyhow!("no positions"))?;
+        anyhow::ensure!(pos.dnf_on_close_collateral != None);
+        Ok(pos)
     }
 
     pub fn query_position_pending_close(
@@ -586,6 +629,17 @@ impl PerpsMarket {
             notional_delta: Signed::<Notional>::from_number(notional_delta),
             pos_delta_neutrality_fee_margin,
         })
+    }
+
+    pub fn query_spot_price_history(&self) -> Result<Vec<PricePoint>> {
+        // NOTE we're not doing any pagination, it will load everything
+        let resp: SpotPriceHistoryResp = self.query(&MarketQueryMsg::SpotPriceHistory {
+            start_after: None,
+            limit: None,
+            order: Some(OrderInMessage::Ascending),
+        })?;
+
+        Ok(resp.price_points)
     }
 
     // market executions
@@ -1169,6 +1223,30 @@ impl PerpsMarket {
             to_binary(msg)?,
         )
     }
+
+    pub fn exec_liquidity_token_send_from(
+        &self,
+        kind: LiquidityTokenKind,
+        wallet: &Addr,
+        owner: &Addr,
+        contract: &Addr,
+        amount: LpToken,
+        msg: &impl Serialize,
+    ) -> Result<AppResponse> {
+        let token_info = self.query_liquidity_token_info(kind)?;
+        self.exec_liquidity_token_send_from_raw(
+            kind,
+            wallet,
+            owner,
+            contract,
+            amount
+                .into_number()
+                .to_u128_with_precision(token_info.decimals as u32)
+                .context("couldnt convert liquidity token amount")?
+                .into(),
+            to_binary(msg)?,
+        )
+    }
     fn exec_liquidity_token_send_raw(
         &self,
         kind: LiquidityTokenKind,
@@ -1183,6 +1261,29 @@ impl PerpsMarket {
             from,
             &contract_addr,
             &Cw20ExecuteMsg::Send {
+                contract: contract.clone().into(),
+                amount,
+                msg,
+            },
+        )
+    }
+
+    fn exec_liquidity_token_send_from_raw(
+        &self,
+        kind: LiquidityTokenKind,
+        wallet: &Addr,
+        owner: &Addr,
+        contract: &Addr,
+        amount: Uint128,
+        msg: Binary,
+    ) -> Result<AppResponse> {
+        let contract_addr = self.query_liquidity_token_addr(kind)?;
+
+        self.app().cw20_exec(
+            wallet,
+            &contract_addr,
+            &Cw20ExecuteMsg::SendFrom {
+                owner: owner.into(),
                 contract: contract.clone().into(),
                 amount,
                 msg,
@@ -1208,6 +1309,7 @@ impl PerpsMarket {
                 .into(),
         )
     }
+
     pub(crate) fn exec_liquidity_token_transfer_raw(
         &self,
         kind: LiquidityTokenKind,
@@ -1223,6 +1325,32 @@ impl PerpsMarket {
             &Cw20ExecuteMsg::Transfer {
                 recipient: recipient.into(),
                 amount,
+            },
+        )
+    }
+    pub fn exec_liquidity_token_increase_allowance(
+        &self,
+        kind: LiquidityTokenKind,
+        wallet: &Addr,
+        spender: &Addr,
+        amount: Number,
+    ) -> Result<AppResponse> {
+        let contract_addr = self.query_liquidity_token_addr(kind)?;
+
+        let token_info = self.query_liquidity_token_info(kind)?;
+
+        let amount = amount
+            .to_u128_with_precision(token_info.decimals as u32)
+            .context("couldnt convert liquidity token amount")?
+            .into();
+
+        self.app().cw20_exec(
+            wallet,
+            &contract_addr,
+            &Cw20ExecuteMsg::IncreaseAllowance {
+                spender: spender.into(),
+                amount,
+                expires: None,
             },
         )
     }
@@ -1332,5 +1460,105 @@ impl PerpsMarket {
                 on_time_jump(self.set_time(TimeJump::Seconds(*seconds)).map(|_| *seconds));
             }
         }
+    }
+
+    pub fn exec_farming_deposit_xlp(
+        &self,
+        wallet: &Addr,
+        amount: NonZero<LpToken>,
+    ) -> Result<AppResponse> {
+        self.exec_liquidity_token_send(
+            LiquidityTokenKind::Xlp,
+            wallet,
+            &self.farming_addr,
+            amount.raw(),
+            &FarmingExecuteMsg::Deposit {},
+        )
+    }
+
+    fn exec_farming(&self, wallet: &Addr, msg: &FarmingExecuteMsg) -> Result<AppResponse> {
+        let farming_addr = self.farming_addr.clone();
+
+        let msg = WasmMsg::Execute {
+            contract_addr: farming_addr.into_string(),
+            msg: to_binary(msg)?,
+            funds: vec![],
+        };
+        self.exec_wasm_msg(wallet, msg)
+    }
+
+    pub fn exec_farming_withdraw_xlp(
+        &self,
+        wallet: &Addr,
+        amount: NonZero<FarmingToken>,
+    ) -> Result<AppResponse> {
+        self.exec_farming(
+            wallet,
+            &FarmingExecuteMsg::Withdraw {
+                amount: Some(amount),
+            },
+        )
+    }
+
+    pub fn exec_farming_start_lockdrop(&self, start: Option<Timestamp>) -> Result<AppResponse> {
+        self.exec_farming(
+            &Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::StartLockdropPeriod { start }),
+        )
+    }
+
+    pub fn exec_farming_start_launch(&self, start: Option<Timestamp>) -> Result<AppResponse> {
+        self.exec_farming(
+            &Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::StartLaunchPeriod { start }),
+        )
+    }
+    pub fn exec_farming_lockdrop_deposit(
+        &self,
+        wallet: &Addr,
+        amount: NonZero<Collateral>,
+        bucket_id: LockdropBucketId,
+    ) -> Result<AppResponse> {
+        let msg = self.token.into_execute_msg(
+            &self.farming_addr,
+            amount.raw(),
+            &FarmingExecuteMsg::LockdropDeposit { bucket_id },
+        )?;
+
+        self.exec_wasm_msg(wallet, msg)
+    }
+
+    pub fn exec_farming_lockdrop_withdraw(
+        &self,
+        wallet: &Addr,
+        amount: NonZero<Collateral>,
+        bucket_id: LockdropBucketId,
+    ) -> Result<AppResponse> {
+        self.exec_farming(
+            wallet,
+            &FarmingExecuteMsg::LockdropWithdraw { amount, bucket_id },
+        )
+    }
+
+    fn query_farming<T: DeserializeOwned>(
+        &self,
+        msg: &msg::contracts::farming::entry::QueryMsg,
+    ) -> Result<T> {
+        let farming_addr = self.farming_addr.clone();
+
+        self.app()
+            .wrap()
+            .query_wasm_smart(farming_addr, &msg)
+            .map_err(|err| err.into())
+    }
+
+    pub fn query_farming_farmer_stats(&self, wallet: &Addr) -> Result<FarmerStats> {
+        self.query_farming(&FarmingQueryMsg::FarmerStats {
+            addr: wallet.into(),
+        })
+    }
+
+    pub fn query_farming_stats(&self) -> FarmingStatusResp {
+        self.query_farming(&FarmingQueryMsg::Status {}).unwrap()
     }
 }

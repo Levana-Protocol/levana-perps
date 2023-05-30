@@ -1,7 +1,7 @@
 use cosmwasm_std::{BlockInfo, Timestamp};
 
 const SECS_PER_BLOCK: i64 = 7;
-const NANOS_PER_SECOND: i64 = 1_000_000_000;
+pub const NANOS_PER_SECOND: i64 = 1_000_000_000;
 const NANOS_PER_BLOCK: i64 = SECS_PER_BLOCK * NANOS_PER_SECOND;
 
 // Encapsulates simulated time jumps (i.e. moves time and block height together)
@@ -21,13 +21,13 @@ pub enum TimeJump {
     PreciseHeight(u64),
 }
 
-pub(crate) struct BlockInfoChange {
+pub struct BlockInfoChange {
     pub height: i64,
     pub nanos: i64,
 }
 
 impl BlockInfoChange {
-    pub(crate) fn from_nanos(nanos: i64) -> Self {
+    pub fn from_nanos(nanos: i64) -> Self {
         // taken from https://github.com/rust-lang/rust/pull/88582/files#diff-dd440fe33121a785308d5cde98a1ab79b0b285d27bb29eaa9800e180870e16a6R1788
         // but adapted slightly, since we want to ceil away from 0 (i.e. the ceil of a negative should be "more negative")
         const fn signed_div_ceil(a: i64, b: i64) -> i64 {

@@ -8,7 +8,7 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         hatch_id: u64,
-        owner: &Addr,
+        lvn_grantee_address: String,
         amount: NumberGtZero,
     ) -> Result<()> {
         // outbound IBC message, where packet is then received on other chain
@@ -22,7 +22,7 @@ impl State<'_> {
             .clone();
 
         let msg = IbcExecuteMsg::GrantLvn {
-            address: owner.to_string(),
+            address: lvn_grantee_address,
             amount,
             hatch_id: hatch_id.to_string(),
         };
@@ -47,6 +47,10 @@ pub fn get_lvn_to_grant(details: &HatchDetails) -> Result<Option<NumberGtZero>> 
 
     for dust in &details.dusts {
         total = total.checked_add(dust.lvn.into_decimal256())?;
+    }
+
+    if let Some(profile) = &details.profile {
+        total = total.checked_add(profile.lvn.into_decimal256())?;
     }
 
     Ok(NumberGtZero::new(total))

@@ -5,7 +5,8 @@ use msg::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
 use msg::contracts::market::entry::{PositionActionKind, SlippageAssert};
 use msg::contracts::market::fees::events::FeeSource;
 use msg::contracts::market::position::events::{
-    calculate_position_collaterals, PositionAttributes, PositionOpenEvent, PositionTradingFee,
+    calculate_position_collaterals, PositionAttributes, PositionOpenEvent, PositionSaveReason,
+    PositionTradingFee,
 };
 use msg::contracts::market::position::{
     CollateralAndUsd, LiquidationMargin, SignedCollateralAndUsd,
@@ -79,9 +80,6 @@ impl State<'_> {
             leverage_to_notional,
         )?;
 
-        let notional_size_in_collateral =
-            notional_size.map(|x| price_point.notional_to_collateral(x));
-
         // FEES
         // https://www.notion.so/levana-protocol/Levana-Well-funded-Perpetuals-Whitepaper-9805a6eba56d429b839f5551dbb65c40#75bb26a1439c4a81894c2aa399471263
 
@@ -124,6 +122,8 @@ impl State<'_> {
                 .map(|x| x.into_notional_price(market_type)),
         };
 
+        self.set_next_liquifunding_and_stale_at(&mut pos, liquifunded_at);
+
         let trade_volume_usd = trade_volume_usd(&pos, price_point, market_type)?;
 
         // Validate leverage before removing trading fees from active collateral
@@ -154,6 +154,9 @@ impl State<'_> {
         )?;
 
         self.check_unlocked_liquidity(&self.load_liquidity_stats(store)?, pos.counter_collateral)?;
+
+        pos.liquidation_margin =
+            pos.liquidation_margin(price_point.price_notional, &price_point, &self.config)?;
 
         // Check for sufficient margin
         perp_ensure!(
@@ -192,6 +195,7 @@ impl State<'_> {
             delta_neutrality_fee,
             open_interest,
         }: ValidatedPosition,
+        is_market: bool,
     ) -> Result<PositionId> {
         self.trade_history_add_volume(ctx, &pos.owner, trade_volume_usd)?;
         open_interest.store(ctx)?;
@@ -215,7 +219,18 @@ impl State<'_> {
         self.liquidity_lock(ctx, pos.counter_collateral)?;
 
         // Save the position, setting liquidation margin and prices
-        self.position_save(ctx, &mut pos, &price_point, false, true)?;
+        self.position_save(
+            ctx,
+            &mut pos,
+            &price_point,
+            false,
+            true,
+            if is_market {
+                PositionSaveReason::OpenMarket
+            } else {
+                PositionSaveReason::ExecuteLimitOrder
+            },
+        )?;
 
         // mint the nft
         self.nft_mint(ctx, pos.owner.clone(), pos.id.to_string())?;
@@ -302,6 +317,6 @@ impl State<'_> {
             },
         )?;
 
-        self.open_validated_position(ctx, validated_position)
+        self.open_validated_position(ctx, validated_position, true)
     }
 }

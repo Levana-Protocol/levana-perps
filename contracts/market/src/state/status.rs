@@ -3,7 +3,10 @@ use anyhow::Result;
 use cosmwasm_std::Storage;
 use msg::contracts::market::entry::StatusResp;
 
-use super::{fees::all_fees, stale::ProtocolStaleness, State};
+use super::{
+    crank::LAST_CRANK_COMPLETED, fees::all_fees, position::LIQUIDATION_PRICES_PENDING_COUNT,
+    stale::ProtocolStaleness, State,
+};
 use crate::state::delta_neutrality_fee::DELTA_NEUTRALITY_FUND;
 
 impl State<'_> {
@@ -60,6 +63,11 @@ impl State<'_> {
 
         let fees = all_fees(store)?;
 
+        let last_crank_completed = LAST_CRANK_COMPLETED.may_load(store)?;
+        let unpend_queue_size = LIQUIDATION_PRICES_PENDING_COUNT
+            .may_load(store)?
+            .unwrap_or_default();
+
         Ok(StatusResp {
             market_id: market_id.clone(),
             base: market_id.get_base().to_owned(),
@@ -83,6 +91,9 @@ impl State<'_> {
             stale_liquifunding,
             stale_price: old_price,
             fees,
+            last_crank_completed,
+            unpend_queue_size,
+            congested: unpend_queue_size >= self.config.unpend_limit,
         })
     }
 }

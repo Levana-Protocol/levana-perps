@@ -373,3 +373,22 @@ fn trade_history_nft_transfer_perp_963() {
     assert_eq!(&new_owner_actions.actions, &[transfer]);
     assert_eq!(new_owner_actions.next_start_after, None);
 }
+
+#[test]
+fn price_history_works() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    let start_len = market.query_spot_price_history().unwrap().len();
+
+    market.exec_set_price("2.0".parse().unwrap()).unwrap();
+    market.exec_set_price("3.0".parse().unwrap()).unwrap();
+    market.exec_set_price("4.0".parse().unwrap()).unwrap();
+
+    let mut prices = market.query_spot_price_history().unwrap();
+
+    assert_eq!(prices.len() - start_len, 3);
+
+    assert_eq!(prices.pop().unwrap().price_base, "4.0".parse().unwrap());
+    assert_eq!(prices.pop().unwrap().price_base, "3.0".parse().unwrap());
+    assert_eq!(prices.pop().unwrap().price_base, "2.0".parse().unwrap());
+}

@@ -184,6 +184,10 @@ pub enum QueryMsg {
         /// Market to look up
         market_id: MarketId,
     },
+
+    /// * returns [CodeIds]
+    #[returns(CodeIds)]
+    CodeIds {},
 }
 
 /// Information on owners and other protocol-wide special addresses
@@ -245,4 +249,15 @@ impl ExecuteMsg {
             ExecuteMsg::Shutdown { .. } => false,
         }
     }
+}
+
+/// Which code IDs are currently set for new markets
+#[cw_serde]
+pub struct CodeIds {
+    /// Market code ID
+    pub market: Uint64,
+    /// Position token proxy code ID
+    pub position_token: Uint64,
+    /// Liquidity token proxy code ID
+    pub liquidity_token: Uint64,
 }

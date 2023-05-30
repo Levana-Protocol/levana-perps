@@ -3,8 +3,9 @@ use std::str::FromStr;
 use anyhow::Result;
 use cosmos::{Cosmos, CosmosNetwork, Wallet};
 use msg::contracts::tracker::entry::CodeIdResp;
+use perps_exes::config::parse_deployment;
 
-use crate::{app::get_suffix_network, cli::Opt, tracker::Tracker, util::get_hash_for_path};
+use crate::{cli::Opt, tracker::Tracker, util::get_hash_for_path};
 
 #[derive(clap::Parser)]
 pub(crate) struct StoreCodeOpt {
@@ -23,12 +24,20 @@ pub(crate) struct StoreCodeOpt {
         global = true
     )]
     contracts: Contracts,
+
+    /// Use the following market contract code ID instead of uploading.
+    ///
+    /// Useful because some networks currently aren't working well with uploads
+    #[clap(long)]
+    market_code_id: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Contracts {
     PerpsProtocol,
     Hatching,
+    IbcExecuteProxy,
+    LvnRewards,
 }
 
 impl FromStr for Contracts {
@@ -38,6 +47,8 @@ impl FromStr for Contracts {
         match s {
             "perps-protocol" => Ok(Contracts::PerpsProtocol),
             "hatching" => Ok(Contracts::Hatching),
+            "ibc-execute-proxy" => Ok(Contracts::IbcExecuteProxy),
+            "lvn-rewards" => Ok(Contracts::LvnRewards),
             _ => Err(anyhow::anyhow!("Unknown contracts: {s}")),
         }
     }
@@ -55,6 +66,8 @@ impl Contracts {
                 PYTH_BRIDGE,
             ],
             Contracts::Hatching => &[HATCHING],
+            Contracts::IbcExecuteProxy => &[IBC_EXECUTE_PROXY],
+            Contracts::LvnRewards => &[LVN_REWARDS],
         }
     }
 }
@@ -66,6 +79,8 @@ pub(crate) const MARKET: &str = "market";
 pub(crate) const POSITION_TOKEN: &str = "position_token";
 pub(crate) const PYTH_BRIDGE: &str = "pyth_bridge";
 pub(crate) const HATCHING: &str = "hatching";
+pub(crate) const IBC_EXECUTE_PROXY: &str = "ibc_execute_proxy";
+pub(crate) const LVN_REWARDS: &str = "rewards";
 
 pub(crate) async fn go(
     opt: Opt,
@@ -73,13 +88,14 @@ pub(crate) async fn go(
         family,
         network,
         contracts,
+        market_code_id,
     }: StoreCodeOpt,
 ) -> Result<()> {
     let network = match (family, network) {
         (None, None) => anyhow::bail!("Please specify either family or network"),
         (None, Some(network)) => network,
         (Some(family), _) => {
-            let from_family = get_suffix_network(&family)?.1;
+            let from_family = parse_deployment(&family)?.0;
             if let Some(network) = network {
                 anyhow::ensure!(
                     network == from_family,
@@ -91,7 +107,7 @@ pub(crate) async fn go(
     };
 
     let basic = opt.load_basic_app(network).await?;
-    let (tracker, _) = basic.get_tracker_faucet()?;
+    let (tracker, _) = basic.get_tracker_and_faucet()?;
 
     store_code(
         &opt,
@@ -99,6 +115,7 @@ pub(crate) async fn go(
         &basic.wallet,
         &tracker,
         contracts.names(),
+        market_code_id,
     )
     .await
 }
@@ -109,6 +126,7 @@ pub(crate) async fn store_code(
     wallet: &Wallet,
     tracker: &Tracker,
     contract_types: &[&str],
+    market_code_id: Option<u64>,
 ) -> Result<()> {
     let gitrev = opt.get_gitrev()?;
     log::info!("Compiled WASM comes from gitrev {gitrev}");
@@ -119,7 +137,13 @@ pub(crate) async fn store_code(
         match tracker.get_code_by_hash(hash.clone()).await? {
             CodeIdResp::NotFound {} => {
                 log::info!("Contract {ct} has SHA256 {hash} and is not on blockchain, uploading");
-                let code_id = cosmos.store_code_path(wallet, &path).await?.get_code_id();
+                let code_id = match market_code_id {
+                    Some(code_id) if ct == "market" => {
+                        log::info!("Using override market code ID of: {code_id}");
+                        code_id
+                    }
+                    _ => cosmos.store_code_path(wallet, &path).await?.get_code_id(),
+                };
                 log::info!("Upload complete, new code ID is {code_id}, logging with the tracker");
                 let res = tracker
                     .store_code(wallet, ct.to_owned(), code_id, hash, gitrev.clone())

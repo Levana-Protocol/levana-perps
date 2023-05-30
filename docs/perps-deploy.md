@@ -5,7 +5,7 @@ Command line tool providing functionality for working with perps, providing depl
 ## Basic workflow
 
 * One time per chain
-    * Deploy a new copy of the `tracker` contract to the chain
+    * Use the `init-chain` subcommand to deploy a new copy of the `tracker` contract
     * Update `assets/config.yaml` to include that address
 * Each time there is a new version of a contract that you'd like to upload
     * Build the contracts (can use `../.ci/contracts.sh`)

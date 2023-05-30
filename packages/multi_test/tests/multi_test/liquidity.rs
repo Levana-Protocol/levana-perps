@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use cosmwasm_std::{Addr, Decimal256, Uint128, Uint256};
 use levana_perpswap_multi_test::arbitrary::lp::data::LpYield;
-use levana_perpswap_multi_test::config::DEFAULT_MARKET;
+use levana_perpswap_multi_test::config::{TokenKind, DEFAULT_MARKET, TEST_CONFIG};
 use levana_perpswap_multi_test::return_unless_market_collateral_quote;
 use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
@@ -12,7 +12,9 @@ use msg::contracts::cw20::entry::{QueryMsg as Cw20QueryMsg, TokenInfoResponse};
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::config::ConfigUpdate;
 use msg::contracts::market::liquidity::LiquidityStats;
+use msg::contracts::market::position::{LiquidationReason, PositionCloseReason};
 use msg::prelude::*;
+use msg::token::TokenInit;
 
 #[test]
 fn liquidity_deposit_new_user() {
@@ -189,6 +191,8 @@ fn liquidity_claim_yield_from_borrow_fee() {
             borrow_fee_rate_min_annualized: Some("0.01".parse().unwrap()),
             borrow_fee_rate_max_annualized: Some("0.01".parse().unwrap()),
             delta_neutrality_fee_tax: Some(Decimal256::zero()),
+            // We need precise liquifunding periods for this test so remove randomization
+            liquifunding_delay_fuzz_seconds: Some(0),
             ..Default::default()
         })
         .unwrap();
@@ -1397,4 +1401,124 @@ fn lp_yield_perp_1023() {
     };
 
     lp_yield.run().unwrap();
+}
+
+#[test]
+fn max_liquidity() {
+    let app = PerpsApp::new_cell().unwrap();
+    let token_init = match DEFAULT_MARKET.token_kind {
+        TokenKind::Native => TokenInit::Native {
+            denom: TEST_CONFIG.native_denom.to_string(),
+        },
+        TokenKind::Cw20 => {
+            let addr = app
+                .borrow_mut()
+                .get_cw20_addr(&DEFAULT_MARKET.cw20_symbol)
+                .unwrap();
+            TokenInit::Cw20 { addr: addr.into() }
+        }
+    };
+    let market = PerpsMarket::new_custom(
+        app,
+        MarketId::new(
+            "ETH".to_owned(),
+            "USDC".to_owned(),
+            DEFAULT_MARKET.collateral_type,
+        ),
+        token_init,
+        "1".parse().unwrap(),
+        Some("1".parse().unwrap()),
+        false,
+    )
+    .unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    market
+        .exec_set_config(ConfigUpdate {
+            max_liquidity: Some(msg::contracts::market::config::MaxLiquidity::Usd {
+                amount: "1000".parse().unwrap(),
+            }),
+            ..Default::default()
+        })
+        .unwrap();
+    market
+        .exec_set_price_with_usd("1".parse().unwrap(), Some("1".parse().unwrap()))
+        .unwrap();
+
+    market
+        .exec_mint_and_deposit_liquidity(&lp, "1000".parse().unwrap())
+        .unwrap();
+    let err = market
+        .exec_mint_and_deposit_liquidity(&lp, "1".parse().unwrap())
+        .unwrap_err()
+        .downcast::<PerpError<MarketError>>()
+        .unwrap();
+    assert_eq!(err.id, ErrorId::MaxLiquidity);
+
+    market
+        .exec_set_config(ConfigUpdate {
+            max_liquidity: Some(msg::contracts::market::config::MaxLiquidity::Usd {
+                amount: "2000".parse().unwrap(),
+            }),
+            ..Default::default()
+        })
+        .unwrap();
+    market
+        .exec_mint_and_deposit_liquidity(&lp, "1001".parse().unwrap())
+        .unwrap_err();
+    market
+        .exec_mint_and_deposit_liquidity(&lp, "1000".parse().unwrap())
+        .unwrap();
+
+    // Take out some liquidity and then cause impairment to push the value above the 2000 limit again
+    market
+        .exec_withdraw_liquidity(&lp, Some("1".parse().unwrap()))
+        .unwrap();
+    let (pos_id, _) = market
+        .exec_open_position(
+            &trader,
+            "5",
+            "10",
+            DirectionToBase::Short,
+            "2",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    market
+        .exec_set_price_with_usd("50".parse().unwrap(), Some("1".parse().unwrap()))
+        .unwrap();
+    market.exec_crank_till_finished(&trader).unwrap();
+    let closed = market.query_closed_position(&trader, pos_id).unwrap();
+    assert_eq!(
+        closed.reason,
+        PositionCloseReason::Liquidated(LiquidationReason::Liquidated)
+    );
+    market
+        .exec_set_price_with_usd("1".parse().unwrap(), Some("1".parse().unwrap()))
+        .unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+    market
+        .exec_mint_and_deposit_liquidity(&lp, "1".parse().unwrap())
+        .unwrap_err();
+
+    // Now drop the price of collateral in terms of USD so that we're back under the limit
+    market
+        .exec_set_price_with_usd("1".parse().unwrap(), Some("0.1".parse().unwrap()))
+        .unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+    market
+        .exec_mint_and_deposit_liquidity(&lp, "1".parse().unwrap())
+        .unwrap();
+
+    // Set the price back and we can't deposit again
+    market
+        .exec_set_price_with_usd("1".parse().unwrap(), Some("1".parse().unwrap()))
+        .unwrap();
+    market.exec_crank_till_finished(&lp).unwrap();
+    market
+        .exec_mint_and_deposit_liquidity(&lp, "1".parse().unwrap())
+        .unwrap_err();
 }

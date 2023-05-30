@@ -1,5 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Addr;
+use cosmwasm_std::{Addr, Uint128};
 use shared::prelude::*;
 
 use crate::contracts::cw20::Cw20Coin;
@@ -10,6 +10,8 @@ pub struct InstantiateMsg {
     pub tap_limit: Option<u32>,
     /// Code ID of the CW20 contract we'll deploy
     pub cw20_code_id: u64,
+    /// Configuration of the gas coin allowance
+    pub gas_allowance: Option<GasAllowance>,
 }
 
 #[cw_serde]
@@ -19,7 +21,16 @@ pub enum ExecuteMsg {
         recipient: RawAddr,
         amount: Option<Number>,
     },
+    Multitap {
+        recipients: Vec<MultitapRecipient>,
+    },
     OwnerMsg(OwnerMsg),
+}
+
+#[cw_serde]
+pub struct MultitapRecipient {
+    pub addr: RawAddr,
+    pub assets: Vec<FaucetAsset>,
 }
 
 #[cw_serde]
@@ -73,6 +84,15 @@ pub enum OwnerMsg {
         cw20: String,
         balances: Vec<Cw20Coin>,
     },
+    SetGasAllowance {
+        allowance: GasAllowance,
+    },
+    ClearGasAllowance {},
+    /// Set the tap amount for a named asset
+    SetMultitapAmount {
+        name: String,
+        amount: Decimal256,
+    },
 }
 
 #[cw_serde]
@@ -98,6 +118,44 @@ pub enum QueryMsg {
     /// * returns [NextTradingIndexResponse]
     #[returns(NextTradingIndexResponse)]
     NextTradingIndex { name: String },
+
+    /// * returns [GasAllowanceResp]
+    #[returns(GasAllowanceResp)]
+    GetGasAllowance {},
+
+    /// * returns [TapEligibleResponse]
+    #[returns(TapEligibleResponse)]
+    IsTapEligible {
+        addr: RawAddr,
+        #[serde(default)]
+        assets: Vec<FaucetAsset>,
+    },
+
+    /// * returns [IsAdminResponse]
+    #[returns(IsAdminResponse)]
+    IsAdmin { addr: RawAddr },
+
+    /// * returns [TapAmountResponse]
+    #[returns(TapAmountResponse)]
+    TapAmount { asset: FaucetAsset },
+
+    /// * returns [TapAmountResponse]
+    #[returns(TapAmountResponse)]
+    TapAmountByName { name: String },
+
+    /// Find out the cumulative amount of funds transferred at a given timestamp.
+    #[returns(FundsSentResponse)]
+    FundsSent {
+        asset: FaucetAsset,
+        timestamp: Option<Timestamp>,
+    },
+
+    /// Enumerate all wallets that tapped the faucet
+    #[returns(TappersResp)]
+    Tappers {
+        start_after: Option<RawAddr>,
+        limit: Option<u32>,
+    },
 }
 
 #[cw_serde]
@@ -120,4 +178,53 @@ pub struct ConfigResponse {
     pub admins: Vec<Addr>,
     /// Given in seconds
     pub tap_limit: Option<u32>,
+}
+
+#[cw_serde]
+pub struct GasAllowance {
+    pub denom: String,
+    pub amount: Uint128,
+}
+
+#[cw_serde]
+pub enum GasAllowanceResp {
+    Enabled { denom: String, amount: Uint128 },
+    Disabled {},
+}
+
+#[cw_serde]
+pub enum TapEligibleResponse {
+    Eligible {},
+    Ineligible {
+        seconds: Decimal256,
+        message: String,
+        reason: IneligibleReason,
+    },
+}
+
+#[cw_serde]
+pub enum IneligibleReason {
+    TooSoon,
+    AlreadyTapped,
+}
+
+#[cw_serde]
+pub struct IsAdminResponse {
+    pub is_admin: bool,
+}
+
+#[cw_serde]
+pub enum TapAmountResponse {
+    CannotTap {},
+    CanTap { amount: Decimal256 },
+}
+
+#[cw_serde]
+pub struct FundsSentResponse {
+    pub amount: Decimal256,
+}
+
+#[cw_serde]
+pub struct TappersResp {
+    pub tappers: Vec<Addr>,
 }

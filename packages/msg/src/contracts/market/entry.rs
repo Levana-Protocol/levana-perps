@@ -388,6 +388,19 @@ pub enum QueryMsg {
         timestamp: Option<Timestamp>,
     },
 
+    /// * returns [SpotPriceHistoryResp]
+    ///
+    /// Gets a collection of historical spot prices
+    #[returns(SpotPriceHistoryResp)]
+    SpotPriceHistory {
+        /// Last timestamp we saw
+        start_after: Option<Timestamp>,
+        /// How many prices to query
+        limit: Option<u32>,
+        /// Order to sort by, if None then it will be descending
+        order: Option<OrderInMessage>,
+    },
+
     /// * returns [super::position::PositionsResp]
     ///
     /// Maps the given PositionIds into Positions
@@ -403,7 +416,7 @@ pub enum QueryMsg {
     /// * returns [LimitOrderResp]
     ///
     /// Returns the specified Limit Order
-    #[returns(Option<LimitOrderResp>)]
+    #[returns(LimitOrderResp)]
     LimitOrder {
         /// Limit order ID to query
         order_id: OrderId,
@@ -595,6 +608,10 @@ pub struct TraderActionHistoryResp {
 /// A distinct position history action
 #[cw_serde]
 pub struct PositionAction {
+    /// ID of the position impacted
+    ///
+    /// For ease of migration, we allow for a missing position ID.
+    pub id: Option<PositionId>,
     /// Kind of action taken by the trader
     pub kind: PositionActionKind,
     /// Timestamp when the action occurred
@@ -995,6 +1012,10 @@ pub struct StatusResp {
     pub liquidity: super::liquidity::LiquidityStats,
     /// Next bit of crank work available, if any
     pub next_crank: Option<CrankWorkInfo>,
+    /// Timestamp of the last completed crank
+    pub last_crank_completed: Option<Timestamp>,
+    /// Size of the unpend queue
+    pub unpend_queue_size: u32,
     /// Overall borrow fee rate (annualized), combining LP and xLP
     pub borrow_fee: Decimal256,
     /// LP component of [Self::borrow_fee]
@@ -1028,6 +1049,8 @@ pub struct StatusResp {
     pub stale_liquifunding: Option<Timestamp>,
     /// Is the last price update too old? If so, contains [Option::Some], and the timestamp when the price became too old.
     pub stale_price: Option<Timestamp>,
+    /// Are we in the congested state where new positions cannot be opened?
+    pub congested: bool,
 
     /// Fees held by the market contract
     pub fees: Fees,
@@ -1075,4 +1098,11 @@ pub enum LimitOrderResult {
         /// Error message
         reason: String,
     },
+}
+
+/// Response for [QueryMsg::SpotPriceHistory]
+#[cw_serde]
+pub struct SpotPriceHistoryResp {
+    /// list of historical price points
+    pub price_points: Vec<PricePoint>,
 }

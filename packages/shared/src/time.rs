@@ -19,7 +19,7 @@ use std::ops::{Add, Div, Mul, Sub};
 /// directly (instead of a [Timestamp] or [cosmwasm_std::Uint64]) to make it
 /// easier to derive some impls. The result is that we need to explicitly
 /// implement [Serialize] and [Deserialize] to keep the stringy representation.
-#[derive(Debug, Clone, Default, Copy, Eq, PartialEq, Ord, PartialOrd, JsonSchema)]
+#[derive(Debug, Clone, Default, Copy, Eq, PartialEq, Ord, PartialOrd, JsonSchema, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Timestamp(#[schemars(with = "String")] u64);
 
@@ -86,6 +86,31 @@ impl Timestamp {
     pub fn plus_seconds(self, secs: u64) -> Self {
         self + Duration::from_seconds(secs)
     }
+
+    /// Subtract two timestamps to get the duration between them.
+    ///
+    /// Will fail if the right hand side is greater than the left hand side.
+    pub fn checked_sub(self, rhs: Self, desc: &str) -> Result<Duration> {
+        #[derive(serde::Serialize)]
+        struct Data {
+            lhs: Timestamp,
+            rhs: Timestamp,
+            desc: String,
+        }
+        match self.0.checked_sub(rhs.0) {
+            Some(x) => Ok(Duration(x)),
+            None => Err(perp_anyhow_data!(
+                ErrorId::TimestampSubtractUnderflow,
+                ErrorDomain::Default,
+                Data {
+                    lhs: self,
+                    rhs,
+                    desc: desc.to_owned()
+                },
+                "Invalid timestamp subtraction during. Action: {desc}. Values: {self} - {rhs}"
+            )),
+        }
+    }
 }
 
 // Lossless conversions. In the future, we may want to focus on using this type
@@ -130,7 +155,9 @@ impl<'a> Prefixer<'a> for Timestamp {
 }
 
 /// A duration of time measured in nanoseconds
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, JsonSchema,
+)]
 pub struct Duration(u64);
 
 impl Duration {
@@ -174,22 +201,6 @@ impl Add<Duration> for Timestamp {
 
     fn add(self, rhs: Duration) -> Self::Output {
         Timestamp(self.0 + rhs.0)
-    }
-}
-
-impl Sub<Timestamp> for Timestamp {
-    type Output = Duration;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Duration(self.0 - rhs.0)
-    }
-}
-
-impl Sub<Duration> for Timestamp {
-    type Output = Timestamp;
-
-    fn sub(self, rhs: Duration) -> Self::Output {
-        Timestamp(self.0 - rhs.0)
     }
 }
 

@@ -7,6 +7,7 @@ use cosmwasm_std::Order;
 pub use cw20::*;
 use cw_storage_plus::Map;
 use msg::contracts::liquidity_token::LiquidityTokenKind;
+use msg::contracts::market::config::MaxLiquidity;
 use msg::contracts::market::entry::{LpInfoResp, UnstakingStatus};
 use msg::contracts::market::liquidity::events::{
     DeltaNeutralityRatioEvent, DepositEvent, LockEvent, UnlockEvent, WithdrawEvent,
@@ -244,9 +245,22 @@ impl State<'_> {
             Some(amount) => {
                 let remainder = match yield_to_reinvest.raw().checked_sub(amount.raw()) {
                     Ok(remainder) => remainder,
-                    Err(_) => anyhow::bail!(
-                        "Requested to reinvest {amount}, but only have {yield_to_reinvest}"
-                    ),
+                    Err(_) => {
+                        #[derive(serde::Serialize)]
+                        struct Data {
+                            requested_to_reinvest: NonZero<Collateral>,
+                            available_yield: NonZero<Collateral>,
+                        }
+                        perp_bail_data!(
+                            ErrorId::InsufficientForReinvest,
+                            ErrorDomain::Market,
+                            Data {
+                                requested_to_reinvest: amount,
+                                available_yield: yield_to_reinvest
+                            },
+                            "Requested to reinvest {amount}, but only have {yield_to_reinvest}"
+                        );
+                    }
                 };
                 if let Some(remainder) = NonZero::new(remainder) {
                     self.add_token_transfer_msg(ctx, lp_addr, remainder)?;
@@ -332,13 +346,15 @@ impl State<'_> {
         amount: NonZero<Collateral>,
         is_xlp: bool,
     ) -> Result<NonZero<LpToken>> {
+        let mut liquidity_stats = self.load_liquidity_stats(ctx.storage)?;
+        self.ensure_max_liquidity(ctx, amount, &liquidity_stats)?;
+
         // Handle yield
 
         self.perform_lp_book_keeping(ctx, lp_addr)?;
 
         // Update liquidity and calculate shares
 
-        let mut liquidity_stats = self.load_liquidity_stats(ctx.storage)?;
         let new_shares = liquidity_stats.collateral_to_lp(amount)?;
         liquidity_stats.total_lp += new_shares.raw();
         liquidity_stats.unlocked += amount.raw();
@@ -388,13 +404,11 @@ impl State<'_> {
             None => old_lp,
             Some(lp_amount) => {
                 if lp_amount > old_lp {
-                    perp_bail!(
-                        ErrorId::InvalidWithdrawal,
-                        ErrorDomain::Market,
-                        "unable to withdraw {}, current allocation: {}",
-                        lp_amount,
-                        old_lp
-                    )
+                    return Err(MarketError::WithdrawTooMuch {
+                        requested: lp_amount,
+                        available: old_lp,
+                    }
+                    .into());
                 }
 
                 lp_amount
@@ -417,13 +431,12 @@ impl State<'_> {
         let liquidity_to_return = liquidity_stats.lp_to_collateral_non_zero(shares_to_withdraw)?;
 
         if liquidity_to_return.raw() > liquidity_stats.unlocked {
-            return Err(perp_anyhow!(
-                ErrorId::InvalidWithdrawal,
-                ErrorDomain::Market,
-                "unable to withdraw, allotted liquidity: {}, available liquidity: {}",
-                liquidity_to_return,
-                liquidity_stats.unlocked
-            ));
+            return Err(MarketError::InsufficientLiquidityForWithdrawal {
+                requested_lp: shares_to_withdraw,
+                requested_collateral: liquidity_to_return,
+                unlocked: liquidity_stats.unlocked,
+            }
+            .into());
         }
 
         debug_assert!(total_collateral >= liquidity_to_return.raw());
@@ -687,8 +700,14 @@ impl State<'_> {
         self.perform_lp_book_keeping(ctx, lp_addr)?;
         let mut addr_stats = self.load_liquidity_stats_addr(ctx.storage, lp_addr)?;
         let total_yield = addr_stats.total_yield()?;
-        let total_yield =
-            NonZero::new(total_yield).context("liquidity_claim_yield: total yield is 0")?;
+        let total_yield = match NonZero::new(total_yield) {
+            Some(total_yield) => total_yield,
+            None => perp_bail!(
+                ErrorId::NoYieldToClaim,
+                ErrorDomain::Market,
+                "liquidity_claim_yield: total yield is 0"
+            ),
+        };
 
         addr_stats.lp_accrued_yield = Collateral::zero();
         addr_stats.xlp_accrued_yield = Collateral::zero();
@@ -796,13 +815,19 @@ impl State<'_> {
     /// Returns the amount of LP that has unstaked and can now be collected after an xLP unstaking
     /// process has begun
     pub(crate) fn calculate_unstaked_lp(&self, unstaking_info: &UnstakingXlp) -> Result<LpToken> {
-        let elapsed_since_start = self.now() - unstaking_info.unstake_started;
+        let elapsed_since_start = self.now().checked_sub(
+            unstaking_info.unstake_started,
+            "calculate_unstaked_lp: elapsed_since_start",
+        )?;
 
         let amount = if elapsed_since_start >= unstaking_info.unstake_duration {
             unstaking_info.xlp_amount.into_number() - unstaking_info.collected.into_number()
         } else {
-            let elapsed_since_last_collected =
-                (self.now() - unstaking_info.last_collected).as_nanos();
+            let elapsed_since_last_collected = (self.now().checked_sub(
+                unstaking_info.last_collected,
+                "calculate_unstaked_lp, elapsed_since_last_collected",
+            )?)
+            .as_nanos();
             let elapsed_ratio: Number = Number::from(elapsed_since_last_collected)
                 .checked_div(unstaking_info.unstake_duration.as_nanos().into())?;
             elapsed_ratio.checked_mul(unstaking_info.xlp_amount.into_number())?
@@ -949,5 +974,35 @@ impl State<'_> {
             unstaking,
             history,
         })
+    }
+
+    /// Ensure that we have not exceeded max liquidity.
+    fn ensure_max_liquidity(
+        &self,
+        ctx: &mut StateContext,
+        deposit: NonZero<Collateral>,
+        stats: &LiquidityStats,
+    ) -> Result<()> {
+        let max = match self.config.max_liquidity {
+            MaxLiquidity::Unlimited {} => return Ok(()),
+            MaxLiquidity::Usd { amount } => amount.raw(),
+        };
+        let price = self.spot_price(ctx.storage, None)?;
+        let deposit = price.collateral_to_usd(deposit.raw());
+        let current = stats.total_collateral();
+        let current = price.collateral_to_usd(current);
+
+        let new_total = current.checked_add(deposit)?;
+        if new_total > max {
+            Err(MarketError::MaxLiquidity {
+                price_collateral_in_usd: price.price_usd,
+                current,
+                deposit,
+                max,
+            }
+            .into_anyhow())
+        } else {
+            Ok(())
+        }
     }
 }

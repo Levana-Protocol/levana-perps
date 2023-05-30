@@ -1,6 +1,12 @@
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
+
 use crate::prelude::*;
 use msg::contracts::market::position::{
-    ClosePositionInstructions, LiquidationReason, MaybeClosedPosition, PositionCloseReason,
+    events::PositionSaveReason, ClosePositionInstructions, LiquidationReason, MaybeClosedPosition,
+    PositionCloseReason,
 };
 
 impl State<'_> {
@@ -12,21 +18,23 @@ impl State<'_> {
         starts_at: Timestamp,
         ends_at: Timestamp,
         charge_crank_fee: bool,
+        reason: PositionSaveReason,
     ) -> Result<()> {
         let mcp = self.position_liquifund(ctx, pos, starts_at, ends_at, charge_crank_fee)?;
-        self.process_maybe_closed_position(ctx, mcp, ends_at)
+        self.process_maybe_closed_position(ctx, mcp, ends_at, reason)
     }
 
-    pub(crate) fn process_maybe_closed_position(
+    fn process_maybe_closed_position(
         &self,
         ctx: &mut StateContext,
         mcp: MaybeClosedPosition,
         ends_at: Timestamp,
+        reason: PositionSaveReason,
     ) -> Result<()> {
         match mcp {
             MaybeClosedPosition::Open(mut position) => {
                 let price_point = self.spot_price(ctx.storage, Some(ends_at))?;
-                self.position_save(ctx, &mut position, &price_point, true, false)?;
+                self.position_save(ctx, &mut position, &price_point, true, false, reason)?;
                 Ok(())
             }
             MaybeClosedPosition::Close(close_position_instructions) => {
@@ -130,12 +138,50 @@ impl State<'_> {
         };
 
         // Position does not need to be closed
-        pos.liquifunded_at = ends_at;
-        pos.next_liquifunding = ends_at.plus_seconds(config.liquifunding_delay_seconds.into());
-        pos.stale_at = pos
-            .next_liquifunding
-            .plus_seconds(config.staleness_seconds.into());
+        self.set_next_liquifunding_and_stale_at(&mut pos, ends_at);
         pos.liquidation_margin = liquidation_margin;
         Ok(MaybeClosedPosition::Open(pos))
+    }
+
+    /// Updates the liquifunded_at, next_liquifunding, and stale_at fields of the position.
+    ///
+    /// Includes logic for randomization of the next_liquifunding field
+    pub(crate) fn set_next_liquifunding_and_stale_at(
+        &self,
+        pos: &mut Position,
+        liquifunded_at: Timestamp,
+    ) {
+        // First set up the values correctly
+        pos.liquifunded_at = liquifunded_at;
+        pos.next_liquifunding =
+            liquifunded_at.plus_seconds(self.config.liquifunding_delay_seconds.into());
+        pos.stale_at = pos
+            .next_liquifunding
+            .plus_seconds(self.config.staleness_seconds.into());
+
+        if self.config.liquifunding_delay_fuzz_seconds != 0 {
+            // Next we're going to add a bit of randomization to schedule the
+            // next_liquifunding earlier than it should be. This is part of the
+            // crank smoothing mechanism. We don't need true randomness for this,
+            // just something random enough to spread load around.
+            let mut hash = DefaultHasher::new();
+            self.now().hash(&mut hash);
+            pos.owner.hash(&mut hash);
+            pos.id.hash(&mut hash);
+            let semi_random = hash.finish();
+
+            // If anything goes wrong, we just ignore it. This is an optimization that is
+            // allowed to fail.
+            let res = (|| {
+                let how_early_seconds =
+                    semi_random.checked_rem(self.config.liquifunding_delay_fuzz_seconds.into())?;
+                let actual_delay = u64::from(self.config.liquifunding_delay_seconds)
+                    .checked_sub(how_early_seconds)?;
+                pos.next_liquifunding = liquifunded_at.plus_seconds(actual_delay);
+
+                Some(())
+            })();
+            debug_assert_eq!(res, Some(()));
+        }
     }
 }

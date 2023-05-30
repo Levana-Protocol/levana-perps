@@ -48,7 +48,8 @@ impl<'a> DataSeries<'a> {
         let prefix_sum = match last {
             None => Number::ZERO,
             Some((last_time, data_point)) => {
-                let elapsed = Number::from((time - last_time).as_nanos());
+                let elapsed =
+                    Number::from((time.checked_sub(last_time, "DataSeries::append")?).as_nanos());
                 let elapsed_sum = data_point.value.checked_mul(elapsed)?;
                 data_point.prefix_sum.checked_add(elapsed_sum)?
             }
@@ -90,11 +91,17 @@ impl<'a> DataSeries<'a> {
             .transpose()?
             .with_context(|| format!("Unable to find entry for end time {}", end))?;
 
-        let elapsed_start: Number = (start - start_data_point_time).as_nanos().into();
+        let elapsed_start: Number = (start
+            .checked_sub(start_data_point_time, "DataSeries::sum, elapsed_start")?)
+        .as_nanos()
+        .into();
         let elapsed_sum = start_data_point.value.checked_mul(elapsed_start)?;
         let start_prefix_sum = start_data_point.prefix_sum.checked_add(elapsed_sum)?;
 
-        let elapsed_end: Number = (end - end_data_point_time).as_nanos().into();
+        let elapsed_end: Number = (end
+            .checked_sub(end_data_point_time, "DataSeries::sum, elapsed_end")?)
+        .as_nanos()
+        .into();
         let elapsed_sum = end_data_point.value.checked_mul(elapsed_end)?;
         let end_prefix_sum = end_data_point.prefix_sum.checked_add(elapsed_sum)?;
 

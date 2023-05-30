@@ -4,7 +4,9 @@ use cosmos::{
 };
 use msg::contracts::{
     cw20::Cw20Coin,
-    faucet::entry::{ExecuteMsg, GetTokenResponse, NextTradingIndexResponse, OwnerMsg, QueryMsg},
+    faucet::entry::{
+        ExecuteMsg, GetTokenResponse, IsAdminResponse, NextTradingIndexResponse, OwnerMsg, QueryMsg,
+    },
 };
 
 #[derive(Clone)]
@@ -51,7 +53,9 @@ impl Faucet {
         let tap_amount = match name.as_str() {
             "ATOM" => "1000",
             "USDC" => "20000",
-            "BTC" => "15",
+            "BTC" => "1",
+            // This is going to end up being ignored I think...
+            "ETH" => "2",
             name => anyhow::bail!("Unknown collateral type: {name}"),
         }
         .parse()?;
@@ -114,6 +118,16 @@ impl Faucet {
                 }),
             )
             .await
+    }
+
+    pub(crate) async fn is_admin(&self, new_admin: impl HasAddress) -> Result<bool> {
+        let IsAdminResponse { is_admin } = self
+            .0
+            .query(QueryMsg::IsAdmin {
+                addr: new_admin.get_address_string().into(),
+            })
+            .await?;
+        Ok(is_admin)
     }
 
     pub(crate) async fn add_admin(

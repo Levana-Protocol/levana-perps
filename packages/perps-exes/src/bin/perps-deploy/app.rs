@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use cosmos::{Address, Cosmos, CosmosNetwork, HasAddress, HasAddressType, Wallet};
 use msg::contracts::pyth_bridge::PythMarketPriceFeeds;
 use msg::prelude::MarketId;
-use perps_exes::config::{ChainConfig, Config, PartialDeploymentConfig};
+use perps_exes::config::{ChainConfig, Config, DeploymentConfig};
 
 use crate::{cli::Opt, faucet::Faucet, tracker::Tracker};
 
@@ -60,24 +60,20 @@ impl Opt {
     }
 
     pub(crate) async fn load_app(&self, family: &str) -> Result<App> {
-        let (suffix, network) = get_suffix_network(family)?;
-        let basic = self.load_basic_app(network).await?;
-
         let config = Config::load()?;
-        let partial_deploy_config = config.deployments.get(suffix).with_context(|| {
-            format!("No configuration for family {suffix}, user parameter was {family}")
-        })?;
+        let partial = config.get_deployment_info(family)?;
+        let basic = self.load_basic_app(partial.network).await?;
 
-        let PartialDeploymentConfig {
+        let DeploymentConfig {
             wallet_manager_address,
             price_address: price_admin,
             trading_competition,
             dev_settings,
             default_market_ids,
             ..
-        } = partial_deploy_config;
+        } = partial.config;
 
-        let (tracker, faucet) = basic.get_tracker_faucet()?;
+        let (tracker, faucet) = basic.get_tracker_and_faucet()?;
 
         let pyth_address = basic
             .chain_config
@@ -107,37 +103,21 @@ impl Opt {
         };
 
         Ok(App {
-            wallet_manager: wallet_manager_address.for_chain(network.get_address_type()),
-            price_admin: price_admin.for_chain(network.get_address_type()),
-            trading_competition: *trading_competition,
-            dev_settings: *dev_settings,
+            wallet_manager: wallet_manager_address.for_chain(partial.network.get_address_type()),
+            price_admin: price_admin.for_chain(partial.network.get_address_type()),
+            trading_competition,
+            dev_settings,
             tracker,
             faucet,
             basic,
-            default_market_ids: default_market_ids.clone(),
+            default_market_ids,
             pyth_info,
         })
     }
 }
 
-pub(crate) fn get_suffix_network(family: &str) -> Result<(&str, CosmosNetwork)> {
-    const PREFIXES: [(&str, CosmosNetwork); 2] = [
-        ("osmo", CosmosNetwork::OsmosisTestnet),
-        ("dragon", CosmosNetwork::Dragonfire),
-    ];
-
-    for (prefix, network) in PREFIXES {
-        if let Some(suffix) = family.strip_prefix(prefix) {
-            return Ok((suffix, network));
-        }
-    }
-    Err(anyhow::anyhow!(
-        "Family does not contain known prefix: {family}"
-    ))
-}
-
 impl BasicApp {
-    pub(crate) fn get_tracker_faucet(&self) -> Result<(Tracker, Faucet)> {
+    pub(crate) fn get_tracker_and_faucet(&self) -> Result<(Tracker, Faucet)> {
         let ChainConfig {
             tracker, faucet, ..
         } = self

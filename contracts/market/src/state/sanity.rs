@@ -8,8 +8,9 @@ use crate::state::{
     fees::ALL_FEES,
     funding::get_total_funding_margin,
     position::{
-        LIQUIDATION_PRICES_PENDING, LIQUIDATION_PRICES_PENDING_REVERSE, NEXT_LIQUIFUNDING,
-        NEXT_STALE, OPEN_POSITIONS, PRICE_TRIGGER_ASC, PRICE_TRIGGER_DESC,
+        LIQUIDATION_PRICES_PENDING, LIQUIDATION_PRICES_PENDING_COUNT,
+        LIQUIDATION_PRICES_PENDING_REVERSE, NEXT_LIQUIFUNDING, NEXT_STALE, OPEN_POSITIONS,
+        PRICE_TRIGGER_ASC, PRICE_TRIGGER_DESC,
     },
     token::TOKEN,
 };
@@ -66,8 +67,11 @@ fn next_last_liquifunding(store: &dyn Storage, env: &Env) -> Result<()> {
     for pair in NEXT_LIQUIFUNDING.keys(store, None, None, cosmwasm_std::Order::Ascending) {
         let (timestamp, position_id) = pair?;
         let position = OPEN_POSITIONS.load(store, position_id)?;
-        anyhow::ensure!(timestamp < now || (timestamp - now) <= delay);
-        anyhow::ensure!(position.liquifunded_at + delay == timestamp);
+        anyhow::ensure!(
+            timestamp < now || (timestamp.checked_sub(now, "next_last_liquifunding (1)")?) <= delay
+        );
+        // Thanks to randomization, this can happen early
+        anyhow::ensure!(position.liquifunded_at + delay >= timestamp);
         next_count += 1;
     }
     anyhow::ensure!(next_count == open_position_count);
@@ -81,7 +85,10 @@ fn next_last_liquifunding(store: &dyn Storage, env: &Env) -> Result<()> {
     for pair in NEXT_STALE.keys(store, None, None, cosmwasm_std::Order::Ascending) {
         let (timestamp, position_id) = pair?;
         let position = OPEN_POSITIONS.load(store, position_id)?;
-        anyhow::ensure!(timestamp < now || (timestamp - now) <= delay_and_stale);
+        anyhow::ensure!(
+            timestamp < now
+                || (timestamp.checked_sub(now, "next_last_liquifunding (2)")?) <= delay_and_stale
+        );
         anyhow::ensure!(position.liquifunded_at + delay_and_stale == timestamp);
         next_stale_count += 1;
     }
@@ -106,6 +113,19 @@ fn liquidation_prices(store: &dyn Storage, _env: &Env) -> Result<()> {
             }
             None => None,
         };
+
+        let pending_count_expected: usize = LIQUIDATION_PRICES_PENDING_COUNT
+            .may_load(store)?
+            .unwrap_or_default()
+            .try_into()?;
+        let pending_count_actual1 = LIQUIDATION_PRICES_PENDING
+            .keys(store, None, None, Order::Ascending)
+            .count();
+        let pending_count_actual2 = LIQUIDATION_PRICES_PENDING_REVERSE
+            .keys(store, None, None, Order::Ascending)
+            .count();
+        anyhow::ensure!(pending_count_expected == pending_count_actual1);
+        anyhow::ensure!(pending_count_expected == pending_count_actual2);
 
         match pending {
             None => {
@@ -205,8 +225,6 @@ fn liquidation_prices(store: &dyn Storage, _env: &Env) -> Result<()> {
             Some(_) => {
                 ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
                 ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
-                ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
-                ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
             }
         }
     }

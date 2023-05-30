@@ -39,8 +39,22 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
     match msg {
-        ExecuteMsg::Hatch { eggs, dusts } => {
-            state.hatch(&mut ctx, info.sender, eggs, dusts)?;
+        ExecuteMsg::Hatch {
+            lvn_grant_address,
+            eggs,
+            dusts,
+            profile,
+            nft_mint_owner,
+        } => {
+            state.hatch(
+                &mut ctx,
+                info.sender,
+                nft_mint_owner,
+                eggs,
+                dusts,
+                profile,
+                lvn_grant_address,
+            )?;
         }
         ExecuteMsg::RetryHatch { id } => {
             state.retry_hatch(&mut ctx, id.parse()?)?;
@@ -72,10 +86,19 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
 
         QueryMsg::HatchStatusByOwner { details, owner } => MaybeHatchStatusResp {
             resp: state
-                .get_hatch_status_by_owner(store, &state.api.addr_validate(&owner)?, details)?
+                .get_hatch_status_by_owner(store, &owner.validate(deps.api)?, details)?
                 .map(HatchStatusResp::from),
         }
         .query_result(),
+
+        QueryMsg::PotentialHatchInfo {
+            owner,
+            eggs,
+            dusts,
+            profile,
+        } => state
+            .get_potential_hatch_info(&owner.validate(deps.api)?, eggs, dusts, profile)?
+            .query_result(),
     }
 }
 
