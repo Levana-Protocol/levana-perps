@@ -1,6 +1,5 @@
 use cosmwasm_schema::cw_serde;
 
-
 #[cw_serde]
 pub struct DragonMintExtra {
     #[serde(rename = "dragon_id")]
@@ -9,7 +8,7 @@ pub struct DragonMintExtra {
     pub cid: String,
     pub eye_color: String,
     #[serde(rename = "dragon_type")]
-    pub kind: String
+    pub kind: String,
 }
 
 impl DragonMintExtra {

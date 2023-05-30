@@ -75,7 +75,11 @@ impl State<'_> {
     }
 }
 
-pub(crate) fn extract_nft_info(token_id: String, meta: Metadata, now: Timestamp) -> Result<NftHatchInfo> {
+pub(crate) fn extract_nft_info(
+    token_id: String,
+    meta: Metadata,
+    now: Timestamp,
+) -> Result<NftHatchInfo> {
     let kind = {
         let name = match &meta.name {
             Some(name) => name.to_lowercase(),

@@ -5,7 +5,6 @@ use std::vec;
 
 use crate::cli::{Cmd, Subcommand};
 use anyhow::Result;
-use chrono::Utc;
 use clap::Parser;
 use cli::HatchEggOpt;
 use cosmos::{Contract, Cosmos, HasAddressType, Wallet};
@@ -335,12 +334,17 @@ async fn clear_lvn_rewards(rewards: &Rewards) -> Result<()> {
                 log::info!("...rewards are clear");
                 break;
             }
-            Some(_) => {
-                log::info!("...found rewards, claiming...");
-                rewards
-                    .contract
-                    .execute(&rewards.wallet, vec![], Claim {})
-                    .await?;
+            Some(info) => {
+                if info.unlocked.is_zero() {
+                    log::info!("... no unlocked rewards");
+                    break;
+                } else {
+                    log::info!("...found {:?} rewards, claiming...", info);
+                    rewards
+                        .contract
+                        .execute(&rewards.wallet, vec![], Claim {})
+                        .await?;
+                }
             }
         }
 
@@ -363,7 +367,8 @@ async fn get_hatch_status(hatch: &Hatch, details: bool) -> Result<MaybeHatchStat
 }
 
 async fn mint_egg(hatch: &Hatch, spirit_level: NumberGtZero, rarity: NftRarity) -> Result<String> {
-    let token_id = Utc::now().timestamp_millis().to_string();
+    // a Wyvern egg
+    let token_id = "4".to_string();
     // mint the egg NFT
 
     log::info!(

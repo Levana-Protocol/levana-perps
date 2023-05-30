@@ -1,8 +1,12 @@
-use crate::state::{config::lvn_from_nft_spirit_level, nft_burn::extract_nft_info, nft_mint::babydragon_nft_mint_msg};
+use crate::state::{
+    config::lvn_from_nft_spirit_level, nft_burn::extract_nft_info,
+    nft_mint::babydragon_nft_mint_msg,
+};
 
 use msg::contracts::hatching::{
+    dragon_mint::DragonMintExtra,
     nft::{Metadata, Trait},
-    NftRarity, NftBurnKind, dragon_mint::DragonMintExtra,
+    NftBurnKind, NftRarity,
 };
 use shared::time::Timestamp;
 
@@ -23,8 +27,7 @@ fn hatchable_nft() {
 
                 assert_eq!(info.burn_kind, *kind);
                 assert_eq!(info.spirit_level, spirit_level.parse().unwrap());
-                lvn_from_nft_spirit_level(spirit_level.parse().unwrap(), *kind, *rarity)
-                    .unwrap();
+                lvn_from_nft_spirit_level(spirit_level.parse().unwrap(), *kind, *rarity).unwrap();
             }
         }
 
@@ -32,13 +35,13 @@ fn hatchable_nft() {
         extract_nft_info(
             "token_id".to_string(),
             mock_metadata(Some(*kind), Some("0.0"), Some(NftRarity::Common)),
-            now
+            now,
         )
         .unwrap_err();
         extract_nft_info(
             "token_id".to_string(),
             mock_metadata(Some(*kind), None, None),
-            now
+            now,
         )
         .unwrap_err();
     }
@@ -47,7 +50,7 @@ fn hatchable_nft() {
     extract_nft_info(
         "token_id".to_string(),
         mock_metadata(None, Some("1.23"), None),
-        now
+        now,
     )
     .unwrap_err();
 
@@ -74,7 +77,11 @@ fn hatchable_nft() {
 #[test]
 fn egg_to_dragon() {
     let now = Timestamp::from_seconds(1685362658);
-    let burn_meta = mock_metadata(Some(NftBurnKind::Egg), Some("1.23"), Some(NftRarity::Common));
+    let burn_meta = mock_metadata(
+        Some(NftBurnKind::Egg),
+        Some("1.23"),
+        Some(NftRarity::Common),
+    );
     let info = extract_nft_info("42".to_string(), burn_meta, now).unwrap();
     let extra = DragonMintExtra {
         id: "42".to_string(),
@@ -82,7 +89,9 @@ fn egg_to_dragon() {
         eye_color: "Blue".to_string(),
         kind: "Wyvern".to_string(),
     };
-    let mint_meta = babydragon_nft_mint_msg("alice".to_string(), &info, extra.clone()).unwrap().extension;
+    let mint_meta = babydragon_nft_mint_msg("alice".to_string(), &info, extra.clone())
+        .unwrap()
+        .extension;
 
     let expected_mint_meta: Metadata = serde_json::from_str(EXPECTED_DRAGON_META).unwrap();
     assert_eq!(mint_meta.name, expected_mint_meta.name);
@@ -96,21 +105,27 @@ fn egg_to_dragon() {
 
     assert_eq!(attributes, expected_attributes);
 
-    assert_eq!(attributes.iter().find_map(|a| {
-        if a.trait_type == "Eye Color" {
-            Some(&a.value)
-        } else {
-            None
-        }
-    }), Some(&extra.eye_color));
+    assert_eq!(
+        attributes.iter().find_map(|a| {
+            if a.trait_type == "Eye Color" {
+                Some(&a.value)
+            } else {
+                None
+            }
+        }),
+        Some(&extra.eye_color)
+    );
 
-    assert_eq!(attributes.iter().find_map(|a| {
-        if a.trait_type == "Dragon Type" {
-            Some(&a.value)
-        } else {
-            None
-        }
-    }), Some(&extra.kind));
+    assert_eq!(
+        attributes.iter().find_map(|a| {
+            if a.trait_type == "Dragon Type" {
+                Some(&a.value)
+            } else {
+                None
+            }
+        }),
+        Some(&extra.kind)
+    );
 }
 
 fn mock_metadata(
@@ -276,7 +291,6 @@ static OTHER_META: &str = r#"{
     "animation_url":null,
     "youtube_url":null
 }"#;
-
 
 static EXPECTED_DRAGON_META: &str = r#"{
     "image":"ipfs://somehashhere",

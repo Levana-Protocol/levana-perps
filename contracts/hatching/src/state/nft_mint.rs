@@ -2,8 +2,9 @@ use super::{State, StateContext};
 use cosmwasm_std::{to_binary, IbcMsg, IbcTimeout};
 use msg::contracts::{
     hatching::{
+        dragon_mint::DragonMintExtra,
         nft::{Metadata, Trait},
-        HatchDetails, NftHatchInfo, dragon_mint::DragonMintExtra,
+        HatchDetails, NftHatchInfo,
     },
     ibc_execute_proxy::entry::IbcProxyContractMessages,
 };
@@ -49,7 +50,6 @@ impl State<'_> {
         Ok(())
     }
 
-
     // NFTs are minted via sending an IBC message to a proxy contract on the other chain
     // The proxy contract receives the IbcProxyContractMessages wrapper, unpacks it,
     // and forwards the inner NFT execute messages (encoded as Binary) to the NFT contract
@@ -68,12 +68,13 @@ impl State<'_> {
 
                     babydragon_nft_mint_msg(nft_mint_owner.clone(), egg, extra)
                 })
-                .map(|mint_msg| to_binary(&NftExecuteMsg::Mint(mint_msg?)).map_err(|err| err.into()))
+                .map(|mint_msg| {
+                    to_binary(&NftExecuteMsg::Mint(mint_msg?)).map_err(|err| err.into())
+                })
                 .collect::<Result<Vec<_>>>()?,
         ))
     }
 }
-
 
 // extracts only those NFTs that are mintable
 pub(crate) fn get_nft_mint_iter(details: &HatchDetails) -> impl Iterator<Item = &NftHatchInfo> {
@@ -98,26 +99,41 @@ pub(crate) struct MintMsg {
     pub extension: Metadata,
 }
 
-pub(crate) fn babydragon_nft_mint_msg(owner: String, egg: &NftHatchInfo, extra: DragonMintExtra) -> Result<MintMsg> {
+pub(crate) fn babydragon_nft_mint_msg(
+    owner: String,
+    egg: &NftHatchInfo,
+    extra: DragonMintExtra,
+) -> Result<MintMsg> {
     let mut metadata = Metadata::default();
 
-    let hatching_date = egg.hatch_time.try_into_chrono_datetime()?.format("%Y-%m-%d").to_string();
+    let hatching_date = egg
+        .hatch_time
+        .try_into_chrono_datetime()?
+        .format("%Y-%m-%d")
+        .to_string();
 
-    let mut attributes:Vec<Trait> = egg
+    let mut attributes: Vec<Trait> = egg
         .burn_metadata
         .attributes
         .as_ref()
         .ok_or_else(|| anyhow!("no attributes"))?
         .iter()
-        .filter(|attr| {
-            attr.trait_type != "Nesting Date"
-        })
+        .filter(|attr| attr.trait_type != "Nesting Date")
         .cloned()
         .collect();
 
-    let dragon_type = &attributes.iter().find(|attr| attr.trait_type == "Dragon Type").context("no dragon type")?.value;
+    let dragon_type = &attributes
+        .iter()
+        .find(|attr| attr.trait_type == "Dragon Type")
+        .context("no dragon type")?
+        .value;
     if *dragon_type != extra.kind {
-        bail!("dragon type mismatch for {}: {} != {}", egg.token_id, dragon_type, extra.kind);
+        bail!(
+            "dragon type mismatch for {}: {} != {}",
+            egg.token_id,
+            dragon_type,
+            extra.kind
+        );
     }
 
     attributes.extend(
@@ -130,7 +146,7 @@ pub(crate) fn babydragon_nft_mint_msg(owner: String, egg: &NftHatchInfo, extra: 
             display_type: None,
             trait_type: trait_type.to_string(),
             value,
-        })
+        }),
     );
 
     metadata.image = Some(extra.image_ipfs_url());

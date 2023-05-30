@@ -1,8 +1,4 @@
-use super::{
-    get_lvn_to_grant,
-    nft_mint::{get_nft_mint_iter},
-    State, StateContext,
-};
+use super::{get_lvn_to_grant, nft_mint::get_nft_mint_iter, State, StateContext};
 use msg::contracts::hatching::{
     entry::PotentialHatchInfo,
     events::{HatchCompleteEvent, HatchRetryEvent, HatchStartEvent},
@@ -120,7 +116,10 @@ impl State<'_> {
         let status = HATCH_STATUS.load(ctx.storage, id)?;
 
         if !status.nft_mint_completed {
-            self.send_mint_nfts_ibc_message(ctx, self.get_nft_mint_proxy_messages(ctx.storage, &details)?)?;
+            self.send_mint_nfts_ibc_message(
+                ctx,
+                self.get_nft_mint_proxy_messages(ctx.storage, &details)?,
+            )?;
         }
 
         if !status.lvn_grant_completed {

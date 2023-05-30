@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use shared::storage::RawAddr;
 
-use super::{HatchStatus, NftHatchInfo, ProfileInfo, dragon_mint::DragonMintExtra};
+use super::{dragon_mint::DragonMintExtra, HatchStatus, NftHatchInfo, ProfileInfo};
 
 /// Instantiate message
 #[cw_serde]
@@ -32,9 +32,9 @@ pub enum ExecuteMsg {
 
     /// Admin-only: set the config
     SetBabyDragonExtras {
-        /// list of baby dragon extras 
+        /// list of baby dragon extras
         extras: Vec<DragonMintExtra>,
-    }
+    },
 }
 
 #[cw_serde]

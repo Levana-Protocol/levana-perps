@@ -5,11 +5,11 @@ use cosmwasm_std::Addr;
 use shared::prelude::*;
 
 pub mod config;
+pub mod dragon_mint;
 pub mod entry;
 pub mod events;
 pub mod ibc;
 pub mod nft;
-pub mod dragon_mint;
 
 #[cw_serde]
 pub struct HatchStatus {
