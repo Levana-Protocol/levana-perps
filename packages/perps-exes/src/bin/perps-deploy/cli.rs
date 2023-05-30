@@ -61,6 +61,11 @@ pub(crate) enum Subcommand {
         #[clap(flatten)]
         inner: crate::setup_market::SetupMarketOpt,
     },
+    /// Mainnet-specific deployment activities.
+    Mainnet {
+        #[clap(flatten)]
+        inner: crate::mainnet::MainnetOpt,
+    },
 }
 
 #[derive(clap::Parser, Clone)]

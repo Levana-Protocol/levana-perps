@@ -6,42 +6,54 @@ use cosmos::{Address, CosmosNetwork, RawAddress};
 use msg::{contracts::pyth_bridge::PythMarketPriceFeeds, prelude::*};
 use once_cell::sync::OnceCell;
 
+/// Overall configuration of Pyth, for information valid across all chains.
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct Config {
-    pub chains: HashMap<CosmosNetwork, ChainConfig>,
-    deployments: HashMap<String, DeploymentConfig>,
-    overrides: HashMap<String, DeploymentConfig>,
+pub struct PythConfig {
+    /// How to calculate price feeds for each market.
+    pub markets: HashMap<MarketId, PythMarketPriceFeeds>,
+    /// Endpoint to communicate with to get price data
+    pub endpoint: String,
+    /// How old a price to allow, in seconds
+    pub update_age_tolerance: u32,
+}
+
+/// Configuration for chainwide data.
+///
+/// This contains information which would be valid for multiple different
+/// contract deployments on a single chain.
+#[derive(serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct ChainConfig {
+    /// Is this chain a mainnet chain?
+    ///
+    /// Mainnet chains have additional restrictions, such as not looking up
+    /// contract addresses via the tracker. This is for heightened security.
+    pub mainnet: bool,
+    pub tracker: Option<Address>,
+    pub faucet: Option<Address>,
+    pub pyth: Option<Address>,
+    pub explorer: Option<String>,
+    /// Potential RPC endpoints to use
+    #[serde(default)]
+    pub rpc_nodes: Vec<String>,
+}
+
+#[derive(serde::Deserialize, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct ConfigTestnet {
+    deployments: HashMap<String, BotDeploymentConfigTestnet>,
+    overrides: HashMap<String, BotDeploymentConfigTestnet>,
     pub price_api: String,
-    pub pyth_markets: HashMap<MarketId, PythMarketPriceFeeds>,
-    pub pyth_update_age_tolerance: u32,
     pub liquidity: LiquidityConfig,
     pub utilization: UtilizationConfig,
     pub trader: TraderConfig,
 }
 
-#[derive(serde::Deserialize, Clone, Debug)]
+#[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct ChainConfig {
-    pub tracker: Address,
-    pub faucet: Address,
-    pub pyth: Option<PythChainConfig>,
-    pub explorer: String,
-    #[serde(default)]
-    pub watcher: WatcherConfig,
-    /// Minimum gas required in wallet managed by perps bots
-    #[serde(default = "defaults::min_gas")]
-    pub min_gas: u128,
-    /// Minimum gas required in the faucet contract
-    #[serde(default = "defaults::min_gas_in_faucet")]
-    pub min_gas_in_faucet: u128,
-    /// Minimum gas required in the gas wallet
-    #[serde(default = "defaults::min_gas_in_gas_wallet")]
-    pub min_gas_in_gas_wallet: u128,
-    /// Override the gas multiplier
-    pub gas_multiplier: Option<f64>,
-    /// Potential RPC endpoints to use
-    pub rpc_nodes: Vec<String>,
+pub struct ConfigMainnet {
+    pub deployments: HashMap<String, BotDeploymentConfigMainnet>,
 }
 
 #[derive(serde::Deserialize, Clone, Debug)]
@@ -93,7 +105,7 @@ pub struct LiquidityBounds {
 
 #[derive(serde::Deserialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct DeploymentConfig {
+pub struct BotDeploymentConfigTestnet {
     #[serde(default)]
     pub crank: bool,
     /// How many ultracrank wallets to set up
@@ -122,15 +134,57 @@ pub struct DeploymentConfig {
     pub ignore_stale: bool,
     #[serde(default)]
     pub execs_per_price: Option<u32>,
+    #[serde(default)]
+    pub watcher: WatcherConfig,
+    /// Minimum gas required in wallet managed by perps bots
+    #[serde(default = "defaults::min_gas")]
+    pub min_gas: u128,
+    /// Minimum gas required in the faucet contract
+    #[serde(default = "defaults::min_gas_in_faucet")]
+    pub min_gas_in_faucet: u128,
+    /// Minimum gas required in the gas wallet
+    #[serde(default = "defaults::min_gas_in_gas_wallet")]
+    pub min_gas_in_gas_wallet: u128,
+    /// Override the gas multiplier
+    pub gas_multiplier: Option<f64>,
 }
 
-const CONFIG_YAML: &[u8] = include_bytes!("../assets/config.yaml");
+#[derive(serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct BotDeploymentConfigMainnet {
+    #[serde(default)]
+    pub crank: bool,
+    pub price: bool,
+    #[serde(default)]
+    pub execs_per_price: Option<u32>,
+    pub network: CosmosNetwork,
+    pub wallet_phrase_name: String,
+}
 
-impl Config {
+const CONFIG_CHAIN_YAML: &[u8] = include_bytes!("../assets/config-chain.yaml");
+const CONFIG_TESTNET_YAML: &[u8] = include_bytes!("../assets/config-testnet.yaml");
+const CONFIG_MAINNET_YAML: &[u8] = include_bytes!("../assets/config-mainnet.yaml");
+const CONFIG_PYTH_YAML: &[u8] = include_bytes!("../assets/config-pyth.yaml");
+
+impl ChainConfig {
+    pub fn load(network: CosmosNetwork) -> Result<&'static Self> {
+        static CONFIG: OnceCell<HashMap<CosmosNetwork, ChainConfig>> = OnceCell::new();
+        CONFIG
+            .get_or_try_init(|| {
+                serde_yaml::from_slice(CONFIG_CHAIN_YAML)
+                    .context("Could not parse config-chain.yaml")
+            })?
+            .get(&network)
+            .with_context(|| format!("No chain config found for {network}"))
+    }
+}
+
+impl ConfigTestnet {
     pub fn load() -> Result<&'static Self> {
-        static CONFIG: OnceCell<Config> = OnceCell::new();
+        static CONFIG: OnceCell<ConfigTestnet> = OnceCell::new();
         CONFIG.get_or_try_init(|| {
-            serde_yaml::from_slice(CONFIG_YAML).context("Could not parse config.yaml")
+            serde_yaml::from_slice(CONFIG_TESTNET_YAML)
+                .context("Could not parse config-testnet.yaml")
         })
     }
 
@@ -162,8 +216,44 @@ impl Config {
     }
 }
 
+impl PythConfig {
+    pub fn load() -> Result<&'static Self> {
+        static CONFIG: OnceCell<PythConfig> = OnceCell::new();
+        CONFIG.get_or_try_init(|| {
+            serde_yaml::from_slice(CONFIG_PYTH_YAML).context("Could not parse config-pyth.yaml")
+        })
+    }
+}
+
+impl ConfigMainnet {
+    pub fn load() -> Result<&'static Self> {
+        static CONFIG: OnceCell<ConfigMainnet> = OnceCell::new();
+        CONFIG.get_or_try_init(|| {
+            serde_yaml::from_slice(CONFIG_MAINNET_YAML)
+                .context("Could not parse config-mainnet.yaml")
+        })
+    }
+
+    pub fn get_deployment_info(&self, deployment: &str) -> Result<BotDeploymentConfigMainnet> {
+        self.deployments
+            .get(deployment)
+            .with_context(|| {
+                format!(
+                    "No config found for {}. Valid configs: {}",
+                    deployment,
+                    self.deployments
+                        .keys()
+                        .map(|s| s.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            })
+            .cloned()
+    }
+}
+
 pub struct DeploymentInfo {
-    pub config: DeploymentConfig,
+    pub config: BotDeploymentConfigTestnet,
     pub network: CosmosNetwork,
     pub wallet_phrase_name: String,
 }
@@ -219,6 +309,31 @@ pub struct WatcherConfig {
     pub stats: TaskConfig,
     #[serde(default = "defaults::ultra_crank")]
     pub ultra_crank: TaskConfig,
+}
+
+#[derive(serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct WatcherConfigMainnet {
+    /// How many times to retry before giving up
+    #[serde(default = "defaults::retries")]
+    pub retries: usize,
+    /// How many seconds to delay between retries
+    #[serde(default = "defaults::delay_between_retries")]
+    pub delay_between_retries: u32,
+    #[serde(default = "defaults::gas_check")]
+    pub gas_check: TaskConfig,
+    #[serde(default = "defaults::track_balance")]
+    pub track_balance: TaskConfig,
+    #[serde(default = "defaults::crank")]
+    pub crank: TaskConfig,
+    #[serde(default = "defaults::get_factory")]
+    pub get_factory: TaskConfig,
+    #[serde(default = "defaults::price")]
+    pub price: TaskConfig,
+    #[serde(default = "defaults::stale")]
+    pub stale: TaskConfig,
+    #[serde(default = "defaults::stats")]
+    pub stats: TaskConfig,
 }
 
 impl Default for WatcherConfig {
@@ -277,6 +392,23 @@ impl Default for WatcherConfig {
                 delay: Delay::Constant(120),
                 out_of_date: 180,
             },
+        }
+    }
+}
+
+impl Default for WatcherConfigMainnet {
+    fn default() -> Self {
+        let watcher = WatcherConfig::default();
+        Self {
+            retries: watcher.retries,
+            delay_between_retries: watcher.delay_between_retries,
+            gas_check: watcher.gas_check,
+            track_balance: watcher.track_balance,
+            crank: watcher.crank,
+            get_factory: watcher.get_factory,
+            price: watcher.price,
+            stale: watcher.stale,
+            stats: watcher.stats,
         }
     }
 }

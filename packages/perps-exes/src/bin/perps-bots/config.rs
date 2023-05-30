@@ -3,8 +3,8 @@ use std::sync::Arc;
 use cosmos::{Address, CosmosNetwork, HasAddressType, Wallet};
 use perps_exes::{
     config::{
-        ChainConfig, Config, DeploymentInfo, LiquidityConfig, PythChainConfig, TraderConfig,
-        UtilizationConfig, WatcherConfig,
+        ChainConfig, ConfigTestnet, DeploymentInfo, LiquidityConfig, PythChainConfig, PythConfig,
+        TraderConfig, UtilizationConfig, WatcherConfig,
     },
     prelude::*,
     wallet_manager::WalletManager,
@@ -44,40 +44,39 @@ pub(crate) struct BotConfig {
 
 impl Opt {
     pub(crate) fn get_bot_config(&self) -> Result<BotConfig> {
-        let config = Config::load()?;
+        let config = ConfigTestnet::load()?;
+        let pyth_config = PythConfig::load()?;
         let DeploymentInfo {
             config: partial,
             network,
             wallet_phrase_name,
         } = config.get_deployment_info(&self.deployment)?;
+        let ChainConfig {
+            tracker,
+            faucet,
+            pyth,
+            explorer,
+            rpc_nodes,
+            mainnet,
+        } = ChainConfig::load(network)?;
         let partial = match &self.deployment_config {
             Some(s) => serde_yaml::from_str(s)?,
             None => partial,
         };
-        let ChainConfig {
-            tracker,
-            faucet,
-            explorer,
-            pyth,
-            watcher,
-            min_gas,
-            min_gas_in_faucet,
-            min_gas_in_gas_wallet,
-            gas_multiplier,
-            rpc_nodes,
-        } = config
-            .chains
-            .get(&network)
-            .with_context(|| format!("No chain config found for network {}", network))?;
         Ok(BotConfig {
-            tracker: *tracker,
-            faucet: *faucet,
-            pyth: pyth.clone(),
-            min_gas: *min_gas,
-            min_gas_in_faucet: *min_gas_in_faucet,
-            min_gas_in_gas_wallet: *min_gas_in_gas_wallet,
+            tracker: tracker.with_context(|| format!("No tracker found for {network}"))?,
+            faucet: faucet.with_context(|| format!("No faucet found for {network}"))?,
+            pyth: pyth.map(|address| PythChainConfig {
+                address,
+                endpoint: pyth_config.endpoint.clone(),
+            }),
+            min_gas: partial.min_gas,
+            min_gas_in_faucet: partial.min_gas_in_faucet,
+            min_gas_in_gas_wallet: partial.min_gas_in_gas_wallet,
             price_api: &config.price_api,
-            explorer,
+            explorer: explorer
+                .as_deref()
+                .with_context(|| format!("No explorer found for network {network}"))?,
             contract_family: self.deployment.clone(),
             network,
             crank_wallet: if partial.crank {
@@ -110,8 +109,8 @@ impl Opt {
             liquidity_config: config.liquidity.clone(),
             utilization_config: config.utilization,
             trader_config: config.trader,
-            watcher: watcher.clone(),
-            gas_multiplier: *gas_multiplier,
+            watcher: partial.watcher.clone(),
+            gas_multiplier: partial.gas_multiplier,
             rpc_nodes: match &self.rpc_url {
                 None => rpc_nodes.iter().map(|x| Arc::new(x.clone())).collect(),
                 Some(rpc) => vec![rpc.clone().into()],
