@@ -141,7 +141,7 @@ impl State<'_> {
             total_user_rewards
                 .checked_mul_dec(elapsed_ratio)?
                 // using min as an added precaution to make sure it never goes above the total due to rounding errors
-                .min(total_user_rewards)
+                .min(total_user_rewards.checked_sub(stats.lockdrop_amount_collected)?)
         };
 
         // Update internal storage & transfer
