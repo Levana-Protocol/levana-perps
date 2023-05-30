@@ -1,4 +1,5 @@
 sei-testnet:
+  mainnet: false
   pyth: sei1977nnu5jqatteqgve8tx7nzu9y7eh6cvq0e4g6xjx8tf5wm4nkmsfljunh
   tracker: sei14k4xcy6dfdyqvpvx6njxptry2urcp98f74lv49m36u7gkdkv7s6qleq4tp
   faucet: sei1czf3age49j99yrkxynmetysh3p2x8tp429mv23jme7zj8hytwhesnqngza
@@ -10,6 +11,7 @@ sei-testnet:
   #- https://sei-testnet-rpc.polkachu.com/
   #- https://sei-a2-rpc.brocha.in/
 osmosis-testnet:
+  mainnet: false
   pyth: osmo12u2vqdecdte84kg6c3d40nwzjsya59hsj048n687m9q3t6wdmqgsq6zrlx 
   tracker: osmo1l3ypxctzcdev9dmyydlzrflqz52f0wsqmzkuyq9dvpdnqx69wvvq9zszh2
   faucet: osmo1ycrm74p7uc976hu2z428l27vxj8l44zu0x0yqjr8gh775qr6gtnq9f3zsz
@@ -17,16 +19,19 @@ osmosis-testnet:
   rpc-nodes:
   - https://rpc-testnet.osmosis.sandbox.levana.finance
 dragonfire:
+  mainnet: false
   tracker: levana18cszlvm6pze0x9sz32qnjq4vtd45xehqs8dq7cwy8yhq35wfnn3q6s5ylj
   faucet: levana1qg5ega6dykkxc307y25pecuufrjkxkaggkkxh7nad0vhyhtuhw3s7ff6rr
   explorer: "https://bigdipper.dragonfire.sandbox.levana.finance/transactions/"
   rpc-nodes:
   - https://rpc-v4-udb8dydv.dragonfire.sandbox.levana.finance
 juno-testnet:
+  mainnet: false
   tracker: juno1u23qyg0j4y5mzhessf0kcnjuqwg48kpufj5vujsq7kxxgxfnv5pqjmkmr4
   faucet: juno15rwad8twfrj34q7ep2sgrz3lqqs7vj939z9p4kccvfu9qm6mn55qxn7gy3
   explorer: "https://testnet.mintscan.io/juno-testnet/txs/"
 stargaze-testnet:
+  mainnet: false
   tracker: stars1vfa0a8846ay2l2ehmqtwxgpcxzes9m598kw6mjh50zgnqhxgwmys7fkew3 
   faucet: stars1pnlmx33qgx7822t7tc73znu0ddkxzcg29rshpls6acdlrrr7snkst4xwq6
   explorer: "https://testnet-explorer.publicawesome.dev/stargaze/tx/"
