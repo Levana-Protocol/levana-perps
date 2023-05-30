@@ -59,6 +59,7 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 struct CodeIds {
+    /// Uses a Vec instead of a HashMap to keep consistent ordering and avoid large diffs.
     hashes: HashMap<String, StoredContract>,
 }
 
@@ -191,9 +192,6 @@ struct InstantiateFactoryOpts {
     /// Network to use.
     #[clap(long, env = "COSMOS_NETWORK")]
     network: CosmosNetwork,
-    /// Unique label used internally for this factory
-    #[clap(long)]
-    id: String,
     /// On-chain label for the factory contract
     #[clap(long)]
     factory_label: String,
@@ -217,11 +215,11 @@ struct InstantiateFactoryOpts {
     wind_down: Option<Address>,
 }
 
-/// Stores mainnet factory contract IDs, keyed by a unique identifier
+/// Stores mainnet factory contracts
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 struct MainnetFactories {
-    factories: HashMap<String, MainnetFactory>,
+    factories: Vec<MainnetFactory>,
 }
 
 /// An instantiated factory on mainnet.
@@ -257,7 +255,6 @@ async fn instantiate_factory(
     opt: Opt,
     InstantiateFactoryOpts {
         network,
-        id,
         factory_label,
         label_suffix,
         owner,
@@ -271,11 +268,6 @@ async fn instantiate_factory(
     let code_ids = CodeIds::load()?;
     let mut factories = MainnetFactories::load()?;
 
-    anyhow::ensure!(
-        !factories.factories.contains_key(&id),
-        "Factory ID already in use: {id}"
-    );
-
     let StoredCodeId {
         gitrev,
         hash,
@@ -285,6 +277,7 @@ async fn instantiate_factory(
     let position = code_ids.get_simple(ContractType::PositionToken, &opt, network)?;
     let liquidity = code_ids.get_simple(ContractType::LiquidityToken, &opt, network)?;
     let factory = app.cosmos.make_code_id(factory_code_id);
+    log::info!("Instantiating a factory using code ID {factory_code_id}");
     let factory = factory
         .instantiate(
             &app.wallet,
@@ -305,18 +298,15 @@ async fn instantiate_factory(
         .await?;
     log::info!("Deployed fresh factory contract to: {factory}");
 
-    factories.factories.insert(
-        id,
-        MainnetFactory {
-            address: factory.get_address(),
-            network: network,
-            label: factory_label,
-            instantiate_code_id: factory_code_id,
-            instantiate_at: Utc::now(),
-            gitrev: gitrev.to_owned(),
-            hash,
-        },
-    );
+    factories.factories.push(MainnetFactory {
+        address: factory.get_address(),
+        network: network,
+        label: factory_label,
+        instantiate_code_id: factory_code_id,
+        instantiate_at: Utc::now(),
+        gitrev: gitrev.to_owned(),
+        hash,
+    });
     factories.save()?;
 
     Ok(())
@@ -324,9 +314,9 @@ async fn instantiate_factory(
 
 #[derive(clap::Parser)]
 struct AddMarketOpts {
-    /// Unique label used internally for this factory
+    /// Address of the factory contract
     #[clap(long)]
-    factory_id: String,
+    factory: Address,
     /// New market ID to add
     #[clap(long)]
     market_id: MarketId,
@@ -357,7 +347,7 @@ impl MarketConfigUpdates {
 async fn add_market(
     opt: Opt,
     AddMarketOpts {
-        factory_id,
+        factory,
         market_id,
         collateral,
         initial_borrow_fee_rate,
@@ -380,8 +370,9 @@ async fn add_market(
     let factories = MainnetFactories::load()?;
     let factory = factories
         .factories
-        .get(&factory_id)
-        .with_context(|| format!("Unknown mainnet factory ID: {factory_id}"))?;
+        .into_iter()
+        .find(|x| x.address == factory)
+        .with_context(|| format!("Unknown mainnet factory: {factory}"))?;
     let app = opt.load_app_mainnet(Some(factory.network), None).await?;
 
     log::info!("Deploying a new Pyth bridge");
@@ -444,9 +435,9 @@ async fn add_market(
 
 #[derive(clap::Parser)]
 struct SetPythFeedsOpts {
-    /// Unique label used internally for this factory
+    /// Address of the factory contract
     #[clap(long)]
-    factory_id: String,
+    factory: Address,
     /// New market ID to add
     #[clap(long)]
     market_id: MarketId,
@@ -454,10 +445,7 @@ struct SetPythFeedsOpts {
 
 async fn set_pyth_feeds(
     opt: Opt,
-    SetPythFeedsOpts {
-        factory_id,
-        market_id,
-    }: SetPythFeedsOpts,
+    SetPythFeedsOpts { factory, market_id }: SetPythFeedsOpts,
 ) -> Result<()> {
     let pyth_config = PythConfig::load()?
         .markets
@@ -467,8 +455,9 @@ async fn set_pyth_feeds(
     let factories = MainnetFactories::load()?;
     let factory = factories
         .factories
-        .get(&factory_id)
-        .with_context(|| format!("Unknown mainnet factory ID: {factory_id}"))?;
+        .into_iter()
+        .find(|x| x.address == factory)
+        .with_context(|| format!("Unknown mainnet factory: {factory}"))?;
     let app = opt.load_app_mainnet(Some(factory.network), None).await?;
 
     let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));

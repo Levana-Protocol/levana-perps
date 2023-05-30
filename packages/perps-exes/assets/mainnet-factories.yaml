@@ -1,9 +1,8 @@
 factories:
-  osmo-pretend-mainnet-1:
-    address: osmo1lke82kne4hcv690gsy6cq2ka7ta8pq2wh5wy67caz45xj2maf82sh5edcw
-    network: osmosis-testnet
-    label: Pretend mainnet 1
-    instantiate-code-id: 403
-    instantiate-at: 2023-05-30T11:06:39.736918086Z
-    gitrev: a0ba2217bed8f847a604ff890a05e640406bf63f
-    hash: 0f59e244069271be6b584ee59e4c22b61ecfb4b474b41526ded627e81bbbda79
+- address: osmo1sf0xectg6pvzk27pkpk74px0r7kjjh82cek6t22dsh4nkq794q7qea7g8y
+  network: osmosis-testnet
+  label: Pretend mainnet 2
+  instantiate-code-id: 403
+  instantiate-at: 2023-05-30T12:13:09.930256077Z
+  gitrev: a0ba2217bed8f847a604ff890a05e640406bf63f
+  hash: 0f59e244069271be6b584ee59e4c22b61ecfb4b474b41526ded627e81bbbda79
