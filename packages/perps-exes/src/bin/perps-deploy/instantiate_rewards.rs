@@ -1,4 +1,4 @@
-use std::{collections::HashSet, str::FromStr};
+use std::{collections::HashSet, str::FromStr, path::PathBuf};
 
 use crate::{
     app::BasicApp,
@@ -6,10 +6,10 @@ use crate::{
     store_code::{Contracts, HATCHING, IBC_EXECUTE_PROXY, LVN_REWARDS},
 };
 use anyhow::{bail, Context, Result};
-use cosmos::{Coin, CosmosBuilder};
+use cosmos::{Coin, CosmosBuilder, TokenFactory};
 use cosmos::{Contract, CosmosNetwork, HasAddress};
 use cosmwasm_std::IbcOrder;
-use msg::contracts::hatching::ibc::IbcChannelVersion;
+use msg::contracts::hatching::{ibc::IbcChannelVersion, dragon_mint::DragonMintExtra, entry::ExecuteMsg as HatchingExecuteMsg};
 use serde::{Deserialize, Serialize};
 
 #[derive(clap::Parser)]
@@ -32,6 +32,9 @@ pub(crate) struct InstantiateRewardsOpt {
         default_value = "factory/osmo12g96ahplpf78558cv5pyunus2m66guykt96lvc/lvn1"
     )]
     pub(crate) lvn_denom: String,
+    /// If deploying ibc_execute_proxy, specify the target contract it's proxying
+    #[clap(long, default_value = "../levana-hatchery")]
+    pub(crate) path_to_hatchery: PathBuf,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -56,6 +59,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
         prod,
         ibc_execute_proxy_target: ibc_execute_proxy,
         lvn_denom,
+        path_to_hatchery
     } = inst_opt;
 
     let basic = opt.load_basic_app(network).await?;
@@ -72,9 +76,13 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                 .context("Must specify --ibc-execute-proxy when instantiating ibc-execute")?
             {
                 IbcExecuteProxyTarget::NftMint => {
-                    let mint_contract =
+
+                    let mint_contract = if network == CosmosNetwork::JunoMainnet {
+                        bail!("no mint contract on mainnet!")
+                    } else {
                         instantiate_testnet_nft_contract(&basic, "Levana Baby Dragons Mock")
-                            .await?;
+                            .await?
+                    };
 
                     let ibc_contract = tracker
                         .require_code_by_type(&opt, IBC_EXECUTE_PROXY)
@@ -110,6 +118,8 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
             };
         }
         Contracts::Hatching => {
+
+
             let burn_egg_contract = if network == CosmosNetwork::JunoMainnet {
                 // eggs are in dragon contract
                 "juno1a90f8jdwm4h43yzqgj4xqzcfxt4l98ev970vwz6l9m02wxlpqd2squuv6k".to_string()
@@ -209,11 +219,24 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                     .await?;
             }
 
+
+            log::info!("uploading babydragon mint info...");
+            let filepath = path_to_hatchery.join("data").join("juno-warp").join("baby-dragons-extra.csv");
+            let mut rdr = csv::Reader::from_path(filepath)?;
+            let dragons:Vec<DragonMintExtra> = rdr.deserialize::<DragonMintExtra>().map(|x| x.map_err(|e| e.into())).collect::<Result<Vec<_>>>()?;
+            const CHUNK_SIZE:usize = 1024;
+            for (idx, chunk) in dragons.chunks(CHUNK_SIZE).enumerate() {
+                println!("uploading {} to {} of {}", idx * CHUNK_SIZE, (idx * CHUNK_SIZE) + chunk.len(), dragons.len());
+                let resp = contract.execute(&basic.wallet, vec![], HatchingExecuteMsg::SetBabyDragonExtras { extras: chunk.to_vec() }).await?;
+                println!("tx hash: {:?}", resp.txhash);
+            }
+
             let info = contract.info().await?;
 
             log::info!("new hatching deployed at {}", contract.get_address_string());
             log::info!("hatching ibc port is {}", info.ibc_port_id);
         }
+
         Contracts::LvnRewards => {
             let code_id = tracker.require_code_by_type(&opt, LVN_REWARDS).await?;
             let contract = code_id
@@ -243,22 +266,28 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
             log::info!("lvn rewards ibc port is {}", info.ibc_port_id);
 
             if network != CosmosNetwork::OsmosisMainnet {
-                let amount = "1000".to_string();
+                const AMOUNT:u128 = 100000000;
                 log::info!(
-                    "giving {amount} of {lvn_denom} to {}",
+                    "giving {AMOUNT} of {lvn_denom} to {}",
                     contract.get_address()
                 );
-                let coin = Coin {
-                    denom: lvn_denom,
-                    amount: "10000".to_string(),
-                };
 
                 // gas is wildly underestimated on osmosis testnet at least
-                // bump up the multiplier to make sure we have enough
-                // then set it back when we're done sending coins
+                // create a new cosmos instance with increased estimation multiplier
+                // to make sure we have enough
                 let mut builder = CosmosBuilder::clone(&*basic.cosmos.get_first_builder());
                 builder.config.gas_estimate_multiplier = 1.5;
                 let cosmos = builder.build_lazy();
+
+
+                let tokenfactory = TokenFactory::new(basic.cosmos.clone(), basic.wallet.clone());
+
+                tokenfactory.mint(lvn_denom.clone(), AMOUNT).await?;
+
+                let coin = Coin {
+                    denom: lvn_denom,
+                    amount: AMOUNT.to_string(),
+                };
 
                 basic
                     .wallet

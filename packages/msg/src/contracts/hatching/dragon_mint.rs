@@ -5,7 +5,7 @@ use cosmwasm_schema::cw_serde;
 pub struct DragonMintExtra {
     #[serde(rename = "dragon_id")]
     pub id: String,
-    #[serde(rename = "dragon_cid")]
+    #[serde(rename = "baby_dragon_cid")]
     pub cid: String,
     pub eye_color: String,
     #[serde(rename = "dragon_type")]

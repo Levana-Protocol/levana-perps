@@ -3,6 +3,7 @@ use cosmwasm_std::{Addr, IbcChannel};
 
 #[cw_serde]
 pub struct Config {
+    pub admin: Addr,
     pub nft_burn_contracts: ConfigNftBurnContracts,
     pub profile_contract: Addr,
     /// The IBC channel for NFT minting.

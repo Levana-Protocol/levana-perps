@@ -13,6 +13,18 @@ use shared::{ibc::TIMEOUT_SECONDS, prelude::*};
 const BABY_DRAGON_EXTRA: Map<&str, DragonMintExtra> = Map::new("baby-dragon-extra");
 
 impl State<'_> {
+    pub(crate) fn set_babydragon_extras(
+        &self,
+        ctx: &mut StateContext,
+        extras: Vec<DragonMintExtra>,
+    ) -> Result<()> {
+        for extra in extras {
+            BABY_DRAGON_EXTRA.save(ctx.storage, &extra.id, &extra)?;
+        }
+
+        Ok(())
+    }
+
     pub(crate) fn send_mint_nfts_ibc_message(
         &self,
         ctx: &mut StateContext,
@@ -105,7 +117,7 @@ pub(crate) fn babydragon_nft_mint_msg(owner: String, egg: &NftHatchInfo, extra: 
 
     let dragon_type = &attributes.iter().find(|attr| attr.trait_type == "Dragon Type").context("no dragon type")?.value;
     if *dragon_type != extra.kind {
-        bail!("dragon type mismatch {} != {}", dragon_type, extra.kind);
+        bail!("dragon type mismatch for {}: {} != {}", egg.token_id, dragon_type, extra.kind);
     }
 
     attributes.extend(
