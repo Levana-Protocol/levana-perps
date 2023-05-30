@@ -14,7 +14,7 @@ use msg::{
     token::Token,
 };
 
-use crate::config::{BotConfig, BotConfigTestnet};
+use crate::config::{BotConfig, BotConfigByType, BotConfigTestnet};
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
 use super::{App, AppBuilder};
@@ -51,34 +51,29 @@ pub(crate) struct Cw20 {
 }
 
 impl AppBuilder {
-    pub(super) fn launch_factory_task(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
-        self.watch_periodic(
-            crate::watcher::TaskLabel::GetFactory,
-            FactoryUpdate { testnet },
-        )
+    pub(super) fn launch_factory_task(&mut self) -> Result<()> {
+        self.watch_periodic(crate::watcher::TaskLabel::GetFactory, FactoryUpdate)
     }
 }
 
 #[derive(Clone)]
-struct FactoryUpdate {
-    testnet: Arc<BotConfigTestnet>,
-}
+struct FactoryUpdate;
 
 #[async_trait]
 impl WatchedTask for FactoryUpdate {
     async fn run_single(&mut self, app: &App, _heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
-        update(app, &self.testnet).await
+        update(app).await
     }
 }
 
-async fn update(app: &App, testnet: &BotConfigTestnet) -> Result<WatchedTaskOutput> {
-    let info = get_factory_info(&app.cosmos, &app.config, testnet, &app.client).await?;
+async fn update(app: &App) -> Result<WatchedTaskOutput> {
+    let (message, info) = get_factory_info(&app.cosmos, &app.config, &app.client).await?;
     let output = WatchedTaskOutput {
         skip_delay: false,
-        message: format!(
-            "Successfully loaded factory address {} from tracker {}",
-            info.factory, testnet.tracker
-        ),
+        message, // message: format!(
+                 //     "Successfully loaded factory address {} from tracker {}",
+                 //     info.factory, testnet.tracker
+                 // ),
     };
     app.set_factory_info(info);
     Ok(output)
@@ -87,34 +82,60 @@ async fn update(app: &App, testnet: &BotConfigTestnet) -> Result<WatchedTaskOutp
 pub(crate) async fn get_factory_info(
     cosmos: &Cosmos,
     config: &BotConfig,
-    testnet: &BotConfigTestnet,
     client: &reqwest::Client,
-) -> Result<FactoryInfo> {
-    let (factory, gitrev) = get_contract(cosmos, config, testnet, "factory")
-        .await
-        .context("Unable to get 'factory' contract")?;
+) -> Result<(String, FactoryInfo)> {
+    let (factory, gitrev, message) = match &config.by_type {
+        BotConfigByType::Testnet { inner } => {
+            let (factory, gitrev) = get_contract(cosmos, config, inner, "factory")
+                .await
+                .context("Unable to get 'factory' contract")?;
+            let message = format!(
+                "Successfully loaded factory address {factory} from tracker {}",
+                inner.tracker
+            );
+            (factory, gitrev, message)
+        }
+        BotConfigByType::Mainnet { factory, .. } => (
+            *factory,
+            None,
+            format!("Using hard-coded factory address {factory}"),
+        ),
+    };
+
+    let faucet = match &config.by_type {
+        BotConfigByType::Testnet { inner } => Some(inner.faucet),
+        BotConfigByType::Mainnet { .. } => None,
+    };
+
     let (cw20s, markets) = get_tokens_markets(cosmos, factory)
         .await
         .with_context(|| format!("Unable to get_tokens_market for factory {factory}"))?;
-    let faucet_gas_amount = match get_faucet_gas_amount(cosmos, testnet.faucet).await {
-        Ok(x) => x,
-        Err(e) => {
-            log::warn!("Error on get_faucet_gas_amount: {e:?}");
-            None
-        }
+    let faucet_gas_amount = match faucet {
+        Some(faucet) => match get_faucet_gas_amount(cosmos, faucet).await {
+            Ok(x) => x,
+            Err(e) => {
+                log::warn!("Error on get_faucet_gas_amount: {e:?}");
+                None
+            }
+        },
+        None => None,
     };
-    let faucet_collateral_amount = match get_faucet_collateral_amount(cosmos, testnet.faucet).await
-    {
-        Ok(x) => x,
-        Err(e) => {
-            log::warn!("Error on get_faucet_collateral_amount: {e:?}");
-            HashMap::new()
-        }
+
+    let faucet_collateral_amount = match faucet {
+        Some(faucet) => match get_faucet_collateral_amount(cosmos, faucet).await {
+            Ok(x) => x,
+            Err(e) => {
+                log::warn!("Error on get_faucet_collateral_amount: {e:?}");
+                HashMap::new()
+            }
+        },
+        None => HashMap::new(),
     };
+
     let rpc = get_rpc_info(cosmos, config, client).await?;
-    Ok(FactoryInfo {
+    let info = FactoryInfo {
         factory,
-        faucet: Some(testnet.faucet),
+        faucet,
         updated: Utc::now(),
         is_static: false,
         cw20s,
@@ -123,7 +144,8 @@ pub(crate) async fn get_factory_info(
         faucet_gas_amount,
         faucet_collateral_amount,
         rpc: Some(rpc),
-    })
+    };
+    Ok((message, info))
 }
 
 pub(crate) async fn get_contract(
@@ -285,7 +307,13 @@ async fn get_rpc_info(
         // All nodes are broken
         None => match config.rpc_nodes.first() {
             Some(node) => (node.clone(), 0),
-            None => anyhow::bail!("Config includes no RPC nodes"),
+            None => {
+                if config.by_type.is_testnet() {
+                    anyhow::bail!("Config includes no RPC nodes")
+                } else {
+                    ("MAINNET".to_owned().into(), 0)
+                }
+            }
         },
     };
 

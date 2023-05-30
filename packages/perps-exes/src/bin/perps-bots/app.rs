@@ -12,8 +12,6 @@ mod types;
 mod ultra_crank;
 mod utilization;
 
-use std::cmp::min;
-
 use anyhow::Result;
 pub(crate) use types::*;
 
@@ -21,9 +19,7 @@ use crate::config::BotConfigByType;
 
 impl AppBuilder {
     pub(crate) async fn load(&mut self) -> Result<()> {
-        if let BotConfigByType::Testnet { inner } = &self.app.config.by_type {
-            self.launch_factory_task(inner.clone())?;
-        }
+        self.launch_factory_task()?;
 
         match &self.app.config.by_type {
             BotConfigByType::Testnet { inner } => {

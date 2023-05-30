@@ -301,6 +301,7 @@ impl AppBuilder {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct WatchedTaskOutput {
     pub(crate) skip_delay: bool,
     pub(crate) message: String,

@@ -98,28 +98,7 @@ impl Opt {
             },
         };
 
-        let factory = match &config.by_type {
-            BotConfigByType::Testnet { inner } => {
-                get_factory_info(&cosmos, &config, inner, &client).await?
-            }
-            BotConfigByType::Mainnet {
-                factory,
-                pyth,
-                min_gas_crank,
-                min_gas_price,
-            } => FactoryInfo {
-                factory: *factory,
-                faucet: None,
-                updated: Utc::now(),
-                is_static: true,
-                cw20s: vec![],
-                markets: HashMap::new(),
-                gitrev: None,
-                faucet_gas_amount: None,
-                faucet_collateral_amount: HashMap::new(),
-                rpc: None,
-            },
-        };
+        let factory = get_factory_info(&cosmos, &config, &client).await?.1;
         log::info!("Discovered factory contract: {}", factory.factory);
         if let Some(faucet) = factory.faucet {
             log::info!("Discovered faucet contract: {}", faucet);
