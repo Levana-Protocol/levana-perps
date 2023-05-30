@@ -631,12 +631,16 @@ impl PerpsMarket {
         })
     }
 
-    pub fn query_spot_price_history(&self) -> Result<Vec<PricePoint>> {
-        // NOTE we're not doing any pagination, it will load everything
+    pub fn query_spot_price_history(
+        &self,
+        start_after: Option<Timestamp>,
+        limit: Option<u32>,
+        order: Option<OrderInMessage>,
+    ) -> Result<Vec<PricePoint>> {
         let resp: SpotPriceHistoryResp = self.query(&MarketQueryMsg::SpotPriceHistory {
-            start_after: None,
-            limit: None,
-            order: Some(OrderInMessage::Ascending),
+            start_after,
+            limit,
+            order,
         })?;
 
         Ok(resp.price_points)
