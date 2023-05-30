@@ -11,12 +11,16 @@ use msg::{
 };
 use tokio::sync::mpsc::error::TrySendError;
 
+use crate::config::{BotConfigByType, BotConfigTestnet};
+
 use super::{App, AppBuilder};
 
 impl AppBuilder {
     pub(super) fn launch_faucet_task(&mut self, runner: FaucetBotRunner) {
-        let contract = self.app.cosmos.make_contract(self.app.config.faucet);
-        self.watch_background(runner.start(contract));
+        if let BotConfigByType::Testnet { inner } = &self.app.config.by_type {
+            let contract = self.app.cosmos.make_contract(inner.faucet);
+            self.watch_background(runner.start(contract));
+        }
     }
 }
 
@@ -24,15 +28,21 @@ pub(crate) struct FaucetBot {
     wallet_address: Address,
     hcaptcha_secret: String,
     tx: tokio::sync::mpsc::Sender<TapRequest>,
+    testnet: Arc<BotConfigTestnet>,
 }
 
 impl FaucetBot {
-    pub(crate) fn new(wallet: Wallet, hcaptcha_secret: String) -> (Self, FaucetBotRunner) {
+    pub(crate) fn new(
+        wallet: Wallet,
+        hcaptcha_secret: String,
+        testnet: Arc<BotConfigTestnet>,
+    ) -> (Self, FaucetBotRunner) {
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         let bot = FaucetBot {
             wallet_address: wallet.get_address(),
             hcaptcha_secret,
             tx,
+            testnet,
         };
         let runner = FaucetBotRunner { wallet, rx };
         (bot, runner)
@@ -53,7 +63,7 @@ impl FaucetBot {
         recipient: Address,
         cw20s: Vec<Address>,
     ) -> Result<Arc<String>, FaucetTapError> {
-        let contract = app.cosmos.make_contract(app.config.faucet);
+        let contract = app.cosmos.make_contract(self.testnet.faucet);
         match contract
             .query(QueryMsg::IsTapEligible {
                 addr: recipient.get_address_string().into(),
@@ -131,6 +141,8 @@ pub(crate) enum FaucetTapError {
     CannotQueryCaptcha {},
     #[error("The captcha provided was invalid, please try again.")]
     InvalidCaptcha {},
+    #[error("Unfortunately we cannot provide a faucet for mainnet.")]
+    Mainnet {},
 }
 
 pub struct FaucetBotRunner {

@@ -405,7 +405,7 @@ impl TaskStatuses {
         #[template(path = "status.html")]
         struct MyTemplate<'a> {
             statuses: Vec<RenderedStatus>,
-            family: &'a str,
+            family: Cow<'a, str>,
             build_version: &'a str,
             grpc: &'a str,
             grpc_height: u64,
@@ -419,12 +419,19 @@ impl TaskStatuses {
         let factory = app.get_factory_info();
         let mut res = MyTemplate {
             statuses,
-            family: &app.config.contract_family,
+            family: match &app.config.by_type {
+                crate::config::BotConfigByType::Testnet { inner } => {
+                    (&inner.contract_family).into()
+                }
+                crate::config::BotConfigByType::Mainnet { factory, .. } => {
+                    format!("Factory address {factory}").into()
+                }
+            },
             build_version: build_version(),
             grpc: &app.cosmos.get_first_builder().grpc_url,
-            grpc_height: factory.rpc.grpc_height,
-            rpc: &factory.rpc.endpoint,
-            rpc_height: factory.rpc.rpc_height,
+            grpc_height: factory.rpc.as_ref().map_or(0, |x| x.grpc_height),
+            rpc: factory.rpc.as_ref().map_or("MAINNET", |x| &x.endpoint),
+            rpc_height: factory.rpc.as_ref().map_or(0, |x| x.rpc_height),
             live_since: app.live_since,
             now: Utc::now(),
         }

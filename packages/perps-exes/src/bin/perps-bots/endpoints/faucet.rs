@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use axum::{extract::State, Json};
 use cosmos::Address;
 
@@ -56,7 +56,10 @@ async fn bot_inner(
         Ok(false) => return Err(FaucetTapError::InvalidCaptcha {}),
         Err(_) => return Err(FaucetTapError::CannotQueryCaptcha {}),
     }
-    app.faucet_bot.tap(app, recipient, cw20s).await
+    match &app.faucet_bot {
+        Some(faucet_bot) => faucet_bot.tap(app, recipient, cw20s).await,
+        None => Err(FaucetTapError::Mainnet {}),
+    }
 }
 
 impl App {
@@ -74,7 +77,11 @@ impl App {
             .client
             .post("https://hcaptcha.com/siteverify")
             .form(&Body {
-                secret: self.faucet_bot.get_hcaptcha_secret(),
+                secret: self
+                    .faucet_bot
+                    .as_ref()
+                    .context("No faucet on mainnet")?
+                    .get_hcaptcha_secret(),
                 response: g_recaptcha_response,
             })
             .send()

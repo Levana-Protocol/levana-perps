@@ -8,6 +8,7 @@ use rust_decimal::Decimal;
 use serde_json::de::StrRead;
 
 use crate::{
+    config::BotConfigByType,
     util::{
         markets::{get_markets, Market, PriceApi},
         oracle::Pyth,
@@ -175,10 +176,15 @@ impl App {
             latest_price: Decimal,
         }
 
-        let url = format!(
-            "{}current?marketId={}",
-            self.config.price_api, price_api_symbol
-        );
+        let url = match &self.config.by_type {
+            BotConfigByType::Testnet { inner } => {
+                format!("{}current?marketId={}", inner.price_api, price_api_symbol)
+            }
+            BotConfigByType::Mainnet { .. } => {
+                anyhow::bail!("On mainnet, we must use Pyth price oracles")
+            }
+        };
+
         let Latest { latest_price } = self
             .client
             .get(url)

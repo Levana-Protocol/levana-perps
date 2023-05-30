@@ -5,6 +5,7 @@ use msg::contracts::market;
 use msg::contracts::market::crank::CrankWorkInfo;
 use perps_exes::prelude::MarketId;
 
+use crate::config::BotConfigByType;
 use crate::watcher::{WatchedTaskOutput, WatchedTaskPerMarket};
 
 use super::factory::FactoryInfo;
@@ -19,7 +20,14 @@ struct Worker {
 impl AppBuilder {
     pub(super) fn start_crank_bot(&mut self) -> Result<()> {
         if let Some(crank_wallet) = self.app.config.crank_wallet.clone() {
-            self.refill_gas(*crank_wallet.address(), "crank-bot")?;
+            match &self.app.config.by_type {
+                BotConfigByType::Testnet { inner } => {
+                    self.refill_gas(*crank_wallet.address(), "crank-bot")?
+                }
+                BotConfigByType::Mainnet { min_gas_crank, .. } => {
+                    self.alert_on_low_gas(*crank_wallet.address(), "crank-bot", *min_gas_crank)?
+                }
+            }
 
             let worker = Worker { crank_wallet };
             self.watch_periodic(crate::watcher::TaskLabel::Crank, worker)

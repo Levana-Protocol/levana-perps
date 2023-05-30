@@ -58,6 +58,7 @@ async fn check_balance_single(cosmos: &Cosmos, addr: Address) -> Result<()> {
 struct Balance {
     app: Arc<App>,
     wallet: Wallet,
+    faucet: Address,
 }
 
 impl AppBuilder {
@@ -65,6 +66,12 @@ impl AppBuilder {
         let balance = Balance {
             app: self.app.clone(),
             wallet,
+            faucet: match &self.app.config.by_type {
+                crate::config::BotConfigByType::Testnet { inner } => inner.faucet,
+                crate::config::BotConfigByType::Mainnet { .. } => {
+                    anyhow::bail!("Cannot run balance bot on mainnet")
+                }
+            },
         };
         self.watch_periodic(TaskLabel::Balance, balance)
     }
@@ -79,7 +86,7 @@ impl WatchedTaskPerMarket for Balance {
         market_id: &MarketId,
         addr: Address,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, market_id, addr, factory.faucet).await
+        single_market(self, market_id, addr, self.faucet).await
     }
 }
 

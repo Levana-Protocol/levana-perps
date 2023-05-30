@@ -14,7 +14,7 @@ use parking_lot::RwLock;
 use reqwest::Client;
 
 use crate::cli::Opt;
-use crate::config::BotConfig;
+use crate::config::{BotConfig, BotConfigByType};
 use crate::watcher::TaskStatuses;
 use crate::watcher::Watcher;
 
@@ -27,7 +27,7 @@ pub(crate) type GasRecords = VecDeque<(DateTime<Utc>, u128)>;
 pub(crate) struct App {
     factory: RwLock<Arc<FactoryInfo>>,
     pub(crate) frontend_info: FrontendInfo,
-    pub(crate) faucet_bot: FaucetBot,
+    pub(crate) faucet_bot: Option<FaucetBot>,
     pub(crate) cosmos: Cosmos,
     pub(crate) config: BotConfig,
     pub(crate) client: Client,
@@ -71,22 +71,76 @@ impl Opt {
         let client = Client::builder().user_agent("perps-bots").build()?;
         let cosmos = self.make_cosmos(&config).await?;
 
-        let faucet_bot_wallet = self.get_faucet_bot_wallet(cosmos.get_address_type())?;
-        let gas_wallet = self.get_gas_wallet(cosmos.get_address_type())?;
+        let gas_wallet = match &self.sub {
+            crate::cli::Sub::Testnet { inner } => {
+                Some(self.get_gas_wallet(cosmos.get_address_type())?)
+            }
+            crate::cli::Sub::Mainnet { inner } => None,
+        };
 
         let frontend_info = FrontendInfo {
             network: config.network,
-            price_api: config.price_api,
-            explorer: config.explorer,
-            maintenance: self.maintenance.filter(|s| !s.is_empty()),
+            price_api: match &config.by_type {
+                BotConfigByType::Testnet { inner } => inner.price_api,
+                BotConfigByType::Mainnet { .. } => "MAINNET",
+            },
+            explorer: match &config.by_type {
+                BotConfigByType::Testnet { inner } => inner.explorer,
+                BotConfigByType::Mainnet { .. } => "MAINNET",
+            },
+            maintenance: match &self.sub {
+                crate::cli::Sub::Testnet { inner } => inner
+                    .maintenance
+                    .as_ref()
+                    .filter(|s| !s.is_empty())
+                    .cloned(),
+                crate::cli::Sub::Mainnet { .. } => None,
+            },
         };
 
-        let factory = get_factory_info(&cosmos, &config, &client).await?;
+        let factory = match &config.by_type {
+            BotConfigByType::Testnet { inner } => {
+                get_factory_info(&cosmos, &config, inner, &client).await?
+            }
+            BotConfigByType::Mainnet {
+                factory,
+                pyth,
+                min_gas_crank,
+                min_gas_price,
+            } => FactoryInfo {
+                factory: *factory,
+                faucet: None,
+                updated: Utc::now(),
+                is_static: true,
+                cw20s: vec![],
+                markets: HashMap::new(),
+                gitrev: None,
+                faucet_gas_amount: None,
+                faucet_collateral_amount: HashMap::new(),
+                rpc: None,
+            },
+        };
         log::info!("Discovered factory contract: {}", factory.factory);
-        log::info!("Discovered faucet contract: {}", factory.faucet);
+        if let Some(faucet) = factory.faucet {
+            log::info!("Discovered faucet contract: {}", faucet);
+        }
 
-        let (faucet_bot, faucet_bot_runner) =
-            FaucetBot::new(faucet_bot_wallet, self.hcaptcha_secret);
+        let (faucet_bot, faucet_bot_runner) = match (&self.sub, &config.by_type) {
+            (
+                crate::cli::Sub::Testnet { inner: cli },
+                BotConfigByType::Testnet { inner: config },
+            ) => {
+                let faucet_bot_wallet = self.get_faucet_bot_wallet(cosmos.get_address_type())?;
+                let (x, y) = FaucetBot::new(
+                    faucet_bot_wallet,
+                    cli.hcaptcha_secret.clone(),
+                    config.clone(),
+                );
+                (Some(x), Some(y))
+            }
+            (crate::cli::Sub::Mainnet { .. }, BotConfigByType::Mainnet { .. }) => (None, None),
+            _ => anyhow::bail!("Invalid CLI/bot config combo"),
+        };
 
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
@@ -104,9 +158,11 @@ impl Opt {
         let mut builder = AppBuilder {
             app,
             watcher: Watcher::default(),
-            gas_check: GasCheckBuilder::new(Arc::new(gas_wallet)),
+            gas_check: GasCheckBuilder::new(gas_wallet.map(Arc::new)),
         };
-        builder.launch_faucet_task(faucet_bot_runner);
+        if let Some(faucet_bot_runner) = faucet_bot_runner {
+            builder.launch_faucet_task(faucet_bot_runner);
+        }
         Ok(builder)
     }
 }
@@ -118,8 +174,16 @@ impl AppBuilder {
         address: Address,
         wallet_name: impl Into<String>,
     ) -> Result<()> {
-        self.gas_check
-            .add(address, wallet_name, self.app.config.min_gas, true)
+        match &self.app.config.by_type {
+            BotConfigByType::Testnet { inner } => {
+                self.gas_check
+                    .add(address, wallet_name, inner.min_gas, true)
+            }
+            BotConfigByType::Mainnet { .. } => Err(anyhow::anyhow!(
+                "Cannot use refill_gas on mainnet, called on {}",
+                wallet_name.into()
+            )),
+        }
     }
 
     pub(crate) fn alert_on_low_gas(
@@ -131,7 +195,7 @@ impl AppBuilder {
         self.gas_check.add(address, wallet_name, min_gas, false)
     }
 
-    pub(crate) fn get_gas_wallet_address(&self) -> Address {
+    pub(crate) fn get_gas_wallet_address(&self) -> Option<Address> {
         self.gas_check.get_wallet_address()
     }
 
@@ -139,7 +203,9 @@ impl AppBuilder {
     pub(crate) fn get_track_wallet(&mut self, wallet_name: impl Into<String>) -> Result<Wallet> {
         let wallet_name = wallet_name.into();
         let wallet = self.app.config.wallet_manager.get_wallet(&wallet_name)?;
-        self.refill_gas(*wallet.address(), wallet_name)?;
+        if self.app.config.by_type.is_testnet() {
+            self.refill_gas(*wallet.address(), wallet_name)?;
+        }
         Ok(wallet)
     }
 

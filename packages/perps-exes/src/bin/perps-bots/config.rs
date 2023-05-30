@@ -10,30 +10,52 @@ use perps_exes::{
     wallet_manager::WalletManager,
 };
 
-use crate::cli::Opt;
+use crate::cli::{MainnetOpt, Opt, TestnetOpt};
 
-pub(crate) struct BotConfig {
+#[derive(Clone)]
+pub(crate) enum BotConfigByType {
+    Testnet {
+        inner: Arc<BotConfigTestnet>,
+    },
+    Mainnet {
+        factory: Address,
+        pyth: PythChainConfig,
+        min_gas_crank: u128,
+        min_gas_price: u128,
+    },
+}
+impl BotConfigByType {
+    pub(crate) fn is_testnet(&self) -> bool {
+        match self {
+            BotConfigByType::Testnet { .. } => true,
+            BotConfigByType::Mainnet { .. } => false,
+        }
+    }
+}
+
+pub(crate) struct BotConfigTestnet {
     pub(crate) tracker: Address,
     pub(crate) faucet: Address,
     pub(crate) pyth: Option<PythChainConfig>,
+    pub(crate) price_api: &'static str,
+    pub(crate) contract_family: String,
     pub(crate) min_gas: u128,
     pub(crate) min_gas_in_faucet: u128,
     pub(crate) min_gas_in_gas_wallet: u128,
-    pub(crate) price_api: &'static str,
     pub(crate) explorer: &'static str,
-    pub(crate) contract_family: String,
+}
+
+pub(crate) struct BotConfig {
+    pub(crate) by_type: BotConfigByType,
     pub(crate) network: CosmosNetwork,
     pub(crate) price_wallet: Option<Arc<Wallet>>,
     pub(crate) crank_wallet: Option<Wallet>,
     pub(crate) ultra_crank_wallets: Vec<Wallet>,
     pub(crate) wallet_manager: WalletManager,
-    pub(crate) liquidity: bool,
-    pub(crate) utilization: bool,
     pub(crate) balance: bool,
-    pub(crate) traders: usize,
-    pub(crate) liquidity_config: LiquidityConfig,
-    pub(crate) utilization_config: UtilizationConfig,
-    pub(crate) trader_config: TraderConfig,
+    pub(crate) liquidity_config: Option<LiquidityConfig>,
+    pub(crate) utilization_config: Option<UtilizationConfig>,
+    pub(crate) trader_config: Option<(usize, TraderConfig)>,
     pub(crate) watcher: WatcherConfig,
     pub(crate) gas_multiplier: Option<f64>,
     pub(crate) rpc_nodes: Vec<Arc<String>>,
@@ -44,13 +66,20 @@ pub(crate) struct BotConfig {
 
 impl Opt {
     pub(crate) fn get_bot_config(&self) -> Result<BotConfig> {
+        match &self.sub {
+            crate::cli::Sub::Testnet { inner } => self.get_bot_config_testnet(inner),
+            crate::cli::Sub::Mainnet { inner } => self.get_bot_config_mainnet(inner),
+        }
+    }
+
+    fn get_bot_config_testnet(&self, testnet: &TestnetOpt) -> Result<BotConfig> {
         let config = ConfigTestnet::load()?;
         let pyth_config = PythConfig::load()?;
         let DeploymentInfo {
             config: partial,
             network,
             wallet_phrase_name,
-        } = config.get_deployment_info(&self.deployment)?;
+        } = config.get_deployment_info(&testnet.deployment)?;
         let ChainConfig {
             tracker,
             faucet,
@@ -59,25 +88,31 @@ impl Opt {
             rpc_nodes,
             mainnet,
         } = ChainConfig::load(network)?;
-        let partial = match &self.deployment_config {
+        let partial = match &testnet.deployment_config {
             Some(s) => serde_yaml::from_str(s)?,
             None => partial,
         };
         Ok(BotConfig {
-            tracker: tracker.with_context(|| format!("No tracker found for {network}"))?,
-            faucet: faucet.with_context(|| format!("No faucet found for {network}"))?,
-            pyth: pyth.map(|address| PythChainConfig {
-                address,
-                endpoint: pyth_config.endpoint.clone(),
-            }),
-            min_gas: partial.min_gas,
-            min_gas_in_faucet: partial.min_gas_in_faucet,
-            min_gas_in_gas_wallet: partial.min_gas_in_gas_wallet,
-            price_api: &config.price_api,
-            explorer: explorer
-                .as_deref()
-                .with_context(|| format!("No explorer found for network {network}"))?,
-            contract_family: self.deployment.clone(),
+            by_type: BotConfigByType::Testnet {
+                inner: BotConfigTestnet {
+                    tracker: tracker.with_context(|| format!("No tracker found for {network}"))?,
+                    faucet: faucet.with_context(|| format!("No faucet found for {network}"))?,
+                    pyth: pyth.map(|address| PythChainConfig {
+                        address,
+                        endpoint: pyth_config.endpoint.clone(),
+                    }),
+                    price_api: &config.price_api,
+                    contract_family: testnet.deployment.clone(),
+                    min_gas: partial.min_gas,
+                    min_gas_in_faucet: partial.min_gas_in_faucet,
+                    min_gas_in_gas_wallet: partial.min_gas_in_gas_wallet,
+                    explorer: explorer
+                        .as_deref()
+                        .with_context(|| format!("No explorer found for network {network}"))?,
+                }
+                .into(),
+            }
+            .into(),
             network,
             crank_wallet: if partial.crank {
                 Some(self.get_crank_wallet(network.get_address_type(), &wallet_phrase_name, 0)?)
@@ -103,12 +138,17 @@ impl Opt {
                 network.get_address_type(),
             )?,
             balance: partial.balance,
-            liquidity: partial.liquidity,
-            utilization: partial.utilization,
-            traders: self.traders.unwrap_or(partial.traders),
-            liquidity_config: config.liquidity.clone(),
-            utilization_config: config.utilization,
-            trader_config: config.trader,
+            liquidity_config: if partial.liquidity {
+                Some(config.liquidity.clone())
+            } else {
+                None
+            },
+            utilization_config: if partial.utilization {
+                Some(config.utilization)
+            } else {
+                None
+            },
+            trader_config: Some((testnet.traders.unwrap_or(partial.traders), config.trader)),
             watcher: partial.watcher.clone(),
             gas_multiplier: partial.gas_multiplier,
             rpc_nodes: match &self.rpc_url {
@@ -119,5 +159,60 @@ impl Opt {
             seconds_till_ultra: partial.seconds_till_ultra,
             execs_per_price: partial.execs_per_price,
         })
+    }
+
+    fn get_bot_config_mainnet(
+        &self,
+        MainnetOpt {
+            factory,
+            seed,
+            network,
+            gas_multiplier,
+        }: &MainnetOpt,
+    ) -> Result<BotConfig> {
+        let chain_config = ChainConfig::load(*network)?;
+        let pyth_config = PythConfig::load()?;
+        let pyth = PythChainConfig {
+            address: chain_config
+                .pyth
+                .with_context(|| format!("No Pyth contract found for network {network}"))?,
+            endpoint: pyth_config.endpoint.clone(),
+        };
+        let wallet_manager = WalletManager::new(seed.clone(), network.get_address_type())?;
+        let price_wallet = wallet_manager.get_wallet("price")?;
+        let crank_wallet = wallet_manager.get_wallet("crank")?;
+        Ok(BotConfig {
+            by_type: BotConfigByType::Mainnet {
+                factory: *factory,
+                pyth,
+                min_gas_crank: 1_000_000, // FIXME
+                min_gas_price: 1_000_000, // FIXME
+            }
+            .into(),
+            network: *network,
+            price_wallet: Some(price_wallet.into()),
+            crank_wallet: Some(crank_wallet),
+            ultra_crank_wallets: vec![],
+            wallet_manager,
+            balance: false,
+            liquidity_config: None,
+            utilization_config: None,
+            trader_config: None,
+            watcher: WatcherConfig::default(), // FIXME
+            gas_multiplier: *gas_multiplier,
+            rpc_nodes: vec![],
+            ignore_stale: false,
+            seconds_till_ultra: 0,
+            execs_per_price: None,
+        })
+    }
+}
+
+impl BotConfig {
+    pub(crate) fn get_pyth(&self) -> Option<&PythChainConfig> {
+        match &self.by_type {
+            BotConfigByType::Testnet { inner } => inner.pyth.as_ref(),
+            BotConfigByType::Mainnet { pyth, .. } => Some(pyth),
+        }
     }
 }

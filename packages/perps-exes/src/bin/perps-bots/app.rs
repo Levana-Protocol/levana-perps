@@ -12,33 +12,48 @@ mod types;
 mod ultra_crank;
 mod utilization;
 
+use std::cmp::min;
+
 use anyhow::Result;
 pub(crate) use types::*;
 
+use crate::config::BotConfigByType;
+
 impl AppBuilder {
     pub(crate) async fn load(&mut self) -> Result<()> {
-        self.launch_factory_task()?;
+        if let BotConfigByType::Testnet { inner } = &self.app.config.by_type {
+            self.launch_factory_task(inner.clone())?;
+        }
 
-        self.alert_on_low_gas(
-            self.app.config.faucet,
-            "faucet",
-            self.app.config.min_gas_in_faucet,
-        )?;
-        self.alert_on_low_gas(
-            self.get_gas_wallet_address(),
-            "gas-wallet",
-            self.app.config.min_gas_in_gas_wallet,
-        )?;
-        self.refill_gas(
-            self.app.config.wallet_manager.get_minter_address(),
-            "wallet-manager",
-        )?;
-        let faucet_bot_address = self.app.faucet_bot.get_wallet_address();
-        self.refill_gas(faucet_bot_address, "faucet-bot")?;
+        match &self.app.config.by_type {
+            BotConfigByType::Testnet { inner } => {
+                let inner = inner.clone();
+                self.alert_on_low_gas(inner.faucet, "faucet", inner.min_gas_in_faucet)?;
+                if let Some(gas_wallet) = self.get_gas_wallet_address() {
+                    self.alert_on_low_gas(gas_wallet, "gas-wallet", inner.min_gas_in_gas_wallet)?;
+                }
+                self.refill_gas(
+                    self.app.config.wallet_manager.get_minter_address(),
+                    "wallet-manager",
+                )?;
+            }
+            BotConfigByType::Mainnet { .. } => (),
+        }
+        if let Some(faucet_bot) = &self.app.faucet_bot {
+            let faucet_bot_address = faucet_bot.get_wallet_address();
+            self.refill_gas(faucet_bot_address, "faucet-bot")?;
+        }
 
         let price_wallet = self.app.config.price_wallet.clone();
         if let Some(price_wallet) = price_wallet {
-            self.refill_gas(*price_wallet.address(), "price-bot")?;
+            match &self.app.config.by_type {
+                BotConfigByType::Testnet { .. } => {
+                    self.refill_gas(*price_wallet.address(), "price-bot")?;
+                }
+                BotConfigByType::Mainnet { min_gas_price, .. } => {
+                    self.alert_on_low_gas(*price_wallet.address(), "price-bot", *min_gas_price)?;
+                }
+            }
             self.start_price(price_wallet).await?;
         }
 
@@ -59,19 +74,21 @@ impl AppBuilder {
 
         let liquidity_wallet = self.get_track_wallet("liquidity")?;
 
-        if self.app.config.liquidity {
-            self.launch_liquidity(liquidity_wallet)?;
+        if let Some(liquidity_config) = &self.app.config.liquidity_config {
+            self.launch_liquidity(liquidity_wallet, liquidity_config.clone())?;
         }
 
         let utilization_wallet = self.get_track_wallet("utilization")?;
 
-        if self.app.config.utilization {
-            self.launch_utilization(utilization_wallet)?;
+        if let Some(utilization_config) = self.app.config.utilization_config {
+            self.launch_utilization(utilization_wallet, utilization_config)?;
         }
 
-        for index in 1..=self.app.config.traders {
-            let wallet = self.get_track_wallet(format!("Trader #{index}"))?;
-            self.launch_trader(wallet, index)?;
+        if let Some((traders, trader_config)) = self.app.config.trader_config {
+            for index in 1..=traders {
+                let wallet = self.get_track_wallet(format!("Trader #{index}"))?;
+                self.launch_trader(wallet, index, trader_config)?;
+            }
         }
 
         Ok(())

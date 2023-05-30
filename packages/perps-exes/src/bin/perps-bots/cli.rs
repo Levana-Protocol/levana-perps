@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, str::FromStr};
 
 use anyhow::{Context, Result};
-use cosmos::{AddressType, SeedPhrase, Wallet};
+use cosmos::{Address, AddressType, CosmosNetwork, SeedPhrase, Wallet};
 use perps_exes::build_version;
 
 #[derive(clap::Parser)]
@@ -9,17 +9,37 @@ use perps_exes::build_version;
 pub(crate) struct Opt {
     #[clap(long, short)]
     verbose: bool,
-    #[clap(long, default_value = "0.0.0.0:3000", env = "LEVANA_BOTS_BIND")]
+    #[clap(
+        long,
+        default_value = "0.0.0.0:3000",
+        env = "LEVANA_BOTS_BIND",
+        global = true
+    )]
     pub(crate) bind: SocketAddr,
-    /// Deployment name to use (aka contract family)
-    #[clap(long, env = "LEVANA_BOTS_DEPLOYMENT")]
-    pub(crate) deployment: String,
     /// Override the gRPC URL
     #[clap(long, env = "COSMOS_GRPC")]
     pub(crate) grpc_url: Option<String>,
     /// Override the RPC URL
     #[clap(long, env = "COSMOS_RPC")]
     pub(crate) rpc_url: Option<String>,
+    #[clap(subcommand)]
+    pub(crate) sub: Sub,
+}
+
+#[derive(clap::Parser)]
+pub(crate) enum Sub {
+    Testnet {
+        #[clap(flatten)]
+        inner: TestnetOpt,
+    },
+    Mainnet {
+        #[clap(flatten)]
+        inner: MainnetOpt,
+    },
+}
+
+#[derive(clap::Parser)]
+pub(crate) struct TestnetOpt {
     /// hCaptcha secret key
     #[clap(long, env = "LEVANA_BOTS_HCAPTCHA_SECRET")]
     pub(crate) hcaptcha_secret: String,
@@ -32,6 +52,21 @@ pub(crate) struct Opt {
     /// Override the contents of the DeploymentConfig in YAML format
     #[clap(long, env = "LEVANA_BOTS_DEPLOYMENT_CONFIG")]
     pub(crate) deployment_config: Option<String>,
+    /// Deployment name to use (aka contract family)
+    #[clap(long, env = "LEVANA_BOTS_DEPLOYMENT")]
+    pub(crate) deployment: String,
+}
+
+#[derive(clap::Parser)]
+pub(crate) struct MainnetOpt {
+    #[clap(long, env = "LEVANA_BOTS_FACTORY")]
+    pub(crate) factory: Address,
+    #[clap(long, env = "LEVANA_BOTS_SEED_PHRASE")]
+    pub(crate) seed: SeedPhrase,
+    #[clap(long, env = "COSMOS_NETWORK")]
+    pub(crate) network: CosmosNetwork,
+    #[clap(long, env = "LEVANA_BOTS_GAS_MULTIPLIER")]
+    pub(crate) gas_multiplier: Option<f64>,
 }
 
 impl Opt {

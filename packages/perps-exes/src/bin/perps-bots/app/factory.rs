@@ -14,7 +14,7 @@ use msg::{
     token::Token,
 };
 
-use crate::config::BotConfig;
+use crate::config::{BotConfig, BotConfigTestnet};
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
 use super::{App, AppBuilder};
@@ -23,7 +23,7 @@ use super::{App, AppBuilder};
 #[serde(rename_all = "snake_case")]
 pub(crate) struct FactoryInfo {
     pub(crate) factory: Address,
-    pub(crate) faucet: Address,
+    pub(crate) faucet: Option<Address>,
     pub(crate) updated: DateTime<Utc>,
     pub(crate) is_static: bool,
     pub(crate) cw20s: Vec<Cw20>,
@@ -31,7 +31,7 @@ pub(crate) struct FactoryInfo {
     pub(crate) gitrev: Option<String>,
     pub(crate) faucet_gas_amount: Option<String>,
     pub(crate) faucet_collateral_amount: HashMap<&'static str, Decimal256>,
-    pub(crate) rpc: RpcInfo,
+    pub(crate) rpc: Option<RpcInfo>,
 }
 
 #[derive(serde::Serialize)]
@@ -51,28 +51,33 @@ pub(crate) struct Cw20 {
 }
 
 impl AppBuilder {
-    pub(super) fn launch_factory_task(&mut self) -> Result<()> {
-        self.watch_periodic(crate::watcher::TaskLabel::GetFactory, FactoryUpdate)
+    pub(super) fn launch_factory_task(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
+        self.watch_periodic(
+            crate::watcher::TaskLabel::GetFactory,
+            FactoryUpdate { testnet },
+        )
     }
 }
 
 #[derive(Clone)]
-struct FactoryUpdate;
+struct FactoryUpdate {
+    testnet: Arc<BotConfigTestnet>,
+}
 
 #[async_trait]
 impl WatchedTask for FactoryUpdate {
     async fn run_single(&mut self, app: &App, _heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
-        update(app).await
+        update(app, &self.testnet).await
     }
 }
 
-async fn update(app: &App) -> Result<WatchedTaskOutput> {
-    let info = get_factory_info(&app.cosmos, &app.config, &app.client).await?;
+async fn update(app: &App, testnet: &BotConfigTestnet) -> Result<WatchedTaskOutput> {
+    let info = get_factory_info(&app.cosmos, &app.config, testnet, &app.client).await?;
     let output = WatchedTaskOutput {
         skip_delay: false,
         message: format!(
             "Successfully loaded factory address {} from tracker {}",
-            info.factory, app.config.tracker
+            info.factory, testnet.tracker
         ),
     };
     app.set_factory_info(info);
@@ -82,22 +87,24 @@ async fn update(app: &App) -> Result<WatchedTaskOutput> {
 pub(crate) async fn get_factory_info(
     cosmos: &Cosmos,
     config: &BotConfig,
+    testnet: &BotConfigTestnet,
     client: &reqwest::Client,
 ) -> Result<FactoryInfo> {
-    let (factory, gitrev) = get_contract(cosmos, config, "factory")
+    let (factory, gitrev) = get_contract(cosmos, config, testnet, "factory")
         .await
         .context("Unable to get 'factory' contract")?;
     let (cw20s, markets) = get_tokens_markets(cosmos, factory)
         .await
         .with_context(|| format!("Unable to get_tokens_market for factory {factory}"))?;
-    let faucet_gas_amount = match get_faucet_gas_amount(cosmos, config.faucet).await {
+    let faucet_gas_amount = match get_faucet_gas_amount(cosmos, testnet.faucet).await {
         Ok(x) => x,
         Err(e) => {
             log::warn!("Error on get_faucet_gas_amount: {e:?}");
             None
         }
     };
-    let faucet_collateral_amount = match get_faucet_collateral_amount(cosmos, config.faucet).await {
+    let faucet_collateral_amount = match get_faucet_collateral_amount(cosmos, testnet.faucet).await
+    {
         Ok(x) => x,
         Err(e) => {
             log::warn!("Error on get_faucet_collateral_amount: {e:?}");
@@ -107,7 +114,7 @@ pub(crate) async fn get_factory_info(
     let rpc = get_rpc_info(cosmos, config, client).await?;
     Ok(FactoryInfo {
         factory,
-        faucet: config.faucet,
+        faucet: Some(testnet.faucet),
         updated: Utc::now(),
         is_static: false,
         cw20s,
@@ -115,32 +122,33 @@ pub(crate) async fn get_factory_info(
         gitrev,
         faucet_gas_amount,
         faucet_collateral_amount,
-        rpc,
+        rpc: Some(rpc),
     })
 }
 
 pub(crate) async fn get_contract(
     cosmos: &Cosmos,
     config: &BotConfig,
+    testnet: &BotConfigTestnet,
     contract_type: &str,
 ) -> Result<(Address, Option<String>)> {
-    let tracker = cosmos.make_contract(config.tracker);
+    let tracker = cosmos.make_contract(testnet.tracker);
     let (addr, code_id) = match tracker
         .query(msg::contracts::tracker::entry::QueryMsg::ContractByFamily {
             contract_type: contract_type.to_owned(),
-            family: config.contract_family.clone(),
+            family: testnet.contract_family.clone(),
             sequence: None,
         })
         .await
         .with_context(|| {
             format!(
                 "Calling ContractByFamily with {contract_type} and {} against {tracker}",
-                config.contract_family
+                testnet.contract_family
             )
         })? {
         ContractResp::NotFound {} => anyhow::bail!(
             "No {contract_type} contract found for contract family {}",
-            config.contract_family
+            testnet.contract_family
         ),
         ContractResp::Found {
             address,

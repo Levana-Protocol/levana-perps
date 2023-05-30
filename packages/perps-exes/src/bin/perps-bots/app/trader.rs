@@ -4,7 +4,7 @@ use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, Cosmos, HasAddress, Wallet};
 use msg::{contracts::market::entry::StatusResp, prelude::*};
-use perps_exes::prelude::*;
+use perps_exes::{config::TraderConfig, prelude::*};
 use rand::Rng;
 
 use crate::{
@@ -17,13 +17,27 @@ use super::{factory::FactoryInfo, App, AppBuilder};
 pub(super) struct Trader {
     pub(super) app: Arc<App>,
     pub(super) wallet: Wallet,
+    config: TraderConfig,
+    faucet: Address,
 }
 
 impl AppBuilder {
-    pub(super) fn launch_trader(&mut self, wallet: Wallet, index: usize) -> Result<()> {
+    pub(super) fn launch_trader(
+        &mut self,
+        wallet: Wallet,
+        index: usize,
+        config: TraderConfig,
+    ) -> Result<()> {
         let trader = Trader {
             app: self.app.clone(),
             wallet,
+            config,
+            faucet: match &self.app.config.by_type {
+                crate::config::BotConfigByType::Testnet { inner } => inner.faucet,
+                crate::config::BotConfigByType::Mainnet { .. } => {
+                    anyhow::bail!("Cannot run trader bots on mainnet")
+                }
+            },
         };
         self.watch_periodic(crate::watcher::TaskLabel::Trader { index }, trader)
     }
@@ -38,7 +52,7 @@ impl WatchedTaskPerMarket for Trader {
         _market: &MarketId,
         addr: Address,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, addr, factory.faucet).await
+        single_market(self, addr, self.faucet).await
     }
 }
 
@@ -124,11 +138,11 @@ async fn single_market(
         CloseMany,
     }
 
-    let action = if util_ratio > worker.app.config.trader_config.max_util {
+    let action = if util_ratio > worker.config.max_util {
         Action::CloseMany
-    } else if status.borrow_fee < worker.app.config.trader_config.min_borrow_fee {
+    } else if status.borrow_fee < worker.config.min_borrow_fee {
         Action::Open
-    } else if status.borrow_fee > worker.app.config.trader_config.max_borrow_fee {
+    } else if status.borrow_fee > worker.config.max_borrow_fee {
         Action::CloseMany
     } else {
         let to_u32 = |x: Decimal256| -> Result<u32, _> {
@@ -137,8 +151,8 @@ async fn single_market(
                 .to_string()
                 .parse()
         };
-        let min = to_u32(worker.app.config.trader_config.min_borrow_fee)?;
-        let max = to_u32(worker.app.config.trader_config.max_borrow_fee)?;
+        let min = to_u32(worker.config.min_borrow_fee)?;
+        let max = to_u32(worker.config.max_borrow_fee)?;
         let cutoff = to_u32(status.borrow_fee)?;
         let rand = rand::thread_rng().gen_range(min..=max);
         let should_close = cutoff > rand;

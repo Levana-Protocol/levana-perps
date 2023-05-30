@@ -45,8 +45,7 @@ impl Pyth {
         market_id: MarketId,
     ) -> Result<Self> {
         let endpoint = config
-            .pyth
-            .as_ref()
+            .get_pyth()
             .context("must have a pyth endpoint if there's a pyth bridge")?
             .endpoint
             .clone();

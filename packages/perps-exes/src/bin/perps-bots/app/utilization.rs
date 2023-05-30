@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, HasAddress, Wallet};
-use perps_exes::prelude::*;
+use perps_exes::{config::UtilizationConfig, prelude::*};
 
 use crate::watcher::{WatchedTaskOutput, WatchedTaskPerMarket};
 
@@ -12,13 +12,26 @@ use super::{factory::FactoryInfo, App, AppBuilder};
 pub(super) struct Utilization {
     pub(super) app: Arc<App>,
     pub(super) wallet: Wallet,
+    config: UtilizationConfig,
+    faucet: Address,
 }
 
 impl AppBuilder {
-    pub(super) fn launch_utilization(&mut self, wallet: Wallet) -> Result<()> {
+    pub(super) fn launch_utilization(
+        &mut self,
+        wallet: Wallet,
+        config: UtilizationConfig,
+    ) -> Result<()> {
         let util = Utilization {
             app: self.app.clone(),
             wallet,
+            config,
+            faucet: match &self.app.config.by_type {
+                crate::config::BotConfigByType::Testnet { inner } => inner.faucet,
+                crate::config::BotConfigByType::Mainnet { .. } => {
+                    anyhow::bail!("Cannot run utilization bots on mainnet")
+                }
+            },
         };
         self.watch_periodic(crate::watcher::TaskLabel::Utilization, util)
     }
@@ -33,7 +46,7 @@ impl WatchedTaskPerMarket for Utilization {
         _market: &MarketId,
         addr: Address,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, addr, factory.faucet).await
+        single_market(self, addr, self.faucet).await
     }
 }
 
@@ -65,7 +78,7 @@ async fn single_market(
         .into_decimal256()
         .checked_div(total.into_decimal256())?;
 
-    if util > worker.app.config.utilization_config.max_util {
+    if util > worker.config.max_util {
         let positions = market
             .get_some_positions(worker.wallet.get_address(), Some(20))
             .await?;
@@ -85,7 +98,7 @@ async fn single_market(
                 message,
             })
         }
-    } else if util < worker.app.config.utilization_config.min_util {
+    } else if util < worker.config.min_util {
         log::info!("Low utilization ratio, opening positions.");
 
         let balance = market
@@ -130,11 +143,9 @@ async fn single_market(
 
         // Determine how large a position we would need to open to hit the midpoint of min and max utilization
         let mid_util = worker
-            .app
             .config
-            .utilization_config
             .min_util
-            .checked_add(worker.app.config.utilization_config.max_util)?
+            .checked_add(worker.config.max_util)?
             .checked_div("2".parse().unwrap())?;
         let extra_util = mid_util.checked_sub(util)?;
         let desired_counter_collateral = NonZero::new(total.checked_mul_dec(extra_util)?)
