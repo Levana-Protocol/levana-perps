@@ -6,7 +6,7 @@ use crate::{prelude::*, state::funds::Received};
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
-    let (sender, received, msg) = state.funds_received(info, msg)?;
+    let (sender, received, msg) = state.funds_received(info.clone(), msg)?;
 
     state.validate_period_msg(ctx.storage, &sender, &msg)?;
 
@@ -24,12 +24,23 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     start,
                     duration,
                     lvn,
-                } => state.set_emissions(
-                    &mut ctx,
-                    start.unwrap_or_else(|| state.now()),
-                    Duration::from_seconds(duration.into()),
-                    lvn,
-                )?,
+                } => {
+                    let received_lvn = state.get_lvn_funds(&info, ctx.storage)?;
+
+                    anyhow::ensure!(
+                        received_lvn == lvn.raw(),
+                        "LVN amount {} does not match sent LVN funds {}",
+                        lvn,
+                        received_lvn
+                    );
+
+                    state.set_emissions(
+                        &mut ctx,
+                        start.unwrap_or_else(|| state.now()),
+                        Duration::from_seconds(duration.into()),
+                        lvn,
+                    )?
+                }
                 OwnerExecuteMsg::ClearEmissions {} => state.clear_emissions(&mut ctx)?,
                 OwnerExecuteMsg::ReclaimEmissions { .. } => todo!(),
                 OwnerExecuteMsg::UpdateConfig { .. } => todo!(),

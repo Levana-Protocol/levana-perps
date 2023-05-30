@@ -60,8 +60,8 @@ impl State<'_> {
         Ok(())
     }
 
-    pub(crate) fn load_lvn_token(&self, ctx: &StateContext) -> Result<Token> {
-        let token = LVN_TOKEN.load(ctx.storage)?;
+    pub(crate) fn load_lvn_token(&self, store: &dyn Storage) -> Result<Token> {
+        let token = LVN_TOKEN.load(store)?;
         Ok(token)
     }
 
@@ -153,7 +153,7 @@ impl State<'_> {
         let amount = NumberGtZero::new(amount.into_decimal256())
             .context("Unable to convert amount into NumberGtZero")?;
         let coin = self
-            .load_lvn_token(ctx)?
+            .load_lvn_token(ctx.storage)?
             .into_native_coin(amount)?
             .context("Invalid LVN transfer amount calculated")?;
 
@@ -313,7 +313,7 @@ impl State<'_> {
         let amount = NumberGtZero::new(amount.into_decimal256())
             .context("Unable to convert amount into NumberGtZero")?;
         let coin = self
-            .load_lvn_token(ctx)?
+            .load_lvn_token(ctx.storage)?
             .into_native_coin(amount)?
             .context("Invalid LVN transfer amount calculated")?;
 

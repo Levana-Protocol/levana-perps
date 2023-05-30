@@ -91,6 +91,30 @@ impl State<'_> {
 
         Ok((sender, received, msg))
     }
+
+    pub(crate) fn get_lvn_funds(
+        &self,
+        info: &MessageInfo,
+        store: &dyn Storage,
+    ) -> Result<LvnToken> {
+        let token = self.load_lvn_token(store)?;
+        let denom = match &token {
+            Token::Cw20 { .. } => bail!("LVN token must be Native"),
+            Token::Native { denom, .. } => denom,
+        };
+
+        let funds = info.funds.iter().find(|coin| coin.denom == *denom);
+
+        let lvn = match funds {
+            None => LvnToken::zero(),
+            Some(coin) => {
+                let amount = token.from_u128(coin.amount.u128())?;
+                LvnToken::from_decimal256(amount)
+            }
+        };
+
+        Ok(lvn)
+    }
 }
 
 fn msg_requires_funds(msg: &ExecuteMsg) -> bool {

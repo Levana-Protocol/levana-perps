@@ -1,14 +1,28 @@
 use crate::prelude::*;
+use levana_perpswap_multi_test::config::TEST_CONFIG;
+use msg::token::Token;
+use std::cell::RefCell;
+use std::rc::Rc;
+
+fn setup_rewards(app_cell: Rc<RefCell<PerpsApp>>, amount: &str) -> Token {
+    let mut app = app_cell.borrow_mut();
+    let protocol_owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
+    let token = app.rewards_token();
+    app.mint_token(&protocol_owner, &token, amount.parse().unwrap())
+        .unwrap();
+
+    token
+}
 
 #[test]
 fn test_emissions() {
     // Setup
 
-    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    market.automatic_time_jump_enabled = false;
-
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let mut market = PerpsMarket::new(app_cell.clone()).unwrap();
     let lp = market.clone_lp(0).unwrap();
 
+    market.automatic_time_jump_enabled = false;
     market
         .exec_mint_and_deposit_liquidity(&lp, "100".parse().unwrap())
         .unwrap();
@@ -18,11 +32,19 @@ fn test_emissions() {
     market.set_time(TimeJump::Hours(24 * 365)).unwrap();
     market.exec_farming_start_launch(None).unwrap();
 
+    let amount = "200";
+    let token = setup_rewards(app_cell, amount);
+
+    // sanity check
+    let protocol_owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
+    let balance = market.query_reward_token_balance(&token, &protocol_owner);
+    assert_eq!(balance, LvnToken::from_str(amount).unwrap());
+
     market
-        .exec_farming_set_emissions(market.now(), 20, "200".parse().unwrap())
+        .exec_farming_set_emissions(market.now(), 20, amount.parse().unwrap(), token)
         .unwrap();
 
-    // Test claim farming rewards
+    // Test query farming rewards
 
     market
         .exec_farming_deposit_xlp(&lp, NonZero::new("100".parse().unwrap()).unwrap())
@@ -46,7 +68,8 @@ fn test_emissions_multiple_lps() {
 
     // market Setup
 
-    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let mut market = PerpsMarket::new(app_cell.clone()).unwrap();
     market.automatic_time_jump_enabled = false;
 
     let lp0 = market.clone_lp(0).unwrap();
@@ -81,8 +104,10 @@ fn test_emissions_multiple_lps() {
     market.set_time(TimeJump::Hours(24 * 365)).unwrap();
     market.exec_farming_start_launch(None).unwrap();
 
+    let amount = "200";
+    let token = setup_rewards(app_cell, amount);
     market
-        .exec_farming_set_emissions(market.now(), 20, "200".parse().unwrap())
+        .exec_farming_set_emissions(market.now(), 20, amount.parse().unwrap(), token)
         .unwrap();
 
     // lp0

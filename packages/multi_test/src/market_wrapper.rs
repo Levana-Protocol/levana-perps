@@ -16,8 +16,8 @@ use crate::time::{BlockInfoChange, TimeJump};
 use anyhow::Context;
 pub use anyhow::{anyhow, Result};
 use cosmwasm_std::{
-    to_binary, to_vec, Addr, Binary, ContractResult, CosmosMsg, Empty, QueryRequest, StdError,
-    SystemResult, Uint128, WasmMsg, WasmQuery,
+    to_binary, to_vec, Addr, Binary, Coin, ContractResult, CosmosMsg, Empty, QueryRequest,
+    StdError, SystemResult, Uint128, WasmMsg, WasmQuery,
 };
 use cw_multi_test::{AppResponse, BankSudo, Executor, SudoMsg};
 use msg::bridge::{ClientToBridgeMsg, ClientToBridgeWrapper};
@@ -1465,12 +1465,21 @@ impl PerpsMarket {
     }
 
     fn exec_farming(&self, wallet: &Addr, msg: &FarmingExecuteMsg) -> Result<AppResponse> {
+        self.exec_farming_with_funds(wallet, msg, vec![])
+    }
+
+    fn exec_farming_with_funds(
+        &self,
+        wallet: &Addr,
+        msg: &FarmingExecuteMsg,
+        funds: Vec<Coin>,
+    ) -> Result<AppResponse> {
         let farming_addr = self.farming_addr.clone();
 
         let msg = WasmMsg::Execute {
             contract_addr: farming_addr.into_string(),
             msg: to_binary(msg)?,
-            funds: vec![],
+            funds,
         };
         self.exec_wasm_msg(wallet, msg)
     }
@@ -1501,6 +1510,7 @@ impl PerpsMarket {
             &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::StartLaunchPeriod { start }),
         )
     }
+
     pub fn exec_farming_lockdrop_deposit(
         &self,
         wallet: &Addr,
@@ -1533,14 +1543,20 @@ impl PerpsMarket {
         start: Timestamp,
         duration: u32,
         lvn_amount: NonZero<LvnToken>,
+        lvn_token: Token,
     ) -> Result<AppResponse> {
-        self.exec_farming(
+        let funds = NumberGtZero::try_from_decimal(lvn_amount.into_decimal256())
+            .and_then(|amount| lvn_token.into_native_coin(amount).unwrap())
+            .unwrap();
+
+        self.exec_farming_with_funds(
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
             &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::SetEmissions {
                 start: Some(start),
                 duration,
                 lvn: lvn_amount,
             }),
+            vec![funds],
         )
     }
 
@@ -1579,5 +1595,14 @@ impl PerpsMarket {
 
     pub fn query_farming_stats(&self) -> FarmingStatusResp {
         self.query_farming(&FarmingQueryMsg::Status {}).unwrap()
+    }
+
+    pub fn query_reward_token_balance(&self, token: &Token, addr: &Addr) -> LvnToken {
+        let balance = token
+            .query_balance(&self.app().querier(), addr)
+            .unwrap()
+            .into_decimal256();
+
+        LvnToken::from_decimal256(balance)
     }
 }

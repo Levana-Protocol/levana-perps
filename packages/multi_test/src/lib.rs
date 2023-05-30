@@ -209,7 +209,7 @@ impl PerpsApp {
     /**
      * Return an object that allows querying of current blockchain state
      */
-    pub(crate) fn querier(&self) -> QuerierWrapper {
+    pub fn querier(&self) -> QuerierWrapper {
         self.app.wrap()
     }
 
