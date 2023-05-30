@@ -174,7 +174,6 @@ pub fn parse_deployment(deployment: &str) -> Result<(CosmosNetwork, &str)> {
         (CosmosNetwork::OsmosisTestnet, "osmo"),
         (CosmosNetwork::Dragonfire, "dragon"),
         (CosmosNetwork::SeiTestnet, "sei"),
-        (CosmosNetwork::LevanaTest, "levanasei"),
     ];
     for (network, prefix) in NETWORKS {
         if let Some(suffix) = deployment.strip_prefix(prefix) {

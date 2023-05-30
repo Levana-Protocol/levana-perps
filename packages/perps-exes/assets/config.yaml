@@ -1,17 +1,4 @@
 chains:
-  levana-test:
-    tracker: sei1qu43pvag5hu95hmml7y658t3k8sd9plnmpj8xmw9qgy0t458nyrqdcjxxz
-    faucet: sei1c2f79k5kykr5s4zhknn5w56hs5c9a8zxh4w03x07dnzwyrcj4pfsrkfvmm
-    explorer: "http://fake-explorer/"
-    # Lower gas requirements, we don't have much available on Sei
-    min-gas: 1000000
-    min-gas-in-faucet: 2000000000
-    min-gas-in-gas-wallet: 3000000000
-    watcher:
-      # Nodes seem to crash often, let's see if this helps
-      retries: 10
-    rpc-nodes:
-    - http://fake-rpc-node/
   sei-testnet:
     tracker: sei14k4xcy6dfdyqvpvx6njxptry2urcp98f74lv49m36u7gkdkv7s6qleq4tp
     faucet: sei1czf3age49j99yrkxynmetysh3p2x8tp429mv23jme7zj8hytwhesnqngza
@@ -192,18 +179,6 @@ deployments:
       - OSMO_USDC
       - ETH_BTC
 overrides:
-  levanaseibeta:
-    wallet-manager-address: osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k
-    price-address: osmo1dfagdh540vrqqnuet5rqvdg3uldhhgdxpttmzl
-    price: true
-    ultra-crank: 20
-    crank: true
-    liquidity: true
-    utilization: true
-    balance: true
-    traders: 400
-    default-market-ids:
-      - ETH_USD
   seibeta:
     wallet-manager-address: osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k
     price-address: osmo1dfagdh540vrqqnuet5rqvdg3uldhhgdxpttmzl
