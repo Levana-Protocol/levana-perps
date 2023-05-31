@@ -20,14 +20,6 @@ pub(crate) enum BotConfigByType {
     Testnet { inner: Arc<BotConfigTestnet> },
     Mainnet { inner: Arc<BotConfigMainnet> },
 }
-impl BotConfigByType {
-    pub(crate) fn is_testnet(&self) -> bool {
-        match self {
-            BotConfigByType::Testnet { .. } => true,
-            BotConfigByType::Mainnet { .. } => false,
-        }
-    }
-}
 
 pub(crate) struct BotConfigTestnet {
     pub(crate) tracker: Address,
@@ -48,6 +40,7 @@ pub(crate) struct BotConfigTestnet {
     pub(crate) balance: bool,
     pub(crate) wallet_manager: WalletManager,
     pub(crate) faucet_bot: FaucetBot,
+    pub(crate) maintenance: Option<String>,
 }
 
 pub(crate) struct BotConfigMainnet {
@@ -145,6 +138,11 @@ impl Opt {
                 network.get_address_type(),
             )?,
             faucet_bot,
+            maintenance: testnet
+                .maintenance
+                .as_ref()
+                .filter(|s| !s.is_empty())
+                .cloned(),
         };
         let config = BotConfig {
             by_type: BotConfigByType::Testnet {

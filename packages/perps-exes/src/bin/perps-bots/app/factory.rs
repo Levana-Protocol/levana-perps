@@ -133,9 +133,7 @@ pub(crate) async fn get_factory_info(
     };
 
     let rpc = match &config.by_type {
-        BotConfigByType::Testnet { inner } => {
-            Some(get_rpc_info(cosmos, config, inner, client).await?)
-        }
+        BotConfigByType::Testnet { inner } => Some(get_rpc_info(cosmos, inner, client).await?),
         BotConfigByType::Mainnet { .. } => None,
     };
     let info = FactoryInfo {
@@ -286,7 +284,6 @@ async fn get_faucet_collateral_amount(
 
 async fn get_rpc_info(
     cosmos: &Cosmos,
-    config: &BotConfig,
     testnet: &BotConfigTestnet,
     client: &reqwest::Client,
 ) -> Result<RpcInfo> {
@@ -310,16 +307,13 @@ async fn get_rpc_info(
     let (endpoint, rpc_height) = match results.into_iter().rev().next() {
         Some(pair) => pair,
         // All nodes are broken
-        None => match testnet.rpc_nodes.first() {
-            Some(node) => (node.clone(), 0),
-            None => {
-                if config.by_type.is_testnet() {
-                    anyhow::bail!("Config includes no RPC nodes")
-                } else {
-                    ("MAINNET".to_owned().into(), 0)
-                }
-            }
-        },
+        None => {
+            let node = testnet
+                .rpc_nodes
+                .first()
+                .context("Config includes no RPC nodes")?;
+            (node.clone(), 0)
+        }
     };
 
     let grpc_height = grpc.height.try_into()?;

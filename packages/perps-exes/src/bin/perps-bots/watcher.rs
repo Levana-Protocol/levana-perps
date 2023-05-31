@@ -21,6 +21,7 @@ use reqwest::header::CONTENT_TYPE;
 use reqwest::StatusCode;
 use tokio::task::JoinSet;
 
+use crate::app::factory::RpcInfo;
 use crate::app::AppBuilder;
 use crate::app::{factory::FactoryInfo, App};
 
@@ -409,9 +410,7 @@ impl TaskStatuses {
             family: Cow<'a, str>,
             build_version: &'a str,
             grpc: &'a str,
-            grpc_height: u64,
-            rpc: &'a str,
-            rpc_height: u64,
+            rpc: Option<&'a RpcInfo>,
             live_since: DateTime<Utc>,
             now: DateTime<Utc>,
         }
@@ -430,9 +429,7 @@ impl TaskStatuses {
             },
             build_version: build_version(),
             grpc: &app.cosmos.get_first_builder().grpc_url,
-            grpc_height: factory.rpc.as_ref().map_or(0, |x| x.grpc_height),
-            rpc: factory.rpc.as_ref().map_or("MAINNET", |x| &x.endpoint),
-            rpc_height: factory.rpc.as_ref().map_or(0, |x| x.rpc_height),
+            rpc: factory.rpc.as_ref(),
             live_since: app.live_since,
             now: Utc::now(),
         }

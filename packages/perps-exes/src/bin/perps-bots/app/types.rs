@@ -7,14 +7,13 @@ use chrono::DateTime;
 use chrono::Utc;
 use cosmos::Address;
 use cosmos::Cosmos;
-use cosmos::CosmosNetwork;
 use cosmos::HasAddressType;
 use cosmos::Wallet;
 use parking_lot::RwLock;
 use reqwest::Client;
 
 use crate::cli::Opt;
-use crate::config::{BotConfig, BotConfigByType, BotConfigTestnet};
+use crate::config::{BotConfig, BotConfigTestnet};
 use crate::wallet_manager::ManagedWallet;
 use crate::watcher::TaskStatuses;
 use crate::watcher::Watcher;
@@ -26,7 +25,6 @@ use super::gas_check::GasCheckBuilder;
 pub(crate) type GasRecords = VecDeque<(DateTime<Utc>, u128)>;
 pub(crate) struct App {
     factory: RwLock<Arc<FactoryInfo>>,
-    pub(crate) frontend_info: FrontendInfo,
     pub(crate) cosmos: Cosmos,
     pub(crate) config: BotConfig,
     pub(crate) client: Client,
@@ -34,15 +32,6 @@ pub(crate) struct App {
     pub(crate) statuses: TaskStatuses,
     pub(crate) live_since: DateTime<Utc>,
     pub(crate) gases: RwLock<HashMap<Address, GasRecords>>,
-}
-
-#[derive(serde::Serialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) struct FrontendInfo {
-    network: CosmosNetwork,
-    price_api: &'static str,
-    explorer: &'static str,
-    maintenance: Option<String>,
 }
 
 /// Helper data structure for building up an application.
@@ -80,26 +69,6 @@ impl Opt {
             crate::cli::Sub::Mainnet { .. } => None,
         };
 
-        let frontend_info = FrontendInfo {
-            network: config.network,
-            price_api: match &config.by_type {
-                BotConfigByType::Testnet { inner } => inner.price_api,
-                BotConfigByType::Mainnet { .. } => "MAINNET",
-            },
-            explorer: match &config.by_type {
-                BotConfigByType::Testnet { inner } => inner.explorer,
-                BotConfigByType::Mainnet { .. } => "MAINNET",
-            },
-            maintenance: match &self.sub {
-                crate::cli::Sub::Testnet { inner } => inner
-                    .maintenance
-                    .as_ref()
-                    .filter(|s| !s.is_empty())
-                    .cloned(),
-                crate::cli::Sub::Mainnet { .. } => None,
-            },
-        };
-
         let factory = get_factory_info(&cosmos, &config, &client).await?.1;
         log::info!("Discovered factory contract: {}", factory.factory);
         if let Some(faucet) = factory.faucet {
@@ -108,7 +77,6 @@ impl Opt {
 
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
-            frontend_info,
             cosmos,
             config,
             client,
