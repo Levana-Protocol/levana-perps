@@ -32,3 +32,4 @@ stargaze-testnet:
   tracker: stars1vfa0a8846ay2l2ehmqtwxgpcxzes9m598kw6mjh50zgnqhxgwmys7fkew3 
   faucet: stars1pnlmx33qgx7822t7tc73znu0ddkxzcg29rshpls6acdlrrr7snkst4xwq6
   explorer: "https://testnet-explorer.publicawesome.dev/stargaze/tx/"
+osmosis-local: {}
