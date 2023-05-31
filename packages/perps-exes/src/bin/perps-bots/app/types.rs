@@ -14,7 +14,7 @@ use parking_lot::RwLock;
 use reqwest::Client;
 
 use crate::cli::Opt;
-use crate::config::{BotConfig, BotConfigByType};
+use crate::config::{BotConfig, BotConfigByType, BotConfigTestnet};
 use crate::watcher::TaskStatuses;
 use crate::watcher::Watcher;
 
@@ -153,19 +153,12 @@ impl AppBuilder {
     /// Track and refill gas to the default gas level
     pub(crate) fn refill_gas(
         &mut self,
+        testnet: &BotConfigTestnet,
         address: Address,
         wallet_name: impl Into<String>,
     ) -> Result<()> {
-        match &self.app.config.by_type {
-            BotConfigByType::Testnet { inner } => {
-                self.gas_check
-                    .add(address, wallet_name, inner.min_gas, true)
-            }
-            BotConfigByType::Mainnet { .. } => Err(anyhow::anyhow!(
-                "Cannot use refill_gas on mainnet, called on {}",
-                wallet_name.into()
-            )),
-        }
+        self.gas_check
+            .add(address, wallet_name, testnet.min_gas, true)
     }
 
     pub(crate) fn alert_on_low_gas(
@@ -182,12 +175,14 @@ impl AppBuilder {
     }
 
     /// Get a wallet from the wallet manager and track its gas funds.
-    pub(crate) fn get_track_wallet(&mut self, wallet_name: impl Into<String>) -> Result<Wallet> {
+    pub(crate) fn get_track_wallet(
+        &mut self,
+        testnet: &BotConfigTestnet,
+        wallet_name: impl Into<String>,
+    ) -> Result<Wallet> {
         let wallet_name = wallet_name.into();
-        let wallet = self.app.config.wallet_manager.get_wallet(&wallet_name)?;
-        if self.app.config.by_type.is_testnet() {
-            self.refill_gas(*wallet.address(), wallet_name)?;
-        }
+        let wallet = testnet.wallet_manager.get_wallet(&wallet_name)?;
+        self.refill_gas(testnet, *wallet.address(), wallet_name)?;
         Ok(wallet)
     }
 

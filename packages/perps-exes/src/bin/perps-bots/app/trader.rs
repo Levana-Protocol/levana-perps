@@ -8,7 +8,7 @@ use perps_exes::{config::TraderConfig, prelude::*};
 use rand::Rng;
 
 use crate::{
-    config::BotConfig,
+    config::BotConfigTestnet,
     watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
 };
 
@@ -18,7 +18,7 @@ pub(super) struct Trader {
     pub(super) app: Arc<App>,
     pub(super) wallet: Wallet,
     config: TraderConfig,
-    faucet: Address,
+    testnet: Arc<BotConfigTestnet>,
 }
 
 impl AppBuilder {
@@ -27,17 +27,13 @@ impl AppBuilder {
         wallet: Wallet,
         index: usize,
         config: TraderConfig,
+        testnet: Arc<BotConfigTestnet>,
     ) -> Result<()> {
         let trader = Trader {
             app: self.app.clone(),
             wallet,
             config,
-            faucet: match &self.app.config.by_type {
-                crate::config::BotConfigByType::Testnet { inner } => inner.faucet,
-                crate::config::BotConfigByType::Mainnet { .. } => {
-                    anyhow::bail!("Cannot run trader bots on mainnet")
-                }
-            },
+            testnet,
         };
         self.watch_periodic(crate::watcher::TaskLabel::Trader { index }, trader)
     }
@@ -52,7 +48,7 @@ impl WatchedTaskPerMarket for Trader {
         _market: &MarketId,
         addr: Address,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, addr, self.faucet).await
+        single_market(self, addr, self.testnet.faucet).await
     }
 }
 
@@ -60,7 +56,7 @@ pub(crate) struct EnsureCollateral<'a> {
     pub(crate) market: &'a MarketContract,
     pub(crate) wallet: &'a Wallet,
     pub(crate) status: &'a StatusResp,
-    pub(crate) config: &'a BotConfig,
+    pub(crate) testnet: &'a BotConfigTestnet,
     pub(crate) cosmos: &'a Cosmos,
     pub(crate) min: Collateral,
     pub(crate) to_mint: Collateral,
@@ -81,7 +77,7 @@ impl EnsureCollateral<'_> {
             msg::token::Token::Native { .. } => anyhow::bail!("Native not supported"),
         };
         if balance < self.min {
-            self.config
+            self.testnet
                 .wallet_manager
                 .mint(
                     self.cosmos.clone(),
@@ -110,7 +106,7 @@ async fn single_market(
         market: &market,
         wallet: &worker.wallet,
         status: &status,
-        config: &worker.app.config,
+        testnet: &worker.testnet,
         cosmos: &worker.app.cosmos,
         min: "50000".parse().unwrap(),
         to_mint: "200000".parse().unwrap(),

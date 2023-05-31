@@ -10,6 +10,7 @@ mod cli;
 pub(crate) mod config;
 mod endpoints;
 mod util;
+pub(crate) mod wallet_manager;
 pub(crate) mod watcher;
 
 #[tokio::main]

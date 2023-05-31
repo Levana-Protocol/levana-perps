@@ -5,7 +5,10 @@ use axum::async_trait;
 use cosmos::{Address, HasAddress, Wallet};
 use perps_exes::{config::UtilizationConfig, prelude::*};
 
-use crate::watcher::{WatchedTaskOutput, WatchedTaskPerMarket};
+use crate::{
+    config::BotConfigTestnet,
+    watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
+};
 
 use super::{factory::FactoryInfo, App, AppBuilder};
 
@@ -13,7 +16,7 @@ pub(super) struct Utilization {
     pub(super) app: Arc<App>,
     pub(super) wallet: Wallet,
     config: UtilizationConfig,
-    faucet: Address,
+    testnet: Arc<BotConfigTestnet>,
 }
 
 impl AppBuilder {
@@ -21,17 +24,13 @@ impl AppBuilder {
         &mut self,
         wallet: Wallet,
         config: UtilizationConfig,
+        testnet: Arc<BotConfigTestnet>,
     ) -> Result<()> {
         let util = Utilization {
             app: self.app.clone(),
             wallet,
             config,
-            faucet: match &self.app.config.by_type {
-                crate::config::BotConfigByType::Testnet { inner } => inner.faucet,
-                crate::config::BotConfigByType::Mainnet { .. } => {
-                    anyhow::bail!("Cannot run utilization bots on mainnet")
-                }
-            },
+            testnet,
         };
         self.watch_periodic(crate::watcher::TaskLabel::Utilization, util)
     }
@@ -46,7 +45,7 @@ impl WatchedTaskPerMarket for Utilization {
         _market: &MarketId,
         addr: Address,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, addr, self.faucet).await
+        single_market(self, addr, self.testnet.faucet).await
     }
 }
 
@@ -120,8 +119,7 @@ async fn single_market(
         };
         if balance < "20000".parse().unwrap() {
             worker
-                .app
-                .config
+                .testnet
                 .wallet_manager
                 .mint(
                     worker.app.cosmos.clone(),

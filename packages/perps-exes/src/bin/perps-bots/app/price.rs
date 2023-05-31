@@ -25,8 +25,29 @@ struct Worker {
 
 /// Start the background thread to keep options pools up to date.
 impl AppBuilder {
-    pub(super) async fn start_price(&mut self, wallet: Arc<Wallet>) -> Result<()> {
-        self.watch_periodic(crate::watcher::TaskLabel::Price, Worker { wallet })
+    pub(super) async fn start_price(&mut self) -> Result<()> {
+        if let Some(price_wallet) = self.app.config.price_wallet.clone() {
+            match &self.app.config.by_type {
+                BotConfigByType::Testnet { inner } => {
+                    let inner = inner.clone();
+                    self.refill_gas(&inner, *price_wallet.address(), "price-bot")?;
+                }
+                BotConfigByType::Mainnet { inner } => {
+                    self.alert_on_low_gas(
+                        *price_wallet.address(),
+                        "price-bot",
+                        inner.min_gas_price,
+                    )?;
+                }
+            }
+            self.watch_periodic(
+                crate::watcher::TaskLabel::Price,
+                Worker {
+                    wallet: price_wallet,
+                },
+            )?;
+        }
+        Ok(())
     }
 }
 

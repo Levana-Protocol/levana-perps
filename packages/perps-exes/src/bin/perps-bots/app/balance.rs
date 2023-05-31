@@ -8,6 +8,7 @@ use perps_exes::contracts::MarketContract;
 
 use crate::{
     app::trader::EnsureCollateral,
+    config::BotConfigTestnet,
     watcher::{TaskLabel, WatchedTaskOutput, WatchedTaskPerMarket},
 };
 
@@ -58,20 +59,19 @@ async fn check_balance_single(cosmos: &Cosmos, addr: Address) -> Result<()> {
 struct Balance {
     app: Arc<App>,
     wallet: Wallet,
-    faucet: Address,
+    testnet: Arc<BotConfigTestnet>,
 }
 
 impl AppBuilder {
-    pub(super) fn launch_balance(&mut self, wallet: Wallet) -> Result<()> {
+    pub(super) fn launch_balance(
+        &mut self,
+        wallet: Wallet,
+        testnet: Arc<BotConfigTestnet>,
+    ) -> Result<()> {
         let balance = Balance {
             app: self.app.clone(),
             wallet,
-            faucet: match &self.app.config.by_type {
-                crate::config::BotConfigByType::Testnet { inner } => inner.faucet,
-                crate::config::BotConfigByType::Mainnet { .. } => {
-                    anyhow::bail!("Cannot run balance bot on mainnet")
-                }
-            },
+            testnet,
         };
         self.watch_periodic(TaskLabel::Balance, balance)
     }
@@ -86,7 +86,7 @@ impl WatchedTaskPerMarket for Balance {
         market_id: &MarketId,
         addr: Address,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, market_id, addr, self.faucet).await
+        single_market(self, market_id, addr, self.testnet.faucet).await
     }
 }
 
@@ -180,7 +180,7 @@ async fn single_market(
         market: &market,
         wallet: &worker.wallet,
         status: &status,
-        config: &worker.app.config,
+        testnet: &worker.testnet,
         cosmos: &worker.app.cosmos,
         min: needed_collateral,
         to_mint: needed_collateral,

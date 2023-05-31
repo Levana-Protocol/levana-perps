@@ -7,10 +7,12 @@ use perps_exes::{
         UtilizationConfig, WatcherConfig,
     },
     prelude::*,
-    wallet_manager::WalletManager,
 };
 
-use crate::cli::{MainnetOpt, Opt, TestnetOpt};
+use crate::{
+    cli::{MainnetOpt, Opt, TestnetOpt},
+    wallet_manager::WalletManager,
+};
 
 #[derive(Clone)]
 pub(crate) enum BotConfigByType {
@@ -35,6 +37,15 @@ pub(crate) struct BotConfigTestnet {
     pub(crate) min_gas_in_faucet: u128,
     pub(crate) min_gas_in_gas_wallet: u128,
     pub(crate) explorer: &'static str,
+    pub(crate) ultra_crank_wallets: Vec<Wallet>,
+    pub(crate) liquidity_config: Option<LiquidityConfig>,
+    pub(crate) utilization_config: Option<UtilizationConfig>,
+    pub(crate) trader_config: Option<(usize, TraderConfig)>,
+    pub(crate) ignore_stale: bool,
+    pub(crate) rpc_nodes: Vec<Arc<String>>,
+    pub(crate) seconds_till_ultra: u32,
+    pub(crate) balance: bool,
+    pub(crate) wallet_manager: WalletManager,
 }
 
 pub(crate) struct BotConfigMainnet {
@@ -48,19 +59,10 @@ pub(crate) struct BotConfig {
     pub(crate) network: CosmosNetwork,
     pub(crate) price_wallet: Option<Arc<Wallet>>,
     pub(crate) crank_wallet: Option<Wallet>,
-    pub(crate) ultra_crank_wallets: Vec<Wallet>,
-    pub(crate) wallet_manager: WalletManager,
-    pub(crate) balance: bool,
-    pub(crate) liquidity_config: Option<LiquidityConfig>,
-    pub(crate) utilization_config: Option<UtilizationConfig>,
-    pub(crate) trader_config: Option<(usize, TraderConfig)>,
     pub(crate) watcher: WatcherConfig,
     pub(crate) gas_multiplier: Option<f64>,
-    pub(crate) rpc_nodes: Vec<Arc<String>>,
-    pub(crate) ignore_stale: bool,
-    pub(crate) seconds_till_ultra: u32,
-    pub(crate) execs_per_price: Option<u32>,
     pub(crate) pyth_endpoint: String,
+    pub(crate) execs_per_price: Option<u32>,
 }
 
 impl Opt {
@@ -90,47 +92,22 @@ impl Opt {
             Some(s) => serde_yaml::from_str(s)?,
             None => partial,
         };
-        Ok(BotConfig {
-            by_type: BotConfigByType::Testnet {
-                inner: BotConfigTestnet {
-                    tracker: tracker.with_context(|| format!("No tracker found for {network}"))?,
-                    faucet: faucet.with_context(|| format!("No faucet found for {network}"))?,
-                    price_api: &config.price_api,
-                    contract_family: testnet.deployment.clone(),
-                    min_gas: partial.min_gas,
-                    min_gas_in_faucet: partial.min_gas_in_faucet,
-                    min_gas_in_gas_wallet: partial.min_gas_in_gas_wallet,
-                    explorer: explorer
-                        .as_deref()
-                        .with_context(|| format!("No explorer found for network {network}"))?,
-                }
-                .into(),
-            },
-            network,
-            crank_wallet: if partial.crank {
-                Some(self.get_crank_wallet(network.get_address_type(), &wallet_phrase_name, 0)?)
-            } else {
-                None
-            },
+        let testnet = BotConfigTestnet {
+            tracker: tracker.with_context(|| format!("No tracker found for {network}"))?,
+            faucet: faucet.with_context(|| format!("No faucet found for {network}"))?,
+            price_api: &config.price_api,
+            contract_family: testnet.deployment.clone(),
+            min_gas: partial.min_gas,
+            min_gas_in_faucet: partial.min_gas_in_faucet,
+            min_gas_in_gas_wallet: partial.min_gas_in_gas_wallet,
+            explorer: explorer
+                .as_deref()
+                .with_context(|| format!("No explorer found for network {network}"))?,
             ultra_crank_wallets: (1..=partial.ultra_crank)
                 .map(|index| {
                     self.get_crank_wallet(network.get_address_type(), &wallet_phrase_name, index)
                 })
                 .collect::<Result<_>>()?,
-            price_wallet: if partial.price {
-                Some(Arc::new(self.get_wallet(
-                    network.get_address_type(),
-                    &wallet_phrase_name,
-                    "PRICE",
-                )?))
-            } else {
-                None
-            },
-            wallet_manager: WalletManager::new(
-                self.get_wallet_seed(&wallet_phrase_name, "WALLET_MANAGER")?,
-                network.get_address_type(),
-            )?,
-            balance: partial.balance,
             liquidity_config: if partial.liquidity {
                 Some(config.liquidity.clone())
             } else {
@@ -142,16 +119,41 @@ impl Opt {
                 None
             },
             trader_config: Some((testnet.traders.unwrap_or(partial.traders), config.trader)),
-            watcher: partial.watcher.clone(),
-            gas_multiplier: partial.gas_multiplier,
             rpc_nodes: match &self.rpc_url {
                 None => rpc_nodes.iter().map(|x| Arc::new(x.clone())).collect(),
                 Some(rpc) => vec![rpc.clone().into()],
             },
             ignore_stale: partial.ignore_stale,
             seconds_till_ultra: partial.seconds_till_ultra,
-            execs_per_price: partial.execs_per_price,
+            balance: partial.balance,
+            wallet_manager: WalletManager::new(
+                self.get_wallet_seed(&wallet_phrase_name, "WALLET_MANAGER")?,
+                network.get_address_type(),
+            )?,
+        };
+        Ok(BotConfig {
+            by_type: BotConfigByType::Testnet {
+                inner: Arc::new(testnet),
+            },
+            network,
+            crank_wallet: if partial.crank {
+                Some(self.get_crank_wallet(network.get_address_type(), &wallet_phrase_name, 0)?)
+            } else {
+                None
+            },
+            price_wallet: if partial.price {
+                Some(Arc::new(self.get_wallet(
+                    network.get_address_type(),
+                    &wallet_phrase_name,
+                    "PRICE",
+                )?))
+            } else {
+                None
+            },
+            watcher: partial.watcher.clone(),
+            gas_multiplier: partial.gas_multiplier,
             pyth_endpoint: pyth_config.endpoint.clone(),
+            execs_per_price: partial.execs_per_price,
         })
     }
 
@@ -168,6 +170,7 @@ impl Opt {
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let pyth_config = PythConfig::load()?;
+        // FIXME don't use WalletManager here
         let wallet_manager = WalletManager::new(seed.clone(), network.get_address_type())?;
         let price_wallet = wallet_manager.get_wallet("price")?;
         let crank_wallet = wallet_manager.get_wallet("crank")?;
@@ -187,19 +190,10 @@ impl Opt {
             network: *network,
             price_wallet: Some(price_wallet.into()),
             crank_wallet: Some(crank_wallet),
-            ultra_crank_wallets: vec![],
-            wallet_manager,
-            balance: false,
-            liquidity_config: None,
-            utilization_config: None,
-            trader_config: None,
             watcher,
             gas_multiplier: *gas_multiplier,
-            rpc_nodes: vec![],
-            ignore_stale: false,
-            seconds_till_ultra: 0,
-            execs_per_price: None,
             pyth_endpoint: pyth_config.endpoint.clone(),
+            execs_per_price: None,
         })
     }
 }

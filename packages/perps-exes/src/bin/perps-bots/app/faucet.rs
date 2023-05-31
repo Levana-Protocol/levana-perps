@@ -28,7 +28,7 @@ pub(crate) struct FaucetBot {
     wallet_address: Address,
     hcaptcha_secret: String,
     tx: tokio::sync::mpsc::Sender<TapRequest>,
-    testnet: Arc<BotConfigTestnet>,
+    pub(crate) testnet: Arc<BotConfigTestnet>,
 }
 
 impl FaucetBot {

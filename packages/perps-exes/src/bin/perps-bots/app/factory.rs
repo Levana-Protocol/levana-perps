@@ -132,7 +132,12 @@ pub(crate) async fn get_factory_info(
         None => HashMap::new(),
     };
 
-    let rpc = get_rpc_info(cosmos, config, client).await?;
+    let rpc = match &config.by_type {
+        BotConfigByType::Testnet { inner } => {
+            Some(get_rpc_info(cosmos, config, inner, client).await?)
+        }
+        BotConfigByType::Mainnet { .. } => None,
+    };
     let info = FactoryInfo {
         factory,
         faucet,
@@ -143,7 +148,7 @@ pub(crate) async fn get_factory_info(
         gitrev,
         faucet_gas_amount,
         faucet_collateral_amount,
-        rpc: Some(rpc),
+        rpc,
     };
     Ok((message, info))
 }
@@ -282,12 +287,13 @@ async fn get_faucet_collateral_amount(
 async fn get_rpc_info(
     cosmos: &Cosmos,
     config: &BotConfig,
+    testnet: &BotConfigTestnet,
     client: &reqwest::Client,
 ) -> Result<RpcInfo> {
     let grpc = cosmos.get_latest_block_info().await?;
 
     let mut handles = vec![];
-    for node in &config.rpc_nodes {
+    for node in &testnet.rpc_nodes {
         handles.push(tokio::task::spawn(get_height(node.clone(), client.clone())));
     }
 
@@ -304,7 +310,7 @@ async fn get_rpc_info(
     let (endpoint, rpc_height) = match results.into_iter().rev().next() {
         Some(pair) => pair,
         // All nodes are broken
-        None => match config.rpc_nodes.first() {
+        None => match testnet.rpc_nodes.first() {
             Some(node) => (node.clone(), 0),
             None => {
                 if config.by_type.is_testnet() {

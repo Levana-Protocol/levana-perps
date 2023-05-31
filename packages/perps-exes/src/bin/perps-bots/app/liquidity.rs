@@ -6,7 +6,10 @@ use cosmos::{Address, Wallet};
 use cosmwasm_std::Fraction;
 use perps_exes::{config::LiquidityConfig, prelude::*};
 
-use crate::watcher::{WatchedTaskOutput, WatchedTaskPerMarket};
+use crate::{
+    config::BotConfigTestnet,
+    watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
+};
 
 use super::{factory::FactoryInfo, App, AppBuilder};
 
@@ -14,7 +17,7 @@ pub(super) struct Liquidity {
     pub(super) app: Arc<App>,
     liquidity_config: LiquidityConfig,
     pub(super) wallet: Wallet,
-    faucet: Address,
+    testnet: Arc<BotConfigTestnet>,
 }
 
 impl AppBuilder {
@@ -22,17 +25,13 @@ impl AppBuilder {
         &mut self,
         wallet: Wallet,
         liquidity_config: LiquidityConfig,
+        testnet: Arc<BotConfigTestnet>,
     ) -> Result<()> {
         let liquidity = Liquidity {
             app: self.app.clone(),
             liquidity_config,
             wallet,
-            faucet: match &self.app.config.by_type {
-                crate::config::BotConfigByType::Testnet { inner } => inner.faucet,
-                crate::config::BotConfigByType::Mainnet { .. } => {
-                    anyhow::bail!("Cannot run liquidity bot on mainnet")
-                }
-            },
+            testnet,
         };
         self.watch_periodic(crate::watcher::TaskLabel::Liquidity, liquidity)
     }
@@ -47,7 +46,7 @@ impl WatchedTaskPerMarket for Liquidity {
         market: &MarketId,
         addr: Address,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, market, addr, self.faucet).await
+        single_market(self, market, addr, self.testnet.faucet).await
     }
 }
 
@@ -134,8 +133,7 @@ async fn single_market(
                 msg::token::Token::Native { .. } => anyhow::bail!("No support for native coins"),
             };
             worker
-                .app
-                .config
+                .testnet
                 .wallet_manager
                 .mint(
                     worker.app.cosmos.clone(),
