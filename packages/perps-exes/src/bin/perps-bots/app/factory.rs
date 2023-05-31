@@ -70,10 +70,7 @@ async fn update(app: &App) -> Result<WatchedTaskOutput> {
     let (message, info) = get_factory_info(&app.cosmos, &app.config, &app.client).await?;
     let output = WatchedTaskOutput {
         skip_delay: false,
-        message, // message: format!(
-                 //     "Successfully loaded factory address {} from tracker {}",
-                 //     info.factory, testnet.tracker
-                 // ),
+        message,
     };
     app.set_factory_info(info);
     Ok(output)
