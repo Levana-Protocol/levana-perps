@@ -94,7 +94,7 @@ impl Token {
     ) -> Result<Option<CosmosMsg>> {
         match self {
             Self::Native { .. } => {
-                let coin = self.into_native_coin(amount.raw())?;
+                let coin = self.into_native_coin(amount.into_number_gt_zero())?;
 
                 match coin {
                     Some(coin) => Ok(Some(CosmosMsg::Bank(BankMsg::Send {
@@ -190,7 +190,7 @@ impl Token {
     ///
     /// when we know for a fact we have a WalletSource::native
     /// we can get a Coin from a Number amount
-    pub fn into_native_coin(&self, amount: Collateral) -> Result<Option<Coin>> {
+    pub fn into_native_coin(&self, amount: NumberGtZero) -> Result<Option<Coin>> {
         match self {
             Self::Native { denom, .. } => {
                 Ok(self
@@ -312,24 +312,28 @@ impl Token {
                 }
             }
             Self::Native { .. } => {
-                let coin = self.into_native_coin(amount).map_err(|err| {
-                    perp_anyhow!(
-                        ErrorId::Conversion,
-                        ErrorDomain::Wallet,
-                        "{} (exec inner msg: {:?})!",
-                        err.downcast_ref::<PerpError>().unwrap().description,
-                        execute_msg
-                    )
-                })?;
+                let funds = if amount.is_zero() {
+                    Vec::new()
+                } else {
+                    let amount = NumberGtZero::new(amount.into_decimal256())
+                        .context("Unable to convert amount into NumberGtZero")?;
+                    let coin = self
+                        .into_native_coin(amount)
+                        .map_err(|err| {
+                            perp_anyhow!(
+                                ErrorId::Conversion,
+                                ErrorDomain::Wallet,
+                                "{} (exec inner msg: {:?})!",
+                                err.downcast_ref::<PerpError>().unwrap().description,
+                                execute_msg
+                            )
+                        })?
+                        .unwrap();
+
+                    vec![coin]
+                };
 
                 let execute_msg = to_binary(&execute_msg)?;
-
-                let funds = match coin {
-                    Some(coin) => {
-                        vec![coin]
-                    }
-                    None => Vec::new(),
-                };
 
                 Ok(WasmMsg::Execute {
                     contract_addr: contract_addr.to_string(),

@@ -5,13 +5,13 @@ use std::vec;
 
 use crate::cli::{Cmd, Subcommand};
 use anyhow::Result;
-use chrono::Utc;
 use clap::Parser;
 use cli::HatchEggOpt;
 use cosmos::{Contract, Cosmos, HasAddressType, Wallet};
 use mock_nft::Metadata;
 use msg::contracts::hatching::{
     config::Config as HatchConfig,
+    dragon_mint::DragonMintExtra,
     entry::{ExecuteMsg as HatchExecMsg, MaybeHatchStatusResp, QueryMsg as HatchQueryMsg},
     NftRarity,
 };
@@ -178,8 +178,24 @@ async fn main() -> Result<()> {
                     .await?
             } else {
                 add_profile_spirit_level(&hatch, "1.23".parse().unwrap()).await?;
-                let egg_token_id =
-                    mint_egg(&hatch, "1.23".parse().unwrap(), NftRarity::Ancient).await?;
+                let filepath = opt
+                    .path_to_hatchery
+                    .join("data")
+                    .join("juno-warp")
+                    .join("baby-dragons-extra.csv");
+                let mut rdr = csv::Reader::from_path(filepath)?;
+                let dragon_extras: Vec<DragonMintExtra> = rdr
+                    .deserialize::<DragonMintExtra>()
+                    .map(|x| x.map_err(|e| e.into()))
+                    .collect::<Result<Vec<_>>>()?;
+
+                let egg_token_id = mint_egg(
+                    &hatch,
+                    "1.23".parse().unwrap(),
+                    NftRarity::Ancient,
+                    dragon_extras,
+                )
+                .await?;
 
                 // hatch the egg
 
@@ -262,7 +278,6 @@ async fn main() -> Result<()> {
                 }
 
                 if !reward_success {
-                    log::info!("checking if LVN rewards have been transferred to rewards contract and recipient...");
                     match rewards
                         .contract
                         .query::<Option<RewardsInfoResp>>(RewardsInfo {
@@ -335,12 +350,17 @@ async fn clear_lvn_rewards(rewards: &Rewards) -> Result<()> {
                 log::info!("...rewards are clear");
                 break;
             }
-            Some(_) => {
-                log::info!("...found rewards, claiming...");
-                rewards
-                    .contract
-                    .execute(&rewards.wallet, vec![], Claim {})
-                    .await?;
+            Some(info) => {
+                if info.unlocked.is_zero() {
+                    log::info!("... no unlocked rewards");
+                    break;
+                } else {
+                    log::info!("...found {:?} rewards, claiming...", info);
+                    rewards
+                        .contract
+                        .execute(&rewards.wallet, vec![], Claim {})
+                        .await?;
+                }
             }
         }
 
@@ -362,29 +382,56 @@ async fn get_hatch_status(hatch: &Hatch, details: bool) -> Result<MaybeHatchStat
         .await
 }
 
-async fn mint_egg(hatch: &Hatch, spirit_level: NumberGtZero, rarity: NftRarity) -> Result<String> {
-    let token_id = Utc::now().timestamp_millis().to_string();
+async fn mint_egg(
+    hatch: &Hatch,
+    spirit_level: NumberGtZero,
+    rarity: NftRarity,
+    dragon_extras: Vec<DragonMintExtra>,
+) -> Result<String> {
     // mint the egg NFT
 
-    log::info!(
-        "minting mock nft egg w/ id {} and spirit level {}",
-        token_id,
-        spirit_level
-    );
+    let mut token_id = None;
+    for dragon_extra in dragon_extras.iter() {
+        log::info!(
+            "minting mock nft egg w/ id {} and spirit level {}",
+            dragon_extra.id,
+            spirit_level
+        );
 
-    hatch
-        .burn_egg_contract
-        .execute(
-            &hatch.nft_mint_admin_wallet,
-            vec![],
-            mock_nft::ExecuteMsg::Mint(Box::new(mock_nft::MintMsg {
-                token_id: token_id.clone(),
-                owner: hatch.wallet.address().to_string(),
-                token_uri: None,
-                extension: Metadata::new_egg(spirit_level, rarity),
-            })),
-        )
-        .await?;
+        let res = hatch
+            .burn_egg_contract
+            .execute(
+                &hatch.nft_mint_admin_wallet,
+                vec![],
+                mock_nft::ExecuteMsg::Mint(Box::new(mock_nft::MintMsg {
+                    token_id: dragon_extra.id.clone(),
+                    owner: hatch.wallet.address().to_string(),
+                    token_uri: None,
+                    extension: Metadata::new_egg(spirit_level, rarity, dragon_extra.kind.clone()),
+                })),
+            )
+            .await;
+
+        match res {
+            Ok(_) => {
+                token_id = Some(dragon_extra.id.clone());
+                break;
+            }
+            Err(err) => {
+                let s = err.root_cause().to_string();
+                if s.contains("remint a token") || s.contains("already claimed") {
+                    log::warn!(
+                        "token {} was already minted or claimed, trying the next one...",
+                        dragon_extra.id
+                    );
+                } else {
+                    return Err(err);
+                }
+            }
+        }
+    }
+
+    let token_id = token_id.context("no token id found")?;
 
     let nft_info: mock_nft::AllNftInfoResponse = hatch
         .burn_egg_contract

@@ -23,7 +23,7 @@ library = []
 
 [dependencies]
 msg = {package = "levana_perpswap_cosmos_msg", path = "../../packages/msg" }
-shared = {package = "levana_perpswap_cosmos_shared", path = "../../packages/shared" }
+shared = {package = "levana_perpswap_cosmos_shared", path = "../../packages/shared", features = ["chrono"] }
 cosmwasm-std = { version = "1.2.3", features = ["abort", "ibc3"] }
 cw2 = "1.0.1"
 cw-storage-plus = "1.0.1"

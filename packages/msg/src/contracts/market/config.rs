@@ -141,7 +141,7 @@ impl Default for Config {
             max_xlp_rewards_multiplier: "2".parse().unwrap(),
             min_xlp_rewards_multiplier: "1".parse().unwrap(),
             delta_neutrality_fee_sensitivity: "50000000".parse().unwrap(),
-            delta_neutrality_fee_cap: "0.01".parse().unwrap(),
+            delta_neutrality_fee_cap: "0.005".parse().unwrap(),
             delta_neutrality_fee_tax: "0.25".parse().unwrap(),
             limit_order_fee: Collateral::from(0u64),
             crank_fee_charged: "0.01".parse().unwrap(),

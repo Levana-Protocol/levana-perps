@@ -15,7 +15,7 @@ pub struct InstantiateMsg {
     pub factory: RawAddr,
     /// Market ID within the factory
     pub market_id: MarketId,
-    /// How many seconds a a lockdrop "month" lasts.
+    /// How many seconds a lockdrop "month" lasts.
     #[serde(default = "defaults::lockdrop_month_seconds")]
     pub lockdrop_month_seconds: u32,
     /// Lockdrop buckets supported by this contracts
@@ -26,12 +26,14 @@ pub struct InstantiateMsg {
     pub bonus_ratio: NonZero<Decimal256>,
     /// The address that receives bonus transfers.
     pub bonus_addr: RawAddr,
-    /// How long LVN rewards from the lockdrop take to linearly unstake
+    /// How long LVN rewards from the lockdrop take to linearly unlock
     #[serde(default = "defaults::lockdrop_month_seconds")]
     pub lockdrop_lvn_unlock_seconds: u32,
     /// What ratio of lockdrop LVN becomes available immediately on launch
     #[serde(default = "defaults::lockdrop_immediate_unlock_ratio")]
     pub lockdrop_immediate_unlock_ratio: Decimal256,
+    /// The denomination of the LVN token that's used for rewards
+    pub lvn_token_denom: String,
 }
 
 /// Migrate a farming contract.
@@ -86,8 +88,10 @@ pub enum ExecuteMsg {
         /// withdraws all.
         amount: Option<NonZero<FarmingToken>>,
     },
-    /// Claim any pending LVN rewards
-    ClaimLvn {},
+    /// Claim lockdrop rewards
+    ClaimLockdropRewards {},
+    /// Claim LVN emissions
+    ClaimEmissions {},
     /// Claim real yield from the market contract and reinvest as xLP.
     ///
     /// The bonus ratio will be taken off of this first.
@@ -122,6 +126,15 @@ pub enum OwnerExecuteMsg {
     },
     /// Clear the active emissions
     ClearEmissions {},
+    /// Reclaim unused LVN tokens from a previous emissions.
+    /// Returns an error if there's an ongoing emissions period.
+    ReclaimEmissions {
+        /// The destination address for the unused tokens
+        addr: String,
+        /// The amount of tokens to reclaim
+        /// A value of None will reclaim all unused emission tokens
+        amount: Option<LvnToken>,
+    },
     /// Update the configuration set in the [InstantiateMsg]
     ///
     /// Note that, by design, not all fields from [InstantiateMsg] can be
@@ -337,7 +350,7 @@ pub struct FarmerStats {
     /// Total lockdrop LVN rewards that are pending unlock
     pub lockdrop_locked: LvnToken,
     /// LVN emissions available for claiming
-    pub emissions: LvnToken,
+    pub emission_rewards: LvnToken,
 }
 
 /// Information on an individual farmers lockdrop stats.

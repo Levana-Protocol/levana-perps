@@ -1,8 +1,6 @@
-use serde::{Deserialize, Serialize};
-
-use crate::prelude::*;
-
 use super::period::FarmingPeriod;
+use crate::prelude::*;
+use serde::{Deserialize, Serialize};
 
 impl State<'_> {
     pub(crate) fn lockdrop_deposit(

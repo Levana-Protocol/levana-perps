@@ -31,7 +31,7 @@ fn delta_neutrality_fee_cap() {
         .unwrap();
 
     // get expected error after updating
-    let err: PerpError = market
+    let err: PerpError<MarketError> = market
         .exec_update_position_collateral_impact_size(
             &trader,
             pos_id,

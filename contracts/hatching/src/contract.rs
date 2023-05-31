@@ -22,12 +22,12 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn instantiate(
     deps: DepsMut,
     env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    init_config(deps.storage, deps.api, &msg)?;
+    init_config(deps.storage, deps.api, info.sender, &msg)?;
 
     let (_, ctx) = StateContext::new(deps, env)?;
 
@@ -58,6 +58,14 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         }
         ExecuteMsg::RetryHatch { id } => {
             state.retry_hatch(&mut ctx, id.parse()?)?;
+        }
+
+        ExecuteMsg::SetBabyDragonExtras { extras } => {
+            if info.sender != state.config.admin {
+                bail!("unauthorized");
+            }
+
+            state.set_babydragon_extras(&mut ctx, extras)?;
         }
     }
 

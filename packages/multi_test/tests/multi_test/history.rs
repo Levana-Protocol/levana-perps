@@ -378,17 +378,74 @@ fn trade_history_nft_transfer_perp_963() {
 fn price_history_works() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
-    let start_len = market.query_spot_price_history().unwrap().len();
+    let start_len = market
+        .query_spot_price_history(None, None, None)
+        .unwrap()
+        .len();
 
-    market.exec_set_price("2.0".parse().unwrap()).unwrap();
-    market.exec_set_price("3.0".parse().unwrap()).unwrap();
-    market.exec_set_price("4.0".parse().unwrap()).unwrap();
+    for i in 2..=10 {
+        market
+            .exec_set_price(format!("{}", i).parse().unwrap())
+            .unwrap();
+    }
 
-    let mut prices = market.query_spot_price_history().unwrap();
+    let prices = market
+        .query_spot_price_history(None, None, Some(OrderInMessage::Ascending))
+        .unwrap();
 
-    assert_eq!(prices.len() - start_len, 3);
+    assert_eq!(prices.len() - start_len, 9);
 
-    assert_eq!(prices.pop().unwrap().price_base, "4.0".parse().unwrap());
-    assert_eq!(prices.pop().unwrap().price_base, "3.0".parse().unwrap());
-    assert_eq!(prices.pop().unwrap().price_base, "2.0".parse().unwrap());
+    for (i, price) in prices.iter().enumerate() {
+        assert_eq!(price.price_base, (i + 1).to_string().parse().unwrap());
+    }
+
+    let prices = market
+        .query_spot_price_history(None, None, Some(OrderInMessage::Descending))
+        .unwrap();
+
+    assert_eq!(prices.len() - start_len, 9);
+
+    for i in 1..=prices.len() {
+        assert_eq!(prices[10 - i].price_base, i.to_string().parse().unwrap());
+    }
+
+    let prices_desc_page_1 = market
+        .query_spot_price_history(None, Some(3), Some(OrderInMessage::Descending))
+        .unwrap();
+    let prices_desc_page_2 = market
+        .query_spot_price_history(
+            Some(prices_desc_page_1.last().unwrap().timestamp),
+            None,
+            Some(OrderInMessage::Descending),
+        )
+        .unwrap();
+    let prices_desc = prices_desc_page_1
+        .iter()
+        .chain(prices_desc_page_2.iter())
+        .map(|p| p.price_base.to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        vec!["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"],
+        prices_desc
+    );
+
+    let prices_asc_page_1 = market
+        .query_spot_price_history(None, Some(3), Some(OrderInMessage::Ascending))
+        .unwrap();
+    let prices_asc_page_2 = market
+        .query_spot_price_history(
+            Some(prices_asc_page_1.last().unwrap().timestamp),
+            None,
+            Some(OrderInMessage::Ascending),
+        )
+        .unwrap();
+    let prices_asc = prices_asc_page_1
+        .iter()
+        .chain(prices_asc_page_2.iter())
+        .map(|p| p.price_base.to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        vec!["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
+        prices_asc
+    );
 }

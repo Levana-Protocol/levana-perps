@@ -16,8 +16,8 @@ use crate::time::{BlockInfoChange, TimeJump};
 use anyhow::Context;
 pub use anyhow::{anyhow, Result};
 use cosmwasm_std::{
-    to_binary, to_vec, Addr, Binary, ContractResult, CosmosMsg, Empty, QueryRequest, StdError,
-    SystemResult, Uint128, WasmMsg, WasmQuery,
+    to_binary, to_vec, Addr, Binary, Coin, ContractResult, CosmosMsg, Empty, QueryRequest,
+    StdError, SystemResult, Uint128, WasmMsg, WasmQuery,
 };
 use cw_multi_test::{AppResponse, BankSudo, Executor, SudoMsg};
 use msg::bridge::{ClientToBridgeMsg, ClientToBridgeWrapper};
@@ -195,6 +195,7 @@ impl PerpsMarket {
                     msg::contracts::farming::entry::defaults::lockdrop_month_seconds(),
                 lockdrop_immediate_unlock_ratio:
                     msg::contracts::farming::entry::defaults::lockdrop_immediate_unlock_ratio(),
+                lvn_token_denom: TEST_CONFIG.rewards_token_denom.clone(),
             },
             &[],
             "Farming Contract".to_owned(),
@@ -631,12 +632,16 @@ impl PerpsMarket {
         })
     }
 
-    pub fn query_spot_price_history(&self) -> Result<Vec<PricePoint>> {
-        // NOTE we're not doing any pagination, it will load everything
+    pub fn query_spot_price_history(
+        &self,
+        start_after: Option<Timestamp>,
+        limit: Option<u32>,
+        order: Option<OrderInMessage>,
+    ) -> Result<Vec<PricePoint>> {
         let resp: SpotPriceHistoryResp = self.query(&MarketQueryMsg::SpotPriceHistory {
-            start_after: None,
-            limit: None,
-            order: Some(OrderInMessage::Ascending),
+            start_after,
+            limit,
+            order,
         })?;
 
         Ok(resp.price_points)
@@ -1462,6 +1467,8 @@ impl PerpsMarket {
         }
     }
 
+    /***** FARMING *****/
+
     pub fn exec_farming_deposit_xlp(
         &self,
         wallet: &Addr,
@@ -1477,12 +1484,21 @@ impl PerpsMarket {
     }
 
     fn exec_farming(&self, wallet: &Addr, msg: &FarmingExecuteMsg) -> Result<AppResponse> {
+        self.exec_farming_with_funds(wallet, msg, vec![])
+    }
+
+    fn exec_farming_with_funds(
+        &self,
+        wallet: &Addr,
+        msg: &FarmingExecuteMsg,
+        funds: Vec<Coin>,
+    ) -> Result<AppResponse> {
         let farming_addr = self.farming_addr.clone();
 
         let msg = WasmMsg::Execute {
             contract_addr: farming_addr.into_string(),
             msg: to_binary(msg)?,
-            funds: vec![],
+            funds,
         };
         self.exec_wasm_msg(wallet, msg)
     }
@@ -1513,6 +1529,7 @@ impl PerpsMarket {
             &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::StartLaunchPeriod { start }),
         )
     }
+
     pub fn exec_farming_lockdrop_deposit(
         &self,
         wallet: &Addr,
@@ -1540,6 +1557,43 @@ impl PerpsMarket {
         )
     }
 
+    pub fn exec_farming_set_emissions(
+        &self,
+        start: Timestamp,
+        duration: u32,
+        lvn_amount: NonZero<LvnToken>,
+        lvn_token: Token,
+    ) -> Result<AppResponse> {
+        let funds = NumberGtZero::try_from_decimal(lvn_amount.into_decimal256())
+            .and_then(|amount| lvn_token.into_native_coin(amount).unwrap())
+            .unwrap();
+
+        self.exec_farming_with_funds(
+            &Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::SetEmissions {
+                start: Some(start),
+                duration,
+                lvn: lvn_amount,
+            }),
+            vec![funds],
+        )
+    }
+
+    pub fn exec_farming_clear_emissions(&self) -> Result<AppResponse> {
+        self.exec_farming(
+            &Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::ClearEmissions {}),
+        )
+    }
+
+    pub fn exec_farming_claim_lockdrop_rewards(&self, sender: &Addr) -> Result<AppResponse> {
+        self.exec_farming(sender, &FarmingExecuteMsg::ClaimLockdropRewards {})
+    }
+
+    pub fn exec_farming_claim_emissions(&self, sender: &Addr) -> Result<AppResponse> {
+        self.exec_farming(sender, &FarmingExecuteMsg::ClaimEmissions {})
+    }
+
     fn query_farming<T: DeserializeOwned>(
         &self,
         msg: &msg::contracts::farming::entry::QueryMsg,
@@ -1560,5 +1614,14 @@ impl PerpsMarket {
 
     pub fn query_farming_stats(&self) -> FarmingStatusResp {
         self.query_farming(&FarmingQueryMsg::Status {}).unwrap()
+    }
+
+    pub fn query_reward_token_balance(&self, token: &Token, addr: &Addr) -> LvnToken {
+        let balance = token
+            .query_balance(&self.app().querier(), addr)
+            .unwrap()
+            .into_decimal256();
+
+        LvnToken::from_decimal256(balance)
     }
 }

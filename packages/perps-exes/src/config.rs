@@ -295,8 +295,8 @@ impl Default for WatcherConfig {
                 out_of_date: 180,
             },
             price: TaskConfig {
-                delay: Delay::Constant(60),
-                out_of_date: 180,
+                delay: Delay::Interval(1),
+                out_of_date: 30,
             },
             stale: TaskConfig {
                 delay: Delay::Constant(30),
@@ -329,5 +329,6 @@ pub struct TaskConfig {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum Delay {
     Constant(u64),
+    Interval(u64),
     Random { low: u64, high: u64 },
 }

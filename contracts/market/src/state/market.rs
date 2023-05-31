@@ -104,12 +104,19 @@ impl State<'_> {
         limit: Option<usize>,
         order: Option<Order>,
     ) -> Result<Vec<PricePoint>> {
+        let order = order.unwrap_or(Order::Descending);
         let iter = PRICES
             .range(
                 store,
-                start_after.map(Bound::exclusive),
-                None,
-                order.unwrap_or(Order::Descending),
+                match order {
+                    Order::Ascending => start_after.map(Bound::exclusive),
+                    Order::Descending => None,
+                },
+                match order {
+                    Order::Ascending => None,
+                    Order::Descending => start_after.map(Bound::exclusive),
+                },
+                order,
             )
             .map(|res| {
                 let (timestamp, price_storage) = res?;
