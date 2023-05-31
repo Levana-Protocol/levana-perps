@@ -34,7 +34,7 @@ pub(crate) struct InstantiateRewardsOpt {
         default_value = "factory/osmo12g96ahplpf78558cv5pyunus2m66guykt96lvc/lvn1"
     )]
     pub(crate) lvn_denom: String,
-    /// If deploying ibc_execute_proxy, specify the target contract it's proxying
+    /// Path to hatchery so we can load the CSV for babydragon extra meta
     #[clap(long, default_value = "../levana-hatchery")]
     pub(crate) path_to_hatchery: PathBuf,
 }

@@ -238,7 +238,7 @@ pub struct MinterResponse {
 }
 
 impl Metadata {
-    pub fn new_egg(spirit_level: NumberGtZero, rarity: NftRarity) -> Self {
+    pub fn new_egg(spirit_level: NumberGtZero, rarity: NftRarity, dragon_type: String) -> Self {
         let mut m: Self = serde_json::from_str(EGG_META).unwrap();
 
         m.attributes.push(Trait {
@@ -256,6 +256,12 @@ impl Metadata {
                 NftRarity::Ancient => "Ancient".to_string(),
                 NftRarity::Legendary => "Legendary".to_string(),
             },
+        });
+
+        m.attributes.push(Trait {
+            display_type: None,
+            trait_type: "Dragon Type".to_string(),
+            value: dragon_type,
         });
 
         m
@@ -322,11 +328,6 @@ static EGG_META: &str = r#"{
             "display_type":null,
             "trait_type":"Nesting Date",
             "value":"2472-02-01"
-        },
-        {
-            "display_type":null,
-            "trait_type":"Dragon Type",
-            "value":"Wyvern"
         }
     ],
     "background_color":null,

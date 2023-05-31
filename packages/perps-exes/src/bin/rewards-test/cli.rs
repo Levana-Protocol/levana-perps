@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use cosmos::{Address, CosmosNetwork, RawWallet};
 use perps_exes::build_version;
 
@@ -64,7 +66,7 @@ pub(crate) struct HatchEggOpt {
     #[clap(
         long,
         env = "HATCH_ADDRESS",
-        default_value = "juno1l9xmkjvwa8jqlx89vayaha97ukttk3y3sypulx7k4nq66fd2gs6qljjn7u"
+        default_value = "juno15nmqu8s7ywcacm3755eg7024vfqchxm3tytqgzdv94uwm6a62n6qc8r0uz"
     )]
     pub hatch_address: Address,
 
@@ -72,7 +74,7 @@ pub(crate) struct HatchEggOpt {
     #[clap(
         long,
         env = "NFT_MINT_ADDRESS",
-        default_value = "stars1gt7z8xclnl95nuqusd6zym9kvrqxa32slye84n9sqtdr3vu7rn7se0jz2n"
+        default_value = "stars18gy2pyymthnaqaglw0r2zeaxmydd9fgsvz9prje8nt29c72n6v2qt8z3vk"
     )]
     pub nft_mint_address: Address,
 
@@ -80,7 +82,7 @@ pub(crate) struct HatchEggOpt {
     #[clap(
         long,
         env = "LVN_REWARDS_ADDRESS",
-        default_value = "osmo14c8jt9uaxxsughp2758ghsx54p2xgmvkg9k8mvr2lygs0v9mzs0qjdptg5"
+        default_value = "osmo129kvnqwgmec9xxpmsnrseelj4da92qmtdq6pz587sjfz52uvjs9qnxdyrv"
     )]
     pub lvn_rewards_address: Address,
 
@@ -95,6 +97,10 @@ pub(crate) struct HatchEggOpt {
         default_value = "factory/osmo12g96ahplpf78558cv5pyunus2m66guykt96lvc/lvn1"
     )]
     pub reward_token_denom: String,
+
+    /// Path to hatchery so we can load the CSV for babydragon extra meta
+    #[clap(long, default_value = "../levana-hatchery")]
+    pub(crate) path_to_hatchery: PathBuf,
 }
 
 impl Opt {
