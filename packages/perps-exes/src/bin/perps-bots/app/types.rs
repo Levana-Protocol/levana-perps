@@ -75,10 +75,10 @@ impl Opt {
         let cosmos = self.make_cosmos(&config).await?;
 
         let gas_wallet = match &self.sub {
-            crate::cli::Sub::Testnet { inner } => {
+            crate::cli::Sub::Testnet { .. } => {
                 Some(self.get_gas_wallet(cosmos.get_address_type())?)
             }
-            crate::cli::Sub::Mainnet { inner } => None,
+            crate::cli::Sub::Mainnet { .. } => None,
         };
 
         let frontend_info = FrontendInfo {

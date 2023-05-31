@@ -21,12 +21,14 @@ impl AppBuilder {
     pub(super) fn start_crank_bot(&mut self) -> Result<()> {
         if let Some(crank_wallet) = self.app.config.crank_wallet.clone() {
             match &self.app.config.by_type {
-                BotConfigByType::Testnet { inner } => {
+                BotConfigByType::Testnet { .. } => {
                     self.refill_gas(*crank_wallet.address(), "crank-bot")?
                 }
-                BotConfigByType::Mainnet { min_gas_crank, .. } => {
-                    self.alert_on_low_gas(*crank_wallet.address(), "crank-bot", *min_gas_crank)?
-                }
+                BotConfigByType::Mainnet { inner } => self.alert_on_low_gas(
+                    *crank_wallet.address(),
+                    "crank-bot",
+                    inner.min_gas_crank,
+                )?,
             }
 
             let worker = Worker { crank_wallet };

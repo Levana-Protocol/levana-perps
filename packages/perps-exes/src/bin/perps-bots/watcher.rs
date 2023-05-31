@@ -424,8 +424,8 @@ impl TaskStatuses {
                 crate::config::BotConfigByType::Testnet { inner } => {
                     (&inner.contract_family).into()
                 }
-                crate::config::BotConfigByType::Mainnet { factory, .. } => {
-                    format!("Factory address {factory}").into()
+                crate::config::BotConfigByType::Mainnet { inner } => {
+                    format!("Factory address {}", inner.factory).into()
                 }
             },
             build_version: build_version(),

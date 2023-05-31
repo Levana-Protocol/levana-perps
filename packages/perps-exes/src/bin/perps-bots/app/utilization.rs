@@ -42,7 +42,7 @@ impl WatchedTaskPerMarket for Utilization {
     async fn run_single_market(
         &mut self,
         _app: &App,
-        factory: &FactoryInfo,
+        _factory: &FactoryInfo,
         _market: &MarketId,
         addr: Address,
     ) -> Result<WatchedTaskOutput> {

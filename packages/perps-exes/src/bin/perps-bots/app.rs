@@ -46,8 +46,12 @@ impl AppBuilder {
                 BotConfigByType::Testnet { .. } => {
                     self.refill_gas(*price_wallet.address(), "price-bot")?;
                 }
-                BotConfigByType::Mainnet { min_gas_price, .. } => {
-                    self.alert_on_low_gas(*price_wallet.address(), "price-bot", *min_gas_price)?;
+                BotConfigByType::Mainnet { inner } => {
+                    self.alert_on_low_gas(
+                        *price_wallet.address(),
+                        "price-bot",
+                        inner.min_gas_price,
+                    )?;
                 }
             }
             self.start_price(price_wallet).await?;

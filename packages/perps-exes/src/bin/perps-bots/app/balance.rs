@@ -82,7 +82,7 @@ impl WatchedTaskPerMarket for Balance {
     async fn run_single_market(
         &mut self,
         _app: &App,
-        factory: &FactoryInfo,
+        _factory: &FactoryInfo,
         market_id: &MarketId,
         addr: Address,
     ) -> Result<WatchedTaskOutput> {

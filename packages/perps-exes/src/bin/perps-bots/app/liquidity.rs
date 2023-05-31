@@ -43,7 +43,7 @@ impl WatchedTaskPerMarket for Liquidity {
     async fn run_single_market(
         &mut self,
         _app: &App,
-        factory: &FactoryInfo,
+        _factory: &FactoryInfo,
         market: &MarketId,
         addr: Address,
     ) -> Result<WatchedTaskOutput> {

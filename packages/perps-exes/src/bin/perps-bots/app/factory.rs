@@ -86,7 +86,7 @@ pub(crate) async fn get_factory_info(
 ) -> Result<(String, FactoryInfo)> {
     let (factory, gitrev, message) = match &config.by_type {
         BotConfigByType::Testnet { inner } => {
-            let (factory, gitrev) = get_contract(cosmos, config, inner, "factory")
+            let (factory, gitrev) = get_contract(cosmos, inner, "factory")
                 .await
                 .context("Unable to get 'factory' contract")?;
             let message = format!(
@@ -95,10 +95,10 @@ pub(crate) async fn get_factory_info(
             );
             (factory, gitrev, message)
         }
-        BotConfigByType::Mainnet { factory, .. } => (
-            *factory,
+        BotConfigByType::Mainnet { inner } => (
+            inner.factory,
             None,
-            format!("Using hard-coded factory address {factory}"),
+            format!("Using hard-coded factory address {}", inner.factory),
         ),
     };
 
@@ -150,7 +150,6 @@ pub(crate) async fn get_factory_info(
 
 pub(crate) async fn get_contract(
     cosmos: &Cosmos,
-    config: &BotConfig,
     testnet: &BotConfigTestnet,
     contract_type: &str,
 ) -> Result<(Address, Option<String>)> {

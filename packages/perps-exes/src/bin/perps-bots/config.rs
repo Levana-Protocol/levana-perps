@@ -14,15 +14,8 @@ use crate::cli::{MainnetOpt, Opt, TestnetOpt};
 
 #[derive(Clone)]
 pub(crate) enum BotConfigByType {
-    Testnet {
-        inner: Arc<BotConfigTestnet>,
-    },
-    Mainnet {
-        factory: Address,
-        pyth: PythChainConfig,
-        min_gas_crank: u128,
-        min_gas_price: u128,
-    },
+    Testnet { inner: Arc<BotConfigTestnet> },
+    Mainnet { inner: Arc<BotConfigMainnet> },
 }
 impl BotConfigByType {
     pub(crate) fn is_testnet(&self) -> bool {
@@ -43,6 +36,13 @@ pub(crate) struct BotConfigTestnet {
     pub(crate) min_gas_in_faucet: u128,
     pub(crate) min_gas_in_gas_wallet: u128,
     pub(crate) explorer: &'static str,
+}
+
+pub(crate) struct BotConfigMainnet {
+    pub(crate) factory: Address,
+    pub(crate) pyth: PythChainConfig,
+    pub(crate) min_gas_crank: u128,
+    pub(crate) min_gas_price: u128,
 }
 
 pub(crate) struct BotConfig {
@@ -86,7 +86,6 @@ impl Opt {
             pyth,
             explorer,
             rpc_nodes,
-            mainnet,
         } = ChainConfig::load(network)?;
         let partial = match &testnet.deployment_config {
             Some(s) => serde_yaml::from_str(s)?,
@@ -111,8 +110,7 @@ impl Opt {
                         .with_context(|| format!("No explorer found for network {network}"))?,
                 }
                 .into(),
-            }
-            .into(),
+            },
             network,
             crank_wallet: if partial.crank {
                 Some(self.get_crank_wallet(network.get_address_type(), &wallet_phrase_name, 0)?)
@@ -190,12 +188,14 @@ impl Opt {
         };
         Ok(BotConfig {
             by_type: BotConfigByType::Mainnet {
-                factory: *factory,
-                pyth,
-                min_gas_crank: *min_gas_crank,
-                min_gas_price: *min_gas_price,
-            }
-            .into(),
+                inner: BotConfigMainnet {
+                    factory: *factory,
+                    pyth,
+                    min_gas_crank: *min_gas_crank,
+                    min_gas_price: *min_gas_price,
+                }
+                .into(),
+            },
             network: *network,
             price_wallet: Some(price_wallet.into()),
             crank_wallet: Some(crank_wallet),
@@ -219,7 +219,7 @@ impl BotConfig {
     pub(crate) fn get_pyth(&self) -> Option<&PythChainConfig> {
         match &self.by_type {
             BotConfigByType::Testnet { inner } => inner.pyth.as_ref(),
-            BotConfigByType::Mainnet { pyth, .. } => Some(pyth),
+            BotConfigByType::Mainnet { inner } => Some(&inner.pyth),
         }
     }
 }

@@ -25,11 +25,6 @@ pub struct PythConfig {
 #[derive(serde::Deserialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ChainConfig {
-    /// Is this chain a mainnet chain?
-    ///
-    /// Mainnet chains have additional restrictions, such as not looking up
-    /// contract addresses via the tracker. This is for heightened security.
-    pub mainnet: bool,
     pub tracker: Option<Address>,
     pub faucet: Option<Address>,
     pub pyth: Option<Address>,
@@ -48,12 +43,6 @@ pub struct ConfigTestnet {
     pub liquidity: LiquidityConfig,
     pub utilization: UtilizationConfig,
     pub trader: TraderConfig,
-}
-
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct ConfigMainnet {
-    pub deployments: HashMap<String, BotDeploymentConfigMainnet>,
 }
 
 #[derive(serde::Deserialize, Clone, Debug)]
@@ -149,21 +138,8 @@ pub struct BotDeploymentConfigTestnet {
     pub gas_multiplier: Option<f64>,
 }
 
-#[derive(serde::Deserialize, Clone, Debug)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct BotDeploymentConfigMainnet {
-    #[serde(default)]
-    pub crank: bool,
-    pub price: bool,
-    #[serde(default)]
-    pub execs_per_price: Option<u32>,
-    pub network: CosmosNetwork,
-    pub wallet_phrase_name: String,
-}
-
 const CONFIG_CHAIN_YAML: &[u8] = include_bytes!("../assets/config-chain.yaml");
 const CONFIG_TESTNET_YAML: &[u8] = include_bytes!("../assets/config-testnet.yaml");
-const CONFIG_MAINNET_YAML: &[u8] = include_bytes!("../assets/config-mainnet.yaml");
 const CONFIG_PYTH_YAML: &[u8] = include_bytes!("../assets/config-pyth.yaml");
 
 impl ChainConfig {
@@ -222,33 +198,6 @@ impl PythConfig {
         CONFIG.get_or_try_init(|| {
             serde_yaml::from_slice(CONFIG_PYTH_YAML).context("Could not parse config-pyth.yaml")
         })
-    }
-}
-
-impl ConfigMainnet {
-    pub fn load() -> Result<&'static Self> {
-        static CONFIG: OnceCell<ConfigMainnet> = OnceCell::new();
-        CONFIG.get_or_try_init(|| {
-            serde_yaml::from_slice(CONFIG_MAINNET_YAML)
-                .context("Could not parse config-mainnet.yaml")
-        })
-    }
-
-    pub fn get_deployment_info(&self, deployment: &str) -> Result<BotDeploymentConfigMainnet> {
-        self.deployments
-            .get(deployment)
-            .with_context(|| {
-                format!(
-                    "No config found for {}. Valid configs: {}",
-                    deployment,
-                    self.deployments
-                        .keys()
-                        .map(|s| s.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            })
-            .cloned()
     }
 }
 

@@ -170,7 +170,7 @@ async fn store_perps_contracts(
     network: CosmosNetwork,
     market_code_id: Option<u64>,
 ) -> Result<()> {
-    let app = opt.load_app_mainnet(Some(network), None).await?;
+    let app = opt.load_app_mainnet(network).await?;
     let mut code_ids = CodeIds::load()?;
     let gitrev = opt.get_gitrev()?;
 
@@ -296,7 +296,7 @@ async fn instantiate_factory(
         wind_down,
     }: InstantiateFactoryOpts,
 ) -> Result<()> {
-    let app = opt.load_app_mainnet(Some(network), None).await?;
+    let app = opt.load_app_mainnet(network).await?;
     let code_ids = CodeIds::load()?;
     let mut factories = MainnetFactories::load()?;
 
@@ -332,7 +332,7 @@ async fn instantiate_factory(
 
     factories.factories.push(MainnetFactory {
         address: factory.get_address(),
-        network: network,
+        network,
         label: factory_label,
         instantiate_code_id: factory_code_id,
         instantiate_at: Utc::now(),
@@ -405,7 +405,7 @@ async fn add_market(
         .into_iter()
         .find(|x| x.address == factory)
         .with_context(|| format!("Unknown mainnet factory: {factory}"))?;
-    let app = opt.load_app_mainnet(Some(factory.network), None).await?;
+    let app = opt.load_app_mainnet(factory.network).await?;
 
     log::info!("Deploying a new Pyth bridge");
     let pyth_bridge = code_ids.get_simple(ContractType::PythBridge, &opt, factory.network)?;
@@ -490,7 +490,7 @@ async fn set_pyth_feeds(
         .into_iter()
         .find(|x| x.address == factory)
         .with_context(|| format!("Unknown mainnet factory: {factory}"))?;
-    let app = opt.load_app_mainnet(Some(factory.network), None).await?;
+    let app = opt.load_app_mainnet(factory.network).await?;
 
     let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
     let pyth_bridge = factory.get_market(market_id.clone()).await?.price_admin;
