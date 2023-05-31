@@ -11,16 +11,12 @@ use msg::{
 };
 use tokio::sync::mpsc::error::TrySendError;
 
-use crate::config::BotConfigByType;
-
 use super::{App, AppBuilder};
 
 impl AppBuilder {
     pub(super) fn launch_faucet_task(&mut self, runner: FaucetBotRunner) {
-        if let BotConfigByType::Testnet { inner } = &self.app.config.by_type {
-            let contract = self.app.cosmos.make_contract(inner.faucet);
-            self.watch_background(runner.start(contract));
-        }
+        let contract = self.app.cosmos.make_contract(runner.faucet);
+        self.watch_background(runner.start(contract));
     }
 }
 
@@ -44,7 +40,7 @@ impl FaucetBot {
             tx,
             faucet,
         };
-        let runner = FaucetBotRunner { wallet, rx };
+        let runner = FaucetBotRunner { wallet, rx, faucet };
         (bot, runner)
     }
 
@@ -145,9 +141,10 @@ pub(crate) enum FaucetTapError {
     Mainnet {},
 }
 
-pub struct FaucetBotRunner {
+pub(crate) struct FaucetBotRunner {
     wallet: Wallet,
     rx: tokio::sync::mpsc::Receiver<TapRequest>,
+    faucet: Address,
 }
 
 impl FaucetBotRunner {

@@ -60,7 +60,10 @@ async fn bot_inner(
             match app.is_valid_recaptcha(&hcaptcha, inner).await {
                 Ok(true) => inner.faucet_bot.tap(app, recipient, cw20s).await,
                 Ok(false) => Err(FaucetTapError::InvalidCaptcha {}),
-                Err(_) => Err(FaucetTapError::CannotQueryCaptcha {}),
+                Err(e) => {
+                    log::error!("Cannot query captcha service: {e:?}");
+                    Err(FaucetTapError::CannotQueryCaptcha {})
+                }
             }
         }
     }

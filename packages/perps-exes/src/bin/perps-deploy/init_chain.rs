@@ -22,7 +22,7 @@ pub(crate) struct InitChainOpt {
 }
 
 const FAUCET: &str = "faucet";
-pub(crate) const TRACKER: &str = "tracker";
+const TRACKER: &str = "tracker";
 
 pub(crate) async fn go(
     opt: Opt,
