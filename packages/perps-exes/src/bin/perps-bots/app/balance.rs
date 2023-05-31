@@ -5,6 +5,7 @@ use axum::async_trait;
 use cosmos::{Address, Cosmos, Wallet};
 use msg::prelude::*;
 use perps_exes::contracts::MarketContract;
+use rand::Rng;
 
 use crate::{
     app::trader::EnsureCollateral,
@@ -156,10 +157,18 @@ async fn single_market(
         .into_number()
         .abs_unsigned();
 
+    // Introduce a randomization factor as well
+    let random_multiplier = {
+        let mut rng = rand::thread_rng();
+        let percent = rng.gen_range(80..=100u32);
+        Decimal256::from_ratio(percent, 100u32)
+    };
+
     let collateral_for_balance = price
         .notional_to_collateral(Notional::from_decimal256(net_notional.abs_unsigned()))
         .into_decimal256()
-        / leverage_divider;
+        .checked_div(leverage_divider)?
+        .checked_mul(random_multiplier)?;
     log::info!("collateral_for_balance: {}", collateral_for_balance);
 
     let needed_collateral = Collateral::from_decimal256(
