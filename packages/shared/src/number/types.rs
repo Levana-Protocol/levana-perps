@@ -572,6 +572,11 @@ impl<T: UnsignedDecimal> NonZero<T> {
         self.0.into_decimal256()
     }
 
+    /// Convert into `NonZero<Decimal>`
+    pub fn into_number_gt_zero(self) -> NumberGtZero {
+        NonZero::<Decimal256>(self.into_decimal256())
+    }
+
     /// Convert into a general purpose [Number].
     pub fn into_number(self) -> Signed<Decimal256> {
         self.0.into_number()
@@ -740,6 +745,24 @@ impl LpToken {
             x,
             Self::PRECISION.into(),
         )?))
+    }
+}
+
+impl LvnToken {
+    /// Multiply by the given [Decimal256]
+    pub fn checked_mul_dec(self, rhs: Decimal256) -> Result<LvnToken> {
+        self.0
+            .checked_mul(rhs)
+            .map(LvnToken)
+            .with_context(|| format!("LvnToken::checked_mul failed on {self} * {rhs}"))
+    }
+
+    /// Divide by the given [Decimal256]
+    pub fn checked_div_dec(self, rhs: Decimal256) -> Result<LvnToken> {
+        self.0
+            .checked_div(rhs)
+            .map(LvnToken)
+            .with_context(|| format!("LvnToken::checked_div failed on {self} * {rhs}"))
     }
 }
 

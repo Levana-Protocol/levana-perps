@@ -8,7 +8,30 @@ const FARMERS: Map<&Addr, RawFarmerStats> = Map::new("farmer-stats");
 
 #[derive(serde::Serialize, serde::Deserialize, Default, Debug)]
 pub(crate) struct RawFarmerStats {
-    pub(crate) farming_tokens: FarmingToken,
+    /// The amount of farming tokens owned by this farmer that came from the lockdrop
+    /// Farming tokens represent the farmer's share of the total LVN reward pool allocated
+    /// to the lockdrop.
+    pub(crate) lockdrop_farming_tokens: FarmingToken,
+    /// A timestamp representing the last time the farmer collected rewards
+    pub(crate) lockdrop_last_collected: Timestamp,
+    /// The amount of LVN tokens collected by the farmer up until [lockdrop_last_collected]
+    pub(crate) lockdrop_amount_collected: LvnToken,
+    /// The amount of farming tokens owned by this farmer that came from xLP deposits
+    pub(crate) xlp_farming_tokens: FarmingToken,
+    /// The prefix sum of the last time the farmer claimed.
+    /// See [REWARDS_PER_TIME_PER_TOKEN] for more explanation of prefix sums.
+    pub(crate) xlp_last_claimed_prefix_sum: LvnToken,
+    /// The amount of LVN tokens that have accrued from emissions but have not yet been claimed
+    pub(crate) accrued_emissions: LvnToken,
+}
+
+impl RawFarmerStats {
+    pub(crate) fn total_farming_tokens(&self) -> Result<FarmingToken> {
+        let total = self
+            .lockdrop_farming_tokens
+            .checked_add(self.xlp_farming_tokens)?;
+        Ok(total)
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Default, Debug)]
@@ -55,11 +78,20 @@ impl FarmingTotals {
 
 impl State<'_> {
     /// Get the total amount of xLP held by this contract
-    pub(crate) fn get_farming_totals(&self, store: &dyn Storage) -> Result<FarmingTotals> {
+    pub(crate) fn load_farming_totals(&self, store: &dyn Storage) -> Result<FarmingTotals> {
         TOTALS
             .may_load(store)
             .map_err(|e| e.into())
             .map(|x| x.unwrap_or_default())
+    }
+
+    pub(crate) fn save_farming_totals(
+        &self,
+        store: &mut dyn Storage,
+        totals: &FarmingTotals,
+    ) -> Result<()> {
+        TOTALS.save(store, totals)?;
+        Ok(())
     }
 
     /// Load the raw farmer stats for the given farmer.
@@ -75,7 +107,7 @@ impl State<'_> {
     }
 
     /// Save the raw farmer stats for the given farmer.
-    fn save_raw_farmer_stats(
+    pub(crate) fn save_raw_farmer_stats(
         &self,
         ctx: &mut StateContext,
         farmer: &Addr,
@@ -91,14 +123,20 @@ impl State<'_> {
         farmer: &Addr,
         xlp: LpToken,
     ) -> Result<FarmingToken> {
-        let mut totals = self.get_farming_totals(ctx.storage)?;
+        self.farming_perform_emissions_bookkeeping(ctx, farmer)?;
+
+        let mut totals = self.load_farming_totals(ctx.storage)?;
         let new_farming = totals.xlp_to_farming(xlp)?;
+
         totals.xlp = totals.xlp.checked_add(xlp)?;
         totals.farming = totals.farming.checked_add(new_farming)?;
-        TOTALS.save(ctx.storage, &totals)?;
+        self.save_farming_totals(ctx.storage, &totals)?;
+
         let mut raw = self.load_raw_farmer_stats(ctx.storage, farmer)?;
-        raw.farming_tokens = raw.farming_tokens.checked_add(new_farming)?;
+        raw.xlp_farming_tokens = raw.xlp_farming_tokens.checked_add(new_farming)?;
+
         self.save_raw_farmer_stats(ctx, farmer, &raw)?;
+
         Ok(new_farming)
     }
 
@@ -111,18 +149,20 @@ impl State<'_> {
         farmer: &Addr,
         amount: Option<NonZero<FarmingToken>>,
     ) -> Result<(LpToken, FarmingToken)> {
-        let mut totals = self.get_farming_totals(ctx.storage)?;
+        self.farming_perform_emissions_bookkeeping(ctx, farmer)?;
+
+        let mut totals = self.load_farming_totals(ctx.storage)?;
         let mut raw = self.load_raw_farmer_stats(ctx.storage, farmer)?;
 
         let amount = match amount {
             Some(amount) => amount.raw(),
-            None => raw.farming_tokens,
+            None => raw.xlp_farming_tokens,
         };
 
         anyhow::ensure!(
-            amount <= raw.farming_tokens,
+            amount <= raw.xlp_farming_tokens,
             "Insufficient farming tokens. Wanted: {amount}. Available: {}.",
-            raw.farming_tokens
+            raw.xlp_farming_tokens
         );
         anyhow::ensure!(!amount.is_zero(), "Cannot withdraw 0 farming tokens");
 
@@ -130,9 +170,9 @@ impl State<'_> {
 
         totals.farming = totals.farming.checked_sub(amount)?;
         totals.xlp = totals.xlp.checked_sub(removed_xlp)?;
-        TOTALS.save(ctx.storage, &totals)?;
+        self.save_farming_totals(ctx.storage, &totals)?;
 
-        raw.farming_tokens = raw.farming_tokens.checked_sub(amount)?;
+        raw.xlp_farming_tokens = raw.xlp_farming_tokens.checked_sub(amount)?;
         self.save_raw_farmer_stats(ctx, farmer, &raw)?;
 
         Ok((removed_xlp, amount))

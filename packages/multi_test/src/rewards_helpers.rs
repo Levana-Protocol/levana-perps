@@ -12,7 +12,7 @@ use msg::prelude::RawAddr;
 use msg::token::Token;
 
 impl PerpsApp {
-    pub(crate) fn rewards_token(&self) -> Token {
+    pub fn rewards_token(&self) -> Token {
         Token::Native {
             denom: TEST_CONFIG.rewards_token_denom.clone(),
             decimal_places: 6,

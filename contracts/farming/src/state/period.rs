@@ -46,7 +46,19 @@ impl State<'_> {
         let period = (&period_resp).into();
 
         let is_valid = match msg {
-            ExecuteMsg::Owner(_) => true,
+            ExecuteMsg::Owner(owner_msg) => {
+                match owner_msg {
+                    OwnerExecuteMsg::SetEmissions { .. }
+                    | OwnerExecuteMsg::ClearEmissions { .. }
+                    | OwnerExecuteMsg::ReclaimEmissions { .. } => period == FarmingPeriod::Launched,
+
+                    // Validation for config and transitioning between Periods is handled in the
+                    // appropriate business logic
+                    OwnerExecuteMsg::UpdateConfig { .. }
+                    | OwnerExecuteMsg::StartLaunchPeriod { .. }
+                    | OwnerExecuteMsg::StartLockdropPeriod { .. } => true,
+                }
+            }
             ExecuteMsg::Receive { .. } => {
                 anyhow::bail!("Cannot have double-wrapped Receive");
             }
@@ -69,7 +81,8 @@ impl State<'_> {
             },
             ExecuteMsg::Deposit { .. }
             | ExecuteMsg::Withdraw { .. }
-            | ExecuteMsg::ClaimLvn {}
+            | ExecuteMsg::ClaimEmissions { .. }
+            | ExecuteMsg::ClaimLockdropRewards { .. }
             | ExecuteMsg::Reinvest {}
             | ExecuteMsg::TransferBonus {} => period == FarmingPeriod::Launched,
         };
