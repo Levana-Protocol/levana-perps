@@ -6,3 +6,10 @@ factories:
   instantiate-at: 2023-05-30T12:13:09.930256077Z
   gitrev: a0ba2217bed8f847a604ff890a05e640406bf63f
   hash: 0f59e244069271be6b584ee59e4c22b61ecfb4b474b41526ded627e81bbbda79
+- address: sei1qfk0prkalfdmlkm9nudj2xuax4hdr4nfpw9vczdeeul57r2k2jhs08fm64
+  network: sei-mainnet
+  label: Levana Perps Mainnet Test 1
+  instantiate-code-id: 36
+  instantiate-at: 2023-05-31T05:43:10.210099422Z
+  gitrev: b22ecd5d91ba6e6adc8aafdd627eea7a925d69a0
+  hash: b11cf50cd0c625036c733e956ba41967e46649cfc45b4c3f2abb905dbc10f2c4
