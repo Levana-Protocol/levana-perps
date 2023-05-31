@@ -224,6 +224,7 @@ impl AppBuilder {
                         out_of_date,
                     };
                 }
+                let before = tokio::time::Instant::now();
                 let res = task
                     .run_single(
                         &app,
@@ -249,13 +250,24 @@ impl AppBuilder {
                         };
                         retries = 0;
                         if !skip_delay {
-                            let delay = match config.delay {
-                                perps_exes::config::Delay::Constant(x) => x,
+                            match config.delay {
+                                perps_exes::config::Delay::Constant(secs) => {
+                                    tokio::time::sleep(tokio::time::Duration::from_secs(secs))
+                                        .await;
+                                }
                                 perps_exes::config::Delay::Random { low, high } => {
-                                    rand::thread_rng().gen_range(low..=high)
+                                    let secs = rand::thread_rng().gen_range(low..=high);
+                                    tokio::time::sleep(tokio::time::Duration::from_secs(secs))
+                                        .await;
+                                }
+                                perps_exes::config::Delay::Interval(secs) => {
+                                    if let Some(after) =
+                                        before.checked_add(tokio::time::Duration::from_secs(secs))
+                                    {
+                                        tokio::time::sleep_until(after).await;
+                                    }
                                 }
                             };
-                            tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
                         }
                     }
                     Err(err) => {
