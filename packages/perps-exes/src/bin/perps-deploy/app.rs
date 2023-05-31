@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use cosmos::{Address, Cosmos, CosmosNetwork, HasAddress, HasAddressType, Wallet};
 use msg::contracts::pyth_bridge::PythMarketPriceFeeds;
 use msg::prelude::MarketId;
-use perps_exes::config::{BotDeploymentConfigTestnet, ChainConfig, ConfigTestnet, PythConfig};
+use perps_exes::config::{ChainConfig, ConfigTestnet, DeploymentConfigTestnet, PythConfig};
 
 use crate::{cli::Opt, faucet::Faucet, tracker::Tracker};
 
@@ -83,7 +83,7 @@ impl Opt {
         let partial = config.get_deployment_info(family)?;
         let basic = self.load_basic_app(partial.network).await?;
 
-        let BotDeploymentConfigTestnet {
+        let DeploymentConfigTestnet {
             wallet_manager_address,
             price_address: price_admin,
             trading_competition,

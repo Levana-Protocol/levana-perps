@@ -37,8 +37,8 @@ pub struct ChainConfig {
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ConfigTestnet {
-    deployments: HashMap<String, BotDeploymentConfigTestnet>,
-    overrides: HashMap<String, BotDeploymentConfigTestnet>,
+    deployments: HashMap<String, DeploymentConfigTestnet>,
+    overrides: HashMap<String, DeploymentConfigTestnet>,
     pub price_api: String,
     pub liquidity: LiquidityConfig,
     pub utilization: UtilizationConfig,
@@ -87,7 +87,7 @@ pub struct LiquidityBounds {
 
 #[derive(serde::Deserialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct BotDeploymentConfigTestnet {
+pub struct DeploymentConfigTestnet {
     #[serde(default)]
     pub crank: bool,
     /// How many ultracrank wallets to set up
@@ -131,16 +131,13 @@ pub struct BotDeploymentConfigTestnet {
     pub gas_multiplier: Option<f64>,
 }
 
-const CONFIG_CHAIN_YAML: &[u8] = include_bytes!("../assets/config-chain.yaml");
-const CONFIG_TESTNET_YAML: &[u8] = include_bytes!("../assets/config-testnet.yaml");
-const CONFIG_PYTH_YAML: &[u8] = include_bytes!("../assets/config-pyth.yaml");
-
 impl ChainConfig {
+    const CONFIG_CHAIN_YAML: &[u8] = include_bytes!("../assets/config-chain.yaml");
     pub fn load(network: CosmosNetwork) -> Result<&'static Self> {
         static CONFIG: OnceCell<HashMap<CosmosNetwork, ChainConfig>> = OnceCell::new();
         CONFIG
             .get_or_try_init(|| {
-                serde_yaml::from_slice(CONFIG_CHAIN_YAML)
+                serde_yaml::from_slice(Self::CONFIG_CHAIN_YAML)
                     .context("Could not parse config-chain.yaml")
             })?
             .get(&network)
@@ -149,10 +146,11 @@ impl ChainConfig {
 }
 
 impl ConfigTestnet {
+    const CONFIG_TESTNET_YAML: &[u8] = include_bytes!("../assets/config-testnet.yaml");
     pub fn load() -> Result<&'static Self> {
         static CONFIG: OnceCell<ConfigTestnet> = OnceCell::new();
         CONFIG.get_or_try_init(|| {
-            serde_yaml::from_slice(CONFIG_TESTNET_YAML)
+            serde_yaml::from_slice(Self::CONFIG_TESTNET_YAML)
                 .context("Could not parse config-testnet.yaml")
         })
     }
@@ -186,16 +184,19 @@ impl ConfigTestnet {
 }
 
 impl PythConfig {
+    const CONFIG_PYTH_YAML: &[u8] = include_bytes!("../assets/config-pyth.yaml");
+
     pub fn load() -> Result<&'static Self> {
         static CONFIG: OnceCell<PythConfig> = OnceCell::new();
         CONFIG.get_or_try_init(|| {
-            serde_yaml::from_slice(CONFIG_PYTH_YAML).context("Could not parse config-pyth.yaml")
+            serde_yaml::from_slice(Self::CONFIG_PYTH_YAML)
+                .context("Could not parse config-pyth.yaml")
         })
     }
 }
 
 pub struct DeploymentInfo {
-    pub config: BotDeploymentConfigTestnet,
+    pub config: DeploymentConfigTestnet,
     pub network: CosmosNetwork,
     pub wallet_phrase_name: String,
 }
@@ -251,31 +252,6 @@ pub struct WatcherConfig {
     pub stats: TaskConfig,
     #[serde(default = "defaults::ultra_crank")]
     pub ultra_crank: TaskConfig,
-}
-
-#[derive(serde::Deserialize, Clone, Debug)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct WatcherConfigMainnet {
-    /// How many times to retry before giving up
-    #[serde(default = "defaults::retries")]
-    pub retries: usize,
-    /// How many seconds to delay between retries
-    #[serde(default = "defaults::delay_between_retries")]
-    pub delay_between_retries: u32,
-    #[serde(default = "defaults::gas_check")]
-    pub gas_check: TaskConfig,
-    #[serde(default = "defaults::track_balance")]
-    pub track_balance: TaskConfig,
-    #[serde(default = "defaults::crank")]
-    pub crank: TaskConfig,
-    #[serde(default = "defaults::get_factory")]
-    pub get_factory: TaskConfig,
-    #[serde(default = "defaults::price")]
-    pub price: TaskConfig,
-    #[serde(default = "defaults::stale")]
-    pub stale: TaskConfig,
-    #[serde(default = "defaults::stats")]
-    pub stats: TaskConfig,
 }
 
 impl Default for WatcherConfig {
@@ -334,23 +310,6 @@ impl Default for WatcherConfig {
                 delay: Delay::Constant(120),
                 out_of_date: 180,
             },
-        }
-    }
-}
-
-impl Default for WatcherConfigMainnet {
-    fn default() -> Self {
-        let watcher = WatcherConfig::default();
-        Self {
-            retries: watcher.retries,
-            delay_between_retries: watcher.delay_between_retries,
-            gas_check: watcher.gas_check,
-            track_balance: watcher.track_balance,
-            crank: watcher.crank,
-            get_factory: watcher.get_factory,
-            price: watcher.price,
-            stale: watcher.stale,
-            stats: watcher.stats,
         }
     }
 }
