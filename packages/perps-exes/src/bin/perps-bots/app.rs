@@ -27,7 +27,7 @@ impl AppBuilder {
         self.track_stale()?;
         self.track_stats()?;
         self.track_balance()?;
-        self.start_price().await?;
+        self.start_price()?;
 
         match &self.app.config.by_type {
             // Run tasks that can only run in testnet.

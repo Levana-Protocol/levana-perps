@@ -25,7 +25,7 @@ struct Worker {
 
 /// Start the background thread to keep options pools up to date.
 impl AppBuilder {
-    pub(super) async fn start_price(&mut self) -> Result<()> {
+    pub(super) fn start_price(&mut self) -> Result<()> {
         if let Some(price_wallet) = self.app.config.price_wallet.clone() {
             match &self.app.config.by_type {
                 BotConfigByType::Testnet { inner } => {
