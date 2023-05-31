@@ -10,6 +10,7 @@ use perps_exes::{
 };
 
 use crate::{
+    app::faucet::{FaucetBot, FaucetBotRunner},
     cli::{MainnetOpt, Opt, TestnetOpt},
     wallet_manager::WalletManager,
 };
@@ -46,6 +47,7 @@ pub(crate) struct BotConfigTestnet {
     pub(crate) seconds_till_ultra: u32,
     pub(crate) balance: bool,
     pub(crate) wallet_manager: WalletManager,
+    pub(crate) faucet_bot: FaucetBot,
 }
 
 pub(crate) struct BotConfigMainnet {
@@ -66,14 +68,20 @@ pub(crate) struct BotConfig {
 }
 
 impl Opt {
-    pub(crate) fn get_bot_config(&self) -> Result<BotConfig> {
+    pub(crate) fn get_bot_config(&self) -> Result<(BotConfig, Option<FaucetBotRunner>)> {
         match &self.sub {
             crate::cli::Sub::Testnet { inner } => self.get_bot_config_testnet(inner),
-            crate::cli::Sub::Mainnet { inner } => self.get_bot_config_mainnet(inner),
+            crate::cli::Sub::Mainnet { inner } => {
+                let config = self.get_bot_config_mainnet(inner)?;
+                Ok((config, None))
+            }
         }
     }
 
-    fn get_bot_config_testnet(&self, testnet: &TestnetOpt) -> Result<BotConfig> {
+    fn get_bot_config_testnet(
+        &self,
+        testnet: &TestnetOpt,
+    ) -> Result<(BotConfig, Option<FaucetBotRunner>)> {
         let config = ConfigTestnet::load()?;
         let pyth_config = PythConfig::load()?;
         let DeploymentInfo {
@@ -92,9 +100,15 @@ impl Opt {
             Some(s) => serde_yaml::from_str(s)?,
             None => partial,
         };
+
+        let faucet_bot_wallet = self.get_faucet_bot_wallet(network.get_address_type())?;
+        let faucet = faucet.with_context(|| format!("No faucet found for {network}"))?;
+        let (faucet_bot, faucet_bot_runner) =
+            FaucetBot::new(faucet_bot_wallet, testnet.hcaptcha_secret.clone(), faucet);
+
         let testnet = BotConfigTestnet {
             tracker: tracker.with_context(|| format!("No tracker found for {network}"))?,
-            faucet: faucet.with_context(|| format!("No faucet found for {network}"))?,
+            faucet,
             price_api: &config.price_api,
             contract_family: testnet.deployment.clone(),
             min_gas: partial.min_gas,
@@ -130,8 +144,9 @@ impl Opt {
                 self.get_wallet_seed(&wallet_phrase_name, "WALLET_MANAGER")?,
                 network.get_address_type(),
             )?,
+            faucet_bot,
         };
-        Ok(BotConfig {
+        let config = BotConfig {
             by_type: BotConfigByType::Testnet {
                 inner: Arc::new(testnet),
             },
@@ -154,7 +169,9 @@ impl Opt {
             gas_multiplier: partial.gas_multiplier,
             pyth_endpoint: pyth_config.endpoint.clone(),
             execs_per_price: partial.execs_per_price,
-        })
+        };
+
+        Ok((config, Some(faucet_bot_runner)))
     }
 
     fn get_bot_config_mainnet(

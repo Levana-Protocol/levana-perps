@@ -29,12 +29,11 @@ impl AppBuilder {
 
         match &self.app.config.by_type {
             BotConfigByType::Testnet { inner } => {
+                // Run tasks that can only run in testnet.
                 let inner = inner.clone();
 
-                if let Some(faucet_bot) = &self.app.faucet_bot {
-                    let faucet_bot_address = faucet_bot.get_wallet_address();
-                    self.refill_gas(&inner, faucet_bot_address, "faucet-bot")?;
-                }
+                let faucet_bot_address = inner.faucet_bot.get_wallet_address();
+                self.refill_gas(&inner, faucet_bot_address, "faucet-bot")?;
 
                 self.alert_on_low_gas(inner.faucet, "faucet", inner.min_gas_in_faucet)?;
                 if let Some(gas_wallet) = self.get_gas_wallet_address() {
@@ -74,6 +73,7 @@ impl AppBuilder {
                 }
                 self.start_ultra_crank_bot(&inner)?;
             }
+            // Nothing to do, no tasks are mainnet-only
             BotConfigByType::Mainnet { .. } => (),
         }
 

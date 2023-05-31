@@ -21,14 +21,12 @@ use crate::watcher::Watcher;
 
 use super::factory::get_factory_info;
 use super::factory::FactoryInfo;
-use super::faucet::FaucetBot;
 use super::gas_check::GasCheckBuilder;
 
 pub(crate) type GasRecords = VecDeque<(DateTime<Utc>, u128)>;
 pub(crate) struct App {
     factory: RwLock<Arc<FactoryInfo>>,
     pub(crate) frontend_info: FrontendInfo,
-    pub(crate) faucet_bot: Option<FaucetBot>,
     pub(crate) cosmos: Cosmos,
     pub(crate) config: BotConfig,
     pub(crate) client: Client,
@@ -71,7 +69,7 @@ impl Opt {
     }
 
     pub(crate) async fn into_app_builder(self) -> Result<AppBuilder> {
-        let config = self.get_bot_config()?;
+        let (config, faucet_bot_runner) = self.get_bot_config()?;
         let client = Client::builder().user_agent("perps-bots").build()?;
         let cosmos = self.make_cosmos(&config).await?;
 
@@ -108,27 +106,9 @@ impl Opt {
             log::info!("Discovered faucet contract: {}", faucet);
         }
 
-        let (faucet_bot, faucet_bot_runner) = match (&self.sub, &config.by_type) {
-            (
-                crate::cli::Sub::Testnet { inner: cli },
-                BotConfigByType::Testnet { inner: config },
-            ) => {
-                let faucet_bot_wallet = self.get_faucet_bot_wallet(cosmos.get_address_type())?;
-                let (x, y) = FaucetBot::new(
-                    faucet_bot_wallet,
-                    cli.hcaptcha_secret.clone(),
-                    config.clone(),
-                );
-                (Some(x), Some(y))
-            }
-            (crate::cli::Sub::Mainnet { .. }, BotConfigByType::Mainnet { .. }) => (None, None),
-            _ => anyhow::bail!("Invalid CLI/bot config combo"),
-        };
-
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
             frontend_info,
-            faucet_bot,
             cosmos,
             config,
             client,

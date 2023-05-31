@@ -11,7 +11,7 @@ use msg::{
 };
 use tokio::sync::mpsc::error::TrySendError;
 
-use crate::config::{BotConfigByType, BotConfigTestnet};
+use crate::config::BotConfigByType;
 
 use super::{App, AppBuilder};
 
@@ -28,21 +28,21 @@ pub(crate) struct FaucetBot {
     wallet_address: Address,
     hcaptcha_secret: String,
     tx: tokio::sync::mpsc::Sender<TapRequest>,
-    pub(crate) testnet: Arc<BotConfigTestnet>,
+    faucet: Address,
 }
 
 impl FaucetBot {
     pub(crate) fn new(
         wallet: Wallet,
         hcaptcha_secret: String,
-        testnet: Arc<BotConfigTestnet>,
+        faucet: Address,
     ) -> (Self, FaucetBotRunner) {
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         let bot = FaucetBot {
             wallet_address: wallet.get_address(),
             hcaptcha_secret,
             tx,
-            testnet,
+            faucet,
         };
         let runner = FaucetBotRunner { wallet, rx };
         (bot, runner)
@@ -63,7 +63,7 @@ impl FaucetBot {
         recipient: Address,
         cw20s: Vec<Address>,
     ) -> Result<Arc<String>, FaucetTapError> {
-        let contract = app.cosmos.make_contract(self.testnet.faucet);
+        let contract = app.cosmos.make_contract(self.faucet);
         match contract
             .query(QueryMsg::IsTapEligible {
                 addr: recipient.get_address_string().into(),
