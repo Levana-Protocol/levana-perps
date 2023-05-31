@@ -1,10 +1,12 @@
 use std::{
     collections::{HashSet, VecDeque},
+    fmt::Display,
     sync::Arc,
 };
 
 use crate::{
     app::App,
+    wallet_manager::ManagedWallet,
     watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
 };
 use anyhow::{Context, Result};
@@ -20,9 +22,37 @@ use super::AppBuilder;
 
 pub(crate) struct GasCheckBuilder {
     tracked_wallets: HashSet<Address>,
-    tracked_names: HashSet<String>,
+    tracked_names: HashSet<GasCheckWallet>,
     to_track: Vec<Tracked>,
     gas_wallet: Option<Arc<Wallet>>,
+}
+
+/// Description of which wallet is being tracked
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum GasCheckWallet {
+    FaucetBot,
+    FaucetContract,
+    GasWallet,
+    WalletManager,
+    Crank,
+    Price,
+    Managed(ManagedWallet),
+    UltraCrank(usize),
+}
+
+impl Display for GasCheckWallet {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            GasCheckWallet::FaucetBot => write!(f, "Faucet bot"),
+            GasCheckWallet::FaucetContract => write!(f, "Faucet contract"),
+            GasCheckWallet::GasWallet => write!(f, "Gas wallet"),
+            GasCheckWallet::WalletManager => write!(f, "Wallet manager"),
+            GasCheckWallet::Crank => write!(f, "Crank"),
+            GasCheckWallet::Price => write!(f, "Price"),
+            GasCheckWallet::Managed(x) => write!(f, "{x}"),
+            GasCheckWallet::UltraCrank(x) => write!(f, "Ultra crank #{x}"),
+        }
+    }
 }
 
 impl GasCheckBuilder {
@@ -38,13 +68,12 @@ impl GasCheckBuilder {
     pub(crate) fn add(
         &mut self,
         address: Address,
-        name: impl Into<String>,
+        name: GasCheckWallet,
         min_gas: u128,
         should_refill: bool,
     ) -> Result<()> {
-        let name = name.into();
         anyhow::ensure!(
-            self.tracked_names.insert(name.clone()),
+            self.tracked_names.insert(name),
             "Wallet name already in use: {name}"
         );
         anyhow::ensure!(
@@ -216,7 +245,7 @@ impl GasCheck {
 }
 
 struct Tracked {
-    name: String,
+    name: GasCheckWallet,
     address: Address,
     min_gas: u128,
     should_refill: bool,

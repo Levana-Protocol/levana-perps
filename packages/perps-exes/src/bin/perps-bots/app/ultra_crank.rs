@@ -12,6 +12,7 @@ use crate::config::BotConfigTestnet;
 use crate::watcher::{WatchedTaskOutput, WatchedTaskPerMarket};
 
 use super::factory::FactoryInfo;
+use super::gas_check::GasCheckWallet;
 use super::{App, AppBuilder};
 
 #[derive(Clone)]
@@ -31,7 +32,7 @@ impl AppBuilder {
             self.refill_gas(
                 testnet,
                 *wallet.address(),
-                format!("ultra-crank-bot-{index}"),
+                GasCheckWallet::UltraCrank(index),
             )?;
             let worker = Worker {
                 wallet,

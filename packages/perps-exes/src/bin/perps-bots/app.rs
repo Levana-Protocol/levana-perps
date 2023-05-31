@@ -17,6 +17,8 @@ pub(crate) use types::*;
 
 use crate::config::BotConfigByType;
 
+use self::gas_check::GasCheckWallet;
+
 impl AppBuilder {
     pub(crate) async fn load(&mut self) -> Result<()> {
         // Start the tasks that run on all deployments
@@ -35,16 +37,24 @@ impl AppBuilder {
 
                 // Establish some gas checks
                 let faucet_bot_address = inner.faucet_bot.get_wallet_address();
-                self.refill_gas(&inner, faucet_bot_address, "faucet-bot")?;
+                self.refill_gas(&inner, faucet_bot_address, GasCheckWallet::FaucetBot)?;
 
-                self.alert_on_low_gas(inner.faucet, "faucet", inner.min_gas_in_faucet)?;
+                self.alert_on_low_gas(
+                    inner.faucet,
+                    GasCheckWallet::FaucetContract,
+                    inner.min_gas_in_faucet,
+                )?;
                 if let Some(gas_wallet) = self.get_gas_wallet_address() {
-                    self.alert_on_low_gas(gas_wallet, "gas-wallet", inner.min_gas_in_gas_wallet)?;
+                    self.alert_on_low_gas(
+                        gas_wallet,
+                        GasCheckWallet::GasWallet,
+                        inner.min_gas_in_gas_wallet,
+                    )?;
                 }
                 self.refill_gas(
                     &inner,
                     inner.wallet_manager.get_minter_address(),
-                    "wallet-manager",
+                    GasCheckWallet::WalletManager,
                 )?;
 
                 // Launch testnet tasks

@@ -20,7 +20,7 @@ use crate::watcher::Watcher;
 
 use super::factory::get_factory_info;
 use super::factory::FactoryInfo;
-use super::gas_check::GasCheckBuilder;
+use super::gas_check::{GasCheckBuilder, GasCheckWallet};
 
 pub(crate) type GasRecords = VecDeque<(DateTime<Utc>, u128)>;
 pub(crate) struct App {
@@ -104,7 +104,7 @@ impl AppBuilder {
         &mut self,
         testnet: &BotConfigTestnet,
         address: Address,
-        wallet_name: impl Into<String>,
+        wallet_name: GasCheckWallet,
     ) -> Result<()> {
         self.gas_check
             .add(address, wallet_name, testnet.min_gas, true)
@@ -113,7 +113,7 @@ impl AppBuilder {
     pub(crate) fn alert_on_low_gas(
         &mut self,
         address: Address,
-        wallet_name: impl Into<String>,
+        wallet_name: GasCheckWallet,
         min_gas: u128,
     ) -> Result<()> {
         self.gas_check.add(address, wallet_name, min_gas, false)
@@ -130,7 +130,7 @@ impl AppBuilder {
         desc: ManagedWallet,
     ) -> Result<Wallet> {
         let wallet = testnet.wallet_manager.get_wallet(desc)?;
-        self.refill_gas(testnet, *wallet.address(), desc.to_string())?;
+        self.refill_gas(testnet, *wallet.address(), GasCheckWallet::Managed(desc))?;
         Ok(wallet)
     }
 

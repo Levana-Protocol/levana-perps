@@ -16,7 +16,7 @@ use crate::{
     watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
 };
 
-use super::{App, AppBuilder};
+use super::{gas_check::GasCheckWallet, App, AppBuilder};
 
 #[derive(Clone)]
 struct Worker {
@@ -30,12 +30,12 @@ impl AppBuilder {
             match &self.app.config.by_type {
                 BotConfigByType::Testnet { inner } => {
                     let inner = inner.clone();
-                    self.refill_gas(&inner, *price_wallet.address(), "price-bot")?;
+                    self.refill_gas(&inner, *price_wallet.address(), GasCheckWallet::Price)?;
                 }
                 BotConfigByType::Mainnet { inner } => {
                     self.alert_on_low_gas(
                         *price_wallet.address(),
-                        "price-bot",
+                        GasCheckWallet::Price,
                         inner.min_gas_price,
                     )?;
                 }

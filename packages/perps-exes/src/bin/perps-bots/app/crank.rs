@@ -9,6 +9,7 @@ use crate::config::BotConfigByType;
 use crate::watcher::{WatchedTaskOutput, WatchedTaskPerMarket};
 
 use super::factory::FactoryInfo;
+use super::gas_check::GasCheckWallet;
 use super::{App, AppBuilder};
 
 #[derive(Clone)]
@@ -23,11 +24,11 @@ impl AppBuilder {
             match &self.app.config.by_type {
                 BotConfigByType::Testnet { inner } => {
                     let inner = inner.clone();
-                    self.refill_gas(&inner, *crank_wallet.address(), "crank-bot")?
+                    self.refill_gas(&inner, *crank_wallet.address(), GasCheckWallet::Crank)?
                 }
                 BotConfigByType::Mainnet { inner } => self.alert_on_low_gas(
                     *crank_wallet.address(),
-                    "crank-bot",
+                    GasCheckWallet::Crank,
                     inner.min_gas_crank,
                 )?,
             }
