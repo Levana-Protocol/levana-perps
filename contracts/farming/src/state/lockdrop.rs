@@ -1,6 +1,7 @@
 use super::period::FarmingPeriod;
 use crate::prelude::*;
 use serde::{Deserialize, Serialize};
+use crate::prelude::farming::RawFarmerStats;
 use crate::state::period::LockdropDurations;
 
 //todo don't forget to set LVN_LOCKDROP_REWARDS
@@ -40,6 +41,15 @@ impl State<'_> {
         amount: NonZero<Collateral>,
     ) -> Result<()> {
         let period = self.get_period(ctx.storage)?;
+        let mut farmer_stats = match self.load_raw_farmer_stats(ctx.storage, &user)? {
+            None => RawFarmerStats::default(),
+            Some(farmer_stats) => farmer_stats
+        };
+
+        let farming_tokens = FarmingToken::from_decimal256(amount.into_decimal256());
+        farmer_stats.farming_tokens = farmer_stats.farming_tokens.checked_add(farming_tokens)?;
+        self.save_raw_farmer_stats(ctx.storage, &user, &farmer_stats)?;
+
         LockdropBuckets::update_balance(
             ctx.storage,
             bucket_id,
@@ -47,6 +57,7 @@ impl State<'_> {
             amount.into_number(),
             period,
         )?;
+
         Ok(())
     }
 
@@ -162,6 +173,7 @@ impl State<'_> {
         &self,
         store: &dyn Storage,
         user: &Addr,
+        stats: &RawFarmerStats
     ) -> Result<LvnToken> {
         let period = self.get_period_resp(store)?;
         let lockdrop_start = match period {
@@ -173,19 +185,18 @@ impl State<'_> {
             .now()
             .checked_sub(lockdrop_start, "claim_lockdrop_rewards")?;
         let total_user_rewards = self.calculate_lockdrop_rewards(store, user)?;
-        let stats = self.load_raw_farmer_stats(store, user)?;
 
         let amount = if elapsed_since_start >= lockdrop_config.lockdrop_lvn_unlock_seconds {
             total_user_rewards.checked_sub(stats.lockdrop_amount_collected)?
         } else {
-            let elapsed_since_last_collected = (self.now().checked_sub(
-                stats.lockdrop_last_collected,
+            let start_time = stats.lockdrop_last_collected.unwrap_or(lockdrop_start);
+            let elapsed_since_last_collected = self.now().checked_sub(
+                start_time,
                 "claim_lockdrop_rewards, elapsed_since_last_collected",
-            )?)
-            .as_nanos();
+            )?;
 
             let elapsed_ratio = Decimal256::from_ratio(
-                elapsed_since_last_collected,
+                elapsed_since_last_collected.as_nanos(),
                 lockdrop_config.lockdrop_lvn_unlock_seconds.as_nanos(),
             );
 

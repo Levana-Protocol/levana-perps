@@ -193,8 +193,9 @@ fn test_lockdrop_rewards() {
     market.exec_farming_start_launch(None).unwrap();
 
     // Jump halfway to the end of lockup period
+
     let unlock_duration: i64 = lockdrop_month_seconds().into();
-    // market.set_time(TimeJump::Seconds(unlock_duration / 2)).unwrap();
+    market.set_time(TimeJump::Seconds(unlock_duration / 2)).unwrap();
 
     let stats0 = market.query_farming_farmer_stats(&farmers[0]).unwrap();
     let stats1 = market.query_farming_farmer_stats(&farmers[1]).unwrap();
@@ -203,4 +204,16 @@ fn test_lockdrop_rewards() {
     assert_eq!(stats0.lockdrop_available, "5".parse().unwrap());
     assert_eq!(stats1.lockdrop_available, "14".parse().unwrap());
     assert_eq!(stats2.lockdrop_available, "26".parse().unwrap());
+
+    // Jump to the end of the lockup period
+
+    market.set_time(TimeJump::Seconds(unlock_duration / 2)).unwrap();
+
+    let stats0 = market.query_farming_farmer_stats(&farmers[0]).unwrap();
+    let stats1 = market.query_farming_farmer_stats(&farmers[1]).unwrap();
+    let stats2 = market.query_farming_farmer_stats(&farmers[2]).unwrap();
+
+    assert_eq!(stats0.lockdrop_available, "10".parse().unwrap());
+    assert_eq!(stats1.lockdrop_available, "28".parse().unwrap());
+    assert_eq!(stats2.lockdrop_available, "52".parse().unwrap());
 }

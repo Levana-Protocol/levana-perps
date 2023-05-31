@@ -344,6 +344,7 @@ pub struct LockdropBucketStats {
 
 /// Stats on a specific farmer
 #[cw_serde]
+#[derive(Default)]
 pub struct FarmerStats {
     /// Total farming tokens held
     pub farming_tokens: FarmingToken,
