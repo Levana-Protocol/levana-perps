@@ -116,7 +116,7 @@ pub(crate) fn babydragon_nft_mint_msg(
         .burn_metadata
         .attributes
         .as_ref()
-        .ok_or_else(|| anyhow!("no attributes"))?
+        .context("no attributes")?
         .iter()
         .filter(|attr| attr.trait_type != "Nesting Date")
         .cloned()
