@@ -23,6 +23,9 @@ enum Sub {
         /// Network to use.
         #[clap(long, env = "COSMOS_NETWORK")]
         network: CosmosNetwork,
+        /// Override the market code ID
+        #[clap(long)]
+        market_code_id: Option<u64>,
     },
     /// Instantiate a new factory contract
     InstantiateFactory {
@@ -43,8 +46,11 @@ enum Sub {
 
 pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
     match inner.sub {
-        Sub::StorePerpsContracts { network } => {
-            store_perps_contracts(opt, network).await?;
+        Sub::StorePerpsContracts {
+            network,
+            market_code_id,
+        } => {
+            store_perps_contracts(opt, network, market_code_id).await?;
         }
         Sub::InstantiateFactory { inner } => {
             instantiate_factory(opt, inner).await?;
@@ -150,7 +156,11 @@ struct StoredContract {
     code_ids: HashMap<CosmosNetwork, u64>,
 }
 
-async fn store_perps_contracts(opt: Opt, network: CosmosNetwork) -> Result<()> {
+async fn store_perps_contracts(
+    opt: Opt,
+    network: CosmosNetwork,
+    market_code_id: Option<u64>,
+) -> Result<()> {
     let app = opt.load_app_mainnet(Some(network), None).await?;
     let mut code_ids = CodeIds::load()?;
     let gitrev = opt.get_gitrev()?;
@@ -172,13 +182,22 @@ async fn store_perps_contracts(opt: Opt, network: CosmosNetwork) -> Result<()> {
                 log::info!("{contract_type:?} already found under code ID {code_id}");
             }
             None => {
-                log::info!("Storing {contract_type:?}...");
-                let code_id = app
-                    .cosmos
-                    .store_code_path(&app.wallet, &contract_path)
-                    .await?;
-                log::info!("New code ID: {code_id}");
-                entry.code_ids.insert(network, code_id.get_code_id());
+                let code_id = match (contract_type, market_code_id) {
+                    (ContractType::Market, Some(code_id)) => {
+                        log::info!("Using market code ID from the command line: {code_id}");
+                        code_id
+                    }
+                    _ => {
+                        log::info!("Storing {contract_type:?}...");
+                        let code_id = app
+                            .cosmos
+                            .store_code_path(&app.wallet, &contract_path)
+                            .await?;
+                        log::info!("New code ID: {code_id}");
+                        code_id.get_code_id()
+                    }
+                };
+                entry.code_ids.insert(network, code_id);
                 code_ids.save()?;
             }
         }

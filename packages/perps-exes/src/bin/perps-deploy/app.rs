@@ -56,6 +56,9 @@ impl Opt {
         if let Some(grpc) = &self.cosmos_grpc {
             builder.grpc_url = grpc.clone();
         }
+        if let Some(chain_id) = &self.cosmos_chain_id {
+            builder.chain_id = chain_id.clone();
+        }
         log::info!("Connecting to {}", builder.grpc_url);
 
         builder.build().await
