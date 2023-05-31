@@ -77,17 +77,55 @@ pub enum MarketError {
         max: Usd,
     },
     #[error("Cannot perform this action since it would exceed delta neutrality limits - protocol is already too long")]
-    DeltaNeutralityFeeAlreadyLong {},
+    DeltaNeutralityFeeAlreadyLong {
+        cap: Number,
+        sensitivity: Number,
+        instant_before: Number,
+        net_notional_before: Signed<Notional>,
+        net_notional_after: Signed<Notional>,
+    },
     #[error("Cannot perform this action since it would exceed delta neutrality limits - protocol is already too short")]
-    DeltaNeutralityFeeAlreadyShort {},
+    DeltaNeutralityFeeAlreadyShort {
+        cap: Number,
+        sensitivity: Number,
+        instant_before: Number,
+        net_notional_before: Signed<Notional>,
+        net_notional_after: Signed<Notional>,
+    },
     #[error("Cannot perform this action since it would exceed delta neutrality limits - protocol would become too long")]
-    DeltaNeutralityFeeNewlyLong {},
+    DeltaNeutralityFeeNewlyLong {
+        cap: Number,
+        sensitivity: Number,
+        instant_after: Number,
+        net_notional_before: Signed<Notional>,
+        net_notional_after: Signed<Notional>,
+    },
     #[error( "Cannot perform this action since it would exceed delta neutrality limits - protocol would become too short")]
-    DeltaNeutralityFeeNewlyShort {},
+    DeltaNeutralityFeeNewlyShort {
+        cap: Number,
+        sensitivity: Number,
+        instant_after: Number,
+        net_notional_before: Signed<Notional>,
+        net_notional_after: Signed<Notional>,
+    },
     #[error("Cannot perform this action since it would exceed delta neutrality limits - protocol would go from too long to too short")]
-    DeltaNeutralityFeeLongToShort {},
+    DeltaNeutralityFeeLongToShort {
+        cap: Number,
+        sensitivity: Number,
+        instant_before: Number,
+        instant_after: Number,
+        net_notional_before: Signed<Notional>,
+        net_notional_after: Signed<Notional>,
+    },
     #[error( "Cannot perform this action since it would exceed delta neutrality limits - protocol would go from too short to too long")]
-    DeltaNeutralityFeeShortToLong {},
+    DeltaNeutralityFeeShortToLong {
+        cap: Number,
+        sensitivity: Number,
+        instant_before: Number,
+        instant_after: Number,
+        net_notional_before: Signed<Notional>,
+        net_notional_after: Signed<Notional>,
+    },
 }
 
 /// What was the user doing when they hit the congestion error message?

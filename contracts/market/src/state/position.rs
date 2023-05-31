@@ -122,24 +122,84 @@ impl PositionOrId {
     }
 }
 
-fn already(dir: DirectionToBase) -> MarketError {
+fn already(
+    dir: DirectionToBase,
+    cap: Number,
+    sensitivity: Number,
+    instant_before: Number,
+    net_notional_before: Signed<Notional>,
+    net_notional_after: Signed<Notional>,
+) -> MarketError {
     match dir {
-        DirectionToBase::Long => MarketError::DeltaNeutralityFeeAlreadyLong {},
-        DirectionToBase::Short => MarketError::DeltaNeutralityFeeAlreadyShort {},
+        DirectionToBase::Long => MarketError::DeltaNeutralityFeeAlreadyLong {
+            cap,
+            sensitivity,
+            instant_before,
+            net_notional_before,
+            net_notional_after,
+        },
+        DirectionToBase::Short => MarketError::DeltaNeutralityFeeAlreadyShort {
+            cap,
+            sensitivity,
+            instant_before,
+            net_notional_before,
+            net_notional_after,
+        },
     }
 }
 
-fn newly(dir: DirectionToBase) -> MarketError {
+fn newly(
+    dir: DirectionToBase,
+    cap: Number,
+    sensitivity: Number,
+    instant_after: Number,
+    net_notional_before: Signed<Notional>,
+    net_notional_after: Signed<Notional>,
+) -> MarketError {
     match dir {
-        DirectionToBase::Long => MarketError::DeltaNeutralityFeeNewlyLong {},
-        DirectionToBase::Short => MarketError::DeltaNeutralityFeeNewlyShort {},
+        DirectionToBase::Long => MarketError::DeltaNeutralityFeeNewlyLong {
+            cap,
+            sensitivity,
+            instant_after,
+            net_notional_before,
+            net_notional_after,
+        },
+        DirectionToBase::Short => MarketError::DeltaNeutralityFeeNewlyShort {
+            cap,
+            sensitivity,
+            instant_after,
+            net_notional_before,
+            net_notional_after,
+        },
     }
 }
 
-fn flipped(dir: DirectionToBase) -> MarketError {
+fn flipped(
+    dir: DirectionToBase,
+    cap: Number,
+    sensitivity: Number,
+    instant_before: Number,
+    instant_after: Number,
+    net_notional_before: Signed<Notional>,
+    net_notional_after: Signed<Notional>,
+) -> MarketError {
     match dir {
-        DirectionToBase::Long => MarketError::DeltaNeutralityFeeShortToLong {},
-        DirectionToBase::Short => MarketError::DeltaNeutralityFeeLongToShort {},
+        DirectionToBase::Long => MarketError::DeltaNeutralityFeeShortToLong {
+            cap,
+            sensitivity,
+            instant_before,
+            instant_after,
+            net_notional_before,
+            net_notional_after,
+        },
+        DirectionToBase::Short => MarketError::DeltaNeutralityFeeLongToShort {
+            cap,
+            sensitivity,
+            instant_before,
+            instant_after,
+            net_notional_before,
+            net_notional_after,
+        },
     }
 }
 
@@ -278,11 +338,26 @@ impl State<'_> {
             let res = if is_capped_low_before {
                 match notional_direction {
                     // We were already too short, disallow going shorter
-                    DirectionToNotional::Short => Err(already(base_direction)),
+                    DirectionToNotional::Short => Err(already(
+                        base_direction,
+                        cap,
+                        sensitivity,
+                        instant_delta_neutrality_before_uncapped,
+                        net_notional_before,
+                        net_notional_after,
+                    )),
                     // We don't allow the user to swing the market all the way from capped low to capped high
                     DirectionToNotional::Long => {
                         if is_capped_high_after {
-                            Err(flipped(base_direction))
+                            Err(flipped(
+                                base_direction,
+                                cap,
+                                sensitivity,
+                                instant_delta_neutrality_before_uncapped,
+                                instant_delta_neutrality_after_uncapped,
+                                net_notional_before,
+                                net_notional_after,
+                            ))
                         } else {
                             Ok(())
                         }
@@ -291,11 +366,26 @@ impl State<'_> {
             } else if is_capped_high_before {
                 match notional_direction {
                     // We were already too long, disallow going longer
-                    DirectionToNotional::Long => Err(already(base_direction)),
+                    DirectionToNotional::Long => Err(already(
+                        base_direction,
+                        cap,
+                        sensitivity,
+                        instant_delta_neutrality_before_uncapped,
+                        net_notional_before,
+                        net_notional_after,
+                    )),
                     // We don't allow the user to swing the market all the way from capped high to capped low
                     DirectionToNotional::Short => {
                         if is_capped_low_after {
-                            Err(flipped(base_direction))
+                            Err(flipped(
+                                base_direction,
+                                cap,
+                                sensitivity,
+                                instant_delta_neutrality_before_uncapped,
+                                instant_delta_neutrality_after_uncapped,
+                                net_notional_before,
+                                net_notional_after,
+                            ))
                         } else {
                             Ok(())
                         }
@@ -303,10 +393,24 @@ impl State<'_> {
                 }
             } else if is_capped_low_after {
                 debug_assert!(notional_size_diff <= Signed::zero());
-                Err(newly(base_direction))
+                Err(newly(
+                    base_direction,
+                    cap,
+                    sensitivity,
+                    instant_delta_neutrality_after_uncapped,
+                    net_notional_before,
+                    net_notional_after,
+                ))
             } else if is_capped_high_after {
                 debug_assert!(notional_size_diff >= Signed::zero());
-                Err(newly(base_direction))
+                Err(newly(
+                    base_direction,
+                    cap,
+                    sensitivity,
+                    instant_delta_neutrality_after_uncapped,
+                    net_notional_before,
+                    net_notional_after,
+                ))
             } else {
                 Ok(())
             };
