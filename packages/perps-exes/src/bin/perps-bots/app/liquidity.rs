@@ -8,6 +8,7 @@ use perps_exes::{config::LiquidityConfig, prelude::*};
 
 use crate::{
     config::BotConfigTestnet,
+    wallet_manager::ManagedWallet,
     watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
 };
 
@@ -21,19 +22,17 @@ pub(super) struct Liquidity {
 }
 
 impl AppBuilder {
-    pub(super) fn launch_liquidity(
-        &mut self,
-        wallet: Wallet,
-        liquidity_config: LiquidityConfig,
-        testnet: Arc<BotConfigTestnet>,
-    ) -> Result<()> {
-        let liquidity = Liquidity {
-            app: self.app.clone(),
-            liquidity_config,
-            wallet,
-            testnet,
-        };
-        self.watch_periodic(crate::watcher::TaskLabel::Liquidity, liquidity)
+    pub(super) fn launch_liquidity(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
+        if let Some(liquidity_config) = &testnet.liquidity_config {
+            let liquidity = Liquidity {
+                app: self.app.clone(),
+                liquidity_config: liquidity_config.clone(),
+                wallet: self.get_track_wallet(&testnet, ManagedWallet::Liquidity)?,
+                testnet,
+            };
+            self.watch_periodic(crate::watcher::TaskLabel::Liquidity, liquidity)?;
+        }
+        Ok(())
     }
 }
 

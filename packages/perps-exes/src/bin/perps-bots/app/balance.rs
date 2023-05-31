@@ -9,6 +9,7 @@ use perps_exes::contracts::MarketContract;
 use crate::{
     app::trader::EnsureCollateral,
     config::BotConfigTestnet,
+    wallet_manager::ManagedWallet,
     watcher::{TaskLabel, WatchedTaskOutput, WatchedTaskPerMarket},
 };
 
@@ -63,17 +64,16 @@ struct Balance {
 }
 
 impl AppBuilder {
-    pub(super) fn launch_balance(
-        &mut self,
-        wallet: Wallet,
-        testnet: Arc<BotConfigTestnet>,
-    ) -> Result<()> {
-        let balance = Balance {
-            app: self.app.clone(),
-            wallet,
-            testnet,
-        };
-        self.watch_periodic(TaskLabel::Balance, balance)
+    pub(super) fn launch_balance(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
+        if testnet.balance {
+            let balance = Balance {
+                app: self.app.clone(),
+                wallet: self.get_track_wallet(&testnet, ManagedWallet::Balance)?,
+                testnet,
+            };
+            self.watch_periodic(TaskLabel::Balance, balance)?;
+        }
+        Ok(())
     }
 }
 

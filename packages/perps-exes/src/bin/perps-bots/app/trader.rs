@@ -9,6 +9,7 @@ use rand::Rng;
 
 use crate::{
     config::BotConfigTestnet,
+    wallet_manager::ManagedWallet,
     watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
 };
 
@@ -22,20 +23,21 @@ pub(super) struct Trader {
 }
 
 impl AppBuilder {
-    pub(super) fn launch_trader(
-        &mut self,
-        wallet: Wallet,
-        index: u32,
-        config: TraderConfig,
-        testnet: Arc<BotConfigTestnet>,
-    ) -> Result<()> {
-        let trader = Trader {
-            app: self.app.clone(),
-            wallet,
-            config,
-            testnet,
-        };
-        self.watch_periodic(crate::watcher::TaskLabel::Trader { index }, trader)
+    pub(super) fn launch_traders(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
+        if let Some((traders, config)) = testnet.trader_config {
+            for index in 1..=traders {
+                let wallet = self.get_track_wallet(&testnet, ManagedWallet::Trader(index))?;
+                let trader = Trader {
+                    app: self.app.clone(),
+                    wallet,
+                    config,
+                    testnet: testnet.clone(),
+                };
+                self.watch_periodic(crate::watcher::TaskLabel::Trader { index }, trader)?;
+            }
+        }
+
+        Ok(())
     }
 }
 

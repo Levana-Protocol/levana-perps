@@ -7,6 +7,7 @@ use perps_exes::{config::UtilizationConfig, prelude::*};
 
 use crate::{
     config::BotConfigTestnet,
+    wallet_manager::ManagedWallet,
     watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
 };
 
@@ -20,19 +21,17 @@ pub(super) struct Utilization {
 }
 
 impl AppBuilder {
-    pub(super) fn launch_utilization(
-        &mut self,
-        wallet: Wallet,
-        config: UtilizationConfig,
-        testnet: Arc<BotConfigTestnet>,
-    ) -> Result<()> {
-        let util = Utilization {
-            app: self.app.clone(),
-            wallet,
-            config,
-            testnet,
-        };
-        self.watch_periodic(crate::watcher::TaskLabel::Utilization, util)
+    pub(super) fn launch_utilization(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
+        if let Some(config) = testnet.utilization_config {
+            let util = Utilization {
+                app: self.app.clone(),
+                wallet: self.get_track_wallet(&testnet, ManagedWallet::Utilization)?,
+                config,
+                testnet,
+            };
+            self.watch_periodic(crate::watcher::TaskLabel::Utilization, util)?;
+        }
+        Ok(())
     }
 }
 

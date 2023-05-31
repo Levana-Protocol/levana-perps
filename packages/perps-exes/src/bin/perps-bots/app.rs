@@ -15,7 +15,7 @@ mod utilization;
 use anyhow::Result;
 pub(crate) use types::*;
 
-use crate::{config::BotConfigByType, wallet_manager::ManagedWallet};
+use crate::config::BotConfigByType;
 
 impl AppBuilder {
     pub(crate) async fn load(&mut self) -> Result<()> {
@@ -28,10 +28,12 @@ impl AppBuilder {
         self.start_price().await?;
 
         match &self.app.config.by_type {
+            // Run tasks that can only run in testnet.
             BotConfigByType::Testnet { inner } => {
-                // Run tasks that can only run in testnet.
+                // Deal with the borrow checker by not keeping a reference to self borrowed
                 let inner = inner.clone();
 
+                // Establish some gas checks
                 let faucet_bot_address = inner.faucet_bot.get_wallet_address();
                 self.refill_gas(&inner, faucet_bot_address, "faucet-bot")?;
 
@@ -44,33 +46,12 @@ impl AppBuilder {
                     inner.wallet_manager.get_minter_address(),
                     "wallet-manager",
                 )?;
-                if inner.balance {
-                    let balance_wallet = self.get_track_wallet(&inner, ManagedWallet::Balance)?;
-                    self.launch_balance(balance_wallet, inner.clone())?;
-                }
 
-                if let Some(liquidity_config) = &inner.liquidity_config {
-                    let liquidity_wallet =
-                        self.get_track_wallet(&inner, ManagedWallet::Liquidity)?;
-                    self.launch_liquidity(
-                        liquidity_wallet,
-                        liquidity_config.clone(),
-                        inner.clone(),
-                    )?;
-                }
-
-                if let Some(utilization_config) = inner.utilization_config {
-                    let utilization_wallet =
-                        self.get_track_wallet(&inner, ManagedWallet::Utilization)?;
-                    self.launch_utilization(utilization_wallet, utilization_config, inner.clone())?;
-                }
-
-                if let Some((traders, trader_config)) = inner.trader_config {
-                    for index in 1..=traders {
-                        let wallet = self.get_track_wallet(&inner, ManagedWallet::Trader(index))?;
-                        self.launch_trader(wallet, index, trader_config, inner.clone())?;
-                    }
-                }
+                // Launch testnet tasks
+                self.launch_balance(inner.clone())?;
+                self.launch_liquidity(inner.clone())?;
+                self.launch_utilization(inner.clone())?;
+                self.launch_traders(inner.clone())?;
                 self.start_ultra_crank_bot(&inner)?;
             }
             // Nothing to do, no tasks are mainnet-only
