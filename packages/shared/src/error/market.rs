@@ -76,6 +76,56 @@ pub enum MarketError {
         deposit: Usd,
         max: Usd,
     },
+    #[error("Cannot perform this action since it would exceed delta neutrality limits - protocol is already too long")]
+    DeltaNeutralityFeeAlreadyLong {
+        cap: Number,
+        sensitivity: Number,
+        instant_before: Number,
+        net_notional_before: Signed<Notional>,
+        net_notional_after: Signed<Notional>,
+    },
+    #[error("Cannot perform this action since it would exceed delta neutrality limits - protocol is already too short")]
+    DeltaNeutralityFeeAlreadyShort {
+        cap: Number,
+        sensitivity: Number,
+        instant_before: Number,
+        net_notional_before: Signed<Notional>,
+        net_notional_after: Signed<Notional>,
+    },
+    #[error("Cannot perform this action since it would exceed delta neutrality limits - protocol would become too long")]
+    DeltaNeutralityFeeNewlyLong {
+        cap: Number,
+        sensitivity: Number,
+        instant_after: Number,
+        net_notional_before: Signed<Notional>,
+        net_notional_after: Signed<Notional>,
+    },
+    #[error( "Cannot perform this action since it would exceed delta neutrality limits - protocol would become too short")]
+    DeltaNeutralityFeeNewlyShort {
+        cap: Number,
+        sensitivity: Number,
+        instant_after: Number,
+        net_notional_before: Signed<Notional>,
+        net_notional_after: Signed<Notional>,
+    },
+    #[error("Cannot perform this action since it would exceed delta neutrality limits - protocol would go from too long to too short")]
+    DeltaNeutralityFeeLongToShort {
+        cap: Number,
+        sensitivity: Number,
+        instant_before: Number,
+        instant_after: Number,
+        net_notional_before: Signed<Notional>,
+        net_notional_after: Signed<Notional>,
+    },
+    #[error( "Cannot perform this action since it would exceed delta neutrality limits - protocol would go from too short to too long")]
+    DeltaNeutralityFeeShortToLong {
+        cap: Number,
+        sensitivity: Number,
+        instant_before: Number,
+        instant_after: Number,
+        net_notional_before: Signed<Notional>,
+        net_notional_after: Signed<Notional>,
+    },
 }
 
 /// What was the user doing when they hit the congestion error message?
@@ -141,6 +191,22 @@ impl MarketError {
             MarketError::MinimumDeposit { .. } => ErrorId::MinimumDeposit,
             MarketError::Congestion { .. } => ErrorId::Congestion,
             MarketError::MaxLiquidity { .. } => ErrorId::MaxLiquidity,
+            MarketError::DeltaNeutralityFeeAlreadyLong { .. } => {
+                ErrorId::DeltaNeutralityFeeAlreadyLong
+            }
+            MarketError::DeltaNeutralityFeeAlreadyShort { .. } => {
+                ErrorId::DeltaNeutralityFeeAlreadyShort
+            }
+            MarketError::DeltaNeutralityFeeNewlyLong { .. } => ErrorId::DeltaNeutralityFeeNewlyLong,
+            MarketError::DeltaNeutralityFeeNewlyShort { .. } => {
+                ErrorId::DeltaNeutralityFeeNewlyShort
+            }
+            MarketError::DeltaNeutralityFeeLongToShort { .. } => {
+                ErrorId::DeltaNeutralityFeeLongToShort
+            }
+            MarketError::DeltaNeutralityFeeShortToLong { .. } => {
+                ErrorId::DeltaNeutralityFeeShortToLong
+            }
         }
     }
 }

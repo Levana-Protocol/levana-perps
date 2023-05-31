@@ -5,6 +5,7 @@ use axum::async_trait;
 use cosmos::{Address, Cosmos, Wallet};
 use msg::prelude::*;
 use perps_exes::contracts::MarketContract;
+use rand::Rng;
 
 use crate::{
     app::trader::EnsureCollateral,
@@ -144,10 +145,30 @@ async fn single_market(
         status.liquidity.unlocked.into_decimal256() / Decimal256::from_str("1.5").unwrap();
 
     let price = market.current_price().await?;
+
+    let leverage = LeverageToBase::from_str("2").unwrap();
+
+    // We need to divide the desired notional impact by the leverage we'll be using.
+    // We calculate this "leverage divider" by converting our actual leverage value
+    // into notional leverage and then getting its absolute value.
+    let leverage_divider = leverage
+        .into_signed(direction)
+        .into_notional(market_id.get_market_type())
+        .into_number()
+        .abs_unsigned();
+
+    // Introduce a randomization factor as well
+    let random_multiplier = {
+        let mut rng = rand::thread_rng();
+        let percent = rng.gen_range(80..=100u32);
+        Decimal256::from_ratio(percent, 100u32)
+    };
+
     let collateral_for_balance = price
         .notional_to_collateral(Notional::from_decimal256(net_notional.abs_unsigned()))
         .into_decimal256()
-        / Decimal256::two();
+        .checked_div(leverage_divider)?
+        .checked_mul(random_multiplier)?;
     log::info!("collateral_for_balance: {}", collateral_for_balance);
 
     let needed_collateral = Collateral::from_decimal256(
@@ -190,7 +211,7 @@ async fn single_market(
             &status,
             needed_collateral,
             direction,
-            "2".parse().unwrap(),
+            leverage,
             "0.5".parse().unwrap(),
             None,
             None,
