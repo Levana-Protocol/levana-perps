@@ -25,7 +25,7 @@ impl AppBuilder {
     pub(super) fn launch_trader(
         &mut self,
         wallet: Wallet,
-        index: usize,
+        index: u32,
         config: TraderConfig,
         testnet: Arc<BotConfigTestnet>,
     ) -> Result<()> {

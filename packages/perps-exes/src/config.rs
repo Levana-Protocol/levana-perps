@@ -110,7 +110,7 @@ pub struct DeploymentConfigTestnet {
     #[serde(default)]
     pub balance: bool,
     #[serde(default)]
-    pub traders: usize,
+    pub traders: u32,
     pub default_market_ids: Vec<MarketId>,
     #[serde(default)]
     pub ignore_stale: bool,

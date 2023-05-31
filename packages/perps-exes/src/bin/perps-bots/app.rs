@@ -15,7 +15,7 @@ mod utilization;
 use anyhow::Result;
 pub(crate) use types::*;
 
-use crate::config::BotConfigByType;
+use crate::{config::BotConfigByType, wallet_manager::ManagedWallet};
 
 impl AppBuilder {
     pub(crate) async fn load(&mut self) -> Result<()> {
@@ -46,12 +46,13 @@ impl AppBuilder {
                     "wallet-manager",
                 )?;
                 if inner.balance {
-                    let balance_wallet = self.get_track_wallet(&inner, "balance")?;
+                    let balance_wallet = self.get_track_wallet(&inner, ManagedWallet::Balance)?;
                     self.launch_balance(balance_wallet, inner.clone())?;
                 }
 
                 if let Some(liquidity_config) = &inner.liquidity_config {
-                    let liquidity_wallet = self.get_track_wallet(&inner, "liquidity")?;
+                    let liquidity_wallet =
+                        self.get_track_wallet(&inner, ManagedWallet::Liquidity)?;
                     self.launch_liquidity(
                         liquidity_wallet,
                         liquidity_config.clone(),
@@ -60,13 +61,14 @@ impl AppBuilder {
                 }
 
                 if let Some(utilization_config) = inner.utilization_config {
-                    let utilization_wallet = self.get_track_wallet(&inner, "utilization")?;
+                    let utilization_wallet =
+                        self.get_track_wallet(&inner, ManagedWallet::Utilization)?;
                     self.launch_utilization(utilization_wallet, utilization_config, inner.clone())?;
                 }
 
                 if let Some((traders, trader_config)) = inner.trader_config {
                     for index in 1..=traders {
-                        let wallet = self.get_track_wallet(&inner, format!("Trader #{index}"))?;
+                        let wallet = self.get_track_wallet(&inner, ManagedWallet::Trader(index))?;
                         self.launch_trader(wallet, index, trader_config, inner.clone())?;
                     }
                 }

@@ -51,7 +51,7 @@ pub(crate) struct TestnetOpt {
     pub(crate) maintenance: Option<String>,
     /// Override the number of trading bots to run
     #[clap(long, env = "LEVANA_BOTS_TRADERS")]
-    pub(crate) traders: Option<usize>,
+    pub(crate) traders: Option<u32>,
     /// Override the contents of the DeploymentConfig in YAML format
     #[clap(long, env = "LEVANA_BOTS_DEPLOYMENT_CONFIG")]
     pub(crate) deployment_config: Option<String>,

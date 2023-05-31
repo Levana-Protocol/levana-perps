@@ -38,7 +38,7 @@ pub(crate) enum TaskLabel {
     Utilization,
     Balance,
     UltraCrank { index: usize },
-    Trader { index: usize },
+    Trader { index: u32 },
 }
 
 impl Display for TaskLabel {

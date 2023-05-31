@@ -15,6 +15,7 @@ use reqwest::Client;
 
 use crate::cli::Opt;
 use crate::config::{BotConfig, BotConfigByType, BotConfigTestnet};
+use crate::wallet_manager::ManagedWallet;
 use crate::watcher::TaskStatuses;
 use crate::watcher::Watcher;
 
@@ -178,11 +179,10 @@ impl AppBuilder {
     pub(crate) fn get_track_wallet(
         &mut self,
         testnet: &BotConfigTestnet,
-        wallet_name: impl Into<String>,
+        desc: ManagedWallet,
     ) -> Result<Wallet> {
-        let wallet_name = wallet_name.into();
-        let wallet = testnet.wallet_manager.get_wallet(&wallet_name)?;
-        self.refill_gas(testnet, *wallet.address(), wallet_name)?;
+        let wallet = testnet.wallet_manager.get_wallet(desc)?;
+        self.refill_gas(testnet, *wallet.address(), desc.to_string())?;
         Ok(wallet)
     }
 

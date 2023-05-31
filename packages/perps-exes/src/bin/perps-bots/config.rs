@@ -40,7 +40,7 @@ pub(crate) struct BotConfigTestnet {
     pub(crate) ultra_crank_wallets: Vec<Wallet>,
     pub(crate) liquidity_config: Option<LiquidityConfig>,
     pub(crate) utilization_config: Option<UtilizationConfig>,
-    pub(crate) trader_config: Option<(usize, TraderConfig)>,
+    pub(crate) trader_config: Option<(u32, TraderConfig)>,
     pub(crate) ignore_stale: bool,
     pub(crate) rpc_nodes: Vec<Arc<String>>,
     pub(crate) seconds_till_ultra: u32,
@@ -170,10 +170,12 @@ impl Opt {
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let pyth_config = PythConfig::load()?;
-        // FIXME don't use WalletManager here
-        let wallet_manager = WalletManager::new(seed.clone(), network.get_address_type())?;
-        let price_wallet = wallet_manager.get_wallet("price")?;
-        let crank_wallet = wallet_manager.get_wallet("crank")?;
+        let price_wallet = seed
+            .derive_cosmos_numbered(1)?
+            .for_chain(network.get_address_type());
+        let crank_wallet = seed
+            .derive_cosmos_numbered(2)?
+            .for_chain(network.get_address_type());
         let watcher = match watcher_config {
             Some(yaml) => serde_yaml::from_str(yaml).context("Invalid watcher config on CLI")?,
             None => WatcherConfig::default(),
