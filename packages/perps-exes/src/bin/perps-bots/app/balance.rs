@@ -150,16 +150,11 @@ async fn single_market(
     // We need to divide the desired notional impact by the leverage we'll be using.
     // We calculate this "leverage divider" by converting our actual leverage value
     // into notional leverage and then getting its absolute value.
-    //
-    // We then multiply the divider by an extra factor to account for random
-    // variability in the market (like other positions being opened/closed
-    // between our query and landing the transaction).
     let leverage_divider = leverage
         .into_signed(direction)
         .into_notional(market_id.get_market_type())
         .into_number()
-        .abs_unsigned()
-        .checked_mul("1.3".parse().unwrap())?;
+        .abs_unsigned();
 
     let collateral_for_balance = price
         .notional_to_collateral(Notional::from_decimal256(net_notional.abs_unsigned()))
