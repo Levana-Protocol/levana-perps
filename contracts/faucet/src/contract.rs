@@ -319,6 +319,16 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 state.get_history(store, &asset, timestamp.unwrap_or_else(|| state.now()))?;
             FundsSentResponse { amount }.query_result()
         }
+        QueryMsg::Tappers { start_after, limit } => {
+            let (state, store) = State::new(deps, env);
+            let start_after = match start_after {
+                Some(raw) => Some(raw.validate(deps.api)?),
+                None => None,
+            };
+            state
+                .tappers(store, start_after, limit.unwrap_or(30))?
+                .query_result()
+        }
     }
 }
 

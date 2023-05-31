@@ -149,6 +149,13 @@ pub enum QueryMsg {
         asset: FaucetAsset,
         timestamp: Option<Timestamp>,
     },
+
+    /// Enumerate all wallets that tapped the faucet
+    #[returns(TappersResp)]
+    Tappers {
+        start_after: Option<RawAddr>,
+        limit: Option<u32>,
+    },
 }
 
 #[cw_serde]
@@ -215,4 +222,9 @@ pub enum TapAmountResponse {
 #[cw_serde]
 pub struct FundsSentResponse {
     pub amount: Decimal256,
+}
+
+#[cw_serde]
+pub struct TappersResp {
+    pub tappers: Vec<Addr>,
 }

@@ -4,7 +4,10 @@ use cosmwasm_std::{Addr, BankMsg, Coin, CosmosMsg, Uint128};
 use cw_storage_plus::{Item, Map};
 use msg::contracts::{
     cw20::entry::{ExecuteMsg as Cw20ExecuteMsg, QueryMsg as Cw20QueryMsg, TokenInfoResponse},
-    faucet::{entry::FaucetAsset, events::TapEvent},
+    faucet::{
+        entry::{FaucetAsset, TappersResp},
+        events::TapEvent,
+    },
 };
 use msg::prelude::*;
 use shared::namespace;
@@ -265,6 +268,21 @@ impl State<'_> {
                 .save(ctx.storage, denom, &amount)
                 .map_err(|err| err.into()),
         }
+    }
+
+    pub(crate) fn tappers(
+        &self,
+        store: &dyn Storage,
+        start_after: Option<Addr>,
+        limit: u32,
+    ) -> Result<TappersResp> {
+        let start_after = start_after.as_ref().map(Bound::exclusive);
+        Ok(TappersResp {
+            tappers: LAST_TAP_TIMESTAMP
+                .keys(store, start_after, None, Order::Ascending)
+                .take(limit.try_into()?)
+                .collect::<Result<_, _>>()?,
+        })
     }
 }
 

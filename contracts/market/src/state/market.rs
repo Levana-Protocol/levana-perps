@@ -97,6 +97,40 @@ impl State<'_> {
         }
     }
 
+    pub(crate) fn historical_spot_prices(
+        &self,
+        store: &dyn Storage,
+        start_after: Option<Timestamp>,
+        limit: Option<usize>,
+        order: Option<Order>,
+    ) -> Result<Vec<PricePoint>> {
+        let order = order.unwrap_or(Order::Descending);
+        let iter = PRICES
+            .range(
+                store,
+                match order {
+                    Order::Ascending => start_after.map(Bound::exclusive),
+                    Order::Descending => None,
+                },
+                match order {
+                    Order::Ascending => None,
+                    Order::Descending => start_after.map(Bound::exclusive),
+                },
+                order,
+            )
+            .map(|res| {
+                let (timestamp, price_storage) = res?;
+                self.make_price_point(store, timestamp, price_storage)
+            });
+
+        let prices = match limit {
+            None => iter.collect::<Result<Vec<_>>>()?,
+            Some(limit) => iter.take(limit).collect::<Result<Vec<_>>>()?,
+        };
+
+        Ok(prices)
+    }
+
     /// Get the latest spot price, if one is set.
     pub(crate) fn spot_price_latest_opt(&self, store: &dyn Storage) -> Result<Option<PricePoint>> {
         if let Some(x) = self.spot_price_cache.get() {

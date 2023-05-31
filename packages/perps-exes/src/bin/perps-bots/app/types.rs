@@ -1,3 +1,4 @@
+use std::collections::{HashMap, VecDeque};
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -22,6 +23,7 @@ use super::factory::FactoryInfo;
 use super::faucet::FaucetBot;
 use super::gas_check::GasCheckBuilder;
 
+pub(crate) type GasRecords = VecDeque<(DateTime<Utc>, u128)>;
 pub(crate) struct App {
     factory: RwLock<Arc<FactoryInfo>>,
     pub(crate) frontend_info: FrontendInfo,
@@ -32,6 +34,7 @@ pub(crate) struct App {
     pub(crate) bind: SocketAddr,
     pub(crate) statuses: TaskStatuses,
     pub(crate) live_since: DateTime<Utc>,
+    pub(crate) gases: RwLock<HashMap<Address, GasRecords>>,
 }
 
 #[derive(serde::Serialize)]
@@ -95,6 +98,7 @@ impl Opt {
             bind: self.bind,
             statuses: TaskStatuses::default(),
             live_since: Utc::now(),
+            gases: RwLock::new(HashMap::new()),
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {

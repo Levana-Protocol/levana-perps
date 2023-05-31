@@ -70,6 +70,10 @@ fn pending_fees_in_query() {
     market.exec_crank_till_finished(&trader).unwrap();
     market.set_time(TimeJump::Blocks(1)).unwrap();
 
+    // Get the position information without fees so we can properly test the DNF
+    // amount below.
+    let pos_no_fees = market.query_position(pos_id).unwrap();
+
     let pos = market.query_position_with_pending_fees(pos_id).unwrap();
     assert_ne!(pos.borrow_fee_collateral, Collateral::zero());
     assert_ne!(pos.borrow_fee_usd, Usd::zero());
@@ -77,8 +81,19 @@ fn pending_fees_in_query() {
     assert_ne!(pos.funding_fee_usd, Signed::<Usd>::zero());
     assert_ne!(pos_orig.liquidation_margin, pos.liquidation_margin);
 
+    // We want to check that the dnf_on_close_collateral field is accurate by
+    // comparing the fees before and after closing versus this value.
+    let dnf_on_close = pos.dnf_on_close_collateral.unwrap();
+
     // Actually close and make sure it matches
     market.exec_close_position(&trader, pos_id, None).unwrap();
     let closed = market.query_closed_position(&trader, pos_id).unwrap();
     assert_eq!(closed.pnl_collateral, pos.pnl_collateral);
+
+    // Ensure that the DNF before closing (taken from pos_no_fees) plus the
+    // calculated DNF amount equals the final DNF value.
+    assert_eq!(
+        pos_no_fees.delta_neutrality_fee_collateral + dnf_on_close,
+        closed.delta_neutrality_fee_collateral
+    );
 }

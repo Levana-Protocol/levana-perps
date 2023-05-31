@@ -225,8 +225,6 @@ fn liquidation_prices(store: &dyn Storage, _env: &Env) -> Result<()> {
             Some(_) => {
                 ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
                 ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
-                ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
-                ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
             }
         }
     }

@@ -21,12 +21,12 @@ pub fn lockdrop_buckets() -> Vec<LockdropBucketConfig> {
         }
     }
     vec![
-        go(1, "1"),
-        go(3, "3.3"),
-        go(6, "7.8"),
-        go(9, "12"),
-        go(12, "17"),
-        go(18, "24"),
+        go(3, "1"),
+        go(6, "2.8"),
+        go(9, "5.2"),
+        go(12, "8"),
+        go(15, "11.2"),
+        go(18, "14.7"),
     ]
 }
 

@@ -388,6 +388,19 @@ pub enum QueryMsg {
         timestamp: Option<Timestamp>,
     },
 
+    /// * returns [SpotPriceHistoryResp]
+    ///
+    /// Gets a collection of historical spot prices
+    #[returns(SpotPriceHistoryResp)]
+    SpotPriceHistory {
+        /// Last timestamp we saw
+        start_after: Option<Timestamp>,
+        /// How many prices to query
+        limit: Option<u32>,
+        /// Order to sort by, if None then it will be descending
+        order: Option<OrderInMessage>,
+    },
+
     /// * returns [super::position::PositionsResp]
     ///
     /// Maps the given PositionIds into Positions
@@ -1085,4 +1098,11 @@ pub enum LimitOrderResult {
         /// Error message
         reason: String,
     },
+}
+
+/// Response for [QueryMsg::SpotPriceHistory]
+#[cw_serde]
+pub struct SpotPriceHistoryResp {
+    /// list of historical price points
+    pub price_points: Vec<PricePoint>,
 }

@@ -3,8 +3,9 @@ use std::str::FromStr;
 use anyhow::Result;
 use cosmos::{Cosmos, CosmosNetwork, Wallet};
 use msg::contracts::tracker::entry::CodeIdResp;
+use perps_exes::config::parse_deployment;
 
-use crate::{app::get_suffix_network, cli::Opt, tracker::Tracker, util::get_hash_for_path};
+use crate::{cli::Opt, tracker::Tracker, util::get_hash_for_path};
 
 #[derive(clap::Parser)]
 pub(crate) struct StoreCodeOpt {
@@ -94,7 +95,7 @@ pub(crate) async fn go(
         (None, None) => anyhow::bail!("Please specify either family or network"),
         (None, Some(network)) => network,
         (Some(family), _) => {
-            let from_family = get_suffix_network(&family)?.1;
+            let from_family = parse_deployment(&family)?.0;
             if let Some(network) = network {
                 anyhow::ensure!(
                     network == from_family,

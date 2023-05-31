@@ -39,8 +39,8 @@ use msg::contracts::market::crank::CrankWorkInfo;
 use msg::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
     LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpActionHistoryResp, LpInfoResp,
-    PositionActionHistoryResp, QueryMsg, SlippageAssert, StatusResp, TradeHistorySummary,
-    TraderActionHistoryResp,
+    PositionActionHistoryResp, QueryMsg, SlippageAssert, SpotPriceHistoryResp, StatusResp,
+    TradeHistorySummary, TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
 use msg::contracts::market::{
@@ -399,7 +399,9 @@ impl PerpsMarket {
         })?;
         anyhow::ensure!(pending_close.is_empty());
         anyhow::ensure!(closed.is_empty());
-        positions.pop().ok_or_else(|| anyhow!("no positions"))
+        let pos = positions.pop().ok_or_else(|| anyhow!("no positions"))?;
+        anyhow::ensure!(pos.dnf_on_close_collateral == None);
+        Ok(pos)
     }
 
     pub fn query_position_with_pending_fees(
@@ -416,7 +418,9 @@ impl PerpsMarket {
         })?;
         anyhow::ensure!(pending_close.is_empty());
         anyhow::ensure!(closed.is_empty());
-        positions.pop().ok_or_else(|| anyhow!("no positions"))
+        let pos = positions.pop().ok_or_else(|| anyhow!("no positions"))?;
+        anyhow::ensure!(pos.dnf_on_close_collateral != None);
+        Ok(pos)
     }
 
     pub fn query_position_pending_close(
@@ -626,6 +630,21 @@ impl PerpsMarket {
             notional_delta: Signed::<Notional>::from_number(notional_delta),
             pos_delta_neutrality_fee_margin,
         })
+    }
+
+    pub fn query_spot_price_history(
+        &self,
+        start_after: Option<Timestamp>,
+        limit: Option<u32>,
+        order: Option<OrderInMessage>,
+    ) -> Result<Vec<PricePoint>> {
+        let resp: SpotPriceHistoryResp = self.query(&MarketQueryMsg::SpotPriceHistory {
+            start_after,
+            limit,
+            order,
+        })?;
+
+        Ok(resp.price_points)
     }
 
     // market executions

@@ -120,6 +120,8 @@ pub struct DeploymentConfig {
     pub default_market_ids: Vec<MarketId>,
     #[serde(default)]
     pub ignore_stale: bool,
+    #[serde(default)]
+    pub execs_per_price: Option<u32>,
 }
 
 const CONFIG_YAML: &[u8] = include_bytes!("../assets/config.yaml");
@@ -166,7 +168,8 @@ pub struct DeploymentInfo {
     pub wallet_phrase_name: String,
 }
 
-fn parse_deployment(deployment: &str) -> Result<(CosmosNetwork, &str)> {
+/// Parse a deployment name (like dragonbeta) into network and family (like dragonfire and beta).
+pub fn parse_deployment(deployment: &str) -> Result<(CosmosNetwork, &str)> {
     const NETWORKS: &[(CosmosNetwork, &str)] = &[
         (CosmosNetwork::OsmosisTestnet, "osmo"),
         (CosmosNetwork::Dragonfire, "dragon"),
