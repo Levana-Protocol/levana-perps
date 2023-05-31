@@ -44,11 +44,6 @@ impl Pyth {
         bridge_addr: Address,
         market_id: MarketId,
     ) -> Result<Self> {
-        let endpoint = config
-            .get_pyth()
-            .context("must have a pyth endpoint if there's a pyth bridge")?
-            .endpoint
-            .clone();
         let bridge = cosmos.make_contract(bridge_addr);
         let oracle_addr = bridge.query(BridgeQueryMsg::PythAddress {}).await?;
         let oracle = cosmos.make_contract(oracle_addr);
@@ -59,7 +54,7 @@ impl Pyth {
             .await?;
 
         Ok(Self {
-            endpoint,
+            endpoint: config.pyth_endpoint.clone(),
             oracle,
             bridge,
             market_price_feeds,

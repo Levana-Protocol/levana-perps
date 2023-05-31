@@ -47,13 +47,6 @@ pub struct ConfigTestnet {
 
 #[derive(serde::Deserialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct PythChainConfig {
-    pub address: Address,
-    pub endpoint: String,
-}
-
-#[derive(serde::Deserialize, Clone, Debug)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct LiquidityConfig {
     /// Min and max per different markets
     pub markets: HashMap<MarketId, LiquidityBounds>,
