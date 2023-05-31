@@ -122,59 +122,24 @@ impl PositionOrId {
     }
 }
 
-#[derive(Clone, Copy)]
-enum Error {
-    AlreadyLong,
-    AlreadyShort,
-    NewlyLong,
-    NewlyShort,
-    LongToShort,
-    ShortToLong,
-}
-
-impl From<Error> for ErrorId {
-    fn from(e: Error) -> Self {
-        match e {
-            Error::AlreadyLong => ErrorId::DeltaNeutralityFeeAlreadyLong,
-            Error::AlreadyShort => ErrorId::DeltaNeutralityFeeAlreadyShort,
-            Error::NewlyLong => ErrorId::DeltaNeutralityFeeNewlyLong,
-            Error::NewlyShort => ErrorId::DeltaNeutralityFeeNewlyShort,
-            Error::LongToShort => ErrorId::DeltaNeutralityFeeLongToShort,
-            Error::ShortToLong => ErrorId::DeltaNeutralityFeeShortToLong,
-        }
+fn already(dir: DirectionToBase) -> MarketError {
+    match dir {
+        DirectionToBase::Long => MarketError::DeltaNeutralityFeeAlreadyLong {},
+        DirectionToBase::Short => MarketError::DeltaNeutralityFeeAlreadyShort {},
     }
 }
-impl Error {
-    fn as_str(&self) -> &'static str {
-        match self {
-            Error::AlreadyLong => "Cannot perform this action since it would exceed delta neutrality limits - protocol is already too long",
-            Error::AlreadyShort => "Cannot perform this action since it would exceed delta neutrality limits - protocol is already too short",
-            Error::NewlyLong => "Cannot perform this action since it would exceed delta neutrality limits - protocol would become too long",
-            Error::NewlyShort => "Cannot perform this action since it would exceed delta neutrality limits - protocol would become too short",
-            Error::LongToShort => "Cannot perform this action since it would exceed delta neutrality limits - protocol would go from too long to too short",
-            Error::ShortToLong => "Cannot perform this action since it would exceed delta neutrality limits - protocol would go from too short to too long",
-        }
-    }
 
-    fn already(dir: DirectionToBase) -> Self {
-        match dir {
-            DirectionToBase::Long => Error::AlreadyLong,
-            DirectionToBase::Short => Error::AlreadyShort,
-        }
+fn newly(dir: DirectionToBase) -> MarketError {
+    match dir {
+        DirectionToBase::Long => MarketError::DeltaNeutralityFeeNewlyLong {},
+        DirectionToBase::Short => MarketError::DeltaNeutralityFeeNewlyShort {},
     }
+}
 
-    fn newly(dir: DirectionToBase) -> Self {
-        match dir {
-            DirectionToBase::Long => Error::NewlyLong,
-            DirectionToBase::Short => Error::NewlyShort,
-        }
-    }
-
-    fn flipped(dir: DirectionToBase) -> Self {
-        match dir {
-            DirectionToBase::Long => Error::ShortToLong,
-            DirectionToBase::Short => Error::LongToShort,
-        }
+fn flipped(dir: DirectionToBase) -> MarketError {
+    match dir {
+        DirectionToBase::Long => MarketError::DeltaNeutralityFeeShortToLong {},
+        DirectionToBase::Short => MarketError::DeltaNeutralityFeeLongToShort {},
     }
 }
 
@@ -313,11 +278,11 @@ impl State<'_> {
             let res = if is_capped_low_before {
                 match notional_direction {
                     // We were already too short, disallow going shorter
-                    DirectionToNotional::Short => Err(Error::already(base_direction)),
+                    DirectionToNotional::Short => Err(already(base_direction)),
                     // We don't allow the user to swing the market all the way from capped low to capped high
                     DirectionToNotional::Long => {
                         if is_capped_high_after {
-                            Err(Error::flipped(base_direction))
+                            Err(flipped(base_direction))
                         } else {
                             Ok(())
                         }
@@ -326,11 +291,11 @@ impl State<'_> {
             } else if is_capped_high_before {
                 match notional_direction {
                     // We were already too long, disallow going longer
-                    DirectionToNotional::Long => Err(Error::already(base_direction)),
+                    DirectionToNotional::Long => Err(already(base_direction)),
                     // We don't allow the user to swing the market all the way from capped high to capped low
                     DirectionToNotional::Short => {
                         if is_capped_low_after {
-                            Err(Error::flipped(base_direction))
+                            Err(flipped(base_direction))
                         } else {
                             Ok(())
                         }
@@ -338,23 +303,15 @@ impl State<'_> {
                 }
             } else if is_capped_low_after {
                 debug_assert!(notional_size_diff <= Signed::zero());
-                Err(Error::newly(base_direction))
+                Err(newly(base_direction))
             } else if is_capped_high_after {
                 debug_assert!(notional_size_diff >= Signed::zero());
-                Err(Error::newly(base_direction))
+                Err(newly(base_direction))
             } else {
                 Ok(())
             };
 
-            res.map(|()| adjust_res).map_err(|e| {
-                PerpError {
-                    id: e.into(),
-                    domain: ErrorDomain::Market,
-                    description: e.as_str().to_owned(),
-                    data: None::<()>,
-                }
-                .into()
-            })
+            res.map(|()| adjust_res).map_err(MarketError::into_anyhow)
         } else {
             Ok(adjust_res)
         }
