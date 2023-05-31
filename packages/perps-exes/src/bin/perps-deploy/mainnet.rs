@@ -66,7 +66,7 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 struct CodeIds {
     /// Uses a Vec instead of a HashMap to keep consistent ordering and avoid large diffs.
-    hashes: HashMap<String, StoredContract>,
+    hashes: Vec<StoredContract>,
 }
 
 impl CodeIds {
@@ -84,6 +84,10 @@ impl CodeIds {
             .with_context(|| format!("Error saving CodeIds to {}", Self::PATH))
     }
 
+    fn get_mut_by_hash(&mut self, hash: &str) -> Option<&mut StoredContract> {
+        self.hashes.iter_mut().find(|x| x.hash == hash)
+    }
+
     fn get(
         &self,
         contract_type: ContractType,
@@ -92,9 +96,13 @@ impl CodeIds {
     ) -> Result<StoredCodeId> {
         let contract_path = opt.get_contract_path(contract_type.as_str());
         let hash = get_hash_for_path(&contract_path)?;
-        let stored_contract = self.hashes.get(&hash).with_context(|| {
-            format!("Mainnet code IDs list does not include hash {hash}, do you need to store?")
-        })?;
+        let stored_contract = self
+            .hashes
+            .iter()
+            .find(|x| x.hash == hash)
+            .with_context(|| {
+                format!("Mainnet code IDs list does not include hash {hash}, do you need to store?")
+            })?;
         anyhow::ensure!(stored_contract.contract_type == contract_type, "Mismatched contract type for SHA256 {hash}. Expected: {contract_type:?}. Found in file: {:?}", stored_contract.contract_type);
         let code_id = stored_contract.code_ids.get(&network).with_context(|| format!("Mainnet code IDs list does not include hash {hash} on network {network}, do you need to store?")).copied()?;
         anyhow::Ok(StoredCodeId {
@@ -148,12 +156,13 @@ impl ContractType {
 }
 
 /// Information about a single compiled contract.
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 struct StoredContract {
     contract_type: ContractType,
     gitrev: String,
     code_ids: HashMap<CosmosNetwork, u64>,
+    hash: String,
 }
 
 async fn store_perps_contracts(
@@ -168,14 +177,18 @@ async fn store_perps_contracts(
     for contract_type in ContractType::all() {
         let contract_path = opt.get_contract_path(contract_type.as_str());
         let hash = get_hash_for_path(&contract_path)?;
-        let entry = code_ids
-            .hashes
-            .entry(hash.clone())
-            .or_insert_with(|| StoredContract {
-                contract_type,
-                gitrev: gitrev.clone(),
-                code_ids: HashMap::new(),
-            });
+        let entry = match code_ids.get_mut_by_hash(&hash) {
+            Some(entry) => entry,
+            None => {
+                code_ids.hashes.push(StoredContract {
+                    contract_type,
+                    gitrev: gitrev.clone(),
+                    code_ids: HashMap::new(),
+                    hash: hash.clone(),
+                });
+                code_ids.hashes.last_mut().expect("last cannot be null")
+            }
+        };
         anyhow::ensure!(entry.contract_type == contract_type, "Mismatched contract type for SHA256 {hash}. Expected: {contract_type:?}. Found in file: {:?}", entry.contract_type);
         match entry.code_ids.get(&network) {
             Some(code_id) => {
