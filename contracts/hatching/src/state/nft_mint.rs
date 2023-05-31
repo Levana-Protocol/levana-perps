@@ -63,8 +63,8 @@ impl State<'_> {
             get_nft_mint_iter(details)
                 .map(|egg| {
                     let extra = BABY_DRAGON_EXTRA
-                        .load(store, egg.token_id.as_str())
-                        .context("no extra data for egg")?;
+                        .may_load(store, egg.token_id.as_str())?
+                        .with_context(|| format!("no extra data for egg #{}", egg.token_id))?;
 
                     babydragon_nft_mint_msg(nft_mint_owner.clone(), egg, extra)
                 })
