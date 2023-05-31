@@ -221,8 +221,8 @@ impl State<'_> {
         addr: &Addr,
     ) -> Result<()> {
         if let Some(emissions) = self.may_load_lvn_emissions(ctx.storage)? {
-            self.update_accrued_emissions(ctx, addr, &emissions)?;
             self.update_emissions_per_token(ctx, &emissions)?;
+            self.update_accrued_emissions(ctx, addr, &emissions)?;
         }
 
         Ok(())
