@@ -20,6 +20,8 @@ arbitrary = { version = "1.2.0", optional = true, default-features = false, feat
 serde_json = { version = "1.0.90", default-features = false }
 pyth-sdk-cw = "1.0.0"
 thiserror = "1"
+chrono = { version = "0.4.25", optional = true, default-features = false, features = ["std"]}
+
 
 [features]
 debug_log = []

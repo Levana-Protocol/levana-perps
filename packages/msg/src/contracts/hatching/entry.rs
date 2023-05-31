@@ -1,7 +1,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use shared::storage::RawAddr;
 
-use super::{HatchStatus, NftHatchInfo, ProfileInfo};
+use super::{dragon_mint::DragonMintExtra, HatchStatus, NftHatchInfo, ProfileInfo};
 
 /// Instantiate message
 #[cw_serde]
@@ -29,6 +29,12 @@ pub enum ExecuteMsg {
 
     /// Retry a hatch that's stuck
     RetryHatch { id: String },
+
+    /// Admin-only: set the config
+    SetBabyDragonExtras {
+        /// list of baby dragon extras
+        extras: Vec<DragonMintExtra>,
+    },
 }
 
 #[cw_serde]

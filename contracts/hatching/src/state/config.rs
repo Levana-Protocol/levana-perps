@@ -20,11 +20,13 @@ impl State<'_> {
 pub(crate) fn init_config(
     store: &mut dyn Storage,
     api: &dyn Api,
+    admin: Addr,
     msg: &InstantiateMsg,
 ) -> Result<()> {
     CONFIG.save(
         store,
         &Config {
+            admin,
             nft_burn_contracts: ConfigNftBurnContracts {
                 egg: msg.burn_egg_contract.validate(api)?,
                 dust: msg.burn_dust_contract.validate(api)?,
