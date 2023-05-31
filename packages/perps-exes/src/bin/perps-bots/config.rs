@@ -168,6 +168,9 @@ impl Opt {
             seed,
             network,
             gas_multiplier,
+            min_gas_crank,
+            min_gas_price,
+            watcher_config,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let chain_config = ChainConfig::load(*network)?;
@@ -181,12 +184,16 @@ impl Opt {
         let wallet_manager = WalletManager::new(seed.clone(), network.get_address_type())?;
         let price_wallet = wallet_manager.get_wallet("price")?;
         let crank_wallet = wallet_manager.get_wallet("crank")?;
+        let watcher = match watcher_config {
+            Some(yaml) => serde_yaml::from_str(yaml).context("Invalid watcher config on CLI")?,
+            None => WatcherConfig::default(),
+        };
         Ok(BotConfig {
             by_type: BotConfigByType::Mainnet {
                 factory: *factory,
                 pyth,
-                min_gas_crank: 1_000_000, // FIXME
-                min_gas_price: 1_000_000, // FIXME
+                min_gas_crank: *min_gas_crank,
+                min_gas_price: *min_gas_price,
             }
             .into(),
             network: *network,
@@ -198,7 +205,7 @@ impl Opt {
             liquidity_config: None,
             utilization_config: None,
             trader_config: None,
-            watcher: WatcherConfig::default(), // FIXME
+            watcher,
             gas_multiplier: *gas_multiplier,
             rpc_nodes: vec![],
             ignore_stale: false,

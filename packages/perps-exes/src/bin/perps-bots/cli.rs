@@ -68,8 +68,14 @@ pub(crate) struct MainnetOpt {
     pub(crate) seed: SeedPhrase,
     #[clap(long, env = "COSMOS_NETWORK")]
     pub(crate) network: CosmosNetwork,
-    #[clap(long, env = "LEVANA_BOTS_GAS_MULTIPLIER")]
+    #[clap(long, env = "COSMOS_GAS_MULTIPLIER")]
     pub(crate) gas_multiplier: Option<f64>,
+    #[clap(long, env = "LEVANA_BOTS_MIN_GAS_CRANK", default_value = "100000000")]
+    pub(crate) min_gas_crank: u128,
+    #[clap(long, env = "LEVANA_BOTS_MIN_GAS_PRICE", default_value = "100000000")]
+    pub(crate) min_gas_price: u128,
+    #[clap(long, env = "LEVANA_BOTS_WATCHER_CONFIG")]
+    pub(crate) watcher_config: Option<String>,
 }
 
 impl Opt {
