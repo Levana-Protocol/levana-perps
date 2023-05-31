@@ -1,18 +1,5 @@
 use crate::prelude::*;
 use levana_perpswap_multi_test::config::TEST_CONFIG;
-use msg::token::Token;
-use std::cell::RefCell;
-use std::rc::Rc;
-
-fn setup_rewards(app_cell: Rc<RefCell<PerpsApp>>, amount: &str) -> Token {
-    let mut app = app_cell.borrow_mut();
-    let protocol_owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
-    let token = app.rewards_token();
-    app.mint_token(&protocol_owner, &token, amount.parse().unwrap())
-        .unwrap();
-
-    token
-}
 
 #[test]
 fn test_emissions() {
@@ -33,7 +20,7 @@ fn test_emissions() {
     market.exec_farming_start_launch(None).unwrap();
 
     let amount = "200";
-    let token = setup_rewards(app_cell, amount);
+    let token = market.setup_lvn_rewards(amount);
 
     // sanity check
     let protocol_owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
@@ -105,7 +92,7 @@ fn test_emissions_multiple_lps() {
     market.exec_farming_start_launch(None).unwrap();
 
     let amount = "200";
-    let token = setup_rewards(app_cell, amount);
+    let token = market.setup_lvn_rewards(amount);
     market
         .exec_farming_set_emissions(market.now(), 20, amount.parse().unwrap(), token)
         .unwrap();

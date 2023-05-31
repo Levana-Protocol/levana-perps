@@ -2,15 +2,19 @@ use serde::{Deserialize, Serialize};
 
 use crate::prelude::*;
 
-// TODO: configurable?
-// 12 days
-const LOCKDROP_START_DURATION: Duration = Duration::from_seconds(60 * 60 * 24 * 12);
-// 2 days
-const LOCKDROP_SUNSET_DURATION: Duration = Duration::from_seconds(60 * 60 * 24 * 2);
+const LOCKDROP_DURATIONS: Item<LockdropDurations> = Item::new(namespace::LOCKDROP_DURATIONS);
 
 // Almost all the times flow naturally from the epoch timestamps
 // Review start time is an exception, so we stash it
 const REVIEW_START_TIME: Item<Timestamp> = Item::new("review-start-time");
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub(crate) struct  LockdropDurations {
+    /// The amount seconds from the start of the lockdrop until the sunset period begins
+    pub(crate) start_duration: Duration,
+    /// The amount of seconds the sunset period lasts
+    pub(crate) sunset_duration: Duration,
+}
 
 // The current farming period, without the baggage of FarmingPeriodResp
 // used for internal contract logic only
@@ -36,6 +40,16 @@ impl From<&FarmingPeriodResp> for FarmingPeriod {
 }
 
 impl State<'_> {
+    pub(crate) fn save_lockdrop_durations(&self, store: &mut dyn Storage, durations: LockdropDurations) -> Result<()> {
+        LOCKDROP_DURATIONS.save(store, &durations)?;
+        Ok(())
+    }
+
+    pub(crate) fn load_lockdrop_durations(&self, store: &dyn Storage) -> Result<LockdropDurations> {
+        let durations = LOCKDROP_DURATIONS.load(store)?;
+        Ok(durations)
+    }
+
     pub(crate) fn validate_period_msg(
         &self,
         store: &dyn Storage,
@@ -51,6 +65,8 @@ impl State<'_> {
                     OwnerExecuteMsg::SetEmissions { .. }
                     | OwnerExecuteMsg::ClearEmissions { .. }
                     | OwnerExecuteMsg::ReclaimEmissions { .. } => period == FarmingPeriod::Launched,
+
+                    OwnerExecuteMsg::SetLockdropRewards { .. } => period == FarmingPeriod::Review,
 
                     // Validation for config and transitioning between Periods is handled in the
                     // appropriate business logic
@@ -108,8 +124,9 @@ impl State<'_> {
 
                 match epoch {
                     FarmingEpochStartTime::Lockdrop(start) => {
-                        let sunset_start = start + LOCKDROP_START_DURATION;
-                        let review_start = sunset_start + LOCKDROP_SUNSET_DURATION;
+                        let durations = self.load_lockdrop_durations(store)?;
+                        let sunset_start = start + durations.start_duration;
+                        let review_start = sunset_start + durations.sunset_duration;
 
                         if now < start {
                             // A scheduled lockdrop doesn't change the current period until it starts

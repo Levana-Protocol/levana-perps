@@ -290,6 +290,7 @@ unsigned!(Usd);
 unsigned!(LpToken);
 unsigned!(FarmingToken);
 unsigned!(LvnToken);
+unsigned!(LockdropShares);
 
 /// Wrap up any [UnsignedDecimal] to provide negative values too.
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -762,7 +763,7 @@ impl LvnToken {
         self.0
             .checked_div(rhs)
             .map(LvnToken)
-            .with_context(|| format!("LvnToken::checked_div failed on {self} * {rhs}"))
+            .with_context(|| format!("LvnToken::checked_div failed on {self} / {rhs}"))
     }
 }
 

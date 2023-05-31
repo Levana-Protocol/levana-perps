@@ -1,8 +1,37 @@
 use super::period::FarmingPeriod;
 use crate::prelude::*;
 use serde::{Deserialize, Serialize};
+use crate::state::period::LockdropDurations;
+
+//todo don't forget to set LVN_LOCKDROP_REWARDS
+/// The total amount of LVN rewards designated for lockdrop participants
+const LVN_LOCKDROP_REWARDS: Item<LvnToken> = Item::new(namespace::LVN_LOCKDROP_REWARDS);
 
 impl State<'_> {
+    pub(crate) fn lockdrop_init(
+        &self,
+        store: &mut dyn Storage,
+        msg: &InstantiateMsg,
+    ) -> Result<()> {
+        LockdropBuckets::init(store, msg)?;
+        self.save_lockdrop_rewards(store, LvnToken::zero())?;
+        self.save_lockdrop_durations(store, LockdropDurations {
+            start_duration: Duration::from_seconds(msg.lockdrop_start_duration.into()),
+            sunset_duration: Duration::from_seconds(msg.lockdrop_sunset_duration.into()),
+        })?;
+
+        Ok(())
+    }
+
+    pub(crate) fn save_lockdrop_rewards(
+        &self,
+        store: &mut dyn Storage,
+        amount: LvnToken,
+    ) -> Result<()> {
+        LVN_LOCKDROP_REWARDS.save(store, &amount)?;
+        Ok(())
+    }
+
     pub(crate) fn lockdrop_deposit(
         &self,
         ctx: &mut StateContext,
@@ -51,9 +80,9 @@ impl State<'_> {
     pub(crate) fn get_farmer_lockdrop_stats(
         &self,
         storage: &dyn Storage,
-        farmer: &Addr,
+        user: &Addr,
     ) -> Result<Vec<FarmerLockdropStats>> {
-        LockdropBuckets::get_all_balances_iter(storage, farmer)
+        LockdropBuckets::get_all_balances_iter(storage, user)
             .map(|res| {
                 let (bucket_id, balance) = res?;
                 let total =
@@ -112,9 +141,110 @@ impl State<'_> {
 
         Ok(())
     }
+
+    /// Calculates the total amount of rewards a user earned by participating in the lockdrop
+    pub(crate) fn calculate_lockdrop_rewards(
+        &self,
+        store: &dyn Storage,
+        user: &Addr,
+    ) -> Result<LvnToken> {
+        let user_shares = LockdropBuckets::get_shares(store, user)?;
+        let total_shares = LockdropBuckets::TOTAL_SHARES.load(store)?;
+        let total_rewards = LVN_LOCKDROP_REWARDS.load(store)?;
+        let user_rewards = total_rewards
+            .checked_mul_dec(user_shares.into_decimal256())?
+            .checked_div_dec(total_shares.into_decimal256())?;
+
+        Ok(user_rewards)
+    }
+
+    pub(crate) fn calculate_unlocked_lockdrop_rewards(
+        &self,
+        store: &dyn Storage,
+        user: &Addr,
+    ) -> Result<LvnToken> {
+        let period = self.get_period_resp(store)?;
+        let lockdrop_start = match period {
+            FarmingPeriodResp::Launched { started_at } => started_at,
+            _ => bail!("Cannot collect lockdrop rewards prior to launch"),
+        };
+        let lockdrop_config = self.load_lockdrop_config(store)?;
+        let elapsed_since_start = self
+            .now()
+            .checked_sub(lockdrop_start, "claim_lockdrop_rewards")?;
+        let total_user_rewards = self.calculate_lockdrop_rewards(store, user)?;
+        let stats = self.load_raw_farmer_stats(store, user)?;
+
+        let amount = if elapsed_since_start >= lockdrop_config.lockdrop_lvn_unlock_seconds {
+            total_user_rewards.checked_sub(stats.lockdrop_amount_collected)?
+        } else {
+            let elapsed_since_last_collected = (self.now().checked_sub(
+                stats.lockdrop_last_collected,
+                "claim_lockdrop_rewards, elapsed_since_last_collected",
+            )?)
+            .as_nanos();
+
+            let elapsed_ratio = Decimal256::from_ratio(
+                elapsed_since_last_collected,
+                lockdrop_config.lockdrop_lvn_unlock_seconds.as_nanos(),
+            );
+
+            total_user_rewards
+                .checked_mul_dec(elapsed_ratio)?
+                // using min as an added precaution to make sure it never goes above the total due to rounding errors
+                .min(total_user_rewards)
+        };
+
+        Ok(amount)
+    }
+
+    /// Calculates how many lockdrop shares have unlocked
+    pub(crate) fn lockdrop_lockup_info(
+        &self,
+        store: &dyn Storage,
+        addr: &Addr,
+    ) -> Result<LockdropLockupInfo> {
+        let lockdrop_start = match self.get_period_resp(store)? {
+            FarmingPeriodResp::Launched { started_at } => started_at,
+            _ => bail!("Cannot calculate unlocked lockdrop balance prior to launch"),
+        };
+        let elapsed = self
+            .now()
+            .checked_sub(lockdrop_start, "calculate_unlocked_lockdrop_balance")?;
+
+        LockdropBuckets::get_all_balances_iter(store, addr).try_fold(
+            LockdropLockupInfo::default(),
+            |mut acc, res| {
+                let (bucket_id, balance) = res?;
+                let lockdrop_duration = LockdropBuckets::get_duration(store, bucket_id)?;
+                let balance = FarmingToken::from_decimal256(balance.total()?.into_decimal256());
+
+                acc.total = acc.total.checked_add(balance)?;
+
+                if elapsed < lockdrop_duration {
+                    acc.locked.checked_add(balance)?;
+                } else {
+                    acc.unlocked.checked_add(balance)?;
+                }
+
+                anyhow::Ok(acc)
+            },
+        )
+    }
 }
 
 pub(crate) struct LockdropBuckets {}
+
+#[derive(Default)]
+/// Information about the funds deposited into the lockdrop
+pub(crate) struct LockdropLockupInfo {
+    /// The total amount of farming tokens that came from the lockdrop
+    pub(crate) total: FarmingToken,
+    /// The amount of farming tokens that came from the lockdrop that are still locked
+    pub(crate) locked: FarmingToken,
+    /// The amount of farming tokens that came from the lockdrop that are unlocked
+    pub(crate) unlocked: FarmingToken,
+}
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 struct Balance {
@@ -139,10 +269,13 @@ impl Balance {
 
 impl LockdropBuckets {
     const MULTIPLIER: Map<'static, LockdropBucketId, NonZero<Decimal256>> =
-        Map::new("lockdrop-bucket-multiplier");
-    const DURATION: Map<'static, LockdropBucketId, Duration> = Map::new("lockdrop-bucket-duration");
+        Map::new(namespace::LOCKDROP_BUCKETS_MULTIPLIER);
+    const DURATION: Map<'static, LockdropBucketId, Duration> =
+        Map::new(namespace::LOCKDROP_BUCKETS_DURATION);
     const BALANCES: Map<'static, (&Addr, LockdropBucketId), Balance> =
-        Map::new("lockdrop-bucket-balances");
+        Map::new(namespace::LOCKDROP_BUCKETS_BALANCES);
+    const TOTAL_SHARES: Item<'static, LockdropShares> =
+        Item::new(namespace::LOCKDROP_BUCKETS_TOTAL_SHARES);
 
     pub fn init(storage: &mut dyn Storage, msg: &InstantiateMsg) -> Result<()> {
         for bucket in msg.lockdrop_buckets.iter() {
@@ -152,6 +285,8 @@ impl LockdropBuckets {
             Self::MULTIPLIER.save(storage, bucket.bucket_id, &bucket.multiplier)?;
             Self::DURATION.save(storage, bucket.bucket_id, &duration)?;
         }
+
+        Self::TOTAL_SHARES.save(storage, &LockdropShares::zero())?;
 
         Ok(())
     }
@@ -174,12 +309,27 @@ impl LockdropBuckets {
 
     fn get_all_balances_iter<'a>(
         storage: &'a dyn Storage,
-        farmer: &'a Addr,
+        user: &'a Addr,
     ) -> impl Iterator<Item = Result<(LockdropBucketId, Balance)>> + 'a {
         Self::BALANCES
-            .prefix(farmer)
+            .prefix(user)
             .range(storage, None, None, Order::Ascending)
             .map(|x| x.map_err(|err| err.into()))
+    }
+
+    fn get_shares(store: &dyn Storage, user: &Addr) -> Result<LockdropShares> {
+        Self::get_all_balances_iter(store, user)
+            .try_fold(Decimal256::zero(), |acc, res| {
+                let (bucket_id, balance) = res?;
+                let multiplier = LockdropBuckets::MULTIPLIER
+                    .load(store, bucket_id)?
+                    .into_decimal256();
+                let total_balance = balance.total()?.into_decimal256();
+                let acc = multiplier.checked_mul(total_balance)?.checked_add(acc)?;
+
+                anyhow::Ok(acc)
+            })
+            .map(LockdropShares::from_decimal256)
     }
 
     fn update_balance(
@@ -196,6 +346,17 @@ impl LockdropBuckets {
         let old = Self::BALANCES
             .may_load(storage, (user, bucket_id))?
             .unwrap_or_default();
+
+        let multiplier = LockdropBuckets::MULTIPLIER
+            .load(storage, bucket_id)?
+            .into_number();
+
+        let weighted_amount = amount
+            .checked_mul(multiplier)
+            .map(Signed::<LockdropShares>::from_number)?;
+
+        LockdropBuckets::TOTAL_SHARES
+            .update(storage, |total| total.checked_add_signed(weighted_amount))?;
 
         let is_withdrawal = amount.is_negative();
         if is_withdrawal {
