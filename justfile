@@ -127,11 +127,11 @@ push-bots-image:
 
 # Deploy to dragonfire
 deploy-dragonfire:
-	cargo run --bin perps-deploy store-code --network dragonfire
+	cargo run --bin perps-deploy testnet store-code --network dragonfire
 
 # Migrate dragonci
 migrate-dragonci:
-	cargo run --bin perps-deploy migrate --family dragonci
+	cargo run --bin perps-deploy testnet migrate --family dragonci
 
 # Build documentations
 build-docs:
@@ -196,17 +196,17 @@ rewards-relayer-start:
 
 # Rewards subcommands
 store-hatching:
-	cargo run --bin perps-deploy store-code --contracts=hatching --network=juno-testnet
+	cargo run --bin perps-deploy testnet store-code --contracts=hatching --network=juno-testnet
 store-lvn-rewards:
-	cargo run --bin perps-deploy store-code --contracts=lvn-rewards --network=osmosis-testnet
+	cargo run --bin perps-deploy testnet store-code --contracts=lvn-rewards --network=osmosis-testnet
 instantiate-hatching:
-	cargo run --bin perps-deploy instantiate-rewards --contracts=hatching --network=juno-testnet
+	cargo run --bin perps-deploy testnet instantiate-rewards --contracts=hatching --network=juno-testnet
 instantiate-lvn-rewards:
-	cargo run --bin perps-deploy instantiate-rewards --contracts=lvn-rewards --network=osmosis-testnet
+	cargo run --bin perps-deploy testnet instantiate-rewards --contracts=lvn-rewards --network=osmosis-testnet
 store-ibc-execute:
-	cargo run --bin perps-deploy store-code --contracts=ibc-execute-proxy --network=stargaze-testnet
+	cargo run --bin perps-deploy testnet store-code --contracts=ibc-execute-proxy --network=stargaze-testnet
 instantiate-nft-mint:
-	cargo run --bin perps-deploy instantiate-rewards --contracts=ibc-execute-proxy --ibc-execute-proxy-target=nft-mint --network=stargaze-testnet
+	cargo run --bin perps-deploy testnet instantiate-rewards --contracts=ibc-execute-proxy --ibc-execute-proxy-target=nft-mint --network=stargaze-testnet
 hatch-egg-test:
 	cargo run --bin rewards-test hatch-egg --hatch-network=juno-testnet --nft-mint-network=stargaze-testnet --lvn-rewards-network=osmosis-testnet
 create-nft-mint-relayer-channel path-name juno-port stargaze-port:

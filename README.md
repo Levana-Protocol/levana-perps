@@ -86,9 +86,9 @@ When you deploy, you'll need to have the deployer seed phrase. This is available
     * Or, with native tools: `just build-contracts-native`
 2. Set your seed phrase to an environment variable: `export COSMOS_WALLET="deployer seed phrase"`
 3. Set the appropriate contract family: `export PERPS_FAMILY=dragonci`
-4. Store the WASM code on the blockchain: `cargo run --bin perps-deploy store-code`
-5. To deploy a fresh set of contracts: `cargo run --bin perps-deploy instantiate`
-6. To migrate an existing set of contracts: `cargo run --bin perps-deploy migrate`
+4. Store the WASM code on the blockchain: `cargo run --bin perps-deploy testnet store-code`
+5. To deploy a fresh set of contracts: `cargo run --bin perps-deploy testnet instantiate`
+6. To migrate an existing set of contracts: `cargo run --bin perps-deploy testnet migrate`
 
 # Basic wasmd setup
 

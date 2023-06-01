@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use anyhow::{Context, Result};
-use cosmos::{CosmosNetwork, HasAddress};
+use cosmos::{ContractAdmin, CosmosNetwork, HasAddress};
 use msg::contracts::{
     cw20::{entry::InstantiateMinter, Cw20Coin},
     market::config::ConfigUpdate,
@@ -79,6 +79,7 @@ pub(crate) async fn go(
                     },
                     marketing: None,
                 },
+                ContractAdmin::Sender,
             )
             .await?;
 
@@ -91,6 +92,12 @@ pub(crate) async fn go(
             market_id,
             cw20_source: crate::instantiate::Cw20Source::Existing(cw20.get_address()),
             price_source: PriceSource::Manual,
+            config: ConfigUpdate {
+                // https://phobosfinance.atlassian.net/browse/PERP-710
+                staleness_seconds: Some(60 * 60 * 24 * 7),
+                price_update_too_old_seconds: Some(60 * 60 * 24 * 5),
+                ..ConfigUpdate::default()
+            },
         });
     }
 
@@ -125,12 +132,6 @@ pub(crate) async fn go(
         code_id_source: crate::instantiate::CodeIdSource::Existing(ids),
         family: "localperps".to_owned(),
         markets,
-        market_config_update: Some(ConfigUpdate {
-            // https://phobosfinance.atlassian.net/browse/PERP-710
-            staleness_seconds: Some(60 * 60 * 24 * 7),
-            price_update_too_old_seconds: Some(60 * 60 * 24 * 5),
-            ..ConfigUpdate::default()
-        }),
         trading_competition: false,
         faucet_admin: None,
         price_admin: *basic.wallet.address(),
