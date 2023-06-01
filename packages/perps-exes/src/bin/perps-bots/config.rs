@@ -88,6 +88,7 @@ impl Opt {
             pyth: _,
             explorer,
             rpc_nodes,
+            gas_multiplier,
         } = ChainConfig::load(network)?;
         let partial = match &testnet.deployment_config {
             Some(s) => serde_yaml::from_str(s)?,
@@ -164,7 +165,7 @@ impl Opt {
                 None
             },
             watcher: partial.watcher.clone(),
-            gas_multiplier: partial.gas_multiplier,
+            gas_multiplier: *gas_multiplier,
             pyth_endpoint: pyth_config.endpoint.clone(),
             execs_per_price: partial.execs_per_price,
         };
