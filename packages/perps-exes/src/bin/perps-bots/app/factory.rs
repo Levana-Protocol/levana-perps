@@ -14,7 +14,7 @@ use msg::{
     token::Token,
 };
 
-use crate::config::{BotConfig, BotConfigByType, BotConfigTestnet};
+use crate::config::BotConfigByType;
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
 use super::{App, AppBuilder};
@@ -23,15 +23,20 @@ use super::{App, AppBuilder};
 #[serde(rename_all = "snake_case")]
 pub(crate) struct FactoryInfo {
     pub(crate) factory: Address,
-    pub(crate) faucet: Option<Address>,
     pub(crate) updated: DateTime<Utc>,
     pub(crate) is_static: bool,
-    pub(crate) cw20s: Vec<Cw20>,
     pub(crate) markets: HashMap<MarketId, Address>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) struct FrontendInfoTestnet {
+    pub(crate) faucet: Address,
+    pub(crate) cw20s: Vec<Cw20>,
     pub(crate) gitrev: Option<String>,
     pub(crate) faucet_gas_amount: Option<String>,
     pub(crate) faucet_collateral_amount: HashMap<&'static str, Decimal256>,
-    pub(crate) rpc: Option<RpcInfo>,
+    pub(crate) rpc: RpcInfo,
 }
 
 #[derive(serde::Serialize)]
@@ -67,7 +72,24 @@ impl WatchedTask for FactoryUpdate {
 }
 
 async fn update(app: &App) -> Result<WatchedTaskOutput> {
-    let (message, info) = get_factory_info(&app.cosmos, &app.config, &app.client).await?;
+    let (message, info) = match &app.config.by_type {
+        BotConfigByType::Testnet { inner } => {
+            let (message, factory_info, frontend_info_testnet) = get_factory_info_testnet(
+                &app.cosmos,
+                &app.client,
+                inner.tracker,
+                inner.faucet,
+                &inner.contract_family,
+                &inner.rpc_nodes,
+            )
+            .await?;
+            app.set_frontend_info_testnet(frontend_info_testnet)?;
+            (message, factory_info)
+        }
+        BotConfigByType::Mainnet { inner } => {
+            get_factory_info_mainnet(&app.cosmos, inner.factory).await?
+        }
+    };
     let output = WatchedTaskOutput {
         skip_delay: false,
         message,
@@ -76,101 +98,96 @@ async fn update(app: &App) -> Result<WatchedTaskOutput> {
     Ok(output)
 }
 
-pub(crate) async fn get_factory_info(
+pub(crate) async fn get_factory_info_mainnet(
     cosmos: &Cosmos,
-    config: &BotConfig,
-    client: &reqwest::Client,
+    factory: Address,
 ) -> Result<(String, FactoryInfo)> {
-    let (factory, gitrev, message) = match &config.by_type {
-        BotConfigByType::Testnet { inner } => {
-            let (factory, gitrev) = get_contract(cosmos, inner, "factory")
-                .await
-                .context("Unable to get 'factory' contract")?;
-            let message = format!(
-                "Successfully loaded factory address {factory} from tracker {}",
-                inner.tracker
-            );
-            (factory, gitrev, message)
-        }
-        BotConfigByType::Mainnet { inner } => (
-            inner.factory,
-            None,
-            format!("Using hard-coded factory address {}", inner.factory),
-        ),
-    };
+    let message = format!("Using hard-coded factory address {factory}");
 
-    let faucet = match &config.by_type {
-        BotConfigByType::Testnet { inner } => Some(inner.faucet),
-        BotConfigByType::Mainnet { .. } => None,
+    let (_cw20s, markets) = get_tokens_markets(cosmos, factory)
+        .await
+        .with_context(|| format!("Unable to get_tokens_market for factory {factory}"))?;
+
+    let factory_info = FactoryInfo {
+        factory,
+        updated: Utc::now(),
+        is_static: false,
+        markets,
     };
+    Ok((message, factory_info))
+}
+
+pub(crate) async fn get_factory_info_testnet(
+    cosmos: &Cosmos,
+    client: &reqwest::Client,
+    tracker: Address,
+    faucet: Address,
+    family: &str,
+    rpc_nodes: &[Arc<String>],
+) -> Result<(String, FactoryInfo, FrontendInfoTestnet)> {
+    let (factory, gitrev) = get_contract(cosmos, tracker, family, "factory")
+        .await
+        .context("Unable to get 'factory' contract")?;
+    let message = format!("Successfully loaded factory address {factory} from tracker {tracker}",);
 
     let (cw20s, markets) = get_tokens_markets(cosmos, factory)
         .await
         .with_context(|| format!("Unable to get_tokens_market for factory {factory}"))?;
-    let faucet_gas_amount = match faucet {
-        Some(faucet) => match get_faucet_gas_amount(cosmos, faucet).await {
-            Ok(x) => x,
-            Err(e) => {
-                log::warn!("Error on get_faucet_gas_amount: {e:?}");
-                None
-            }
-        },
-        None => None,
+    let faucet_gas_amount = match get_faucet_gas_amount(cosmos, faucet).await {
+        Ok(x) => x,
+        Err(e) => {
+            log::warn!("Error on get_faucet_gas_amount: {e:?}");
+            None
+        }
     };
 
-    let faucet_collateral_amount = match faucet {
-        Some(faucet) => match get_faucet_collateral_amount(cosmos, faucet).await {
-            Ok(x) => x,
-            Err(e) => {
-                log::warn!("Error on get_faucet_collateral_amount: {e:?}");
-                HashMap::new()
-            }
-        },
-        None => HashMap::new(),
+    let faucet_collateral_amount = match get_faucet_collateral_amount(cosmos, faucet).await {
+        Ok(x) => x,
+        Err(e) => {
+            log::warn!("Error on get_faucet_collateral_amount: {e:?}");
+            HashMap::new()
+        }
     };
 
-    let rpc = match &config.by_type {
-        BotConfigByType::Testnet { inner } => Some(get_rpc_info(cosmos, inner, client).await?),
-        BotConfigByType::Mainnet { .. } => None,
-    };
-    let info = FactoryInfo {
+    let rpc = get_rpc_info(cosmos, client, rpc_nodes).await?;
+
+    let factory_info = FactoryInfo {
         factory,
-        faucet,
         updated: Utc::now(),
         is_static: false,
-        cw20s,
         markets,
+    };
+    let frontend_info_testnet = FrontendInfoTestnet {
+        faucet,
+        cw20s,
         gitrev,
         faucet_gas_amount,
         faucet_collateral_amount,
         rpc,
     };
-    Ok((message, info))
+    Ok((message, factory_info, frontend_info_testnet))
 }
 
 pub(crate) async fn get_contract(
     cosmos: &Cosmos,
-    testnet: &BotConfigTestnet,
+    tracker: Address,
+    family: &str,
     contract_type: &str,
 ) -> Result<(Address, Option<String>)> {
-    let tracker = cosmos.make_contract(testnet.tracker);
+    let tracker = cosmos.make_contract(tracker);
     let (addr, code_id) = match tracker
         .query(msg::contracts::tracker::entry::QueryMsg::ContractByFamily {
             contract_type: contract_type.to_owned(),
-            family: testnet.contract_family.clone(),
+            family: family.to_owned(),
             sequence: None,
         })
         .await
         .with_context(|| {
-            format!(
-                "Calling ContractByFamily with {contract_type} and {} against {tracker}",
-                testnet.contract_family
-            )
+            format!("Calling ContractByFamily with {contract_type} and {family} against {tracker}",)
         })? {
-        ContractResp::NotFound {} => anyhow::bail!(
-            "No {contract_type} contract found for contract family {}",
-            testnet.contract_family
-        ),
+        ContractResp::NotFound {} => {
+            anyhow::bail!("No {contract_type} contract found for contract family {family}",)
+        }
         ContractResp::Found {
             address,
             current_code_id,
@@ -281,13 +298,13 @@ async fn get_faucet_collateral_amount(
 
 async fn get_rpc_info(
     cosmos: &Cosmos,
-    testnet: &BotConfigTestnet,
     client: &reqwest::Client,
+    rpc_nodes: &[Arc<String>],
 ) -> Result<RpcInfo> {
     let grpc = cosmos.get_latest_block_info().await?;
 
     let mut handles = vec![];
-    for node in &testnet.rpc_nodes {
+    for node in rpc_nodes {
         handles.push(tokio::task::spawn(get_height(node.clone(), client.clone())));
     }
 
@@ -305,10 +322,7 @@ async fn get_rpc_info(
         Some(pair) => pair,
         // All nodes are broken
         None => {
-            let node = testnet
-                .rpc_nodes
-                .first()
-                .context("Config includes no RPC nodes")?;
+            let node = rpc_nodes.first().context("Config includes no RPC nodes")?;
             (node.clone(), 0)
         }
     };

@@ -2,7 +2,7 @@ use std::collections::{HashMap, VecDeque};
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::DateTime;
 use chrono::Utc;
 use cosmos::Address;
@@ -12,19 +12,20 @@ use cosmos::Wallet;
 use parking_lot::RwLock;
 use reqwest::Client;
 
+use crate::app::factory::{get_factory_info_mainnet, get_factory_info_testnet};
 use crate::cli::Opt;
-use crate::config::{BotConfig, BotConfigTestnet};
+use crate::config::{BotConfig, BotConfigByType, BotConfigTestnet};
 use crate::wallet_manager::ManagedWallet;
 use crate::watcher::TaskStatuses;
 use crate::watcher::Watcher;
 
-use super::factory::get_factory_info;
-use super::factory::FactoryInfo;
+use super::factory::{FactoryInfo, FrontendInfoTestnet};
 use super::gas_check::{GasCheckBuilder, GasCheckWallet};
 
 pub(crate) type GasRecords = VecDeque<(DateTime<Utc>, u128)>;
 pub(crate) struct App {
     factory: RwLock<Arc<FactoryInfo>>,
+    frontend_info_testnet: Option<RwLock<Arc<FrontendInfoTestnet>>>,
     pub(crate) cosmos: Cosmos,
     pub(crate) config: BotConfig,
     pub(crate) client: Client,
@@ -69,11 +70,24 @@ impl Opt {
             crate::cli::Sub::Mainnet { .. } => None,
         };
 
-        let factory = get_factory_info(&cosmos, &config, &client).await?.1;
-        log::info!("Discovered factory contract: {}", factory.factory);
-        if let Some(faucet) = factory.faucet {
-            log::info!("Discovered faucet contract: {}", faucet);
-        }
+        let (factory, frontend_info_testnet) = match &config.by_type {
+            BotConfigByType::Testnet { inner } => {
+                let (_, factory, frontend) = get_factory_info_testnet(
+                    &cosmos,
+                    &client,
+                    inner.tracker,
+                    inner.faucet,
+                    &inner.contract_family,
+                    &inner.rpc_nodes,
+                )
+                .await?;
+                (factory, Some(RwLock::new(Arc::new(frontend))))
+            }
+            BotConfigByType::Mainnet { inner } => (
+                get_factory_info_mainnet(&cosmos, inner.factory).await?.1,
+                None,
+            ),
+        };
 
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
@@ -84,6 +98,7 @@ impl Opt {
             statuses: TaskStatuses::default(),
             live_since: Utc::now(),
             gases: RwLock::new(HashMap::new()),
+            frontend_info_testnet,
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {
@@ -151,5 +166,20 @@ impl App {
 
     pub(crate) fn set_factory_info(&self, info: FactoryInfo) {
         *self.factory.write() = Arc::new(info);
+    }
+
+    pub(crate) fn get_frontend_info_testnet(&self) -> Option<Arc<FrontendInfoTestnet>> {
+        self.frontend_info_testnet
+            .as_ref()
+            .map(|x| x.read().clone())
+    }
+
+    pub(crate) fn set_frontend_info_testnet(&self, info: FrontendInfoTestnet) -> Result<()> {
+        *self
+            .frontend_info_testnet
+            .as_ref()
+            .context("Tried to set frontend_info_testnet with a mainnet config")?
+            .write() = Arc::new(info);
+        Ok(())
     }
 }

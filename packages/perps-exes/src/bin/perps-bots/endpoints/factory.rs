@@ -4,7 +4,10 @@ use axum::{extract::State, response::IntoResponse, Json};
 use cosmos::CosmosNetwork;
 
 use crate::{
-    app::{factory::FactoryInfo, App},
+    app::{
+        factory::{FactoryInfo, FrontendInfoTestnet},
+        App,
+    },
     config::BotConfigByType,
 };
 
@@ -12,6 +15,8 @@ use crate::{
 struct FactoryResp<'a> {
     #[serde(flatten)]
     factory_info: &'a FactoryInfo,
+    #[serde(flatten)]
+    frontend_info_testnet: Option<&'a FrontendInfoTestnet>,
 
     network: CosmosNetwork,
     price_api: &'static str,
@@ -24,6 +29,7 @@ pub(crate) async fn factory(app: State<Arc<App>>) -> impl IntoResponse {
     match &app.config.by_type {
         BotConfigByType::Testnet { inner } => Json(FactoryResp {
             factory_info: &factory_info,
+            frontend_info_testnet: app.get_frontend_info_testnet().as_deref(),
             network: app.config.network,
             price_api: inner.price_api,
             explorer: inner.explorer,

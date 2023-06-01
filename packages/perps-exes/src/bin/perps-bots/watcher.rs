@@ -428,7 +428,7 @@ impl TaskStatuses {
         }
         let statuses = self.all_statuses();
         let alert = statuses.iter().any(|x| x.short.alert());
-        let factory = app.get_factory_info();
+        let frontend_info_testnet = app.get_frontend_info_testnet();
         let mut res = MyTemplate {
             statuses,
             family: match &app.config.by_type {
@@ -441,7 +441,7 @@ impl TaskStatuses {
             },
             build_version: build_version(),
             grpc: &app.cosmos.get_first_builder().grpc_url,
-            rpc: factory.rpc.as_ref(),
+            rpc: frontend_info_testnet.as_deref().map(|x| &x.rpc),
             live_since: app.live_since,
             now: Utc::now(),
         }
