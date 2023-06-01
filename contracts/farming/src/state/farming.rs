@@ -10,10 +10,10 @@ const FARMERS: Map<&Addr, RawFarmerStats> = Map::new("farmer-stats");
 pub(crate) struct RawFarmerStats {
     /// The amount of farming tokens owned by this farmer
     pub(crate) farming_tokens: FarmingToken,
-    /// A timestamp representing the last time the farmer collected lockdrop rewards
-    pub(crate) lockdrop_last_collected: Option<Timestamp>,
-    /// The amount of LVN tokens collected by the farmer up until [lockdrop_last_collected]
-    pub(crate) lockdrop_amount_collected: LvnToken,
+    /// A timestamp representing the last time the farmer claimed lockdrop rewards
+    pub(crate) lockdrop_last_claimed: Option<Timestamp>,
+    /// The amount of LVN tokens claimed by the farmer up until [lockdrop_last_claimed]
+    pub(crate) lockdrop_amount_claimed: LvnToken,
     /// The prefix sum of the last time the farmer claimed.
     /// See [REWARDS_PER_TIME_PER_TOKEN] for more explanation of prefix sums.
     pub(crate) xlp_last_claimed_prefix_sum: LvnToken,

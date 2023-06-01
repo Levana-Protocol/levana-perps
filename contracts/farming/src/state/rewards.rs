@@ -114,10 +114,10 @@ impl State<'_> {
         match amount {
             None => Ok(()),
             Some(amount) => {
-                farmer_stats.lockdrop_amount_collected = farmer_stats
-                    .lockdrop_amount_collected
+                farmer_stats.lockdrop_amount_claimed = farmer_stats
+                    .lockdrop_amount_claimed
                     .checked_add(unlocked)?;
-                farmer_stats.lockdrop_last_collected = Some(self.now());
+                farmer_stats.lockdrop_last_claimed = Some(self.now());
                 self.save_raw_farmer_stats(ctx.storage, user, &farmer_stats)?;
 
                 let coin = self

@@ -183,34 +183,34 @@ impl State<'_> {
         stats: &RawFarmerStats,
     ) -> Result<LvnToken> {
         let period = self.get_period_resp(store)?;
-        let lockdrop_start = match period {
+        let launch_start = match period {
             FarmingPeriodResp::Launched { started_at } => started_at,
             _ => bail!("Cannot collect lockdrop rewards prior to launch"),
         };
         let lockdrop_config = self.load_lockdrop_config(store)?;
         let elapsed_since_start = self
             .now()
-            .checked_sub(lockdrop_start, "claim_lockdrop_rewards")?;
+            .checked_sub(launch_start, "claim_lockdrop_rewards")?;
         let total_user_rewards = self.calculate_lockdrop_rewards(store, user)?;
 
         let amount = if elapsed_since_start >= lockdrop_config.lockdrop_lvn_unlock_seconds {
-            total_user_rewards.checked_sub(stats.lockdrop_amount_collected)?
+            total_user_rewards.checked_sub(stats.lockdrop_amount_claimed)?
         } else {
-            let start_time = stats.lockdrop_last_collected.unwrap_or(lockdrop_start);
-            let elapsed_since_last_collected = self.now().checked_sub(
+            let start_time = stats.lockdrop_last_claimed.unwrap_or(launch_start);
+            let elapsed_since_last_claimed = self.now().checked_sub(
                 start_time,
-                "claim_lockdrop_rewards, elapsed_since_last_collected",
+                "claim_lockdrop_rewards, elapsed_since_last_claimed",
             )?;
 
             let elapsed_ratio = Decimal256::from_ratio(
-                elapsed_since_last_collected.as_nanos(),
+                elapsed_since_last_claimed.as_nanos(),
                 lockdrop_config.lockdrop_lvn_unlock_seconds.as_nanos(),
             );
 
             total_user_rewards
                 .checked_mul_dec(elapsed_ratio)?
                 // using min as an added precaution to make sure it never goes above the total due to rounding errors
-                .min(total_user_rewards.checked_sub(stats.lockdrop_amount_collected)?)
+                .min(total_user_rewards.checked_sub(stats.lockdrop_amount_claimed)?)
         };
 
         Ok(amount)
