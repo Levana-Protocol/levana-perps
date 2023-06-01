@@ -4,7 +4,6 @@ use crate::prelude::*;
 use crate::state::period::LockdropDurations;
 use serde::{Deserialize, Serialize};
 
-//todo don't forget to set LVN_LOCKDROP_REWARDS
 /// The total amount of LVN rewards designated for lockdrop participants
 const LVN_LOCKDROP_REWARDS: Item<LvnToken> = Item::new(namespace::LVN_LOCKDROP_REWARDS);
 
