@@ -76,15 +76,25 @@ async fn single_market(
     } else {
         status.liquidity.locked.into_decimal256() / total.into_decimal256()
     };
-    let high_util = worker.liquidity_config.max_util;
-    let low_util = worker.liquidity_config.min_util;
-    let target_liquidity = status.liquidity.locked.checked_mul_dec(
-        worker
-            .liquidity_config
-            .target_util
-            .inv()
-            .context("Cannot invert target util")?,
-    )?;
+    let high_util = status
+        .config
+        .target_utilization
+        .raw()
+        .checked_add_signed(worker.liquidity_config.max_util_delta)?;
+    let low_util = status
+        .config
+        .target_utilization
+        .raw()
+        .checked_add_signed(worker.liquidity_config.min_util_delta)?;
+    let target_util = status
+        .config
+        .target_utilization
+        .raw()
+        .checked_add_signed(worker.liquidity_config.target_util_delta)?;
+    let target_liquidity = status
+        .liquidity
+        .locked
+        .checked_mul_dec(target_util.inv().context("Cannot invert target util")?)?;
 
     let lp_info = market.lp_info(&worker.wallet).await.with_context(|| {
         format!(

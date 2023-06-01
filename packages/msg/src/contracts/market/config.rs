@@ -124,14 +124,14 @@ impl Default for Config {
             funding_rate_max_annualized: "0.9".parse().unwrap(),
             borrow_fee_rate_min_annualized: "0.01".parse().unwrap(),
             borrow_fee_rate_max_annualized: "0.60".parse().unwrap(),
-            funding_rate_sensitivity: "1".parse().unwrap(),
+            funding_rate_sensitivity: "10".parse().unwrap(),
             mute_events: false,
             liquifunding_delay_seconds: 60 * 60 * 24,
             price_update_too_old_seconds: 60 * 30,
             staleness_seconds: 60 * 60 * 2,
             protocol_tax: "0.3".parse().unwrap(),
             unstake_period_seconds: 60 * 60 * 24 * 45, // 45 days
-            target_utilization: "0.9".parse().unwrap(),
+            target_utilization: "0.8".parse().unwrap(),
             // Try to realize the bias over a 3 day period.
             //
             // See: https://phobosfinance.atlassian.net/browse/PERP-606
@@ -147,7 +147,7 @@ impl Default for Config {
             crank_fee_charged: "0.01".parse().unwrap(),
             crank_fee_reward: "0.001".parse().unwrap(),
             minimum_deposit_usd: "5".parse().unwrap(),
-            unpend_limit: 50,
+            unpend_limit: 500,
             liquifunding_delay_fuzz_seconds: 60 * 60 * 4,
             max_liquidity: MaxLiquidity::Unlimited {},
             disable_position_nft_exec: false,
