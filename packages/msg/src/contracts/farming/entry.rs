@@ -356,9 +356,9 @@ pub struct FarmerStats {
     /// Information on all lockdrops the farmer is associated with
     pub lockdrops: Vec<FarmerLockdropStats>,
     /// Total lockdrop LVN rewards that are available for claiming
-    pub lockdrop_available: LvnToken,
+    pub lockdrop_rewards_available: LvnToken,
     /// Total lockdrop LVN rewards that are pending unlock
-    pub lockdrop_locked: LvnToken,
+    pub lockdrop_rewards_locked: LvnToken,
     /// LVN emissions available for claiming
     pub emission_rewards: LvnToken,
 }

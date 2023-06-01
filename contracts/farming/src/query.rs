@@ -15,15 +15,40 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             match state.load_raw_farmer_stats(store, &farmer)? {
                 None => FarmerStats::default(),
                 Some(farmer_stats) => {
-                    let lockup_info = state.lockdrop_lockup_info(store, &farmer)?;
+                    let (
+                        lockdrop_rewards_available,
+                        lockdrop_rewards_locked,
+                        lockdrop_deposit_locked,
+                    ) = match state.get_period_resp(store)? {
+                        FarmingPeriodResp::Launched { .. } => {
+                            let lockup_info = state.lockdrop_lockup_info(store, &farmer)?;
+
+                            let lockdrop_rewards =
+                                state.calculate_lockdrop_rewards(store, &farmer)?;
+                            let lockdrop_rewards_available = state
+                                .calculate_unlocked_lockdrop_rewards(
+                                    store,
+                                    &farmer,
+                                    &farmer_stats,
+                                )?;
+                            let lockdrop_rewards_locked =
+                                lockdrop_rewards.checked_sub(lockdrop_rewards_available)?;
+                            (
+                                lockdrop_rewards_available,
+                                lockdrop_rewards_locked,
+                                lockup_info.locked,
+                            )
+                        }
+                        _ => (
+                            LvnToken::zero(),
+                            LvnToken::zero(),
+                            farmer_stats.farming_tokens,
+                        ),
+                    };
+
                     let farming_tokens_available = farmer_stats
                         .farming_tokens
-                        .checked_sub(lockup_info.locked)?;
-
-                    let lockdrop_rewards = state.calculate_lockdrop_rewards(store, &farmer)?;
-                    let lockdrop_available =
-                        state.calculate_unlocked_lockdrop_rewards(store, &farmer, &farmer_stats)?;
-                    let lockdrop_locked = lockdrop_rewards.checked_sub(lockdrop_available)?;
+                        .checked_sub(lockdrop_deposit_locked)?;
 
                     let emissions = state.may_load_lvn_emissions(store)?;
                     let unlocked_emissions = match emissions {
@@ -39,8 +64,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                         farming_tokens: farmer_stats.farming_tokens,
                         lockdrops: state.get_farmer_lockdrop_stats(store, &farmer)?,
                         farming_tokens_available,
-                        lockdrop_available,
-                        lockdrop_locked,
+                        lockdrop_rewards_available,
+                        lockdrop_rewards_locked,
                         emission_rewards,
                     }
                 }

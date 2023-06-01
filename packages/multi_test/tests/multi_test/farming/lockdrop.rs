@@ -220,27 +220,27 @@ fn test_query_lockdrop_rewards() {
     assert_eq!(stats0.lockdrops.len(), 2);
     assert_eq!(stats0.lockdrops[0].total, "100".parse().unwrap());
     assert_eq!(stats0.lockdrops[1].total, "200".parse().unwrap());
-    assert_eq!(stats0.lockdrop_available, "76".parse().unwrap());
-    assert_eq!(stats0.lockdrop_locked, "228".parse().unwrap());
+    assert_eq!(stats0.lockdrop_rewards_available, "76".parse().unwrap());
+    assert_eq!(stats0.lockdrop_rewards_locked, "228".parse().unwrap());
 
     assert_eq!(stats1.lockdrops.len(), 1);
     assert_eq!(stats1.lockdrops[0].total, "100".parse().unwrap());
-    assert_eq!(stats1.lockdrop_available, "7".parse().unwrap());
-    assert_eq!(stats1.lockdrop_locked, "21".parse().unwrap());
+    assert_eq!(stats1.lockdrop_rewards_available, "7".parse().unwrap());
+    assert_eq!(stats1.lockdrop_rewards_locked, "21".parse().unwrap());
 
     assert_eq!(stats2.lockdrops.len(), 1);
     assert_eq!(stats2.lockdrops[0].total, "100".parse().unwrap());
-    assert_eq!(stats2.lockdrop_available, "13".parse().unwrap());
-    assert_eq!(stats2.lockdrop_locked, "39".parse().unwrap());
+    assert_eq!(stats2.lockdrop_rewards_available, "13".parse().unwrap());
+    assert_eq!(stats2.lockdrop_rewards_locked, "39".parse().unwrap());
 
     let assert_total = || {
         let stats0 = market.query_farming_farmer_stats(&farmers[0]).unwrap();
         let stats1 = market.query_farming_farmer_stats(&farmers[1]).unwrap();
         let stats2 = market.query_farming_farmer_stats(&farmers[2]).unwrap();
 
-        assert_eq!(stats0.lockdrop_available, "304".parse().unwrap());
-        assert_eq!(stats1.lockdrop_available, "28".parse().unwrap());
-        assert_eq!(stats2.lockdrop_available, "52".parse().unwrap());
+        assert_eq!(stats0.lockdrop_rewards_available, "304".parse().unwrap());
+        assert_eq!(stats1.lockdrop_rewards_available, "28".parse().unwrap());
+        assert_eq!(stats2.lockdrop_rewards_available, "52".parse().unwrap());
     };
 
     // Jump to the end of the lockup period
