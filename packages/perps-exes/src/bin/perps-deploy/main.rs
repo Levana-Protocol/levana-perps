@@ -1,5 +1,5 @@
 use clap::Parser;
-use cli::{Cmd, Subcommand};
+use cli::{Cmd, Subcommand, TestnetSub};
 
 mod app;
 mod chain_tests;
@@ -32,13 +32,15 @@ async fn main_inner() -> anyhow::Result<()> {
         Subcommand::LocalDeploy { inner } => {
             local_deploy::go(opt, inner).await?;
         }
-        Subcommand::StoreCode { inner } => store_code::go(opt, inner).await?,
-        Subcommand::Instantiate { inner } => instantiate::go(opt, inner).await?,
-        Subcommand::Migrate { inner } => migrate::go(opt, inner).await?,
         Subcommand::OnChainTests { inner } => localtest::go(opt, inner).await?,
-        Subcommand::InitChain { inner } => init_chain::go(opt, inner).await?,
         Subcommand::SetupMarket { inner } => setup_market::go(opt, inner).await?,
-        Subcommand::InstantiateRewards { inner } => instantiate_rewards::go(opt, inner).await?,
+        Subcommand::Testnet { inner } => match inner {
+            TestnetSub::StoreCode { inner } => store_code::go(opt, inner).await?,
+            TestnetSub::Instantiate { inner } => instantiate::go(opt, inner).await?,
+            TestnetSub::Migrate { inner } => migrate::go(opt, inner).await?,
+            TestnetSub::InitChain { inner } => init_chain::go(opt, inner).await?,
+            TestnetSub::InstantiateRewards { inner } => instantiate_rewards::go(opt, inner).await?,
+        },
         Subcommand::Mainnet { inner } => mainnet::go(opt, inner).await?,
     }
 
