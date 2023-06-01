@@ -310,6 +310,7 @@ async fn instantiate_factory(
     let liquidity = code_ids.get_simple(ContractType::LiquidityToken, &opt, network)?;
     let factory = app.cosmos.make_code_id(factory_code_id);
     log::info!("Instantiating a factory using code ID {factory_code_id}");
+    let migration_admin = migration_admin.unwrap_or(owner);
     let factory = factory
         .instantiate(
             &app.wallet,
@@ -320,13 +321,13 @@ async fn instantiate_factory(
                 position_token_code_id: position.to_string(),
                 liquidity_token_code_id: liquidity.to_string(),
                 owner: owner.get_address_string().into(),
-                migration_admin: migration_admin.unwrap_or(owner).get_address_string().into(),
+                migration_admin: migration_admin.get_address_string().into(),
                 dao: dao.unwrap_or(owner).get_address_string().into(),
                 kill_switch: kill_switch.unwrap_or(owner).get_address_string().into(),
                 wind_down: wind_down.unwrap_or(owner).get_address_string().into(),
                 label_suffix,
             },
-            ContractAdmin::Addr(owner),
+            ContractAdmin::Addr(migration_admin),
         )
         .await?;
     log::info!("Deployed fresh factory contract to: {factory}");
@@ -392,8 +393,8 @@ async fn add_market(
         .with_context(|| format!("Unknown mainnet factory: {factory}"))?;
     let app = opt.load_app_mainnet(factory.network).await?;
 
-    let owner = Factory::from_contract(app.cosmos.make_contract(factory.address))
-        .query_owner()
+    let migration_admin = Factory::from_contract(app.cosmos.make_contract(factory.address))
+        .query_migration_admin()
         .await?;
 
     log::info!("Deploying a new Pyth bridge");
@@ -410,7 +411,7 @@ async fn add_market(
                 pyth: app.pyth.address.get_address_string().into(),
                 update_age_tolerance_seconds: app.pyth.update_age_tolerance,
             },
-            ContractAdmin::Addr(owner),
+            ContractAdmin::Addr(migration_admin),
         )
         .await?;
     log::info!("New Pyth bridge contract: {pyth_bridge}");
