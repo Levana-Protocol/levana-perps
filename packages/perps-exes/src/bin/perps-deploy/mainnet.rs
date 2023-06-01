@@ -415,25 +415,6 @@ async fn add_market(
         .await?;
     log::info!("New Pyth bridge contract: {pyth_bridge}");
 
-    log::info!("Calling AddMarket on the factory");
-    let factory = app.cosmos.make_contract(factory.address);
-    let res = factory
-        .execute(
-            &app.wallet,
-            vec![],
-            msg::contracts::factory::entry::ExecuteMsg::AddMarket {
-                new_market: NewMarketParams {
-                    market_id: market_id.clone(),
-                    token: TokenInit::Native { denom: collateral },
-                    config: Some(market_config_update),
-                    price_admin: pyth_bridge.get_address_string().into(),
-                    initial_borrow_fee_rate,
-                },
-            },
-        )
-        .await?;
-    log::info!("New market added in transaction: {}", res.txhash);
-
     log::info!("Setting price feed for market {market_id} to use Pyth Oracle.");
     log::info!(
         "Main price feeds: {:?}, USD price feeds: {:?}",
@@ -445,12 +426,31 @@ async fn add_market(
             &app.wallet,
             vec![],
             msg::contracts::pyth_bridge::entry::ExecuteMsg::SetMarketPriceFeeds {
-                market_id,
+                market_id: market_id.clone(),
                 market_price_feeds: pyth_config.clone(),
             },
         )
         .await?;
     log::info!("Called SetMarketPriceFeeds in {}", res.txhash);
+
+    log::info!("Calling AddMarket on the factory");
+    let factory = app.cosmos.make_contract(factory.address);
+    let res = factory
+        .execute(
+            &app.wallet,
+            vec![],
+            msg::contracts::factory::entry::ExecuteMsg::AddMarket {
+                new_market: NewMarketParams {
+                    market_id,
+                    token: TokenInit::Native { denom: collateral },
+                    config: Some(market_config_update),
+                    price_admin: pyth_bridge.get_address_string().into(),
+                    initial_borrow_fee_rate,
+                },
+            },
+        )
+        .await?;
+    log::info!("New market added in transaction: {}", res.txhash);
 
     Ok(())
 }
