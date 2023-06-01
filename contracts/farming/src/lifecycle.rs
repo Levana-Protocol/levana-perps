@@ -1,5 +1,5 @@
-use crate::state::rewards::LockdropConfig;
 use crate::prelude::*;
+use crate::state::rewards::LockdropConfig;
 
 use semver::Version;
 

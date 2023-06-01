@@ -21,7 +21,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                         .checked_sub(lockup_info.locked)?;
 
                     let lockdrop_rewards = state.calculate_lockdrop_rewards(store, &farmer)?;
-                    let lockdrop_available = state.calculate_unlocked_lockdrop_rewards(store, &farmer, &farmer_stats)?;
+                    let lockdrop_available =
+                        state.calculate_unlocked_lockdrop_rewards(store, &farmer, &farmer_stats)?;
                     let lockdrop_locked = lockdrop_rewards.checked_sub(lockdrop_available)?;
 
                     let emissions = state.may_load_lvn_emissions(store)?;
@@ -43,7 +44,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                         emission_rewards,
                     }
                 }
-            }.query_result()
+            }
+            .query_result()
         }
 
         QueryMsg::Farmers { .. } => todo!(),

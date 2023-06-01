@@ -9,7 +9,7 @@ const LOCKDROP_DURATIONS: Item<LockdropDurations> = Item::new(namespace::LOCKDRO
 const REVIEW_START_TIME: Item<Timestamp> = Item::new("review-start-time");
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
-pub(crate) struct  LockdropDurations {
+pub(crate) struct LockdropDurations {
     /// The amount seconds from the start of the lockdrop until the sunset period begins
     pub(crate) start_duration: Duration,
     /// The amount of seconds the sunset period lasts
@@ -40,7 +40,11 @@ impl From<&FarmingPeriodResp> for FarmingPeriod {
 }
 
 impl State<'_> {
-    pub(crate) fn save_lockdrop_durations(&self, store: &mut dyn Storage, durations: LockdropDurations) -> Result<()> {
+    pub(crate) fn save_lockdrop_durations(
+        &self,
+        store: &mut dyn Storage,
+        durations: LockdropDurations,
+    ) -> Result<()> {
         LOCKDROP_DURATIONS.save(store, &durations)?;
         Ok(())
     }

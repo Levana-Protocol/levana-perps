@@ -1573,7 +1573,7 @@ impl PerpsMarket {
     pub fn exec_farming_set_lockdrop_rewards(
         &self,
         lvn_amount: NonZero<LvnToken>,
-        lvn_token: Token,
+        lvn_token: &Token,
     ) -> Result<AppResponse> {
         let funds = NumberGtZero::try_from_decimal(lvn_amount.into_decimal256())
             .and_then(|amount| lvn_token.into_native_coin(amount).unwrap())

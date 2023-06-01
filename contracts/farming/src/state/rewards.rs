@@ -43,9 +43,9 @@ impl State<'_> {
     pub(crate) fn rewards_init(
         &self,
         store: &mut dyn Storage,
-        lvn_token_denom: &String,
+        lvn_token_denom: &str,
     ) -> Result<()> {
-        self.save_lvn_token(store, lvn_token_denom.clone())?;
+        self.save_lvn_token(store, lvn_token_denom.to_string())?;
 
         EMISSIONS_PER_TIME_PER_TOKEN
             .save(store, self.now(), &LvnToken::zero())
@@ -104,30 +104,37 @@ impl State<'_> {
     pub(crate) fn claim_lockdrop_rewards(&self, ctx: &mut StateContext, user: &Addr) -> Result<()> {
         let mut farmer_stats = match self.load_raw_farmer_stats(ctx.storage, user)? {
             None => bail!("Unable to claim rewards, {} does not exist", user),
-            Some(stats) => stats
+            Some(stats) => stats,
         };
 
-        let unlocked = self.calculate_unlocked_lockdrop_rewards(ctx.storage, user, &farmer_stats)?;
+        let unlocked =
+            self.calculate_unlocked_lockdrop_rewards(ctx.storage, user, &farmer_stats)?;
+        let amount = NumberGtZero::new(unlocked.into_decimal256());
 
-        farmer_stats.lockdrop_amount_collected.checked_add(unlocked)?;
-        farmer_stats.lockdrop_last_collected = Some(self.now());
-        self.save_raw_farmer_stats(ctx.storage, user, &farmer_stats)?;
+        match amount {
+            None => Ok(()),
+            Some(amount) => {
+                farmer_stats.lockdrop_amount_collected = farmer_stats
+                    .lockdrop_amount_collected
+                    .checked_add(unlocked)?;
+                farmer_stats.lockdrop_last_collected = Some(self.now());
+                self.save_raw_farmer_stats(ctx.storage, user, &farmer_stats)?;
 
-        let amount = NumberGtZero::new(unlocked.into_decimal256())
-            .context("Unable to convert amount into NumberGtZero")?;
-        let coin = self
-            .load_lvn_token(ctx.storage)?
-            .into_native_coin(amount)?
-            .context("Invalid LVN transfer amount calculated")?;
+                let coin = self
+                    .load_lvn_token(ctx.storage)?
+                    .into_native_coin(amount)?
+                    .context("Invalid LVN transfer amount calculated")?;
 
-        let transfer_msg = CosmosMsg::Bank(BankMsg::Send {
-            to_address: user.to_string(),
-            amount: vec![coin],
-        });
+                let transfer_msg = CosmosMsg::Bank(BankMsg::Send {
+                    to_address: user.to_string(),
+                    amount: vec![coin],
+                });
 
-        ctx.response.add_message(transfer_msg);
+                ctx.response.add_message(transfer_msg);
 
-        Ok(())
+                Ok(())
+            }
+        }
     }
 
     /// Get the latest key and value from [REWARDS_PER_TIME_PER_TOKEN].
@@ -182,7 +189,7 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         addr: &Addr,
-        farmer_stats: &mut RawFarmerStats
+        farmer_stats: &mut RawFarmerStats,
     ) -> Result<()> {
         if let Some(emissions) = self.may_load_lvn_emissions(ctx.storage)? {
             self.update_emissions_per_token(ctx, &emissions)?;
@@ -229,10 +236,10 @@ impl State<'_> {
         ctx: &mut StateContext,
         addr: &Addr,
         emissions: &Emissions,
-        farmer_stats: &mut RawFarmerStats
+        farmer_stats: &mut RawFarmerStats,
     ) -> Result<()> {
         let accrued_rewards =
-            self.calculate_unlocked_emissions(ctx.storage, &farmer_stats, emissions)?;
+            self.calculate_unlocked_emissions(ctx.storage, farmer_stats, emissions)?;
 
         farmer_stats.accrued_emissions = farmer_stats
             .accrued_emissions
@@ -240,7 +247,7 @@ impl State<'_> {
         let end_prefix_sum = self.calculate_emissions_per_token_per_time(ctx.storage, emissions)?;
         farmer_stats.xlp_last_claimed_prefix_sum = end_prefix_sum;
 
-        self.save_raw_farmer_stats(ctx.storage, addr, &farmer_stats)?;
+        self.save_raw_farmer_stats(ctx.storage, addr, farmer_stats)?;
 
         Ok(())
     }
@@ -250,7 +257,7 @@ impl State<'_> {
     pub(crate) fn claim_lvn_emissions(&self, ctx: &mut StateContext, addr: &Addr) -> Result<()> {
         let mut farmer_stats = match self.load_raw_farmer_stats(ctx.storage, addr)? {
             None => bail!("Unable to claim emissions, {} does not exist", addr),
-            Some(farmer_stats) => farmer_stats
+            Some(farmer_stats) => farmer_stats,
         };
 
         let emissions = self.may_load_lvn_emissions(ctx.storage)?;

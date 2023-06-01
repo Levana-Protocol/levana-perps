@@ -6,7 +6,7 @@ fn test_emissions() {
     // Setup
 
     let app_cell = PerpsApp::new_cell().unwrap();
-    let mut market = PerpsMarket::new(app_cell.clone()).unwrap();
+    let mut market = PerpsMarket::new(app_cell).unwrap();
     let lp = market.clone_lp(0).unwrap();
 
     market.automatic_time_jump_enabled = false;
@@ -56,7 +56,7 @@ fn test_emissions_multiple_lps() {
     // market Setup
 
     let app_cell = PerpsApp::new_cell().unwrap();
-    let mut market = PerpsMarket::new(app_cell.clone()).unwrap();
+    let mut market = PerpsMarket::new(app_cell).unwrap();
     market.automatic_time_jump_enabled = false;
 
     let lp0 = market.clone_lp(0).unwrap();

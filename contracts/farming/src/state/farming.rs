@@ -88,9 +88,7 @@ impl State<'_> {
         store: &dyn Storage,
         farmer: &Addr,
     ) -> Result<Option<RawFarmerStats>> {
-        FARMERS
-            .may_load(store, farmer)
-            .map_err(|e| e.into())
+        FARMERS.may_load(store, farmer).map_err(|e| e.into())
     }
 
     /// Save the raw farmer stats for the given farmer.
@@ -112,7 +110,7 @@ impl State<'_> {
     ) -> Result<FarmingToken> {
         let mut farmer_stats = match self.load_raw_farmer_stats(ctx.storage, farmer)? {
             None => RawFarmerStats::default(),
-            Some(farmer_stats) => farmer_stats
+            Some(farmer_stats) => farmer_stats,
         };
 
         self.farming_perform_emissions_bookkeeping(ctx, farmer, &mut farmer_stats)?;
@@ -141,7 +139,7 @@ impl State<'_> {
     ) -> Result<(LpToken, FarmingToken)> {
         let mut farmer_stats = match self.load_raw_farmer_stats(ctx.storage, farmer)? {
             None => bail!("Unable to withdraw, {} does not exist", farmer),
-            Some(farmer_stats) => farmer_stats
+            Some(farmer_stats) => farmer_stats,
         };
 
         self.farming_perform_emissions_bookkeeping(ctx, farmer, &mut farmer_stats)?;

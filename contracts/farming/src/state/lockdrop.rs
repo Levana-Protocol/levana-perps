@@ -1,8 +1,8 @@
 use super::period::FarmingPeriod;
-use crate::prelude::*;
-use serde::{Deserialize, Serialize};
 use crate::prelude::farming::RawFarmerStats;
+use crate::prelude::*;
 use crate::state::period::LockdropDurations;
+use serde::{Deserialize, Serialize};
 
 //todo don't forget to set LVN_LOCKDROP_REWARDS
 /// The total amount of LVN rewards designated for lockdrop participants
@@ -16,10 +16,13 @@ impl State<'_> {
     ) -> Result<()> {
         LockdropBuckets::init(store, msg)?;
         self.save_lockdrop_rewards(store, LvnToken::zero())?;
-        self.save_lockdrop_durations(store, LockdropDurations {
-            start_duration: Duration::from_seconds(msg.lockdrop_start_duration.into()),
-            sunset_duration: Duration::from_seconds(msg.lockdrop_sunset_duration.into()),
-        })?;
+        self.save_lockdrop_durations(
+            store,
+            LockdropDurations {
+                start_duration: Duration::from_seconds(msg.lockdrop_start_duration.into()),
+                sunset_duration: Duration::from_seconds(msg.lockdrop_sunset_duration.into()),
+            },
+        )?;
 
         Ok(())
     }
@@ -43,7 +46,7 @@ impl State<'_> {
         let period = self.get_period(ctx.storage)?;
         let mut farmer_stats = match self.load_raw_farmer_stats(ctx.storage, &user)? {
             None => RawFarmerStats::default(),
-            Some(farmer_stats) => farmer_stats
+            Some(farmer_stats) => farmer_stats,
         };
 
         let farming_tokens = FarmingToken::from_decimal256(amount.into_decimal256());
@@ -173,7 +176,7 @@ impl State<'_> {
         &self,
         store: &dyn Storage,
         user: &Addr,
-        stats: &RawFarmerStats
+        stats: &RawFarmerStats,
     ) -> Result<LvnToken> {
         let period = self.get_period_resp(store)?;
         let lockdrop_start = match period {
