@@ -136,7 +136,12 @@ async fn single_market(
         CloseMany,
     }
 
-    let action = if util_ratio > worker.config.max_util {
+    let max_util = status
+        .config
+        .target_utilization
+        .raw()
+        .checked_add_signed(worker.config.max_util_delta)?;
+    let action = if util_ratio > max_util {
         Action::CloseMany
     } else if status.borrow_fee < worker.config.min_borrow_fee {
         Action::Open

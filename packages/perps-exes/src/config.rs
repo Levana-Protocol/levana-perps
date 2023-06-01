@@ -54,27 +54,27 @@ pub struct LiquidityConfig {
     /// Min and max per different markets
     pub markets: HashMap<MarketId, LiquidityBounds>,
     /// Lower bound of util ratio, at which point we would withdraw liquidity
-    pub min_util: Decimal256,
+    pub min_util_delta: Signed<Decimal256>,
     /// Upper bound of util ratio, at which point we would deposit liquidity
-    pub max_util: Decimal256,
+    pub max_util_delta: Signed<Decimal256>,
     /// When we deposit or withdraw, what utilization ratio do we target?
-    pub target_util: Decimal256,
+    pub target_util_delta: Signed<Decimal256>,
 }
 
 #[derive(serde::Deserialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct UtilizationConfig {
     /// Lower bound of util ratio, at which point we would open a position
-    pub min_util: Decimal256,
+    pub min_util_delta: Signed<Decimal256>,
     /// Upper bound of util ratio, at which point we would close a position
-    pub max_util: Decimal256,
+    pub max_util_delta: Signed<Decimal256>,
 }
 
 #[derive(serde::Deserialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct TraderConfig {
     /// Upper bound of util ratio, at which point we always close a position
-    pub max_util: Decimal256,
+    pub max_util_delta: Signed<Decimal256>,
     /// Minimum borrow fee ratio. If below this, we always open positions.
     pub min_borrow_fee: Decimal256,
     /// Maximum borrow fee ratio. If above this, we always close a position.
