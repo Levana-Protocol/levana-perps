@@ -9,6 +9,8 @@ use rand::Rng;
 
 use crate::{
     app::trader::EnsureCollateral,
+    config::BotConfigTestnet,
+    wallet_manager::ManagedWallet,
     watcher::{TaskLabel, WatchedTaskOutput, WatchedTaskPerMarket},
 };
 
@@ -59,15 +61,20 @@ async fn check_balance_single(cosmos: &Cosmos, addr: Address) -> Result<()> {
 struct Balance {
     app: Arc<App>,
     wallet: Wallet,
+    testnet: Arc<BotConfigTestnet>,
 }
 
 impl AppBuilder {
-    pub(super) fn launch_balance(&mut self, wallet: Wallet) -> Result<()> {
-        let balance = Balance {
-            app: self.app.clone(),
-            wallet,
-        };
-        self.watch_periodic(TaskLabel::Balance, balance)
+    pub(super) fn start_balance(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
+        if testnet.balance {
+            let balance = Balance {
+                app: self.app.clone(),
+                wallet: self.get_track_wallet(&testnet, ManagedWallet::Balance)?,
+                testnet,
+            };
+            self.watch_periodic(TaskLabel::Balance, balance)?;
+        }
+        Ok(())
     }
 }
 
@@ -76,11 +83,11 @@ impl WatchedTaskPerMarket for Balance {
     async fn run_single_market(
         &mut self,
         _app: &App,
-        factory: &FactoryInfo,
+        _factory: &FactoryInfo,
         market_id: &MarketId,
         addr: Address,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, market_id, addr, factory.faucet).await
+        single_market(self, market_id, addr, self.testnet.faucet).await
     }
 }
 
@@ -194,7 +201,7 @@ async fn single_market(
         market: &market,
         wallet: &worker.wallet,
         status: &status,
-        config: &worker.app.config,
+        testnet: &worker.testnet,
         cosmos: &worker.app.cosmos,
         min: needed_collateral,
         to_mint: needed_collateral,

@@ -8,6 +8,7 @@ use rust_decimal::Decimal;
 use serde_json::de::StrRead;
 
 use crate::{
+    config::BotConfigByType,
     util::{
         markets::{get_markets, Market, PriceApi},
         oracle::Pyth,
@@ -15,7 +16,7 @@ use crate::{
     watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
 };
 
-use super::{App, AppBuilder};
+use super::{gas_check::GasCheckWallet, App, AppBuilder};
 
 #[derive(Clone)]
 struct Worker {
@@ -24,8 +25,29 @@ struct Worker {
 
 /// Start the background thread to keep options pools up to date.
 impl AppBuilder {
-    pub(super) async fn start_price(&mut self, wallet: Arc<Wallet>) -> Result<()> {
-        self.watch_periodic(crate::watcher::TaskLabel::Price, Worker { wallet })
+    pub(super) fn start_price(&mut self) -> Result<()> {
+        if let Some(price_wallet) = self.app.config.price_wallet.clone() {
+            match &self.app.config.by_type {
+                BotConfigByType::Testnet { inner } => {
+                    let inner = inner.clone();
+                    self.refill_gas(&inner, *price_wallet.address(), GasCheckWallet::Price)?;
+                }
+                BotConfigByType::Mainnet { inner } => {
+                    self.alert_on_low_gas(
+                        *price_wallet.address(),
+                        GasCheckWallet::Price,
+                        inner.min_gas_price,
+                    )?;
+                }
+            }
+            self.watch_periodic(
+                crate::watcher::TaskLabel::Price,
+                Worker {
+                    wallet: price_wallet,
+                },
+            )?;
+        }
+        Ok(())
     }
 }
 
@@ -175,10 +197,15 @@ impl App {
             latest_price: Decimal,
         }
 
-        let url = format!(
-            "{}current?marketId={}",
-            self.config.price_api, price_api_symbol
-        );
+        let url = match &self.config.by_type {
+            BotConfigByType::Testnet { inner } => {
+                format!("{}current?marketId={}", inner.price_api, price_api_symbol)
+            }
+            BotConfigByType::Mainnet { .. } => {
+                anyhow::bail!("On mainnet, we must use Pyth price oracles")
+            }
+        };
+
         let Latest { latest_price } = self
             .client
             .get(url)

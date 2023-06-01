@@ -5,6 +5,7 @@ use cosmwasm_std::Addr;
 use shared::prelude::*;
 
 pub mod config;
+pub mod dragon_mint;
 pub mod entry;
 pub mod events;
 pub mod ibc;
@@ -37,6 +38,7 @@ pub struct NftHatchInfo {
     pub burn_kind: NftBurnKind,
     pub burn_metadata: nft::Metadata,
     pub rarity: NftRarity,
+    pub hatch_time: Timestamp,
 }
 
 #[cw_serde]

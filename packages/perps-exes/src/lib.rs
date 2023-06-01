@@ -2,7 +2,6 @@ pub mod config;
 pub mod contracts;
 pub mod discovery;
 pub mod prelude;
-pub mod wallet_manager;
 
 use chrono::{DateTime, TimeZone, Utc};
 use cosmos::{

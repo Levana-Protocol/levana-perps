@@ -5,13 +5,23 @@ use cosmos::{Address, Cosmos};
 use msg::prelude::*;
 use perps_exes::{contracts::MarketContract, timestamp_to_date_time};
 
-use crate::watcher::{TaskLabel, WatchedTaskOutput, WatchedTaskPerMarket};
+use crate::{
+    config::BotConfigByType,
+    watcher::{TaskLabel, WatchedTaskOutput, WatchedTaskPerMarket},
+};
 
 use super::{factory::FactoryInfo, App, AppBuilder};
 
 impl AppBuilder {
     pub(super) fn track_stale(&mut self) -> Result<()> {
-        self.watch_periodic(TaskLabel::Stale, Stale)
+        let ignore_stale = match &self.app.config.by_type {
+            BotConfigByType::Testnet { inner } => inner.ignore_stale,
+            BotConfigByType::Mainnet { .. } => false,
+        };
+        if !ignore_stale {
+            self.watch_periodic(TaskLabel::Stale, Stale)?;
+        }
+        Ok(())
     }
 }
 

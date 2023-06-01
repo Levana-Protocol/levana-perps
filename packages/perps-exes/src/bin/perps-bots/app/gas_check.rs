@@ -1,10 +1,12 @@
 use std::{
     collections::{HashSet, VecDeque},
+    fmt::Display,
     sync::Arc,
 };
 
 use crate::{
     app::App,
+    wallet_manager::ManagedWallet,
     watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
 };
 use anyhow::{Context, Result};
@@ -20,13 +22,41 @@ use super::AppBuilder;
 
 pub(crate) struct GasCheckBuilder {
     tracked_wallets: HashSet<Address>,
-    tracked_names: HashSet<String>,
+    tracked_names: HashSet<GasCheckWallet>,
     to_track: Vec<Tracked>,
-    gas_wallet: Arc<Wallet>,
+    gas_wallet: Option<Arc<Wallet>>,
+}
+
+/// Description of which wallet is being tracked
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum GasCheckWallet {
+    FaucetBot,
+    FaucetContract,
+    GasWallet,
+    WalletManager,
+    Crank,
+    Price,
+    Managed(ManagedWallet),
+    UltraCrank(usize),
+}
+
+impl Display for GasCheckWallet {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            GasCheckWallet::FaucetBot => write!(f, "Faucet bot"),
+            GasCheckWallet::FaucetContract => write!(f, "Faucet contract"),
+            GasCheckWallet::GasWallet => write!(f, "Gas wallet"),
+            GasCheckWallet::WalletManager => write!(f, "Wallet manager"),
+            GasCheckWallet::Crank => write!(f, "Crank"),
+            GasCheckWallet::Price => write!(f, "Price"),
+            GasCheckWallet::Managed(x) => write!(f, "{x}"),
+            GasCheckWallet::UltraCrank(x) => write!(f, "Ultra crank #{x}"),
+        }
+    }
 }
 
 impl GasCheckBuilder {
-    pub(crate) fn new(gas_wallet: Arc<Wallet>) -> GasCheckBuilder {
+    pub(crate) fn new(gas_wallet: Option<Arc<Wallet>>) -> GasCheckBuilder {
         GasCheckBuilder {
             tracked_wallets: Default::default(),
             tracked_names: Default::default(),
@@ -38,13 +68,12 @@ impl GasCheckBuilder {
     pub(crate) fn add(
         &mut self,
         address: Address,
-        name: impl Into<String>,
+        name: GasCheckWallet,
         min_gas: u128,
         should_refill: bool,
     ) -> Result<()> {
-        let name = name.into();
         anyhow::ensure!(
-            self.tracked_names.insert(name.clone()),
+            self.tracked_names.insert(name),
             "Wallet name already in use: {name}"
         );
         anyhow::ensure!(
@@ -60,8 +89,8 @@ impl GasCheckBuilder {
         Ok(())
     }
 
-    pub(crate) fn get_wallet_address(&self) -> Address {
-        *self.gas_wallet.address()
+    pub(crate) fn get_wallet_address(&self) -> Option<Address> {
+        self.gas_wallet.as_ref().map(|x| *x.address())
     }
 
     pub(crate) fn build(&mut self, app: Arc<App>) -> GasCheck {
@@ -75,12 +104,12 @@ impl GasCheckBuilder {
 
 pub(crate) struct GasCheck {
     to_track: Vec<Tracked>,
-    gas_wallet: Arc<Wallet>,
+    gas_wallet: Option<Arc<Wallet>>,
     app: Arc<App>,
 }
 
 impl AppBuilder {
-    pub(crate) fn launch_gas_task(&mut self, gas_check: GasCheck) -> Result<()> {
+    pub(crate) fn start_gas_task(&mut self, gas_check: GasCheck) -> Result<()> {
         self.watch_periodic(crate::watcher::TaskLabel::GasCheck, gas_check)
     }
 }
@@ -164,11 +193,15 @@ impl GasCheck {
         if !to_refill.is_empty() {
             let mut builder = TxBuilder::default();
             let denom = self.app.cosmos.get_gas_coin();
+            let gas_wallet = self
+                .gas_wallet
+                .clone()
+                .context("Cannot refill gas automatically on mainnet")?;
             {
                 let mut gases = app.gases.write();
                 for (address, amount) in to_refill {
                     builder.add_message_mut(MsgSend {
-                        from_address: self.gas_wallet.get_address_string(),
+                        from_address: gas_wallet.get_address_string(),
                         to_address: address.get_address_string(),
                         amount: vec![Coin {
                             denom: denom.clone(),
@@ -185,7 +218,7 @@ impl GasCheck {
             }
 
             match builder
-                .sign_and_broadcast(&self.app.cosmos, &self.gas_wallet)
+                .sign_and_broadcast(&self.app.cosmos, &gas_wallet)
                 .await
             {
                 Err(e) => {
@@ -212,7 +245,7 @@ impl GasCheck {
 }
 
 struct Tracked {
-    name: String,
+    name: GasCheckWallet,
     address: Address,
     min_gas: u128,
     should_refill: bool,

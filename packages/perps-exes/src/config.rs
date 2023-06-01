@@ -6,49 +6,43 @@ use cosmos::{Address, CosmosNetwork, RawAddress};
 use msg::{contracts::pyth_bridge::PythMarketPriceFeeds, prelude::*};
 use once_cell::sync::OnceCell;
 
+/// Overall configuration of Pyth, for information valid across all chains.
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct Config {
-    pub chains: HashMap<CosmosNetwork, ChainConfig>,
-    deployments: HashMap<String, DeploymentConfig>,
-    overrides: HashMap<String, DeploymentConfig>,
-    pub price_api: String,
-    pub pyth_markets: HashMap<MarketId, PythMarketPriceFeeds>,
-    pub pyth_update_age_tolerance: u32,
-    pub liquidity: LiquidityConfig,
-    pub utilization: UtilizationConfig,
-    pub trader: TraderConfig,
+pub struct PythConfig {
+    /// How to calculate price feeds for each market.
+    pub markets: HashMap<MarketId, PythMarketPriceFeeds>,
+    /// Endpoint to communicate with to get price data
+    pub endpoint: String,
+    /// How old a price to allow, in seconds
+    pub update_age_tolerance: u32,
 }
 
+/// Configuration for chainwide data.
+///
+/// This contains information which would be valid for multiple different
+/// contract deployments on a single chain.
 #[derive(serde::Deserialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ChainConfig {
-    pub tracker: Address,
-    pub faucet: Address,
-    pub pyth: Option<PythChainConfig>,
-    pub explorer: String,
-    #[serde(default)]
-    pub watcher: WatcherConfig,
-    /// Minimum gas required in wallet managed by perps bots
-    #[serde(default = "defaults::min_gas")]
-    pub min_gas: u128,
-    /// Minimum gas required in the faucet contract
-    #[serde(default = "defaults::min_gas_in_faucet")]
-    pub min_gas_in_faucet: u128,
-    /// Minimum gas required in the gas wallet
-    #[serde(default = "defaults::min_gas_in_gas_wallet")]
-    pub min_gas_in_gas_wallet: u128,
-    /// Override the gas multiplier
-    pub gas_multiplier: Option<f64>,
+    pub tracker: Option<Address>,
+    pub faucet: Option<Address>,
+    pub pyth: Option<Address>,
+    pub explorer: Option<String>,
     /// Potential RPC endpoints to use
+    #[serde(default)]
     pub rpc_nodes: Vec<String>,
 }
 
-#[derive(serde::Deserialize, Clone, Debug)]
+#[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct PythChainConfig {
-    pub address: Address,
-    pub endpoint: String,
+pub struct ConfigTestnet {
+    deployments: HashMap<String, DeploymentConfigTestnet>,
+    overrides: HashMap<String, DeploymentConfigTestnet>,
+    pub price_api: String,
+    pub liquidity: LiquidityConfig,
+    pub utilization: UtilizationConfig,
+    pub trader: TraderConfig,
 }
 
 #[derive(serde::Deserialize, Clone, Debug)]
@@ -93,7 +87,7 @@ pub struct LiquidityBounds {
 
 #[derive(serde::Deserialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct DeploymentConfig {
+pub struct DeploymentConfigTestnet {
     #[serde(default)]
     pub crank: bool,
     /// How many ultracrank wallets to set up
@@ -116,21 +110,48 @@ pub struct DeploymentConfig {
     #[serde(default)]
     pub balance: bool,
     #[serde(default)]
-    pub traders: usize,
+    pub traders: u32,
     pub default_market_ids: Vec<MarketId>,
     #[serde(default)]
     pub ignore_stale: bool,
     #[serde(default)]
     pub execs_per_price: Option<u32>,
+    #[serde(default)]
+    pub watcher: WatcherConfig,
+    /// Minimum gas required in wallet managed by perps bots
+    #[serde(default = "defaults::min_gas")]
+    pub min_gas: u128,
+    /// Minimum gas required in the faucet contract
+    #[serde(default = "defaults::min_gas_in_faucet")]
+    pub min_gas_in_faucet: u128,
+    /// Minimum gas required in the gas wallet
+    #[serde(default = "defaults::min_gas_in_gas_wallet")]
+    pub min_gas_in_gas_wallet: u128,
+    /// Override the gas multiplier
+    pub gas_multiplier: Option<f64>,
 }
 
-const CONFIG_YAML: &[u8] = include_bytes!("../assets/config.yaml");
+impl ChainConfig {
+    const CONFIG_CHAIN_YAML: &[u8] = include_bytes!("../assets/config-chain.yaml");
+    pub fn load(network: CosmosNetwork) -> Result<&'static Self> {
+        static CONFIG: OnceCell<HashMap<CosmosNetwork, ChainConfig>> = OnceCell::new();
+        CONFIG
+            .get_or_try_init(|| {
+                serde_yaml::from_slice(Self::CONFIG_CHAIN_YAML)
+                    .context("Could not parse config-chain.yaml")
+            })?
+            .get(&network)
+            .with_context(|| format!("No chain config found for {network}"))
+    }
+}
 
-impl Config {
+impl ConfigTestnet {
+    const CONFIG_TESTNET_YAML: &[u8] = include_bytes!("../assets/config-testnet.yaml");
     pub fn load() -> Result<&'static Self> {
-        static CONFIG: OnceCell<Config> = OnceCell::new();
+        static CONFIG: OnceCell<ConfigTestnet> = OnceCell::new();
         CONFIG.get_or_try_init(|| {
-            serde_yaml::from_slice(CONFIG_YAML).context("Could not parse config.yaml")
+            serde_yaml::from_slice(Self::CONFIG_TESTNET_YAML)
+                .context("Could not parse config-testnet.yaml")
         })
     }
 
@@ -162,8 +183,20 @@ impl Config {
     }
 }
 
+impl PythConfig {
+    const CONFIG_PYTH_YAML: &[u8] = include_bytes!("../assets/config-pyth.yaml");
+
+    pub fn load() -> Result<&'static Self> {
+        static CONFIG: OnceCell<PythConfig> = OnceCell::new();
+        CONFIG.get_or_try_init(|| {
+            serde_yaml::from_slice(Self::CONFIG_PYTH_YAML)
+                .context("Could not parse config-pyth.yaml")
+        })
+    }
+}
+
 pub struct DeploymentInfo {
-    pub config: DeploymentConfig,
+    pub config: DeploymentConfigTestnet,
     pub network: CosmosNetwork,
     pub wallet_phrase_name: String,
 }
@@ -262,8 +295,8 @@ impl Default for WatcherConfig {
                 out_of_date: 180,
             },
             price: TaskConfig {
-                delay: Delay::Constant(60),
-                out_of_date: 180,
+                delay: Delay::Interval(1),
+                out_of_date: 30,
             },
             stale: TaskConfig {
                 delay: Delay::Constant(30),
@@ -296,5 +329,6 @@ pub struct TaskConfig {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum Delay {
     Constant(u64),
+    Interval(u64),
     Random { low: u64, high: u64 },
 }

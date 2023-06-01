@@ -1,8 +1,8 @@
 //! Generates new wallets and manages minting of CW20s
 
 use std::{
-    fmt::Debug,
-    sync::{atomic::AtomicU32, Arc},
+    fmt::{Debug, Display},
+    sync::Arc,
 };
 
 use anyhow::{Context, Result};
@@ -17,14 +17,43 @@ use msg::{
 use tokio::sync::{mpsc, oneshot};
 
 #[derive(Clone)]
-pub struct WalletManager {
+pub(crate) struct WalletManager {
     inner: Arc<Inner>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+pub(crate) enum ManagedWallet {
+    Balance,
+    Liquidity,
+    Utilization,
+    Trader(u32),
+}
+
+impl ManagedWallet {
+    fn get_index(self) -> u32 {
+        match self {
+            ManagedWallet::Balance => 1,
+            ManagedWallet::Liquidity => 2,
+            ManagedWallet::Utilization => 3,
+            ManagedWallet::Trader(x) => x + 3,
+        }
+    }
+}
+
+impl Display for ManagedWallet {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ManagedWallet::Balance => write!(f, "balance"),
+            ManagedWallet::Liquidity => write!(f, "liquidity"),
+            ManagedWallet::Utilization => write!(f, "utlization"),
+            ManagedWallet::Trader(x) => write!(f, "trader-{x}"),
+        }
+    }
 }
 
 struct Inner {
     seed: SeedPhrase,
     address_type: AddressType,
-    next_index: AtomicU32,
     send_request: mpsc::Sender<MintRequest>,
     minter_address: Address,
 }
@@ -50,7 +79,7 @@ impl Debug for MintRequest {
 }
 
 impl WalletManager {
-    pub fn new(seed: SeedPhrase, address_type: AddressType) -> Result<Self> {
+    pub(crate) fn new(seed: SeedPhrase, address_type: AddressType) -> Result<Self> {
         let minter = seed.derive_cosmos_numbered(0)?.for_chain(address_type);
         log::info!("Wallet manager minter wallet: {minter}");
         let (send_request, recv_request) = mpsc::channel(100);
@@ -58,7 +87,6 @@ impl WalletManager {
             inner: Arc::new(Inner {
                 seed,
                 address_type,
-                next_index: AtomicU32::new(1),
                 send_request,
                 minter_address: *minter.address(),
             }),
@@ -67,24 +95,18 @@ impl WalletManager {
         Ok(manager)
     }
 
-    pub fn get_wallet(&self, desc: impl AsRef<str>) -> Result<Wallet> {
-        let idx = self
-            .inner
-            .next_index
-            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    pub(crate) fn get_wallet(&self, desc: ManagedWallet) -> Result<Wallet> {
+        let idx = desc.get_index();
         let wallet = self
             .inner
             .seed
             .derive_cosmos_numbered(idx)?
             .for_chain(self.inner.address_type);
-        log::info!(
-            "Got fresh wallet from manager for {}: {wallet}",
-            desc.as_ref()
-        );
+        log::info!("Got fresh wallet from manager for {desc}: {wallet}",);
         Ok(wallet)
     }
 
-    pub async fn mint(
+    pub(crate) async fn mint(
         &self,
         cosmos: Cosmos,
         addr: Address,
@@ -112,7 +134,7 @@ impl WalletManager {
     }
 
     /// Get the address of the minter itself.
-    pub fn get_minter_address(&self) -> Address {
+    pub(crate) fn get_minter_address(&self) -> Address {
         self.inner.minter_address
     }
 }

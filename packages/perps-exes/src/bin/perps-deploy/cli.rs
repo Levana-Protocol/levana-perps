@@ -61,6 +61,11 @@ pub(crate) enum Subcommand {
         #[clap(flatten)]
         inner: crate::setup_market::SetupMarketOpt,
     },
+    /// Mainnet-specific deployment activities.
+    Mainnet {
+        #[clap(flatten)]
+        inner: crate::mainnet::MainnetOpt,
+    },
 }
 
 #[derive(clap::Parser, Clone)]
@@ -68,6 +73,9 @@ pub(crate) struct Opt {
     /// Override gRPC endpoint
     #[clap(long, env = "COSMOS_GRPC", global = true)]
     pub(crate) cosmos_grpc: Option<String>,
+    /// Override chain ID
+    #[clap(long, env = "COSMOS_CHAIN_ID", global = true)]
+    pub(crate) cosmos_chain_id: Option<String>,
     /// Mnemonic phrase for the Wallet
     #[clap(long, env = "COSMOS_WALLET")]
     pub(crate) wallet: Option<RawWallet>,
