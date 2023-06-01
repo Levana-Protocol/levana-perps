@@ -1,7 +1,7 @@
 use std::{collections::HashSet, str::FromStr};
 
 use anyhow::{Context, Result};
-use cosmos::{Address, CodeId, HasAddress};
+use cosmos::{Address, CodeId, ContractAdmin, HasAddress};
 use msg::contracts::market::entry::ExecuteOwnerMsg;
 use msg::contracts::pyth_bridge::PythMarketPriceFeeds;
 use msg::prelude::*;
@@ -221,6 +221,7 @@ pub(crate) async fn instantiate(
                 wind_down: wallet.get_address_string().into(),
                 label_suffix: Some(label_suffix),
             },
+            ContractAdmin::Sender,
         )
         .await?;
     log::info!("New factory deployed at {factory}");
@@ -242,6 +243,7 @@ pub(crate) async fn instantiate(
                         pyth: pyth_info.address.to_string().into(),
                         update_age_tolerance_seconds: pyth_info.update_age_tolerance,
                     },
+                    ContractAdmin::Sender,
                 )
                 .await?;
             log::info!(

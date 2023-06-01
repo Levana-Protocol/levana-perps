@@ -1,5 +1,5 @@
 use anyhow::Result;
-use cosmos::CosmosNetwork;
+use cosmos::{ContractAdmin, CosmosNetwork};
 use msg::contracts::faucet::entry::GasAllowance;
 
 use crate::cli::Opt;
@@ -61,6 +61,7 @@ pub(crate) async fn go(
             "Levana Perps Tracker",
             vec![],
             msg::contracts::tracker::entry::InstantiateMsg {},
+            ContractAdmin::Sender,
         )
         .await?;
     log::info!("New tracker contract: {tracker}");
@@ -78,6 +79,7 @@ pub(crate) async fn go(
                     amount: gas_allowance.into(),
                 }),
             },
+            ContractAdmin::Sender,
         )
         .await?;
     log::info!("New faucet contract: {faucet}");

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use cosmos::{Address, CosmosNetwork, HasAddress};
+use cosmos::{Address, ContractAdmin, CosmosNetwork, HasAddress};
 use msg::{contracts::market::entry::NewMarketParams, token::TokenInit};
 use perps_exes::{
     config::{MarketConfigUpdates, PythConfig},
@@ -326,6 +326,7 @@ async fn instantiate_factory(
                 wind_down: wind_down.unwrap_or(owner).get_address_string().into(),
                 label_suffix,
             },
+            ContractAdmin::Addr(owner),
         )
         .await?;
     log::info!("Deployed fresh factory contract to: {factory}");
@@ -391,6 +392,10 @@ async fn add_market(
         .with_context(|| format!("Unknown mainnet factory: {factory}"))?;
     let app = opt.load_app_mainnet(factory.network).await?;
 
+    let owner = Factory::from_contract(app.cosmos.make_contract(factory.address))
+        .query_owner()
+        .await?;
+
     log::info!("Deploying a new Pyth bridge");
     let pyth_bridge = code_ids.get_simple(ContractType::PythBridge, &opt, factory.network)?;
     let pyth_bridge = app
@@ -405,6 +410,7 @@ async fn add_market(
                 pyth: app.pyth.address.get_address_string().into(),
                 update_age_tolerance_seconds: app.pyth.update_age_tolerance,
             },
+            ContractAdmin::Addr(owner),
         )
         .await?;
     log::info!("New Pyth bridge contract: {pyth_bridge}");

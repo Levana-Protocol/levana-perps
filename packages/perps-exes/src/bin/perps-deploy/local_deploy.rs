@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use anyhow::{Context, Result};
-use cosmos::{CosmosNetwork, HasAddress};
+use cosmos::{ContractAdmin, CosmosNetwork, HasAddress};
 use msg::contracts::{
     cw20::{entry::InstantiateMinter, Cw20Coin},
     market::config::ConfigUpdate,
@@ -79,6 +79,7 @@ pub(crate) async fn go(
                     },
                     marketing: None,
                 },
+                ContractAdmin::Sender,
             )
             .await?;
 

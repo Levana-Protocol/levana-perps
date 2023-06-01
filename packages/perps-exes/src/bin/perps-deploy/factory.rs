@@ -1,6 +1,6 @@
 use anyhow::Result;
 use cosmos::{Address, Contract, HasCosmos};
-use msg::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
+use msg::contracts::factory::entry::{FactoryOwnerResp, MarketInfoResponse, MarketsResp, QueryMsg};
 use msg::prelude::*;
 
 pub(crate) struct Factory(Contract);
@@ -20,7 +20,7 @@ impl Factory {
             price_admin,
         } = self
             .0
-            .query(msg::contracts::factory::entry::QueryMsg::MarketInfo {
+            .query(QueryMsg::MarketInfo {
                 market_id: market_id.clone(),
             })
             .await?;
@@ -59,7 +59,7 @@ impl Factory {
         loop {
             let MarketsResp { markets } = self
                 .0
-                .query(msg::contracts::factory::entry::QueryMsg::Markets {
+                .query(QueryMsg::Markets {
                     start_after: start_after.take(),
                     limit: None,
                 })
@@ -76,6 +76,14 @@ impl Factory {
         }
 
         Ok(res)
+    }
+
+    pub(crate) async fn query_owner(&self) -> Result<Address> {
+        let FactoryOwnerResp { owner, .. } = self.0.query(QueryMsg::FactoryOwner {}).await?;
+        owner
+            .into_string()
+            .parse()
+            .with_context(|| format!("Invalid factory owner found for factory {}", self.0))
     }
 }
 
