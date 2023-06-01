@@ -100,6 +100,8 @@ impl Opt {
         let (faucet_bot, faucet_bot_runner) =
             FaucetBot::new(faucet_bot_wallet, testnet.hcaptcha_secret.clone(), faucet);
 
+        let gas_multiplier = testnet.gas_multiplier.or(*gas_multiplier);
+
         let testnet = BotConfigTestnet {
             tracker: tracker.with_context(|| format!("No tracker found for {network}"))?,
             faucet,
@@ -165,7 +167,7 @@ impl Opt {
                 None
             },
             watcher: partial.watcher.clone(),
-            gas_multiplier: *gas_multiplier,
+            gas_multiplier,
             pyth_endpoint: pyth_config.endpoint.clone(),
             execs_per_price: partial.execs_per_price,
         };
