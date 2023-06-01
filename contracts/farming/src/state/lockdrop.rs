@@ -164,6 +164,11 @@ impl State<'_> {
         let user_shares = LockdropBuckets::get_shares(store, user)?;
         let total_shares = LockdropBuckets::TOTAL_SHARES.load(store)?;
         let total_rewards = LVN_LOCKDROP_REWARDS.load(store)?;
+
+        if total_shares.is_zero() {
+            return Ok(LvnToken::zero());
+        }
+
         let user_rewards = total_rewards
             .checked_mul_dec(user_shares.into_decimal256())?
             .checked_div_dec(total_shares.into_decimal256())?;
