@@ -219,11 +219,11 @@ impl State<'_> {
     ) -> Result<LockdropLockupInfo> {
         let lockdrop_start = match self.get_period_resp(store)? {
             FarmingPeriodResp::Launched { started_at } => started_at,
-            _ => bail!("Cannot calculate unlocked lockdrop balance prior to launch"),
+            _ => bail!("Cannot calculate lockdrop lockup info prior to launch"),
         };
         let elapsed = self
             .now()
-            .checked_sub(lockdrop_start, "calculate_unlocked_lockdrop_balance")?;
+            .checked_sub(lockdrop_start, "lockdrop_lockup_info")?;
 
         LockdropBuckets::get_all_balances_iter(store, addr).try_fold(
             LockdropLockupInfo::default(),
