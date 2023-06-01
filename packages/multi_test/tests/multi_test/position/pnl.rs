@@ -256,6 +256,8 @@ fn position_pnl_long_and_short_precise() {
             // We need precise liquifunding periods for this test so remove randomization
             liquifunding_delay_fuzz_seconds: Some(0),
             delta_neutrality_fee_tax: Some(Decimal256::zero()),
+            // Precise values were calculated using original config value
+            funding_rate_sensitivity: Some("1".parse().unwrap()),
             ..Default::default()
         })
         .unwrap();
