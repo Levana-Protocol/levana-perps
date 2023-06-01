@@ -260,19 +260,25 @@ pub struct WatcherConfig {
 impl Default for WatcherConfig {
     fn default() -> Self {
         Self {
-            retries: 6,
-            delay_between_retries: 20,
+            retries: defaults::retries(),
+            delay_between_retries: defaults::delay_between_retries(),
             balance: TaskConfig {
                 delay: Delay::Constant(20),
                 out_of_date: 180,
+                retries: None,
+                delay_between_retries: None,
             },
             gas_check: TaskConfig {
                 delay: Delay::Constant(60),
                 out_of_date: 180,
+                retries: None,
+                delay_between_retries: None,
             },
             liquidity: TaskConfig {
                 delay: Delay::Constant(120),
                 out_of_date: 180,
+                retries: None,
+                delay_between_retries: None,
             },
             trader: TaskConfig {
                 delay: Delay::Random {
@@ -280,38 +286,59 @@ impl Default for WatcherConfig {
                     high: 1200,
                 },
                 out_of_date: 180,
+                retries: None,
+                delay_between_retries: None,
             },
             utilization: TaskConfig {
                 delay: Delay::Constant(120),
                 out_of_date: 120,
+                retries: None,
+                delay_between_retries: None,
             },
             track_balance: TaskConfig {
                 delay: Delay::Constant(60),
                 out_of_date: 60,
+                retries: None,
+                delay_between_retries: None,
             },
             crank: TaskConfig {
                 delay: Delay::Constant(30),
                 out_of_date: 60,
+                retries: None,
+                delay_between_retries: None,
             },
             get_factory: TaskConfig {
                 delay: Delay::Constant(60),
                 out_of_date: 180,
+                retries: None,
+                delay_between_retries: None,
             },
             price: TaskConfig {
                 delay: Delay::Interval(1),
                 out_of_date: 30,
+                // Intentionally using different defaults to make sure price
+                // updates come through quickly. We increase our retries to
+                // compensate for the shorter delay.
+                retries: Some(20),
+                delay_between_retries: Some(1),
             },
             stale: TaskConfig {
                 delay: Delay::Constant(30),
                 out_of_date: 180,
+                retries: None,
+                delay_between_retries: None,
             },
             stats: TaskConfig {
                 delay: Delay::Constant(30),
                 out_of_date: 180,
+                retries: None,
+                delay_between_retries: None,
             },
             ultra_crank: TaskConfig {
                 delay: Delay::Constant(120),
                 out_of_date: 180,
+                retries: None,
+                delay_between_retries: None,
             },
         }
     }
@@ -326,6 +353,12 @@ pub struct TaskConfig {
     ///
     /// This does not include the delay time
     pub out_of_date: u32,
+    /// How many times to retry before giving up, overriding the general watcher
+    /// config
+    pub retries: Option<usize>,
+    /// How many seconds to delay between retries, overriding the general
+    /// watcher config
+    pub delay_between_retries: Option<u32>,
 }
 
 #[derive(serde::Deserialize, Clone, Copy, Debug)]
