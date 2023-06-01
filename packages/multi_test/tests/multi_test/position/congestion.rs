@@ -1,11 +1,20 @@
 use std::collections::HashSet;
 
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::prelude::*;
+use msg::{contracts::market::config::ConfigUpdate, prelude::*};
 
 #[test]
 fn test_congestion_block() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    // Reduce the unpend_limit to keep execution time reasonable
+    market
+        .exec_set_config(ConfigUpdate {
+            unpend_limit: Some(50),
+            ..Default::default()
+        })
+        .unwrap();
+
     let trader = market.clone_trader(0).unwrap();
 
     // Do a price update without cranking to force unpending the position
