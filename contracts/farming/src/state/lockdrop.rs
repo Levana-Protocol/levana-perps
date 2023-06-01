@@ -185,7 +185,7 @@ impl State<'_> {
         let period = self.get_period_resp(store)?;
         let launch_start = match period {
             FarmingPeriodResp::Launched { started_at } => started_at,
-            _ => bail!("Cannot collect lockdrop rewards prior to launch"),
+            _ => bail!("Cannot claim lockdrop rewards prior to launch"),
         };
         let lockdrop_config = self.load_lockdrop_config(store)?;
         let elapsed_since_start = self
