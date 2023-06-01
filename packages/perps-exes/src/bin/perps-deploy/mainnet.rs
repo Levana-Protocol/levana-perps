@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, HasAddress};
-use msg::{
-    contracts::market::{config::ConfigUpdate, entry::NewMarketParams},
-    token::TokenInit,
+use msg::{contracts::market::entry::NewMarketParams, token::TokenInit};
+use perps_exes::{
+    config::{MarketConfigUpdates, PythConfig},
+    prelude::*,
 };
-use perps_exes::{config::PythConfig, prelude::*};
 
 use crate::{cli::Opt, factory::Factory, util::get_hash_for_path};
 
@@ -358,22 +358,6 @@ struct AddMarketOpts {
     /// Initial borrow fee rate
     #[clap(long, default_value = "0.2")]
     initial_borrow_fee_rate: Decimal256,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-struct MarketConfigUpdates {
-    markets: HashMap<MarketId, ConfigUpdate>,
-}
-
-impl MarketConfigUpdates {
-    const PATH: &str = "packages/perps-exes/assets/market-config-updates.yaml";
-
-    fn load() -> Result<Self> {
-        let mut file = fs_err::File::open(Self::PATH)?;
-        serde_yaml::from_reader(&mut file)
-            .with_context(|| format!("Error loading MarketConfigUpdates from {}", Self::PATH))
-    }
 }
 
 async fn add_market(

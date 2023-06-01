@@ -1,3 +1,6 @@
 # FIXME need to put in settings as part of PERP-1392
 markets:
   ETH_USD: {}
+  ATOM_USD: {}
+  OSMO_USDC: {}
+  ETH_BTC: {}

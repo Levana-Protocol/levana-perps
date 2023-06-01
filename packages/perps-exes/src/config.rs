@@ -3,7 +3,10 @@ mod defaults;
 use std::collections::HashMap;
 
 use cosmos::{Address, CosmosNetwork, RawAddress};
-use msg::{contracts::pyth_bridge::PythMarketPriceFeeds, prelude::*};
+use msg::{
+    contracts::{market::config::ConfigUpdate, pyth_bridge::PythMarketPriceFeeds},
+    prelude::*,
+};
 use once_cell::sync::OnceCell;
 
 /// Overall configuration of Pyth, for information valid across all chains.
@@ -331,4 +334,20 @@ pub enum Delay {
     Constant(u64),
     Interval(u64),
     Random { low: u64, high: u64 },
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct MarketConfigUpdates {
+    pub markets: HashMap<MarketId, ConfigUpdate>,
+}
+
+impl MarketConfigUpdates {
+    const PATH: &str = "packages/perps-exes/assets/market-config-updates.yaml";
+
+    pub fn load() -> Result<Self> {
+        let mut file = fs_err::File::open(Self::PATH)?;
+        serde_yaml::from_reader(&mut file)
+            .with_context(|| format!("Error loading MarketConfigUpdates from {}", Self::PATH))
+    }
 }
