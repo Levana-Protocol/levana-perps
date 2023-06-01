@@ -57,14 +57,6 @@ pub(crate) enum Subcommand {
         #[clap(flatten)]
         inner: localtest::TestsOpt,
     },
-    /// Perform post-deploy market setup for public facing markets
-    ///
-    /// This is responsible for activities like depositing collateral and
-    /// opening enough positions to create a 90% utilization ratio.
-    SetupMarket {
-        #[clap(flatten)]
-        inner: crate::setup_market::SetupMarketOpt,
-    },
     /// Testnet-specific commands.
     Testnet {
         #[clap(subcommand)]

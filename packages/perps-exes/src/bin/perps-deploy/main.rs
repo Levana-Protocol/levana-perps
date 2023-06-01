@@ -13,7 +13,6 @@ mod local_deploy;
 mod localtest;
 mod mainnet;
 mod migrate;
-mod setup_market;
 mod store_code;
 mod tracker;
 mod util;
@@ -33,7 +32,6 @@ async fn main_inner() -> anyhow::Result<()> {
             local_deploy::go(opt, inner).await?;
         }
         Subcommand::OnChainTests { inner } => localtest::go(opt, inner).await?,
-        Subcommand::SetupMarket { inner } => setup_market::go(opt, inner).await?,
         Subcommand::Testnet { inner } => match inner {
             TestnetSub::StoreCode { inner } => store_code::go(opt, inner).await?,
             TestnetSub::Instantiate { inner } => instantiate::go(opt, inner).await?,
