@@ -1,0 +1,34 @@
+update-age-tolerance: 120
+endpoint: "https://pyth.sandbox.levana.finance/"
+markets:
+  ATOM_USD:
+    feeds: [
+      { id: "b00b60f88b03a6a625a8d1c048c3f66653edf217439983d037e7222c4e612819", inverted: false }
+    ]
+  OSMO_USDC:
+    feeds: [
+      # OSMO/USD
+      { id: "5867f5683c757393a0670ef0f701490950fe93fdb006d181c8265a831ac0c5c6", inverted: false },
+      # inverted USDC/USD 
+      { id: "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a", inverted: true }
+    ]
+    # OSMO_USD (snake_case for compatibility with instantiate message)
+    feeds_usd: [
+      {id: "5867f5683c757393a0670ef0f701490950fe93fdb006d181c8265a831ac0c5c6", inverted: false }
+    ]
+  ETH_BTC:
+    feeds: [
+      # ETH/USD
+      {id: "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace", inverted: false },
+      # inverted BTC/USD
+      {id: "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43", inverted: true }
+    ]
+    # ETH_USD (snake_case for compatibility with instantiate message)
+    feeds_usd: [
+      {id: "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace", inverted: false }
+    ]
+  ETH_USD:
+    feeds: [
+      # ETH/USD
+      {id: "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace", inverted: false }
+    ]

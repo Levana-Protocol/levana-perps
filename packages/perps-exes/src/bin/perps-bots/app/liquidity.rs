@@ -4,24 +4,35 @@ use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, Wallet};
 use cosmwasm_std::Fraction;
-use perps_exes::prelude::*;
+use perps_exes::{config::LiquidityConfig, prelude::*};
 
-use crate::watcher::{WatchedTaskOutput, WatchedTaskPerMarket};
+use crate::{
+    config::BotConfigTestnet,
+    wallet_manager::ManagedWallet,
+    watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
+};
 
 use super::{factory::FactoryInfo, App, AppBuilder};
 
 pub(super) struct Liquidity {
     pub(super) app: Arc<App>,
+    liquidity_config: LiquidityConfig,
     pub(super) wallet: Wallet,
+    testnet: Arc<BotConfigTestnet>,
 }
 
 impl AppBuilder {
-    pub(super) fn launch_liquidity(&mut self, wallet: Wallet) -> Result<()> {
-        let liquidity = Liquidity {
-            app: self.app.clone(),
-            wallet,
-        };
-        self.watch_periodic(crate::watcher::TaskLabel::Liquidity, liquidity)
+    pub(super) fn start_liquidity(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
+        if let Some(liquidity_config) = &testnet.liquidity_config {
+            let liquidity = Liquidity {
+                app: self.app.clone(),
+                liquidity_config: liquidity_config.clone(),
+                wallet: self.get_track_wallet(&testnet, ManagedWallet::Liquidity)?,
+                testnet,
+            };
+            self.watch_periodic(crate::watcher::TaskLabel::Liquidity, liquidity)?;
+        }
+        Ok(())
     }
 }
 
@@ -30,11 +41,11 @@ impl WatchedTaskPerMarket for Liquidity {
     async fn run_single_market(
         &mut self,
         _app: &App,
-        factory: &FactoryInfo,
+        _factory: &FactoryInfo,
         market: &MarketId,
         addr: Address,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, market, addr, factory.faucet).await
+        single_market(self, market, addr, self.testnet.faucet).await
     }
 }
 
@@ -54,8 +65,6 @@ async fn single_market(
     let status = market.status().await?;
     let total = status.liquidity.total_collateral();
     let bounds = worker
-        .app
-        .config
         .liquidity_config
         .markets
         .get(market_id)
@@ -67,12 +76,10 @@ async fn single_market(
     } else {
         status.liquidity.locked.into_decimal256() / total.into_decimal256()
     };
-    let high_util = worker.app.config.liquidity_config.max_util;
-    let low_util = worker.app.config.liquidity_config.min_util;
+    let high_util = worker.liquidity_config.max_util;
+    let low_util = worker.liquidity_config.min_util;
     let target_liquidity = status.liquidity.locked.checked_mul_dec(
         worker
-            .app
-            .config
             .liquidity_config
             .target_util
             .inv()
@@ -125,8 +132,7 @@ async fn single_market(
                 msg::token::Token::Native { .. } => anyhow::bail!("No support for native coins"),
             };
             worker
-                .app
-                .config
+                .testnet
                 .wallet_manager
                 .mint(
                     worker.app.cosmos.clone(),

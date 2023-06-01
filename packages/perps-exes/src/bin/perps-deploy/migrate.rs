@@ -136,6 +136,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         position_token,
         liquidity_token_lp,
         liquidity_token_xlp,
+        price_admin: _,
     } in factory.get_markets().await?
     {
         log::info!("Performing migrations for market {market_id}");

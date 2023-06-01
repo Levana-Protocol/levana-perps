@@ -15,65 +15,64 @@ mod utilization;
 use anyhow::Result;
 pub(crate) use types::*;
 
+use crate::config::BotConfigByType;
+
+use self::gas_check::GasCheckWallet;
+
 impl AppBuilder {
-    pub(crate) async fn load(&mut self) -> Result<()> {
-        self.launch_factory_task()?;
-
-        self.alert_on_low_gas(
-            self.app.config.faucet,
-            "faucet",
-            self.app.config.min_gas_in_faucet,
-        )?;
-        self.alert_on_low_gas(
-            self.get_gas_wallet_address(),
-            "gas-wallet",
-            self.app.config.min_gas_in_gas_wallet,
-        )?;
-        self.refill_gas(
-            self.app.config.wallet_manager.get_minter_address(),
-            "wallet-manager",
-        )?;
-        let faucet_bot_address = self.app.faucet_bot.get_wallet_address();
-        self.refill_gas(faucet_bot_address, "faucet-bot")?;
-
-        let price_wallet = self.app.config.price_wallet.clone();
-        if let Some(price_wallet) = price_wallet {
-            self.refill_gas(*price_wallet.address(), "price-bot")?;
-            self.start_price(price_wallet).await?;
-        }
-
+    pub(crate) async fn start(mut self) -> Result<()> {
+        // Start the tasks that run on all deployments
+        self.start_rest_api();
+        self.start_factory_task()?;
         self.start_crank_bot()?;
-        self.start_ultra_crank_bot()?;
-
-        if !self.app.config.ignore_stale {
-            self.track_stale()?;
-        }
-
+        self.start_price()?;
+        self.track_stale()?;
         self.track_stats()?;
-
-        let balance_wallet = self.get_track_wallet("balance")?;
-        if self.app.config.balance {
-            self.launch_balance(balance_wallet)?;
-        }
         self.track_balance()?;
 
-        let liquidity_wallet = self.get_track_wallet("liquidity")?;
+        match &self.app.config.by_type {
+            // Run tasks that can only run in testnet.
+            BotConfigByType::Testnet { inner } => {
+                // Deal with the borrow checker by not keeping a reference to self borrowed
+                let inner = inner.clone();
 
-        if self.app.config.liquidity {
-            self.launch_liquidity(liquidity_wallet)?;
+                // Establish some gas checks
+                let faucet_bot_address = inner.faucet_bot.get_wallet_address();
+                self.refill_gas(&inner, faucet_bot_address, GasCheckWallet::FaucetBot)?;
+
+                self.alert_on_low_gas(
+                    inner.faucet,
+                    GasCheckWallet::FaucetContract,
+                    inner.min_gas_in_faucet,
+                )?;
+                if let Some(gas_wallet) = self.get_gas_wallet_address() {
+                    self.alert_on_low_gas(
+                        gas_wallet,
+                        GasCheckWallet::GasWallet,
+                        inner.min_gas_in_gas_wallet,
+                    )?;
+                }
+                self.refill_gas(
+                    &inner,
+                    inner.wallet_manager.get_minter_address(),
+                    GasCheckWallet::WalletManager,
+                )?;
+
+                // Launch testnet tasks
+                self.start_balance(inner.clone())?;
+                self.start_liquidity(inner.clone())?;
+                self.start_utilization(inner.clone())?;
+                self.start_traders(inner.clone())?;
+                self.start_ultra_crank_bot(&inner)?;
+            }
+            // Nothing to do, no tasks are mainnet-only
+            BotConfigByType::Mainnet { .. } => (),
         }
 
-        let utilization_wallet = self.get_track_wallet("utilization")?;
+        // Gas task must always be launched last so that it includes all wallets specified above
+        let gas_check = self.gas_check.build(self.app.clone());
+        self.start_gas_task(gas_check)?;
 
-        if self.app.config.utilization {
-            self.launch_utilization(utilization_wallet)?;
-        }
-
-        for index in 1..=self.app.config.traders {
-            let wallet = self.get_track_wallet(format!("Trader #{index}"))?;
-            self.launch_trader(wallet, index)?;
-        }
-
-        Ok(())
+        self.watcher.wait(&self.app).await
     }
 }

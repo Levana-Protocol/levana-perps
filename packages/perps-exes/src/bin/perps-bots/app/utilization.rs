@@ -3,24 +3,35 @@ use std::sync::Arc;
 use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, HasAddress, Wallet};
-use perps_exes::prelude::*;
+use perps_exes::{config::UtilizationConfig, prelude::*};
 
-use crate::watcher::{WatchedTaskOutput, WatchedTaskPerMarket};
+use crate::{
+    config::BotConfigTestnet,
+    wallet_manager::ManagedWallet,
+    watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
+};
 
 use super::{factory::FactoryInfo, App, AppBuilder};
 
 pub(super) struct Utilization {
     pub(super) app: Arc<App>,
     pub(super) wallet: Wallet,
+    config: UtilizationConfig,
+    testnet: Arc<BotConfigTestnet>,
 }
 
 impl AppBuilder {
-    pub(super) fn launch_utilization(&mut self, wallet: Wallet) -> Result<()> {
-        let util = Utilization {
-            app: self.app.clone(),
-            wallet,
-        };
-        self.watch_periodic(crate::watcher::TaskLabel::Utilization, util)
+    pub(super) fn start_utilization(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
+        if let Some(config) = testnet.utilization_config {
+            let util = Utilization {
+                app: self.app.clone(),
+                wallet: self.get_track_wallet(&testnet, ManagedWallet::Utilization)?,
+                config,
+                testnet,
+            };
+            self.watch_periodic(crate::watcher::TaskLabel::Utilization, util)?;
+        }
+        Ok(())
     }
 }
 
@@ -29,11 +40,11 @@ impl WatchedTaskPerMarket for Utilization {
     async fn run_single_market(
         &mut self,
         _app: &App,
-        factory: &FactoryInfo,
+        _factory: &FactoryInfo,
         _market: &MarketId,
         addr: Address,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, addr, factory.faucet).await
+        single_market(self, addr, self.testnet.faucet).await
     }
 }
 
@@ -65,7 +76,7 @@ async fn single_market(
         .into_decimal256()
         .checked_div(total.into_decimal256())?;
 
-    if util > worker.app.config.utilization_config.max_util {
+    if util > worker.config.max_util {
         let positions = market
             .get_some_positions(worker.wallet.get_address(), Some(20))
             .await?;
@@ -85,7 +96,7 @@ async fn single_market(
                 message,
             })
         }
-    } else if util < worker.app.config.utilization_config.min_util {
+    } else if util < worker.config.min_util {
         log::info!("Low utilization ratio, opening positions.");
 
         let balance = market
@@ -107,8 +118,7 @@ async fn single_market(
         };
         if balance < "20000".parse().unwrap() {
             worker
-                .app
-                .config
+                .testnet
                 .wallet_manager
                 .mint(
                     worker.app.cosmos.clone(),
@@ -130,11 +140,9 @@ async fn single_market(
 
         // Determine how large a position we would need to open to hit the midpoint of min and max utilization
         let mid_util = worker
-            .app
             .config
-            .utilization_config
             .min_util
-            .checked_add(worker.app.config.utilization_config.max_util)?
+            .checked_add(worker.config.max_util)?
             .checked_div("2".parse().unwrap())?;
         let extra_util = mid_util.checked_sub(util)?;
         let desired_counter_collateral = NonZero::new(total.checked_mul_dec(extra_util)?)

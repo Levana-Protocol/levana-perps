@@ -4,7 +4,10 @@ use anyhow::Result;
 use axum::{extract::State, Json};
 use cosmos::Address;
 
-use crate::app::{faucet::FaucetTapError, App};
+use crate::{
+    app::{faucet::FaucetTapError, App},
+    config::{BotConfigByType, BotConfigTestnet},
+};
 
 #[derive(serde::Deserialize)]
 pub(crate) struct FaucetQuery {
@@ -51,16 +54,27 @@ async fn bot_inner(
         hcaptcha,
     }: FaucetQuery,
 ) -> Result<Arc<String>, FaucetTapError> {
-    match app.is_valid_recaptcha(&hcaptcha).await {
-        Ok(true) => (),
-        Ok(false) => return Err(FaucetTapError::InvalidCaptcha {}),
-        Err(_) => return Err(FaucetTapError::CannotQueryCaptcha {}),
+    match &app.config.by_type {
+        BotConfigByType::Mainnet { .. } => Err(FaucetTapError::Mainnet {}),
+        BotConfigByType::Testnet { inner } => {
+            match app.is_valid_recaptcha(&hcaptcha, inner).await {
+                Ok(true) => inner.faucet_bot.tap(app, recipient, cw20s).await,
+                Ok(false) => Err(FaucetTapError::InvalidCaptcha {}),
+                Err(e) => {
+                    log::error!("Cannot query captcha service: {e:?}");
+                    Err(FaucetTapError::CannotQueryCaptcha {})
+                }
+            }
+        }
     }
-    app.faucet_bot.tap(app, recipient, cw20s).await
 }
 
 impl App {
-    pub(crate) async fn is_valid_recaptcha(&self, g_recaptcha_response: &str) -> Result<bool> {
+    pub(crate) async fn is_valid_recaptcha(
+        &self,
+        g_recaptcha_response: &str,
+        testnet: &BotConfigTestnet,
+    ) -> Result<bool> {
         #[derive(serde::Serialize)]
         struct Body<'a> {
             secret: &'a str,
@@ -74,7 +88,7 @@ impl App {
             .client
             .post("https://hcaptcha.com/siteverify")
             .form(&Body {
-                secret: self.faucet_bot.get_hcaptcha_secret(),
+                secret: testnet.faucet_bot.get_hcaptcha_secret(),
                 response: g_recaptcha_response,
             })
             .send()

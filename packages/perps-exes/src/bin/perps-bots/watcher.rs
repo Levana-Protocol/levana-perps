@@ -21,6 +21,7 @@ use reqwest::header::CONTENT_TYPE;
 use reqwest::StatusCode;
 use tokio::task::JoinSet;
 
+use crate::app::factory::RpcInfo;
 use crate::app::AppBuilder;
 use crate::app::{factory::FactoryInfo, App};
 
@@ -38,7 +39,7 @@ pub(crate) enum TaskLabel {
     Utilization,
     Balance,
     UltraCrank { index: usize },
-    Trader { index: usize },
+    Trader { index: u32 },
 }
 
 impl Display for TaskLabel {
@@ -313,6 +314,7 @@ impl AppBuilder {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct WatchedTaskOutput {
     pub(crate) skip_delay: bool,
     pub(crate) message: String,
@@ -417,26 +419,29 @@ impl TaskStatuses {
         #[template(path = "status.html")]
         struct MyTemplate<'a> {
             statuses: Vec<RenderedStatus>,
-            family: &'a str,
+            family: Cow<'a, str>,
             build_version: &'a str,
             grpc: &'a str,
-            grpc_height: u64,
-            rpc: &'a str,
-            rpc_height: u64,
+            rpc: Option<&'a RpcInfo>,
             live_since: DateTime<Utc>,
             now: DateTime<Utc>,
         }
         let statuses = self.all_statuses();
         let alert = statuses.iter().any(|x| x.short.alert());
-        let factory = app.get_factory_info();
+        let frontend_info_testnet = app.get_frontend_info_testnet();
         let mut res = MyTemplate {
             statuses,
-            family: &app.config.contract_family,
+            family: match &app.config.by_type {
+                crate::config::BotConfigByType::Testnet { inner } => {
+                    (&inner.contract_family).into()
+                }
+                crate::config::BotConfigByType::Mainnet { inner } => {
+                    format!("Factory address {}", inner.factory).into()
+                }
+            },
             build_version: build_version(),
             grpc: &app.cosmos.get_first_builder().grpc_url,
-            grpc_height: factory.rpc.grpc_height,
-            rpc: &factory.rpc.endpoint,
-            rpc_height: factory.rpc.rpc_height,
+            rpc: frontend_info_testnet.as_deref().map(|x| &x.rpc),
             live_since: app.live_since,
             now: Utc::now(),
         }

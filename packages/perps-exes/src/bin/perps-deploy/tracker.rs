@@ -7,7 +7,7 @@ use msg::prelude::*;
 
 use crate::{cli::Opt, util::get_hash_for_path};
 
-pub(crate) struct Tracker(Contract);
+pub(crate) struct Tracker(pub(crate) Contract);
 
 impl Tracker {
     pub(crate) fn from_contract(contract: Contract) -> Self {

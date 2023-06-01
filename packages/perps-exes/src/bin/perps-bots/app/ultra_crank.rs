@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::{Context, Result};
 use axum::async_trait;
 use chrono::Utc;
@@ -6,28 +8,36 @@ use msg::contracts::market;
 use perps_exes::prelude::MarketId;
 use perps_exes::timestamp_to_date_time;
 
+use crate::config::BotConfigTestnet;
 use crate::watcher::{WatchedTaskOutput, WatchedTaskPerMarket};
 
 use super::factory::FactoryInfo;
+use super::gas_check::GasCheckWallet;
 use super::{App, AppBuilder};
 
 #[derive(Clone)]
 struct Worker {
     wallet: Wallet,
     activated: bool,
+    testnet: Arc<BotConfigTestnet>,
 }
 
 /// Start the background thread to monitor and use ultra cranking.
 impl AppBuilder {
-    pub(super) fn start_ultra_crank_bot(&mut self) -> Result<()> {
-        let ultra_crank_wallets = self.app.config.ultra_crank_wallets.clone();
+    pub(super) fn start_ultra_crank_bot(&mut self, testnet: &Arc<BotConfigTestnet>) -> Result<()> {
+        let ultra_crank_wallets = testnet.ultra_crank_wallets.clone();
         for (index, wallet) in ultra_crank_wallets.into_iter().enumerate() {
             // People like things that start at 1, not 0
             let index = index + 1;
-            self.refill_gas(*wallet.address(), format!("ultra-crank-bot-{index}"))?;
+            self.refill_gas(
+                testnet,
+                *wallet.address(),
+                GasCheckWallet::UltraCrank(index),
+            )?;
             let worker = Worker {
                 wallet,
                 activated: false,
+                testnet: testnet.clone(),
             };
             self.watch_periodic(crate::watcher::TaskLabel::UltraCrank { index }, worker)?;
         }
@@ -44,7 +54,7 @@ impl WatchedTaskPerMarket for Worker {
         _market: &MarketId,
         addr: Address,
     ) -> Result<WatchedTaskOutput> {
-        app.ultra_crank(addr, &self.wallet, &mut self.activated)
+        app.ultra_crank(addr, &self.wallet, &mut self.activated, &self.testnet)
             .await
     }
 }
@@ -55,6 +65,7 @@ impl App {
         addr: Address,
         wallet: &Wallet,
         activated: &mut bool,
+        testnet: &BotConfigTestnet,
     ) -> Result<WatchedTaskOutput> {
         let market = self.cosmos.make_contract(addr);
         let market::entry::StatusResp {
@@ -74,7 +85,7 @@ impl App {
         let age = Utc::now()
             .signed_duration_since(last_crank_completed)
             .num_seconds();
-        if age >= self.config.seconds_till_ultra.into() {
+        if age >= testnet.seconds_till_ultra.into() {
             *activated = true;
         } else if !*activated {
             return Ok(WatchedTaskOutput {
