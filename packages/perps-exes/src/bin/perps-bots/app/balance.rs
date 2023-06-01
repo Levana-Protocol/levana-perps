@@ -65,7 +65,7 @@ struct Balance {
 }
 
 impl AppBuilder {
-    pub(super) fn launch_balance(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
+    pub(super) fn start_balance(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
         if testnet.balance {
             let balance = Balance {
                 app: self.app.clone(),

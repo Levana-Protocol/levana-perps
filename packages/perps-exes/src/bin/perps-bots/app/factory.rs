@@ -56,7 +56,7 @@ pub(crate) struct Cw20 {
 }
 
 impl AppBuilder {
-    pub(super) fn launch_factory_task(&mut self) -> Result<()> {
+    pub(super) fn start_factory_task(&mut self) -> Result<()> {
         self.watch_periodic(crate::watcher::TaskLabel::GetFactory, FactoryUpdate)
     }
 }

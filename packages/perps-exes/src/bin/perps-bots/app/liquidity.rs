@@ -22,7 +22,7 @@ pub(super) struct Liquidity {
 }
 
 impl AppBuilder {
-    pub(super) fn launch_liquidity(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
+    pub(super) fn start_liquidity(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
         if let Some(liquidity_config) = &testnet.liquidity_config {
             let liquidity = Liquidity {
                 app: self.app.clone(),

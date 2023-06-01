@@ -39,7 +39,7 @@ pub(crate) struct App {
 pub(crate) struct AppBuilder {
     pub(crate) app: Arc<App>,
     pub(crate) watcher: Watcher,
-    gas_check: GasCheckBuilder,
+    pub(crate) gas_check: GasCheckBuilder,
 }
 
 impl Opt {
@@ -147,15 +147,6 @@ impl AppBuilder {
         let wallet = testnet.wallet_manager.get_wallet(desc)?;
         self.refill_gas(testnet, *wallet.address(), GasCheckWallet::Managed(desc))?;
         Ok(wallet)
-    }
-
-    /// Wait for background tasks to complete.
-    pub(crate) async fn wait(mut self) -> Result<()> {
-        // Gas task must always be launched last so that it includes all wallets specified above
-        let gas_check = self.gas_check.build(self.app.clone());
-        self.launch_gas_task(gas_check)?;
-
-        self.watcher.wait(&self.app).await
     }
 }
 

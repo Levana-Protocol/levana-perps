@@ -21,7 +21,7 @@ pub(super) struct Utilization {
 }
 
 impl AppBuilder {
-    pub(super) fn launch_utilization(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
+    pub(super) fn start_utilization(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
         if let Some(config) = testnet.utilization_config {
             let util = Utilization {
                 app: self.app.clone(),

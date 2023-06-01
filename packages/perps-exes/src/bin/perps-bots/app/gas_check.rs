@@ -109,7 +109,7 @@ pub(crate) struct GasCheck {
 }
 
 impl AppBuilder {
-    pub(crate) fn launch_gas_task(&mut self, gas_check: GasCheck) -> Result<()> {
+    pub(crate) fn start_gas_task(&mut self, gas_check: GasCheck) -> Result<()> {
         self.watch_periodic(crate::watcher::TaskLabel::GasCheck, gas_check)
     }
 }

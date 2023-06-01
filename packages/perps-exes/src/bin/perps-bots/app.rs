@@ -20,14 +20,15 @@ use crate::config::BotConfigByType;
 use self::gas_check::GasCheckWallet;
 
 impl AppBuilder {
-    pub(crate) async fn load(&mut self) -> Result<()> {
+    pub(crate) async fn start(mut self) -> Result<()> {
         // Start the tasks that run on all deployments
-        self.launch_factory_task()?;
+        self.start_rest_api();
+        self.start_factory_task()?;
         self.start_crank_bot()?;
+        self.start_price()?;
         self.track_stale()?;
         self.track_stats()?;
         self.track_balance()?;
-        self.start_price()?;
 
         match &self.app.config.by_type {
             // Run tasks that can only run in testnet.
@@ -58,16 +59,20 @@ impl AppBuilder {
                 )?;
 
                 // Launch testnet tasks
-                self.launch_balance(inner.clone())?;
-                self.launch_liquidity(inner.clone())?;
-                self.launch_utilization(inner.clone())?;
-                self.launch_traders(inner.clone())?;
+                self.start_balance(inner.clone())?;
+                self.start_liquidity(inner.clone())?;
+                self.start_utilization(inner.clone())?;
+                self.start_traders(inner.clone())?;
                 self.start_ultra_crank_bot(&inner)?;
             }
             // Nothing to do, no tasks are mainnet-only
             BotConfigByType::Mainnet { .. } => (),
         }
 
-        Ok(())
+        // Gas task must always be launched last so that it includes all wallets specified above
+        let gas_check = self.gas_check.build(self.app.clone());
+        self.start_gas_task(gas_check)?;
+
+        self.watcher.wait(&self.app).await
     }
 }
