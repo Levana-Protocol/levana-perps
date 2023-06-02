@@ -35,6 +35,8 @@ pub struct ChainConfig {
     /// Potential RPC endpoints to use
     #[serde(default)]
     pub rpc_nodes: Vec<String>,
+    /// Override the gas multiplier
+    pub gas_multiplier: Option<f64>,
 }
 
 #[derive(serde::Deserialize, Debug)]
@@ -130,8 +132,6 @@ pub struct DeploymentConfigTestnet {
     /// Minimum gas required in the gas wallet
     #[serde(default = "defaults::min_gas_in_gas_wallet")]
     pub min_gas_in_gas_wallet: u128,
-    /// Override the gas multiplier
-    pub gas_multiplier: Option<f64>,
 }
 
 impl ChainConfig {

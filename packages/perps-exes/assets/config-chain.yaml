@@ -18,6 +18,7 @@ osmosis-testnet:
   explorer: "https://testnet.mintscan.io/osmosis-testnet/txs/"
   rpc-nodes:
   - https://rpc-testnet.osmosis.sandbox.levana.finance
+  gas-multiplier: 1.5
 dragonfire:
   tracker: levana18cszlvm6pze0x9sz32qnjq4vtd45xehqs8dq7cwy8yhq35wfnn3q6s5ylj
   faucet: levana1qg5ega6dykkxc307y25pecuufrjkxkaggkkxh7nad0vhyhtuhw3s7ff6rr
