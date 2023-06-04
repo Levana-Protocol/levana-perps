@@ -16,9 +16,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 OwnerExecuteMsg::StartLockdropPeriod { start } => {
                     state.start_lockdrop_period(&mut ctx, start)?
                 }
-                OwnerExecuteMsg::TransferLockdropCollateral {} => {
-                    state.transfer_lockdrop_collateral(&mut ctx)?
-                }
                 OwnerExecuteMsg::StartLaunchPeriod {} => state.start_launch_period(&mut ctx)?,
                 OwnerExecuteMsg::SetEmissions {
                     start,

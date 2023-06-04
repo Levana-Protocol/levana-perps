@@ -71,10 +71,7 @@ impl State<'_> {
                     | OwnerExecuteMsg::ClearEmissions { .. }
                     | OwnerExecuteMsg::ReclaimEmissions { .. } => period == FarmingPeriod::Launched,
 
-                    OwnerExecuteMsg::SetLockdropRewards { .. }
-                    | OwnerExecuteMsg::TransferLockdropCollateral { .. } => {
-                        period == FarmingPeriod::Review
-                    }
+                    OwnerExecuteMsg::SetLockdropRewards { .. } => period == FarmingPeriod::Review,
 
                     // Validation for config and transitioning between Periods is handled in the
                     // appropriate business logic
@@ -91,7 +88,7 @@ impl State<'_> {
             }
             ExecuteMsg::LockdropWithdraw { bucket_id, amount } => match period {
                 FarmingPeriod::Lockdrop => true,
-                FarmingPeriod::Sunset | FarmingPeriod::Launched => {
+                FarmingPeriod::Sunset => {
                     self.validate_lockdrop_withdrawal(
                         store,
                         &period_resp,
@@ -101,7 +98,9 @@ impl State<'_> {
                     )?;
                     true
                 }
-                FarmingPeriod::Inactive | FarmingPeriod::Review => false,
+                FarmingPeriod::Inactive
+                | FarmingPeriod::Review
+                | FarmingPeriod::Launched => false,
             },
             ExecuteMsg::Deposit { .. }
             | ExecuteMsg::Withdraw { .. }
@@ -200,30 +199,6 @@ impl State<'_> {
         Ok(())
     }
 
-    pub(crate) fn transfer_lockdrop_collateral(&self, ctx: &mut StateContext) -> Result<()> {
-        let period_resp = self.get_period_resp(ctx.storage)?;
-        match period_resp {
-            FarmingPeriodResp::Review { .. } => {
-                let farming_tokens = self.load_farming_totals(ctx.storage)?.farming;
-                let collateral_amount =
-                    Collateral::from_decimal256(farming_tokens.into_decimal256());
-                let send_msg = self.market_info.collateral.into_execute_msg(
-                    &self.market_info.addr,
-                    collateral_amount,
-                    &DepositLiquidity { stake_to_xlp: true },
-                )?;
-
-                ctx.response.add_message(send_msg);
-
-                Ok(())
-            }
-            _ => bail!(
-                "Can only transfer lockdrop collateral while in review period, currently in {:?}.",
-                FarmingPeriod::from(&period_resp)
-            ),
-        }
-    }
-
     pub(crate) fn start_launch_period(&self, ctx: &mut StateContext) -> Result<()> {
         let period_resp = self.get_period_resp(ctx.storage)?;
         match period_resp {
@@ -237,6 +212,22 @@ impl State<'_> {
                 }
 
                 FarmingEpochStartTime::Launch(self.now()).save(ctx.storage)?;
+
+                // Deposit lockdrop collateral into Market contract for xLP
+
+                let farming_tokens = self.load_farming_totals(ctx.storage)?.farming;
+
+                if farming_tokens > FarmingToken::zero() {
+                    let collateral_amount =
+                        Collateral::from_decimal256(farming_tokens.into_decimal256());
+                    let send_msg = self.market_info.collateral.into_execute_msg(
+                        &self.market_info.addr,
+                        collateral_amount,
+                        &DepositLiquidity { stake_to_xlp: true },
+                    )?;
+
+                    ctx.response.add_message(send_msg);
+                }
 
                 Ok(())
             }

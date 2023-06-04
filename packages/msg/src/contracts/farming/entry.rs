@@ -112,8 +112,6 @@ pub enum OwnerExecuteMsg {
         /// If specified, lockdrop will start at this time.
         start: Option<Timestamp>,
     },
-    /// Transfers the lockdrop collateral to the Market contract and converts it into xLP
-    TransferLockdropCollateral {},
     /// Finish the review period and launch the primary contract
     StartLaunchPeriod {},
     /// Change the active emissions
@@ -379,8 +377,6 @@ pub struct FarmerLockdropStats {
     pub withdrawal_before_sunset: Collateral,
     /// Total withdrawals that have occurred during the sunset period
     pub withdrawal_after_sunset: Collateral,
-    /// Total withdrawals that have occurred post-launch
-    pub withdrawal_after_launch: Collateral,
 }
 
 /// Returned from [QueryMsg::Farmers]

@@ -1520,13 +1520,6 @@ impl PerpsMarket {
         )
     }
 
-    pub fn exec_farming_transfer_lockdrop_collateral(&self) -> Result<AppResponse> {
-        self.exec_farming(
-            &Addr::unchecked(&TEST_CONFIG.protocol_owner),
-            &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::TransferLockdropCollateral {}),
-        )
-    }
-
     pub fn exec_farming_start_launch(&self) -> Result<AppResponse> {
         self.exec_farming(
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
