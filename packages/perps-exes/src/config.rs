@@ -314,7 +314,7 @@ impl Default for WatcherConfig {
                 delay_between_retries: None,
             },
             price: TaskConfig {
-                delay: Delay::Interval(1),
+                delay: Delay::Interval(3),
                 out_of_date: 30,
                 // Intentionally using different defaults to make sure price
                 // updates come through quickly. We increase our retries to
