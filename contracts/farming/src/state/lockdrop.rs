@@ -298,8 +298,7 @@ struct Balance {
 impl Balance {
     pub fn total(&self) -> Result<Collateral> {
         let total_deposit = self.deposit_before_sunset + self.deposit_after_sunset;
-        let total_withdrawal = self.withdrawal_before_sunset
-            + self.withdrawal_after_sunset;
+        let total_withdrawal = self.withdrawal_before_sunset + self.withdrawal_after_sunset;
         let total = total_deposit.checked_sub(total_withdrawal)?;
 
         Ok(total)

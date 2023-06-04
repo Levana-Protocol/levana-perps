@@ -98,9 +98,7 @@ impl State<'_> {
                     )?;
                     true
                 }
-                FarmingPeriod::Inactive
-                | FarmingPeriod::Review
-                | FarmingPeriod::Launched => false,
+                FarmingPeriod::Inactive | FarmingPeriod::Review | FarmingPeriod::Launched => false,
             },
             ExecuteMsg::Deposit { .. }
             | ExecuteMsg::Withdraw { .. }
