@@ -14,7 +14,7 @@ fn farming_period() {
 
     let assert_unable_to_start_launch_or_lockdrop = || {
         // cannot launch without going through sunset and review first
-        market.exec_farming_start_launch(None).unwrap_err();
+        market.exec_farming_start_launch().unwrap_err();
         // cannot start lockdrop after started
         market.exec_farming_start_lockdrop(None).unwrap_err();
     };
@@ -27,7 +27,7 @@ fn farming_period() {
     );
 
     // cannot launch without going through lockdrop first
-    market.exec_farming_start_launch(None).unwrap_err();
+    market.exec_farming_start_launch().unwrap_err();
 
     // schedule a lockdrop 12 hours from now
     let lockdrop_start = market.now() + Duration::from_seconds(60 * 60 * 24);
@@ -41,7 +41,7 @@ fn farming_period() {
         }
     );
     // cannot launch without going through sunset and review first
-    market.exec_farming_start_launch(None).unwrap_err();
+    market.exec_farming_start_launch().unwrap_err();
 
     // reschedule to a day from now
     let lockdrop_start = market.now() + Duration::from_seconds(60 * 60 * 24);
@@ -55,7 +55,7 @@ fn farming_period() {
         }
     );
     // cannot launch without going through sunset and review first
-    market.exec_farming_start_launch(None).unwrap_err();
+    market.exec_farming_start_launch().unwrap_err();
 
     // jump 8 hours, we're still scheduled
     market.set_time(TimeJump::Hours(8)).unwrap();
@@ -65,7 +65,7 @@ fn farming_period() {
             lockdrop_start: Some(lockdrop_start)
         }
     );
-    market.exec_farming_start_launch(None).unwrap_err();
+    market.exec_farming_start_launch().unwrap_err();
 
     // jump the rest of the day, so we're in lockdrop mode
     market.set_time(TimeJump::Hours(16)).unwrap();
@@ -99,7 +99,6 @@ fn farming_period() {
     let review_start = lockdrop_start + LOCKDROP_START_DURATION + LOCKDROP_SUNSET_DURATION;
     let review_period = FarmingPeriodResp::Review {
         started_at: review_start,
-        launch_start: None,
     };
     market.set_time(TimeJump::Hours((24 * 4) + 12)).unwrap();
     assert_eq!(get_period(), review_period);
@@ -110,43 +109,15 @@ fn farming_period() {
     assert_eq!(get_period(), review_period);
     market.exec_farming_start_lockdrop(None).unwrap_err();
 
-    // schedule a launch 10 days from now
-    // the review_start time remains consistent from when we started review, however
-    let launch_start = market.now() + Duration::from_seconds(60 * 60 * 24 * 10);
-    let review_period = FarmingPeriodResp::Review {
-        started_at: review_start,
-        launch_start: Some(launch_start),
-    };
-    market
-        .exec_farming_start_launch(Some(launch_start))
-        .unwrap();
-    assert_eq!(get_period(), review_period);
-    market.exec_farming_start_lockdrop(None).unwrap_err();
-
-    // actually, make it 3 days from now
-    // the review_start time remains consistent from when we started review, however
-    let launch_start = market.now() + Duration::from_seconds(60 * 60 * 24 * 3);
-    let review_period = FarmingPeriodResp::Review {
-        started_at: review_start,
-        launch_start: Some(launch_start),
-    };
-    market
-        .exec_farming_start_launch(Some(launch_start))
-        .unwrap();
-    assert_eq!(get_period(), review_period);
-    market.exec_farming_start_lockdrop(None).unwrap_err();
-
-    // A day later, still in review, pre-launch
-    market.set_time(TimeJump::Hours(24)).unwrap();
-    assert_eq!(get_period(), review_period);
-    market.exec_farming_start_lockdrop(None).unwrap_err();
-
-    // 2 days later - launched!
+    // launch lockdrop
     let launch_period = FarmingPeriodResp::Launched {
-        started_at: launch_start,
+        started_at: market.now(),
     };
-    market.set_time(TimeJump::Hours(24 * 2)).unwrap();
+    market
+        .exec_farming_start_launch()
+        .unwrap();
     assert_eq!(get_period(), launch_period);
+    market.exec_farming_start_lockdrop(None).unwrap_err();
 
     // this is the end of the road
     assert_unable_to_start_launch_or_lockdrop();

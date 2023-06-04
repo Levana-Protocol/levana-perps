@@ -23,7 +23,7 @@ fn deposit_xlp() {
     // Finish lockdrop
     market.set_time(TimeJump::Hours(24 * 365)).unwrap();
     // Start the launch
-    market.exec_farming_start_launch(None).unwrap();
+    market.exec_farming_start_launch().unwrap();
 
     // Deposit the xLP in the farming contract
     market

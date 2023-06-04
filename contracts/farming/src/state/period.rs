@@ -71,7 +71,8 @@ impl State<'_> {
                     | OwnerExecuteMsg::ClearEmissions { .. }
                     | OwnerExecuteMsg::ReclaimEmissions { .. } => period == FarmingPeriod::Launched,
 
-                    OwnerExecuteMsg::SetLockdropRewards { .. } => period == FarmingPeriod::Review,
+                    OwnerExecuteMsg::SetLockdropRewards { .. }
+                    | OwnerExecuteMsg::TransferLockdropCollateral{ .. } => period == FarmingPeriod::Review,
 
                     // Validation for config and transitioning between Periods is handled in the
                     // appropriate business logic
@@ -151,7 +152,6 @@ impl State<'_> {
                         } else {
                             Ok(FarmingPeriodResp::Review {
                                 started_at: review_start,
-                                launch_start: None,
                             })
                         }
                     }
@@ -163,7 +163,6 @@ impl State<'_> {
                                 // rather, we use it from the stashed value
                                 // which definitively exists if we're in this branch
                                 started_at: REVIEW_START_TIME.load(store)?,
-                                launch_start: Some(start),
                             })
                         } else {
                             Ok(FarmingPeriodResp::Launched { started_at: start })
@@ -199,10 +198,34 @@ impl State<'_> {
         Ok(())
     }
 
+    pub(crate) fn transfer_lockdrop_collateral(&self, ctx: &mut StateContext) -> Result<()> {
+        let period_resp = self.get_period_resp(ctx.storage)?;
+        match period_resp {
+            FarmingPeriodResp::Review { .. } => {
+                let farming_tokens = self.load_farming_totals(ctx.storage)?.farming;
+                let collateral_amount = Collateral::from_decimal256(farming_tokens.into_decimal256());
+                let send_msg = self.market_info.collateral.into_execute_msg(
+                    &self.market_info.addr,
+                    collateral_amount,
+                    &DepositLiquidity {
+                        stake_to_xlp: true,
+                    }
+                )?;
+
+                ctx.response.add_message(send_msg);
+
+                Ok(())
+            }
+            _ => bail!(
+                    "Can only transfer lockdrop collateral while in review period, currently in {:?}.",
+                    FarmingPeriod::from(&period_resp)
+                )
+        }
+    }
+
     pub(crate) fn start_launch_period(
         &self,
         ctx: &mut StateContext,
-        start: Option<Timestamp>,
     ) -> Result<()> {
         let period_resp = self.get_period_resp(ctx.storage)?;
         match period_resp {
@@ -215,26 +238,7 @@ impl State<'_> {
                     REVIEW_START_TIME.save(ctx.storage, &started_at)?;
                 }
 
-                let start = start.unwrap_or_else(|| self.now());
-                if start < self.now() {
-                    bail!("Cannot start launch in the past.");
-                }
-
-                FarmingEpochStartTime::Launch(start).save(ctx.storage)?;
-
-                // Deposit lockdrop collateral into Market contract in exchange for xLP¡
-                let farming_tokens = self.load_farming_totals(ctx.storage)?
-                    .farming;
-                let collateral = Collateral::from_decimal256(farming_tokens.into_decimal256());
-                let send_msg = self.market_info.collateral.into_execute_msg(
-                    &self.market_info.addr,
-                    collateral,
-                    &DepositLiquidity {
-                        stake_to_xlp: true,
-                    }
-                )?;
-
-                ctx.response.add_message(send_msg);
+                FarmingEpochStartTime::Launch(self.now()).save(ctx.storage)?;
 
                 Ok(())
             }

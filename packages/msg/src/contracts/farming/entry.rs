@@ -112,11 +112,10 @@ pub enum OwnerExecuteMsg {
         /// If specified, lockdrop will start at this time.
         start: Option<Timestamp>,
     },
+    /// Transfers the lockdrop collateral to the Market contract and converts it into xLP
+    TransferLockdropCollateral {},
     /// Finish the review period and launch the primary contract
-    StartLaunchPeriod {
-        /// If specified, launch will start at this time.
-        start: Option<Timestamp>,
-    },
+    StartLaunchPeriod {},
     /// Change the active emissions
     SetEmissions {
         /// When to start the emissions.
@@ -260,8 +259,6 @@ pub enum FarmingPeriodResp {
     Review {
         /// review started at this time
         started_at: Timestamp,
-        /// If set, launch has been scheduled to start at this time
-        launch_start: Option<Timestamp>,
     },
     /// Normal contract operations.
     Launched {

@@ -118,7 +118,7 @@ fn farming_lockdrop_basic() {
         .unwrap_err();
 
     // launch
-    market.exec_farming_start_launch(None).unwrap();
+    market.exec_farming_start_launch().unwrap();
 
     // still cannot withdraw anything
     market
@@ -214,7 +214,7 @@ fn test_query_lockdrop_rewards() {
     market
         .exec_farming_set_lockdrop_rewards("384".parse().unwrap(), &token)
         .unwrap();
-    market.exec_farming_start_launch(None).unwrap();
+    market.exec_farming_start_launch().unwrap();
 
     // Jump a quarter way to the end of lockup period
 
@@ -278,7 +278,7 @@ fn test_claim_lockdrop_rewards() {
     market
         .exec_farming_set_lockdrop_rewards("90".parse().unwrap(), &token)
         .unwrap();
-    market.exec_farming_start_launch(None).unwrap();
+    market.exec_farming_start_launch().unwrap();
 
     // Jump a quarter way to the end of lockup period
 
@@ -344,12 +344,13 @@ fn test_lockdrop_locked_tokens() {
         .exec_farming_lockdrop_deposit(&farmers[0], "200".parse().unwrap(), buckets[2].bucket_id)
         .unwrap();
 
-    // Jump to review period & start
+    // Jump to review period, transfer collateral, and launch the lockdrop
 
     market
         .set_time(TimeJump::Seconds(60 * 60 * 24 * 14))
         .unwrap();
-    market.exec_farming_start_launch(None).unwrap();
+    market.exec_farming_transfer_lockdrop_collateral().unwrap();
+    market.exec_farming_start_launch().unwrap();
 
     // Assert when no time has passed
 
@@ -433,4 +434,11 @@ fn test_lockdrop_locked_tokens() {
     assert_balance(&f0, 200, 500);
     assert_balance(&f1, 0, 100);
     assert_balance(&f2, 100, 100);
+
+    // 10.5
+    jump();
+
+    assert_balance(&f0, 0, 500);
+    assert_balance(&f1, 0, 100);
+    assert_balance(&f2, 0, 100);
 }
