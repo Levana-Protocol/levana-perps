@@ -1,11 +1,11 @@
+use crate::prelude::*;
 use cosmwasm_std::Uint128;
+use msg::contracts::cw20::entry::{QueryMsg as Cw20QueryMsg, TokenInfoResponse};
 use msg::contracts::farming::entry::defaults::lockdrop_month_seconds;
 use msg::contracts::farming::entry::{
     defaults::lockdrop_buckets, FarmerLockdropStats, LockdropBucketConfig,
 };
 use msg::contracts::liquidity_token::LiquidityTokenKind;
-use msg::contracts::cw20::entry::{QueryMsg as Cw20QueryMsg, TokenInfoResponse};
-use crate::prelude::*;
 
 fn setup_lockdrop() -> (PerpsMarket, Vec<LockdropBucketConfig>, [Addr; 3]) {
     let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
@@ -403,42 +403,42 @@ fn test_lockdrop_locked_tokens() {
     // 3
     jump();
 
-    assert_balance(&f0, 100, 100);
-    assert_balance(&f1, 0, 0);
-    assert_balance(&f2, 0, 0);
+    assert_balance(f0, 100, 100);
+    assert_balance(f1, 0, 0);
+    assert_balance(f2, 0, 0);
 
     // 4.5
     jump();
 
-    assert_balance(&f0, 0, 100);
-    assert_balance(&f1, 0, 0);
-    assert_balance(&f2, 0, 0);
+    assert_balance(f0, 0, 100);
+    assert_balance(f1, 0, 0);
+    assert_balance(f2, 0, 0);
 
     // 6
     jump();
 
-    assert_balance(&f0, 200, 300);
-    assert_balance(&f1, 100, 100);
-    assert_balance(&f2, 0, 0);
+    assert_balance(f0, 200, 300);
+    assert_balance(f1, 100, 100);
+    assert_balance(f2, 0, 0);
 
     // 7.5
     jump();
 
-    assert_balance(&f0, 0, 300);
-    assert_balance(&f1, 0, 100);
-    assert_balance(&f2, 0, 0);
+    assert_balance(f0, 0, 300);
+    assert_balance(f1, 0, 100);
+    assert_balance(f2, 0, 0);
 
     // 9
     jump();
 
-    assert_balance(&f0, 200, 500);
-    assert_balance(&f1, 0, 100);
-    assert_balance(&f2, 100, 100);
+    assert_balance(f0, 200, 500);
+    assert_balance(f1, 0, 100);
+    assert_balance(f2, 100, 100);
 
     // 10.5
     jump();
 
-    assert_balance(&f0, 0, 500);
-    assert_balance(&f1, 0, 100);
-    assert_balance(&f2, 0, 100);
+    assert_balance(f0, 0, 500);
+    assert_balance(f1, 0, 100);
+    assert_balance(f2, 0, 100);
 }

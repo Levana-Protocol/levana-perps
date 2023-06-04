@@ -113,9 +113,7 @@ fn farming_period() {
     let launch_period = FarmingPeriodResp::Launched {
         started_at: market.now(),
     };
-    market
-        .exec_farming_start_launch()
-        .unwrap();
+    market.exec_farming_start_launch().unwrap();
     assert_eq!(get_period(), launch_period);
     market.exec_farming_start_lockdrop(None).unwrap_err();
 

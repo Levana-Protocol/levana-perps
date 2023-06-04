@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use msg::prelude::MarketExecuteMsg::DepositLiquidity;
+use serde::{Deserialize, Serialize};
 
 use crate::prelude::*;
 
@@ -72,7 +72,9 @@ impl State<'_> {
                     | OwnerExecuteMsg::ReclaimEmissions { .. } => period == FarmingPeriod::Launched,
 
                     OwnerExecuteMsg::SetLockdropRewards { .. }
-                    | OwnerExecuteMsg::TransferLockdropCollateral{ .. } => period == FarmingPeriod::Review,
+                    | OwnerExecuteMsg::TransferLockdropCollateral { .. } => {
+                        period == FarmingPeriod::Review
+                    }
 
                     // Validation for config and transitioning between Periods is handled in the
                     // appropriate business logic
@@ -203,13 +205,12 @@ impl State<'_> {
         match period_resp {
             FarmingPeriodResp::Review { .. } => {
                 let farming_tokens = self.load_farming_totals(ctx.storage)?.farming;
-                let collateral_amount = Collateral::from_decimal256(farming_tokens.into_decimal256());
+                let collateral_amount =
+                    Collateral::from_decimal256(farming_tokens.into_decimal256());
                 let send_msg = self.market_info.collateral.into_execute_msg(
                     &self.market_info.addr,
                     collateral_amount,
-                    &DepositLiquidity {
-                        stake_to_xlp: true,
-                    }
+                    &DepositLiquidity { stake_to_xlp: true },
                 )?;
 
                 ctx.response.add_message(send_msg);
@@ -217,16 +218,13 @@ impl State<'_> {
                 Ok(())
             }
             _ => bail!(
-                    "Can only transfer lockdrop collateral while in review period, currently in {:?}.",
-                    FarmingPeriod::from(&period_resp)
-                )
+                "Can only transfer lockdrop collateral while in review period, currently in {:?}.",
+                FarmingPeriod::from(&period_resp)
+            ),
         }
     }
 
-    pub(crate) fn start_launch_period(
-        &self,
-        ctx: &mut StateContext,
-    ) -> Result<()> {
+    pub(crate) fn start_launch_period(&self, ctx: &mut StateContext) -> Result<()> {
         let period_resp = self.get_period_resp(ctx.storage)?;
         match period_resp {
             FarmingPeriodResp::Review { started_at, .. } => {
