@@ -52,6 +52,13 @@ impl State<'_> {
         farmer_stats.farming_tokens = farmer_stats.farming_tokens.checked_add(farming_tokens)?;
         self.save_raw_farmer_stats(ctx.storage, &user, &farmer_stats)?;
 
+        let mut totals = self.load_farming_totals(ctx.storage)?;
+        totals.xlp = totals
+            .xlp
+            .checked_add(LpToken::from_decimal256(amount.into_decimal256()))?;
+        totals.farming = totals.farming.checked_add(farming_tokens)?;
+        self.save_farming_totals(ctx.storage, &totals)?;
+
         LockdropBuckets::update_balance(
             ctx.storage,
             bucket_id,
@@ -71,6 +78,23 @@ impl State<'_> {
         amount: NonZero<Collateral>,
     ) -> Result<()> {
         let period = self.get_period(ctx.storage)?;
+
+        let mut farmer_stats = match self.load_raw_farmer_stats(ctx.storage, &user)? {
+            None => bail!("Unable to withdraw, no deposits"),
+            Some(farmer_stats) => farmer_stats,
+        };
+
+        let farming_tokens = FarmingToken::from_decimal256(amount.into_decimal256());
+        farmer_stats.farming_tokens = farmer_stats.farming_tokens.checked_sub(farming_tokens)?;
+        self.save_raw_farmer_stats(ctx.storage, &user, &farmer_stats)?;
+
+        let mut totals = self.load_farming_totals(ctx.storage)?;
+        totals.xlp = totals
+            .xlp
+            .checked_sub(LpToken::from_decimal256(amount.into_decimal256()))?;
+        totals.farming = totals.farming.checked_add(farming_tokens)?;
+        self.save_farming_totals(ctx.storage, &totals)?;
+
         LockdropBuckets::update_balance(
             ctx.storage,
             bucket_id,
@@ -240,9 +264,9 @@ impl State<'_> {
                 acc.total = acc.total.checked_add(balance)?;
 
                 if elapsed < lockdrop_duration {
-                    acc.locked.checked_add(balance)?;
+                    acc.locked = acc.locked.checked_add(balance)?;
                 } else {
-                    acc.unlocked.checked_add(balance)?;
+                    acc.unlocked = acc.unlocked.checked_add(balance)?;
                 }
 
                 anyhow::Ok(acc)

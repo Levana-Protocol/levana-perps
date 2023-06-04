@@ -1,7 +1,33 @@
+use cosmwasm_std::Uint128;
 use msg::contracts::farming::entry::defaults::lockdrop_month_seconds;
-use msg::contracts::farming::entry::{defaults::lockdrop_buckets, FarmerLockdropStats};
-
+use msg::contracts::farming::entry::{
+    defaults::lockdrop_buckets, FarmerLockdropStats, LockdropBucketConfig,
+};
+use msg::contracts::liquidity_token::LiquidityTokenKind;
+use msg::contracts::cw20::entry::{QueryMsg as Cw20QueryMsg, TokenInfoResponse};
 use crate::prelude::*;
+
+fn setup_lockdrop() -> (PerpsMarket, Vec<LockdropBucketConfig>, [Addr; 3]) {
+    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let buckets = lockdrop_buckets();
+    let farmers = [
+        market.clone_lp(0).unwrap(),
+        market.clone_lp(1).unwrap(),
+        market.clone_lp(2).unwrap(),
+    ];
+
+    market.automatic_time_jump_enabled = false;
+    market.exec_farming_start_lockdrop(None).unwrap();
+
+    // Farmers deposit into the first three buckets respectively
+    for (i, addr) in farmers.iter().enumerate() {
+        market
+            .exec_farming_lockdrop_deposit(addr, "100".parse().unwrap(), buckets[i].bucket_id)
+            .unwrap();
+    }
+
+    (market, buckets, farmers)
+}
 
 #[test]
 fn farming_lockdrop_basic() {
@@ -169,24 +195,8 @@ fn farming_lockdrop_basic() {
 
 #[test]
 fn test_query_lockdrop_rewards() {
-    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    let buckets = lockdrop_buckets();
-    let farmers = [
-        market.clone_lp(0).unwrap(),
-        market.clone_lp(1).unwrap(),
-        market.clone_lp(2).unwrap(),
-    ];
-    let token = market.setup_lvn_rewards("10000");
-
-    market.automatic_time_jump_enabled = false;
-    market.exec_farming_start_lockdrop(None).unwrap();
-
-    // Farmers deposit into the first three buckets respectively
-    for (i, addr) in farmers.iter().enumerate() {
-        market
-            .exec_farming_lockdrop_deposit(addr, "100".parse().unwrap(), buckets[i].bucket_id)
-            .unwrap();
-    }
+    let (market, buckets, farmers) = setup_lockdrop();
+    let token = market.setup_lvn_rewards("1000000");
 
     // Farmer1 makes an additional deposit into the last bucket
     market
@@ -258,24 +268,8 @@ fn test_query_lockdrop_rewards() {
 
 #[test]
 fn test_claim_lockdrop_rewards() {
-    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    let buckets = lockdrop_buckets();
-    let farmers = [
-        market.clone_lp(0).unwrap(),
-        market.clone_lp(1).unwrap(),
-        market.clone_lp(2).unwrap(),
-    ];
+    let (market, _buckets, farmers) = setup_lockdrop();
     let token = market.setup_lvn_rewards("1000000");
-
-    market.automatic_time_jump_enabled = false;
-    market.exec_farming_start_lockdrop(None).unwrap();
-
-    // Farmers deposit into the first three buckets respectively
-    for (i, addr) in farmers.iter().enumerate() {
-        market
-            .exec_farming_lockdrop_deposit(addr, "100".parse().unwrap(), buckets[i].bucket_id)
-            .unwrap();
-    }
 
     // Jump to review period
     market
@@ -332,4 +326,111 @@ fn test_claim_lockdrop_rewards() {
 
     market.set_time(TimeJump::Hours(3)).unwrap();
     assert_total();
+}
+
+#[test]
+fn test_lockdrop_locked_tokens() {
+    let (market, buckets, farmers) = setup_lockdrop();
+    let cw20_info: TokenInfoResponse = market
+        .query_liquidity_token(LiquidityTokenKind::Xlp, &Cw20QueryMsg::TokenInfo {})
+        .unwrap();
+    let decimals = cw20_info.decimals as u32;
+
+    // Farmer1 makes a additional deposits into second and third buckets
+    market
+        .exec_farming_lockdrop_deposit(&farmers[0], "200".parse().unwrap(), buckets[1].bucket_id)
+        .unwrap();
+    market
+        .exec_farming_lockdrop_deposit(&farmers[0], "200".parse().unwrap(), buckets[2].bucket_id)
+        .unwrap();
+
+    // Jump to review period & start
+
+    market
+        .set_time(TimeJump::Seconds(60 * 60 * 24 * 14))
+        .unwrap();
+    market.exec_farming_start_launch(None).unwrap();
+
+    // Assert when no time has passed
+
+    for farmer in &farmers {
+        market.exec_farming_withdraw_xlp(farmer, None).unwrap_err();
+        let xlp_balance = market
+            .query_liquidity_token_balance_raw(LiquidityTokenKind::Xlp, farmer)
+            .unwrap();
+        assert_eq!(xlp_balance, Uint128::zero());
+    }
+
+    // Jump 1.5 months at a time while asserting withdrawals
+
+    let jump = || {
+        let one_and_a_half = (lockdrop_month_seconds() + lockdrop_month_seconds() / 2).into();
+        market.set_time(TimeJump::Seconds(one_and_a_half)).unwrap();
+    };
+    let assert_balance = |farmer: &Addr, expected_delta: u64, expected_total: u64| {
+        let expected_delta = Number::from(expected_delta);
+        let expected_total = Number::from(expected_total);
+        let raw_balance_before = market
+            .query_liquidity_token_balance_raw(LiquidityTokenKind::Xlp, farmer)
+            .unwrap();
+
+        if expected_delta.is_zero() {
+            market.exec_farming_withdraw_xlp(farmer, None).unwrap_err();
+        } else {
+            market.exec_farming_withdraw_xlp(farmer, None).unwrap();
+        }
+
+        let raw_balance_after = market
+            .query_liquidity_token_balance_raw(LiquidityTokenKind::Xlp, farmer)
+            .unwrap();
+        let balance_before = Number::from_fixed_u128(raw_balance_before.into(), decimals);
+        let balance_after = Number::from_fixed_u128(raw_balance_after.into(), decimals);
+        let delta = balance_after.checked_sub(balance_before).unwrap();
+
+        assert_eq!(delta, expected_delta);
+        assert_eq!(balance_after, expected_total);
+    };
+    let (f0, f1, f2) = (&farmers[0], &farmers[1], &farmers[2]);
+
+    // 1.5
+    jump();
+
+    for farmer in &farmers {
+        assert_balance(farmer, 0, 0);
+    }
+
+    // 3
+    jump();
+
+    assert_balance(&f0, 100, 100);
+    assert_balance(&f1, 0, 0);
+    assert_balance(&f2, 0, 0);
+
+    // 4.5
+    jump();
+
+    assert_balance(&f0, 0, 100);
+    assert_balance(&f1, 0, 0);
+    assert_balance(&f2, 0, 0);
+
+    // 6
+    jump();
+
+    assert_balance(&f0, 200, 300);
+    assert_balance(&f1, 100, 100);
+    assert_balance(&f2, 0, 0);
+
+    // 7.5
+    jump();
+
+    assert_balance(&f0, 0, 300);
+    assert_balance(&f1, 0, 100);
+    assert_balance(&f2, 0, 0);
+
+    // 9
+    jump();
+
+    assert_balance(&f0, 200, 500);
+    assert_balance(&f1, 0, 100);
+    assert_balance(&f2, 100, 100);
 }

@@ -49,14 +49,14 @@ fn deposit_xlp() {
     market
         .exec_farming_withdraw_xlp(
             &lp,
-            NonZero::new(stats2.farming_tokens + "1".parse().unwrap()).unwrap(),
+            Some(NonZero::new(stats2.farming_tokens + "1".parse().unwrap()).unwrap()),
         )
         .unwrap_err();
     market
-        .exec_farming_withdraw_xlp(&lp, NonZero::new(stats2.farming_tokens).unwrap())
+        .exec_farming_withdraw_xlp(&lp, Some(NonZero::new(stats2.farming_tokens).unwrap()))
         .unwrap();
     market
-        .exec_farming_withdraw_xlp(&lp, NonZero::new(stats2.farming_tokens).unwrap())
+        .exec_farming_withdraw_xlp(&lp, Some(NonZero::new(stats2.farming_tokens).unwrap()))
         .unwrap_err();
 
     let info3 = market.query_lp_info(&lp).unwrap();

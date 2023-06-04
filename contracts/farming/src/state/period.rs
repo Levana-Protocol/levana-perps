@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use msg::prelude::MarketExecuteMsg::DepositLiquidity;
 
 use crate::prelude::*;
 
@@ -220,6 +221,20 @@ impl State<'_> {
                 }
 
                 FarmingEpochStartTime::Launch(start).save(ctx.storage)?;
+
+                // Deposit lockdrop collateral into Market contract in exchange for xLP¡
+                let farming_tokens = self.load_farming_totals(ctx.storage)?
+                    .farming;
+                let collateral = Collateral::from_decimal256(farming_tokens.into_decimal256());
+                let send_msg = self.market_info.collateral.into_execute_msg(
+                    &self.market_info.addr,
+                    collateral,
+                    &DepositLiquidity {
+                        stake_to_xlp: true,
+                    }
+                )?;
+
+                ctx.response.add_message(send_msg);
 
                 Ok(())
             }
