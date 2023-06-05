@@ -157,15 +157,6 @@ impl State<'_> {
                     bail!("can only withdraw up to half of the original lockdrop deposit during sunset period. requested {amount}, available: {available}");
                 }
             }
-            FarmingPeriodResp::Launched { started_at } => {
-                let ready_at = started_at + LockdropBuckets::get_duration(storage, bucket_id)?;
-
-                if self.now() < ready_at {
-                    bail!(
-                        "can only withdraw after the lockdrop period is over. ready at: {ready_at}"
-                    );
-                }
-            }
             _ => {}
         }
 
