@@ -334,7 +334,7 @@ pub struct LockdropBucketStats {
     pub deposit: Collateral,
     /// If we are in the [FarmingStatus::Launched] state, the timestamp when
     /// this will unlock.
-    pub unlocks: Option<Timestamp>,
+    pub unlocks_at: Option<Timestamp>,
 }
 
 /// Stats on a specific farmer

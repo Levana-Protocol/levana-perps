@@ -5,7 +5,7 @@ use crate::state::reply::ReplyExpectedYield;
 use cosmwasm_std::{to_binary, BankMsg, CosmosMsg, SubMsg, WasmMsg};
 use cw_storage_plus::Item;
 use msg::contracts::market::entry::LpInfoResp;
-use msg::prelude::MarketExecuteMsg::{ClaimYield, ReinvestYield};
+use msg::prelude::MarketExecuteMsg::ReinvestYield;
 use msg::prelude::MarketQueryMsg::LpInfo;
 use msg::token::Token;
 use std::cmp::{max, min};
@@ -73,6 +73,7 @@ impl State<'_> {
         lvn_token_denom: &str,
     ) -> Result<()> {
         self.save_lvn_token(store, lvn_token_denom.to_string())?;
+        self.save_bonus_fund(store, Collateral::zero())?;
 
         EMISSIONS_PER_TIME_PER_TOKEN
             .save(store, self.now(), &LvnToken::zero())
@@ -371,24 +372,27 @@ impl State<'_> {
             .checked_sub(bonus_amount)
             .map(NonZero::<Collateral>::new)?;
 
-        if reinvest_amount.is_none() {
-            let reinvest_msg = ReinvestYield {
-                stake_to_xlp: true,
-                amount: reinvest_amount,
-            };
-            let market_addr = &self.market_info.addr;
-            let claim_msg = WasmMsg::Execute {
-                contract_addr: market_addr.to_string(),
-                msg: to_binary(&ClaimYield {})?,
+        if reinvest_amount.is_some() {
+            let token = self.market_info.collateral.clone();
+            let bonus_amount = token
+                .into_u128(bonus_amount.into_decimal256())?
+                .with_context(|| format!("unable to convert bonus_amount {:?}", bonus_amount))?;
+            let bonus_amount = token
+                .from_u128(bonus_amount)
+                .map(Collateral::from_decimal256)?;
+            let reinvest_msg = WasmMsg::Execute {
+                contract_addr: self.market_info.addr.to_string(),
+                msg: to_binary(&ReinvestYield {
+                    stake_to_xlp: true,
+                    amount: reinvest_amount,
+                })?,
                 funds: vec![],
             };
 
             ReplyExpectedYield::save(ctx.storage, Some(bonus_amount))?;
 
-            ctx.response
-                .add_execute_submessage_oneshot(market_addr.clone(), &reinvest_msg)?;
             ctx.response.add_raw_submessage(SubMsg::reply_on_success(
-                claim_msg,
+                reinvest_msg,
                 ReplyId::ReinvestYield.into(),
             ));
         }
@@ -410,11 +414,43 @@ impl State<'_> {
             balance
         );
 
-        let mut balance = self.load_bonus_fund(store)?;
-        balance = balance.checked_add(expected_yield)?;
-        self.save_bonus_fund(store, balance)?;
+        let mut fund_balance = self.load_bonus_fund(store)?;
+        fund_balance = fund_balance.checked_add(expected_yield)?;
+        self.save_bonus_fund(store, fund_balance)?;
+
+        let token = Token::Cw20 {
+            addr: self.market_info.xlp_addr.clone().into(),
+            decimal_places: LpToken::PRECISION,
+        };
+        let xlp_balance = token
+            .query_balance(&self.querier, &self.env.contract.address)
+            .map(Collateral::into_decimal256)
+            .map(LpToken::from_decimal256)?;
+
+        let mut totals = self.load_farming_totals(store)?;
+        totals.xlp = xlp_balance;
+        self.save_farming_totals(store, &totals)?;
 
         ReplyExpectedYield::save(store, None)?;
+
+        Ok(())
+    }
+
+    pub(crate) fn transfer_bonus(&self, ctx: &mut StateContext) -> Result<()> {
+        let config = self.load_bonus_config(ctx.storage)?;
+        let amount = self
+            .load_bonus_fund(ctx.storage)
+            .map(NonZero::<Collateral>::new)?;
+
+        if let Some(amount) = amount {
+            let transfer_msg = self
+                .market_info
+                .collateral
+                .into_transfer_msg(&config.bonus_addr, amount)?
+                .with_context(|| "unable to construct msg to transfer bonus")?;
+
+            ctx.response.add_message(transfer_msg);
+        }
 
         Ok(())
     }

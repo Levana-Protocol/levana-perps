@@ -76,7 +76,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         ExecuteMsg::ClaimLockdropRewards {} => state.claim_lockdrop_rewards(&mut ctx, &sender)?,
         ExecuteMsg::ClaimEmissions {} => state.claim_lvn_emissions(&mut ctx, &sender)?,
         ExecuteMsg::Reinvest {} => state.reinvest_yield(&mut ctx)?,
-        ExecuteMsg::TransferBonus {} => todo!(),
+        ExecuteMsg::TransferBonus {} => state.transfer_bonus(&mut ctx)?,
     }
 
     Ok(ctx.response.into_response())
