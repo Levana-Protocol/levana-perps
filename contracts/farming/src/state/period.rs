@@ -1,6 +1,9 @@
+use cosmwasm_std::SubMsg;
+use msg::prelude::MarketExecuteMsg::DepositLiquidity;
 use serde::{Deserialize, Serialize};
 
 use crate::prelude::*;
+use crate::state::reply::ReplyId;
 
 const LOCKDROP_DURATIONS: Item<LockdropDurations> = Item::new(namespace::LOCKDROP_DURATIONS);
 
@@ -87,7 +90,7 @@ impl State<'_> {
             }
             ExecuteMsg::LockdropWithdraw { bucket_id, amount } => match period {
                 FarmingPeriod::Lockdrop => true,
-                FarmingPeriod::Sunset | FarmingPeriod::Launched => {
+                FarmingPeriod::Sunset => {
                     self.validate_lockdrop_withdrawal(
                         store,
                         &period_resp,
@@ -97,7 +100,7 @@ impl State<'_> {
                     )?;
                     true
                 }
-                FarmingPeriod::Inactive | FarmingPeriod::Review => false,
+                FarmingPeriod::Inactive | FarmingPeriod::Review | FarmingPeriod::Launched => false,
             },
             ExecuteMsg::Deposit { .. }
             | ExecuteMsg::Withdraw { .. }
@@ -150,7 +153,6 @@ impl State<'_> {
                         } else {
                             Ok(FarmingPeriodResp::Review {
                                 started_at: review_start,
-                                launch_start: None,
                             })
                         }
                     }
@@ -162,7 +164,6 @@ impl State<'_> {
                                 // rather, we use it from the stashed value
                                 // which definitively exists if we're in this branch
                                 started_at: REVIEW_START_TIME.load(store)?,
-                                launch_start: Some(start),
                             })
                         } else {
                             Ok(FarmingPeriodResp::Launched { started_at: start })
@@ -198,11 +199,7 @@ impl State<'_> {
         Ok(())
     }
 
-    pub(crate) fn start_launch_period(
-        &self,
-        ctx: &mut StateContext,
-        start: Option<Timestamp>,
-    ) -> Result<()> {
+    pub(crate) fn start_launch_period(&self, ctx: &mut StateContext) -> Result<()> {
         let period_resp = self.get_period_resp(ctx.storage)?;
         match period_resp {
             FarmingPeriodResp::Review { started_at, .. } => {
@@ -214,12 +211,25 @@ impl State<'_> {
                     REVIEW_START_TIME.save(ctx.storage, &started_at)?;
                 }
 
-                let start = start.unwrap_or_else(|| self.now());
-                if start < self.now() {
-                    bail!("Cannot start launch in the past.");
-                }
+                FarmingEpochStartTime::Launch(self.now()).save(ctx.storage)?;
 
-                FarmingEpochStartTime::Launch(start).save(ctx.storage)?;
+                // Deposit lockdrop collateral into Market contract for xLP
+
+                let farming_tokens = self.load_farming_totals(ctx.storage)?.farming;
+
+                if farming_tokens > FarmingToken::zero() {
+                    let collateral_amount =
+                        Collateral::from_decimal256(farming_tokens.into_decimal256());
+                    let send_msg = self.market_info.collateral.into_execute_msg(
+                        &self.market_info.addr,
+                        collateral_amount,
+                        &DepositLiquidity { stake_to_xlp: true },
+                    )?;
+
+                    let submsg =
+                        SubMsg::reply_on_success(send_msg, ReplyId::TransferCollateral.into());
+                    ctx.response.add_raw_submessage(submsg);
+                }
 
                 Ok(())
             }

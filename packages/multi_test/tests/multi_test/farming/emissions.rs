@@ -18,7 +18,7 @@ fn test_emissions() {
 
     market.exec_farming_start_lockdrop(None).unwrap();
     market.set_time(TimeJump::Hours(24 * 365)).unwrap();
-    market.exec_farming_start_launch(None).unwrap();
+    market.exec_farming_start_launch().unwrap();
 
     let amount = "200";
     let token = market.setup_lvn_rewards(amount);
@@ -90,7 +90,7 @@ fn test_emissions_multiple_lps() {
 
     market.exec_farming_start_lockdrop(None).unwrap();
     market.set_time(TimeJump::Hours(24 * 365)).unwrap();
-    market.exec_farming_start_launch(None).unwrap();
+    market.exec_farming_start_launch().unwrap();
 
     let amount = "200";
     let token = market.setup_lvn_rewards(amount);

@@ -52,6 +52,10 @@ impl State<'_> {
         farmer_stats.farming_tokens = farmer_stats.farming_tokens.checked_add(farming_tokens)?;
         self.save_raw_farmer_stats(ctx.storage, &user, &farmer_stats)?;
 
+        let mut totals = self.load_farming_totals(ctx.storage)?;
+        totals.farming = totals.farming.checked_add(farming_tokens)?;
+        self.save_farming_totals(ctx.storage, &totals)?;
+
         LockdropBuckets::update_balance(
             ctx.storage,
             bucket_id,
@@ -71,6 +75,20 @@ impl State<'_> {
         amount: NonZero<Collateral>,
     ) -> Result<()> {
         let period = self.get_period(ctx.storage)?;
+
+        let mut farmer_stats = match self.load_raw_farmer_stats(ctx.storage, &user)? {
+            None => bail!("Unable to withdraw, no deposits"),
+            Some(farmer_stats) => farmer_stats,
+        };
+
+        let farming_tokens = FarmingToken::from_decimal256(amount.into_decimal256());
+        farmer_stats.farming_tokens = farmer_stats.farming_tokens.checked_sub(farming_tokens)?;
+        self.save_raw_farmer_stats(ctx.storage, &user, &farmer_stats)?;
+
+        let mut totals = self.load_farming_totals(ctx.storage)?;
+        totals.farming = totals.farming.checked_sub(farming_tokens)?;
+        self.save_farming_totals(ctx.storage, &totals)?;
+
         LockdropBuckets::update_balance(
             ctx.storage,
             bucket_id,
@@ -108,7 +126,6 @@ impl State<'_> {
                     deposit_after_sunset: balance.deposit_after_sunset,
                     withdrawal_before_sunset: balance.withdrawal_before_sunset,
                     withdrawal_after_sunset: balance.withdrawal_after_sunset,
-                    withdrawal_after_launch: balance.withdrawal_after_launch,
                 })
             })
             .collect()
@@ -122,34 +139,22 @@ impl State<'_> {
         bucket_id: LockdropBucketId,
         amount: NonZero<Collateral>,
     ) -> Result<()> {
-        match *period_resp {
-            FarmingPeriodResp::Sunset { .. } => {
-                let balance = LockdropBuckets::get_balance(storage, bucket_id, user)?;
+        if let FarmingPeriodResp::Sunset { .. } = *period_resp {
+            let balance = LockdropBuckets::get_balance(storage, bucket_id, user)?;
 
-                // INVARIANT: the max that can ever be withdrawn during sunset period is half_balance_before_sunset
-                // multiple withdrawals accumulate in withdrawal_after_sunset, but this max is never surpassed
-                // therefore the available `amount` can never be negative
-                let balance_before_sunset =
-                    balance.deposit_before_sunset - balance.withdrawal_before_sunset;
-                let half_balance_before_sunset =
-                    balance_before_sunset.into_decimal256() / Decimal256::two();
-                let available =
-                    half_balance_before_sunset - balance.withdrawal_after_sunset.into_decimal256();
+            // INVARIANT: the max that can ever be withdrawn during sunset period is half_balance_before_sunset
+            // multiple withdrawals accumulate in withdrawal_after_sunset, but this max is never surpassed
+            // therefore the available `amount` can never be negative
+            let balance_before_sunset =
+                balance.deposit_before_sunset - balance.withdrawal_before_sunset;
+            let half_balance_before_sunset =
+                balance_before_sunset.into_decimal256() / Decimal256::two();
+            let available =
+                half_balance_before_sunset - balance.withdrawal_after_sunset.into_decimal256();
 
-                if amount.into_decimal256() >= available {
-                    bail!("can only withdraw up to half of the original lockdrop deposit during sunset period. requested {amount}, available: {available}");
-                }
+            if amount.into_decimal256() >= available {
+                bail!("can only withdraw up to half of the original lockdrop deposit during sunset period. requested {amount}, available: {available}");
             }
-            FarmingPeriodResp::Launched { started_at } => {
-                let ready_at = started_at + LockdropBuckets::get_duration(storage, bucket_id)?;
-
-                if self.now() < ready_at {
-                    bail!(
-                        "can only withdraw after the lockdrop period is over. ready at: {ready_at}"
-                    );
-                }
-            }
-            _ => {}
         }
 
         Ok(())
@@ -183,34 +188,34 @@ impl State<'_> {
         stats: &RawFarmerStats,
     ) -> Result<LvnToken> {
         let period = self.get_period_resp(store)?;
-        let lockdrop_start = match period {
+        let launch_start = match period {
             FarmingPeriodResp::Launched { started_at } => started_at,
-            _ => bail!("Cannot collect lockdrop rewards prior to launch"),
+            _ => bail!("Cannot claim lockdrop rewards prior to launch"),
         };
         let lockdrop_config = self.load_lockdrop_config(store)?;
         let elapsed_since_start = self
             .now()
-            .checked_sub(lockdrop_start, "claim_lockdrop_rewards")?;
+            .checked_sub(launch_start, "claim_lockdrop_rewards")?;
         let total_user_rewards = self.calculate_lockdrop_rewards(store, user)?;
 
         let amount = if elapsed_since_start >= lockdrop_config.lockdrop_lvn_unlock_seconds {
-            total_user_rewards.checked_sub(stats.lockdrop_amount_collected)?
+            total_user_rewards.checked_sub(stats.lockdrop_amount_claimed)?
         } else {
-            let start_time = stats.lockdrop_last_collected.unwrap_or(lockdrop_start);
-            let elapsed_since_last_collected = self.now().checked_sub(
+            let start_time = stats.lockdrop_last_claimed.unwrap_or(launch_start);
+            let elapsed_since_last_claimed = self.now().checked_sub(
                 start_time,
-                "claim_lockdrop_rewards, elapsed_since_last_collected",
+                "claim_lockdrop_rewards, elapsed_since_last_claimed",
             )?;
 
             let elapsed_ratio = Decimal256::from_ratio(
-                elapsed_since_last_collected.as_nanos(),
+                elapsed_since_last_claimed.as_nanos(),
                 lockdrop_config.lockdrop_lvn_unlock_seconds.as_nanos(),
             );
 
             total_user_rewards
                 .checked_mul_dec(elapsed_ratio)?
                 // using min as an added precaution to make sure it never goes above the total due to rounding errors
-                .min(total_user_rewards.checked_sub(stats.lockdrop_amount_collected)?)
+                .min(total_user_rewards.checked_sub(stats.lockdrop_amount_claimed)?)
         };
 
         Ok(amount)
@@ -240,9 +245,9 @@ impl State<'_> {
                 acc.total = acc.total.checked_add(balance)?;
 
                 if elapsed < lockdrop_duration {
-                    acc.locked.checked_add(balance)?;
+                    acc.locked = acc.locked.checked_add(balance)?;
                 } else {
-                    acc.unlocked.checked_add(balance)?;
+                    acc.unlocked = acc.unlocked.checked_add(balance)?;
                 }
 
                 anyhow::Ok(acc)
@@ -270,15 +275,12 @@ struct Balance {
     deposit_after_sunset: Collateral,
     withdrawal_before_sunset: Collateral,
     withdrawal_after_sunset: Collateral,
-    withdrawal_after_launch: Collateral,
 }
 
 impl Balance {
     pub fn total(&self) -> Result<Collateral> {
         let total_deposit = self.deposit_before_sunset + self.deposit_after_sunset;
-        let total_withdrawal = self.withdrawal_before_sunset
-            + self.withdrawal_after_sunset
-            + self.withdrawal_after_launch;
+        let total_withdrawal = self.withdrawal_before_sunset + self.withdrawal_after_sunset;
         let total = total_deposit.checked_sub(total_withdrawal)?;
 
         Ok(total)
@@ -418,20 +420,11 @@ impl LockdropBuckets {
                 )?,
                 ..old
             },
-            (FarmingPeriod::Launched, true) => Balance {
-                withdrawal_after_launch: Collateral::try_from_number(
-                    old.withdrawal_after_launch
-                        .into_number()
-                        .checked_add(amount)
-                        .context("Withdrawal after launch overflow")?,
-                )?,
-                ..old
-            },
             (_, false) => {
                 bail!("can only deposit during lockdrop or sunset");
             }
             (_, true) => {
-                bail!("can only withdraw during lockdrop, sunset, or launch");
+                bail!("can only withdraw during lockdrop or sunset");
             }
         };
 

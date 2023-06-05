@@ -10,10 +10,10 @@ const FARMERS: Map<&Addr, RawFarmerStats> = Map::new("farmer-stats");
 pub(crate) struct RawFarmerStats {
     /// The amount of farming tokens owned by this farmer
     pub(crate) farming_tokens: FarmingToken,
-    /// A timestamp representing the last time the farmer collected lockdrop rewards
-    pub(crate) lockdrop_last_collected: Option<Timestamp>,
-    /// The amount of LVN tokens collected by the farmer up until [lockdrop_last_collected]
-    pub(crate) lockdrop_amount_collected: LvnToken,
+    /// A timestamp representing the last time the farmer claimed lockdrop rewards
+    pub(crate) lockdrop_last_claimed: Option<Timestamp>,
+    /// The amount of LVN tokens claimed by the farmer up until [lockdrop_last_claimed]
+    pub(crate) lockdrop_amount_claimed: LvnToken,
     /// The prefix sum of the last time the farmer claimed.
     /// See [REWARDS_PER_TIME_PER_TOKEN] for more explanation of prefix sums.
     pub(crate) xlp_last_claimed_prefix_sum: LvnToken,
@@ -51,8 +51,14 @@ impl FarmingTotals {
     }
 
     fn farming_to_xlp(&self, farming: FarmingToken) -> Result<LpToken> {
-        anyhow::ensure!(!self.farming.is_zero());
-        anyhow::ensure!(!self.xlp.is_zero());
+        anyhow::ensure!(
+            !self.farming.is_zero(),
+            "unable to convert farming tokens to xlp, no farming tokens"
+        );
+        anyhow::ensure!(
+            !self.xlp.is_zero(),
+            "unable to convert farming tokens to xlp, no xlp"
+        );
 
         Ok(LpToken::from_decimal256(
             self.xlp
@@ -82,7 +88,7 @@ impl State<'_> {
     }
 
     /// Load the raw farmer stats for the given farmer.
-    /// If the farmer does not exist, returns a default [RawFarmerStats]
+    /// Returns None if no stats exists for the specified addr
     pub(crate) fn load_raw_farmer_stats(
         &self,
         store: &dyn Storage,
@@ -145,16 +151,19 @@ impl State<'_> {
         self.farming_perform_emissions_bookkeeping(ctx, farmer, &mut farmer_stats)?;
 
         let mut totals = self.load_farming_totals(ctx.storage)?;
-
+        let lockdrop_lockup_info = self.lockdrop_lockup_info(ctx.storage, farmer)?;
+        let unlocked_farming_tokens = farmer_stats
+            .farming_tokens
+            .checked_sub(lockdrop_lockup_info.locked)?;
         let amount = match amount {
             Some(amount) => amount.raw(),
-            None => farmer_stats.farming_tokens,
+            None => unlocked_farming_tokens,
         };
 
         anyhow::ensure!(
-            amount <= farmer_stats.farming_tokens,
+            amount <= unlocked_farming_tokens,
             "Insufficient farming tokens. Wanted: {amount}. Available: {}.",
-            farmer_stats.farming_tokens
+            unlocked_farming_tokens
         );
         anyhow::ensure!(!amount.is_zero(), "Cannot withdraw 0 farming tokens");
 

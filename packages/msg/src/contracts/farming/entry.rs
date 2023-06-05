@@ -113,10 +113,7 @@ pub enum OwnerExecuteMsg {
         start: Option<Timestamp>,
     },
     /// Finish the review period and launch the primary contract
-    StartLaunchPeriod {
-        /// If specified, launch will start at this time.
-        start: Option<Timestamp>,
-    },
+    StartLaunchPeriod {},
     /// Change the active emissions
     SetEmissions {
         /// When to start the emissions.
@@ -260,8 +257,6 @@ pub enum FarmingPeriodResp {
     Review {
         /// review started at this time
         started_at: Timestamp,
-        /// If set, launch has been scheduled to start at this time
-        launch_start: Option<Timestamp>,
     },
     /// Normal contract operations.
     Launched {
@@ -382,8 +377,6 @@ pub struct FarmerLockdropStats {
     pub withdrawal_before_sunset: Collateral,
     /// Total withdrawals that have occurred during the sunset period
     pub withdrawal_after_sunset: Collateral,
-    /// Total withdrawals that have occurred post-launch
-    pub withdrawal_after_launch: Collateral,
 }
 
 /// Returned from [QueryMsg::Farmers]

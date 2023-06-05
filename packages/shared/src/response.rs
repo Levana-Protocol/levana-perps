@@ -116,7 +116,8 @@ impl ResponseBuilder {
         Ok(())
     }
 
-    pub(crate) fn add_raw_submessage(&mut self, msg: SubMsg<Empty>) {
+    /// Add a raw submsg. Helpful if you need to handle a reply.
+    pub fn add_raw_submessage(&mut self, msg: SubMsg<Empty>) {
         self.resp.messages.push(msg);
     }
 

@@ -145,6 +145,7 @@ impl Token {
         })
         .map(Collateral::from_decimal256)
     }
+
     /// helper function
     ///
     /// given a u128, typically via a native Coin.amount or Cw20 amount
@@ -263,6 +264,7 @@ impl Token {
             })),
         }
     }
+
     /// perps-specific use-case for executing a market message with funds
     pub fn into_market_execute_msg(
         &self,
