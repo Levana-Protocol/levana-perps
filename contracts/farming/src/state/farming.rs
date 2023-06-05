@@ -88,7 +88,7 @@ impl State<'_> {
     }
 
     /// Load the raw farmer stats for the given farmer.
-    /// If the farmer does not exist, returns a default [RawFarmerStats]
+    /// Returns None if no stats exists for the specified addr
     pub(crate) fn load_raw_farmer_stats(
         &self,
         store: &dyn Storage,
