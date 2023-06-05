@@ -1,7 +1,12 @@
+use crate::prelude::reply::ReplyId;
 use crate::prelude::*;
 use crate::state::farming::RawFarmerStats;
-use cosmwasm_std::{BankMsg, CosmosMsg};
+use crate::state::reply::ReplyExpectedYield;
+use cosmwasm_std::{to_binary, BankMsg, CosmosMsg, SubMsg, WasmMsg};
 use cw_storage_plus::Item;
+use msg::contracts::market::entry::LpInfoResp;
+use msg::prelude::MarketExecuteMsg::{ClaimYield, ReinvestYield};
+use msg::prelude::MarketQueryMsg::LpInfo;
 use msg::token::Token;
 use std::cmp::{max, min};
 
@@ -31,13 +36,35 @@ const EMISSIONS_PER_TIME_PER_TOKEN: Map<Timestamp, LvnToken> =
 /// The active LVN emission plan
 const LVN_EMISSIONS: Item<Emissions> = Item::new(namespace::LVN_EMISSIONS);
 
+/// Lockdrop configuration info
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub(crate) struct LockdropConfig {
+    /// The amount of time in seconds it takes for lockdrop rewards to unlock
     pub(crate) lockdrop_lvn_unlock_seconds: Duration,
+    /// The ratio of lockdrop rewards that are immediately available on launch
     pub(crate) lockdrop_immediate_unlock_ratio: Decimal256,
 }
 
+/// The Bonus Fund contains funds that come from a portion of reinvested yield.
+///
+/// The farming contract allows liquidity providers to deposit xLP and receive a portion of LVN
+/// emissions in return. However, they lose direct access to yield that comes from trading activity.
+/// The farming contract, which controls all of the deposited xLP, has a mechanism to reinvest
+/// accrued yield and distribute it amongst farmers (see [ExecuteMsg::Reinvest]). A portion of this
+/// yield is put aside in a special fund called the Bonus Fund to be used at a later time.
+const BONUS_FUND: Item<Collateral> = Item::new(namespace::BONUS_FUND);
+
+/// Bonus fund configuration info
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub(crate) struct BonusConfig {
+    /// The part of the reinvested yield that goes to the [BONUS_FUND]
+    pub(crate) bonus_ratio: Decimal256,
+    /// The destination for the funds collected in the [BONUS_FUND]
+    pub(crate) bonus_addr: Addr,
+}
+
 const LOCKDROP_CONFIG: Item<LockdropConfig> = Item::new(namespace::LOCKDROP_CONFIG);
+const BONUS_CONFIG: Item<BonusConfig> = Item::new(namespace::BONUS_CONFIG);
 
 impl State<'_> {
     pub(crate) fn rewards_init(
@@ -97,6 +124,34 @@ impl State<'_> {
     pub(crate) fn load_lockdrop_config(&self, store: &dyn Storage) -> Result<LockdropConfig> {
         let lockdrop_config = LOCKDROP_CONFIG.load(store)?;
         Ok(lockdrop_config)
+    }
+
+    pub(crate) fn save_bonus_config(
+        &self,
+        store: &mut dyn Storage,
+        config: BonusConfig,
+    ) -> Result<()> {
+        BONUS_CONFIG.save(store, &config)?;
+        Ok(())
+    }
+
+    pub(crate) fn load_bonus_config(&self, store: &dyn Storage) -> Result<BonusConfig> {
+        let bonus_config = BONUS_CONFIG.load(store)?;
+        Ok(bonus_config)
+    }
+
+    pub(crate) fn load_bonus_fund(&self, store: &dyn Storage) -> Result<Collateral> {
+        let fund = BONUS_FUND.load(store)?;
+        Ok(fund)
+    }
+
+    pub(crate) fn save_bonus_fund(
+        &self,
+        store: &mut dyn Storage,
+        amount: Collateral,
+    ) -> Result<()> {
+        BONUS_FUND.save(store, &amount)?;
+        Ok(())
     }
 
     /// Calculates how many reward tokens can be claimed from the lockdrop and transfers them to the
@@ -296,6 +351,70 @@ impl State<'_> {
         });
 
         ctx.response.add_message(transfer_msg);
+
+        Ok(())
+    }
+
+    pub(crate) fn reinvest_yield(&self, ctx: &mut StateContext) -> Result<()> {
+        let lp_info: LpInfoResp = self.querier.query_wasm_smart(
+            self.market_info.addr.clone(),
+            &LpInfo {
+                liquidity_provider: self.env.contract.address.clone().into(),
+            },
+        )?;
+        let config = self.load_bonus_config(ctx.storage)?;
+        let bonus_amount = lp_info
+            .available_yield
+            .checked_mul_dec(config.bonus_ratio)?;
+        let reinvest_amount = lp_info
+            .available_yield
+            .checked_sub(bonus_amount)
+            .map(NonZero::<Collateral>::new)?;
+
+        if reinvest_amount.is_none() {
+            let reinvest_msg = ReinvestYield {
+                stake_to_xlp: true,
+                amount: reinvest_amount,
+            };
+            let market_addr = &self.market_info.addr;
+            let claim_msg = WasmMsg::Execute {
+                contract_addr: market_addr.to_string(),
+                msg: to_binary(&ClaimYield {})?,
+                funds: vec![],
+            };
+
+            ReplyExpectedYield::save(ctx.storage, Some(bonus_amount))?;
+
+            ctx.response
+                .add_execute_submessage_oneshot(market_addr.clone(), &reinvest_msg)?;
+            ctx.response.add_raw_submessage(SubMsg::reply_on_success(
+                claim_msg,
+                ReplyId::ReinvestYield.into(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn handle_reinvest_yield_reply(&self, store: &mut dyn Storage) -> Result<()> {
+        let expected_yield = ReplyExpectedYield::load(store)?;
+        let balance = self
+            .market_info
+            .collateral
+            .query_balance(&self.querier, &self.env.contract.address)?;
+
+        anyhow::ensure!(
+            expected_yield <= balance,
+            "expected yield {} is greater than the current balance {}",
+            expected_yield,
+            balance
+        );
+
+        let mut balance = self.load_bonus_fund(store)?;
+        balance = balance.checked_add(expected_yield)?;
+        self.save_bonus_fund(store, balance)?;
+
+        ReplyExpectedYield::save(store, None)?;
 
         Ok(())
     }

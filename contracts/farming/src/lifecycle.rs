@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::state::rewards::LockdropConfig;
+use crate::state::rewards::{BonusConfig, LockdropConfig};
 
 use semver::Version;
 
@@ -31,6 +31,13 @@ pub fn instantiate(
                 msg.lockdrop_lvn_unlock_seconds.into(),
             ),
             lockdrop_immediate_unlock_ratio: msg.lockdrop_immediate_unlock_ratio,
+        },
+    )?;
+    state.save_bonus_config(
+        ctx.storage,
+        BonusConfig {
+            bonus_ratio: msg.bonus_ratio,
+            bonus_addr: msg.bonus_addr.validate(state.api)?,
         },
     )?;
 

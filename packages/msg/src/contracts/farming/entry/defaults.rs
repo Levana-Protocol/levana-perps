@@ -1,7 +1,6 @@
 //! Functions providing serde defaults
 
 use cosmwasm_std::Decimal256;
-use shared::storage::NonZero;
 
 use crate::contracts::farming::entry::LockdropBucketId;
 
@@ -31,7 +30,7 @@ pub fn lockdrop_buckets() -> Vec<LockdropBucketConfig> {
 }
 
 /// Default bonus ratio
-pub fn bonus_ratio() -> NonZero<Decimal256> {
+pub fn bonus_ratio() -> Decimal256 {
     "0.05".parse().unwrap()
 }
 

@@ -23,7 +23,7 @@ pub struct InstantiateMsg {
     pub lockdrop_buckets: Vec<LockdropBucketConfig>,
     /// The amount of real yield taken for the bonus fund
     #[serde(default = "defaults::bonus_ratio")]
-    pub bonus_ratio: NonZero<Decimal256>,
+    pub bonus_ratio: Decimal256,
     /// The address that receives bonus transfers.
     pub bonus_addr: RawAddr,
     /// How long LVN rewards from the lockdrop take to linearly unlock
