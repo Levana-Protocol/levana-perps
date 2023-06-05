@@ -1,5 +1,6 @@
 use crate::prelude::*;
-use levana_perpswap_multi_test::config::TEST_CONFIG;
+use levana_perpswap_multi_test::{config::TEST_CONFIG, arbitrary::farming::emissions::data::FarmingEmissions};
+use proptest::prelude::*;
 
 #[test]
 fn test_emissions() {
@@ -141,4 +142,15 @@ fn test_emissions_multiple_lps() {
     assert_eq!(lp0_stats.emission_rewards, "100".parse().unwrap());
     assert_eq!(lp1_stats.emission_rewards, "50".parse().unwrap());
     assert_eq!(lp2_stats.emission_rewards, "50".parse().unwrap());
+}
+
+
+proptest! {
+    #[test]
+    //#[cfg_attr(not(feature = "proptest"), ignore)]
+    fn proptest_farming_emissions(
+        strategy in FarmingEmissions::new_strategy()
+    ) {
+        strategy.run().unwrap();
+    }
 }
