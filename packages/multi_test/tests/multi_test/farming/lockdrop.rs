@@ -415,7 +415,7 @@ fn test_lockdrop_locked_tokens() {
 fn test_reinvest_yield() {
     // Setup
 
-    let (market, _buckets, _farmers) = setup_lockdrop();
+    let (market, _buckets, farmers) = setup_lockdrop();
     let trader0 = market.clone_trader(0).unwrap();
 
     // Jump to review period, transfer collateral, and launch the lockdrop
@@ -467,5 +467,23 @@ fn test_reinvest_yield() {
         balance_before
             .checked_add(farming_stats_after.bonus.into_number())
             .unwrap()
+    );
+
+    // Withdraw xLP
+
+    market
+        .set_time(TimeJump::Seconds((lockdrop_month_seconds() * 4).into()))
+        .unwrap();
+    let balance_before = market
+        .query_liquidity_token_balance_raw(LiquidityTokenKind::Xlp, &farmers[0])
+        .unwrap();
+    market.exec_farming_withdraw_xlp(&farmers[0], None).unwrap();
+    let balance_after = market
+        .query_liquidity_token_balance_raw(LiquidityTokenKind::Xlp, &farmers[0])
+        .unwrap();
+
+    assert_eq!(balance_before, Uint128::zero());
+    assert!(
+        LpToken::from_u128(balance_after.u128()).unwrap() > LpToken::from_u128(100u128).unwrap()
     );
 }
