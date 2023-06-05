@@ -356,3 +356,50 @@ fn threshold_range(n1: Collateral, n2: Collateral, threshold: Collateral) -> Res
     );
     Ok(())
 }
+
+pub(crate) async fn test_pnl_on_liquidation(perp_app: &PerpApp) -> Result<()> {
+    log::info!("Test PnL on liquidation");
+
+    // Open position
+    let collateral = "100".parse()?;
+    let direction = DirectionToBase::Long;
+    let max_gains = MaxGainsInQuote::PosInfinity;
+    let leverage = LeverageToBase::from_str("17.5")?;
+
+    perp_app.set_price("6.33".parse()?).await?;
+
+    perp_app
+        .open_position(collateral, direction, leverage, max_gains, None, None, None)
+        .await?;
+    perp_app.crank().await?;
+
+    let positions = perp_app.all_open_positions().await?;
+
+    let position_detail = match &positions.info[..] {
+        [a] => a,
+        _ => bail!("More than one position found"),
+    };
+
+    let res = perp_app.set_price("6.02".parse()?).await?;
+    log::info!("Price set to force liquidation in: {}", res.txhash);
+    perp_app.crank().await?;
+
+    let closed = perp_app
+        .get_closed_positions()
+        .await?
+        .into_iter()
+        .find(|x| x.id == position_detail.id)
+        .context("Position wasn't closed")?;
+
+    let pnl_from_price = closed
+        .pnl_collateral
+        .checked_sub(position_detail.pnl_collateral)?;
+    ensure!(
+        pnl_from_price < "-0.1".parse()?,
+        "PnL didn't decrease sufficiently. Old PnL: {}. New PnL: {}.",
+        position_detail.pnl_collateral,
+        closed.pnl_collateral
+    );
+
+    Ok(())
+}
