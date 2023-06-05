@@ -53,9 +53,6 @@ impl State<'_> {
         self.save_raw_farmer_stats(ctx.storage, &user, &farmer_stats)?;
 
         let mut totals = self.load_farming_totals(ctx.storage)?;
-        totals.xlp = totals
-            .xlp
-            .checked_add(LpToken::from_decimal256(amount.into_decimal256()))?;
         totals.farming = totals.farming.checked_add(farming_tokens)?;
         self.save_farming_totals(ctx.storage, &totals)?;
 
@@ -89,9 +86,6 @@ impl State<'_> {
         self.save_raw_farmer_stats(ctx.storage, &user, &farmer_stats)?;
 
         let mut totals = self.load_farming_totals(ctx.storage)?;
-        totals.xlp = totals
-            .xlp
-            .checked_sub(LpToken::from_decimal256(amount.into_decimal256()))?;
         totals.farming = totals.farming.checked_sub(farming_tokens)?;
         self.save_farming_totals(ctx.storage, &totals)?;
 

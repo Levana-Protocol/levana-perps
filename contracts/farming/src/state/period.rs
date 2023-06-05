@@ -1,7 +1,9 @@
+use cosmwasm_std::SubMsg;
 use msg::prelude::MarketExecuteMsg::DepositLiquidity;
 use serde::{Deserialize, Serialize};
 
 use crate::prelude::*;
+use crate::state::reply::ReplyId;
 
 const LOCKDROP_DURATIONS: Item<LockdropDurations> = Item::new(namespace::LOCKDROP_DURATIONS);
 
@@ -224,7 +226,9 @@ impl State<'_> {
                         &DepositLiquidity { stake_to_xlp: true },
                     )?;
 
-                    ctx.response.add_message(send_msg);
+                    let submsg =
+                        SubMsg::reply_on_success(send_msg, ReplyId::TransferCollateral.into());
+                    ctx.response.add_raw_submessage(submsg);
                 }
 
                 Ok(())

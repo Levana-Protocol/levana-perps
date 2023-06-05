@@ -117,8 +117,18 @@ fn farming_lockdrop_basic() {
         .exec_farming_lockdrop_withdraw(&farmer, "1".parse().unwrap(), buckets[0].bucket_id)
         .unwrap_err();
 
+    // assert totals before launch
+    let farming_stats = market.query_farming_stats();
+    assert_eq!(farming_stats.xlp, LpToken::zero());
+    assert_eq!(farming_stats.farming_tokens, "157".parse().unwrap());
+
     // launch
     market.exec_farming_start_launch().unwrap();
+
+    // assert totals after launch
+    let farming_stats = market.query_farming_stats();
+    assert_eq!(farming_stats.xlp, "157".parse().unwrap());
+    assert_eq!(farming_stats.farming_tokens, "157".parse().unwrap());
 
     // Assert we cannot withdraw anything after launch
     market

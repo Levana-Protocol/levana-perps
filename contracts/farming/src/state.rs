@@ -4,6 +4,7 @@ pub(crate) mod funds;
 pub(crate) mod lockdrop;
 pub(crate) mod market_info;
 pub(crate) mod period;
+pub(crate) mod reply;
 pub(crate) mod rewards;
 pub(crate) mod status;
 
