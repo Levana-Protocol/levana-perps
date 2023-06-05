@@ -1,5 +1,5 @@
+use crate::prelude::*;
 use crate::state::rewards::LockdropConfig;
-use crate::{prelude::*, state::lockdrop::LockdropBuckets};
 
 use semver::Version;
 
@@ -18,13 +18,12 @@ pub fn instantiate(
 
     let factory = msg.factory.validate(deps.api)?;
     MarketInfo::save(deps.querier, deps.storage, factory, msg.market_id.clone())?;
-    LockdropBuckets::init(deps.storage, &msg)?;
 
     let (state, mut ctx) = StateContext::new(deps, env)?;
     let admin = msg.owner.validate(state.api)?;
     state.set_admin(&mut ctx, &admin)?;
-    state.save_lvn_token(&mut ctx, msg.lvn_token_denom)?;
-    state.rewards_init(ctx.storage)?;
+    state.rewards_init(ctx.storage, &msg.lvn_token_denom)?;
+    state.lockdrop_init(ctx.storage, &msg)?;
     state.save_lockdrop_config(
         ctx.storage,
         LockdropConfig {

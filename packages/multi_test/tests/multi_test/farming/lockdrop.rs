@@ -1,3 +1,4 @@
+use msg::contracts::farming::entry::defaults::lockdrop_month_seconds;
 use msg::contracts::farming::entry::{defaults::lockdrop_buckets, FarmerLockdropStats};
 
 use crate::prelude::*;
@@ -164,4 +165,171 @@ fn farming_lockdrop_basic() {
         .unwrap()
         .lockdrops
         .is_empty());
+}
+
+#[test]
+fn test_query_lockdrop_rewards() {
+    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let buckets = lockdrop_buckets();
+    let farmers = [
+        market.clone_lp(0).unwrap(),
+        market.clone_lp(1).unwrap(),
+        market.clone_lp(2).unwrap(),
+    ];
+    let token = market.setup_lvn_rewards("10000");
+
+    market.automatic_time_jump_enabled = false;
+    market.exec_farming_start_lockdrop(None).unwrap();
+
+    // Farmers deposit into the first three buckets respectively
+    for (i, addr) in farmers.iter().enumerate() {
+        market
+            .exec_farming_lockdrop_deposit(addr, "100".parse().unwrap(), buckets[i].bucket_id)
+            .unwrap();
+    }
+
+    // Farmer1 makes an additional deposit into the last bucket
+    market
+        .exec_farming_lockdrop_deposit(
+            &farmers[0],
+            "200".parse().unwrap(),
+            buckets[buckets.len() - 1].bucket_id,
+        )
+        .unwrap();
+
+    // Jump to review period
+    market
+        .set_time(TimeJump::Seconds(60 * 60 * 24 * 14))
+        .unwrap();
+    market
+        .exec_farming_set_lockdrop_rewards("384".parse().unwrap(), &token)
+        .unwrap();
+    market.exec_farming_start_launch(None).unwrap();
+
+    // Jump a quarter way to the end of lockup period
+
+    let unlock_duration: i64 = lockdrop_month_seconds().into();
+    market
+        .set_time(TimeJump::Seconds(unlock_duration / 4))
+        .unwrap();
+
+    let stats0 = market.query_farming_farmer_stats(&farmers[0]).unwrap();
+    let stats1 = market.query_farming_farmer_stats(&farmers[1]).unwrap();
+    let stats2 = market.query_farming_farmer_stats(&farmers[2]).unwrap();
+
+    assert_eq!(stats0.lockdrops.len(), 2);
+    assert_eq!(stats0.lockdrops[0].total, "100".parse().unwrap());
+    assert_eq!(stats0.lockdrops[1].total, "200".parse().unwrap());
+    assert_eq!(stats0.lockdrop_rewards_available, "76".parse().unwrap());
+    assert_eq!(stats0.lockdrop_rewards_locked, "228".parse().unwrap());
+
+    assert_eq!(stats1.lockdrops.len(), 1);
+    assert_eq!(stats1.lockdrops[0].total, "100".parse().unwrap());
+    assert_eq!(stats1.lockdrop_rewards_available, "7".parse().unwrap());
+    assert_eq!(stats1.lockdrop_rewards_locked, "21".parse().unwrap());
+
+    assert_eq!(stats2.lockdrops.len(), 1);
+    assert_eq!(stats2.lockdrops[0].total, "100".parse().unwrap());
+    assert_eq!(stats2.lockdrop_rewards_available, "13".parse().unwrap());
+    assert_eq!(stats2.lockdrop_rewards_locked, "39".parse().unwrap());
+
+    let assert_total = || {
+        let stats0 = market.query_farming_farmer_stats(&farmers[0]).unwrap();
+        let stats1 = market.query_farming_farmer_stats(&farmers[1]).unwrap();
+        let stats2 = market.query_farming_farmer_stats(&farmers[2]).unwrap();
+
+        assert_eq!(stats0.lockdrop_rewards_available, "304".parse().unwrap());
+        assert_eq!(stats1.lockdrop_rewards_available, "28".parse().unwrap());
+        assert_eq!(stats2.lockdrop_rewards_available, "52".parse().unwrap());
+    };
+
+    // Jump to the end of the lockup period
+
+    market
+        .set_time(TimeJump::Seconds(unlock_duration / 4 * 3))
+        .unwrap();
+    assert_total();
+
+    // Jump passed the end of the lockup period
+
+    market.set_time(TimeJump::Hours(3)).unwrap();
+    assert_total();
+}
+
+#[test]
+fn test_claim_lockdrop_rewards() {
+    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let buckets = lockdrop_buckets();
+    let farmers = [
+        market.clone_lp(0).unwrap(),
+        market.clone_lp(1).unwrap(),
+        market.clone_lp(2).unwrap(),
+    ];
+    let token = market.setup_lvn_rewards("1000000");
+
+    market.automatic_time_jump_enabled = false;
+    market.exec_farming_start_lockdrop(None).unwrap();
+
+    // Farmers deposit into the first three buckets respectively
+    for (i, addr) in farmers.iter().enumerate() {
+        market
+            .exec_farming_lockdrop_deposit(addr, "100".parse().unwrap(), buckets[i].bucket_id)
+            .unwrap();
+    }
+
+    // Jump to review period
+    market
+        .set_time(TimeJump::Seconds(60 * 60 * 24 * 14))
+        .unwrap();
+    market
+        .exec_farming_set_lockdrop_rewards("90".parse().unwrap(), &token)
+        .unwrap();
+    market.exec_farming_start_launch(None).unwrap();
+
+    // Jump a quarter way to the end of lockup period
+
+    let unlock_duration: i64 = lockdrop_month_seconds().into();
+    market
+        .set_time(TimeJump::Seconds(unlock_duration / 2))
+        .unwrap();
+
+    // Claim and assert
+
+    for addr in &farmers {
+        market.exec_farming_claim_lockdrop_rewards(addr).unwrap();
+    }
+
+    let balance0 = market.query_reward_token_balance(&token, &farmers[0]);
+    let balance1 = market.query_reward_token_balance(&token, &farmers[1]);
+    let balance2 = market.query_reward_token_balance(&token, &farmers[2]);
+
+    assert_eq!(balance0, "5".parse().unwrap());
+    assert_eq!(balance1, "14".parse().unwrap());
+    assert_eq!(balance2, "26".parse().unwrap());
+
+    let assert_total = || {
+        for addr in &farmers {
+            market.exec_farming_claim_lockdrop_rewards(addr).unwrap();
+        }
+
+        let balance0 = market.query_reward_token_balance(&token, &farmers[0]);
+        let balance1 = market.query_reward_token_balance(&token, &farmers[1]);
+        let balance2 = market.query_reward_token_balance(&token, &farmers[2]);
+
+        assert_eq!(balance0, "10".parse().unwrap());
+        assert_eq!(balance1, "28".parse().unwrap());
+        assert_eq!(balance2, "52".parse().unwrap());
+    };
+
+    // Jump to the end of the lockup period
+
+    market
+        .set_time(TimeJump::Seconds(unlock_duration / 4 * 3))
+        .unwrap();
+    assert_total();
+
+    // Jump passed the end of the lockup period
+
+    market.set_time(TimeJump::Hours(3)).unwrap();
+    assert_total();
 }

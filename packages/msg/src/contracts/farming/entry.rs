@@ -34,6 +34,10 @@ pub struct InstantiateMsg {
     pub lockdrop_immediate_unlock_ratio: Decimal256,
     /// The denomination of the LVN token that's used for rewards
     pub lvn_token_denom: String,
+    /// The amount seconds from the start of the lockdrop until the sunset period begins
+    pub lockdrop_start_duration: u32,
+    /// The amount of seconds the sunset period lasts
+    pub lockdrop_sunset_duration: u32,
 }
 
 /// Migrate a farming contract.
@@ -134,6 +138,11 @@ pub enum OwnerExecuteMsg {
         /// The amount of tokens to reclaim
         /// A value of None will reclaim all unused emission tokens
         amount: Option<LvnToken>,
+    },
+    /// Set the amount of LVN tokens that will be used for lockdrop rewards
+    SetLockdropRewards {
+        /// How much LVN to use as rewards
+        lvn: NonZero<LvnToken>,
     },
     /// Update the configuration set in the [InstantiateMsg]
     ///
@@ -335,6 +344,7 @@ pub struct LockdropBucketStats {
 
 /// Stats on a specific farmer
 #[cw_serde]
+#[derive(Default)]
 pub struct FarmerStats {
     /// Total farming tokens held
     pub farming_tokens: FarmingToken,
@@ -346,9 +356,9 @@ pub struct FarmerStats {
     /// Information on all lockdrops the farmer is associated with
     pub lockdrops: Vec<FarmerLockdropStats>,
     /// Total lockdrop LVN rewards that are available for claiming
-    pub lockdrop_available: LvnToken,
+    pub lockdrop_rewards_available: LvnToken,
     /// Total lockdrop LVN rewards that are pending unlock
-    pub lockdrop_locked: LvnToken,
+    pub lockdrop_rewards_locked: LvnToken,
     /// LVN emissions available for claiming
     pub emission_rewards: LvnToken,
 }

@@ -196,6 +196,8 @@ impl PerpsMarket {
                 lockdrop_immediate_unlock_ratio:
                     msg::contracts::farming::entry::defaults::lockdrop_immediate_unlock_ratio(),
                 lvn_token_denom: TEST_CONFIG.rewards_token_denom.clone(),
+                lockdrop_start_duration: 60 * 60 * 24 * 12,
+                lockdrop_sunset_duration: 60 * 60 * 24 * 2,
             },
             &[],
             "Farming Contract".to_owned(),
@@ -1554,6 +1556,35 @@ impl PerpsMarket {
         self.exec_farming(
             wallet,
             &FarmingExecuteMsg::LockdropWithdraw { amount, bucket_id },
+        )
+    }
+
+    pub fn setup_lvn_rewards(&self, amount_to_mint: &str) -> Token {
+        let mut app = self.app();
+        let protocol_owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
+        let token = app.rewards_token();
+
+        app.mint_token(&protocol_owner, &token, amount_to_mint.parse().unwrap())
+            .unwrap();
+
+        token
+    }
+
+    pub fn exec_farming_set_lockdrop_rewards(
+        &self,
+        lvn_amount: NonZero<LvnToken>,
+        lvn_token: &Token,
+    ) -> Result<AppResponse> {
+        let funds = NumberGtZero::try_from_decimal(lvn_amount.into_decimal256())
+            .and_then(|amount| lvn_token.into_native_coin(amount).unwrap())
+            .unwrap();
+
+        self.exec_farming_with_funds(
+            &Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::SetLockdropRewards {
+                lvn: lvn_amount,
+            }),
+            vec![funds],
         )
     }
 
