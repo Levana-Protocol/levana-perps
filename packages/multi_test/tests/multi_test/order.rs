@@ -708,3 +708,111 @@ fn cannot_place_when_stale() {
         .unwrap();
     assert_eq!(err.id, ErrorId::Stale);
 }
+
+#[test]
+fn invalid_trigger_price() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    market.exec_set_price("20".parse().unwrap()).unwrap();
+
+    let err = market
+        .exec_place_limit_order(
+            &trader,
+            // So much collateral that we can't open it because of insufficient liquidity
+            "10".try_into().unwrap(),
+            "20.1".parse().unwrap(),
+            "10".try_into().unwrap(),
+            DirectionToBase::Long,
+            "1".try_into().unwrap(),
+            None,
+            None,
+        )
+        .unwrap_err()
+        .downcast::<PerpError<MarketError>>()
+        .unwrap();
+    assert_eq!(
+        err.data.unwrap(),
+        MarketError::InvalidTriggerPrice {
+            must_be: TriggerPriceMustBe::Less,
+            trigger_type: TriggerType::LimitOrder,
+            specified: "20.1".parse().unwrap(),
+            bound: "20".parse().unwrap(),
+        }
+    );
+
+    let err = market
+        .exec_place_limit_order(
+            &trader,
+            // So much collateral that we can't open it because of insufficient liquidity
+            "10".try_into().unwrap(),
+            "19.9".parse().unwrap(),
+            "10".try_into().unwrap(),
+            DirectionToBase::Short,
+            "1".try_into().unwrap(),
+            None,
+            None,
+        )
+        .unwrap_err()
+        .downcast::<PerpError<MarketError>>()
+        .unwrap();
+    assert_eq!(
+        err.data.unwrap(),
+        MarketError::InvalidTriggerPrice {
+            must_be: TriggerPriceMustBe::Greater,
+            trigger_type: TriggerType::LimitOrder,
+            specified: "19.9".parse().unwrap(),
+            bound: "20".parse().unwrap(),
+        }
+    );
+
+    let err = market
+        .exec_place_limit_order(
+            &trader,
+            // So much collateral that we can't open it because of insufficient liquidity
+            "10".try_into().unwrap(),
+            "20".parse().unwrap(),
+            "10".try_into().unwrap(),
+            DirectionToBase::Long,
+            "1".try_into().unwrap(),
+            None,
+            None,
+        )
+        .unwrap_err()
+        .downcast::<PerpError<MarketError>>()
+        .unwrap();
+    assert_eq!(
+        err.data.unwrap(),
+        MarketError::InvalidTriggerPrice {
+            must_be: TriggerPriceMustBe::Less,
+            trigger_type: TriggerType::LimitOrder,
+            specified: "20".parse().unwrap(),
+            bound: "20".parse().unwrap(),
+        }
+    );
+
+    let err = market
+        .exec_place_limit_order(
+            &trader,
+            // So much collateral that we can't open it because of insufficient liquidity
+            "10".try_into().unwrap(),
+            "20".parse().unwrap(),
+            "10".try_into().unwrap(),
+            DirectionToBase::Short,
+            "1".try_into().unwrap(),
+            None,
+            None,
+        )
+        .unwrap_err()
+        .downcast::<PerpError<MarketError>>()
+        .unwrap();
+    assert_eq!(
+        err.data.unwrap(),
+        MarketError::InvalidTriggerPrice {
+            must_be: TriggerPriceMustBe::Greater,
+            trigger_type: TriggerType::LimitOrder,
+            specified: "20".parse().unwrap(),
+            bound: "20".parse().unwrap(),
+        }
+    );
+}
