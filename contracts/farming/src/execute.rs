@@ -99,6 +99,12 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                     .map(LpToken::from_decimal256)?;
                 let mut totals = state.load_farming_totals(ctx.storage)?;
 
+                anyhow::ensure!(
+                    totals.xlp.is_zero(),
+                    "After transferring lockdrop collateral, xLP is {}, should be zero",
+                    totals.xlp
+                );
+
                 totals.xlp = balance;
                 state.save_farming_totals(ctx.storage, &totals)?;
             }
