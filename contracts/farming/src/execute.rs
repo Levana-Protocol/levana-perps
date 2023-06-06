@@ -3,7 +3,7 @@ use msg::contracts::market::entry::LiquidityDepositResponseData;
 use msg::prelude::MarketExecuteMsg::DepositLiquidity;
 use msg::token::Token;
 
-use crate::state::reply::{ReplyFarmerAddr, ReplyId};
+use crate::state::reply::{ReplyId, EPHEMERAL_FARMER_ADDR};
 use crate::{prelude::*, state::funds::Received};
 use cw_utils::parse_reply_execute_data;
 
@@ -124,7 +124,7 @@ impl State<'_> {
                     &DepositLiquidity { stake_to_xlp: true },
                 )?;
 
-                ReplyFarmerAddr::save(ctx.storage, Some(farmer))?;
+                EPHEMERAL_FARMER_ADDR.save(ctx.storage, farmer)?;
 
                 ctx.response.add_raw_submessage(SubMsg::reply_on_success(
                     deposit_liquidity_msg,
@@ -158,10 +158,9 @@ impl State<'_> {
             .data
             .with_context(|| "could not find expected data response")?;
         let deposit_data: LiquidityDepositResponseData = from_binary(&parsed_data)?;
-        let farmer_addr = ReplyFarmerAddr::load(ctx.storage)?;
+        let farmer_addr = EPHEMERAL_FARMER_ADDR.load_once(ctx.storage)?;
 
         self.farming_deposit(ctx, &farmer_addr, deposit_data.amount)?;
-        ReplyFarmerAddr::save(ctx.storage, None)?;
 
         Ok(())
     }

@@ -1,7 +1,6 @@
-use crate::prelude::reply::ReplyId;
+use crate::prelude::reply::{ReplyId, EPHEMERAL_BONUS_FUND};
 use crate::prelude::*;
 use crate::state::farming::RawFarmerStats;
-use crate::state::reply::ReplyExpectedYield;
 use cosmwasm_std::{to_binary, BankMsg, CosmosMsg, SubMsg, WasmMsg};
 use cw_storage_plus::Item;
 use msg::contracts::market::entry::LpInfoResp;
@@ -387,7 +386,7 @@ impl State<'_> {
                 funds: vec![],
             };
 
-            ReplyExpectedYield::save(ctx.storage, Some(bonus_amount))?;
+            EPHEMERAL_BONUS_FUND.save(ctx.storage, &bonus_amount)?;
 
             ctx.response.add_raw_submessage(SubMsg::reply_on_success(
                 reinvest_msg,
@@ -399,7 +398,7 @@ impl State<'_> {
     }
 
     pub(crate) fn handle_reinvest_yield_reply(&self, store: &mut dyn Storage) -> Result<()> {
-        let expected_yield = ReplyExpectedYield::load(store)?;
+        let expected_yield = EPHEMERAL_BONUS_FUND.load_once(store)?;
         let balance = self
             .market_info
             .collateral
@@ -424,20 +423,10 @@ impl State<'_> {
 
         self.save_bonus_fund(store, fund_balance)?;
 
-        let token = Token::Cw20 {
-            addr: self.market_info.xlp_addr.clone().into(),
-            decimal_places: LpToken::PRECISION,
-        };
-        let xlp_balance = token
-            .query_balance(&self.querier, &self.env.contract.address)
-            .map(Collateral::into_decimal256)
-            .map(LpToken::from_decimal256)?;
-
+        let xlp_balance = self.query_xlp_balance()?;
         let mut totals = self.load_farming_totals(store)?;
         totals.xlp = xlp_balance;
         self.save_farming_totals(store, &totals)?;
-
-        ReplyExpectedYield::save(store, None)?;
 
         Ok(())
     }
