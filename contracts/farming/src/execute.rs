@@ -1,5 +1,7 @@
+use cosmwasm_std::Reply;
 use msg::token::Token;
 
+use crate::state::reply::ReplyId;
 use crate::{prelude::*, state::funds::Received};
 
 #[entry_point]
@@ -16,9 +18,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 OwnerExecuteMsg::StartLockdropPeriod { start } => {
                     state.start_lockdrop_period(&mut ctx, start)?
                 }
-                OwnerExecuteMsg::StartLaunchPeriod { start } => {
-                    state.start_launch_period(&mut ctx, start)?
-                }
+                OwnerExecuteMsg::StartLaunchPeriod {} => state.start_launch_period(&mut ctx)?,
                 OwnerExecuteMsg::SetEmissions {
                     start,
                     duration,
@@ -78,6 +78,46 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         ExecuteMsg::Reinvest {} => todo!(),
         ExecuteMsg::TransferBonus {} => todo!(),
     }
+
+    Ok(ctx.response.into_response())
+}
+
+#[entry_point]
+pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
+    let (state, ctx) = StateContext::new(deps, env)?;
+
+    match ReplyId::try_from(msg.id) {
+        Ok(id) => match id {
+            ReplyId::TransferCollateral => {
+                let token = Token::Cw20 {
+                    addr: state.market_info.xlp_addr.clone().into(),
+                    decimal_places: LpToken::PRECISION,
+                };
+                let balance = token
+                    .query_balance(&state.querier, &state.env.contract.address)
+                    .map(Collateral::into_decimal256)
+                    .map(LpToken::from_decimal256)?;
+                let mut totals = state.load_farming_totals(ctx.storage)?;
+
+                anyhow::ensure!(
+                    totals.xlp.is_zero(),
+                    "After transferring lockdrop collateral, xLP is {}, should be zero",
+                    totals.xlp
+                );
+
+                totals.xlp = balance;
+                state.save_farming_totals(ctx.storage, &totals)?;
+            }
+        },
+        _ => {
+            return Err(perp_anyhow!(
+                ErrorId::InternalReply,
+                ErrorDomain::Farming,
+                "not a valid reply id: {}",
+                msg.id
+            ));
+        }
+    };
 
     Ok(ctx.response.into_response())
 }

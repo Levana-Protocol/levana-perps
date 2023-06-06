@@ -1508,14 +1508,9 @@ impl PerpsMarket {
     pub fn exec_farming_withdraw_xlp(
         &self,
         wallet: &Addr,
-        amount: NonZero<FarmingToken>,
+        amount: Option<NonZero<FarmingToken>>,
     ) -> Result<AppResponse> {
-        self.exec_farming(
-            wallet,
-            &FarmingExecuteMsg::Withdraw {
-                amount: Some(amount),
-            },
-        )
+        self.exec_farming(wallet, &FarmingExecuteMsg::Withdraw { amount })
     }
 
     pub fn exec_farming_start_lockdrop(&self, start: Option<Timestamp>) -> Result<AppResponse> {
@@ -1525,10 +1520,10 @@ impl PerpsMarket {
         )
     }
 
-    pub fn exec_farming_start_launch(&self, start: Option<Timestamp>) -> Result<AppResponse> {
+    pub fn exec_farming_start_launch(&self) -> Result<AppResponse> {
         self.exec_farming(
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
-            &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::StartLaunchPeriod { start }),
+            &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::StartLaunchPeriod {}),
         )
     }
 

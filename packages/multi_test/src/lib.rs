@@ -329,11 +329,14 @@ pub(crate) fn contract_rewards() -> Box<dyn Contract<Empty>> {
 }
 
 pub(crate) fn contract_farming() -> Box<dyn Contract<Empty>> {
-    Box::new(LocalContractWrapper::new(
-        farming::lifecycle::instantiate,
-        farming::execute::execute,
-        farming::query::query,
-    ))
+    Box::new(
+        LocalContractWrapper::new(
+            farming::lifecycle::instantiate,
+            farming::execute::execute,
+            farming::query::query,
+        )
+        .with_reply(farming::execute::reply),
+    )
 }
 
 // struct to satisfy the `Contract` trait
