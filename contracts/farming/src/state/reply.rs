@@ -6,8 +6,11 @@ use std::convert::TryFrom;
 pub enum ReplyId {
     TransferCollateral = 0,
     ReinvestYield = 1,
+    FarmingDepositXlp = 2,
 }
 
+/// This represents the portion of the yield that is allocated to the Bonus Fund during the
+/// process of reinvesting yield.
 pub(crate) struct ReplyExpectedYield;
 
 impl ReplyExpectedYield {
@@ -30,6 +33,29 @@ impl ReplyExpectedYield {
     }
 }
 
+/// The address of the farmer who deposited Collateral.
+pub(crate) struct ReplyFarmerAddr;
+
+impl ReplyFarmerAddr {
+    const FARMER_ADDR: Item<'static, Addr> = Item::new(namespace::REPLY_FARMER_ADDR);
+
+    pub(crate) fn load(store: &dyn Storage) -> Result<Addr> {
+        Self::FARMER_ADDR.load(store).map_err(|err| err.into())
+    }
+
+    pub(crate) fn save(store: &mut dyn Storage, farmer_addr: Option<&Addr>) -> Result<()> {
+        match farmer_addr {
+            None => {
+                Self::FARMER_ADDR.remove(store);
+                Ok(())
+            }
+            Some(addr) => Self::FARMER_ADDR
+                .save(store, addr)
+                .map_err(|err| err.into()),
+        }
+    }
+}
+
 impl TryFrom<u64> for ReplyId {
     type Error = PerpError<u64>;
 
@@ -37,6 +63,7 @@ impl TryFrom<u64> for ReplyId {
         match value {
             0 => Ok(ReplyId::TransferCollateral),
             1 => Ok(ReplyId::ReinvestYield),
+            2 => Ok(ReplyId::FarmingDepositXlp),
             _ => Err(PerpError {
                 id: ErrorId::InternalReply,
                 domain: ErrorDomain::Factory,

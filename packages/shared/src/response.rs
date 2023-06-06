@@ -1,9 +1,10 @@
 use anyhow::Result;
 use cosmwasm_std::{
-    to_binary, wasm_execute, CosmosMsg, Empty, Event, IbcBasicResponse, IbcReceiveResponse,
-    Response, SubMsg, WasmMsg,
+    from_binary, to_binary, wasm_execute, CosmosMsg, Empty, Event, IbcBasicResponse,
+    IbcReceiveResponse, Response, SubMsg, WasmMsg,
 };
 use cw2::ContractVersion;
+use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::ibc::{ack_fail, ack_success};
@@ -161,6 +162,44 @@ impl ResponseBuilder {
                 .events
                 .push(event.add_attributes(common_attrs.clone())),
         }
+    }
+
+    /// Set response data
+    pub fn set_data(&mut self, data: &impl Serialize) -> Result<()> {
+        match self.resp.data {
+            None => {
+                let data = to_binary(data)?;
+                self.resp.data = Some(data);
+            }
+            Some(_) => bail!("data already exists, use update_data instead"),
+        }
+
+        Ok(())
+    }
+
+    /// Get response data
+    pub fn get_data<T: DeserializeOwned>(&self) -> Result<Option<T>> {
+        match &self.resp.data {
+            None => Ok(None),
+            Some(data) => Ok(Some(from_binary(data)?)),
+        }
+    }
+
+    /// Remove response data
+    pub fn remove_data(&mut self) {
+        self.resp.data = None;
+    }
+
+    /// Update response data
+    pub fn update_data<T: Serialize + DeserializeOwned>(
+        &mut self,
+        f: impl FnOnce(Option<T>) -> T,
+    ) -> Result<()> {
+        let data = self.get_data()?;
+        let updated = f(data);
+        self.resp.data = Some(to_binary(&updated)?);
+
+        Ok(())
     }
 
     /// Turn the accumulated response into an IBC Basic response

@@ -138,4 +138,5 @@ pub const LOCKDROP_BUCKETS_TOTAL_SHARES: &str = "ee";
 pub const LOCKDROP_DURATIONS: &str = "ef";
 pub const BONUS_CONFIG: &str = "eg";
 pub const REPLY_EXPECTED_YIELD: &str = "eh";
-pub const BONUS_FUND: &str = "eI";
+pub const BONUS_FUND: &str = "ei";
+pub const REPLY_FARMER_ADDR: &str = "ej";

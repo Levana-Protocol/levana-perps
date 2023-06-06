@@ -1,8 +1,11 @@
-use cosmwasm_std::Reply;
+use cosmwasm_std::{from_binary, Reply, SubMsg};
+use msg::contracts::market::entry::LiquidityDepositResponseData;
+use msg::prelude::MarketExecuteMsg::DepositLiquidity;
 use msg::token::Token;
 
-use crate::state::reply::ReplyId;
+use crate::state::reply::{ReplyFarmerAddr, ReplyId};
 use crate::{prelude::*, state::funds::Received};
+use cw_utils::parse_reply_execute_data;
 
 #[entry_point]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
@@ -84,7 +87,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
 #[entry_point]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
-    let (state, ctx) = StateContext::new(deps, env)?;
+    let (state, mut ctx) = StateContext::new(deps, env)?;
 
     match ReplyId::try_from(msg.id) {
         Ok(id) => match id {
@@ -93,6 +96,9 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
             }
             ReplyId::ReinvestYield => {
                 state.handle_reinvest_yield_reply(ctx.storage)?;
+            }
+            ReplyId::FarmingDepositXlp => {
+                state.handle_farming_deposit_xlp_reply(&mut ctx, msg)?;
             }
         },
         _ => {
@@ -110,24 +116,52 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
 
 impl State<'_> {
     fn deposit(&self, ctx: &mut StateContext, farmer: &Addr, received: Received) -> Result<()> {
-        let xlp = match received {
-            Received::Collateral(_) => todo!(),
-            Received::Lp(_) => todo!(),
-            Received::Xlp(xlp) => xlp,
-        };
+        match received {
+            Received::Collateral(collateral) => {
+                let deposit_liquidity_msg = self.market_info.collateral.into_execute_msg(
+                    &self.market_info.addr.clone(),
+                    collateral.raw(),
+                    &DepositLiquidity { stake_to_xlp: true },
+                )?;
 
-        let farming = self.farming_deposit(ctx, farmer, xlp)?;
+                ReplyFarmerAddr::save(ctx.storage, Some(farmer))?;
 
-        ctx.response.add_event(DepositEvent {
-            farmer: farmer.clone(),
-            farming,
-            xlp,
-            source: match received {
-                Received::Collateral(_) => DepositSource::Collateral,
-                Received::Lp(_) => DepositSource::Lp,
-                Received::Xlp(_) => DepositSource::Xlp,
-            },
-        });
+                ctx.response.add_raw_submessage(SubMsg::reply_on_success(
+                    deposit_liquidity_msg,
+                    ReplyId::FarmingDepositXlp.into(),
+                ));
+            }
+            Received::Lp(_) => {
+                bail!("Unable to process LP deposits. Farming is restricted to Collateral and xLP")
+            }
+            Received::Xlp(xlp) => {
+                let farming = self.farming_deposit(ctx, farmer, xlp)?;
+
+                ctx.response.add_event(DepositEvent {
+                    farmer: farmer.clone(),
+                    farming,
+                    xlp,
+                    source: match received {
+                        Received::Collateral(_) => DepositSource::Collateral,
+                        Received::Lp(_) => DepositSource::Lp,
+                        Received::Xlp(_) => DepositSource::Xlp,
+                    },
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    fn handle_farming_deposit_xlp_reply(&self, ctx: &mut StateContext, msg: Reply) -> Result<()> {
+        let parsed_data = parse_reply_execute_data(msg)?
+            .data
+            .with_context(|| "could not find expected data response")?;
+        let deposit_data: LiquidityDepositResponseData = from_binary(&parsed_data)?;
+        let farmer_addr = ReplyFarmerAddr::load(ctx.storage)?;
+
+        self.farming_deposit(ctx, &farmer_addr, deposit_data.amount)?;
+        ReplyFarmerAddr::save(ctx.storage, None)?;
 
         Ok(())
     }

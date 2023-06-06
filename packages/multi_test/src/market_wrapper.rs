@@ -1485,6 +1485,21 @@ impl PerpsMarket {
         )
     }
 
+    pub fn exec_farming_deposit_collateral(
+        &self,
+        wallet: &Addr,
+        amount: NonZero<Collateral>,
+    ) -> Result<AppResponse> {
+        let msg = self.token.into_execute_msg(
+            &self.farming_addr.clone(),
+            amount.raw(),
+            &FarmingExecuteMsg::Deposit {},
+        )?;
+
+        self.exec_mint_tokens(wallet, amount.into_number())?;
+        self.exec_wasm_msg(wallet, msg)
+    }
+
     fn exec_farming(&self, wallet: &Addr, msg: &FarmingExecuteMsg) -> Result<AppResponse> {
         self.exec_farming_with_funds(wallet, msg, vec![])
     }

@@ -8,7 +8,7 @@ pub use cw20::*;
 use cw_storage_plus::Map;
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::config::MaxLiquidity;
-use msg::contracts::market::entry::{LpInfoResp, UnstakingStatus};
+use msg::contracts::market::entry::{LiquidityDepositResponseData, LpInfoResp, UnstakingStatus};
 use msg::contracts::market::liquidity::events::{
     DeltaNeutralityRatioEvent, DepositEvent, LockEvent, UnlockEvent, WithdrawEvent,
 };
@@ -222,9 +222,17 @@ impl State<'_> {
         stake_to_xlp: bool,
     ) -> Result<()> {
         let lp_shares = self.liquidity_deposit_inner(ctx, lp_addr, amount, stake_to_xlp)?;
+
         if stake_to_xlp {
             self.liquidity_stake_lp(ctx, lp_addr, Some(lp_shares))?;
         }
+
+        let data = LiquidityDepositResponseData {
+            amount: lp_shares.raw(),
+        };
+
+        ctx.response.set_data(&data)?;
+
         Ok(())
     }
 

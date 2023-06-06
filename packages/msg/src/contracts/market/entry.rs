@@ -192,6 +192,7 @@ pub enum ExecuteMsg {
     },
 
     /// Deposits send funds into the unlocked liquidity fund
+    /// Returns [LiquidityDepositResponseData] as response data
     DepositLiquidity {
         /// Should we stake the resulting LP tokens into xLP?
         ///
@@ -674,6 +675,14 @@ pub struct LpInfoResp {
     pub unstaking: Option<UnstakingStatus>,
     /// Historical information on LP activity
     pub history: LpHistorySummary,
+}
+
+/// The amount of LP or xLP tokens that are minted when depositing liquidity.
+/// Returned from [ExecuteMsg::DepositLiquidity] execute message
+#[cw_serde]
+pub struct LiquidityDepositResponseData {
+    /// The amount of LP or xLP tokens minted after the deposit
+    pub amount: LpToken,
 }
 
 /// Status of an ongoing unstaking process.
