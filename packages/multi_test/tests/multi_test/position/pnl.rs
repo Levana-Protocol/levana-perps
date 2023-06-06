@@ -7,7 +7,7 @@ use levana_perpswap_multi_test::{
     time::TimeJump,
     PerpsApp,
 };
-use msg::contracts::market::config::ConfigUpdate;
+use msg::contracts::market::{config::ConfigUpdate, entry::PositionsQueryFeeApproach};
 use msg::prelude::*;
 
 // this is currently a known issue, working around it in the meantime
@@ -87,7 +87,9 @@ fn position_pnl_close_take_profit() {
     market.exec_set_price("100000".try_into().unwrap()).unwrap();
 
     // pnl is updated even without cranking or liquifunding
-    let pos = market.query_position_pending_close(pos_id, true).unwrap();
+    let pos = market
+        .query_position_pending_close(pos_id, PositionsQueryFeeApproach::NoFees)
+        .unwrap();
     assert!(pos.pnl_collateral > start_pnl_in_collateral);
 
     // crank to liquidate
@@ -133,7 +135,9 @@ fn position_pnl_close_liquidate() {
     market.exec_set_price("100000".try_into().unwrap()).unwrap();
 
     // pnl is updated even without cranking or liquifunding
-    let pos = market.query_position_pending_close(pos_id, true).unwrap();
+    let pos = market
+        .query_position_pending_close(pos_id, PositionsQueryFeeApproach::NoFees)
+        .unwrap();
     assert!(pos.pnl_collateral < start_pnl_in_collateral);
 
     // crank to liquidate

@@ -11,6 +11,7 @@ use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::contracts::cw20::entry::{QueryMsg as Cw20QueryMsg, TokenInfoResponse};
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::config::ConfigUpdate;
+use msg::contracts::market::entry::PositionsQueryFeeApproach;
 use msg::contracts::market::liquidity::LiquidityStats;
 use msg::contracts::market::position::{LiquidationReason, PositionCloseReason};
 use msg::prelude::*;
@@ -151,7 +152,9 @@ fn liquidity_share_allocation_with_trading() {
 
     // Assert post-liquidation
 
-    let _pos = market.query_position_pending_close(pos_id, true).unwrap();
+    let _pos = market
+        .query_position_pending_close(pos_id, PositionsQueryFeeApproach::NoFees)
+        .unwrap();
     market.exec_crank_till_finished(&cranker).unwrap();
     let _pos = market.query_closed_position(&trader, pos_id).unwrap();
 

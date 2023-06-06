@@ -189,7 +189,8 @@ impl MarketContract {
             .0
             .query(MarketQueryMsg::Positions {
                 position_ids: vec![pos_id],
-                skip_calc_pending_fees: false,
+                skip_calc_pending_fees: Some(false),
+                fees: None,
             })
             .await?;
         positions
@@ -273,7 +274,8 @@ impl MarketContract {
 
         let query = MarketQueryMsg::Positions {
             position_ids: positions.clone(),
-            skip_calc_pending_fees: false,
+            skip_calc_pending_fees: Some(false),
+            fees: None,
         };
         let PositionsResp {
             positions: response,
@@ -291,7 +293,8 @@ impl MarketContract {
     pub async fn position_detail(&self, position_id: PositionId) -> Result<PositionQueryResponse> {
         let query = MarketQueryMsg::Positions {
             position_ids: vec![position_id],
-            skip_calc_pending_fees: false,
+            skip_calc_pending_fees: Some(false),
+            fees: None,
         };
         let PositionsResp {
             positions: mut response,
