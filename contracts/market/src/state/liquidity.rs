@@ -221,7 +221,8 @@ impl State<'_> {
         amount: NonZero<Collateral>,
         stake_to_xlp: bool,
     ) -> Result<()> {
-        let lp_shares = self.liquidity_deposit_inner(ctx, lp_addr, amount, stake_to_xlp)?;
+        let lp_shares = self.liquidity_deposit_inner(ctx, lp_addr, amount)?;
+        self.lp_history_add_deposit(ctx, lp_addr, lp_shares, amount, stake_to_xlp)?;
         if stake_to_xlp {
             self.liquidity_stake_lp(ctx, lp_addr, Some(lp_shares))?;
         }
@@ -264,13 +265,13 @@ impl State<'_> {
                 };
                 if let Some(remainder) = NonZero::new(remainder) {
                     self.add_token_transfer_msg(ctx, lp_addr, remainder)?;
+                    self.lp_history_add_claim_yield(ctx, lp_addr, remainder)?;
                 }
                 amount
             }
         };
 
-        let lp_shares =
-            self.liquidity_deposit_inner(ctx, lp_addr, yield_to_reinvest, stake_to_xlp)?;
+        let lp_shares = self.liquidity_deposit_inner(ctx, lp_addr, yield_to_reinvest)?;
         if stake_to_xlp {
             self.liquidity_stake_lp(ctx, lp_addr, Some(lp_shares))?;
         }
@@ -344,7 +345,6 @@ impl State<'_> {
         ctx: &mut StateContext,
         lp_addr: &Addr,
         amount: NonZero<Collateral>,
-        is_xlp: bool,
     ) -> Result<NonZero<LpToken>> {
         let mut liquidity_stats = self.load_liquidity_stats(ctx.storage)?;
         self.ensure_max_liquidity(ctx, amount, &liquidity_stats)?;
@@ -376,8 +376,6 @@ impl State<'_> {
             amount_usd,
             shares: new_shares,
         });
-
-        self.lp_history_add_deposit(ctx, lp_addr, new_shares, amount, is_xlp)?;
 
         Ok(new_shares)
     }
@@ -717,8 +715,8 @@ impl State<'_> {
         self.register_lp_claimed_yield(ctx, total_yield)?;
         if send_to_wallet {
             self.add_token_transfer_msg(ctx, lp_addr, total_yield)?;
+            self.lp_history_add_claim_yield(ctx, lp_addr, total_yield)?;
         }
-        self.lp_history_add_claim_yield(ctx, lp_addr, total_yield)?;
 
         Ok(total_yield)
     }
