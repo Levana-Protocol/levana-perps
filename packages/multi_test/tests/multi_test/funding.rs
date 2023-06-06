@@ -8,6 +8,14 @@ use msg::prelude::*;
 fn funding_rates_typical() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
+    // Fix for exact calculations, go back to the original settings
+    market
+        .exec_set_config(ConfigUpdate {
+            funding_rate_sensitivity: Some("1".parse().unwrap()),
+            ..Default::default()
+        })
+        .unwrap();
+
     let trader = market.clone_trader(0).unwrap();
 
     market

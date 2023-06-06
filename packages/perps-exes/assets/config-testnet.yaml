@@ -13,14 +13,14 @@ liquidity:
     ETH_USD:
       min: 1000
       max: 1000000
-  min-util: 0.85
-  max-util: 0.92
-  target-util: 0.88
+  min-util-delta: -0.05
+  max-util-delta: 0.02
+  target-util-delta: -0.02
 utilization:
-  min-util: 0.8
-  max-util: 0.85
+  min-util-delta: -0.1
+  max-util-delta: -0.05
 trader:
-  max-util: 0.95
+  max-util-delta: 0.05
   min-borrow-fee: 0.1
   max-borrow-fee: 0.2
 deployments:

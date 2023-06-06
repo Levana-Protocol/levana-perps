@@ -16,12 +16,7 @@ pub(crate) struct Cmd {
 }
 
 #[derive(clap::Parser)]
-pub(crate) enum Subcommand {
-    /// Do a complete local deployment
-    LocalDeploy {
-        #[clap(flatten)]
-        inner: crate::local_deploy::LocalDeployOpt,
-    },
+pub(crate) enum TestnetSub {
     /// Store the contracts and notify the tracker. Skips any contracts that are
     /// already uploaded.
     StoreCode {
@@ -43,23 +38,29 @@ pub(crate) enum Subcommand {
         #[clap(flatten)]
         inner: crate::migrate::MigrateOpt,
     },
-    /// On Chain tests
-    OnChainTests {
-        #[clap(flatten)]
-        inner: localtest::TestsOpt,
-    },
     /// Instantiate chain-wide contracts as a one time setup
     InitChain {
         #[clap(flatten)]
         inner: crate::init_chain::InitChainOpt,
     },
-    /// Perform post-deploy market setup for public facing markets
-    ///
-    /// This is responsible for activities like depositing collateral and
-    /// opening enough positions to create a 90% utilization ratio.
-    SetupMarket {
+}
+
+#[derive(clap::Parser)]
+pub(crate) enum Subcommand {
+    /// Do a complete local deployment
+    LocalDeploy {
         #[clap(flatten)]
-        inner: crate::setup_market::SetupMarketOpt,
+        inner: crate::local_deploy::LocalDeployOpt,
+    },
+    /// On Chain tests
+    OnChainTests {
+        #[clap(flatten)]
+        inner: localtest::TestsOpt,
+    },
+    /// Testnet-specific commands.
+    Testnet {
+        #[clap(subcommand)]
+        inner: TestnetSub,
     },
     /// Mainnet-specific deployment activities.
     Mainnet {

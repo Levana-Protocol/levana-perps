@@ -6,7 +6,7 @@ use crate::{
     store_code::{Contracts, HATCHING, IBC_EXECUTE_PROXY, LVN_REWARDS},
 };
 use anyhow::{bail, Context, Result};
-use cosmos::{Coin, CosmosBuilder, TokenFactory};
+use cosmos::{Coin, ContractAdmin, CosmosBuilder, TokenFactory};
 use cosmos::{Contract, CosmosNetwork, HasAddress};
 use cosmwasm_std::IbcOrder;
 use msg::contracts::hatching::{
@@ -98,6 +98,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                                     .to_string(),
                                 ibc_channel_order: IbcOrder::Unordered,
                             },
+                            ContractAdmin::Sender,
                         )
                         .await?;
 
@@ -166,6 +167,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                         burn_dust_contract: burn_dust_contract.clone().into(),
                         profile_contract: profile_contract.clone().into(),
                     },
+                    ContractAdmin::Sender,
                 )
                 .await?;
 
@@ -270,6 +272,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                                     .to_string(),
                         },
                     },
+                    ContractAdmin::Sender,
                 )
                 .await?;
 
@@ -370,6 +373,7 @@ async fn instantiate_testnet_nft_contract(
                 allow_burn: true,
                 royalties: RoyaltyInfo::NoRoyalties {},
             },
+            ContractAdmin::Sender,
         )
         .await?;
 
@@ -427,6 +431,7 @@ async fn instantiate_testnet_profile_contract(
                 admin: app.wallet.get_address_string(),
                 withdraw_dest: app.wallet.get_address_string(),
             },
+            ContractAdmin::Sender,
         )
         .await?;
 

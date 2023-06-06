@@ -58,6 +58,8 @@ pub(crate) struct TestnetOpt {
     /// Deployment name to use (aka contract family)
     #[clap(long, env = "LEVANA_BOTS_DEPLOYMENT")]
     pub(crate) deployment: String,
+    #[clap(long, env = "COSMOS_GAS_MULTIPLIER")]
+    pub(crate) gas_multiplier: Option<f64>,
 }
 
 #[derive(clap::Parser)]
