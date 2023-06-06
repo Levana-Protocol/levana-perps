@@ -289,8 +289,7 @@ fn position_liquidate_long_same_block() {
 
     let crank_liquidation_price_point: PricePoint = res
         .into_iter()
-        .map(|res| res.events)
-        .flatten()
+        .flat_map(|res| res.events)
         .find_map(|event| {
             if let Ok(crank_work) = CrankWorkInfo::try_from(event) {
                 match crank_work {
