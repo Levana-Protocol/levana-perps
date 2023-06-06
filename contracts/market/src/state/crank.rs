@@ -132,23 +132,22 @@ impl State<'_> {
         }
         .into();
 
-        let mut real_cranks = 0;
+        let mut actual = vec![];
         for _ in 0..n_execs {
             match self.crank_work(ctx.storage)? {
                 None => break,
                 Some(work_info) => {
+                    actual.push(work_info.clone());
                     self.crank_exec(ctx, work_info)?;
-                    real_cranks += 1;
                 }
             };
         }
 
+        self.allocate_crank_fees(ctx, rewards, actual.len().try_into()?)?;
         ctx.response_mut().add_event(CrankExecBatchEvent {
             requested: n_execs,
-            actual: real_cranks.into(),
+            actual,
         });
-
-        self.allocate_crank_fees(ctx, rewards, real_cranks)?;
 
         Ok(())
     }

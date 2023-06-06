@@ -49,6 +49,8 @@ pub enum CrankWorkInfo {
 
 /// Events related to the crank
 pub mod events {
+    use std::borrow::Cow;
+
     use super::*;
     use cosmwasm_std::Event;
 
@@ -57,25 +59,44 @@ pub mod events {
         /// How many cranks were requested
         pub requested: u64,
         /// How many cranks were actually processed
-        pub actual: u64,
+        pub actual: Vec<CrankWorkInfo>,
     }
 
     impl PerpEvent for CrankExecBatchEvent {}
     impl From<CrankExecBatchEvent> for Event {
         fn from(CrankExecBatchEvent { requested, actual }: CrankExecBatchEvent) -> Self {
-            Event::new("crank-batch-exec")
+            let mut event = Event::new("crank-batch-exec")
                 .add_attribute("requested", requested.to_string())
-                .add_attribute("actual", actual.to_string())
-        }
-    }
-    impl TryFrom<Event> for CrankExecBatchEvent {
-        type Error = anyhow::Error;
+                .add_attribute("actual", actual.len().to_string());
 
-        fn try_from(evt: Event) -> anyhow::Result<Self> {
-            Ok(CrankExecBatchEvent {
-                requested: evt.u64_attr("requested")?,
-                actual: evt.u64_attr("actual")?,
-            })
+            for (idx, work) in actual.into_iter().enumerate() {
+                event = event.add_attribute(
+                    format!("work-{}", idx + 1),
+                    match work {
+                        CrankWorkInfo::CloseAllPositions { .. } => {
+                            Cow::Borrowed("close-all-positions")
+                        }
+                        CrankWorkInfo::ResetLpBalances {} => "reset-lp-balances".into(),
+                        CrankWorkInfo::Liquifunding { position } => {
+                            format!("liquifund {position}").into()
+                        }
+                        CrankWorkInfo::UnpendLiquidationPrices { position } => {
+                            format!("unpend {position}").into()
+                        }
+                        CrankWorkInfo::Liquidation { position, .. } => {
+                            format!("liquidation {position}").into()
+                        }
+                        CrankWorkInfo::LimitOrder { order_id } => {
+                            format!("limit order {order_id}").into()
+                        }
+                        CrankWorkInfo::Completed {
+                            price_point_timestamp,
+                        } => format!("completed {price_point_timestamp}").into(),
+                    },
+                )
+            }
+
+            event
         }
     }
 
