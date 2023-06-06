@@ -36,8 +36,8 @@ pub fn instantiate(
     state.save_bonus_config(
         ctx.storage,
         BonusConfig {
-            bonus_ratio: msg.bonus_ratio,
-            bonus_addr: msg.bonus_addr.validate(state.api)?,
+            ratio: msg.bonus_ratio,
+            addr: msg.bonus_addr.validate(state.api)?,
         },
     )?;
 

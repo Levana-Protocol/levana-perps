@@ -58,9 +58,9 @@ const BONUS_FUND: Item<Collateral> = Item::new(namespace::BONUS_FUND);
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub(crate) struct BonusConfig {
     /// The part of the reinvested yield that goes to the [BONUS_FUND]
-    pub(crate) bonus_ratio: Decimal256,
+    pub(crate) ratio: Decimal256,
     /// The destination for the funds collected in the [BONUS_FUND]
-    pub(crate) bonus_addr: Addr,
+    pub(crate) addr: Addr,
 }
 
 const LOCKDROP_CONFIG: Item<LockdropConfig> = Item::new(namespace::LOCKDROP_CONFIG);
@@ -364,9 +364,7 @@ impl State<'_> {
             },
         )?;
         let config = self.load_bonus_config(ctx.storage)?;
-        let bonus_amount = lp_info
-            .available_yield
-            .checked_mul_dec(config.bonus_ratio)?;
+        let bonus_amount = lp_info.available_yield.checked_mul_dec(config.ratio)?;
         let reinvest_amount = lp_info
             .available_yield
             .checked_sub(bonus_amount)
@@ -416,6 +414,14 @@ impl State<'_> {
 
         let mut fund_balance = self.load_bonus_fund(store)?;
         fund_balance = fund_balance.checked_add(expected_yield)?;
+
+        anyhow::ensure!(
+            fund_balance <= balance,
+            "bonus fund {} is greater than the current balance {}",
+            expected_yield,
+            balance
+        );
+
         self.save_bonus_fund(store, fund_balance)?;
 
         let token = Token::Cw20 {
@@ -443,10 +449,12 @@ impl State<'_> {
             .map(NonZero::<Collateral>::new)?;
 
         if let Some(amount) = amount {
+            self.save_bonus_fund(ctx.storage, Collateral::zero())?;
+
             let transfer_msg = self
                 .market_info
                 .collateral
-                .into_transfer_msg(&config.bonus_addr, amount)?
+                .into_transfer_msg(&config.addr, amount)?
                 .with_context(|| "unable to construct msg to transfer bonus")?;
 
             ctx.response.add_message(transfer_msg);

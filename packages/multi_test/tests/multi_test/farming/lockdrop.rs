@@ -462,12 +462,16 @@ fn test_reinvest_yield() {
     let balance_before = market.query_collateral_balance(&owner).unwrap();
     market.exec_farming_transfer_bonus().unwrap();
     let balance_after = market.query_collateral_balance(&owner).unwrap();
+
     assert_eq!(
         balance_after,
         balance_before
             .checked_add(farming_stats_after.bonus.into_number())
             .unwrap()
     );
+
+    let farming_stats = market.query_farming_stats();
+    assert_eq!(farming_stats.bonus, Collateral::zero());
 
     // Withdraw xLP
 
