@@ -102,7 +102,7 @@ impl State<'_> {
                     CrankWorkInfo::Liquidation {
                         position: pos.id,
                         liquidation_reason: pos.reason,
-                        price_point_timestamp: price_point.timestamp,
+                        price_point,
                     }
                 } else if let Some(order_id) =
                     self.limit_order_triggered_order(store, price_point.price_notional)?
@@ -210,7 +210,7 @@ impl State<'_> {
             CrankWorkInfo::Liquidation {
                 position,
                 liquidation_reason,
-                price_point_timestamp,
+                price_point,
             } => {
                 let pos = get_position(ctx.storage, position)?;
 
@@ -223,7 +223,7 @@ impl State<'_> {
                         pos,
                         exposure: Signed::zero(),
                         close_time: ends_at,
-                        settlement_time: price_point_timestamp,
+                        settlement_time: price_point.timestamp,
                         reason: PositionCloseReason::Liquidated(liquidation_reason),
                     },
                     MaybeClosedPosition::Close(x) => x,

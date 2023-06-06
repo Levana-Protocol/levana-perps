@@ -6,6 +6,7 @@ use levana_perpswap_multi_test::{
     PerpsApp,
 };
 use msg::contracts::market::config::ConfigUpdate;
+use msg::contracts::market::crank::CrankWorkInfo;
 use msg::contracts::market::position::PositionId;
 use msg::prelude::*;
 
@@ -255,4 +256,60 @@ fn position_stop_loss_short() {
         .unwrap();
 
     trigger_and_assert(pos_id);
+}
+
+#[test]
+fn position_liquidate_long_same_block() {
+    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+    let cranker = market.clone_trader(1).unwrap();
+
+    market.exec_set_price("100".try_into().unwrap()).unwrap();
+
+    let (pos_id, _) = market
+        .exec_open_position(
+            &trader,
+            "100",
+            "10",
+            DirectionToBase::Long,
+            "0.5",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    // make sure cranking is all caught up
+    market.exec_crank_till_finished(&cranker).unwrap();
+
+    // update price and crank in the same block
+    market.automatic_time_jump_enabled = false;
+    market.exec_set_price("1".try_into().unwrap()).unwrap();
+    let res = market.exec_crank_till_finished(&cranker).unwrap();
+
+    let crank_liquidation_price_point: PricePoint = res
+        .into_iter()
+        .map(|res| res.events)
+        .flatten()
+        .find_map(|event| {
+            if let Ok(crank_work) = CrankWorkInfo::try_from(event) {
+                match crank_work {
+                    CrankWorkInfo::Liquidation { price_point, .. } => Some(price_point),
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        })
+        .unwrap();
+
+    let pos = market.query_closed_position(&trader, pos_id).unwrap();
+    assert_position_liquidated(&pos).unwrap();
+
+    // confirm that the position was settled up to the liquidation time
+    assert!(pos.settlement_time >= crank_liquidation_price_point.timestamp);
+
+    // confirm that we get no positions when we query
+    let positions = market.query_positions(&trader).unwrap();
+    assert_eq!(positions.len(), 0);
 }
