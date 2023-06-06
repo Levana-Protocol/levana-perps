@@ -60,14 +60,27 @@ pub mod events {
         pub requested: u64,
         /// How many cranks were actually processed
         pub actual: Vec<CrankWorkInfo>,
+        /// Size of unpend queue at start
+        pub starting_unpend: u32,
+        /// Size of unpend queue at end
+        pub ending_unpend: u32,
     }
 
     impl PerpEvent for CrankExecBatchEvent {}
     impl From<CrankExecBatchEvent> for Event {
-        fn from(CrankExecBatchEvent { requested, actual }: CrankExecBatchEvent) -> Self {
+        fn from(
+            CrankExecBatchEvent {
+                requested,
+                actual,
+                starting_unpend,
+                ending_unpend,
+            }: CrankExecBatchEvent,
+        ) -> Self {
             let mut event = Event::new("crank-batch-exec")
                 .add_attribute("requested", requested.to_string())
-                .add_attribute("actual", actual.len().to_string());
+                .add_attribute("actual", actual.len().to_string())
+                .add_attribute("starting-unpend", starting_unpend.to_string())
+                .add_attribute("ending-unpend", ending_unpend.to_string());
 
             for (idx, work) in actual.into_iter().enumerate() {
                 event = event.add_attribute(
