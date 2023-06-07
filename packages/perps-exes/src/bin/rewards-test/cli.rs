@@ -109,7 +109,7 @@ pub(crate) struct HatchEggOpt {
     /// finding a mintable egg requires crawling the CSV
     /// this gets increasingly slow on each test run
     /// so optionally skip the cawling
-    #[clap(long, default_value = "14")]
+    #[clap(long, default_value = "21")]
     pub(crate) mint_eggs_start_skip: usize,
 }
 
