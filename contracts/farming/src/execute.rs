@@ -90,7 +90,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
     match ReplyId::try_from(msg.id) {
         Ok(id) => match id {
             ReplyId::TransferCollateral => {
-                state.handle_transfer_collateral_reply(ctx.storage)?;
+                state.handle_transfer_collateral_reply(&mut ctx)?;
             }
             ReplyId::ReinvestYield => {
                 state.handle_reinvest_yield_reply(ctx.storage)?;
@@ -158,17 +158,14 @@ impl State<'_> {
                 ));
             }
             Received::Xlp(xlp) => {
-                let farming = self.farming_deposit(ctx, farmer, xlp)?;
+                let (farming, pool_size) = self.farming_deposit(ctx, farmer, xlp)?;
 
                 ctx.response.add_event(DepositEvent {
                     farmer: farmer.clone(),
                     farming,
                     xlp,
-                    source: match received {
-                        Received::Collateral(_) => DepositSource::Collateral,
-                        Received::Lp(_) => DepositSource::Lp,
-                        Received::Xlp(_) => DepositSource::Xlp,
-                    },
+                    source: DepositSource::Collateral,
+                    pool_size,
                 });
             }
         }
@@ -196,7 +193,7 @@ impl State<'_> {
             decimal_places: LpToken::PRECISION,
         };
 
-        let (xlp, farming) = self.farming_withdraw(ctx, farmer, amount)?;
+        let (xlp, farming, pool_size) = self.farming_withdraw(ctx, farmer, amount)?;
         let msg = msg::contracts::liquidity_token::entry::ExecuteMsg::Transfer {
             recipient: farmer.into(),
             amount: token
@@ -204,12 +201,14 @@ impl State<'_> {
                 .context("Invalid transfer amount calculated")?
                 .into(),
         };
+
         ctx.response
             .add_execute_submessage_oneshot(&self.market_info.xlp_addr, &msg)?;
         ctx.response.add_event(WithdrawEvent {
             farmer: farmer.clone(),
             farming,
             xlp,
+            pool_size
         });
 
         Ok(())

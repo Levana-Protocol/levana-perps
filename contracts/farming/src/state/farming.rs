@@ -79,6 +79,7 @@ impl State<'_> {
             .map(|x| x.unwrap_or_default())
     }
 
+    /// Save the farming totals
     pub(crate) fn save_farming_totals(
         &self,
         store: &mut dyn Storage,
@@ -114,7 +115,7 @@ impl State<'_> {
         ctx: &mut StateContext,
         farmer: &Addr,
         xlp: LpToken,
-    ) -> Result<FarmingToken> {
+    ) -> Result<(FarmingToken, LpToken)> {
         let mut farmer_stats = match self.load_raw_farmer_stats(ctx.storage, farmer)? {
             None => RawFarmerStats::default(),
             Some(farmer_stats) => farmer_stats,
@@ -132,18 +133,21 @@ impl State<'_> {
         farmer_stats.farming_tokens = farmer_stats.farming_tokens.checked_add(new_farming)?;
         self.save_raw_farmer_stats(ctx.storage, farmer, &farmer_stats)?;
 
-        Ok(new_farming)
+        Ok((new_farming, totals.xlp))
     }
 
     /// Update internal farming token balances to indicate a withdrawal of the given number of farming tokens.
     ///
-    /// Returns the amount of xLP tokens that were withdrawn.
+    /// Returns a tuple comprising:
+    /// 1. the amount of xLP tokens that were withdrawn
+    /// 2. The amount of farming tokens being burned
+    /// 3. The total amount of xLP in the contract after the withdrawal
     pub(crate) fn farming_withdraw(
         &self,
         ctx: &mut StateContext,
         farmer: &Addr,
         amount: Option<NonZero<FarmingToken>>,
-    ) -> Result<(LpToken, FarmingToken)> {
+    ) -> Result<(LpToken, FarmingToken, LpToken)> {
         let mut farmer_stats = match self.load_raw_farmer_stats(ctx.storage, farmer)? {
             None => bail!("Unable to withdraw, {} does not exist", farmer),
             Some(farmer_stats) => farmer_stats,
@@ -177,7 +181,7 @@ impl State<'_> {
         farmer_stats.farming_tokens = farmer_stats.farming_tokens.checked_sub(amount)?;
         self.save_raw_farmer_stats(ctx.storage, farmer, &farmer_stats)?;
 
-        Ok((removed_xlp, amount))
+        Ok((removed_xlp, amount, totals.xlp))
     }
 
     /// Query the xLP token balance for the farming contract
