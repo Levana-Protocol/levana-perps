@@ -171,7 +171,7 @@ impl ResponseBuilder {
                 let data = to_binary(data)?;
                 self.resp.data = Some(data);
             }
-            Some(_) => bail!("data already exists, use update_data instead"),
+            Some(_) => anyhow::bail!("data already exists, use update_data instead"),
         }
 
         Ok(())
