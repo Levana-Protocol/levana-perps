@@ -12,6 +12,7 @@ use cosmos::Wallet;
 use cosmwasm_std::Decimal256;
 use parking_lot::RwLock;
 use reqwest::Client;
+use tokio::sync::Mutex;
 
 use crate::app::factory::{get_factory_info_mainnet, get_factory_info_testnet};
 use crate::cli::Opt;
@@ -63,6 +64,8 @@ pub(crate) struct App {
     pub(crate) statuses: TaskStatuses,
     pub(crate) live_since: DateTime<Utc>,
     pub(crate) gases: RwLock<HashMap<Address, GasRecords>>,
+    /// Ensure that the crank and price bots don't try to work at the same time
+    pub(crate) crank_lock: Mutex<()>,
 }
 
 /// Helper data structure for building up an application.
@@ -129,6 +132,7 @@ impl Opt {
             live_since: Utc::now(),
             gases: RwLock::new(HashMap::new()),
             frontend_info_testnet,
+            crank_lock: Mutex::new(()),
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {
