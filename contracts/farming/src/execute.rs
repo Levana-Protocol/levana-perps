@@ -140,7 +140,7 @@ impl State<'_> {
                 let lp_amount = NonZero::try_from_decimal(lp.into_decimal256())
                     .with_context(|| "unable to convert lp amount")?;
                 let stake_lp_msg = &MarketExecuteMsg::StakeLp {
-                    amount: Some(lp_amount)
+                    amount: Some(lp_amount),
                 };
 
                 let xlp = self.query_xlp_balance()?;

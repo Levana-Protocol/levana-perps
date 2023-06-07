@@ -1505,7 +1505,8 @@ impl PerpsMarket {
         wallet: &Addr,
         amount: NonZero<LpToken>,
     ) -> Result<AppResponse> {
-        self.exec_mint_and_deposit_liquidity(wallet, amount.into_number()).unwrap();
+        self.exec_mint_and_deposit_liquidity(wallet, amount.into_number())
+            .unwrap();
         self.exec_liquidity_token_send(
             LiquidityTokenKind::Lp,
             wallet,
