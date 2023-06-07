@@ -1,3 +1,20 @@
-# FIXME need to put in settings as part of PERP-1392
 markets:
-  ETH_USD: {}
+  ETH_USD:
+    delta_neutrality_fee_sensitivity: 1000000000
+    # Initial deployment to mainnet probably wants a modified max_liquidity too
+    # Not setting here since it shouldn't be used for testnet deploys
+
+  # Internal testing contracts, not yet on mainnet
+  ATOM_USD:
+    delta_neutrality_fee_sensitivity: 200000000
+
+  # Currently only used on CI versions of contracts
+  OSMO_USDC:
+    max_leverage: 10
+    carry_leverage: 9
+    delta_neutrality_fee_cap: 0.015
+    delta_neutrality_fee_sensitivity: 50000000
+  ETH_BTC:
+    delta_neutrality_fee_sensitivity: 1000000000
+  BTC_USD:
+    delta_neutrality_fee_sensitivity: 5000000000

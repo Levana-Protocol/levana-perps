@@ -88,6 +88,7 @@ impl Opt {
             pyth: _,
             explorer,
             rpc_nodes,
+            gas_multiplier,
         } = ChainConfig::load(network)?;
         let partial = match &testnet.deployment_config {
             Some(s) => serde_yaml::from_str(s)?,
@@ -98,6 +99,8 @@ impl Opt {
         let faucet = faucet.with_context(|| format!("No faucet found for {network}"))?;
         let (faucet_bot, faucet_bot_runner) =
             FaucetBot::new(faucet_bot_wallet, testnet.hcaptcha_secret.clone(), faucet);
+
+        let gas_multiplier = testnet.gas_multiplier.or(*gas_multiplier);
 
         let testnet = BotConfigTestnet {
             tracker: tracker.with_context(|| format!("No tracker found for {network}"))?,
@@ -164,7 +167,7 @@ impl Opt {
                 None
             },
             watcher: partial.watcher.clone(),
-            gas_multiplier: partial.gas_multiplier,
+            gas_multiplier,
             pyth_endpoint: pyth_config.endpoint.clone(),
             execs_per_price: partial.execs_per_price,
         };

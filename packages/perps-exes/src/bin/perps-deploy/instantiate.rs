@@ -1,7 +1,7 @@
 use std::{collections::HashSet, str::FromStr};
 
 use anyhow::{Context, Result};
-use cosmos::{Address, CodeId, HasAddress};
+use cosmos::{Address, CodeId, ContractAdmin, HasAddress};
 use msg::contracts::market::entry::ExecuteOwnerMsg;
 use msg::contracts::pyth_bridge::PythMarketPriceFeeds;
 use msg::prelude::*;
@@ -13,6 +13,7 @@ use msg::{
     },
     token::TokenInit,
 };
+use perps_exes::config::MarketConfigUpdates;
 
 use crate::app::PythInfo;
 use crate::store_code::PYTH_BRIDGE;
@@ -44,6 +45,7 @@ pub(crate) struct InstantiateOpt {
 pub(crate) async fn go(opt: Opt, inst_opt: InstantiateOpt) -> Result<()> {
     let app = opt.load_app(&inst_opt.family).await?;
     let is_prod = inst_opt.prod;
+    let configs = MarketConfigUpdates::load()?;
 
     instantiate(InstantiateParams {
         opt: &opt,
@@ -54,25 +56,31 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateOpt) -> Result<()> {
             .market_id
             .unwrap_or_else(|| app.default_market_ids.clone())
             .into_iter()
-            .map(|market_id| InstantiateMarket {
-                price_source: app
-                    .pyth_info
-                    .as_ref()
-                    .and_then(|pyth| pyth.markets.get(&market_id))
-                    .cloned()
-                    .map_or(PriceSource::Manual, PriceSource::Pyth),
-                cw20_source: Cw20Source::Faucet(app.faucet.clone()),
-                market_id,
+            .map(|market_id| {
+                anyhow::Ok(InstantiateMarket {
+                    price_source: app
+                        .pyth_info
+                        .as_ref()
+                        .and_then(|pyth| pyth.markets.get(&market_id))
+                        .cloned()
+                        .map_or(PriceSource::Manual, PriceSource::Pyth),
+                    cw20_source: Cw20Source::Faucet(app.faucet.clone()),
+                    config: {
+                        let mut config = configs
+                            .markets
+                            .get(&market_id)
+                            .with_context(|| format!("No config found for {market_id}"))?
+                            .clone();
+
+                        if app.dev_settings {
+                            config.unstake_period_seconds = Some(60 * 60);
+                        }
+                        config
+                    },
+                    market_id,
+                })
             })
-            .collect(),
-        market_config_update: if app.dev_settings {
-            Some(ConfigUpdate {
-                unstake_period_seconds: Some(60 * 60),
-                ..Default::default()
-            })
-        } else {
-            None
-        },
+            .collect::<Result<_>>()?,
         trading_competition: app.trading_competition,
         faucet_admin: Some(app.wallet_manager),
         price_admin: app.price_admin,
@@ -128,7 +136,6 @@ pub(crate) struct InstantiateParams<'a> {
     pub(crate) code_id_source: CodeIdSource,
     pub(crate) family: String,
     pub(crate) markets: Vec<InstantiateMarket>,
-    pub(crate) market_config_update: Option<ConfigUpdate>,
     pub(crate) trading_competition: bool,
     /// Address that should be set as a faucet admin
     pub(crate) faucet_admin: Option<Address>,
@@ -144,6 +151,7 @@ pub(crate) struct InstantiateMarket {
     pub(crate) market_id: MarketId,
     pub(crate) cw20_source: Cw20Source,
     pub(crate) price_source: PriceSource,
+    pub(crate) config: ConfigUpdate,
 }
 
 pub(crate) async fn instantiate(
@@ -157,7 +165,6 @@ pub(crate) async fn instantiate(
                 chain_config: _,
             },
         code_id_source,
-        market_config_update,
         trading_competition,
         faucet_admin,
         price_admin,
@@ -214,6 +221,7 @@ pub(crate) async fn instantiate(
                 wind_down: wallet.get_address_string().into(),
                 label_suffix: Some(label_suffix),
             },
+            ContractAdmin::Sender,
         )
         .await?;
     log::info!("New factory deployed at {factory}");
@@ -235,6 +243,7 @@ pub(crate) async fn instantiate(
                         pyth: pyth_info.address.to_string().into(),
                         update_age_tolerance_seconds: pyth_info.update_age_tolerance,
                     },
+                    ContractAdmin::Sender,
                 )
                 .await?;
             log::info!(
@@ -253,6 +262,7 @@ pub(crate) async fn instantiate(
         market_id,
         cw20_source,
         price_source,
+        config,
     } in markets
     {
         log::info!(
@@ -375,7 +385,7 @@ pub(crate) async fn instantiate(
                         token: TokenInit::Cw20 {
                             addr: cw20.get_address_string().into(),
                         },
-                        config: market_config_update.clone(),
+                        config: Some(config),
                         price_admin,
                         initial_borrow_fee_rate,
                     },

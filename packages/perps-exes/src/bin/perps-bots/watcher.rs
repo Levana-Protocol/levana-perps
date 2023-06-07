@@ -274,7 +274,8 @@ impl AppBuilder {
                     Err(err) => {
                         log::warn!("{label}: Error: {err:?}");
                         retries += 1;
-                        if retries >= app.config.watcher.retries {
+                        let max_retries = config.retries.unwrap_or(app.config.watcher.retries);
+                        if retries >= max_retries {
                             retries = 0;
                             *task_status.write() = TaskStatus {
                                 last_result: TaskResult {
@@ -301,7 +302,10 @@ impl AppBuilder {
                             }
 
                             tokio::time::sleep(tokio::time::Duration::from_secs(
-                                app.config.watcher.delay_between_retries.into(),
+                                config
+                                    .delay_between_retries
+                                    .unwrap_or(app.config.watcher.delay_between_retries)
+                                    .into(),
                             ))
                             .await;
                         }

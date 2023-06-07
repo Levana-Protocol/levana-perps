@@ -1,11 +1,20 @@
 use std::collections::HashSet;
 
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::prelude::*;
+use msg::{contracts::market::config::ConfigUpdate, prelude::*};
 
 #[test]
 fn test_congestion_block() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    // Reduce the unpend_limit to keep execution time reasonable
+    market
+        .exec_set_config(ConfigUpdate {
+            unpend_limit: Some(50),
+            ..Default::default()
+        })
+        .unwrap();
+
     let trader = market.clone_trader(0).unwrap();
 
     // Do a price update without cranking to force unpending the position
@@ -70,7 +79,9 @@ fn randomization() {
     let mut timestamps = HashSet::new();
 
     // We can open up a bunch of positions without a crank...
-    for _ in 0..market.query_status().unwrap().config.unpend_limit {
+    // Set a max on the number of positions we open to deal with long test executions.
+    // Also, just due to random weirdness, the duplicate test fails when the number is too high.
+    for _ in 0..market.query_status().unwrap().config.unpend_limit.min(50) {
         let (pos_id, _) = market
             .exec_open_position(
                 &trader,

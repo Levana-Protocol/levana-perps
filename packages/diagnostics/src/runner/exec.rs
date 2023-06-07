@@ -333,7 +333,8 @@ where
     async fn query_position(&self, pos_id: PositionId) -> Result<Option<PositionQueryResponse>> {
         let msg = QueryMsg::Positions {
             position_ids: vec![pos_id],
-            skip_calc_pending_fees: false,
+            skip_calc_pending_fees: Some(false),
+            fees: None,
         };
         let mut resp = self.bridge.query_market::<PositionsResp>(msg).await?;
 

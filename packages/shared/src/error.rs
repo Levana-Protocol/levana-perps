@@ -71,6 +71,7 @@ pub enum ErrorId {
     MinimumDeposit,
     Congestion,
     MaxLiquidity,
+    InvalidTriggerPrice,
 }
 
 /// Source within the protocol for the error

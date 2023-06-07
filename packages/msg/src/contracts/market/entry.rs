@@ -410,8 +410,21 @@ pub enum QueryMsg {
         /// Positions to query.
         position_ids: Vec<PositionId>,
         /// Should we skip calculating pending fees?
-        #[serde(default)]
-        skip_calc_pending_fees: bool,
+        ///
+        /// This field is ignored if `fees` is set.
+        ///
+        /// The default for this field is `false`. The behavior of this field is:
+        ///
+        /// * `true`: the same as [PositionsQueryFeeApproach::NoFees]
+        ///
+        /// * `false`: the same as [PositionsQueryFeeApproach::AllFees] (though see note on that variant, this default will likely change in the future).
+        ///
+        /// It is recommended _not_ to use this field going forward, and to instead use `fees`.
+        skip_calc_pending_fees: Option<bool>,
+        /// How do we calculate fees for this position?
+        ///
+        /// Any value here will override the `skip_calc_pending_fees` field.
+        fees: Option<PositionsQueryFeeApproach>,
     },
 
     /// * returns [LimitOrderResp]
@@ -568,6 +581,24 @@ pub enum QueryMsg {
         /// should only be supplied if querying the fee for close or update
         pos_delta_neutrality_fee_margin: Option<Collateral>,
     },
+}
+
+/// When querying an open position, how do we calculate PnL vis-a-vis fees?
+#[cw_serde]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Copy, Eq)]
+pub enum PositionsQueryFeeApproach {
+    /// Do not include any pending fees
+    NoFees,
+    /// Include accumulated fees (borrow and funding rates), but do not include future fees (specifically DNF).
+    Accumulated,
+    /// Include the DNF fee in addition to accumulated fees.
+    ///
+    /// This gives an idea of "what will be my PnL if I close my position right
+    /// now." To keep compatibility with previous contract APIs, this is the
+    /// default behavior. However, going forward, `Accumulated` should be
+    /// preferred, and will eventually become the default.
+    AllFees,
 }
 
 /// Placeholder migration message
@@ -839,6 +870,7 @@ impl QueryMsg {
             3 => Ok(Self::Positions {
                 position_ids: u.arbitrary()?,
                 skip_calc_pending_fees: u.arbitrary()?,
+                fees: u.arbitrary()?,
             }),
 
             4 => Ok(Self::LimitOrder {
