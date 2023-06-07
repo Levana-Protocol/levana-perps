@@ -75,8 +75,18 @@ async fn single_market(
         .locked
         .into_decimal256()
         .checked_div(total.into_decimal256())?;
+    let max_util = status
+        .config
+        .target_utilization
+        .raw()
+        .checked_add_signed(worker.config.max_util_delta)?;
+    let min_util = status
+        .config
+        .target_utilization
+        .raw()
+        .checked_add_signed(worker.config.min_util_delta)?;
 
-    if util > worker.config.max_util {
+    if util > max_util {
         let positions = market
             .get_some_positions(worker.wallet.get_address(), Some(20))
             .await?;
@@ -96,7 +106,7 @@ async fn single_market(
                 message,
             })
         }
-    } else if util < worker.config.min_util {
+    } else if util < min_util {
         log::info!("Low utilization ratio, opening positions.");
 
         let balance = market
@@ -139,10 +149,18 @@ async fn single_market(
         };
 
         // Determine how large a position we would need to open to hit the midpoint of min and max utilization
-        let mid_util = worker
+        let min_util = status
             .config
-            .min_util
-            .checked_add(worker.config.max_util)?
+            .target_utilization
+            .raw()
+            .checked_add_signed(worker.config.min_util_delta)?;
+        let max_util = status
+            .config
+            .target_utilization
+            .raw()
+            .checked_add_signed(worker.config.max_util_delta)?;
+        let mid_util = min_util
+            .checked_add(max_util)?
             .checked_div("2".parse().unwrap())?;
         let extra_util = mid_util.checked_sub(util)?;
         let desired_counter_collateral = NonZero::new(total.checked_mul_dec(extra_util)?)

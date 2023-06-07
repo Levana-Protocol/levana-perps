@@ -13,7 +13,7 @@ pub(super) fn min_gas_in_gas_wallet() -> u128 {
 }
 
 pub(super) fn retries() -> usize {
-    4
+    6
 }
 
 pub(super) fn delay_between_retries() -> u32 {

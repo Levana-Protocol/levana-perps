@@ -157,33 +157,39 @@ impl State<'_> {
         upper_bound: Option<Price>,
         upper_bound_base: Option<PriceBaseInQuote>,
         market_type: MarketType,
-        name: &str,
+        trigger_type: TriggerType,
     ) -> Result<()> {
         let (lower_bound_comparison, upper_bound_comparison) = match market_type {
-            MarketType::CollateralIsQuote => ("greater", "less"),
-            MarketType::CollateralIsBase => ("less", "greater"),
+            MarketType::CollateralIsQuote => {
+                (TriggerPriceMustBe::Greater, TriggerPriceMustBe::Less)
+            }
+            MarketType::CollateralIsBase => (TriggerPriceMustBe::Less, TriggerPriceMustBe::Greater),
         };
 
         if let Some(lower_bound) = lower_bound {
-            anyhow::ensure!(
-                order_price > lower_bound,
-                "{} trigger {} must be {} than {}",
-                name,
-                order_price_base,
-                lower_bound_comparison,
-                lower_bound_base.ok_or_else(|| anyhow!("no external lower bound provided"))?
-            )
+            if order_price <= lower_bound {
+                return Err(MarketError::InvalidTriggerPrice {
+                    specified: order_price_base,
+                    bound: lower_bound_base
+                        .ok_or_else(|| anyhow!("no external lower bound provided"))?,
+                    must_be: lower_bound_comparison,
+                    trigger_type,
+                }
+                .into_anyhow());
+            }
         }
 
         if let Some(upper_bound) = upper_bound {
-            anyhow::ensure!(
-                order_price < upper_bound,
-                "{} trigger {} must be {} than {}",
-                name,
-                order_price_base,
-                upper_bound_comparison,
-                upper_bound_base.ok_or_else(|| anyhow!("no external upper bound provided"))?
-            )
+            if order_price >= upper_bound {
+                return Err(MarketError::InvalidTriggerPrice {
+                    specified: order_price_base,
+                    bound: upper_bound_base
+                        .ok_or_else(|| anyhow!("no external upper bound provided"))?,
+                    must_be: upper_bound_comparison,
+                    trigger_type,
+                }
+                .into_anyhow());
+            }
         }
 
         Ok(())
@@ -207,7 +213,7 @@ impl State<'_> {
                         Some(current_price.price_notional),
                         Some(current_price.price_base),
                         market_type,
-                        "Stop loss",
+                        TriggerType::StopLoss,
                     )?;
                 }
                 DirectionToNotional::Short => {
@@ -220,7 +226,7 @@ impl State<'_> {
                         pos.liquidation_price
                             .map(|price| price.into_base_price(market_type)),
                         market_type,
-                        "Stop loss",
+                        TriggerType::StopLoss,
                     )?;
                 }
             }
@@ -237,7 +243,7 @@ impl State<'_> {
                     pos.take_profit_price
                         .map(|price| price.into_base_price(market_type)),
                     market_type,
-                    "Take profit",
+                    TriggerType::TakeProfit,
                 )?,
                 DirectionToNotional::Short => self.validate_order_price(
                     take_profit_override.into_notional_price(market_type),
@@ -248,7 +254,7 @@ impl State<'_> {
                     Some(current_price.price_notional),
                     Some(current_price.price_base),
                     market_type,
-                    "Take profit",
+                    TriggerType::TakeProfit,
                 )?,
             }
         }

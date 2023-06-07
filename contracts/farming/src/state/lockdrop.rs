@@ -139,34 +139,22 @@ impl State<'_> {
         bucket_id: LockdropBucketId,
         amount: NonZero<Collateral>,
     ) -> Result<()> {
-        match *period_resp {
-            FarmingPeriodResp::Sunset { .. } => {
-                let balance = LockdropBuckets::get_balance(storage, bucket_id, user)?;
+        if let FarmingPeriodResp::Sunset { .. } = *period_resp {
+            let balance = LockdropBuckets::get_balance(storage, bucket_id, user)?;
 
-                // INVARIANT: the max that can ever be withdrawn during sunset period is half_balance_before_sunset
-                // multiple withdrawals accumulate in withdrawal_after_sunset, but this max is never surpassed
-                // therefore the available `amount` can never be negative
-                let balance_before_sunset =
-                    balance.deposit_before_sunset - balance.withdrawal_before_sunset;
-                let half_balance_before_sunset =
-                    balance_before_sunset.into_decimal256() / Decimal256::two();
-                let available =
-                    half_balance_before_sunset - balance.withdrawal_after_sunset.into_decimal256();
+            // INVARIANT: the max that can ever be withdrawn during sunset period is half_balance_before_sunset
+            // multiple withdrawals accumulate in withdrawal_after_sunset, but this max is never surpassed
+            // therefore the available `amount` can never be negative
+            let balance_before_sunset =
+                balance.deposit_before_sunset - balance.withdrawal_before_sunset;
+            let half_balance_before_sunset =
+                balance_before_sunset.into_decimal256() / Decimal256::two();
+            let available =
+                half_balance_before_sunset - balance.withdrawal_after_sunset.into_decimal256();
 
-                if amount.into_decimal256() >= available {
-                    bail!("can only withdraw up to half of the original lockdrop deposit during sunset period. requested {amount}, available: {available}");
-                }
+            if amount.into_decimal256() >= available {
+                bail!("can only withdraw up to half of the original lockdrop deposit during sunset period. requested {amount}, available: {available}");
             }
-            FarmingPeriodResp::Launched { started_at } => {
-                let ready_at = started_at + LockdropBuckets::get_duration(storage, bucket_id)?;
-
-                if self.now() < ready_at {
-                    bail!(
-                        "can only withdraw after the lockdrop period is over. ready at: {ready_at}"
-                    );
-                }
-            }
-            _ => {}
         }
 
         Ok(())

@@ -102,7 +102,7 @@ impl State<'_> {
                     CrankWorkInfo::Liquidation {
                         position: pos.id,
                         liquidation_reason: pos.reason,
-                        price_point_timestamp: price_point.timestamp,
+                        price_point,
                     }
                 } else if let Some(order_id) =
                     self.limit_order_triggered_order(store, price_point.price_notional)?
@@ -132,23 +132,22 @@ impl State<'_> {
         }
         .into();
 
-        let mut real_cranks = 0;
+        let mut actual = vec![];
         for _ in 0..n_execs {
             match self.crank_work(ctx.storage)? {
                 None => break,
                 Some(work_info) => {
+                    actual.push(work_info.clone());
                     self.crank_exec(ctx, work_info)?;
-                    real_cranks += 1;
                 }
             };
         }
 
+        self.allocate_crank_fees(ctx, rewards, actual.len().try_into()?)?;
         ctx.response_mut().add_event(CrankExecBatchEvent {
             requested: n_execs,
-            actual: real_cranks.into(),
+            actual,
         });
-
-        self.allocate_crank_fees(ctx, rewards, real_cranks)?;
 
         Ok(())
     }
@@ -211,7 +210,7 @@ impl State<'_> {
             CrankWorkInfo::Liquidation {
                 position,
                 liquidation_reason,
-                price_point_timestamp,
+                price_point,
             } => {
                 let pos = get_position(ctx.storage, position)?;
 
@@ -224,7 +223,7 @@ impl State<'_> {
                         pos,
                         exposure: Signed::zero(),
                         close_time: ends_at,
-                        settlement_time: price_point_timestamp,
+                        settlement_time: price_point.timestamp,
                         reason: PositionCloseReason::Liquidated(liquidation_reason),
                     },
                     MaybeClosedPosition::Close(x) => x,
