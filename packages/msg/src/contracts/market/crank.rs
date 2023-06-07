@@ -32,8 +32,8 @@ pub enum CrankWorkInfo {
         position: PositionId,
         /// Reason for the liquidation
         liquidation_reason: LiquidationReason,
-        /// Timestamp of price update that triggered the liquidation
-        price_point_timestamp: Timestamp,
+        /// price point that triggered the liquidation
+        price_point: PricePoint,
     },
     /// Limit order can be opened
     LimitOrder {
@@ -125,8 +125,8 @@ pub mod events {
                 CrankWorkInfo::Liquidation {
                     position,
                     liquidation_reason: _,
-                    price_point_timestamp,
-                } => (Some(position), None, Some(price_point_timestamp)),
+                    price_point,
+                } => (Some(position), None, Some(price_point.timestamp)),
                 CrankWorkInfo::Liquifunding { position } => (Some(position), None, None),
                 CrankWorkInfo::UnpendLiquidationPrices { position } => (Some(position), None, None),
                 CrankWorkInfo::LimitOrder { order_id } => (None, Some(order_id), None),
@@ -138,6 +138,17 @@ pub mod events {
             if let Some(price_point_timestamp) = price_point_timestamp {
                 event =
                     event.add_attribute("price-point-timestamp", price_point_timestamp.to_string());
+            }
+
+            if let CrankWorkInfo::Liquidation {
+                price_point,
+                liquidation_reason,
+                ..
+            } = src
+            {
+                event = event
+                    .add_attribute("price-point", serde_json::to_string(&price_point).unwrap())
+                    .add_attribute("liquidation-reason", liquidation_reason.to_string());
             }
 
             if let Some(order_id) = order_id {
@@ -156,6 +167,7 @@ pub mod events {
                 || -> anyhow::Result<PositionId> { Ok(PositionId::new(evt.u64_attr("pos-id")?)) };
 
             let get_price_point_timestamp = || evt.timestamp_attr("price-point-timestamp");
+            let get_price_point = || evt.json_attr("price-point");
 
             let get_liquidation_reason = || -> anyhow::Result<LiquidationReason> {
                 match evt.string_attr("liquidation-reason")?.as_str() {
@@ -175,7 +187,7 @@ pub mod events {
                 "liquidation" => Ok(CrankWorkInfo::Liquidation {
                     position: get_position_id()?,
                     liquidation_reason: get_liquidation_reason()?,
-                    price_point_timestamp: get_price_point_timestamp()?,
+                    price_point: get_price_point()?,
                 }),
                 "unpend-liquidation-prices" => Ok(CrankWorkInfo::UnpendLiquidationPrices {
                     position: get_position_id()?,
