@@ -142,3 +142,85 @@ fn test_emissions_multiple_lps() {
     assert_eq!(lp1_stats.emission_rewards, "50".parse().unwrap());
     assert_eq!(lp2_stats.emission_rewards, "50".parse().unwrap());
 }
+
+#[test]
+fn test_deposit_collateral() {
+    // Setup
+
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let mut market = PerpsMarket::new(app_cell).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+
+    market.automatic_time_jump_enabled = false;
+
+    market.exec_farming_start_lockdrop(None).unwrap();
+    market.set_time(TimeJump::Hours(24 * 365)).unwrap();
+    market.exec_farming_start_launch().unwrap();
+
+    // Deposit & assert
+
+    let farming_stats_before = market.query_farming_stats();
+    market
+        .exec_farming_deposit_collateral(&lp, "100".parse().unwrap())
+        .unwrap();
+
+    let farmer_stats = market.query_farming_farmer_stats(&lp).unwrap();
+    assert_eq!(farmer_stats.farming_tokens, "100".parse().unwrap());
+
+    let farming_stats_after = market.query_farming_stats();
+    assert_eq!(
+        farming_stats_after.xlp,
+        farming_stats_before
+            .xlp
+            .checked_add("100".parse().unwrap())
+            .unwrap()
+    );
+    assert_eq!(
+        farming_stats_after.farming_tokens,
+        farming_stats_before
+            .farming_tokens
+            .checked_add("100".parse().unwrap())
+            .unwrap()
+    );
+}
+
+#[test]
+fn test_deposit_lp() {
+    // Setup
+
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let mut market = PerpsMarket::new(app_cell).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+
+    market.automatic_time_jump_enabled = false;
+
+    market.exec_farming_start_lockdrop(None).unwrap();
+    market.set_time(TimeJump::Hours(24 * 365)).unwrap();
+    market.exec_farming_start_launch().unwrap();
+
+    // Deposit & assert
+
+    let farming_stats_before = market.query_farming_stats();
+    market
+        .exec_farming_deposit_lp(&lp, "100".parse().unwrap())
+        .unwrap();
+
+    let farmer_stats = market.query_farming_farmer_stats(&lp).unwrap();
+    assert_eq!(farmer_stats.farming_tokens, "100".parse().unwrap());
+
+    let farming_stats_after = market.query_farming_stats();
+    assert_eq!(
+        farming_stats_after.xlp,
+        farming_stats_before
+            .xlp
+            .checked_add("100".parse().unwrap())
+            .unwrap()
+    );
+    assert_eq!(
+        farming_stats_after.farming_tokens,
+        farming_stats_before
+            .farming_tokens
+            .checked_add("100".parse().unwrap())
+            .unwrap()
+    );
+}

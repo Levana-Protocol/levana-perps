@@ -226,6 +226,7 @@ impl State<'_> {
         if stake_to_xlp {
             self.liquidity_stake_lp(ctx, lp_addr, Some(lp_shares))?;
         }
+
         Ok(())
     }
 

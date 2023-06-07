@@ -79,6 +79,7 @@
           <div class="panel panel-default">
             <h2 id="{{ status.label.ident() }}">{{ status.label }}</h2>
             <p>Status: {{ status.short.as_str() }} <i>{{ status.status.last_result.since() }}</i></p>
+            <p>Successes: {{ status.status.counts.successes }}. Retries: {{ status.status.counts.retries }}. Errors: {{ status.status.counts.errors }}.</p>
             {% if let Some(started) = status.status.current_run_started.as_ref() %}
               <p>Currently running, started at {{ started }}</p>
             {% endif %}
