@@ -58,6 +58,7 @@ where
 
     /// Save an item
     pub(crate) fn save(&self, store: &mut dyn Storage, data: &T) -> Result<()> {
+        debug_assert!(self.item.may_load(store)?.is_none());
         self.item.save(store, data).map_err(|err| err.into())
     }
 }
@@ -70,8 +71,10 @@ pub(crate) const EPHEMERAL_BONUS_FUND: EphemeralReplyData<Collateral> = Ephemera
 
 #[derive(Serialize, Deserialize)]
 pub(crate) struct DepositReplyData {
+    /// The address of the farmer who deposited Collateral or LP
     pub(crate) farmer: Addr,
-    pub(crate) xlp: LpToken,
+    /// The xLP balance before the farming contract sends the Collateral or LP
+    pub(crate) xlp_balance_before: LpToken,
 }
 
 /// The address of the farmer who sent the [ExecuteMsg::Deposit] msg with Collateral instead of xLP.
