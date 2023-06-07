@@ -437,7 +437,10 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
     match msg {
         QueryMsg::Version {} => get_contract_version(store)?.query_result(),
 
-        QueryMsg::Status {} => state.status(store)?.query_result(),
+        QueryMsg::Status { price } => {
+            state.override_current_price(store, price)?;
+            state.status(store)?.query_result()
+        }
 
         QueryMsg::SpotPrice { timestamp } => state.spot_price(store, timestamp)?.query_result(),
         QueryMsg::SpotPriceHistory {
@@ -459,7 +462,10 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             position_ids,
             skip_calc_pending_fees,
             fees,
+            price,
         } => {
+            state.override_current_price(store, price)?;
+
             let mut closed = vec![];
             let mut positions = vec![];
             let mut pending_close = vec![];
@@ -606,14 +612,22 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             )?
             .query_result(),
 
-        QueryMsg::LpInfo { liquidity_provider } => state
-            .lp_info(store, &liquidity_provider.validate(state.api)?)?
-            .query_result(),
+        QueryMsg::LpInfo {
+            liquidity_provider,
+            price,
+        } => {
+            state.override_current_price(store, price)?;
+            state
+                .lp_info(store, &liquidity_provider.validate(state.api)?)?
+                .query_result()
+        }
 
         QueryMsg::DeltaNeutralityFee {
             notional_delta,
             pos_delta_neutrality_fee_margin,
+            price,
         } => {
+            state.override_current_price(store, price)?;
             let price = state.spot_price(store, None)?;
             let fees = state.calc_delta_neutrality_fee(
                 store,

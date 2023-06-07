@@ -317,7 +317,7 @@ fn position_update_open_interest_inner(
     expected_notional_size_updated: Signed<Notional>,
 ) {
     let query_notional_interest = || -> (Notional, Notional) {
-        let open_interest: StatusResp = market.query(&QueryMsg::Status {}).unwrap();
+        let open_interest: StatusResp = market.query(&QueryMsg::Status { price: None }).unwrap();
         match direction {
             DirectionToBase::Long => (open_interest.long_notional, open_interest.short_notional),
             DirectionToBase::Short => (open_interest.short_notional, open_interest.long_notional),
@@ -366,7 +366,7 @@ fn position_update_open_interest_inner(
 
     market.exec_close_position(&trader, pos_id, None).unwrap();
     let _pos = market.query_closed_position(&trader, pos.id).unwrap();
-    let open_interest: StatusResp = market.query(&QueryMsg::Status {}).unwrap();
+    let open_interest: StatusResp = market.query(&QueryMsg::Status { price: None }).unwrap();
 
     assert_eq!(open_interest.short_notional, Notional::zero());
     assert_eq!(open_interest.long_notional, Notional::zero());

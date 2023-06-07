@@ -72,7 +72,9 @@ impl App {
             next_crank,
             last_crank_completed,
             ..
-        } = market.query(market::entry::QueryMsg::Status {}).await?;
+        } = market
+            .query(market::entry::QueryMsg::Status { price: None })
+            .await?;
         if next_crank.is_none() {
             *activated = false;
             return Ok(WatchedTaskOutput {

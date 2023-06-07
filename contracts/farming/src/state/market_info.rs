@@ -39,7 +39,7 @@ impl MarketInfo {
         )?;
         let status: msg::contracts::market::entry::StatusResp = querier.query_wasm_smart(
             market_addr.clone(),
-            &msg::contracts::market::entry::QueryMsg::Status {},
+            &msg::contracts::market::entry::QueryMsg::Status { price: None },
         )?;
         let info = MarketInfo {
             addr: market_addr,
