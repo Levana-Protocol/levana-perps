@@ -12,7 +12,10 @@ use mock_nft::Metadata;
 use msg::contracts::hatching::{
     config::Config as HatchConfig,
     dragon_mint::DragonMintExtra,
-    entry::{ExecuteMsg as HatchExecMsg, MaybeHatchStatusResp, QueryMsg as HatchQueryMsg},
+    entry::{
+        ExecuteMsg as HatchExecMsg, MaybeHatchStatusResp, PotentialHatchInfo,
+        QueryMsg as HatchQueryMsg,
+    },
     NftRarity,
 };
 use msg::contracts::rewards::entry::ExecuteMsg::Claim;
@@ -197,6 +200,26 @@ async fn main() -> Result<()> {
                     dragon_extras,
                 )
                 .await?;
+
+                // query for the "potential hatch info"
+
+                let info: PotentialHatchInfo = hatch
+                    .contract
+                    .query(&HatchQueryMsg::PotentialHatchInfo {
+                        owner: hatch.wallet.address().to_string().into(),
+                        eggs: eggs.clone(),
+                        dusts: vec![],
+                        profile: true,
+                    })
+                    .await?;
+
+                println!(
+                    "hatching {} eggs, {} dusts, and profile is {}",
+                    info.eggs.len(),
+                    info.dusts.len(),
+                    info.profile.is_some()
+                );
+                assert_eq!(info.eggs.len(), eggs.len());
 
                 // hatch the egg
 
