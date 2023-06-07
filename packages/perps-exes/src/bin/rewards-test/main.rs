@@ -164,7 +164,7 @@ async fn main() -> Result<()> {
                 log::info!(
                     "re-hatching hatch id {} over ibc channel: {:#?}",
                     hatch_status.id,
-                    hatch.config.nft_mint_channel.unwrap()
+                    hatch.config.nft_mint_channel.as_ref().unwrap()
                 );
                 hatch
                     .contract
@@ -189,8 +189,9 @@ async fn main() -> Result<()> {
                     .map(|x| x.map_err(|e| e.into()))
                     .collect::<Result<Vec<_>>>()?;
 
-                let egg_token_id = mint_egg(
+                let eggs = mint_eggs(
                     &hatch,
+                    &opt,
                     "1.23".parse().unwrap(),
                     NftRarity::Ancient,
                     dragon_extras,
@@ -208,7 +209,7 @@ async fn main() -> Result<()> {
                             nft_mint_owner: nft_mint.wallet.address().to_string(),
                             lvn_grant_address: rewards.wallet.address().to_string(),
                             profile: true,
-                            eggs: vec![egg_token_id],
+                            eggs,
                             dusts: vec![],
                         },
                     )
@@ -263,10 +264,8 @@ async fn main() -> Result<()> {
                         })
                         .await
                     {
-                        Ok(resp) => {
+                        Ok(_) => {
                             log::info!("Token was minted!");
-                            log::info!("{:#?}", resp);
-
                             //todo maybe check ownership of NFT on minting chain (aka stargaze)
 
                             mint_success = true
@@ -323,6 +322,10 @@ async fn main() -> Result<()> {
                 }
 
                 if mint_success && reward_success {
+                    let resp = get_hatch_status(&hatch, true).await?.resp.unwrap();
+
+                    log::info!("hatch {} complete!", resp.id);
+                    log::info!("{:#?}", resp.status);
                     break;
                 } else {
                     tokio::time::sleep(tokio::time::Duration::from_secs(opt.ibc_sleep_seconds))
@@ -382,96 +385,109 @@ async fn get_hatch_status(hatch: &Hatch, details: bool) -> Result<MaybeHatchStat
         .await
 }
 
-async fn mint_egg(
+async fn mint_eggs(
     hatch: &Hatch,
+    opt: &HatchEggOpt,
     spirit_level: NumberGtZero,
     rarity: NftRarity,
     dragon_extras: Vec<DragonMintExtra>,
-) -> Result<String> {
+) -> Result<Vec<String>> {
     // mint the egg NFT
 
-    let mut token_id = None;
-    for dragon_extra in dragon_extras.iter() {
-        log::info!(
-            "minting mock nft egg w/ id {} and spirit level {}",
-            dragon_extra.id,
-            spirit_level
-        );
+    let mut token_ids = vec![];
+    let mut skip_offset = opt.mint_eggs_start_skip;
 
-        let res = hatch
-            .burn_egg_contract
-            .execute(
-                &hatch.nft_mint_admin_wallet,
-                vec![],
-                mock_nft::ExecuteMsg::Mint(Box::new(mock_nft::MintMsg {
-                    token_id: dragon_extra.id.clone(),
-                    owner: hatch.wallet.address().to_string(),
-                    token_uri: None,
-                    extension: Metadata::new_egg(spirit_level, rarity, dragon_extra.kind.clone()),
-                })),
-            )
-            .await;
+    for _ in 0..opt.mint_eggs_count {
+        let mut token_id = None;
+        for dragon_extra in dragon_extras.iter().skip(skip_offset) {
+            skip_offset += 1;
+            log::info!(
+                "minting mock nft egg w/ id {} and spirit level {}",
+                dragon_extra.id,
+                spirit_level
+            );
 
-        match res {
-            Ok(_) => {
-                token_id = Some(dragon_extra.id.clone());
-                break;
-            }
-            Err(err) => {
-                let s = err.root_cause().to_string();
-                if s.contains("remint a token") || s.contains("already claimed") {
-                    log::warn!(
-                        "token {} was already minted or claimed, trying the next one...",
-                        dragon_extra.id
-                    );
-                } else {
-                    return Err(err);
+            let res = hatch
+                .burn_egg_contract
+                .execute(
+                    &hatch.nft_mint_admin_wallet,
+                    vec![],
+                    mock_nft::ExecuteMsg::Mint(Box::new(mock_nft::MintMsg {
+                        token_id: dragon_extra.id.clone(),
+                        owner: hatch.wallet.address().to_string(),
+                        token_uri: None,
+                        extension: Metadata::new_egg(
+                            spirit_level,
+                            rarity,
+                            dragon_extra.kind.clone(),
+                        ),
+                    })),
+                )
+                .await;
+
+            match res {
+                Ok(_) => {
+                    token_id = Some(dragon_extra.id.clone());
+                    break;
+                }
+                Err(err) => {
+                    let s = err.root_cause().to_string();
+                    if s.contains("remint a token") || s.contains("already claimed") {
+                        log::warn!(
+                            "token {} was already minted or claimed, trying the next one...",
+                            dragon_extra.id
+                        );
+                    } else {
+                        return Err(err);
+                    }
                 }
             }
         }
+
+        let token_id = token_id.context("no token id found")?;
+
+        let nft_info: mock_nft::AllNftInfoResponse = hatch
+            .burn_egg_contract
+            .query(mock_nft::QueryMsg::AllNftInfo {
+                token_id: token_id.clone(),
+                include_expired: None,
+            })
+            .await?;
+
+        // make sure the owner is correct
+        assert_eq!(nft_info.access.owner, hatch.wallet.address().to_string());
+
+        // make sure the minted nft has the correct spirit level
+        let spirit_level_attr: NumberGtZero = nft_info
+            .info
+            .extension
+            .attributes
+            .iter()
+            .find_map(|a| {
+                if a.trait_type == "Spirit Level" {
+                    Some(a.value.parse().unwrap())
+                } else {
+                    None
+                }
+            })
+            .unwrap();
+
+        assert_eq!(spirit_level, spirit_level_attr);
+
+        log::info!(
+            "minted mock nft egg w/ id {} and spirit level {}",
+            token_id,
+            spirit_level
+        );
+        log::info!(
+            "hatching nft over ibc channel: {:#?}",
+            hatch.config.nft_mint_channel.as_ref().unwrap()
+        );
+
+        token_ids.push(token_id);
     }
 
-    let token_id = token_id.context("no token id found")?;
-
-    let nft_info: mock_nft::AllNftInfoResponse = hatch
-        .burn_egg_contract
-        .query(mock_nft::QueryMsg::AllNftInfo {
-            token_id: token_id.clone(),
-            include_expired: None,
-        })
-        .await?;
-
-    // make sure the owner is correct
-    assert_eq!(nft_info.access.owner, hatch.wallet.address().to_string());
-
-    // make sure the minted nft has the correct spirit level
-    let spirit_level_attr: NumberGtZero = nft_info
-        .info
-        .extension
-        .attributes
-        .iter()
-        .find_map(|a| {
-            if a.trait_type == "Spirit Level" {
-                Some(a.value.parse().unwrap())
-            } else {
-                None
-            }
-        })
-        .unwrap();
-
-    assert_eq!(spirit_level, spirit_level_attr);
-
-    log::info!(
-        "minted mock nft egg w/ id {} and spirit level {}",
-        token_id,
-        spirit_level
-    );
-    log::info!(
-        "hatching nft over ibc channel: {:#?}",
-        hatch.config.nft_mint_channel.as_ref().unwrap()
-    );
-
-    Ok(token_id)
+    Ok(token_ids)
 }
 
 async fn add_profile_spirit_level(hatch: &Hatch, spirit_level: NumberGtZero) -> Result<()> {
