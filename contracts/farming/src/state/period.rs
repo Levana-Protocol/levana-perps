@@ -1,5 +1,6 @@
 use cosmwasm_std::SubMsg;
 use msg::prelude::MarketExecuteMsg::DepositLiquidity;
+use msg::token::Token;
 use serde::{Deserialize, Serialize};
 
 use crate::prelude::*;
@@ -240,6 +241,29 @@ impl State<'_> {
                 );
             }
         }
+    }
+
+    pub(crate) fn handle_transfer_collateral_reply(&self, store: &mut dyn Storage) -> Result<()> {
+        let token = Token::Cw20 {
+            addr: self.market_info.xlp_addr.clone().into(),
+            decimal_places: LpToken::PRECISION,
+        };
+        let balance = token
+            .query_balance(&self.querier, &self.env.contract.address)
+            .map(Collateral::into_decimal256)
+            .map(LpToken::from_decimal256)?;
+        let mut totals = self.load_farming_totals(store)?;
+
+        anyhow::ensure!(
+            totals.xlp.is_zero(),
+            "After transferring lockdrop collateral, xLP is {}, should be zero",
+            totals.xlp
+        );
+
+        totals.xlp = balance;
+        self.save_farming_totals(store, &totals)?;
+
+        Ok(())
     }
 }
 

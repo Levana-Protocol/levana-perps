@@ -75,8 +75,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         ExecuteMsg::Withdraw { amount } => state.withdraw(&mut ctx, &sender, amount)?,
         ExecuteMsg::ClaimLockdropRewards {} => state.claim_lockdrop_rewards(&mut ctx, &sender)?,
         ExecuteMsg::ClaimEmissions {} => state.claim_lvn_emissions(&mut ctx, &sender)?,
-        ExecuteMsg::Reinvest {} => todo!(),
-        ExecuteMsg::TransferBonus {} => todo!(),
+        ExecuteMsg::Reinvest {} => state.reinvest_yield(&mut ctx)?,
+        ExecuteMsg::TransferBonus {} => state.transfer_bonus(&mut ctx)?,
     }
 
     Ok(ctx.response.into_response())
@@ -89,24 +89,10 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
     match ReplyId::try_from(msg.id) {
         Ok(id) => match id {
             ReplyId::TransferCollateral => {
-                let token = Token::Cw20 {
-                    addr: state.market_info.xlp_addr.clone().into(),
-                    decimal_places: LpToken::PRECISION,
-                };
-                let balance = token
-                    .query_balance(&state.querier, &state.env.contract.address)
-                    .map(Collateral::into_decimal256)
-                    .map(LpToken::from_decimal256)?;
-                let mut totals = state.load_farming_totals(ctx.storage)?;
-
-                anyhow::ensure!(
-                    totals.xlp.is_zero(),
-                    "After transferring lockdrop collateral, xLP is {}, should be zero",
-                    totals.xlp
-                );
-
-                totals.xlp = balance;
-                state.save_farming_totals(ctx.storage, &totals)?;
+                state.handle_transfer_collateral_reply(ctx.storage)?;
+            }
+            ReplyId::ReinvestYield => {
+                state.handle_reinvest_yield_reply(ctx.storage)?;
             }
         },
         _ => {

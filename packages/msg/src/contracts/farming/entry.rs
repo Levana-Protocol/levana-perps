@@ -23,7 +23,7 @@ pub struct InstantiateMsg {
     pub lockdrop_buckets: Vec<LockdropBucketConfig>,
     /// The amount of real yield taken for the bonus fund
     #[serde(default = "defaults::bonus_ratio")]
-    pub bonus_ratio: NonZero<Decimal256>,
+    pub bonus_ratio: Decimal256,
     /// The address that receives bonus transfers.
     pub bonus_addr: RawAddr,
     /// How long LVN rewards from the lockdrop take to linearly unlock
@@ -334,7 +334,7 @@ pub struct LockdropBucketStats {
     pub deposit: Collateral,
     /// If we are in the [FarmingStatus::Launched] state, the timestamp when
     /// this will unlock.
-    pub unlocks: Option<Timestamp>,
+    pub unlocks_at: Option<Timestamp>,
 }
 
 /// Stats on a specific farmer

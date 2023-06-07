@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use cosmwasm_std::Uint128;
+use levana_perpswap_multi_test::config::{DEFAULT_MARKET, TEST_CONFIG};
 use msg::contracts::cw20::entry::{QueryMsg as Cw20QueryMsg, TokenInfoResponse};
 use msg::contracts::farming::entry::defaults::lockdrop_month_seconds;
 use msg::contracts::farming::entry::{
@@ -8,7 +9,12 @@ use msg::contracts::farming::entry::{
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 
 fn setup_lockdrop() -> (PerpsMarket, Vec<LockdropBucketConfig>, [Addr; 3]) {
-    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let mut market = PerpsMarket::new_with_type(
+        PerpsApp::new_cell().unwrap(),
+        DEFAULT_MARKET.collateral_type,
+        false,
+    )
+    .unwrap();
     let buckets = lockdrop_buckets();
     let farmers = [
         market.clone_lp(0).unwrap(),
@@ -403,4 +409,85 @@ fn test_lockdrop_locked_tokens() {
     assert_balance(f0, 0, 500);
     assert_balance(f1, 0, 100);
     assert_balance(f2, 0, 100);
+}
+
+#[test]
+fn test_reinvest_yield() {
+    // Setup
+
+    let (market, _buckets, farmers) = setup_lockdrop();
+    let trader0 = market.clone_trader(0).unwrap();
+
+    // Jump to review period, transfer collateral, and launch the lockdrop
+
+    market
+        .set_time(TimeJump::Seconds(60 * 60 * 24 * 14))
+        .unwrap();
+    market.exec_farming_start_launch().unwrap();
+
+    market.exec_refresh_price().unwrap();
+    market.set_time(TimeJump::Seconds(60)).unwrap();
+    market
+        .exec_crank_till_finished(&Addr::unchecked("cranker"))
+        .unwrap();
+
+    // Open a position to accrue trading fees
+
+    let farming_stats_before = market.query_farming_stats();
+
+    market
+        .exec_open_position(
+            &trader0,
+            "100",
+            "9",
+            DirectionToBase::Long,
+            "1.0",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    // Reinvest and assert
+
+    market.exec_farming_reinvest().unwrap();
+
+    let farming_stats_after = market.query_farming_stats();
+    assert!(farming_stats_before.xlp < farming_stats_after.xlp);
+    assert!(farming_stats_before.bonus < farming_stats_after.bonus);
+
+    // Test transfer bonus
+
+    let owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
+    let balance_before = market.query_collateral_balance(&owner).unwrap();
+    market.exec_farming_transfer_bonus().unwrap();
+    let balance_after = market.query_collateral_balance(&owner).unwrap();
+
+    assert_eq!(
+        balance_after,
+        balance_before
+            .checked_add(farming_stats_after.bonus.into_number())
+            .unwrap()
+    );
+
+    let farming_stats = market.query_farming_stats();
+    assert_eq!(farming_stats.bonus, Collateral::zero());
+
+    // Withdraw xLP
+
+    market
+        .set_time(TimeJump::Seconds((lockdrop_month_seconds() * 4).into()))
+        .unwrap();
+    let balance_before = market
+        .query_liquidity_token_balance_raw(LiquidityTokenKind::Xlp, &farmers[0])
+        .unwrap();
+    market.exec_farming_withdraw_xlp(&farmers[0], None).unwrap();
+    let balance_after = market
+        .query_liquidity_token_balance_raw(LiquidityTokenKind::Xlp, &farmers[0])
+        .unwrap();
+
+    assert_eq!(balance_before, Uint128::zero());
+    assert!(
+        LpToken::from_u128(balance_after.u128()).unwrap() > LpToken::from_u128(100u128).unwrap()
+    );
 }

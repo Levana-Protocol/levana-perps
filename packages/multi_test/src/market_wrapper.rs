@@ -1620,6 +1620,17 @@ impl PerpsMarket {
         self.exec_farming(sender, &FarmingExecuteMsg::ClaimEmissions {})
     }
 
+    pub fn exec_farming_reinvest(&self) -> Result<AppResponse> {
+        self.exec_farming(&Addr::unchecked("user"), &FarmingExecuteMsg::Reinvest {})
+    }
+
+    pub fn exec_farming_transfer_bonus(&self) -> Result<AppResponse> {
+        self.exec_farming(
+            &Addr::unchecked("user"),
+            &FarmingExecuteMsg::TransferBonus {},
+        )
+    }
+
     fn query_farming<T: DeserializeOwned>(
         &self,
         msg: &msg::contracts::farming::entry::QueryMsg,
