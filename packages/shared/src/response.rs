@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
 use cosmwasm_std::{
     from_binary, to_binary, wasm_execute, CosmosMsg, Empty, Event, IbcBasicResponse,
@@ -15,6 +17,7 @@ use crate::prelude::*;
 pub struct ResponseBuilder {
     resp: Response,
     event_type: EventType,
+    event_type_count: HashMap<String, u32>,
 }
 
 enum EventType {
@@ -42,6 +45,7 @@ impl ResponseBuilder {
             event_type: EventType::EmitEvents {
                 common_attrs: standard_event_attributes(contract_version),
             },
+            event_type_count: HashMap::new(),
         }
     }
 
@@ -50,6 +54,7 @@ impl ResponseBuilder {
         ResponseBuilder {
             resp: Response::new(),
             event_type: EventType::MuteEvents,
+            event_type_count: HashMap::new(),
         }
     }
 
@@ -157,10 +162,19 @@ impl ResponseBuilder {
 
         match &self.event_type {
             EventType::MuteEvents => (),
-            EventType::EmitEvents { common_attrs } => self
-                .resp
-                .events
-                .push(event.add_attributes(common_attrs.clone())),
+            EventType::EmitEvents { common_attrs } => {
+                let mut event = event.add_attributes(common_attrs.clone());
+
+                let event_type_count = self.event_type_count.entry(event.ty.clone()).or_default();
+
+                if *event_type_count > 0 {
+                    event.ty = format!("{}-{}", event.ty, *event_type_count);
+                }
+
+                *event_type_count += 1;
+
+                self.resp.events.push(event)
+            }
         }
     }
 

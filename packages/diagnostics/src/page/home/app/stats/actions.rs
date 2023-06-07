@@ -52,24 +52,24 @@ impl Stats {
 
         // first parse all the events to accummulate the changes
         for event in events.iter() {
-            if event.ty == "wasm-position-open" {
+            if event.ty.starts_with("wasm-position-open") {
                 let evt: PositionOpenEvent = event.clone().try_into().unwrap();
                 res.open_positions.push(evt.position_attributes.pos_id);
                 let value = evt.position_attributes.collaterals.deposit_collateral;
                 res.deposit_collateral =
                     Some(res.deposit_collateral.map_or(value, |prev| prev + value));
-            } else if event.ty == "wasm-position-close" {
+            } else if event.ty.starts_with("wasm-position-close") {
                 let evt: PositionCloseEvent = event.clone().try_into().unwrap();
                 res.closed_positions.push(evt.closed_position.id);
                 let value = evt.closed_position.deposit_collateral;
                 res.deposit_collateral =
                     Some(-res.deposit_collateral.map_or(value, |prev| prev - value));
-            } else if event.ty == "wasm-position-update" {
+            } else if event.ty.starts_with("wasm-position-update") {
                 let evt: PositionUpdateEvent = event.clone().try_into().unwrap();
                 let value = evt.deposit_collateral_delta;
                 res.deposit_collateral =
                     Some(-res.deposit_collateral.map_or(value, |prev| prev - value));
-            } else if event.ty == "wasm-spot-price" {
+            } else if event.ty.starts_with("wasm-spot-price") {
                 let evt: SpotPriceEvent = event.clone().try_into().unwrap();
                 res.prices.push(evt.price_base);
             }

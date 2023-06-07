@@ -6,6 +6,7 @@ pub mod diagnostic;
 pub mod edge;
 mod edge_liquidation;
 mod edge_update;
+pub mod events;
 pub mod farming;
 pub mod fees;
 pub mod funding;

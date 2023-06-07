@@ -23,7 +23,7 @@ pub trait CosmosResponseExt: std::fmt::Debug {
 
     fn filter_events_type<'a>(&self, ty: &'a str) -> Box<dyn Iterator<Item = Event> + 'a> {
         let ty = wasm_event_type(ty);
-        Box::new(self.events().filter(move |e| e.ty == ty))
+        Box::new(self.events().filter(move |e| e.ty.starts_with(&ty)))
     }
 
     fn filter_events_attr<'a>(
@@ -49,7 +49,7 @@ pub trait CosmosResponseExt: std::fmt::Debug {
         let ty = wasm_event_type(ty);
 
         Box::new(self.events().filter_map(move |e| {
-            if e.ty == ty {
+            if e.ty.starts_with(&ty) {
                 e.attributes
                     .iter()
                     .find(|a| a.key == key)
@@ -73,7 +73,7 @@ pub trait CosmosResponseExt: std::fmt::Debug {
         let ty = wasm_event_type(ty);
 
         Box::new(self.events().filter_map(move |e| {
-            if e.ty == ty {
+            if e.ty.starts_with(&ty) {
                 e.attributes.iter().find(|a| a.key == key).and_then({
                     let f = f.clone();
                     move |a| f(a.value.as_str())
