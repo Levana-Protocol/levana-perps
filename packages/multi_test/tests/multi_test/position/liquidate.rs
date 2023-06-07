@@ -6,7 +6,6 @@ use levana_perpswap_multi_test::{
     PerpsApp,
 };
 use msg::contracts::market::config::ConfigUpdate;
-use msg::contracts::market::crank::CrankWorkInfo;
 use msg::contracts::market::position::PositionId;
 use msg::prelude::*;
 
