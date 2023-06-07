@@ -8,7 +8,7 @@ use std::convert::TryFrom;
 pub enum ReplyId {
     TransferCollateral = 0,
     ReinvestYield = 1,
-    FarmingDepositXlp = 2,
+    FarmingDeposit = 2,
 }
 
 impl TryFrom<u64> for ReplyId {
@@ -18,7 +18,7 @@ impl TryFrom<u64> for ReplyId {
         match value {
             0 => Ok(ReplyId::TransferCollateral),
             1 => Ok(ReplyId::ReinvestYield),
-            2 => Ok(ReplyId::FarmingDepositXlp),
+            2 => Ok(ReplyId::FarmingDeposit),
             _ => Err(PerpError {
                 id: ErrorId::InternalReply,
                 domain: ErrorDomain::Factory,
@@ -71,10 +71,11 @@ pub(crate) const EPHEMERAL_BONUS_FUND: EphemeralReplyData<Collateral> = Ephemera
 #[derive(Serialize, Deserialize)]
 pub(crate) struct DepositReplyData {
     pub(crate) farmer: Addr,
-    pub(crate) xlp: LpToken
+    pub(crate) xlp: LpToken,
 }
 
 /// The address of the farmer who sent the [ExecuteMsg::Deposit] msg with Collateral instead of xLP.
-pub(crate) const EPHEMERAL_DEPOSIT_COLLATERAL_DATA: EphemeralReplyData<DepositReplyData> = EphemeralReplyData {
-    item: Item::new(namespace::EPHEMERAL_DEPOSIT_COLLATERAL_DATA),
-};
+pub(crate) const EPHEMERAL_DEPOSIT_COLLATERAL_DATA: EphemeralReplyData<DepositReplyData> =
+    EphemeralReplyData {
+        item: Item::new(namespace::EPHEMERAL_DEPOSIT_COLLATERAL_DATA),
+    };
