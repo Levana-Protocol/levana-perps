@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use msg::token::Token;
 
 /// Total number of farming tokens.
 const TOTALS: Item<FarmingTotals> = Item::new("farming-totals");
@@ -177,5 +178,18 @@ impl State<'_> {
         self.save_raw_farmer_stats(ctx.storage, farmer, &farmer_stats)?;
 
         Ok((removed_xlp, amount))
+    }
+
+    /// Query the xLP token balance for the farming contract
+    pub(crate) fn query_xlp_balance(&self) -> Result<LpToken> {
+        let token = Token::Cw20 {
+            addr: self.market_info.xlp_addr.clone().into(),
+            decimal_places: LpToken::PRECISION,
+        };
+
+        token
+            .query_balance(&self.querier, &self.env.contract.address)
+            .map(Collateral::into_decimal256)
+            .map(LpToken::from_decimal256)
     }
 }

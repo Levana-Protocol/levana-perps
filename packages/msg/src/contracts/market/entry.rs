@@ -192,6 +192,7 @@ pub enum ExecuteMsg {
     },
 
     /// Deposits send funds into the unlocked liquidity fund
+    /// Returns [LiquidityDepositResponseData] as response data
     DepositLiquidity {
         /// Should we stake the resulting LP tokens into xLP?
         ///

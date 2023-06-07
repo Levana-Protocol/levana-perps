@@ -1487,6 +1487,37 @@ impl PerpsMarket {
         )
     }
 
+    pub fn exec_farming_deposit_collateral(
+        &self,
+        wallet: &Addr,
+        amount: NonZero<Collateral>,
+    ) -> Result<AppResponse> {
+        let msg = self.token.into_execute_msg(
+            &self.farming_addr.clone(),
+            amount.raw(),
+            &FarmingExecuteMsg::Deposit {},
+        )?;
+
+        self.exec_mint_tokens(wallet, amount.into_number())?;
+        self.exec_wasm_msg(wallet, msg)
+    }
+
+    pub fn exec_farming_deposit_lp(
+        &self,
+        wallet: &Addr,
+        amount: NonZero<LpToken>,
+    ) -> Result<AppResponse> {
+        self.exec_mint_and_deposit_liquidity(wallet, amount.into_number())
+            .unwrap();
+        self.exec_liquidity_token_send(
+            LiquidityTokenKind::Lp,
+            wallet,
+            &self.farming_addr,
+            amount.raw(),
+            &FarmingExecuteMsg::Deposit {},
+        )
+    }
+
     fn exec_farming(&self, wallet: &Addr, msg: &FarmingExecuteMsg) -> Result<AppResponse> {
         self.exec_farming_with_funds(wallet, msg, vec![])
     }
