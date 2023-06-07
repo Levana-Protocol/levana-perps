@@ -9,6 +9,7 @@ use cosmos::Address;
 use cosmos::Cosmos;
 use cosmos::HasAddressType;
 use cosmos::Wallet;
+use cosmwasm_std::Decimal256;
 use parking_lot::RwLock;
 use reqwest::Client;
 
@@ -22,7 +23,36 @@ use crate::watcher::Watcher;
 use super::factory::{FactoryInfo, FrontendInfoTestnet};
 use super::gas_check::{GasCheckBuilder, GasCheckWallet};
 
-pub(crate) type GasRecords = VecDeque<(DateTime<Utc>, u128)>;
+#[derive(Default, serde::Serialize)]
+pub(crate) struct GasRecords {
+    pub(crate) total: Decimal256,
+    pub(crate) entries: VecDeque<GasEntry>,
+}
+
+impl GasRecords {
+    pub(crate) fn add_entry(&mut self, timestamp: DateTime<Utc>, amount: u128) {
+        if let Err(e) = self.add_entry_inner(timestamp, amount) {
+            log::error!("Error adding gas record {timestamp}/{amount}: {e:?}");
+        }
+    }
+
+    fn add_entry_inner(&mut self, timestamp: DateTime<Utc>, amount: u128) -> Result<()> {
+        let amount = Decimal256::from_ratio(amount, 1_000_000u32);
+        self.total = self.total.checked_add(amount)?;
+        self.entries.push_back(GasEntry { timestamp, amount });
+        if self.entries.len() > 1000 {
+            self.entries.pop_front();
+        }
+        Ok(())
+    }
+}
+
+#[derive(serde::Serialize)]
+pub(crate) struct GasEntry {
+    pub(crate) timestamp: DateTime<Utc>,
+    pub(crate) amount: Decimal256,
+}
+
 pub(crate) struct App {
     factory: RwLock<Arc<FactoryInfo>>,
     frontend_info_testnet: Option<RwLock<Arc<FrontendInfoTestnet>>>,
