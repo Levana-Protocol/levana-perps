@@ -35,11 +35,11 @@ impl From<ReplyId> for u64 {
     }
 }
 
-/// Sometimes it's necessary to access certain data in a reply handler that existed in the
-/// execution handler that sent the original SubMsg but is not persisted.
+/// Sometimes it's necessary for a reply handler to access certain data that only existed in the
+/// execution handler that sent the original SubMsg.
 /// `EphemeralReplyData` provides a solution to this problem by allowing the original execution
-/// handler to store data that would otherwise not be persisted and for the reply handler to load it
-/// as needed. Once loaded, the data automatically is cleaned up.
+/// handler to store data that would otherwise not be persisted, and for the reply handler to load it
+/// as needed. Once loaded, the data is automatically cleaned up.
 pub(crate) struct EphemeralReplyData<'a, T> {
     item: Item<'a, T>,
 }
