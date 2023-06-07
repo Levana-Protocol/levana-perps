@@ -11,7 +11,9 @@ use msg::contracts::market::{
 
 use shared::prelude::*;
 
-use super::position::{get_position, NEXT_LIQUIFUNDING, NEXT_STALE, OPEN_POSITIONS};
+use super::position::{
+    get_position, LIQUIDATION_PRICES_PENDING_COUNT, NEXT_LIQUIFUNDING, NEXT_STALE, OPEN_POSITIONS,
+};
 
 /// The last price point timestamp for which the cranking process was completed.
 ///
@@ -132,6 +134,10 @@ impl State<'_> {
         }
         .into();
 
+        let starting_unpend = LIQUIDATION_PRICES_PENDING_COUNT
+            .may_load(ctx.storage)?
+            .unwrap_or_default();
+
         let mut actual = vec![];
         for _ in 0..n_execs {
             match self.crank_work(ctx.storage)? {
@@ -143,10 +149,16 @@ impl State<'_> {
             };
         }
 
+        let ending_unpend = LIQUIDATION_PRICES_PENDING_COUNT
+            .may_load(ctx.storage)?
+            .unwrap_or_default();
+
         self.allocate_crank_fees(ctx, rewards, actual.len().try_into()?)?;
         ctx.response_mut().add_event(CrankExecBatchEvent {
             requested: n_execs,
             actual,
+            starting_unpend,
+            ending_unpend,
         });
 
         Ok(())

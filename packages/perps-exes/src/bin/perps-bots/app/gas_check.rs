@@ -1,8 +1,4 @@
-use std::{
-    collections::{HashSet, VecDeque},
-    fmt::Display,
-    sync::Arc,
-};
+use std::{collections::HashSet, fmt::Display, sync::Arc};
 
 use crate::{
     app::App,
@@ -18,7 +14,7 @@ use cosmos::{
 use cosmwasm_std::Decimal256;
 use msg::prelude::{LpToken, UnsignedDecimal};
 
-use super::AppBuilder;
+use super::{AppBuilder, GasRecords};
 
 pub(crate) struct GasCheckBuilder {
     tracked_wallets: HashSet<Address>,
@@ -148,20 +144,6 @@ impl GasCheck {
                     continue;
                 }
             };
-            let mut gases = app.gases.write();
-            gases
-                .entry(*address)
-                .and_modify(|v| {
-                    v.push_back((now, gas));
-                    if v.len() >= 1000 {
-                        v.pop_front();
-                    }
-                })
-                .or_insert_with(|| {
-                    let mut def = VecDeque::new();
-                    def.push_back((now, gas));
-                    def
-                });
             if gas >= *min_gas {
                 balances.push(format!(
                     "Sufficient gas in {name} ({address}). Found: {}.",
@@ -198,8 +180,7 @@ impl GasCheck {
                 .clone()
                 .context("Cannot refill gas automatically on mainnet")?;
             {
-                let mut gases = app.gases.write();
-                for (address, amount) in to_refill {
+                for (address, amount) in &to_refill {
                     builder.add_message_mut(MsgSend {
                         from_address: gas_wallet.get_address_string(),
                         to_address: address.get_address_string(),
@@ -207,12 +188,6 @@ impl GasCheck {
                             denom: denom.clone(),
                             amount: amount.to_string(),
                         }],
-                    });
-                    gases.entry(address).and_modify(|v| {
-                        for tg in v.iter_mut() {
-                            let (t, g) = *tg;
-                            *tg = (t, g + amount);
-                        }
                     });
                 }
             }
@@ -227,6 +202,13 @@ impl GasCheck {
                 }
                 Ok(tx) => {
                     log::info!("Filled up gas in {}", tx.txhash);
+                    let mut gases = app.gases.write();
+                    for (address, amount) in to_refill {
+                        gases
+                            .entry(address)
+                            .or_insert_with(GasRecords::default)
+                            .add_entry(now, amount);
+                    }
                 }
             }
         }

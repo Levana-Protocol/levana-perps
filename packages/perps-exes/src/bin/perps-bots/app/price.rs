@@ -92,6 +92,9 @@ impl App {
             }
         }
 
+        // Take the crank lock for the rest of the execution
+        let _crank_lock = self.crank_lock.lock().await;
+
         let broadcast_status = match builder.sign_and_broadcast(&self.cosmos, wallet).await {
             Ok(res) => {
                 // just for logging pyth prices
