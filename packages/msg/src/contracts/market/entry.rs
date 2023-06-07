@@ -677,14 +677,6 @@ pub struct LpInfoResp {
     pub history: LpHistorySummary,
 }
 
-/// The amount of LP or xLP tokens that are minted when depositing liquidity.
-/// Returned from [ExecuteMsg::DepositLiquidity] execute message
-#[cw_serde]
-pub struct LiquidityDepositResponseData {
-    /// The amount of LP or xLP tokens minted after the deposit
-    pub amount: LpToken,
-}
-
 /// Status of an ongoing unstaking process.
 #[cw_serde]
 pub struct UnstakingStatus {

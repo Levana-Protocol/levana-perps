@@ -1,11 +1,9 @@
-use cosmwasm_std::{from_binary, Reply, SubMsg};
-use msg::contracts::market::entry::LiquidityDepositResponseData;
+use cosmwasm_std::{Reply, SubMsg};
 use msg::prelude::MarketExecuteMsg::DepositLiquidity;
 use msg::token::Token;
 
-use crate::state::reply::{ReplyId, EPHEMERAL_FARMER_ADDR};
+use crate::state::reply::{ReplyId, EPHEMERAL_DEPOSIT_COLLATERAL_DATA, DepositReplyData};
 use crate::{prelude::*, state::funds::Received};
-use cw_utils::parse_reply_execute_data;
 
 #[entry_point]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
@@ -98,7 +96,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                 state.handle_reinvest_yield_reply(ctx.storage)?;
             }
             ReplyId::FarmingDepositXlp => {
-                state.handle_farming_deposit_xlp_reply(&mut ctx, msg)?;
+                state.handle_farming_deposit_xlp_reply(&mut ctx)?;
             }
         },
         _ => {
@@ -124,7 +122,11 @@ impl State<'_> {
                     &DepositLiquidity { stake_to_xlp: true },
                 )?;
 
-                EPHEMERAL_FARMER_ADDR.save(ctx.storage, farmer)?;
+                let xlp = self.query_xlp_balance()?;
+                EPHEMERAL_DEPOSIT_COLLATERAL_DATA.save(ctx.storage, &DepositReplyData {
+                    farmer: farmer.clone(),
+                    xlp,
+                })?;
 
                 ctx.response.add_raw_submessage(SubMsg::reply_on_success(
                     deposit_liquidity_msg,
@@ -153,14 +155,11 @@ impl State<'_> {
         Ok(())
     }
 
-    fn handle_farming_deposit_xlp_reply(&self, ctx: &mut StateContext, msg: Reply) -> Result<()> {
-        let parsed_data = parse_reply_execute_data(msg)?
-            .data
-            .with_context(|| "could not find expected data response")?;
-        let deposit_data: LiquidityDepositResponseData = from_binary(&parsed_data)?;
-        let farmer_addr = EPHEMERAL_FARMER_ADDR.load_once(ctx.storage)?;
-
-        self.farming_deposit(ctx, &farmer_addr, deposit_data.amount)?;
+    fn handle_farming_deposit_xlp_reply(&self, ctx: &mut StateContext) -> Result<()> {
+        let ephemeral_data = EPHEMERAL_DEPOSIT_COLLATERAL_DATA.load_once(ctx.storage)?;
+        let new_xlp = self.query_xlp_balance()?;
+        let xlp_delta = new_xlp.checked_sub(ephemeral_data.xlp)?;
+        self.farming_deposit(ctx, &ephemeral_data.farmer, xlp_delta)?;
 
         Ok(())
     }

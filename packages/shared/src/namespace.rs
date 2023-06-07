@@ -139,4 +139,4 @@ pub const LOCKDROP_DURATIONS: &str = "ef";
 pub const BONUS_CONFIG: &str = "eg";
 pub const EPHEMERAL_BONUS_FUND: &str = "eh";
 pub const BONUS_FUND: &str = "ei";
-pub const EPHEMERAL_FARMER_ADDR: &str = "ej";
+pub const EPHEMERAL_DEPOSIT_COLLATERAL_DATA: &str = "ej";

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -68,7 +68,13 @@ pub(crate) const EPHEMERAL_BONUS_FUND: EphemeralReplyData<Collateral> = Ephemera
     item: Item::new(namespace::EPHEMERAL_BONUS_FUND),
 };
 
+#[derive(Serialize, Deserialize)]
+pub(crate) struct DepositReplyData {
+    pub(crate) farmer: Addr,
+    pub(crate) xlp: LpToken
+}
+
 /// The address of the farmer who sent the [ExecuteMsg::Deposit] msg with Collateral instead of xLP.
-pub(crate) const EPHEMERAL_FARMER_ADDR: EphemeralReplyData<Addr> = EphemeralReplyData {
-    item: Item::new(namespace::EPHEMERAL_FARMER_ADDR),
+pub(crate) const EPHEMERAL_DEPOSIT_COLLATERAL_DATA: EphemeralReplyData<DepositReplyData> = EphemeralReplyData {
+    item: Item::new(namespace::EPHEMERAL_DEPOSIT_COLLATERAL_DATA),
 };
