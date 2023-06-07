@@ -1,6 +1,6 @@
 use levana_perpswap_multi_test::{
-    market_wrapper::PerpsMarket, position_helpers::assert_position_liquidated, time::TimeJump,
-    PerpsApp,
+    market_wrapper::PerpsMarket, position_helpers::assert_position_liquidated,
+    return_unless_market_collateral_base, time::TimeJump, PerpsApp,
 };
 use msg::{contracts::market::config::ConfigUpdate, prelude::*};
 
@@ -178,4 +178,46 @@ fn deposit_collateral_stops_liquidation_perp_874() {
 
     // The position should be open
     market.query_position(pos_id).unwrap();
+}
+
+#[test]
+fn pnl_from_liquidation_perp_1404() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    return_unless_market_collateral_base!(&market);
+
+    market.exec_set_price("6.33".parse().unwrap()).unwrap();
+    market.exec_crank_till_finished(&trader).unwrap();
+    let (pos_id, _) = market
+        .exec_open_position(
+            &trader,
+            "100",
+            "17.5",
+            DirectionToBase::Long,
+            "+Inf",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    let pos = market.query_position(pos_id).unwrap();
+    println!("{pos:#?}");
+
+    market.exec_crank_till_finished(&trader).unwrap();
+    market
+        .exec_set_price_and_crank("6.03".parse().unwrap())
+        .unwrap();
+
+    let closed = market.query_closed_position(&trader, pos_id).unwrap();
+
+    let additional_pnl = closed.pnl_collateral - pos.pnl_collateral;
+    assert!(
+        additional_pnl < "-0.1".parse().unwrap(),
+        "Didn't lose more money from price movement. Old PnL: {}. New PnL: {}. Additional PnL: {}.",
+        pos.pnl_collateral,
+        closed.pnl_collateral,
+        additional_pnl
+    );
 }

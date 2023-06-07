@@ -668,6 +668,18 @@ impl PerpsMarket {
         self.exec_set_price_with_usd(price, None)
     }
 
+    pub fn exec_set_price_and_crank(&self, price: PriceBaseInQuote) -> Result<AppResponse> {
+        self.exec(
+            &Addr::unchecked(&DEFAULT_MARKET.price_admin),
+            &msg::contracts::market::entry::ExecuteMsg::SetPrice {
+                price,
+                execs: None,
+                price_usd: None,
+                rewards: None,
+            },
+        )
+    }
+
     pub fn exec_set_price_with_usd(
         &self,
         price: PriceBaseInQuote,
