@@ -117,7 +117,7 @@ pub enum MarketError {
         net_notional_before: Signed<Notional>,
         net_notional_after: Signed<Notional>,
     },
-    #[error( "Cannot perform this action since it would exceed delta neutrality limits - protocol would go from too short to too long")]
+    #[error("Cannot perform this action since it would exceed delta neutrality limits - protocol would go from too short to too long")]
     DeltaNeutralityFeeShortToLong {
         cap: Number,
         sensitivity: Number,
@@ -126,6 +126,64 @@ pub enum MarketError {
         net_notional_before: Signed<Notional>,
         net_notional_after: Signed<Notional>,
     },
+    #[error(
+        "Specified {trigger_type} trigger price of '{specified}' must be {must_be} than '{bound}'."
+    )]
+    InvalidTriggerPrice {
+        must_be: TriggerPriceMustBe,
+        trigger_type: TriggerType,
+        specified: PriceBaseInQuote,
+        bound: PriceBaseInQuote,
+    },
+}
+
+/// Was the price provided by the trader too high or too low?
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TriggerPriceMustBe {
+    /// Specified price must be less than the bound
+    Less,
+    /// Specified price must be greater than the bound
+    Greater,
+}
+
+impl Display for TriggerPriceMustBe {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                TriggerPriceMustBe::Greater => "greater",
+                TriggerPriceMustBe::Less => "less",
+            }
+        )
+    }
+}
+
+/// What type of price trigger occurred?
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TriggerType {
+    /// A limit order
+    LimitOrder,
+    /// A stop loss
+    StopLoss,
+    /// A take profit
+    TakeProfit,
+}
+
+impl Display for TriggerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                TriggerType::LimitOrder => "limit order",
+                TriggerType::StopLoss => "stop loss",
+                TriggerType::TakeProfit => "take profit",
+            }
+        )
+    }
 }
 
 /// What was the user doing when they hit the congestion error message?
@@ -207,6 +265,7 @@ impl MarketError {
             MarketError::DeltaNeutralityFeeShortToLong { .. } => {
                 ErrorId::DeltaNeutralityFeeShortToLong
             }
+            MarketError::InvalidTriggerPrice { .. } => ErrorId::InvalidTriggerPrice,
         }
     }
 }

@@ -368,7 +368,7 @@ impl State<'_> {
                     Some(price.price_notional),
                     Some(price.price_base),
                     market_type,
-                    "Limit order",
+                    TriggerType::LimitOrder,
                 )?;
             }
             DirectionToNotional::Short => {
@@ -382,7 +382,7 @@ impl State<'_> {
                         .map(|price| price.into_notional_price(market_type)),
                     order.stop_loss_override,
                     market_type,
-                    "Limit order",
+                    TriggerType::LimitOrder,
                 )?;
             }
         }
