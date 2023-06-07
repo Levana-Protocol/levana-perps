@@ -202,12 +202,7 @@ pub struct PositionQueryResponse {
     pub pnl_usd: Signed<Usd>,
 
     /// DNF that would be charged (positive) or received (negative) if position was closed now.
-    ///
-    /// This is only set if the query parameter `skip_calc_pending_fees` is set
-    /// to `false`. In that case, this value is already included in
-    /// `pnl_collateral` and `pnl_usd`. If we skip calculating pending fees,
-    /// this value will be set to `None`.
-    pub dnf_on_close_collateral: Option<Signed<Collateral>>,
+    pub dnf_on_close_collateral: Signed<Collateral>,
 
     /// Notional size of the position
     pub notional_size: Signed<Notional>,
@@ -528,7 +523,7 @@ impl Position {
         config: &Config,
         market_type: MarketType,
         original_direction_to_base: DirectionToBase,
-        dnf_on_close_collateral: Option<Signed<Collateral>>,
+        dnf_on_close_collateral: Signed<Collateral>,
     ) -> Result<PositionOrPendingClose> {
         // We always use the current spot price for the current_price_point
         // parameter to liquidation_margin. It's used exclusively to calculate
@@ -642,7 +637,7 @@ impl Position {
         end_price: PricePoint,
         entry_price: Price,
         market_type: MarketType,
-        dnf_on_close_collateral: Option<Signed<Collateral>>,
+        dnf_on_close_collateral: Signed<Collateral>,
     ) -> Result<PositionQueryResponse> {
         let (direction_to_base, leverage) = self
             .active_leverage_to_notional(&end_price)

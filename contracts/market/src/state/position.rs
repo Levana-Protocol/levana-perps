@@ -4,7 +4,7 @@ use cosmwasm_std::Order;
 pub use liquifund::*;
 mod open;
 use msg::contracts::market::{
-    entry::{ClosedPositionCursor, ClosedPositionsResp},
+    entry::{ClosedPositionCursor, ClosedPositionsResp, PositionsQueryFeeApproach},
     position::events::{PositionSaveEvent, PositionSaveReason},
 };
 pub(crate) use open::*;
@@ -472,7 +472,7 @@ impl State<'_> {
         &self,
         store: &dyn Storage,
         mut pos: Position,
-        calc_pending_fees: bool,
+        fees: PositionsQueryFeeApproach,
     ) -> Result<PositionOrPendingClose> {
         let config = &self.config;
         let market_type = self.market_id(store)?.get_market_type();
@@ -490,19 +490,33 @@ impl State<'_> {
             .split()
             .0;
 
-        let dnf_on_close_collateral = if calc_pending_fees {
+        // We calculate the DNF fee that would be applied on closing the
+        // position.
+        let dnf_on_close_collateral = self.calc_delta_neutrality_fee(
+            store,
+            -pos.notional_size,
+            spot_price,
+            Some(pos.liquidation_margin.delta_neutrality),
+        )?;
+
+        let (calc_pending_fees, include_dnf) = match fees {
+            PositionsQueryFeeApproach::NoFees => (false, false),
+            PositionsQueryFeeApproach::Accumulated => (true, false),
+            PositionsQueryFeeApproach::AllFees => (true, true),
+        };
+
+        if calc_pending_fees {
             // Calculate pending fees
             let (borrow_fees, _) =
                 self.calc_capped_borrow_fee_payment(store, &pos, pos.liquifunded_at, self.now())?;
             let borrow_fees = borrow_fees.lp.checked_add(borrow_fees.xlp)?;
             let (funding_payments, _) =
                 self.calc_capped_funding_payment(store, &pos, pos.liquifunded_at, self.now())?;
-            let delta_neutrality_fee = self.calc_delta_neutrality_fee(
-                store,
-                -pos.notional_size,
-                spot_price,
-                Some(pos.liquidation_margin.delta_neutrality),
-            )?;
+            let delta_neutrality_fee = if include_dnf {
+                dnf_on_close_collateral
+            } else {
+                Signed::zero()
+            };
             pos.borrow_fee
                 .checked_add_assign(borrow_fees, &spot_price)?;
             pos.funding_fee
@@ -545,9 +559,6 @@ impl State<'_> {
                     "0.00001".parse().unwrap()
                 }
             };
-            Some(delta_neutrality_fee)
-        } else {
-            None
         };
 
         let start_price = self.spot_price(store, Some(pos.liquifunded_at))?;
