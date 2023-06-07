@@ -235,7 +235,10 @@ async fn main() -> Result<()> {
             let hatch_event = resp
                 .events
                 .iter()
-                .find(|e| e.r#type == "wasm-hatch-start" || e.r#type == "wasm-hatch-retry")
+                .find(|e| {
+                    e.r#type.starts_with("wasm-hatch-start")
+                        || e.r#type.starts_with("wasm-hatch-retry")
+                })
                 .unwrap();
 
             let token_id = hatch_event
