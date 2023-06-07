@@ -180,7 +180,7 @@ impl GasCheck {
                 .clone()
                 .context("Cannot refill gas automatically on mainnet")?;
             {
-                for (address, amount) in to_refill.iter() {
+                for (address, amount) in &to_refill {
                     builder.add_message_mut(MsgSend {
                         from_address: gas_wallet.get_address_string(),
                         to_address: address.get_address_string(),
