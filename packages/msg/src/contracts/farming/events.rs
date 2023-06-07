@@ -24,10 +24,11 @@ pub struct DepositEvent {
     /// The asset originally deposited by the farmer
     pub source: DepositSource,
     /// The total amount of xLP deposited into the farming contract from all farmers
-    pub pool_size: LpToken
+    pub pool_size: LpToken,
 }
 
 /// Where did the funds for a farming deposit come from?
+#[cw_serde]
 pub enum DepositSource {
     /// Farmer deposited collateral
     Collateral,
@@ -44,7 +45,7 @@ impl From<DepositEvent> for Event {
             farming,
             xlp,
             source,
-            pool_size
+            pool_size,
         }: DepositEvent,
     ) -> Self {
         Event::new("deposit")
@@ -72,7 +73,7 @@ pub struct WithdrawEvent {
     /// Amount of xLP
     pub xlp: LpToken,
     /// The total amount of xLP deposited into the farming contract from all farmers
-    pub pool_size: LpToken
+    pub pool_size: LpToken,
 }
 
 impl From<WithdrawEvent> for Event {
@@ -81,7 +82,7 @@ impl From<WithdrawEvent> for Event {
             farmer,
             farming,
             xlp,
-            pool_size
+            pool_size,
         }: WithdrawEvent,
     ) -> Self {
         Event::new("withdraw")

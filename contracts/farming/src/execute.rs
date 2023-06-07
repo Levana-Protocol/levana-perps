@@ -128,6 +128,7 @@ impl State<'_> {
                     &DepositReplyData {
                         farmer: farmer.clone(),
                         xlp_balance_before: xlp,
+                        deposit_source: DepositSource::Collateral,
                     },
                 )?;
 
@@ -149,6 +150,7 @@ impl State<'_> {
                     &DepositReplyData {
                         farmer: farmer.clone(),
                         xlp_balance_before: xlp,
+                        deposit_source: DepositSource::Lp,
                     },
                 )?;
 
@@ -177,7 +179,15 @@ impl State<'_> {
         let ephemeral_data = EPHEMERAL_DEPOSIT_COLLATERAL_DATA.load_once(ctx.storage)?;
         let new_balance = self.query_xlp_balance()?;
         let delta = new_balance.checked_sub(ephemeral_data.xlp_balance_before)?;
-        self.farming_deposit(ctx, &ephemeral_data.farmer, delta)?;
+        let (farming, pool_size) = self.farming_deposit(ctx, &ephemeral_data.farmer, delta)?;
+
+        ctx.response.add_event(DepositEvent {
+            farmer: ephemeral_data.farmer,
+            farming,
+            xlp: delta,
+            source: ephemeral_data.deposit_source,
+            pool_size,
+        });
 
         Ok(())
     }
@@ -208,7 +218,7 @@ impl State<'_> {
             farmer: farmer.clone(),
             farming,
             xlp,
-            pool_size
+            pool_size,
         });
 
         Ok(())

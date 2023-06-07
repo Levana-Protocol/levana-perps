@@ -76,6 +76,8 @@ pub(crate) struct DepositReplyData {
     pub(crate) farmer: Addr,
     /// The xLP balance before the farming contract sends the Collateral or LP
     pub(crate) xlp_balance_before: LpToken,
+    /// The asset that was originally deposited by the farmer
+    pub(crate) deposit_source: DepositSource,
 }
 
 /// The address of the farmer who sent the [ExecuteMsg::Deposit] msg with Collateral instead of xLP.
