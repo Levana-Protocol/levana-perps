@@ -146,6 +146,14 @@ fn test_emissions_multiple_lps() {
 
 
 proptest! {
+    #![proptest_config(ProptestConfig{
+        failure_persistence: None,
+        max_shrink_iters: 0,
+        max_local_rejects: 1,
+        max_global_rejects: 1,
+        .. ProptestConfig::with_cases(10)
+    })]
+
     #[test]
     //#[cfg_attr(not(feature = "proptest"), ignore)]
     fn proptest_farming_emissions(

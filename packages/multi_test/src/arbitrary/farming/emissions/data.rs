@@ -12,7 +12,7 @@ pub struct FarmingEmissions {
 
 #[derive(Clone, Debug)]
 pub struct Action {
-    pub action: ActionKind,
+    pub kind: ActionKind,
     pub at_seconds: u32,
 }
 

@@ -802,7 +802,7 @@ impl PerpsMarket {
         )
     }
 
-    pub fn exec_deposit_liquidity_full(
+    pub fn exec_mint_and_deposit_liquidity_full(
         &self,
         user_addr: &Addr,
         amount: Number,
