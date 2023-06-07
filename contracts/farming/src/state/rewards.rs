@@ -1,6 +1,7 @@
 use crate::prelude::reply::{ReplyId, EPHEMERAL_BONUS_FUND};
 use crate::prelude::*;
 use crate::state::farming::RawFarmerStats;
+use crate::state::reply::BonusFundReplyData;
 use cosmwasm_std::{to_binary, BankMsg, CosmosMsg, SubMsg, WasmMsg};
 use cw_storage_plus::Item;
 use msg::contracts::market::entry::LpInfoResp;
@@ -369,7 +370,7 @@ impl State<'_> {
             .checked_sub(bonus_amount)
             .map(NonZero::<Collateral>::new)?;
 
-        if reinvest_amount.is_some() {
+        if let Some(reinvest_amount) = reinvest_amount {
             let token = self.market_info.collateral.clone();
             let bonus_amount = token
                 .into_u128(bonus_amount.into_decimal256())?
@@ -381,12 +382,20 @@ impl State<'_> {
                 contract_addr: self.market_info.addr.to_string(),
                 msg: to_binary(&ReinvestYield {
                     stake_to_xlp: true,
-                    amount: reinvest_amount,
+                    amount: Some(reinvest_amount),
                 })?,
                 funds: vec![],
             };
+            let xlp_before_reinvest = self.query_xlp_balance()?;
 
-            EPHEMERAL_BONUS_FUND.save(ctx.storage, &bonus_amount)?;
+            EPHEMERAL_BONUS_FUND.save(
+                ctx.storage,
+                &BonusFundReplyData {
+                    bonus_amount,
+                    reinvest_amount: reinvest_amount.raw(),
+                    xlp_before_reinvest,
+                },
+            )?;
 
             ctx.response.add_raw_submessage(SubMsg::reply_on_success(
                 reinvest_msg,
@@ -397,36 +406,49 @@ impl State<'_> {
         Ok(())
     }
 
-    pub(crate) fn handle_reinvest_yield_reply(&self, store: &mut dyn Storage) -> Result<()> {
-        let expected_yield = EPHEMERAL_BONUS_FUND.load_once(store)?;
+    pub(crate) fn handle_reinvest_yield_reply(&self, ctx: &mut StateContext) -> Result<()> {
+        let ephemeral_data = EPHEMERAL_BONUS_FUND.load_once(ctx.storage)?;
         let balance = self
             .market_info
             .collateral
             .query_balance(&self.querier, &self.env.contract.address)?;
 
         anyhow::ensure!(
-            expected_yield <= balance,
+            ephemeral_data.bonus_amount <= balance,
             "expected yield {} is greater than the current balance {}",
-            expected_yield,
+            ephemeral_data.bonus_amount,
             balance
         );
 
-        let mut fund_balance = self.load_bonus_fund(store)?;
-        fund_balance = fund_balance.checked_add(expected_yield)?;
+        let mut fund_balance = self.load_bonus_fund(ctx.storage)?;
+        fund_balance = fund_balance.checked_add(ephemeral_data.bonus_amount)?;
 
         anyhow::ensure!(
             fund_balance <= balance,
             "bonus fund {} is greater than the current balance {}",
-            expected_yield,
+            ephemeral_data.bonus_amount,
             balance
         );
 
-        self.save_bonus_fund(store, fund_balance)?;
+        self.save_bonus_fund(ctx.storage, fund_balance)?;
 
         let xlp_balance = self.query_xlp_balance()?;
-        let mut totals = self.load_farming_totals(store)?;
+        let mut totals = self.load_farming_totals(ctx.storage)?;
+        let xlp_delta = xlp_balance.checked_sub(ephemeral_data.xlp_before_reinvest)?;
+
         totals.xlp = xlp_balance;
-        self.save_farming_totals(store, &totals)?;
+        self.save_farming_totals(ctx.storage, &totals)?;
+
+        ctx.response.add_event(ReinvestEvent {
+            reinvested_yield: ephemeral_data.reinvest_amount,
+            xlp: xlp_delta,
+            bonus_yield: ephemeral_data.bonus_amount,
+        });
+
+        ctx.response.add_event(FarmingPoolSizeEvent {
+            farming: totals.farming,
+            xlp: totals.xlp,
+        });
 
         Ok(())
     }

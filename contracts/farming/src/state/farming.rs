@@ -110,12 +110,16 @@ impl State<'_> {
     }
 
     /// Update internal farming token balances to represent a deposit of xLP for the given farmer.
+    ///
+    /// Returns a tuple comprising
+    /// 1. the amount of newly minted farming tokens
+    /// 2. the latest [FarmingTotals]
     pub(crate) fn farming_deposit(
         &self,
         ctx: &mut StateContext,
         farmer: &Addr,
         xlp: LpToken,
-    ) -> Result<(FarmingToken, LpToken)> {
+    ) -> Result<(FarmingToken, FarmingTotals)> {
         let mut farmer_stats = match self.load_raw_farmer_stats(ctx.storage, farmer)? {
             None => RawFarmerStats::default(),
             Some(farmer_stats) => farmer_stats,
@@ -133,21 +137,21 @@ impl State<'_> {
         farmer_stats.farming_tokens = farmer_stats.farming_tokens.checked_add(new_farming)?;
         self.save_raw_farmer_stats(ctx.storage, farmer, &farmer_stats)?;
 
-        Ok((new_farming, totals.xlp))
+        Ok((new_farming, totals))
     }
 
     /// Update internal farming token balances to indicate a withdrawal of the given number of farming tokens.
     ///
     /// Returns a tuple comprising:
     /// 1. the amount of xLP tokens that were withdrawn
-    /// 2. The amount of farming tokens being burned
-    /// 3. The total amount of xLP in the contract after the withdrawal
+    /// 2. the amount of farming tokens being burned
+    /// 3. the latest [FarmingTotals]
     pub(crate) fn farming_withdraw(
         &self,
         ctx: &mut StateContext,
         farmer: &Addr,
         amount: Option<NonZero<FarmingToken>>,
-    ) -> Result<(LpToken, FarmingToken, LpToken)> {
+    ) -> Result<(LpToken, FarmingToken, FarmingTotals)> {
         let mut farmer_stats = match self.load_raw_farmer_stats(ctx.storage, farmer)? {
             None => bail!("Unable to withdraw, {} does not exist", farmer),
             Some(farmer_stats) => farmer_stats,
@@ -181,7 +185,7 @@ impl State<'_> {
         farmer_stats.farming_tokens = farmer_stats.farming_tokens.checked_sub(amount)?;
         self.save_raw_farmer_stats(ctx.storage, farmer, &farmer_stats)?;
 
-        Ok((removed_xlp, amount, totals.xlp))
+        Ok((removed_xlp, amount, totals))
     }
 
     /// Query the xLP token balance for the farming contract

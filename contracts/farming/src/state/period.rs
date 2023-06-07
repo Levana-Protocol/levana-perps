@@ -261,6 +261,11 @@ impl State<'_> {
             xlp: totals.xlp,
         });
 
+        ctx.response.add_event(FarmingPoolSizeEvent {
+            farming: totals.farming,
+            xlp: totals.xlp,
+        });
+
         Ok(())
     }
 }

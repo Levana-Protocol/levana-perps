@@ -23,8 +23,6 @@ pub struct DepositEvent {
     pub xlp: LpToken,
     /// The asset originally deposited by the farmer
     pub source: DepositSource,
-    /// The total amount of xLP deposited into the farming contract from all farmers
-    pub pool_size: LpToken,
 }
 
 /// Where did the funds for a farming deposit come from?
@@ -45,7 +43,6 @@ impl From<DepositEvent> for Event {
             farming,
             xlp,
             source,
-            pool_size,
         }: DepositEvent,
     ) -> Self {
         Event::new("deposit")
@@ -60,7 +57,6 @@ impl From<DepositEvent> for Event {
                     DepositSource::Xlp => "xlp",
                 },
             )
-            .add_attribute("pool-size", pool_size.to_string())
     }
 }
 
@@ -72,8 +68,6 @@ pub struct WithdrawEvent {
     pub farming: FarmingToken,
     /// Amount of xLP
     pub xlp: LpToken,
-    /// The total amount of xLP deposited into the farming contract from all farmers
-    pub pool_size: LpToken,
 }
 
 impl From<WithdrawEvent> for Event {
@@ -82,14 +76,12 @@ impl From<WithdrawEvent> for Event {
             farmer,
             farming,
             xlp,
-            pool_size,
         }: WithdrawEvent,
     ) -> Self {
         Event::new("withdraw")
             .add_attribute("farmer", farmer)
             .add_attribute("farming", farming.to_string())
             .add_attribute("xlp", xlp.to_string())
-            .add_attribute("pool-size", pool_size.to_string())
     }
 }
 
@@ -148,6 +140,76 @@ impl From<LockdropLaunchEvent> for Event {
         Event::new("lockdrop-withdraw-event")
             .add_attribute("launched-at", src.launched_at.to_string())
             .add_attribute("farming-tokens", src.farming_tokens.to_string())
+            .add_attribute("xlp", src.xlp.to_string())
+    }
+}
+
+/// Accrued market yield was reinvested
+pub struct ReinvestEvent {
+    /// The amount of yield accrued
+    pub reinvested_yield: Collateral,
+    /// The amount of new xLP
+    pub xlp: LpToken,
+    /// The amount of yield allocated to the bonus fund
+    pub bonus_yield: Collateral,
+}
+
+impl From<ReinvestEvent> for Event {
+    fn from(src: ReinvestEvent) -> Self {
+        Event::new("reinvest-event")
+            .add_attribute("reinvested_yield", src.reinvested_yield.to_string())
+            .add_attribute("xlp", src.xlp.to_string())
+            .add_attribute("bonus_yield", src.bonus_yield.to_string())
+    }
+}
+
+/// New emissions are set
+pub struct SetEmissionsEvent {
+    /// The emissions start time
+    pub start: Timestamp,
+    /// The duration of the emissions
+    pub duration: u32,
+    /// The amount of LVN tokens
+    pub tokens: LvnToken,
+}
+
+impl From<SetEmissionsEvent> for Event {
+    fn from(src: SetEmissionsEvent) -> Self {
+        Event::new("set-emissions-event")
+            .add_attribute("start", src.start.to_string())
+            .add_attribute("duration", src.duration.to_string())
+            .add_attribute("tokens", src.tokens.to_string())
+    }
+}
+
+/// Emissions are cleared
+pub struct ClearEmissionsEvent {
+    /// The timestamp for when the emissions were cleared
+    pub cleared_at: Timestamp,
+    /// The amount of LVN tokens that are no longer being distributed
+    pub remaining_lvn: LvnToken,
+}
+
+impl From<ClearEmissionsEvent> for Event {
+    fn from(src: ClearEmissionsEvent) -> Self {
+        Event::new("clear-emissions-event")
+            .add_attribute("cleared-at", src.cleared_at.to_string())
+            .add_attribute("remaining-lvn", src.remaining_lvn.to_string())
+    }
+}
+
+/// Provides current size of the farming assets
+pub struct FarmingPoolSizeEvent {
+    /// Total amount of minted farming tokens
+    pub farming: FarmingToken,
+    /// Total amount of xLP held by the farming contract
+    pub xlp: LpToken,
+}
+
+impl From<FarmingPoolSizeEvent> for Event {
+    fn from(src: FarmingPoolSizeEvent) -> Self {
+        Event::new("farming-pool-size-event")
+            .add_attribute("farming", src.farming.to_string())
             .add_attribute("xlp", src.xlp.to_string())
     }
 }
