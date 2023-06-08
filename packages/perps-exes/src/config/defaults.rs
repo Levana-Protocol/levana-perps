@@ -1,3 +1,5 @@
+use cosmwasm_std::Decimal256;
+
 use super::TaskConfig;
 
 pub(super) fn min_gas() -> u128 {
@@ -71,4 +73,13 @@ pub(super) fn ultra_crank() -> TaskConfig {
 pub(super) fn seconds_till_ultra() -> u32 {
     // 8 minutes
     60 * 8
+}
+
+pub fn max_price_age_secs() -> u32 {
+    // 2 minutes
+    60 * 2
+}
+
+pub fn max_allowed_price_delta() -> Decimal256 {
+    "0.005".parse().unwrap()
 }

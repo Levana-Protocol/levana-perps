@@ -8,7 +8,9 @@ use msg::{
     contracts::{
         cw20::entry::BalanceResponse,
         market::{
-            entry::{ClosedPositionsResp, LpInfoResp, SlippageAssert, StatusResp},
+            entry::{
+                ClosedPositionsResp, LpInfoResp, PriceWouldTriggerResp, SlippageAssert, StatusResp,
+            },
             position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
         },
         position_token::entry::{NumTokensResponse, QueryMsg as PositionQueryMsg, TokensResponse},
@@ -458,5 +460,13 @@ impl MarketContract {
             };
             self.0.execute(wallet, vec![], execute_msg).await
         }
+    }
+
+    pub async fn price_would_trigger(&self, price: PriceBaseInQuote) -> Result<bool> {
+        let PriceWouldTriggerResp { would_trigger } = self
+            .0
+            .query(MarketQueryMsg::PriceWouldTrigger { price })
+            .await?;
+        Ok(would_trigger)
     }
 }

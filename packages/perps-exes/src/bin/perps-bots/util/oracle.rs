@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use cosmos::{
     proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, Contract, Cosmos, HasAddress,
 };
-use cosmwasm_std::{Binary, Coin};
+use cosmwasm_std::{Binary, Coin, Uint256};
 use msg::{
     contracts::pyth_bridge::{
-        entry::QueryMsg as BridgeQueryMsg, MarketPrice, PythMarketPriceFeeds,
+        entry::QueryMsg as BridgeQueryMsg, MarketPrice, PythMarketPriceFeeds, PythPriceFeed,
     },
     prelude::*,
 };
@@ -120,6 +122,78 @@ impl Pyth {
             )?,
             funds: vec![],
         })
+    }
+
+    /// Get the latest price from Pyth
+    pub async fn get_latest_price(
+        &self,
+        client: &reqwest::Client,
+    ) -> Result<(PriceBaseInQuote, Option<PriceCollateralInUsd>)> {
+        let base = self
+            .price_helper(client, &self.market_price_feeds.feeds)
+            .await?;
+        let base = PriceBaseInQuote::try_from_number(base.into_signed())?;
+        let collateral = match &self.market_price_feeds.feeds_usd {
+            Some(feeds_usd) => {
+                let collateral = self.price_helper(client, feeds_usd).await?;
+                Some(PriceCollateralInUsd::try_from_number(
+                    collateral.into_signed(),
+                )?)
+            }
+            None => None,
+        };
+        Ok((base, collateral))
+    }
+
+    async fn price_helper(
+        &self,
+        client: &reqwest::Client,
+        feeds: &[PythPriceFeed],
+    ) -> Result<Decimal256> {
+        let mut req = client.get(format!("{}api/latest_price_feeds", self.endpoint));
+        for feed in feeds {
+            req = req.query(&[("ids[]", feed.id)]);
+        }
+
+        #[derive(serde::Deserialize)]
+        struct Record {
+            id: String,
+            price: Price,
+        }
+        #[derive(serde::Deserialize)]
+        struct Price {
+            expo: i8,
+            price: Uint256,
+        }
+        let records = req
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<Vec<Record>>()
+            .await?;
+
+        let prices = records
+            .into_iter()
+            .map(|Record { id, price }| (id, price))
+            .collect::<HashMap<_, _>>();
+
+        let mut final_price = Decimal256::one();
+
+        for feed in feeds {
+            let Price { expo, price } = prices
+                .get(&feed.id.to_hex())
+                .with_context(|| format!("Missing price for ID {}", feed.id))?;
+
+            anyhow::ensure!(*expo <= 0, "Exponent from Pyth must always be negative");
+            let component = Decimal256::from_atomics(*price, expo.abs().try_into()?)?;
+            if feed.inverted {
+                final_price = final_price.checked_div(component)?;
+            } else {
+                final_price = final_price.checked_mul(component)?;
+            }
+        }
+
+        Ok(final_price)
     }
 
     pub async fn get_wormhole_proofs(&self, client: &reqwest::Client) -> Result<Vec<String>> {
