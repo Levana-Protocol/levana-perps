@@ -64,6 +64,12 @@ impl State<'_> {
             period,
         )?;
 
+        ctx.response.add_event(LockdropDepositEvent {
+            farmer: user,
+            amount: amount.raw(),
+            bucket_id,
+        });
+
         Ok(())
     }
 
@@ -104,6 +110,12 @@ impl State<'_> {
             .context("invalid transfer msg")?;
 
         ctx.response.add_message(msg);
+
+        ctx.response.add_event(LockdropWithdrawEvent {
+            farmer: user,
+            amount: amount.raw(),
+            bucket_id,
+        });
 
         Ok(())
     }

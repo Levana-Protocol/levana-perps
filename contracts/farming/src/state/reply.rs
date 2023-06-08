@@ -64,11 +64,19 @@ where
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub(crate) struct BonusFundReplyData {
+    pub(crate) bonus_amount: Collateral,
+    pub(crate) reinvest_amount: Collateral,
+    pub(crate) xlp_before_reinvest: LpToken,
+}
+
 /// The portion of yield that was earned by the Farming Contract that is allocated to the bonus fund
 /// and is not reinvested into xLP.
-pub(crate) const EPHEMERAL_BONUS_FUND: EphemeralReplyData<Collateral> = EphemeralReplyData {
-    item: Item::new(namespace::EPHEMERAL_BONUS_FUND),
-};
+pub(crate) const EPHEMERAL_BONUS_FUND: EphemeralReplyData<BonusFundReplyData> =
+    EphemeralReplyData {
+        item: Item::new(namespace::EPHEMERAL_BONUS_FUND),
+    };
 
 #[derive(Serialize, Deserialize)]
 pub(crate) struct DepositReplyData {
@@ -76,6 +84,8 @@ pub(crate) struct DepositReplyData {
     pub(crate) farmer: Addr,
     /// The xLP balance before the farming contract sends the Collateral or LP
     pub(crate) xlp_balance_before: LpToken,
+    /// The asset that was originally deposited by the farmer
+    pub(crate) deposit_source: DepositSource,
 }
 
 /// The address of the farmer who sent the [ExecuteMsg::Deposit] msg with Collateral instead of xLP.

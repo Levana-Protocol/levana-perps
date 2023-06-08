@@ -242,9 +242,9 @@ impl State<'_> {
         }
     }
 
-    pub(crate) fn handle_transfer_collateral_reply(&self, store: &mut dyn Storage) -> Result<()> {
+    pub(crate) fn handle_transfer_collateral_reply(&self, ctx: &mut StateContext) -> Result<()> {
         let balance = self.query_xlp_balance()?;
-        let mut totals = self.load_farming_totals(store)?;
+        let mut totals = self.load_farming_totals(ctx.storage)?;
 
         anyhow::ensure!(
             totals.xlp.is_zero(),
@@ -253,7 +253,18 @@ impl State<'_> {
         );
 
         totals.xlp = balance;
-        self.save_farming_totals(store, &totals)?;
+        self.save_farming_totals(ctx.storage, &totals)?;
+
+        ctx.response.add_event(LockdropLaunchEvent {
+            launched_at: self.now(),
+            farming_tokens: totals.farming,
+            xlp: totals.xlp,
+        });
+
+        ctx.response.add_event(FarmingPoolSizeEvent {
+            farming: totals.farming,
+            xlp: totals.xlp,
+        });
 
         Ok(())
     }
