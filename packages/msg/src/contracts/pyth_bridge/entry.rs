@@ -50,6 +50,11 @@ pub enum ExecuteMsg {
         /// If unspecified, this defaults to the caller
         /// (of the bridge, not the bridge itself)
         rewards: Option<RawAddr>,
+
+        /// If true: then an error (such as no new price) bails out with Err
+        /// if false (the default): sets the error string on the response's data field and returns Ok
+        #[serde(default)]
+        bail_on_error: bool,
     },
 }
 
