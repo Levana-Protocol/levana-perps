@@ -203,3 +203,81 @@ fn liquidate_positions() {
     assert!(longlow.pnl_collateral < longreal.pnl_collateral);
     assert!(shortlow.pnl_collateral > shortreal.pnl_collateral);
 }
+
+#[test]
+fn would_trigger() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    market.exec_set_price("100".parse().unwrap()).unwrap();
+
+    let trader = market.clone_trader(0).unwrap();
+
+    let (long, _) = market
+        .exec_open_position(
+            &trader,
+            "5",
+            "10",
+            DirectionToBase::Long,
+            "1.0",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    let (_short, _) = market
+        .exec_open_position(
+            &trader,
+            "5",
+            "10",
+            DirectionToBase::Short,
+            "1.0",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    let pricehigh = PriceForQuery {
+        base: "101".parse().unwrap(),
+        collateral: None,
+    };
+    let priceveryhigh = PriceForQuery {
+        base: "200".parse().unwrap(),
+        collateral: None,
+    };
+    let pricelow = PriceForQuery {
+        base: "99".parse().unwrap(),
+        collateral: None,
+    };
+    let priceverylow = PriceForQuery {
+        base: "50".parse().unwrap(),
+        collateral: None,
+    };
+
+    assert_eq!(market.query_price_would_trigger(pricehigh).unwrap(), false);
+    assert_eq!(market.query_price_would_trigger(pricelow).unwrap(), false);
+    assert_eq!(
+        market.query_price_would_trigger(priceveryhigh).unwrap(),
+        true
+    );
+    assert_eq!(
+        market.query_price_would_trigger(priceverylow).unwrap(),
+        true
+    );
+
+    // Ensure that both liquidations and take profits are working by closing the long and only testing the short
+
+    market.exec_close_position(&trader, long, None).unwrap();
+    market.exec_crank_till_finished(&trader).unwrap();
+
+    assert_eq!(market.query_price_would_trigger(pricehigh).unwrap(), false);
+    assert_eq!(market.query_price_would_trigger(pricelow).unwrap(), false);
+    assert_eq!(
+        market.query_price_would_trigger(priceveryhigh).unwrap(),
+        true
+    );
+    assert_eq!(
+        market.query_price_would_trigger(priceverylow).unwrap(),
+        true
+    );
+}

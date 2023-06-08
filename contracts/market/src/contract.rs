@@ -21,7 +21,7 @@ use msg::{
     contracts::market::{
         entry::{
             DeltaNeutralityFeeResp, InstantiateMsg, MigrateMsg, PositionsQueryFeeApproach,
-            SpotPriceHistoryResp,
+            PriceWouldTriggerResp, SpotPriceHistoryResp,
         },
         position::{events::PositionSaveReason, PositionId, PositionOrPendingClose, PositionsResp},
     },
@@ -636,6 +636,10 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                     .into_base_price(state.market_id(store)?.get_market_type()),
             }
             .query_result()
+        }
+        QueryMsg::PriceWouldTrigger { price } => {
+            let would_trigger = state.price_would_trigger(store, price)?;
+            PriceWouldTriggerResp { would_trigger }.query_result()
         }
     }
 }

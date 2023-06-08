@@ -599,6 +599,15 @@ pub enum QueryMsg {
         /// should only be supplied if querying the fee for close or update
         pos_delta_neutrality_fee_margin: Option<Collateral>,
     },
+
+    /// Check if a price update would trigger a liquidation/take profit/etc.
+    ///
+    /// * returns [PriceWouldTriggerResp]
+    #[returns(PriceWouldTriggerResp)]
+    PriceWouldTrigger {
+        /// The new price point
+        price: PriceForQuery,
+    },
 }
 
 /// When querying an open position, how do we calculate PnL vis-a-vis fees?
@@ -1159,4 +1168,11 @@ pub enum LimitOrderResult {
 pub struct SpotPriceHistoryResp {
     /// list of historical price points
     pub price_points: Vec<PricePoint>,
+}
+
+/// Would a price update trigger a liquidation/take profit/etc?
+#[cw_serde]
+pub struct PriceWouldTriggerResp {
+    /// Would a price update trigger a liquidation/take profit/etc?
+    pub would_trigger: bool,
 }

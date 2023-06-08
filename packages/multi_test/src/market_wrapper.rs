@@ -39,8 +39,9 @@ use msg::contracts::market::crank::CrankWorkInfo;
 use msg::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
     LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpActionHistoryResp, LpInfoResp,
-    PositionActionHistoryResp, PositionsQueryFeeApproach, PriceForQuery, QueryMsg, SlippageAssert,
-    SpotPriceHistoryResp, StatusResp, TradeHistorySummary, TraderActionHistoryResp,
+    PositionActionHistoryResp, PositionsQueryFeeApproach, PriceForQuery, PriceWouldTriggerResp,
+    QueryMsg, SlippageAssert, SpotPriceHistoryResp, StatusResp, TradeHistorySummary,
+    TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
 use msg::contracts::market::{
@@ -454,6 +455,12 @@ impl PerpsMarket {
         anyhow::ensure!(positions.is_empty());
         anyhow::ensure!(closed.is_empty());
         pending_close.pop().ok_or_else(|| anyhow!("no positions"))
+    }
+
+    pub fn query_price_would_trigger(&self, price: PriceForQuery) -> Result<bool> {
+        let PriceWouldTriggerResp { would_trigger } =
+            self.query(&MarketQueryMsg::PriceWouldTrigger { price })?;
+        Ok(would_trigger)
     }
 
     pub fn query_position_with_pending_fees(
