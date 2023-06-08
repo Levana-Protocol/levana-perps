@@ -5,7 +5,7 @@ use msg::contracts::{factory::entry::CodeIds, tracker::entry::ContractResp};
 use crate::{
     cli::Opt,
     factory::{Factory, MarketInfo},
-    store_code::{FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN},
+    store_code::{FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN, PYTH_BRIDGE},
 };
 
 #[derive(clap::Parser)]
@@ -31,6 +31,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         .require_code_by_type(&opt, LIQUIDITY_TOKEN)
         .await?;
     let market_code_id = app.tracker.require_code_by_type(&opt, MARKET).await?;
+    let pyth_bridge_code_id = app.tracker.require_code_by_type(&opt, PYTH_BRIDGE).await?;
 
     let factory = match app
         .tracker
@@ -136,7 +137,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         position_token,
         liquidity_token_lp,
         liquidity_token_xlp,
-        price_admin: _,
+        price_admin,
     } in factory.get_markets().await?
     {
         log::info!("Performing migrations for market {market_id}");
@@ -230,6 +231,49 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                         "Logged {kind} liquidity token {market_id} update in tracker at: {}",
                         res.txhash
                     ),
+                }
+            }
+        }
+
+        // Check if the price admin is a pyth_bridge contract
+        let price_admin = app.basic.cosmos.make_contract(price_admin);
+        match price_admin.info().await {
+            Err(e) => {
+                log::info!("Received error when querying contract info for price admin {price_admin}: {e:?}");
+                log::info!("Ignoring, assuming we're not using pyth_bridge");
+            }
+            Ok(info) => {
+                if info.code_id == pyth_bridge_code_id.get_code_id() {
+                    log::info!(
+                        "Price admin {price_admin} is already using current Pyth bridge code ID {}",
+                        info.code_id
+                    );
+                } else {
+                    price_admin
+                        .migrate(
+                            &app.basic.wallet,
+                            pyth_bridge_code_id.get_code_id(),
+                            msg::contracts::pyth_bridge::entry::MigrateMsg {},
+                        )
+                        .await?;
+                    log::info!("pyth_bridge price admin contract for {market_id} migrated");
+                    match app
+                        .tracker
+                        .migrate(
+                            &app.basic.wallet,
+                            pyth_bridge_code_id.get_code_id(),
+                            price_admin.get_address(),
+                        )
+                        .await
+                    {
+                        Err(e) => {
+                            log::warn!("Unable to migrate pyth_bridge price admin contract: {e:?}")
+                        }
+                        Ok(res) => log::info!(
+                            "Logged pyth_bridge price admin contract for {market_id}, update in tracker at: {}",
+                            res.txhash
+                        ),
+                    }
                 }
             }
         }
