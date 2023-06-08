@@ -87,7 +87,7 @@ where
             loop {
                 let resp = self
                     .bridge
-                    .query_market::<StatusResp>(QueryMsg::Status {})
+                    .query_market::<StatusResp>(QueryMsg::Status { price: None })
                     .await?;
                 if resp.data.next_crank.is_some() {
                     let resp = self.bridge.crank().await?;
@@ -335,6 +335,7 @@ where
             position_ids: vec![pos_id],
             skip_calc_pending_fees: Some(false),
             fees: None,
+            price: None,
         };
         let mut resp = self.bridge.query_market::<PositionsResp>(msg).await?;
 

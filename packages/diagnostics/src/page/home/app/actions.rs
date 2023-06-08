@@ -125,7 +125,11 @@ impl App {
         self.stats
             .update_trade_history(resp.msg_id, resp.msg_elapsed, resp.data);
 
-        let resp = self.bridge.query_market(QueryMsg::Status {}).await.unwrap();
+        let resp = self
+            .bridge
+            .query_market(QueryMsg::Status { price: None })
+            .await
+            .unwrap();
         self.stats
             .update_market_status(resp.msg_id, resp.msg_elapsed, resp.data);
     }

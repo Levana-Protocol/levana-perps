@@ -21,7 +21,7 @@ use msg::{
     contracts::market::{
         entry::{
             DeltaNeutralityFeeResp, InstantiateMsg, MigrateMsg, PositionsQueryFeeApproach,
-            SpotPriceHistoryResp,
+            PriceWouldTriggerResp, SpotPriceHistoryResp,
         },
         position::{events::PositionSaveReason, PositionId, PositionOrPendingClose, PositionsResp},
     },
@@ -437,7 +437,10 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
     match msg {
         QueryMsg::Version {} => get_contract_version(store)?.query_result(),
 
-        QueryMsg::Status {} => state.status(store)?.query_result(),
+        QueryMsg::Status { price } => {
+            state.override_current_price(store, price)?;
+            state.status(store)?.query_result()
+        }
 
         QueryMsg::SpotPrice { timestamp } => state.spot_price(store, timestamp)?.query_result(),
         QueryMsg::SpotPriceHistory {
@@ -459,7 +462,10 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             position_ids,
             skip_calc_pending_fees,
             fees,
+            price,
         } => {
+            state.override_current_price(store, price)?;
+
             let mut closed = vec![];
             let mut positions = vec![];
             let mut pending_close = vec![];
@@ -630,6 +636,10 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                     .into_base_price(state.market_id(store)?.get_market_type()),
             }
             .query_result()
+        }
+        QueryMsg::PriceWouldTrigger { price } => {
+            let would_trigger = state.price_would_trigger(store, price)?;
+            PriceWouldTriggerResp { would_trigger }.query_result()
         }
     }
 }

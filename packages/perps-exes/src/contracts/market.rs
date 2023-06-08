@@ -26,12 +26,12 @@ impl MarketContract {
     }
 
     pub async fn status(&self) -> Result<StatusResp> {
-        self.0.query(MarketQueryMsg::Status {}).await
+        self.0.query(MarketQueryMsg::Status { price: None }).await
     }
 
     pub async fn status_at_height(&self, height: u64) -> Result<StatusResp> {
         self.0
-            .query_at_height(MarketQueryMsg::Status {}, height)
+            .query_at_height(MarketQueryMsg::Status { price: None }, height)
             .await
     }
 
@@ -191,6 +191,7 @@ impl MarketContract {
                 position_ids: vec![pos_id],
                 skip_calc_pending_fees: Some(false),
                 fees: None,
+                price: None,
             })
             .await?;
         positions
@@ -276,6 +277,7 @@ impl MarketContract {
             position_ids: positions.clone(),
             skip_calc_pending_fees: Some(false),
             fees: None,
+            price: None,
         };
         let PositionsResp {
             positions: response,
@@ -295,6 +297,7 @@ impl MarketContract {
             position_ids: vec![position_id],
             skip_calc_pending_fees: Some(false),
             fees: None,
+            price: None,
         };
         let PositionsResp {
             positions: mut response,

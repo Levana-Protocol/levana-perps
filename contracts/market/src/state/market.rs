@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use cosmwasm_std::Order;
-use msg::contracts::market::spot_price::events::SpotPriceEvent;
+use msg::contracts::market::{entry::PriceForQuery, spot_price::events::SpotPriceEvent};
 
 /// Stores spot price history.
 /// Key is a [Timestamp] of when the price was received.
@@ -68,6 +68,36 @@ impl State<'_> {
                 .make_price_point(store, timestamp, price_storage)
                 .map(Some),
         }
+    }
+
+    /// Override the current price with the given value.
+    ///
+    /// This doesn't store any data in the contract. Instead, it only updates an
+    /// in-memory representation.
+    pub(crate) fn override_current_price(
+        &self,
+        store: &dyn Storage,
+        price: Option<PriceForQuery>,
+    ) -> Result<()> {
+        if let Some(PriceForQuery { base, collateral }) = price {
+            let market_id = self.market_id(store)?;
+            let market_type = market_id.get_market_type();
+            let price_usd = get_price_usd(base, collateral, market_id)?;
+            let price = base.into_notional_price(market_type);
+            let price = PricePoint {
+                price_notional: price,
+                price_usd,
+                price_base: base,
+                timestamp: self.now(),
+                is_notional_usd: market_id.is_notional_usd(),
+                market_type,
+            };
+            self.spot_price_cache
+                .set(price)
+                .ok()
+                .context("override_current_price: current price already loaded")?;
+        }
+        Ok(())
     }
 
     /// Returns the spot price for the provided timestamp.

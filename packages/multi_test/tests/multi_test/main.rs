@@ -18,6 +18,7 @@ pub mod lp_cw20;
 pub mod multi_market;
 pub mod nft;
 pub mod order;
+pub mod override_price;
 pub mod position;
 pub(crate) mod prelude;
 pub mod proptest;

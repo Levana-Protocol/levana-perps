@@ -125,8 +125,9 @@ impl App {
     }
 
     async fn check_crank(&self, market: &Contract) -> Result<Option<market::crank::CrankWorkInfo>> {
-        let market::entry::StatusResp { next_crank, .. } =
-            market.query(market::entry::QueryMsg::Status {}).await?;
+        let market::entry::StatusResp { next_crank, .. } = market
+            .query(market::entry::QueryMsg::Status { price: None })
+            .await?;
 
         Ok(next_crank)
     }

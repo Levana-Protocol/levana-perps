@@ -359,6 +359,19 @@ pub struct ClosedPositionCursor {
     pub position: PositionId,
 }
 
+/// Use this price as the current price during a query.
+#[cw_serde]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Eq, Copy)]
+pub struct PriceForQuery {
+    /// Price of the base asset in terms of quote
+    pub base: PriceBaseInQuote,
+    /// Price of the collateral asset in terms of USD
+    ///
+    /// This is optional if the notional asset is USD and required otherwise.
+    pub collateral: Option<PriceCollateralInUsd>,
+}
+
 /// Query messages on the market contract
 #[cw_serde]
 #[derive(QueryResponses)]
@@ -376,7 +389,10 @@ pub enum QueryMsg {
     ///
     /// * returns [StatusResp]
     #[returns(StatusResp)]
-    Status {},
+    Status {
+        /// Price to be used as the current price
+        price: Option<PriceForQuery>,
+    },
 
     /// * returns [shared::prelude::PricePoint]
     ///
@@ -425,6 +441,8 @@ pub enum QueryMsg {
         ///
         /// Any value here will override the `skip_calc_pending_fees` field.
         fees: Option<PositionsQueryFeeApproach>,
+        /// Price to be used as the current price
+        price: Option<PriceForQuery>,
     },
 
     /// * returns [LimitOrderResp]
@@ -580,6 +598,15 @@ pub enum QueryMsg {
         /// for real delta neutrality fees, this is calculated internally
         /// should only be supplied if querying the fee for close or update
         pos_delta_neutrality_fee_margin: Option<Collateral>,
+    },
+
+    /// Check if a price update would trigger a liquidation/take profit/etc.
+    ///
+    /// * returns [PriceWouldTriggerResp]
+    #[returns(PriceWouldTriggerResp)]
+    PriceWouldTrigger {
+        /// The new price of the base asset in terms of quote
+        price: PriceBaseInQuote,
     },
 }
 
@@ -863,7 +890,9 @@ impl QueryMsg {
         // prior art for this approach: https://github.com/rust-fuzz/arbitrary/blob/061ca86be699faf1fb584dd7a7843b3541cd5f2c/src/lib.rs#L724
         match u.int_in_range::<u8>(0..=11)? {
             0 => Ok(Self::Version {}),
-            1 => Ok(Self::Status {}),
+            1 => Ok(Self::Status {
+                price: u.arbitrary()?,
+            }),
             2 => Ok(Self::SpotPrice {
                 timestamp: u.arbitrary()?,
             }),
@@ -871,6 +900,7 @@ impl QueryMsg {
                 position_ids: u.arbitrary()?,
                 skip_calc_pending_fees: u.arbitrary()?,
                 fees: u.arbitrary()?,
+                price: u.arbitrary()?,
             }),
 
             4 => Ok(Self::LimitOrder {
@@ -1138,4 +1168,11 @@ pub enum LimitOrderResult {
 pub struct SpotPriceHistoryResp {
     /// list of historical price points
     pub price_points: Vec<PricePoint>,
+}
+
+/// Would a price update trigger a liquidation/take profit/etc?
+#[cw_serde]
+pub struct PriceWouldTriggerResp {
+    /// Would a price update trigger a liquidation/take profit/etc?
+    pub would_trigger: bool,
 }
