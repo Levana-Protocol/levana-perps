@@ -225,7 +225,7 @@ impl State<'_> {
             let start_time = max(latest_timestamp, emissions.start);
             let end_time = min(self.now(), emissions.end);
             let elapsed_time =
-                end_time.checked_sub(start_time, "calculate_rewards_per_farming_token")?;
+                end_time.checked_sub(start_time, "calculate_emissions_per_token_per_time")?;
             let elapsed_time = Decimal256::from_ratio(elapsed_time.as_nanos(), 1u64);
             let elapsed_ratio = elapsed_time.checked_div(emissions_duration)?;
 
@@ -247,8 +247,16 @@ impl State<'_> {
         farmer_stats: &mut RawFarmerStats,
     ) -> Result<()> {
         if let Some(emissions) = self.may_load_lvn_emissions(ctx.storage)? {
-            self.update_emissions_per_token(ctx, &emissions)?;
-            self.update_accrued_emissions(ctx, addr, &emissions, farmer_stats)?;
+            let emissions_per_token = self.update_emissions_per_token(ctx, &emissions)?;
+            let accrued_rewards =
+                self.calculate_unlocked_emissions(ctx.storage, farmer_stats, &emissions)?;
+
+            farmer_stats.accrued_emissions = farmer_stats
+                .accrued_emissions
+                .checked_add(accrued_rewards)?;
+            farmer_stats.xlp_last_claimed_prefix_sum = emissions_per_token;
+
+            self.save_raw_farmer_stats(ctx.storage, addr, farmer_stats)?;
         }
 
         Ok(())
@@ -276,35 +284,14 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         emissions: &Emissions,
-    ) -> Result<()> {
-        let rewards_per_token =
+    ) -> Result<LvnToken> {
+        let emissions_per_token =
             self.calculate_emissions_per_token_per_time(ctx.storage, emissions)?;
+        let key = min(self.now(), emissions.end);
 
-        EMISSIONS_PER_TIME_PER_TOKEN.save(ctx.storage, self.now(), &rewards_per_token)?;
+        EMISSIONS_PER_TIME_PER_TOKEN.save(ctx.storage, key, &emissions_per_token)?;
 
-        Ok(())
-    }
-
-    /// Allocates accrued emissions to the specified user
-    pub(crate) fn update_accrued_emissions(
-        &self,
-        ctx: &mut StateContext,
-        addr: &Addr,
-        emissions: &Emissions,
-        farmer_stats: &mut RawFarmerStats,
-    ) -> Result<()> {
-        let accrued_rewards =
-            self.calculate_unlocked_emissions(ctx.storage, farmer_stats, emissions)?;
-
-        farmer_stats.accrued_emissions = farmer_stats
-            .accrued_emissions
-            .checked_add(accrued_rewards)?;
-        let end_prefix_sum = self.calculate_emissions_per_token_per_time(ctx.storage, emissions)?;
-        farmer_stats.xlp_last_claimed_prefix_sum = end_prefix_sum;
-
-        self.save_raw_farmer_stats(ctx.storage, addr, farmer_stats)?;
-
-        Ok(())
+        Ok(emissions_per_token)
     }
 
     /// Calculates how many tokens the user can claim from LVN emissions
