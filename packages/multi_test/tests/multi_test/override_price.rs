@@ -257,3 +257,48 @@ fn would_trigger() {
     assert!(market.query_price_would_trigger(priceveryhigh).unwrap(),);
     assert!(market.query_price_would_trigger(priceverylow).unwrap(),);
 }
+
+#[test]
+fn would_trigger_on_limit() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    market.exec_set_price("100".parse().unwrap()).unwrap();
+    assert!(!market
+        .query_price_would_trigger("90".parse().unwrap())
+        .unwrap());
+
+    let trader = market.clone_trader(0).unwrap();
+
+    let (long, _) = market
+        .exec_place_limit_order(
+            &trader,
+            "5".parse().unwrap(),
+            "90".parse().unwrap(),
+            "10".parse().unwrap(),
+            DirectionToBase::Long,
+            "1.0".parse().unwrap(),
+            None,
+            None,
+        )
+        .unwrap();
+    assert!(market
+        .query_price_would_trigger("90".parse().unwrap())
+        .unwrap());
+    assert!(market
+        .query_price_would_trigger("89".parse().unwrap())
+        .unwrap());
+    assert!(!market
+        .query_price_would_trigger("91".parse().unwrap())
+        .unwrap());
+
+    market.exec_cancel_limit_order(&trader, long).unwrap();
+    assert!(!market
+        .query_price_would_trigger("90".parse().unwrap())
+        .unwrap());
+    assert!(!market
+        .query_price_would_trigger("89".parse().unwrap())
+        .unwrap());
+    assert!(!market
+        .query_price_would_trigger("91".parse().unwrap())
+        .unwrap());
+}

@@ -107,7 +107,7 @@ impl State<'_> {
                         price_point,
                     }
                 } else if let Some(order_id) =
-                    self.limit_order_triggered_order(store, price_point.price_notional)?
+                    self.limit_order_triggered_order(store, price_point.price_notional, false)?
                 {
                     CrankWorkInfo::LimitOrder { order_id }
                 } else {
@@ -126,7 +126,10 @@ impl State<'_> {
         price: PriceBaseInQuote,
     ) -> Result<bool> {
         let price = price.into_notional_price(self.market_type(store)?);
-        self.liquidatable_position(store, price)
+        if self.liquidatable_position(store, price)?.is_some() {
+            return Ok(true);
+        }
+        self.limit_order_triggered_order(store, price, true)
             .map(|x| x.is_some())
     }
 
