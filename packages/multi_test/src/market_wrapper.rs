@@ -435,6 +435,27 @@ impl PerpsMarket {
         positions.pop().ok_or_else(|| anyhow!("no positions"))
     }
 
+    pub fn query_position_pending_close_with_price(
+        &self,
+        position_id: PositionId,
+        price: PriceForQuery,
+    ) -> Result<ClosedPosition> {
+        let PositionsResp {
+            positions,
+            mut pending_close,
+            closed,
+        } = self.query(&MarketQueryMsg::Positions {
+            position_ids: vec![position_id],
+            // Backwards compat in the tests
+            skip_calc_pending_fees: Some(true),
+            fees: None,
+            price: Some(price),
+        })?;
+        anyhow::ensure!(positions.is_empty());
+        anyhow::ensure!(closed.is_empty());
+        pending_close.pop().ok_or_else(|| anyhow!("no positions"))
+    }
+
     pub fn query_position_with_pending_fees(
         &self,
         position_id: PositionId,

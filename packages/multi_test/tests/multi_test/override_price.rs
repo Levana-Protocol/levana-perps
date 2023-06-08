@@ -1,5 +1,11 @@
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::{contracts::market::entry::PriceForQuery, prelude::*};
+use msg::{
+    contracts::market::{
+        entry::PriceForQuery,
+        position::{LiquidationReason, PositionCloseReason},
+    },
+    prelude::*,
+};
 
 #[test]
 fn status() {
@@ -108,6 +114,92 @@ fn positions() {
     };
     let longlow = market.query_position_with_price(long, pricelow).unwrap();
     let shortlow = market.query_position_with_price(short, pricelow).unwrap();
+    assert!(longlow.pnl_collateral < longreal.pnl_collateral);
+    assert!(shortlow.pnl_collateral > shortreal.pnl_collateral);
+
+    market.exec_set_price("99".parse().unwrap()).unwrap();
+    let longfinal = market.query_position(long).unwrap();
+    let shortfinal = market.query_position(short).unwrap();
+
+    assert_eq!(longlow.pnl_collateral, longfinal.pnl_collateral);
+    assert_eq!(shortlow.pnl_collateral, shortfinal.pnl_collateral);
+}
+
+#[test]
+fn liquidate_positions() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    market.exec_set_price("100".parse().unwrap()).unwrap();
+
+    let trader = market.clone_trader(0).unwrap();
+
+    let (long, _) = market
+        .exec_open_position(
+            &trader,
+            "5",
+            "10",
+            DirectionToBase::Long,
+            "1.0",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    let (short, _) = market
+        .exec_open_position(
+            &trader,
+            "5",
+            "10",
+            DirectionToBase::Short,
+            "1.0",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    let longreal = market.query_position(long).unwrap();
+    let shortreal = market.query_position(short).unwrap();
+
+    let pricehigh = PriceForQuery {
+        base: "200".parse().unwrap(),
+        collateral: None,
+    };
+    let longhigh = market
+        .query_position_pending_close_with_price(long, pricehigh)
+        .unwrap();
+    let shorthigh = market
+        .query_position_pending_close_with_price(short, pricehigh)
+        .unwrap();
+    assert_eq!(
+        longhigh.reason,
+        PositionCloseReason::Liquidated(LiquidationReason::MaxGains)
+    );
+    assert_eq!(
+        shorthigh.reason,
+        PositionCloseReason::Liquidated(LiquidationReason::Liquidated)
+    );
+    assert!(longhigh.pnl_collateral > longreal.pnl_collateral);
+    assert!(shorthigh.pnl_collateral < shortreal.pnl_collateral);
+
+    let pricelow = PriceForQuery {
+        base: "50".parse().unwrap(),
+        collateral: None,
+    };
+    let longlow = market
+        .query_position_pending_close_with_price(long, pricelow)
+        .unwrap();
+    let shortlow = market
+        .query_position_pending_close_with_price(short, pricelow)
+        .unwrap();
+    assert_eq!(
+        longlow.reason,
+        PositionCloseReason::Liquidated(LiquidationReason::Liquidated)
+    );
+    assert_eq!(
+        shortlow.reason,
+        PositionCloseReason::Liquidated(LiquidationReason::MaxGains)
+    );
     assert!(longlow.pnl_collateral < longreal.pnl_collateral);
     assert!(shortlow.pnl_collateral > shortreal.pnl_collateral);
 }
