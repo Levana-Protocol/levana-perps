@@ -383,7 +383,7 @@ fn test_multiple_withdraws() {
 
     let interval: i64 = (EMISSIONS_DURATION / 4).into();
     market.set_time(TimeJump::Seconds(interval)).unwrap();
-    farming_withdraw(&market, &lp, Some("20")).unwrap(); // accrued 40 LVN
+    farming_withdraw(&market, &lp, Some("20")).unwrap();
 
     let stats = market.query_farming_farmer_stats(&lp).unwrap();
     assert_eq!(stats.emission_rewards, "50".parse().unwrap());
