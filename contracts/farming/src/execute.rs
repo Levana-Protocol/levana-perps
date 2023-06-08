@@ -181,8 +181,8 @@ impl State<'_> {
 
     fn handle_farming_deposit_reply(&self, ctx: &mut StateContext) -> Result<()> {
         let ephemeral_data = EPHEMERAL_DEPOSIT_COLLATERAL_DATA.load_once(ctx.storage)?;
-        let new_balance = self.query_xlp_balance()?;
-        let delta = new_balance.checked_sub(ephemeral_data.xlp_balance_before)?;
+        let new_xlp_balance = self.query_xlp_balance()?;
+        let delta = new_xlp_balance.checked_sub(ephemeral_data.xlp_balance_before)?;
         let (farming, totals) = self.farming_deposit(ctx, &ephemeral_data.farmer, delta)?;
 
         ctx.response.add_event(DepositEvent {

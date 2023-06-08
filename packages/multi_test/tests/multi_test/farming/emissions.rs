@@ -144,6 +144,78 @@ fn test_emissions_multiple_lps() {
 }
 
 #[test]
+fn test_multiple_emissions() {
+    // Setup
+
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let mut market = PerpsMarket::new(app_cell).unwrap();
+    let lps = [
+        market.clone_lp(0).unwrap(),
+        market.clone_lp(1).unwrap(),
+        market.clone_lp(2).unwrap(),
+        market.clone_lp(3).unwrap(),
+    ];
+
+    market.automatic_time_jump_enabled = false;
+
+    market.exec_farming_start_lockdrop(None).unwrap();
+    market.set_time(TimeJump::Hours(24 * 365)).unwrap();
+    market.exec_farming_start_launch().unwrap();
+
+    let token = market.setup_lvn_rewards("400");
+
+    // Execute first emissions with two LPs
+
+    for lp in &lps[0..=1] {
+        market
+            .exec_mint_and_deposit_liquidity(lp, "100".parse().unwrap())
+            .unwrap();
+        market
+            .exec_farming_deposit_lp(lp, "100".parse().unwrap())
+            .unwrap();
+    }
+
+    market
+        .exec_farming_set_emissions(market.now(), 20, "200".parse().unwrap(), token.clone())
+        .unwrap();
+    market.set_time(TimeJump::Seconds(100)).unwrap();
+
+    let lp0_stats = market.query_farming_farmer_stats(&lps[0]).unwrap();
+    assert_eq!(lp0_stats.emission_rewards, "100".parse().unwrap());
+
+    let lp1_stats = market.query_farming_farmer_stats(&lps[1]).unwrap();
+    assert_eq!(lp1_stats.emission_rewards, "100".parse().unwrap());
+
+    // Execute second emissions with an additional two LPs
+
+    for lp in &lps[2..=3] {
+        market
+            .exec_mint_and_deposit_liquidity(lp, "100".parse().unwrap())
+            .unwrap();
+        market
+            .exec_farming_deposit_lp(lp, "100".parse().unwrap())
+            .unwrap();
+    }
+
+    market
+        .exec_farming_set_emissions(market.now(), 20, "200".parse().unwrap(), token)
+        .unwrap();
+    market.set_time(TimeJump::Seconds(100)).unwrap();
+
+    let lp0_stats = market.query_farming_farmer_stats(&lps[0]).unwrap();
+    assert_eq!(lp0_stats.emission_rewards, "150".parse().unwrap());
+
+    let lp1_stats = market.query_farming_farmer_stats(&lps[1]).unwrap();
+    assert_eq!(lp1_stats.emission_rewards, "150".parse().unwrap());
+
+    let lp2_stats = market.query_farming_farmer_stats(&lps[2]).unwrap();
+    assert_eq!(lp2_stats.emission_rewards, "50".parse().unwrap());
+
+    let lp3_stats = market.query_farming_farmer_stats(&lps[3]).unwrap();
+    assert_eq!(lp3_stats.emission_rewards, "50".parse().unwrap());
+}
+
+#[test]
 fn test_deposit_collateral() {
     // Setup
 
