@@ -137,7 +137,7 @@ pub struct LockdropLaunchEvent {
 
 impl From<LockdropLaunchEvent> for Event {
     fn from(src: LockdropLaunchEvent) -> Self {
-        Event::new("lockdrop-withdraw-event")
+        Event::new("lockdrop-launch-event")
             .add_attribute("launched-at", src.launched_at.to_string())
             .add_attribute("farming-tokens", src.farming_tokens.to_string())
             .add_attribute("xlp", src.xlp.to_string())
