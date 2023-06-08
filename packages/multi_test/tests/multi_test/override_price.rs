@@ -242,30 +242,18 @@ fn would_trigger() {
     let pricelow = "99".parse().unwrap();
     let priceverylow = "50".parse().unwrap();
 
-    assert_eq!(market.query_price_would_trigger(pricehigh).unwrap(), false);
-    assert_eq!(market.query_price_would_trigger(pricelow).unwrap(), false);
-    assert_eq!(
-        market.query_price_would_trigger(priceveryhigh).unwrap(),
-        true
-    );
-    assert_eq!(
-        market.query_price_would_trigger(priceverylow).unwrap(),
-        true
-    );
+    assert!(!market.query_price_would_trigger(pricehigh).unwrap());
+    assert!(!market.query_price_would_trigger(pricelow).unwrap());
+    assert!(market.query_price_would_trigger(priceveryhigh).unwrap());
+    assert!(market.query_price_would_trigger(priceverylow).unwrap());
 
     // Ensure that both liquidations and take profits are working by closing the long and only testing the short
 
     market.exec_close_position(&trader, long, None).unwrap();
     market.exec_crank_till_finished(&trader).unwrap();
 
-    assert_eq!(market.query_price_would_trigger(pricehigh).unwrap(), false);
-    assert_eq!(market.query_price_would_trigger(pricelow).unwrap(), false);
-    assert_eq!(
-        market.query_price_would_trigger(priceveryhigh).unwrap(),
-        true
-    );
-    assert_eq!(
-        market.query_price_would_trigger(priceverylow).unwrap(),
-        true
-    );
+    assert!(!market.query_price_would_trigger(pricehigh).unwrap());
+    assert!(!market.query_price_would_trigger(pricelow).unwrap());
+    assert!(market.query_price_would_trigger(priceveryhigh).unwrap(),);
+    assert!(market.query_price_would_trigger(priceverylow).unwrap(),);
 }
