@@ -21,7 +21,7 @@ fn farming_deposit_from_source(
     match source {
         DepositSource::Collateral => {
             market
-                .exec_farming_deposit_collateral(&lp, "100".parse().unwrap())
+                .exec_farming_deposit_collateral(lp, "100".parse().unwrap())
                 .unwrap();
         }
         DepositSource::Lp => {
@@ -30,7 +30,7 @@ fn farming_deposit_from_source(
         }
         DepositSource::Xlp => {
             market.exec_mint_and_deposit_liquidity(lp, "100".parse().unwrap())?;
-            market.exec_stake_lp(&lp, Some("100".parse().unwrap()))?;
+            market.exec_stake_lp(lp, Some("100".parse().unwrap()))?;
             market.exec_farming_deposit_xlp(lp, "100".parse().unwrap())?;
         }
     }
@@ -50,7 +50,7 @@ fn start_emissions(market: &PerpsMarket) -> Result<()> {
         market.now(),
         EMISSIONS_DURATION,
         EMISSIONS_REWARDS.parse().unwrap(),
-        token.clone(),
+        token,
     )?;
 
     Ok(())
