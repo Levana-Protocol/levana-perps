@@ -114,6 +114,8 @@ impl Pyth {
                     market_id,
                     execs: None,
                     rewards: None,
+                    /// TBD: bots currently expect and process the error
+                    bail_on_error: true,
                 },
             )?,
             funds: vec![],
