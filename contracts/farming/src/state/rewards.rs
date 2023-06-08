@@ -234,7 +234,8 @@ impl State<'_> {
                 .checked_div_dec(total_farming_tokens.into_decimal256())?
         };
 
-        let new_emissions_per_token = latest_emissions_per_token.checked_add(emissions_per_token)?;
+        let new_emissions_per_token =
+            latest_emissions_per_token.checked_add(emissions_per_token)?;
 
         Ok(new_emissions_per_token)
     }

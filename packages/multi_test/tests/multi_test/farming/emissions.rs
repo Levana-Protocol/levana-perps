@@ -13,7 +13,11 @@ fn farming_withdraw(market: &PerpsMarket, lp: &Addr, amount: Option<&str>) -> Re
     Ok(())
 }
 
-fn farming_deposit_from_source(market: &PerpsMarket, lp: &Addr, source: DepositSource) -> Result<()> {
+fn farming_deposit_from_source(
+    market: &PerpsMarket,
+    lp: &Addr,
+    source: DepositSource,
+) -> Result<()> {
     match source {
         DepositSource::Collateral => {
             market
@@ -21,13 +25,11 @@ fn farming_deposit_from_source(market: &PerpsMarket, lp: &Addr, source: DepositS
                 .unwrap();
         }
         DepositSource::Lp => {
-            market
-                .exec_mint_and_deposit_liquidity(lp, "100".parse().unwrap())?;
+            market.exec_mint_and_deposit_liquidity(lp, "100".parse().unwrap())?;
             market.exec_farming_deposit_lp(lp, "100".parse().unwrap())?;
         }
         DepositSource::Xlp => {
-            market
-                .exec_mint_and_deposit_liquidity(lp, "100".parse().unwrap())?;
+            market.exec_mint_and_deposit_liquidity(lp, "100".parse().unwrap())?;
             market.exec_stake_lp(&lp, Some("100".parse().unwrap()))?;
             market.exec_farming_deposit_xlp(lp, "100".parse().unwrap())?;
         }
@@ -44,8 +46,12 @@ fn move_past_lockdrop(market: &PerpsMarket) {
 
 fn start_emissions(market: &PerpsMarket) -> Result<()> {
     let token = market.mint_lvn_rewards(EMISSIONS_REWARDS);
-    market
-        .exec_farming_set_emissions(market.now(), EMISSIONS_DURATION, EMISSIONS_REWARDS.parse().unwrap(), token.clone())?;
+    market.exec_farming_set_emissions(
+        market.now(),
+        EMISSIONS_DURATION,
+        EMISSIONS_REWARDS.parse().unwrap(),
+        token.clone(),
+    )?;
 
     Ok(())
 }
@@ -187,7 +193,9 @@ fn test_emission_bounds() {
     farming_deposit(&market, &lp1).unwrap();
 
     start_emissions(&market).unwrap();
-    market.set_time(TimeJump::Seconds(EMISSIONS_DURATION.into())).unwrap();
+    market
+        .set_time(TimeJump::Seconds(EMISSIONS_DURATION.into()))
+        .unwrap();
 
     // lp0 deposits at end of emissions
     farming_deposit(&market, &lp0).unwrap();
@@ -213,7 +221,6 @@ fn test_multiple_emissions() {
     let lp2 = market.clone_lp(2).unwrap();
     let lp3 = market.clone_lp(3).unwrap();
 
-
     market.automatic_time_jump_enabled = false;
 
     move_past_lockdrop(&market);
@@ -238,7 +245,9 @@ fn test_multiple_emissions() {
     farming_deposit(&market, &lp2).unwrap();
 
     // lp3 deposits 3/4 of the way in
-    market.set_time(TimeJump::Seconds((EMISSIONS_DURATION * 3 / 4).into())).unwrap();
+    market
+        .set_time(TimeJump::Seconds((EMISSIONS_DURATION * 3 / 4).into()))
+        .unwrap();
     farming_deposit(&market, &lp3).unwrap();
 
     market.set_time(TimeJump::Seconds(100)).unwrap();
@@ -341,15 +350,22 @@ fn test_withdraw() {
     move_past_lockdrop(&market);
     start_emissions(&market).unwrap();
 
-    market.set_time(TimeJump::Seconds((EMISSIONS_DURATION / 4).into())).unwrap();
+    market
+        .set_time(TimeJump::Seconds((EMISSIONS_DURATION / 4).into()))
+        .unwrap();
     farming_deposit(&market, &lp).unwrap();
 
-    market.set_time(TimeJump::Seconds((EMISSIONS_DURATION / 2).into())).unwrap();
+    market
+        .set_time(TimeJump::Seconds((EMISSIONS_DURATION / 2).into()))
+        .unwrap();
     farming_withdraw(&market, &lp, None).unwrap();
 
     market.set_time(TimeJump::Seconds(100)).unwrap();
     let stats = market.query_farming_farmer_stats(&lp).unwrap();
-    assert_eq!(stats.emission_rewards, LvnToken::from(EMISSIONS_REWARDS.parse::<u64>().unwrap() / 2));
+    assert_eq!(
+        stats.emission_rewards,
+        LvnToken::from(EMISSIONS_REWARDS.parse::<u64>().unwrap() / 2)
+    );
     assert_eq!(stats.farming_tokens, FarmingToken::zero());
 }
 
