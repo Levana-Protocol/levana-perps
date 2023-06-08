@@ -605,8 +605,8 @@ pub enum QueryMsg {
     /// * returns [PriceWouldTriggerResp]
     #[returns(PriceWouldTriggerResp)]
     PriceWouldTrigger {
-        /// The new price point
-        price: PriceForQuery,
+        /// The new price of the base asset in terms of quote
+        price: PriceBaseInQuote,
     },
 }
 

@@ -457,7 +457,7 @@ impl PerpsMarket {
         pending_close.pop().ok_or_else(|| anyhow!("no positions"))
     }
 
-    pub fn query_price_would_trigger(&self, price: PriceForQuery) -> Result<bool> {
+    pub fn query_price_would_trigger(&self, price: PriceBaseInQuote) -> Result<bool> {
         let PriceWouldTriggerResp { would_trigger } =
             self.query(&MarketQueryMsg::PriceWouldTrigger { price })?;
         Ok(would_trigger)

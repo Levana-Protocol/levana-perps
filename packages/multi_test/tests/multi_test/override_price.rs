@@ -237,22 +237,10 @@ fn would_trigger() {
         )
         .unwrap();
 
-    let pricehigh = PriceForQuery {
-        base: "101".parse().unwrap(),
-        collateral: None,
-    };
-    let priceveryhigh = PriceForQuery {
-        base: "200".parse().unwrap(),
-        collateral: None,
-    };
-    let pricelow = PriceForQuery {
-        base: "99".parse().unwrap(),
-        collateral: None,
-    };
-    let priceverylow = PriceForQuery {
-        base: "50".parse().unwrap(),
-        collateral: None,
-    };
+    let pricehigh = "101".parse().unwrap();
+    let priceveryhigh = "200".parse().unwrap();
+    let pricelow = "99".parse().unwrap();
+    let priceverylow = "50".parse().unwrap();
 
     assert_eq!(market.query_price_would_trigger(pricehigh).unwrap(), false);
     assert_eq!(market.query_price_would_trigger(pricelow).unwrap(), false);

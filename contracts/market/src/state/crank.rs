@@ -3,7 +3,6 @@ use cosmwasm_std::Order;
 use cw_storage_plus::{Bound, PrefixBound};
 use msg::contracts::market::{
     crank::{events::CrankExecBatchEvent, CrankWorkInfo},
-    entry::PriceForQuery,
     position::{
         events::PositionSaveReason, ClosePositionInstructions, MaybeClosedPosition,
         PositionCloseReason,
@@ -124,9 +123,9 @@ impl State<'_> {
     pub(crate) fn price_would_trigger(
         &self,
         store: &dyn Storage,
-        price: PriceForQuery,
+        price: PriceBaseInQuote,
     ) -> Result<bool> {
-        let price = price.base.into_notional_price(self.market_type(store)?);
+        let price = price.into_notional_price(self.market_type(store)?);
         self.liquidatable_position(store, price)
             .map(|x| x.is_some())
     }
