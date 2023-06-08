@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{process::Output, str::FromStr};
 
 use anyhow::Result;
 use cosmos::{Cosmos, CosmosNetwork, Wallet};
@@ -24,12 +24,6 @@ pub(crate) struct StoreCodeOpt {
         global = true
     )]
     contracts: Contracts,
-
-    /// Use the following market contract code ID instead of uploading.
-    ///
-    /// Useful because some networks currently aren't working well with uploads
-    #[clap(long)]
-    market_code_id: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -88,7 +82,6 @@ pub(crate) async fn go(
         family,
         network,
         contracts,
-        market_code_id,
     }: StoreCodeOpt,
 ) -> Result<()> {
     let network = match (family, network) {
@@ -112,10 +105,10 @@ pub(crate) async fn go(
     store_code(
         &opt,
         &basic.cosmos,
+        network,
         &basic.wallet,
         &tracker,
         contracts.names(),
-        market_code_id,
     )
     .await
 }
@@ -123,10 +116,10 @@ pub(crate) async fn go(
 pub(crate) async fn store_code(
     opt: &Opt,
     cosmos: &Cosmos,
+    network: CosmosNetwork,
     wallet: &Wallet,
     tracker: &Tracker,
     contract_types: &[&str],
-    market_code_id: Option<u64>,
 ) -> Result<()> {
     let gitrev = opt.get_gitrev()?;
     log::info!("Compiled WASM comes from gitrev {gitrev}");
@@ -137,11 +130,11 @@ pub(crate) async fn store_code(
         match tracker.get_code_by_hash(hash.clone()).await? {
             CodeIdResp::NotFound {} => {
                 log::info!("Contract {ct} has SHA256 {hash} and is not on blockchain, uploading");
-                let code_id = match market_code_id {
-                    Some(code_id) if ct == "market" => {
-                        log::info!("Using override market code ID of: {code_id}");
-                        code_id
+                let code_id = match (ct, network) {
+                    ("market", CosmosNetwork::OsmosisTestnet) => {
+                        store_market_cosmjs("osmosis").await?
                     }
+                    ("market", CosmosNetwork::SeiTestnet) => store_market_cosmjs("sei").await?,
                     _ => cosmos.store_code_path(wallet, &path).await?.get_code_id(),
                 };
                 log::info!("Upload complete, new code ID is {code_id}, logging with the tracker");
@@ -168,4 +161,38 @@ pub(crate) async fn store_code(
     }
 
     Ok(())
+}
+
+async fn store_market_cosmjs(network: &str) -> Result<u64> {
+    log::info!("Calling out to cosmjs script to upload market contract for {network}");
+    let Output {
+        status,
+        stdout,
+        stderr,
+    } = tokio::process::Command::new("yarn")
+        .current_dir("packages/perps-exes/cosmjs")
+        .arg(format!("upload:{network}"))
+        .output()
+        .await?;
+    if status.success() {
+        let stdout = String::from_utf8(stdout).map_or_else(|x| format!("{x:?}"), |x| x);
+        for line in stdout.lines() {
+            if let Some(code_id) = line
+                .strip_prefix("Contract uploaded with code ID ")
+                .and_then(|x| u64::from_str(x).ok())
+            {
+                return Ok(code_id);
+            }
+        }
+        let stderr = String::from_utf8(stderr).map_or_else(|x| format!("{x:?}"), |x| x);
+        Err(anyhow::anyhow!(
+            "Did not found code ID in output:\nstdout: {stdout}\nstderr: {stderr}"
+        ))
+    } else {
+        let stdout = String::from_utf8(stdout).map_or_else(|x| format!("{x:?}"), |x| x);
+        let stderr = String::from_utf8(stderr).map_or_else(|x| format!("{x:?}"), |x| x);
+        Err(anyhow::anyhow!(
+            "cosmjs failed.\nstdout: {stdout}\nstderr: {stderr}"
+        ))
+    }
 }
