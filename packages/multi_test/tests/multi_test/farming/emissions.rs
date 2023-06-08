@@ -153,7 +153,7 @@ fn test_multiple_emissions() {
         market.clone_lp(0).unwrap(),
         market.clone_lp(1).unwrap(),
         market.clone_lp(2).unwrap(),
-        market.clone_lp(3).unwrap()
+        market.clone_lp(3).unwrap(),
     ];
 
     market.automatic_time_jump_enabled = false;
@@ -170,7 +170,9 @@ fn test_multiple_emissions() {
         market
             .exec_mint_and_deposit_liquidity(lp, "100".parse().unwrap())
             .unwrap();
-        market.exec_farming_deposit_lp(lp, "100".parse().unwrap()).unwrap();
+        market
+            .exec_farming_deposit_lp(lp, "100".parse().unwrap())
+            .unwrap();
     }
 
     market
@@ -190,7 +192,9 @@ fn test_multiple_emissions() {
         market
             .exec_mint_and_deposit_liquidity(lp, "100".parse().unwrap())
             .unwrap();
-        market.exec_farming_deposit_lp(lp, "100".parse().unwrap()).unwrap();
+        market
+            .exec_farming_deposit_lp(lp, "100".parse().unwrap())
+            .unwrap();
     }
 
     market
