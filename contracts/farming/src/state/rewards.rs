@@ -207,18 +207,18 @@ impl State<'_> {
         store: &dyn Storage,
         emissions: &Emissions,
     ) -> Result<LvnToken> {
-        let emissions_duration = Decimal256::from_ratio(
+        let emissions_duration_nanos = Decimal256::from_ratio(
             emissions
                 .end
                 .checked_sub(emissions.start, "emissions_duration")?
                 .as_nanos(),
             1u64,
         );
-        let (latest_timestamp, latest_rewards_per_token) =
+        let (latest_timestamp, latest_emissions_per_token) =
             self.latest_emissions_per_token(store)?;
         let total_farming_tokens = self.load_farming_totals(store)?.farming;
 
-        let rewards_per_token = if total_farming_tokens.is_zero() {
+        let emissions_per_token = if total_farming_tokens.is_zero() {
             LvnToken::zero()
         } else {
             let total_lvn = emissions.lvn.raw();
@@ -227,16 +227,16 @@ impl State<'_> {
             let elapsed_time =
                 end_time.checked_sub(start_time, "calculate_emissions_per_token_per_time")?;
             let elapsed_time = Decimal256::from_ratio(elapsed_time.as_nanos(), 1u64);
-            let elapsed_ratio = elapsed_time.checked_div(emissions_duration)?;
+            let elapsed_ratio = elapsed_time.checked_div(emissions_duration_nanos)?;
 
             total_lvn
-                .checked_div_dec(total_farming_tokens.into_decimal256())?
                 .checked_mul_dec(elapsed_ratio)?
+                .checked_div_dec(total_farming_tokens.into_decimal256())?
         };
 
-        let new_rewards_per_token = latest_rewards_per_token.checked_add(rewards_per_token)?;
+        let new_emissions_per_token = latest_emissions_per_token.checked_add(emissions_per_token)?;
 
-        Ok(new_rewards_per_token)
+        Ok(new_emissions_per_token)
     }
 
     /// Performs bookkeeping on any pending values for a farmer

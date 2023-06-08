@@ -1,5 +1,54 @@
 use crate::prelude::*;
-use levana_perpswap_multi_test::config::TEST_CONFIG;
+use msg::contracts::farming::events::DepositSource;
+
+const EMISSIONS_DURATION: u32 = 20;
+const EMISSIONS_REWARDS: &str = "200";
+
+fn farming_deposit(market: &PerpsMarket, lp: &Addr) -> Result<()> {
+    farming_deposit_from_source(market, lp, DepositSource::Xlp)
+}
+
+fn farming_withdraw(market: &PerpsMarket, lp: &Addr, amount: Option<&str>) -> Result<()> {
+    market.exec_farming_withdraw_xlp(lp, amount.map(|s| s.parse().unwrap()))?;
+    Ok(())
+}
+
+fn farming_deposit_from_source(market: &PerpsMarket, lp: &Addr, source: DepositSource) -> Result<()> {
+    match source {
+        DepositSource::Collateral => {
+            market
+                .exec_farming_deposit_collateral(&lp, "100".parse().unwrap())
+                .unwrap();
+        }
+        DepositSource::Lp => {
+            market
+                .exec_mint_and_deposit_liquidity(lp, "100".parse().unwrap())?;
+            market.exec_farming_deposit_lp(lp, "100".parse().unwrap())?;
+        }
+        DepositSource::Xlp => {
+            market
+                .exec_mint_and_deposit_liquidity(lp, "100".parse().unwrap())?;
+            market.exec_stake_lp(&lp, Some("100".parse().unwrap()))?;
+            market.exec_farming_deposit_xlp(lp, "100".parse().unwrap())?;
+        }
+    }
+
+    Ok(())
+}
+
+fn move_past_lockdrop(market: &PerpsMarket) {
+    market.exec_farming_start_lockdrop(None).unwrap();
+    market.set_time(TimeJump::Hours(24 * 365)).unwrap();
+    market.exec_farming_start_launch().unwrap();
+}
+
+fn start_emissions(market: &PerpsMarket) -> Result<()> {
+    let token = market.mint_lvn_rewards(EMISSIONS_REWARDS);
+    market
+        .exec_farming_set_emissions(market.now(), EMISSIONS_DURATION, EMISSIONS_REWARDS.parse().unwrap(), token.clone())?;
+
+    Ok(())
+}
 
 #[test]
 fn test_emissions() {
@@ -10,32 +59,12 @@ fn test_emissions() {
     let lp = market.clone_lp(0).unwrap();
 
     market.automatic_time_jump_enabled = false;
-    market
-        .exec_mint_and_deposit_liquidity(&lp, "100".parse().unwrap())
-        .unwrap();
-    market.exec_stake_lp(&lp, None).unwrap();
 
-    market.exec_farming_start_lockdrop(None).unwrap();
-    market.set_time(TimeJump::Hours(24 * 365)).unwrap();
-    market.exec_farming_start_launch().unwrap();
-
-    let amount = "200";
-    let token = market.setup_lvn_rewards(amount);
-
-    // sanity check
-    let protocol_owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
-    let balance = market.query_reward_token_balance(&token, &protocol_owner);
-    assert_eq!(balance, LvnToken::from_str(amount).unwrap());
-
-    market
-        .exec_farming_set_emissions(market.now(), 20, amount.parse().unwrap(), token)
-        .unwrap();
+    move_past_lockdrop(&market);
+    farming_deposit(&market, &lp).unwrap();
+    start_emissions(&market).unwrap();
 
     // Test query farming rewards
-
-    market
-        .exec_farming_deposit_xlp(&lp, NonZero::new("100".parse().unwrap()).unwrap())
-        .unwrap();
 
     market.set_time(TimeJump::Seconds(5)).unwrap();
     let stats = market.query_farming_farmer_stats(&lp).unwrap();
@@ -87,15 +116,8 @@ fn test_emissions_multiple_lps() {
 
     // Farming setup & deposit
 
-    market.exec_farming_start_lockdrop(None).unwrap();
-    market.set_time(TimeJump::Hours(24 * 365)).unwrap();
-    market.exec_farming_start_launch().unwrap();
-
-    let amount = "200";
-    let token = market.setup_lvn_rewards(amount);
-    market
-        .exec_farming_set_emissions(market.now(), 20, amount.parse().unwrap(), token)
-        .unwrap();
+    move_past_lockdrop(&market);
+    start_emissions(&market).unwrap();
 
     // lp0
     market
@@ -144,75 +166,94 @@ fn test_emissions_multiple_lps() {
 }
 
 #[test]
+fn test_emission_bounds() {
+    // Setup
+
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let mut market = PerpsMarket::new(app_cell).unwrap();
+    let lp0 = market.clone_lp(0).unwrap();
+    let lp1 = market.clone_lp(1).unwrap();
+
+    market.automatic_time_jump_enabled = false;
+
+    move_past_lockdrop(&market);
+
+    // lp0 deposits before start of emissions
+    farming_deposit(&market, &lp0).unwrap();
+
+    market.set_time(TimeJump::Seconds(30)).unwrap();
+
+    // lp1 deposits at start of emissions
+    farming_deposit(&market, &lp1).unwrap();
+
+    start_emissions(&market).unwrap();
+    market.set_time(TimeJump::Seconds(EMISSIONS_DURATION.into())).unwrap();
+
+    // lp0 deposits at end of emissions
+    farming_deposit(&market, &lp0).unwrap();
+
+    // lp1 deposits after end of emissions
+    farming_deposit(&market, &lp1).unwrap();
+
+    let lp0_stats = market.query_farming_farmer_stats(&lp0).unwrap();
+    assert_eq!(lp0_stats.emission_rewards, "100".parse().unwrap());
+
+    let lp1_stats = market.query_farming_farmer_stats(&lp1).unwrap();
+    assert_eq!(lp1_stats.emission_rewards, "100".parse().unwrap());
+}
+
+#[test]
 fn test_multiple_emissions() {
     // Setup
 
     let app_cell = PerpsApp::new_cell().unwrap();
     let mut market = PerpsMarket::new(app_cell).unwrap();
-    let lps = [
-        market.clone_lp(0).unwrap(),
-        market.clone_lp(1).unwrap(),
-        market.clone_lp(2).unwrap(),
-        market.clone_lp(3).unwrap(),
-    ];
+    let lp0 = market.clone_lp(0).unwrap();
+    let lp1 = market.clone_lp(1).unwrap();
+    let lp2 = market.clone_lp(2).unwrap();
+    let lp3 = market.clone_lp(3).unwrap();
+
 
     market.automatic_time_jump_enabled = false;
 
-    market.exec_farming_start_lockdrop(None).unwrap();
-    market.set_time(TimeJump::Hours(24 * 365)).unwrap();
-    market.exec_farming_start_launch().unwrap();
-
-    let token = market.setup_lvn_rewards("400");
+    move_past_lockdrop(&market);
 
     // Execute first emissions with two LPs
 
-    for lp in &lps[0..=1] {
-        market
-            .exec_mint_and_deposit_liquidity(lp, "100".parse().unwrap())
-            .unwrap();
-        market
-            .exec_farming_deposit_lp(lp, "100".parse().unwrap())
-            .unwrap();
-    }
+    farming_deposit(&market, &lp0).unwrap();
+    farming_deposit(&market, &lp1).unwrap();
 
-    market
-        .exec_farming_set_emissions(market.now(), 20, "200".parse().unwrap(), token.clone())
-        .unwrap();
+    start_emissions(&market).unwrap();
     market.set_time(TimeJump::Seconds(100)).unwrap();
 
-    let lp0_stats = market.query_farming_farmer_stats(&lps[0]).unwrap();
+    let lp0_stats = market.query_farming_farmer_stats(&lp0).unwrap();
     assert_eq!(lp0_stats.emission_rewards, "100".parse().unwrap());
 
-    let lp1_stats = market.query_farming_farmer_stats(&lps[1]).unwrap();
+    let lp1_stats = market.query_farming_farmer_stats(&lp1).unwrap();
     assert_eq!(lp1_stats.emission_rewards, "100".parse().unwrap());
 
     // Execute second emissions with an additional two LPs
 
-    for lp in &lps[2..=3] {
-        market
-            .exec_mint_and_deposit_liquidity(lp, "100".parse().unwrap())
-            .unwrap();
-        market
-            .exec_farming_deposit_lp(lp, "100".parse().unwrap())
-            .unwrap();
-    }
+    start_emissions(&market).unwrap();
+    farming_deposit(&market, &lp2).unwrap();
 
-    market
-        .exec_farming_set_emissions(market.now(), 20, "200".parse().unwrap(), token)
-        .unwrap();
+    // lp3 deposits 3/4 of the way in
+    market.set_time(TimeJump::Seconds((EMISSIONS_DURATION * 3 / 4).into())).unwrap();
+    farming_deposit(&market, &lp3).unwrap();
+
     market.set_time(TimeJump::Seconds(100)).unwrap();
 
-    let lp0_stats = market.query_farming_farmer_stats(&lps[0]).unwrap();
-    assert_eq!(lp0_stats.emission_rewards, "150".parse().unwrap());
+    let lp0_stats = market.query_farming_farmer_stats(&lp0).unwrap();
+    assert_eq!(lp0_stats.emission_rewards, "162.5".parse().unwrap());
 
-    let lp1_stats = market.query_farming_farmer_stats(&lps[1]).unwrap();
-    assert_eq!(lp1_stats.emission_rewards, "150".parse().unwrap());
+    let lp1_stats = market.query_farming_farmer_stats(&lp1).unwrap();
+    assert_eq!(lp1_stats.emission_rewards, "162.5".parse().unwrap());
 
-    let lp2_stats = market.query_farming_farmer_stats(&lps[2]).unwrap();
-    assert_eq!(lp2_stats.emission_rewards, "50".parse().unwrap());
+    let lp2_stats = market.query_farming_farmer_stats(&lp2).unwrap();
+    assert_eq!(lp2_stats.emission_rewards, "62.5".parse().unwrap());
 
-    let lp3_stats = market.query_farming_farmer_stats(&lps[3]).unwrap();
-    assert_eq!(lp3_stats.emission_rewards, "50".parse().unwrap());
+    let lp3_stats = market.query_farming_farmer_stats(&lp3).unwrap();
+    assert_eq!(lp3_stats.emission_rewards, "12.5".parse().unwrap());
 }
 
 #[test]
@@ -225,16 +266,12 @@ fn test_deposit_collateral() {
 
     market.automatic_time_jump_enabled = false;
 
-    market.exec_farming_start_lockdrop(None).unwrap();
-    market.set_time(TimeJump::Hours(24 * 365)).unwrap();
-    market.exec_farming_start_launch().unwrap();
+    move_past_lockdrop(&market);
 
     // Deposit & assert
 
     let farming_stats_before = market.query_farming_stats();
-    market
-        .exec_farming_deposit_collateral(&lp, "100".parse().unwrap())
-        .unwrap();
+    farming_deposit_from_source(&market, &lp, DepositSource::Collateral).unwrap();
 
     let farmer_stats = market.query_farming_farmer_stats(&lp).unwrap();
     assert_eq!(farmer_stats.farming_tokens, "100".parse().unwrap());
@@ -266,16 +303,12 @@ fn test_deposit_lp() {
 
     market.automatic_time_jump_enabled = false;
 
-    market.exec_farming_start_lockdrop(None).unwrap();
-    market.set_time(TimeJump::Hours(24 * 365)).unwrap();
-    market.exec_farming_start_launch().unwrap();
+    move_past_lockdrop(&market);
 
     // Deposit & assert
 
     let farming_stats_before = market.query_farming_stats();
-    market
-        .exec_farming_deposit_lp(&lp, "100".parse().unwrap())
-        .unwrap();
+    farming_deposit_from_source(&market, &lp, DepositSource::Lp).unwrap();
 
     let farmer_stats = market.query_farming_farmer_stats(&lp).unwrap();
     assert_eq!(farmer_stats.farming_tokens, "100".parse().unwrap());
@@ -295,4 +328,56 @@ fn test_deposit_lp() {
             .checked_add("100".parse().unwrap())
             .unwrap()
     );
+}
+
+#[test]
+fn test_withdraw() {
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let mut market = PerpsMarket::new(app_cell).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+
+    market.automatic_time_jump_enabled = false;
+
+    move_past_lockdrop(&market);
+    start_emissions(&market).unwrap();
+
+    market.set_time(TimeJump::Seconds((EMISSIONS_DURATION / 4).into())).unwrap();
+    farming_deposit(&market, &lp).unwrap();
+
+    market.set_time(TimeJump::Seconds((EMISSIONS_DURATION / 2).into())).unwrap();
+    farming_withdraw(&market, &lp, None).unwrap();
+
+    market.set_time(TimeJump::Seconds(100)).unwrap();
+    let stats = market.query_farming_farmer_stats(&lp).unwrap();
+    assert_eq!(stats.emission_rewards, LvnToken::from(EMISSIONS_REWARDS.parse::<u64>().unwrap() / 2));
+    assert_eq!(stats.farming_tokens, FarmingToken::zero());
+}
+
+#[test]
+fn test_multiple_withdraws() {
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let mut market = PerpsMarket::new(app_cell).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+
+    market.automatic_time_jump_enabled = false;
+
+    move_past_lockdrop(&market);
+    start_emissions(&market).unwrap();
+    farming_deposit(&market, &lp).unwrap();
+
+    let interval: i64 = (EMISSIONS_DURATION / 4).into();
+    market.set_time(TimeJump::Seconds(interval)).unwrap();
+    farming_withdraw(&market, &lp, Some("20")).unwrap(); // accrued 40 LVN
+
+    let stats = market.query_farming_farmer_stats(&lp).unwrap();
+    assert_eq!(stats.emission_rewards, "50".parse().unwrap());
+    assert_eq!(stats.farming_tokens, "80".parse().unwrap());
+
+    market.set_time(TimeJump::Seconds(interval)).unwrap();
+    farming_withdraw(&market, &lp, Some("80")).unwrap();
+
+    market.set_time(TimeJump::Seconds(100)).unwrap();
+    let stats = market.query_farming_farmer_stats(&lp).unwrap();
+    assert_eq!(stats.emission_rewards, "100".parse().unwrap());
+    assert_eq!(stats.farming_tokens, FarmingToken::zero());
 }

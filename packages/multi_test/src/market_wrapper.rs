@@ -1661,12 +1661,12 @@ impl PerpsMarket {
         )
     }
 
-    pub fn setup_lvn_rewards(&self, amount_to_mint: &str) -> Token {
+    pub fn mint_lvn_rewards(&self, amount: &str) -> Token {
         let mut app = self.app();
         let protocol_owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
         let token = app.rewards_token();
 
-        app.mint_token(&protocol_owner, &token, amount_to_mint.parse().unwrap())
+        app.mint_token(&protocol_owner, &token, amount.parse().unwrap())
             .unwrap();
 
         token
