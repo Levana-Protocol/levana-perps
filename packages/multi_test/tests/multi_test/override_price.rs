@@ -49,18 +49,37 @@ fn status() {
         )
         .unwrap();
 
+    let new_price = PriceForQuery {
+        base: "42".parse().unwrap(),
+        collateral: Some("42".parse().unwrap()),
+    };
+
     let status1 = market.query_status().unwrap();
-    let status2 = market
-        .query_status_with_price(PriceForQuery {
-            base: "42".parse().unwrap(),
-            collateral: Some("42".parse().unwrap()),
-        })
-        .unwrap();
+    let status2 = market.query_status_with_price(new_price).unwrap();
 
     assert_eq!(status1.long_notional, status2.long_notional);
     assert_eq!(status1.short_notional, status2.short_notional);
+
+    let market_type = market.id.get_market_type();
+    let price_point = PricePoint {
+        price_notional: new_price.base.into_notional_price(market_type),
+        price_usd: new_price.collateral.unwrap(),
+        price_base: new_price.base,
+        timestamp: market.now(),
+        is_notional_usd: market.id.is_notional_usd(),
+        market_type,
+    };
+
     assert_ne!(status1.long_usd, status2.long_usd);
     assert_ne!(status1.short_usd, status2.short_usd);
+    assert_eq!(
+        price_point.notional_to_usd(status1.long_notional),
+        status2.long_usd
+    );
+    assert_eq!(
+        price_point.notional_to_usd(status1.short_notional),
+        status2.short_usd
+    );
 }
 
 #[test]
