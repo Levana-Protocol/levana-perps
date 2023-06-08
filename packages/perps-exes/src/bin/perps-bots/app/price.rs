@@ -4,10 +4,9 @@ use anyhow::Result;
 use axum::async_trait;
 use chrono::Utc;
 use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, HasAddress, TxBuilder, Wallet};
-use msg::prelude::{ErrorId, PerpError, PriceBaseInQuote, Signed, UnsignedDecimal};
+use msg::prelude::{PriceBaseInQuote, Signed, UnsignedDecimal};
 use perps_exes::prelude::MarketContract;
 use rust_decimal::Decimal;
-use serde_json::de::StrRead;
 
 use crate::{
     config::BotConfigByType,
@@ -124,63 +123,34 @@ impl App {
         // Take the crank lock for the rest of the execution
         let _crank_lock = self.crank_lock.lock().await;
 
-        let broadcast_status = match builder.sign_and_broadcast(&self.cosmos, wallet).await {
-            Ok(res) => {
-                // just for logging pyth prices
-                for market in &markets {
-                    match &market
-                        .get_price_api(wallet, &self.cosmos, &self.config)
-                        .await?
-                    {
-                        PriceApi::Manual { .. } => {}
+        let res = builder.sign_and_broadcast(&self.cosmos, wallet).await?;
 
-                        PriceApi::Pyth(pyth) => {
-                            let market_price = pyth.query_price(120).await?;
-                            statuses.push(format!(
-                                "{} updated pyth price: {:?}",
-                                market.market_id, market_price
-                            ));
-                        }
-                    }
-                }
+        // just for logging pyth prices
+        for market in &markets {
+            match &market
+                .get_price_api(wallet, &self.cosmos, &self.config)
+                .await?
+            {
+                PriceApi::Manual { .. } => {}
 
-                format!("Prices updated in oracles with txhash {}", res.txhash)
-            }
-            Err(e) => {
-                let maybe_tonic_error = e.downcast_ref::<tonic::Status>();
-                let maybe_perp_error =
-                    maybe_tonic_error.and_then(|status| parse_perp_error(status.message()));
-
-                let price_exists_error = maybe_perp_error.as_ref().and_then(|perp_err| {
-                    if perp_err.id == ErrorId::PriceAlreadyExists {
-                        Some(perp_err)
-                    } else {
-                        None
-                    }
-                });
-
-                let price_too_old_error = maybe_perp_error.as_ref().and_then(|perp_err| {
-                    if perp_err.id == ErrorId::PriceTooOld {
-                        Some(perp_err)
-                    } else {
-                        None
-                    }
-                });
-
-                if let Some(err) = price_exists_error {
-                    format!("This price point already exists: {:?}", err)
-                } else if let Some(err) = price_too_old_error {
-                    format!("The price is too old: {:?}", err)
-                } else {
-                    anyhow::bail!(
-                        "is tonic error: {}, is perp error: {}, raw error: {e:?}",
-                        maybe_tonic_error.is_some(),
-                        maybe_perp_error.is_some()
-                    );
+                PriceApi::Pyth(pyth) => {
+                    let market_price = pyth.query_price(120).await?;
+                    statuses.push(format!(
+                        "{} updated pyth price: {:?}",
+                        market.market_id, market_price
+                    ));
                 }
             }
-        };
-        statuses.push(broadcast_status);
+        }
+
+        if !res.data.is_empty() {
+            statuses.push(format!("Response data from contracts: {}", res.data));
+        }
+
+        statuses.push(format!(
+            "Prices updated in oracles with txhash {}",
+            res.txhash
+        ));
 
         Ok(WatchedTaskOutput {
             skip_delay: false,
@@ -297,38 +267,5 @@ impl App {
             .await?;
 
         Ok(vec![oracle_msg, bridge_msg])
-    }
-}
-
-// todo - this can be moved somewhere more general
-fn parse_perp_error(err: &str) -> Option<PerpError<serde_json::Value>> {
-    // This weird parsing to (1) strip off the content before the JSON body
-    // itself and (2) ignore the trailing data after the JSON data
-    let start = err.find(" {")?;
-    let err = &err[start..];
-    serde_json::Deserializer::new(StrRead::new(err))
-        .into_iter()
-        .next()?
-        .ok()
-}
-
-#[cfg(test)]
-mod tests {
-    use msg::prelude::{ErrorDomain, ErrorId, PerpError};
-
-    use super::*;
-
-    #[test]
-    fn test_parse_perp_error() {
-        const INPUT: &str = "failed to execute message; message index: 0: {\n  \"id\": \"exceeded\",\n  \"domain\": \"faucet\",\n  \"description\": \"exceeded tap limit, wait 284911 more seconds\",\n  \"data\": {\n    \"wait_secs\": \"284911\"\n  }\n}: execute wasm contract failed [CosmWasm/wasmd@v0.29.2/x/wasm/keeper/keeper.go:425] With gas wanted: '0' and gas used: '115538' ";
-        let expected = PerpError {
-            id: ErrorId::Exceeded,
-            domain: ErrorDomain::Faucet,
-            description: "exceeded tap limit, wait 284911 more seconds".to_owned(),
-            data: None,
-        };
-        let mut actual = parse_perp_error(INPUT).unwrap();
-        actual.data = None;
-        assert_eq!(actual, expected);
     }
 }
