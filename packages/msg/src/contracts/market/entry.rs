@@ -585,8 +585,6 @@ pub enum QueryMsg {
     LpInfo {
         /// Which provider's information are we querying?
         liquidity_provider: RawAddr,
-        /// Price to be used as the current price
-        price: Option<PriceForQuery>,
     },
 
     /// * returns [DeltaNeutralityFeeResp]
@@ -600,8 +598,6 @@ pub enum QueryMsg {
         /// for real delta neutrality fees, this is calculated internally
         /// should only be supplied if querying the fee for close or update
         pos_delta_neutrality_fee_margin: Option<Collateral>,
-        /// Price to be used as the current price
-        price: Option<PriceForQuery>,
     },
 }
 
@@ -934,13 +930,11 @@ impl QueryMsg {
 
             10 => Ok(Self::LpInfo {
                 liquidity_provider: user_arb(u)?,
-                price: u.arbitrary()?,
             }),
 
             11 => Ok(Self::DeltaNeutralityFee {
                 notional_delta: u.arbitrary()?,
                 pos_delta_neutrality_fee_margin: u.arbitrary()?,
-                price: u.arbitrary()?,
             }),
 
             _ => unreachable!(),

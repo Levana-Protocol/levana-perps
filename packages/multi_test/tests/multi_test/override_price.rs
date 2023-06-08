@@ -90,15 +90,24 @@ fn positions() {
         )
         .unwrap();
 
-    todo!()
-}
+    let longreal = market.query_position(long).unwrap();
+    let shortreal = market.query_position(short).unwrap();
 
-#[test]
-fn lp_info() {
-    todo!()
-}
+    let pricehigh = PriceForQuery {
+        base: "101".parse().unwrap(),
+        collateral: None,
+    };
+    let longhigh = market.query_position_with_price(long, pricehigh).unwrap();
+    let shorthigh = market.query_position_with_price(short, pricehigh).unwrap();
+    assert!(longhigh.pnl_collateral > longreal.pnl_collateral);
+    assert!(shorthigh.pnl_collateral < shortreal.pnl_collateral);
 
-#[test]
-fn dnf() {
-    todo!()
+    let pricelow = PriceForQuery {
+        base: "99".parse().unwrap(),
+        collateral: None,
+    };
+    let longlow = market.query_position_with_price(long, pricelow).unwrap();
+    let shortlow = market.query_position_with_price(short, pricelow).unwrap();
+    assert!(longlow.pnl_collateral < longreal.pnl_collateral);
+    assert!(shortlow.pnl_collateral > shortreal.pnl_collateral);
 }

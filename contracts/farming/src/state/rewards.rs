@@ -360,7 +360,6 @@ impl State<'_> {
             self.market_info.addr.clone(),
             &LpInfo {
                 liquidity_provider: self.env.contract.address.clone().into(),
-                price: None,
             },
         )?;
         let config = self.load_bonus_config(ctx.storage)?;

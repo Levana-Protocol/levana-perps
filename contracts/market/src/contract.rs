@@ -612,22 +612,14 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             )?
             .query_result(),
 
-        QueryMsg::LpInfo {
-            liquidity_provider,
-            price,
-        } => {
-            state.override_current_price(store, price)?;
-            state
-                .lp_info(store, &liquidity_provider.validate(state.api)?)?
-                .query_result()
-        }
+        QueryMsg::LpInfo { liquidity_provider } => state
+            .lp_info(store, &liquidity_provider.validate(state.api)?)?
+            .query_result(),
 
         QueryMsg::DeltaNeutralityFee {
             notional_delta,
             pos_delta_neutrality_fee_margin,
-            price,
         } => {
-            state.override_current_price(store, price)?;
             let price = state.spot_price(store, None)?;
             let fees = state.calc_delta_neutrality_fee(
                 store,

@@ -216,7 +216,6 @@ impl MarketContract {
         self.0
             .query(MarketQueryMsg::LpInfo {
                 liquidity_provider: addr.get_address_string().into(),
-                price: None,
             })
             .await
     }
