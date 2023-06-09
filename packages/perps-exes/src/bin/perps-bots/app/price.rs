@@ -1,9 +1,10 @@
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 
 use anyhow::Result;
 use axum::async_trait;
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, HasAddress, TxBuilder, Wallet};
+use cosmwasm_std::Decimal256;
 use msg::prelude::{PriceBaseInQuote, Signed, UnsignedDecimal};
 use perps_exes::prelude::MarketContract;
 use rust_decimal::Decimal;
@@ -82,12 +83,16 @@ impl App {
                         .await?
                         .to_string()
                         .parse()?;
-                    if self.needs_price_update(market, price).await? {
+
+                    if let Some(reason) = self.needs_price_update(market, price).await? {
                         has_messages = true;
                         let (status, msg) = self
                             .get_tx_symbol(wallet, market, symbol_usd, price)
                             .await?;
-                        statuses.push(format!("{}: {status}", market.market_id));
+                        statuses.push(format!(
+                            "{}: needs update: {reason} {status}",
+                            market.market_id
+                        ));
                         builder.add_message_mut(msg);
                     } else {
                         statuses.push(format!(
@@ -99,13 +104,16 @@ impl App {
 
                 PriceApi::Pyth(pyth) => {
                     let (latest_price, _) = pyth.get_latest_price(&self.client).await?;
-                    if self.needs_price_update(market, latest_price).await? {
+                    if let Some(reason) = self.needs_price_update(market, latest_price).await? {
                         has_messages = true;
                         let msgs = self.get_txs_pyth(wallet, market, pyth).await?;
                         for msg in msgs {
                             builder.add_message_mut(msg);
                         }
-                        statuses.push(format!("{}: got pyth contract messages", market.market_id));
+                        statuses.push(format!(
+                            "{}: needs update: {reason} Got pyth contract messages",
+                            market.market_id
+                        ));
                     } else {
                         statuses.push(format!("{}: no pyth price update needed", market.market_id));
                     }
@@ -163,7 +171,7 @@ impl App {
         &self,
         market: &Market,
         latest_price: PriceBaseInQuote,
-    ) -> Result<bool> {
+    ) -> Result<Option<PriceUpdateReason>> {
         let market = MarketContract::new(market.market.clone());
         let price = market.current_price().await?;
 
@@ -172,7 +180,7 @@ impl App {
         let age = Utc::now().signed_duration_since(updated);
         let age_secs = age.num_seconds();
         if age_secs > self.config.max_price_age_secs.into() {
-            return Ok(true);
+            return Ok(Some(PriceUpdateReason::LastUpdateTooOld(age)));
         }
 
         // Check 2: has the price moved more than the allowed delta?
@@ -184,12 +192,20 @@ impl App {
             .checked_sub(Signed::ONE)?
             .abs_unsigned();
         if delta >= self.config.max_allowed_price_delta {
-            return Ok(true);
+            return Ok(Some(PriceUpdateReason::PriceDelta {
+                old: price.price_base,
+                new: latest_price,
+                delta,
+            }));
         }
 
         // Check 3: would any triggers happen from this price?
         // We save this for last since it requires a network round trip
-        market.price_would_trigger(latest_price).await
+        if market.price_would_trigger(latest_price).await? {
+            return Ok(Some(PriceUpdateReason::Triggers));
+        }
+
+        Ok(None)
     }
 
     async fn get_tx_symbol(
@@ -267,5 +283,30 @@ impl App {
             .await?;
 
         Ok(vec![oracle_msg, bridge_msg])
+    }
+}
+
+enum PriceUpdateReason {
+    LastUpdateTooOld(Duration),
+    PriceDelta {
+        old: PriceBaseInQuote,
+        new: PriceBaseInQuote,
+        delta: Decimal256,
+    },
+    Triggers,
+}
+
+impl Display for PriceUpdateReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            PriceUpdateReason::LastUpdateTooOld(age) => write!(f, "Last update too old: {age}."),
+            PriceUpdateReason::PriceDelta { old, new, delta } => write!(
+                f,
+                "Large price delta. Old: {old}. New: {new}. Delta: {delta}."
+            ),
+            PriceUpdateReason::Triggers => {
+                write!(f, "Price would trigger positions and/or orders.")
+            }
+        }
     }
 }
