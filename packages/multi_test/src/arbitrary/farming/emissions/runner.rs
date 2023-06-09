@@ -140,14 +140,6 @@ impl FarmingEmissions {
         farming_balance
     }
 
-    fn emissions_duration_seconds(&self) -> u32 {
-        let total_action_time_seconds = self.actions.last().unwrap().at_seconds;
-        // emissions time is the full duration of the test, plus the amount for final remainder unstaking
-        // remainder unstaking happens after a year, and enables the automatic timejumps, so add an extra day too
-
-        total_action_time_seconds + 60 * 60 * 24 * 366
-    }
-
     fn do_simulation(&self, lp: &Addr) -> Result<()> {
         let mut market = self.market.borrow_mut();
         market.automatic_time_jump_enabled = false;
@@ -166,7 +158,7 @@ impl FarmingEmissions {
         market
             .exec_farming_set_emissions(
                 market.now(),
-                self.emissions_duration_seconds(),
+                self.emissions_duration_seconds.into(),
                 NonZero::new(self.emissions_amount).unwrap(),
                 token,
             )
