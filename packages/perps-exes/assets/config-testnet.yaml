@@ -35,6 +35,8 @@ deployments:
     traders: 10
     default-market-ids:
       - ATOM_USD
+    # TODO Remove this once the frontend pushes its own price updates
+    max-price-age-secs: 1
   dev:
     wallet-manager-address: osmo1lkc7lnq204m4yeydcdg94stkm50jjyglh7ucel
     price-address: osmo1q47uh5e2v8gfr3efy03xs9m0qrz3d2g2fpdc7l
@@ -121,6 +123,8 @@ overrides:
     watcher:
       # Nodes seem to crash often, let's see if this helps
       retries: 10
+    # TODO Remove this once the frontend pushes its own price updates
+    max-price-age-secs: 1
   seitrade:
     wallet-manager-address: osmo19a93ag7hf49zqemds0x8nutldv7288drj6fw74
     price-address: osmo1uvllz6r8aye35rm38jdcjwe7r73wgcxvtsu4c6
@@ -141,3 +145,5 @@ overrides:
     watcher:
       # Nodes seem to crash often, let's see if this helps
       retries: 10
+    # TODO Remove this once the frontend pushes its own price updates
+    max-price-age-secs: 1

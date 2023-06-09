@@ -4,9 +4,9 @@ use std::pin::Pin;
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::{Context, Result};
-use axum::async_trait;
 use axum::http::HeaderValue;
 use axum::response::IntoResponse;
+use axum::{async_trait, Json};
 use chrono::{DateTime, Duration, Utc};
 use cosmos::Address;
 use once_cell::sync::OnceCell;
@@ -21,7 +21,7 @@ use reqwest::header::CONTENT_TYPE;
 use reqwest::StatusCode;
 use tokio::task::JoinSet;
 
-use crate::app::factory::RpcInfo;
+use crate::app::factory::FrontendInfoTestnet;
 use crate::app::AppBuilder;
 use crate::app::{factory::FactoryInfo, App};
 
@@ -52,6 +52,15 @@ impl Display for TaskLabel {
     }
 }
 
+impl serde::Serialize for TaskLabel {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
 struct ToSpawn {
     future: Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>,
     label: TaskLabel,
@@ -71,29 +80,34 @@ pub(crate) struct TaskStatuses {
     statuses: Arc<OnceCell<StatusMap>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub(crate) struct TaskStatus {
     last_result: TaskResult,
     last_retry_error: Option<TaskError>,
     current_run_started: Option<DateTime<Utc>>,
+    #[serde(skip)]
     out_of_date: Duration,
     counts: TaskCounts,
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub(crate) struct TaskCounts {
     pub(crate) successes: usize,
     pub(crate) retries: usize,
     pub(crate) errors: usize,
 }
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub(crate) struct TaskResult {
     pub(crate) value: Arc<Result<String, String>>,
     pub(crate) updated: DateTime<Utc>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub(crate) struct TaskError {
     pub(crate) value: Arc<String>,
     pub(crate) updated: DateTime<Utc>,
@@ -412,6 +426,8 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
     }
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
 struct RenderedStatus {
     label: TaskLabel,
     status: TaskStatus,
@@ -442,46 +458,26 @@ impl TaskStatuses {
     }
 
     pub(crate) fn all_statuses_html(&self, app: &App) -> axum::response::Response {
-        use askama::Template;
-        #[derive(Template)]
-        #[template(path = "status.html")]
-        struct MyTemplate<'a> {
-            statuses: Vec<RenderedStatus>,
-            family: Cow<'a, str>,
-            build_version: &'a str,
-            grpc: &'a str,
-            rpc: Option<&'a RpcInfo>,
-            live_since: DateTime<Utc>,
-            now: DateTime<Utc>,
-        }
-        let statuses = self.all_statuses();
-        let alert = statuses.iter().any(|x| x.short.alert());
-        let frontend_info_testnet = app.get_frontend_info_testnet();
-        let mut res = MyTemplate {
-            statuses,
-            family: match &app.config.by_type {
-                crate::config::BotConfigByType::Testnet { inner } => {
-                    (&inner.contract_family).into()
-                }
-                crate::config::BotConfigByType::Mainnet { inner } => {
-                    format!("Factory address {}", inner.factory).into()
-                }
-            },
-            build_version: build_version(),
-            grpc: &app.cosmos.get_first_builder().grpc_url,
-            rpc: frontend_info_testnet.as_deref().map(|x| &x.rpc),
-            live_since: app.live_since,
-            now: Utc::now(),
-        }
-        .render()
-        .unwrap()
-        .into_response();
+        let template = self.to_template(app);
+        let mut res = template.render().unwrap().into_response();
         res.headers_mut().append(
             CONTENT_TYPE,
             HeaderValue::from_static("text/html; charset=utf-8"),
         );
 
-        if alert {
+        if template.alert {
+            *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+        }
+
+        res
+    }
+
+    pub(crate) fn all_statuses_json(&self, app: &App) -> axum::response::Response {
+        let template = self.to_template(app);
+
+        let mut res = Json(&template).into_response();
+
+        if template.alert {
             *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
         }
 
@@ -511,7 +507,8 @@ struct ResponseBuilder {
     any_errors: bool,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
 enum ShortStatus {
     Error,
     OutOfDate,
@@ -677,6 +674,46 @@ impl Display for Since {
 
                 write!(f, " ({})", self.0)
             }
+        }
+    }
+}
+
+use askama::Template;
+#[derive(Template, serde::Serialize)]
+#[template(path = "status.html")]
+#[serde(rename_all = "kebab-case")]
+struct StatusTemplate<'a> {
+    statuses: Vec<RenderedStatus>,
+    family: Cow<'a, str>,
+    build_version: &'a str,
+    grpc: String,
+    frontend_info_testnet: Option<Arc<FrontendInfoTestnet>>,
+    live_since: DateTime<Utc>,
+    now: DateTime<Utc>,
+    alert: bool,
+}
+
+impl TaskStatuses {
+    fn to_template<'a>(&'a self, app: &'a App) -> StatusTemplate<'a> {
+        let statuses = self.all_statuses();
+        let alert = statuses.iter().any(|x| x.short.alert());
+        let frontend_info_testnet = app.get_frontend_info_testnet();
+        StatusTemplate {
+            statuses,
+            family: match &app.config.by_type {
+                crate::config::BotConfigByType::Testnet { inner } => {
+                    (&inner.contract_family).into()
+                }
+                crate::config::BotConfigByType::Mainnet { inner } => {
+                    format!("Factory address {}", inner.factory).into()
+                }
+            },
+            build_version: build_version(),
+            grpc: app.cosmos.get_first_builder().grpc_url.clone(),
+            frontend_info_testnet,
+            live_since: app.live_since,
+            now: Utc::now(),
+            alert,
         }
     }
 }
