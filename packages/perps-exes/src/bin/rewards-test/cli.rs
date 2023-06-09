@@ -101,6 +101,16 @@ pub(crate) struct HatchEggOpt {
     /// Path to hatchery so we can load the CSV for babydragon extra meta
     #[clap(long, default_value = "../levana-hatchery")]
     pub(crate) path_to_hatchery: PathBuf,
+
+    /// number of eggs to mint for the test
+    #[clap(long, default_value = "3")]
+    pub(crate) mint_eggs_count: u32,
+
+    /// finding a mintable egg requires crawling the CSV
+    /// this gets increasingly slow on each test run
+    /// so optionally skip the cawling
+    #[clap(long, default_value = "21")]
+    pub(crate) mint_eggs_start_skip: usize,
 }
 
 impl Opt {

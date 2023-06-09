@@ -39,8 +39,9 @@ use msg::contracts::market::crank::CrankWorkInfo;
 use msg::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
     LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpActionHistoryResp, LpInfoResp,
-    PositionActionHistoryResp, QueryMsg, SlippageAssert, SpotPriceHistoryResp, StatusResp,
-    TradeHistorySummary, TraderActionHistoryResp,
+    PositionActionHistoryResp, PositionsQueryFeeApproach, PriceForQuery, PriceWouldTriggerResp,
+    QueryMsg, SlippageAssert, SpotPriceHistoryResp, StatusResp, TradeHistorySummary,
+    TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
 use msg::contracts::market::{
@@ -175,7 +176,10 @@ impl PerpsMarket {
         let token = app
             .borrow()
             .wrap()
-            .query_wasm_smart::<StatusResp>(market_addr.clone(), &MarketQueryMsg::Status {})?
+            .query_wasm_smart::<StatusResp>(
+                market_addr.clone(),
+                &MarketQueryMsg::Status { price: None },
+            )?
             .collateral;
 
         let farming_code_id = app.borrow().code_id(crate::PerpsContract::Farming)?;
@@ -382,7 +386,12 @@ impl PerpsMarket {
 
     // market queries
     pub fn query_status(&self) -> Result<StatusResp> {
-        self.query(&MarketQueryMsg::Status {})
+        self.query(&MarketQueryMsg::Status { price: None })
+    }
+
+    // market queries
+    pub fn query_status_with_price(&self, price: PriceForQuery) -> Result<StatusResp> {
+        self.query(&MarketQueryMsg::Status { price: Some(price) })
     }
 
     pub fn query_crank_stats(&self) -> Result<Option<CrankWorkInfo>> {
@@ -397,18 +406,19 @@ impl PerpsMarket {
         } = self.query(&MarketQueryMsg::Positions {
             position_ids: vec![position_id],
             // Backwards compat in the tests
-            skip_calc_pending_fees: true,
+            skip_calc_pending_fees: Some(true),
+            fees: None,
+            price: None,
         })?;
         anyhow::ensure!(pending_close.is_empty());
         anyhow::ensure!(closed.is_empty());
-        let pos = positions.pop().ok_or_else(|| anyhow!("no positions"))?;
-        anyhow::ensure!(pos.dnf_on_close_collateral == None);
-        Ok(pos)
+        positions.pop().ok_or_else(|| anyhow!("no positions"))
     }
 
-    pub fn query_position_with_pending_fees(
+    pub fn query_position_with_price(
         &self,
         position_id: PositionId,
+        price: PriceForQuery,
     ) -> Result<PositionQueryResponse> {
         let PositionsResp {
             mut positions,
@@ -416,19 +426,20 @@ impl PerpsMarket {
             closed,
         } = self.query(&MarketQueryMsg::Positions {
             position_ids: vec![position_id],
-            skip_calc_pending_fees: false,
+            // Backwards compat in the tests
+            skip_calc_pending_fees: Some(true),
+            fees: None,
+            price: Some(price),
         })?;
         anyhow::ensure!(pending_close.is_empty());
         anyhow::ensure!(closed.is_empty());
-        let pos = positions.pop().ok_or_else(|| anyhow!("no positions"))?;
-        anyhow::ensure!(pos.dnf_on_close_collateral != None);
-        Ok(pos)
+        positions.pop().ok_or_else(|| anyhow!("no positions"))
     }
 
-    pub fn query_position_pending_close(
+    pub fn query_position_pending_close_with_price(
         &self,
         position_id: PositionId,
-        skip_calc_pending_fees: bool,
+        price: PriceForQuery,
     ) -> Result<ClosedPosition> {
         let PositionsResp {
             positions,
@@ -436,7 +447,56 @@ impl PerpsMarket {
             closed,
         } = self.query(&MarketQueryMsg::Positions {
             position_ids: vec![position_id],
-            skip_calc_pending_fees,
+            // Backwards compat in the tests
+            skip_calc_pending_fees: Some(true),
+            fees: None,
+            price: Some(price),
+        })?;
+        anyhow::ensure!(positions.is_empty());
+        anyhow::ensure!(closed.is_empty());
+        pending_close.pop().ok_or_else(|| anyhow!("no positions"))
+    }
+
+    pub fn query_price_would_trigger(&self, price: PriceBaseInQuote) -> Result<bool> {
+        let PriceWouldTriggerResp { would_trigger } =
+            self.query(&MarketQueryMsg::PriceWouldTrigger { price })?;
+        Ok(would_trigger)
+    }
+
+    pub fn query_position_with_pending_fees(
+        &self,
+        position_id: PositionId,
+        fees: PositionsQueryFeeApproach,
+    ) -> Result<PositionQueryResponse> {
+        let PositionsResp {
+            mut positions,
+            pending_close,
+            closed,
+        } = self.query(&MarketQueryMsg::Positions {
+            position_ids: vec![position_id],
+            skip_calc_pending_fees: None,
+            fees: Some(fees),
+            price: None,
+        })?;
+        anyhow::ensure!(pending_close.is_empty());
+        anyhow::ensure!(closed.is_empty());
+        positions.pop().ok_or_else(|| anyhow!("no positions"))
+    }
+
+    pub fn query_position_pending_close(
+        &self,
+        position_id: PositionId,
+        fees: PositionsQueryFeeApproach,
+    ) -> Result<ClosedPosition> {
+        let PositionsResp {
+            positions,
+            mut pending_close,
+            closed,
+        } = self.query(&MarketQueryMsg::Positions {
+            position_ids: vec![position_id],
+            skip_calc_pending_fees: None,
+            fees: Some(fees),
+            price: None,
         })?;
         anyhow::ensure!(positions.is_empty());
         anyhow::ensure!(closed.is_empty());
@@ -459,7 +519,9 @@ impl PerpsMarket {
             closed,
         } = self.query(&MarketQueryMsg::Positions {
             position_ids: ids,
-            skip_calc_pending_fees: true,
+            skip_calc_pending_fees: Some(true),
+            fees: None,
+            price: None,
         })?;
         anyhow::ensure!(pending_close.is_empty());
         anyhow::ensure!(closed.is_empty());
@@ -516,7 +578,9 @@ impl PerpsMarket {
             mut closed,
         } = self.query(&MarketQueryMsg::Positions {
             position_ids: vec![pos_id],
-            skip_calc_pending_fees: true,
+            skip_calc_pending_fees: Some(true),
+            fees: None,
+            price: None,
         })?;
         anyhow::ensure!(positions.is_empty());
         anyhow::ensure!(pending_close.is_empty());
@@ -664,6 +728,18 @@ impl PerpsMarket {
     }
     pub fn exec_set_price(&self, price: PriceBaseInQuote) -> Result<AppResponse> {
         self.exec_set_price_with_usd(price, None)
+    }
+
+    pub fn exec_set_price_and_crank(&self, price: PriceBaseInQuote) -> Result<AppResponse> {
+        self.exec(
+            &Addr::unchecked(&DEFAULT_MARKET.price_admin),
+            &msg::contracts::market::entry::ExecuteMsg::SetPrice {
+                price,
+                execs: None,
+                price_usd: None,
+                rewards: None,
+            },
+        )
     }
 
     pub fn exec_set_price_with_usd(
@@ -1485,6 +1561,37 @@ impl PerpsMarket {
         )
     }
 
+    pub fn exec_farming_deposit_collateral(
+        &self,
+        wallet: &Addr,
+        amount: NonZero<Collateral>,
+    ) -> Result<AppResponse> {
+        let msg = self.token.into_execute_msg(
+            &self.farming_addr.clone(),
+            amount.raw(),
+            &FarmingExecuteMsg::Deposit {},
+        )?;
+
+        self.exec_mint_tokens(wallet, amount.into_number())?;
+        self.exec_wasm_msg(wallet, msg)
+    }
+
+    pub fn exec_farming_deposit_lp(
+        &self,
+        wallet: &Addr,
+        amount: NonZero<LpToken>,
+    ) -> Result<AppResponse> {
+        self.exec_mint_and_deposit_liquidity(wallet, amount.into_number())
+            .unwrap();
+        self.exec_liquidity_token_send(
+            LiquidityTokenKind::Lp,
+            wallet,
+            &self.farming_addr,
+            amount.raw(),
+            &FarmingExecuteMsg::Deposit {},
+        )
+    }
+
     fn exec_farming(&self, wallet: &Addr, msg: &FarmingExecuteMsg) -> Result<AppResponse> {
         self.exec_farming_with_funds(wallet, msg, vec![])
     }
@@ -1618,6 +1725,17 @@ impl PerpsMarket {
 
     pub fn exec_farming_claim_emissions(&self, sender: &Addr) -> Result<AppResponse> {
         self.exec_farming(sender, &FarmingExecuteMsg::ClaimEmissions {})
+    }
+
+    pub fn exec_farming_reinvest(&self) -> Result<AppResponse> {
+        self.exec_farming(&Addr::unchecked("user"), &FarmingExecuteMsg::Reinvest {})
+    }
+
+    pub fn exec_farming_transfer_bonus(&self) -> Result<AppResponse> {
+        self.exec_farming(
+            &Addr::unchecked("user"),
+            &FarmingExecuteMsg::TransferBonus {},
+        )
     }
 
     fn query_farming<T: DeserializeOwned>(

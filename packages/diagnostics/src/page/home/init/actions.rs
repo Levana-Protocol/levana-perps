@@ -26,7 +26,7 @@ impl InitUi {
                         }
                     }), None).await.unwrap();
 
-                    let resp = bridge.query_market::<StatusResp>(QueryMsg::Status {  }).await.unwrap();
+                    let resp = bridge.query_market::<StatusResp>(QueryMsg::Status { price:None }).await.unwrap();
                     state.phase.set(Phase::Connected{bridge, status: resp.data});
                 }
                 Err(err) => {

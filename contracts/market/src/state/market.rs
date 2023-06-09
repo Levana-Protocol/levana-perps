@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use cosmwasm_std::Order;
-use msg::contracts::market::spot_price::events::SpotPriceEvent;
+use msg::contracts::market::{entry::PriceForQuery, spot_price::events::SpotPriceEvent};
 
 /// Stores spot price history.
 /// Key is a [Timestamp] of when the price was received.
@@ -39,35 +39,24 @@ impl State<'_> {
             market_type,
         })
     }
-    fn spot_price_inner(
-        &self,
-        store: &dyn Storage,
-        timestamp: Timestamp,
-        inclusive: bool,
-    ) -> Result<PricePoint> {
-        self.spot_price_inner_opt(store, timestamp, inclusive)?
-            .ok_or_else(|| {
-                perp_error!(
-                    ErrorId::PriceNotFound,
-                    ErrorDomain::SpotPrice,
-                    "there is no spot price for timestamp {}",
-                    timestamp
-                )
-                .into()
-            })
+    fn spot_price_inner(&self, store: &dyn Storage, timestamp: Timestamp) -> Result<PricePoint> {
+        self.spot_price_inner_opt(store, timestamp)?.ok_or_else(|| {
+            perp_error!(
+                ErrorId::PriceNotFound,
+                ErrorDomain::SpotPrice,
+                "there is no spot price for timestamp {}",
+                timestamp
+            )
+            .into()
+        })
     }
 
     fn spot_price_inner_opt(
         &self,
         store: &dyn Storage,
         timestamp: Timestamp,
-        inclusive: bool,
     ) -> Result<Option<PricePoint>> {
-        let max = if inclusive {
-            Bound::inclusive(timestamp)
-        } else {
-            Bound::exclusive(timestamp)
-        };
+        let max = Bound::inclusive(timestamp);
 
         match PRICES
             .range(store, None, Some(max), Order::Descending)
@@ -81,6 +70,36 @@ impl State<'_> {
         }
     }
 
+    /// Override the current price with the given value.
+    ///
+    /// This doesn't store any data in the contract. Instead, it only updates an
+    /// in-memory representation.
+    pub(crate) fn override_current_price(
+        &self,
+        store: &dyn Storage,
+        price: Option<PriceForQuery>,
+    ) -> Result<()> {
+        if let Some(PriceForQuery { base, collateral }) = price {
+            let market_id = self.market_id(store)?;
+            let market_type = market_id.get_market_type();
+            let price_usd = get_price_usd(base, collateral, market_id)?;
+            let price = base.into_notional_price(market_type);
+            let price = PricePoint {
+                price_notional: price,
+                price_usd,
+                price_base: base,
+                timestamp: self.now(),
+                is_notional_usd: market_id.is_notional_usd(),
+                market_type,
+            };
+            self.spot_price_cache
+                .set(price)
+                .ok()
+                .context("override_current_price: current price already loaded")?;
+        }
+        Ok(())
+    }
+
     /// Returns the spot price for the provided timestamp.
     /// If no timestamp is provided, it returns the latest spot price.
     pub(crate) fn spot_price(
@@ -91,9 +110,9 @@ impl State<'_> {
         match time {
             None => self
                 .spot_price_cache
-                .get_or_try_init(|| self.spot_price_inner(store, self.now(), false))
+                .get_or_try_init(|| self.spot_price_inner(store, self.now()))
                 .copied(),
-            Some(time) => self.spot_price_inner(store, time, false),
+            Some(time) => self.spot_price_inner(store, time),
         }
     }
 
@@ -137,7 +156,7 @@ impl State<'_> {
             return Ok(Some(*x));
         }
 
-        match self.spot_price_inner_opt(store, self.now(), false) {
+        match self.spot_price_inner_opt(store, self.now()) {
             Ok(Some(x)) => {
                 self.spot_price_cache.set(x).ok();
                 Ok(Some(x))
@@ -145,14 +164,6 @@ impl State<'_> {
             Ok(None) => Ok(None),
             Err(e) => Err(e),
         }
-    }
-
-    pub(crate) fn spot_price_inclusive(
-        &self,
-        store: &dyn Storage,
-        time: Timestamp,
-    ) -> Result<PricePoint> {
-        self.spot_price_inner(store, time, true)
     }
 
     /// Get the next price point after the given minimum bound.

@@ -11,7 +11,9 @@ use msg::contracts::market::{
 
 use shared::prelude::*;
 
-use super::position::{get_position, NEXT_LIQUIFUNDING, NEXT_STALE, OPEN_POSITIONS};
+use super::position::{
+    get_position, LIQUIDATION_PRICES_PENDING_COUNT, NEXT_LIQUIFUNDING, NEXT_STALE, OPEN_POSITIONS,
+};
 
 /// The last price point timestamp for which the cranking process was completed.
 ///
@@ -102,10 +104,10 @@ impl State<'_> {
                     CrankWorkInfo::Liquidation {
                         position: pos.id,
                         liquidation_reason: pos.reason,
-                        price_point_timestamp: price_point.timestamp,
+                        price_point,
                     }
                 } else if let Some(order_id) =
-                    self.limit_order_triggered_order(store, price_point.price_notional)?
+                    self.limit_order_triggered_order(store, price_point.price_notional, false)?
                 {
                     CrankWorkInfo::LimitOrder { order_id }
                 } else {
@@ -115,6 +117,20 @@ impl State<'_> {
                 }
             }),
         })
+    }
+
+    /// Would the given price update trigger any liquidations?
+    pub(crate) fn price_would_trigger(
+        &self,
+        store: &dyn Storage,
+        price: PriceBaseInQuote,
+    ) -> Result<bool> {
+        let price = price.into_notional_price(self.market_type(store)?);
+        if self.liquidatable_position(store, price)?.is_some() {
+            return Ok(true);
+        }
+        self.limit_order_triggered_order(store, price, true)
+            .map(|x| x.is_some())
     }
 
     // this always executes the requested cranks
@@ -132,23 +148,32 @@ impl State<'_> {
         }
         .into();
 
-        let mut real_cranks = 0;
+        let starting_unpend = LIQUIDATION_PRICES_PENDING_COUNT
+            .may_load(ctx.storage)?
+            .unwrap_or_default();
+
+        let mut actual = vec![];
         for _ in 0..n_execs {
             match self.crank_work(ctx.storage)? {
                 None => break,
                 Some(work_info) => {
+                    actual.push(work_info.clone());
                     self.crank_exec(ctx, work_info)?;
-                    real_cranks += 1;
                 }
             };
         }
 
+        let ending_unpend = LIQUIDATION_PRICES_PENDING_COUNT
+            .may_load(ctx.storage)?
+            .unwrap_or_default();
+
+        self.allocate_crank_fees(ctx, rewards, actual.len().try_into()?)?;
         ctx.response_mut().add_event(CrankExecBatchEvent {
             requested: n_execs,
-            actual: real_cranks.into(),
+            actual,
+            starting_unpend,
+            ending_unpend,
         });
-
-        self.allocate_crank_fees(ctx, rewards, real_cranks)?;
 
         Ok(())
     }
@@ -211,7 +236,7 @@ impl State<'_> {
             CrankWorkInfo::Liquidation {
                 position,
                 liquidation_reason,
-                price_point_timestamp,
+                price_point,
             } => {
                 let pos = get_position(ctx.storage, position)?;
 
@@ -224,7 +249,7 @@ impl State<'_> {
                         pos,
                         exposure: Signed::zero(),
                         close_time: ends_at,
-                        settlement_time: price_point_timestamp,
+                        settlement_time: price_point.timestamp,
                         reason: PositionCloseReason::Liquidated(liquidation_reason),
                     },
                     MaybeClosedPosition::Close(x) => x,

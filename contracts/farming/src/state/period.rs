@@ -241,6 +241,33 @@ impl State<'_> {
             }
         }
     }
+
+    pub(crate) fn handle_transfer_collateral_reply(&self, ctx: &mut StateContext) -> Result<()> {
+        let balance = self.query_xlp_balance()?;
+        let mut totals = self.load_farming_totals(ctx.storage)?;
+
+        anyhow::ensure!(
+            totals.xlp.is_zero(),
+            "After transferring lockdrop collateral, xLP is {}, should be zero",
+            totals.xlp
+        );
+
+        totals.xlp = balance;
+        self.save_farming_totals(ctx.storage, &totals)?;
+
+        ctx.response.add_event(LockdropLaunchEvent {
+            launched_at: self.now(),
+            farming_tokens: totals.farming,
+            xlp: totals.xlp,
+        });
+
+        ctx.response.add_event(FarmingPoolSizeEvent {
+            farming: totals.farming,
+            xlp: totals.xlp,
+        });
+
+        Ok(())
+    }
 }
 
 /// The FarmingPeriod is what we really care about

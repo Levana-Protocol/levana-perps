@@ -130,14 +130,23 @@ impl State<'_> {
     /// price will be used when actually opening the position. Only if the
     /// trigger price is above both of those prices (for longs, below for
     /// shorts) do we open the order.
+    ///
+    /// If `ignore_current_price` is `true`, we only check based on the supplied
+    /// `price` parameter. Otherwise we ensure that the order would be placed
+    /// for both the provided price and the most recent price within the
+    /// contracts.
     pub(crate) fn limit_order_triggered_order(
         &self,
         storage: &dyn Storage,
         price: Price,
+        ignore_current_price: bool,
     ) -> Result<Option<OrderId>> {
-        let current = self
-            .spot_price_latest_opt(storage)?
-            .map_or(price, |x| x.price_notional);
+        let current = if ignore_current_price {
+            price
+        } else {
+            self.spot_price_latest_opt(storage)?
+                .map_or(price, |x| x.price_notional)
+        };
 
         let order = LIMIT_ORDERS_BY_PRICE_LONG
             .prefix_range(
@@ -368,7 +377,7 @@ impl State<'_> {
                     Some(price.price_notional),
                     Some(price.price_base),
                     market_type,
-                    "Limit order",
+                    TriggerType::LimitOrder,
                 )?;
             }
             DirectionToNotional::Short => {
@@ -382,7 +391,7 @@ impl State<'_> {
                         .map(|price| price.into_notional_price(market_type)),
                     order.stop_loss_override,
                     market_type,
-                    "Limit order",
+                    TriggerType::LimitOrder,
                 )?;
             }
         }

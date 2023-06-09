@@ -8,7 +8,9 @@ use msg::{
     contracts::{
         cw20::entry::BalanceResponse,
         market::{
-            entry::{ClosedPositionsResp, LpInfoResp, SlippageAssert, StatusResp},
+            entry::{
+                ClosedPositionsResp, LpInfoResp, PriceWouldTriggerResp, SlippageAssert, StatusResp,
+            },
             position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
         },
         position_token::entry::{NumTokensResponse, QueryMsg as PositionQueryMsg, TokensResponse},
@@ -26,12 +28,12 @@ impl MarketContract {
     }
 
     pub async fn status(&self) -> Result<StatusResp> {
-        self.0.query(MarketQueryMsg::Status {}).await
+        self.0.query(MarketQueryMsg::Status { price: None }).await
     }
 
     pub async fn status_at_height(&self, height: u64) -> Result<StatusResp> {
         self.0
-            .query_at_height(MarketQueryMsg::Status {}, height)
+            .query_at_height(MarketQueryMsg::Status { price: None }, height)
             .await
     }
 
@@ -189,7 +191,9 @@ impl MarketContract {
             .0
             .query(MarketQueryMsg::Positions {
                 position_ids: vec![pos_id],
-                skip_calc_pending_fees: false,
+                skip_calc_pending_fees: Some(false),
+                fees: None,
+                price: None,
             })
             .await?;
         positions
@@ -273,7 +277,9 @@ impl MarketContract {
 
         let query = MarketQueryMsg::Positions {
             position_ids: positions.clone(),
-            skip_calc_pending_fees: false,
+            skip_calc_pending_fees: Some(false),
+            fees: None,
+            price: None,
         };
         let PositionsResp {
             positions: response,
@@ -291,7 +297,9 @@ impl MarketContract {
     pub async fn position_detail(&self, position_id: PositionId) -> Result<PositionQueryResponse> {
         let query = MarketQueryMsg::Positions {
             position_ids: vec![position_id],
-            skip_calc_pending_fees: false,
+            skip_calc_pending_fees: Some(false),
+            fees: None,
+            price: None,
         };
         let PositionsResp {
             positions: mut response,
@@ -452,5 +460,13 @@ impl MarketContract {
             };
             self.0.execute(wallet, vec![], execute_msg).await
         }
+    }
+
+    pub async fn price_would_trigger(&self, price: PriceBaseInQuote) -> Result<bool> {
+        let PriceWouldTriggerResp { would_trigger } = self
+            .0
+            .query(MarketQueryMsg::PriceWouldTrigger { price })
+            .await?;
+        Ok(would_trigger)
     }
 }

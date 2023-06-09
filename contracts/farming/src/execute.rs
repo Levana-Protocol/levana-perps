@@ -1,7 +1,8 @@
-use cosmwasm_std::Reply;
+use cosmwasm_std::{wasm_execute, Reply, SubMsg};
+use msg::prelude::MarketExecuteMsg::DepositLiquidity;
 use msg::token::Token;
 
-use crate::state::reply::ReplyId;
+use crate::state::reply::{DepositReplyData, ReplyId, EPHEMERAL_DEPOSIT_COLLATERAL_DATA};
 use crate::{prelude::*, state::funds::Received};
 
 #[entry_point]
@@ -75,8 +76,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         ExecuteMsg::Withdraw { amount } => state.withdraw(&mut ctx, &sender, amount)?,
         ExecuteMsg::ClaimLockdropRewards {} => state.claim_lockdrop_rewards(&mut ctx, &sender)?,
         ExecuteMsg::ClaimEmissions {} => state.claim_lvn_emissions(&mut ctx, &sender)?,
-        ExecuteMsg::Reinvest {} => todo!(),
-        ExecuteMsg::TransferBonus {} => todo!(),
+        ExecuteMsg::Reinvest {} => state.reinvest_yield(&mut ctx)?,
+        ExecuteMsg::TransferBonus {} => state.transfer_bonus(&mut ctx)?,
     }
 
     Ok(ctx.response.into_response())
@@ -84,29 +85,18 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
 #[entry_point]
 pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
-    let (state, ctx) = StateContext::new(deps, env)?;
+    let (state, mut ctx) = StateContext::new(deps, env)?;
 
     match ReplyId::try_from(msg.id) {
         Ok(id) => match id {
             ReplyId::TransferCollateral => {
-                let token = Token::Cw20 {
-                    addr: state.market_info.xlp_addr.clone().into(),
-                    decimal_places: LpToken::PRECISION,
-                };
-                let balance = token
-                    .query_balance(&state.querier, &state.env.contract.address)
-                    .map(Collateral::into_decimal256)
-                    .map(LpToken::from_decimal256)?;
-                let mut totals = state.load_farming_totals(ctx.storage)?;
-
-                anyhow::ensure!(
-                    totals.xlp.is_zero(),
-                    "After transferring lockdrop collateral, xLP is {}, should be zero",
-                    totals.xlp
-                );
-
-                totals.xlp = balance;
-                state.save_farming_totals(ctx.storage, &totals)?;
+                state.handle_transfer_collateral_reply(&mut ctx)?;
+            }
+            ReplyId::ReinvestYield => {
+                state.handle_reinvest_yield_reply(&mut ctx)?;
+            }
+            ReplyId::FarmingDeposit => {
+                state.handle_farming_deposit_reply(&mut ctx)?;
             }
         },
         _ => {
@@ -124,23 +114,87 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
 
 impl State<'_> {
     fn deposit(&self, ctx: &mut StateContext, farmer: &Addr, received: Received) -> Result<()> {
-        let xlp = match received {
-            Received::Collateral(_) => todo!(),
-            Received::Lp(_) => todo!(),
-            Received::Xlp(xlp) => xlp,
-        };
+        match received {
+            Received::Collateral(collateral) => {
+                let deposit_liquidity_msg = self.market_info.collateral.into_execute_msg(
+                    &self.market_info.addr.clone(),
+                    collateral.raw(),
+                    &DepositLiquidity { stake_to_xlp: true },
+                )?;
 
-        let farming = self.farming_deposit(ctx, farmer, xlp)?;
+                let xlp = self.query_xlp_balance()?;
+                EPHEMERAL_DEPOSIT_COLLATERAL_DATA.save(
+                    ctx.storage,
+                    &DepositReplyData {
+                        farmer: farmer.clone(),
+                        xlp_balance_before: xlp,
+                        deposit_source: DepositSource::Collateral,
+                    },
+                )?;
+
+                ctx.response.add_raw_submessage(SubMsg::reply_on_success(
+                    deposit_liquidity_msg,
+                    ReplyId::FarmingDeposit.into(),
+                ));
+            }
+            Received::Lp(lp) => {
+                let lp_amount = NonZero::try_from_decimal(lp.into_decimal256())
+                    .with_context(|| "unable to convert lp amount")?;
+                let stake_lp_msg = &MarketExecuteMsg::StakeLp {
+                    amount: Some(lp_amount),
+                };
+
+                let xlp = self.query_xlp_balance()?;
+                EPHEMERAL_DEPOSIT_COLLATERAL_DATA.save(
+                    ctx.storage,
+                    &DepositReplyData {
+                        farmer: farmer.clone(),
+                        xlp_balance_before: xlp,
+                        deposit_source: DepositSource::Lp,
+                    },
+                )?;
+
+                ctx.response.add_raw_submessage(SubMsg::reply_on_success(
+                    wasm_execute(self.market_info.addr.to_string(), &stake_lp_msg, vec![])?,
+                    ReplyId::FarmingDeposit.into(),
+                ));
+            }
+            Received::Xlp(xlp) => {
+                let (farming, totals) = self.farming_deposit(ctx, farmer, xlp)?;
+
+                ctx.response.add_event(DepositEvent {
+                    farmer: farmer.clone(),
+                    farming,
+                    xlp,
+                    source: DepositSource::Xlp,
+                });
+
+                ctx.response.add_event(FarmingPoolSizeEvent {
+                    farming: totals.farming,
+                    xlp: totals.xlp,
+                })
+            }
+        }
+
+        Ok(())
+    }
+
+    fn handle_farming_deposit_reply(&self, ctx: &mut StateContext) -> Result<()> {
+        let ephemeral_data = EPHEMERAL_DEPOSIT_COLLATERAL_DATA.load_once(ctx.storage)?;
+        let new_xlp_balance = self.query_xlp_balance()?;
+        let delta = new_xlp_balance.checked_sub(ephemeral_data.xlp_balance_before)?;
+        let (farming, totals) = self.farming_deposit(ctx, &ephemeral_data.farmer, delta)?;
 
         ctx.response.add_event(DepositEvent {
-            farmer: farmer.clone(),
+            farmer: ephemeral_data.farmer,
             farming,
-            xlp,
-            source: match received {
-                Received::Collateral(_) => DepositSource::Collateral,
-                Received::Lp(_) => DepositSource::Lp,
-                Received::Xlp(_) => DepositSource::Xlp,
-            },
+            xlp: delta,
+            source: ephemeral_data.deposit_source,
+        });
+
+        ctx.response.add_event(FarmingPoolSizeEvent {
+            farming: totals.farming,
+            xlp: totals.xlp,
         });
 
         Ok(())
@@ -157,7 +211,7 @@ impl State<'_> {
             decimal_places: LpToken::PRECISION,
         };
 
-        let (xlp, farming) = self.farming_withdraw(ctx, farmer, amount)?;
+        let (xlp, farming, totals) = self.farming_withdraw(ctx, farmer, amount)?;
         let msg = msg::contracts::liquidity_token::entry::ExecuteMsg::Transfer {
             recipient: farmer.into(),
             amount: token
@@ -165,12 +219,19 @@ impl State<'_> {
                 .context("Invalid transfer amount calculated")?
                 .into(),
         };
+
         ctx.response
             .add_execute_submessage_oneshot(&self.market_info.xlp_addr, &msg)?;
+
         ctx.response.add_event(WithdrawEvent {
             farmer: farmer.clone(),
             farming,
             xlp,
+        });
+
+        ctx.response.add_event(FarmingPoolSizeEvent {
+            farming: totals.farming,
+            xlp: totals.xlp,
         });
 
         Ok(())

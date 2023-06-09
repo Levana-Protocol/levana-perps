@@ -69,6 +69,20 @@ impl App {
             Some(work) => work,
         };
 
+        let _crank_lock = match self.crank_lock.try_lock() {
+            Ok(crank_lock) => crank_lock,
+            Err(_) => {
+                log::info!("Crank lock is held by the price bot, waiting for price bot to finish and then retrying");
+                // Don't take the lock, we're just waiting till the price bot
+                // finishes and then dropping the lock.
+                let _ = self.crank_lock.lock().await;
+                return Ok(WatchedTaskOutput {
+                    skip_delay: true,
+                    message: "Crank lock was held, retrying".to_owned(),
+                });
+            }
+        };
+
         for execs in CRANK_EXECS {
             match self
                 .try_with_execs(crank_wallet, addr, &work, Some(*execs))
@@ -111,8 +125,9 @@ impl App {
     }
 
     async fn check_crank(&self, market: &Contract) -> Result<Option<market::crank::CrankWorkInfo>> {
-        let market::entry::StatusResp { next_crank, .. } =
-            market.query(market::entry::QueryMsg::Status {}).await?;
+        let market::entry::StatusResp { next_crank, .. } = market
+            .query(market::entry::QueryMsg::Status { price: None })
+            .await?;
 
         Ok(next_crank)
     }

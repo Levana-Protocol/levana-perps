@@ -136,3 +136,7 @@ pub const LOCKDROP_BUCKETS_DURATION: &str = "ec";
 pub const LOCKDROP_BUCKETS_BALANCES: &str = "ed";
 pub const LOCKDROP_BUCKETS_TOTAL_SHARES: &str = "ee";
 pub const LOCKDROP_DURATIONS: &str = "ef";
+pub const BONUS_CONFIG: &str = "eg";
+pub const EPHEMERAL_BONUS_FUND: &str = "eh";
+pub const BONUS_FUND: &str = "ei";
+pub const EPHEMERAL_DEPOSIT_COLLATERAL_DATA: &str = "ej";

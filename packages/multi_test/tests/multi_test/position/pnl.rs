@@ -7,7 +7,7 @@ use levana_perpswap_multi_test::{
     time::TimeJump,
     PerpsApp,
 };
-use msg::contracts::market::config::ConfigUpdate;
+use msg::contracts::market::{config::ConfigUpdate, entry::PositionsQueryFeeApproach};
 use msg::prelude::*;
 
 // this is currently a known issue, working around it in the meantime
@@ -87,7 +87,9 @@ fn position_pnl_close_take_profit() {
     market.exec_set_price("100000".try_into().unwrap()).unwrap();
 
     // pnl is updated even without cranking or liquifunding
-    let pos = market.query_position_pending_close(pos_id, true).unwrap();
+    let pos = market
+        .query_position_pending_close(pos_id, PositionsQueryFeeApproach::NoFees)
+        .unwrap();
     assert!(pos.pnl_collateral > start_pnl_in_collateral);
 
     // crank to liquidate
@@ -133,7 +135,9 @@ fn position_pnl_close_liquidate() {
     market.exec_set_price("100000".try_into().unwrap()).unwrap();
 
     // pnl is updated even without cranking or liquifunding
-    let pos = market.query_position_pending_close(pos_id, true).unwrap();
+    let pos = market
+        .query_position_pending_close(pos_id, PositionsQueryFeeApproach::NoFees)
+        .unwrap();
     assert!(pos.pnl_collateral < start_pnl_in_collateral);
 
     // crank to liquidate
@@ -439,7 +443,7 @@ fn position_pnl_long_and_short_precise() {
             .price_notional
             .into_number()
         / Number::from(365u64 * 24u64);
-    let cost_of_capital_estimate_long_2 = -long_before_epoch.counter_collateral.into_number()
+    let cost_of_capital_estimate_long_2 = -long_after_epoch_1.counter_collateral.into_number()
         * rates.borrow_fee.into_number()
         / Number::from(365u64 * 24u64);
     let funding_estimate_short_2 = -short_after_epoch_1.notional_size.abs().into_number()
@@ -450,7 +454,7 @@ fn position_pnl_long_and_short_precise() {
             .price_notional
             .into_number()
         / Number::from(365u64 * 24u64);
-    let cost_of_capital_estimate_short_2 = -short_before_epoch.counter_collateral.into_number()
+    let cost_of_capital_estimate_short_2 = -short_after_epoch_1.counter_collateral.into_number()
         * rates.borrow_fee.into_number()
         / Number::from(365u64 * 24u64);
 

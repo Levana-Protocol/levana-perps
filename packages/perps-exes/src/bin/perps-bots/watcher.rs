@@ -77,6 +77,14 @@ pub(crate) struct TaskStatus {
     last_retry_error: Option<TaskError>,
     current_run_started: Option<DateTime<Utc>>,
     out_of_date: Duration,
+    counts: TaskCounts,
+}
+
+#[derive(Clone, Copy, Default)]
+pub(crate) struct TaskCounts {
+    pub(crate) successes: usize,
+    pub(crate) retries: usize,
+    pub(crate) errors: usize,
 }
 
 #[derive(Clone)]
@@ -204,6 +212,7 @@ impl AppBuilder {
             last_retry_error: None,
             current_run_started: None,
             out_of_date,
+            counts: Default::default(),
         }));
         {
             let old = self.watcher.statuses.insert(label, task_status.clone());
@@ -215,7 +224,7 @@ impl AppBuilder {
         let future = Box::pin(async move {
             let mut retries = 0;
             loop {
-                {
+                let old_counts = {
                     let mut guard = task_status.write();
                     let old = &*guard;
                     *guard = TaskStatus {
@@ -223,8 +232,10 @@ impl AppBuilder {
                         last_retry_error: old.last_retry_error.clone(),
                         current_run_started: Some(Utc::now()),
                         out_of_date,
+                        counts: old.counts,
                     };
-                }
+                    guard.counts
+                };
                 let before = tokio::time::Instant::now();
                 let res = task
                     .run_single(
@@ -248,6 +259,10 @@ impl AppBuilder {
                             last_retry_error: None,
                             current_run_started: None,
                             out_of_date,
+                            counts: TaskCounts {
+                                successes: old_counts.successes + 1,
+                                ..old_counts
+                            },
                         };
                         retries = 0;
                         if !skip_delay {
@@ -285,6 +300,10 @@ impl AppBuilder {
                                 last_retry_error: None,
                                 current_run_started: None,
                                 out_of_date,
+                                counts: TaskCounts {
+                                    errors: old_counts.errors + 1,
+                                    ..old_counts
+                                },
                             };
                         } else {
                             {
@@ -298,6 +317,10 @@ impl AppBuilder {
                                     }),
                                     current_run_started: None,
                                     out_of_date,
+                                    counts: TaskCounts {
+                                        retries: old_counts.retries + 1,
+                                        ..old_counts
+                                    },
                                 };
                             }
 
@@ -342,6 +365,7 @@ impl Heartbeat {
             last_retry_error: old.last_retry_error.clone(),
             current_run_started: Some(Utc::now()),
             out_of_date: old.out_of_date,
+            counts: old.counts,
         };
     }
 }
@@ -564,6 +588,7 @@ impl ResponseBuilder {
                     last_retry_error,
                     current_run_started,
                     out_of_date: _,
+                    counts: _,
                 },
             short,
         }: RenderedStatus,

@@ -3,7 +3,7 @@ use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, response::CosmosResponseExt, PerpsApp,
 };
-use msg::contracts::market::entry::StatusResp;
+use msg::contracts::market::entry::{PositionsQueryFeeApproach, StatusResp};
 use msg::contracts::market::{config::ConfigUpdate, position::events::PositionUpdateEvent};
 use msg::prelude::*;
 
@@ -96,7 +96,7 @@ fn version_and_meta() {
     assert!(!market_version.version.is_empty());
 
     let status: StatusResp = market
-        .query(&msg::contracts::market::entry::QueryMsg::Status {})
+        .query(&msg::contracts::market::entry::QueryMsg::Status { price: None })
         .unwrap();
     assert!(!status.base.is_empty());
     assert!(!status.quote.is_empty());
@@ -192,13 +192,19 @@ fn funding_payment_flips_direction() {
     match market.id.get_market_type() {
         MarketType::CollateralIsQuote => {
             market
-                .query_position_pending_close(pos_id, false)
+                .query_position_pending_close(pos_id, PositionsQueryFeeApproach::AllFees)
                 .unwrap_err();
-            market.query_position_with_pending_fees(pos_id).unwrap();
+            market
+                .query_position_with_pending_fees(pos_id, PositionsQueryFeeApproach::AllFees)
+                .unwrap();
         }
         MarketType::CollateralIsBase => {
-            market.query_position_pending_close(pos_id, false).unwrap();
-            market.query_position_with_pending_fees(pos_id).unwrap_err();
+            market
+                .query_position_pending_close(pos_id, PositionsQueryFeeApproach::AllFees)
+                .unwrap();
+            market
+                .query_position_with_pending_fees(pos_id, PositionsQueryFeeApproach::AllFees)
+                .unwrap_err();
 
             // If we ignore the pending fees though, it should be computable
             market.query_position(pos_id).unwrap();

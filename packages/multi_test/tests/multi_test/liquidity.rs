@@ -11,6 +11,7 @@ use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::contracts::cw20::entry::{QueryMsg as Cw20QueryMsg, TokenInfoResponse};
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::config::ConfigUpdate;
+use msg::contracts::market::entry::PositionsQueryFeeApproach;
 use msg::contracts::market::liquidity::LiquidityStats;
 use msg::contracts::market::position::{LiquidationReason, PositionCloseReason};
 use msg::prelude::*;
@@ -151,7 +152,9 @@ fn liquidity_share_allocation_with_trading() {
 
     // Assert post-liquidation
 
-    let _pos = market.query_position_pending_close(pos_id, true).unwrap();
+    let _pos = market
+        .query_position_pending_close(pos_id, PositionsQueryFeeApproach::NoFees)
+        .unwrap();
     market.exec_crank_till_finished(&cranker).unwrap();
     let _pos = market.query_closed_position(&trader, pos_id).unwrap();
 
@@ -1521,4 +1524,116 @@ fn max_liquidity() {
     market
         .exec_mint_and_deposit_liquidity(&lp, "1".parse().unwrap())
         .unwrap_err();
+}
+
+#[test]
+fn reinvest_history_perp_1418() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    // Get some LP
+    let new_lp = Addr::unchecked("new-lp");
+    market
+        .exec_mint_and_deposit_liquidity(&new_lp, "100".parse().unwrap())
+        .unwrap();
+
+    // Have a trader open a position and keep it running for a while for borrow fees
+    let trader = market.clone_trader(0).unwrap();
+    let _ = market
+        .exec_open_position(
+            &trader,
+            "10",
+            "10",
+            DirectionToBase::Long,
+            "5",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    for _ in 0..10 {
+        market.set_time(TimeJump::Hours(6)).unwrap();
+        market.exec_refresh_price().unwrap();
+        market.exec_crank_till_finished(&trader).unwrap();
+    }
+
+    // Should have some yield
+    let lp_info = market.query_lp_info(&new_lp).unwrap();
+    assert_ne!(lp_info.available_yield, Collateral::zero());
+
+    // Get our current history events
+    let events_before_reinvest = market.query_lp_action_history(&new_lp).unwrap();
+
+    // Reinvest
+    market.exec_reinvest_yield(&new_lp, None, false).unwrap();
+
+    // Get new events, make sure there's only one more
+    let events_after_reinvest = market.query_lp_action_history(&new_lp).unwrap();
+    assert_eq!(
+        events_before_reinvest.actions.len() + 1,
+        events_after_reinvest.actions.len()
+    );
+}
+
+#[test]
+fn reinvest_history_perp_1418_partial() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    // Get some LP
+    let new_lp = Addr::unchecked("new-lp");
+    market
+        .exec_mint_and_deposit_liquidity(&new_lp, "100".parse().unwrap())
+        .unwrap();
+
+    // Have a trader open a position and keep it running for a while for borrow fees
+    let trader = market.clone_trader(0).unwrap();
+    let _ = market
+        .exec_open_position(
+            &trader,
+            "10",
+            "10",
+            DirectionToBase::Long,
+            "5",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    for _ in 0..10 {
+        market.set_time(TimeJump::Hours(6)).unwrap();
+        market.exec_refresh_price().unwrap();
+        market.exec_crank_till_finished(&trader).unwrap();
+    }
+
+    // Should have some yield
+    let lp_info = market.query_lp_info(&new_lp).unwrap();
+    assert_ne!(lp_info.available_yield, Collateral::zero());
+
+    // Get our current history events
+    let events_before_reinvest = market.query_lp_action_history(&new_lp).unwrap();
+
+    // Reinvest
+    market
+        .exec_reinvest_yield(
+            &new_lp,
+            Some(
+                NonZero::new(
+                    lp_info
+                        .available_yield
+                        .checked_mul_dec("0.5".parse().unwrap())
+                        .unwrap(),
+                )
+                .unwrap(),
+            ),
+            false,
+        )
+        .unwrap();
+
+    // Get new events, make sure there are two: one for the reinvest, one for the claim
+    let events_after_reinvest = market.query_lp_action_history(&new_lp).unwrap();
+    assert_eq!(
+        events_before_reinvest.actions.len() + 2,
+        events_after_reinvest.actions.len()
+    );
 }

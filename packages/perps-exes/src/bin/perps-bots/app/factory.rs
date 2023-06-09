@@ -242,7 +242,7 @@ async fn get_tokens_markets(
                 collateral: Token,
             }
             let StatusRespJustCollateral { collateral } = market
-                .query(msg::contracts::market::entry::QueryMsg::Status {})
+                .query(msg::contracts::market::entry::QueryMsg::Status { price: None })
                 .await?;
             match collateral {
                 msg::token::Token::Cw20 {

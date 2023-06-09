@@ -32,8 +32,8 @@ pub enum CrankWorkInfo {
         position: PositionId,
         /// Reason for the liquidation
         liquidation_reason: LiquidationReason,
-        /// Timestamp of price update that triggered the liquidation
-        price_point_timestamp: Timestamp,
+        /// price point that triggered the liquidation
+        price_point: PricePoint,
     },
     /// Limit order can be opened
     LimitOrder {
@@ -49,6 +49,8 @@ pub enum CrankWorkInfo {
 
 /// Events related to the crank
 pub mod events {
+    use std::borrow::Cow;
+
     use super::*;
     use cosmwasm_std::Event;
 
@@ -57,25 +59,57 @@ pub mod events {
         /// How many cranks were requested
         pub requested: u64,
         /// How many cranks were actually processed
-        pub actual: u64,
+        pub actual: Vec<CrankWorkInfo>,
+        /// Size of unpend queue at start
+        pub starting_unpend: u32,
+        /// Size of unpend queue at end
+        pub ending_unpend: u32,
     }
 
     impl PerpEvent for CrankExecBatchEvent {}
     impl From<CrankExecBatchEvent> for Event {
-        fn from(CrankExecBatchEvent { requested, actual }: CrankExecBatchEvent) -> Self {
-            Event::new("crank-batch-exec")
+        fn from(
+            CrankExecBatchEvent {
+                requested,
+                actual,
+                starting_unpend,
+                ending_unpend,
+            }: CrankExecBatchEvent,
+        ) -> Self {
+            let mut event = Event::new("crank-batch-exec")
                 .add_attribute("requested", requested.to_string())
-                .add_attribute("actual", actual.to_string())
-        }
-    }
-    impl TryFrom<Event> for CrankExecBatchEvent {
-        type Error = anyhow::Error;
+                .add_attribute("actual", actual.len().to_string())
+                .add_attribute("starting-unpend", starting_unpend.to_string())
+                .add_attribute("ending-unpend", ending_unpend.to_string());
 
-        fn try_from(evt: Event) -> anyhow::Result<Self> {
-            Ok(CrankExecBatchEvent {
-                requested: evt.u64_attr("requested")?,
-                actual: evt.u64_attr("actual")?,
-            })
+            for (idx, work) in actual.into_iter().enumerate() {
+                event = event.add_attribute(
+                    format!("work-{}", idx + 1),
+                    match work {
+                        CrankWorkInfo::CloseAllPositions { .. } => {
+                            Cow::Borrowed("close-all-positions")
+                        }
+                        CrankWorkInfo::ResetLpBalances {} => "reset-lp-balances".into(),
+                        CrankWorkInfo::Liquifunding { position } => {
+                            format!("liquifund {position}").into()
+                        }
+                        CrankWorkInfo::UnpendLiquidationPrices { position } => {
+                            format!("unpend {position}").into()
+                        }
+                        CrankWorkInfo::Liquidation { position, .. } => {
+                            format!("liquidation {position}").into()
+                        }
+                        CrankWorkInfo::LimitOrder { order_id } => {
+                            format!("limit order {order_id}").into()
+                        }
+                        CrankWorkInfo::Completed {
+                            price_point_timestamp,
+                        } => format!("completed {price_point_timestamp}").into(),
+                    },
+                )
+            }
+
+            event
         }
     }
 
@@ -104,8 +138,8 @@ pub mod events {
                 CrankWorkInfo::Liquidation {
                     position,
                     liquidation_reason: _,
-                    price_point_timestamp,
-                } => (Some(position), None, Some(price_point_timestamp)),
+                    price_point,
+                } => (Some(position), None, Some(price_point.timestamp)),
                 CrankWorkInfo::Liquifunding { position } => (Some(position), None, None),
                 CrankWorkInfo::UnpendLiquidationPrices { position } => (Some(position), None, None),
                 CrankWorkInfo::LimitOrder { order_id } => (None, Some(order_id), None),
@@ -117,6 +151,17 @@ pub mod events {
             if let Some(price_point_timestamp) = price_point_timestamp {
                 event =
                     event.add_attribute("price-point-timestamp", price_point_timestamp.to_string());
+            }
+
+            if let CrankWorkInfo::Liquidation {
+                price_point,
+                liquidation_reason,
+                ..
+            } = src
+            {
+                event = event
+                    .add_attribute("price-point", serde_json::to_string(&price_point).unwrap())
+                    .add_attribute("liquidation-reason", liquidation_reason.to_string());
             }
 
             if let Some(order_id) = order_id {
@@ -135,6 +180,7 @@ pub mod events {
                 || -> anyhow::Result<PositionId> { Ok(PositionId::new(evt.u64_attr("pos-id")?)) };
 
             let get_price_point_timestamp = || evt.timestamp_attr("price-point-timestamp");
+            let get_price_point = || evt.json_attr("price-point");
 
             let get_liquidation_reason = || -> anyhow::Result<LiquidationReason> {
                 match evt.string_attr("liquidation-reason")?.as_str() {
@@ -154,7 +200,7 @@ pub mod events {
                 "liquidation" => Ok(CrankWorkInfo::Liquidation {
                     position: get_position_id()?,
                     liquidation_reason: get_liquidation_reason()?,
-                    price_point_timestamp: get_price_point_timestamp()?,
+                    price_point: get_price_point()?,
                 }),
                 "unpend-liquidation-prices" => Ok(CrankWorkInfo::UnpendLiquidationPrices {
                     position: get_position_id()?,

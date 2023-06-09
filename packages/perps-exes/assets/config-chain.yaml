@@ -17,7 +17,7 @@ osmosis-testnet:
   faucet: osmo1ycrm74p7uc976hu2z428l27vxj8l44zu0x0yqjr8gh775qr6gtnq9f3zsz
   explorer: "https://testnet.mintscan.io/osmosis-testnet/txs/"
   rpc-nodes:
-  - https://rpc-testnet.osmosis.sandbox.levana.finance
+  - https://rpc.osmotest5.osmosis.zone
   gas-multiplier: 1.5
 dragonfire:
   tracker: levana18cszlvm6pze0x9sz32qnjq4vtd45xehqs8dq7cwy8yhq35wfnn3q6s5ylj

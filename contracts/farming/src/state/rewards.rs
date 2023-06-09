@@ -1,7 +1,12 @@
+use crate::prelude::reply::{ReplyId, EPHEMERAL_BONUS_FUND};
 use crate::prelude::*;
 use crate::state::farming::RawFarmerStats;
-use cosmwasm_std::{BankMsg, CosmosMsg};
+use crate::state::reply::BonusFundReplyData;
+use cosmwasm_std::{to_binary, BankMsg, CosmosMsg, SubMsg, WasmMsg};
 use cw_storage_plus::Item;
+use msg::contracts::market::entry::LpInfoResp;
+use msg::prelude::MarketExecuteMsg::ReinvestYield;
+use msg::prelude::MarketQueryMsg::LpInfo;
 use msg::token::Token;
 use std::cmp::{max, min};
 
@@ -31,13 +36,35 @@ const EMISSIONS_PER_TIME_PER_TOKEN: Map<Timestamp, LvnToken> =
 /// The active LVN emission plan
 const LVN_EMISSIONS: Item<Emissions> = Item::new(namespace::LVN_EMISSIONS);
 
+/// Lockdrop configuration info
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub(crate) struct LockdropConfig {
+    /// The amount of time in seconds it takes for lockdrop rewards to unlock
     pub(crate) lockdrop_lvn_unlock_seconds: Duration,
+    /// The ratio of lockdrop rewards that are immediately available on launch
     pub(crate) lockdrop_immediate_unlock_ratio: Decimal256,
 }
 
+/// The Bonus Fund contains funds that come from a portion of reinvested yield.
+///
+/// The farming contract allows liquidity providers to deposit xLP and receive a portion of LVN
+/// emissions in return. However, they lose direct access to yield that comes from trading activity.
+/// The farming contract, which controls all of the deposited xLP, has a mechanism to reinvest
+/// accrued yield and distribute it amongst farmers (see [ExecuteMsg::Reinvest]). A portion of this
+/// yield is put aside in a special fund called the Bonus Fund to be used at a later time.
+const BONUS_FUND: Item<Collateral> = Item::new(namespace::BONUS_FUND);
+
+/// Bonus fund configuration info
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub(crate) struct BonusConfig {
+    /// The part of the reinvested yield that goes to the [BONUS_FUND]
+    pub(crate) ratio: Decimal256,
+    /// The destination for the funds collected in the [BONUS_FUND]
+    pub(crate) addr: Addr,
+}
+
 const LOCKDROP_CONFIG: Item<LockdropConfig> = Item::new(namespace::LOCKDROP_CONFIG);
+const BONUS_CONFIG: Item<BonusConfig> = Item::new(namespace::BONUS_CONFIG);
 
 impl State<'_> {
     pub(crate) fn rewards_init(
@@ -46,6 +73,7 @@ impl State<'_> {
         lvn_token_denom: &str,
     ) -> Result<()> {
         self.save_lvn_token(store, lvn_token_denom.to_string())?;
+        self.save_bonus_fund(store, Collateral::zero())?;
 
         EMISSIONS_PER_TIME_PER_TOKEN
             .save(store, self.now(), &LvnToken::zero())
@@ -97,6 +125,34 @@ impl State<'_> {
     pub(crate) fn load_lockdrop_config(&self, store: &dyn Storage) -> Result<LockdropConfig> {
         let lockdrop_config = LOCKDROP_CONFIG.load(store)?;
         Ok(lockdrop_config)
+    }
+
+    pub(crate) fn save_bonus_config(
+        &self,
+        store: &mut dyn Storage,
+        config: BonusConfig,
+    ) -> Result<()> {
+        BONUS_CONFIG.save(store, &config)?;
+        Ok(())
+    }
+
+    pub(crate) fn load_bonus_config(&self, store: &dyn Storage) -> Result<BonusConfig> {
+        let bonus_config = BONUS_CONFIG.load(store)?;
+        Ok(bonus_config)
+    }
+
+    pub(crate) fn load_bonus_fund(&self, store: &dyn Storage) -> Result<Collateral> {
+        let fund = BONUS_FUND.load(store)?;
+        Ok(fund)
+    }
+
+    pub(crate) fn save_bonus_fund(
+        &self,
+        store: &mut dyn Storage,
+        amount: Collateral,
+    ) -> Result<()> {
+        BONUS_FUND.save(store, &amount)?;
+        Ok(())
     }
 
     /// Calculates how many reward tokens can be claimed from the lockdrop and transfers them to the
@@ -169,7 +225,7 @@ impl State<'_> {
             let start_time = max(latest_timestamp, emissions.start);
             let end_time = min(self.now(), emissions.end);
             let elapsed_time =
-                end_time.checked_sub(start_time, "calculate_rewards_per_farming_token")?;
+                end_time.checked_sub(start_time, "calculate_emissions_per_token_per_time")?;
             let elapsed_time = Decimal256::from_ratio(elapsed_time.as_nanos(), 1u64);
             let elapsed_ratio = elapsed_time.checked_div(emissions_duration)?;
 
@@ -191,8 +247,16 @@ impl State<'_> {
         farmer_stats: &mut RawFarmerStats,
     ) -> Result<()> {
         if let Some(emissions) = self.may_load_lvn_emissions(ctx.storage)? {
-            self.update_emissions_per_token(ctx, &emissions)?;
-            self.update_accrued_emissions(ctx, addr, &emissions, farmer_stats)?;
+            let emissions_per_token = self.update_emissions_per_token(ctx, &emissions)?;
+            let accrued_rewards =
+                self.calculate_unlocked_emissions(ctx.storage, farmer_stats, &emissions)?;
+
+            farmer_stats.accrued_emissions = farmer_stats
+                .accrued_emissions
+                .checked_add(accrued_rewards)?;
+            farmer_stats.xlp_last_claimed_prefix_sum = emissions_per_token;
+
+            self.save_raw_farmer_stats(ctx.storage, addr, farmer_stats)?;
         }
 
         Ok(())
@@ -220,35 +284,14 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         emissions: &Emissions,
-    ) -> Result<()> {
-        let rewards_per_token =
+    ) -> Result<LvnToken> {
+        let emissions_per_token =
             self.calculate_emissions_per_token_per_time(ctx.storage, emissions)?;
+        let key = min(self.now(), emissions.end);
 
-        EMISSIONS_PER_TIME_PER_TOKEN.save(ctx.storage, self.now(), &rewards_per_token)?;
+        EMISSIONS_PER_TIME_PER_TOKEN.save(ctx.storage, key, &emissions_per_token)?;
 
-        Ok(())
-    }
-
-    /// Allocates accrued emissions to the specified user
-    pub(crate) fn update_accrued_emissions(
-        &self,
-        ctx: &mut StateContext,
-        addr: &Addr,
-        emissions: &Emissions,
-        farmer_stats: &mut RawFarmerStats,
-    ) -> Result<()> {
-        let accrued_rewards =
-            self.calculate_unlocked_emissions(ctx.storage, farmer_stats, emissions)?;
-
-        farmer_stats.accrued_emissions = farmer_stats
-            .accrued_emissions
-            .checked_add(accrued_rewards)?;
-        let end_prefix_sum = self.calculate_emissions_per_token_per_time(ctx.storage, emissions)?;
-        farmer_stats.xlp_last_claimed_prefix_sum = end_prefix_sum;
-
-        self.save_raw_farmer_stats(ctx.storage, addr, farmer_stats)?;
-
-        Ok(())
+        Ok(emissions_per_token)
     }
 
     /// Calculates how many tokens the user can claim from LVN emissions
@@ -296,6 +339,124 @@ impl State<'_> {
         });
 
         ctx.response.add_message(transfer_msg);
+
+        Ok(())
+    }
+
+    pub(crate) fn reinvest_yield(&self, ctx: &mut StateContext) -> Result<()> {
+        let lp_info: LpInfoResp = self.querier.query_wasm_smart(
+            self.market_info.addr.clone(),
+            &LpInfo {
+                liquidity_provider: self.env.contract.address.clone().into(),
+            },
+        )?;
+        let config = self.load_bonus_config(ctx.storage)?;
+        let bonus_amount = lp_info.available_yield.checked_mul_dec(config.ratio)?;
+        let reinvest_amount = lp_info
+            .available_yield
+            .checked_sub(bonus_amount)
+            .map(NonZero::<Collateral>::new)?;
+
+        if let Some(reinvest_amount) = reinvest_amount {
+            let token = self.market_info.collateral.clone();
+            let bonus_amount = token
+                .into_u128(bonus_amount.into_decimal256())?
+                .with_context(|| format!("unable to convert bonus_amount {:?}", bonus_amount))?;
+            let bonus_amount = token
+                .from_u128(bonus_amount)
+                .map(Collateral::from_decimal256)?;
+            let reinvest_msg = WasmMsg::Execute {
+                contract_addr: self.market_info.addr.to_string(),
+                msg: to_binary(&ReinvestYield {
+                    stake_to_xlp: true,
+                    amount: Some(reinvest_amount),
+                })?,
+                funds: vec![],
+            };
+            let xlp_before_reinvest = self.query_xlp_balance()?;
+
+            EPHEMERAL_BONUS_FUND.save(
+                ctx.storage,
+                &BonusFundReplyData {
+                    bonus_amount,
+                    reinvest_amount: reinvest_amount.raw(),
+                    xlp_before_reinvest,
+                },
+            )?;
+
+            ctx.response.add_raw_submessage(SubMsg::reply_on_success(
+                reinvest_msg,
+                ReplyId::ReinvestYield.into(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn handle_reinvest_yield_reply(&self, ctx: &mut StateContext) -> Result<()> {
+        let ephemeral_data = EPHEMERAL_BONUS_FUND.load_once(ctx.storage)?;
+        let balance = self
+            .market_info
+            .collateral
+            .query_balance(&self.querier, &self.env.contract.address)?;
+
+        anyhow::ensure!(
+            ephemeral_data.bonus_amount <= balance,
+            "expected yield {} is greater than the current balance {}",
+            ephemeral_data.bonus_amount,
+            balance
+        );
+
+        let mut fund_balance = self.load_bonus_fund(ctx.storage)?;
+        fund_balance = fund_balance.checked_add(ephemeral_data.bonus_amount)?;
+
+        anyhow::ensure!(
+            fund_balance <= balance,
+            "bonus fund {} is greater than the current balance {}",
+            ephemeral_data.bonus_amount,
+            balance
+        );
+
+        self.save_bonus_fund(ctx.storage, fund_balance)?;
+
+        let xlp_balance = self.query_xlp_balance()?;
+        let mut totals = self.load_farming_totals(ctx.storage)?;
+        let xlp_delta = xlp_balance.checked_sub(ephemeral_data.xlp_before_reinvest)?;
+
+        totals.xlp = xlp_balance;
+        self.save_farming_totals(ctx.storage, &totals)?;
+
+        ctx.response.add_event(ReinvestEvent {
+            reinvested_yield: ephemeral_data.reinvest_amount,
+            xlp: xlp_delta,
+            bonus_yield: ephemeral_data.bonus_amount,
+        });
+
+        ctx.response.add_event(FarmingPoolSizeEvent {
+            farming: totals.farming,
+            xlp: totals.xlp,
+        });
+
+        Ok(())
+    }
+
+    pub(crate) fn transfer_bonus(&self, ctx: &mut StateContext) -> Result<()> {
+        let config = self.load_bonus_config(ctx.storage)?;
+        let amount = self
+            .load_bonus_fund(ctx.storage)
+            .map(NonZero::<Collateral>::new)?;
+
+        if let Some(amount) = amount {
+            self.save_bonus_fund(ctx.storage, Collateral::zero())?;
+
+            let transfer_msg = self
+                .market_info
+                .collateral
+                .into_transfer_msg(&config.addr, amount)?
+                .with_context(|| "unable to construct msg to transfer bonus")?;
+
+            ctx.response.add_message(transfer_msg);
+        }
 
         Ok(())
     }

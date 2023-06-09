@@ -19,7 +19,10 @@ use cosmwasm_std::{Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Respons
 use cw2::{get_contract_version, set_contract_version};
 use msg::{
     contracts::market::{
-        entry::{DeltaNeutralityFeeResp, InstantiateMsg, MigrateMsg, SpotPriceHistoryResp},
+        entry::{
+            DeltaNeutralityFeeResp, InstantiateMsg, MigrateMsg, PositionsQueryFeeApproach,
+            PriceWouldTriggerResp, SpotPriceHistoryResp,
+        },
         position::{events::PositionSaveReason, PositionId, PositionOrPendingClose, PositionsResp},
     },
     shutdown::ShutdownImpact,
@@ -434,7 +437,10 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
     match msg {
         QueryMsg::Version {} => get_contract_version(store)?.query_result(),
 
-        QueryMsg::Status {} => state.status(store)?.query_result(),
+        QueryMsg::Status { price } => {
+            state.override_current_price(store, price)?;
+            state.status(store)?.query_result()
+        }
 
         QueryMsg::SpotPrice { timestamp } => state.spot_price(store, timestamp)?.query_result(),
         QueryMsg::SpotPriceHistory {
@@ -455,17 +461,29 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
         QueryMsg::Positions {
             position_ids,
             skip_calc_pending_fees,
+            fees,
+            price,
         } => {
+            state.override_current_price(store, price)?;
+
             let mut closed = vec![];
             let mut positions = vec![];
             let mut pending_close = vec![];
+
+            let fees = fees.unwrap_or_else(|| {
+                if skip_calc_pending_fees.unwrap_or(false) {
+                    PositionsQueryFeeApproach::NoFees
+                } else {
+                    PositionsQueryFeeApproach::AllFees
+                }
+            });
 
             for id in position_ids {
                 if let Some(pos) = state.load_closed_position(store, id)? {
                     closed.push(pos);
                 } else {
                     let pos = get_position(store, id)?;
-                    match state.pos_snapshot_for_open(store, pos, !skip_calc_pending_fees)? {
+                    match state.pos_snapshot_for_open(store, pos, fees)? {
                         PositionOrPendingClose::Open(pos) => positions.push(*pos),
                         PositionOrPendingClose::PendingClose(pending) => {
                             pending_close.push(*pending)
@@ -618,6 +636,10 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                     .into_base_price(state.market_id(store)?.get_market_type()),
             }
             .query_result()
+        }
+        QueryMsg::PriceWouldTrigger { price } => {
+            let would_trigger = state.price_would_trigger(store, price)?;
+            PriceWouldTriggerResp { would_trigger }.query_result()
         }
     }
 }

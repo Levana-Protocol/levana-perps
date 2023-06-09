@@ -29,7 +29,7 @@ impl Stats {
         spawn_local(clone!(price, bridge, market_status => async move {
             let resp = bridge.query_market::<PricePoint>(QueryMsg::SpotPrice{timestamp: None}).await.unwrap();
             price.set(Some(resp.data.price_base));
-            let resp = bridge.query_market::<StatusResp>(QueryMsg::Status{}).await.unwrap();
+            let resp = bridge.query_market::<StatusResp>(QueryMsg::Status{price:None}).await.unwrap();
             market_status.set(Some(resp.data));
         }));
 
