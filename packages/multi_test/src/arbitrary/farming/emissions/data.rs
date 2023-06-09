@@ -1,13 +1,14 @@
 use msg::prelude::*;
 use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
-use crate::{market_wrapper::PerpsMarket, time::TimeJump};
+use crate::market_wrapper::PerpsMarket;
 
 #[derive(Clone)]
 pub struct FarmingEmissions {
     pub market: Rc<RefCell<PerpsMarket>>,
     pub actions: Vec<Action>,
     pub emissions_duration_seconds: u32,
+    pub emissions_amount: LvnToken,
 }
 
 #[derive(Clone, Debug)]

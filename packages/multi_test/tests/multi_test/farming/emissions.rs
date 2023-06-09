@@ -1,5 +1,7 @@
 use crate::prelude::*;
-use levana_perpswap_multi_test::{config::TEST_CONFIG, arbitrary::farming::emissions::data::FarmingEmissions};
+use levana_perpswap_multi_test::{
+    arbitrary::farming::emissions::data::FarmingEmissions, config::TEST_CONFIG,
+};
 use proptest::prelude::*;
 
 #[test]
