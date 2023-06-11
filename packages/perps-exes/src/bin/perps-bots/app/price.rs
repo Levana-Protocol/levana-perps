@@ -5,15 +5,14 @@ use axum::async_trait;
 use chrono::{Duration, Utc};
 use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, HasAddress, TxBuilder, Wallet};
 use cosmwasm_std::Decimal256;
-use msg::prelude::{PriceBaseInQuote, Signed, UnsignedDecimal};
+use msg::prelude::{PriceBaseInQuote, PriceCollateralInUsd, Signed, UnsignedDecimal};
 use perps_exes::prelude::MarketContract;
-use rust_decimal::Decimal;
 
 use crate::{
     config::BotConfigByType,
     util::{
         markets::{get_markets, Market, PriceApi},
-        oracle::Pyth,
+        oracle::{get_latest_price, Pyth},
     },
     watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
 };
@@ -73,22 +72,14 @@ impl App {
         anyhow::ensure!(!markets.is_empty(), "Cannot have empty markets vec");
 
         for market in &markets {
-            let price_apis = &market
-                .get_price_api(wallet, &self.cosmos, &self.config)
-                .await?;
+            let price_apis = &market.get_price_api(wallet, &self.cosmos).await?;
             match price_apis {
-                PriceApi::Manual { symbol, symbol_usd } => {
-                    let price = self
-                        .get_current_price_symbol(symbol)
-                        .await?
-                        .to_string()
-                        .parse()?;
+                PriceApi::Manual(feeds) => {
+                    let (price, price_usd) = get_latest_price(&self.client, feeds).await?;
 
                     if let Some(reason) = self.needs_price_update(market, price).await? {
                         has_messages = true;
-                        let (status, msg) = self
-                            .get_tx_symbol(wallet, market, symbol_usd, price)
-                            .await?;
+                        let (status, msg) = self.get_tx_manual(wallet, market, price, price_usd)?;
                         statuses.push(format!(
                             "{}: needs update: {reason} {status}",
                             market.market_id
@@ -103,7 +94,8 @@ impl App {
                 }
 
                 PriceApi::Pyth(pyth) => {
-                    let (latest_price, _) = pyth.get_latest_price(&self.client).await?;
+                    let (latest_price, _) =
+                        get_latest_price(&self.client, &pyth.market_price_feeds).await?;
                     if let Some(reason) = self.needs_price_update(market, latest_price).await? {
                         has_messages = true;
                         let msgs = self.get_txs_pyth(wallet, market, pyth).await?;
@@ -135,10 +127,7 @@ impl App {
 
         // just for logging pyth prices
         for market in &markets {
-            match &market
-                .get_price_api(wallet, &self.cosmos, &self.config)
-                .await?
-            {
+            match &market.get_price_api(wallet, &self.cosmos).await? {
                 PriceApi::Manual { .. } => {}
 
                 PriceApi::Pyth(pyth) => {
@@ -208,31 +197,20 @@ impl App {
         Ok(None)
     }
 
-    async fn get_tx_symbol(
+    fn get_tx_manual(
         &self,
         wallet: &Wallet,
         market: &Market,
-        collateral_price_api_symbol: &Option<String>,
         price: PriceBaseInQuote,
+        price_usd: Option<PriceCollateralInUsd>,
     ) -> Result<(String, MsgExecuteContract)> {
-        let price_usd = match collateral_price_api_symbol {
-            Some(symbol) if symbol.as_str() == "USDC_USD" => Some("1".parse()?),
-            Some(symbol) => Some(
-                self.get_current_price_symbol(symbol)
-                    .await?
-                    .to_string()
-                    .parse()?,
-            ),
-            None => None,
-        };
-
         Ok((
             format!("Updated price for {}: {}", market.market_id, price),
             MsgExecuteContract {
                 sender: wallet.get_address_string(),
                 contract: market.market.get_address_string(),
                 msg: serde_json::to_vec(&msg::contracts::market::entry::ExecuteMsg::SetPrice {
-                    price: price.to_string().parse()?,
+                    price,
                     price_usd,
                     execs: self.config.execs_per_price,
                     rewards: None,
@@ -240,32 +218,6 @@ impl App {
                 funds: vec![],
             },
         ))
-    }
-
-    async fn get_current_price_symbol(&self, price_api_symbol: &str) -> Result<Decimal> {
-        #[derive(serde::Deserialize)]
-        struct Latest {
-            latest_price: Decimal,
-        }
-
-        let url = match &self.config.by_type {
-            BotConfigByType::Testnet { inner } => {
-                format!("{}current?marketId={}", inner.price_api, price_api_symbol)
-            }
-            BotConfigByType::Mainnet { .. } => {
-                anyhow::bail!("On mainnet, we must use Pyth price oracles")
-            }
-        };
-
-        let Latest { latest_price } = self
-            .client
-            .get(url)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
-        Ok(latest_price)
     }
 
     async fn get_txs_pyth(
