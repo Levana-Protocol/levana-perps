@@ -131,7 +131,7 @@ pub enum OwnerExecuteMsg {
     /// Returns an error if there's an ongoing emissions period.
     ReclaimEmissions {
         /// The destination address for the unused tokens
-        addr: String,
+        addr: RawAddr,
         /// The amount of tokens to reclaim
         /// A value of None will reclaim all unused emission tokens
         amount: Option<LvnToken>,
