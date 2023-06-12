@@ -29,7 +29,7 @@ use msg::contracts::factory::entry::{
     ShutdownStatus,
 };
 use msg::contracts::farming::entry::{
-    ExecuteMsg as FarmingExecuteMsg, LockdropBucketId, QueryMsg as FarmingQueryMsg,
+    ExecuteMsg as FarmingExecuteMsg, FarmersResp, LockdropBucketId, QueryMsg as FarmingQueryMsg,
 };
 use msg::contracts::farming::entry::{
     FarmerStats, OwnerExecuteMsg as FarmingOwnerExecuteMsg, StatusResp as FarmingStatusResp,
@@ -1766,6 +1766,14 @@ impl PerpsMarket {
             .map_err(|err| err.into())
     }
 
+    pub fn query_farmers(
+        &self,
+        start_after: Option<RawAddr>,
+        limit: Option<u32>,
+    ) -> Result<FarmersResp> {
+        self.query_farming(&FarmingQueryMsg::Farmers { start_after, limit })
+    }
+
     pub fn query_farming_farmer_stats(&self, wallet: &Addr) -> Result<FarmerStats> {
         self.query_farming(&FarmingQueryMsg::FarmerStats {
             addr: wallet.into(),
@@ -1777,11 +1785,9 @@ impl PerpsMarket {
     }
 
     pub fn query_reward_token_balance(&self, token: &Token, addr: &Addr) -> LvnToken {
-        let balance = token
-            .query_balance(&self.app().querier(), addr)
+        token
+            .query_balance_dec(&self.app().querier(), addr)
+            .map(LvnToken::from_decimal256)
             .unwrap()
-            .into_decimal256();
-
-        LvnToken::from_decimal256(balance)
     }
 }

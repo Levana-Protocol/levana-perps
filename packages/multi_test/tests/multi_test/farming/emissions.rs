@@ -482,3 +482,43 @@ fn test_clear_and_reclaim_emissions() {
         "75".parse().unwrap()
     )
 }
+
+#[test]
+fn test_query_farmers() {
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let market = PerpsMarket::new(app_cell).unwrap();
+    let mut farmers: Vec<Addr> = vec![];
+
+    move_past_lockdrop(&market);
+
+    for i in 0..9 {
+        let lp = market.clone_lp(i).unwrap();
+        farming_deposit(&market, &lp).unwrap();
+        farmers.push(lp);
+    }
+
+    // Test defaults
+
+    let res = market.query_farmers(None, None).unwrap();
+    assert_eq!(res.farmers, farmers);
+    assert_eq!(res.next_start_after, None);
+
+    // Full pagination
+
+    let limit = Some(4u32);
+    let res = market.query_farmers(None, limit).unwrap();
+    assert_eq!(res.farmers, farmers[..4]);
+    assert_eq!(res.next_start_after, farmers[3].clone().into());
+
+    let res = market
+        .query_farmers(res.next_start_after.map(RawAddr::from), limit)
+        .unwrap();
+    assert_eq!(res.farmers, farmers[4..8]);
+    assert_eq!(res.next_start_after, farmers[7].clone().into());
+
+    let res = market
+        .query_farmers(res.next_start_after.map(RawAddr::from), limit)
+        .unwrap();
+    assert_eq!(res.farmers, farmers[8..]);
+    assert_eq!(res.next_start_after, None);
+}

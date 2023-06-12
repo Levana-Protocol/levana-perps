@@ -7,6 +7,9 @@ const TOTALS: Item<FarmingTotals> = Item::new("farming-totals");
 /// Farming stats per wallet.
 const FARMERS: Map<&Addr, RawFarmerStats> = Map::new("farmer-stats");
 
+/// Default limit for [QueryMsg::Farmers]
+const FARMERS_QUERY_LIMIT_DEFAULT: u32 = 10;
+
 #[derive(serde::Serialize, serde::Deserialize, Default, Debug)]
 pub(crate) struct RawFarmerStats {
     /// The amount of farming tokens owned by this farmer
@@ -196,8 +199,32 @@ impl State<'_> {
         };
 
         token
-            .query_balance(&self.querier, &self.env.contract.address)
-            .map(Collateral::into_decimal256)
+            .query_balance_dec(&self.querier, &self.env.contract.address)
             .map(LpToken::from_decimal256)
+    }
+
+    pub(crate) fn query_farmers(
+        &self,
+        store: &dyn Storage,
+        start_after: Option<Addr>,
+        limit: Option<u32>,
+    ) -> Result<FarmersResp> {
+        let min = start_after.as_ref().map(Bound::exclusive);
+        let limit = limit.unwrap_or(FARMERS_QUERY_LIMIT_DEFAULT) as usize;
+        let farmers = FARMERS
+            .keys(store, min, None, Order::Ascending)
+            .take(limit)
+            .collect::<Result<Vec<Addr>, _>>()?;
+
+        let next_start_after = if farmers.len() < limit {
+            None
+        } else {
+            farmers.last().cloned()
+        };
+
+        Ok(FarmersResp {
+            next_start_after,
+            farmers,
+        })
     }
 }

@@ -7,7 +7,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
     let (state, store) = State::new(deps, env)?;
 
     match msg {
-        QueryMsg::Version {} => todo!(),
+        QueryMsg::Version {} => get_contract_version(store)?.query_result(),
         QueryMsg::Status {} => state.get_status(store)?.query_result(),
         QueryMsg::FarmerStats { addr } => {
             let farmer = addr.validate(state.api)?;
@@ -73,6 +73,15 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             .query_result()
         }
 
-        QueryMsg::Farmers { .. } => todo!(),
+        QueryMsg::Farmers { start_after, limit } => {
+            let start_after = match start_after {
+                None => None,
+                Some(addr) => Some(addr.validate(state.api)?),
+            };
+
+            state
+                .query_farmers(store, start_after, limit)?
+                .query_result()
+        }
     }
 }
