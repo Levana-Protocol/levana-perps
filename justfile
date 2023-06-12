@@ -194,6 +194,9 @@ rewards-relayer-start:
 	# TODO - add lvn
 	# rly start lvn-mint --debug
 
+rewards-mint-test owner:
+	cargo run --bin rewards-test mint-test --hatch-network=juno-testnet --owner={{owner}}
+
 # Rewards subcommands
 store-hatching:
 	cargo run --bin perps-deploy testnet store-code --contracts=hatching --network=juno-testnet
