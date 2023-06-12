@@ -150,7 +150,7 @@ pub enum OwnerExecuteMsg {
         /// See [InstantiateMsg::owner]
         owner: Option<RawAddr>,
         /// The amount of real yield taken for the bonus fund
-        bonus_ratio: Option<NonZero<Decimal256>>,
+        bonus_ratio: Option<Decimal256>,
         /// The address that receives bonus transfers.
         bonus_addr: Option<RawAddr>,
     },

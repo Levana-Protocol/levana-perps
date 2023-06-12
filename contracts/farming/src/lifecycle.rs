@@ -20,8 +20,8 @@ pub fn instantiate(
     MarketInfo::save(deps.querier, deps.storage, factory, msg.market_id.clone())?;
 
     let (state, mut ctx) = StateContext::new(deps, env)?;
-    let admin = msg.owner.validate(state.api)?;
-    state.set_admin(&mut ctx, &admin)?;
+    let owner = msg.owner.validate(state.api)?;
+    state.set_owner(&mut ctx, &owner)?;
     state.rewards_init(ctx.storage, &msg.lvn_token_denom)?;
     state.lockdrop_init(ctx.storage, &msg)?;
     state.save_lockdrop_config(
