@@ -1,9 +1,9 @@
 use cosmos::{Address, Contract, Cosmos, HasAddress, Wallet};
 use msg::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
+use msg::contracts::pyth_bridge::PythMarketPriceFeeds;
 use msg::prelude::*;
+use perps_exes::config::PythConfig;
 use std::fmt::Debug;
-
-use crate::config::BotConfig;
 
 use super::oracle::Pyth;
 
@@ -32,10 +32,7 @@ impl Debug for Market {
 #[derive(Clone, Debug)]
 pub(crate) enum PriceApi {
     Pyth(Pyth),
-    Manual {
-        symbol: String,
-        symbol_usd: Option<String>,
-    },
+    Manual(&'static PythMarketPriceFeeds),
 }
 
 pub(crate) async fn get_markets(cosmos: &Cosmos, factory: &Contract) -> Result<Vec<Market>> {
@@ -81,12 +78,7 @@ pub(crate) async fn get_markets(cosmos: &Cosmos, factory: &Contract) -> Result<V
 }
 
 impl Market {
-    pub(crate) async fn get_price_api(
-        &self,
-        wallet: &Wallet,
-        cosmos: &Cosmos,
-        config: &BotConfig,
-    ) -> Result<PriceApi> {
+    pub(crate) async fn get_price_api(&self, wallet: &Wallet, cosmos: &Cosmos) -> Result<PriceApi> {
         let Self {
             price_admin,
             market_id,
@@ -94,22 +86,17 @@ impl Market {
         } = self;
 
         if *price_admin == wallet.get_address_string() {
-            let symbol = if market_id.get_quote() == "USDC" {
-                format!("{}_USD", market_id.get_base())
-            } else {
-                market_id.to_string()
-            };
+            // Not using Pyth oracle, but still getting the prices from the Pyth endpoint
+            let pyth_config = PythConfig::load()?;
+            let feeds = pyth_config
+                .markets
+                .get(market_id)
+                .with_context(|| format!("No Pyth config found for market {market_id}"))?;
 
-            let symbol_usd = if market_id.is_notional_usd() {
-                None
-            } else {
-                Some(format!("{}_USD", market_id.get_collateral()))
-            };
-
-            Ok(PriceApi::Manual { symbol, symbol_usd })
+            Ok(PriceApi::Manual(feeds))
         } else {
             let bridge_addr = Address::from_str(price_admin)?;
-            let pyth = Pyth::new(cosmos, config, bridge_addr, market_id.clone()).await?;
+            let pyth = Pyth::new(cosmos, bridge_addr, market_id.clone()).await?;
             Ok(PriceApi::Pyth(pyth))
         }
     }
