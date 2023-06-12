@@ -124,9 +124,20 @@ impl Token {
         }
     }
 
-    /// Get the balance - this is expressed as Number
+    /// Get the balance - this is expressed a Collateral
     /// such that it mirrors self.into_transfer_msg()
     pub fn query_balance(&self, querier: &QuerierWrapper, user_addr: &Addr) -> Result<Collateral> {
+        self.query_balance_dec(querier, user_addr)
+            .map(Collateral::from_decimal256)
+    }
+
+    /// Get the balance - this is expressed as Decimal256
+    /// such that it mirrors self.into_transfer_msg()
+    pub fn query_balance_dec(
+        &self,
+        querier: &QuerierWrapper,
+        user_addr: &Addr,
+    ) -> Result<Decimal256> {
         self.from_u128(match self {
             Self::Cw20 { addr, .. } => {
                 let resp: Cw20BalanceResponse = querier.query_wasm_smart(
@@ -143,7 +154,6 @@ impl Token {
                 coin.amount.u128()
             }
         })
-        .map(Collateral::from_decimal256)
     }
 
     /// helper function

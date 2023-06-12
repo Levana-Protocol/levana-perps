@@ -266,6 +266,42 @@ impl State<'_> {
             },
         )
     }
+
+    pub(crate) fn lockdrop_bucket_stats(
+        &self,
+        store: &dyn Storage,
+    ) -> Result<Vec<LockdropBucketStats>> {
+        let launched_at = match self.get_period_resp(store)? {
+            FarmingPeriodResp::Launched { started_at } => Some(started_at),
+            _ => None,
+        };
+
+        let stats = LockdropBuckets::BALANCES_BY_BUCKET
+            .range(store, None, None, Order::Ascending)
+            .map(|res| {
+                let (bucket_id, deposit) = res?;
+                let multiplier = LockdropBuckets::get_multiplier(store, bucket_id)?;
+                let unlocks_at = match launched_at {
+                    None => None,
+                    Some(launched_at) => {
+                        let duration = LockdropBuckets::get_duration(store, bucket_id)?;
+                        Some(launched_at + duration)
+                    }
+                };
+
+                let stats = LockdropBucketStats {
+                    bucket_id,
+                    multiplier,
+                    deposit,
+                    unlocks_at,
+                };
+
+                anyhow::Ok(stats)
+            })
+            .collect::<Result<Vec<LockdropBucketStats>, _>>()?;
+
+        Ok(stats)
+    }
 }
 
 pub(crate) struct LockdropBuckets {}
@@ -306,6 +342,8 @@ impl LockdropBuckets {
         Map::new(namespace::LOCKDROP_BUCKETS_DURATION);
     const BALANCES: Map<'static, (&Addr, LockdropBucketId), Balance> =
         Map::new(namespace::LOCKDROP_BUCKETS_BALANCES);
+    const BALANCES_BY_BUCKET: Map<'static, LockdropBucketId, Collateral> =
+        Map::new(namespace::LOCKDROP_BALANCES_BY_BUCKET);
     const TOTAL_SHARES: Item<'static, LockdropShares> =
         Item::new(namespace::LOCKDROP_BUCKETS_TOTAL_SHARES);
 
@@ -325,6 +363,15 @@ impl LockdropBuckets {
 
     fn get_duration(storage: &dyn Storage, bucket_id: LockdropBucketId) -> Result<Duration> {
         Self::DURATION
+            .load(storage, bucket_id)
+            .map_err(|err| err.into())
+    }
+
+    fn get_multiplier(
+        storage: &dyn Storage,
+        bucket_id: LockdropBucketId,
+    ) -> Result<NonZero<Decimal256>> {
+        Self::MULTIPLIER
             .load(storage, bucket_id)
             .map_err(|err| err.into())
     }
@@ -389,6 +436,16 @@ impl LockdropBuckets {
 
         LockdropBuckets::TOTAL_SHARES
             .update(storage, |total| total.checked_add_signed(weighted_amount))?;
+
+        Self::BALANCES_BY_BUCKET.update(storage, bucket_id, |balance| {
+            let collateral = Collateral::try_from_number(amount)?;
+            let updated = match balance {
+                None => collateral,
+                Some(balance) => balance.checked_add_signed(collateral.into_signed())?,
+            };
+
+            anyhow::Ok(updated)
+        })?;
 
         let is_withdrawal = amount.is_negative();
         if is_withdrawal {
