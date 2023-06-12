@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use cosmos::{Address, CosmosNetwork, RawWallet};
+use msg::prelude::NumberGtZero;
 use perps_exes::build_version;
 
 #[derive(clap::Parser)]
@@ -18,6 +19,10 @@ pub(crate) enum Subcommand {
     HatchEgg {
         #[clap(flatten)]
         hatch_egg_opt: HatchEggOpt,
+    },
+    MintTest {
+        #[clap(flatten)]
+        mint_test_opt: MintTestOpt,
     },
 }
 
@@ -109,8 +114,61 @@ pub(crate) struct HatchEggOpt {
     /// finding a mintable egg requires crawling the CSV
     /// this gets increasingly slow on each test run
     /// so optionally skip the cawling
-    #[clap(long, default_value = "21")]
+    #[clap(long, default_value = "39")]
     pub(crate) mint_eggs_start_skip: usize,
+}
+
+#[derive(clap::Parser)]
+pub(crate) struct MintTestOpt {
+    /// hatching contract address
+    #[clap(
+        long,
+        env = "HATCH_ADDRESS",
+        default_value = "juno15nmqu8s7ywcacm3755eg7024vfqchxm3tytqgzdv94uwm6a62n6qc8r0uz"
+    )]
+    pub hatch_address: Address,
+
+    /// Mnemonic phrase for the nft mint admin wallet
+    #[clap(long, env = "DEST_ADDR")]
+    pub owner: Address,
+
+    /// Mnemonic phrase for the nft mint admin wallet
+    #[clap(long, env = "NFT_MINT_ADMIN_COSMOS_WALLET")]
+    pub nft_mint_admin_wallet: RawWallet,
+
+    /// Mnemonic phrase for the profile admin wallet
+    #[clap(long, env = "PROFILE_ADMIN_COSMOS_WALLET")]
+    pub profile_admin_wallet: RawWallet,
+
+    /// Network to use for hatching
+    #[clap(long, env = "HATCH_COSMOS_NETWORK")]
+    pub hatch_network: CosmosNetwork,
+
+    /// Mnemonic phrase for the hatching wallet
+    #[clap(long, env = "HATCH_COSMOS_WALLET")]
+    pub hatch_wallet: RawWallet,
+
+    /// Path to hatchery so we can load the CSV for babydragon extra meta
+    #[clap(long, default_value = "../levana-hatchery")]
+    pub(crate) path_to_hatchery: PathBuf,
+
+    /// number of eggs to mint for the test
+    #[clap(long, default_value = "3")]
+    pub(crate) mint_eggs_count: u32,
+
+    /// finding a mintable egg requires crawling the CSV
+    /// this gets increasingly slow on each test run
+    /// so optionally skip the cawling
+    #[clap(long, default_value = "39")]
+    pub(crate) mint_eggs_start_skip: usize,
+
+    /// number of eggs to mint for the test
+    #[clap(long, default_value = "1.23")]
+    pub(crate) profile_spirit_level: NumberGtZero,
+
+    /// number of eggs to mint for the test
+    #[clap(long, default_value = "1.23")]
+    pub(crate) egg_spirit_level: NumberGtZero,
 }
 
 impl Opt {

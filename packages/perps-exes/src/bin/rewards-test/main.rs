@@ -1,13 +1,13 @@
 mod cli;
 mod mock_nft;
 
-use std::vec;
+use std::{path::Path, vec};
 
 use crate::cli::{Cmd, Subcommand};
 use anyhow::Result;
 use clap::Parser;
 use cli::HatchEggOpt;
-use cosmos::{Contract, Cosmos, HasAddressType, Wallet};
+use cosmos::{Address, Contract, Cosmos, CosmosNetwork, HasAddressType, RawWallet, Wallet};
 use mock_nft::Metadata;
 use msg::contracts::hatching::{
     config::Config as HatchConfig,
@@ -36,14 +36,20 @@ struct Hatch {
 }
 
 impl Hatch {
-    pub async fn new(opt: &HatchEggOpt) -> Result<Self> {
-        let cosmos = opt.hatch_network.builder().build().await?;
+    pub async fn new(
+        network: CosmosNetwork,
+        wallet: RawWallet,
+        nft_mint_admin_wallet: RawWallet,
+        profile_admin_wallet: RawWallet,
+        hatch_address: Address,
+    ) -> Result<Self> {
+        let cosmos = network.builder().build().await?;
         let address_type = cosmos.get_address_type();
-        let wallet = opt.hatch_wallet.for_chain(address_type);
-        let nft_mint_admin_wallet = opt.nft_mint_admin_wallet.for_chain(address_type);
-        let profile_admin_wallet = opt.profile_admin_wallet.for_chain(address_type);
+        let wallet = wallet.for_chain(address_type);
+        let nft_mint_admin_wallet = nft_mint_admin_wallet.for_chain(address_type);
+        let profile_admin_wallet = profile_admin_wallet.for_chain(address_type);
 
-        let contract = Contract::new(cosmos.clone(), opt.hatch_address);
+        let contract = Contract::new(cosmos.clone(), hatch_address);
 
         let config: HatchConfig = contract.query(HatchQueryMsg::Config {}).await?;
 
@@ -146,6 +152,30 @@ async fn main() -> Result<()> {
     global_opt.init_logger();
 
     match subcommand {
+        Subcommand::MintTest { mint_test_opt: opt } => {
+            let hatch = Hatch::new(
+                opt.hatch_network,
+                opt.hatch_wallet,
+                opt.nft_mint_admin_wallet,
+                opt.profile_admin_wallet,
+                opt.hatch_address,
+            )
+            .await?;
+
+            let info = mint_test(
+                &hatch,
+                opt.owner.to_string(),
+                &opt.path_to_hatchery,
+                opt.mint_eggs_start_skip,
+                opt.mint_eggs_count,
+                opt.profile_spirit_level,
+                opt.egg_spirit_level,
+            )
+            .await?;
+
+            println!("{:#?}", info);
+        }
+
         /*  This test covers egg hatching and reward grants. The process uses IBC messaging
            spanning three chains.
 
@@ -154,7 +184,15 @@ async fn main() -> Result<()> {
            3. Rewarding users with LVN tokens on osmosis
         */
         Subcommand::HatchEgg { hatch_egg_opt: opt } => {
-            let hatch = Hatch::new(&opt).await?;
+            let hatch = Hatch::new(
+                opt.hatch_network,
+                opt.hatch_wallet,
+                opt.nft_mint_admin_wallet,
+                opt.profile_admin_wallet,
+                opt.hatch_address,
+            )
+            .await?;
+
             let nft_mint = NftMint::new(&opt).await?;
             let rewards = Rewards::new(&opt).await?;
             let lvn_balance_before = get_lvn_balance(&rewards, &opt.reward_token_denom).await?;
@@ -180,49 +218,29 @@ async fn main() -> Result<()> {
                     )
                     .await?
             } else {
-                add_profile_spirit_level(&hatch, "1.23".parse().unwrap()).await?;
-                let filepath = opt
-                    .path_to_hatchery
-                    .join("data")
-                    .join("juno-warp")
-                    .join("baby-dragons-extra.csv");
-                let mut rdr = csv::Reader::from_path(filepath)?;
-                let dragon_extras: Vec<DragonMintExtra> = rdr
-                    .deserialize::<DragonMintExtra>()
-                    .map(|x| x.map_err(|e| e.into()))
-                    .collect::<Result<Vec<_>>>()?;
-
-                let eggs = mint_eggs(
+                let info = mint_test(
                     &hatch,
-                    &opt,
+                    hatch.wallet.address().to_string(),
+                    &opt.path_to_hatchery,
+                    opt.mint_eggs_start_skip,
+                    opt.mint_eggs_count,
                     "1.23".parse().unwrap(),
-                    NftRarity::Ancient,
-                    dragon_extras,
+                    "1.23".parse().unwrap(),
                 )
                 .await?;
 
-                // query for the "potential hatch info"
-
-                let info: PotentialHatchInfo = hatch
-                    .contract
-                    .query(&HatchQueryMsg::PotentialHatchInfo {
-                        owner: hatch.wallet.address().to_string().into(),
-                        eggs: eggs.clone(),
-                        dusts: vec![],
-                        profile: true,
-                    })
-                    .await?;
-
-                println!(
-                    "hatching {} eggs, {} dusts, and profile is {}",
-                    info.eggs.len(),
-                    info.dusts.len(),
-                    info.profile.is_some()
+                log::info!(
+                    "hatching nft over ibc channel: {:#?}",
+                    hatch.config.nft_mint_channel.as_ref().unwrap()
                 );
-                assert_eq!(info.eggs.len(), eggs.len());
 
-                // hatch the egg
+                let eggs = info
+                    .eggs
+                    .iter()
+                    .map(|egg| egg.token_id.to_string())
+                    .collect::<Vec<_>>();
 
+                // hatch everything
                 let tx = hatch
                     .contract
                     .execute(
@@ -410,10 +428,58 @@ async fn get_hatch_status(hatch: &Hatch, details: bool) -> Result<MaybeHatchStat
         })
         .await
 }
+async fn mint_test(
+    hatch: &Hatch,
+    owner: String,
+    path_to_hatchery: &Path,
+    mint_eggs_start_skip: usize,
+    mint_eggs_count: u32,
+    profile_spirit_level: NumberGtZero,
+    egg_spirit_level: NumberGtZero,
+) -> Result<PotentialHatchInfo> {
+    add_profile_spirit_level(hatch, profile_spirit_level, owner.clone()).await?;
+    let filepath = path_to_hatchery
+        .join("data")
+        .join("juno-warp")
+        .join("baby-dragons-extra.csv");
+    let mut rdr = csv::Reader::from_path(filepath)?;
+    let dragon_extras: Vec<DragonMintExtra> = rdr
+        .deserialize::<DragonMintExtra>()
+        .map(|x| x.map_err(|e| e.into()))
+        .collect::<Result<Vec<_>>>()?;
 
+    let eggs = mint_eggs(
+        hatch,
+        owner.clone(),
+        mint_eggs_start_skip,
+        mint_eggs_count,
+        egg_spirit_level,
+        NftRarity::Ancient,
+        dragon_extras,
+    )
+    .await?;
+
+    // query for the "potential hatch info"
+
+    let info: PotentialHatchInfo = hatch
+        .contract
+        .query(&HatchQueryMsg::PotentialHatchInfo {
+            owner: owner.clone().into(),
+            eggs: eggs.clone(),
+            dusts: vec![],
+            profile: true,
+        })
+        .await?;
+
+    assert_eq!(info.eggs.len(), eggs.len());
+
+    Ok(info)
+}
 async fn mint_eggs(
     hatch: &Hatch,
-    opt: &HatchEggOpt,
+    owner: String,
+    mint_eggs_start_skip: usize,
+    mint_eggs_count: u32,
     spirit_level: NumberGtZero,
     rarity: NftRarity,
     dragon_extras: Vec<DragonMintExtra>,
@@ -421,9 +487,9 @@ async fn mint_eggs(
     // mint the egg NFT
 
     let mut token_ids = vec![];
-    let mut skip_offset = opt.mint_eggs_start_skip;
+    let mut skip_offset = mint_eggs_start_skip;
 
-    for _ in 0..opt.mint_eggs_count {
+    for _ in 0..mint_eggs_count {
         let mut token_id = None;
         for dragon_extra in dragon_extras.iter().skip(skip_offset) {
             skip_offset += 1;
@@ -440,7 +506,7 @@ async fn mint_eggs(
                     vec![],
                     mock_nft::ExecuteMsg::Mint(Box::new(mock_nft::MintMsg {
                         token_id: dragon_extra.id.clone(),
-                        owner: hatch.wallet.address().to_string(),
+                        owner: owner.clone(),
                         token_uri: None,
                         extension: Metadata::new_egg(
                             spirit_level,
@@ -481,7 +547,7 @@ async fn mint_eggs(
             .await?;
 
         // make sure the owner is correct
-        assert_eq!(nft_info.access.owner, hatch.wallet.address().to_string());
+        assert_eq!(nft_info.access.owner, owner);
 
         // make sure the minted nft has the correct spirit level
         let spirit_level_attr: NumberGtZero = nft_info
@@ -505,18 +571,17 @@ async fn mint_eggs(
             token_id,
             spirit_level
         );
-        log::info!(
-            "hatching nft over ibc channel: {:#?}",
-            hatch.config.nft_mint_channel.as_ref().unwrap()
-        );
-
         token_ids.push(token_id);
     }
 
     Ok(token_ids)
 }
 
-async fn add_profile_spirit_level(hatch: &Hatch, spirit_level: NumberGtZero) -> Result<()> {
+async fn add_profile_spirit_level(
+    hatch: &Hatch,
+    spirit_level: NumberGtZero,
+    owner: String,
+) -> Result<()> {
     log::info!("adding profile spirit level {}", spirit_level);
 
     #[derive(Serialize, Deserialize)]
@@ -544,7 +609,7 @@ async fn add_profile_spirit_level(hatch: &Hatch, spirit_level: NumberGtZero) -> 
             &ProfileExecuteMsg::Admin {
                 message: ProfileAdminExecuteMsg::AddSpiritLevel {
                     wallets: vec![AddSpiritLevel {
-                        wallet: hatch.wallet.address().to_string(),
+                        wallet: owner,
                         spirit_level: spirit_level.to_string(),
                     }],
                 },
