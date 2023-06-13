@@ -218,15 +218,6 @@ pub struct StatusResp {
     pub bonus: Collateral,
     /// If known, the timestamp when all lockdrop LVN rewards are available
     pub lockdrop_rewards_unlocked: Option<Timestamp>,
-    /// Total amount of LVN currently held by the contract
-    pub lvn_held: LvnToken,
-    /// Total liabilities of LVN for the contract.
-    ///
-    /// This is the sum of unclaimed LVN from lockdrop and emissions, plus any
-    /// remaining emissions for the active emissions.
-    ///
-    /// If this number is less than [StatusResp::lvn_held], the contract is insolvent and needs to be provided with more funds.
-    pub lvn_owed: LvnToken,
     /// Current emissions plan
     pub emissions: Option<Emissions>,
 }

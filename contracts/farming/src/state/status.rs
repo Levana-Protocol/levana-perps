@@ -15,11 +15,6 @@ impl State<'_> {
             }
             _ => None,
         };
-        let lvn_held = self
-            .load_lvn_token(store)?
-            .query_balance_dec(&self.querier, &self.env.contract.address)
-            .map(LvnToken::from_decimal256)?;
-        let lvn_owed = LvnToken::zero(); //TODO fill this in
         let emissions = self.may_load_lvn_emissions(store)?;
 
         Ok(StatusResp {
@@ -29,8 +24,6 @@ impl State<'_> {
             bonus,
             lockdrop_buckets,
             lockdrop_rewards_unlocked,
-            lvn_held,
-            lvn_owed,
             emissions,
         })
     }
