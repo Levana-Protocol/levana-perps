@@ -1,4 +1,5 @@
 mod common;
+mod pnl;
 
 use std::sync::Arc;
 
@@ -16,6 +17,9 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .route("/", get(common::homepage))
         .route("/healthz", get(common::healthz))
         .route("/build-version", get(common::build_version))
+        .route("/pnl/:chain/:market/:position", get(pnl::html))
+        .route("/pnl.css", get(pnl::css))
+        .route("/pnl/:chain/:market/:position/image", get(pnl::image))
         .with_state(app)
         .layer(
             CorsLayer::new()
