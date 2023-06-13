@@ -484,6 +484,67 @@ fn test_clear_and_reclaim_emissions() {
 }
 
 #[test]
+fn test_claim_emissions() {
+    // Setup
+
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let mut market = PerpsMarket::new(app_cell).unwrap();
+    let lp0 = market.clone_lp(0).unwrap();
+    let lp1 = market.clone_lp(1).unwrap();
+    let lp2 = market.clone_lp(2).unwrap();
+
+    market.automatic_time_jump_enabled = false;
+    move_past_lockdrop(&market);
+
+    // Deposit
+
+    let interval: i64 = (EMISSIONS_DURATION / 4).into();
+    let token = start_emissions(&market).unwrap();
+
+    farming_deposit(&market, &lp0).unwrap();
+
+    market.set_time(TimeJump::Seconds(interval)).unwrap();
+    farming_deposit(&market, &lp1).unwrap();
+
+    market.set_time(TimeJump::Seconds(interval)).unwrap();
+    farming_deposit(&market, &lp2).unwrap();
+
+    // Claim halfway through
+
+    market.exec_farming_claim_emissions(&lp0).unwrap();
+    let lp0_balance = market.query_reward_token_balance(&token, &lp0);
+    assert_eq!(lp0_balance, "75".parse().unwrap());
+
+    market.exec_farming_claim_emissions(&lp1).unwrap();
+    let lp1_balance = market.query_reward_token_balance(&token, &lp1);
+    assert_eq!(lp1_balance, "25".parse().unwrap());
+
+    market.exec_farming_claim_emissions(&lp2).unwrap_err();
+
+    // Jump to the end and claim
+
+    market.set_time(TimeJump::Seconds(100)).unwrap();
+
+    market.exec_farming_claim_emissions(&lp0).unwrap();
+    let lp0_balance_after = market.query_reward_token_balance(&token, &lp0);
+    assert_eq!(
+        lp0_balance_after.checked_sub(lp0_balance).unwrap(),
+        "33.333333".parse().unwrap()
+    );
+
+    market.exec_farming_claim_emissions(&lp1).unwrap();
+    let lp1_balance_after = market.query_reward_token_balance(&token, &lp1);
+    assert_eq!(
+        lp1_balance_after.checked_sub(lp1_balance).unwrap(),
+        "33.333333".parse().unwrap()
+    );
+
+    market.exec_farming_claim_emissions(&lp2).unwrap();
+    let lp2_balance = market.query_reward_token_balance(&token, &lp2);
+    assert_eq!(lp2_balance, "33.333333".parse().unwrap())
+}
+
+#[test]
 fn test_query_farmers() {
     let app_cell = PerpsApp::new_cell().unwrap();
     let market = PerpsMarket::new(app_cell).unwrap();

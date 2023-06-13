@@ -348,7 +348,7 @@ impl State<'_> {
         self.save_raw_farmer_stats(ctx.storage, addr, &farmer_stats)?;
 
         let amount = NumberGtZero::new(amount.into_decimal256())
-            .context("Unable to convert amount into NumberGtZero")?;
+            .context("There are no unclaimed emissions")?;
         let coin = self
             .load_lvn_token(ctx.storage)?
             .into_native_coin(amount)?
