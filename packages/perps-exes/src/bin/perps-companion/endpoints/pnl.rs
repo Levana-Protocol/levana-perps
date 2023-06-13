@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use askama::Template;
 use axum::{
     extract::{Path, State},
@@ -13,6 +13,7 @@ use msg::{
     prelude::{Signed, Usd},
 };
 use reqwest::{header::CONTENT_TYPE, StatusCode};
+use resvg::usvg::{TreeParsing, TreeTextToPath};
 
 use crate::app::App;
 
@@ -94,18 +95,50 @@ impl PnlInfo {
     }
 
     fn image(self) -> Response {
-        let mut res = PnlSvg {
+        match self.image_inner() {
+            Ok(res) => res,
+            Err(e) => {
+                let mut res = format!("Error while rendering SVG: {e:?}").into_response();
+                *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+                res
+            }
+        }
+    }
+
+    fn image_inner(self) -> Result<Response> {
+        // Generate the raw SVG text by rendering the template
+        let svg = PnlSvg {
             owner: self.owner,
             pnl_usd: self.pnl_usd,
         }
         .render()
-        .unwrap()
-        .into_response();
-        res.headers_mut().append(
-            CONTENT_TYPE,
-            HeaderValue::from_static("image/svg+xml; charset=utf-8"),
-        );
-        res
+        .unwrap();
+
+        // Convert the SVG into a usvg tree using default settings
+        let mut tree = resvg::usvg::Tree::from_str(&svg, &resvg::usvg::Options::default())?;
+
+        // Load up the fonts and convert text values
+        let mut fontdb = resvg::usvg::fontdb::Database::new();
+        fontdb.load_system_fonts();
+        tree.convert_text(&fontdb);
+
+        // Now that our usvg tree has text converted, convert into an resvg tree
+        let rtree = resvg::Tree::from_usvg(&tree);
+
+        // Generate a new pixmap to hold the rasterized image
+        let pixmap_size = rtree.size.to_int_size();
+        let mut pixmap = resvg::tiny_skia::Pixmap::new(pixmap_size.width(), pixmap_size.height())
+            .context("Could not generate new Pixmap")?;
+
+        // Render the rasterized image from the resvg SVG tree into the pixmap
+        rtree.render(resvg::tiny_skia::Transform::default(), &mut pixmap.as_mut());
+
+        // Take the binary PNG output and return is as a response
+        let png = pixmap.encode_png()?;
+        let mut res = png.into_response();
+        res.headers_mut()
+            .append(CONTENT_TYPE, HeaderValue::from_static("image/png"));
+        Ok(res)
     }
 }
 
