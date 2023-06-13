@@ -40,7 +40,7 @@ pub(super) async fn image(app: State<Arc<App>>, params: Path<Params>) -> impl In
 
 pub(super) async fn css() -> impl IntoResponse {
     let mut res = include_str!("../../../../static/pnl.css").into_response();
-    res.headers_mut().append(
+    res.headers_mut().insert(
         CONTENT_TYPE,
         HeaderValue::from_static("text/css; charset=utf-8"),
     );
@@ -164,7 +164,7 @@ impl PnlInfo {
         let png = pixmap.encode_png()?;
         let mut res = png.into_response();
         res.headers_mut()
-            .append(CONTENT_TYPE, HeaderValue::from_static("image/png"));
+            .insert(CONTENT_TYPE, HeaderValue::from_static("image/png"));
         Ok(res)
     }
 }
