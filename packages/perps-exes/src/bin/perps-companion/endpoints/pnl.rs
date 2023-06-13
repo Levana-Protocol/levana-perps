@@ -9,8 +9,14 @@ use axum::{
 };
 use cosmos::Address;
 use msg::{
-    contracts::market::position::{ClosedPosition, PositionId, PositionsResp},
-    prelude::{Signed, Usd},
+    contracts::market::{
+        entry::StatusResp,
+        position::{ClosedPosition, PositionId, PositionsResp},
+    },
+    prelude::{
+        DirectionToBase, LeverageToBase, MarketId, NonZero, PriceBaseInQuote, PricePoint, Signed,
+        SignedLeverageToNotional, Usd,
+    },
 };
 use reqwest::{header::CONTENT_TYPE, StatusCode};
 use resvg::usvg::{TreeParsing, TreeTextToPath};
@@ -59,6 +65,16 @@ impl Params {
             position,
         } = &self;
         let cosmos = app.cosmos.get(chain).ok_or(Error::UnknownChainId)?;
+        let contract = cosmos.make_contract(*market);
+
+        let status: StatusResp = match contract
+            .query(msg::contracts::market::entry::QueryMsg::Status { price: None })
+            .await
+        {
+            Ok(status) => status,
+            Err(_) => return Err(Error::CouldNotQueryContract),
+        };
+
         let res: Result<PositionsResp> = cosmos
             .make_contract(*market)
             .query(msg::contracts::market::entry::QueryMsg::Positions {
@@ -70,22 +86,33 @@ impl Params {
             .await;
         let mut res = match res {
             Ok(res) => res,
-            Err(_) => match cosmos.contract_info(market).await {
-                Ok(_) => return Err(Error::CouldNotQueryContract),
-                Err(_) => return Err(Error::CouldNotFindContract),
-            },
+            Err(_) => return Err(Error::CouldNotFindContract),
         };
 
-        match res.closed.pop() {
-            Some(pos) => Ok(PnlInfo::new(self, pos)),
-            None => Err(
-                if res.positions.is_empty() && res.pending_close.is_empty() {
-                    Error::PositionNotFound
-                } else {
-                    Error::PositionStillOpen
-                },
-            ),
-        }
+        let pos = match res.closed.pop() {
+            Some(pos) => pos,
+            None => {
+                return Err(
+                    if res.positions.is_empty() && res.pending_close.is_empty() {
+                        Error::PositionNotFound
+                    } else {
+                        Error::PositionStillOpen
+                    },
+                )
+            }
+        };
+
+        let exit_price: PricePoint = match contract
+            .query(msg::contracts::market::entry::QueryMsg::SpotPrice {
+                timestamp: Some(pos.settlement_time),
+            })
+            .await
+        {
+            Ok(status) => status,
+            Err(_) => return Err(Error::CouldNotQueryContract),
+        };
+
+        Ok(PnlInfo::new(self, pos, status.market_id, exit_price))
     }
 }
 
@@ -176,14 +203,47 @@ struct PnlInfo {
     owner: String,
     pnl_usd: Signed<Usd>,
     image_url: String,
+    market_id: MarketId,
+    direction: &'static str,
+    entry_price: PriceBaseInQuote,
+    exit_price: PriceBaseInQuote,
+    leverage: LeverageToBase,
 }
 
 impl PnlInfo {
-    fn new(params: Params, pos: ClosedPosition) -> Self {
+    fn new(
+        params: Params,
+        pos: ClosedPosition,
+        market_id: MarketId,
+        exit_price: PricePoint,
+    ) -> Self {
+        let market_type = market_id.get_market_type();
         PnlInfo {
             owner: pos.owner.into_string(),
             pnl_usd: pos.pnl_usd,
             image_url: params.image_url(),
+            market_id,
+            direction: match pos.direction_to_base {
+                DirectionToBase::Long => "long",
+                DirectionToBase::Short => "short",
+            },
+            entry_price: pos.entry_price_base,
+            exit_price: exit_price.price_base,
+            leverage: match NonZero::new(pos.active_collateral) {
+                // Total liquidation occurred, which (1) should virtually never
+                // happen and (2) wouldn't be a celebration. Just using 0.
+                None => "0".parse().unwrap(),
+                Some(active_collateral) => {
+                    SignedLeverageToNotional::calculate(
+                        pos.notional_size,
+                        &exit_price,
+                        active_collateral,
+                    )
+                    .into_base(market_type)
+                    .split()
+                    .1
+                }
+            },
         }
     }
 }
