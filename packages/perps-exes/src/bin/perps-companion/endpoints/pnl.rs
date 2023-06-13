@@ -56,12 +56,12 @@ impl Params {
             chain,
             market,
             position,
-        } = self;
-        let cosmos = app.cosmos.get(&chain).ok_or(Error::UnknownChainId)?;
+        } = &self;
+        let cosmos = app.cosmos.get(chain).ok_or(Error::UnknownChainId)?;
         let res: Result<PositionsResp> = cosmos
-            .make_contract(market)
+            .make_contract(*market)
             .query(msg::contracts::market::entry::QueryMsg::Positions {
-                position_ids: vec![position],
+                position_ids: vec![*position],
                 skip_calc_pending_fees: None,
                 fees: None,
                 price: None,
@@ -76,8 +76,14 @@ impl Params {
         };
 
         match res.closed.pop() {
-            Some(pos) => Ok(pos.into()),
-            None => Err(Error::ClosedPositionNotFound),
+            Some(pos) => Ok(PnlInfo::new(self, pos)),
+            None => Err(
+                if res.positions.is_empty() && res.pending_close.is_empty() {
+                    Error::PositionNotFound
+                } else {
+                    Error::PositionStillOpen
+                },
+            ),
         }
     }
 }
@@ -88,7 +94,18 @@ impl PnlInfo {
     }
 
     fn image(self) -> Response {
-        "FIXME image rendering not ready".into_response()
+        let mut res = PnlSvg {
+            owner: self.owner,
+            pnl_usd: self.pnl_usd,
+        }
+        .render()
+        .unwrap()
+        .into_response();
+        res.headers_mut().append(
+            CONTENT_TYPE,
+            HeaderValue::from_static("image/svg+xml; charset=utf-8"),
+        );
+        res
     }
 }
 
@@ -96,12 +113,14 @@ impl PnlInfo {
 enum Error {
     #[error("Unknown chain ID")]
     UnknownChainId,
-    #[error("COuld not find contract")]
+    #[error("Could not find contract")]
     CouldNotFindContract,
     #[error("Could not query contract")]
     CouldNotQueryContract,
-    #[error("Specified closed position not found")]
-    ClosedPositionNotFound,
+    #[error("Specified position not found")]
+    PositionNotFound,
+    #[error("The position is still open")]
+    PositionStillOpen,
 }
 
 impl IntoResponse for Error {
@@ -111,7 +130,8 @@ impl IntoResponse for Error {
             Error::UnknownChainId => StatusCode::BAD_REQUEST,
             Error::CouldNotFindContract => StatusCode::BAD_REQUEST,
             Error::CouldNotQueryContract => StatusCode::BAD_REQUEST,
-            Error::ClosedPositionNotFound => StatusCode::BAD_REQUEST,
+            Error::PositionNotFound => StatusCode::BAD_REQUEST,
+            Error::PositionStillOpen => StatusCode::BAD_REQUEST,
         };
         res
     }
@@ -122,13 +142,33 @@ impl IntoResponse for Error {
 struct PnlInfo {
     owner: String,
     pnl_usd: Signed<Usd>,
+    image_url: String,
 }
 
-impl From<ClosedPosition> for PnlInfo {
-    fn from(pos: ClosedPosition) -> Self {
+impl PnlInfo {
+    fn new(params: Params, pos: ClosedPosition) -> Self {
         PnlInfo {
             owner: pos.owner.into_string(),
             pnl_usd: pos.pnl_usd,
+            image_url: params.image_url(),
         }
     }
+}
+
+impl Params {
+    fn image_url(&self) -> String {
+        format!(
+            "/pnl/{chain}/{market}/{position}/image",
+            chain = self.chain,
+            market = self.market,
+            position = self.position
+        )
+    }
+}
+
+#[derive(askama::Template)]
+#[template(path = "pnl.svg.xml")]
+struct PnlSvg {
+    owner: String,
+    pnl_usd: Signed<Usd>,
 }
