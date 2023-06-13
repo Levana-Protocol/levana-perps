@@ -28,9 +28,7 @@ use msg::contracts::factory::entry::{
     ExecuteMsg as FactoryExecuteMsg, MarketInfoResponse, QueryMsg as FactoryQueryMsg,
     ShutdownStatus,
 };
-use msg::contracts::farming::entry::{
-    ExecuteMsg as FarmingExecuteMsg, FarmersResp, LockdropBucketId, QueryMsg as FarmingQueryMsg,
-};
+use msg::contracts::farming::entry::{ExecuteMsg as FarmingExecuteMsg, FarmersResp, LockdropBucketId, OwnerExecuteMsg, QueryMsg as FarmingQueryMsg};
 use msg::contracts::farming::entry::{
     FarmerStats, OwnerExecuteMsg as FarmingOwnerExecuteMsg, StatusResp as FarmingStatusResp,
 };
@@ -1593,7 +1591,7 @@ impl PerpsMarket {
         )
     }
 
-    fn exec_farming(&self, wallet: &Addr, msg: &FarmingExecuteMsg) -> Result<AppResponse> {
+    pub fn exec_farming(&self, wallet: &Addr, msg: &FarmingExecuteMsg) -> Result<AppResponse> {
         self.exec_farming_with_funds(wallet, msg, vec![])
     }
 
@@ -1754,6 +1752,23 @@ impl PerpsMarket {
         )
     }
 
+    pub fn exec_farming_update_config(
+        &self,
+        owner: &Addr,
+        new_owner: Option<RawAddr>,
+        bonus_ratio: Option<Decimal256>,
+        bonus_addr: Option<RawAddr>) -> Result<AppResponse>
+    {
+        self.exec_farming(
+            owner,
+            &FarmingExecuteMsg::Owner(OwnerExecuteMsg::UpdateConfig {
+                owner: new_owner,
+                bonus_ratio,
+                bonus_addr,
+            })
+        )
+    }
+
     fn query_farming<T: DeserializeOwned>(
         &self,
         msg: &msg::contracts::farming::entry::QueryMsg,
@@ -1780,7 +1795,7 @@ impl PerpsMarket {
         })
     }
 
-    pub fn query_farming_stats(&self) -> FarmingStatusResp {
+    pub fn query_farming_status(&self) -> FarmingStatusResp {
         self.query_farming(&FarmingQueryMsg::Status {}).unwrap()
     }
 

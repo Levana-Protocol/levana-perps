@@ -15,6 +15,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     match msg {
         ExecuteMsg::Owner(owner_msg) => {
             state.validate_owner(ctx.storage, &sender)?;
+
             match owner_msg {
                 OwnerExecuteMsg::StartLockdropPeriod { start } => {
                     state.start_lockdrop_period(&mut ctx, start)?
@@ -70,6 +71,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     let mut config = state.load_bonus_config(ctx.storage)?;
 
                     if let Some(ratio) = bonus_ratio {
+                        anyhow::ensure!(ratio > Decimal256::zero() && ratio <= Decimal256::one(),
+                            "bonus_ratio must be a value in between 0 and 1");
                         config.ratio = ratio;
                     }
 

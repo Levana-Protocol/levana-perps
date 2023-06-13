@@ -276,15 +276,15 @@ impl State<'_> {
             _ => None,
         };
 
-        let stats = LockdropBuckets::BALANCES_BY_BUCKET
+        let stats = LockdropBuckets::DURATION
             .range(store, None, None, Order::Ascending)
             .map(|res| {
-                let (bucket_id, deposit) = res?;
+                let (bucket_id, duration) = res?;
                 let multiplier = LockdropBuckets::get_multiplier(store, bucket_id)?;
+                let deposit = LockdropBuckets::get_balance_by_bucket(store, bucket_id)?;
                 let unlocks_at = match launched_at {
                     None => None,
                     Some(launched_at) => {
-                        let duration = LockdropBuckets::get_duration(store, bucket_id)?;
                         Some(launched_at + duration)
                     }
                 };
@@ -384,6 +384,14 @@ impl LockdropBuckets {
         Self::BALANCES
             .load(storage, (user, bucket_id))
             .map_err(|err| err.into())
+    }
+
+    fn get_balance_by_bucket(storage: &dyn Storage, bucket_id: LockdropBucketId) -> Result<Collateral> {
+        let balance = Self::BALANCES_BY_BUCKET
+            .may_load(storage, bucket_id)?
+            .unwrap_or_default();
+
+        Ok(balance)
     }
 
     fn get_all_balances_iter<'a>(

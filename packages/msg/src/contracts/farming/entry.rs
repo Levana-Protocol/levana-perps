@@ -216,6 +216,10 @@ pub struct StatusResp {
     pub lockdrop_buckets: Vec<LockdropBucketStats>,
     /// The amount of collateral in the bonus fund
     pub bonus: Collateral,
+    /// The amount of real yield taken for the bonus fund
+    pub bonus_ratio: Decimal256,
+    /// The address that receives bonus transfers.
+    pub bonus_addr: Addr,
     /// If known, the timestamp when all lockdrop LVN rewards are available
     pub lockdrop_rewards_unlocked: Option<Timestamp>,
     /// Current emissions plan
