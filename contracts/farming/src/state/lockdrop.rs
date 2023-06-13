@@ -446,7 +446,9 @@ impl LockdropBuckets {
         Self::BALANCES_BY_BUCKET.update(storage, bucket_id, |balance| {
             let updated = match balance {
                 None => Collateral::try_from_number(amount).unwrap_or_default(),
-                Some(balance) => balance.checked_add_signed(Signed::<Collateral>::from_number(amount))?,
+                Some(balance) => {
+                    balance.checked_add_signed(Signed::<Collateral>::from_number(amount))?
+                }
             };
 
             anyhow::Ok(updated)
