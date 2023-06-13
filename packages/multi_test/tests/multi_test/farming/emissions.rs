@@ -1,7 +1,11 @@
 use crate::prelude::*;
 use levana_perpswap_multi_test::config::TEST_CONFIG;
-use msg::contracts::farming::entry::defaults::{bonus_ratio, lockdrop_buckets, lockdrop_month_seconds};
-use msg::contracts::farming::entry::{Emissions, ExecuteMsg, FarmingPeriodResp, LockdropBucketId, LockdropBucketStats, OwnerExecuteMsg, StatusResp};
+use msg::contracts::farming::entry::defaults::{
+    bonus_ratio, lockdrop_buckets, lockdrop_month_seconds,
+};
+use msg::contracts::farming::entry::{
+    Emissions, ExecuteMsg, FarmingPeriodResp, LockdropBucketStats, OwnerExecuteMsg,
+};
 use msg::contracts::farming::events::DepositSource;
 use msg::token::Token;
 
@@ -596,13 +600,18 @@ fn test_farming_status() {
     let lp2 = market.clone_lp(2).unwrap();
     let lp3 = market.clone_lp(3).unwrap();
 
-
     market.automatic_time_jump_enabled = false;
     market.exec_farming_start_lockdrop(None).unwrap();
 
-    market.exec_farming_lockdrop_deposit(&lp0, "100".parse().unwrap(), buckets[0].bucket_id).unwrap();
-    market.exec_farming_lockdrop_deposit(&lp1, "200".parse().unwrap(), buckets[1].bucket_id).unwrap();
-    market.exec_farming_lockdrop_deposit(&lp2, "300".parse().unwrap(), buckets[2].bucket_id).unwrap();
+    market
+        .exec_farming_lockdrop_deposit(&lp0, "100".parse().unwrap(), buckets[0].bucket_id)
+        .unwrap();
+    market
+        .exec_farming_lockdrop_deposit(&lp1, "200".parse().unwrap(), buckets[1].bucket_id)
+        .unwrap();
+    market
+        .exec_farming_lockdrop_deposit(&lp2, "300".parse().unwrap(), buckets[2].bucket_id)
+        .unwrap();
 
     market.set_time(TimeJump::Hours(24 * 365)).unwrap();
     market.exec_farming_start_launch().unwrap();
@@ -612,26 +621,31 @@ fn test_farming_status() {
     start_emissions(&market).unwrap();
 
     let status = market.query_farming_status();
-    let lockdrop_buckets = buckets.iter().map(|bucket| {
-        let duration = bucket.bucket_id.0 * lockdrop_month_seconds();
-        let unlocks_at = started_at + Duration::from_seconds(duration.into());
-        let deposit = if bucket.bucket_id == buckets[0].bucket_id {
-            "100"
-        } else if bucket.bucket_id == buckets[1].bucket_id {
-            "200"
-        } else if bucket.bucket_id == buckets[2].bucket_id {
-            "300"
-        } else {
-            "0"
-        }.parse().unwrap();
+    let lockdrop_buckets = buckets
+        .iter()
+        .map(|bucket| {
+            let duration = bucket.bucket_id.0 * lockdrop_month_seconds();
+            let unlocks_at = started_at + Duration::from_seconds(duration.into());
+            let deposit = if bucket.bucket_id == buckets[0].bucket_id {
+                "100"
+            } else if bucket.bucket_id == buckets[1].bucket_id {
+                "200"
+            } else if bucket.bucket_id == buckets[2].bucket_id {
+                "300"
+            } else {
+                "0"
+            }
+            .parse()
+            .unwrap();
 
-        LockdropBucketStats {
-            bucket_id: bucket.bucket_id,
-            multiplier: bucket.multiplier,
-            deposit,
-            unlocks_at: Some(unlocks_at),
-        }
-    }).collect::<Vec<LockdropBucketStats>>();
+            LockdropBucketStats {
+                bucket_id: bucket.bucket_id,
+                multiplier: bucket.multiplier,
+                deposit,
+                unlocks_at: Some(unlocks_at),
+            }
+        })
+        .collect::<Vec<LockdropBucketStats>>();
 
     let emissions = Some(Emissions {
         start: market.now(),
@@ -639,7 +653,8 @@ fn test_farming_status() {
         lvn: EMISSIONS_REWARDS.parse().unwrap(),
     });
 
-    let lockdrop_rewards_unlocked = Some(market.now() + Duration::from_seconds(lockdrop_month_seconds().into()));
+    let lockdrop_rewards_unlocked =
+        Some(market.now() + Duration::from_seconds(lockdrop_month_seconds().into()));
 
     assert_eq!(status.period, FarmingPeriodResp::Launched { started_at });
     assert_eq!(status.farming_tokens, "700".parse().unwrap());
@@ -665,28 +680,36 @@ fn test_farming_update_config() {
 
     // Test update owner
 
-    market.exec_farming(
-        &new_owner,
-        &ExecuteMsg::Owner(OwnerExecuteMsg::StartLaunchPeriod {}),
-    ).unwrap_err();
+    market
+        .exec_farming(
+            &new_owner,
+            &ExecuteMsg::Owner(OwnerExecuteMsg::StartLaunchPeriod {}),
+        )
+        .unwrap_err();
 
-    market.exec_farming_update_config(&owner, Some(new_owner.clone().into()), None, None).unwrap();
-    market.exec_farming(
-        &new_owner,
-        &ExecuteMsg::Owner(OwnerExecuteMsg::StartLaunchPeriod {}),
-    ).unwrap();
+    market
+        .exec_farming_update_config(&owner, Some(new_owner.clone().into()), None, None)
+        .unwrap();
+    market
+        .exec_farming(
+            &new_owner,
+            &ExecuteMsg::Owner(OwnerExecuteMsg::StartLaunchPeriod {}),
+        )
+        .unwrap();
 
     // Test update bonus config
 
     let bonus_ratio = bonus_ratio() + Decimal256::from_ratio(1u64, 10u64);
     let bonus_addr = Addr::unchecked("new_addr");
 
-    market.exec_farming_update_config(
-        &new_owner,
-        None,
-        Some(bonus_ratio),
-        Some(bonus_addr.clone().into())
-    ).unwrap();
+    market
+        .exec_farming_update_config(
+            &new_owner,
+            None,
+            Some(bonus_ratio),
+            Some(bonus_addr.clone().into()),
+        )
+        .unwrap();
 
     let status = market.query_farming_status();
 
@@ -695,11 +718,12 @@ fn test_farming_update_config() {
 
     // Test bonus ratio validation
 
-    market.exec_farming_update_config(
-        &new_owner,
-        None,
-        Some(Decimal256::from_ratio(2u64, 1u64)),
-        None,
-    ).unwrap_err();
+    market
+        .exec_farming_update_config(
+            &new_owner,
+            None,
+            Some(Decimal256::from_ratio(2u64, 1u64)),
+            None,
+        )
+        .unwrap_err();
 }
-

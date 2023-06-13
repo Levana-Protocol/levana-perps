@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use crate::prelude::rewards::BonusConfig;
 
 impl State<'_> {
     pub(crate) fn get_status(&self, store: &dyn Storage) -> Result<StatusResp> {

@@ -28,7 +28,10 @@ use msg::contracts::factory::entry::{
     ExecuteMsg as FactoryExecuteMsg, MarketInfoResponse, QueryMsg as FactoryQueryMsg,
     ShutdownStatus,
 };
-use msg::contracts::farming::entry::{ExecuteMsg as FarmingExecuteMsg, FarmersResp, LockdropBucketId, OwnerExecuteMsg, QueryMsg as FarmingQueryMsg};
+use msg::contracts::farming::entry::{
+    ExecuteMsg as FarmingExecuteMsg, FarmersResp, LockdropBucketId, OwnerExecuteMsg,
+    QueryMsg as FarmingQueryMsg,
+};
 use msg::contracts::farming::entry::{
     FarmerStats, OwnerExecuteMsg as FarmingOwnerExecuteMsg, StatusResp as FarmingStatusResp,
 };
@@ -1757,15 +1760,15 @@ impl PerpsMarket {
         owner: &Addr,
         new_owner: Option<RawAddr>,
         bonus_ratio: Option<Decimal256>,
-        bonus_addr: Option<RawAddr>) -> Result<AppResponse>
-    {
+        bonus_addr: Option<RawAddr>,
+    ) -> Result<AppResponse> {
         self.exec_farming(
             owner,
             &FarmingExecuteMsg::Owner(OwnerExecuteMsg::UpdateConfig {
                 owner: new_owner,
                 bonus_ratio,
                 bonus_addr,
-            })
+            }),
         )
     }
 

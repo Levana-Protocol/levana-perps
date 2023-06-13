@@ -71,8 +71,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     let mut config = state.load_bonus_config(ctx.storage)?;
 
                     if let Some(ratio) = bonus_ratio {
-                        anyhow::ensure!(ratio > Decimal256::zero() && ratio <= Decimal256::one(),
-                            "bonus_ratio must be a value in between 0 and 1");
+                        anyhow::ensure!(
+                            ratio > Decimal256::zero() && ratio <= Decimal256::one(),
+                            "bonus_ratio must be a value in between 0 and 1"
+                        );
                         config.ratio = ratio;
                     }
 

@@ -1,6 +1,6 @@
-use anyhow::ensure;
 use crate::prelude::*;
 use crate::state::rewards::{BonusConfig, LockdropConfig};
+use anyhow::ensure;
 
 use semver::Version;
 
@@ -35,8 +35,10 @@ pub fn instantiate(
         },
     )?;
 
-    ensure!(msg.bonus_ratio > Decimal256::zero() && msg.bonus_ratio <= Decimal256::one(),
-    "bonus_ratio must be a value in between 0 and 1");
+    ensure!(
+        msg.bonus_ratio > Decimal256::zero() && msg.bonus_ratio <= Decimal256::one(),
+        "bonus_ratio must be a value in between 0 and 1"
+    );
 
     state.save_bonus_config(
         ctx.storage,

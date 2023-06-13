@@ -282,12 +282,7 @@ impl State<'_> {
                 let (bucket_id, duration) = res?;
                 let multiplier = LockdropBuckets::get_multiplier(store, bucket_id)?;
                 let deposit = LockdropBuckets::get_balance_by_bucket(store, bucket_id)?;
-                let unlocks_at = match launched_at {
-                    None => None,
-                    Some(launched_at) => {
-                        Some(launched_at + duration)
-                    }
-                };
+                let unlocks_at = launched_at.map(|launched_at| launched_at + duration);
 
                 let stats = LockdropBucketStats {
                     bucket_id,
@@ -386,7 +381,10 @@ impl LockdropBuckets {
             .map_err(|err| err.into())
     }
 
-    fn get_balance_by_bucket(storage: &dyn Storage, bucket_id: LockdropBucketId) -> Result<Collateral> {
+    fn get_balance_by_bucket(
+        storage: &dyn Storage,
+        bucket_id: LockdropBucketId,
+    ) -> Result<Collateral> {
         let balance = Self::BALANCES_BY_BUCKET
             .may_load(storage, bucket_id)?
             .unwrap_or_default();
@@ -446,10 +444,9 @@ impl LockdropBuckets {
             .update(storage, |total| total.checked_add_signed(weighted_amount))?;
 
         Self::BALANCES_BY_BUCKET.update(storage, bucket_id, |balance| {
-            let collateral = Collateral::try_from_number(amount)?;
             let updated = match balance {
-                None => collateral,
-                Some(balance) => balance.checked_add_signed(collateral.into_signed())?,
+                None => Collateral::try_from_number(amount).unwrap_or_default(),
+                Some(balance) => balance.checked_add_signed(Signed::<Collateral>::from_number(amount))?,
             };
 
             anyhow::Ok(updated)
