@@ -1,4 +1,5 @@
 use cosmwasm_std::{wasm_execute, Reply, SubMsg};
+use msg::prelude::ratio::InclusiveRatio;
 use msg::prelude::MarketExecuteMsg::DepositLiquidity;
 use msg::token::Token;
 
@@ -75,7 +76,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                             ratio > Decimal256::zero() && ratio <= Decimal256::one(),
                             "bonus_ratio must be a value in between 0 and 1"
                         );
-                        config.ratio = ratio;
+                        config.ratio = InclusiveRatio::new(ratio)?;
                     }
 
                     if let Some(addr) = bonus_addr {

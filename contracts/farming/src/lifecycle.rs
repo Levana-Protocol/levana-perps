@@ -2,6 +2,7 @@ use crate::prelude::*;
 use crate::state::rewards::{BonusConfig, LockdropConfig};
 use anyhow::ensure;
 
+use msg::prelude::ratio::InclusiveRatio;
 use semver::Version;
 
 // version info for migration info
@@ -43,7 +44,7 @@ pub fn instantiate(
     state.save_bonus_config(
         ctx.storage,
         BonusConfig {
-            ratio: msg.bonus_ratio,
+            ratio: InclusiveRatio::new(msg.bonus_ratio)?,
             addr: msg.bonus_addr.validate(state.api)?,
         },
     )?;

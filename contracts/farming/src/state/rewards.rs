@@ -6,6 +6,7 @@ use anyhow::ensure;
 use cosmwasm_std::{to_binary, BankMsg, CosmosMsg, SubMsg, WasmMsg};
 use cw_storage_plus::Item;
 use msg::contracts::market::entry::LpInfoResp;
+use msg::prelude::ratio::InclusiveRatio;
 use msg::prelude::MarketExecuteMsg::ReinvestYield;
 use msg::prelude::MarketQueryMsg::LpInfo;
 use msg::token::Token;
@@ -63,7 +64,7 @@ const BONUS_FUND: Item<Collateral> = Item::new(namespace::BONUS_FUND);
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub(crate) struct BonusConfig {
     /// The part of the reinvested yield that goes to the [BONUS_FUND]
-    pub(crate) ratio: Decimal256,
+    pub(crate) ratio: InclusiveRatio,
     /// The destination for the funds collected in the [BONUS_FUND]
     pub(crate) addr: Addr,
 }
@@ -373,7 +374,9 @@ impl State<'_> {
             },
         )?;
         let config = self.load_bonus_config(ctx.storage)?;
-        let bonus_amount = lp_info.available_yield.checked_mul_dec(config.ratio)?;
+        let bonus_amount = lp_info
+            .available_yield
+            .checked_mul_dec(config.ratio.raw())?;
         let reinvest_amount = lp_info
             .available_yield
             .checked_sub(bonus_amount)

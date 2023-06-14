@@ -23,7 +23,7 @@ impl State<'_> {
             farming_tokens: farming_totals.farming,
             xlp: farming_totals.xlp,
             bonus,
-            bonus_ratio: bonus_config.ratio,
+            bonus_ratio: bonus_config.ratio.raw(),
             bonus_addr: bonus_config.addr,
             lockdrop_buckets,
             lockdrop_rewards_unlocked,
