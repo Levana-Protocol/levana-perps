@@ -125,6 +125,19 @@ build-bots-image:
 push-bots-image:
 	docker push ghcr.io/levana-protocol/levana-perps/bots:{{GIT_SHA}}
 
+# Build companion binary in release mode
+cargo-companion-release:
+    cargo build --bin perps-companion --release --target x86_64-unknown-linux-musl
+
+# Build companion docker image
+build-companion-image:
+	cp target/x86_64-unknown-linux-musl/release/perps-companion .ci/companion
+	cd .ci/companion && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/companion:{{GIT_SHA}}
+
+# Push bots docker image
+push-companion-image:
+	docker push ghcr.io/levana-protocol/levana-perps/companion:{{GIT_SHA}}
+
 # Deploy to dragonfire
 deploy-dragonfire:
 	cargo run --bin perps-deploy testnet store-code --network dragonfire
