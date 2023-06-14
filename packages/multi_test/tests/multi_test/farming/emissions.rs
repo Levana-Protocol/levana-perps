@@ -1,5 +1,11 @@
 use crate::prelude::*;
 use levana_perpswap_multi_test::config::TEST_CONFIG;
+use msg::contracts::farming::entry::defaults::{
+    bonus_ratio, lockdrop_buckets, lockdrop_month_seconds,
+};
+use msg::contracts::farming::entry::{
+    Emissions, ExecuteMsg, FarmingPeriodResp, LockdropBucketStats, OwnerExecuteMsg,
+};
 use msg::contracts::farming::events::DepositSource;
 use msg::token::Token;
 
@@ -281,13 +287,13 @@ fn test_deposit_collateral() {
 
     // Deposit & assert
 
-    let farming_stats_before = market.query_farming_stats();
+    let farming_stats_before = market.query_farming_status();
     farming_deposit_from_source(&market, &lp, DepositSource::Collateral).unwrap();
 
     let farmer_stats = market.query_farming_farmer_stats(&lp).unwrap();
     assert_eq!(farmer_stats.farming_tokens, "100".parse().unwrap());
 
-    let farming_stats_after = market.query_farming_stats();
+    let farming_stats_after = market.query_farming_status();
     assert_eq!(
         farming_stats_after.xlp,
         farming_stats_before
@@ -318,13 +324,13 @@ fn test_deposit_lp() {
 
     // Deposit & assert
 
-    let farming_stats_before = market.query_farming_stats();
+    let farming_stats_before = market.query_farming_status();
     farming_deposit_from_source(&market, &lp, DepositSource::Lp).unwrap();
 
     let farmer_stats = market.query_farming_farmer_stats(&lp).unwrap();
     assert_eq!(farmer_stats.farming_tokens, "100".parse().unwrap());
 
-    let farming_stats_after = market.query_farming_stats();
+    let farming_stats_after = market.query_farming_status();
     assert_eq!(
         farming_stats_after.xlp,
         farming_stats_before
@@ -449,9 +455,9 @@ fn test_clear_and_reclaim_emissions() {
         .set_time(TimeJump::Seconds((EMISSIONS_DURATION / 2).into()))
         .unwrap();
 
-    assert!(market.query_farming_stats().emissions.is_some());
+    assert!(market.query_farming_status().emissions.is_some());
     market.exec_farming_clear_emissions().unwrap();
-    assert!(market.query_farming_stats().emissions.is_none());
+    assert!(market.query_farming_status().emissions.is_none());
 
     // There should be 100 tokens to reclaim, first try 25
 
@@ -481,4 +487,243 @@ fn test_clear_and_reclaim_emissions() {
         balance_after.checked_sub(balance_before).unwrap(),
         "75".parse().unwrap()
     )
+}
+
+#[test]
+fn test_claim_emissions() {
+    // Setup
+
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let mut market = PerpsMarket::new(app_cell).unwrap();
+    let lp0 = market.clone_lp(0).unwrap();
+    let lp1 = market.clone_lp(1).unwrap();
+    let lp2 = market.clone_lp(2).unwrap();
+
+    market.automatic_time_jump_enabled = false;
+    move_past_lockdrop(&market);
+
+    // Deposit
+
+    let interval: i64 = (EMISSIONS_DURATION / 4).into();
+    let token = start_emissions(&market).unwrap();
+
+    farming_deposit(&market, &lp0).unwrap();
+
+    market.set_time(TimeJump::Seconds(interval)).unwrap();
+    farming_deposit(&market, &lp1).unwrap();
+
+    market.set_time(TimeJump::Seconds(interval)).unwrap();
+    farming_deposit(&market, &lp2).unwrap();
+
+    // Claim halfway through
+
+    market.exec_farming_claim_emissions(&lp0).unwrap();
+    let lp0_balance = market.query_reward_token_balance(&token, &lp0);
+    assert_eq!(lp0_balance, "75".parse().unwrap());
+
+    market.exec_farming_claim_emissions(&lp1).unwrap();
+    let lp1_balance = market.query_reward_token_balance(&token, &lp1);
+    assert_eq!(lp1_balance, "25".parse().unwrap());
+
+    market.exec_farming_claim_emissions(&lp2).unwrap_err();
+
+    // Jump to the end and claim
+
+    market.set_time(TimeJump::Seconds(100)).unwrap();
+
+    market.exec_farming_claim_emissions(&lp0).unwrap();
+    let lp0_balance_after = market.query_reward_token_balance(&token, &lp0);
+    assert_eq!(
+        lp0_balance_after.checked_sub(lp0_balance).unwrap(),
+        "33.333333".parse().unwrap()
+    );
+
+    market.exec_farming_claim_emissions(&lp1).unwrap();
+    let lp1_balance_after = market.query_reward_token_balance(&token, &lp1);
+    assert_eq!(
+        lp1_balance_after.checked_sub(lp1_balance).unwrap(),
+        "33.333333".parse().unwrap()
+    );
+
+    market.exec_farming_claim_emissions(&lp2).unwrap();
+    let lp2_balance = market.query_reward_token_balance(&token, &lp2);
+    assert_eq!(lp2_balance, "33.333333".parse().unwrap())
+}
+
+#[test]
+fn test_query_farmers() {
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let market = PerpsMarket::new(app_cell).unwrap();
+    let mut farmers: Vec<Addr> = vec![];
+
+    move_past_lockdrop(&market);
+
+    for i in 0..9 {
+        let lp = market.clone_lp(i).unwrap();
+        farming_deposit(&market, &lp).unwrap();
+        farmers.push(lp);
+    }
+
+    // Test defaults
+
+    let res = market.query_farmers(None, None).unwrap();
+    assert_eq!(res.farmers, farmers);
+    assert_eq!(res.next_start_after, None);
+
+    // Full pagination
+
+    let limit = Some(4u32);
+    let res = market.query_farmers(None, limit).unwrap();
+    assert_eq!(res.farmers, farmers[..4]);
+    assert_eq!(res.next_start_after, farmers[3].clone().into());
+
+    let res = market
+        .query_farmers(res.next_start_after.map(RawAddr::from), limit)
+        .unwrap();
+    assert_eq!(res.farmers, farmers[4..8]);
+    assert_eq!(res.next_start_after, farmers[7].clone().into());
+
+    let res = market
+        .query_farmers(res.next_start_after.map(RawAddr::from), limit)
+        .unwrap();
+    assert_eq!(res.farmers, farmers[8..]);
+    assert_eq!(res.next_start_after, None);
+}
+
+#[test]
+fn test_farming_status() {
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let mut market = PerpsMarket::new(app_cell).unwrap();
+    let buckets = lockdrop_buckets();
+    let lp0 = market.clone_lp(0).unwrap();
+    let lp1 = market.clone_lp(1).unwrap();
+    let lp2 = market.clone_lp(2).unwrap();
+    let lp3 = market.clone_lp(3).unwrap();
+
+    market.automatic_time_jump_enabled = false;
+    market.exec_farming_start_lockdrop(None).unwrap();
+
+    market
+        .exec_farming_lockdrop_deposit(&lp0, "100".parse().unwrap(), buckets[0].bucket_id)
+        .unwrap();
+    market
+        .exec_farming_lockdrop_deposit(&lp1, "200".parse().unwrap(), buckets[1].bucket_id)
+        .unwrap();
+    market
+        .exec_farming_lockdrop_deposit(&lp2, "300".parse().unwrap(), buckets[2].bucket_id)
+        .unwrap();
+
+    market.set_time(TimeJump::Hours(24 * 365)).unwrap();
+    market.exec_farming_start_launch().unwrap();
+    let started_at = market.now();
+    farming_deposit(&market, &lp3).unwrap();
+
+    start_emissions(&market).unwrap();
+
+    let status = market.query_farming_status();
+    let lockdrop_buckets = buckets
+        .iter()
+        .map(|bucket| {
+            let duration = bucket.bucket_id.0 * lockdrop_month_seconds();
+            let unlocks_at = started_at + Duration::from_seconds(duration.into());
+            let deposit = if bucket.bucket_id == buckets[0].bucket_id {
+                "100"
+            } else if bucket.bucket_id == buckets[1].bucket_id {
+                "200"
+            } else if bucket.bucket_id == buckets[2].bucket_id {
+                "300"
+            } else {
+                "0"
+            }
+            .parse()
+            .unwrap();
+
+            LockdropBucketStats {
+                bucket_id: bucket.bucket_id,
+                multiplier: bucket.multiplier,
+                deposit,
+                unlocks_at: Some(unlocks_at),
+            }
+        })
+        .collect::<Vec<LockdropBucketStats>>();
+
+    let emissions = Some(Emissions {
+        start: market.now(),
+        end: market.now() + Duration::from_seconds(EMISSIONS_DURATION.into()),
+        lvn: EMISSIONS_REWARDS.parse().unwrap(),
+    });
+
+    let lockdrop_rewards_unlocked =
+        Some(market.now() + Duration::from_seconds(lockdrop_month_seconds().into()));
+
+    assert_eq!(status.period, FarmingPeriodResp::Launched { started_at });
+    assert_eq!(status.farming_tokens, "700".parse().unwrap());
+    assert_eq!(status.xlp, "700".parse().unwrap());
+    assert_eq!(status.lockdrop_buckets, lockdrop_buckets);
+    assert_eq!(status.lockdrop_rewards_unlocked, lockdrop_rewards_unlocked);
+    assert_eq!(status.emissions, emissions);
+
+    // note: FarmingStatus::bonus is covered in `test_reinvest_yield`
+}
+
+#[test]
+fn test_farming_update_config() {
+    // Setup
+
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let market = PerpsMarket::new(app_cell).unwrap();
+    let owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
+    let new_owner = Addr::unchecked("new_owner");
+
+    market.exec_farming_start_lockdrop(None).unwrap();
+    market.set_time(TimeJump::Hours(24 * 365)).unwrap();
+
+    // Test update owner
+
+    market
+        .exec_farming(
+            &new_owner,
+            &ExecuteMsg::Owner(OwnerExecuteMsg::StartLaunchPeriod {}),
+        )
+        .unwrap_err();
+
+    market
+        .exec_farming_update_config(&owner, Some(new_owner.clone().into()), None, None)
+        .unwrap();
+    market
+        .exec_farming(
+            &new_owner,
+            &ExecuteMsg::Owner(OwnerExecuteMsg::StartLaunchPeriod {}),
+        )
+        .unwrap();
+
+    // Test update bonus config
+
+    let bonus_ratio = bonus_ratio() + Decimal256::from_ratio(1u64, 10u64);
+    let bonus_addr = Addr::unchecked("new_addr");
+
+    market
+        .exec_farming_update_config(
+            &new_owner,
+            None,
+            Some(bonus_ratio),
+            Some(bonus_addr.clone().into()),
+        )
+        .unwrap();
+
+    let status = market.query_farming_status();
+
+    assert_eq!(status.bonus_addr, bonus_addr);
+    assert_eq!(status.bonus_ratio, bonus_ratio);
+
+    // Test bonus ratio validation
+
+    market
+        .exec_farming_update_config(
+            &new_owner,
+            None,
+            Some(Decimal256::from_ratio(2u64, 1u64)),
+            None,
+        )
+        .unwrap_err();
 }

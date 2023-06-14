@@ -167,6 +167,7 @@ use schemars::JsonSchema;
 mod nonzero;
 pub use self::types::*;
 
+pub mod ratio;
 mod types;
 
 // schemars could not figure out that it is serialized as a string

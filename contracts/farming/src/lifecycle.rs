@@ -1,6 +1,8 @@
 use crate::prelude::*;
 use crate::state::rewards::{BonusConfig, LockdropConfig};
+use anyhow::ensure;
 
+use msg::prelude::ratio::InclusiveRatio;
 use semver::Version;
 
 // version info for migration info
@@ -20,8 +22,8 @@ pub fn instantiate(
     MarketInfo::save(deps.querier, deps.storage, factory, msg.market_id.clone())?;
 
     let (state, mut ctx) = StateContext::new(deps, env)?;
-    let admin = msg.owner.validate(state.api)?;
-    state.set_admin(&mut ctx, &admin)?;
+    let owner = msg.owner.validate(state.api)?;
+    state.set_owner(&mut ctx, &owner)?;
     state.rewards_init(ctx.storage, &msg.lvn_token_denom)?;
     state.lockdrop_init(ctx.storage, &msg)?;
     state.save_lockdrop_config(
@@ -33,10 +35,16 @@ pub fn instantiate(
             lockdrop_immediate_unlock_ratio: msg.lockdrop_immediate_unlock_ratio,
         },
     )?;
+
+    ensure!(
+        msg.bonus_ratio > Decimal256::zero() && msg.bonus_ratio <= Decimal256::one(),
+        "bonus_ratio must be a value in between 0 and 1"
+    );
+
     state.save_bonus_config(
         ctx.storage,
         BonusConfig {
-            ratio: msg.bonus_ratio,
+            ratio: InclusiveRatio::new(msg.bonus_ratio)?,
             addr: msg.bonus_addr.validate(state.api)?,
         },
     )?;

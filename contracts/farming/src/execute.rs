@@ -1,4 +1,5 @@
 use cosmwasm_std::{wasm_execute, Reply, SubMsg};
+use msg::prelude::ratio::InclusiveRatio;
 use msg::prelude::MarketExecuteMsg::DepositLiquidity;
 use msg::token::Token;
 
@@ -14,7 +15,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
     match msg {
         ExecuteMsg::Owner(owner_msg) => {
-            state.validate_admin(ctx.storage, &sender)?;
+            state.validate_owner(ctx.storage, &sender)?;
+
             match owner_msg {
                 OwnerExecuteMsg::StartLockdropPeriod { start } => {
                     state.start_lockdrop_period(&mut ctx, start)?
@@ -57,7 +59,32 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
                     state.save_lockdrop_rewards(ctx.storage, received_lvn)?
                 }
-                OwnerExecuteMsg::UpdateConfig { .. } => todo!(),
+                OwnerExecuteMsg::UpdateConfig {
+                    owner,
+                    bonus_ratio,
+                    bonus_addr,
+                } => {
+                    if let Some(new_owner) = owner {
+                        let new_owner = new_owner.validate(state.api)?;
+                        state.set_owner(&mut ctx, &new_owner)?;
+                    }
+
+                    let mut config = state.load_bonus_config(ctx.storage)?;
+
+                    if let Some(ratio) = bonus_ratio {
+                        anyhow::ensure!(
+                            ratio > Decimal256::zero() && ratio <= Decimal256::one(),
+                            "bonus_ratio must be a value in between 0 and 1"
+                        );
+                        config.ratio = InclusiveRatio::new(ratio)?;
+                    }
+
+                    if let Some(addr) = bonus_addr {
+                        config.addr = addr.validate(state.api)?;
+                    }
+
+                    state.save_bonus_config(ctx.storage, config)?;
+                }
             }
         }
         ExecuteMsg::Receive { .. } => anyhow::bail!("Cannot have double-wrapped Receive"),

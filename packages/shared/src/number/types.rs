@@ -2,14 +2,13 @@
 //! construct them. It exports smart contructors to the rest of the crate to
 //! ensure that invariants are never violated.
 
+use anyhow::{Context, Result};
+use cosmwasm_std::{Decimal256, OverflowError, Uint128, Uint256};
 use std::{
     fmt::Display,
     ops::{Add, AddAssign, Sub, SubAssign},
     str::FromStr,
 };
-
-use anyhow::{Context, Result};
-use cosmwasm_std::{Decimal256, OverflowError, Uint128, Uint256};
 
 /// needed to get around the orphan rule
 #[cfg(feature = "arbitrary")]
