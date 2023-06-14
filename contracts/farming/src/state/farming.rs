@@ -210,7 +210,7 @@ impl State<'_> {
         limit: Option<u32>,
     ) -> Result<FarmersResp> {
         let min = start_after.as_ref().map(Bound::exclusive);
-        let limit = limit.unwrap_or(FARMERS_QUERY_LIMIT_DEFAULT) as usize;
+        let limit = limit.unwrap_or(FARMERS_QUERY_LIMIT_DEFAULT).try_into()?;
         let farmers = FARMERS
             .keys(store, min, None, Order::Ascending)
             .take(limit)
