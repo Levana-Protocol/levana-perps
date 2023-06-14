@@ -165,7 +165,7 @@ fn farming_lockdrop_basic() {
 #[test]
 fn test_query_lockdrop_rewards() {
     let (market, buckets, farmers) = setup_lockdrop();
-    let token = market.setup_lvn_rewards("1000000");
+    let token = market.mint_lvn_rewards("1000000");
 
     // Farmer1 makes an additional deposit into the last bucket
     market
@@ -238,7 +238,7 @@ fn test_query_lockdrop_rewards() {
 #[test]
 fn test_claim_lockdrop_rewards() {
     let (market, _buckets, farmers) = setup_lockdrop();
-    let token = market.setup_lvn_rewards("1000000");
+    let token = market.mint_lvn_rewards("1000000");
 
     // Jump to review period
     market
