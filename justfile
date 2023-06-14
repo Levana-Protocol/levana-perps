@@ -223,6 +223,8 @@ store-ibc-execute:
 	cargo run --bin perps-deploy testnet store-code --contracts=ibc-execute-proxy --network=stargaze-testnet
 instantiate-nft-mint:
 	cargo run --bin perps-deploy testnet instantiate-rewards --contracts=ibc-execute-proxy --ibc-execute-proxy-target=nft-mint --network=stargaze-testnet
+migrate-hatching:
+	cargo run --bin perps-deploy testnet migrate-rewards --contracts=hatching --network=juno-testnet
 hatch-egg-test:
 	cargo run --bin rewards-test hatch-egg --hatch-network=juno-testnet --nft-mint-network=stargaze-testnet --lvn-rewards-network=osmosis-testnet
 create-nft-mint-relayer-channel path-name juno-port stargaze-port:
