@@ -63,6 +63,7 @@ use msg::contracts::position_token::{
 use msg::prelude::*;
 
 use msg::constants::event_key;
+use msg::contracts::farming::entry::OwnerExecuteMsg::ReclaimEmissions;
 use msg::contracts::market::order::OrderId;
 use msg::shared::cosmwasm::OrderInMessage;
 use msg::shutdown::{ShutdownEffect, ShutdownImpact};
@@ -1661,12 +1662,13 @@ impl PerpsMarket {
         )
     }
 
-    pub fn mint_lvn_rewards(&self, amount: &str) -> Token {
+    pub fn mint_lvn_rewards(&self, amount: &str, recipient: Option<Addr>) -> Token {
         let mut app = self.app();
-        let protocol_owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
         let token = app.rewards_token();
+        let owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
+        let recipient = recipient.unwrap_or(owner);
 
-        app.mint_token(&protocol_owner, &token, amount.parse().unwrap())
+        app.mint_token(&recipient, &token, amount.parse().unwrap())
             .unwrap();
 
         token
@@ -1716,6 +1718,20 @@ impl PerpsMarket {
         self.exec_farming(
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
             &FarmingExecuteMsg::Owner(FarmingOwnerExecuteMsg::ClearEmissions {}),
+        )
+    }
+
+    pub fn exec_farming_reclaim_emissions(
+        &self,
+        addr: &Addr,
+        amount: Option<LvnToken>,
+    ) -> Result<AppResponse> {
+        self.exec_farming(
+            &Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &FarmingExecuteMsg::Owner(ReclaimEmissions {
+                addr: addr.into(),
+                amount,
+            }),
         )
     }
 

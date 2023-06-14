@@ -1,5 +1,7 @@
 use crate::prelude::*;
+use levana_perpswap_multi_test::config::TEST_CONFIG;
 use msg::contracts::farming::events::DepositSource;
+use msg::token::Token;
 
 const EMISSIONS_DURATION: u32 = 20;
 const EMISSIONS_REWARDS: &str = "200";
@@ -44,16 +46,16 @@ fn move_past_lockdrop(market: &PerpsMarket) {
     market.exec_farming_start_launch().unwrap();
 }
 
-fn start_emissions(market: &PerpsMarket) -> Result<()> {
-    let token = market.mint_lvn_rewards(EMISSIONS_REWARDS);
+fn start_emissions(market: &PerpsMarket) -> Result<Token> {
+    let token = market.mint_lvn_rewards(EMISSIONS_REWARDS, None);
     market.exec_farming_set_emissions(
         market.now(),
         EMISSIONS_DURATION,
         EMISSIONS_REWARDS.parse().unwrap(),
-        token,
+        token.clone(),
     )?;
 
-    Ok(())
+    Ok(token)
 }
 
 #[test]
@@ -396,4 +398,87 @@ fn test_multiple_withdraws() {
     let stats = market.query_farming_farmer_stats(&lp).unwrap();
     assert_eq!(stats.emission_rewards, "100".parse().unwrap());
     assert_eq!(stats.farming_tokens, FarmingToken::zero());
+}
+
+#[test]
+fn test_multiple_lps_withdraw() {
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let mut market = PerpsMarket::new(app_cell).unwrap();
+    let lp0 = market.clone_lp(0).unwrap();
+    let lp1 = market.clone_lp(1).unwrap();
+    let interval: i64 = (EMISSIONS_DURATION / 4).into();
+
+    market.automatic_time_jump_enabled = false;
+
+    move_past_lockdrop(&market);
+    start_emissions(&market).unwrap();
+
+    farming_deposit(&market, &lp0).unwrap();
+
+    market.set_time(TimeJump::Seconds(interval)).unwrap();
+    farming_deposit(&market, &lp1).unwrap();
+
+    market.set_time(TimeJump::Seconds(interval)).unwrap();
+    farming_withdraw(&market, &lp0, None).unwrap();
+
+    market.set_time(TimeJump::Seconds(100)).unwrap();
+
+    let lp0_stats = market.query_farming_farmer_stats(&lp0).unwrap();
+    let lp1_stats = market.query_farming_farmer_stats(&lp1).unwrap();
+
+    assert_eq!(lp0_stats.emission_rewards, "75".parse().unwrap());
+    assert_eq!(lp1_stats.emission_rewards, "125".parse().unwrap());
+}
+
+#[test]
+fn test_clear_and_reclaim_emissions() {
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let mut market = PerpsMarket::new(app_cell).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
+
+    market.automatic_time_jump_enabled = false;
+    move_past_lockdrop(&market);
+
+    let token = start_emissions(&market).unwrap();
+    farming_deposit(&market, &lp).unwrap();
+
+    // Jump halfway to the end of the emissions period
+
+    market
+        .set_time(TimeJump::Seconds((EMISSIONS_DURATION / 2).into()))
+        .unwrap();
+
+    assert!(market.query_farming_stats().emissions.is_some());
+    market.exec_farming_clear_emissions().unwrap();
+    assert!(market.query_farming_stats().emissions.is_none());
+
+    // There should be 100 tokens to reclaim, first try 25
+
+    let balance_before = market.query_reward_token_balance(&token, &owner);
+    market
+        .exec_farming_reclaim_emissions(&owner, Some("25".parse().unwrap()))
+        .unwrap();
+    let balance_after = market.query_reward_token_balance(&token, &owner);
+    assert_eq!(
+        balance_after.checked_sub(balance_before).unwrap(),
+        "25".parse().unwrap()
+    );
+
+    // Assert you can't reclaim more than remains, even if there happens to be more LVN in the contract
+
+    market.mint_lvn_rewards("1000", Some(owner.clone()));
+    market
+        .exec_farming_reclaim_emissions(&owner, Some("100".parse().unwrap()))
+        .unwrap_err();
+
+    // Assert you can reclaim the test
+
+    let balance_before = market.query_reward_token_balance(&token, &owner);
+    market.exec_farming_reclaim_emissions(&owner, None).unwrap();
+    let balance_after = market.query_reward_token_balance(&token, &owner);
+    assert_eq!(
+        balance_after.checked_sub(balance_before).unwrap(),
+        "75".parse().unwrap()
+    )
 }

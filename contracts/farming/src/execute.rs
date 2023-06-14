@@ -42,7 +42,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     )?
                 }
                 OwnerExecuteMsg::ClearEmissions {} => state.clear_emissions(&mut ctx)?,
-                OwnerExecuteMsg::ReclaimEmissions { .. } => todo!(),
+                OwnerExecuteMsg::ReclaimEmissions { addr, amount } => {
+                    state.reclaim_emissions(&mut ctx, addr.validate(state.api)?, amount)?;
+                }
                 OwnerExecuteMsg::SetLockdropRewards { lvn } => {
                     let received_lvn = state.get_lvn_funds(&info, ctx.storage)?;
 
@@ -267,9 +269,34 @@ impl State<'_> {
         Ok(())
     }
 
+    /// Removes an active emissions period
+    ///
+    /// Leftover LVN tokens can be reclaimed via the [OwnerExecuteMsg::ReclaimEmissions]
     fn clear_emissions(&self, ctx: &mut StateContext) -> Result<()> {
         if let Some(emissions) = self.may_load_lvn_emissions(ctx.storage)? {
             self.update_emissions_per_token(ctx, &emissions)?;
+
+            let now = self.now();
+
+            if now < emissions.end {
+                let time_remaining = emissions
+                    .end
+                    .checked_sub(now, "clear_emissions")?
+                    .as_nanos();
+                let duration = emissions
+                    .end
+                    .checked_sub(emissions.start, "clear_emissions")?
+                    .as_nanos();
+                let new_reclaimable_emissions = emissions
+                    .lvn
+                    .raw()
+                    .checked_mul_dec(Decimal256::from_ratio(time_remaining, duration))?;
+                let reclaimable_emissions = self
+                    .load_reclaimable_emissions(ctx.storage)?
+                    .checked_add(new_reclaimable_emissions)?;
+
+                self.save_reclaimable_emissions(ctx.storage, reclaimable_emissions)?;
+            }
         }
 
         self.save_lvn_emissions(ctx.storage, None)?;
