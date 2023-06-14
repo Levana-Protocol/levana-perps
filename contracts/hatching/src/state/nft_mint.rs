@@ -118,7 +118,7 @@ pub(crate) fn babydragon_nft_mint_msg(
         .as_ref()
         .context("no attributes")?
         .iter()
-        .filter(|attr| attr.trait_type != "Nesting Date")
+        .filter(|attr| attr.trait_type != "Nesting Date" && attr.trait_type != "Stage")
         .cloned()
         .collect();
 
@@ -127,6 +127,7 @@ pub(crate) fn babydragon_nft_mint_msg(
         .find(|attr| attr.trait_type == "Dragon Type")
         .context("no dragon type")?
         .value;
+
     if *dragon_type != extra.kind {
         bail!(
             "dragon type mismatch for {}: {} != {}",
@@ -140,6 +141,7 @@ pub(crate) fn babydragon_nft_mint_msg(
         [
             ("Hatching Date", hatching_date),
             ("Eye Color", extra.eye_color.to_string()),
+            ("Stage", "Baby Dragon".to_string()),
         ]
         .into_iter()
         .map(|(trait_type, value)| Trait {
