@@ -302,7 +302,7 @@ static EXPECTED_DRAGON_META: &str = r#"{
         {
             "display_type":null,
             "trait_type":"Stage",
-            "value":"Nested Egg"
+            "value":"Baby Dragon"
         },
         {
             "display_type":null,
