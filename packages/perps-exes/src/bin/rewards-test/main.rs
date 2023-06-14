@@ -509,10 +509,10 @@ async fn mint_eggs(
                         owner: owner.clone(),
                         token_uri: None,
                         extension: Metadata::new_egg(
+                            dragon_extra.id.clone(),
                             spirit_level,
                             rarity,
                             dragon_extra.kind.clone(),
-                            dragon_extra.image_ipfs_url(),
                         ),
                     })),
                 )
