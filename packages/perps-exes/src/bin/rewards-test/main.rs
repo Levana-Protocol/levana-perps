@@ -512,6 +512,7 @@ async fn mint_eggs(
                             spirit_level,
                             rarity,
                             dragon_extra.kind.clone(),
+                            dragon_extra.image_ipfs_url(),
                         ),
                     })),
                 )

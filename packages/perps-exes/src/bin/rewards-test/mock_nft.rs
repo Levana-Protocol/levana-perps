@@ -238,8 +238,16 @@ pub struct MinterResponse {
 }
 
 impl Metadata {
-    pub fn new_egg(spirit_level: NumberGtZero, rarity: NftRarity, dragon_type: String) -> Self {
+    pub fn new_egg(
+        spirit_level: NumberGtZero,
+        rarity: NftRarity,
+        dragon_type: String,
+        ipfs_url: String,
+    ) -> Self {
         let mut m: Self = serde_json::from_str(EGG_META).unwrap();
+
+        // this is a bit odd since it's the image of the dragon, not the egg, but this is only for mock/testing
+        m.image = ipfs_url;
 
         m.attributes.push(Trait {
             display_type: None,
@@ -268,7 +276,7 @@ impl Metadata {
     }
 }
 static EGG_META: &str = r#"{
-    "image":"ipfs://blah",
+    "image":"ipfs://replaceme",
     "image_data":null,
     "external_url":null,
     "description":"Evolutionary Rare Nested Egg NFT, stage 3 of the Levana Dragons adventure.",
