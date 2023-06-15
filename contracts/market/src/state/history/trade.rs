@@ -61,14 +61,14 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         pos: &ClosedPosition,
-        delta_netruality_fee: Signed<Collateral>,
+        delta_neutrality_fee: Signed<Collateral>,
         settlement_price: &PricePoint,
     ) -> Result<()> {
         self.position_history_add_close_action(
             ctx,
             pos,
             pos.active_collateral,
-            delta_netruality_fee,
+            delta_neutrality_fee,
             settlement_price,
         )?;
         self.trade_history_add_volume(
@@ -225,7 +225,7 @@ impl State<'_> {
         pos: &Position,
         kind: PositionActionKind,
         trading_fee: Option<Collateral>,
-        delta_netruality_fee: Option<Signed<Collateral>>,
+        delta_neutrality_fee: Option<Signed<Collateral>>,
         price_point: PricePoint,
     ) -> Result<()> {
         let market_type = self.market_type(ctx.storage)?;
@@ -244,7 +244,7 @@ impl State<'_> {
             leverage: Some(leverage),
             max_gains: Some(pos.max_gains_in_quote(market_type, price_point)?),
             trade_fee: trade_fee_usd,
-            delta_neutrality_fee: delta_netruality_fee
+            delta_neutrality_fee: delta_neutrality_fee
                 .map(|x| x.map(|x| price_point.collateral_to_usd(x))),
             old_owner: None,
             new_owner: None,
@@ -271,7 +271,7 @@ impl State<'_> {
         ctx: &mut StateContext,
         pos: &ClosedPosition,
         active_collateral: Collateral,
-        delta_netruality_fee: Signed<Collateral>,
+        delta_neutrality_fee: Signed<Collateral>,
         price_point: &PricePoint,
     ) -> Result<()> {
         let action = PositionAction {
@@ -283,7 +283,7 @@ impl State<'_> {
             max_gains: None,
             trade_fee: None,
             delta_neutrality_fee: Some(
-                delta_netruality_fee.map(|x| price_point.collateral_to_usd(x)),
+                delta_neutrality_fee.map(|x| price_point.collateral_to_usd(x)),
             ),
             old_owner: None,
             new_owner: None,
