@@ -82,11 +82,10 @@ impl MarketContract {
         loop {
             let res = self.0.query(&msg).await.map_err(|source| {
                 let e = Error::FailedToQueryContract {
-                    source,
                     msg: msg.clone(),
                     query_type,
                 };
-                log::error!("Attempt #{attempt}: {e}");
+                log::error!("Attempt #{attempt}: {e}. {source:?}");
                 e
             });
             match res {
@@ -250,9 +249,8 @@ enum Error {
     PositionNotFound,
     #[error("The position is still open")]
     PositionStillOpen,
-    #[error("Failed to query contract with {query_type:?}\nQuery: {msg:?}\nError: {source:?}")]
+    #[error("Failed to query contract with {query_type:?}\nQuery: {msg:?}")]
     FailedToQueryContract {
-        source: anyhow::Error,
         msg: QueryMsg,
         query_type: QueryType,
     },
@@ -265,11 +263,7 @@ impl IntoResponse for Error {
             Error::UnknownChainId => StatusCode::BAD_REQUEST,
             Error::PositionNotFound => StatusCode::BAD_REQUEST,
             Error::PositionStillOpen => StatusCode::BAD_REQUEST,
-            Error::FailedToQueryContract {
-                query_type,
-                source: _,
-                msg: _,
-            } => match query_type {
+            Error::FailedToQueryContract { query_type, msg: _ } => match query_type {
                 QueryType::Status => StatusCode::BAD_REQUEST,
                 QueryType::EntryPrice => StatusCode::INTERNAL_SERVER_ERROR,
                 QueryType::ExitPrice => StatusCode::INTERNAL_SERVER_ERROR,
