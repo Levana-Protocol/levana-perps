@@ -678,6 +678,7 @@ pub struct PositionAction {
     /// the amount of collateral at the time of the action
     pub active_collateral: Collateral,
     /// The amount of collateral transferred to or from the trader
+    #[serde(default)]
     pub transfer_collateral: Signed<Collateral>,
     /// Leverage of the position at the time of the action, if relevant
     pub leverage: Option<LeverageToBase>,
