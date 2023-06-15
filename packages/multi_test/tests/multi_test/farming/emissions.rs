@@ -2,7 +2,6 @@ use crate::prelude::*;
 use levana_perpswap_multi_test::{
     arbitrary::farming::emissions::data::FarmingEmissions, config::TEST_CONFIG,
 };
-use proptest::prelude::*;
 use msg::contracts::farming::entry::defaults::{
     bonus_ratio, lockdrop_buckets, lockdrop_month_seconds,
 };
@@ -11,6 +10,7 @@ use msg::contracts::farming::entry::{
 };
 use msg::contracts::farming::events::DepositSource;
 use msg::token::Token;
+use proptest::prelude::*;
 
 const EMISSIONS_DURATION: u32 = 20;
 const EMISSIONS_REWARDS: &str = "200";

@@ -148,7 +148,7 @@ impl FarmingEmissions {
         market.set_time(TimeJump::Hours(24 * 365)).unwrap();
         market.exec_farming_start_launch().unwrap();
 
-        let token = market.setup_lvn_rewards(&self.emissions_amount.to_string());
+        let token = market.mint_lvn_rewards(&self.emissions_amount.to_string(), None);
 
         // // sanity check
         let protocol_owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
@@ -158,7 +158,7 @@ impl FarmingEmissions {
         market
             .exec_farming_set_emissions(
                 market.now(),
-                self.emissions_duration_seconds.into(),
+                self.emissions_duration_seconds,
                 NonZero::new(self.emissions_amount).unwrap(),
                 token,
             )
