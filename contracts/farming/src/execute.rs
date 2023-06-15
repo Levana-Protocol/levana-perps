@@ -1,4 +1,5 @@
 use cosmwasm_std::{wasm_execute, Reply, SubMsg};
+use msg::prelude::ratio::InclusiveRatio;
 use msg::prelude::MarketExecuteMsg::DepositLiquidity;
 use msg::token::Token;
 
@@ -14,7 +15,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
     match msg {
         ExecuteMsg::Owner(owner_msg) => {
-            state.validate_admin(ctx.storage, &sender)?;
+            state.validate_owner(ctx.storage, &sender)?;
+
             match owner_msg {
                 OwnerExecuteMsg::StartLockdropPeriod { start } => {
                     state.start_lockdrop_period(&mut ctx, start)?
@@ -42,7 +44,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     )?
                 }
                 OwnerExecuteMsg::ClearEmissions {} => state.clear_emissions(&mut ctx)?,
-                OwnerExecuteMsg::ReclaimEmissions { .. } => todo!(),
+                OwnerExecuteMsg::ReclaimEmissions { addr, amount } => {
+                    state.reclaim_emissions(&mut ctx, addr.validate(state.api)?, amount)?;
+                }
                 OwnerExecuteMsg::SetLockdropRewards { lvn } => {
                     let received_lvn = state.get_lvn_funds(&info, ctx.storage)?;
 
@@ -55,7 +59,32 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
                     state.save_lockdrop_rewards(ctx.storage, received_lvn)?
                 }
-                OwnerExecuteMsg::UpdateConfig { .. } => todo!(),
+                OwnerExecuteMsg::UpdateConfig {
+                    owner,
+                    bonus_ratio,
+                    bonus_addr,
+                } => {
+                    if let Some(new_owner) = owner {
+                        let new_owner = new_owner.validate(state.api)?;
+                        state.set_owner(&mut ctx, &new_owner)?;
+                    }
+
+                    let mut config = state.load_bonus_config(ctx.storage)?;
+
+                    if let Some(ratio) = bonus_ratio {
+                        anyhow::ensure!(
+                            ratio > Decimal256::zero() && ratio <= Decimal256::one(),
+                            "bonus_ratio must be a value in between 0 and 1"
+                        );
+                        config.ratio = InclusiveRatio::new(ratio)?;
+                    }
+
+                    if let Some(addr) = bonus_addr {
+                        config.addr = addr.validate(state.api)?;
+                    }
+
+                    state.save_bonus_config(ctx.storage, config)?;
+                }
             }
         }
         ExecuteMsg::Receive { .. } => anyhow::bail!("Cannot have double-wrapped Receive"),
@@ -267,9 +296,34 @@ impl State<'_> {
         Ok(())
     }
 
+    /// Removes an active emissions period
+    ///
+    /// Leftover LVN tokens can be reclaimed via the [OwnerExecuteMsg::ReclaimEmissions]
     fn clear_emissions(&self, ctx: &mut StateContext) -> Result<()> {
         if let Some(emissions) = self.may_load_lvn_emissions(ctx.storage)? {
             self.update_emissions_per_token(ctx, &emissions)?;
+
+            let now = self.now();
+
+            if now < emissions.end {
+                let time_remaining = emissions
+                    .end
+                    .checked_sub(now, "clear_emissions")?
+                    .as_nanos();
+                let duration = emissions
+                    .end
+                    .checked_sub(emissions.start, "clear_emissions")?
+                    .as_nanos();
+                let new_reclaimable_emissions = emissions
+                    .lvn
+                    .raw()
+                    .checked_mul_dec(Decimal256::from_ratio(time_remaining, duration))?;
+                let reclaimable_emissions = self
+                    .load_reclaimable_emissions(ctx.storage)?
+                    .checked_add(new_reclaimable_emissions)?;
+
+                self.save_reclaimable_emissions(ctx.storage, reclaimable_emissions)?;
+            }
         }
 
         self.save_lvn_emissions(ctx.storage, None)?;

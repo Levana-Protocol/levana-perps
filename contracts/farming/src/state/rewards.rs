@@ -2,9 +2,11 @@ use crate::prelude::reply::{ReplyId, EPHEMERAL_BONUS_FUND};
 use crate::prelude::*;
 use crate::state::farming::RawFarmerStats;
 use crate::state::reply::BonusFundReplyData;
+use anyhow::ensure;
 use cosmwasm_std::{to_binary, BankMsg, CosmosMsg, SubMsg, WasmMsg};
 use cw_storage_plus::Item;
 use msg::contracts::market::entry::LpInfoResp;
+use msg::prelude::ratio::InclusiveRatio;
 use msg::prelude::MarketExecuteMsg::ReinvestYield;
 use msg::prelude::MarketQueryMsg::LpInfo;
 use msg::token::Token;
@@ -36,6 +38,10 @@ const EMISSIONS_PER_TIME_PER_TOKEN: Map<Timestamp, LvnToken> =
 /// The active LVN emission plan
 const LVN_EMISSIONS: Item<Emissions> = Item::new(namespace::LVN_EMISSIONS);
 
+/// If an emissions period is cancelled in the middle (via [ClearEmissions]) this keeps track of the
+/// leftover LVN tokens that can be reclaimed.
+const RECLAIMABLE_EMISSIONS: Item<LvnToken> = Item::new(namespace::RECLAIMABLE_EMISSIONS);
+
 /// Lockdrop configuration info
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub(crate) struct LockdropConfig {
@@ -58,7 +64,7 @@ const BONUS_FUND: Item<Collateral> = Item::new(namespace::BONUS_FUND);
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub(crate) struct BonusConfig {
     /// The part of the reinvested yield that goes to the [BONUS_FUND]
-    pub(crate) ratio: Decimal256,
+    pub(crate) ratio: InclusiveRatio,
     /// The destination for the funds collected in the [BONUS_FUND]
     pub(crate) addr: Addr,
 }
@@ -74,6 +80,7 @@ impl State<'_> {
     ) -> Result<()> {
         self.save_lvn_token(store, lvn_token_denom.to_string())?;
         self.save_bonus_fund(store, Collateral::zero())?;
+        self.save_reclaimable_emissions(store, LvnToken::zero())?;
 
         EMISSIONS_PER_TIME_PER_TOKEN
             .save(store, self.now(), &LvnToken::zero())
@@ -155,6 +162,20 @@ impl State<'_> {
         Ok(())
     }
 
+    pub(crate) fn load_reclaimable_emissions(&self, store: &dyn Storage) -> Result<LvnToken> {
+        let amount = RECLAIMABLE_EMISSIONS.load(store)?;
+        Ok(amount)
+    }
+
+    pub(crate) fn save_reclaimable_emissions(
+        &self,
+        store: &mut dyn Storage,
+        amount: LvnToken,
+    ) -> Result<()> {
+        RECLAIMABLE_EMISSIONS.save(store, &amount)?;
+        Ok(())
+    }
+
     /// Calculates how many reward tokens can be claimed from the lockdrop and transfers them to the
     /// specified user
     pub(crate) fn claim_lockdrop_rewards(&self, ctx: &mut StateContext, user: &Addr) -> Result<()> {
@@ -207,18 +228,18 @@ impl State<'_> {
         store: &dyn Storage,
         emissions: &Emissions,
     ) -> Result<LvnToken> {
-        let emissions_duration = Decimal256::from_ratio(
+        let emissions_duration_nanos = Decimal256::from_ratio(
             emissions
                 .end
                 .checked_sub(emissions.start, "emissions_duration")?
                 .as_nanos(),
             1u64,
         );
-        let (latest_timestamp, latest_rewards_per_token) =
+        let (latest_timestamp, latest_emissions_per_token) =
             self.latest_emissions_per_token(store)?;
         let total_farming_tokens = self.load_farming_totals(store)?.farming;
 
-        let rewards_per_token = if total_farming_tokens.is_zero() {
+        let emissions_per_token = if total_farming_tokens.is_zero() {
             LvnToken::zero()
         } else {
             let total_lvn = emissions.lvn.raw();
@@ -227,16 +248,17 @@ impl State<'_> {
             let elapsed_time =
                 end_time.checked_sub(start_time, "calculate_emissions_per_token_per_time")?;
             let elapsed_time = Decimal256::from_ratio(elapsed_time.as_nanos(), 1u64);
-            let elapsed_ratio = elapsed_time.checked_div(emissions_duration)?;
+            let elapsed_ratio = elapsed_time.checked_div(emissions_duration_nanos)?;
 
             total_lvn
-                .checked_div_dec(total_farming_tokens.into_decimal256())?
                 .checked_mul_dec(elapsed_ratio)?
+                .checked_div_dec(total_farming_tokens.into_decimal256())?
         };
 
-        let new_rewards_per_token = latest_rewards_per_token.checked_add(rewards_per_token)?;
+        let new_emissions_per_token =
+            latest_emissions_per_token.checked_add(emissions_per_token)?;
 
-        Ok(new_rewards_per_token)
+        Ok(new_emissions_per_token)
     }
 
     /// Performs bookkeeping on any pending values for a farmer
@@ -327,7 +349,7 @@ impl State<'_> {
         self.save_raw_farmer_stats(ctx.storage, addr, &farmer_stats)?;
 
         let amount = NumberGtZero::new(amount.into_decimal256())
-            .context("Unable to convert amount into NumberGtZero")?;
+            .context("There are no unclaimed emissions")?;
         let coin = self
             .load_lvn_token(ctx.storage)?
             .into_native_coin(amount)?
@@ -343,6 +365,7 @@ impl State<'_> {
         Ok(())
     }
 
+    /// Reinvests yield that was accrued from holding xLP tokens
     pub(crate) fn reinvest_yield(&self, ctx: &mut StateContext) -> Result<()> {
         let lp_info: LpInfoResp = self.querier.query_wasm_smart(
             self.market_info.addr.clone(),
@@ -351,7 +374,9 @@ impl State<'_> {
             },
         )?;
         let config = self.load_bonus_config(ctx.storage)?;
-        let bonus_amount = lp_info.available_yield.checked_mul_dec(config.ratio)?;
+        let bonus_amount = lp_info
+            .available_yield
+            .checked_mul_dec(config.ratio.raw())?;
         let reinvest_amount = lp_info
             .available_yield
             .checked_sub(bonus_amount)
@@ -393,6 +418,7 @@ impl State<'_> {
         Ok(())
     }
 
+    /// Reply handler for Reinvest Yield
     pub(crate) fn handle_reinvest_yield_reply(&self, ctx: &mut StateContext) -> Result<()> {
         let ephemeral_data = EPHEMERAL_BONUS_FUND.load_once(ctx.storage)?;
         let balance = self
@@ -440,6 +466,7 @@ impl State<'_> {
         Ok(())
     }
 
+    /// Transfers the bonus fund to the designated addr
     pub(crate) fn transfer_bonus(&self, ctx: &mut StateContext) -> Result<()> {
         let config = self.load_bonus_config(ctx.storage)?;
         let amount = self
@@ -457,6 +484,53 @@ impl State<'_> {
 
             ctx.response.add_message(transfer_msg);
         }
+
+        Ok(())
+    }
+
+    /// Transfers LVN tokens leftover from an emissions period that ended early
+    pub(crate) fn reclaim_emissions(
+        &self,
+        ctx: &mut StateContext,
+        addr: Addr,
+        amount: Option<LvnToken>,
+    ) -> Result<()> {
+        let reclaimable = self.load_reclaimable_emissions(ctx.storage)?;
+
+        ensure!(
+            reclaimable > LvnToken::zero(),
+            "There are no emissions to reclaim"
+        );
+
+        let amount = match amount {
+            None => reclaimable,
+            Some(amount) => {
+                ensure!(
+                    amount <= reclaimable,
+                    "Error reclaiming emissions, requested: {}, available: {}",
+                    amount,
+                    reclaimable
+                );
+
+                amount
+            }
+        };
+
+        let remaining_reclaimable = reclaimable.checked_sub(amount)?;
+        self.save_reclaimable_emissions(ctx.storage, remaining_reclaimable)?;
+
+        let amount = NumberGtZero::new(amount.into_decimal256())
+            .context("Unable to convert amount into NumberGtZero")?;
+        let coin = self
+            .load_lvn_token(ctx.storage)?
+            .into_native_coin(amount)?
+            .context("Invalid LVN transfer amount calculated")?;
+        let transfer_msg = CosmosMsg::Bank(BankMsg::Send {
+            to_address: addr.to_string(),
+            amount: vec![coin],
+        });
+
+        ctx.response.add_message(transfer_msg);
 
         Ok(())
     }

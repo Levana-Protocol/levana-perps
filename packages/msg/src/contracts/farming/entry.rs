@@ -131,7 +131,7 @@ pub enum OwnerExecuteMsg {
     /// Returns an error if there's an ongoing emissions period.
     ReclaimEmissions {
         /// The destination address for the unused tokens
-        addr: String,
+        addr: RawAddr,
         /// The amount of tokens to reclaim
         /// A value of None will reclaim all unused emission tokens
         amount: Option<LvnToken>,
@@ -150,7 +150,7 @@ pub enum OwnerExecuteMsg {
         /// See [InstantiateMsg::owner]
         owner: Option<RawAddr>,
         /// The amount of real yield taken for the bonus fund
-        bonus_ratio: Option<NonZero<Decimal256>>,
+        bonus_ratio: Option<Decimal256>,
         /// The address that receives bonus transfers.
         bonus_addr: Option<RawAddr>,
     },
@@ -216,17 +216,12 @@ pub struct StatusResp {
     pub lockdrop_buckets: Vec<LockdropBucketStats>,
     /// The amount of collateral in the bonus fund
     pub bonus: Collateral,
+    /// The amount of real yield taken for the bonus fund
+    pub bonus_ratio: Decimal256,
+    /// The address that receives bonus transfers.
+    pub bonus_addr: Addr,
     /// If known, the timestamp when all lockdrop LVN rewards are available
     pub lockdrop_rewards_unlocked: Option<Timestamp>,
-    /// Total amount of LVN currently held by the contract
-    pub lvn_held: LvnToken,
-    /// Total liabilities of LVN for the contract.
-    ///
-    /// This is the sum of unclaimed LVN from lockdrop and emissions, plus any
-    /// remaining emissions for the active emissions.
-    ///
-    /// If this number is less than [StatusResp::lvn_held], the contract is insolvent and needs to be provided with more funds.
-    pub lvn_owed: LvnToken,
     /// Current emissions plan
     pub emissions: Option<Emissions>,
 }

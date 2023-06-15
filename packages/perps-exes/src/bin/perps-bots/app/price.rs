@@ -1,18 +1,18 @@
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 
 use anyhow::Result;
 use axum::async_trait;
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, HasAddress, TxBuilder, Wallet};
-use msg::prelude::{PriceBaseInQuote, Signed, UnsignedDecimal};
+use cosmwasm_std::Decimal256;
+use msg::prelude::{PriceBaseInQuote, PriceCollateralInUsd, Signed, UnsignedDecimal};
 use perps_exes::prelude::MarketContract;
-use rust_decimal::Decimal;
 
 use crate::{
     config::BotConfigByType,
     util::{
         markets::{get_markets, Market, PriceApi},
-        oracle::Pyth,
+        oracle::{get_latest_price, Pyth},
     },
     watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
 };
@@ -72,22 +72,18 @@ impl App {
         anyhow::ensure!(!markets.is_empty(), "Cannot have empty markets vec");
 
         for market in &markets {
-            let price_apis = &market
-                .get_price_api(wallet, &self.cosmos, &self.config)
-                .await?;
+            let price_apis = &market.get_price_api(wallet, &self.cosmos).await?;
             match price_apis {
-                PriceApi::Manual { symbol, symbol_usd } => {
-                    let price = self
-                        .get_current_price_symbol(symbol)
-                        .await?
-                        .to_string()
-                        .parse()?;
-                    if self.needs_price_update(market, price).await? {
+                PriceApi::Manual(feeds) => {
+                    let (price, price_usd) = get_latest_price(&self.client, feeds).await?;
+
+                    if let Some(reason) = self.needs_price_update(market, price).await? {
                         has_messages = true;
-                        let (status, msg) = self
-                            .get_tx_symbol(wallet, market, symbol_usd, price)
-                            .await?;
-                        statuses.push(format!("{}: {status}", market.market_id));
+                        let (status, msg) = self.get_tx_manual(wallet, market, price, price_usd)?;
+                        statuses.push(format!(
+                            "{}: needs update: {reason} {status}",
+                            market.market_id
+                        ));
                         builder.add_message_mut(msg);
                     } else {
                         statuses.push(format!(
@@ -98,14 +94,18 @@ impl App {
                 }
 
                 PriceApi::Pyth(pyth) => {
-                    let (latest_price, _) = pyth.get_latest_price(&self.client).await?;
-                    if self.needs_price_update(market, latest_price).await? {
+                    let (latest_price, _) =
+                        get_latest_price(&self.client, &pyth.market_price_feeds).await?;
+                    if let Some(reason) = self.needs_price_update(market, latest_price).await? {
                         has_messages = true;
                         let msgs = self.get_txs_pyth(wallet, market, pyth).await?;
                         for msg in msgs {
                             builder.add_message_mut(msg);
                         }
-                        statuses.push(format!("{}: got pyth contract messages", market.market_id));
+                        statuses.push(format!(
+                            "{}: needs update: {reason} Got pyth contract messages",
+                            market.market_id
+                        ));
                     } else {
                         statuses.push(format!("{}: no pyth price update needed", market.market_id));
                     }
@@ -127,10 +127,7 @@ impl App {
 
         // just for logging pyth prices
         for market in &markets {
-            match &market
-                .get_price_api(wallet, &self.cosmos, &self.config)
-                .await?
-            {
+            match &market.get_price_api(wallet, &self.cosmos).await? {
                 PriceApi::Manual { .. } => {}
 
                 PriceApi::Pyth(pyth) => {
@@ -163,7 +160,7 @@ impl App {
         &self,
         market: &Market,
         latest_price: PriceBaseInQuote,
-    ) -> Result<bool> {
+    ) -> Result<Option<PriceUpdateReason>> {
         let market = MarketContract::new(market.market.clone());
         let price = market.current_price().await?;
 
@@ -172,7 +169,7 @@ impl App {
         let age = Utc::now().signed_duration_since(updated);
         let age_secs = age.num_seconds();
         if age_secs > self.config.max_price_age_secs.into() {
-            return Ok(true);
+            return Ok(Some(PriceUpdateReason::LastUpdateTooOld(age)));
         }
 
         // Check 2: has the price moved more than the allowed delta?
@@ -184,39 +181,36 @@ impl App {
             .checked_sub(Signed::ONE)?
             .abs_unsigned();
         if delta >= self.config.max_allowed_price_delta {
-            return Ok(true);
+            return Ok(Some(PriceUpdateReason::PriceDelta {
+                old: price.price_base,
+                new: latest_price,
+                delta,
+            }));
         }
 
         // Check 3: would any triggers happen from this price?
         // We save this for last since it requires a network round trip
-        market.price_would_trigger(latest_price).await
+        if market.price_would_trigger(latest_price).await? {
+            return Ok(Some(PriceUpdateReason::Triggers));
+        }
+
+        Ok(None)
     }
 
-    async fn get_tx_symbol(
+    fn get_tx_manual(
         &self,
         wallet: &Wallet,
         market: &Market,
-        collateral_price_api_symbol: &Option<String>,
         price: PriceBaseInQuote,
+        price_usd: Option<PriceCollateralInUsd>,
     ) -> Result<(String, MsgExecuteContract)> {
-        let price_usd = match collateral_price_api_symbol {
-            Some(symbol) if symbol.as_str() == "USDC_USD" => Some("1".parse()?),
-            Some(symbol) => Some(
-                self.get_current_price_symbol(symbol)
-                    .await?
-                    .to_string()
-                    .parse()?,
-            ),
-            None => None,
-        };
-
         Ok((
             format!("Updated price for {}: {}", market.market_id, price),
             MsgExecuteContract {
                 sender: wallet.get_address_string(),
                 contract: market.market.get_address_string(),
                 msg: serde_json::to_vec(&msg::contracts::market::entry::ExecuteMsg::SetPrice {
-                    price: price.to_string().parse()?,
+                    price,
                     price_usd,
                     execs: self.config.execs_per_price,
                     rewards: None,
@@ -224,32 +218,6 @@ impl App {
                 funds: vec![],
             },
         ))
-    }
-
-    async fn get_current_price_symbol(&self, price_api_symbol: &str) -> Result<Decimal> {
-        #[derive(serde::Deserialize)]
-        struct Latest {
-            latest_price: Decimal,
-        }
-
-        let url = match &self.config.by_type {
-            BotConfigByType::Testnet { inner } => {
-                format!("{}current?marketId={}", inner.price_api, price_api_symbol)
-            }
-            BotConfigByType::Mainnet { .. } => {
-                anyhow::bail!("On mainnet, we must use Pyth price oracles")
-            }
-        };
-
-        let Latest { latest_price } = self
-            .client
-            .get(url)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
-        Ok(latest_price)
     }
 
     async fn get_txs_pyth(
@@ -267,5 +235,30 @@ impl App {
             .await?;
 
         Ok(vec![oracle_msg, bridge_msg])
+    }
+}
+
+enum PriceUpdateReason {
+    LastUpdateTooOld(Duration),
+    PriceDelta {
+        old: PriceBaseInQuote,
+        new: PriceBaseInQuote,
+        delta: Decimal256,
+    },
+    Triggers,
+}
+
+impl Display for PriceUpdateReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            PriceUpdateReason::LastUpdateTooOld(age) => write!(f, "Last update too old: {age}."),
+            PriceUpdateReason::PriceDelta { old, new, delta } => write!(
+                f,
+                "Large price delta. Old: {old}. New: {new}. Delta: {delta}."
+            ),
+            PriceUpdateReason::Triggers => {
+                write!(f, "Price would trigger positions and/or orders.")
+            }
+        }
     }
 }

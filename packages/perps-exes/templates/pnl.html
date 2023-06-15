@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#4b1596" />
+
+    <title>Levana Perps PnL Celebration</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Public+Sans&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/pnl.css" />
+
+    <meta property="twitter:site" content="@Levana_protocol">
+    <meta property="twitter:creator" content="@Levana_protocol">
+    <meta property="og:site_property" content="Levana Well-Funded Perps PnL Celebration">
+    <meta property="og:title" content="Levana Perps PnL">
+    <meta property="og:description" value="Trade on Levana Perps, the safest, lowest-cost decentralized perpetual swaps platform.">
+    <meta property="og:type" content="website">
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="og:image" content="{{ image_url }}">
+  </head>
+  <body>
+    <div class="content">
+      <img src="https://static.levana.finance/images/logo.svg" alt="Levana Logo" class="logo">
+      <div class="pnl">
+        {{ pnl_display }}
+      </div>
+      <div class="market-info">
+        {{ market_id }} - {{ direction }}
+      </div>
+      <div class="trade-stats">
+        <div class="trade-stat">
+          Entry Price
+          <span>{{ entry_price }} USD</span>
+        </div>
+        <div class="trade-stat">
+          Exit Price
+          <span>{{ exit_price }} USD</span>
+        </div>
+        <div class="trade-stat">
+          Leverage
+          <span>{{ leverage }}x</span>
+        </div>
+      </div>
+      <div class="separator">
+        <div class="separator-line"></div>
+        <div class="separator-icon-container">
+          <img src="https://static.levana.finance/images/trade.svg" alt="Trade Icon" class="separator-icon" />
+        </div>
+      </div>
+      <div class="levana-description">
+        Levana is the safest, lowest-cost perpetual swaps on Cosmos
+      </div>
+      <a class="cta" href="https://levana.exchange">
+        Start Trading
+      </a>
+    </div>
+  </body>
+</html>

@@ -38,6 +38,11 @@ pub(crate) enum TestnetSub {
         #[clap(flatten)]
         inner: crate::migrate::MigrateOpt,
     },
+    /// Migrate rewards contracts
+    MigrateRewards {
+        #[clap(flatten)]
+        inner: crate::migrate_rewards::MigrateRewardsOpt,
+    },
     /// Instantiate chain-wide contracts as a one time setup
     InitChain {
         #[clap(flatten)]

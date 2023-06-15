@@ -29,7 +29,6 @@ reqwest = { version = "0.11.11", default-features = false, features = [
        "gzip",
 ] }
 chrono = { version = "0.4.19", features = ["serde"] }
-rust_decimal = "1.26.1"
 axum = "0.6"
 tower-http = { version = "0.3.4", features = ["cors", "auth"] }
 futures = "0.3.26"
@@ -43,6 +42,7 @@ tonic = "0.8.3"
 askama = "0.12"
 cw-utils = "1.0.1"
 thiserror = "1"
+resvg = "0.34"
 
 [features]
 default = []

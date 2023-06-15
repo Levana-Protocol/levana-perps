@@ -10,13 +10,11 @@ use msg::{
     },
     prelude::*,
 };
+use perps_exes::config::PythConfig;
 use pyth_sdk_cw::PriceIdentifier;
-
-use crate::config::BotConfig;
 
 #[derive(Clone)]
 pub(crate) struct Pyth {
-    pub endpoint: String,
     pub oracle: Contract,
     pub bridge: Contract,
     pub market_id: MarketId,
@@ -26,7 +24,6 @@ pub(crate) struct Pyth {
 impl std::fmt::Debug for Pyth {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Pyth")
-            .field("endpoint", &self.endpoint)
             .field("market_id", &self.market_id)
             .field("oracle", &self.oracle.get_address())
             .field("bridge", &self.bridge.get_address())
@@ -40,12 +37,7 @@ impl std::fmt::Debug for Pyth {
 }
 
 impl Pyth {
-    pub async fn new(
-        cosmos: &Cosmos,
-        config: &BotConfig,
-        bridge_addr: Address,
-        market_id: MarketId,
-    ) -> Result<Self> {
+    pub async fn new(cosmos: &Cosmos, bridge_addr: Address, market_id: MarketId) -> Result<Self> {
         let bridge = cosmos.make_contract(bridge_addr);
         let oracle_addr = bridge.query(BridgeQueryMsg::PythAddress {}).await?;
         let oracle = cosmos.make_contract(oracle_addr);
@@ -56,7 +48,6 @@ impl Pyth {
             .await?;
 
         Ok(Self {
-            endpoint: config.pyth_endpoint.clone(),
             oracle,
             bridge,
             market_price_feeds,
@@ -123,78 +114,6 @@ impl Pyth {
         })
     }
 
-    /// Get the latest price from Pyth
-    pub async fn get_latest_price(
-        &self,
-        client: &reqwest::Client,
-    ) -> Result<(PriceBaseInQuote, Option<PriceCollateralInUsd>)> {
-        let base = self
-            .price_helper(client, &self.market_price_feeds.feeds)
-            .await?;
-        let base = PriceBaseInQuote::try_from_number(base.into_signed())?;
-        let collateral = match &self.market_price_feeds.feeds_usd {
-            Some(feeds_usd) => {
-                let collateral = self.price_helper(client, feeds_usd).await?;
-                Some(PriceCollateralInUsd::try_from_number(
-                    collateral.into_signed(),
-                )?)
-            }
-            None => None,
-        };
-        Ok((base, collateral))
-    }
-
-    async fn price_helper(
-        &self,
-        client: &reqwest::Client,
-        feeds: &[PythPriceFeed],
-    ) -> Result<Decimal256> {
-        let mut req = client.get(format!("{}api/latest_price_feeds", self.endpoint));
-        for feed in feeds {
-            req = req.query(&[("ids[]", feed.id)]);
-        }
-
-        #[derive(serde::Deserialize)]
-        struct Record {
-            id: String,
-            price: Price,
-        }
-        #[derive(serde::Deserialize)]
-        struct Price {
-            expo: i8,
-            price: Uint256,
-        }
-        let records = req
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<Vec<Record>>()
-            .await?;
-
-        let prices = records
-            .into_iter()
-            .map(|Record { id, price }| (id, price))
-            .collect::<HashMap<_, _>>();
-
-        let mut final_price = Decimal256::one();
-
-        for feed in feeds {
-            let Price { expo, price } = prices
-                .get(&feed.id.to_hex())
-                .with_context(|| format!("Missing price for ID {}", feed.id))?;
-
-            anyhow::ensure!(*expo <= 0, "Exponent from Pyth must always be negative");
-            let component = Decimal256::from_atomics(*price, expo.abs().try_into()?)?;
-            if feed.inverted {
-                final_price = final_price.checked_div(component)?;
-            } else {
-                final_price = final_price.checked_mul(component)?;
-            }
-        }
-
-        Ok(final_price)
-    }
-
     pub async fn get_wormhole_proofs(&self, client: &reqwest::Client) -> Result<Vec<String>> {
         let mut all_ids: Vec<PriceIdentifier> =
             self.market_price_feeds.feeds.iter().map(|f| f.id).collect();
@@ -205,7 +124,7 @@ impl Pyth {
         all_ids.sort();
         all_ids.dedup();
 
-        let mut url = format!("{}api/latest_vaas", self.endpoint);
+        let mut url = format!("{}api/latest_vaas", PythConfig::load()?.endpoint);
 
         for (index, id) in all_ids.iter().enumerate() {
             // pyth uses this format for array params: https://github.com/axios/axios/blob/9588fcdec8aca45c3ba2f7968988a5d03f23168c/test/specs/helpers/buildURL.spec.js#L31
@@ -227,4 +146,75 @@ impl Pyth {
 
         Ok(vaas)
     }
+}
+
+/// Get the latest price from Pyth
+pub async fn get_latest_price(
+    client: &reqwest::Client,
+    market_price_feeds: &PythMarketPriceFeeds,
+) -> Result<(PriceBaseInQuote, Option<PriceCollateralInUsd>)> {
+    let endpoint = &PythConfig::load()?.endpoint;
+    let base = price_helper(client, endpoint, &market_price_feeds.feeds).await?;
+    let base = PriceBaseInQuote::try_from_number(base.into_signed())?;
+    let collateral = match &market_price_feeds.feeds_usd {
+        Some(feeds_usd) => {
+            let collateral = price_helper(client, endpoint, feeds_usd).await?;
+            Some(PriceCollateralInUsd::try_from_number(
+                collateral.into_signed(),
+            )?)
+        }
+        None => None,
+    };
+    Ok((base, collateral))
+}
+
+async fn price_helper(
+    client: &reqwest::Client,
+    endpoint: &str,
+    feeds: &[PythPriceFeed],
+) -> Result<Decimal256> {
+    let mut req = client.get(format!("{}api/latest_price_feeds", endpoint));
+    for feed in feeds {
+        req = req.query(&[("ids[]", feed.id)]);
+    }
+
+    #[derive(serde::Deserialize)]
+    struct Record {
+        id: String,
+        price: Price,
+    }
+    #[derive(serde::Deserialize)]
+    struct Price {
+        expo: i8,
+        price: Uint256,
+    }
+    let records = req
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<Vec<Record>>()
+        .await?;
+
+    let prices = records
+        .into_iter()
+        .map(|Record { id, price }| (id, price))
+        .collect::<HashMap<_, _>>();
+
+    let mut final_price = Decimal256::one();
+
+    for feed in feeds {
+        let Price { expo, price } = prices
+            .get(&feed.id.to_hex())
+            .with_context(|| format!("Missing price for ID {}", feed.id))?;
+
+        anyhow::ensure!(*expo <= 0, "Exponent from Pyth must always be negative");
+        let component = Decimal256::from_atomics(*price, expo.abs().try_into()?)?;
+        if feed.inverted {
+            final_price = final_price.checked_div(component)?;
+        } else {
+            final_price = final_price.checked_mul(component)?;
+        }
+    }
+
+    Ok(final_price)
 }

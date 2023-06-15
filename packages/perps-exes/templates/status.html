@@ -48,9 +48,9 @@
         <ul>
           <li>Contract family: {{family}}</li>
           <li>Build version: {{build_version}}</li>
-          {% if let Some(rpc) = rpc %}
-          <li>gRPC endpoint: {{grpc}} (height: {{rpc.grpc_height}})</li>
-          <li>RPC endpoint: {{rpc.endpoint}} (height: {{rpc.rpc_height}})</li>
+          {% if let Some(info) = frontend_info_testnet %}
+          <li>gRPC endpoint: {{grpc}} (height: {{info.rpc.grpc_height}})</li>
+          <li>RPC endpoint: {{info.rpc.endpoint}} (height: {{info.rpc.rpc_height}})</li>
           {% endif %}
           <li>Bot live since: {{live_since}}</li>
           <li>Current time: {{now}}</li>

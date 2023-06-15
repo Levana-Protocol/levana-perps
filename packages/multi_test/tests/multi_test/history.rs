@@ -9,6 +9,7 @@ use msg::contracts::market::{
     history::events::{LpActionEvent, PositionActionEvent},
 };
 use msg::prelude::*;
+use std::ops::Neg;
 
 #[test]
 fn trade_history_works() {
@@ -366,7 +367,9 @@ fn trade_history_nft_transfer_perp_963() {
     assert_eq!(open.collateral, transfer.collateral);
 
     let old_owner_actions = market.query_trader_action_history(&trader).unwrap();
-    assert_eq!(&old_owner_actions.actions, &[open, transfer.clone()]);
+    let mut old_owner_transfer = transfer.clone();
+    old_owner_transfer.transfer_collateral = old_owner_transfer.transfer_collateral.neg();
+    assert_eq!(&old_owner_actions.actions, &[open, old_owner_transfer]);
     assert_eq!(old_owner_actions.next_start_after, None);
 
     let new_owner_actions = market.query_trader_action_history(&new_owner).unwrap();

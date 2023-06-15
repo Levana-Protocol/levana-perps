@@ -29,7 +29,8 @@ use msg::contracts::factory::entry::{
     ShutdownStatus,
 };
 use msg::contracts::farming::entry::{
-    ExecuteMsg as FarmingExecuteMsg, LockdropBucketId, QueryMsg as FarmingQueryMsg,
+    ExecuteMsg as FarmingExecuteMsg, FarmersResp, LockdropBucketId, OwnerExecuteMsg,
+    QueryMsg as FarmingQueryMsg,
 };
 use msg::contracts::farming::entry::{
     FarmerStats, OwnerExecuteMsg as FarmingOwnerExecuteMsg, StatusResp as FarmingStatusResp,
@@ -63,6 +64,7 @@ use msg::contracts::position_token::{
 use msg::prelude::*;
 
 use msg::constants::event_key;
+use msg::contracts::farming::entry::OwnerExecuteMsg::ReclaimEmissions;
 use msg::contracts::market::order::OrderId;
 use msg::shared::cosmwasm::OrderInMessage;
 use msg::shutdown::{ShutdownEffect, ShutdownImpact};
@@ -1592,7 +1594,7 @@ impl PerpsMarket {
         )
     }
 
-    fn exec_farming(&self, wallet: &Addr, msg: &FarmingExecuteMsg) -> Result<AppResponse> {
+    pub fn exec_farming(&self, wallet: &Addr, msg: &FarmingExecuteMsg) -> Result<AppResponse> {
         self.exec_farming_with_funds(wallet, msg, vec![])
     }
 
@@ -1661,12 +1663,13 @@ impl PerpsMarket {
         )
     }
 
-    pub fn setup_lvn_rewards(&self, amount_to_mint: &str) -> Token {
+    pub fn mint_lvn_rewards(&self, amount: &str, recipient: Option<Addr>) -> Token {
         let mut app = self.app();
-        let protocol_owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
         let token = app.rewards_token();
+        let owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
+        let recipient = recipient.unwrap_or(owner);
 
-        app.mint_token(&protocol_owner, &token, amount_to_mint.parse().unwrap())
+        app.mint_token(&recipient, &token, amount.parse().unwrap())
             .unwrap();
 
         token
@@ -1719,6 +1722,20 @@ impl PerpsMarket {
         )
     }
 
+    pub fn exec_farming_reclaim_emissions(
+        &self,
+        addr: &Addr,
+        amount: Option<LvnToken>,
+    ) -> Result<AppResponse> {
+        self.exec_farming(
+            &Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &FarmingExecuteMsg::Owner(ReclaimEmissions {
+                addr: addr.into(),
+                amount,
+            }),
+        )
+    }
+
     pub fn exec_farming_claim_lockdrop_rewards(&self, sender: &Addr) -> Result<AppResponse> {
         self.exec_farming(sender, &FarmingExecuteMsg::ClaimLockdropRewards {})
     }
@@ -1738,6 +1755,23 @@ impl PerpsMarket {
         )
     }
 
+    pub fn exec_farming_update_config(
+        &self,
+        owner: &Addr,
+        new_owner: Option<RawAddr>,
+        bonus_ratio: Option<Decimal256>,
+        bonus_addr: Option<RawAddr>,
+    ) -> Result<AppResponse> {
+        self.exec_farming(
+            owner,
+            &FarmingExecuteMsg::Owner(OwnerExecuteMsg::UpdateConfig {
+                owner: new_owner,
+                bonus_ratio,
+                bonus_addr,
+            }),
+        )
+    }
+
     fn query_farming<T: DeserializeOwned>(
         &self,
         msg: &msg::contracts::farming::entry::QueryMsg,
@@ -1750,22 +1784,28 @@ impl PerpsMarket {
             .map_err(|err| err.into())
     }
 
+    pub fn query_farmers(
+        &self,
+        start_after: Option<RawAddr>,
+        limit: Option<u32>,
+    ) -> Result<FarmersResp> {
+        self.query_farming(&FarmingQueryMsg::Farmers { start_after, limit })
+    }
+
     pub fn query_farming_farmer_stats(&self, wallet: &Addr) -> Result<FarmerStats> {
         self.query_farming(&FarmingQueryMsg::FarmerStats {
             addr: wallet.into(),
         })
     }
 
-    pub fn query_farming_stats(&self) -> FarmingStatusResp {
+    pub fn query_farming_status(&self) -> FarmingStatusResp {
         self.query_farming(&FarmingQueryMsg::Status {}).unwrap()
     }
 
     pub fn query_reward_token_balance(&self, token: &Token, addr: &Addr) -> LvnToken {
-        let balance = token
-            .query_balance(&self.app().querier(), addr)
+        token
+            .query_balance_dec(&self.app().querier(), addr)
+            .map(LvnToken::from_decimal256)
             .unwrap()
-            .into_decimal256();
-
-        LvnToken::from_decimal256(balance)
     }
 }

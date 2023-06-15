@@ -124,7 +124,7 @@ fn farming_lockdrop_basic() {
         .unwrap_err();
 
     // assert totals before launch
-    let farming_stats = market.query_farming_stats();
+    let farming_stats = market.query_farming_status();
     assert_eq!(farming_stats.xlp, LpToken::zero());
     assert_eq!(farming_stats.farming_tokens, "157".parse().unwrap());
 
@@ -132,7 +132,7 @@ fn farming_lockdrop_basic() {
     market.exec_farming_start_launch().unwrap();
 
     // assert totals after launch
-    let farming_stats = market.query_farming_stats();
+    let farming_stats = market.query_farming_status();
     assert_eq!(farming_stats.xlp, "157".parse().unwrap());
     assert_eq!(farming_stats.farming_tokens, "157".parse().unwrap());
 
@@ -165,7 +165,7 @@ fn farming_lockdrop_basic() {
 #[test]
 fn test_query_lockdrop_rewards() {
     let (market, buckets, farmers) = setup_lockdrop();
-    let token = market.setup_lvn_rewards("1000000");
+    let token = market.mint_lvn_rewards("1000000", None);
 
     // Farmer1 makes an additional deposit into the last bucket
     market
@@ -238,7 +238,7 @@ fn test_query_lockdrop_rewards() {
 #[test]
 fn test_claim_lockdrop_rewards() {
     let (market, _buckets, farmers) = setup_lockdrop();
-    let token = market.setup_lvn_rewards("1000000");
+    let token = market.mint_lvn_rewards("1000000", None);
 
     // Jump to review period
     market
@@ -433,7 +433,7 @@ fn test_reinvest_yield() {
 
     // Open a position to accrue trading fees
 
-    let farming_stats_before = market.query_farming_stats();
+    let farming_status_before = market.query_farming_status();
 
     market
         .exec_open_position(
@@ -452,9 +452,9 @@ fn test_reinvest_yield() {
 
     market.exec_farming_reinvest().unwrap();
 
-    let farming_stats_after = market.query_farming_stats();
-    assert!(farming_stats_before.xlp < farming_stats_after.xlp);
-    assert!(farming_stats_before.bonus < farming_stats_after.bonus);
+    let farming_status_after = market.query_farming_status();
+    assert!(farming_status_before.xlp < farming_status_after.xlp);
+    assert!(farming_status_before.bonus < farming_status_after.bonus);
 
     // Test transfer bonus
 
@@ -466,12 +466,12 @@ fn test_reinvest_yield() {
     assert_eq!(
         balance_after,
         balance_before
-            .checked_add(farming_stats_after.bonus.into_number())
+            .checked_add(farming_status_after.bonus.into_number())
             .unwrap()
     );
 
-    let farming_stats = market.query_farming_stats();
-    assert_eq!(farming_stats.bonus, Collateral::zero());
+    let farming_status = market.query_farming_status();
+    assert_eq!(farming_status.bonus, Collateral::zero());
 
     // Withdraw xLP
 

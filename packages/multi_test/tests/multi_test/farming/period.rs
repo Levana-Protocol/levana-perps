@@ -10,7 +10,7 @@ fn farming_period() {
     const LOCKDROP_START_DURATION: Duration = Duration::from_seconds(60 * 60 * 24 * 12);
     const LOCKDROP_SUNSET_DURATION: Duration = Duration::from_seconds(60 * 60 * 24 * 2);
 
-    let get_period = || market.query_farming_stats().period;
+    let get_period = || market.query_farming_status().period;
 
     let assert_unable_to_start_launch_or_lockdrop = || {
         // cannot launch without going through sunset and review first

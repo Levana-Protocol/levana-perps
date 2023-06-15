@@ -109,7 +109,7 @@ impl State<'_> {
     }
 }
 
-/// Result of charging a delta neturality fee.
+/// Result of charging a delta neutrality fee.
 ///
 /// This struct keeps track of the results of successfully calculating a delta
 /// neutrality fee to be charged. We do this in a two-step process
