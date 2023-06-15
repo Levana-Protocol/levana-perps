@@ -19,7 +19,10 @@ use msg::{
         SignedLeverageToNotional, UnsignedDecimal, Usd,
     },
 };
-use reqwest::{header::CONTENT_TYPE, StatusCode};
+use reqwest::{
+    header::{CACHE_CONTROL, CONTENT_TYPE},
+    StatusCode,
+};
 use resvg::usvg::{TreeParsing, TreeTextToPath};
 
 use crate::app::App;
@@ -198,6 +201,10 @@ impl PnlInfo {
         let mut res = png.into_response();
         res.headers_mut()
             .insert(CONTENT_TYPE, HeaderValue::from_static("image/png"));
+        res.headers_mut().insert(
+            CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=86400"),
+        );
         Ok(res)
     }
 }
