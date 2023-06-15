@@ -274,7 +274,7 @@ impl PnlInfo {
                     }
                 },
             },
-            image_url: params.image_url(),
+            image_url: params.image_url(pnl_type),
             market_id,
             direction: match pos.direction_to_base {
                 DirectionToBase::Long => "long",
