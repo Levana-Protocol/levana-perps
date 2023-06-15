@@ -11,7 +11,7 @@ env:
   RUSTUP_MAX_RETRIES: 10
 
 jobs:
-  bots-image:
+  companion-image:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
