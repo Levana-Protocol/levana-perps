@@ -393,18 +393,18 @@ mod tests {
 
     #[test]
     fn usd_display() {
-        assert_eq!(UsdDisplay("1.2".parse().unwrap()).to_string(), "1.20 USD");
+        assert_eq!(UsdDisplay("1.2".parse().unwrap()).to_string(), "+1.20 USD");
         assert_eq!(
             UsdDisplay("1.2345".parse().unwrap()).to_string(),
-            "1.23 USD"
+            "+1.23 USD"
         );
         assert_eq!(
             UsdDisplay("1.2355".parse().unwrap()).to_string(),
-            "1.24 USD"
+            "+1.24 USD"
         );
         assert_eq!(
             UsdDisplay("54321.2355".parse().unwrap()).to_string(),
-            "54,321.24 USD"
+            "+54,321.24 USD"
         );
         assert_eq!(
             UsdDisplay("-54321.2355".parse().unwrap()).to_string(),
