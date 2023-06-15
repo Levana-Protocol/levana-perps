@@ -285,7 +285,7 @@ impl IntoResponse for Error {
 struct PnlInfo {
     pnl_display: String,
     image_url: String,
-    market_id: MarketId,
+    market_id: String,
     direction: &'static str,
     entry_price: PriceBaseInQuote,
     exit_price: PriceBaseInQuote,
@@ -318,10 +318,10 @@ impl PnlInfo {
                 },
             },
             image_url: params.image_url(pnl_type),
-            market_id,
+            market_id: market_id.to_string().replace("_", "/"),
             direction: match pos.direction_to_base {
-                DirectionToBase::Long => "long",
-                DirectionToBase::Short => "short",
+                DirectionToBase::Long => "LONG",
+                DirectionToBase::Short => "SHORT",
             },
             entry_price: pos.entry_price_base,
             exit_price: exit_price.price_base,
