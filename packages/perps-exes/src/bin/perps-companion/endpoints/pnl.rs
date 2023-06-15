@@ -418,9 +418,13 @@ mod tests {
 }
 
 impl Params {
-    fn image_url(&self) -> String {
+    fn image_url(&self, pnl_type: PnlType) -> String {
         format!(
-            "/pnl/{chain}/{market}/{position}/image",
+            "/{pnl_type}/{chain}/{market}/{position}/image.png",
+            pnl_type = match pnl_type {
+                PnlType::Usd => "pnl-usd",
+                PnlType::Percent => "pnl-percent",
+            },
             chain = self.chain,
             market = self.market,
             position = self.position

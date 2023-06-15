@@ -20,7 +20,7 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .route("/pnl.css", get(pnl::css))
         .route("/pnl-usd/:chain/:market/:position", get(pnl::html_usd))
         .route(
-            "/pnl-usd/:chain/:market/:position/image",
+            "/pnl-usd/:chain/:market/:position/image.png",
             get(pnl::image_usd),
         )
         .route(
@@ -28,7 +28,7 @@ pub(crate) async fn launch(app: App) -> Result<()> {
             get(pnl::html_percent),
         )
         .route(
-            "/pnl-percent/:chain/:market/:position/image",
+            "/pnl-percent/:chain/:market/:position/image.png",
             get(pnl::image_percent),
         )
         .route("/favicon.ico", get(common::favicon))
