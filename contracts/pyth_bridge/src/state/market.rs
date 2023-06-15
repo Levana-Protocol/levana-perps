@@ -87,6 +87,8 @@ impl State<'_> {
             }
         }
 
+        PYTH_PREV_MARKET_PRICE.save(ctx.storage, &market_id, &market_price)?;
+
         let MarketPrice {
             price, price_usd, ..
         } = market_price;
