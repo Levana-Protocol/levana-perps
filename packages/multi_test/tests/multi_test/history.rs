@@ -364,7 +364,7 @@ fn trade_history_nft_transfer_perp_963() {
     assert_eq!(open.old_owner, None);
     assert_eq!(open.new_owner, None);
 
-    assert_eq!(open.active_collateral, transfer.active_collateral);
+    assert_eq!(open.collateral, transfer.collateral);
 
     let old_owner_actions = market.query_trader_action_history(&trader).unwrap();
     let mut old_owner_transfer = transfer.clone();
