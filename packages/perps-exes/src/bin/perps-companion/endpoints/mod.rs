@@ -17,9 +17,20 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .route("/", get(common::homepage))
         .route("/healthz", get(common::healthz))
         .route("/build-version", get(common::build_version))
-        .route("/pnl/:chain/:market/:position", get(pnl::html))
         .route("/pnl.css", get(pnl::css))
-        .route("/pnl/:chain/:market/:position/image", get(pnl::image))
+        .route("/pnl-usd/:chain/:market/:position", get(pnl::html_usd))
+        .route(
+            "/pnl-usd/:chain/:market/:position/image",
+            get(pnl::image_usd),
+        )
+        .route(
+            "/pnl-percent/:chain/:market/:position",
+            get(pnl::html_percent),
+        )
+        .route(
+            "/pnl-percent/:chain/:market/:position/image",
+            get(pnl::image_percent),
+        )
         .route("/favicon.ico", get(common::favicon))
         .route("/robots.txt", get(common::robots_txt))
         .with_state(app)

@@ -16,7 +16,7 @@ use msg::{
     },
     prelude::{
         DirectionToBase, MarketId, NonZero, PriceBaseInQuote, PricePoint, Signed,
-        SignedLeverageToNotional, Usd,
+        SignedLeverageToNotional, UnsignedDecimal, Usd,
     },
 };
 use reqwest::{header::CONTENT_TYPE, StatusCode};
@@ -31,12 +31,32 @@ pub(super) struct Params {
     position: PositionId,
 }
 
-pub(super) async fn html(app: State<Arc<App>>, params: Path<Params>) -> impl IntoResponse {
-    params.0.with_pnl(&app, PnlInfo::html).await
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum PnlType {
+    Usd,
+    Percent,
 }
 
-pub(super) async fn image(app: State<Arc<App>>, params: Path<Params>) -> impl IntoResponse {
-    params.0.with_pnl(&app, PnlInfo::image).await
+pub(super) async fn html_usd(app: State<Arc<App>>, params: Path<Params>) -> impl IntoResponse {
+    params.0.with_pnl(&app, PnlInfo::html, PnlType::Usd).await
+}
+
+pub(super) async fn image_usd(app: State<Arc<App>>, params: Path<Params>) -> impl IntoResponse {
+    params.0.with_pnl(&app, PnlInfo::image, PnlType::Usd).await
+}
+
+pub(super) async fn html_percent(app: State<Arc<App>>, params: Path<Params>) -> impl IntoResponse {
+    params
+        .0
+        .with_pnl(&app, PnlInfo::html, PnlType::Percent)
+        .await
+}
+
+pub(super) async fn image_percent(app: State<Arc<App>>, params: Path<Params>) -> impl IntoResponse {
+    params
+        .0
+        .with_pnl(&app, PnlInfo::image, PnlType::Percent)
+        .await
 }
 
 pub(super) async fn css() -> impl IntoResponse {
@@ -49,17 +69,17 @@ pub(super) async fn css() -> impl IntoResponse {
 }
 
 impl Params {
-    async fn with_pnl<F>(self, app: &App, f: F) -> Response
+    async fn with_pnl<F>(self, app: &App, f: F, pnl_type: PnlType) -> Response
     where
         F: FnOnce(PnlInfo) -> Response,
     {
-        match self.get_pnl_info(app).await {
+        match self.get_pnl_info(app, pnl_type).await {
             Ok(pnl) => f(pnl),
             Err(e) => e.into_response(),
         }
     }
 
-    async fn get_pnl_info(self, app: &App) -> Result<PnlInfo, Error> {
+    async fn get_pnl_info(self, app: &App, pnl_type: PnlType) -> Result<PnlInfo, Error> {
         let Params {
             chain,
             market,
@@ -103,6 +123,16 @@ impl Params {
             }
         };
 
+        let entry_price: PricePoint = match contract
+            .query(msg::contracts::market::entry::QueryMsg::SpotPrice {
+                timestamp: Some(pos.created_at),
+            })
+            .await
+        {
+            Ok(status) => status,
+            Err(_) => return Err(Error::CouldNotQueryContract),
+        };
+
         let exit_price: PricePoint = match contract
             .query(msg::contracts::market::entry::QueryMsg::SpotPrice {
                 timestamp: Some(pos.settlement_time),
@@ -113,7 +143,14 @@ impl Params {
             Err(_) => return Err(Error::CouldNotQueryContract),
         };
 
-        Ok(PnlInfo::new(self, pos, status.market_id, exit_price))
+        Ok(PnlInfo::new(
+            self,
+            pos,
+            status.market_id,
+            entry_price,
+            exit_price,
+            pnl_type,
+        ))
     }
 }
 
@@ -210,12 +247,26 @@ impl PnlInfo {
         params: Params,
         pos: ClosedPosition,
         market_id: MarketId,
+        entry_price: PricePoint,
         exit_price: PricePoint,
+        pnl_type: PnlType,
     ) -> Self {
         let market_type = market_id.get_market_type();
         PnlInfo {
-            pnl_display: UsdDisplay(pos.pnl_usd).to_string(),
-            // pnl_usd: pos.pnl_usd,
+            pnl_display: match pnl_type {
+                PnlType::Usd => UsdDisplay(pos.pnl_usd).to_string(),
+                PnlType::Percent => match pos.deposit_collateral.try_into_positive_value() {
+                    None => "Negative collateral".to_owned(),
+                    Some(deposit) => {
+                        // FIXME we need a deposit_usd to do this accurately
+                        let deposit = entry_price.collateral_to_usd(deposit);
+                        let percent = pos.pnl_usd.into_number() / deposit.into_number()
+                            * Decimal256::from_ratio(100u32, 1u32).into_signed();
+                        let plus = if percent.is_negative() { "" } else { "+" };
+                        format!("{plus}{}%", TwoDecimalPoints(percent))
+                    }
+                },
+            },
             image_url: params.image_url(),
             market_id,
             direction: match pos.direction_to_base {
@@ -227,7 +278,7 @@ impl PnlInfo {
             leverage: match NonZero::new(pos.active_collateral) {
                 // Total liquidation occurred, which (1) should virtually never
                 // happen and (2) wouldn't be a celebration. Just using 0.
-                None => TwoDecimalPoints(Decimal256::zero()),
+                None => TwoDecimalPoints(Decimal256::zero().into_number()),
                 Some(active_collateral) => TwoDecimalPoints(
                     SignedLeverageToNotional::calculate(
                         pos.notional_size,
@@ -237,22 +288,26 @@ impl PnlInfo {
                     .into_base(market_type)
                     .split()
                     .1
-                    .into_decimal256(),
+                    .into_number(),
                 ),
             },
         }
     }
 }
 
-struct TwoDecimalPoints(Decimal256);
+struct TwoDecimalPoints(Signed<Decimal256>);
 
 impl Display for TwoDecimalPoints {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let ten = Decimal256::from_ratio(10u32, 1u32);
         let half = Decimal256::from_ratio(1u32, 2u32);
 
-        let whole = self.0.floor();
-        let rem = self.0 - whole;
+        if self.0.is_negative() {
+            write!(f, "-")?;
+        }
+
+        let whole = self.0.abs_unsigned().floor();
+        let rem = self.0.abs_unsigned() - whole;
         let rem = rem * ten;
         let x = rem.floor();
         let rem = rem - x;
@@ -275,6 +330,8 @@ impl Display for UsdDisplay {
         let number = self.0.into_number();
         if number.is_negative() {
             write!(f, "-")?;
+        } else {
+            write!(f, "+")?;
         }
         let raw = number.abs_unsigned();
 
@@ -293,7 +350,7 @@ impl Display for UsdDisplay {
             }
         }
 
-        write!(f, "{} USD", TwoDecimalPoints(rest))
+        write!(f, "{} USD", TwoDecimalPoints(rest.into_signed()))
     }
 }
 
