@@ -20,6 +20,8 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .route("/pnl/:chain/:market/:position", get(pnl::html))
         .route("/pnl.css", get(pnl::css))
         .route("/pnl/:chain/:market/:position/image", get(pnl::image))
+        .route("/favicon.ico", get(common::favicon))
+        .route("/robots.txt", get(common::robots_txt))
         .with_state(app)
         .layer(
             CorsLayer::new()
