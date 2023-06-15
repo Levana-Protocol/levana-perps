@@ -1,4 +1,3 @@
-use std::ops::Neg;
 use cosmwasm_std::Addr;
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, response::CosmosResponseExt,
@@ -10,6 +9,7 @@ use msg::contracts::market::{
     history::events::{LpActionEvent, PositionActionEvent},
 };
 use msg::prelude::*;
+use std::ops::Neg;
 
 #[test]
 fn trade_history_works() {
