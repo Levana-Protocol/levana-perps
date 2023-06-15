@@ -1548,6 +1548,9 @@ impl PerpsMarket {
     }
 
     /***** FARMING *****/
+    pub fn rewards_token(&self) -> Token {
+        self.app.borrow().rewards_token()
+    }
 
     pub fn exec_farming_deposit_xlp(
         &self,

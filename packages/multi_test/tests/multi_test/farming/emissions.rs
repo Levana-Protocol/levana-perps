@@ -550,7 +550,17 @@ fn test_claim_emissions() {
 
     market.exec_farming_claim_emissions(&lp2).unwrap();
     let lp2_balance = market.query_reward_token_balance(&token, &lp2);
-    assert_eq!(lp2_balance, "33.333333".parse().unwrap())
+    assert_eq!(lp2_balance, "33.333333".parse().unwrap());
+
+    let total_lp_balances = lp0_balance_after + lp1_balance_after + lp2_balance;
+    assert_eq!(
+        EMISSIONS_REWARDS.parse::<f64>().unwrap().round(),
+        total_lp_balances
+            .to_string()
+            .parse::<f64>()
+            .unwrap()
+            .round()
+    );
 }
 
 #[test]
