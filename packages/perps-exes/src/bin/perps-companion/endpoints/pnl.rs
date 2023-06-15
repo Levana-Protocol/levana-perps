@@ -132,14 +132,9 @@ impl PnlInfo {
         }
     }
 
-    fn image_inner(self) -> Result<Response> {
+    fn image_inner(&self) -> Result<Response> {
         // Generate the raw SVG text by rendering the template
-        let svg = PnlSvg {
-            owner: self.owner,
-            pnl_usd: self.pnl_usd,
-        }
-        .render()
-        .unwrap();
+        let svg = PnlSvg { info: self }.render().unwrap();
 
         // Convert the SVG into a usvg tree using default settings
         let mut tree = resvg::usvg::Tree::from_str(&svg, &resvg::usvg::Options::default())?;
@@ -200,7 +195,6 @@ impl IntoResponse for Error {
 #[derive(askama::Template)]
 #[template(path = "pnl.html")]
 struct PnlInfo {
-    owner: String,
     pnl_usd: Signed<Usd>,
     image_url: String,
     market_id: MarketId,
@@ -219,7 +213,6 @@ impl PnlInfo {
     ) -> Self {
         let market_type = market_id.get_market_type();
         PnlInfo {
-            owner: pos.owner.into_string(),
             pnl_usd: pos.pnl_usd,
             image_url: params.image_url(),
             market_id,
@@ -261,7 +254,6 @@ impl Params {
 
 #[derive(askama::Template)]
 #[template(path = "pnl.svg.xml")]
-struct PnlSvg {
-    owner: String,
-    pnl_usd: Signed<Usd>,
+struct PnlSvg<'a> {
+    info: &'a PnlInfo,
 }
