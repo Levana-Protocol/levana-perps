@@ -676,7 +676,9 @@ pub struct PositionAction {
     /// Timestamp when the action occurred
     pub timestamp: Timestamp,
     /// the amount of collateral at the time of the action
-    pub collateral: Collateral,
+    pub active_collateral: Collateral,
+    /// The amount of collateral transferred to or from the trader
+    pub transfer_collateral: Signed<Collateral>,
     /// Leverage of the position at the time of the action, if relevant
     pub leverage: Option<LeverageToBase>,
     /// max gains in quote

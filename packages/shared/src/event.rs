@@ -77,6 +77,15 @@ pub trait CosmwasmEventExt {
     }
 
     /// Parse a signed decimal attribute
+    fn signed_attr<T: UnsignedDecimal>(&self, key: &str) -> anyhow::Result<Signed<T>> {
+        self.map_attr_result(key, |s| {
+            s.parse()
+                .ok()
+                .with_context(|| format!("signed_attr failed on key {key} and value {s}"))
+        })
+    }
+
+    /// Parse a signed decimal attribute
     fn number_attr<T: UnsignedDecimal>(&self, key: &str) -> anyhow::Result<Signed<T>> {
         self.map_attr_result(key, |s| s.parse())
     }

@@ -218,6 +218,7 @@ impl State<'_> {
             } else {
                 Some(delta_neutrality_fee_delta)
             },
+            deposit_collateral_delta,
             spot_price,
         )?;
 

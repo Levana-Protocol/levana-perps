@@ -1,3 +1,4 @@
+use std::ops::Neg;
 use cosmwasm_std::Addr;
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, response::CosmosResponseExt,
@@ -363,10 +364,12 @@ fn trade_history_nft_transfer_perp_963() {
     assert_eq!(open.old_owner, None);
     assert_eq!(open.new_owner, None);
 
-    assert_eq!(open.collateral, transfer.collateral);
+    assert_eq!(open.active_collateral, transfer.active_collateral);
 
     let old_owner_actions = market.query_trader_action_history(&trader).unwrap();
-    assert_eq!(&old_owner_actions.actions, &[open, transfer.clone()]);
+    let mut old_owner_transfer = transfer.clone();
+    old_owner_transfer.transfer_collateral = old_owner_transfer.transfer_collateral.neg();
+    assert_eq!(&old_owner_actions.actions, &[open, old_owner_transfer]);
     assert_eq!(old_owner_actions.next_start_after, None);
 
     let new_owner_actions = market.query_trader_action_history(&new_owner).unwrap();

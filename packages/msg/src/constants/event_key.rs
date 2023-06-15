@@ -67,6 +67,7 @@ pub(crate) const COUNTER_LEVERAGE: &str = "counter-leverage";
 pub(crate) const POSITION_ACTION_KIND: &str = "kind";
 pub(crate) const POSITION_ACTION_TIMESTAMP: &str = "timestamp";
 pub(crate) const POSITION_ACTION_COLLATERAL: &str = "collateral";
+pub(crate) const POSITION_ACTION_TRANSFER: &str = "transfer";
 pub(crate) const POSITION_ACTION_LEVERAGE: &str = "leverage";
 pub(crate) const POSITION_ACTION_MAX_GAINS: &str = "max-gains";
 pub(crate) const POSITION_ACTION_TRADE_FEE: &str = "trade-fee";

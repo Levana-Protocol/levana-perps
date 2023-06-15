@@ -8,6 +8,7 @@ use msg::contracts::market::{
     history::events::{PnlEvent, PositionActionEvent, TradeVolumeEvent},
 };
 use shared::storage::push_to_monotonic_multilevel_map;
+use std::ops::Neg;
 
 const TRADE_HISTORY_SUMMARY: Map<&Addr, TradeHistorySummary> =
     Map::new(namespace::TRADE_HISTORY_SUMMARY);
@@ -87,11 +88,12 @@ impl State<'_> {
         pos: &Position,
         old_owner: Addr,
     ) -> Result<()> {
-        let action = PositionAction {
+        let new_owner_action = PositionAction {
             id: Some(pos.id),
             kind: PositionActionKind::Transfer,
             timestamp: self.now(),
-            collateral: pos.active_collateral.raw(),
+            active_collateral: pos.active_collateral.raw(),
+            transfer_collateral: pos.active_collateral.into_signed(),
             leverage: None,
             max_gains: None,
             trade_fee: None,
@@ -99,24 +101,35 @@ impl State<'_> {
             old_owner: Some(old_owner.clone()),
             new_owner: Some(pos.owner.clone()),
         };
+        let old_owner_action = PositionAction {
+            transfer_collateral: pos.active_collateral.into_signed().neg(),
+            ..new_owner_action.clone()
+        };
 
         ctx.response.add_event(PositionActionEvent {
             pos_id: pos.id,
-            action: action.clone(),
+            action: new_owner_action.clone(),
         });
 
-        push_to_monotonic_multilevel_map(ctx.storage, TRADE_HISTORY_BY_POSITION, pos.id, &action)?;
+        push_to_monotonic_multilevel_map(
+            ctx.storage,
+            TRADE_HISTORY_BY_POSITION,
+            pos.id,
+            &new_owner_action,
+        )?;
+
         push_to_monotonic_multilevel_map(
             ctx.storage,
             TRADE_HISTORY_BY_ADDRESS,
             &pos.owner,
-            &action,
+            &new_owner_action,
         )?;
+
         push_to_monotonic_multilevel_map(
             ctx.storage,
             TRADE_HISTORY_BY_ADDRESS,
             &old_owner,
-            &action,
+            &old_owner_action,
         )?;
 
         Ok(())
@@ -219,6 +232,7 @@ impl State<'_> {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn position_history_add_action(
         &self,
         ctx: &mut StateContext,
@@ -226,6 +240,7 @@ impl State<'_> {
         kind: PositionActionKind,
         trading_fee: Option<Collateral>,
         delta_neutrality_fee: Option<Signed<Collateral>>,
+        deposit_collateral_delta: Signed<Collateral>,
         price_point: PricePoint,
     ) -> Result<()> {
         let market_type = self.market_type(ctx.storage)?;
@@ -240,7 +255,8 @@ impl State<'_> {
             id: Some(pos.id),
             kind,
             timestamp: self.now(),
-            collateral: pos.active_collateral.raw(),
+            active_collateral: pos.active_collateral.raw(),
+            transfer_collateral: deposit_collateral_delta,
             leverage: Some(leverage),
             max_gains: Some(pos.max_gains_in_quote(market_type, price_point)?),
             trade_fee: trade_fee_usd,
@@ -278,7 +294,8 @@ impl State<'_> {
             id: Some(pos.id),
             kind: PositionActionKind::Close,
             timestamp: self.now(),
-            collateral: active_collateral,
+            active_collateral,
+            transfer_collateral: active_collateral.into_signed(),
             leverage: None,
             max_gains: None,
             trade_fee: None,
