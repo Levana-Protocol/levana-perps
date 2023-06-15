@@ -3,7 +3,7 @@ use std::sync::Arc;
 use cosmos::{Address, CosmosNetwork, HasAddressType, Wallet};
 use perps_exes::{
     config::{
-        ChainConfig, ConfigTestnet, DeploymentInfo, LiquidityConfig, PythConfig, TraderConfig,
+        ChainConfig, ConfigTestnet, DeploymentInfo, LiquidityConfig, TraderConfig,
         UtilizationConfig, WatcherConfig,
     },
     prelude::*,
@@ -56,8 +56,9 @@ pub(crate) struct BotConfig {
     pub(crate) crank_wallet: Option<Wallet>,
     pub(crate) watcher: WatcherConfig,
     pub(crate) gas_multiplier: Option<f64>,
-    pub(crate) pyth_endpoint: String,
     pub(crate) execs_per_price: Option<u32>,
+    pub(crate) max_price_age_secs: u32,
+    pub(crate) max_allowed_price_delta: Decimal256,
 }
 
 impl Opt {
@@ -76,7 +77,6 @@ impl Opt {
         testnet: &TestnetOpt,
     ) -> Result<(BotConfig, Option<FaucetBotRunner>)> {
         let config = ConfigTestnet::load()?;
-        let pyth_config = PythConfig::load()?;
         let DeploymentInfo {
             config: partial,
             network,
@@ -168,8 +168,9 @@ impl Opt {
             },
             watcher: partial.watcher.clone(),
             gas_multiplier,
-            pyth_endpoint: pyth_config.endpoint.clone(),
             execs_per_price: partial.execs_per_price,
+            max_price_age_secs: partial.max_price_age_secs,
+            max_allowed_price_delta: partial.max_allowed_price_delta,
         };
 
         Ok((config, Some(faucet_bot_runner)))
@@ -185,9 +186,10 @@ impl Opt {
             min_gas_crank,
             min_gas_price,
             watcher_config,
+            max_price_age_secs,
+            max_allowed_price_delta,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
-        let pyth_config = PythConfig::load()?;
         let price_wallet = seed
             .derive_cosmos_numbered(1)?
             .for_chain(network.get_address_type());
@@ -212,8 +214,11 @@ impl Opt {
             crank_wallet: Some(crank_wallet),
             watcher,
             gas_multiplier: *gas_multiplier,
-            pyth_endpoint: pyth_config.endpoint.clone(),
             execs_per_price: None,
+            max_price_age_secs: max_price_age_secs
+                .unwrap_or_else(perps_exes::config::defaults::max_price_age_secs),
+            max_allowed_price_delta: max_allowed_price_delta
+                .unwrap_or_else(perps_exes::config::defaults::max_allowed_price_delta),
         })
     }
 }

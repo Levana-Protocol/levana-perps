@@ -13,6 +13,7 @@ mod local_deploy;
 mod localtest;
 mod mainnet;
 mod migrate;
+mod migrate_rewards;
 mod store_code;
 mod tracker;
 mod util;
@@ -38,6 +39,7 @@ async fn main_inner() -> anyhow::Result<()> {
             TestnetSub::Migrate { inner } => migrate::go(opt, inner).await?,
             TestnetSub::InitChain { inner } => init_chain::go(opt, inner).await?,
             TestnetSub::InstantiateRewards { inner } => instantiate_rewards::go(opt, inner).await?,
+            TestnetSub::MigrateRewards { inner } => migrate_rewards::go(opt, inner).await?,
         },
         Subcommand::Mainnet { inner } => mainnet::go(opt, inner).await?,
     }

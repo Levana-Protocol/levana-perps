@@ -125,6 +125,19 @@ build-bots-image:
 push-bots-image:
 	docker push ghcr.io/levana-protocol/levana-perps/bots:{{GIT_SHA}}
 
+# Build companion binary in release mode
+cargo-companion-release:
+    cargo build --bin perps-companion --release --target x86_64-unknown-linux-musl
+
+# Build companion docker image
+build-companion-image:
+	cp target/x86_64-unknown-linux-musl/release/perps-companion .ci/companion
+	cd .ci/companion && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/companion:{{GIT_SHA}}
+
+# Push bots docker image
+push-companion-image:
+	docker push ghcr.io/levana-protocol/levana-perps/companion:{{GIT_SHA}}
+
 # Deploy to dragonfire
 deploy-dragonfire:
 	cargo run --bin perps-deploy testnet store-code --network dragonfire
@@ -194,6 +207,9 @@ rewards-relayer-start:
 	# TODO - add lvn
 	# rly start lvn-mint --debug
 
+rewards-mint-test owner:
+	cargo run --bin rewards-test mint-test --hatch-network=juno-testnet --owner={{owner}}
+
 # Rewards subcommands
 store-hatching:
 	cargo run --bin perps-deploy testnet store-code --contracts=hatching --network=juno-testnet
@@ -207,6 +223,8 @@ store-ibc-execute:
 	cargo run --bin perps-deploy testnet store-code --contracts=ibc-execute-proxy --network=stargaze-testnet
 instantiate-nft-mint:
 	cargo run --bin perps-deploy testnet instantiate-rewards --contracts=ibc-execute-proxy --ibc-execute-proxy-target=nft-mint --network=stargaze-testnet
+migrate-hatching:
+	cargo run --bin perps-deploy testnet migrate-rewards --contracts=hatching --network=juno-testnet
 hatch-egg-test:
 	cargo run --bin rewards-test hatch-egg --hatch-network=juno-testnet --nft-mint-network=stargaze-testnet --lvn-rewards-network=osmosis-testnet
 create-nft-mint-relayer-channel path-name juno-port stargaze-port:

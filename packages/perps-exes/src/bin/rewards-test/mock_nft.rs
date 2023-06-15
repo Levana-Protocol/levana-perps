@@ -238,8 +238,19 @@ pub struct MinterResponse {
 }
 
 impl Metadata {
-    pub fn new_egg(spirit_level: NumberGtZero, rarity: NftRarity, dragon_type: String) -> Self {
+    pub fn new_egg(
+        token_id: String,
+        spirit_level: NumberGtZero,
+        rarity: NftRarity,
+        dragon_type: String,
+    ) -> Self {
         let mut m: Self = serde_json::from_str(EGG_META).unwrap();
+
+        // in theory we'd want to show a different egg based on rarity etc.
+        // but it's okay, this is just for testing, they can all look the same
+        m.image = "ipfs://QmecraVcH6N9Niai53m16zE2bo2rmxsu8ukNi25UvSFuZF".to_string();
+
+        m.name = format!("Levana Dragons: Rare Nested Egg #{}", token_id);
 
         m.attributes.push(Trait {
             display_type: None,
@@ -268,11 +279,11 @@ impl Metadata {
     }
 }
 static EGG_META: &str = r#"{
-    "image":"ipfs://blah",
+    "image":"ipfs://replaceme",
     "image_data":null,
     "external_url":null,
     "description":"Evolutionary Rare Nested Egg NFT, stage 3 of the Levana Dragons adventure.",
-    "name":"Levana Dragons: Rare Nested Egg #0",
+    "name":"replaceme",
     "attributes":[
         {
             "display_type":null,
