@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 
 use anyhow::{Context, Result};
 use askama::Template;
@@ -8,13 +8,14 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 use cosmos::Address;
+use cosmwasm_std::{Decimal256, Uint256};
 use msg::{
     contracts::market::{
         entry::StatusResp,
         position::{ClosedPosition, PositionId, PositionsResp},
     },
     prelude::{
-        DirectionToBase, LeverageToBase, MarketId, NonZero, PriceBaseInQuote, PricePoint, Signed,
+        DirectionToBase, MarketId, NonZero, PriceBaseInQuote, PricePoint, Signed,
         SignedLeverageToNotional, Usd,
     },
 };
@@ -195,13 +196,13 @@ impl IntoResponse for Error {
 #[derive(askama::Template)]
 #[template(path = "pnl.html")]
 struct PnlInfo {
-    pnl_usd: Signed<Usd>,
+    pnl_display: String,
     image_url: String,
     market_id: MarketId,
     direction: &'static str,
     entry_price: PriceBaseInQuote,
     exit_price: PriceBaseInQuote,
-    leverage: LeverageToBase,
+    leverage: TwoDecimalPoints,
 }
 
 impl PnlInfo {
@@ -213,7 +214,8 @@ impl PnlInfo {
     ) -> Self {
         let market_type = market_id.get_market_type();
         PnlInfo {
-            pnl_usd: pos.pnl_usd,
+            pnl_display: UsdDisplay(pos.pnl_usd).to_string(),
+            // pnl_usd: pos.pnl_usd,
             image_url: params.image_url(),
             market_id,
             direction: match pos.direction_to_base {
@@ -225,8 +227,8 @@ impl PnlInfo {
             leverage: match NonZero::new(pos.active_collateral) {
                 // Total liquidation occurred, which (1) should virtually never
                 // happen and (2) wouldn't be a celebration. Just using 0.
-                None => "0".parse().unwrap(),
-                Some(active_collateral) => {
+                None => TwoDecimalPoints(Decimal256::zero()),
+                Some(active_collateral) => TwoDecimalPoints(
                     SignedLeverageToNotional::calculate(
                         pos.notional_size,
                         &exit_price,
@@ -235,9 +237,119 @@ impl PnlInfo {
                     .into_base(market_type)
                     .split()
                     .1
-                }
+                    .into_decimal256(),
+                ),
             },
         }
+    }
+}
+
+struct TwoDecimalPoints(Decimal256);
+
+impl Display for TwoDecimalPoints {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let ten = Decimal256::from_ratio(10u32, 1u32);
+        let half = Decimal256::from_ratio(1u32, 2u32);
+
+        let whole = self.0.floor();
+        let rem = self.0 - whole;
+        let rem = rem * ten;
+        let x = rem.floor();
+        let rem = rem - x;
+        let rem = rem * ten;
+        let y = rem.floor();
+        let rem = rem - y;
+        let y = if rem >= half {
+            y + Decimal256::one()
+        } else {
+            y
+        };
+        write!(f, "{}.{}{}", whole, x, y)
+    }
+}
+
+struct UsdDisplay(Signed<Usd>);
+
+impl Display for UsdDisplay {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let number = self.0.into_number();
+        if number.is_negative() {
+            write!(f, "-")?;
+        }
+        let raw = number.abs_unsigned();
+
+        let bigger = raw.to_uint_floor() / Uint256::from_u128(1000);
+        add_commas(f, bigger)?;
+        let rest =
+            raw - Decimal256::from_ratio(bigger, 1u32) * Decimal256::from_ratio(1000u32, 1u32);
+
+        if raw > Decimal256::from_ratio(1000u32, 1u32) {
+            if rest.is_zero() {
+                write!(f, "000")?;
+            } else if rest < Decimal256::from_ratio(10u32, 1u32) {
+                write!(f, "00")?;
+            } else if rest < Decimal256::from_ratio(100u32, 1u32) {
+                write!(f, "0")?;
+            }
+        }
+
+        write!(f, "{} USD", TwoDecimalPoints(rest))
+    }
+}
+
+fn add_commas(f: &mut std::fmt::Formatter, x: Uint256) -> std::fmt::Result {
+    if x.is_zero() {
+        Ok(())
+    } else if x < Uint256::from_u128(1000) {
+        write!(f, "{x},")
+    } else {
+        let bigger = x / Uint256::from_u128(1000);
+        add_commas(f, bigger)?;
+        let rest = x - bigger;
+        write!(f, "{rest:0>3},")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::endpoints::pnl::{TwoDecimalPoints, UsdDisplay};
+
+    #[test]
+    fn two_decimal_points() {
+        assert_eq!(TwoDecimalPoints("1.2".parse().unwrap()).to_string(), "1.20");
+        assert_eq!(
+            TwoDecimalPoints("1.234".parse().unwrap()).to_string(),
+            "1.23"
+        );
+        assert_eq!(
+            TwoDecimalPoints("1.235".parse().unwrap()).to_string(),
+            "1.24"
+        );
+    }
+
+    #[test]
+    fn usd_display() {
+        assert_eq!(UsdDisplay("1.2".parse().unwrap()).to_string(), "1.20 USD");
+        assert_eq!(
+            UsdDisplay("1.2345".parse().unwrap()).to_string(),
+            "1.23 USD"
+        );
+        assert_eq!(
+            UsdDisplay("1.2355".parse().unwrap()).to_string(),
+            "1.24 USD"
+        );
+        assert_eq!(
+            UsdDisplay("54321.2355".parse().unwrap()).to_string(),
+            "54,321.24 USD"
+        );
+        assert_eq!(
+            UsdDisplay("-54321.2355".parse().unwrap()).to_string(),
+            "-54,321.24 USD"
+        );
+        assert_eq!(
+            UsdDisplay("-50001.2355".parse().unwrap()).to_string(),
+            "-50,001.24 USD"
+        );
     }
 }
 

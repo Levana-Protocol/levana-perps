@@ -80,7 +80,7 @@
 
 
 <text class="pnl" x="540" y="197">
-  {{ info.pnl_usd }} USD
+  {{ info.pnl_display }}
 </text>
 
 <text class="market-info" x="540" y="304">
