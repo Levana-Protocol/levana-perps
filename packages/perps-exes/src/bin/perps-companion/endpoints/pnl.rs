@@ -312,7 +312,7 @@ impl PnlInfo {
                 },
             },
             image_url: params.image_url(pnl_type),
-            market_id: market_id.to_string().replace("_", "/"),
+            market_id: market_id.to_string().replace('_', "/"),
             direction: match pos.direction_to_base {
                 DirectionToBase::Long => "LONG",
                 DirectionToBase::Short => "SHORT",
