@@ -260,6 +260,7 @@ impl State<'_> {
             PositionActionKind::Open,
             Some(pos.trading_fee.collateral()),
             Some(pos.delta_neutrality_fee.collateral()),
+            pos.deposit_collateral.collateral(),
             price_point,
         )?;
 

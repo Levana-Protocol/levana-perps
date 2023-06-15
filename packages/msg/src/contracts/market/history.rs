@@ -88,7 +88,11 @@ pub mod events {
                 )
                 .add_attribute(
                     event_key::POSITION_ACTION_COLLATERAL,
-                    src.action.collateral.to_string(),
+                    src.action.active_collateral.to_string(),
+                )
+                .add_attribute(
+                    event_key::POSITION_ACTION_TRANSFER,
+                    src.action.transfer_collateral.to_string(),
                 );
 
             let evt = match src.action.leverage {
@@ -154,7 +158,8 @@ pub mod events {
                         _ => Err(PerpError::unimplemented().into()),
                     })?,
                     timestamp: evt.timestamp_attr(event_key::POSITION_ACTION_TIMESTAMP)?,
-                    collateral: evt.decimal_attr(event_key::POSITION_ACTION_COLLATERAL)?,
+                    active_collateral: evt.decimal_attr(event_key::POSITION_ACTION_COLLATERAL)?,
+                    transfer_collateral: evt.signed_attr(event_key::POSITION_ACTION_TRANSFER)?,
                     leverage: evt.try_leverage_to_base_attr(event_key::POSITION_ACTION_LEVERAGE)?,
                     max_gains: evt
                         .try_map_attr(event_key::POSITION_ACTION_MAX_GAINS, |value| {
