@@ -5,39 +5,91 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use askama::Template;
-use axum::{
-    response::{Html, IntoResponse, Response},
-    routing::get,
-};
+use axum::response::{Html, IntoResponse, Response};
+use axum_extra::routing::{RouterExt, TypedPath};
+use cosmos::Address;
+use msg::contracts::market::position::PositionId;
 use reqwest::{header::CONTENT_TYPE, Method, StatusCode};
+use serde::Deserialize;
 use tower_http::cors::CorsLayer;
 
 use crate::app::App;
+
+#[derive(TypedPath)]
+#[typed_path("/")]
+pub(crate) struct HomeRoute;
+
+#[derive(TypedPath)]
+#[typed_path("/healthz")]
+pub(crate) struct HealthRoute;
+
+#[derive(TypedPath)]
+#[typed_path("/build-version")]
+pub(crate) struct BuildVersionRoute;
+
+#[derive(TypedPath)]
+#[typed_path("/pnl.css")]
+pub(crate) struct PnlCssRoute;
+
+#[derive(TypedPath)]
+#[typed_path("/error.css")]
+pub(crate) struct ErrorCssRoute;
+
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/pnl-usd/:chain/:market/:position")]
+pub(crate) struct PnlUsdHtml {
+    chain: String,
+    market: Address,
+    position: PositionId,
+}
+
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/pnl-usd/:chain/:market/:position/image.png")]
+pub(crate) struct PnlUsdImage {
+    chain: String,
+    market: Address,
+    position: PositionId,
+}
+
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/pnl-percent/:chain/:market/:position")]
+pub(crate) struct PnlPercentHtml {
+    chain: String,
+    market: Address,
+    position: PositionId,
+}
+
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/pnl-percent/:chain/:market/:position/image.png")]
+pub(crate) struct PnlPercentImage {
+    chain: String,
+    market: Address,
+    position: PositionId,
+}
+
+#[derive(TypedPath)]
+#[typed_path("/favicon.ico")]
+pub(crate) struct Favicon;
+
+#[derive(TypedPath)]
+#[typed_path("/robots.txt")]
+pub(crate) struct RobotRoute;
 
 pub(crate) async fn launch(app: App) -> Result<()> {
     let bind = app.opt.bind;
     let app = Arc::new(app);
     let router = axum::Router::new()
-        .route("/", get(common::homepage))
-        .route("/healthz", get(common::healthz))
-        .route("/build-version", get(common::build_version))
-        .route("/pnl.css", get(pnl::css))
-        .route("/error.css", get(common::error_css))
-        .route("/pnl-usd/:chain/:market/:position", get(pnl::html_usd))
-        .route(
-            "/pnl-usd/:chain/:market/:position/image.png",
-            get(pnl::image_usd),
-        )
-        .route(
-            "/pnl-percent/:chain/:market/:position",
-            get(pnl::html_percent),
-        )
-        .route(
-            "/pnl-percent/:chain/:market/:position/image.png",
-            get(pnl::image_percent),
-        )
-        .route("/favicon.ico", get(common::favicon))
-        .route("/robots.txt", get(common::robots_txt))
+        .typed_get(common::homepage)
+        .typed_get(common::healthz)
+        .typed_get(common::build_version)
+        .typed_get(pnl::css)
+        .typed_get(common::error_css)
+        .typed_get(pnl::html_usd)
+        .typed_get(pnl::image_usd)
+        .typed_get(pnl::html_percent)
+        .typed_get(pnl::image_percent)
+        .typed_get(common::favicon)
+        .typed_get(common::robots_txt)
         .fallback(common::not_found)
         .with_state(app)
         .layer(

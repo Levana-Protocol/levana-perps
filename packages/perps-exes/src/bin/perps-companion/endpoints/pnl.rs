@@ -3,7 +3,7 @@ use std::{fmt::Display, sync::Arc};
 use anyhow::{Context, Result};
 use askama::Template;
 use axum::{
-    extract::{Path, State},
+    extract::State,
     headers::Host,
     http::HeaderValue,
     response::{Html, IntoResponse, Response},
@@ -30,14 +30,7 @@ use resvg::usvg::{TreeParsing, TreeTextToPath};
 
 use crate::app::App;
 
-use super::ErrorPage;
-
-#[derive(serde::Deserialize, Debug)]
-pub(super) struct Params {
-    chain: String,
-    market: Address,
-    position: PositionId,
-}
+use super::{ErrorPage, PnlCssRoute, PnlPercentHtml, PnlPercentImage, PnlUsdHtml, PnlUsdImage};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum PnlType {
@@ -46,50 +39,60 @@ enum PnlType {
 }
 
 pub(super) async fn html_usd(
+    PnlUsdHtml {
+        chain,
+        market,
+        position,
+    }: PnlUsdHtml,
     TypedHeader(host): TypedHeader<Host>,
     app: State<Arc<App>>,
-    params: Path<Params>,
 ) -> impl IntoResponse {
-    params
-        .0
-        .with_pnl(&app, host, PnlInfo::html, PnlType::Usd)
-        .await
+    let pnl = Pnl::new(chain, market, position);
+    pnl.with_pnl(&app, host, PnlInfo::html, PnlType::Usd).await
 }
 
 pub(super) async fn image_usd(
+    PnlUsdImage {
+        chain,
+        market,
+        position,
+    }: PnlUsdImage,
     TypedHeader(host): TypedHeader<Host>,
     app: State<Arc<App>>,
-    params: Path<Params>,
 ) -> impl IntoResponse {
-    params
-        .0
-        .with_pnl(&app, host, PnlInfo::image, PnlType::Usd)
-        .await
+    let pnl = Pnl::new(chain, market, position);
+    pnl.with_pnl(&app, host, PnlInfo::image, PnlType::Usd).await
 }
 
 pub(super) async fn html_percent(
+    PnlPercentHtml {
+        chain,
+        market,
+        position,
+    }: PnlPercentHtml,
     TypedHeader(host): TypedHeader<Host>,
     app: State<Arc<App>>,
-    params: Path<Params>,
 ) -> impl IntoResponse {
-    params
-        .0
-        .with_pnl(&app, host, PnlInfo::html, PnlType::Percent)
+    let pnl = Pnl::new(chain, market, position);
+    pnl.with_pnl(&app, host, PnlInfo::html, PnlType::Percent)
         .await
 }
 
 pub(super) async fn image_percent(
+    PnlPercentImage {
+        chain,
+        market,
+        position,
+    }: PnlPercentImage,
     TypedHeader(host): TypedHeader<Host>,
     app: State<Arc<App>>,
-    params: Path<Params>,
 ) -> impl IntoResponse {
-    params
-        .0
-        .with_pnl(&app, host, PnlInfo::image, PnlType::Percent)
+    let pnl = Pnl::new(chain, market, position);
+    pnl.with_pnl(&app, host, PnlInfo::image, PnlType::Percent)
         .await
 }
 
-pub(super) async fn css() -> Css<&'static str> {
+pub(super) async fn css(_: PnlCssRoute) -> Css<&'static str> {
     Css(include_str!("../../../../static/pnl.css"))
 }
 
@@ -124,7 +127,35 @@ impl MarketContract {
     }
 }
 
-impl Params {
+#[derive(serde::Deserialize, Debug)]
+pub(super) struct Pnl {
+    chain: String,
+    market: Address,
+    position: PositionId,
+}
+
+impl Pnl {
+    pub fn new(chain: String, market: Address, position: PositionId) -> Self {
+        Pnl {
+            chain,
+            market,
+            position,
+        }
+    }
+
+    fn image_url(&self, pnl_type: PnlType) -> String {
+        format!(
+            "/{pnl_type}/{chain}/{market}/{position}/image.png",
+            pnl_type = match pnl_type {
+                PnlType::Usd => "pnl-usd",
+                PnlType::Percent => "pnl-percent",
+            },
+            chain = self.chain,
+            market = self.market,
+            position = self.position
+        )
+    }
+
     async fn with_pnl<F>(
         self,
         app: &App,
@@ -144,7 +175,7 @@ impl Params {
         host: Host,
         pnl_type: PnlType,
     ) -> Result<PnlInfo, Error> {
-        let Params {
+        let Pnl {
             chain,
             market,
             position,
@@ -322,7 +353,7 @@ struct PnlInfo {
 
 impl PnlInfo {
     fn new(
-        params: Params,
+        params: Pnl,
         pos: ClosedPosition,
         market_id: MarketId,
         entry_price: PricePoint,
@@ -487,21 +518,6 @@ mod tests {
             UsdDisplay("-50001.2355".parse().unwrap()).to_string(),
             "-50,001.24 USD"
         );
-    }
-}
-
-impl Params {
-    fn image_url(&self, pnl_type: PnlType) -> String {
-        format!(
-            "/{pnl_type}/{chain}/{market}/{position}/image.png",
-            pnl_type = match pnl_type {
-                PnlType::Usd => "pnl-usd",
-                PnlType::Percent => "pnl-percent",
-            },
-            chain = self.chain,
-            market = self.market,
-            position = self.position
-        )
     }
 }
 
