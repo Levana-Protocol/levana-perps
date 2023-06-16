@@ -143,3 +143,4 @@ pub const EPHEMERAL_DEPOSIT_COLLATERAL_DATA: &str = "ej";
 pub const RECLAIMABLE_EMISSIONS: &str = "ek";
 pub const LOCKDROP_BALANCES_BY_BUCKET: &str = "el";
 pub const PYTH_LAST_BLOCK_TIME_UPDATED: &str = "em";
+pub const PYTH_REPLY_CONTEXT: &str = "en";

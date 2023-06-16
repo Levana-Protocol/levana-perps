@@ -1,7 +1,9 @@
+use crate::state::market::ReplyContext;
+
 use super::state::{pyth::set_pyth_addr, set_factory_addr, State, StateContext};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{Deps, DepsMut, Env, MessageInfo, QueryResponse, Response};
+use cosmwasm_std::{Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response};
 use cw2::{get_contract_version, set_contract_version};
 use msg::contracts::pyth_bridge::entry::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
 use msg::prelude::*;
@@ -62,15 +64,30 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         } => {
             // any user may call UpdatePrice, and they get the crank rewards (if any)
             let reward_addr = rewards.unwrap_or_else(|| info.sender.into());
-            if let Err(err) = state.update_market_price(&mut ctx, market_id, execs, reward_addr) {
-                if bail_on_error {
-                    return Err(err);
-                } else {
-                    ctx.response.set_data(&err.to_string())?;
-                }
-            }
+            state.update_market_price(&mut ctx, market_id, execs, reward_addr, bail_on_error)?;
+
+            // if let Err(err) = state.update_market_price(&mut ctx, market_id, execs, reward_addr) {
+            //     if bail_on_error {
+            //         return Err(err);
+            //     } else {
+            //         ctx.response.set_data(&err.to_string())?;
+            //     }
+            // }
         }
     }
+
+    Ok(ctx.response.into_response())
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
+    let (state, mut ctx) = StateContext::new(deps, env)?;
+
+    if msg.id != ReplyContext::ID {
+        bail!("invalid reply id");
+    }
+
+    state.handle_reply(&mut ctx, msg.result.into_result())?;
 
     Ok(ctx.response.into_response())
 }
