@@ -2,7 +2,10 @@ use axum::{
     http::HeaderValue,
     response::{IntoResponse, Response},
 };
-use reqwest::header::CONTENT_TYPE;
+use axum_extra::response::Css;
+use reqwest::{header::CONTENT_TYPE, StatusCode};
+
+use super::ErrorPage;
 
 pub(crate) async fn homepage() -> &'static str {
     r#"Welcome intrepid reader!
@@ -32,4 +35,15 @@ pub(crate) async fn robots_txt() -> Response {
     res.headers_mut()
         .insert(CONTENT_TYPE, HeaderValue::from_static("text/plain"));
     res
+}
+
+pub(crate) async fn not_found() -> ErrorPage<&'static str> {
+    ErrorPage {
+        error: "Page not found",
+        code: StatusCode::NOT_FOUND,
+    }
+}
+
+pub(super) async fn error_css() -> Css<&'static str> {
+    Css(include_str!("../../../../static/error.css"))
 }

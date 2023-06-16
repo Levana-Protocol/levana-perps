@@ -7,6 +7,7 @@ use axum::{
     http::HeaderValue,
     response::{Html, IntoResponse, Response},
 };
+use axum_extra::response::Css;
 use cosmos::{Address, Contract};
 use cosmwasm_std::{Decimal256, Uint256};
 use msg::{
@@ -26,6 +27,8 @@ use reqwest::{
 use resvg::usvg::{TreeParsing, TreeTextToPath};
 
 use crate::app::App;
+
+use super::ErrorPage;
 
 #[derive(serde::Deserialize, Debug)]
 pub(super) struct Params {
@@ -62,13 +65,8 @@ pub(super) async fn image_percent(app: State<Arc<App>>, params: Path<Params>) ->
         .await
 }
 
-pub(super) async fn css() -> impl IntoResponse {
-    let mut res = include_str!("../../../../static/pnl.css").into_response();
-    res.headers_mut().insert(
-        CONTENT_TYPE,
-        HeaderValue::from_static("text/css; charset=utf-8"),
-    );
-    res
+pub(super) async fn css() -> Css<&'static str> {
+    Css(include_str!("../../../../static/pnl.css"))
 }
 
 struct MarketContract(Contract);
@@ -103,14 +101,11 @@ impl MarketContract {
 }
 
 impl Params {
-    async fn with_pnl<F>(self, app: &App, f: F, pnl_type: PnlType) -> Response
+    async fn with_pnl<F>(self, app: &App, f: F, pnl_type: PnlType) -> Result<Response, Error>
     where
         F: FnOnce(PnlInfo) -> Response,
     {
-        match self.get_pnl_info(app, pnl_type).await {
-            Ok(pnl) => f(pnl),
-            Err(e) => e.into_response(),
-        }
+        self.get_pnl_info(app, pnl_type).await.map(f)
     }
 
     async fn get_pnl_info(self, app: &App, pnl_type: PnlType) -> Result<PnlInfo, Error> {
@@ -258,19 +253,21 @@ enum Error {
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
-        let mut res = self.to_string().into_response();
-        *res.status_mut() = match self {
-            Error::UnknownChainId => StatusCode::BAD_REQUEST,
-            Error::PositionNotFound => StatusCode::BAD_REQUEST,
-            Error::PositionStillOpen => StatusCode::BAD_REQUEST,
-            Error::FailedToQueryContract { query_type, msg: _ } => match query_type {
-                QueryType::Status => StatusCode::BAD_REQUEST,
-                QueryType::EntryPrice => StatusCode::INTERNAL_SERVER_ERROR,
-                QueryType::ExitPrice => StatusCode::INTERNAL_SERVER_ERROR,
-                QueryType::Positions => StatusCode::INTERNAL_SERVER_ERROR,
+        ErrorPage {
+            code: match &self {
+                Error::UnknownChainId => StatusCode::BAD_REQUEST,
+                Error::PositionNotFound => StatusCode::BAD_REQUEST,
+                Error::PositionStillOpen => StatusCode::BAD_REQUEST,
+                Error::FailedToQueryContract { query_type, msg: _ } => match query_type {
+                    QueryType::Status => StatusCode::BAD_REQUEST,
+                    QueryType::EntryPrice => StatusCode::INTERNAL_SERVER_ERROR,
+                    QueryType::ExitPrice => StatusCode::INTERNAL_SERVER_ERROR,
+                    QueryType::Positions => StatusCode::INTERNAL_SERVER_ERROR,
+                },
             },
-        };
-        res
+            error: self,
+        }
+        .into_response()
     }
 }
 

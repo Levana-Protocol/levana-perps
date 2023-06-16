@@ -4,8 +4,12 @@ mod pnl;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use axum::routing::get;
-use reqwest::{header::CONTENT_TYPE, Method};
+use askama::Template;
+use axum::{
+    response::{Html, IntoResponse, Response},
+    routing::get,
+};
+use reqwest::{header::CONTENT_TYPE, Method, StatusCode};
 use tower_http::cors::CorsLayer;
 
 use crate::app::App;
@@ -18,6 +22,7 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .route("/healthz", get(common::healthz))
         .route("/build-version", get(common::build_version))
         .route("/pnl.css", get(pnl::css))
+        .route("/error.css", get(common::error_css))
         .route("/pnl-usd/:chain/:market/:position", get(pnl::html_usd))
         .route(
             "/pnl-usd/:chain/:market/:position/image.png",
@@ -33,6 +38,7 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         )
         .route("/favicon.ico", get(common::favicon))
         .route("/robots.txt", get(common::robots_txt))
+        .fallback(common::not_found)
         .with_state(app)
         .layer(
             CorsLayer::new()
@@ -45,4 +51,19 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .serve(router.into_make_service())
         .await
         .context("Background task should never complete")
+}
+
+#[derive(askama::Template)]
+#[template(path = "error.html")]
+pub(crate) struct ErrorPage<T: std::fmt::Display> {
+    error: T,
+    code: StatusCode,
+}
+
+impl<T: std::fmt::Display> IntoResponse for ErrorPage<T> {
+    fn into_response(self) -> Response {
+        let mut res = Html(self.render().unwrap()).into_response();
+        *res.status_mut() = self.code;
+        res
+    }
 }
