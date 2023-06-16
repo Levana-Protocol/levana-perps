@@ -1,10 +1,18 @@
 FROM alpine:3.14.2
 
-# Install necessary fonts
-RUN apk --no-cache add msttcorefonts-installer fontconfig && \
-    update-ms-fonts && \
-    fc-cache -f
+RUN apk update && apk add fontconfig
 
-COPY perps-companion /usr/bin
+ADD https://github.com/fpco/pid1/releases/download/v0.1.3.1/pid1 /usr/bin/pid1
 
-CMD ["/usr/bin/perps-companion"]
+RUN chmod +x /usr/bin/pid1
+
+ADD https://s3.ap-northeast-2.amazonaws.com/static.meteors.levana.finance/PublicSans-Regular.ttf /usr/share/fonts/PublicSans-Regular.ttf
+
+# Force re-generation of font information cache files
+RUN fc-cache -fv
+
+COPY perps-companion /usr/bin/perps-companion
+
+ENTRYPOINT [ "pid1" ]
+
+CMD [ "perps-companion" ]
