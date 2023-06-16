@@ -8,6 +8,8 @@ use msg::prelude::*;
 const PYTH_PREV_MARKET_PRICE: Map<&MarketId, MarketPrice> =
     Map::new(namespace::PYTH_PREV_MARKET_PRICE);
 
+const LAST_BLOCK_TIME_UPDATED: Item<Timestamp> = Item::new(namespace::PYTH_LAST_BLOCK_TIME_UPDATED);
+
 impl State<'_> {
     pub(crate) fn market_addr(&self, market_id: MarketId) -> Result<Addr> {
         load_external_map(
@@ -47,6 +49,29 @@ impl State<'_> {
         execs: Option<u32>,
         reward_addr: RawAddr,
     ) -> Result<()> {
+        // Pyth may have updated its time from another transaction in the same block
+        // so the pyth time may have moved forward since our last update
+        // but we should still only allow one update per block
+        if let Some(prev_block_time) = LAST_BLOCK_TIME_UPDATED.may_load(ctx.storage)? {
+            match self.now().cmp(&prev_block_time) {
+                std::cmp::Ordering::Less => {
+                    perp_bail!(
+                        ErrorId::TimestampSubtractUnderflow,
+                        ErrorDomain::Pyth,
+                        "Time must always move forward"
+                    )
+                }
+                std::cmp::Ordering::Equal => {
+                    perp_bail!(
+                        ErrorId::PriceAlreadyExists,
+                        ErrorDomain::Pyth,
+                        "Price already updated"
+                    );
+                }
+                std::cmp::Ordering::Greater => {}
+            }
+        }
+
         // for updating market price, it must be set within the configured age tolerance
         let market_price = self.market_price(
             ctx.storage,
@@ -88,6 +113,7 @@ impl State<'_> {
         }
 
         PYTH_PREV_MARKET_PRICE.save(ctx.storage, &market_id, &market_price)?;
+        LAST_BLOCK_TIME_UPDATED.save(ctx.storage, &self.now())?;
 
         let MarketPrice {
             price, price_usd, ..
