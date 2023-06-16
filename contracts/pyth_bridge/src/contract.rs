@@ -65,14 +65,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             // any user may call UpdatePrice, and they get the crank rewards (if any)
             let reward_addr = rewards.unwrap_or_else(|| info.sender.into());
             state.update_market_price(&mut ctx, market_id, execs, reward_addr, bail_on_error)?;
-
-            // if let Err(err) = state.update_market_price(&mut ctx, market_id, execs, reward_addr) {
-            //     if bail_on_error {
-            //         return Err(err);
-            //     } else {
-            //         ctx.response.set_data(&err.to_string())?;
-            //     }
-            // }
         }
     }
 
