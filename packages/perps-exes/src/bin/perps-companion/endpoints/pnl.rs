@@ -7,11 +7,11 @@ use axum::{
     http::HeaderValue,
     response::{Html, IntoResponse, Response},
 };
-use cosmos::Address;
+use cosmos::{Address, Contract};
 use cosmwasm_std::{Decimal256, Uint256};
 use msg::{
     contracts::market::{
-        entry::StatusResp,
+        entry::{QueryMsg, StatusResp},
         position::{ClosedPosition, PositionId, PositionsResp},
     },
     prelude::{
@@ -27,7 +27,7 @@ use resvg::usvg::{TreeParsing, TreeTextToPath};
 
 use crate::app::App;
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Debug)]
 pub(super) struct Params {
     chain: String,
     market: Address,
@@ -71,6 +71,37 @@ pub(super) async fn css() -> impl IntoResponse {
     res
 }
 
+struct MarketContract(Contract);
+
+impl MarketContract {
+    async fn query<T>(&self, msg: QueryMsg, query_type: QueryType) -> Result<T, Error>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let mut attempt = 1;
+        loop {
+            let res = self.0.query(&msg).await.map_err(|source| {
+                let e = Error::FailedToQueryContract {
+                    msg: msg.clone(),
+                    query_type,
+                };
+                log::error!("Attempt #{attempt}: {e}. {source:?}");
+                e
+            });
+            match res {
+                Ok(x) => break Ok(x),
+                Err(e) => {
+                    if attempt >= 5 {
+                        break Err(e);
+                    } else {
+                        attempt += 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
 impl Params {
     async fn with_pnl<F>(self, app: &App, f: F, pnl_type: PnlType) -> Response
     where
@@ -89,29 +120,24 @@ impl Params {
             position,
         } = &self;
         let cosmos = app.cosmos.get(chain).ok_or(Error::UnknownChainId)?;
-        let contract = cosmos.make_contract(*market);
 
-        let status: StatusResp = match contract
-            .query(msg::contracts::market::entry::QueryMsg::Status { price: None })
-            .await
-        {
-            Ok(status) => status,
-            Err(_) => return Err(Error::CouldNotQueryContract),
-        };
+        let contract = MarketContract(cosmos.make_contract(*market));
 
-        let res: Result<PositionsResp> = cosmos
-            .make_contract(*market)
-            .query(msg::contracts::market::entry::QueryMsg::Positions {
-                position_ids: vec![*position],
-                skip_calc_pending_fees: None,
-                fees: None,
-                price: None,
-            })
-            .await;
-        let mut res = match res {
-            Ok(res) => res,
-            Err(_) => return Err(Error::CouldNotFindContract),
-        };
+        let status = contract
+            .query::<StatusResp>(QueryMsg::Status { price: None }, QueryType::Status)
+            .await?;
+
+        let mut res = contract
+            .query::<PositionsResp>(
+                QueryMsg::Positions {
+                    position_ids: vec![*position],
+                    skip_calc_pending_fees: None,
+                    fees: None,
+                    price: None,
+                },
+                QueryType::Positions,
+            )
+            .await?;
 
         let pos = match res.closed.pop() {
             Some(pos) => pos,
@@ -126,25 +152,23 @@ impl Params {
             }
         };
 
-        let entry_price: PricePoint = match contract
-            .query(msg::contracts::market::entry::QueryMsg::SpotPrice {
-                timestamp: Some(pos.created_at),
-            })
-            .await
-        {
-            Ok(status) => status,
-            Err(_) => return Err(Error::CouldNotQueryContract),
-        };
+        let entry_price = contract
+            .query::<PricePoint>(
+                QueryMsg::SpotPrice {
+                    timestamp: Some(pos.created_at),
+                },
+                QueryType::EntryPrice,
+            )
+            .await?;
 
-        let exit_price: PricePoint = match contract
-            .query(msg::contracts::market::entry::QueryMsg::SpotPrice {
-                timestamp: Some(pos.settlement_time),
-            })
-            .await
-        {
-            Ok(status) => status,
-            Err(_) => return Err(Error::CouldNotQueryContract),
-        };
+        let exit_price: PricePoint = contract
+            .query::<PricePoint>(
+                QueryMsg::SpotPrice {
+                    timestamp: Some(pos.settlement_time),
+                },
+                QueryType::ExitPrice,
+            )
+            .await?;
 
         Ok(PnlInfo::new(
             self,
@@ -209,18 +233,27 @@ impl PnlInfo {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+enum QueryType {
+    Status,
+    EntryPrice,
+    ExitPrice,
+    Positions,
+}
+
 #[derive(thiserror::Error, Debug)]
 enum Error {
     #[error("Unknown chain ID")]
     UnknownChainId,
-    #[error("Could not find contract")]
-    CouldNotFindContract,
-    #[error("Could not query contract")]
-    CouldNotQueryContract,
     #[error("Specified position not found")]
     PositionNotFound,
     #[error("The position is still open")]
     PositionStillOpen,
+    #[error("Failed to query contract with {query_type:?}\nQuery: {msg:?}")]
+    FailedToQueryContract {
+        msg: QueryMsg,
+        query_type: QueryType,
+    },
 }
 
 impl IntoResponse for Error {
@@ -228,10 +261,14 @@ impl IntoResponse for Error {
         let mut res = self.to_string().into_response();
         *res.status_mut() = match self {
             Error::UnknownChainId => StatusCode::BAD_REQUEST,
-            Error::CouldNotFindContract => StatusCode::BAD_REQUEST,
-            Error::CouldNotQueryContract => StatusCode::BAD_REQUEST,
             Error::PositionNotFound => StatusCode::BAD_REQUEST,
             Error::PositionStillOpen => StatusCode::BAD_REQUEST,
+            Error::FailedToQueryContract { query_type, msg: _ } => match query_type {
+                QueryType::Status => StatusCode::BAD_REQUEST,
+                QueryType::EntryPrice => StatusCode::INTERNAL_SERVER_ERROR,
+                QueryType::ExitPrice => StatusCode::INTERNAL_SERVER_ERROR,
+                QueryType::Positions => StatusCode::INTERNAL_SERVER_ERROR,
+            },
         };
         res
     }
@@ -242,7 +279,7 @@ impl IntoResponse for Error {
 struct PnlInfo {
     pnl_display: String,
     image_url: String,
-    market_id: MarketId,
+    market_id: String,
     direction: &'static str,
     entry_price: PriceBaseInQuote,
     exit_price: PriceBaseInQuote,
@@ -275,10 +312,10 @@ impl PnlInfo {
                 },
             },
             image_url: params.image_url(pnl_type),
-            market_id,
+            market_id: market_id.to_string().replace('_', "/"),
             direction: match pos.direction_to_base {
-                DirectionToBase::Long => "long",
-                DirectionToBase::Short => "short",
+                DirectionToBase::Long => "LONG",
+                DirectionToBase::Short => "SHORT",
             },
             entry_price: pos.entry_price_base,
             exit_price: exit_price.price_base,
