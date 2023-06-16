@@ -4,8 +4,10 @@ use anyhow::{Context, Result};
 use askama::Template;
 use axum::{
     extract::{Path, State},
+    headers::Host,
     http::HeaderValue,
     response::{Html, IntoResponse, Response},
+    TypedHeader,
 };
 use axum_extra::response::Css;
 use cosmos::{Address, Contract};
@@ -43,25 +45,47 @@ enum PnlType {
     Percent,
 }
 
-pub(super) async fn html_usd(app: State<Arc<App>>, params: Path<Params>) -> impl IntoResponse {
-    params.0.with_pnl(&app, PnlInfo::html, PnlType::Usd).await
-}
-
-pub(super) async fn image_usd(app: State<Arc<App>>, params: Path<Params>) -> impl IntoResponse {
-    params.0.with_pnl(&app, PnlInfo::image, PnlType::Usd).await
-}
-
-pub(super) async fn html_percent(app: State<Arc<App>>, params: Path<Params>) -> impl IntoResponse {
+pub(super) async fn html_usd(
+    TypedHeader(host): TypedHeader<Host>,
+    app: State<Arc<App>>,
+    params: Path<Params>,
+) -> impl IntoResponse {
     params
         .0
-        .with_pnl(&app, PnlInfo::html, PnlType::Percent)
+        .with_pnl(&app, host, PnlInfo::html, PnlType::Usd)
         .await
 }
 
-pub(super) async fn image_percent(app: State<Arc<App>>, params: Path<Params>) -> impl IntoResponse {
+pub(super) async fn image_usd(
+    TypedHeader(host): TypedHeader<Host>,
+    app: State<Arc<App>>,
+    params: Path<Params>,
+) -> impl IntoResponse {
     params
         .0
-        .with_pnl(&app, PnlInfo::image, PnlType::Percent)
+        .with_pnl(&app, host, PnlInfo::image, PnlType::Usd)
+        .await
+}
+
+pub(super) async fn html_percent(
+    TypedHeader(host): TypedHeader<Host>,
+    app: State<Arc<App>>,
+    params: Path<Params>,
+) -> impl IntoResponse {
+    params
+        .0
+        .with_pnl(&app, host, PnlInfo::html, PnlType::Percent)
+        .await
+}
+
+pub(super) async fn image_percent(
+    TypedHeader(host): TypedHeader<Host>,
+    app: State<Arc<App>>,
+    params: Path<Params>,
+) -> impl IntoResponse {
+    params
+        .0
+        .with_pnl(&app, host, PnlInfo::image, PnlType::Percent)
         .await
 }
 
@@ -101,14 +125,25 @@ impl MarketContract {
 }
 
 impl Params {
-    async fn with_pnl<F>(self, app: &App, f: F, pnl_type: PnlType) -> Result<Response, Error>
+    async fn with_pnl<F>(
+        self,
+        app: &App,
+        host: Host,
+        f: F,
+        pnl_type: PnlType,
+    ) -> Result<Response, Error>
     where
         F: FnOnce(PnlInfo) -> Response,
     {
-        self.get_pnl_info(app, pnl_type).await.map(f)
+        self.get_pnl_info(app, host, pnl_type).await.map(f)
     }
 
-    async fn get_pnl_info(self, app: &App, pnl_type: PnlType) -> Result<PnlInfo, Error> {
+    async fn get_pnl_info(
+        self,
+        app: &App,
+        host: Host,
+        pnl_type: PnlType,
+    ) -> Result<PnlInfo, Error> {
         let Params {
             chain,
             market,
@@ -172,6 +207,7 @@ impl Params {
             entry_price,
             exit_price,
             pnl_type,
+            host,
         ))
     }
 }
@@ -275,6 +311,7 @@ impl IntoResponse for Error {
 #[template(path = "pnl.html")]
 struct PnlInfo {
     pnl_display: String,
+    host: String,
     image_url: String,
     market_id: String,
     direction: &'static str,
@@ -291,6 +328,7 @@ impl PnlInfo {
         entry_price: PricePoint,
         exit_price: PricePoint,
         pnl_type: PnlType,
+        host: Host,
     ) -> Self {
         let market_type = market_id.get_market_type();
         PnlInfo {
@@ -332,6 +370,7 @@ impl PnlInfo {
                     .into_number(),
                 ),
             },
+            host: host.hostname().into(),
         }
     }
 }
