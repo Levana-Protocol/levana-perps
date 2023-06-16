@@ -15,4 +15,4 @@ COPY perps-companion /usr/bin/perps-companion
 
 ENTRYPOINT [ "pid1" ]
 
-CMD [ "price-companion" ]
+CMD [ "perps-companion" ]
