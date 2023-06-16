@@ -7,6 +7,7 @@ use axum::{
     http::HeaderValue,
     response::{Html, IntoResponse, Response},
 };
+use axum_extra::response::Css;
 use cosmos::{Address, Contract};
 use cosmwasm_std::{Decimal256, Uint256};
 use msg::{
@@ -64,13 +65,8 @@ pub(super) async fn image_percent(app: State<Arc<App>>, params: Path<Params>) ->
         .await
 }
 
-pub(super) async fn css() -> impl IntoResponse {
-    let mut res = include_str!("../../../../static/pnl.css").into_response();
-    res.headers_mut().insert(
-        CONTENT_TYPE,
-        HeaderValue::from_static("text/css; charset=utf-8"),
-    );
-    res
+pub(super) async fn css() -> Css<&'static str> {
+    Css(include_str!("../../../../static/pnl.css"))
 }
 
 struct MarketContract(Contract);

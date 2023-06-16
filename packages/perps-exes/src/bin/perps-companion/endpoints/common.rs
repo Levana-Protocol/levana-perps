@@ -2,6 +2,7 @@ use axum::{
     http::HeaderValue,
     response::{IntoResponse, Response},
 };
+use axum_extra::response::Css;
 use reqwest::{header::CONTENT_TYPE, StatusCode};
 
 use super::ErrorPage;
@@ -43,11 +44,6 @@ pub(crate) async fn not_found() -> ErrorPage<&'static str> {
     }
 }
 
-pub(super) async fn error_css() -> Response {
-    let mut res = include_str!("../../../../static/error.css").into_response();
-    res.headers_mut().insert(
-        CONTENT_TYPE,
-        HeaderValue::from_static("text/css; charset=utf-8"),
-    );
-    res
+pub(super) async fn error_css() -> Css<&'static str> {
+    Css(include_str!("../../../../static/error.css"))
 }

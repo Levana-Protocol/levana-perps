@@ -30,6 +30,7 @@ reqwest = { version = "0.11.11", default-features = false, features = [
 ] }
 chrono = { version = "0.4.19", features = ["serde"] }
 axum = "0.6"
+axum-extra = { version = "0.7", features = [] }
 tower-http = { version = "0.3.4", features = ["cors", "auth"] }
 futures = "0.3.26"
 tokio-tungstenite = "*"
