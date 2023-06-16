@@ -10,6 +10,7 @@ use axum::{
     TypedHeader,
 };
 use axum_extra::response::Css;
+use axum_extra::routing::TypedPath;
 use cosmos::{Address, Contract};
 use cosmwasm_std::{Decimal256, Uint256};
 use msg::{
@@ -141,19 +142,6 @@ impl Pnl {
             market,
             position,
         }
-    }
-
-    fn image_url(&self, pnl_type: PnlType) -> String {
-        format!(
-            "/{pnl_type}/{chain}/{market}/{position}/image.png",
-            pnl_type = match pnl_type {
-                PnlType::Usd => "pnl-usd",
-                PnlType::Percent => "pnl-percent",
-            },
-            chain = self.chain,
-            market = self.market,
-            position = self.position
-        )
     }
 
     async fn with_pnl<F>(
@@ -353,7 +341,11 @@ struct PnlInfo {
 
 impl PnlInfo {
     fn new(
-        params: Pnl,
+        Pnl {
+            chain,
+            market,
+            position,
+        }: Pnl,
         pos: ClosedPosition,
         market_id: MarketId,
         entry_price: PricePoint,
@@ -377,7 +369,22 @@ impl PnlInfo {
                     }
                 },
             },
-            image_url: params.image_url(pnl_type),
+            image_url: match pnl_type {
+                PnlType::Usd => PnlUsdImage {
+                    chain,
+                    market,
+                    position,
+                }
+                .to_uri()
+                .to_string(),
+                PnlType::Percent => PnlPercentImage {
+                    chain,
+                    market,
+                    position,
+                }
+                .to_uri()
+                .to_string(),
+            },
             market_id: market_id.to_string().replace('_', "/"),
             direction: match pos.direction_to_base {
                 DirectionToBase::Long => "LONG",
