@@ -5,9 +5,11 @@ use axum::{
 use axum_extra::response::Css;
 use reqwest::{header::CONTENT_TYPE, StatusCode};
 
-use super::{ErrorPage, HomeRoute, HealthRoute, BuildVersionRoute, ErrorCssRoute, Favicon, RobotRoute};
+use super::{
+    BuildVersionRoute, ErrorCssRoute, ErrorPage, Favicon, HealthRoute, HomeRoute, RobotRoute,
+};
 
-pub(crate) async fn homepage(_ : HomeRoute) -> &'static str {
+pub(crate) async fn homepage(_: HomeRoute) -> &'static str {
     r#"Welcome intrepid reader!
 
 Not sure what you thought you'd find, but you didn't find it.
