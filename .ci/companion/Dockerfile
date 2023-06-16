@@ -13,4 +13,6 @@ RUN fc-cache -fv
 
 COPY perps-companion /usr/bin/perps-companion
 
-CMD ["pid1" "price-companion"]
+ENTRYPOINT [ "pid1" ]
+
+CMD [ "price-companion" ]
