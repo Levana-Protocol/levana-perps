@@ -46,9 +46,9 @@ pub(crate) struct PnlUsdHtml {
 #[derive(TypedPath, Deserialize)]
 #[typed_path("/pnl-usd/:chain/:market/:position/image.png")]
 pub(crate) struct PnlUsdImage {
-    chain: String,
-    market: Address,
-    position: PositionId,
+    pub(crate) chain: String,
+    pub(crate) market: Address,
+    pub(crate) position: PositionId,
 }
 
 #[derive(TypedPath, Deserialize)]
@@ -62,9 +62,9 @@ pub(crate) struct PnlPercentHtml {
 #[derive(TypedPath, Deserialize)]
 #[typed_path("/pnl-percent/:chain/:market/:position/image.png")]
 pub(crate) struct PnlPercentImage {
-    chain: String,
-    market: Address,
-    position: PositionId,
+    pub(crate) chain: String,
+    pub(crate) market: Address,
+    pub(crate) position: PositionId,
 }
 
 #[derive(TypedPath)]
