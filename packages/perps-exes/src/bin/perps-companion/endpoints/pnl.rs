@@ -284,7 +284,7 @@ impl PnlInfo {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum QueryType {
+pub(crate) enum QueryType {
     Status,
     EntryPrice,
     ExitPrice,
@@ -292,7 +292,7 @@ enum QueryType {
 }
 
 #[derive(thiserror::Error, Debug)]
-enum Error {
+pub(crate) enum Error {
     #[error("Unknown chain ID")]
     UnknownChainId,
     #[error("Specified position not found")]
@@ -304,6 +304,8 @@ enum Error {
         msg: QueryMsg,
         query_type: QueryType,
     },
+    #[error("Error parsing path: {msg}")]
+    Path { msg: String },
 }
 
 impl IntoResponse for Error {
@@ -319,6 +321,7 @@ impl IntoResponse for Error {
                     QueryType::ExitPrice => StatusCode::INTERNAL_SERVER_ERROR,
                     QueryType::Positions => StatusCode::INTERNAL_SERVER_ERROR,
                 },
+                Error::Path { msg: _ } => StatusCode::BAD_REQUEST,
             },
             error: self,
         }

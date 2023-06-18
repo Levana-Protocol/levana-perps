@@ -5,7 +5,10 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use askama::Template;
-use axum::response::{Html, IntoResponse, Response};
+use axum::{
+    extract::rejection::PathRejection,
+    response::{Html, IntoResponse, Response},
+};
 use axum_extra::routing::{RouterExt, TypedPath};
 use cosmos::Address;
 use msg::contracts::market::position::PositionId;
@@ -36,15 +39,23 @@ pub(crate) struct PnlCssRoute;
 pub(crate) struct ErrorCssRoute;
 
 #[derive(TypedPath, Deserialize)]
-#[typed_path("/pnl-usd/:chain/:market/:position")]
+#[typed_path("/pnl-usd/:chain/:market/:position", rejection(pnl::Error))]
 pub(crate) struct PnlUsdHtml {
     chain: String,
     market: Address,
     position: PositionId,
 }
 
+impl From<PathRejection> for pnl::Error {
+    fn from(rejection: PathRejection) -> Self {
+        Self::Path {
+            msg: rejection.to_string(),
+        }
+    }
+}
+
 #[derive(TypedPath, Deserialize)]
-#[typed_path("/pnl-usd/:chain/:market/:position/image.png")]
+#[typed_path("/pnl-usd/:chain/:market/:position/image.png", rejection(pnl::Error))]
 pub(crate) struct PnlUsdImage {
     pub(crate) chain: String,
     pub(crate) market: Address,
@@ -52,7 +63,7 @@ pub(crate) struct PnlUsdImage {
 }
 
 #[derive(TypedPath, Deserialize)]
-#[typed_path("/pnl-percent/:chain/:market/:position")]
+#[typed_path("/pnl-percent/:chain/:market/:position", rejection(pnl::Error))]
 pub(crate) struct PnlPercentHtml {
     chain: String,
     market: Address,
@@ -60,7 +71,10 @@ pub(crate) struct PnlPercentHtml {
 }
 
 #[derive(TypedPath, Deserialize)]
-#[typed_path("/pnl-percent/:chain/:market/:position/image.png")]
+#[typed_path(
+    "/pnl-percent/:chain/:market/:position/image.png",
+    rejection(pnl::Error)
+)]
 pub(crate) struct PnlPercentImage {
     pub(crate) chain: String,
     pub(crate) market: Address,
