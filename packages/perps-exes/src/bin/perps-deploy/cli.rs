@@ -48,6 +48,11 @@ pub(crate) enum TestnetSub {
         #[clap(flatten)]
         inner: crate::init_chain::InitChainOpt,
     },
+    /// Enable a market, useful for starting a trading competition
+    EnableMarket {
+        #[clap(flatten)]
+        inner: crate::testnet::enable_market::EnableMarketOpt,
+    },
 }
 
 #[derive(clap::Parser)]
