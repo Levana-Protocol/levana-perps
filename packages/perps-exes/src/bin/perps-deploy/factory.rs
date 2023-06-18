@@ -3,7 +3,7 @@ use cosmos::proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmos::{Address, Contract, HasCosmos, Wallet};
 use msg::contracts::factory::entry::{FactoryOwnerResp, MarketInfoResponse, MarketsResp, QueryMsg};
 use msg::prelude::*;
-use msg::shutdown::ShutdownEffect;
+use msg::shutdown::{ShutdownEffect, ShutdownImpact};
 
 pub(crate) struct Factory(Contract);
 
@@ -92,7 +92,7 @@ impl Factory {
         })
     }
 
-    pub(crate) async fn disable_market(
+    pub(crate) async fn disable_trades(
         &self,
         wallet: &Wallet,
         market: MarketId,
@@ -103,24 +103,20 @@ impl Factory {
                 vec![],
                 FactoryExecuteMsg::Shutdown {
                     markets: vec![market],
-                    impacts: vec![],
+                    impacts: vec![ShutdownImpact::NewTrades],
                     effect: ShutdownEffect::Disable,
                 },
             )
             .await
     }
 
-    pub(crate) async fn enable_market(
-        &self,
-        wallet: &Wallet,
-        market: MarketId,
-    ) -> Result<TxResponse> {
+    pub(crate) async fn enable_all(&self, wallet: &Wallet) -> Result<TxResponse> {
         self.0
             .execute(
                 wallet,
                 vec![],
                 FactoryExecuteMsg::Shutdown {
-                    markets: vec![market],
+                    markets: vec![],
                     impacts: vec![],
                     effect: ShutdownEffect::Enable,
                 },

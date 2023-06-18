@@ -434,7 +434,7 @@ pub(crate) async fn instantiate(
             );
 
             let factory = Factory::from_contract(factory.clone());
-            let res = factory.disable_market(wallet, market_id.clone()).await?;
+            let res = factory.disable_trades(wallet, market_id.clone()).await?;
             log::info!("Market shut down in {}", res.txhash);
         }
 

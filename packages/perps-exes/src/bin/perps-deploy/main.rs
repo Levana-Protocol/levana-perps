@@ -41,6 +41,7 @@ async fn main_inner() -> anyhow::Result<()> {
             TestnetSub::InitChain { inner } => init_chain::go(opt, inner).await?,
             TestnetSub::InstantiateRewards { inner } => instantiate_rewards::go(opt, inner).await?,
             TestnetSub::MigrateRewards { inner } => migrate_rewards::go(opt, inner).await?,
+            TestnetSub::Deposit { inner } => inner.go(opt).await?,
             TestnetSub::EnableMarket { inner } => inner.go(opt).await?,
         },
         Subcommand::Mainnet { inner } => mainnet::go(opt, inner).await?,
