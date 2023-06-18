@@ -162,7 +162,20 @@ impl App {
         latest_price: PriceBaseInQuote,
     ) -> Result<Option<PriceUpdateReason>> {
         let market = MarketContract::new(market.market.clone());
-        let price = market.current_price().await?;
+        let price = market.current_price().await;
+
+        let price = match price {
+            Ok(price) => price,
+            Err(e) => {
+                let msg = format!("{e}");
+                return if msg.contains("price_not_found") {
+                    // Assume this is the first price being set
+                    Ok(Some(PriceUpdateReason::NoPriceFound))
+                } else {
+                    Err(e)
+                };
+            }
+        };
 
         // Check 1: is the last price update too old?
         let updated = price.timestamp.try_into_chrono_datetime()?;
@@ -246,6 +259,7 @@ enum PriceUpdateReason {
         delta: Decimal256,
     },
     Triggers,
+    NoPriceFound,
 }
 
 impl Display for PriceUpdateReason {
@@ -259,6 +273,7 @@ impl Display for PriceUpdateReason {
             PriceUpdateReason::Triggers => {
                 write!(f, "Price would trigger positions and/or orders.")
             }
+            PriceUpdateReason::NoPriceFound => write!(f, "No price point found."),
         }
     }
 }
