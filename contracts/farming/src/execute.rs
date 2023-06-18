@@ -281,7 +281,7 @@ impl State<'_> {
         };
 
         match old_emissions {
-            None => self.save_lvn_emissions(ctx.storage, Some(new_emissions))?,
+            None => self.save_lvn_emissions(ctx.storage, Some(new_emissions.clone()))?,
             Some(old_emissions) => {
                 anyhow::ensure!(
                     self.now() > old_emissions.end,
@@ -289,8 +289,14 @@ impl State<'_> {
                 );
 
                 self.update_emissions_per_token(ctx, &old_emissions)?;
-                self.save_lvn_emissions(ctx.storage, Some(new_emissions))?;
+                self.save_lvn_emissions(ctx.storage, Some(new_emissions.clone()))?;
             }
+        }
+
+        let total_farming = self.load_farming_totals(ctx.storage)?.farming;
+
+        if total_farming.is_zero() {
+            self.save_reclaimable_start(ctx.storage, Some(new_emissions.start))?;
         }
 
         Ok(())
@@ -306,9 +312,11 @@ impl State<'_> {
             let now = self.now();
 
             if now < emissions.end {
+                let time_remaining_start =
+                    self.may_load_reclaimable_start(ctx.storage)?.unwrap_or(now);
                 let time_remaining = emissions
                     .end
-                    .checked_sub(now, "clear_emissions")?
+                    .checked_sub(time_remaining_start, "clear_emissions")?
                     .as_nanos();
                 let duration = emissions
                     .end
@@ -323,6 +331,7 @@ impl State<'_> {
                     .checked_add(new_reclaimable_emissions)?;
 
                 self.save_reclaimable_emissions(ctx.storage, reclaimable_emissions)?;
+                self.save_reclaimable_start(ctx.storage, None)?;
             }
         }
 

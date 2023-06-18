@@ -128,6 +128,7 @@ impl State<'_> {
             Some(farmer_stats) => farmer_stats,
         };
 
+        self.process_reclaimable_emissions(ctx.storage)?;
         self.farming_perform_emissions_bookkeeping(ctx, farmer, &mut farmer_stats)?;
 
         let mut totals = self.load_farming_totals(ctx.storage)?;
@@ -187,6 +188,10 @@ impl State<'_> {
 
         farmer_stats.farming_tokens = farmer_stats.farming_tokens.checked_sub(amount)?;
         self.save_raw_farmer_stats(ctx.storage, farmer, &farmer_stats)?;
+
+        if totals.farming.is_zero() {
+            self.save_reclaimable_start(ctx.storage, Some(self.now()))?;
+        }
 
         Ok((removed_xlp, amount, totals))
     }

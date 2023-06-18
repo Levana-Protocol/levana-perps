@@ -142,3 +142,4 @@ pub const BONUS_FUND: &str = "ei";
 pub const EPHEMERAL_DEPOSIT_COLLATERAL_DATA: &str = "ej";
 pub const RECLAIMABLE_EMISSIONS: &str = "ek";
 pub const LOCKDROP_BALANCES_BY_BUCKET: &str = "el";
+pub const RECLAIMABLE_START: &str = "em";

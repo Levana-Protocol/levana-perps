@@ -741,6 +741,83 @@ fn test_farming_update_config() {
         .unwrap_err();
 }
 
+#[test]
+fn test_reclaimable_emissions_with_gaps() {
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let mut market = PerpsMarket::new(app_cell).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+
+    market.automatic_time_jump_enabled = false;
+    move_past_lockdrop(&market);
+
+    // test with gap at the beginning
+
+    let token = start_emissions(&market).unwrap();
+
+    market.set_time(TimeJump::Seconds(5)).unwrap();
+    farming_deposit(&market, &lp).unwrap();
+
+    market.set_time(TimeJump::Seconds(100)).unwrap();
+    let reclaim_addr0 = Addr::unchecked("reclaim_addr0");
+    market.exec_farming_reclaim_emissions(&reclaim_addr0, None).unwrap();
+
+    let balance = market.query_reward_token_balance(&token, &reclaim_addr0);
+    assert_eq!(balance, "50".parse().unwrap());
+
+    // test with gap in the middle
+
+    let token = start_emissions(&market).unwrap();
+    farming_deposit(&market, &lp).unwrap();
+
+    market.set_time(TimeJump::Seconds(5)).unwrap();
+    farming_withdraw(&market, &lp, None).unwrap();
+
+    market.set_time(TimeJump::Seconds(5)).unwrap();
+    farming_deposit(&market, &lp).unwrap();
+
+    market.set_time(TimeJump::Seconds(100)).unwrap();
+
+    let reclaim_addr1 = Addr::unchecked("reclaim_addr1");
+    market.exec_farming_reclaim_emissions(&reclaim_addr1, None).unwrap();
+
+    let balance = market.query_reward_token_balance(&token, &reclaim_addr1);
+    assert_eq!(balance, "50".parse().unwrap());
+
+    // test with gap at the end
+
+    let token = start_emissions(&market).unwrap();
+    farming_deposit(&market, &lp).unwrap();
+
+    market.set_time(TimeJump::Seconds(15)).unwrap();
+    farming_withdraw(&market, &lp, None).unwrap();
+
+    market.set_time(TimeJump::Seconds(100)).unwrap();
+
+    let reclaim_addr2 = Addr::unchecked("reclaim_addr2");
+    market.exec_farming_reclaim_emissions(&reclaim_addr2, None).unwrap();
+
+    let balance = market.query_reward_token_balance(&token, &reclaim_addr2);
+    assert_eq!(balance, "50".parse().unwrap());
+
+    // test after call to clear emissions
+
+    let token = start_emissions(&market).unwrap();
+    farming_deposit(&market, &lp).unwrap();
+
+    market.set_time(TimeJump::Seconds(5)).unwrap();
+    farming_withdraw(&market, &lp, None).unwrap();
+
+    market.set_time(TimeJump::Seconds(5)).unwrap();
+    market.exec_farming_clear_emissions().unwrap();
+
+    let reclaim_addr3 = Addr::unchecked("reclaim_addr3");
+    market.exec_farming_reclaim_emissions(&reclaim_addr3, None).unwrap();
+
+    let balance = market.query_reward_token_balance(&token, &reclaim_addr3);
+    assert_eq!(balance, "150".parse().unwrap());
+
+}
+
 proptest! {
     #![proptest_config(ProptestConfig{
         failure_persistence: None,
