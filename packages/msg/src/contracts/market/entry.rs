@@ -676,6 +676,7 @@ pub struct PositionAction {
     /// Timestamp when the action occurred
     pub timestamp: Timestamp,
     /// the amount of collateral at the time of the action
+    #[serde(alias = "active_collateral")]
     pub collateral: Collateral,
     /// The amount of collateral transferred to or from the trader
     #[serde(default)]
