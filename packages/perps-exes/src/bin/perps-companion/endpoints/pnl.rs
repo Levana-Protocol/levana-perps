@@ -332,6 +332,7 @@ struct PnlInfo {
     pnl_display: String,
     host: String,
     image_url: String,
+    html_url: String,
     market_id: String,
     direction: &'static str,
     entry_price: PriceBaseInQuote,
@@ -371,13 +372,29 @@ impl PnlInfo {
             },
             image_url: match pnl_type {
                 PnlType::Usd => PnlUsdImage {
-                    chain,
+                    chain: chain.clone(),
                     market,
                     position,
                 }
                 .to_uri()
                 .to_string(),
                 PnlType::Percent => PnlPercentImage {
+                    chain: chain.clone(),
+                    market,
+                    position,
+                }
+                .to_uri()
+                .to_string(),
+            },
+            html_url: match pnl_type {
+                PnlType::Usd => PnlUsdHtml {
+                    chain,
+                    market,
+                    position,
+                }
+                .to_uri()
+                .to_string(),
+                PnlType::Percent => PnlUsdHtml {
                     chain,
                     market,
                     position,
