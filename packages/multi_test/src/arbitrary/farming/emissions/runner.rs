@@ -15,9 +15,9 @@ impl FarmingEmissions {
 
         self.do_simulation(&lp)?;
 
-        self.check_actions_claim(&lp, self.claim_lvn_rewards(&lp)?);
+        let claimed = self.claim_lvn_rewards(&lp)?;
+        self.check_actions_claim(&lp, claimed);
 
-        // FIXME: this is currently failing
         self.check_last_remaining_rewards(&lp)?;
 
         Ok(())
@@ -27,29 +27,15 @@ impl FarmingEmissions {
         let market = self.market.borrow_mut();
         let last_action_time = self.actions.last().unwrap().at_seconds;
         let remaining_emissions_seconds = self.emissions_duration_seconds - last_action_time;
-        let total_emissions_amount = self.emissions_amount;
         let token = market.rewards_token();
-        println!("total emissions amount: {}", total_emissions_amount);
-        println!(
-            "total emissions seconds: {}",
-            self.emissions_duration_seconds
-        );
 
-        println!("jumping {remaining_emissions_seconds} seconds");
         market
-            .set_time(TimeJump::Hours(remaining_emissions_seconds as i64))
+            .set_time(TimeJump::Seconds(remaining_emissions_seconds.into()))
             .unwrap();
 
-        let wallet_rewards_before_claim = market.query_reward_token_balance(&token, lp);
-        println!(
-            "wallet rewards before claim: {}",
-            wallet_rewards_before_claim
-        );
+        let balance_before_claim = market.query_reward_token_balance(&token, lp);
         let farmer_stats_before_claim = market.query_farming_farmer_stats(lp).unwrap();
 
-        println!("{:#?}", farmer_stats_before_claim);
-
-        println!("Checking last remaining rewards");
         if farmer_stats_before_claim.emission_rewards == LvnToken::zero() {
             println!("No LVN rewards to check");
             return Ok(());
@@ -57,11 +43,13 @@ impl FarmingEmissions {
 
         market.exec_farming_claim_emissions(lp).unwrap();
 
-        let wallet_rewards = market.query_reward_token_balance(&token, lp);
+        let balance_after_claim = market.query_reward_token_balance(&token, lp);
+
         token.assert_eq(
-            NonZero::new(total_emissions_amount).unwrap(),
-            NonZero::new(wallet_rewards).unwrap(),
+            NonZero::new(farmer_stats_before_claim.emission_rewards).unwrap(),
+            NonZero::new(balance_after_claim - balance_before_claim).unwrap(),
         );
+
         Ok(())
     }
 
@@ -109,7 +97,7 @@ impl FarmingEmissions {
 
         let mut prev_action: Option<&Action> = None;
         let mut farming_tokens_total = Number::ZERO;
-        let mut lp_emissions_total = Number::ZERO;
+        let mut accrued_emissions = Number::ZERO;
 
         for action in self.actions.iter() {
             let time_since_last_action = match prev_action {
@@ -126,7 +114,7 @@ impl FarmingEmissions {
                 let lp_farming_tokens = farming_tokens_total; // this will change with multiple lps
                 let lp_timeslice_emissions = timeslice_emissions * lp_farming_tokens;
 
-                lp_emissions_total += lp_timeslice_emissions;
+                accrued_emissions += lp_timeslice_emissions;
             }
 
             match action.kind {
@@ -141,7 +129,7 @@ impl FarmingEmissions {
             prev_action = Some(action);
         }
 
-        LvnToken::from_decimal256(lp_emissions_total.abs_unsigned())
+        LvnToken::from_decimal256(accrued_emissions.abs_unsigned())
     }
 
     fn do_simulation(&self, lp: &Addr) -> Result<()> {
@@ -154,7 +142,7 @@ impl FarmingEmissions {
 
         let token = market.mint_lvn_rewards(&self.emissions_amount.to_string(), None);
 
-        // // sanity check
+        // sanity check
         let protocol_owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
         let balance = market.query_reward_token_balance(&token, &protocol_owner);
         assert_eq!(balance, self.emissions_amount);
@@ -168,7 +156,7 @@ impl FarmingEmissions {
             )
             .unwrap();
 
-        // // Test query farming rewards
+        // Test query farming rewards
 
         let mut time_jumped = 0;
 
