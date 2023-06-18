@@ -48,6 +48,16 @@ pub(crate) enum TestnetSub {
         #[clap(flatten)]
         inner: crate::init_chain::InitChainOpt,
     },
+    /// Deposit collateral into a market, useful for the trading competition
+    Deposit {
+        #[clap(flatten)]
+        inner: crate::testnet::deposit::DepositOpt,
+    },
+    /// Enable a market, useful for starting a trading competition
+    EnableMarket {
+        #[clap(flatten)]
+        inner: crate::testnet::enable_market::EnableMarketOpt,
+    },
 }
 
 #[derive(clap::Parser)]

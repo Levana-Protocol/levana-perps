@@ -11,6 +11,9 @@ cache
 # CI temp directory
 .output
 
+# local temp files like shell scripts that aren't checked in
+temp-*
+
 ####### Proptest regressions - allowed :)
 # *.proptest-regressions
 

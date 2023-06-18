@@ -1,0 +1,56 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body, .content {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background-color: #0E0A12;
+  color: #FFFFFF;
+  max-width: 100vw;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 1rem;
+  padding-top: 4rem;
+
+  text-align: center;
+  font-family: Public Sans;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+h2 {
+  font-weight: 700;
+  font-size: 1.75rem;
+  margin: 0;
+  margin-bottom: 1rem;
+}
+
+p {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+@media only screen and (min-width: 600px) {
+  .content {
+    padding: 2rem;
+    padding-top: 5rem;
+  }
+
+  h2 {
+    font-size: 3rem;
+  }
+
+  p {
+    font-size: 1.25rem;
+  }
+}

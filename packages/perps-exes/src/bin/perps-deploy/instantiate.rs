@@ -2,7 +2,6 @@ use std::{collections::HashSet, str::FromStr};
 
 use anyhow::{Context, Result};
 use cosmos::{Address, CodeId, ContractAdmin, HasAddress};
-use msg::contracts::market::entry::ExecuteOwnerMsg;
 use msg::contracts::pyth_bridge::PythMarketPriceFeeds;
 use msg::prelude::*;
 use msg::{
@@ -14,6 +13,7 @@ use msg::{
     token::TokenInit,
 };
 use perps_exes::config::MarketConfigUpdates;
+use perps_exes::prelude::MarketContract;
 
 use crate::app::PythInfo;
 use crate::store_code::PYTH_BRIDGE;
@@ -416,19 +416,15 @@ pub(crate) async fn instantiate(
                 res.txhash
             );
 
-            let res = cosmos
-                .make_contract(market_addr)
-                .execute(
+            let market = MarketContract::new(cosmos.make_contract(market_addr));
+
+            let res = market
+                .config_update(
                     wallet,
-                    vec![],
-                    msg::contracts::market::entry::ExecuteMsg::Owner(
-                        ExecuteOwnerMsg::ConfigUpdate {
-                            update: ConfigUpdate {
-                                disable_position_nft_exec: Some(true),
-                                ..Default::default()
-                            },
-                        },
-                    ),
+                    ConfigUpdate {
+                        disable_position_nft_exec: Some(true),
+                        ..Default::default()
+                    },
                 )
                 .await?;
 
@@ -436,6 +432,10 @@ pub(crate) async fn instantiate(
                 "Disabled NFT executions for new trading competition at {}",
                 res.txhash
             );
+
+            let factory = Factory::from_contract(factory.clone());
+            let res = factory.disable_trades(wallet, market_id.clone()).await?;
+            log::info!("Market shut down in {}", res.txhash);
         }
 
         market_res.push(MarketResponse {
