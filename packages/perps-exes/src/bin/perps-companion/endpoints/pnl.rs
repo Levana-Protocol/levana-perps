@@ -305,7 +305,7 @@ pub(crate) enum Error {
         query_type: QueryType,
     },
     #[error("Error parsing path: {msg}")]
-    PathError { msg: String },
+    Path { msg: String },
 }
 
 impl IntoResponse for Error {
@@ -321,7 +321,7 @@ impl IntoResponse for Error {
                     QueryType::ExitPrice => StatusCode::INTERNAL_SERVER_ERROR,
                     QueryType::Positions => StatusCode::INTERNAL_SERVER_ERROR,
                 },
-                Error::PathError { msg: _ } => StatusCode::BAD_REQUEST,
+                Error::Path { msg: _ } => StatusCode::BAD_REQUEST,
             },
             error: self,
         }

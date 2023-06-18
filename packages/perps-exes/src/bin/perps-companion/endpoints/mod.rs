@@ -48,7 +48,7 @@ pub(crate) struct PnlUsdHtml {
 
 impl From<PathRejection> for pnl::Error {
     fn from(rejection: PathRejection) -> Self {
-        Self::PathError {
+        Self::Path {
             msg: rejection.to_string(),
         }
     }
