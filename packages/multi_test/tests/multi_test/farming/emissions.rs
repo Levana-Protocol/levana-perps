@@ -759,7 +759,9 @@ fn test_reclaimable_emissions_with_gaps() {
 
     market.set_time(TimeJump::Seconds(100)).unwrap();
     let reclaim_addr0 = Addr::unchecked("reclaim_addr0");
-    market.exec_farming_reclaim_emissions(&reclaim_addr0, None).unwrap();
+    market
+        .exec_farming_reclaim_emissions(&reclaim_addr0, None)
+        .unwrap();
 
     let balance = market.query_reward_token_balance(&token, &reclaim_addr0);
     assert_eq!(balance, "50".parse().unwrap());
@@ -778,7 +780,9 @@ fn test_reclaimable_emissions_with_gaps() {
     market.set_time(TimeJump::Seconds(100)).unwrap();
 
     let reclaim_addr1 = Addr::unchecked("reclaim_addr1");
-    market.exec_farming_reclaim_emissions(&reclaim_addr1, None).unwrap();
+    market
+        .exec_farming_reclaim_emissions(&reclaim_addr1, None)
+        .unwrap();
 
     let balance = market.query_reward_token_balance(&token, &reclaim_addr1);
     assert_eq!(balance, "50".parse().unwrap());
@@ -794,7 +798,9 @@ fn test_reclaimable_emissions_with_gaps() {
     market.set_time(TimeJump::Seconds(100)).unwrap();
 
     let reclaim_addr2 = Addr::unchecked("reclaim_addr2");
-    market.exec_farming_reclaim_emissions(&reclaim_addr2, None).unwrap();
+    market
+        .exec_farming_reclaim_emissions(&reclaim_addr2, None)
+        .unwrap();
 
     let balance = market.query_reward_token_balance(&token, &reclaim_addr2);
     assert_eq!(balance, "50".parse().unwrap());
@@ -811,11 +817,12 @@ fn test_reclaimable_emissions_with_gaps() {
     market.exec_farming_clear_emissions().unwrap();
 
     let reclaim_addr3 = Addr::unchecked("reclaim_addr3");
-    market.exec_farming_reclaim_emissions(&reclaim_addr3, None).unwrap();
+    market
+        .exec_farming_reclaim_emissions(&reclaim_addr3, None)
+        .unwrap();
 
     let balance = market.query_reward_token_balance(&token, &reclaim_addr3);
     assert_eq!(balance, "150".parse().unwrap());
-
 }
 
 proptest! {
