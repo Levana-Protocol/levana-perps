@@ -2508,6 +2508,7 @@ dependencies = [
  "askama",
  "axum",
  "axum-extra",
+ "axum-macros",
  "chrono",
  "clap",
  "cosmos",
