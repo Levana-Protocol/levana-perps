@@ -8,8 +8,10 @@ use msg::{
     contracts::{
         cw20::entry::BalanceResponse,
         market::{
+            config::ConfigUpdate,
             entry::{
-                ClosedPositionsResp, LpInfoResp, PriceWouldTriggerResp, SlippageAssert, StatusResp,
+                ClosedPositionsResp, ExecuteOwnerMsg, LpInfoResp, PriceWouldTriggerResp,
+                SlippageAssert, StatusResp,
             },
             position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
         },
@@ -468,5 +470,15 @@ impl MarketContract {
             .query(MarketQueryMsg::PriceWouldTrigger { price })
             .await?;
         Ok(would_trigger)
+    }
+
+    pub async fn config_update(&self, wallet: &Wallet, update: ConfigUpdate) -> Result<TxResponse> {
+        self.0
+            .execute(
+                wallet,
+                vec![],
+                MarketExecuteMsg::Owner(ExecuteOwnerMsg::ConfigUpdate { update }),
+            )
+            .await
     }
 }

@@ -3,15 +3,19 @@ use std::{fmt::Display, sync::Arc};
 use anyhow::{Context, Result};
 use askama::Template;
 use axum::{
-    extract::{Path, State},
+    extract::State,
+    headers::Host,
     http::HeaderValue,
     response::{Html, IntoResponse, Response},
+    TypedHeader,
 };
-use cosmos::Address;
+use axum_extra::response::Css;
+use axum_extra::routing::TypedPath;
+use cosmos::{Address, Contract};
 use cosmwasm_std::{Decimal256, Uint256};
 use msg::{
     contracts::market::{
-        entry::StatusResp,
+        entry::{QueryMsg, StatusResp},
         position::{ClosedPosition, PositionId, PositionsResp},
     },
     prelude::{
@@ -27,12 +31,7 @@ use resvg::usvg::{TreeParsing, TreeTextToPath};
 
 use crate::app::App;
 
-#[derive(serde::Deserialize)]
-pub(super) struct Params {
-    chain: String,
-    market: Address,
-    position: PositionId,
-}
+use super::{ErrorPage, PnlCssRoute, PnlPercentHtml, PnlPercentImage, PnlUsdHtml, PnlUsdImage};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum PnlType {
@@ -40,78 +39,154 @@ enum PnlType {
     Percent,
 }
 
-pub(super) async fn html_usd(app: State<Arc<App>>, params: Path<Params>) -> impl IntoResponse {
-    params.0.with_pnl(&app, PnlInfo::html, PnlType::Usd).await
+pub(super) async fn html_usd(
+    PnlUsdHtml {
+        chain,
+        market,
+        position,
+    }: PnlUsdHtml,
+    TypedHeader(host): TypedHeader<Host>,
+    app: State<Arc<App>>,
+) -> impl IntoResponse {
+    let pnl = Pnl::new(chain, market, position);
+    pnl.with_pnl(&app, host, PnlInfo::html, PnlType::Usd).await
 }
 
-pub(super) async fn image_usd(app: State<Arc<App>>, params: Path<Params>) -> impl IntoResponse {
-    params.0.with_pnl(&app, PnlInfo::image, PnlType::Usd).await
+pub(super) async fn image_usd(
+    PnlUsdImage {
+        chain,
+        market,
+        position,
+    }: PnlUsdImage,
+    TypedHeader(host): TypedHeader<Host>,
+    app: State<Arc<App>>,
+) -> impl IntoResponse {
+    let pnl = Pnl::new(chain, market, position);
+    pnl.with_pnl(&app, host, PnlInfo::image, PnlType::Usd).await
 }
 
-pub(super) async fn html_percent(app: State<Arc<App>>, params: Path<Params>) -> impl IntoResponse {
-    params
-        .0
-        .with_pnl(&app, PnlInfo::html, PnlType::Percent)
+pub(super) async fn html_percent(
+    PnlPercentHtml {
+        chain,
+        market,
+        position,
+    }: PnlPercentHtml,
+    TypedHeader(host): TypedHeader<Host>,
+    app: State<Arc<App>>,
+) -> impl IntoResponse {
+    let pnl = Pnl::new(chain, market, position);
+    pnl.with_pnl(&app, host, PnlInfo::html, PnlType::Percent)
         .await
 }
 
-pub(super) async fn image_percent(app: State<Arc<App>>, params: Path<Params>) -> impl IntoResponse {
-    params
-        .0
-        .with_pnl(&app, PnlInfo::image, PnlType::Percent)
+pub(super) async fn image_percent(
+    PnlPercentImage {
+        chain,
+        market,
+        position,
+    }: PnlPercentImage,
+    TypedHeader(host): TypedHeader<Host>,
+    app: State<Arc<App>>,
+) -> impl IntoResponse {
+    let pnl = Pnl::new(chain, market, position);
+    pnl.with_pnl(&app, host, PnlInfo::image, PnlType::Percent)
         .await
 }
 
-pub(super) async fn css() -> impl IntoResponse {
-    let mut res = include_str!("../../../../static/pnl.css").into_response();
-    res.headers_mut().insert(
-        CONTENT_TYPE,
-        HeaderValue::from_static("text/css; charset=utf-8"),
-    );
-    res
+pub(super) async fn css(_: PnlCssRoute) -> Css<&'static str> {
+    Css(include_str!("../../../../static/pnl.css"))
 }
 
-impl Params {
-    async fn with_pnl<F>(self, app: &App, f: F, pnl_type: PnlType) -> Response
+struct MarketContract(Contract);
+
+impl MarketContract {
+    async fn query<T>(&self, msg: QueryMsg, query_type: QueryType) -> Result<T, Error>
     where
-        F: FnOnce(PnlInfo) -> Response,
+        T: serde::de::DeserializeOwned,
     {
-        match self.get_pnl_info(app, pnl_type).await {
-            Ok(pnl) => f(pnl),
-            Err(e) => e.into_response(),
+        let mut attempt = 1;
+        loop {
+            let res = self.0.query(&msg).await.map_err(|source| {
+                let e = Error::FailedToQueryContract {
+                    msg: msg.clone(),
+                    query_type,
+                };
+                log::error!("Attempt #{attempt}: {e}. {source:?}");
+                e
+            });
+            match res {
+                Ok(x) => break Ok(x),
+                Err(e) => {
+                    if attempt >= 5 {
+                        break Err(e);
+                    } else {
+                        attempt += 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[derive(serde::Deserialize, Debug)]
+pub(super) struct Pnl {
+    chain: String,
+    market: Address,
+    position: PositionId,
+}
+
+impl Pnl {
+    pub fn new(chain: String, market: Address, position: PositionId) -> Self {
+        Pnl {
+            chain,
+            market,
+            position,
         }
     }
 
-    async fn get_pnl_info(self, app: &App, pnl_type: PnlType) -> Result<PnlInfo, Error> {
-        let Params {
+    async fn with_pnl<F>(
+        self,
+        app: &App,
+        host: Host,
+        f: F,
+        pnl_type: PnlType,
+    ) -> Result<Response, Error>
+    where
+        F: FnOnce(PnlInfo) -> Response,
+    {
+        self.get_pnl_info(app, host, pnl_type).await.map(f)
+    }
+
+    async fn get_pnl_info(
+        self,
+        app: &App,
+        host: Host,
+        pnl_type: PnlType,
+    ) -> Result<PnlInfo, Error> {
+        let Pnl {
             chain,
             market,
             position,
         } = &self;
         let cosmos = app.cosmos.get(chain).ok_or(Error::UnknownChainId)?;
-        let contract = cosmos.make_contract(*market);
 
-        let status: StatusResp = match contract
-            .query(msg::contracts::market::entry::QueryMsg::Status { price: None })
-            .await
-        {
-            Ok(status) => status,
-            Err(_) => return Err(Error::CouldNotQueryContract),
-        };
+        let contract = MarketContract(cosmos.make_contract(*market));
 
-        let res: Result<PositionsResp> = cosmos
-            .make_contract(*market)
-            .query(msg::contracts::market::entry::QueryMsg::Positions {
-                position_ids: vec![*position],
-                skip_calc_pending_fees: None,
-                fees: None,
-                price: None,
-            })
-            .await;
-        let mut res = match res {
-            Ok(res) => res,
-            Err(_) => return Err(Error::CouldNotFindContract),
-        };
+        let status = contract
+            .query::<StatusResp>(QueryMsg::Status { price: None }, QueryType::Status)
+            .await?;
+
+        let mut res = contract
+            .query::<PositionsResp>(
+                QueryMsg::Positions {
+                    position_ids: vec![*position],
+                    skip_calc_pending_fees: None,
+                    fees: None,
+                    price: None,
+                },
+                QueryType::Positions,
+            )
+            .await?;
 
         let pos = match res.closed.pop() {
             Some(pos) => pos,
@@ -126,25 +201,23 @@ impl Params {
             }
         };
 
-        let entry_price: PricePoint = match contract
-            .query(msg::contracts::market::entry::QueryMsg::SpotPrice {
-                timestamp: Some(pos.created_at),
-            })
-            .await
-        {
-            Ok(status) => status,
-            Err(_) => return Err(Error::CouldNotQueryContract),
-        };
+        let entry_price = contract
+            .query::<PricePoint>(
+                QueryMsg::SpotPrice {
+                    timestamp: Some(pos.created_at),
+                },
+                QueryType::EntryPrice,
+            )
+            .await?;
 
-        let exit_price: PricePoint = match contract
-            .query(msg::contracts::market::entry::QueryMsg::SpotPrice {
-                timestamp: Some(pos.settlement_time),
-            })
-            .await
-        {
-            Ok(status) => status,
-            Err(_) => return Err(Error::CouldNotQueryContract),
-        };
+        let exit_price: PricePoint = contract
+            .query::<PricePoint>(
+                QueryMsg::SpotPrice {
+                    timestamp: Some(pos.settlement_time),
+                },
+                QueryType::ExitPrice,
+            )
+            .await?;
 
         Ok(PnlInfo::new(
             self,
@@ -153,6 +226,7 @@ impl Params {
             entry_price,
             exit_price,
             pnl_type,
+            host,
         ))
     }
 }
@@ -209,31 +283,49 @@ impl PnlInfo {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum QueryType {
+    Status,
+    EntryPrice,
+    ExitPrice,
+    Positions,
+}
+
 #[derive(thiserror::Error, Debug)]
-enum Error {
+pub(crate) enum Error {
     #[error("Unknown chain ID")]
     UnknownChainId,
-    #[error("Could not find contract")]
-    CouldNotFindContract,
-    #[error("Could not query contract")]
-    CouldNotQueryContract,
     #[error("Specified position not found")]
     PositionNotFound,
     #[error("The position is still open")]
     PositionStillOpen,
+    #[error("Failed to query contract with {query_type:?}\nQuery: {msg:?}")]
+    FailedToQueryContract {
+        msg: QueryMsg,
+        query_type: QueryType,
+    },
+    #[error("Error parsing path: {msg}")]
+    Path { msg: String },
 }
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
-        let mut res = self.to_string().into_response();
-        *res.status_mut() = match self {
-            Error::UnknownChainId => StatusCode::BAD_REQUEST,
-            Error::CouldNotFindContract => StatusCode::BAD_REQUEST,
-            Error::CouldNotQueryContract => StatusCode::BAD_REQUEST,
-            Error::PositionNotFound => StatusCode::BAD_REQUEST,
-            Error::PositionStillOpen => StatusCode::BAD_REQUEST,
-        };
-        res
+        ErrorPage {
+            code: match &self {
+                Error::UnknownChainId => StatusCode::BAD_REQUEST,
+                Error::PositionNotFound => StatusCode::BAD_REQUEST,
+                Error::PositionStillOpen => StatusCode::BAD_REQUEST,
+                Error::FailedToQueryContract { query_type, msg: _ } => match query_type {
+                    QueryType::Status => StatusCode::BAD_REQUEST,
+                    QueryType::EntryPrice => StatusCode::INTERNAL_SERVER_ERROR,
+                    QueryType::ExitPrice => StatusCode::INTERNAL_SERVER_ERROR,
+                    QueryType::Positions => StatusCode::INTERNAL_SERVER_ERROR,
+                },
+                Error::Path { msg: _ } => StatusCode::BAD_REQUEST,
+            },
+            error: self,
+        }
+        .into_response()
     }
 }
 
@@ -241,8 +333,10 @@ impl IntoResponse for Error {
 #[template(path = "pnl.html")]
 struct PnlInfo {
     pnl_display: String,
+    host: String,
     image_url: String,
-    market_id: MarketId,
+    html_url: String,
+    market_id: String,
     direction: &'static str,
     entry_price: PriceBaseInQuote,
     exit_price: PriceBaseInQuote,
@@ -251,12 +345,17 @@ struct PnlInfo {
 
 impl PnlInfo {
     fn new(
-        params: Params,
+        Pnl {
+            chain,
+            market,
+            position,
+        }: Pnl,
         pos: ClosedPosition,
         market_id: MarketId,
         entry_price: PricePoint,
         exit_price: PricePoint,
         pnl_type: PnlType,
+        host: Host,
     ) -> Self {
         let market_type = market_id.get_market_type();
         PnlInfo {
@@ -274,11 +373,42 @@ impl PnlInfo {
                     }
                 },
             },
-            image_url: params.image_url(pnl_type),
-            market_id,
+            image_url: match pnl_type {
+                PnlType::Usd => PnlUsdImage {
+                    chain: chain.clone(),
+                    market,
+                    position,
+                }
+                .to_uri()
+                .to_string(),
+                PnlType::Percent => PnlPercentImage {
+                    chain: chain.clone(),
+                    market,
+                    position,
+                }
+                .to_uri()
+                .to_string(),
+            },
+            html_url: match pnl_type {
+                PnlType::Usd => PnlUsdHtml {
+                    chain,
+                    market,
+                    position,
+                }
+                .to_uri()
+                .to_string(),
+                PnlType::Percent => PnlUsdHtml {
+                    chain,
+                    market,
+                    position,
+                }
+                .to_uri()
+                .to_string(),
+            },
+            market_id: market_id.to_string().replace('_', "/"),
             direction: match pos.direction_to_base {
-                DirectionToBase::Long => "long",
-                DirectionToBase::Short => "short",
+                DirectionToBase::Long => "LONG",
+                DirectionToBase::Short => "SHORT",
             },
             entry_price: pos.entry_price_base,
             exit_price: exit_price.price_base,
@@ -298,6 +428,7 @@ impl PnlInfo {
                     .into_number(),
                 ),
             },
+            host: host.hostname().into(),
         }
     }
 }
@@ -414,21 +545,6 @@ mod tests {
             UsdDisplay("-50001.2355".parse().unwrap()).to_string(),
             "-50,001.24 USD"
         );
-    }
-}
-
-impl Params {
-    fn image_url(&self, pnl_type: PnlType) -> String {
-        format!(
-            "/{pnl_type}/{chain}/{market}/{position}/image.png",
-            pnl_type = match pnl_type {
-                PnlType::Usd => "pnl-usd",
-                PnlType::Percent => "pnl-percent",
-            },
-            chain = self.chain,
-            market = self.market,
-            position = self.position
-        )
     }
 }
 

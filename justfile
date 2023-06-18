@@ -138,6 +138,10 @@ build-companion-image:
 push-companion-image:
 	docker push ghcr.io/levana-protocol/levana-perps/companion:{{GIT_SHA}}
 
+# Run companion
+run-companion:
+	cargo run --bin perps-companion
+
 # Deploy to dragonfire
 deploy-dragonfire:
 	cargo run --bin perps-deploy testnet store-code --network dragonfire
@@ -198,7 +202,7 @@ instantiate-rewards:
 	just instantiate-nft-mint
 	just instantiate-lvn-rewards
 create-rewards-channels juno-port stargaze-port osmosis-port:
-	just create-nft-mint-relayer-channel hatching-nft {{juno-port}} {{stargaze-port}} 
+	just create-nft-mint-relayer-channel hatching-nft {{juno-port}} {{stargaze-port}}
 	just create-lvn-grant-relayer-channel lvn-mint {{juno-port}} {{osmosis-port}}
 rewards-test:
 	just hatch-egg-test

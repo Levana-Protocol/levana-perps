@@ -29,7 +29,8 @@ reqwest = { version = "0.11.11", default-features = false, features = [
        "gzip",
 ] }
 chrono = { version = "0.4.19", features = ["serde"] }
-axum = "0.6"
+axum = { version = "0.6", features = ["headers"]}
+axum-extra = { version = "0.7", features = ["typed-routing"] }
 tower-http = { version = "0.3.4", features = ["cors", "auth"] }
 futures = "0.3.26"
 tokio-tungstenite = "*"
@@ -43,6 +44,7 @@ askama = "0.12"
 cw-utils = "1.0.1"
 thiserror = "1"
 resvg = "0.34"
+axum-macros = "0.3.7"
 
 [features]
 default = []

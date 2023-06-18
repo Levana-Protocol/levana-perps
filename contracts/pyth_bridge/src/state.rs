@@ -33,6 +33,10 @@ impl<'a> State<'a> {
             deps.storage,
         ))
     }
+
+    pub(crate) fn now(&self) -> Timestamp {
+        self.env.block.time.into()
+    }
 }
 
 impl<'a> StateContext<'a> {
