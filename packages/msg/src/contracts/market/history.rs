@@ -131,6 +131,22 @@ pub mod events {
                 ),
             };
 
+            let evt = match src.action.take_profit_override {
+                None => evt,
+                Some(take_profit_override) => evt.add_attribute(
+                    event_key::TAKE_PROFIT_OVERRIDE,
+                    take_profit_override.to_string(),
+                ),
+            };
+
+            let evt = match src.action.stop_loss_override {
+                None => evt,
+                Some(stop_loss_override) => evt.add_attribute(
+                    event_key::STOP_LOSS_OVERRIDE,
+                    stop_loss_override.to_string(),
+                ),
+            };
+
             match src.action.new_owner {
                 None => evt,
                 Some(new_owner) => evt.add_attribute(
@@ -171,6 +187,10 @@ pub mod events {
                         .try_number_attr(event_key::POSITION_ACTION_DELTA_NEUTRALITY_FEE)?,
                     old_owner: evt.try_unchecked_addr_attr(event_key::POSITION_ACTION_OLD_OWNER)?,
                     new_owner: evt.try_unchecked_addr_attr(event_key::POSITION_ACTION_NEW_OWNER)?,
+                    take_profit_override: evt
+                        .try_price_base_in_quote(event_key::TAKE_PROFIT_OVERRIDE)?,
+                    stop_loss_override: evt
+                        .try_price_base_in_quote(event_key::STOP_LOSS_OVERRIDE)?,
                 },
             })
         }
