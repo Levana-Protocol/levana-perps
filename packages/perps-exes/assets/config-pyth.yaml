@@ -1,5 +1,5 @@
 update-age-tolerance: 120
-endpoint: "https://pyth.sandbox.levana.finance/"
+endpoint: "https://pyth.levana.finance/"
 markets:
   ATOM_USD:
     feeds: [
