@@ -110,6 +110,16 @@ pub trait CosmwasmEventExt {
         .transpose()
     }
 
+    /// Parse an optional price
+    fn try_price_base_in_quote(&self, key: &str) -> anyhow::Result<Option<PriceBaseInQuote>> {
+        self.try_map_attr(key, |s| {
+            s.parse().ok().with_context(|| {
+                format!("try_price_base_in_quote failed parse on key {key} and value {s}")
+            })
+        })
+        .transpose()
+    }
+
     /// Parse a string attribute
     fn string_attr(&self, key: &str) -> anyhow::Result<String> {
         self.map_attr_ok(key, |s| s.to_string())
