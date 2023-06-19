@@ -262,7 +262,7 @@ impl State<'_> {
         if let Some(reclaimable_start) = reclaimable_start {
             let emissions = self
                 .may_load_lvn_emissions(store)?
-                .with_context(|| "Unable to find emissions when processing reclaim")?;
+                .context("Unable to find emissions when processing reclaim")?;
             let end_time = min(self.now(), emissions.end);
             let elapsed =
                 end_time.checked_sub(reclaimable_start, "process_reclaimable_emissions")?;
