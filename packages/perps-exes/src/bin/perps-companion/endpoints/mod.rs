@@ -1,5 +1,7 @@
 mod common;
+mod export;
 mod pnl;
+mod shared;
 
 use std::sync::Arc;
 
@@ -89,6 +91,16 @@ pub(crate) struct Favicon;
 #[typed_path("/robots.txt")]
 pub(crate) struct RobotRoute;
 
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/export-history/:chain/:market/:wallet")]
+pub(crate) struct ExportHistory {
+    pub(crate) chain: String,
+    pub(crate) market: Address,
+    pub(crate) wallet: Address,
+    // pub(crate) start: u32,
+    // pub(crate) end: u32
+}
+
 pub(crate) async fn launch(app: App) -> Result<()> {
     let bind = app.opt.bind;
     let app = Arc::new(app);
@@ -104,6 +116,7 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .typed_get(pnl::image_percent)
         .typed_get(common::favicon)
         .typed_get(common::robots_txt)
+        .typed_get(export::history)
         .fallback(common::not_found)
         .with_state(app)
         .layer(

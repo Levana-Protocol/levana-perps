@@ -7,6 +7,7 @@ use crate::{contracts::liquidity_token::LiquidityTokenKind, token::TokenInit};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Binary, Decimal256, Uint128};
 use shared::prelude::*;
+use std::fmt::{Formatter, Write};
 
 /// The InstantiateMsg comes from Factory only
 #[cw_serde]
@@ -697,6 +698,14 @@ pub struct PositionAction {
     pub take_profit_override: Option<PriceBaseInQuote>,
     /// The stop loss override, if set.
     pub stop_loss_override: Option<PriceBaseInQuote>,
+    /// The direction of the position
+    #[serde(default = "default_direction")]
+    pub direction: DirectionToBase,
+}
+
+//FIXME remove default_direction
+fn default_direction() -> DirectionToBase {
+    DirectionToBase::Long
 }
 
 /// Action taken by trader for a [PositionAction]
@@ -709,7 +718,22 @@ pub enum PositionActionKind {
     /// Close a position
     Close,
     /// Position was transferred between wallets
+    //FIXME need distinct "Received Position" and "Sent Position" cases
     Transfer,
+}
+
+//todo does it make sense for PositionActionKind to impl Display
+impl Display for PositionActionKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            PositionActionKind::Open => "Open",
+            PositionActionKind::Update => "Update",
+            PositionActionKind::Close => "Close",
+            PositionActionKind::Transfer => "Transfer",
+        };
+
+        f.write_str(&str)
+    }
 }
 
 /// Returned by [QueryMsg::LpInfo]

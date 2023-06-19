@@ -38,13 +38,14 @@ tokio-util = {version = "0.7.7", features = ["full"]}
 cw-multi-test = "0.16.2"
 rand = "0.8"
 pyth-sdk-cw = "1.0.0"
-csv = "1"
+csv = "1.2.2"
 tonic = "0.8.3"
 askama = "0.12"
 cw-utils = "1.0.1"
 thiserror = "1"
 resvg = "0.34"
 axum-macros = "0.3.7"
+mime = "0.3.17"
 
 [features]
 default = []

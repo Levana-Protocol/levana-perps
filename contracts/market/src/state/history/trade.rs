@@ -102,6 +102,7 @@ impl State<'_> {
             new_owner: Some(pos.owner.clone()),
             take_profit_override: pos.take_profit_override,
             stop_loss_override: pos.stop_loss_override,
+            direction: pos.direction().into_base(self.market_type(ctx.storage)?),
         };
         let old_owner_action = PositionAction {
             transfer_collateral: pos.active_collateral.into_signed().neg(),
@@ -268,6 +269,7 @@ impl State<'_> {
             new_owner: None,
             take_profit_override: pos.take_profit_override,
             stop_loss_override: pos.stop_loss_override,
+            direction: pos.direction().into_base(market_type),
         };
 
         ctx.response.add_event(PositionActionEvent {
@@ -310,6 +312,7 @@ impl State<'_> {
             new_owner: None,
             take_profit_override: None,
             stop_loss_override: None,
+            direction: pos.direction_to_base,
         };
 
         ctx.response.add_event(PositionActionEvent {
