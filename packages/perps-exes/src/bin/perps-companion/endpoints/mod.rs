@@ -1,5 +1,5 @@
 mod common;
-mod pnl;
+pub(crate) mod pnl;
 
 use std::sync::Arc;
 
@@ -10,8 +10,6 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 use axum_extra::routing::{RouterExt, TypedPath};
-use cosmos::Address;
-use msg::contracts::market::position::PositionId;
 use reqwest::{header::CONTENT_TYPE, Method, StatusCode};
 use serde::Deserialize;
 use tower_http::cors::CorsLayer;
@@ -38,12 +36,28 @@ pub(crate) struct PnlCssRoute;
 #[typed_path("/error.css")]
 pub(crate) struct ErrorCssRoute;
 
+#[derive(TypedPath)]
+#[typed_path("/favicon.ico")]
+pub(crate) struct Favicon;
+
+#[derive(TypedPath)]
+#[typed_path("/robots.txt")]
+pub(crate) struct RobotRoute;
+
 #[derive(TypedPath, Deserialize)]
-#[typed_path("/pnl-usd/:chain/:market/:position", rejection(pnl::Error))]
-pub(crate) struct PnlUsdHtml {
-    chain: String,
-    market: Address,
-    position: PositionId,
+#[typed_path("/pnl-url")]
+pub(crate) struct PnlUrl;
+
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/pnl/:pnl_id", rejection(pnl::Error))]
+pub(crate) struct PnlHtml {
+    pub(crate) pnl_id: i32,
+}
+
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/pnl/:pnl_id/image.png", rejection(pnl::Error))]
+pub(crate) struct PnlImage {
+    pub(crate) pnl_id: i32,
 }
 
 impl From<PathRejection> for pnl::Error {
@@ -54,41 +68,6 @@ impl From<PathRejection> for pnl::Error {
     }
 }
 
-#[derive(TypedPath, Deserialize)]
-#[typed_path("/pnl-usd/:chain/:market/:position/image.png", rejection(pnl::Error))]
-pub(crate) struct PnlUsdImage {
-    pub(crate) chain: String,
-    pub(crate) market: Address,
-    pub(crate) position: PositionId,
-}
-
-#[derive(TypedPath, Deserialize)]
-#[typed_path("/pnl-percent/:chain/:market/:position", rejection(pnl::Error))]
-pub(crate) struct PnlPercentHtml {
-    chain: String,
-    market: Address,
-    position: PositionId,
-}
-
-#[derive(TypedPath, Deserialize)]
-#[typed_path(
-    "/pnl-percent/:chain/:market/:position/image.png",
-    rejection(pnl::Error)
-)]
-pub(crate) struct PnlPercentImage {
-    pub(crate) chain: String,
-    pub(crate) market: Address,
-    pub(crate) position: PositionId,
-}
-
-#[derive(TypedPath)]
-#[typed_path("/favicon.ico")]
-pub(crate) struct Favicon;
-
-#[derive(TypedPath)]
-#[typed_path("/robots.txt")]
-pub(crate) struct RobotRoute;
-
 pub(crate) async fn launch(app: App) -> Result<()> {
     let bind = app.opt.bind;
     let app = Arc::new(app);
@@ -98,20 +77,20 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .typed_get(common::build_version)
         .typed_get(pnl::css)
         .typed_get(common::error_css)
-        .typed_get(pnl::html_usd)
-        .typed_get(pnl::image_usd)
-        .typed_get(pnl::html_percent)
-        .typed_get(pnl::image_percent)
         .typed_get(common::favicon)
         .typed_get(common::robots_txt)
-        .fallback(common::not_found)
+        .typed_post(pnl::pnl_url)
+        .typed_get(pnl::pnl_html)
+        .typed_get(pnl::pnl_image)
         .with_state(app)
+        .fallback(common::not_found)
         .layer(
             CorsLayer::new()
                 .allow_origin(tower_http::cors::Any)
                 .allow_methods([Method::GET, Method::HEAD, Method::POST])
                 .allow_headers([CONTENT_TYPE]),
         );
+
     log::info!("Launching server");
     axum::Server::bind(&bind)
         .serve(router.into_make_service())

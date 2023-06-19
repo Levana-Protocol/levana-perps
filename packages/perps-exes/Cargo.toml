@@ -46,6 +46,7 @@ cw-utils = "1.0.1"
 thiserror = "1"
 resvg = "0.34"
 axum-macros = "0.3.7"
+sqlx = { version = "0.6.3", features = ["runtime-tokio-rustls", "postgres", "offline"]}
 
 [features]
 default = []

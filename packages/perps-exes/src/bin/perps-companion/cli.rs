@@ -11,6 +11,8 @@ pub(crate) struct Opt {
         global = true
     )]
     pub(crate) bind: SocketAddr,
+    #[clap(long, env = "LEVANA_COMPANION_POSTGRES_URI")]
+    pub(crate) postgres_uri: String,
 }
 
 impl Opt {

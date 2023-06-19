@@ -1,5 +1,6 @@
 mod app;
 mod cli;
+mod db;
 mod endpoints;
 
 use anyhow::Result;
@@ -15,6 +16,6 @@ async fn main() -> Result<()> {
 async fn main_inner() -> Result<()> {
     let opt = Opt::parse();
     opt.init_logger();
-    let app = App::new(opt)?;
+    let app = App::new(opt).await?;
     endpoints::launch(app).await
 }
