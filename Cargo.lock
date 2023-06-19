@@ -2522,6 +2522,7 @@ dependencies = [
  "futures",
  "hex",
  "levana_perpswap_cosmos_msg",
+ "levana_perpswap_cosmos_shared",
  "levana_perpswap_multi_test",
  "log",
  "once_cell",
