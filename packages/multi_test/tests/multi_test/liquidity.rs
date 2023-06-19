@@ -692,7 +692,7 @@ fn lp_info_api() {
     // Sanity check
     market.query_lp_info(&new_lp).unwrap();
     market
-        .exec_deposit_liquidity_full(&new_lp, Number::ONE, true)
+        .exec_mint_and_deposit_liquidity_full(&new_lp, Number::ONE, true)
         .unwrap();
 
     market.exec_reinvest_yield(&new_lp, None, true).unwrap();

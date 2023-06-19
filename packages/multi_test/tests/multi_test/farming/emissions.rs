@@ -1,5 +1,7 @@
 use crate::prelude::*;
-use levana_perpswap_multi_test::config::TEST_CONFIG;
+use levana_perpswap_multi_test::{
+    arbitrary::farming::emissions::data::FarmingEmissions, config::TEST_CONFIG,
+};
 use msg::contracts::farming::entry::defaults::{
     bonus_ratio, lockdrop_buckets, lockdrop_month_seconds,
 };
@@ -8,6 +10,7 @@ use msg::contracts::farming::entry::{
 };
 use msg::contracts::farming::events::DepositSource;
 use msg::token::Token;
+use proptest::prelude::*;
 
 const EMISSIONS_DURATION: u32 = 20;
 const EMISSIONS_REWARDS: &str = "200";
@@ -547,7 +550,17 @@ fn test_claim_emissions() {
 
     market.exec_farming_claim_emissions(&lp2).unwrap();
     let lp2_balance = market.query_reward_token_balance(&token, &lp2);
-    assert_eq!(lp2_balance, "33.333333".parse().unwrap())
+    assert_eq!(lp2_balance, "33.333333".parse().unwrap());
+
+    let total_lp_balances = lp0_balance_after + lp1_balance_after + lp2_balance;
+    assert_eq!(
+        EMISSIONS_REWARDS.parse::<f64>().unwrap().round(),
+        total_lp_balances
+            .to_string()
+            .parse::<f64>()
+            .unwrap()
+            .round()
+    );
 }
 
 #[test]
@@ -726,4 +739,22 @@ fn test_farming_update_config() {
             None,
         )
         .unwrap_err();
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig{
+        failure_persistence: None,
+        max_shrink_iters: 0,
+        max_local_rejects: 1,
+        max_global_rejects: 1,
+        .. ProptestConfig::with_cases(10)
+    })]
+
+    #[test]
+    //#[cfg_attr(not(feature = "proptest"), ignore)]
+    fn proptest_farming_emissions(
+        strategy in FarmingEmissions::new_strategy()
+    ) {
+        strategy.run().unwrap();
+    }
 }

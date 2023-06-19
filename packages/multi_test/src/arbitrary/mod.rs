@@ -1,3 +1,4 @@
+pub mod farming;
 pub mod funding_payment;
 pub mod helpers;
 pub mod lp;

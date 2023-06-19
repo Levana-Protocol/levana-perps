@@ -880,7 +880,7 @@ impl PerpsMarket {
         )
     }
 
-    pub fn exec_deposit_liquidity_full(
+    pub fn exec_mint_and_deposit_liquidity_full(
         &self,
         user_addr: &Addr,
         amount: Number,
@@ -1548,6 +1548,9 @@ impl PerpsMarket {
     }
 
     /***** FARMING *****/
+    pub fn rewards_token(&self) -> Token {
+        self.app.borrow().rewards_token()
+    }
 
     pub fn exec_farming_deposit_xlp(
         &self,
