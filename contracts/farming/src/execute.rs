@@ -312,6 +312,13 @@ impl State<'_> {
             let now = self.now();
 
             if now < emissions.end {
+                // We want to calculate the amount of time where LVN emissions will remain unclaimed.
+                // In the normal case, this lasts from the time the emissions were cleared until
+                // the originally planned end of the emissions period.
+                // However, if at the time of clearing the emissions there were no active farmers,
+                // we go back in time further to when we entered the "no farmers" state to cover
+                // the entire time that no emissions occurred.
+
                 let time_remaining_start =
                     self.may_load_reclaimable_start(ctx.storage)?.unwrap_or(now);
                 let time_remaining = emissions
