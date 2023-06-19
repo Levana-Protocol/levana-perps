@@ -7,7 +7,7 @@ use crate::{contracts::liquidity_token::LiquidityTokenKind, token::TokenInit};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Binary, Decimal256, Uint128};
 use shared::prelude::*;
-use std::fmt::{Formatter, Write};
+use std::fmt::Formatter;
 
 /// The InstantiateMsg comes from Factory only
 #[cw_serde]
@@ -732,7 +732,7 @@ impl Display for PositionActionKind {
             PositionActionKind::Transfer => "Transfer",
         };
 
-        f.write_str(&str)
+        f.write_str(str)
     }
 }
 

@@ -6,9 +6,7 @@ use axum::http::HeaderValue;
 use axum::response::{IntoResponse, Response};
 use cosmos::{Address, Contract};
 use csv::WriterBuilder;
-use msg::contracts::market::entry::{
-    PositionAction, PositionActionKind, StatusResp, TraderActionHistoryResp,
-};
+use msg::contracts::market::entry::{PositionAction, StatusResp, TraderActionHistoryResp};
 use msg::contracts::market::position::PositionId;
 use msg::prelude::{DirectionToBase, MarketId, MarketQueryMsg, OrderInMessage, RawAddr, Signed};
 use perps_exes::prelude::Collateral;
@@ -164,7 +162,7 @@ impl Exporter {
     pub(crate) fn generate_csv(&self, actions: Vec<TradeAction>) -> Result<String> {
         let mut writer = WriterBuilder::new().has_headers(false).from_writer(vec![]);
 
-        writer.write_record(&[
+        writer.write_record([
             "Transaction Time (UTC)",
             "Position ID",
             "Market",
