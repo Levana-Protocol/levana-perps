@@ -277,6 +277,32 @@ impl Metadata {
 
         m
     }
+    pub fn new_dust(spirit_level: NumberGtZero, rarity: NftRarity) -> Self {
+        let mut m: Self = serde_json::from_str(DUST_META).unwrap();
+
+        // in theory we'd want to show a different dust based on rarity etc.
+        // but it's okay, this is just for testing, they can all look the same
+        m.image = "ipfs://QmPYGyUarK7L4oUdB7esxnTFHUhexfnxxzFgxRZSgQVsKA".to_string();
+
+        m.attributes.push(Trait {
+            display_type: None,
+            trait_type: "Spirit Level".to_string(),
+            value: spirit_level.to_string(),
+        });
+
+        m.attributes.push(Trait {
+            display_type: None,
+            trait_type: "Rarity".to_string(),
+            value: match rarity {
+                NftRarity::Common => "Common".to_string(),
+                NftRarity::Rare => "Rare".to_string(),
+                NftRarity::Ancient => "Ancient".to_string(),
+                NftRarity::Legendary => "Legendary".to_string(),
+            },
+        });
+
+        m
+    }
 }
 static EGG_META: &str = r#"{
     "image":"ipfs://replaceme",
@@ -345,3 +371,54 @@ static EGG_META: &str = r#"{
     "animation_url":null,
     "youtube_url":null
 }"#;
+
+static DUST_META: &str = r#"
+{
+
+    "image":"ipfs://replaceme",
+    "image_data":null,
+    "external_url":null,
+    "description":"Evolutionary Rare Meteor Dust NFT, stage 2 of the Levana Dragons adventure.",
+    "name":"Levana Dragons: Rare Meteor Dust",
+    "attributes":[
+        {
+            "display_type":null,
+            "trait_type":"Type",
+            "value":"Meteor Dust"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Dust Volume",
+            "value":"Quarter"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Essence",
+            "value":"Psychic"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Rare Gem",
+            "value":"Cinnabar"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Common Gem",
+            "value":"Azurite"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Rare Composition",
+            "value":"Sulfur"
+        },
+        {
+            "display_type":null,
+            "trait_type":"Common Composition",
+            "value":"Silicon"
+        }
+    ],
+    "background_color":null,
+    "animation_url":null,
+    "youtube_url":null
+ }
+"#;

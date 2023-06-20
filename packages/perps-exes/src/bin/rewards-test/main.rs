@@ -31,6 +31,7 @@ struct Hatch {
     pub profile_admin_wallet: Wallet,
     pub contract: Contract,
     pub burn_egg_contract: Contract,
+    pub burn_dust_contract: Contract,
     pub profile_contract: Contract,
     pub config: HatchConfig,
 }
@@ -58,6 +59,11 @@ impl Hatch {
             config.nft_burn_contracts.egg.to_string().parse().unwrap(),
         );
 
+        let burn_dust_contract = Contract::new(
+            cosmos.clone(),
+            config.nft_burn_contracts.dust.to_string().parse().unwrap(),
+        );
+
         let profile_contract = Contract::new(
             cosmos.clone(),
             config.profile_contract.to_string().parse().unwrap(),
@@ -70,6 +76,7 @@ impl Hatch {
             profile_admin_wallet,
             contract,
             burn_egg_contract,
+            burn_dust_contract,
             profile_contract,
             config,
         })
@@ -168,8 +175,10 @@ async fn main() -> Result<()> {
                 &opt.path_to_hatchery,
                 opt.mint_eggs_start_skip,
                 opt.mint_eggs_count,
+                opt.mint_dusts_count,
                 opt.profile_spirit_level,
                 opt.egg_spirit_level,
+                opt.dust_spirit_level,
             )
             .await?;
 
@@ -224,6 +233,8 @@ async fn main() -> Result<()> {
                     &opt.path_to_hatchery,
                     opt.mint_eggs_start_skip,
                     opt.mint_eggs_count,
+                    opt.mint_dusts_count,
+                    Some("1.23".parse().unwrap()),
                     "1.23".parse().unwrap(),
                     "1.23".parse().unwrap(),
                 )
@@ -428,16 +439,22 @@ async fn get_hatch_status(hatch: &Hatch, details: bool) -> Result<MaybeHatchStat
         })
         .await
 }
+
+#[allow(clippy::too_many_arguments)]
 async fn mint_test(
     hatch: &Hatch,
     owner: String,
     path_to_hatchery: &Path,
     mint_eggs_start_skip: usize,
     mint_eggs_count: u32,
-    profile_spirit_level: NumberGtZero,
+    mint_dusts_count: u32,
+    profile_spirit_level: Option<NumberGtZero>,
     egg_spirit_level: NumberGtZero,
+    dust_spirit_level: NumberGtZero,
 ) -> Result<PotentialHatchInfo> {
-    add_profile_spirit_level(hatch, profile_spirit_level, owner.clone()).await?;
+    if let Some(profile_spirit_level) = profile_spirit_level {
+        add_profile_spirit_level(hatch, profile_spirit_level, owner.clone()).await?;
+    }
     let filepath = path_to_hatchery
         .join("data")
         .join("juno-warp")
@@ -459,6 +476,14 @@ async fn mint_test(
     )
     .await?;
 
+    let dusts = mint_dusts(
+        hatch,
+        owner.clone(),
+        mint_dusts_count,
+        dust_spirit_level,
+        NftRarity::Ancient,
+    )
+    .await?;
     // query for the "potential hatch info"
 
     let info: PotentialHatchInfo = hatch
@@ -466,12 +491,13 @@ async fn mint_test(
         .query(&HatchQueryMsg::PotentialHatchInfo {
             owner: owner.clone().into(),
             eggs: eggs.clone(),
-            dusts: vec![],
+            dusts: dusts.clone(),
             profile: true,
         })
         .await?;
 
     assert_eq!(info.eggs.len(), eggs.len());
+    assert_eq!(info.dusts.len(), dusts.len());
 
     Ok(info)
 }
@@ -569,6 +595,80 @@ async fn mint_eggs(
 
         log::info!(
             "minted mock nft egg w/ id {} and spirit level {}",
+            token_id,
+            spirit_level
+        );
+        token_ids.push(token_id);
+    }
+
+    Ok(token_ids)
+}
+
+async fn mint_dusts(
+    hatch: &Hatch,
+    owner: String,
+    mint_dusts_count: u32,
+    spirit_level: NumberGtZero,
+    rarity: NftRarity,
+) -> Result<Vec<String>> {
+    // mint the dust NFT
+
+    let mut token_ids = vec![];
+
+    let now: u64 = chrono::Utc::now().timestamp() as u64;
+
+    for i in 0..mint_dusts_count {
+        let token_id = format!("{}", now + i as u64);
+        log::info!(
+            "minting mock dust nft w/ id {} and spirit level {}",
+            token_id,
+            spirit_level
+        );
+
+        hatch
+            .burn_dust_contract
+            .execute(
+                &hatch.nft_mint_admin_wallet,
+                vec![],
+                mock_nft::ExecuteMsg::Mint(Box::new(mock_nft::MintMsg {
+                    token_id: token_id.clone(),
+                    owner: owner.clone(),
+                    token_uri: None,
+                    extension: Metadata::new_dust(spirit_level, rarity),
+                })),
+            )
+            .await?;
+
+        let nft_info: mock_nft::AllNftInfoResponse = hatch
+            .burn_dust_contract
+            .query(mock_nft::QueryMsg::AllNftInfo {
+                token_id: token_id.clone(),
+                include_expired: None,
+            })
+            .await?;
+
+        // make sure the owner is correct
+        assert_eq!(nft_info.access.owner, owner);
+
+        // make sure the minted nft has the correct spirit level
+        let spirit_level_attr: NumberGtZero = nft_info
+            .info
+            .extension
+            .attributes
+            .iter()
+            .find_map(|a| {
+                if a.trait_type == "Spirit Level" {
+                    Some(a.value.parse().unwrap())
+                } else {
+                    None
+                }
+            })
+            .unwrap();
+
+        assert_eq!(spirit_level, spirit_level_attr);
+
+        log::info!(
+            "minted mock nft dust w/ id {} and spirit level {}",
             token_id,
             spirit_level
         );
