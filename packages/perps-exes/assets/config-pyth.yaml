@@ -1,5 +1,6 @@
 update-age-tolerance: 120
-endpoint: "https://pyth.levana.finance/"
+#endpoint: "https://pyth.levana.finance/"
+endpoint: "https://xc-mainnet.pyth.network/"
 markets:
   ATOM_USD:
     feeds: [
