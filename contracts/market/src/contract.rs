@@ -224,23 +224,29 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             leverage,
             slippage_assert,
         } => {
+            handle_update_position_shared(&state, &mut ctx, info.sender, id, None, None)?;
+
             let notional_size = state.update_leverage_new_notional_size(&mut ctx, id, leverage)?;
-            handle_update_position_shared(
-                &state,
-                &mut ctx,
-                info.sender,
-                id,
-                Some(notional_size),
-                slippage_assert,
-            )?;
+            if let Some(slippage_assert) = slippage_assert {
+                let market_type = state.market_id(ctx.storage)?.get_market_type();
+                let pos = get_position(ctx.storage, id)?;
+                let delta_notional_size = notional_size - pos.notional_size;
+                state.do_slippage_assert(
+                    ctx.storage,
+                    slippage_assert,
+                    delta_notional_size,
+                    market_type,
+                    Some(pos.liquidation_margin.delta_neutrality),
+                )?;
+            }
 
             state.update_position_leverage(&mut ctx, id, notional_size)?;
         }
 
         ExecuteMsg::UpdatePositionMaxGains { id, max_gains } => {
+            handle_update_position_shared(&state, &mut ctx, info.sender, id, None, None)?;
             let counter_collateral =
                 state.update_max_gains_new_counter_collateral(&mut ctx, id, max_gains)?;
-            handle_update_position_shared(&state, &mut ctx, info.sender, id, None, None)?;
             state.update_position_max_gains(&mut ctx, id, counter_collateral)?;
         }
 
