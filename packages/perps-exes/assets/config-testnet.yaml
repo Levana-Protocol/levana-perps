@@ -1,4 +1,4 @@
-price-api: "https://price-api.sandbox.levana.finance/"
+price-api: "https://price-api.levana.exchange/"
 liquidity:
   markets:
     ATOM_USD:
