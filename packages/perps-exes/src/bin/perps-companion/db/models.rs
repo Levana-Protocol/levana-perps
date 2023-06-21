@@ -1,41 +1,31 @@
-use cosmos::Address;
-use msg::contracts::market::position::PositionId;
-use sqlx::FromRow;
+use shared::storage::{MarketId, PriceBaseInQuote};
 
-use crate::{endpoints::pnl::PnlType, types::ChainId};
+use crate::{
+    endpoints::pnl::PositionInfo,
+    types::{ChainId, ContractEnvironment, DirectionForDb},
+};
 
-#[derive(FromRow, Debug, PartialEq, Eq)]
-pub(crate) struct AddressModel {
-    pub(crate) id: i64,
-    pub(crate) address: String,
-}
-
-#[derive(FromRow, Debug, PartialEq, Eq)]
-pub(crate) struct PositionDetail {
-    pub(crate) id: i64,
-    pub(crate) contract_address: i64,
-    #[sqlx(try_from = "String")]
-    pub(crate) chain: ChainId,
-    pub(crate) position_id: i64,
-    pub(crate) pnl_type: String,
-    pub(crate) url_id: i32,
-}
-
-#[derive(FromRow, Debug, PartialEq, Eq)]
-pub(crate) struct NewPositionDetail {
-    pub(crate) chain: String,
-    pub(crate) address: String,
-    pub(crate) position_id: i64,
-}
-
-// This is a type safe variant of PositionDetail with more
-// information.
+/// Position data returned from the database for a given URL ID.
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) struct UrlDetail {
-    pub(crate) id: i64,
-    pub(crate) contract_address: Address,
+pub(crate) struct PositionInfoFromDb {
+    pub(crate) market_id: String,
+    pub(crate) environment: ContractEnvironment,
+    pub(crate) pnl: String,
+    pub(crate) direction: DirectionForDb,
+    pub(crate) entry_price: String,
+    pub(crate) exit_price: String,
+    pub(crate) leverage: String,
     pub(crate) chain: ChainId,
-    pub(crate) position_id: PositionId,
-    pub(crate) pnl_type: PnlType,
-    pub(crate) url_id: i32,
+}
+
+/// Information sent to the database to insert a new position.
+pub(crate) struct PositionInfoToDb {
+    pub(crate) info: PositionInfo,
+    pub(crate) market_id: MarketId,
+    pub(crate) pnl: String,
+    pub(crate) direction: DirectionForDb,
+    pub(crate) entry_price: PriceBaseInQuote,
+    pub(crate) exit_price: PriceBaseInQuote,
+    pub(crate) leverage: String,
+    pub(crate) environment: ContractEnvironment,
 }
