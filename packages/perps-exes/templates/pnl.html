@@ -80,7 +80,7 @@
       var pnl = '{{ pnl_display }}'
       var direction = '{{ direction }}'
       var market = '{{ market_id }}'
-      var target = '{{ target }}'
+      var chain = '{{ chain }}'
       var domain = window.location.host
 
       amplitude.init(API_KEY);
@@ -89,7 +89,7 @@
         pnl: pnl,
         direction: direction,
         market: market,
-        chain: target,
+        chain: chain,  // TODO: This is not chain but target
         domain: domain,
       };
 

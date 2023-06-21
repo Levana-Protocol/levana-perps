@@ -51,10 +51,6 @@ fn is_beta(label: &str) -> bool {
     label.ends_with("beta") || label.ends_with("trade")
 }
 
-fn get_target(label: &str) -> Option<&str> {
-    label.split(" ").last()
-}
-
 pub(super) async fn html_usd(
     PnlUsdHtml {
         chain,
@@ -186,24 +182,21 @@ impl Pnl {
             position,
         } = &self;
         let cosmos = app.cosmos.get(chain).ok_or(Error::UnknownChainId)?;
-        let contract_info = match cosmos.contract_info(market).await {
-            Ok(contract_info) => contract_info,
-            Err(_) => return Err(Error::CouldNotGetContractInfo),
-        };
 
         let amplitude_key = if is_mainnet(chain) {
             AMPLITUDE_MAINNET_KEY
         } else {
-            if is_beta(&contract_info.label) {
-                AMPLITUDE_BETA_KEY
-            } else {
-                AMPLITUDE_DEV_KEY
-            }
-        };
+            match cosmos.contract_info(market).await {
+                Ok(contract_info) => {
+                    if is_beta(&contract_info.label) {
+                        AMPLITUDE_BETA_KEY
+                    } else {
+                        AMPLITUDE_DEV_KEY
+                    }
+                }
 
-        let target = match get_target(&contract_info.label) {
-            Some(target) => target,
-            None => return Err(Error::CouldNotGetTarget),
+                Err(_) => AMPLITUDE_BETA_KEY,
+            }
         };
 
         let contract = MarketContract(cosmos.make_contract(*market));
@@ -258,7 +251,6 @@ impl Pnl {
         Ok(PnlInfo::new(
             self,
             amplitude_key,
-            target,
             pos,
             status.market_id,
             entry_price,
@@ -344,10 +336,6 @@ pub(crate) enum Error {
     },
     #[error("Error parsing path: {msg}")]
     Path { msg: String },
-    #[error("Could not get contract info")]
-    CouldNotGetContractInfo,
-    #[error("Could not get target")]
-    CouldNotGetTarget,
 }
 
 impl IntoResponse for Error {
@@ -363,8 +351,6 @@ impl IntoResponse for Error {
                     QueryType::ExitPrice => StatusCode::INTERNAL_SERVER_ERROR,
                     QueryType::Positions => StatusCode::INTERNAL_SERVER_ERROR,
                 },
-                Error::CouldNotGetContractInfo => StatusCode::BAD_REQUEST,
-                Error::CouldNotGetTarget => StatusCode::BAD_REQUEST,
                 Error::Path { msg: _ } => StatusCode::BAD_REQUEST,
             },
             error: self,
@@ -379,7 +365,7 @@ struct PnlInfo {
     amplitude_key: &'static str,
     pnl_display: String,
     host: String,
-    target: String,
+    chain: String,
     image_url: String,
     html_url: String,
     market_id: String,
@@ -397,7 +383,6 @@ impl PnlInfo {
             position,
         }: Pnl,
         amplitude_key: &'static str,
-        target: &str,
         pos: ClosedPosition,
         market_id: MarketId,
         entry_price: PricePoint,
@@ -422,7 +407,7 @@ impl PnlInfo {
                     }
                 },
             },
-            target: target.to_string(),
+            chain: chain.clone(),
             image_url: match pnl_type {
                 PnlType::Usd => PnlUsdImage {
                     chain: chain.clone(),
