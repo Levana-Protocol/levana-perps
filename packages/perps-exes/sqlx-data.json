@@ -1,32 +1,6 @@
 {
   "db": "PostgreSQL",
-  "34e410cc28a131fd72654027999111cee31a79deedc12d93993da929cd38c429": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id",
-          "ordinal": 0,
-          "type_info": "Int8"
-        },
-        {
-          "name": "address",
-          "ordinal": 1,
-          "type_info": "Varchar"
-        }
-      ],
-      "nullable": [
-        false,
-        false
-      ],
-      "parameters": {
-        "Left": [
-          "Varchar"
-        ]
-      }
-    },
-    "query": "INSERT INTO address(address) VALUES($1) RETURNING id, address"
-  },
-  "64de8cda96e41770dea256b097dea4ccb6a146dec3c057596eef2c8c391a01c5": {
+  "21817af5d46a752073f4a058858cf7897eba5d1afcf4074e7993b69e0783c5d8": {
     "describe": {
       "columns": [
         {
@@ -40,9 +14,9 @@
           "type_info": "Int8"
         },
         {
-          "name": "chain",
+          "name": "chain: ChainId",
           "ordinal": 2,
-          "type_info": "Varchar"
+          "type_info": "Int4"
         },
         {
           "name": "position_id",
@@ -71,13 +45,89 @@
       "parameters": {
         "Left": [
           "Int8",
-          "Text",
+          "Int4",
           "Int8",
-          "Text"
+          "Varchar"
         ]
       }
     },
-    "query": "SELECT id, contract_address, chain, position_id, pnl_type, url_id FROM position_detail WHERE contract_address=$1 AND chain=$2 AND position_id=$3 AND pnl_type=$4"
+    "query": "INSERT INTO position_detail(contract_address, chain, position_id, pnl_type) VALUES($1, $2, $3, $4) RETURNING id, contract_address, chain as \"chain: ChainId\", position_id, pnl_type, url_id"
+  },
+  "34e410cc28a131fd72654027999111cee31a79deedc12d93993da929cd38c429": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "address",
+          "ordinal": 1,
+          "type_info": "Varchar"
+        }
+      ],
+      "nullable": [
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Varchar"
+        ]
+      }
+    },
+    "query": "INSERT INTO address(address) VALUES($1) RETURNING id, address"
+  },
+  "353ea0d7789f52b137302b05882a91ba7daacd300e966f8a8f6bf08c5949fda4": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "contract_address",
+          "ordinal": 1,
+          "type_info": "Int8"
+        },
+        {
+          "name": "chain: ChainId",
+          "ordinal": 2,
+          "type_info": "Int4"
+        },
+        {
+          "name": "position_id",
+          "ordinal": 3,
+          "type_info": "Int8"
+        },
+        {
+          "name": "pnl_type",
+          "ordinal": 4,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "url_id",
+          "ordinal": 5,
+          "type_info": "Int4"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      }
+    },
+    "query": "SELECT id, contract_address, chain as \"chain: ChainId\", position_id, pnl_type, url_id FROM position_detail WHERE url_id=$1"
   },
   "844f89010fd213d5f3028b84129f82dc31ec142826894fd4c38a2ab48f3af120": {
     "describe": {
@@ -131,7 +181,7 @@
     },
     "query": "SELECT id, address FROM address WHERE address=$1"
   },
-  "d37135b04c2d971e60ca3f5b566b4eb5ccd602d2c7f31de8609de6418008a484": {
+  "dd4b1e0c0bebe425ddcc25fcfb3cc266a5b20a2f27fa776df64333822f808a85": {
     "describe": {
       "columns": [
         {
@@ -145,59 +195,9 @@
           "type_info": "Int8"
         },
         {
-          "name": "chain",
+          "name": "chain: ChainId",
           "ordinal": 2,
-          "type_info": "Varchar"
-        },
-        {
-          "name": "position_id",
-          "ordinal": 3,
-          "type_info": "Int8"
-        },
-        {
-          "name": "pnl_type",
-          "ordinal": 4,
-          "type_info": "Varchar"
-        },
-        {
-          "name": "url_id",
-          "ordinal": 5,
           "type_info": "Int4"
-        }
-      ],
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      }
-    },
-    "query": "SELECT id, contract_address, chain, position_id, pnl_type, url_id FROM position_detail WHERE url_id=$1"
-  },
-  "d9b1981d31cbea966c71bd78961b09ec0771d7b01999d2d4b9609a6335c4259c": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id",
-          "ordinal": 0,
-          "type_info": "Int8"
-        },
-        {
-          "name": "contract_address",
-          "ordinal": 1,
-          "type_info": "Int8"
-        },
-        {
-          "name": "chain",
-          "ordinal": 2,
-          "type_info": "Varchar"
         },
         {
           "name": "position_id",
@@ -226,12 +226,12 @@
       "parameters": {
         "Left": [
           "Int8",
-          "Varchar",
+          "Int4",
           "Int8",
-          "Varchar"
+          "Text"
         ]
       }
     },
-    "query": "INSERT INTO position_detail(contract_address, chain, position_id, pnl_type) VALUES($1, $2, $3, $4) RETURNING id, contract_address, chain, position_id, pnl_type, url_id"
+    "query": "SELECT id, contract_address, chain as \"chain: ChainId\", position_id, pnl_type, url_id FROM position_detail WHERE contract_address=$1 AND chain=$2 AND position_id=$3 AND pnl_type=$4"
   }
 }
