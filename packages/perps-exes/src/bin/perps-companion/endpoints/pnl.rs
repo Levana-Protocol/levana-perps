@@ -7,7 +7,7 @@ use axum::{
     headers::Host,
     http::HeaderValue,
     response::{Html, IntoResponse, Response},
-    TypedHeader,
+    Json, TypedHeader,
 };
 use axum_extra::response::Css;
 use axum_extra::routing::TypedPath;
@@ -28,13 +28,15 @@ use reqwest::{
     StatusCode,
 };
 use resvg::usvg::{TreeParsing, TreeTextToPath};
+use serde::Deserialize;
+use serde_json::{json, Value};
 
 use crate::app::App;
 
-use super::{ErrorPage, PnlCssRoute, PnlPercentHtml, PnlPercentImage, PnlUsdHtml, PnlUsdImage};
+use super::{ErrorPage, PnlCssRoute, PnlHtml, PnlImage, PnlUrl};
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum PnlType {
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize)]
+pub(crate) enum PnlType {
     Usd,
     Percent,
 }
@@ -51,63 +53,88 @@ fn is_beta(label: &str) -> bool {
     label.ends_with("beta") || label.ends_with("trade")
 }
 
-pub(super) async fn html_usd(
-    PnlUsdHtml {
-        chain,
-        market,
-        position,
-    }: PnlUsdHtml,
-    TypedHeader(host): TypedHeader<Host>,
-    app: State<Arc<App>>,
-) -> impl IntoResponse {
-    let pnl = Pnl::new(chain, market, position);
-
-    pnl.with_pnl(&app, host, PnlInfo::html, PnlType::Usd).await
+impl From<PnlType> for String {
+    fn from(val: PnlType) -> Self {
+        match val {
+            PnlType::Usd => "Usd".into(),
+            PnlType::Percent => "Percent".into(),
+        }
+    }
 }
 
-pub(super) async fn image_usd(
-    PnlUsdImage {
-        chain,
-        market,
-        position,
-    }: PnlUsdImage,
-    TypedHeader(host): TypedHeader<Host>,
+pub(super) async fn pnl_url(
+    _: PnlUrl,
     app: State<Arc<App>>,
-) -> impl IntoResponse {
-    let pnl = Pnl::new(chain, market, position);
-    pnl.with_pnl(&app, host, PnlInfo::image, PnlType::Usd).await
-}
-
-pub(super) async fn html_percent(
-    PnlPercentHtml {
-        chain,
-        market,
-        position,
-    }: PnlPercentHtml,
-    TypedHeader(host): TypedHeader<Host>,
-    app: State<Arc<App>>,
-) -> impl IntoResponse {
-    let pnl = Pnl::new(chain, market, position);
-    pnl.with_pnl(&app, host, PnlInfo::html, PnlType::Percent)
+    Json(position_info): Json<PositionInfo>,
+) -> Result<Json<Value>, Error> {
+    let db = &app.db;
+    let position_detail = db
+        .insert_position_detail(position_info)
         .await
+        .map_err(|e| Error::Database { msg: e.to_string() })?;
+    let url_id = position_detail.url_id;
+    let url = PnlHtml { pnl_id: url_id };
+    Ok(Json(json!({ "url": url.to_uri().to_string() })))
 }
 
-pub(super) async fn image_percent(
-    PnlPercentImage {
-        chain,
-        market,
-        position,
-    }: PnlPercentImage,
+pub(super) async fn pnl_html(
+    PnlHtml { pnl_id }: PnlHtml,
     TypedHeader(host): TypedHeader<Host>,
-    app: State<Arc<App>>,
-) -> impl IntoResponse {
-    let pnl = Pnl::new(chain, market, position);
-    pnl.with_pnl(&app, host, PnlInfo::image, PnlType::Percent)
+    State(app): State<Arc<App>>,
+) -> Result<Response, Error> {
+    let url_detail = app
+        .db
+        .get_url_detail(pnl_id)
         .await
+        .map_err(|e| Error::Database { msg: e.to_string() })?;
+    match url_detail {
+        Some(url_detail) => {
+            let pnl = Pnl::new(
+                url_detail.chain,
+                url_detail.contract_address,
+                url_detail.position_id,
+            );
+            pnl.with_pnl(&app, host, PnlInfo::html, url_detail.pnl_type, pnl_id)
+                .await
+        }
+        None => Err(Error::InvalidPage),
+    }
+}
+
+pub(super) async fn pnl_image(
+    PnlImage { pnl_id }: PnlImage,
+    TypedHeader(host): TypedHeader<Host>,
+    State(app): State<Arc<App>>,
+) -> Result<Response, Error> {
+    let url_detail = app
+        .db
+        .get_url_detail(pnl_id)
+        .await
+        .map_err(|e| Error::Database { msg: e.to_string() })?;
+    match url_detail {
+        Some(url_detail) => {
+            let pnl = Pnl::new(
+                url_detail.chain,
+                url_detail.contract_address,
+                url_detail.position_id,
+            );
+            pnl.with_pnl(&app, host, PnlInfo::image, url_detail.pnl_type, pnl_id)
+                .await
+        }
+        None => Err(Error::InvalidPage),
+    }
 }
 
 pub(super) async fn css(_: PnlCssRoute) -> Css<&'static str> {
     Css(include_str!("../../../../static/pnl.css"))
+}
+
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
+pub(crate) struct PositionInfo {
+    pub(crate) address: Address,
+    pub(crate) chain: String,
+    pub(crate) position_id: PositionId,
+    pub(crate) pnl_type: PnlType,
 }
 
 struct MarketContract(Contract);
@@ -163,11 +190,12 @@ impl Pnl {
         host: Host,
         f: F,
         pnl_type: PnlType,
+        pnl_id: i32,
     ) -> Result<Response, Error>
     where
         F: FnOnce(PnlInfo) -> Response,
     {
-        self.get_pnl_info(app, host, pnl_type).await.map(f)
+        self.get_pnl_info(app, host, pnl_type, pnl_id).await.map(f)
     }
 
     async fn get_pnl_info(
@@ -175,6 +203,7 @@ impl Pnl {
         app: &App,
         host: Host,
         pnl_type: PnlType,
+        pnl_id: i32,
     ) -> Result<PnlInfo, Error> {
         let Pnl {
             chain,
@@ -257,6 +286,7 @@ impl Pnl {
             exit_price,
             pnl_type,
             host,
+            pnl_id,
         ))
     }
 }
@@ -336,6 +366,10 @@ pub(crate) enum Error {
     },
     #[error("Error parsing path: {msg}")]
     Path { msg: String },
+    #[error("Error returned from database")]
+    Database { msg: String },
+    #[error("Page not found")]
+    InvalidPage,
 }
 
 impl IntoResponse for Error {
@@ -352,6 +386,11 @@ impl IntoResponse for Error {
                     QueryType::Positions => StatusCode::INTERNAL_SERVER_ERROR,
                 },
                 Error::Path { msg: _ } => StatusCode::BAD_REQUEST,
+                Error::Database { msg } => {
+                    log::error!("Database serror: {msg}");
+                    StatusCode::INTERNAL_SERVER_ERROR
+                }
+                Error::InvalidPage => StatusCode::NOT_FOUND,
             },
             error: self,
         }
@@ -379,8 +418,7 @@ impl PnlInfo {
     fn new(
         Pnl {
             chain,
-            market,
-            position,
+            ..
         }: Pnl,
         amplitude_key: &'static str,
         pos: ClosedPosition,
@@ -389,6 +427,7 @@ impl PnlInfo {
         exit_price: PricePoint,
         pnl_type: PnlType,
         host: Host,
+        pnl_id: i32,
     ) -> Self {
         let market_type = market_id.get_market_type();
         PnlInfo {
@@ -408,38 +447,8 @@ impl PnlInfo {
                 },
             },
             chain: chain.clone(),
-            image_url: match pnl_type {
-                PnlType::Usd => PnlUsdImage {
-                    chain: chain.clone(),
-                    market,
-                    position,
-                }
-                .to_uri()
-                .to_string(),
-                PnlType::Percent => PnlPercentImage {
-                    chain: chain.clone(),
-                    market,
-                    position,
-                }
-                .to_uri()
-                .to_string(),
-            },
-            html_url: match pnl_type {
-                PnlType::Usd => PnlUsdHtml {
-                    chain,
-                    market,
-                    position,
-                }
-                .to_uri()
-                .to_string(),
-                PnlType::Percent => PnlUsdHtml {
-                    chain,
-                    market,
-                    position,
-                }
-                .to_uri()
-                .to_string(),
-            },
+            image_url: PnlImage { pnl_id }.to_uri().to_string(),
+            html_url: PnlHtml { pnl_id }.to_uri().to_string(),
             market_id: market_id.to_string().replace('_', "/"),
             direction: match pos.direction_to_base {
                 DirectionToBase::Long => "LONG",

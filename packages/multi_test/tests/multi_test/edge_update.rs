@@ -146,7 +146,7 @@ fn leverage_edge() {
         .unwrap();
 
     // Bumping above high_leverage will result in failure
-    let fail_high_leverage = "30";
+    let fail_high_leverage = "30.01";
 
     let response = market.exec_update_position_leverage(
         &trader,
