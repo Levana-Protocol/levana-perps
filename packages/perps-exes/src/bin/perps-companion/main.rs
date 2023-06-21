@@ -19,5 +19,6 @@ async fn main_inner() -> Result<()> {
     let opt = Opt::parse();
     opt.init_logger();
     let app = App::new(opt).await?;
+    app.migrate_db().await?;
     endpoints::launch(app).await
 }

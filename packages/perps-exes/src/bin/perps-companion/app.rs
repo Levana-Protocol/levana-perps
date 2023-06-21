@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use cosmos::Cosmos;
 
 use crate::{cli::Opt, db::handle::Db, types::ChainId};
@@ -29,5 +29,12 @@ impl App {
             opt,
             db,
         })
+    }
+
+    pub(crate) async fn migrate_db(&self) -> Result<()> {
+        sqlx::migrate!("src/bin/perps-companion/migrations")
+            .run(&self.db.pool)
+            .await
+            .context("Error while running database migrations")
     }
 }
