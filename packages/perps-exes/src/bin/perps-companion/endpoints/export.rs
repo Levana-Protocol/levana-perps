@@ -187,7 +187,7 @@ impl CsvGenerator {
     }
 
     /// Create a vec of [ActionRecord]s by zipping [PositionAction]s and [LpAction]s together, sorting them
-    /// chronologically, and filtering out actions that didn't actually move and collateral (e.g. update leverage)
+    /// chronologically, and filtering out actions that didn't actually move any collateral (e.g. update leverage)
     fn get_action_records(&self) -> Result<Vec<ActionRecord>, Error> {
         let mut position_actions_iter = self
             .position_actions
