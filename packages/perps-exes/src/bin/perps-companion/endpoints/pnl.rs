@@ -42,6 +42,18 @@ pub(crate) enum PnlType {
     Percent,
 }
 
+const AMPLITUDE_MAINNET_KEY: &str = "b95d602af8198e98fb113a4e01b02ac7";
+const AMPLITUDE_BETA_KEY: &str = "90522542888df13ac43bc467698fa94d";
+const AMPLITUDE_DEV_KEY: &str = "272aaf66576c3fe4d054149073bb70a2";
+
+fn is_mainnet(label: &str) -> bool {
+    label == "pacific-1"
+}
+
+fn is_beta(label: &str) -> bool {
+    label.ends_with("beta") || label.ends_with("trade")
+}
+
 impl From<PnlType> for String {
     fn from(val: PnlType) -> Self {
         match val {
@@ -201,6 +213,22 @@ impl Pnl {
         } = &self;
         let cosmos = app.cosmos.get(chain).ok_or(Error::UnknownChainId)?;
 
+        let amplitude_key = if is_mainnet(chain) {
+            AMPLITUDE_MAINNET_KEY
+        } else {
+            match cosmos.contract_info(market).await {
+                Ok(contract_info) => {
+                    if is_beta(&contract_info.label) {
+                        AMPLITUDE_BETA_KEY
+                    } else {
+                        AMPLITUDE_DEV_KEY
+                    }
+                }
+
+                Err(_) => AMPLITUDE_BETA_KEY,
+            }
+        };
+
         let contract = MarketContract(cosmos.make_contract(*market));
 
         let status = contract
@@ -250,15 +278,17 @@ impl Pnl {
             )
             .await?;
 
-        Ok(PnlInfo::new(
+        Ok(PnlInfo::new(PnlInfoNewArgs {
+            pnl: self,
+            amplitude_key,
             pos,
-            status.market_id,
+            market_id: status.market_id,
             entry_price,
             exit_price,
             pnl_type,
             host,
             pnl_id,
-        ))
+        }))
     }
 }
 
@@ -372,8 +402,10 @@ impl IntoResponse for Error {
 #[derive(askama::Template)]
 #[template(path = "pnl.html")]
 struct PnlInfo {
+    amplitude_key: &'static str,
     pnl_display: String,
     host: String,
+    chain: String,
     image_url: String,
     html_url: String,
     market_id: String,
@@ -383,18 +415,36 @@ struct PnlInfo {
     leverage: TwoDecimalPoints,
 }
 
+struct PnlInfoNewArgs {
+    pnl: Pnl,
+    amplitude_key: &'static str,
+    pos: ClosedPosition,
+    market_id: MarketId,
+    entry_price: PricePoint,
+    exit_price: PricePoint,
+    pnl_type: PnlType,
+    host: Host,
+    pnl_id: i32,
+}
+
 impl PnlInfo {
     fn new(
-        pos: ClosedPosition,
-        market_id: MarketId,
-        entry_price: PricePoint,
-        exit_price: PricePoint,
-        pnl_type: PnlType,
-        host: Host,
-        pnl_id: i32,
+        PnlInfoNewArgs {
+            pnl,
+            amplitude_key,
+            pos,
+            market_id,
+            entry_price,
+            exit_price,
+            pnl_type,
+            host,
+            pnl_id,
+        }: PnlInfoNewArgs,
     ) -> Self {
+        let Pnl { chain, .. } = pnl;
         let market_type = market_id.get_market_type();
         PnlInfo {
+            amplitude_key,
             pnl_display: match pnl_type {
                 PnlType::Usd => UsdDisplay(pos.pnl_usd).to_string(),
                 PnlType::Percent => match pos.deposit_collateral.try_into_positive_value() {
@@ -409,6 +459,7 @@ impl PnlInfo {
                     }
                 },
             },
+            chain,
             image_url: PnlImage { pnl_id }.to_uri().to_string(),
             html_url: PnlHtml { pnl_id }.to_uri().to_string(),
             market_id: market_id.to_string().replace('_', "/"),
