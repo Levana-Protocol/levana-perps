@@ -10,9 +10,7 @@ use msg::contracts::market::entry::{
     LpAction, LpActionHistoryResp, LpActionKind, PositionAction, PositionActionKind, StatusResp,
     TraderActionHistoryResp,
 };
-use msg::prelude::{
-    DirectionToBase, MarketQueryMsg, OrderInMessage, RawAddr, Signed
-};
+use msg::prelude::{DirectionToBase, MarketQueryMsg, OrderInMessage, RawAddr, Signed};
 use perps_exes::prelude::{Collateral, UnsignedDecimal};
 use reqwest::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
 use reqwest::StatusCode;
@@ -171,28 +169,32 @@ impl Exporter {
 struct CsvGenerator {
     status: StatusResp,
     position_actions: Vec<PositionAction>,
-    lp_actions: Vec<LpAction>
+    lp_actions: Vec<LpAction>,
 }
 
 impl CsvGenerator {
     /// Returns a new CsvGenerator
-    fn new(status: StatusResp, position_actions: Vec<PositionAction>, lp_actions: Vec<LpAction>) -> CsvGenerator {
+    fn new(
+        status: StatusResp,
+        position_actions: Vec<PositionAction>,
+        lp_actions: Vec<LpAction>,
+    ) -> CsvGenerator {
         CsvGenerator {
             status,
             position_actions,
-            lp_actions
+            lp_actions,
         }
     }
 
-    /// Create a vec of [ActionRecord]s by zipping [PositionAction]s and [LpAction]s together, sorted
+    /// Create a vec of [ActionRecord]s by zipping [PositionAction]s and [LpAction]s together, sorting them
     /// chronologically, and filtering out actions that didn't actually move and collateral (e.g. update leverage)
-    fn get_action_records(
-        &self,
-    ) -> Result<Vec<ActionRecord>, Error> {
-        let mut position_actions_iter = self.position_actions
+    fn get_action_records(&self) -> Result<Vec<ActionRecord>, Error> {
+        let mut position_actions_iter = self
+            .position_actions
             .iter()
             .filter(|action| !action.transfer_collateral.is_zero());
-        let mut lp_actions_iter = self.lp_actions
+        let mut lp_actions_iter = self
+            .lp_actions
             .iter()
             .filter(|action| !action.collateral.is_zero());
         let mut next_position_action = position_actions_iter.next();
@@ -293,7 +295,7 @@ impl ActionRecord {
         })
     }
 
-    /// Converts a LpAction into an ActionRecord
+    /// Converts an LpAction into an ActionRecord
     fn from_lp_action(action: &LpAction, status: &StatusResp) -> Result<Self, Error> {
         let dt = action
             .timestamp

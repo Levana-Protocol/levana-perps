@@ -97,8 +97,6 @@ pub(crate) struct ExportHistory {
     pub(crate) chain: String,
     pub(crate) market: Address,
     pub(crate) wallet: Address,
-    // pub(crate) start: u32,
-    // pub(crate) end: u32
 }
 
 pub(crate) async fn launch(app: App) -> Result<()> {
