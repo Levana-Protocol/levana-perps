@@ -85,8 +85,8 @@ impl Db {
             position_id,
             pnl,
             direction as i32,
-            entry_price.to_string(),
-            exit_price.to_string(),
+            TwoDecimalPoints(entry_price.into_number()).to_string(),
+            TwoDecimalPoints(exit_price.into_number()).to_string(),
             leverage,
             pnl_type as i32,
         )
