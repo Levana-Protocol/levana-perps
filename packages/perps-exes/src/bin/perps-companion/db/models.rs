@@ -2,7 +2,7 @@ use shared::storage::{MarketId, PriceBaseInQuote};
 
 use crate::{
     endpoints::pnl::PositionInfo,
-    types::{ContractEnvironment, DirectionForDb},
+    types::{ChainId, ContractEnvironment, DirectionForDb},
 };
 
 /// Position data returned from the database for a given URL ID.
@@ -15,6 +15,7 @@ pub(crate) struct PositionInfoFromDb {
     pub(crate) entry_price: String,
     pub(crate) exit_price: String,
     pub(crate) leverage: String,
+    pub(crate) chain: ChainId,
 }
 
 /// Information sent to the database to insert a new position.

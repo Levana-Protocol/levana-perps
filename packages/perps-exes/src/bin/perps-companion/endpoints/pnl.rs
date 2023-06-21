@@ -1,4 +1,4 @@
-use std::{fmt::Display, sync::Arc};
+use std::{borrow::Cow, fmt::Display, sync::Arc};
 
 use anyhow::{Context, Result};
 use askama::Template;
@@ -55,12 +55,13 @@ impl PnlInfo {
     async fn load_from_database(app: &App, pnl_id: i64, host: &Host) -> Result<Self, Error> {
         let PositionInfoFromDb {
             market_id,
-            environment: _, // FIXME used for analytics, to be merged next
+            environment,
             pnl,
             direction,
             entry_price,
             exit_price,
             leverage,
+            chain,
         } = app
             .db
             .get_url_detail(pnl_id)
@@ -77,6 +78,8 @@ impl PnlInfo {
             entry_price,
             exit_price,
             leverage,
+            amplitude_key: environment.amplitude_key(),
+            chain: chain.to_string(),
         })
     }
 }
@@ -154,6 +157,11 @@ impl PositionInfo {
         } = &self;
         let cosmos = app.cosmos.get(chain).ok_or(Error::UnknownChainId)?;
 
+        // TODO check the database first to see if we need to insert this at all.
+        let label = match cosmos.contract_info(*address).await {
+            Ok(info) => Cow::Owned(info.label),
+            Err(_) => "unknown contract".into(),
+        };
         let contract = MarketContract(cosmos.make_contract(*address));
 
         let status = contract
@@ -225,7 +233,7 @@ impl PositionInfo {
                 ),
             }
             .to_string(),
-            environment: ContractEnvironment::Beta, // FIXME change when merging with analytics PR
+            environment: ContractEnvironment::from_market(*chain, &label),
             pnl: match pnl_type {
                 PnlType::Usd => UsdDisplay(pos.pnl_usd).to_string(),
                 PnlType::Percent => match pos.deposit_collateral.try_into_positive_value() {
@@ -355,8 +363,10 @@ impl IntoResponse for Error {
 #[derive(askama::Template)]
 #[template(path = "pnl.html")]
 struct PnlInfo {
+    amplitude_key: &'static str,
     pnl_display: String,
     host: String,
+    chain: String,
     image_url: String,
     html_url: String,
     market_id: String,

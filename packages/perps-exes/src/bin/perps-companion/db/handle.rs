@@ -106,7 +106,8 @@ impl Db {
                     exit_price,
                     leverage,
                     direction as "direction: DirectionForDb",
-                    environment as "environment: ContractEnvironment"
+                    environment as "environment: ContractEnvironment",
+                    chain as "chain: ChainId"
                 FROM position_detail INNER JOIN market
                 ON position_detail.market = market.id
                 WHERE url_id=$1
