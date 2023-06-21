@@ -277,19 +277,17 @@ impl Pnl {
             )
             .await?;
 
-        Ok(PnlInfo::new(
-            PnlInfoNewArgs {
-              pnl: self,
-              amplitude_key,
-              pos,
-              market_id: status.market_id,
-              entry_price,
-              exit_price,
-              pnl_type,
-              host,
-              pnl_id,
-            }
-        ))
+        Ok(PnlInfo::new(PnlInfoNewArgs {
+            pnl: self,
+            amplitude_key,
+            pos,
+            market_id: status.market_id,
+            entry_price,
+            exit_price,
+            pnl_type,
+            host,
+            pnl_id,
+        }))
     }
 }
 
@@ -430,17 +428,17 @@ struct PnlInfoNewArgs {
 
 impl PnlInfo {
     fn new(
-      PnlInfoNewArgs {
-        pnl,
-        amplitude_key,
-        pos,
-        market_id,
-        entry_price,
-        exit_price,
-        pnl_type,
-        host,
-        pnl_id,
-      } : PnlInfoNewArgs
+        PnlInfoNewArgs {
+            pnl,
+            amplitude_key,
+            pos,
+            market_id,
+            entry_price,
+            exit_price,
+            pnl_type,
+            host,
+            pnl_id,
+        }: PnlInfoNewArgs,
     ) -> Self {
         let Pnl { chain, .. } = pnl;
         let market_type = market_id.get_market_type();
