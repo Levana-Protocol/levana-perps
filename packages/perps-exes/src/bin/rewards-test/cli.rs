@@ -108,8 +108,12 @@ pub(crate) struct HatchEggOpt {
     pub(crate) path_to_hatchery: PathBuf,
 
     /// number of eggs to mint for the test
-    #[clap(long, default_value = "3")]
+    #[clap(long, default_value = "2")]
     pub(crate) mint_eggs_count: u32,
+
+    /// number of dusts to mint for the test
+    #[clap(long, default_value = "2")]
+    pub(crate) mint_dusts_count: u32,
 
     /// finding a mintable egg requires crawling the CSV
     /// this gets increasingly slow on each test run
@@ -162,13 +166,21 @@ pub(crate) struct MintTestOpt {
     #[clap(long, default_value = "52")]
     pub(crate) mint_eggs_start_skip: usize,
 
-    /// number of eggs to mint for the test
+    /// spirit level to add to the profile
     #[clap(long, default_value = "1.23")]
-    pub(crate) profile_spirit_level: NumberGtZero,
+    pub(crate) profile_spirit_level: Option<NumberGtZero>,
 
-    /// number of eggs to mint for the test
+    /// spirit level in each egg for the test
     #[clap(long, default_value = "1.23")]
     pub(crate) egg_spirit_level: NumberGtZero,
+
+    /// number of dusts to mint for the test
+    #[clap(long, default_value = "3")]
+    pub(crate) mint_dusts_count: u32,
+
+    /// spirit level in each dust for the test
+    #[clap(long, default_value = "1.23")]
+    pub(crate) dust_spirit_level: NumberGtZero,
 }
 
 impl Opt {

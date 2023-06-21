@@ -270,8 +270,16 @@ fn position_update_max_gains() {
     let max_gains = MaxGainsInQuote::from_str("5").unwrap();
     match DefaultMarket::market_type() {
         MarketType::CollateralIsQuote => {
-            perform_update(DirectionToBase::Long, max_gains, "496.7".parse().unwrap());
-            perform_update(DirectionToBase::Short, max_gains, "496.7".parse().unwrap());
+            perform_update(
+                DirectionToBase::Long,
+                max_gains,
+                "496.699996670471841705".parse().unwrap(),
+            );
+            perform_update(
+                DirectionToBase::Short,
+                max_gains,
+                "496.699996670471841705".parse().unwrap(),
+            );
         }
         MarketType::CollateralIsBase => {
             perform_update(
@@ -282,7 +290,7 @@ fn position_update_max_gains() {
             perform_update(
                 DirectionToBase::Short,
                 max_gains,
-                "1080.875983".parse().unwrap(),
+                "1080.875958405433354248".parse().unwrap(),
             );
         }
     }
@@ -292,8 +300,16 @@ fn position_update_max_gains() {
     let max_gains = MaxGainsInQuote::from_str("2").unwrap();
     match DefaultMarket::market_type() {
         MarketType::CollateralIsQuote => {
-            perform_update(DirectionToBase::Long, max_gains, "198.68".parse().unwrap());
-            perform_update(DirectionToBase::Short, max_gains, "198.68".parse().unwrap());
+            perform_update(
+                DirectionToBase::Long,
+                max_gains,
+                "198.679998668188736682".parse().unwrap(),
+            );
+            perform_update(
+                DirectionToBase::Short,
+                max_gains,
+                "198.679998668188736682".parse().unwrap(),
+            );
         }
         MarketType::CollateralIsBase => {
             perform_update(
@@ -304,7 +320,7 @@ fn position_update_max_gains() {
             perform_update(
                 DirectionToBase::Short,
                 max_gains,
-                "271.992263".parse().unwrap(),
+                "271.992259356357591301".parse().unwrap(),
             );
         }
     }
@@ -383,8 +399,8 @@ fn position_update_short_open_interest() {
     .unwrap();
 
     let expected_notional_size_updated = match market.id.get_market_type() {
-        MarketType::CollateralIsQuote => Signed::<Notional>::from_str("-1979.838"),
-        MarketType::CollateralIsBase => Signed::<Notional>::from_str("2076.165"),
+        MarketType::CollateralIsQuote => Signed::<Notional>::from_str("-1979.83799556062912228"),
+        MarketType::CollateralIsBase => Signed::<Notional>::from_str("2076.164994173325723003"),
     }
     .unwrap();
 
@@ -407,8 +423,8 @@ fn position_update_long_open_interest() {
     .unwrap();
 
     let expected_notional_size_updated = match market.id.get_market_type() {
-        MarketType::CollateralIsQuote => Signed::<Notional>::from_str("1979.838"),
-        MarketType::CollateralIsBase => Signed::<Notional>::from_str("-1883.1584"),
+        MarketType::CollateralIsQuote => Signed::<Notional>::from_str("1979.83799556062912228"),
+        MarketType::CollateralIsBase => Signed::<Notional>::from_str("-1883.158396626078132929"),
     }
     .unwrap();
 

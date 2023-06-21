@@ -1,6 +1,8 @@
 mod app;
 mod cli;
+mod db;
 mod endpoints;
+mod types;
 
 use anyhow::Result;
 use app::App;
@@ -13,8 +15,10 @@ async fn main() -> Result<()> {
 }
 
 async fn main_inner() -> Result<()> {
+    dotenv::dotenv().ok();
     let opt = Opt::parse();
     opt.init_logger();
-    let app = App::new(opt)?;
+    let app = App::new(opt).await?;
+    app.migrate_db().await?;
     endpoints::launch(app).await
 }

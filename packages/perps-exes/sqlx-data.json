@@ -1,0 +1,135 @@
+{
+  "db": "PostgreSQL",
+  "4488374b844646f8a7a430060e31251a1c1e0ae1695085cf8fcfedc6f4b075bb": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Int4",
+          "Varchar",
+          "Int4"
+        ]
+      }
+    },
+    "query": "\n                    INSERT INTO market(address, chain, market_id, environment)\n                    VALUES($1, $2, $3, $4)\n                    RETURNING id"
+  },
+  "6d483ed967d0a28628e663f1597d54fd1857a05fe2adb8a22f7965e9943dbaef": {
+    "describe": {
+      "columns": [
+        {
+          "name": "url_id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Varchar",
+          "Int4",
+          "Varchar",
+          "Varchar",
+          "Varchar",
+          "Int4"
+        ]
+      }
+    },
+    "query": "\n                INSERT INTO position_detail\n                (market, position_id, pnl, direction, entry_price, exit_price, leverage, pnl_type)\n                VALUES($1, $2, $3, $4, $5, $6, $7, $8)\n                RETURNING url_id\n            "
+  },
+  "702f738cc2e292a43be702b9713e6de7b59c223a549f65721018fa79bed4c789": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT id FROM market WHERE address=$1"
+  },
+  "fbe23f22f99f944f3f589170433d62b545702eca8e3040f4e458f4b76e70d485": {
+    "describe": {
+      "columns": [
+        {
+          "name": "market_id",
+          "ordinal": 0,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "pnl",
+          "ordinal": 1,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "entry_price",
+          "ordinal": 2,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "exit_price",
+          "ordinal": 3,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "leverage",
+          "ordinal": 4,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "direction: DirectionForDb",
+          "ordinal": 5,
+          "type_info": "Int4"
+        },
+        {
+          "name": "environment: ContractEnvironment",
+          "ordinal": 6,
+          "type_info": "Int4"
+        },
+        {
+          "name": "chain: ChainId",
+          "ordinal": 7,
+          "type_info": "Int4"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "\n                SELECT\n                    market_id,\n                    pnl,\n                    entry_price,\n                    exit_price,\n                    leverage,\n                    direction as \"direction: DirectionForDb\",\n                    environment as \"environment: ContractEnvironment\",\n                    chain as \"chain: ChainId\"\n                FROM position_detail INNER JOIN market\n                ON position_detail.market = market.id\n                WHERE url_id=$1\n            "
+  }
+}

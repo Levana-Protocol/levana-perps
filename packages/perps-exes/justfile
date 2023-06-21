@@ -44,3 +44,7 @@ test:
 other-test:
 	perps-qa open-position --collateral 5 --leverage 4 --max-gains 14 --current-price 9.98 --max-slippage 1
 	perps-qa open-position --collateral 5 --leverage 4 --max-gains 14 --current-price 9.98 --max-slippage 1 --short
+
+# Offline db generation
+offline-db:
+	cargo sqlx prepare

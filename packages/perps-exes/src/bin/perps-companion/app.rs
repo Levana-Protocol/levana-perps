@@ -1,34 +1,40 @@
 use std::collections::HashMap;
 
-use anyhow::Result;
-use cosmos::{Cosmos, CosmosNetwork};
+use anyhow::{Context, Result};
+use cosmos::Cosmos;
 
-use crate::cli::Opt;
+use crate::{cli::Opt, db::handle::Db, types::ChainId};
 
 pub(crate) struct App {
     /// Map from chain ID to a Cosmos connection
     #[allow(dead_code)]
-    pub(crate) cosmos: HashMap<String, Cosmos>,
+    pub(crate) cosmos: HashMap<ChainId, Cosmos>,
     pub(crate) opt: Opt,
+    pub(crate) db: Db,
 }
 
 impl App {
-    pub(crate) fn new(opt: Opt) -> Result<App> {
+    pub(crate) async fn new(opt: Opt) -> Result<App> {
+        let db = Db::new(&opt.postgres_uri).await?;
         Ok(App {
-            cosmos: [
-                ("atlantic-2", CosmosNetwork::SeiTestnet),
-                ("dragonfire-4", CosmosNetwork::Dragonfire),
-                ("elgafar-1", CosmosNetwork::StargazeTestnet),
-                ("juno-1", CosmosNetwork::JunoMainnet),
-                ("osmo-test-5", CosmosNetwork::OsmosisTestnet),
-                ("osmosis-1", CosmosNetwork::OsmosisMainnet),
-                ("stargaze-1", CosmosNetwork::StargazeMainnet),
-                ("uni-6", CosmosNetwork::JunoTestnet),
-            ]
-            .into_iter()
-            .map(|(chain_id, network)| (chain_id.to_owned(), network.builder().build_lazy()))
-            .collect(),
+            cosmos: ChainId::all()
+                .into_iter()
+                .map(|chain_id| {
+                    (
+                        chain_id,
+                        chain_id.into_cosmos_network().builder().build_lazy(),
+                    )
+                })
+                .collect(),
             opt,
+            db,
         })
+    }
+
+    pub(crate) async fn migrate_db(&self) -> Result<()> {
+        sqlx::migrate!("src/bin/perps-companion/migrations")
+            .run(&self.db.pool)
+            .await
+            .context("Error while running database migrations")
     }
 }

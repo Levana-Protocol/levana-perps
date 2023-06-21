@@ -1,0 +1,32 @@
+# List all recipies
+default:
+	just --list --unsorted
+
+# Run postgres via docker
+postgres:
+    docker run --name price_api_pg --net=host --rm -it -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:14.1-alpine -c log_statement=all
+
+# psql to docker
+psql:
+    psql -U postgres -h localhost -d companion
+
+# Shutdown postgres
+postgres-down:
+    docker container stop price_api_pg
+
+# Database reset
+db-reset:
+	sqlx database reset -y
+
+# Run application
+run:
+	cargo run --bin perps-companion -- --postgres-uri postgresql://postgres:postgres@localhost/companion
+
+# Postgres terminate connection
+pg-terminate-conn:
+	psql -U postgres -h localhost -c "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = 'companion' AND pid <> pg_backend_pid();"
+
+# Tests
+test:
+	curl --header "Content-Type: application/json" --request POST --data '{"address":"sei1vc9zsrma0gezczzfqcps8gvned5s5nq9p7yw7nu68spcvj4lngwqau4rln","chain":"atlantic-2","position_id":"1","pnl_type":"Usd"}' http://localhost:3000/pnl-url
+	curl --header "Content-Type: application/json" --request POST --data '{"address":"sei1vc9zsrma0gezczzfqcps8gvned5s5nq9p7yw7nu68spcvj4lngwqau4rln","chain":"atlantic-2","position_id":"1","pnl_type":"Percent"}' http://localhost:3000/pnl-url
