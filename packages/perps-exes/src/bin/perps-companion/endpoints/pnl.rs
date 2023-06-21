@@ -39,9 +39,9 @@ enum PnlType {
     Percent,
 }
 
-const AMPLITUDE_MAINNET_KEY: &str = "b95d602af8198e98fb113a4e01b02ac7";
-const AMPLITUDE_BETA_KEY: &str = "90522542888df13ac43bc467698fa94d";
-const AMPLITUDE_DEV_KEY: &str = "272aaf66576c3fe4d054149073bb70a2";
+const AMPLITUDE_MAINNET_KEY: &'static str = "b95d602af8198e98fb113a4e01b02ac7";
+const AMPLITUDE_BETA_KEY: &'static str = "90522542888df13ac43bc467698fa94d";
+const AMPLITUDE_DEV_KEY: &'static str = "272aaf66576c3fe4d054149073bb70a2";
 
 fn is_mainnet(label: &str) -> bool {
     label == "pacific-1"
@@ -52,7 +52,7 @@ fn is_beta(label: &str) -> bool {
 }
 
 fn get_target(label: &str) -> Option<&str> {
-    label.split(' ').last()
+    label.split(" ").last()
 }
 
 pub(super) async fn html_usd(
@@ -193,10 +193,12 @@ impl Pnl {
 
         let amplitude_key = if is_mainnet(chain) {
             AMPLITUDE_MAINNET_KEY
-        } else if is_beta(&contract_info.label) {
-            AMPLITUDE_BETA_KEY
         } else {
-            AMPLITUDE_DEV_KEY
+            if is_beta(&contract_info.label) {
+                AMPLITUDE_BETA_KEY
+            } else {
+                AMPLITUDE_DEV_KEY
+            }
         };
 
         let target = match get_target(&contract_info.label) {
@@ -253,17 +255,17 @@ impl Pnl {
             )
             .await?;
 
-        Ok(PnlInfo::new(PnlInfoNewArgs {
-            pnl: self,
+        Ok(PnlInfo::new(
+            self,
             amplitude_key,
             target,
             pos,
-            market_id: status.market_id,
+            status.market_id,
             entry_price,
             exit_price,
             pnl_type,
             host,
-        }))
+        ))
     }
 }
 
@@ -387,39 +389,23 @@ struct PnlInfo {
     leverage: TwoDecimalPoints,
 }
 
-struct PnlInfoNewArgs<'a> {
-    pnl: Pnl,
-    amplitude_key: &'static str,
-    target: &'a str,
-    pos: ClosedPosition,
-    market_id: MarketId,
-    entry_price: PricePoint,
-    exit_price: PricePoint,
-    pnl_type: PnlType,
-    host: Host,
-}
-
 impl PnlInfo {
     fn new(
-        PnlInfoNewArgs {
-            pnl,
-            amplitude_key,
-            target,
-            pos,
-            market_id,
-            entry_price,
-            exit_price,
-            pnl_type,
-            host,
-        }: PnlInfoNewArgs,
-    ) -> Self {
-        let Pnl {
+        Pnl {
             chain,
             market,
             position,
-        } = pnl;
+        }: Pnl,
+        amplitude_key: &'static str,
+        target: &str,
+        pos: ClosedPosition,
+        market_id: MarketId,
+        entry_price: PricePoint,
+        exit_price: PricePoint,
+        pnl_type: PnlType,
+        host: Host,
+    ) -> Self {
         let market_type = market_id.get_market_type();
-
         PnlInfo {
             amplitude_key,
             pnl_display: match pnl_type {
