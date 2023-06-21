@@ -1,149 +1,120 @@
 {
   "db": "PostgreSQL",
-  "21817af5d46a752073f4a058858cf7897eba5d1afcf4074e7993b69e0783c5d8": {
+  "4488374b844646f8a7a430060e31251a1c1e0ae1695085cf8fcfedc6f4b075bb": {
     "describe": {
       "columns": [
         {
           "name": "id",
           "ordinal": 0,
           "type_info": "Int8"
-        },
-        {
-          "name": "contract_address",
-          "ordinal": 1,
-          "type_info": "Int8"
-        },
-        {
-          "name": "chain: ChainId",
-          "ordinal": 2,
-          "type_info": "Int4"
-        },
-        {
-          "name": "position_id",
-          "ordinal": 3,
-          "type_info": "Int8"
-        },
-        {
-          "name": "pnl_type",
-          "ordinal": 4,
-          "type_info": "Varchar"
-        },
-        {
-          "name": "url_id",
-          "ordinal": 5,
-          "type_info": "Int4"
         }
       ],
       "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
         false
       ],
       "parameters": {
         "Left": [
-          "Int8",
+          "Varchar",
           "Int4",
-          "Int8",
-          "Varchar"
-        ]
-      }
-    },
-    "query": "INSERT INTO position_detail(contract_address, chain, position_id, pnl_type) VALUES($1, $2, $3, $4) RETURNING id, contract_address, chain as \"chain: ChainId\", position_id, pnl_type, url_id"
-  },
-  "34e410cc28a131fd72654027999111cee31a79deedc12d93993da929cd38c429": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id",
-          "ordinal": 0,
-          "type_info": "Int8"
-        },
-        {
-          "name": "address",
-          "ordinal": 1,
-          "type_info": "Varchar"
-        }
-      ],
-      "nullable": [
-        false,
-        false
-      ],
-      "parameters": {
-        "Left": [
-          "Varchar"
-        ]
-      }
-    },
-    "query": "INSERT INTO address(address) VALUES($1) RETURNING id, address"
-  },
-  "353ea0d7789f52b137302b05882a91ba7daacd300e966f8a8f6bf08c5949fda4": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id",
-          "ordinal": 0,
-          "type_info": "Int8"
-        },
-        {
-          "name": "contract_address",
-          "ordinal": 1,
-          "type_info": "Int8"
-        },
-        {
-          "name": "chain: ChainId",
-          "ordinal": 2,
-          "type_info": "Int4"
-        },
-        {
-          "name": "position_id",
-          "ordinal": 3,
-          "type_info": "Int8"
-        },
-        {
-          "name": "pnl_type",
-          "ordinal": 4,
-          "type_info": "Varchar"
-        },
-        {
-          "name": "url_id",
-          "ordinal": 5,
-          "type_info": "Int4"
-        }
-      ],
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ],
-      "parameters": {
-        "Left": [
+          "Varchar",
           "Int4"
         ]
       }
     },
-    "query": "SELECT id, contract_address, chain as \"chain: ChainId\", position_id, pnl_type, url_id FROM position_detail WHERE url_id=$1"
+    "query": "\n                    INSERT INTO market(address, chain, market_id, environment)\n                    VALUES($1, $2, $3, $4)\n                    RETURNING id"
   },
-  "844f89010fd213d5f3028b84129f82dc31ec142826894fd4c38a2ab48f3af120": {
+  "6d483ed967d0a28628e663f1597d54fd1857a05fe2adb8a22f7965e9943dbaef": {
+    "describe": {
+      "columns": [
+        {
+          "name": "url_id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Varchar",
+          "Int4",
+          "Varchar",
+          "Varchar",
+          "Varchar",
+          "Int4"
+        ]
+      }
+    },
+    "query": "\n                INSERT INTO position_detail\n                (market, position_id, pnl, direction, entry_price, exit_price, leverage, pnl_type)\n                VALUES($1, $2, $3, $4, $5, $6, $7, $8)\n                RETURNING url_id\n            "
+  },
+  "702f738cc2e292a43be702b9713e6de7b59c223a549f65721018fa79bed4c789": {
     "describe": {
       "columns": [
         {
           "name": "id",
           "ordinal": 0,
           "type_info": "Int8"
-        },
-        {
-          "name": "address",
-          "ordinal": 1,
-          "type_info": "Varchar"
         }
       ],
       "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT id FROM market WHERE address=$1"
+  },
+  "82881e0d202459fbf40007eefe4141b5878fc019a4ddd8cbb5f55afdb7af5433": {
+    "describe": {
+      "columns": [
+        {
+          "name": "market_id",
+          "ordinal": 0,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "pnl",
+          "ordinal": 1,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "entry_price",
+          "ordinal": 2,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "exit_price",
+          "ordinal": 3,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "leverage",
+          "ordinal": 4,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "direction: DirectionForDb",
+          "ordinal": 5,
+          "type_info": "Int4"
+        },
+        {
+          "name": "environment: ContractEnvironment",
+          "ordinal": 6,
+          "type_info": "Int4"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
         false,
         false
       ],
@@ -153,85 +124,6 @@
         ]
       }
     },
-    "query": "SELECT id, address FROM address WHERE id=$1"
-  },
-  "d2360de3382e054493414f9be94f8f567338e39fdc062631b9c9473fcb4e57dd": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id",
-          "ordinal": 0,
-          "type_info": "Int8"
-        },
-        {
-          "name": "address",
-          "ordinal": 1,
-          "type_info": "Varchar"
-        }
-      ],
-      "nullable": [
-        false,
-        false
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      }
-    },
-    "query": "SELECT id, address FROM address WHERE address=$1"
-  },
-  "dd4b1e0c0bebe425ddcc25fcfb3cc266a5b20a2f27fa776df64333822f808a85": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id",
-          "ordinal": 0,
-          "type_info": "Int8"
-        },
-        {
-          "name": "contract_address",
-          "ordinal": 1,
-          "type_info": "Int8"
-        },
-        {
-          "name": "chain: ChainId",
-          "ordinal": 2,
-          "type_info": "Int4"
-        },
-        {
-          "name": "position_id",
-          "ordinal": 3,
-          "type_info": "Int8"
-        },
-        {
-          "name": "pnl_type",
-          "ordinal": 4,
-          "type_info": "Varchar"
-        },
-        {
-          "name": "url_id",
-          "ordinal": 5,
-          "type_info": "Int4"
-        }
-      ],
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int4",
-          "Int8",
-          "Text"
-        ]
-      }
-    },
-    "query": "SELECT id, contract_address, chain as \"chain: ChainId\", position_id, pnl_type, url_id FROM position_detail WHERE contract_address=$1 AND chain=$2 AND position_id=$3 AND pnl_type=$4"
+    "query": "\n                SELECT\n                    market_id,\n                    pnl,\n                    entry_price,\n                    exit_price,\n                    leverage,\n                    direction as \"direction: DirectionForDb\",\n                    environment as \"environment: ContractEnvironment\"\n                FROM position_detail INNER JOIN market\n                ON position_detail.market = market.id\n                WHERE url_id=$1\n            "
   }
 }

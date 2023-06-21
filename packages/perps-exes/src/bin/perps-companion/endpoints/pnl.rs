@@ -16,12 +16,9 @@ use cosmwasm_std::{Decimal256, Uint256};
 use msg::{
     contracts::market::{
         entry::{QueryMsg, StatusResp},
-        position::{ClosedPosition, PositionId, PositionsResp},
+        position::{PositionId, PositionsResp},
     },
-    prelude::{
-        DirectionToBase, MarketId, NonZero, PriceBaseInQuote, PricePoint, Signed,
-        SignedLeverageToNotional, UnsignedDecimal, Usd,
-    },
+    prelude::{NonZero, PricePoint, Signed, SignedLeverageToNotional, UnsignedDecimal, Usd},
 };
 use reqwest::{
     header::{CACHE_CONTROL, CONTENT_TYPE},
@@ -31,25 +28,13 @@ use resvg::usvg::{TreeParsing, TreeTextToPath};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::{app::App, types::ChainId};
+use crate::{
+    app::App,
+    db::models::{PositionInfoFromDb, PositionInfoToDb},
+    types::{ChainId, ContractEnvironment, DirectionForDb, PnlType},
+};
 
 use super::{ErrorPage, PnlCssRoute, PnlHtml, PnlImage, PnlUrl};
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum PnlType {
-    Usd,
-    Percent,
-}
-
-impl From<PnlType> for String {
-    fn from(val: PnlType) -> Self {
-        match val {
-            PnlType::Usd => "Usd".into(),
-            PnlType::Percent => "Percent".into(),
-        }
-    }
-}
 
 pub(super) async fn pnl_url(
     _: PnlUrl,
@@ -57,13 +42,43 @@ pub(super) async fn pnl_url(
     Json(position_info): Json<PositionInfo>,
 ) -> Result<Json<Value>, Error> {
     let db = &app.db;
-    let position_detail = db
-        .insert_position_detail(position_info)
+    let to_db = position_info.get_info_to_db(&app).await?;
+    let url_id = db
+        .insert_position_detail(to_db)
         .await
         .map_err(|e| Error::Database { msg: e.to_string() })?;
-    let url_id = position_detail.url_id;
     let url = PnlHtml { pnl_id: url_id };
     Ok(Json(json!({ "url": url.to_uri().to_string() })))
+}
+
+impl PnlInfo {
+    async fn load_from_database(app: &App, pnl_id: i64, host: &Host) -> Result<Self, Error> {
+        let PositionInfoFromDb {
+            market_id,
+            environment: _, // FIXME used for analytics, to be merged next
+            pnl,
+            direction,
+            entry_price,
+            exit_price,
+            leverage,
+        } = app
+            .db
+            .get_url_detail(pnl_id)
+            .await
+            .map_err(|e| Error::Database { msg: e.to_string() })?
+            .ok_or(Error::InvalidPage)?;
+        Ok(PnlInfo {
+            pnl_display: pnl,
+            host: host.hostname().to_owned(),
+            image_url: PnlImage { pnl_id }.to_uri().to_string(),
+            html_url: PnlHtml { pnl_id }.to_uri().to_string(),
+            market_id,
+            direction,
+            entry_price,
+            exit_price,
+            leverage,
+        })
+    }
 }
 
 pub(super) async fn pnl_html(
@@ -71,23 +86,9 @@ pub(super) async fn pnl_html(
     TypedHeader(host): TypedHeader<Host>,
     State(app): State<Arc<App>>,
 ) -> Result<Response, Error> {
-    let url_detail = app
-        .db
-        .get_url_detail(pnl_id)
+    PnlInfo::load_from_database(&app, pnl_id, &host)
         .await
-        .map_err(|e| Error::Database { msg: e.to_string() })?;
-    match url_detail {
-        Some(url_detail) => {
-            let pnl = Pnl::new(
-                url_detail.chain,
-                url_detail.contract_address,
-                url_detail.position_id,
-            );
-            pnl.with_pnl(&app, host, PnlInfo::html, url_detail.pnl_type, pnl_id)
-                .await
-        }
-        None => Err(Error::InvalidPage),
-    }
+        .map(PnlInfo::html)
 }
 
 pub(super) async fn pnl_image(
@@ -95,23 +96,9 @@ pub(super) async fn pnl_image(
     TypedHeader(host): TypedHeader<Host>,
     State(app): State<Arc<App>>,
 ) -> Result<Response, Error> {
-    let url_detail = app
-        .db
-        .get_url_detail(pnl_id)
+    PnlInfo::load_from_database(&app, pnl_id, &host)
         .await
-        .map_err(|e| Error::Database { msg: e.to_string() })?;
-    match url_detail {
-        Some(url_detail) => {
-            let pnl = Pnl::new(
-                url_detail.chain,
-                url_detail.contract_address,
-                url_detail.position_id,
-            );
-            pnl.with_pnl(&app, host, PnlInfo::image, url_detail.pnl_type, pnl_id)
-                .await
-        }
-        None => Err(Error::InvalidPage),
-    }
+        .map(PnlInfo::image)
 }
 
 pub(super) async fn css(_: PnlCssRoute) -> Css<&'static str> {
@@ -157,51 +144,17 @@ impl MarketContract {
     }
 }
 
-#[derive(serde::Deserialize, Debug)]
-pub(super) struct Pnl {
-    chain: ChainId,
-    market: Address,
-    position: PositionId,
-}
-
-impl Pnl {
-    pub fn new(chain: ChainId, market: Address, position: PositionId) -> Self {
-        Pnl {
+impl PositionInfo {
+    async fn get_info_to_db(self, app: &App) -> Result<PositionInfoToDb, Error> {
+        let PositionInfo {
             chain,
-            market,
-            position,
-        }
-    }
-
-    async fn with_pnl<F>(
-        self,
-        app: &App,
-        host: Host,
-        f: F,
-        pnl_type: PnlType,
-        pnl_id: i32,
-    ) -> Result<Response, Error>
-    where
-        F: FnOnce(PnlInfo) -> Response,
-    {
-        self.get_pnl_info(app, host, pnl_type, pnl_id).await.map(f)
-    }
-
-    async fn get_pnl_info(
-        self,
-        app: &App,
-        host: Host,
-        pnl_type: PnlType,
-        pnl_id: i32,
-    ) -> Result<PnlInfo, Error> {
-        let Pnl {
-            chain,
-            market,
-            position,
+            address,
+            position_id,
+            pnl_type,
         } = &self;
         let cosmos = app.cosmos.get(chain).ok_or(Error::UnknownChainId)?;
 
-        let contract = MarketContract(cosmos.make_contract(*market));
+        let contract = MarketContract(cosmos.make_contract(*address));
 
         let status = contract
             .query::<StatusResp>(QueryMsg::Status { price: None }, QueryType::Status)
@@ -210,7 +163,7 @@ impl Pnl {
         let mut res = contract
             .query::<PositionsResp>(
                 QueryMsg::Positions {
-                    position_ids: vec![*position],
+                    position_ids: vec![*position_id],
                     skip_calc_pending_fees: None,
                     fees: None,
                     price: None,
@@ -250,15 +203,45 @@ impl Pnl {
             )
             .await?;
 
-        Ok(PnlInfo::new(
-            pos,
-            status.market_id,
-            entry_price,
-            exit_price,
-            pnl_type,
-            host,
-            pnl_id,
-        ))
+        Ok(PositionInfoToDb {
+            market_id: status.market_id,
+            direction: pos.direction_to_base.into(),
+            entry_price: entry_price.price_base,
+            exit_price: exit_price.price_base,
+            leverage: match NonZero::new(pos.active_collateral) {
+                // Total liquidation occurred, which (1) should virtually never
+                // happen and (2) wouldn't be a celebration. Just using 0.
+                None => TwoDecimalPoints(Decimal256::zero().into_number()),
+                Some(active_collateral) => TwoDecimalPoints(
+                    SignedLeverageToNotional::calculate(
+                        pos.notional_size,
+                        &exit_price,
+                        active_collateral,
+                    )
+                    .into_base(status.market_type)
+                    .split()
+                    .1
+                    .into_number(),
+                ),
+            }
+            .to_string(),
+            environment: ContractEnvironment::Beta, // FIXME change when merging with analytics PR
+            pnl: match pnl_type {
+                PnlType::Usd => UsdDisplay(pos.pnl_usd).to_string(),
+                PnlType::Percent => match pos.deposit_collateral.try_into_positive_value() {
+                    None => "Negative collateral".to_owned(),
+                    Some(deposit) => {
+                        // FIXME we need a deposit_usd to do this accurately
+                        let deposit = entry_price.collateral_to_usd(deposit);
+                        let percent = pos.pnl_usd.into_number() / deposit.into_number()
+                            * Decimal256::from_ratio(100u32, 1u32).into_signed();
+                        let plus = if percent.is_negative() { "" } else { "+" };
+                        format!("{plus}{}%", TwoDecimalPoints(percent))
+                    }
+                },
+            },
+            info: self,
+        })
     }
 }
 
@@ -377,66 +360,10 @@ struct PnlInfo {
     image_url: String,
     html_url: String,
     market_id: String,
-    direction: &'static str,
-    entry_price: PriceBaseInQuote,
-    exit_price: PriceBaseInQuote,
-    leverage: TwoDecimalPoints,
-}
-
-impl PnlInfo {
-    fn new(
-        pos: ClosedPosition,
-        market_id: MarketId,
-        entry_price: PricePoint,
-        exit_price: PricePoint,
-        pnl_type: PnlType,
-        host: Host,
-        pnl_id: i32,
-    ) -> Self {
-        let market_type = market_id.get_market_type();
-        PnlInfo {
-            pnl_display: match pnl_type {
-                PnlType::Usd => UsdDisplay(pos.pnl_usd).to_string(),
-                PnlType::Percent => match pos.deposit_collateral.try_into_positive_value() {
-                    None => "Negative collateral".to_owned(),
-                    Some(deposit) => {
-                        // FIXME we need a deposit_usd to do this accurately
-                        let deposit = entry_price.collateral_to_usd(deposit);
-                        let percent = pos.pnl_usd.into_number() / deposit.into_number()
-                            * Decimal256::from_ratio(100u32, 1u32).into_signed();
-                        let plus = if percent.is_negative() { "" } else { "+" };
-                        format!("{plus}{}%", TwoDecimalPoints(percent))
-                    }
-                },
-            },
-            image_url: PnlImage { pnl_id }.to_uri().to_string(),
-            html_url: PnlHtml { pnl_id }.to_uri().to_string(),
-            market_id: market_id.to_string().replace('_', "/"),
-            direction: match pos.direction_to_base {
-                DirectionToBase::Long => "LONG",
-                DirectionToBase::Short => "SHORT",
-            },
-            entry_price: pos.entry_price_base,
-            exit_price: exit_price.price_base,
-            leverage: match NonZero::new(pos.active_collateral) {
-                // Total liquidation occurred, which (1) should virtually never
-                // happen and (2) wouldn't be a celebration. Just using 0.
-                None => TwoDecimalPoints(Decimal256::zero().into_number()),
-                Some(active_collateral) => TwoDecimalPoints(
-                    SignedLeverageToNotional::calculate(
-                        pos.notional_size,
-                        &exit_price,
-                        active_collateral,
-                    )
-                    .into_base(market_type)
-                    .split()
-                    .1
-                    .into_number(),
-                ),
-            },
-            host: host.hostname().into(),
-        }
-    }
+    direction: DirectionForDb,
+    entry_price: String,
+    exit_price: String,
+    leverage: String,
 }
 
 struct TwoDecimalPoints(Signed<Decimal256>);

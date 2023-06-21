@@ -51,13 +51,13 @@ pub(crate) struct PnlUrl;
 #[derive(TypedPath, Deserialize)]
 #[typed_path("/pnl/:pnl_id", rejection(pnl::Error))]
 pub(crate) struct PnlHtml {
-    pub(crate) pnl_id: i32,
+    pub(crate) pnl_id: i64,
 }
 
 #[derive(TypedPath, Deserialize)]
 #[typed_path("/pnl/:pnl_id/image.png", rejection(pnl::Error))]
 pub(crate) struct PnlImage {
-    pub(crate) pnl_id: i32,
+    pub(crate) pnl_id: i64,
 }
 
 impl From<PathRejection> for pnl::Error {

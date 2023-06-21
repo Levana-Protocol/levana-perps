@@ -1,4 +1,7 @@
+use std::fmt::Display;
+
 use cosmos::CosmosNetwork;
+use shared::storage::DirectionToBase;
 
 /// Chains supported by this server.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, serde::Deserialize, sqlx::Type)]
@@ -76,6 +79,58 @@ impl ChainId {
             ChainId::Osmosis1 => CosmosNetwork::OsmosisMainnet,
             ChainId::Stargaze1 => CosmosNetwork::StargazeMainnet,
             ChainId::Uni6 => CosmosNetwork::JunoTestnet,
+        }
+    }
+}
+
+/// Which analytics environment the contract is part of
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, sqlx::Type)]
+#[repr(i32)]
+pub(crate) enum ContractEnvironment {
+    Mainnet = 1,
+    Beta = 2,
+    Dev = 3,
+}
+
+/// Is this is a long or short position
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, sqlx::Type)]
+#[repr(i32)]
+pub(crate) enum DirectionForDb {
+    Long = 1,
+    Short = 2,
+}
+
+impl From<DirectionToBase> for DirectionForDb {
+    fn from(src: DirectionToBase) -> Self {
+        match src {
+            DirectionToBase::Long => Self::Long,
+            DirectionToBase::Short => Self::Short,
+        }
+    }
+}
+
+impl Display for DirectionForDb {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(match self {
+            DirectionForDb::Long => "LONG",
+            DirectionForDb::Short => "SHORT",
+        })
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Deserialize, sqlx::Type)]
+#[serde(rename_all = "snake_case")]
+#[repr(i32)]
+pub(crate) enum PnlType {
+    Usd = 1,
+    Percent = 2,
+}
+
+impl From<PnlType> for String {
+    fn from(val: PnlType) -> Self {
+        match val {
+            PnlType::Usd => "Usd".into(),
+            PnlType::Percent => "Percent".into(),
         }
     }
 }
