@@ -70,7 +70,7 @@
     },
     "query": "SELECT id FROM market WHERE address=$1"
   },
-  "82881e0d202459fbf40007eefe4141b5878fc019a4ddd8cbb5f55afdb7af5433": {
+  "fbe23f22f99f944f3f589170433d62b545702eca8e3040f4e458f4b76e70d485": {
     "describe": {
       "columns": [
         {
@@ -107,9 +107,15 @@
           "name": "environment: ContractEnvironment",
           "ordinal": 6,
           "type_info": "Int4"
+        },
+        {
+          "name": "chain: ChainId",
+          "ordinal": 7,
+          "type_info": "Int4"
         }
       ],
       "nullable": [
+        false,
         false,
         false,
         false,
@@ -124,6 +130,6 @@
         ]
       }
     },
-    "query": "\n                SELECT\n                    market_id,\n                    pnl,\n                    entry_price,\n                    exit_price,\n                    leverage,\n                    direction as \"direction: DirectionForDb\",\n                    environment as \"environment: ContractEnvironment\"\n                FROM position_detail INNER JOIN market\n                ON position_detail.market = market.id\n                WHERE url_id=$1\n            "
+    "query": "\n                SELECT\n                    market_id,\n                    pnl,\n                    entry_price,\n                    exit_price,\n                    leverage,\n                    direction as \"direction: DirectionForDb\",\n                    environment as \"environment: ContractEnvironment\",\n                    chain as \"chain: ChainId\"\n                FROM position_detail INNER JOIN market\n                ON position_detail.market = market.id\n                WHERE url_id=$1\n            "
   }
 }
