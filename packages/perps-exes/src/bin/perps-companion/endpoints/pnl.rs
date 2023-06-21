@@ -31,11 +31,12 @@ use resvg::usvg::{TreeParsing, TreeTextToPath};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use crate::app::App;
+use crate::{app::App, types::ChainId};
 
 use super::{ErrorPage, PnlCssRoute, PnlHtml, PnlImage, PnlUrl};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub(crate) enum PnlType {
     Usd,
     Percent,
@@ -120,7 +121,7 @@ pub(super) async fn css(_: PnlCssRoute) -> Css<&'static str> {
 #[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
 pub(crate) struct PositionInfo {
     pub(crate) address: Address,
-    pub(crate) chain: String,
+    pub(crate) chain: ChainId,
     pub(crate) position_id: PositionId,
     pub(crate) pnl_type: PnlType,
 }
@@ -158,13 +159,13 @@ impl MarketContract {
 
 #[derive(serde::Deserialize, Debug)]
 pub(super) struct Pnl {
-    chain: String,
+    chain: ChainId,
     market: Address,
     position: PositionId,
 }
 
 impl Pnl {
-    pub fn new(chain: String, market: Address, position: PositionId) -> Self {
+    pub fn new(chain: ChainId, market: Address, position: PositionId) -> Self {
         Pnl {
             chain,
             market,

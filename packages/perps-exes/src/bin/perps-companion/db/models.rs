@@ -2,7 +2,7 @@ use cosmos::Address;
 use msg::contracts::market::position::PositionId;
 use sqlx::FromRow;
 
-use crate::endpoints::pnl::PnlType;
+use crate::{endpoints::pnl::PnlType, types::ChainId};
 
 #[derive(FromRow, Debug, PartialEq, Eq)]
 pub(crate) struct AddressModel {
@@ -14,7 +14,8 @@ pub(crate) struct AddressModel {
 pub(crate) struct PositionDetail {
     pub(crate) id: i64,
     pub(crate) contract_address: i64,
-    pub(crate) chain: String,
+    #[sqlx(try_from = "String")]
+    pub(crate) chain: ChainId,
     pub(crate) position_id: i64,
     pub(crate) pnl_type: String,
     pub(crate) url_id: i32,
@@ -33,7 +34,7 @@ pub(crate) struct NewPositionDetail {
 pub(crate) struct UrlDetail {
     pub(crate) id: i64,
     pub(crate) contract_address: Address,
-    pub(crate) chain: String,
+    pub(crate) chain: ChainId,
     pub(crate) position_id: PositionId,
     pub(crate) pnl_type: PnlType,
     pub(crate) url_id: i32,

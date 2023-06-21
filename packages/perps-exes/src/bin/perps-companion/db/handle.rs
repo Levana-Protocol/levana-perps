@@ -8,6 +8,7 @@ use sqlx::{query_as, PgPool};
 
 use crate::db::models::AddressModel;
 use crate::endpoints::pnl::PnlType;
+use crate::types::ChainId;
 
 use super::super::endpoints::pnl::PositionInfo;
 use super::models::{PositionDetail, UrlDetail};
@@ -73,7 +74,7 @@ impl Db {
             i64::try_from(position_u64).context("Error converting {position_u64} to i64 type")?;
         match address {
             Some(address) => {
-                let position_detail = query_as!(PositionDetail, "SELECT id, contract_address, chain, position_id, pnl_type, url_id FROM position_detail WHERE contract_address=$1 AND chain=$2 AND position_id=$3 AND pnl_type=$4", address.id, position_info.chain, position_id , pnl).fetch_optional(&self.pool).await?;
+                let position_detail = query_as!(PositionDetail, r#"SELECT id, contract_address, chain as "chain: ChainId", position_id, pnl_type, url_id FROM position_detail WHERE contract_address=$1 AND chain=$2 AND position_id=$3 AND pnl_type=$4"#, address.id, position_info.chain as i32, position_id , pnl).fetch_optional(&self.pool).await?;
                 Ok(position_detail)
             }
             None => Ok(None),
@@ -98,14 +99,14 @@ impl Db {
                 let position_u64 = position_info.position_id.u64();
                 let position_id = i64::try_from(position_u64)
                     .context("Error converting {position_u64} to i64 type")?;
-                let position_detail = query_as!(PositionDetail, "INSERT INTO position_detail(contract_address, chain, position_id, pnl_type) VALUES($1, $2, $3, $4) RETURNING id, contract_address, chain, position_id, pnl_type, url_id", address.id, chain, position_id, pnl).fetch_one(&self.pool).await?;
+                let position_detail = query_as!(PositionDetail, r#"INSERT INTO position_detail(contract_address, chain, position_id, pnl_type) VALUES($1, $2, $3, $4) RETURNING id, contract_address, chain as "chain: ChainId", position_id, pnl_type, url_id"#, address.id, chain as i32, position_id, pnl).fetch_one(&self.pool).await?;
                 Ok(position_detail)
             }
         }
     }
 
     pub(crate) async fn get_url_detail(&self, url_id: i32) -> Result<Option<UrlDetail>> {
-        let result = query_as!(PositionDetail, "SELECT id, contract_address, chain, position_id, pnl_type, url_id FROM position_detail WHERE url_id=$1", url_id).fetch_optional(&self.pool).await?;
+        let result = query_as!(PositionDetail, r#"SELECT id, contract_address, chain as "chain: ChainId", position_id, pnl_type, url_id FROM position_detail WHERE url_id=$1"#, url_id).fetch_optional(&self.pool).await?;
         match result {
             Some(position_detail) => {
                 let id = position_detail.id;
