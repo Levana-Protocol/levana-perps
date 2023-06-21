@@ -41,9 +41,9 @@ pub(crate) enum PnlType {
     Percent,
 }
 
-const AMPLITUDE_MAINNET_KEY: &'static str = "b95d602af8198e98fb113a4e01b02ac7";
-const AMPLITUDE_BETA_KEY: &'static str = "90522542888df13ac43bc467698fa94d";
-const AMPLITUDE_DEV_KEY: &'static str = "272aaf66576c3fe4d054149073bb70a2";
+const AMPLITUDE_MAINNET_KEY: &str = "b95d602af8198e98fb113a4e01b02ac7";
+const AMPLITUDE_BETA_KEY: &str = "90522542888df13ac43bc467698fa94d";
+const AMPLITUDE_DEV_KEY: &str = "272aaf66576c3fe4d054149073bb70a2";
 
 fn is_mainnet(label: &str) -> bool {
     label == "pacific-1"
@@ -278,15 +278,17 @@ impl Pnl {
             .await?;
 
         Ok(PnlInfo::new(
-            self,
-            amplitude_key,
-            pos,
-            status.market_id,
-            entry_price,
-            exit_price,
-            pnl_type,
-            host,
-            pnl_id,
+            PnlInfoNewArgs {
+              pnl: self,
+              amplitude_key,
+              pos,
+              market_id: status.market_id,
+              entry_price,
+              exit_price,
+              pnl_type,
+              host,
+              pnl_id,
+            }
         ))
     }
 }
@@ -414,21 +416,33 @@ struct PnlInfo {
     leverage: TwoDecimalPoints,
 }
 
+struct PnlInfoNewArgs {
+    pnl: Pnl,
+    amplitude_key: &'static str,
+    pos: ClosedPosition,
+    market_id: MarketId,
+    entry_price: PricePoint,
+    exit_price: PricePoint,
+    pnl_type: PnlType,
+    host: Host,
+    pnl_id: i32,
+}
+
 impl PnlInfo {
     fn new(
-        Pnl {
-            chain,
-            ..
-        }: Pnl,
-        amplitude_key: &'static str,
-        pos: ClosedPosition,
-        market_id: MarketId,
-        entry_price: PricePoint,
-        exit_price: PricePoint,
-        pnl_type: PnlType,
-        host: Host,
-        pnl_id: i32,
+      PnlInfoNewArgs {
+        pnl,
+        amplitude_key,
+        pos,
+        market_id,
+        entry_price,
+        exit_price,
+        pnl_type,
+        host,
+        pnl_id,
+      } : PnlInfoNewArgs
     ) -> Self {
+        let Pnl { chain, .. } = pnl;
         let market_type = market_id.get_market_type();
         PnlInfo {
             amplitude_key,
@@ -446,7 +460,7 @@ impl PnlInfo {
                     }
                 },
             },
-            chain: chain.clone(),
+            chain,
             image_url: PnlImage { pnl_id }.to_uri().to_string(),
             html_url: PnlHtml { pnl_id }.to_uri().to_string(),
             market_id: market_id.to_string().replace('_', "/"),
