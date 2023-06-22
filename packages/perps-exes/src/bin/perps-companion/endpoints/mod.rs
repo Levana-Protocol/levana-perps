@@ -1,6 +1,6 @@
 mod common;
 mod export;
-mod(crate)) pnl;
+pub(crate) mod pnl;
 mod shared;
 
 use std::sync::Arc;
@@ -12,11 +12,13 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 use axum_extra::routing::{RouterExt, TypedPath};
+use cosmos::Address;
 use reqwest::{header::CONTENT_TYPE, Method, StatusCode};
 use serde::Deserialize;
 use tower_http::cors::CorsLayer;
 
 use crate::app::App;
+use crate::types::ChainId;
 
 #[derive(TypedPath)]
 #[typed_path("/")]
@@ -73,7 +75,7 @@ impl From<PathRejection> for pnl::Error {
 #[derive(TypedPath, Deserialize)]
 #[typed_path("/export-history/:chain/:market/:wallet")]
 pub(crate) struct ExportHistory {
-    pub(crate) chain: String,
+    pub(crate) chain: ChainId,
     pub(crate) market: Address,
     pub(crate) wallet: Address,
 }

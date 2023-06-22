@@ -17,12 +17,16 @@ use reqwest::StatusCode;
 use serde::Serialize;
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
+// use chrono::*;
+use msg::contracts::market::position::{Position, PositionId, PositionsResp};
+use crate::types::ChainId;
 
 // Route Handlers
 
 const FILENAME: &str = "levana-history.csv";
 const TRADER_ACTION_HISTORY_LIMIT: Option<u32> = Some(20);
 const LP_ACTION_HISTORY_LIMIT: Option<u32> = Some(20);
+const POSITIONS_QUERY_CHUNK_SIZE: usize = 5;
 
 pub(crate) async fn history(
     ExportHistory {
@@ -63,16 +67,16 @@ struct Exporter {
 impl Exporter {
     /// Returns a new Exporter
     ///
-    /// * chain - The chain id of the desired chain.
+    /// * chain_id - The chain id of the desired chain.
     /// * market - The address of the market contract
     /// * wallet - The wallet address for which to export trader and LP history
     pub(crate) fn new(
         app: &App,
-        chain: String,
+        chain_id: ChainId,
         market: Address,
         wallet: Address,
     ) -> Result<Self, Error> {
-        let cosmos = app.cosmos.get(&chain).ok_or(Error::UnknownChainId)?;
+        let cosmos = app.cosmos.get(&chain_id).ok_or(Error::UnknownChainId)?;
         let contract = PerpsContract(cosmos.make_contract(market));
 
         Ok(Exporter { wallet, contract })
@@ -82,9 +86,13 @@ impl Exporter {
     async fn export(&self) -> Result<String, Error> {
         let status = self.query_market_stats().await?;
         let position_actions = self.query_position_actions().await?;
+        let position_ids = position_actions.iter()
+            .filter_map(|a| a.id)
+            .collect::<Vec<PositionId>>();
+        let directions = self.query_positions_direction(&position_ids).await?;
         let lp_actions = self.query_lp_actions().await?;
-        let csv_generator = CsvGenerator::new(status, position_actions, lp_actions);
-        let records = csv_generator.get_action_records()?;
+        let csv_generator = CsvGenerator::new(status, position_actions, directions, lp_actions);
+        let records = csv_generator.get_action_records()?; //FIXME make into fn
         let csv = csv_generator
             .generate_csv(records)
             .map_err(|_| Error::FailedToGenerateCsv)?;
@@ -120,6 +128,46 @@ impl Exporter {
         }
 
         Ok(actions)
+    }
+
+    /// Query the position (aka trader) actions, paginating until complete
+    async fn query_positions_direction(&self, position_ids: &[PositionId]) -> Result<HashMap<PositionId, DirectionToBase>, Error> {
+        let mut directions = HashMap::<PositionId, DirectionToBase>::new();
+        let mut chunks = position_ids.chunks(POSITIONS_QUERY_CHUNK_SIZE);
+
+        loop {
+            match chunks.next() {
+                None => break,
+                Some(position_ids) => {
+                    let res = self
+                        .contract
+                        .query::<MarketQueryMsg, PositionsResp>(
+                            MarketQueryMsg::Positions {
+                                position_ids: position_ids.to_vec(),
+                                skip_calc_pending_fees: None,
+                                fees: None,
+                                price: None,
+                            },
+                            QueryType::Positions,
+                        )
+                        .await?;
+
+                    for pos in res.positions {
+                        directions.insert(pos.id, pos.direction_to_base);
+                    }
+
+                    for pos in res.pending_close {
+                        directions.insert(pos.id, pos.direction_to_base);
+                    }
+
+                    for pos in res.closed {
+                        directions.insert(pos.id, pos.direction_to_base);
+                    }
+                }
+            }
+        }
+
+        Ok(directions)
     }
 
     /// Query the LP actions, paginating until complete
@@ -169,6 +217,7 @@ impl Exporter {
 struct CsvGenerator {
     status: StatusResp,
     position_actions: Vec<PositionAction>,
+    directions: HashMap<PositionId, DirectionToBase>,
     lp_actions: Vec<LpAction>,
 }
 
@@ -177,11 +226,13 @@ impl CsvGenerator {
     fn new(
         status: StatusResp,
         position_actions: Vec<PositionAction>,
+        directions: HashMap<PositionId, DirectionToBase>,
         lp_actions: Vec<LpAction>,
     ) -> CsvGenerator {
         CsvGenerator {
             status,
             position_actions,
+            directions,
             lp_actions,
         }
     }
@@ -206,7 +257,8 @@ impl CsvGenerator {
                 (Some(position_action), Some(lp_action)) => {
                     if position_action.timestamp <= lp_action.timestamp {
                         next_position_action = position_actions_iter.next();
-                        ActionRecord::from_position_action(position_action, &self.status)?
+                        let pos_id = position_action.id.ok_or(Error::FailedToGenerateCsv)?;
+                        ActionRecord::from_position_action(position_action, &self.status, self.directions[&pos_id])?
                     } else {
                         next_lp_action = lp_actions_iter.next();
                         ActionRecord::from_lp_action(lp_action, &self.status)?
@@ -214,7 +266,8 @@ impl CsvGenerator {
                 }
                 (Some(position_action), None) => {
                     next_position_action = position_actions_iter.next();
-                    ActionRecord::from_position_action(position_action, &self.status)?
+                    let pos_id = position_action.id.ok_or(Error::FailedToGenerateCsv)?;
+                    ActionRecord::from_position_action(position_action, &self.status, self.directions[&pos_id])?
                 }
                 (None, Some(lp_action)) => {
                     next_lp_action = lp_actions_iter.next();
@@ -267,7 +320,7 @@ struct ActionRecord {
 
 impl ActionRecord {
     /// Converts a PositionAction into an ActionRecord
-    fn from_position_action(action: &PositionAction, status: &StatusResp) -> Result<Self, Error> {
+    fn from_position_action(action: &PositionAction, status: &StatusResp, direction: DirectionToBase) -> Result<Self, Error> {
         let dt = action
             .timestamp
             .try_into_chrono_datetime()
@@ -275,7 +328,7 @@ impl ActionRecord {
         let transaction_time = dt.format("%Y-%m-%d %H:%M:%S").to_string();
         let position_id = action.id.ok_or(Error::FailedToGenerateCsv)?.to_string();
         let market_id = status.market_id.clone().to_string().replace("_", "-");
-        let direction = match action.direction {
+        let direction = match direction {
             DirectionToBase::Long => "Long",
             DirectionToBase::Short => "Short",
         }
@@ -359,6 +412,7 @@ pub(crate) enum QueryType {
     TraderActionHistory,
     LpActionHistory,
     Status,
+    Positions
 }
 
 struct PerpsContract(Contract);
@@ -414,6 +468,7 @@ impl IntoResponse for Error {
                     QueryType::Status => StatusCode::BAD_REQUEST,
                     QueryType::TraderActionHistory => StatusCode::INTERNAL_SERVER_ERROR,
                     QueryType::LpActionHistory => StatusCode::INTERNAL_SERVER_ERROR,
+                    QueryType::Positions => StatusCode::INTERNAL_SERVER_ERROR,
                 },
                 Error::FailedToGenerateCsv => StatusCode::INTERNAL_SERVER_ERROR,
             },
@@ -425,8 +480,7 @@ impl IntoResponse for Error {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::endpoints::export::Exporter;
+    // use crate::endpoints::export::Exporter;
 
     #[test]
     fn test_export_history() {

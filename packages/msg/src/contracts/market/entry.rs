@@ -698,14 +698,6 @@ pub struct PositionAction {
     pub take_profit_override: Option<PriceBaseInQuote>,
     /// The stop loss override, if set.
     pub stop_loss_override: Option<PriceBaseInQuote>,
-    /// The direction of the position
-    #[serde(default = "default_direction")]
-    pub direction: DirectionToBase,
-}
-
-//FIXME remove default_direction
-fn default_direction() -> DirectionToBase {
-    DirectionToBase::Long
 }
 
 /// Action taken by trader for a [PositionAction]

@@ -191,7 +191,6 @@ pub mod events {
                         .try_price_base_in_quote(event_key::TAKE_PROFIT_OVERRIDE)?,
                     stop_loss_override: evt
                         .try_price_base_in_quote(event_key::STOP_LOSS_OVERRIDE)?,
-                    direction: evt.direction_attr(event_key::DIRECTION)?,
                 },
             })
         }
