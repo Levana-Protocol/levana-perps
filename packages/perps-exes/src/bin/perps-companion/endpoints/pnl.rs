@@ -315,7 +315,7 @@ pub(crate) enum QueryType {
 
 #[derive(Debug, Clone)]
 pub(crate) struct ErrorDescription {
-    pub(crate) msg: String
+    pub(crate) msg: String,
 }
 
 #[derive(thiserror::Error, Clone, Debug)]
@@ -362,9 +362,11 @@ impl IntoResponse for Error {
             error: self.clone(),
         }
         .into_response();
-	let error_description = ErrorDescription {msg: self.to_string()};
-	response.extensions_mut().insert(error_description);
-	response
+        let error_description = ErrorDescription {
+            msg: self.to_string(),
+        };
+        response.extensions_mut().insert(error_description);
+        response
     }
 }
 
