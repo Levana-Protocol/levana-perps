@@ -211,6 +211,16 @@ impl PositionInfo {
             )
             .await?;
 
+        let deposit_collateral_usd = if pos.deposit_collateral_usd.is_zero() {
+            // Old data doesn't have this field, so it defaults to 0. We assume
+            // that if we see 0, it's just a default value and we need to
+            // hackily calculate this.
+            pos.deposit_collateral
+                .map(|x| entry_price.collateral_to_usd(x))
+        } else {
+            pos.deposit_collateral_usd
+        };
+
         Ok(PositionInfoToDb {
             market_id: status.market_id,
             direction: pos.direction_to_base.into(),
@@ -236,11 +246,9 @@ impl PositionInfo {
             environment: ContractEnvironment::from_market(*chain, &label),
             pnl: match pnl_type {
                 PnlType::Usd => UsdDisplay(pos.pnl_usd).to_string(),
-                PnlType::Percent => match pos.deposit_collateral.try_into_positive_value() {
+                PnlType::Percent => match deposit_collateral_usd.try_into_positive_value() {
                     None => "Negative collateral".to_owned(),
                     Some(deposit) => {
-                        // FIXME we need a deposit_usd to do this accurately
-                        let deposit = entry_price.collateral_to_usd(deposit);
                         let percent = pos.pnl_usd.into_number() / deposit.into_number()
                             * Decimal256::from_ratio(100u32, 1u32).into_signed();
                         let plus = if percent.is_negative() { "" } else { "+" };

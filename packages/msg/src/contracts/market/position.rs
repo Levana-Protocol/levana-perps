@@ -611,6 +611,7 @@ impl Position {
                         crank_fee_collateral: pos.crank_fee.collateral(),
                         crank_fee_usd: pos.crank_fee.usd(),
                         deposit_collateral: pos.deposit_collateral.collateral(),
+                        deposit_collateral_usd: pos.deposit_collateral.usd(),
                         pnl_collateral: active_collateral
                             .into_signed()
                             .checked_sub(pos.deposit_collateral.collateral())?,
@@ -1061,6 +1062,7 @@ pub mod events {
                         delta_neutrality_fee_collateral,
                         delta_neutrality_fee_usd,
                         deposit_collateral,
+                        deposit_collateral_usd,
                         active_collateral,
                         pnl_collateral,
                         pnl_usd,
@@ -1097,6 +1099,10 @@ pub mod events {
                 .add_attribute(
                     event_key::DEPOSIT_COLLATERAL,
                     deposit_collateral.to_string(),
+                )
+                .add_attribute(
+                    event_key::DEPOSIT_COLLATERAL_USD,
+                    deposit_collateral_usd.to_string(),
                 )
                 .add_attribute(event_key::PNL, pnl_collateral.to_string())
                 .add_attribute(event_key::PNL_USD, pnl_usd.to_string())
@@ -1165,6 +1171,10 @@ pub mod events {
                     .number_attr(event_key::DELTA_NEUTRALITY_FEE)?,
                 delta_neutrality_fee_usd: evt.number_attr(event_key::DELTA_NEUTRALITY_FEE_USD)?,
                 deposit_collateral: evt.number_attr(event_key::DEPOSIT_COLLATERAL)?,
+                deposit_collateral_usd: evt
+                    // For migrations, this data wasn't always present
+                    .try_number_attr(event_key::DEPOSIT_COLLATERAL_USD)?
+                    .unwrap_or_default(),
                 pnl_collateral: evt.number_attr(event_key::PNL)?,
                 pnl_usd: evt.number_attr(event_key::PNL_USD)?,
                 notional_size: evt.number_attr(event_key::NOTIONAL_SIZE)?,

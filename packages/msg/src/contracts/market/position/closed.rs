@@ -59,6 +59,10 @@ pub struct ClosedPosition {
     /// This includes any updates from collateral being added or removed.
     pub deposit_collateral: Signed<Collateral>,
 
+    /// Deposit collateral in USD, using cost basis analysis.
+    #[serde(default)]
+    pub deposit_collateral_usd: Signed<Usd>,
+
     /// Final active collateral, the amount sent back to the trader on close
     pub active_collateral: Collateral,
 
