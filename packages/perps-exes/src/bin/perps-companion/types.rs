@@ -1,7 +1,8 @@
 use std::fmt::Display;
 
 use cosmos::CosmosNetwork;
-use shared::storage::DirectionToBase;
+use cosmwasm_std::Decimal256;
+use shared::storage::{DirectionToBase, Signed};
 
 /// Chains supported by this server.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, serde::Deserialize, sqlx::Type)]
@@ -185,5 +186,33 @@ impl From<PnlType> for String {
             PnlType::Usd => "Usd".into(),
             PnlType::Percent => "Percent".into(),
         }
+    }
+}
+
+pub(crate) struct TwoDecimalPoints(pub(crate) Signed<Decimal256>);
+
+impl Display for TwoDecimalPoints {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let ten = Decimal256::from_ratio(10u32, 1u32);
+        let half = Decimal256::from_ratio(1u32, 2u32);
+
+        if self.0.is_negative() {
+            write!(f, "-")?;
+        }
+
+        let whole = self.0.abs_unsigned().floor();
+        let rem = self.0.abs_unsigned() - whole;
+        let rem = rem * ten;
+        let x = rem.floor();
+        let rem = rem - x;
+        let rem = rem * ten;
+        let y = rem.floor();
+        let rem = rem - y;
+        let y = if rem >= half {
+            y + Decimal256::one()
+        } else {
+            y
+        };
+        write!(f, "{}.{}{}", whole, x, y)
     }
 }

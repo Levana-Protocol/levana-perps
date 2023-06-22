@@ -31,7 +31,7 @@ use serde_json::{json, Value};
 use crate::{
     app::App,
     db::models::{PositionInfoFromDb, PositionInfoToDb},
-    types::{ChainId, ContractEnvironment, DirectionForDb, PnlType},
+    types::{ChainId, ContractEnvironment, DirectionForDb, PnlType, TwoDecimalPoints},
 };
 
 use super::{ErrorPage, PnlCssRoute, PnlHtml, PnlImage, PnlUrl};
@@ -374,34 +374,6 @@ struct PnlInfo {
     entry_price: String,
     exit_price: String,
     leverage: String,
-}
-
-struct TwoDecimalPoints(Signed<Decimal256>);
-
-impl Display for TwoDecimalPoints {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let ten = Decimal256::from_ratio(10u32, 1u32);
-        let half = Decimal256::from_ratio(1u32, 2u32);
-
-        if self.0.is_negative() {
-            write!(f, "-")?;
-        }
-
-        let whole = self.0.abs_unsigned().floor();
-        let rem = self.0.abs_unsigned() - whole;
-        let rem = rem * ten;
-        let x = rem.floor();
-        let rem = rem - x;
-        let rem = rem * ten;
-        let y = rem.floor();
-        let rem = rem - y;
-        let y = if rem >= half {
-            y + Decimal256::one()
-        } else {
-            y
-        };
-        write!(f, "{}.{}{}", whole, x, y)
-    }
 }
 
 struct UsdDisplay(Signed<Usd>);
