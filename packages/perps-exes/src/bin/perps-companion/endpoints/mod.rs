@@ -7,14 +7,23 @@ use anyhow::{Context, Result};
 use askama::Template;
 use axum::{
     extract::rejection::PathRejection,
-    response::{Html, IntoResponse, Response}, http::Request, middleware::{Next, from_fn},
+    http::Request,
+    middleware::{from_fn, Next},
+    response::{Html, IntoResponse, Response},
+    Json,
 };
 use axum_extra::routing::{RouterExt, TypedPath};
-use reqwest::{header::{CONTENT_TYPE, ACCEPT}, Method, StatusCode};
+use reqwest::{
+    header::{ACCEPT, CONTENT_TYPE},
+    Method, StatusCode,
+};
 use serde::Deserialize;
+use serde_json::json;
 use tower_http::cors::CorsLayer;
 
 use crate::app::App;
+
+use self::pnl::ErrorDescription;
 
 #[derive(TypedPath)]
 #[typed_path("/")]
@@ -109,17 +118,17 @@ async fn error_response_handler<B>(request: Request<B>, next: Next<B>) -> Respon
 
     let status_code = response.status();
 
-    // https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
-    // if status_code
-
-    if let Some(my_data) = response.extensions_mut().remove::<MyData>() {
+    if let Some(error_description) = response.extensions_mut().remove::<ErrorDescription>() {
+        let msg = error_description.msg;
         match accept_header.as_deref() {
-            Some(b"application/json") => return Json(my_data).into_response(),
-            Some(b"html") => return Html(format!("<body>{}</body>", my_data.data)).into_response(),
-            _ => { /* yield original 501 response */ }
+            Some(b"application/json") => return Json(json!({ "error": msg })).into_response(),
+            Some(b"text/plain") => {
+                let text_response = format!("error: {msg}");
+                return (status_code, text_response).into_response();
+            }
+            _ => return response,
         }
     }
-
     response
 }
 

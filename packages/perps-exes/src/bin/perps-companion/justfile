@@ -1,3 +1,5 @@
+export DATABASE_URL := "postgresql://postgres:postgres@localhost/companion"
+
 # List all recipies
 default:
 	just --list --unsorted
@@ -28,5 +30,5 @@ pg-terminate-conn:
 
 # Tests
 test:
-	curl --header "Content-Type: application/json" --request POST --data '{"address":"sei1vc9zsrma0gezczzfqcps8gvned5s5nq9p7yw7nu68spcvj4lngwqau4rln","chain":"atlantic-2","position_id":"1","pnl_type":"Usd"}' http://localhost:3000/pnl-url
-	curl --header "Content-Type: application/json" --request POST --data '{"address":"sei1vc9zsrma0gezczzfqcps8gvned5s5nq9p7yw7nu68spcvj4lngwqau4rln","chain":"atlantic-2","position_id":"1","pnl_type":"Percent"}' http://localhost:3000/pnl-url
+	curl --header "Accept: application/json" --header "Content-Type: application/json" http://localhost:3000/pnl/1003
+	curl --header "Accept: application/json" --header "Content-Type: application/json" --request POST --data '{"address":"sei1vc9zsrma0gezczzfqcps8gvned5s5nq9p7yw7nu68spcvj4lngwqau4rln","chain":"atlantic-2","position_id":"1","pnl_type":"usd"}' http://localhost:3000/pnl-url

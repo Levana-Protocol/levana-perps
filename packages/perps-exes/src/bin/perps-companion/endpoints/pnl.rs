@@ -313,7 +313,12 @@ pub(crate) enum QueryType {
     Positions,
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug, Clone)]
+pub(crate) struct ErrorDescription {
+    pub(crate) msg: String
+}
+
+#[derive(thiserror::Error, Clone, Debug)]
 pub(crate) enum Error {
     #[error("Unknown chain ID")]
     UnknownChainId,
@@ -336,7 +341,7 @@ pub(crate) enum Error {
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
-        ErrorPage {
+        let mut response = ErrorPage {
             code: match &self {
                 Error::UnknownChainId => StatusCode::BAD_REQUEST,
                 Error::PositionNotFound => StatusCode::BAD_REQUEST,
@@ -354,9 +359,12 @@ impl IntoResponse for Error {
                 }
                 Error::InvalidPage => StatusCode::NOT_FOUND,
             },
-            error: self,
+            error: self.clone(),
         }
-        .into_response()
+        .into_response();
+	let error_description = ErrorDescription {msg: self.to_string()};
+	response.extensions_mut().insert(error_description);
+	response
     }
 }
 
