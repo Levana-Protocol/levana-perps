@@ -1,3 +1,4 @@
+use futures::future::TryFutureExt;
 use std::collections::HashMap;
 
 use cosmos::{
@@ -124,27 +125,34 @@ impl Pyth {
         all_ids.sort();
         all_ids.dedup();
 
-        let mut url = format!("{}api/latest_vaas", PythConfig::load()?.endpoint);
+        let pyth_config = PythConfig::load()?;
+        let mut result: Result<Vec<String>> = Ok(vec![]);
+        for endpoint in pyth_config.endpoints.iter() {
+            let mut url = format!("{}api/latest_vaas", endpoint);
 
-        for (index, id) in all_ids.iter().enumerate() {
-            // pyth uses this format for array params: https://github.com/axios/axios/blob/9588fcdec8aca45c3ba2f7968988a5d03f23168c/test/specs/helpers/buildURL.spec.js#L31
-            let delim = if index == 0 { "?" } else { "&" };
-            url.push_str(&format!("{}ids[]={}", delim, id));
+            for (index, id) in all_ids.iter().enumerate() {
+                // pyth uses this format for array params: https://github.com/axios/axios/blob/9588fcdec8aca45c3ba2f7968988a5d03f23168c/test/specs/helpers/buildURL.spec.js#L31
+                let delim = if index == 0 { "?" } else { "&" };
+                url.push_str(&format!("{}ids[]={}", delim, id));
+            }
+
+            result = client
+                .get(url)
+                .send()
+                .and_then(|x| async { x.error_for_status() })
+                .and_then(|x| x.json())
+                .await
+                .map_err(|e| e.into());
+
+            if let Ok(vaas) = result.as_ref() {
+                if vaas.len() != all_ids.len() {
+                    anyhow::bail!("expected {} vaas, got {}", all_ids.len(), vaas.len());
+                } else {
+                    break;
+                }
+            }
         }
-
-        let vaas: Vec<String> = client
-            .get(url)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
-
-        if vaas.len() != all_ids.len() {
-            anyhow::bail!("expected {} vaas, got {}", all_ids.len(), vaas.len());
-        }
-
-        Ok(vaas)
+        result
     }
 }
 
@@ -153,19 +161,34 @@ pub async fn get_latest_price(
     client: &reqwest::Client,
     market_price_feeds: &PythMarketPriceFeeds,
 ) -> Result<(PriceBaseInQuote, Option<PriceCollateralInUsd>)> {
-    let endpoint = &PythConfig::load()?.endpoint;
-    let base = price_helper(client, endpoint, &market_price_feeds.feeds).await?;
-    let base = PriceBaseInQuote::try_from_number(base.into_signed())?;
-    let collateral = match &market_price_feeds.feeds_usd {
-        Some(feeds_usd) => {
-            let collateral = price_helper(client, endpoint, feeds_usd).await?;
-            Some(PriceCollateralInUsd::try_from_number(
-                collateral.into_signed(),
-            )?)
+    let pyth_config = PythConfig::load()?;
+    let mut result: Result<(PriceBaseInQuote, Option<PriceCollateralInUsd>)> =
+        Err(anyhow!("nonsense"));
+    for endpoint in pyth_config.endpoints.iter() {
+        let base = price_helper(client, endpoint, &market_price_feeds.feeds)
+            .await
+            .and_then(|base| PriceBaseInQuote::try_from_number(base.into_signed()));
+
+        let collateral = match &market_price_feeds.feeds_usd {
+            Some(feeds_usd) => {
+                let collateral =
+                    price_helper(client, endpoint, feeds_usd)
+                        .await
+                        .and_then(|collateral| {
+                            PriceCollateralInUsd::try_from_number(collateral.into_signed())
+                        });
+                Some(collateral)
+            }
+            None => None,
         }
-        None => None,
-    };
-    Ok((base, collateral))
+        .transpose();
+
+        result = base.and_then(|b| collateral.map(|c| (b, c)));
+        if result.is_ok() {
+            break;
+        }
+    }
+    result
 }
 
 async fn price_helper(
