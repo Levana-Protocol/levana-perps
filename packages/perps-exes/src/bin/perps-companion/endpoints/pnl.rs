@@ -31,7 +31,7 @@ use serde_json::{json, Value};
 use crate::{
     app::App,
     db::models::{PositionInfoFromDb, PositionInfoToDb},
-    types::{ChainId, ContractEnvironment, DirectionForDb, PnlType},
+    types::{ChainId, ContractEnvironment, DirectionForDb, PnlType, TwoDecimalPoints},
 };
 
 use super::{ErrorPage, PnlCssRoute, PnlHtml, PnlImage, PnlUrl};
@@ -211,6 +211,16 @@ impl PositionInfo {
             )
             .await?;
 
+        let deposit_collateral_usd = if pos.deposit_collateral_usd.is_zero() {
+            // Old data doesn't have this field, so it defaults to 0. We assume
+            // that if we see 0, it's just a default value and we need to
+            // hackily calculate this.
+            pos.deposit_collateral
+                .map(|x| entry_price.collateral_to_usd(x))
+        } else {
+            pos.deposit_collateral_usd
+        };
+
         Ok(PositionInfoToDb {
             market_id: status.market_id,
             direction: pos.direction_to_base.into(),
@@ -236,11 +246,9 @@ impl PositionInfo {
             environment: ContractEnvironment::from_market(*chain, &label),
             pnl: match pnl_type {
                 PnlType::Usd => UsdDisplay(pos.pnl_usd).to_string(),
-                PnlType::Percent => match pos.deposit_collateral.try_into_positive_value() {
+                PnlType::Percent => match deposit_collateral_usd.try_into_positive_value() {
                     None => "Negative collateral".to_owned(),
                     Some(deposit) => {
-                        // FIXME we need a deposit_usd to do this accurately
-                        let deposit = entry_price.collateral_to_usd(deposit);
                         let percent = pos.pnl_usd.into_number() / deposit.into_number()
                             * Decimal256::from_ratio(100u32, 1u32).into_signed();
                         let plus = if percent.is_negative() { "" } else { "+" };
@@ -313,7 +321,12 @@ pub(crate) enum QueryType {
     Positions,
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug, Clone)]
+pub(crate) struct ErrorDescription {
+    pub(crate) msg: String,
+}
+
+#[derive(thiserror::Error, Clone, Debug)]
 pub(crate) enum Error {
     #[error("Unknown chain ID")]
     UnknownChainId,
@@ -336,7 +349,7 @@ pub(crate) enum Error {
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
-        ErrorPage {
+        let mut response = ErrorPage {
             code: match &self {
                 Error::UnknownChainId => StatusCode::BAD_REQUEST,
                 Error::PositionNotFound => StatusCode::BAD_REQUEST,
@@ -354,9 +367,14 @@ impl IntoResponse for Error {
                 }
                 Error::InvalidPage => StatusCode::NOT_FOUND,
             },
-            error: self,
+            error: self.clone(),
         }
-        .into_response()
+        .into_response();
+        let error_description = ErrorDescription {
+            msg: self.to_string(),
+        };
+        response.extensions_mut().insert(error_description);
+        response
     }
 }
 
@@ -374,34 +392,6 @@ struct PnlInfo {
     entry_price: String,
     exit_price: String,
     leverage: String,
-}
-
-struct TwoDecimalPoints(Signed<Decimal256>);
-
-impl Display for TwoDecimalPoints {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let ten = Decimal256::from_ratio(10u32, 1u32);
-        let half = Decimal256::from_ratio(1u32, 2u32);
-
-        if self.0.is_negative() {
-            write!(f, "-")?;
-        }
-
-        let whole = self.0.abs_unsigned().floor();
-        let rem = self.0.abs_unsigned() - whole;
-        let rem = rem * ten;
-        let x = rem.floor();
-        let rem = rem - x;
-        let rem = rem * ten;
-        let y = rem.floor();
-        let rem = rem - y;
-        let y = if rem >= half {
-            y + Decimal256::one()
-        } else {
-            y
-        };
-        write!(f, "{}.{}{}", whole, x, y)
-    }
 }
 
 struct UsdDisplay(Signed<Usd>);

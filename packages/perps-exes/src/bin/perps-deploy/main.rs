@@ -43,6 +43,8 @@ async fn main_inner() -> anyhow::Result<()> {
             TestnetSub::MigrateRewards { inner } => migrate_rewards::go(opt, inner).await?,
             TestnetSub::Deposit { inner } => inner.go(opt).await?,
             TestnetSub::EnableMarket { inner } => inner.go(opt).await?,
+            TestnetSub::DisableMarketAt { inner } => inner.go(opt).await?,
+            TestnetSub::CloseAllPositions { inner } => inner.go(opt).await?,
         },
         Subcommand::Mainnet { inner } => mainnet::go(opt, inner).await?,
     }

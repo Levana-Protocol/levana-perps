@@ -14,6 +14,7 @@ markets:
     carry_leverage: 9
     delta_neutrality_fee_cap: 0.015
     delta_neutrality_fee_sensitivity: 50000000
+    delta_neutrality_fee_tax: 0.25
   ETH_BTC:
     delta_neutrality_fee_sensitivity: 1000000000
   BTC_USD:

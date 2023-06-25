@@ -9,16 +9,25 @@ use anyhow::{Context, Result};
 use askama::Template;
 use axum::{
     extract::rejection::PathRejection,
+    http::Request,
+    middleware::{from_fn, Next},
     response::{Html, IntoResponse, Response},
+    Json,
 };
 use axum_extra::routing::{RouterExt, TypedPath};
 use cosmos::Address;
-use reqwest::{header::CONTENT_TYPE, Method, StatusCode};
+use reqwest::{
+    header::{ACCEPT, CONTENT_TYPE},
+    Method, StatusCode,
+};
 use serde::Deserialize;
+use serde_json::json;
 use tower_http::cors::CorsLayer;
 
 use crate::app::App;
 use crate::types::ChainId;
+
+use self::pnl::ErrorDescription;
 
 #[derive(TypedPath)]
 #[typed_path("/")]
@@ -102,13 +111,38 @@ pub(crate) async fn launch(app: App) -> Result<()> {
                 .allow_origin(tower_http::cors::Any)
                 .allow_methods([Method::GET, Method::HEAD, Method::POST])
                 .allow_headers([CONTENT_TYPE]),
-        );
+        )
+        .layer(from_fn(error_response_handler));
 
     log::info!("Launching server");
     axum::Server::bind(&bind)
         .serve(router.into_make_service())
         .await
         .context("Background task should never complete")
+}
+
+async fn error_response_handler<B>(request: Request<B>, next: Next<B>) -> Response {
+    let accept_header = request
+        .headers()
+        .get(&ACCEPT)
+        .map(|value| value.as_ref().to_owned());
+
+    let mut response = next.run(request).await;
+
+    let status_code = response.status();
+
+    if let Some(error_description) = response.extensions_mut().remove::<ErrorDescription>() {
+        let msg = error_description.msg;
+        match accept_header.as_deref() {
+            Some(b"application/json") => return Json(json!({ "error": msg })).into_response(),
+            Some(b"text/plain") => {
+                let text_response = format!("error: {msg}");
+                return (status_code, text_response).into_response();
+            }
+            _ => return response,
+        }
+    }
+    response
 }
 
 #[derive(askama::Template)]

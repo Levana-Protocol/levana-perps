@@ -144,6 +144,7 @@ impl State<'_> {
             crank_fee_collateral: pos.crank_fee.collateral(),
             crank_fee_usd: pos.crank_fee.usd(),
             deposit_collateral: pos.deposit_collateral.collateral(),
+            deposit_collateral_usd: pos.deposit_collateral.usd(),
             pnl_collateral: active_collateral
                 .into_signed()
                 .checked_sub(pos.deposit_collateral.collateral())?,
