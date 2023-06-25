@@ -48,6 +48,7 @@ resvg = "0.34"
 axum-macros = "0.3.7"
 mime = "0.3.17"
 sqlx = { version = "0.6.3", features = ["runtime-tokio-rustls", "postgres", "offline"]}
+itertools = "0.10.5"
 
 [features]
 default = []

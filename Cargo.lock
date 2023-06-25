@@ -2686,6 +2686,7 @@ dependencies = [
  "fs-err",
  "futures",
  "hex",
+ "itertools",
  "levana_perpswap_cosmos_msg",
  "levana_perpswap_cosmos_shared",
  "levana_perpswap_multi_test",
