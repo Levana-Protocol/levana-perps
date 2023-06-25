@@ -438,7 +438,6 @@ impl PerpsContract {
         let mut attempt = 1;
         loop {
             let res = self.0.query(&msg).await.map_err(|source| {
-                //FIXME can this be abstracted?
                 let e = Error::FailedToQueryContract {
                     msg: format!("{:?}", msg),
                     query_type,
@@ -492,8 +491,6 @@ impl IntoResponse for Error {
 
 #[cfg(test)]
 mod tests {
-    // use crate::endpoints::export::Exporter;
-
     use crate::endpoints::export::generate_csv;
     use cosmwasm_std::Addr;
     use msg::contracts::market::entry::{
