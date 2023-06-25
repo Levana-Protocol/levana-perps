@@ -1,4 +1,3 @@
-use futures::future::TryFutureExt;
 use std::collections::HashMap;
 
 use cosmos::{
@@ -124,35 +123,35 @@ impl Pyth {
 
         all_ids.sort();
         all_ids.dedup();
+        let all_ids_len = all_ids.len();
+        // pyth uses this format for array params: https://github.com/axios/axios/blob/9588fcdec8aca45c3ba2f7968988a5d03f23168c/test/specs/helpers/buildURL.spec.js#L31
+        let url_params = all_ids
+            .iter()
+            .map(|id| format!("ids[]={id}"))
+            .collect::<Vec<String>>()
+            .join("&");
+        let url_params = &url_params;
 
         let pyth_config = PythConfig::load()?;
-        let mut result: Result<Vec<String>> = Ok(vec![]);
-        for endpoint in pyth_config.endpoints.iter() {
-            let mut url = format!("{}api/latest_vaas", endpoint);
+        let mut endpoints = crate::util::helpers::VecWithCurr::new(pyth_config.endpoints.iter());
+        endpoints
+            .try_any_from_curr_async(|endpoint| async move {
+                let url = format!("{endpoint}api/latest_vaas?{url_params}");
 
-            for (index, id) in all_ids.iter().enumerate() {
-                // pyth uses this format for array params: https://github.com/axios/axios/blob/9588fcdec8aca45c3ba2f7968988a5d03f23168c/test/specs/helpers/buildURL.spec.js#L31
-                let delim = if index == 0 { "?" } else { "&" };
-                url.push_str(&format!("{}ids[]={}", delim, id));
-            }
+                let vaas: Vec<String> = client
+                    .get(url)
+                    .send()
+                    .await?
+                    .error_for_status()?
+                    .json()
+                    .await?;
 
-            result = client
-                .get(url)
-                .send()
-                .and_then(|x| async { x.error_for_status() })
-                .and_then(|x| x.json())
-                .await
-                .map_err(|e| e.into());
-
-            if let Ok(vaas) = result.as_ref() {
-                if vaas.len() != all_ids.len() {
-                    anyhow::bail!("expected {} vaas, got {}", all_ids.len(), vaas.len());
-                } else {
-                    break;
+                if vaas.len() != all_ids_len {
+                    anyhow::bail!("expected {} vaas, got {}", all_ids_len, vaas.len());
                 }
-            }
-        }
-        result
+                Ok(vaas)
+            })
+            .await
     }
 }
 
@@ -162,33 +161,26 @@ pub async fn get_latest_price(
     market_price_feeds: &PythMarketPriceFeeds,
 ) -> Result<(PriceBaseInQuote, Option<PriceCollateralInUsd>)> {
     let pyth_config = PythConfig::load()?;
-    let mut result: Result<(PriceBaseInQuote, Option<PriceCollateralInUsd>)> =
-        Err(anyhow!("nonsense"));
-    for endpoint in pyth_config.endpoints.iter() {
-        let base = price_helper(client, endpoint, &market_price_feeds.feeds)
-            .await
-            .and_then(|base| PriceBaseInQuote::try_from_number(base.into_signed()));
+    let mut endpoints = crate::util::helpers::VecWithCurr::new(pyth_config.endpoints.iter());
+    endpoints
+        .try_any_from_curr_async(|endpoint| async move {
+            let base = price_helper(client, &endpoint, &market_price_feeds.feeds).await?;
+            let base = PriceBaseInQuote::try_from_number(base.into_signed())?;
 
-        let collateral = match &market_price_feeds.feeds_usd {
-            Some(feeds_usd) => {
-                let collateral =
-                    price_helper(client, endpoint, feeds_usd)
-                        .await
-                        .and_then(|collateral| {
-                            PriceCollateralInUsd::try_from_number(collateral.into_signed())
-                        });
-                Some(collateral)
+            let collateral = match &market_price_feeds.feeds_usd {
+                Some(feeds_usd) => {
+                    let collateral = price_helper(client, &endpoint, feeds_usd).await?;
+                    Some(PriceCollateralInUsd::try_from_number(
+                        collateral.into_signed(),
+                    ))
+                }
+                None => None,
             }
-            None => None,
-        }
-        .transpose();
+            .transpose()?;
 
-        result = base.and_then(|b| collateral.map(|c| (b, c)));
-        if result.is_ok() {
-            break;
-        }
-    }
-    result
+            Ok((base, collateral))
+        })
+        .await
 }
 
 async fn price_helper(
