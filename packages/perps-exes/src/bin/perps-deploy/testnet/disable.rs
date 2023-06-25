@@ -37,7 +37,14 @@ impl DisableMarketAtOpt {
             tokio::time::sleep(to_sleep).await;
         }
 
-        factory.disable_all(&app.basic.wallet).await?;
+        let markets = factory.get_markets().await?;
+        for market in markets {
+            log::info!("Shutting down trades in market {}", market.market_id);
+            let res = factory
+                .disable_trades(&app.basic.wallet, market.market_id)
+                .await?;
+            log::info!("Trades shut down in {}", res.txhash);
+        }
         Ok(())
     }
 }
