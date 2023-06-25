@@ -5,7 +5,7 @@ use cosmos::{
 use msg::contracts::tracker::entry::{CodeIdResp, ContractResp, ExecuteMsg, QueryMsg};
 use msg::prelude::*;
 
-use crate::{cli::Opt, util::get_hash_for_path};
+use crate::{cli::Opt, factory::Factory, util::get_hash_for_path};
 
 pub(crate) struct Tracker(pub(crate) Contract);
 
@@ -112,5 +112,15 @@ impl Tracker {
                 },
             )
             .await
+    }
+
+    pub(crate) async fn get_factory(&self, family: &str) -> Result<Factory> {
+        let factory = self.get_contract_by_family("factory", family, None).await?;
+        match factory {
+            ContractResp::NotFound {} => Err(anyhow::anyhow!("Could not find factory contract")),
+            ContractResp::Found { address, .. } => Ok(Factory::from_contract(
+                self.0.get_cosmos().make_contract(address.parse()?),
+            )),
+        }
     }
 }

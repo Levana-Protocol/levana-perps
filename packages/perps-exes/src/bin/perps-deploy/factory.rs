@@ -123,6 +123,20 @@ impl Factory {
             )
             .await
     }
+
+    pub(crate) async fn disable_all(&self, wallet: &Wallet) -> Result<TxResponse> {
+        self.0
+            .execute(
+                wallet,
+                vec![],
+                FactoryExecuteMsg::Shutdown {
+                    markets: vec![],
+                    impacts: vec![],
+                    effect: ShutdownEffect::Disable,
+                },
+            )
+            .await
+    }
 }
 
 pub(crate) struct MarketInfo {
