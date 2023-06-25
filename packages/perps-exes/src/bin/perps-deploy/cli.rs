@@ -58,6 +58,16 @@ pub(crate) enum TestnetSub {
         #[clap(flatten)]
         inner: crate::testnet::enable_market::EnableMarketOpt,
     },
+    /// Disable a market at the given timestamp, good for trading competition
+    DisableMarketAt {
+        #[clap(flatten)]
+        inner: crate::testnet::disable::DisableMarketAtOpt,
+    },
+    /// Close all positions in the market, good for trading competition
+    CloseAllPositions {
+        #[clap(flatten)]
+        inner: crate::testnet::disable::CloseAllPositionsOpt,
+    },
 }
 
 #[derive(clap::Parser)]

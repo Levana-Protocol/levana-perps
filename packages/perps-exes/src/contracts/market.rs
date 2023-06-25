@@ -481,4 +481,10 @@ impl MarketContract {
             )
             .await
     }
+
+    pub async fn close_all_positions(&self, wallet: &Wallet) -> Result<TxResponse> {
+        self.0
+            .execute(wallet, vec![], MarketExecuteMsg::CloseAllPositions {})
+            .await
+    }
 }
