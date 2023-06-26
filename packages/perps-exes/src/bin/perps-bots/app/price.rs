@@ -239,7 +239,9 @@ impl App {
         market: &Market,
         pyth: &Pyth,
     ) -> Result<Vec<MsgExecuteContract>> {
-        let vaas = pyth.get_wormhole_proofs(&self.client).await?;
+        let vaas = pyth
+            .get_wormhole_proofs(&self.client, &self.endpoints)
+            .await?;
         let oracle_msg = pyth
             .get_oracle_update_msg(wallet.get_address_string(), vaas)
             .await?;

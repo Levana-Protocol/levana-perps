@@ -11,12 +11,14 @@ use cosmos::HasAddressType;
 use cosmos::Wallet;
 use cosmwasm_std::Decimal256;
 use parking_lot::RwLock;
+use perps_exes::config::PythConfig;
 use reqwest::Client;
 use tokio::sync::Mutex;
 
 use crate::app::factory::{get_factory_info_mainnet, get_factory_info_testnet};
 use crate::cli::Opt;
 use crate::config::{BotConfig, BotConfigByType, BotConfigTestnet};
+use crate::util::helpers::VecWithCurr;
 use crate::wallet_manager::ManagedWallet;
 use crate::watcher::TaskStatuses;
 use crate::watcher::Watcher;
@@ -66,7 +68,10 @@ pub(crate) struct App {
     pub(crate) gases: RwLock<HashMap<Address, GasRecords>>,
     /// Ensure that the crank and price bots don't try to work at the same time
     pub(crate) crank_lock: Mutex<()>,
+    pub endpoints: PythEndpoints,
 }
+
+pub(crate) type PythEndpoints = Arc<VecWithCurr<String, Vec<String>>>;
 
 /// Helper data structure for building up an application.
 pub(crate) struct AppBuilder {
@@ -122,6 +127,8 @@ impl Opt {
             ),
         };
 
+        let endpoints = Arc::new(VecWithCurr::new(PythConfig::load()?.endpoints.clone()));
+
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
             cosmos,
@@ -133,6 +140,7 @@ impl Opt {
             gases: RwLock::new(HashMap::new()),
             frontend_info_testnet,
             crank_lock: Mutex::new(()),
+            endpoints,
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {
