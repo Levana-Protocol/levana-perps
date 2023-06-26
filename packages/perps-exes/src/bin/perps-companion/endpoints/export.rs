@@ -5,21 +5,27 @@ use anyhow::{Context, Result};
 use axum::extract::State;
 use axum::http::HeaderValue;
 use axum::response::{IntoResponse, Response};
-use cosmos::{Address, Contract};
+use cosmos::{Address, Contract, Cosmos};
+use cosmwasm_std::Addr;
 use csv::WriterBuilder;
 use itertools::{EitherOrBoth, Itertools};
+use msg::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
 use msg::contracts::market::entry::{
     LpAction, LpActionHistoryResp, LpActionKind, PositionAction, PositionActionKind, StatusResp,
     TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{PositionId, PositionsResp};
-use msg::prelude::{DirectionToBase, MarketQueryMsg, OrderInMessage, RawAddr, Signed};
+use msg::prelude::{
+    DirectionToBase, FactoryQueryMsg, MarketQueryMsg, OrderInMessage, RawAddr, Signed,
+};
 use perps_exes::prelude::{Collateral, UnsignedDecimal};
 use reqwest::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
 use reqwest::StatusCode;
 use serde::Serialize;
+use shared::storage::MarketId;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
+use std::str::FromStr;
 use std::sync::Arc;
 
 // Route Handlers
@@ -32,12 +38,12 @@ const POSITIONS_QUERY_CHUNK_SIZE: usize = 3;
 pub(crate) async fn history(
     ExportHistory {
         chain,
-        market,
+        factory,
         wallet,
     }: ExportHistory,
     app: State<Arc<App>>,
 ) -> impl IntoResponse {
-    let exporter = Exporter::new(&app, chain, market, wallet)?;
+    let exporter = Exporter::new(&app, chain, factory, wallet)?;
 
     exporter.export().await.map(|csv| {
         let mut res = csv.into_response();
@@ -58,60 +64,60 @@ pub(crate) async fn history(
 
 // Export Logic
 
-fn generate_csv(
+fn get_action_records(
     status: StatusResp,
     position_actions: &[PositionAction],
     directions: HashMap<PositionId, DirectionToBase>,
     lp_actions: &[LpAction],
     wallet: &RawAddr,
-) -> Result<String> {
-    // Create action records
-
+) -> Result<Vec<ActionRecord>> {
     let mut action_records = Vec::<ActionRecord>::new();
     let merged_actions = position_actions
         .iter()
         .merge_join_by(lp_actions, |a, b| a.timestamp.cmp(&b.timestamp));
+    let push_position_action =
+        |records: &mut Vec<ActionRecord>, action: &PositionAction| -> Result<()> {
+            if !action.transfer_collateral.is_zero() {
+                let record = ActionRecord::from_position_action(
+                    action,
+                    &status,
+                    directions[&action.id.context("position_action missing id")?],
+                    wallet,
+                )?;
+
+                records.push(record);
+            }
+
+            Ok(())
+        };
+    let push_lp_action = |records: &mut Vec<ActionRecord>, action: &LpAction| -> Result<()> {
+        if !action.collateral.is_zero() && action.kind != LpActionKind::UnstakeXlp {
+            let record = ActionRecord::from_lp_action(action, &status)?;
+            records.push(record)
+        }
+
+        Ok(())
+    };
 
     for either_or_both in merged_actions {
         match either_or_both {
             EitherOrBoth::Left(position_action) => {
-                if !position_action.transfer_collateral.is_zero() {
-                    let record = ActionRecord::from_position_action(
-                        position_action,
-                        &status,
-                        directions[&position_action.id.context("position_action missing id")?],
-                        wallet,
-                    )?;
-                    action_records.push(record);
-                }
+                push_position_action(&mut action_records, position_action)?;
             }
             EitherOrBoth::Right(lp_action) => {
-                if !lp_action.collateral.is_zero() && lp_action.kind != LpActionKind::UnstakeXlp {
-                    let record = ActionRecord::from_lp_action(lp_action, &status)?;
-                    action_records.push(record)
-                }
+                push_lp_action(&mut action_records, lp_action)?;
             }
             EitherOrBoth::Both(position_action, lp_action) => {
-                if !position_action.transfer_collateral.is_zero() {
-                    let record = ActionRecord::from_position_action(
-                        position_action,
-                        &status,
-                        directions[&position_action.id.context("position_action missing id")?],
-                        wallet,
-                    )?;
-                    action_records.push(record);
-                }
-
-                if !lp_action.collateral.is_zero() {
-                    let record = ActionRecord::from_lp_action(lp_action, &status)?;
-                    action_records.push(record)
-                }
+                push_position_action(&mut action_records, position_action)?;
+                push_lp_action(&mut action_records, lp_action)?;
             }
         }
     }
 
-    // Generate CSV
+    Ok(action_records)
+}
 
+fn generate_csv(action_records: &[ActionRecord]) -> Result<String> {
     let mut writer = WriterBuilder::new().has_headers(false).from_writer(vec![]);
 
     writer.write_record([
@@ -134,62 +140,129 @@ fn generate_csv(
     Ok(data)
 }
 
-struct Exporter {
+struct Exporter<'a> {
+    cosmos: &'a Cosmos,
     /// The wallet address of the user for whom to generate a report
     wallet: RawAddr,
     /// The address of the market contract
-    contract: PerpsContract,
+    factory_contract: PerpsContract,
 }
 
-impl Exporter {
+impl<'a> Exporter<'a> {
     /// Returns a new Exporter
     ///
     /// * chain_id - The chain id of the desired chain.
     /// * market - The address of the market contract
     /// * wallet - The wallet address for which to export trader and LP history
     pub(crate) fn new(
-        app: &App,
+        app: &'a App,
         chain_id: ChainId,
-        market: Address,
+        factory: Address,
         wallet: Address,
     ) -> Result<Self, Error> {
         let cosmos = app.cosmos.get(&chain_id).ok_or(Error::UnknownChainId)?;
-        let contract = PerpsContract(cosmos.make_contract(market));
+        let factory_contract = PerpsContract(cosmos.make_contract(factory));
         let wallet = RawAddr::from(wallet.to_string());
 
-        Ok(Exporter { wallet, contract })
+        Ok(Exporter {
+            cosmos,
+            wallet,
+            factory_contract,
+        })
     }
 
     /// Queries the specified market contract for trader and LP history and generates a CSV
     async fn export(&self) -> Result<String, Error> {
-        let status = self.query_market_stats().await?;
-        let position_actions = self.query_position_actions().await?;
-        let position_ids = position_actions
-            .iter()
-            .filter_map(|a| a.id)
-            .collect::<Vec<PositionId>>();
-        let directions = self.query_positions_direction(&position_ids).await?;
-        let lp_actions = self.query_lp_actions().await?;
-        let csv = generate_csv(
-            status,
-            &position_actions,
-            directions,
-            &lp_actions,
-            &self.wallet,
-        )
-        .map_err(|_| Error::FailedToGenerateCsv)?;
+        let market_ids = self.query_market_ids().await?;
+        let mut records = Vec::<ActionRecord>::new();
+
+        for market_id in market_ids {
+            let addr_str = self.query_market_addr(market_id).await?;
+            let address = Address::from_str(addr_str.as_str()).map_err(|_| Error::Generic {
+                msg: "unable to convert addr".to_string(),
+            })?;
+            let market_contract = PerpsContract(self.cosmos.make_contract(address));
+
+            let status = self.query_market_stats(&market_contract).await?;
+            let position_actions = self.query_position_actions(&market_contract).await?;
+            let position_ids = position_actions
+                .iter()
+                .filter_map(|a| a.id)
+                .unique()
+                .collect::<Vec<PositionId>>();
+            let directions = self
+                .query_positions_direction(&market_contract, &position_ids)
+                .await?;
+            let lp_actions = self.query_lp_actions(&market_contract).await?;
+            let mut new_records = get_action_records(
+                status,
+                &position_actions,
+                directions,
+                &lp_actions,
+                &self.wallet,
+            )
+            .map_err(|_| Error::Generic {
+                msg: "unable to create action records".to_string(),
+            })?;
+
+            records.append(&mut new_records);
+        }
+
+        let csv = generate_csv(&records).map_err(|_| Error::FailedToGenerateCsv)?;
 
         Ok(csv)
     }
 
+    async fn query_market_ids(&self) -> Result<Vec<MarketId>, Error> {
+        let mut start_after = None::<MarketId>;
+        let mut markets = Vec::<MarketId>::new();
+
+        loop {
+            let mut res = self
+                .factory_contract
+                .query::<FactoryQueryMsg, MarketsResp>(
+                    FactoryQueryMsg::Markets {
+                        start_after,
+                        limit: None,
+                    },
+                    QueryType::Markets,
+                )
+                .await?;
+
+            match res.markets.last() {
+                None => break,
+                Some(last) => {
+                    start_after = Some(last.clone());
+                    markets.append(&mut res.markets);
+                }
+            }
+        }
+
+        Ok(markets)
+    }
+
+    async fn query_market_addr(&self, market_id: MarketId) -> Result<Addr, Error> {
+        let res = self
+            .factory_contract
+            .query::<FactoryQueryMsg, MarketInfoResponse>(
+                FactoryQueryMsg::MarketInfo { market_id },
+                QueryType::MarketInfo,
+            )
+            .await?;
+
+        Ok(res.market_addr)
+    }
+
     /// Query the position (aka trader) actions, paginating until complete
-    async fn query_position_actions(&self) -> Result<Vec<PositionAction>, Error> {
+    async fn query_position_actions(
+        &self,
+        contract: &PerpsContract,
+    ) -> Result<Vec<PositionAction>, Error> {
         let mut actions = Vec::<PositionAction>::new();
         let mut start_after = None::<String>;
 
         loop {
-            let mut res = self
-                .contract
+            let mut res = contract
                 .query::<MarketQueryMsg, TraderActionHistoryResp>(
                     MarketQueryMsg::TraderActionHistory {
                         owner: self.wallet.clone(),
@@ -215,6 +288,7 @@ impl Exporter {
     /// Query the position (aka trader) actions, paginating until complete
     async fn query_positions_direction(
         &self,
+        contract: &PerpsContract,
         position_ids: &[PositionId],
     ) -> Result<HashMap<PositionId, DirectionToBase>, Error> {
         let mut directions = HashMap::<PositionId, DirectionToBase>::new();
@@ -224,8 +298,7 @@ impl Exporter {
             match chunks.next() {
                 None => break,
                 Some(position_ids) => {
-                    let res = self
-                        .contract
+                    let res = contract
                         .query::<MarketQueryMsg, PositionsResp>(
                             MarketQueryMsg::Positions {
                                 position_ids: position_ids.to_vec(),
@@ -256,13 +329,12 @@ impl Exporter {
     }
 
     /// Query the LP actions, paginating until complete
-    async fn query_lp_actions(&self) -> Result<Vec<LpAction>, Error> {
+    async fn query_lp_actions(&self, contract: &PerpsContract) -> Result<Vec<LpAction>, Error> {
         let mut actions = Vec::<LpAction>::new();
         let mut start_after = None::<String>;
 
         loop {
-            let mut res = self
-                .contract
+            let mut res = contract
                 .query::<MarketQueryMsg, LpActionHistoryResp>(
                     MarketQueryMsg::LpActionHistory {
                         addr: RawAddr::from(self.wallet.to_string()),
@@ -286,9 +358,8 @@ impl Exporter {
     }
 
     /// Get the market stats
-    async fn query_market_stats(&self) -> Result<StatusResp, Error> {
-        let res = self
-            .contract
+    async fn query_market_stats(&self, contract: &PerpsContract) -> Result<StatusResp, Error> {
+        let res = contract
             .query::<MarketQueryMsg, StatusResp>(
                 MarketQueryMsg::Status { price: None },
                 QueryType::Status,
@@ -425,6 +496,8 @@ pub(crate) enum QueryType {
     LpActionHistory,
     Status,
     Positions,
+    Markets,
+    MarketInfo,
 }
 
 struct PerpsContract(Contract);
@@ -468,6 +541,8 @@ pub(crate) enum Error {
     FailedToQueryContract { msg: String, query_type: QueryType },
     #[error("Failed to generate CSV")]
     FailedToGenerateCsv,
+    #[error("CSV export error: {msg:?}")]
+    Generic { msg: String },
 }
 
 impl IntoResponse for Error {
@@ -480,8 +555,11 @@ impl IntoResponse for Error {
                     QueryType::TraderActionHistory => StatusCode::INTERNAL_SERVER_ERROR,
                     QueryType::LpActionHistory => StatusCode::INTERNAL_SERVER_ERROR,
                     QueryType::Positions => StatusCode::INTERNAL_SERVER_ERROR,
+                    QueryType::Markets => StatusCode::BAD_REQUEST,
+                    QueryType::MarketInfo => StatusCode::INTERNAL_SERVER_ERROR,
                 },
                 Error::FailedToGenerateCsv => StatusCode::INTERNAL_SERVER_ERROR,
+                Error::Generic { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             },
             error: self,
         }
@@ -491,7 +569,7 @@ impl IntoResponse for Error {
 
 #[cfg(test)]
 mod tests {
-    use crate::endpoints::export::generate_csv;
+    use crate::endpoints::export::{generate_csv, get_action_records};
     use cosmwasm_std::Addr;
     use msg::contracts::market::entry::{
         Fees, LpAction, LpActionKind, PositionAction, PositionActionKind, StatusResp,
@@ -624,7 +702,7 @@ mod tests {
             new_lp_action(LpActionKind::ClaimYield, start + 420, "8000"),
         ];
 
-        let csv = generate_csv(
+        let records = get_action_records(
             status,
             &position_actions,
             directions,
@@ -632,6 +710,7 @@ mod tests {
             &old_owner.into(),
         )
         .unwrap();
+        let csv = generate_csv(&records).unwrap();
         let expected = "Transaction Time (UTC),Position ID,Market,Direction,Action,Asset,Amount\n\
             2023-06-25 00:01:00,1,BASE+-QUOTE,Long,Open,BASE,10\n\
             2023-06-25 00:01:30,-,BASE+-QUOTE,-,Deposit LP,BASE,1000\n\
