@@ -279,9 +279,10 @@ impl State<'_> {
             end: start + duration,
             lvn,
         };
+        let totals = self.load_farming_totals(ctx.storage)?;
 
         match old_emissions {
-            None => self.save_lvn_emissions(ctx.storage, Some(new_emissions))?,
+            None => self.save_lvn_emissions(ctx.storage, Some(new_emissions.clone()))?,
             Some(old_emissions) => {
                 anyhow::ensure!(
                     self.now() > old_emissions.end,
@@ -289,9 +290,12 @@ impl State<'_> {
                 );
 
                 self.update_emissions_per_token(ctx, &old_emissions)?;
-                self.save_lvn_emissions(ctx.storage, Some(new_emissions))?;
+                self.process_reclaimable_emissions(ctx.storage)?;
+                self.save_lvn_emissions(ctx.storage, Some(new_emissions.clone()))?;
             }
         }
+
+        self.update_reclaimable_start(ctx.storage, Some(new_emissions), Some(totals))?;
 
         Ok(())
     }
@@ -306,9 +310,18 @@ impl State<'_> {
             let now = self.now();
 
             if now < emissions.end {
+                // We want to calculate the amount of time where LVN emissions will remain unclaimed.
+                // In the normal case, this lasts from the time the emissions were cleared until
+                // the originally planned end of the emissions period.
+                // However, if at the time of clearing the emissions there were no active farmers,
+                // we go back in time further to when we entered the "no farmers" state to cover
+                // the entire time that no emissions occurred.
+
+                let time_remaining_start =
+                    self.may_load_reclaimable_start(ctx.storage)?.unwrap_or(now);
                 let time_remaining = emissions
                     .end
-                    .checked_sub(now, "clear_emissions")?
+                    .checked_sub(time_remaining_start, "clear_emissions")?
                     .as_nanos();
                 let duration = emissions
                     .end
@@ -323,10 +336,13 @@ impl State<'_> {
                     .checked_add(new_reclaimable_emissions)?;
 
                 self.save_reclaimable_emissions(ctx.storage, reclaimable_emissions)?;
+            } else {
+                self.process_reclaimable_emissions(ctx.storage)?;
             }
         }
 
         self.save_lvn_emissions(ctx.storage, None)?;
+        self.update_reclaimable_start(ctx.storage, None, None)?;
 
         Ok(())
     }

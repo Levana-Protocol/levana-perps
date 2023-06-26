@@ -25,7 +25,7 @@ pub(crate) struct RawFarmerStats {
     pub(crate) accrued_emissions: LvnToken,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Default, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Default, Debug, Clone)]
 pub(crate) struct FarmingTotals {
     /// Total amount of xLP controlled by this contract.
     ///
@@ -128,6 +128,7 @@ impl State<'_> {
             Some(farmer_stats) => farmer_stats,
         };
 
+        self.process_reclaimable_emissions(ctx.storage)?;
         self.farming_perform_emissions_bookkeeping(ctx, farmer, &mut farmer_stats)?;
 
         let mut totals = self.load_farming_totals(ctx.storage)?;
@@ -139,6 +140,9 @@ impl State<'_> {
 
         farmer_stats.farming_tokens = farmer_stats.farming_tokens.checked_add(new_farming)?;
         self.save_raw_farmer_stats(ctx.storage, farmer, &farmer_stats)?;
+
+        let emissions = self.may_load_lvn_emissions(ctx.storage)?;
+        self.update_reclaimable_start(ctx.storage, emissions, Some(totals.clone()))?;
 
         Ok((new_farming, totals))
     }
@@ -187,6 +191,9 @@ impl State<'_> {
 
         farmer_stats.farming_tokens = farmer_stats.farming_tokens.checked_sub(amount)?;
         self.save_raw_farmer_stats(ctx.storage, farmer, &farmer_stats)?;
+
+        let emissions = self.may_load_lvn_emissions(ctx.storage)?;
+        self.update_reclaimable_start(ctx.storage, emissions, Some(totals.clone()))?;
 
         Ok((removed_xlp, amount, totals))
     }

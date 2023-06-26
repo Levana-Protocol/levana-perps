@@ -1,3 +1,4 @@
+use crate::prelude::farming::FarmingTotals;
 use crate::prelude::reply::{ReplyId, EPHEMERAL_BONUS_FUND};
 use crate::prelude::*;
 use crate::state::farming::RawFarmerStats;
@@ -59,6 +60,11 @@ pub(crate) struct LockdropConfig {
 /// accrued yield and distribute it amongst farmers (see [ExecuteMsg::Reinvest]). A portion of this
 /// yield is put aside in a special fund called the Bonus Fund to be used at a later time.
 const BONUS_FUND: Item<Collateral> = Item::new(namespace::BONUS_FUND);
+
+/// It's possible for there to be no deposits during an emissions period. When this happens, the
+/// tokens that are emitted during that time interval are able to be reclaimed by the protocol. This
+/// Item tracks when such a period begins.
+const RECLAIMABLE_START: Item<Timestamp> = Item::new(namespace::RECLAIMABLE_START);
 
 /// Bonus fund configuration info
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -176,6 +182,27 @@ impl State<'_> {
         Ok(())
     }
 
+    pub(crate) fn save_reclaimable_start(
+        &self,
+        store: &mut dyn Storage,
+        start_time: Option<Timestamp>,
+    ) -> Result<()> {
+        match start_time {
+            None => RECLAIMABLE_START.remove(store),
+            Some(start_time) => RECLAIMABLE_START.save(store, &start_time)?,
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn may_load_reclaimable_start(
+        &self,
+        store: &dyn Storage,
+    ) -> Result<Option<Timestamp>> {
+        let start_time = RECLAIMABLE_START.may_load(store)?;
+        Ok(start_time)
+    }
+
     /// Calculates how many reward tokens can be claimed from the lockdrop and transfers them to the
     /// specified user
     pub(crate) fn claim_lockdrop_rewards(&self, ctx: &mut StateContext, user: &Addr) -> Result<()> {
@@ -220,6 +247,45 @@ impl State<'_> {
             .next()
             .expect("REWARDS_PER_TIME_PER_TOKEN cannot be empty")
             .map_err(|e| e.into())
+    }
+
+    /// Determines whether a time interval has elapsed where there were no farmers and, if so, tracks
+    /// the corresponding emissions accordingly.
+    ///
+    /// Returns the amount of reclaimable emissions
+    pub(crate) fn process_reclaimable_emissions(
+        &self,
+        store: &mut dyn Storage,
+    ) -> Result<LvnToken> {
+        let reclaimable_start = self.may_load_reclaimable_start(store)?;
+        let mut reclaimable = self.load_reclaimable_emissions(store)?;
+
+        if let Some(reclaimable_start) = reclaimable_start {
+            let emissions = self
+                .may_load_lvn_emissions(store)?
+                .context("Unable to find emissions when processing reclaim")?;
+            let end_time = min(self.now(), emissions.end);
+            let elapsed =
+                end_time.checked_sub(reclaimable_start, "process_reclaimable_emissions-1")?;
+
+            if elapsed.as_nanos() > 0 {
+                let elapsed = Decimal256::from_ratio(elapsed.as_nanos(), 1u64);
+                let duration = emissions
+                    .end
+                    .checked_sub(emissions.start, "process_reclaimable_emissions-2")?;
+                let duration = Decimal256::from_ratio(duration.as_nanos(), 1u64);
+                let new_reclaimable_emissions = emissions
+                    .lvn
+                    .raw()
+                    .checked_mul_dec(elapsed)?
+                    .checked_div_dec(duration)?;
+
+                reclaimable = reclaimable.checked_add(new_reclaimable_emissions)?;
+                self.save_reclaimable_emissions(store, reclaimable)?;
+            }
+        }
+
+        Ok(reclaimable)
     }
 
     /// Calculates emissions per farming tokens ratio since the last update
@@ -488,14 +554,58 @@ impl State<'_> {
         Ok(())
     }
 
-    /// Transfers LVN tokens leftover from an emissions period that ended early
+    pub(crate) fn update_reclaimable_start(
+        &self,
+        store: &mut dyn Storage,
+        emissions: Option<Emissions>,
+        totals: Option<FarmingTotals>,
+    ) -> Result<()> {
+        match (emissions, totals) {
+            (Some(emissions), Some(totals)) => {
+                if totals.farming.is_zero() {
+                    // handle case where there are no deposits and...
+
+                    if self.now() < emissions.start {
+                        // ...emissions period starts in the future
+
+                        self.save_reclaimable_start(store, Some(emissions.start))?;
+                    } else if self.now() < emissions.end {
+                        // ...emissions period is active
+
+                        self.save_reclaimable_start(store, Some(self.now()))?;
+                    } else {
+                        // ...emissions period ended in the past
+
+                        self.save_reclaimable_start(store, None)?;
+                    }
+                } else {
+                    // handle case where there are deposits
+
+                    self.save_reclaimable_start(store, None)?;
+                }
+            }
+            _ => self.save_reclaimable_start(store, None)?,
+        }
+
+        Ok(())
+    }
+
+    /// Transfers LVN tokens leftover from an emissions.
+    /// There are two scenarios where this can occur
+    ///
+    /// 1. If the emissions period is terminated prematurely ([OwnerExecuteMsg::ClearEmissions])
+    /// 2. If at any point during an emissions period there is no collateral deposited
     pub(crate) fn reclaim_emissions(
         &self,
         ctx: &mut StateContext,
         addr: Addr,
         amount: Option<LvnToken>,
     ) -> Result<()> {
-        let reclaimable = self.load_reclaimable_emissions(ctx.storage)?;
+        let reclaimable = self.process_reclaimable_emissions(ctx.storage)?;
+        let totals = self.load_farming_totals(ctx.storage)?;
+        let emissions = self.may_load_lvn_emissions(ctx.storage)?;
+
+        self.update_reclaimable_start(ctx.storage, emissions, Some(totals))?;
 
         ensure!(
             reclaimable > LvnToken::zero(),

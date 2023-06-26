@@ -144,3 +144,4 @@ pub const RECLAIMABLE_EMISSIONS: &str = "ek";
 pub const LOCKDROP_BALANCES_BY_BUCKET: &str = "el";
 pub const PYTH_LAST_BLOCK_TIME_UPDATED: &str = "em";
 pub const PYTH_REPLY_CONTEXT: &str = "en";
+pub const RECLAIMABLE_START: &str = "eo";
