@@ -129,7 +129,7 @@ impl State<'_> {
             None => match name {
                 "ATOM" => Some("1000".parse().unwrap()),
                 "ETH" => Some("1".parse().unwrap()),
-                "BTC" => Some("1".parse().unwrap()),
+                "BTC" => Some("0.1".parse().unwrap()),
                 "USDC" => Some("10000".parse().unwrap()),
                 _ => None,
             },
