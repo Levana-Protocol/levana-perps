@@ -71,7 +71,7 @@ pub(crate) struct App {
     pub endpoints: PythEndpoints,
 }
 
-pub(crate) type PythEndpoints = Arc<VecWithCurr<String, Vec<String>>>;
+pub(crate) type PythEndpoints = VecWithCurr<String>;
 
 /// Helper data structure for building up an application.
 pub(crate) struct AppBuilder {
@@ -127,7 +127,7 @@ impl Opt {
             ),
         };
 
-        let endpoints = Arc::new(VecWithCurr::new(PythConfig::load()?.endpoints.clone()));
+        let endpoints = VecWithCurr::new(PythConfig::load()?.endpoints.clone());
 
         let app = App {
             factory: RwLock::new(Arc::new(factory)),

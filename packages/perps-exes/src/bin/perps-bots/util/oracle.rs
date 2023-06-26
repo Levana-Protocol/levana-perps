@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use crate::app::PythEndpoints;
 use cosmos::{
@@ -11,7 +11,6 @@ use msg::{
     },
     prelude::*,
 };
-use perps_exes::config::PythConfig;
 use pyth_sdk_cw::PriceIdentifier;
 
 #[derive(Clone)]
@@ -137,9 +136,7 @@ impl Pyth {
             .join("&");
         let url_params = &url_params;
 
-        let mut endpoints = endpoints.clone();
-        Arc::get_mut(&mut endpoints)
-            .expect("Unable to get_mut on endpoints!")
+        endpoints
             .try_any_from_curr_async(|endpoint| async move {
                 let url = format!("{endpoint}api/latest_vaas?{url_params}");
 
@@ -161,12 +158,11 @@ impl Pyth {
 }
 
 /// Get the latest price from Pyth
-pub async fn get_latest_price(
+pub(crate) async fn get_latest_price(
     client: &reqwest::Client,
     market_price_feeds: &PythMarketPriceFeeds,
+    endpoints: &PythEndpoints,
 ) -> Result<(PriceBaseInQuote, Option<PriceCollateralInUsd>)> {
-    let pyth_config = PythConfig::load()?;
-    let mut endpoints = crate::util::helpers::VecWithCurr::new(pyth_config.endpoints.iter());
     endpoints
         .try_any_from_curr_async(|endpoint| async move {
             let base = price_helper(client, &endpoint, &market_price_feeds.feeds).await?;
