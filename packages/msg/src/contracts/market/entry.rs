@@ -7,6 +7,7 @@ use crate::{contracts::liquidity_token::LiquidityTokenKind, token::TokenInit};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Binary, Decimal256, Uint128};
 use shared::prelude::*;
+use std::fmt::Formatter;
 
 /// The InstantiateMsg comes from Factory only
 #[cw_serde]
@@ -709,7 +710,22 @@ pub enum PositionActionKind {
     /// Close a position
     Close,
     /// Position was transferred between wallets
+    //FIXME need distinct "Received Position" and "Sent Position" cases
     Transfer,
+}
+
+//todo does it make sense for PositionActionKind to impl Display
+impl Display for PositionActionKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            PositionActionKind::Open => "Open",
+            PositionActionKind::Update => "Update",
+            PositionActionKind::Close => "Close",
+            PositionActionKind::Transfer => "Transfer",
+        };
+
+        f.write_str(str)
+    }
 }
 
 /// Returned by [QueryMsg::LpInfo]

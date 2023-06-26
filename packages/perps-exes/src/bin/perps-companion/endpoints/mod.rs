@@ -1,4 +1,5 @@
 mod common;
+mod export;
 pub(crate) mod pnl;
 
 use std::sync::Arc;
@@ -13,6 +14,7 @@ use axum::{
     Json,
 };
 use axum_extra::routing::{RouterExt, TypedPath};
+use cosmos::Address;
 use reqwest::{
     header::{ACCEPT, CONTENT_TYPE},
     Method, StatusCode,
@@ -22,6 +24,7 @@ use serde_json::json;
 use tower_http::cors::CorsLayer;
 
 use crate::app::App;
+use crate::types::ChainId;
 
 use self::pnl::ErrorDescription;
 
@@ -77,6 +80,14 @@ impl From<PathRejection> for pnl::Error {
     }
 }
 
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/export-history/:chain/:market/:wallet")]
+pub(crate) struct ExportHistory {
+    pub(crate) chain: ChainId,
+    pub(crate) market: Address,
+    pub(crate) wallet: Address,
+}
+
 pub(crate) async fn launch(app: App) -> Result<()> {
     let bind = app.opt.bind;
     let app = Arc::new(app);
@@ -91,6 +102,7 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .typed_post(pnl::pnl_url)
         .typed_get(pnl::pnl_html)
         .typed_get(pnl::pnl_image)
+        .typed_get(export::history)
         .with_state(app)
         .fallback(common::not_found)
         .layer(
