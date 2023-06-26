@@ -13,6 +13,9 @@ liquidity:
     ETH_USD:
       min: 1000
       max: 1000000
+    BTC_USD:
+      min: 100
+      max: 10000
   min-util-delta: -0.05
   max-util-delta: 0.02
   target-util-delta: -0.02
