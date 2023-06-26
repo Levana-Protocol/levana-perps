@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
+use crate::util::helpers::VecWithCurr;
 use cosmos::{
     proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, Contract, Cosmos, HasAddress,
 };
@@ -19,6 +20,7 @@ pub(crate) struct Pyth {
     pub bridge: Contract,
     pub market_id: MarketId,
     pub market_price_feeds: PythMarketPriceFeeds,
+    pub endpoints: Arc<VecWithCurr<String, Vec<String>>>,
 }
 
 impl std::fmt::Debug for Pyth {
@@ -46,12 +48,14 @@ impl Pyth {
                 market_id: market_id.clone(),
             })
             .await?;
+        let endpoints = Arc::new(VecWithCurr::new(PythConfig::load()?.endpoints.clone()));
 
         Ok(Self {
             oracle,
             bridge,
             market_price_feeds,
             market_id,
+            endpoints,
         })
     }
 
@@ -114,7 +118,7 @@ impl Pyth {
         })
     }
 
-    pub async fn get_wormhole_proofs(&self, client: &reqwest::Client) -> Result<Vec<String>> {
+    pub async fn get_wormhole_proofs(&mut self, client: &reqwest::Client) -> Result<Vec<String>> {
         let mut all_ids: Vec<PriceIdentifier> =
             self.market_price_feeds.feeds.iter().map(|f| f.id).collect();
         if let Some(feeds_usd) = &self.market_price_feeds.feeds_usd {
@@ -132,9 +136,9 @@ impl Pyth {
             .join("&");
         let url_params = &url_params;
 
-        let pyth_config = PythConfig::load()?;
-        let mut endpoints = crate::util::helpers::VecWithCurr::new(pyth_config.endpoints.iter());
-        endpoints
+        let mut endpoints = self.endpoints.clone();
+        Arc::get_mut(&mut endpoints)
+            .expect("Unable to get_mut on endpoints!")
             .try_any_from_curr_async(|endpoint| async move {
                 let url = format!("{endpoint}api/latest_vaas?{url_params}");
 
