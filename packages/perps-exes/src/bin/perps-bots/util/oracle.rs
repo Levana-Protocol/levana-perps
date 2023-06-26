@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::app::PythEndpoints;
 use cosmos::{
     proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, Contract, Cosmos, HasAddress,
 };
@@ -10,7 +11,6 @@ use msg::{
     },
     prelude::*,
 };
-use perps_exes::config::PythConfig;
 use pyth_sdk_cw::PriceIdentifier;
 
 #[derive(Clone)]
@@ -114,7 +114,11 @@ impl Pyth {
         })
     }
 
-    pub async fn get_wormhole_proofs(&self, client: &reqwest::Client) -> Result<Vec<String>> {
+    pub async fn get_wormhole_proofs(
+        &self,
+        client: &reqwest::Client,
+        endpoints: &PythEndpoints,
+    ) -> Result<Vec<String>> {
         let mut all_ids: Vec<PriceIdentifier> =
             self.market_price_feeds.feeds.iter().map(|f| f.id).collect();
         if let Some(feeds_usd) = &self.market_price_feeds.feeds_usd {
@@ -123,49 +127,61 @@ impl Pyth {
 
         all_ids.sort();
         all_ids.dedup();
+        let all_ids_len = all_ids.len();
+        // pyth uses this format for array params: https://github.com/axios/axios/blob/9588fcdec8aca45c3ba2f7968988a5d03f23168c/test/specs/helpers/buildURL.spec.js#L31
+        let url_params = all_ids
+            .iter()
+            .map(|id| format!("ids[]={id}"))
+            .collect::<Vec<String>>()
+            .join("&");
+        let url_params = &url_params;
 
-        let mut url = format!("{}api/latest_vaas", PythConfig::load()?.endpoint);
+        endpoints
+            .try_any_from_curr_async(|endpoint| async move {
+                let url = format!("{endpoint}api/latest_vaas?{url_params}");
 
-        for (index, id) in all_ids.iter().enumerate() {
-            // pyth uses this format for array params: https://github.com/axios/axios/blob/9588fcdec8aca45c3ba2f7968988a5d03f23168c/test/specs/helpers/buildURL.spec.js#L31
-            let delim = if index == 0 { "?" } else { "&" };
-            url.push_str(&format!("{}ids[]={}", delim, id));
-        }
+                let vaas: Vec<String> = client
+                    .get(url)
+                    .send()
+                    .await?
+                    .error_for_status()?
+                    .json()
+                    .await?;
 
-        let vaas: Vec<String> = client
-            .get(url)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
-
-        if vaas.len() != all_ids.len() {
-            anyhow::bail!("expected {} vaas, got {}", all_ids.len(), vaas.len());
-        }
-
-        Ok(vaas)
+                if vaas.len() != all_ids_len {
+                    anyhow::bail!("expected {} vaas, got {}", all_ids_len, vaas.len());
+                }
+                Ok(vaas)
+            })
+            .await
     }
 }
 
 /// Get the latest price from Pyth
-pub async fn get_latest_price(
+pub(crate) async fn get_latest_price(
     client: &reqwest::Client,
     market_price_feeds: &PythMarketPriceFeeds,
+    endpoints: &PythEndpoints,
 ) -> Result<(PriceBaseInQuote, Option<PriceCollateralInUsd>)> {
-    let endpoint = &PythConfig::load()?.endpoint;
-    let base = price_helper(client, endpoint, &market_price_feeds.feeds).await?;
-    let base = PriceBaseInQuote::try_from_number(base.into_signed())?;
-    let collateral = match &market_price_feeds.feeds_usd {
-        Some(feeds_usd) => {
-            let collateral = price_helper(client, endpoint, feeds_usd).await?;
-            Some(PriceCollateralInUsd::try_from_number(
-                collateral.into_signed(),
-            )?)
-        }
-        None => None,
-    };
-    Ok((base, collateral))
+    endpoints
+        .try_any_from_curr_async(|endpoint| async move {
+            let base = price_helper(client, &endpoint, &market_price_feeds.feeds).await?;
+            let base = PriceBaseInQuote::try_from_number(base.into_signed())?;
+
+            let collateral = match &market_price_feeds.feeds_usd {
+                Some(feeds_usd) => {
+                    let collateral = price_helper(client, &endpoint, feeds_usd).await?;
+                    Some(PriceCollateralInUsd::try_from_number(
+                        collateral.into_signed(),
+                    ))
+                }
+                None => None,
+            }
+            .transpose()?;
+
+            Ok((base, collateral))
+        })
+        .await
 }
 
 async fn price_helper(

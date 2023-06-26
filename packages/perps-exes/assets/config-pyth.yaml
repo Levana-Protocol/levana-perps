@@ -1,6 +1,5 @@
 update-age-tolerance: 120
-endpoint: "https://pyth.levana.finance/"
-#endpoint: "https://xc-mainnet.pyth.network/"
+endpoints: ["https://pyth.levana.finance/", "https://xc-mainnet.pyth.network/"]
 markets:
   # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-stable
   ATOM_USD:

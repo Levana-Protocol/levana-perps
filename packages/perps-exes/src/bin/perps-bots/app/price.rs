@@ -75,7 +75,8 @@ impl App {
             let price_apis = &market.get_price_api(wallet, &self.cosmos).await?;
             match price_apis {
                 PriceApi::Manual(feeds) => {
-                    let (price, price_usd) = get_latest_price(&self.client, feeds).await?;
+                    let (price, price_usd) =
+                        get_latest_price(&self.client, feeds, &self.endpoints).await?;
 
                     if let Some(reason) = self.needs_price_update(market, price).await? {
                         has_messages = true;
@@ -95,7 +96,8 @@ impl App {
 
                 PriceApi::Pyth(pyth) => {
                     let (latest_price, _) =
-                        get_latest_price(&self.client, &pyth.market_price_feeds).await?;
+                        get_latest_price(&self.client, &pyth.market_price_feeds, &self.endpoints)
+                            .await?;
                     if let Some(reason) = self.needs_price_update(market, latest_price).await? {
                         has_messages = true;
                         let msgs = self.get_txs_pyth(wallet, market, pyth).await?;
@@ -239,7 +241,9 @@ impl App {
         market: &Market,
         pyth: &Pyth,
     ) -> Result<Vec<MsgExecuteContract>> {
-        let vaas = pyth.get_wormhole_proofs(&self.client).await?;
+        let vaas = pyth
+            .get_wormhole_proofs(&self.client, &self.endpoints)
+            .await?;
         let oracle_msg = pyth
             .get_oracle_update_msg(wallet.get_address_string(), vaas)
             .await?;

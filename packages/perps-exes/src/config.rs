@@ -15,8 +15,8 @@ use once_cell::sync::OnceCell;
 pub struct PythConfig {
     /// How to calculate price feeds for each market.
     pub markets: HashMap<MarketId, PythMarketPriceFeeds>,
-    /// Endpoint to communicate with to get price data
-    pub endpoint: String,
+    /// Endpoints to communicate with to get price data
+    pub endpoints: Vec<String>,
     /// How old a price to allow, in seconds
     pub update_age_tolerance: u32,
 }
