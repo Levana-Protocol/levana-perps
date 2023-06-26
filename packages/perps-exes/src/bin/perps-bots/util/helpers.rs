@@ -1,5 +1,4 @@
 use anyhow::Result;
-use parking_lot::RwLock;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -8,7 +7,6 @@ use std::sync::{
 pub(crate) struct VecWithCurr<A> {
     vec: Vec<Arc<A>>,
     curr: AtomicUsize,
-    last_errors: RwLock<Vec<anyhow::Error>>,
 }
 
 impl<A> VecWithCurr<A> {
@@ -19,7 +17,6 @@ impl<A> VecWithCurr<A> {
         VecWithCurr {
             vec: vec.into_iter().map(Arc::new).collect(),
             curr: 0.into(),
-            last_errors: vec![].into(),
         }
     }
 
@@ -37,17 +34,14 @@ impl<A> VecWithCurr<A> {
             match f(item.clone()).await {
                 Ok(x) => {
                     self.curr.store(i, Ordering::SeqCst);
-                    *self.last_errors.write() = results;
                     return Ok(x);
                 }
                 Err(e) => results.push(e),
             }
         }
 
-        let e = Err(anyhow::anyhow!(
+        Err(anyhow::anyhow!(
             "Unable to query any of the Pyth endpoints. All raw errors: {results:?}"
-        ));
-        *self.last_errors.write() = results;
-        e
+        ))
     }
 }
