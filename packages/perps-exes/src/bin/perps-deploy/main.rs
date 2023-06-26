@@ -45,6 +45,7 @@ async fn main_inner() -> anyhow::Result<()> {
             TestnetSub::EnableMarket { inner } => inner.go(opt).await?,
             TestnetSub::DisableMarketAt { inner } => inner.go(opt).await?,
             TestnetSub::CloseAllPositions { inner } => inner.go(opt).await?,
+            TestnetSub::AddMarket { inner } => inner.go(opt).await?,
         },
         Subcommand::Mainnet { inner } => mainnet::go(opt, inner).await?,
     }

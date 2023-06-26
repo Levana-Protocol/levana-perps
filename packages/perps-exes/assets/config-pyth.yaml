@@ -2,6 +2,7 @@ update-age-tolerance: 120
 endpoint: "https://pyth.levana.finance/"
 #endpoint: "https://xc-mainnet.pyth.network/"
 markets:
+  # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-stable
   ATOM_USD:
     feeds: [
       { id: "b00b60f88b03a6a625a8d1c048c3f66653edf217439983d037e7222c4e612819", inverted: false }
@@ -32,4 +33,9 @@ markets:
     feeds: [
       # ETH/USD
       {id: "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace", inverted: false }
+    ]
+  BTC_USD:
+    feeds: [
+      # BTC/USD
+      {id: "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43", inverted: false }
     ]

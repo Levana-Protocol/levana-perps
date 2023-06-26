@@ -135,7 +135,6 @@ pub(crate) async fn go(
         trading_competition: false,
         faucet_admin: None,
         price_admin: *basic.wallet.address(),
-        is_prod: false,
         initial_borrow_fee_rate: "0.01".parse().unwrap(),
         pyth_info: None,
     })

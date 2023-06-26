@@ -123,6 +123,10 @@ impl Factory {
             )
             .await
     }
+
+    pub(crate) fn into_contract(self) -> Contract {
+        self.0
+    }
 }
 
 pub(crate) struct MarketInfo {
