@@ -282,8 +282,6 @@ impl State<'_> {
                 reclaimable = reclaimable.checked_add(new_reclaimable_emissions)?;
                 self.save_reclaimable_emissions(store, reclaimable)?;
             }
-
-            self.save_reclaimable_start(store, None)?;
         }
 
         Ok(reclaimable)
@@ -555,7 +553,11 @@ impl State<'_> {
         Ok(())
     }
 
-    /// Transfers LVN tokens leftover from an emissions period that ended early
+    /// Transfers LVN tokens leftover from an emissions.
+    /// There are two scenarios where this can occur
+    ///
+    /// 1. If the emissions period is terminated prematurely ([OwnerExecuteMsg::ClearEmissions])
+    /// 2. If at any point during an emissions period there is no collateral deposited
     pub(crate) fn reclaim_emissions(
         &self,
         ctx: &mut StateContext,
@@ -563,6 +565,12 @@ impl State<'_> {
         amount: Option<LvnToken>,
     ) -> Result<()> {
         let reclaimable = self.process_reclaimable_emissions(ctx.storage)?;
+        let totals = self.load_farming_totals(ctx.storage)?;
+        if totals.farming.is_zero() {
+            self.save_reclaimable_start(ctx.storage, Some(self.now()))?;
+        } else {
+            self.save_reclaimable_start(ctx.storage, None)?;
+        }
 
         ensure!(
             reclaimable > LvnToken::zero(),

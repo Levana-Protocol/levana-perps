@@ -129,6 +129,7 @@ impl State<'_> {
         };
 
         self.process_reclaimable_emissions(ctx.storage)?;
+        self.save_reclaimable_start(ctx.storage, None)?;
         self.farming_perform_emissions_bookkeeping(ctx, farmer, &mut farmer_stats)?;
 
         let mut totals = self.load_farming_totals(ctx.storage)?;

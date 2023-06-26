@@ -823,6 +823,27 @@ fn test_reclaimable_emissions_with_gaps() {
 
     let balance = market.query_reward_token_balance(&token, &reclaim_addr3);
     assert_eq!(balance, "150".parse().unwrap());
+
+}
+
+#[test]
+fn test_reclaim_without_deposits() {
+    let app_cell = PerpsApp::new_cell().unwrap();
+    let mut market = PerpsMarket::new(app_cell).unwrap();
+    let reclaim_addr = Addr::unchecked("reclaim-addr");
+
+    market.automatic_time_jump_enabled = false;
+    move_past_lockdrop(&market);
+    let token = start_emissions(&market).unwrap();
+
+    market.set_time(TimeJump::Seconds(5)).unwrap();
+    market.exec_farming_reclaim_emissions(&reclaim_addr, None).unwrap();
+
+    market.set_time(TimeJump::Seconds(5)).unwrap();
+    market.exec_farming_reclaim_emissions(&reclaim_addr, None).unwrap();
+
+    let balance = market.query_reward_token_balance(&token, &reclaim_addr);
+    assert_eq!(balance, "100".parse().unwrap())
 }
 
 proptest! {
