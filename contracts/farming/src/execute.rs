@@ -279,6 +279,7 @@ impl State<'_> {
             end: start + duration,
             lvn,
         };
+        let totals = self.load_farming_totals(ctx.storage)?;
 
         match old_emissions {
             None => self.save_lvn_emissions(ctx.storage, Some(new_emissions.clone()))?,
@@ -289,15 +290,12 @@ impl State<'_> {
                 );
 
                 self.update_emissions_per_token(ctx, &old_emissions)?;
+                self.process_reclaimable_emissions(ctx.storage)?;
                 self.save_lvn_emissions(ctx.storage, Some(new_emissions.clone()))?;
             }
         }
 
-        let total_farming = self.load_farming_totals(ctx.storage)?.farming;
-
-        if total_farming.is_zero() {
-            self.save_reclaimable_start(ctx.storage, Some(new_emissions.start))?;
-        }
+        self.update_reclaimable_start(ctx.storage, Some(new_emissions), Some(totals))?;
 
         Ok(())
     }
@@ -338,11 +336,13 @@ impl State<'_> {
                     .checked_add(new_reclaimable_emissions)?;
 
                 self.save_reclaimable_emissions(ctx.storage, reclaimable_emissions)?;
-                self.save_reclaimable_start(ctx.storage, None)?;
+            } else {
+                self.process_reclaimable_emissions(ctx.storage)?;
             }
         }
 
         self.save_lvn_emissions(ctx.storage, None)?;
+        self.update_reclaimable_start(ctx.storage, None, None)?;
 
         Ok(())
     }

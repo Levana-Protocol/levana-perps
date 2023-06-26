@@ -824,6 +824,52 @@ fn test_reclaimable_emissions_with_gaps() {
     let balance = market.query_reward_token_balance(&token, &reclaim_addr3);
     assert_eq!(balance, "150".parse().unwrap());
 
+    // test after call to clear emissions when emissions are done
+
+    let token = start_emissions(&market).unwrap();
+    farming_deposit(&market, &lp).unwrap();
+
+    market.set_time(TimeJump::Seconds(5)).unwrap();
+    farming_withdraw(&market, &lp, None).unwrap();
+
+    market.set_time(TimeJump::Seconds(100)).unwrap();
+    market.exec_farming_clear_emissions().unwrap();
+
+    let reclaim_addr4 = Addr::unchecked("reclaim_addr4");
+    market
+        .exec_farming_reclaim_emissions(&reclaim_addr4, None)
+        .unwrap();
+
+    let balance = market.query_reward_token_balance(&token, &reclaim_addr4);
+    assert_eq!(balance, "150".parse().unwrap());
+
+    // test after two emissions periods
+
+    // ...first emissions
+    let token = start_emissions(&market).unwrap();
+    farming_deposit(&market, &lp).unwrap();
+
+    market.set_time(TimeJump::Seconds(15)).unwrap();
+    farming_withdraw(&market, &lp, None).unwrap();
+
+    market.set_time(TimeJump::Seconds(10)).unwrap();
+
+    // ...second emissions
+    start_emissions(&market).unwrap();
+    farming_deposit(&market, &lp).unwrap();
+
+    market.set_time(TimeJump::Seconds(15)).unwrap();
+    farming_withdraw(&market, &lp, None).unwrap();
+
+    market.set_time(TimeJump::Seconds(10)).unwrap();
+
+    let reclaim_addr5 = Addr::unchecked("reclaim_addr5");
+    market
+        .exec_farming_reclaim_emissions(&reclaim_addr5, None)
+        .unwrap();
+
+    let balance = market.query_reward_token_balance(&token, &reclaim_addr5);
+    assert_eq!(balance, "100".parse().unwrap());
 }
 
 #[test]
@@ -837,10 +883,14 @@ fn test_reclaim_without_deposits() {
     let token = start_emissions(&market).unwrap();
 
     market.set_time(TimeJump::Seconds(5)).unwrap();
-    market.exec_farming_reclaim_emissions(&reclaim_addr, None).unwrap();
+    market
+        .exec_farming_reclaim_emissions(&reclaim_addr, None)
+        .unwrap();
 
     market.set_time(TimeJump::Seconds(5)).unwrap();
-    market.exec_farming_reclaim_emissions(&reclaim_addr, None).unwrap();
+    market
+        .exec_farming_reclaim_emissions(&reclaim_addr, None)
+        .unwrap();
 
     let balance = market.query_reward_token_balance(&token, &reclaim_addr);
     assert_eq!(balance, "100".parse().unwrap())

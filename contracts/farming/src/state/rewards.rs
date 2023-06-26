@@ -1,3 +1,4 @@
+use crate::prelude::farming::FarmingTotals;
 use crate::prelude::reply::{ReplyId, EPHEMERAL_BONUS_FUND};
 use crate::prelude::*;
 use crate::state::farming::RawFarmerStats;
@@ -265,13 +266,13 @@ impl State<'_> {
                 .context("Unable to find emissions when processing reclaim")?;
             let end_time = min(self.now(), emissions.end);
             let elapsed =
-                end_time.checked_sub(reclaimable_start, "process_reclaimable_emissions")?;
+                end_time.checked_sub(reclaimable_start, "process_reclaimable_emissions-1")?;
 
             if elapsed.as_nanos() > 0 {
                 let elapsed = Decimal256::from_ratio(elapsed.as_nanos(), 1u64);
                 let duration = emissions
                     .end
-                    .checked_sub(emissions.start, "process_reclaimable_emissions")?;
+                    .checked_sub(emissions.start, "process_reclaimable_emissions-2")?;
                 let duration = Decimal256::from_ratio(duration.as_nanos(), 1u64);
                 let new_reclaimable_emissions = emissions
                     .lvn
@@ -553,6 +554,42 @@ impl State<'_> {
         Ok(())
     }
 
+    pub(crate) fn update_reclaimable_start(
+        &self,
+        store: &mut dyn Storage,
+        emissions: Option<Emissions>,
+        totals: Option<FarmingTotals>,
+    ) -> Result<()> {
+        match (emissions, totals) {
+            (Some(emissions), Some(totals)) => {
+                if totals.farming.is_zero() {
+                    // handle case where there are no deposits and...
+
+                    if self.now() < emissions.start {
+                        // ...emissions period starts in the future
+
+                        self.save_reclaimable_start(store, Some(emissions.start))?;
+                    } else if self.now() < emissions.end {
+                        // ...emissions period is active
+
+                        self.save_reclaimable_start(store, Some(self.now()))?;
+                    } else {
+                        // ...emissions period ended in the past
+
+                        self.save_reclaimable_start(store, None)?;
+                    }
+                } else {
+                    // handle case where there are deposits
+
+                    self.save_reclaimable_start(store, None)?;
+                }
+            }
+            _ => self.save_reclaimable_start(store, None)?,
+        }
+
+        Ok(())
+    }
+
     /// Transfers LVN tokens leftover from an emissions.
     /// There are two scenarios where this can occur
     ///
@@ -566,11 +603,9 @@ impl State<'_> {
     ) -> Result<()> {
         let reclaimable = self.process_reclaimable_emissions(ctx.storage)?;
         let totals = self.load_farming_totals(ctx.storage)?;
-        if totals.farming.is_zero() {
-            self.save_reclaimable_start(ctx.storage, Some(self.now()))?;
-        } else {
-            self.save_reclaimable_start(ctx.storage, None)?;
-        }
+        let emissions = self.may_load_lvn_emissions(ctx.storage)?;
+
+        self.update_reclaimable_start(ctx.storage, emissions, Some(totals))?;
 
         ensure!(
             reclaimable > LvnToken::zero(),
