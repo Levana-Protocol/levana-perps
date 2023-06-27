@@ -25,16 +25,18 @@ fn test_congestion_block() {
     // us to properly test congestion.
 
     market.exec_set_price("5".parse().unwrap()).unwrap();
-    market.exec_place_limit_order(
-        &trader,
-        "100".try_into().unwrap(),
-        "3".try_into().unwrap(),
-        "10".try_into().unwrap(),
-        DirectionToBase::Long,
-        "1".try_into().unwrap(),
-        None,
-        None,
-    ).unwrap();
+    market
+        .exec_place_limit_order(
+            &trader,
+            "100".try_into().unwrap(),
+            "3".try_into().unwrap(),
+            "10".try_into().unwrap(),
+            DirectionToBase::Long,
+            "1".try_into().unwrap(),
+            None,
+            None,
+        )
+        .unwrap();
 
     // Do a price update without cranking to force unpending the position
     // Since we're always off-by-one on which price update we use, we need to insert two price updates.
