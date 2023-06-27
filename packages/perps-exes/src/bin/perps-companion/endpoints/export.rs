@@ -140,15 +140,16 @@ fn generate_csv(action_records: &[ActionRecord]) -> Result<String> {
     Ok(data)
 }
 
-struct Exporter<'a> {
-    cosmos: &'a Cosmos,
+struct Exporter {
+    /// The interface to the relevant cosmos chain
+    cosmos: Cosmos,
     /// The wallet address of the user for whom to generate a report
     wallet: RawAddr,
-    /// The address of the market contract
+    /// The address of the factory contract
     factory_contract: PerpsContract,
 }
 
-impl<'a> Exporter<'a> {
+impl<'a> Exporter {
     /// Returns a new Exporter
     ///
     /// * chain_id - The chain id of the desired chain.
@@ -165,7 +166,7 @@ impl<'a> Exporter<'a> {
         let wallet = RawAddr::from(wallet.to_string());
 
         Ok(Exporter {
-            cosmos,
+            cosmos: cosmos.clone(),
             wallet,
             factory_contract,
         })
