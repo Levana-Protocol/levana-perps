@@ -149,7 +149,7 @@ struct Exporter {
     factory_contract: PerpsContract,
 }
 
-impl<'a> Exporter {
+impl Exporter {
     /// Returns a new Exporter
     ///
     /// * chain_id - The chain id of the desired chain.
