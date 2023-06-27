@@ -180,7 +180,8 @@ impl State<'_> {
 
     /// If the next crank work items completes a price update, crank it.
     ///
-    /// This is a special optimization to avoid accruing unnecessar
+    /// This is a special optimization to avoid accruing unnecessary "complete
+    /// work" items and causing the unpend queue to fill up.
     pub(crate) fn crank_current_price_complete(&self, ctx: &mut StateContext) -> Result<()> {
         let work_info = match self.crank_work(ctx.storage)? {
             Some(work_info) => work_info,
