@@ -208,8 +208,10 @@ fn funding_rates_typical() {
 
 #[test]
 fn funding_payment_typical() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     return_unless_market_collateral_quote!(market);
+
+    market.automatic_time_jump_enabled = false;
 
     let trader = market.clone_trader(0).unwrap();
     let cranker = market.clone_trader(1).unwrap();

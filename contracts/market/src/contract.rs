@@ -402,6 +402,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             };
 
             state.crank_exec_batch(&mut ctx, execs, &rewards)?;
+            state.crank_current_price_complete(&mut ctx)?;
         }
 
         ExecuteMsg::TransferDaoFees {} => {

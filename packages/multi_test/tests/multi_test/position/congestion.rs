@@ -17,6 +17,27 @@ fn test_congestion_block() {
 
     let trader = market.clone_trader(0).unwrap();
 
+    // As an optimization, setting a price will automatically complete cranking for the new price if
+    // there are no actual crank work items to perform. Since the crank is up to date, subsequent
+    // OpenPosition msgs will bypass the unpend queue when storing the position's liquidation prices.
+    // In order to simulate unpend queue congestion, we place a limit order so there will be a crank
+    // work item for the new price thereby preventing the optimization from kicking in and allowing
+    // us to properly test congestion.
+
+    market.exec_set_price("5".parse().unwrap()).unwrap();
+    market
+        .exec_place_limit_order(
+            &trader,
+            "100".try_into().unwrap(),
+            "3".try_into().unwrap(),
+            "10".try_into().unwrap(),
+            DirectionToBase::Long,
+            "1".try_into().unwrap(),
+            None,
+            None,
+        )
+        .unwrap();
+
     // Do a price update without cranking to force unpending the position
     // Since we're always off-by-one on which price update we use, we need to insert two price updates.
     market.exec_set_price("1.02".parse().unwrap()).unwrap();
