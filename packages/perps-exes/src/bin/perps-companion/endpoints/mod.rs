@@ -81,10 +81,10 @@ impl From<PathRejection> for pnl::Error {
 }
 
 #[derive(TypedPath, Deserialize)]
-#[typed_path("/export-history/:chain/:market/:wallet")]
+#[typed_path("/export-history/:chain/:factory/:wallet")]
 pub(crate) struct ExportHistory {
     pub(crate) chain: ChainId,
-    pub(crate) market: Address,
+    pub(crate) factory: Address,
     pub(crate) wallet: Address,
 }
 
