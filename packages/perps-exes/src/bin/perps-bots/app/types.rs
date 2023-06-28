@@ -82,7 +82,7 @@ pub(crate) struct AppBuilder {
 
 impl Opt {
     async fn make_cosmos(&self, config: &BotConfig) -> Result<Cosmos> {
-        let mut builder = config.network.builder();
+        let mut builder = config.network.builder().await?;
         if let Some(grpc) = &self.grpc_url {
             builder.grpc_url = grpc.clone();
         }

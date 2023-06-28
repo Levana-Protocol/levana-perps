@@ -16,16 +16,13 @@ pub(crate) struct App {
 impl App {
     pub(crate) async fn new(opt: Opt) -> Result<App> {
         let db = Db::new(&opt.postgres_uri).await?;
+        let mut cosmos_map = HashMap::new();
+        for chain_id in ChainId::all() {
+            let cosmos = chain_id.into_cosmos_network().builder().await?.build_lazy();
+            cosmos_map.insert(chain_id, cosmos);
+        }
         Ok(App {
-            cosmos: ChainId::all()
-                .into_iter()
-                .map(|chain_id| {
-                    (
-                        chain_id,
-                        chain_id.into_cosmos_network().builder().build_lazy(),
-                    )
-                })
-                .collect(),
+            cosmos: cosmos_map,
             opt,
             db,
         })

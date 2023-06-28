@@ -33,7 +33,7 @@ async fn main_inner() -> Result<()> {
 
     log::debug!("Factory address: {}", factory_address);
 
-    let mut builder = network.builder();
+    let mut builder = network.builder().await?;
     if let Some(grpc) = opt.cosmos_grpc {
         builder.grpc_url = grpc;
     }
