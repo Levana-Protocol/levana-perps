@@ -140,7 +140,7 @@ async fn wait_till_network_is_up(
             anyhow::bail!("localosmo child process exited early with exit status: {exit_status}");
         }
 
-        let builder = network.builder();
+        let builder = network.builder().await?;
         let cosmos = builder.build().await;
         let cosmos = match cosmos {
             Ok(cosmos) => cosmos,

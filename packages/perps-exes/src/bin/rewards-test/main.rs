@@ -44,7 +44,7 @@ impl Hatch {
         profile_admin_wallet: RawWallet,
         hatch_address: Address,
     ) -> Result<Self> {
-        let cosmos = network.builder().build().await?;
+        let cosmos = network.builder().await?.build().await?;
         let address_type = cosmos.get_address_type();
         let wallet = wallet.for_chain(address_type);
         let nft_mint_admin_wallet = nft_mint_admin_wallet.for_chain(address_type);
@@ -93,7 +93,7 @@ struct NftMint {
 
 impl NftMint {
     pub async fn new(opt: &HatchEggOpt) -> Result<Self> {
-        let cosmos = opt.nft_mint_network.builder().build().await?;
+        let cosmos = opt.nft_mint_network.builder().await?.build().await?;
         let address_type = cosmos.get_address_type();
         let wallet = opt.nft_mint_wallet.for_chain(address_type);
 
@@ -115,7 +115,7 @@ struct Rewards {
 
 impl Rewards {
     pub async fn new(opt: &HatchEggOpt) -> Result<Self> {
-        let cosmos = opt.lvn_rewards_network.builder().build().await?;
+        let cosmos = opt.lvn_rewards_network.builder().await?.build().await?;
         let address_type = cosmos.get_address_type();
         let wallet = opt.lvn_rewards_wallet.for_chain(address_type);
 

@@ -52,7 +52,7 @@ impl PerpApp {
         market_id: MarketId,
         network: CosmosNetwork,
     ) -> Result<PerpApp> {
-        let builder = network.builder();
+        let builder = network.builder().await?;
         let cosmos = builder.build().await?;
         let factory_contract = Contract::new(cosmos.clone(), factory_contract_addr);
 

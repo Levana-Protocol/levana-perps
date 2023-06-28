@@ -45,7 +45,7 @@ pub(crate) struct PythInfo {
 
 impl Opt {
     async fn connect(&self, network: CosmosNetwork) -> Result<Cosmos> {
-        let mut builder = network.builder();
+        let mut builder = network.builder().await?;
         if let Some(grpc) = &self.cosmos_grpc {
             builder.grpc_url = grpc.clone();
         }
