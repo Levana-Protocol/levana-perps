@@ -222,3 +222,67 @@ impl Opt {
         })
     }
 }
+
+impl BotConfig {
+    /// Used to determine how many connections to allow in the pool.
+    pub(crate) fn total_bot_count(&self) -> usize {
+        self.price_wallet.as_ref().map_or(0, |_| 1)
+            + self.crank_wallet.as_ref().map_or(0, |_| 1)
+            + self.by_type.total_bot_count()
+    }
+}
+
+impl BotConfigByType {
+    fn total_bot_count(&self) -> usize {
+        match self {
+            BotConfigByType::Testnet { inner } => inner.total_bot_count(),
+            BotConfigByType::Mainnet { inner } => inner.total_bot_count(),
+        }
+    }
+}
+
+impl BotConfigTestnet {
+    fn total_bot_count(&self) -> usize {
+        // Bit match here in case we add more kinds of bots in the future
+        let BotConfigTestnet {
+            tracker: _,
+            faucet: _,
+            price_api: _,
+            contract_family: _,
+            min_gas: _,
+            min_gas_in_faucet: _,
+            min_gas_in_gas_wallet: _,
+            explorer: _,
+            ultra_crank_wallets,
+            liquidity_config,
+            utilization_config,
+            trader_config,
+            ignore_stale,
+            rpc_nodes: _,
+            seconds_till_ultra: _,
+            balance,
+            wallet_manager: _,
+            faucet_bot: _,
+            maintenance: _,
+        } = self;
+        ultra_crank_wallets.len()
+            + liquidity_config.as_ref().map_or(0, |_| 1)
+            + utilization_config.as_ref().map_or(0, |_| 1)
+            + trader_config.as_ref().map_or(0, |x| x.0 as usize)
+            + if *ignore_stale { 0 } else { 1 }
+            + if *balance { 0 } else { 1 }
+            + 5 // just some extra to be safe
+    }
+}
+
+impl BotConfigMainnet {
+    fn total_bot_count(&self) -> usize {
+        // Just future proofing in case we add some optional bots in the future
+        let BotConfigMainnet {
+            factory: _,
+            min_gas_crank: _,
+            min_gas_price: _,
+        } = self;
+        0
+    }
+}
