@@ -49,3 +49,8 @@ hashes:
   code-ids:
     osmosis-testnet: 407
   hash: 0c92f0a2932a0edc8b82e7657cfdd439884aea1cc6fe83b34d257b19e2769278
+- contract-type: factory
+  gitrev: c4857a2ea087dc47a008c292a8f242c42dfa4ae7
+  code-ids:
+    osmosis-mainnet: 91
+  hash: a51dc3e96751e5099a439d1df99cebfefac2726d022aa35920a80a3f37542568

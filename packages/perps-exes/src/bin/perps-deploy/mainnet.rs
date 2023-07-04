@@ -26,6 +26,9 @@ enum Sub {
         /// Override the market code ID
         #[clap(long)]
         market_code_id: Option<u64>,
+        /// Contract that granted store code rights
+        #[clap(long)]
+        granter: Option<Address>,
     },
     /// Instantiate a new factory contract
     InstantiateFactory {
@@ -49,8 +52,9 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
         Sub::StorePerpsContracts {
             network,
             market_code_id,
+            granter,
         } => {
-            store_perps_contracts(opt, network, market_code_id).await?;
+            store_perps_contracts(opt, network, market_code_id, granter).await?;
         }
         Sub::InstantiateFactory { inner } => {
             instantiate_factory(opt, inner).await?;
@@ -169,6 +173,7 @@ async fn store_perps_contracts(
     opt: Opt,
     network: CosmosNetwork,
     market_code_id: Option<u64>,
+    granter: Option<Address>,
 ) -> Result<()> {
     let app = opt.load_app_mainnet(network).await?;
     let mut code_ids = CodeIds::load()?;
@@ -202,10 +207,19 @@ async fn store_perps_contracts(
                     }
                     _ => {
                         log::info!("Storing {contract_type:?}...");
-                        let code_id = app
-                            .cosmos
-                            .store_code_path(&app.wallet, &contract_path)
-                            .await?;
+                        let code_id = match granter {
+                            None => {
+                                app.cosmos
+                                    .store_code_path(&app.wallet, &contract_path)
+                                    .await?
+                            }
+                            Some(granter) => {
+                                app.cosmos
+                                    .store_code_path_authz(&app.wallet, &contract_path, granter)
+                                    .await?
+                                    .1
+                            }
+                        };
                         log::info!("New code ID: {code_id}");
                         code_id.get_code_id()
                     }
