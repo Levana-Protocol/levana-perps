@@ -49,6 +49,9 @@ impl Opt {
         if let Some(grpc) = &self.cosmos_grpc {
             builder.grpc_url = grpc.clone();
         }
+        if let Some(rpc) = &self.cosmos_rpc {
+            builder.config.rpc_url = Some(rpc.clone());
+        }
         if let Some(chain_id) = &self.cosmos_chain_id {
             builder.chain_id = chain_id.clone();
         }
