@@ -59,3 +59,18 @@ hashes:
   code-ids:
     osmosis-mainnet: 93
   hash: dba09d86f2af80efe327110e22c44a36a933f7065d9b0c8a07036aaadaa362ab
+- contract-type: liquidity-token
+  gitrev: c4857a2ea087dc47a008c292a8f242c42dfa4ae7
+  code-ids:
+    osmosis-mainnet: 97
+  hash: c37b15f84dd7a6a88e142587260667a383b433fec840b1eb6606a895ee79a84d
+- contract-type: position-token
+  gitrev: c4857a2ea087dc47a008c292a8f242c42dfa4ae7
+  code-ids:
+    osmosis-mainnet: 98
+  hash: 078c35f11d15c17a80bb5aaf87a3cdde1e978df366c870599d1bade5c7cc57bc
+- contract-type: pyth-bridge
+  gitrev: c4857a2ea087dc47a008c292a8f242c42dfa4ae7
+  code-ids:
+    osmosis-mainnet: 99
+  hash: 434fbfb4afecdda49c7e036c8f4b72261f5a96aa35cebaa2ec6e136bc94830ed
