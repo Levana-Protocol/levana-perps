@@ -23,6 +23,7 @@ import {
   MsgRevoke,
 } from "cosmjs-types/cosmos/authz/v1beta1/tx";
 import { toUtf8 } from "@cosmjs/encoding";
+import { wasmTypes } from "@cosmjs/cosmwasm-stargate/build/modules";
 
 export interface Wallet {
   signer: DirectSecp256k1HdWallet;
@@ -141,15 +142,13 @@ export async function uploadContractGranter(
       wasmByteCode: contents,
     },
   };
+  const registry = new Registry(wasmTypes)
   const value: MsgExec = MsgExec.fromPartial({
     grantee: wallet.address,
     msgs: [
       {
         typeUrl: "/cosmwasm.wasm.v1.MsgStoreCode",
-        value: toUtf8(JSON.stringify({
-          sender: granter,
-          wasmByteCode: contents,
-        })),
+        value: registry.encode(msgInner)
       },
     ],
     // msgs: [
