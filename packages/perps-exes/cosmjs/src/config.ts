@@ -25,6 +25,15 @@ export const NETWORKS = {
       "chain_id": "osmo-test-5",
       "addr_prefix": "osmo"
     },
+    "osmosis-mainnet": {
+      "rpc_url": "https://rpc.dev-osmosis.zone",
+      "rest_url": "https://lcd.osmotest5.osmosis.zone",
+      "gas_price": "0.025",
+      "full_denom": "OSMO",
+      "denom": "uosmo",
+      "chain_id": "osmosis-1",
+      "addr_prefix": "osmo"
+    },
     "juno-mainnet": {
       "rpc_url": "https://juno-rpc.polkachu.com",
       "rest_url": "https://juno-api.polkachu.com",
