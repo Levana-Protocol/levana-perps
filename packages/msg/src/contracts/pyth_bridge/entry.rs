@@ -13,6 +13,17 @@ pub struct InstantiateMsg {
     pub pyth: RawAddr,
     /// The number of seconds to tolerate
     pub update_age_tolerance_seconds: u32,
+    /// Initial price feeds
+    pub feeds: Vec<MarketFeeds>,
+}
+
+/// Market feeds to set when initiating the contract
+#[cw_serde]
+pub struct MarketFeeds {
+    /// The market to set the price for
+    pub market_id: MarketId,
+    /// The Pyth price feeds
+    pub market_price_feeds: PythMarketPriceFeeds,
 }
 
 /// Execute message for pyth bridge

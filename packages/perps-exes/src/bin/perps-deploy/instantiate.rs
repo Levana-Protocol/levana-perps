@@ -534,6 +534,7 @@ impl PythInfo {
                     factory: factory.get_address().to_string().into(),
                     pyth: self.address.to_string().into(),
                     update_age_tolerance_seconds: self.update_age_tolerance,
+                    feeds: vec![],
                 },
                 ContractAdmin::Sender,
             )

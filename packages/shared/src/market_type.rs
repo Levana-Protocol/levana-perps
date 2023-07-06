@@ -263,27 +263,7 @@ impl<'a> PrimaryKey<'a> for MarketId {
     }
 }
 
-impl<'a> PrimaryKey<'a> for &'a MarketId {
-    type Prefix = ();
-    type SubPrefix = ();
-    type Suffix = &'a MarketId;
-    type SuperSuffix = &'a MarketId;
-
-    fn key(&self) -> Vec<Key> {
-        let key = Key::Ref(self.encoded.as_bytes());
-
-        vec![key]
-    }
-}
-
 impl<'a> Prefixer<'a> for MarketId {
-    fn prefix(&self) -> Vec<Key> {
-        let key = Key::Ref(self.encoded.as_bytes());
-        vec![key]
-    }
-}
-
-impl<'a> Prefixer<'a> for &'a MarketId {
     fn prefix(&self) -> Vec<Key> {
         let key = Key::Ref(self.encoded.as_bytes());
         vec![key]

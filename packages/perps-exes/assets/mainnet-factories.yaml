@@ -13,3 +13,17 @@ factories:
   instantiate-at: 2023-05-31T05:43:10.210099422Z
   gitrev: b22ecd5d91ba6e6adc8aafdd627eea7a925d69a0
   hash: b11cf50cd0c625036c733e956ba41967e46649cfc45b4c3f2abb905dbc10f2c4
+- address: osmo1a72syw9cga75k0wcp2n56gkeufptpsk355r9kwv0sg0k6sjug8esxnat82
+  network: osmosis-mainnet
+  label: Levana Test Deploy
+  instantiate-code-id: 91
+  instantiate-at: 2023-07-05T15:09:36.511698173Z
+  gitrev: c4857a2ea087dc47a008c292a8f242c42dfa4ae7
+  hash: a51dc3e96751e5099a439d1df99cebfefac2726d022aa35920a80a3f37542568
+- address: osmo1ssw6x553kzqher0earlkwlxasfm2stnl3ms3ma2zz4tnajxyyaaqlucd45
+  network: osmosis-mainnet
+  label: Levana Perpetual Swaps
+  instantiate-code-id: 91
+  instantiate-at: 2023-07-06T04:26:04.273238619Z
+  gitrev: c4857a2ea087dc47a008c292a8f242c42dfa4ae7
+  hash: a51dc3e96751e5099a439d1df99cebfefac2726d022aa35920a80a3f37542568
