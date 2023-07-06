@@ -6,8 +6,12 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.66"
-msg = { path = "../msg", package = "levana_perpswap_cosmos_msg", features = ["bridge"] }
-shared = { path = "../shared", package = "levana_perpswap_cosmos_shared", features = ["chrono"] }
+msg = { path = "../msg", package = "levana_perpswap_cosmos_msg", features = [
+       "bridge",
+] }
+shared = { path = "../shared", package = "levana_perpswap_cosmos_shared", features = [
+       "chrono",
+] }
 serde = { version = "1.0.141", features = ["derive"] }
 serde_json = "1.0.89"
 serde_yaml = "0.9.2"
@@ -30,12 +34,12 @@ reqwest = { version = "0.11.11", default-features = false, features = [
        "gzip",
 ] }
 chrono = { version = "0.4.19", features = ["serde"] }
-axum = { version = "0.6", features = ["headers"]}
+axum = { version = "0.6", features = ["headers"] }
 axum-extra = { version = "0.7", features = ["typed-routing"] }
 tower-http = { version = "0.3.4", features = ["cors", "auth"] }
 futures = "0.3.26"
 tokio-tungstenite = "*"
-tokio-util = {version = "0.7.7", features = ["full"]}
+tokio-util = { version = "0.7.7", features = ["full"] }
 cw-multi-test = "0.16.2"
 rand = "0.8"
 pyth-sdk-cw = "1.0.0"
@@ -47,8 +51,16 @@ thiserror = "1"
 resvg = "0.34"
 axum-macros = "0.3.7"
 mime = "0.3.17"
-sqlx = { version = "0.6.3", features = ["runtime-tokio-rustls", "postgres", "offline"]}
+sqlx = { version = "0.6.3", features = [
+       "runtime-tokio-rustls",
+       "postgres",
+       "offline",
+] }
 itertools = "0.10.5"
+sentry = { version = "0.29", default-features = false, features = [ # Newer sentry require rustc 1.66+
+       "reqwest",
+       "rustls",
+] }
 
 [features]
 default = []

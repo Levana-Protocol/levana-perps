@@ -19,5 +19,15 @@ async fn main_inner() -> Result<()> {
 
     let opt = cli::Opt::parse();
     opt.init_logger();
+    let _guard = opt.client_key.clone().map(|ck| {
+        sentry::init((
+            ck,
+            sentry::ClientOptions {
+                release: sentry::release_name!(),
+                session_mode: sentry::SessionMode::Request,
+                ..Default::default()
+            },
+        ))
+    });
     opt.into_app_builder().await?.start().await
 }
