@@ -74,3 +74,8 @@ hashes:
   code-ids:
     osmosis-mainnet: 99
   hash: 434fbfb4afecdda49c7e036c8f4b72261f5a96aa35cebaa2ec6e136bc94830ed
+- contract-type: pyth-bridge
+  gitrev: 98081c4648418e115906c2d960901e699b1381a9
+  code-ids:
+    osmosis-mainnet: 102
+  hash: 63b504be7d128d78e13cd323f61c0774afa569268cbd8d429f47b225fca15b86
