@@ -211,21 +211,17 @@ async fn store_perps_contracts(
                     }
                     _ => {
                         log::info!("Storing {contract_type:?}...");
-                        let code_id = if contract_type == ContractType::Market {
-                            app.cosmos.make_code_id(93)
-                        } else {
-                            match granter {
-                                None => {
-                                    app.cosmos
-                                        .store_code_path(&app.wallet, &contract_path)
-                                        .await?
-                                }
-                                Some(granter) => {
-                                    app.cosmos
-                                        .store_code_path_authz(&app.wallet, &contract_path, granter)
-                                        .await?
-                                        .1
-                                }
+                        let code_id = match granter {
+                            None => {
+                                app.cosmos
+                                    .store_code_path(&app.wallet, &contract_path)
+                                    .await?
+                            }
+                            Some(granter) => {
+                                app.cosmos
+                                    .store_code_path_authz(&app.wallet, &contract_path, granter)
+                                    .await?
+                                    .1
                             }
                         };
                         log::info!("New code ID: {code_id}");
