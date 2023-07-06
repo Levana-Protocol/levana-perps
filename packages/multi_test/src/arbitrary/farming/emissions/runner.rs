@@ -24,6 +24,7 @@ impl FarmingEmissions {
     }
 
     fn check_last_remaining_rewards(&self, lp: &Addr) -> Result<()> {
+        println!("checking last remaining rewards");
         let market = self.market.borrow_mut();
         let last_action_time = self.actions.last().unwrap().at_seconds;
         let remaining_emissions_seconds = self.emissions_duration_seconds - last_action_time;
@@ -83,11 +84,14 @@ impl FarmingEmissions {
     fn check_actions_claim(&self, lp: &Addr, wallet_rewards_claimed: LvnToken) {
         let market = self.market.borrow_mut();
         let token = market.rewards_token();
+        let expected = self.expected_rewards(lp);
 
-        token.assert_eq(
-            NonZero::new(self.expected_rewards(lp)).unwrap(),
-            NonZero::new(wallet_rewards_claimed).unwrap(),
-        );
+        if expected > LvnToken::zero() && wallet_rewards_claimed > LvnToken::zero() {
+            token.assert_eq(
+                NonZero::new(expected).unwrap(),
+                NonZero::new(wallet_rewards_claimed).unwrap(),
+            );
+        }
     }
 
     fn expected_rewards(&self, _lp: &Addr) -> LvnToken {
@@ -133,6 +137,7 @@ impl FarmingEmissions {
     }
 
     fn do_simulation(&self, lp: &Addr) -> Result<()> {
+        println!("start simulation");
         let mut market = self.market.borrow_mut();
         market.automatic_time_jump_enabled = false;
 

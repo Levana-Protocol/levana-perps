@@ -29,6 +29,11 @@ impl Debug for FarmingEmissions {
             .field("market-id", &self.market.borrow().id.as_str())
             .field("market-type", &self.market.borrow().id.get_market_type())
             .field("actions", &self.actions)
+            .field(
+                "emissions_duration_seconds",
+                &self.emissions_duration_seconds,
+            )
+            .field("emissions_amount", &self.emissions_amount)
             .finish()
     }
 }
