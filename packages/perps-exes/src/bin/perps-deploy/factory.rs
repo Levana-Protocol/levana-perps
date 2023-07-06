@@ -7,6 +7,12 @@ use msg::shutdown::{ShutdownEffect, ShutdownImpact};
 
 pub(crate) struct Factory(Contract);
 
+impl Display for Factory {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 impl Factory {
     pub(crate) fn from_contract(contract: Contract) -> Self {
         Factory(contract)
@@ -78,6 +84,16 @@ impl Factory {
         }
 
         Ok(res)
+    }
+
+    pub(crate) async fn query_owner(&self) -> Result<Address> {
+        let FactoryOwnerResp { owner, .. } = self.0.query(QueryMsg::FactoryOwner {}).await?;
+        owner.into_string().parse().with_context(|| {
+            format!(
+                "Invalid factory migration admin found for factory {}",
+                self.0
+            )
+        })
     }
 
     pub(crate) async fn query_migration_admin(&self) -> Result<Address> {

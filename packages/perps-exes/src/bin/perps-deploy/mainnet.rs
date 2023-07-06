@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use cosmos::{Address, ContractAdmin, CosmosNetwork, HasAddress};
+use cosmwasm_std::{to_binary, CosmosMsg, Empty};
 use msg::{
     contracts::{market::entry::NewMarketParams, pyth_bridge::entry::MarketFeeds},
     token::TokenInit,
@@ -439,6 +440,9 @@ struct AddMarketOpts {
     /// Pyth bridge contract to use as price admin
     #[clap(long)]
     pyth_bridge: Address,
+    /// Instead of executing, print out CW3 multisig instructions
+    #[clap(long)]
+    cw3: bool,
 }
 
 async fn add_market(
@@ -449,6 +453,7 @@ async fn add_market(
         collateral,
         initial_borrow_fee_rate,
         pyth_bridge,
+        cw3: is_cw3,
     }: AddMarketOpts,
 ) -> Result<()> {
     let market_config_update = {
@@ -467,24 +472,36 @@ async fn add_market(
         .with_context(|| format!("Unknown mainnet factory: {factory}"))?;
     let app = opt.load_app_mainnet(factory.network).await?;
 
-    log::info!("Calling AddMarket on the factory");
+    let msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
+        new_market: NewMarketParams {
+            market_id,
+            token: TokenInit::Native { denom: collateral },
+            config: Some(market_config_update),
+            price_admin: pyth_bridge.get_address_string().into(),
+            initial_borrow_fee_rate,
+        },
+    };
     let factory = app.cosmos.make_contract(factory.address);
-    let res = factory
-        .execute(
-            &app.wallet,
-            vec![],
-            msg::contracts::factory::entry::ExecuteMsg::AddMarket {
-                new_market: NewMarketParams {
-                    market_id,
-                    token: TokenInit::Native { denom: collateral },
-                    config: Some(market_config_update),
-                    price_admin: pyth_bridge.get_address_string().into(),
-                    initial_borrow_fee_rate,
-                },
-            },
-        )
-        .await?;
-    log::info!("New market added in transaction: {}", res.txhash);
+
+    if is_cw3 {
+        let factory = Factory::from_contract(factory);
+        log::info!("Need to make a proposal");
+
+        let owner = factory.query_owner().await?;
+        log::info!("CW3 contract: {owner}");
+        log::info!(
+            "Message: {}",
+            serde_json::to_string(&CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
+                contract_addr: factory.to_string(),
+                msg: to_binary(&msg)?,
+                funds: vec![]
+            }))?
+        );
+    } else {
+        log::info!("Calling AddMarket on the factory");
+        let res = factory.execute(&app.wallet, vec![], msg).await?;
+        log::info!("New market added in transaction: {}", res.txhash);
+    }
 
     Ok(())
 }
