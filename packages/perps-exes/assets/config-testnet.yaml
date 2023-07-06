@@ -123,9 +123,11 @@ overrides:
     default-market-ids:
       - ETH_USD
       - BTC_USD
-    min-gas: 100000000
-    min-gas-in-faucet: 2000000000
-    min-gas-in-gas-wallet: 1000000000
+
+    # Gas is expensive on Sei
+    min-gas: 1000000000
+    min-gas-in-faucet: 2000000000000
+    min-gas-in-gas-wallet: 1000000000000
     watcher:
       # Nodes seem to crash often, let's see if this helps
       retries: 10
@@ -143,10 +145,11 @@ overrides:
       - ETH_USD
       - BTC_USD
     trading-competition: true
-    # Lower gas requirements, we don't have much available on Sei
-    min-gas: 1000000
-    min-gas-in-faucet: 2000000000
-    min-gas-in-gas-wallet: 3000000000
+
+    # Gas is expensive on Sei
+    min-gas: 1000000000
+    min-gas-in-faucet: 2000000000000
+    min-gas-in-gas-wallet: 1000000000000
     watcher:
       # Nodes seem to crash often, let's see if this helps
       retries: 10
