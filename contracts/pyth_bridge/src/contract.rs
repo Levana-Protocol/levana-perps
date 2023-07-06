@@ -5,7 +5,9 @@ use super::state::{pyth::set_pyth_addr, set_factory_addr, State, StateContext};
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response};
 use cw2::{get_contract_version, set_contract_version};
-use msg::contracts::pyth_bridge::entry::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
+use msg::contracts::pyth_bridge::entry::{
+    ExecuteMsg, InstantiateMsg, MarketFeeds, MigrateMsg, QueryMsg,
+};
 use msg::prelude::*;
 use semver::Version;
 
@@ -27,6 +29,14 @@ pub fn instantiate(
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
     state.set_pyth_update_age_tolerance(&mut ctx, msg.update_age_tolerance_seconds.into())?;
+
+    for MarketFeeds {
+        market_id,
+        market_price_feeds,
+    } in msg.feeds
+    {
+        state.set_pyth_market_price_feeds(&mut ctx, market_id, market_price_feeds)?;
+    }
 
     Ok(ctx.response.into_response())
 }

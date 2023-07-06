@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use cosmos::{Address, ContractAdmin, CosmosNetwork, HasAddress};
-use msg::{contracts::market::entry::NewMarketParams, token::TokenInit};
+use msg::{
+    contracts::{market::entry::NewMarketParams, pyth_bridge::entry::MarketFeeds},
+    token::TokenInit,
+};
 use perps_exes::{
     config::{MarketConfigUpdates, PythConfig},
     prelude::*,
@@ -35,15 +38,16 @@ enum Sub {
         #[clap(flatten)]
         inner: InstantiateFactoryOpts,
     },
+    /// Set up the Pyth price bridge without setting up the market
+    NewPythBridge {
+        #[clap(flatten)]
+        inner: NewPythBridgeOpts,
+    },
+
     /// Add a new market to an existing factory
     AddMarket {
         #[clap(flatten)]
         inner: AddMarketOpts,
-    },
-    /// Set the Pyth price feeds for an already deployed market, mostly useful if a prior add-market failed to do this
-    SetPythFeeds {
-        #[clap(flatten)]
-        inner: SetPythFeedsOpts,
     },
 }
 
@@ -60,7 +64,7 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
             instantiate_factory(opt, inner).await?;
         }
         Sub::AddMarket { inner } => add_market(opt, inner).await?,
-        Sub::SetPythFeeds { inner } => set_pyth_feeds(opt, inner).await?,
+        Sub::NewPythBridge { inner } => new_pyth_bridge(opt, inner).await?,
     }
     Ok(())
 }
@@ -365,6 +369,64 @@ async fn instantiate_factory(
 }
 
 #[derive(clap::Parser)]
+struct NewPythBridgeOpts {
+    /// Address of the factory contract
+    #[clap(long)]
+    factory: Address,
+    /// Market ID
+    #[clap(long)]
+    market_id: MarketId,
+}
+
+async fn new_pyth_bridge(
+    opt: Opt,
+    NewPythBridgeOpts { factory, market_id }: NewPythBridgeOpts,
+) -> Result<()> {
+    let pyth_config = PythConfig::load()?
+        .markets
+        .get(&market_id)
+        .with_context(|| format!("No Pyth config found for market {market_id}"))?;
+    let code_ids = CodeIds::load()?;
+
+    let factories = MainnetFactories::load()?;
+    let factory = factories
+        .factories
+        .into_iter()
+        .find(|x| x.address == factory)
+        .with_context(|| format!("Unknown mainnet factory: {factory}"))?;
+    let app = opt.load_app_mainnet(factory.network).await?;
+
+    let pyth_bridge = code_ids.get_simple(ContractType::PythBridge, &opt, factory.network)?;
+    let pyth_bridge = app.cosmos.make_code_id(pyth_bridge);
+
+    let migration_admin = Factory::from_contract(app.cosmos.make_contract(factory.address))
+        .query_migration_admin()
+        .await?;
+
+    log::info!("Deploying a new Pyth bridge");
+    let pyth_bridge = pyth_bridge
+        .instantiate(
+            &app.wallet,
+            format!("{} - {market_id} Pyth bridge", factory.label),
+            vec![],
+            msg::contracts::pyth_bridge::entry::InstantiateMsg {
+                factory: factory.address.get_address_string().into(),
+                pyth: app.pyth.address.get_address_string().into(),
+                update_age_tolerance_seconds: app.pyth.update_age_tolerance,
+                feeds: vec![MarketFeeds {
+                    market_id,
+                    market_price_feeds: pyth_config.clone(),
+                }],
+            },
+            ContractAdmin::Addr(migration_admin),
+        )
+        .await?;
+    log::info!("New Pyth bridge contract: {pyth_bridge}");
+
+    Ok(())
+}
+
+#[derive(clap::Parser)]
 struct AddMarketOpts {
     /// Address of the factory contract
     #[clap(long)]
@@ -378,6 +440,9 @@ struct AddMarketOpts {
     /// Initial borrow fee rate
     #[clap(long, default_value = "0.2")]
     initial_borrow_fee_rate: Decimal256,
+    /// Pyth bridge contract to use as price admin
+    #[clap(long)]
+    pyth_bridge: Address,
 }
 
 async fn add_market(
@@ -387,6 +452,7 @@ async fn add_market(
         market_id,
         collateral,
         initial_borrow_fee_rate,
+        pyth_bridge,
     }: AddMarketOpts,
 ) -> Result<()> {
     let market_config_update = {
@@ -397,12 +463,6 @@ async fn add_market(
             .with_context(|| format!("No config update found for market ID: {market_id}"))?
     };
 
-    let pyth_config = PythConfig::load()?
-        .markets
-        .get(&market_id)
-        .with_context(|| format!("No Pyth config found for market {market_id}"))?;
-
-    let code_ids = CodeIds::load()?;
     let factories = MainnetFactories::load()?;
     let factory = factories
         .factories
@@ -410,47 +470,6 @@ async fn add_market(
         .find(|x| x.address == factory)
         .with_context(|| format!("Unknown mainnet factory: {factory}"))?;
     let app = opt.load_app_mainnet(factory.network).await?;
-
-    let migration_admin = Factory::from_contract(app.cosmos.make_contract(factory.address))
-        .query_migration_admin()
-        .await?;
-
-    log::info!("Deploying a new Pyth bridge");
-    let pyth_bridge = code_ids.get_simple(ContractType::PythBridge, &opt, factory.network)?;
-    let pyth_bridge = app
-        .cosmos
-        .make_code_id(pyth_bridge)
-        .instantiate(
-            &app.wallet,
-            format!("{} - {market_id} Pyth bridge", factory.label),
-            vec![],
-            msg::contracts::pyth_bridge::entry::InstantiateMsg {
-                factory: factory.address.get_address_string().into(),
-                pyth: app.pyth.address.get_address_string().into(),
-                update_age_tolerance_seconds: app.pyth.update_age_tolerance,
-            },
-            ContractAdmin::Addr(migration_admin),
-        )
-        .await?;
-    log::info!("New Pyth bridge contract: {pyth_bridge}");
-
-    log::info!("Setting price feed for market {market_id} to use Pyth Oracle.");
-    log::info!(
-        "Main price feeds: {:?}, USD price feeds: {:?}",
-        pyth_config.feeds,
-        pyth_config.feeds_usd
-    );
-    let res = pyth_bridge
-        .execute(
-            &app.wallet,
-            vec![],
-            msg::contracts::pyth_bridge::entry::ExecuteMsg::SetMarketPriceFeeds {
-                market_id: market_id.clone(),
-                market_price_feeds: pyth_config.clone(),
-            },
-        )
-        .await?;
-    log::info!("Called SetMarketPriceFeeds in {}", res.txhash);
 
     log::info!("Calling AddMarket on the factory");
     let factory = app.cosmos.make_contract(factory.address);
@@ -470,58 +489,6 @@ async fn add_market(
         )
         .await?;
     log::info!("New market added in transaction: {}", res.txhash);
-
-    Ok(())
-}
-
-#[derive(clap::Parser)]
-struct SetPythFeedsOpts {
-    /// Address of the factory contract
-    #[clap(long)]
-    factory: Address,
-    /// New market ID to add
-    #[clap(long)]
-    market_id: MarketId,
-}
-
-async fn set_pyth_feeds(
-    opt: Opt,
-    SetPythFeedsOpts { factory, market_id }: SetPythFeedsOpts,
-) -> Result<()> {
-    let pyth_config = PythConfig::load()?
-        .markets
-        .get(&market_id)
-        .with_context(|| format!("No Pyth config found for market {market_id}"))?;
-
-    let factories = MainnetFactories::load()?;
-    let factory = factories
-        .factories
-        .into_iter()
-        .find(|x| x.address == factory)
-        .with_context(|| format!("Unknown mainnet factory: {factory}"))?;
-    let app = opt.load_app_mainnet(factory.network).await?;
-
-    let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
-    let pyth_bridge = factory.get_market(market_id.clone()).await?.price_admin;
-    let pyth_bridge = app.cosmos.make_contract(pyth_bridge);
-
-    log::info!("Setting price feed for market {market_id} to use Pyth Oracle using Pyth bridge {pyth_bridge}.");
-    log::info!(
-        "Main price feeds: {:?}, USD price feeds: {:?}",
-        pyth_config.feeds,
-        pyth_config.feeds_usd
-    );
-    let res = pyth_bridge
-        .execute(
-            &app.wallet,
-            vec![],
-            msg::contracts::pyth_bridge::entry::ExecuteMsg::SetMarketPriceFeeds {
-                market_id,
-                market_price_feeds: pyth_config.clone(),
-            },
-        )
-        .await?;
-    log::info!("Called SetMarketPriceFeeds in {}", res.txhash);
 
     Ok(())
 }
