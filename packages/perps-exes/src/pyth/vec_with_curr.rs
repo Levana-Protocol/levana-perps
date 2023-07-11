@@ -4,13 +4,13 @@ use std::sync::{
     Arc,
 };
 
-pub(crate) struct VecWithCurr<A> {
+pub struct VecWithCurr<A> {
     vec: Vec<Arc<A>>,
     curr: AtomicUsize,
 }
 
 impl<A> VecWithCurr<A> {
-    pub(crate) fn new<I>(vec: I) -> Self
+    pub fn new<I>(vec: I) -> Self
     where
         I: IntoIterator<Item = A>,
     {

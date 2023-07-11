@@ -6,13 +6,16 @@ use chrono::{Duration, Utc};
 use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, HasAddress, TxBuilder, Wallet};
 use cosmwasm_std::Decimal256;
 use msg::prelude::{PriceBaseInQuote, PriceCollateralInUsd, Signed, UnsignedDecimal};
-use perps_exes::prelude::MarketContract;
+use perps_exes::{
+    prelude::MarketContract,
+    pyth::{get_latest_price, get_oracle_update_msg},
+};
 
 use crate::{
     config::BotConfigByType,
     util::{
         markets::{get_markets, Market, PriceApi},
-        oracle::{get_latest_price, Pyth},
+        oracle::Pyth,
     },
     watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
 };
@@ -241,12 +244,14 @@ impl App {
         market: &Market,
         pyth: &Pyth,
     ) -> Result<Vec<MsgExecuteContract>> {
-        let vaas = pyth
-            .get_wormhole_proofs(&self.client, &self.endpoints)
-            .await?;
-        let oracle_msg = pyth
-            .get_oracle_update_msg(wallet.get_address_string(), vaas)
-            .await?;
+        let oracle_msg = get_oracle_update_msg(
+            &pyth.market_price_feeds,
+            &wallet,
+            &self.endpoints,
+            &self.client,
+            &pyth.oracle,
+        )
+        .await?;
         let bridge_msg = pyth
             .get_bridge_update_msg(wallet.get_address_string(), market.market_id.clone())
             .await?;

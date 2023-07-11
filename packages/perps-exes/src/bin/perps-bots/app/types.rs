@@ -12,13 +12,13 @@ use cosmos::Wallet;
 use cosmwasm_std::Decimal256;
 use parking_lot::RwLock;
 use perps_exes::config::PythConfig;
+use perps_exes::pyth::VecWithCurr;
 use reqwest::Client;
 use tokio::sync::Mutex;
 
 use crate::app::factory::{get_factory_info_mainnet, get_factory_info_testnet};
 use crate::cli::Opt;
 use crate::config::{BotConfig, BotConfigByType, BotConfigTestnet};
-use crate::util::helpers::VecWithCurr;
 use crate::wallet_manager::ManagedWallet;
 use crate::watcher::TaskStatuses;
 use crate::watcher::Watcher;
