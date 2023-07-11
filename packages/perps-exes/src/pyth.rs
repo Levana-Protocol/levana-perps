@@ -46,7 +46,7 @@ async fn get_wormhole_proofs(
     endpoints: &VecWithCurr<String>,
     client: &reqwest::Client,
 ) -> Result<Vec<String>> {
-    let mut all_ids = market_price_feeds
+    let all_ids = market_price_feeds
         .feeds
         .iter()
         .chain(market_price_feeds.feeds_usd.as_deref().unwrap_or_default())
@@ -54,10 +54,8 @@ async fn get_wormhole_proofs(
         .sorted()
         .dedup()
         .collect_vec();
-
-    all_ids.sort();
-    all_ids.dedup();
     let all_ids_len = all_ids.len();
+
     // pyth uses this format for array params: https://github.com/axios/axios/blob/9588fcdec8aca45c3ba2f7968988a5d03f23168c/test/specs/helpers/buildURL.spec.js#L31
     let url_params = all_ids
         .iter()
