@@ -18,6 +18,7 @@ mod store_code;
 mod testnet;
 mod tracker;
 mod util;
+mod util_cmd;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -48,6 +49,7 @@ async fn main_inner() -> anyhow::Result<()> {
             TestnetSub::AddMarket { inner } => inner.go(opt).await?,
         },
         Subcommand::Mainnet { inner } => mainnet::go(opt, inner).await?,
+        Subcommand::Util { inner } => inner.go(opt).await?,
     }
 
     Ok(())

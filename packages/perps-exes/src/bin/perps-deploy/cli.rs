@@ -97,6 +97,11 @@ pub(crate) enum Subcommand {
         #[clap(flatten)]
         inner: crate::mainnet::MainnetOpt,
     },
+    /// General purpose utility commands
+    Util {
+        #[clap(flatten)]
+        inner: crate::util_cmd::UtilOpt,
+    },
 }
 
 #[derive(clap::Parser, Clone)]

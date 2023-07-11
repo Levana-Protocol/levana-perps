@@ -2,6 +2,7 @@ pub mod config;
 pub mod contracts;
 pub mod discovery;
 pub mod prelude;
+pub mod pyth;
 
 use chrono::{DateTime, TimeZone, Utc};
 use cosmos::{
