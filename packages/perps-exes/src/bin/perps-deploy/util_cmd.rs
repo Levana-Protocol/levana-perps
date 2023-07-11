@@ -79,7 +79,7 @@ async fn update_pyth_opt(
     };
     let oracle = basic.cosmos.make_contract(oracle);
 
-    let msg = get_oracle_update_msg(&feeds, &basic.wallet, &endpoints, &client, &oracle).await?;
+    let msg = get_oracle_update_msg(feeds, &basic.wallet, &endpoints, &client, &oracle).await?;
 
     let builder = TxBuilder::default().add_message(msg);
     let res = builder
