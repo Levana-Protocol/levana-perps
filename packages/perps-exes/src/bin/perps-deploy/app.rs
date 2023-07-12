@@ -70,7 +70,7 @@ impl Opt {
     pub(crate) async fn load_basic_app(&self, network: CosmosNetwork) -> Result<BasicApp> {
         let cosmos = self.connect(network).await?;
         let wallet = self.get_wallet(network)?;
-        let chain_config = ChainConfig::load(network)?.clone();
+        let chain_config = ChainConfig::load(network)?;
 
         Ok(BasicApp {
             cosmos,
@@ -134,7 +134,7 @@ impl Opt {
 
     pub(crate) async fn load_app_mainnet(&self, network: CosmosNetwork) -> Result<AppMainnet> {
         let pyth_config = PythConfig::load()?;
-        let chain_config = ChainConfig::load(network)?.clone();
+        let chain_config = ChainConfig::load(network)?;
         let cosmos = self.connect(network).await?;
         let wallet = self.get_wallet(network)?;
 

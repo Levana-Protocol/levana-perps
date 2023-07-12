@@ -75,7 +75,9 @@ impl App {
         anyhow::ensure!(!markets.is_empty(), "Cannot have empty markets vec");
 
         for market in &markets {
-            let price_apis = &market.get_price_api(wallet, &self.cosmos).await?;
+            let price_apis = &market
+                .get_price_api(wallet, &self.cosmos, &self.pyth_config)
+                .await?;
             match price_apis {
                 PriceApi::Manual(feeds) => {
                     let (price, price_usd) =
@@ -132,7 +134,10 @@ impl App {
 
         // just for logging pyth prices
         for market in &markets {
-            match &market.get_price_api(wallet, &self.cosmos).await? {
+            match &market
+                .get_price_api(wallet, &self.cosmos, &self.pyth_config)
+                .await?
+            {
                 PriceApi::Manual { .. } => {}
 
                 PriceApi::Pyth(pyth) => {

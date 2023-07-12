@@ -381,7 +381,7 @@ async fn new_pyth_bridge(
 ) -> Result<()> {
     let pyth_config = PythConfig::load()?
         .markets
-        .get(&market_id)
+        .remove(&market_id)
         .with_context(|| format!("No Pyth config found for market {market_id}"))?;
     let code_ids = CodeIds::load()?;
 

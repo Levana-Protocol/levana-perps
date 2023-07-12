@@ -7,7 +7,6 @@ use msg::{
     contracts::{market::config::ConfigUpdate, pyth_bridge::PythMarketPriceFeeds},
     prelude::*,
 };
-use once_cell::sync::OnceCell;
 
 /// Overall configuration of Pyth, for information valid across all chains.
 #[derive(serde::Deserialize, Debug)]
@@ -142,26 +141,19 @@ pub struct DeploymentConfigTestnet {
 
 impl ChainConfig {
     const CONFIG_CHAIN_YAML: &[u8] = include_bytes!("../assets/config-chain.yaml");
-    pub fn load(network: CosmosNetwork) -> Result<&'static Self> {
-        static CONFIG: OnceCell<HashMap<CosmosNetwork, ChainConfig>> = OnceCell::new();
-        CONFIG
-            .get_or_try_init(|| {
-                serde_yaml::from_slice(Self::CONFIG_CHAIN_YAML)
-                    .context("Could not parse config-chain.yaml")
-            })?
-            .get(&network)
+    pub fn load(network: CosmosNetwork) -> Result<Self> {
+        serde_yaml::from_slice::<HashMap<CosmosNetwork, Self>>(Self::CONFIG_CHAIN_YAML)
+            .context("Could not parse config-chain.yaml")?
+            .remove(&network)
             .with_context(|| format!("No chain config found for {network}"))
     }
 }
 
 impl ConfigTestnet {
     const CONFIG_TESTNET_YAML: &[u8] = include_bytes!("../assets/config-testnet.yaml");
-    pub fn load() -> Result<&'static Self> {
-        static CONFIG: OnceCell<ConfigTestnet> = OnceCell::new();
-        CONFIG.get_or_try_init(|| {
-            serde_yaml::from_slice(Self::CONFIG_TESTNET_YAML)
-                .context("Could not parse config-testnet.yaml")
-        })
+    pub fn load() -> Result<Self> {
+        serde_yaml::from_slice(Self::CONFIG_TESTNET_YAML)
+            .context("Could not parse config-testnet.yaml")
     }
 
     /// Provide the deployment name, such as osmodev, dragonqa, or seibeta
@@ -195,12 +187,8 @@ impl ConfigTestnet {
 impl PythConfig {
     const CONFIG_PYTH_YAML: &[u8] = include_bytes!("../assets/config-pyth.yaml");
 
-    pub fn load() -> Result<&'static Self> {
-        static CONFIG: OnceCell<PythConfig> = OnceCell::new();
-        CONFIG.get_or_try_init(|| {
-            serde_yaml::from_slice(Self::CONFIG_PYTH_YAML)
-                .context("Could not parse config-pyth.yaml")
-        })
+    pub fn load() -> Result<Self> {
+        serde_yaml::from_slice(Self::CONFIG_PYTH_YAML).context("Could not parse config-pyth.yaml")
     }
 }
 

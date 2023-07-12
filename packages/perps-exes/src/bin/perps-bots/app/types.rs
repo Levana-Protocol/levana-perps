@@ -69,6 +69,7 @@ pub(crate) struct App {
     /// Ensure that the crank and price bots don't try to work at the same time
     pub(crate) crank_lock: Mutex<()>,
     pub endpoints: PythEndpoints,
+    pub pyth_config: PythConfig,
 }
 
 pub(crate) type PythEndpoints = VecWithCurr<String>;
@@ -128,7 +129,8 @@ impl Opt {
             ),
         };
 
-        let endpoints = VecWithCurr::new(PythConfig::load()?.endpoints.clone());
+        let pyth_config = PythConfig::load()?;
+        let endpoints = VecWithCurr::new(pyth_config.endpoints.clone());
 
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
@@ -142,6 +144,7 @@ impl Opt {
             frontend_info_testnet,
             crank_lock: Mutex::new(()),
             endpoints,
+            pyth_config,
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {
