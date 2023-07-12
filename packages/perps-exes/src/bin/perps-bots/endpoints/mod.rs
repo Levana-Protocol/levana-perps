@@ -25,6 +25,7 @@ impl AppBuilder {
                 .route("/build-version", get(common::build_version))
                 .route("/api/faucet", post(faucet::bot))
                 .route("/status", get(status::all))
+                .route("/status/:label", get(status::single))
                 .route("/markets", get(markets::markets))
                 .route("/debug/gas-usage", get(debug::gases))
                 .with_state(app)
