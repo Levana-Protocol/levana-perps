@@ -1,13 +1,18 @@
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
 use anyhow::{Context, Result};
 use cosmos::{Address, CosmosNetwork, HasAddress, TxBuilder};
+use msg::contracts::market::{
+    entry::TradeHistorySummary,
+    position::{PositionId, PositionsResp},
+};
 use perps_exes::{
     config::{ChainConfig, PythConfig},
+    prelude::MarketContract,
     pyth::{get_oracle_update_msg, VecWithCurr},
 };
 use serde_json::json;
-use shared::storage::MarketId;
+use shared::storage::{MarketId, Signed, UnsignedDecimal, Usd};
 
 #[derive(clap::Parser)]
 pub(crate) struct UtilOpt {
@@ -27,6 +32,11 @@ enum Sub {
         #[clap(flatten)]
         inner: DeployPythOpt,
     },
+    /// Get the trade volume for a market
+    TradeVolume {
+        #[clap(flatten)]
+        inner: TradeVolumeOpt,
+    },
 }
 
 impl UtilOpt {
@@ -34,6 +44,7 @@ impl UtilOpt {
         match self.sub {
             Sub::UpdatePyth { inner } => update_pyth(opt, inner).await,
             Sub::DeployPyth { inner } => deploy_pyth_opt(opt, inner).await,
+            Sub::TradeVolume { inner } => trade_volume(opt, inner).await,
         }
     }
 }
@@ -227,5 +238,83 @@ async fn deploy_pyth_opt(
         .await?;
     log::info!("Deployed new Pyth oracle contract: {pyth_oracle}");
 
+    Ok(())
+}
+
+#[derive(clap::Parser)]
+struct TradeVolumeOpt {
+    /// Network to use.
+    #[clap(long, env = "COSMOS_NETWORK")]
+    network: CosmosNetwork,
+    /// Market address
+    market: Address,
+}
+
+async fn trade_volume(
+    opt: crate::cli::Opt,
+    TradeVolumeOpt { network, market }: TradeVolumeOpt,
+) -> Result<()> {
+    let cosmos = opt.connect(network).await?;
+    let contract = MarketContract::new(cosmos.make_contract(market));
+
+    let mut traders = HashSet::<Address>::new();
+    let mut next_position_id: PositionId = "1".parse()?;
+
+    loop {
+        match contract.raw_query_positions(vec![next_position_id]).await {
+            Ok(PositionsResp {
+                positions,
+                pending_close,
+                closed,
+            }) => {
+                anyhow::ensure!(1 == positions.len() + pending_close.len() + closed.len());
+
+                for pos in &positions {
+                    println!("{},{},open", pos.id, pos.notional_size);
+                }
+                anyhow::ensure!(pending_close.is_empty());
+                for pos in &closed {
+                    println!("{},{},closed", pos.id, pos.notional_size);
+                }
+
+                positions
+                    .into_iter()
+                    .map(|x| x.owner)
+                    .chain(pending_close.into_iter().map(|x| x.owner))
+                    .chain(closed.into_iter().map(|x| x.owner))
+                    .try_for_each(|addr| {
+                        addr.into_string()
+                            .parse()
+                            .context("Invalid trader address")
+                            .map(|addr| {
+                                traders.insert(addr);
+                            })
+                    })?;
+                next_position_id = (next_position_id.u64() + 1).to_string().parse()?;
+            }
+            Err(e) => {
+                log::warn!("Make sure this says that the position isn't found: {e:?}");
+                break;
+            }
+        }
+    }
+
+    log::info!("Last position checked: {next_position_id}");
+    log::info!("Total traders: {}", traders.len());
+
+    let mut total_trade_volume = Usd::zero();
+    let mut total_realized_pnl = Signed::<Usd>::zero();
+
+    for trader in traders {
+        let TradeHistorySummary {
+            trade_volume,
+            realized_pnl,
+        } = contract.trade_history_summary(trader).await?;
+        total_trade_volume = total_trade_volume.checked_add(trade_volume)?;
+        total_realized_pnl = total_realized_pnl.checked_add(realized_pnl)?;
+    }
+
+    log::info!("Total trade volume: {total_trade_volume}");
+    log::info!("Total realized PnL: {total_realized_pnl}");
     Ok(())
 }
