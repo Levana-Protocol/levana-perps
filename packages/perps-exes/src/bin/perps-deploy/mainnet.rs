@@ -379,7 +379,7 @@ async fn new_pyth_bridge(
     opt: Opt,
     NewPythBridgeOpts { factory, market_id }: NewPythBridgeOpts,
 ) -> Result<()> {
-    let pyth_config = PythConfig::load()?
+    let pyth_config = PythConfig::load(opt.config_pyth.as_ref())?
         .markets
         .remove(&market_id)
         .with_context(|| format!("No Pyth config found for market {market_id}"))?;

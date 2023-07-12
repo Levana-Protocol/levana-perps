@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, str::FromStr};
+use std::{net::SocketAddr, path::PathBuf, str::FromStr};
 
 use anyhow::{Context, Result};
 use cosmos::{Address, AddressType, CosmosNetwork, SeedPhrase, Wallet};
@@ -28,6 +28,9 @@ pub(crate) struct Opt {
     pub(crate) rpc_url: Option<String>,
     #[clap(subcommand)]
     pub(crate) sub: Sub,
+    /// Override the Pyth config file
+    #[clap(long, env = "LEVANA_BOTS_PYTH_CONFIG")]
+    pub(crate) pyth_config: Option<PathBuf>,
 }
 
 #[derive(clap::Parser)]
@@ -61,6 +64,12 @@ pub(crate) struct TestnetOpt {
     pub(crate) deployment: String,
     #[clap(long, env = "COSMOS_GAS_MULTIPLIER")]
     pub(crate) gas_multiplier: Option<f64>,
+    /// Override testnet config file
+    #[clap(long, env = "LEVANA_BOTS_CONFIG_TESTNET")]
+    pub(crate) config_testnet: Option<PathBuf>,
+    /// Override chain config file
+    #[clap(long, env = "LEVANA_BOTS_CONFIG_CHAIN")]
+    pub(crate) config_chain: Option<PathBuf>,
 }
 
 #[derive(clap::Parser)]
