@@ -70,7 +70,7 @@ impl Opt {
     pub(crate) async fn load_basic_app(&self, network: CosmosNetwork) -> Result<BasicApp> {
         let cosmos = self.connect(network).await?;
         let wallet = self.get_wallet(network)?;
-        let chain_config = ChainConfig::load(network)?;
+        let chain_config = ChainConfig::load(self.config_chain.as_ref(), network)?;
 
         Ok(BasicApp {
             cosmos,
@@ -81,8 +81,8 @@ impl Opt {
     }
 
     pub(crate) async fn load_app(&self, family: &str) -> Result<App> {
-        let config = ConfigTestnet::load()?;
-        let pyth_config = PythConfig::load()?;
+        let config = ConfigTestnet::load(self.config_testnet.as_ref())?;
+        let pyth_config = PythConfig::load(self.config_pyth.as_ref())?;
         let partial = config.get_deployment_info(family)?;
         let basic = self.load_basic_app(partial.network).await?;
 
@@ -133,8 +133,8 @@ impl Opt {
     }
 
     pub(crate) async fn load_app_mainnet(&self, network: CosmosNetwork) -> Result<AppMainnet> {
-        let pyth_config = PythConfig::load()?;
-        let chain_config = ChainConfig::load(network)?;
+        let pyth_config = PythConfig::load(self.config_pyth.as_ref())?;
+        let chain_config = ChainConfig::load(self.config_chain.as_ref(), network)?;
         let cosmos = self.connect(network).await?;
         let wallet = self.get_wallet(network)?;
 

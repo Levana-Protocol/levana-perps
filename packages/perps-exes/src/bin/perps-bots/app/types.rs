@@ -129,7 +129,7 @@ impl Opt {
             ),
         };
 
-        let pyth_config = PythConfig::load()?;
+        let pyth_config = PythConfig::load(self.pyth_config)?;
         let endpoints = VecWithCurr::new(pyth_config.endpoints.clone());
 
         let app = App {

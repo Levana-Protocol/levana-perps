@@ -76,7 +76,7 @@ impl Opt {
         &self,
         testnet: &TestnetOpt,
     ) -> Result<(BotConfig, Option<FaucetBotRunner>)> {
-        let config = ConfigTestnet::load()?;
+        let config = ConfigTestnet::load(testnet.config_testnet.as_ref())?;
         let DeploymentInfo {
             config: partial,
             network,
@@ -89,7 +89,7 @@ impl Opt {
             explorer,
             rpc_nodes,
             gas_multiplier,
-        } = ChainConfig::load(network)?;
+        } = ChainConfig::load(testnet.config_chain.as_ref(), network)?;
         let partial = match &testnet.deployment_config {
             Some(s) => serde_yaml::from_str(s)?,
             None => partial,

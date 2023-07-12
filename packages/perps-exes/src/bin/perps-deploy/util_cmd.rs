@@ -32,7 +32,7 @@ enum Sub {
 impl UtilOpt {
     pub(crate) async fn go(self, opt: crate::cli::Opt) -> Result<()> {
         match self.sub {
-            Sub::UpdatePyth { inner } => update_pyth_opt(opt, inner).await,
+            Sub::UpdatePyth { inner } => update_pyth(opt, inner).await,
             Sub::DeployPyth { inner } => deploy_pyth_opt(opt, inner).await,
         }
     }
@@ -49,18 +49,26 @@ struct UpdatePythOpt {
     /// Override the oracle used
     #[clap(long)]
     oracle: Option<Address>,
+    /// Override Pyth config file
+    #[clap(long, env = "LEVANA_BOTS_CONFIG_PYTH")]
+    pub(crate) config_pyth: Option<PathBuf>,
+    /// Override chain config file
+    #[clap(long, env = "LEVANA_BOTS_CONFIG_CHAIN")]
+    pub(crate) config_chain: Option<PathBuf>,
 }
 
-async fn update_pyth_opt(
+async fn update_pyth(
     opt: crate::cli::Opt,
     UpdatePythOpt {
         market,
         network,
         oracle,
+        config_pyth,
+        config_chain,
     }: UpdatePythOpt,
 ) -> Result<()> {
     let basic = opt.load_basic_app(network).await?;
-    let pyth = PythConfig::load()?;
+    let pyth = PythConfig::load(config_pyth)?;
     let endpoints = VecWithCurr::new(pyth.endpoints.clone());
     let client = reqwest::Client::new();
     let feeds = pyth
@@ -71,7 +79,7 @@ async fn update_pyth_opt(
     let oracle = match oracle {
         Some(oracle) => oracle,
         None => {
-            let chain = ChainConfig::load(network)?;
+            let chain = ChainConfig::load(config_chain, network)?;
             chain
                 .pyth
                 .with_context(|| format!("No Pyth oracle found for network {network}"))?

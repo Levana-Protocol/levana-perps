@@ -1,6 +1,6 @@
 pub mod defaults;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
 use cosmos::{Address, CosmosNetwork, RawAddress};
 use msg::{
@@ -139,21 +139,43 @@ pub struct DeploymentConfigTestnet {
     pub max_allowed_price_delta: Decimal256,
 }
 
+fn load_yaml<T: serde::de::DeserializeOwned>(
+    static_path: &str,
+    static_contents: &[u8],
+    runtime_path: Option<impl AsRef<Path>>,
+) -> Result<T> {
+    match runtime_path {
+        Some(path) => {
+            let path = path.as_ref();
+            let mut file = fs_err::File::open(path)?;
+            serde_yaml::from_reader(&mut file)
+                .with_context(|| format!("Parse error reading from YAML file {}", path.display()))
+        }
+        None => serde_yaml::from_slice(static_contents).with_context(|| {
+            format!("Parse error reading from compiled-in YAML file {static_path}")
+        }),
+    }
+}
+
 impl ChainConfig {
-    const CONFIG_CHAIN_YAML: &[u8] = include_bytes!("../assets/config-chain.yaml");
-    pub fn load(network: CosmosNetwork) -> Result<Self> {
-        serde_yaml::from_slice::<HashMap<CosmosNetwork, Self>>(Self::CONFIG_CHAIN_YAML)
-            .context("Could not parse config-chain.yaml")?
-            .remove(&network)
-            .with_context(|| format!("No chain config found for {network}"))
+    pub fn load(config_file: Option<impl AsRef<Path>>, network: CosmosNetwork) -> Result<Self> {
+        load_yaml::<HashMap<CosmosNetwork, Self>>(
+            "config-chain.yaml",
+            include_bytes!("../assets/config-chain.yaml"),
+            config_file,
+        )?
+        .remove(&network)
+        .with_context(|| format!("No chain config found for {network}"))
     }
 }
 
 impl ConfigTestnet {
-    const CONFIG_TESTNET_YAML: &[u8] = include_bytes!("../assets/config-testnet.yaml");
-    pub fn load() -> Result<Self> {
-        serde_yaml::from_slice(Self::CONFIG_TESTNET_YAML)
-            .context("Could not parse config-testnet.yaml")
+    pub fn load(config_file: Option<impl AsRef<Path>>) -> Result<Self> {
+        load_yaml(
+            "config-testnet.yaml",
+            include_bytes!("../assets/config-testnet.yaml"),
+            config_file,
+        )
     }
 
     /// Provide the deployment name, such as osmodev, dragonqa, or seibeta
@@ -185,10 +207,12 @@ impl ConfigTestnet {
 }
 
 impl PythConfig {
-    const CONFIG_PYTH_YAML: &[u8] = include_bytes!("../assets/config-pyth.yaml");
-
-    pub fn load() -> Result<Self> {
-        serde_yaml::from_slice(Self::CONFIG_PYTH_YAML).context("Could not parse config-pyth.yaml")
+    pub fn load(config_file: Option<impl AsRef<Path>>) -> Result<Self> {
+        load_yaml(
+            "config-pyth.yaml",
+            include_bytes!("../assets/config-pyth.yaml"),
+            config_file,
+        )
     }
 }
 

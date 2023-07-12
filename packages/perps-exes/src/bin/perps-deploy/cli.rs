@@ -124,6 +124,15 @@ pub(crate) struct Opt {
     /// Directory containing the generated WASM files.
     #[clap(long, default_value = "./wasm/artifacts", env = "PERPS_WASM_DIR")]
     wasm_dir: PathBuf,
+    /// Override Pyth config file
+    #[clap(long, env = "LEVANA_BOTS_CONFIG_PYTH")]
+    pub(crate) config_pyth: Option<PathBuf>,
+    /// Override chain config file
+    #[clap(long, env = "LEVANA_BOTS_CONFIG_CHAIN")]
+    pub(crate) config_chain: Option<PathBuf>,
+    /// Override testnet config file
+    #[clap(long, env = "LEVANA_BOTS_CONFIG_TESTNET")]
+    pub(crate) config_testnet: Option<PathBuf>,
 }
 
 impl Opt {
