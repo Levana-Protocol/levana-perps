@@ -42,6 +42,25 @@ pub(crate) enum TaskLabel {
     Trader { index: u32 },
 }
 
+impl TaskLabel {
+    pub(crate) fn from_slug(s: &str) -> Option<TaskLabel> {
+        match s {
+            "get-factory" => Some(TaskLabel::GetFactory),
+            "stale" => Some(TaskLabel::Stale),
+            "crank" => Some(TaskLabel::Crank),
+            "price" => Some(TaskLabel::Price),
+            "track-balance" => Some(TaskLabel::TrackBalance),
+            "stats" => Some(TaskLabel::Stats),
+            "gas-check" => Some(TaskLabel::GasCheck),
+            "liquidity" => Some(TaskLabel::Liquidity),
+            "utilization" => Some(TaskLabel::Utilization),
+            "balance" => Some(TaskLabel::Balance),
+            // Being lazy, skipping UltraCrank and Trader, they aren't needed
+            _ => None,
+        }
+    }
+}
+
 impl Display for TaskLabel {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -98,6 +117,11 @@ pub(crate) struct TaskCounts {
     pub(crate) retries: usize,
     pub(crate) errors: usize,
 }
+impl TaskCounts {
+    fn total(&self) -> usize {
+        self.successes + self.retries + self.errors
+    }
+}
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -143,13 +167,17 @@ impl TaskLabel {
         }
     }
 
-    fn triggers_alert(&self) -> bool {
+    fn triggers_alert(&self, selected_label: Option<TaskLabel>) -> bool {
+        // If we loaded up a specific status page, always treat it as an alert.
+        if selected_label.as_ref() == Some(self) {
+            return true;
+        }
         match self {
             TaskLabel::GetFactory => true,
             TaskLabel::Crank => true,
             TaskLabel::Price => true,
             TaskLabel::TrackBalance => true,
-            TaskLabel::GasCheck => true,
+            TaskLabel::GasCheck => false,
             TaskLabel::UltraCrank { index: _ } => false,
             TaskLabel::Liquidity => false,
             TaskLabel::Utilization => false,
@@ -304,7 +332,10 @@ impl AppBuilder {
                         log::warn!("{label}: Error: {err:?}");
                         retries += 1;
                         let max_retries = config.retries.unwrap_or(app.config.watcher.retries);
-                        if retries >= max_retries {
+                        // We want to get to first failure quickly so we don't
+                        // have a misleading success status page. So if this
+                        // failed and there are no prior attempts, don't retry.
+                        if retries >= max_retries || task_status.read().counts.total() == 0 {
                             retries = 0;
                             *task_status.write() = TaskStatus {
                                 last_result: TaskResult {
@@ -337,15 +368,15 @@ impl AppBuilder {
                                     },
                                 };
                             }
-
-                            tokio::time::sleep(tokio::time::Duration::from_secs(
-                                config
-                                    .delay_between_retries
-                                    .unwrap_or(app.config.watcher.delay_between_retries)
-                                    .into(),
-                            ))
-                            .await;
                         }
+
+                        tokio::time::sleep(tokio::time::Duration::from_secs(
+                            config
+                                .delay_between_retries
+                                .unwrap_or(app.config.watcher.delay_between_retries)
+                                .into(),
+                        ))
+                        .await;
                     }
                 }
             }
@@ -435,16 +466,20 @@ struct RenderedStatus {
 }
 
 impl TaskStatuses {
-    fn all_statuses(&self) -> Vec<RenderedStatus> {
+    fn statuses(&self, selected_label: Option<TaskLabel>) -> Vec<RenderedStatus> {
         let mut all_statuses = self
             .statuses
             .get()
             .expect("Status map isn't available yet")
             .iter()
+            .filter(|(curr_label, _)| match selected_label {
+                None => true,
+                Some(label) => **curr_label == label,
+            })
             .map(|(label, status)| {
                 let label = *label;
                 let status = status.read().clone();
-                let short = status.short(label);
+                let short = status.short(label, selected_label);
                 RenderedStatus {
                     label,
                     status,
@@ -457,8 +492,12 @@ impl TaskStatuses {
         all_statuses
     }
 
-    pub(crate) fn all_statuses_html(&self, app: &App) -> axum::response::Response {
-        let template = self.to_template(app);
+    pub(crate) fn statuses_html(
+        &self,
+        app: &App,
+        label: Option<TaskLabel>,
+    ) -> axum::response::Response {
+        let template = self.to_template(app, label);
         let mut res = template.render().unwrap().into_response();
         res.headers_mut().append(
             CONTENT_TYPE,
@@ -472,8 +511,12 @@ impl TaskStatuses {
         res
     }
 
-    pub(crate) fn all_statuses_json(&self, app: &App) -> axum::response::Response {
-        let template = self.to_template(app);
+    pub(crate) fn statuses_json(
+        &self,
+        app: &App,
+        label: Option<TaskLabel>,
+    ) -> axum::response::Response {
+        let template = self.to_template(app, label);
 
         let mut res = Json(&template).into_response();
 
@@ -484,11 +527,11 @@ impl TaskStatuses {
         res
     }
 
-    pub(crate) fn all_statuses_text(&self) -> axum::response::Response {
+    pub(crate) fn statuses_text(&self, label: Option<TaskLabel>) -> axum::response::Response {
         let mut response_builder = ResponseBuilder::default();
-        let statuses = self.all_statuses();
+        let statuses = self.statuses(label);
         let alert = statuses.iter().any(|x| x.short.alert());
-        self.all_statuses()
+        statuses
             .into_iter()
             .for_each(|rendered| response_builder.add(rendered).unwrap());
         let mut res = response_builder.into_response();
@@ -518,11 +561,11 @@ enum ShortStatus {
 }
 
 impl TaskStatus {
-    fn short(&self, label: TaskLabel) -> ShortStatus {
+    fn short(&self, label: TaskLabel, selected_label: Option<TaskLabel>) -> ShortStatus {
         match self.last_result.value.as_ref() {
             Ok(_) => {
                 if self.is_out_of_date() {
-                    if label.triggers_alert() {
+                    if label.triggers_alert(selected_label) {
                         ShortStatus::OutOfDate
                     } else {
                         ShortStatus::OutOfDateNoAlert
@@ -532,7 +575,7 @@ impl TaskStatus {
                 }
             }
             Err(_) => {
-                if label.triggers_alert() {
+                if label.triggers_alert(selected_label) {
                     ShortStatus::Error
                 } else {
                     ShortStatus::ErrorNoAlert
@@ -694,8 +737,8 @@ struct StatusTemplate<'a> {
 }
 
 impl TaskStatuses {
-    fn to_template<'a>(&'a self, app: &'a App) -> StatusTemplate<'a> {
-        let statuses = self.all_statuses();
+    fn to_template<'a>(&'a self, app: &'a App, label: Option<TaskLabel>) -> StatusTemplate<'a> {
+        let statuses = self.statuses(label);
         let alert = statuses.iter().any(|x| x.short.alert());
         let frontend_info_testnet = app.get_frontend_info_testnet();
         StatusTemplate {
