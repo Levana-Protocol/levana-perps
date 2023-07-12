@@ -11,7 +11,7 @@ use msg::{
             config::ConfigUpdate,
             entry::{
                 ClosedPositionsResp, ExecuteOwnerMsg, LpInfoResp, PriceWouldTriggerResp,
-                SlippageAssert, StatusResp,
+                SlippageAssert, StatusResp, TradeHistorySummary,
             },
             position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
         },
@@ -296,6 +296,20 @@ impl MarketContract {
         Ok(position_response)
     }
 
+    pub async fn raw_query_positions(
+        &self,
+        position_ids: Vec<PositionId>,
+    ) -> Result<PositionsResp> {
+        self.0
+            .query(MarketQueryMsg::Positions {
+                position_ids,
+                skip_calc_pending_fees: None,
+                fees: None,
+                price: None,
+            })
+            .await
+    }
+
     pub async fn position_detail(&self, position_id: PositionId) -> Result<PositionQueryResponse> {
         let query = MarketQueryMsg::Positions {
             position_ids: vec![position_id],
@@ -485,6 +499,14 @@ impl MarketContract {
     pub async fn close_all_positions(&self, wallet: &Wallet) -> Result<TxResponse> {
         self.0
             .execute(wallet, vec![], MarketExecuteMsg::CloseAllPositions {})
+            .await
+    }
+
+    pub async fn trade_history_summary(&self, trader: Address) -> Result<TradeHistorySummary> {
+        self.0
+            .query(MarketQueryMsg::TradeHistorySummary {
+                addr: trader.to_string().into(),
+            })
             .await
     }
 }
