@@ -19,8 +19,8 @@ struct FactoryResp<'a> {
     frontend_info_testnet: Option<&'a FrontendInfoTestnet>,
 
     network: CosmosNetwork,
-    price_api: &'static str,
-    explorer: &'static str,
+    price_api: &'a str,
+    explorer: &'a str,
     maintenance: Option<&'a String>,
 }
 
@@ -31,8 +31,8 @@ pub(crate) async fn factory(app: State<Arc<App>>) -> impl IntoResponse {
             factory_info: &factory_info,
             frontend_info_testnet: app.get_frontend_info_testnet().as_deref(),
             network: app.config.network,
-            price_api: inner.price_api,
-            explorer: inner.explorer,
+            price_api: &inner.price_api,
+            explorer: &inner.explorer,
             maintenance: inner.maintenance.as_ref(),
         })
         .into_response(),

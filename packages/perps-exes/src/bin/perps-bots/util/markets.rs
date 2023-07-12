@@ -30,9 +30,9 @@ impl Debug for Market {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum PriceApi {
+pub(crate) enum PriceApi<'a> {
     Pyth(Pyth),
-    Manual(&'static PythMarketPriceFeeds),
+    Manual(&'a PythMarketPriceFeeds),
 }
 
 pub(crate) async fn get_markets(cosmos: &Cosmos, factory: &Contract) -> Result<Vec<Market>> {
@@ -78,7 +78,12 @@ pub(crate) async fn get_markets(cosmos: &Cosmos, factory: &Contract) -> Result<V
 }
 
 impl Market {
-    pub(crate) async fn get_price_api(&self, wallet: &Wallet, cosmos: &Cosmos) -> Result<PriceApi> {
+    pub(crate) async fn get_price_api<'a>(
+        &self,
+        wallet: &Wallet,
+        cosmos: &Cosmos,
+        pyth_config: &'a PythConfig,
+    ) -> Result<PriceApi<'a>> {
         let Self {
             price_admin,
             market_id,
@@ -87,7 +92,6 @@ impl Market {
 
         if *price_admin == wallet.get_address_string() {
             // Not using Pyth oracle, but still getting the prices from the Pyth endpoint
-            let pyth_config = PythConfig::load()?;
             let feeds = pyth_config
                 .markets
                 .get(market_id)

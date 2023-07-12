@@ -24,12 +24,12 @@ pub(crate) enum BotConfigByType {
 pub(crate) struct BotConfigTestnet {
     pub(crate) tracker: Address,
     pub(crate) faucet: Address,
-    pub(crate) price_api: &'static str,
+    pub(crate) price_api: String,
     pub(crate) contract_family: String,
     pub(crate) min_gas: u128,
     pub(crate) min_gas_in_faucet: u128,
     pub(crate) min_gas_in_gas_wallet: u128,
-    pub(crate) explorer: &'static str,
+    pub(crate) explorer: String,
     pub(crate) ultra_crank_wallets: Vec<Wallet>,
     pub(crate) liquidity_config: Option<LiquidityConfig>,
     pub(crate) utilization_config: Option<UtilizationConfig>,
@@ -100,18 +100,17 @@ impl Opt {
         let (faucet_bot, faucet_bot_runner) =
             FaucetBot::new(faucet_bot_wallet, testnet.hcaptcha_secret.clone(), faucet);
 
-        let gas_multiplier = testnet.gas_multiplier.or(*gas_multiplier);
+        let gas_multiplier = testnet.gas_multiplier.or(gas_multiplier);
 
         let testnet = BotConfigTestnet {
             tracker: tracker.with_context(|| format!("No tracker found for {network}"))?,
             faucet,
-            price_api: &config.price_api,
+            price_api: config.price_api.clone(),
             contract_family: testnet.deployment.clone(),
             min_gas: partial.min_gas,
             min_gas_in_faucet: partial.min_gas_in_faucet,
             min_gas_in_gas_wallet: partial.min_gas_in_gas_wallet,
             explorer: explorer
-                .as_deref()
                 .with_context(|| format!("No explorer found for network {network}"))?,
             ultra_crank_wallets: (1..=partial.ultra_crank)
                 .map(|index| {
