@@ -22,6 +22,14 @@ use self::gas_check::GasCheckWallet;
 
 impl AppBuilder {
     pub(crate) async fn start(mut self) -> Result<()> {
+        let family = match &self.app.config.by_type {
+            crate::config::BotConfigByType::Testnet { inner } => inner.contract_family.clone(),
+            crate::config::BotConfigByType::Mainnet { inner } => {
+                format!("Factory address {}", inner.factory)
+            }
+        };
+        sentry::configure_scope(|scope| scope.set_tag("bot-name", family));
+
         // Start the tasks that run on all deployments
         self.start_rest_api();
         self.start_factory_task()?;

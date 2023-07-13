@@ -17,6 +17,9 @@ pub(crate) struct Opt {
         global = true
     )]
     pub(crate) bind: SocketAddr,
+    /// Sentry client key
+    #[arg(short, long, env = "SENTRY_KEY")]
+    pub(crate) client_key: Option<String>,
     /// Override the gRPC URL
     #[clap(long, env = "COSMOS_GRPC")]
     pub(crate) grpc_url: Option<String>,

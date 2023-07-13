@@ -298,19 +298,48 @@ impl AppBuilder {
                         message,
                     }) => {
                         log::info!("{label}: Success! {message}");
-                        *task_status.write() = TaskStatus {
-                            last_result: TaskResult {
-                                value: Ok(message).into(),
-                                updated: Utc::now(),
-                            },
-                            last_retry_error: None,
-                            current_run_started: None,
-                            out_of_date,
-                            counts: TaskCounts {
-                                successes: old_counts.successes + 1,
-                                ..old_counts
-                            },
-                        };
+                        {
+                            let mut guard = task_status.write();
+                            let old = &*guard;
+                            let title = label.to_string();
+                            if let Err(ref err) = *(old.last_result.value) {
+                                sentry::with_scope(
+                                    |scope| scope.set_tag("part-name", title.clone()),
+                                    || {
+                                        sentry::capture_message(
+                                            &format!("{title} Recovered: {err}"),
+                                            sentry::Level::Info,
+                                        )
+                                    },
+                                );
+                            } else if Ok("Task has not yet completed a single run".to_owned())
+                                == *(old.last_result.value)
+                            {
+                                // Bot newly started
+                                sentry::with_scope(
+                                    |scope| scope.set_tag("part-name", title.clone()),
+                                    || {
+                                        sentry::capture_message(
+                                            &format!("{title}: Bot restarted. This piece of the bots is not currently broken"),
+                                            sentry::Level::Info,
+                                        )
+                                    },
+                                );
+                            }
+                            *guard = TaskStatus {
+                                last_result: TaskResult {
+                                    value: Ok(message).into(),
+                                    updated: Utc::now(),
+                                },
+                                last_retry_error: None,
+                                current_run_started: None,
+                                out_of_date,
+                                counts: TaskCounts {
+                                    successes: old_counts.successes + 1,
+                                    ..old_counts
+                                },
+                            };
+                        }
                         retries = 0;
                         if !skip_delay {
                             match config.delay {
@@ -342,7 +371,33 @@ impl AppBuilder {
                         // failed and there are no prior attempts, don't retry.
                         if retries >= max_retries || task_status.read().counts.total() == 0 {
                             retries = 0;
-                            *task_status.write() = TaskStatus {
+                            let mut guard = task_status.write();
+                            let old = &*guard;
+                            let title = label.to_string();
+                            if Err(format!("{err:?}")) == *(old.last_result.value) {
+                                // Error still going on. Do nothing.
+                            } else {
+                                // New error occurs.
+                                sentry::with_scope(
+                                    |scope| scope.set_tag("part-name", title.clone()),
+                                    || {
+                                        sentry::capture_message(
+                                            &format!("{title}: {err:?}"),
+                                            sentry::Level::Error,
+                                        )
+                                    },
+                                );
+                                sentry::with_scope(
+                                    |scope| scope.set_tag("part-name", title.clone()),
+                                    || {
+                                        sentry::capture_message(
+                                            &format!("{title} May Recover: {err:?}"),
+                                            sentry::Level::Info,
+                                        )
+                                    },
+                                );
+                            }
+                            *guard = TaskStatus {
                                 last_result: TaskResult {
                                     value: Err(format!("{err:?}")).into(),
                                     updated: Utc::now(),
