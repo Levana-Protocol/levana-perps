@@ -7,6 +7,7 @@ mod liquidity;
 mod price;
 mod stale;
 mod stats;
+mod stats_alert;
 mod trader;
 mod types;
 mod ultra_crank;
@@ -65,8 +66,10 @@ impl AppBuilder {
                 self.start_traders(inner.clone())?;
                 self.start_ultra_crank_bot(&inner)?;
             }
-            // Nothing to do, no tasks are mainnet-only
-            BotConfigByType::Mainnet { .. } => (),
+            BotConfigByType::Mainnet { inner } => {
+                // Launch mainnet tasks
+                self.start_stats_alert(inner.clone())?;
+            }
         }
 
         // Gas task must always be launched last so that it includes all wallets specified above

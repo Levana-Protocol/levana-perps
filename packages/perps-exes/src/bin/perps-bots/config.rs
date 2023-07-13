@@ -47,6 +47,8 @@ pub(crate) struct BotConfigMainnet {
     pub(crate) factory: Address,
     pub(crate) min_gas_crank: u128,
     pub(crate) min_gas_price: u128,
+    pub(crate) low_util_ratio: Decimal256,
+    pub(crate) high_util_ratio: Decimal256,
 }
 
 pub(crate) struct BotConfig {
@@ -187,6 +189,8 @@ impl Opt {
             watcher_config,
             max_price_age_secs,
             max_allowed_price_delta,
+            low_util_ratio,
+            high_util_ratio,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let price_wallet = seed
@@ -205,6 +209,8 @@ impl Opt {
                     factory: *factory,
                     min_gas_crank: *min_gas_crank,
                     min_gas_price: *min_gas_price,
+                    low_util_ratio: *low_util_ratio,
+                    high_util_ratio: *high_util_ratio,
                 }
                 .into(),
             },
@@ -281,6 +287,8 @@ impl BotConfigMainnet {
             factory: _,
             min_gas_crank: _,
             min_gas_price: _,
+            low_util_ratio: _,
+            high_util_ratio: _,
         } = self;
         0
     }
