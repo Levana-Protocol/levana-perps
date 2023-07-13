@@ -66,6 +66,10 @@ pub(super) fn stats() -> TaskConfig {
     super::WatcherConfig::default().stats
 }
 
+pub(super) fn stats_alert() -> TaskConfig {
+    super::WatcherConfig::default().stats_alert
+}
+
 pub(super) fn ultra_crank() -> TaskConfig {
     super::WatcherConfig::default().ultra_crank
 }

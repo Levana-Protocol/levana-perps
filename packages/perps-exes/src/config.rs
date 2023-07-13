@@ -271,6 +271,8 @@ pub struct WatcherConfig {
     pub stale: TaskConfig,
     #[serde(default = "defaults::stats")]
     pub stats: TaskConfig,
+    #[serde(default = "defaults::stats_alert")]
+    pub stats_alert: TaskConfig,
     #[serde(default = "defaults::ultra_crank")]
     pub ultra_crank: TaskConfig,
 }
@@ -347,6 +349,12 @@ impl Default for WatcherConfig {
                 delay_between_retries: None,
             },
             stats: TaskConfig {
+                delay: Delay::Constant(30),
+                out_of_date: 180,
+                retries: None,
+                delay_between_retries: None,
+            },
+            stats_alert: TaskConfig {
                 delay: Delay::Constant(30),
                 out_of_date: 180,
                 retries: None,
