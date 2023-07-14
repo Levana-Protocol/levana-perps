@@ -128,8 +128,28 @@ impl TaskCounts {
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct TaskResult {
-    pub(crate) value: Arc<Result<String, String>>,
+    pub(crate) value: Arc<TaskResultValue>,
     pub(crate) updated: DateTime<Utc>,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum TaskResultValue {
+    Ok(String),
+    Err(String),
+    NotYetRun,
+}
+
+const NOT_YET_RUN_MESSAGE: &str = "Task has not yet completed a single run";
+
+impl TaskResultValue {
+    fn as_str(&self) -> &str {
+        match self {
+            TaskResultValue::Ok(s) => s,
+            TaskResultValue::Err(s) => s,
+            TaskResultValue::NotYetRun => NOT_YET_RUN_MESSAGE,
+        }
+    }
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -253,7 +273,7 @@ impl AppBuilder {
         let out_of_date = chrono::Duration::seconds(config.out_of_date.into());
         let task_status = Arc::new(RwLock::new(TaskStatus {
             last_result: TaskResult {
-                value: Ok("Task has not yet completed a single run".to_owned()).into(),
+                value: TaskResultValue::NotYetRun.into(),
                 updated: Utc::now(),
             },
             last_retry_error: None,
@@ -302,33 +322,38 @@ impl AppBuilder {
                             let mut guard = task_status.write();
                             let old = &*guard;
                             let title = label.to_string();
-                            if let Err(ref err) = *(old.last_result.value) {
-                                sentry::with_scope(
-                                    |scope| scope.set_tag("part-name", title.clone()),
-                                    || {
-                                        sentry::capture_message(
-                                            &format!("{title} Recovered: {err}"),
-                                            sentry::Level::Info,
-                                        )
-                                    },
-                                );
-                            } else if Ok("Task has not yet completed a single run".to_owned())
-                                == *(old.last_result.value)
-                            {
-                                // Bot newly started
-                                sentry::with_scope(
-                                    |scope| scope.set_tag("part-name", title.clone()),
-                                    || {
-                                        sentry::capture_message(
+                            if label.triggers_alert(None) {
+                                match &*old.last_result.value {
+                                    // Was a success, still a success, do nothing
+                                    TaskResultValue::Ok(_) => (),
+                                    TaskResultValue::Err(err) => {
+                                        sentry::with_scope(
+                                            |scope| scope.set_tag("part-name", title.clone()),
+                                            || {
+                                                sentry::capture_message(
+                                                    &format!("{title} Recovered: {err}"),
+                                                    sentry::Level::Info,
+                                                )
+                                            },
+                                        );
+                                    }
+                                    TaskResultValue::NotYetRun => {
+                                        // Bot newly started
+                                        sentry::with_scope(
+                                            |scope| scope.set_tag("part-name", title.clone()),
+                                            || {
+                                                sentry::capture_message(
                                             &format!("{title}: Bot restarted. This piece of the bots is not currently broken"),
                                             sentry::Level::Info,
                                         )
-                                    },
-                                );
+                                            },
+                                        );
+                                    }
+                                }
                             }
                             *guard = TaskStatus {
                                 last_result: TaskResult {
-                                    value: Ok(message).into(),
+                                    value: TaskResultValue::Ok(message).into(),
                                     updated: Utc::now(),
                                 },
                                 last_retry_error: None,
@@ -374,32 +399,53 @@ impl AppBuilder {
                             let mut guard = task_status.write();
                             let old = &*guard;
                             let title = label.to_string();
-                            if Err(format!("{err:?}")) == *(old.last_result.value) {
-                                // Error still going on. Do nothing.
-                            } else {
-                                // New error occurs.
-                                sentry::with_scope(
-                                    |scope| scope.set_tag("part-name", title.clone()),
-                                    || {
-                                        sentry::capture_message(
-                                            &format!("{title}: {err:?}"),
-                                            sentry::Level::Error,
-                                        )
-                                    },
-                                );
-                                sentry::with_scope(
-                                    |scope| scope.set_tag("part-name", title.clone()),
-                                    || {
-                                        sentry::capture_message(
-                                            &format!("{title} May Recover: {err:?}"),
-                                            sentry::Level::Info,
-                                        )
-                                    },
-                                );
+                            let new_error_message = format!("{err:?}");
+
+                            // Sentry/OpsGenie: only send alerts for labels that require it
+                            if label.triggers_alert(None) {
+                                match &*old.last_result.value {
+                                    // The same error is happening as before
+                                    TaskResultValue::Err(e) if e == &new_error_message => (),
+
+                                    // Previous state is a different error. Update Sentry.
+                                    TaskResultValue::Err(e) => {
+                                        // New error occurs.
+                                        sentry::with_scope(
+                                            |scope| scope.set_tag("part-name", title.clone()),
+                                            || {
+                                                sentry::capture_message(
+                                                    &format!("{title}: {new_error_message}"),
+                                                    sentry::Level::Error,
+                                                )
+                                            },
+                                        );
+                                        sentry::with_scope(
+                                            |scope| scope.set_tag("part-name", title.clone()),
+                                            || {
+                                                sentry::capture_message(
+                                                    &format!("{title} May Recover: {e:?}"),
+                                                    sentry::Level::Info,
+                                                )
+                                            },
+                                        );
+                                    }
+                                    // Previous state is either unknown (NotYetRun), Ok Update Sentry.
+                                    _ => {
+                                        sentry::with_scope(
+                                            |scope| scope.set_tag("part-name", title.clone()),
+                                            || {
+                                                sentry::capture_message(
+                                                    &format!("{title}: {new_error_message}"),
+                                                    sentry::Level::Error,
+                                                )
+                                            },
+                                        );
+                                    }
+                                }
                             }
                             *guard = TaskStatus {
                                 last_result: TaskResult {
-                                    value: Err(format!("{err:?}")).into(),
+                                    value: TaskResultValue::Err(new_error_message).into(),
                                     updated: Utc::now(),
                                 },
                                 last_retry_error: None,
@@ -618,12 +664,13 @@ enum ShortStatus {
     ErrorNoAlert,
     OutOfDateNoAlert,
     Success,
+    NotYetRun,
 }
 
 impl TaskStatus {
     fn short(&self, label: TaskLabel, selected_label: Option<TaskLabel>) -> ShortStatus {
         match self.last_result.value.as_ref() {
-            Ok(_) => {
+            TaskResultValue::Ok(_) => {
                 if self.is_out_of_date() {
                     if label.triggers_alert(selected_label) {
                         ShortStatus::OutOfDate
@@ -634,13 +681,14 @@ impl TaskStatus {
                     ShortStatus::Success
                 }
             }
-            Err(_) => {
+            TaskResultValue::Err(_) => {
                 if label.triggers_alert(selected_label) {
                     ShortStatus::Error
                 } else {
                     ShortStatus::ErrorNoAlert
                 }
             }
+            TaskResultValue::NotYetRun => ShortStatus::NotYetRun,
         }
     }
 }
@@ -653,6 +701,7 @@ impl ShortStatus {
             ShortStatus::Success => "SUCCESS",
             ShortStatus::Error => "ERROR",
             ShortStatus::ErrorNoAlert => "ERROR (no alert)",
+            ShortStatus::NotYetRun => "NOT YET RUN",
         }
     }
 
@@ -663,6 +712,7 @@ impl ShortStatus {
             ShortStatus::ErrorNoAlert => false,
             ShortStatus::OutOfDateNoAlert => false,
             ShortStatus::Success => false,
+            ShortStatus::NotYetRun => false,
         }
     }
 
@@ -673,6 +723,7 @@ impl ShortStatus {
             ShortStatus::ErrorNoAlert => "error-no-alert",
             ShortStatus::OutOfDateNoAlert => "out-of-date-no-alert",
             ShortStatus::Success => "success",
+            ShortStatus::NotYetRun => "not-yet-run",
         }
     }
 }
@@ -701,12 +752,13 @@ impl ResponseBuilder {
 
         writeln!(&mut self.buffer)?;
         match last_result.value.as_ref() {
-            Ok(msg) => {
+            TaskResultValue::Ok(msg) => {
                 writeln!(&mut self.buffer, "{msg}")?;
             }
-            Err(err) => {
+            TaskResultValue::Err(err) => {
                 writeln!(&mut self.buffer, "{err:?}")?;
             }
+            TaskResultValue::NotYetRun => writeln!(&mut self.buffer, "{}", NOT_YET_RUN_MESSAGE)?,
         }
         writeln!(&mut self.buffer)?;
 
