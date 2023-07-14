@@ -407,8 +407,8 @@ impl AppBuilder {
                                     // The same error is happening as before
                                     TaskResultValue::Err(e) if e == &new_error_message => (),
 
-                                    // Previous state is either unknown (NotYetRun), Ok, or we had a different error. Update Sentry.
-                                    _ => {
+                                    // Previous state is a different error. Update Sentry.
+                                    TaskResultValue::Err(e) => {
                                         // New error occurs.
                                         sentry::with_scope(
                                             |scope| scope.set_tag("part-name", title.clone()),
@@ -423,10 +423,20 @@ impl AppBuilder {
                                             |scope| scope.set_tag("part-name", title.clone()),
                                             || {
                                                 sentry::capture_message(
-                                                    &format!(
-                                                        "{title} May Recover: {new_error_message}"
-                                                    ),
+                                                    &format!("{title} May Recover: {e:?}"),
                                                     sentry::Level::Info,
+                                                )
+                                            },
+                                        );
+                                    }
+                                    // Previous state is either unknown (NotYetRun), Ok Update Sentry.
+                                    _ => {
+                                        sentry::with_scope(
+                                            |scope| scope.set_tag("part-name", title.clone()),
+                                            || {
+                                                sentry::capture_message(
+                                                    &format!("{title}: {new_error_message}"),
+                                                    sentry::Level::Error,
                                                 )
                                             },
                                         );
