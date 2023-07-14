@@ -30,6 +30,10 @@
             color: green;
         }
 
+        .status-not-yet-run {
+          color: blue;
+        }
+
         div.panel {
             padding: 0 1em;
         }
@@ -84,7 +88,7 @@
               <p>Currently running, started at {{ started }}</p>
             {% endif %}
 
-            <pre>{% match status.status.last_result.value.as_ref() %}{% when Ok(s) %}{{ s }}{% when Err(e) %}{{ e }}{% endmatch %}</pre>
+            <pre>{{ status.status.last_result.value.as_ref().as_str() }}</pre>
 
             {% if let Some(retrying) = status.status.last_retry_error.as_ref() %}
               <p>Currently retrying, last error message <i>{{ retrying.since() }}</i></p>
