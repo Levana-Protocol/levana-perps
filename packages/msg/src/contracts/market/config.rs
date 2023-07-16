@@ -135,7 +135,11 @@ impl Default for Config {
             // Try to realize the bias over a 3 day period.
             //
             // See: https://phobosfinance.atlassian.net/browse/PERP-606
-            borrow_fee_sensitivity: (Number::ONE / Number::try_from("3").unwrap())
+            //
+            // Spreadsheet calculated this value:
+            //
+            // https://docs.google.com/spreadsheets/d/15EG3I6XnaUKI20ja7XiCqLOjFS80QhKdnoL-PsjzJ-0/edit#gid=0
+            borrow_fee_sensitivity: (Number::ONE / Number::try_from("12").unwrap())
                 .try_into()
                 .unwrap(),
             max_xlp_rewards_multiplier: "2".parse().unwrap(),
