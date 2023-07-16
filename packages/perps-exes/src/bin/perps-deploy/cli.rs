@@ -133,6 +133,13 @@ pub(crate) struct Opt {
     /// Override testnet config file
     #[clap(long, env = "LEVANA_BOTS_CONFIG_TESTNET")]
     pub(crate) config_testnet: Option<PathBuf>,
+    /// Override the market config update file
+    #[clap(
+        long,
+        env = "LEVANA_BOTS_MARKET_CONFIG_UPDATE",
+        default_value = "packages/perps-exes/assets/market-config-updates.yaml"
+    )]
+    pub(crate) market_config: PathBuf,
 }
 
 impl Opt {

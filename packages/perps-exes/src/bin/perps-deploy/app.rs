@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{Context, Result};
 use cosmos::{Address, Cosmos, CosmosNetwork, HasAddress, HasAddressType, Wallet};
@@ -27,6 +27,7 @@ pub(crate) struct App {
     pub(crate) dev_settings: bool,
     pub(crate) default_market_ids: Vec<MarketId>,
     pub(crate) pyth_info: Option<PythInfo>,
+    pub(crate) market_config: PathBuf,
 }
 
 /// Complete app for mainnet
@@ -129,6 +130,7 @@ impl Opt {
             basic,
             default_market_ids,
             pyth_info,
+            market_config: self.market_config.clone(),
         })
     }
 

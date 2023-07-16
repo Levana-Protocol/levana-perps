@@ -402,11 +402,10 @@ pub struct MarketConfigUpdates {
 }
 
 impl MarketConfigUpdates {
-    const PATH: &str = "packages/perps-exes/assets/market-config-updates.yaml";
-
-    pub fn load() -> Result<Self> {
-        let mut file = fs_err::File::open(Self::PATH)?;
+    pub fn load(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
+        let mut file = fs_err::File::open(path)?;
         serde_yaml::from_reader(&mut file)
-            .with_context(|| format!("Error loading MarketConfigUpdates from {}", Self::PATH))
+            .with_context(|| format!("Error loading MarketConfigUpdates from {}", path.display()))
     }
 }
