@@ -32,5 +32,6 @@ popd
 
 mkdir -p source-tarballs
 cp "$DIR/wasm/artifacts/checksums.txt" "source-tarballs/$DIR-checksums.txt"
+rm -rf "$DIR/wasm"
 tar czfv "source-tarballs/$DIR.tar.gz" "$DIR"
 rm -rf "$DIR"
