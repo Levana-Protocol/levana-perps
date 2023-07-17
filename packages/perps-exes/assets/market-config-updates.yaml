@@ -1,12 +1,14 @@
 markets:
   ETH_USD:
     delta_neutrality_fee_sensitivity: 1000000000
+    funding_rate_sensitivity: 1.5
     # Initial deployment to mainnet probably wants a modified max_liquidity too
     # Not setting here since it shouldn't be used for testnet deploys
 
   # Internal testing contracts, not yet on mainnet
   ATOM_USD:
     delta_neutrality_fee_sensitivity: 200000000
+    funding_rate_sensitivity: 2
 
   # Currently only used on CI versions of contracts
   OSMO_USDC:
@@ -19,3 +21,10 @@ markets:
     delta_neutrality_fee_sensitivity: 1000000000
   BTC_USD:
     delta_neutrality_fee_sensitivity: 5000000000
+    max_liquidity: !usd
+      amount: "100000"
+    borrow_fee_sensitivity: "0.03333333333"
+    funding_rate_max_annualized: "0.45"
+    borrow_fee_rate_max_annualized: "0.30"
+    target_utilization: "0.5"
+    funding_rate_sensitivity: 1
