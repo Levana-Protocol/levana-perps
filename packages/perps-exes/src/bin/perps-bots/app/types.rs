@@ -84,13 +84,17 @@ pub(crate) struct AppBuilder {
 impl Opt {
     async fn make_cosmos(&self, config: &BotConfig) -> Result<Cosmos> {
         let mut builder = config.network.builder().await?;
+        log::info!("Creating connection to network {}", config.network);
         if let Some(grpc) = &self.grpc_url {
+            log::info!("Overriding gRPC URL to: {grpc}");
             builder.grpc_url = grpc.clone();
         }
         if let Some(chain_id) = &self.chain_id {
+            log::info!("Overriding chain ID to: {chain_id}");
             builder.chain_id = chain_id.clone();
         }
         if let Some(gas_multiplier) = config.gas_multiplier {
+            log::info!("Overriding gas multiplier to: {gas_multiplier}");
             builder.config.gas_estimate_multiplier = gas_multiplier;
         }
         builder.set_connection_count(config.total_bot_count());
