@@ -33,6 +33,9 @@ enum Sub {
         /// Contract that granted store code rights
         #[clap(long)]
         granter: Option<Address>,
+        /// Contract types to upload, by default uploads all needed contracts
+        #[clap(long)]
+        to_upload: Vec<ContractType>,
     },
     /// Instantiate a new factory contract
     InstantiateFactory {
@@ -58,8 +61,9 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
             network,
             market_code_id,
             granter,
+            to_upload,
         } => {
-            store_perps_contracts(opt, network, market_code_id, granter).await?;
+            store_perps_contracts(opt, network, market_code_id, granter, &to_upload).await?;
         }
         Sub::InstantiateFactory { inner } => {
             instantiate_factory(opt, inner).await?;
@@ -164,6 +168,21 @@ impl ContractType {
     }
 }
 
+impl FromStr for ContractType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "factory" => Ok(ContractType::Factory),
+            "market" => Ok(ContractType::Market),
+            "liquidity_token" => Ok(ContractType::LiquidityToken),
+            "position_token" => Ok(ContractType::PositionToken),
+            "pyth_bridge" => Ok(ContractType::PythBridge),
+            _ => Err(anyhow::anyhow!("Invalid contract type: {s}")),
+        }
+    }
+}
+
 /// Information about a single compiled contract.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -179,12 +198,20 @@ async fn store_perps_contracts(
     network: CosmosNetwork,
     market_code_id: Option<u64>,
     granter: Option<Address>,
+    to_upload: &[ContractType],
 ) -> Result<()> {
     let app = opt.load_app_mainnet(network).await?;
     let mut code_ids = CodeIds::load()?;
     let gitrev = opt.get_gitrev()?;
 
-    for contract_type in ContractType::all() {
+    let all_contracts = ContractType::all();
+    let to_upload = if to_upload.is_empty() {
+        all_contracts.as_slice()
+    } else {
+        to_upload
+    };
+
+    for contract_type in to_upload.iter().copied() {
         let contract_path = opt.get_contract_path(contract_type.as_str());
         let hash = get_hash_for_path(&contract_path)?;
         let entry = match code_ids.get_mut_by_hash(&hash) {
