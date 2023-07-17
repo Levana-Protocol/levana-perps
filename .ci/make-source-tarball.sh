@@ -18,7 +18,7 @@ mkdir -p "$DIR"
 cp -i .ci/source-tarball-misc/* "$DIR"
 mv -i tmp/{Cargo.lock,LICENSE,rust-toolchain.toml} "$DIR"
 mkdir "$DIR/packages"
-mv -i tmp/packages/{msg,multi_test,shared} "$DIR/packages"
+mv -i tmp/packages/{msg,shared} "$DIR/packages"
 mkdir "$DIR/contracts"
 mv -i tmp/contracts/{factory,liquidity_token,position_token,market,pyth_bridge} "$DIR/contracts"
 
