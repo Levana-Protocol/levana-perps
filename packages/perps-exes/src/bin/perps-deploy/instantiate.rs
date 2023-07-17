@@ -54,7 +54,7 @@ impl App {
             },
             cw20_source: Cw20Source::Faucet(self.faucet.clone()),
             config: {
-                let mut config = MarketConfigUpdates::load()?
+                let mut config = MarketConfigUpdates::load(&self.market_config)?
                     .markets
                     .get(&market_id)
                     .with_context(|| format!("No config found for {market_id}"))?

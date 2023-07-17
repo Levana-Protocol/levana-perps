@@ -457,7 +457,7 @@ async fn add_market(
     }: AddMarketOpts,
 ) -> Result<()> {
     let market_config_update = {
-        let mut market_config_updates = MarketConfigUpdates::load()?;
+        let mut market_config_updates = MarketConfigUpdates::load(&opt.market_config)?;
         market_config_updates
             .markets
             .remove(&market_id)
