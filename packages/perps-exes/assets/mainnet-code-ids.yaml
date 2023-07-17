@@ -84,3 +84,8 @@ hashes:
   code-ids:
     osmosis-mainnet: 129
   hash: fd9f31f2c60cdaf3d18efdea333d4286b121f7f23b322cbaf820094c556daab4
+- contract-type: market
+  gitrev: ed7102d64e97931986338f82663834640d14a826
+  code-ids:
+    osmosis-mainnet: 130
+  hash: 755eb65ef2eabef7290d1edb6318772321daf28c7d8a0d9090cb452d1c4da65e
