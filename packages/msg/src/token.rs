@@ -28,13 +28,21 @@ pub enum TokenInit {
     Native {
         /// Denom used within the chain for this native coin
         denom: String,
+        /// Number of decimal points
+        decimal_places: u8,
     },
 }
 
 impl From<Token> for TokenInit {
     fn from(src: Token) -> Self {
         match src {
-            Token::Native { denom, .. } => Self::Native { denom },
+            Token::Native {
+                denom,
+                decimal_places,
+            } => Self::Native {
+                denom,
+                decimal_places,
+            },
             Token::Cw20 { addr, .. } => Self::Cw20 { addr },
         }
     }

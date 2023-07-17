@@ -434,6 +434,9 @@ struct AddMarketOpts {
     /// Denom of the native coin used for collateral
     #[clap(long)]
     collateral: String,
+    /// Decimal places used by this collateral asset
+    #[clap(long)]
+    decimal_places: u8,
     /// Initial borrow fee rate
     #[clap(long, default_value = "0.2")]
     initial_borrow_fee_rate: Decimal256,
@@ -451,6 +454,7 @@ async fn add_market(
         factory,
         market_id,
         collateral,
+        decimal_places,
         initial_borrow_fee_rate,
         pyth_bridge,
         cw3: is_cw3,
@@ -475,7 +479,10 @@ async fn add_market(
     let msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
         new_market: NewMarketParams {
             market_id,
-            token: TokenInit::Native { denom: collateral },
+            token: TokenInit::Native {
+                denom: collateral,
+                decimal_places,
+            },
             config: Some(market_config_update),
             price_admin: pyth_bridge.get_address_string().into(),
             initial_borrow_fee_rate,

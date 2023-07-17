@@ -101,6 +101,7 @@ impl PerpsMarket {
         let token_init = match DEFAULT_MARKET.token_kind {
             TokenKind::Native => TokenInit::Native {
                 denom: TEST_CONFIG.native_denom.to_string(),
+                decimal_places: 6,
             },
             TokenKind::Cw20 => {
                 let addr = app

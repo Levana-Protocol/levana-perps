@@ -15,6 +15,7 @@ fn status() {
         "WBTC_BTC".parse().unwrap(),
         msg::token::TokenInit::Native {
             denom: "BTC".to_owned(),
+            decimal_places: 8,
         },
         "50".parse().unwrap(),
         Some("50".parse().unwrap()),
