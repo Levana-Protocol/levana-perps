@@ -10,7 +10,6 @@ use axum::{
 use cosmos::Address;
 use cosmwasm_std::Decimal256;
 use msg::prelude::{FromStr, MarketType, UnsignedDecimal};
-use perps_exes::contracts::MarketContract;
 use perps_exes::PositionsInfo;
 
 pub(crate) async fn carry(app: State<Arc<App>>, headers: HeaderMap) -> Response {
@@ -122,8 +121,8 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
     res_str += format!("cc_addr: {}\n", cc_addr).as_str();
 
     let factory = app.get_factory_info();
-    for (_, addr) in &factory.markets {
-        let market = MarketContract::new(app.cosmos.make_contract(*addr));
+    for market in &factory.markets {
+        let market = &market.market;
         let status = market.status().await?;
         let price_point = market.current_price().await?;
         let price_notional: f64 = price_point
