@@ -109,9 +109,36 @@ impl App {
         };
 
         // Take the crank lock for the rest of the execution
-        let _crank_lock = self.crank_lock.lock().await;
+        let crank_lock = self.crank_lock.lock().await;
 
-        let res = builder.sign_and_broadcast(&self.cosmos, wallet).await?;
+        let res = match builder.sign_and_broadcast(&self.cosmos, wallet).await {
+            Ok(res) => res,
+            Err(e) => {
+                // PERP-1702: If the price is too old, only complain after a
+                // longer period of time to avoid spurious alerts.
+
+                // Hacky way to check if we're getting this error, we could
+                // parse the error correctly, but this is Good Enough.
+                if !e.to_string().contains("price_too_old") {
+                    return Err(e);
+                }
+
+                // OK, it was a too old error. Let's find out when the last price update was for the contract.
+                let current_price = market.market.current_price().await?;
+                let last_update = current_price.timestamp.try_into_chrono_datetime()?;
+                let now = Utc::now();
+                let age = now - last_update;
+                if u32::try_from(age.num_seconds())? > self.config.price_age_alert_threshold_secs {
+                    return Err(e);
+                } else {
+                    return Ok(format!(
+                        "Ignoring failed price update. Price age in contract is: {age}"
+                    ));
+                }
+            }
+        };
+
+        std::mem::drop(crank_lock);
 
         // just for logging pyth prices
         if let Some(pyth) = pyth_opt {
