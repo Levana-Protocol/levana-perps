@@ -79,3 +79,5 @@ $RECYCLE.BIN/
 *.msp
 *.lnk
 .vercel
+
+/source-tarballs/
