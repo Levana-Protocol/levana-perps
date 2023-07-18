@@ -11,13 +11,13 @@ use perps_exes::pyth::{get_latest_price, get_oracle_update_msg};
 use crate::{
     config::BotConfigByType,
     util::{
-        markets::{get_markets, Market, PriceApi},
+        markets::{Market, PriceApi},
         oracle::Pyth,
     },
-    watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
+    watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
 };
 
-use super::{gas_check::GasCheckWallet, App, AppBuilder};
+use super::{factory::FactoryInfo, gas_check::GasCheckWallet, App, AppBuilder};
 
 #[derive(Clone)]
 struct Worker {
@@ -53,76 +53,60 @@ impl AppBuilder {
 }
 
 #[async_trait]
-impl WatchedTask for Worker {
-    async fn run_single(&mut self, app: &App, _heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
-        app.single_update(&self.wallet).await
+impl WatchedTaskPerMarket for Worker {
+    async fn run_single_market(
+        &mut self,
+        app: &App,
+        _factory: &FactoryInfo,
+        market: &Market,
+    ) -> Result<WatchedTaskOutput> {
+        let message = app.single_update(&self.wallet, market).await?;
+        Ok(WatchedTaskOutput {
+            skip_delay: false,
+            message,
+        })
     }
 }
 
 impl App {
-    async fn single_update(&self, wallet: &Wallet) -> Result<WatchedTaskOutput> {
+    async fn single_update(&self, wallet: &Wallet, market: &Market) -> Result<String> {
         let mut statuses = vec![];
         let mut builder = TxBuilder::default();
-        let mut has_messages = false;
-        let factory = self.get_factory_info().factory;
-        let factory = self.cosmos.make_contract(factory);
 
-        let markets = get_markets(&self.cosmos, &factory).await?;
+        let price_apis = &market
+            .get_price_api(wallet, &self.cosmos, &self.pyth_config)
+            .await?;
+        let pyth_opt = match price_apis {
+            PriceApi::Manual(feeds) => {
+                let (price, price_usd) =
+                    get_latest_price(&self.client, feeds, &self.endpoints).await?;
 
-        anyhow::ensure!(!markets.is_empty(), "Cannot have empty markets vec");
-
-        for market in &markets {
-            let price_apis = &market
-                .get_price_api(wallet, &self.cosmos, &self.pyth_config)
-                .await?;
-            match price_apis {
-                PriceApi::Manual(feeds) => {
-                    let (price, price_usd) =
-                        get_latest_price(&self.client, feeds, &self.endpoints).await?;
-
-                    if let Some(reason) = self.needs_price_update(market, price).await? {
-                        has_messages = true;
-                        let (status, msg) = self.get_tx_manual(wallet, market, price, price_usd)?;
-                        statuses.push(format!(
-                            "{}: needs update: {reason} {status}",
-                            market.market_id
-                        ));
-                        builder.add_message_mut(msg);
-                    } else {
-                        statuses.push(format!(
-                            "{}: no manual price update needed",
-                            market.market_id
-                        ));
-                    }
-                }
-
-                PriceApi::Pyth(pyth) => {
-                    let (latest_price, _) =
-                        get_latest_price(&self.client, &pyth.market_price_feeds, &self.endpoints)
-                            .await?;
-                    if let Some(reason) = self.needs_price_update(market, latest_price).await? {
-                        has_messages = true;
-                        let msgs = self.get_txs_pyth(wallet, market, pyth).await?;
-                        for msg in msgs {
-                            builder.add_message_mut(msg);
-                        }
-                        statuses.push(format!(
-                            "{}: needs update: {reason} Got pyth contract messages",
-                            market.market_id
-                        ));
-                    } else {
-                        statuses.push(format!("{}: no pyth price update needed", market.market_id));
-                    }
+                if let Some(reason) = self.needs_price_update(market, price).await? {
+                    let (status, msg) = self.get_tx_manual(wallet, market, price, price_usd)?;
+                    builder.add_message_mut(msg);
+                    statuses.push(format!("Needs manual update: {reason} {status}"));
+                    None
+                } else {
+                    return Ok("No manual price update needed".to_owned());
                 }
             }
-        }
 
-        if !has_messages {
-            return Ok(WatchedTaskOutput {
-                skip_delay: false,
-                message: statuses.join("\n"),
-            });
-        }
+            PriceApi::Pyth(pyth) => {
+                let (latest_price, _) =
+                    get_latest_price(&self.client, &pyth.market_price_feeds, &self.endpoints)
+                        .await?;
+                if let Some(reason) = self.needs_price_update(market, latest_price).await? {
+                    let msgs = self.get_txs_pyth(wallet, market, pyth).await?;
+                    for msg in msgs {
+                        builder.add_message_mut(msg);
+                    }
+                    statuses.push(format!("Needs Pyth update: {reason}"));
+                    Some(pyth)
+                } else {
+                    return Ok("No pyth price update needed".to_owned());
+                }
+            }
+        };
 
         // Take the crank lock for the rest of the execution
         let _crank_lock = self.crank_lock.lock().await;
@@ -130,21 +114,12 @@ impl App {
         let res = builder.sign_and_broadcast(&self.cosmos, wallet).await?;
 
         // just for logging pyth prices
-        for market in &markets {
-            match &market
-                .get_price_api(wallet, &self.cosmos, &self.pyth_config)
-                .await?
-            {
-                PriceApi::Manual { .. } => {}
-
-                PriceApi::Pyth(pyth) => {
-                    let market_price = pyth.query_price(120).await?;
-                    statuses.push(format!(
-                        "{} updated pyth price: {:?}",
-                        market.market_id, market_price
-                    ));
-                }
-            }
+        if let Some(pyth) = pyth_opt {
+            let msg = match pyth.query_price(120).await {
+                Ok(market_price) => format!("Updated pyth price: {market_price:?}"),
+                Err(e) => format!("query_price failed, ignoring: {e:?}."),
+            };
+            statuses.push(msg);
         }
 
         if !res.data.is_empty() {
@@ -156,10 +131,7 @@ impl App {
             res.txhash
         ));
 
-        Ok(WatchedTaskOutput {
-            skip_delay: false,
-            message: statuses.join("\n"),
-        })
+        Ok(statuses.join("\n"))
     }
 
     /// Does the market need a price update?
