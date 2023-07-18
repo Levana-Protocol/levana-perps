@@ -2,6 +2,12 @@
 
 set -euxo pipefail
 
+if [ -z ${1+x} ]
+then
+    echo "Please provide a Git hash or other tree-ish"
+    exit 1
+fi
+
 rm -rf tmp
 mkdir -p tmp
 git archive -o tmp/source.tar "$1"
