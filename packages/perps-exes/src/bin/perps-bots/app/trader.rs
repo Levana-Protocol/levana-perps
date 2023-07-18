@@ -104,7 +104,7 @@ async fn single_market(
 
     // Make sure we always have at least 50,000 tokens
     EnsureCollateral {
-        market: &market,
+        market,
         wallet: &worker.wallet,
         status: &status,
         testnet: &worker.testnet,

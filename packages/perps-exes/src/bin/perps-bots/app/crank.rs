@@ -62,7 +62,7 @@ impl App {
         crank_wallet: &Wallet,
         market: &MarketContract,
     ) -> Result<WatchedTaskOutput> {
-        let work = match self.check_crank(&market).await? {
+        let work = match self.check_crank(market).await? {
             None => {
                 return Ok(WatchedTaskOutput {
                     skip_delay: false,

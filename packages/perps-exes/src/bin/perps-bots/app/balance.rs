@@ -196,7 +196,7 @@ async fn single_market(
 
     // Make sure we always have enough collateral
     EnsureCollateral {
-        market: &market,
+        market,
         wallet: &worker.wallet,
         status: &status,
         testnet: &worker.testnet,
