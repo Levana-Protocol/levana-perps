@@ -6,7 +6,7 @@ pub(crate) struct Opt {
     verbose: bool,
     #[clap(
         long,
-        default_value = "0.0.0.0:3000",
+        default_value = "[::]:3000",
         env = "LEVANA_COMPANION_BIND",
         global = true
     )]
