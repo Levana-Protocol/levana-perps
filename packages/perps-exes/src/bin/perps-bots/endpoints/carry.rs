@@ -129,13 +129,11 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
             .price_notional
             .into_number()
             .to_string()
-            .as_str()
             .parse::<f64>()?;
         let price_collateral_usd: f64 = price_point
             .price_usd
             .into_number()
             .to_string()
-            .as_str()
             .parse::<f64>()?;
 
         res_str = res_str + "\n" + &status.base + "_" + &status.quote + "\n";
@@ -165,12 +163,12 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
             .as_str();
             total_notional_size += pos.notional_size.into_number();
         }
-        let total_notional_size: f64 = total_notional_size.to_string().as_str().parse::<f64>()?;
+        let total_notional_size: f64 = total_notional_size.to_string().parse::<f64>()?;
 
-        let long_funding_base: f64 = status.long_funding.to_string().as_str().parse::<f64>()?;
-        let short_funding_base: f64 = status.short_funding.to_string().as_str().parse::<f64>()?;
-        let long_interest: f64 = status.long_notional.to_string().as_str().parse::<f64>()?;
-        let short_interest: f64 = status.short_notional.to_string().as_str().parse::<f64>()?;
+        let long_funding_base: f64 = status.long_funding.to_string().parse::<f64>()?;
+        let short_funding_base: f64 = status.short_funding.to_string().parse::<f64>()?;
+        let long_interest: f64 = status.long_notional.to_string().parse::<f64>()?;
+        let short_interest: f64 = status.short_notional.to_string().parse::<f64>()?;
         let (long_funding_notional, short_funding_notional, long_interest, short_interest) =
             match status.market_type {
                 MarketType::CollateralIsQuote => (
@@ -207,25 +205,21 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
                 .config
                 .funding_rate_max_annualized
                 .to_string()
-                .as_str()
                 .parse::<f64>()?,
             funding_rate_sensitivity: status
                 .config
                 .funding_rate_sensitivity
                 .to_string()
-                .as_str()
                 .parse::<f64>()?,
             delta_neutrality_fee_sensitivity: status
                 .config
                 .delta_neutrality_fee_sensitivity
                 .to_string()
-                .as_str()
                 .parse::<f64>()?,
             delta_neutrality_fee_cap: status
                 .config
                 .delta_neutrality_fee_cap
                 .to_string()
-                .as_str()
                 .parse::<f64>()?,
         };
 
@@ -315,7 +309,7 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
                     new_notional_size
                 )
                 .as_str();
-                res_str += format!("    This can be achieved by:\n").as_str();
+                res_str += "    This can be achieved by:\n";
                 res_str += format!(
                     "    1) Updating collateral impacting leverage to target {:.2}x leverage\n",
                     target_leverage_to_base_short
@@ -329,7 +323,7 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
                     res_str += format!("CLOSE {short_str} position\n").as_str();
                 } else {
                     res_str += format!("UPDATE DECREASE {short_str} position size to have notional {} {notional}\n", new_notional_size).as_str();
-                    res_str += format!("    This can be achieved by:\n").as_str();
+                    res_str += "    This can be achieved by:\n";
                     res_str += format!(
                         "    1) Updating collateral impacting leverage to target {:.2}x leverage\n",
                         target_leverage_to_base_short
@@ -347,7 +341,7 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
                     new_notional_size
                 )
                 .as_str();
-                res_str += format!("    This can be achieved by:\n").as_str();
+                res_str += "    This can be achieved by:\n";
                 res_str += format!(
                     "    1) Updating collateral impacting leverage to target {:.2}x leverage\n",
                     target_leverage_to_base_long
@@ -365,7 +359,7 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
                         new_notional_size
                     )
                     .as_str();
-                    res_str += format!("    This can be achieved by:\n").as_str();
+                    res_str += "    This can be achieved by:\n";
                     res_str += format!(
                         "    1) Updating collateral impacting leverage to target {:.2}x leverage\n",
                         target_leverage_to_base_long
@@ -407,7 +401,7 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
                     new_notional_size
                 )
                 .as_str();
-                res_str += format!("    This can be achieved by choosing:\n").as_str();
+                res_str += "    This can be achieved by choosing:\n";
                 res_str += format!(
                     "    1) {long_str} {:.2}x leverage\n",
                     target_leverage_to_base_long
@@ -434,7 +428,7 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
                     new_notional_size
                 )
                 .as_str();
-                res_str += format!("    This can be achieved by choosing:\n").as_str();
+                res_str += "    This can be achieved by choosing:\n";
                 res_str += format!(
                     "    1) {short_str} {:.2}x leverage\n",
                     target_leverage_to_base_short
@@ -450,7 +444,7 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
         }
 
         if !action_needed {
-            res_str += format!("No action needed\n").as_str();
+            res_str += "No action needed\n";
         }
     }
 
