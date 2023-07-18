@@ -9,11 +9,15 @@ use axum::{
 };
 use cosmos::Address;
 use cosmwasm_std::Decimal256;
-use msg::prelude::{FromStr, MarketType, UnsignedDecimal};
+use msg::prelude::{MarketType, UnsignedDecimal};
 use perps_exes::PositionsInfo;
 
-pub(crate) async fn carry(app: State<Arc<App>>, headers: HeaderMap) -> Response {
-    match carry_inner(app, headers).await {
+pub(crate) async fn carry(
+    app: State<Arc<App>>,
+    headers: HeaderMap,
+    params: axum::extract::Query<CarryParams>,
+) -> Response {
+    match carry_inner(app, headers, &params).await {
         Ok(res) => res,
         Err(err) => err.to_string().into_response(),
     }
@@ -112,11 +116,40 @@ pub fn bin_search(mut lower: f64, mut upper: f64, check: impl Fn(f64) -> bool) -
     (upper + lower) * 0.5f64
 }
 
-pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Result<Response> {
-    let mut res_str = "Cash & carry:\n".to_string();
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) struct CarryParams {
+    addr: Address,
+    cc_funding_long_open: Option<f64>,
+    cc_funding_long_close: Option<f64>,
+    cc_funding_short_open: Option<f64>,
+    cc_funding_short_close: Option<f64>,
+    max_notional_size_usd: Option<f64>,
+    target_leverage_to_notional: Option<f64>,
+}
 
-    // TODO: HARDCODED PARAM
-    let cc_addr = Address::from_str("levana1krh02dzscqkakswmgcmgd4467gpss6mp0z5yqc")?;
+pub(crate) async fn carry_inner(
+    app: State<Arc<App>>,
+    _headers: HeaderMap,
+    CarryParams {
+        addr: cc_addr,
+        cc_funding_long_open,
+        cc_funding_long_close,
+        cc_funding_short_open,
+        cc_funding_short_close,
+        max_notional_size_usd,
+        target_leverage_to_notional,
+    }: &CarryParams,
+) -> Result<Response> {
+    // Fill in defaults. We could do this with serde instead, but this is less total code.
+    let cc_funding_long_open = cc_funding_long_open.unwrap_or(-0.3);
+    let cc_funding_long_close = cc_funding_long_close.unwrap_or(-0.2);
+    let cc_funding_short_open = cc_funding_short_open.unwrap_or(-0.15);
+    let cc_funding_short_close = cc_funding_short_close.unwrap_or(-0.05);
+    let max_notional_size_usd = max_notional_size_usd.unwrap_or(1e5);
+    let target_leverage_to_notional = target_leverage_to_notional.unwrap_or(2.0);
+
+    let mut res_str = "Cash & carry:\n".to_string();
 
     res_str += format!("cc_addr: {}\n", cc_addr).as_str();
 
@@ -129,24 +162,14 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
             .price_notional
             .into_number()
             .to_string()
-            .as_str()
             .parse::<f64>()?;
         let price_collateral_usd: f64 = price_point
             .price_usd
             .into_number()
             .to_string()
-            .as_str()
             .parse::<f64>()?;
 
         res_str = res_str + "\n" + &status.base + "_" + &status.quote + "\n";
-
-        // TODO: HARDCODED PARAMS
-        let cc_funding_long_open = -0.3f64;
-        let cc_funding_long_close = -0.2f64;
-        let cc_funding_short_open = -0.15f64;
-        let cc_funding_short_close = -0.05f64;
-        let max_notional_size_usd = 1e5f64;
-        let target_leverage_to_notional = 2.0f64;
 
         let max_notional_size = max_notional_size_usd / price_notional / price_collateral_usd;
 
@@ -165,12 +188,12 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
             .as_str();
             total_notional_size += pos.notional_size.into_number();
         }
-        let total_notional_size: f64 = total_notional_size.to_string().as_str().parse::<f64>()?;
+        let total_notional_size: f64 = total_notional_size.to_string().parse::<f64>()?;
 
-        let long_funding_base: f64 = status.long_funding.to_string().as_str().parse::<f64>()?;
-        let short_funding_base: f64 = status.short_funding.to_string().as_str().parse::<f64>()?;
-        let long_interest: f64 = status.long_notional.to_string().as_str().parse::<f64>()?;
-        let short_interest: f64 = status.short_notional.to_string().as_str().parse::<f64>()?;
+        let long_funding_base: f64 = status.long_funding.to_string().parse::<f64>()?;
+        let short_funding_base: f64 = status.short_funding.to_string().parse::<f64>()?;
+        let long_interest: f64 = status.long_notional.to_string().parse::<f64>()?;
+        let short_interest: f64 = status.short_notional.to_string().parse::<f64>()?;
         let (long_funding_notional, short_funding_notional, long_interest, short_interest) =
             match status.market_type {
                 MarketType::CollateralIsQuote => (
@@ -207,25 +230,21 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
                 .config
                 .funding_rate_max_annualized
                 .to_string()
-                .as_str()
                 .parse::<f64>()?,
             funding_rate_sensitivity: status
                 .config
                 .funding_rate_sensitivity
                 .to_string()
-                .as_str()
                 .parse::<f64>()?,
             delta_neutrality_fee_sensitivity: status
                 .config
                 .delta_neutrality_fee_sensitivity
                 .to_string()
-                .as_str()
                 .parse::<f64>()?,
             delta_neutrality_fee_cap: status
                 .config
                 .delta_neutrality_fee_cap
                 .to_string()
-                .as_str()
                 .parse::<f64>()?,
         };
 
@@ -315,7 +334,7 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
                     new_notional_size
                 )
                 .as_str();
-                res_str += format!("    This can be achieved by:\n").as_str();
+                res_str += "    This can be achieved by:\n";
                 res_str += format!(
                     "    1) Updating collateral impacting leverage to target {:.2}x leverage\n",
                     target_leverage_to_base_short
@@ -329,7 +348,7 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
                     res_str += format!("CLOSE {short_str} position\n").as_str();
                 } else {
                     res_str += format!("UPDATE DECREASE {short_str} position size to have notional {} {notional}\n", new_notional_size).as_str();
-                    res_str += format!("    This can be achieved by:\n").as_str();
+                    res_str += "    This can be achieved by:\n";
                     res_str += format!(
                         "    1) Updating collateral impacting leverage to target {:.2}x leverage\n",
                         target_leverage_to_base_short
@@ -347,7 +366,7 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
                     new_notional_size
                 )
                 .as_str();
-                res_str += format!("    This can be achieved by:\n").as_str();
+                res_str += "    This can be achieved by:\n";
                 res_str += format!(
                     "    1) Updating collateral impacting leverage to target {:.2}x leverage\n",
                     target_leverage_to_base_long
@@ -365,7 +384,7 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
                         new_notional_size
                     )
                     .as_str();
-                    res_str += format!("    This can be achieved by:\n").as_str();
+                    res_str += "    This can be achieved by:\n";
                     res_str += format!(
                         "    1) Updating collateral impacting leverage to target {:.2}x leverage\n",
                         target_leverage_to_base_long
@@ -407,7 +426,7 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
                     new_notional_size
                 )
                 .as_str();
-                res_str += format!("    This can be achieved by choosing:\n").as_str();
+                res_str += "    This can be achieved by choosing:\n";
                 res_str += format!(
                     "    1) {long_str} {:.2}x leverage\n",
                     target_leverage_to_base_long
@@ -434,7 +453,7 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
                     new_notional_size
                 )
                 .as_str();
-                res_str += format!("    This can be achieved by choosing:\n").as_str();
+                res_str += "    This can be achieved by choosing:\n";
                 res_str += format!(
                     "    1) {short_str} {:.2}x leverage\n",
                     target_leverage_to_base_short
@@ -450,7 +469,7 @@ pub(crate) async fn carry_inner(app: State<Arc<App>>, _headers: HeaderMap) -> Re
         }
 
         if !action_needed {
-            res_str += format!("No action needed\n").as_str();
+            res_str += "No action needed\n";
         }
     }
 
