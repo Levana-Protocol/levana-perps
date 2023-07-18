@@ -1,10 +1,11 @@
 use anyhow::Result;
 use axum::async_trait;
-use cosmos::Address;
 use msg::{contracts::market::entry::StatusResp, prelude::*};
-use perps_exes::contracts::MarketContract;
 
-use crate::watcher::{TaskLabel, WatchedTaskOutput, WatchedTaskPerMarket};
+use crate::{
+    util::markets::Market,
+    watcher::{TaskLabel, WatchedTaskOutput, WatchedTaskPerMarket},
+};
 
 use super::{factory::FactoryInfo, App, AppBuilder};
 
@@ -21,13 +22,11 @@ struct Stats;
 impl WatchedTaskPerMarket for Stats {
     async fn run_single_market(
         &mut self,
-        app: &App,
+        _app: &App,
         _factory: &FactoryInfo,
-        _market: &MarketId,
-        addr: Address,
+        market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        let market = MarketContract::new(app.cosmos.make_contract(addr));
-        let status = market.status().await?;
+        let status = market.market.status().await?;
         let market_stats = MarketStats { status };
         Ok(WatchedTaskOutput {
             message: market_stats.to_string(),

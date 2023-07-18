@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::async_trait;
-use cosmos::{Address, Cosmos};
 use msg::prelude::*;
 use perps_exes::contracts::MarketContract;
 
 use crate::{
     config::BotConfigMainnet,
+    util::markets::Market,
     watcher::{TaskLabel, WatchedTaskOutput, WatchedTaskPerMarket},
 };
 
@@ -28,12 +28,11 @@ struct StatsAlert {
 impl WatchedTaskPerMarket for StatsAlert {
     async fn run_single_market(
         &mut self,
-        app: &App,
+        _app: &App,
         _factory: &FactoryInfo,
-        _market: &MarketId,
-        addr: Address,
+        market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        check_stats_alert(&app.cosmos, addr, &self.mainnet)
+        check_stats_alert(&market.market, &self.mainnet)
             .await
             .map(|()| WatchedTaskOutput {
                 skip_delay: false,
@@ -42,12 +41,7 @@ impl WatchedTaskPerMarket for StatsAlert {
     }
 }
 
-async fn check_stats_alert(
-    cosmos: &Cosmos,
-    addr: Address,
-    mainnet: &BotConfigMainnet,
-) -> Result<()> {
-    let market = MarketContract::new(cosmos.make_contract(addr));
+async fn check_stats_alert(market: &MarketContract, mainnet: &BotConfigMainnet) -> Result<()> {
     let status = market.status().await?;
 
     let total = status.liquidity.total_collateral();

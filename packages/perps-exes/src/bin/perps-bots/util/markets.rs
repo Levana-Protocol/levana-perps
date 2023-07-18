@@ -3,13 +3,14 @@ use msg::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
 use msg::contracts::pyth_bridge::PythMarketPriceFeeds;
 use msg::prelude::*;
 use perps_exes::config::PythConfig;
+use perps_exes::prelude::MarketContract;
 use std::fmt::Debug;
 
 use super::oracle::Pyth;
 
 #[derive(Clone)]
 pub(crate) struct Market {
-    pub(crate) market: Contract,
+    pub(crate) market: MarketContract,
     #[allow(dead_code)]
     pub(crate) position_token: Contract,
     #[allow(dead_code)]
@@ -64,7 +65,9 @@ pub(crate) async fn get_markets(cosmos: &Cosmos, factory: &Contract) -> Result<V
                 })
                 .await?;
             res.push(Market {
-                market: cosmos.make_contract(market_addr.into_string().parse()?),
+                market: MarketContract::new(
+                    cosmos.make_contract(market_addr.into_string().parse()?),
+                ),
                 position_token: cosmos.make_contract(position_token.into_string().parse()?),
                 liquidity_token_lp: cosmos.make_contract(liquidity_token_lp.into_string().parse()?),
                 liquidity_token_xlp: cosmos

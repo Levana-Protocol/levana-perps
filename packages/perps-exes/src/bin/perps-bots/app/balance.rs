@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::async_trait;
-use cosmos::{Address, Cosmos, Wallet};
+use cosmos::{Address, Wallet};
 use msg::prelude::*;
 use perps_exes::contracts::MarketContract;
 use rand::Rng;
@@ -10,6 +10,7 @@ use rand::Rng;
 use crate::{
     app::trader::EnsureCollateral,
     config::BotConfigTestnet,
+    util::markets::Market,
     wallet_manager::ManagedWallet,
     watcher::{TaskLabel, WatchedTaskOutput, WatchedTaskPerMarket},
 };
@@ -29,12 +30,11 @@ struct TrackBalance;
 impl WatchedTaskPerMarket for TrackBalance {
     async fn run_single_market(
         &mut self,
-        app: &App,
+        _app: &App,
         _factory: &FactoryInfo,
-        _market: &MarketId,
-        addr: Address,
+        market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        check_balance_single(&app.cosmos, addr)
+        check_balance_single(&market.market)
             .await
             .map(|()| WatchedTaskOutput {
                 skip_delay: false,
@@ -43,8 +43,7 @@ impl WatchedTaskPerMarket for TrackBalance {
     }
 }
 
-async fn check_balance_single(cosmos: &Cosmos, addr: Address) -> Result<()> {
-    let market = MarketContract::new(cosmos.make_contract(addr));
+async fn check_balance_single(market: &MarketContract) -> Result<()> {
     let status = market.status().await?;
     let net_notional = status.long_notional.into_number() - status.short_notional.into_number();
     let instant = net_notional / status.config.delta_neutrality_fee_sensitivity.into_signed();
@@ -84,20 +83,19 @@ impl WatchedTaskPerMarket for Balance {
         &mut self,
         _app: &App,
         _factory: &FactoryInfo,
-        market_id: &MarketId,
-        addr: Address,
+        market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, market_id, addr, self.testnet.faucet).await
+        single_market(self, market, self.testnet.faucet).await
     }
 }
 
 async fn single_market(
     worker: &Balance,
-    market_id: &MarketId,
-    market_addr: Address,
+    market: &Market,
     faucet: Address,
 ) -> Result<WatchedTaskOutput> {
-    let market = MarketContract::new(worker.app.cosmos.make_contract(market_addr));
+    let market_id = &market.market_id;
+    let market = &market.market;
     let status = market.status().await?;
     let net_notional = status.long_notional.into_number() - status.short_notional.into_number();
     let instant = net_notional / status.config.delta_neutrality_fee_sensitivity.into_signed();
@@ -198,7 +196,7 @@ async fn single_market(
 
     // Make sure we always have enough collateral
     EnsureCollateral {
-        market: &market,
+        market,
         wallet: &worker.wallet,
         status: &status,
         testnet: &worker.testnet,

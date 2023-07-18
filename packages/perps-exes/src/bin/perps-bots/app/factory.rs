@@ -8,24 +8,23 @@ use msg::contracts::faucet::entry::{GasAllowanceResp, TapAmountResponse};
 use msg::prelude::*;
 use msg::{
     contracts::{
-        factory::entry::{MarketInfoResponse, MarketsResp},
+        factory::entry::MarketInfoResponse,
         tracker::entry::{CodeIdResp, ContractResp},
     },
     token::Token,
 };
 
 use crate::config::BotConfigByType;
+use crate::util::markets::{get_markets, Market};
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
 use super::{App, AppBuilder};
 
-#[derive(serde::Serialize)]
-#[serde(rename_all = "snake_case")]
 pub(crate) struct FactoryInfo {
     pub(crate) factory: Address,
     pub(crate) updated: DateTime<Utc>,
     pub(crate) is_static: bool,
-    pub(crate) markets: HashMap<MarketId, Address>,
+    pub(crate) markets: Vec<Market>,
 }
 
 #[derive(serde::Serialize)]
@@ -104,9 +103,7 @@ pub(crate) async fn get_factory_info_mainnet(
 ) -> Result<(String, FactoryInfo)> {
     let message = format!("Using hard-coded factory address {factory}");
 
-    let (_cw20s, markets) = get_tokens_markets(cosmos, factory)
-        .await
-        .with_context(|| format!("Unable to get_tokens_market for factory {factory}"))?;
+    let markets = get_markets(cosmos, &cosmos.make_contract(factory)).await?;
 
     let factory_info = FactoryInfo {
         factory,
@@ -204,59 +201,42 @@ pub(crate) async fn get_contract(
     Ok((addr, gitrev))
 }
 
-async fn get_tokens_markets(
-    cosmos: &Cosmos,
-    factory: Address,
-) -> Result<(Vec<Cw20>, HashMap<MarketId, Address>)> {
+async fn get_tokens_markets(cosmos: &Cosmos, factory: Address) -> Result<(Vec<Cw20>, Vec<Market>)> {
     let factory = cosmos.make_contract(factory);
+    let markets = get_markets(cosmos, &factory).await?;
     let mut tokens = vec![];
-    let mut markets_map = HashMap::new();
-    let mut start_after = None;
-    loop {
-        let MarketsResp { markets } = factory
-            .query(msg::contracts::factory::entry::QueryMsg::Markets {
-                start_after: start_after.take(),
-                limit: None,
+    for market in &markets {
+        let denom = market.market_id.get_collateral().to_owned();
+        let market_info: MarketInfoResponse = factory
+            .query(msg::contracts::factory::entry::QueryMsg::MarketInfo {
+                market_id: market.market_id.clone(),
             })
             .await?;
-        match markets.last() {
-            Some(x) => start_after = Some(x.clone()),
-            None => break Ok((tokens, markets_map)),
+        let market_addr = market_info.market_addr.into_string().parse()?;
+        let market = cosmos.make_contract(market_addr);
+
+        // Simplify backwards compatibility issues: only look at the field we care about
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "snake_case")]
+        struct StatusRespJustCollateral {
+            collateral: Token,
         }
-
-        for market_id in markets {
-            let denom = market_id.get_collateral().to_owned();
-            let market_info: MarketInfoResponse = factory
-                .query(msg::contracts::factory::entry::QueryMsg::MarketInfo {
-                    market_id: market_id.clone(),
-                })
-                .await?;
-            let market_addr = market_info.market_addr.into_string().parse()?;
-            markets_map.insert(market_id, market_addr);
-            let market = cosmos.make_contract(market_addr);
-
-            // Simplify backwards compatibility issues: only look at the field we care about
-            #[derive(serde::Deserialize)]
-            #[serde(rename_all = "snake_case")]
-            struct StatusRespJustCollateral {
-                collateral: Token,
-            }
-            let StatusRespJustCollateral { collateral } = market
-                .query(msg::contracts::market::entry::QueryMsg::Status { price: None })
-                .await?;
-            match collateral {
-                msg::token::Token::Cw20 {
-                    addr,
-                    decimal_places,
-                } => tokens.push(Cw20 {
-                    address: addr.as_str().parse()?,
-                    denom,
-                    decimals: decimal_places,
-                }),
-                msg::token::Token::Native { .. } => (),
-            }
+        let StatusRespJustCollateral { collateral } = market
+            .query(msg::contracts::market::entry::QueryMsg::Status { price: None })
+            .await?;
+        match collateral {
+            msg::token::Token::Cw20 {
+                addr,
+                decimal_places,
+            } => tokens.push(Cw20 {
+                address: addr.as_str().parse()?,
+                denom,
+                decimals: decimal_places,
+            }),
+            msg::token::Token::Native { .. } => (),
         }
     }
+    Ok((tokens, markets))
 }
 
 async fn get_faucet_gas_amount(cosmos: &Cosmos, faucet: Address) -> Result<Option<String>> {

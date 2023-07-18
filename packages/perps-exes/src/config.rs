@@ -137,6 +137,8 @@ pub struct DeploymentConfigTestnet {
     /// Maximum the price can move before we push a price update, e.g. 0.01 means 1%.
     #[serde(default = "defaults::max_allowed_price_delta")]
     pub max_allowed_price_delta: Decimal256,
+    #[serde(default = "defaults::price_age_alert_threshold_secs")]
+    pub price_age_alert_threshold_secs: u32,
 }
 
 fn load_yaml<T: serde::de::DeserializeOwned>(

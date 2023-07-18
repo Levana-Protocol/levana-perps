@@ -22,7 +22,20 @@ use msg::{
 
 use crate::{PositionsInfo, UpdatePositionCollateralImpact};
 
+#[derive(Clone)]
 pub struct MarketContract(Contract);
+
+impl Display for MarketContract {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl HasAddress for MarketContract {
+    fn get_address(&self) -> Address {
+        self.0.get_address()
+    }
+}
 
 impl MarketContract {
     pub fn new(contract: Contract) -> Self {
@@ -378,6 +391,19 @@ impl MarketContract {
         }
         log::info!("Cranking finished");
         Ok(())
+    }
+
+    pub async fn crank_single(&self, wallet: &Wallet, execs: Option<u32>) -> Result<TxResponse> {
+        self.0
+            .execute(
+                wallet,
+                vec![],
+                MarketExecuteMsg::Crank {
+                    execs,
+                    rewards: None,
+                },
+            )
+            .await
     }
 
     pub async fn update_max_gains(

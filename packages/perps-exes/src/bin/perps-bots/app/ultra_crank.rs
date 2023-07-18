@@ -3,12 +3,13 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use axum::async_trait;
 use chrono::Utc;
-use cosmos::{Address, Wallet};
+use cosmos::Wallet;
 use msg::contracts::market;
-use perps_exes::prelude::MarketId;
+use perps_exes::prelude::MarketContract;
 use perps_exes::timestamp_to_date_time;
 
 use crate::config::BotConfigTestnet;
+use crate::util::markets::Market;
 use crate::watcher::{WatchedTaskOutput, WatchedTaskPerMarket};
 
 use super::factory::FactoryInfo;
@@ -51,30 +52,31 @@ impl WatchedTaskPerMarket for Worker {
         &mut self,
         app: &App,
         _factory: &FactoryInfo,
-        _market: &MarketId,
-        addr: Address,
+        market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        app.ultra_crank(addr, &self.wallet, &mut self.activated, &self.testnet)
-            .await
+        app.ultra_crank(
+            &market.market,
+            &self.wallet,
+            &mut self.activated,
+            &self.testnet,
+        )
+        .await
     }
 }
 
 impl App {
     async fn ultra_crank(
         &self,
-        addr: Address,
+        market: &MarketContract,
         wallet: &Wallet,
         activated: &mut bool,
         testnet: &BotConfigTestnet,
     ) -> Result<WatchedTaskOutput> {
-        let market = self.cosmos.make_contract(addr);
         let market::entry::StatusResp {
             next_crank,
             last_crank_completed,
             ..
-        } = market
-            .query(market::entry::QueryMsg::Status { price: None })
-            .await?;
+        } = market.status().await?;
         if next_crank.is_none() {
             *activated = false;
             return Ok(WatchedTaskOutput {
@@ -95,16 +97,7 @@ impl App {
                 message: format!("Crank is only {age} seconds out of date, not doing anything"),
             });
         }
-        let res = market
-            .execute(
-                wallet,
-                vec![],
-                msg::contracts::market::entry::ExecuteMsg::Crank {
-                    execs: None,
-                    rewards: None,
-                },
-            )
-            .await?;
+        let res = market.crank_single(wallet, None).await?;
         Ok(WatchedTaskOutput {
             skip_delay: true,
             message: format!("Completed an ultracrank in {}", res.txhash),

@@ -61,6 +61,7 @@ pub(crate) struct BotConfig {
     pub(crate) execs_per_price: Option<u32>,
     pub(crate) max_price_age_secs: u32,
     pub(crate) max_allowed_price_delta: Decimal256,
+    pub(crate) price_age_alert_threshold_secs: u32,
 }
 
 impl Opt {
@@ -172,6 +173,7 @@ impl Opt {
             execs_per_price: partial.execs_per_price,
             max_price_age_secs: partial.max_price_age_secs,
             max_allowed_price_delta: partial.max_allowed_price_delta,
+            price_age_alert_threshold_secs: partial.price_age_alert_threshold_secs,
         };
 
         Ok((config, Some(faucet_bot_runner)))
@@ -191,6 +193,7 @@ impl Opt {
             max_allowed_price_delta,
             low_util_ratio,
             high_util_ratio,
+            price_age_alert_threshold_secs,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let price_wallet = seed
@@ -224,6 +227,8 @@ impl Opt {
                 .unwrap_or_else(perps_exes::config::defaults::max_price_age_secs),
             max_allowed_price_delta: max_allowed_price_delta
                 .unwrap_or_else(perps_exes::config::defaults::max_allowed_price_delta),
+            price_age_alert_threshold_secs: price_age_alert_threshold_secs
+                .unwrap_or_else(perps_exes::config::defaults::price_age_alert_threshold_secs),
         })
     }
 }

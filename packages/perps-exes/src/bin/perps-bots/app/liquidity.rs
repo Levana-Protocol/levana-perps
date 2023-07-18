@@ -8,6 +8,7 @@ use perps_exes::{config::LiquidityConfig, prelude::*};
 
 use crate::{
     config::BotConfigTestnet,
+    util::markets::Market,
     wallet_manager::ManagedWallet,
     watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
 };
@@ -42,10 +43,9 @@ impl WatchedTaskPerMarket for Liquidity {
         &mut self,
         _app: &App,
         _factory: &FactoryInfo,
-        market: &MarketId,
-        addr: Address,
+        market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, market, addr, self.testnet.faucet).await
+        single_market(self, &market.market_id, &market.market, self.testnet.faucet).await
     }
 }
 
@@ -58,10 +58,9 @@ enum Action {
 async fn single_market(
     worker: &Liquidity,
     market_id: &MarketId,
-    market_addr: Address,
+    market: &MarketContract,
     faucet: Address,
 ) -> Result<WatchedTaskOutput> {
-    let market = MarketContract::new(worker.app.cosmos.make_contract(market_addr));
     let status = market.status().await?;
     let total = status.liquidity.total_collateral();
     let bounds = worker
