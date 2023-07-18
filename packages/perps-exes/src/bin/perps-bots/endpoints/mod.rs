@@ -4,6 +4,7 @@ use tower_http::cors::CorsLayer;
 
 use crate::app::AppBuilder;
 
+pub(crate) mod carry;
 pub(crate) mod common;
 pub(crate) mod debug;
 pub(crate) mod factory;
@@ -25,6 +26,7 @@ impl AppBuilder {
                 .route("/build-version", get(common::build_version))
                 .route("/api/faucet", post(faucet::bot))
                 .route("/status", get(status::all))
+                .route("/carry", get(carry::carry))
                 .route("/status/:label", get(status::single))
                 .route("/markets", get(markets::markets))
                 .route("/debug/gas-usage", get(debug::gases))
