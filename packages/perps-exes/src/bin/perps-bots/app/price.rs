@@ -119,7 +119,7 @@ impl App {
 
                 // Hacky way to check if we're getting this error, we could
                 // parse the error correctly, but this is Good Enough.
-                if !e.to_string().contains("price_too_old") {
+                if !format!("{e:?}").contains("price_too_old") {
                     return Err(e);
                 }
 
