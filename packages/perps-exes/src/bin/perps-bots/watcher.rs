@@ -8,14 +8,10 @@ use axum::http::HeaderValue;
 use axum::response::IntoResponse;
 use axum::{async_trait, Json};
 use chrono::{DateTime, Duration, Utc};
-use cosmos::Address;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use perps_exes::build_version;
-use perps_exes::{
-    config::{TaskConfig, WatcherConfig},
-    prelude::MarketId,
-};
+use perps_exes::config::{TaskConfig, WatcherConfig};
 use rand::Rng;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::StatusCode;
@@ -24,6 +20,7 @@ use tokio::task::JoinSet;
 use crate::app::factory::FrontendInfoTestnet;
 use crate::app::AppBuilder;
 use crate::app::{factory::FactoryInfo, App};
+use crate::util::markets::Market;
 
 /// Different kinds of tasks that we can watch
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
@@ -527,8 +524,7 @@ pub(crate) trait WatchedTaskPerMarket: Send + Sync + 'static {
         &mut self,
         app: &App,
         factory_info: &FactoryInfo,
-        market: &MarketId,
-        addr: Address,
+        market: &Market,
     ) -> Result<WatchedTaskOutput>;
 }
 
@@ -539,16 +535,24 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
         let mut successes = vec![];
         let mut errors = vec![];
         let mut total_skip_delay = false;
-        for (market, addr) in &factory.markets {
-            match self.run_single_market(app, &factory, market, *addr).await {
+        for market in &factory.markets {
+            match self.run_single_market(app, &factory, market).await {
                 Ok(WatchedTaskOutput {
                     skip_delay,
                     message,
                 }) => {
-                    successes.push(format!("{market} {addr}: {message}"));
+                    successes.push(format!(
+                        "{market} {addr}: {message}",
+                        market = market.market_id,
+                        addr = market.market
+                    ));
                     total_skip_delay = skip_delay || total_skip_delay;
                 }
-                Err(e) => errors.push(format!("{market} {addr}: {e:?}")),
+                Err(e) => errors.push(format!(
+                    "{market} {addr}: {e:?}",
+                    market = market.market_id,
+                    addr = market.market
+                )),
             }
             heartbeat.reset_too_old();
         }

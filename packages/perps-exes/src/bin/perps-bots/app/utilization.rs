@@ -7,6 +7,7 @@ use perps_exes::{config::UtilizationConfig, prelude::*};
 
 use crate::{
     config::BotConfigTestnet,
+    util::markets::Market,
     wallet_manager::ManagedWallet,
     watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
 };
@@ -41,19 +42,17 @@ impl WatchedTaskPerMarket for Utilization {
         &mut self,
         _app: &App,
         _factory: &FactoryInfo,
-        _market: &MarketId,
-        addr: Address,
+        market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, addr, self.testnet.faucet).await
+        single_market(self, &market.market, self.testnet.faucet).await
     }
 }
 
 async fn single_market(
     worker: &Utilization,
-    market_addr: Address,
+    market: &MarketContract,
     faucet: Address,
 ) -> Result<WatchedTaskOutput> {
-    let market = MarketContract::new(worker.app.cosmos.make_contract(market_addr));
     let status = market.status().await?;
 
     if status.is_stale() {

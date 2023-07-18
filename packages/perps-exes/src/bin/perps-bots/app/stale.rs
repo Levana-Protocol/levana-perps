@@ -1,12 +1,12 @@
 use anyhow::Result;
 use axum::async_trait;
 use chrono::{DateTime, Utc};
-use cosmos::{Address, Cosmos};
 use msg::prelude::*;
 use perps_exes::{contracts::MarketContract, timestamp_to_date_time};
 
 use crate::{
     config::BotConfigByType,
+    util::markets::Market,
     watcher::{TaskLabel, WatchedTaskOutput, WatchedTaskPerMarket},
 };
 
@@ -36,12 +36,11 @@ struct Stale {
 impl WatchedTaskPerMarket for Stale {
     async fn run_single_market(
         &mut self,
-        app: &App,
+        _app: &App,
         _factory: &FactoryInfo,
-        _market: &MarketId,
-        addr: Address,
+        market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        self.check_stale_single(&app.cosmos, addr)
+        self.check_stale_single(&market.market)
             .await
             .map(|message| WatchedTaskOutput {
                 skip_delay: false,
@@ -51,8 +50,7 @@ impl WatchedTaskPerMarket for Stale {
 }
 
 impl Stale {
-    async fn check_stale_single(&mut self, cosmos: &Cosmos, addr: Address) -> Result<String> {
-        let market = MarketContract::new(cosmos.make_contract(addr));
+    async fn check_stale_single(&mut self, market: &MarketContract) -> Result<String> {
         let status = market.status().await?;
         let last_crank_completed = status
             .last_crank_completed

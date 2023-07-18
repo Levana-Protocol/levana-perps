@@ -6,10 +6,7 @@ use chrono::{Duration, Utc};
 use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, HasAddress, TxBuilder, Wallet};
 use cosmwasm_std::Decimal256;
 use msg::prelude::{PriceBaseInQuote, PriceCollateralInUsd, Signed, UnsignedDecimal};
-use perps_exes::{
-    prelude::MarketContract,
-    pyth::{get_latest_price, get_oracle_update_msg},
-};
+use perps_exes::pyth::{get_latest_price, get_oracle_update_msg};
 
 use crate::{
     config::BotConfigByType,
@@ -171,7 +168,7 @@ impl App {
         market: &Market,
         latest_price: PriceBaseInQuote,
     ) -> Result<Option<PriceUpdateReason>> {
-        let market = MarketContract::new(market.market.clone());
+        let market = &market.market;
         let price = market.current_price().await;
 
         let price = match price {

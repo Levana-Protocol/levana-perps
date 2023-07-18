@@ -9,6 +9,7 @@ use rand::Rng;
 
 use crate::{
     config::BotConfigTestnet,
+    util::markets::Market,
     wallet_manager::ManagedWallet,
     watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
 };
@@ -47,10 +48,9 @@ impl WatchedTaskPerMarket for Trader {
         &mut self,
         _app: &App,
         _factory: &FactoryInfo,
-        _market: &MarketId,
-        addr: Address,
+        market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, addr, self.testnet.faucet).await
+        single_market(self, &market.market, self.testnet.faucet).await
     }
 }
 
@@ -97,10 +97,9 @@ impl EnsureCollateral<'_> {
 
 async fn single_market(
     worker: &Trader,
-    market_addr: Address,
+    market: &MarketContract,
     faucet: Address,
 ) -> Result<WatchedTaskOutput> {
-    let market = MarketContract::new(worker.app.cosmos.make_contract(market_addr));
     let status = market.status().await?;
 
     // Make sure we always have at least 50,000 tokens

@@ -1,11 +1,12 @@
 use anyhow::Result;
 use axum::async_trait;
-use cosmos::{Address, Contract, Wallet};
+use cosmos::Wallet;
 use msg::contracts::market;
 use msg::contracts::market::crank::CrankWorkInfo;
-use perps_exes::prelude::MarketId;
+use perps_exes::prelude::MarketContract;
 
 use crate::config::BotConfigByType;
+use crate::util::markets::Market;
 use crate::watcher::{WatchedTaskOutput, WatchedTaskPerMarket};
 
 use super::factory::FactoryInfo;
@@ -47,18 +48,20 @@ impl WatchedTaskPerMarket for Worker {
         &mut self,
         app: &App,
         _factory: &FactoryInfo,
-        _market: &MarketId,
-        addr: Address,
+        market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        app.crank(&self.crank_wallet, addr).await
+        app.crank(&self.crank_wallet, &market.market).await
     }
 }
 
 const CRANK_EXECS: &[u32] = &[30, 25, 20, 15, 10, 7, 6, 5, 4, 3, 2, 1];
 
 impl App {
-    async fn crank(&self, crank_wallet: &Wallet, addr: Address) -> Result<WatchedTaskOutput> {
-        let market = self.cosmos.make_contract(addr);
+    async fn crank(
+        &self,
+        crank_wallet: &Wallet,
+        market: &MarketContract,
+    ) -> Result<WatchedTaskOutput> {
         let work = match self.check_crank(&market).await? {
             None => {
                 return Ok(WatchedTaskOutput {
@@ -85,7 +88,7 @@ impl App {
 
         for execs in CRANK_EXECS {
             match self
-                .try_with_execs(crank_wallet, addr, &work, Some(*execs))
+                .try_with_execs(crank_wallet, market, &work, Some(*execs))
                 .await
             {
                 Ok(x) => return Ok(x),
@@ -93,28 +96,17 @@ impl App {
             }
         }
 
-        self.try_with_execs(crank_wallet, addr, &work, None).await
+        self.try_with_execs(crank_wallet, market, &work, None).await
     }
 
     async fn try_with_execs(
         &self,
         crank_wallet: &Wallet,
-        addr: Address,
+        market: &MarketContract,
         work: &CrankWorkInfo,
         execs: Option<u32>,
     ) -> Result<WatchedTaskOutput> {
-        let txres = self
-            .cosmos
-            .make_contract(addr)
-            .execute(
-                crank_wallet,
-                vec![],
-                market::entry::ExecuteMsg::Crank {
-                    execs,
-                    rewards: None,
-                },
-            )
-            .await?;
+        let txres = market.crank_single(crank_wallet, execs).await?;
         Ok(WatchedTaskOutput {
             skip_delay: true,
             message: format!(
@@ -124,11 +116,10 @@ impl App {
         })
     }
 
-    async fn check_crank(&self, market: &Contract) -> Result<Option<market::crank::CrankWorkInfo>> {
-        let market::entry::StatusResp { next_crank, .. } = market
-            .query(market::entry::QueryMsg::Status { price: None })
-            .await?;
-
-        Ok(next_crank)
+    async fn check_crank(
+        &self,
+        market: &MarketContract,
+    ) -> Result<Option<market::crank::CrankWorkInfo>> {
+        Ok(market.status().await?.next_crank)
     }
 }
