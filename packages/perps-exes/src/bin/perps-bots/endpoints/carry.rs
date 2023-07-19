@@ -9,7 +9,7 @@ use axum::{
 };
 use cosmos::Address;
 use cosmwasm_std::Decimal256;
-use msg::prelude::{MarketType, UnsignedDecimal};
+use msg::prelude::{MarketId, MarketType, UnsignedDecimal};
 use perps_exes::PositionsInfo;
 
 pub(crate) async fn carry(
@@ -126,6 +126,7 @@ pub(crate) struct CarryParams {
     cc_funding_short_close: Option<f64>,
     max_notional_size_usd: Option<f64>,
     target_leverage_to_notional: Option<f64>,
+    market_id: Option<MarketId>,
 }
 
 pub(crate) async fn carry_inner(
@@ -139,6 +140,7 @@ pub(crate) async fn carry_inner(
         cc_funding_short_close,
         max_notional_size_usd,
         target_leverage_to_notional,
+        market_id,
     }: &CarryParams,
 ) -> Result<Response> {
     // Fill in defaults. We could do this with serde instead, but this is less total code.
@@ -154,7 +156,7 @@ pub(crate) async fn carry_inner(
     res_str += format!("cc_addr: {}\n", cc_addr).as_str();
 
     let factory = app.get_factory_info();
-    for market in &factory.markets {
+    'market: for market in &factory.markets {
         let market = &market.market;
         let status = market.status().await?;
         let price_point = market.current_price().await?;
@@ -169,7 +171,12 @@ pub(crate) async fn carry_inner(
             .to_string()
             .parse::<f64>()?;
 
-        res_str = res_str + "\n" + &status.base + "_" + &status.quote + "\n";
+        if let Some(market_id) = market_id {
+            if market_id.as_str() != status.market_id.as_str() {
+                continue 'market;
+            }
+        }
+        res_str = res_str + "\n" + status.market_id.as_str() + "\n";
 
         let max_notional_size = max_notional_size_usd / price_notional / price_collateral_usd;
 
@@ -180,14 +187,32 @@ pub(crate) async fn carry_inner(
 
         let positions: PositionsInfo = market.all_open_positions(cc_addr).await?;
         let mut total_notional_size = Decimal256::zero().into_signed();
+        let mut has_long = false;
+        let mut has_short = false;
+        let positions_count = positions.info.len();
         for pos in positions.info {
             res_str += format!(
-                "- position with notional_size: {:?} {notional}\n",
+                "- Existing position with notional_size: {:?} {notional}\n",
                 pos.notional_size
             )
             .as_str();
             total_notional_size += pos.notional_size.into_number();
+            if pos.notional_size.is_negative() {
+                has_short = true;
+            } else {
+                has_long = true;
+            }
         }
+
+        if has_long && has_short {
+            res_str += "ERROR: There are both short and long positions open in the market. Skipping market...\n";
+            continue 'market;
+        }
+
+        if positions_count > 1 {
+            res_str += "WARNING: More than one position open in the market, recommendations assume they are all combined into one.\n";
+        }
+
         let total_notional_size: f64 = total_notional_size.to_string().parse::<f64>()?;
 
         let long_funding_base: f64 = status.long_funding.to_string().parse::<f64>()?;
