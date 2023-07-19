@@ -4,7 +4,9 @@ sei-testnet:
   faucet: sei1czf3age49j99yrkxynmetysh3p2x8tp429mv23jme7zj8hytwhesnqngza
   explorer: "https://testnet-explorer.brocha.in/sei%20atlantic%202/tx/"
   rpc-nodes:
-  - https://sei.kingnodes.com/
+  # - https://sei.kingnodes.com/
+  - https://test-sei.kingnodes.com
+  # - https://test-sei-grpc.kingnodes.com
   #- https://rpc-sei-testnet.rhinostake.com/
   #- https://rpc.atlantic-2.seinetwork.io/
   #- https://sei-testnet-rpc.polkachu.com/
