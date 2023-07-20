@@ -157,9 +157,9 @@ pub(crate) async fn carry_inner(
 
     let factory = app.get_factory_info();
     let market_iter = factory.markets.iter().filter(|market| {
-        market_id.as_ref().map_or(true, |market_id| {
-            market.market_id.as_str() == market_id.as_str()
-        })
+        market_id
+            .as_ref()
+            .map_or(true, |market_id| market.market_id == *market_id)
     });
     'market: for market in market_iter {
         let market = &market.market;
