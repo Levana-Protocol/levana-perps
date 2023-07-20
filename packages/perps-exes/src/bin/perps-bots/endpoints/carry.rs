@@ -156,7 +156,12 @@ pub(crate) async fn carry_inner(
     res_str += format!("cc_addr: {}\n", cc_addr).as_str();
 
     let factory = app.get_factory_info();
-    'market: for market in &factory.markets {
+    let market_iter = factory.markets.iter().filter(|market| {
+        market_id.as_ref().map_or(true, |market_id| {
+            market.market_id.as_str() == market_id.as_str()
+        })
+    });
+    'market: for market in market_iter {
         let market = &market.market;
         let status = market.status().await?;
         let price_point = market.current_price().await?;
@@ -171,11 +176,6 @@ pub(crate) async fn carry_inner(
             .to_string()
             .parse::<f64>()?;
 
-        if let Some(market_id) = market_id {
-            if market_id.as_str() != status.market_id.as_str() {
-                continue 'market;
-            }
-        }
         res_str = res_str + "\n" + status.market_id.as_str() + "\n";
 
         let max_notional_size = max_notional_size_usd / price_notional / price_collateral_usd;
@@ -202,15 +202,6 @@ pub(crate) async fn carry_inner(
             } else {
                 has_long = true;
             }
-        }
-
-        if has_long && has_short {
-            res_str += "ERROR: There are both short and long positions open in the market. Skipping market...\n";
-            continue 'market;
-        }
-
-        if positions_count > 1 {
-            res_str += "WARNING: More than one position open in the market, recommendations assume they are all combined into one.\n";
         }
 
         let total_notional_size: f64 = total_notional_size.to_string().parse::<f64>()?;
@@ -272,6 +263,21 @@ pub(crate) async fn carry_inner(
                 .to_string()
                 .parse::<f64>()?,
         };
+
+        if has_long && has_short {
+            res_str += "ERROR: There are both short and long positions open in the market.\n";
+            if short_funding_notional > 0f64 {
+                res_str += format!("Consider closing all {short_str} positions.\n").as_str();
+            } else {
+                res_str += format!("Consider closing all {long_str} positions.\n").as_str();
+            }
+            res_str += "Skipping market...\n";
+            continue 'market;
+        }
+
+        if positions_count > 1 {
+            res_str += "WARNING: More than one position open in the market, recommendations assume they are all combined into one.\n";
+        }
 
         let short_and_decrease = |current_notional: f64| -> f64 {
             if current_notional > 0f64 {
