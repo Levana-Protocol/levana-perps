@@ -85,7 +85,7 @@ pub fn max_price_age_secs() -> u32 {
 }
 
 pub fn max_allowed_price_delta() -> Decimal256 {
-    "0.005".parse().unwrap()
+    "0.0005".parse().unwrap()
 }
 
 pub fn price_age_alert_threshold_secs() -> u32 {
