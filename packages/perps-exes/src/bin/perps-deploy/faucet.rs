@@ -54,6 +54,7 @@ impl Faucet {
             "ATOM" => "1000",
             "USDC" => "20000",
             "BTC" => "1",
+            "OSMO" => "2000",
             // This is going to end up being ignored I think...
             "ETH" => "2",
             name => anyhow::bail!("Unknown collateral type: {name}"),
