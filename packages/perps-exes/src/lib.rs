@@ -120,8 +120,12 @@ impl PerpApp {
             .await
     }
 
-    pub async fn set_price(&self, price: PriceBaseInQuote) -> Result<TxResponse> {
-        self.market.set_price(&self.wallet, price).await
+    pub async fn set_price(
+        &self,
+        price: PriceBaseInQuote,
+        price_usd: Option<PriceCollateralInUsd>,
+    ) -> Result<TxResponse> {
+        self.market.set_price(&self.wallet, price, price_usd).await
     }
 
     pub async fn get_closed_positions(&self) -> Result<Vec<ClosedPosition>> {

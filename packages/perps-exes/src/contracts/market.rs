@@ -341,10 +341,15 @@ impl MarketContract {
         }
     }
 
-    pub async fn set_price(&self, wallet: &Wallet, price: PriceBaseInQuote) -> Result<TxResponse> {
+    pub async fn set_price(
+        &self,
+        wallet: &Wallet,
+        price: PriceBaseInQuote,
+        price_usd: Option<PriceCollateralInUsd>,
+    ) -> Result<TxResponse> {
         let execute_msg = MarketExecuteMsg::SetPrice {
             price,
-            price_usd: None,
+            price_usd,
             execs: None,
             rewards: None,
         };
