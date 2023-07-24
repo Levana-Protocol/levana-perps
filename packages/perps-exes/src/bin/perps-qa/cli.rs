@@ -76,7 +76,7 @@ pub(crate) enum Subcommand {
         /// Current USD Price
         #[clap(long)]
         price: PriceBaseInQuote,
-        /// Proice of collateral assert in terms of USD
+        /// Price of collateral assert in terms of USD
         #[clap(long)]
         price_usd: Option<PriceCollateralInUsd>,
     },
