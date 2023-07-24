@@ -225,7 +225,7 @@ pub async fn test_set_and_fetch_price(perp_app: &PerpApp) -> Result<()> {
     log::info!("Set and fetch price");
 
     let new_price = PriceBaseInQuote::from_str("9.433493300000000079")?;
-    perp_app.set_price(new_price).await?;
+    perp_app.set_price(new_price, None).await?;
     perp_app.wait_till_next_block().await?;
     let price = perp_app.market.current_price().await?;
     ensure!(
@@ -366,7 +366,7 @@ pub(crate) async fn test_pnl_on_liquidation(perp_app: &PerpApp) -> Result<()> {
     let max_gains = MaxGainsInQuote::PosInfinity;
     let leverage = LeverageToBase::from_str("17.5")?;
 
-    perp_app.set_price("6.33".parse()?).await?;
+    perp_app.set_price("6.33".parse()?, None).await?;
 
     perp_app
         .open_position(collateral, direction, leverage, max_gains, None, None, None)
@@ -380,7 +380,7 @@ pub(crate) async fn test_pnl_on_liquidation(perp_app: &PerpApp) -> Result<()> {
         _ => bail!("More than one position found"),
     };
 
-    let res = perp_app.set_price("6.02".parse()?).await?;
+    let res = perp_app.set_price("6.02".parse()?, None).await?;
     log::info!("Price set to force liquidation in: {}", res.txhash);
     perp_app.crank().await?;
 

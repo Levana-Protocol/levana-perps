@@ -160,8 +160,8 @@ async fn main_inner() -> Result<()> {
                 price.price_usd
             );
         }
-        cli::Subcommand::SetPrice { price } => {
-            let tx = perp_contract.set_price(price).await?;
+        cli::Subcommand::SetPrice { price, price_usd } => {
+            let tx = perp_contract.set_price(price, price_usd).await?;
             println!("Transaction hash: {}", tx.txhash);
             log::debug!("Raw log: {}", tx.raw_log);
         }
