@@ -361,72 +361,68 @@ async fn open_position_csv(
         let contract = MarketContract::new(market.market);
         let mut next_position_id: PositionId = "1".parse()?;
 
-        loop {
-            match contract.first_position_action(next_position_id).await? {
-                Some(PositionAction {
-                    id,
-                    kind,
-                    timestamp,
-                    collateral,
-                    transfer_collateral: _,
-                    leverage,
-                    max_gains: _,
-                    trade_fee: _,
-                    delta_neutrality_fee: _,
-                    old_owner: _,
-                    new_owner: _,
-                    take_profit_override: _,
-                    stop_loss_override: _,
-                }) => {
-                    anyhow::ensure!(kind == PositionActionKind::Open);
-                    anyhow::ensure!(id == Some(next_position_id));
+        while let Some(action) = contract.first_position_action(next_position_id).await? {
+            let PositionAction {
+                id,
+                kind,
+                timestamp,
+                collateral,
+                transfer_collateral: _,
+                leverage,
+                max_gains: _,
+                trade_fee: _,
+                delta_neutrality_fee: _,
+                old_owner: _,
+                new_owner: _,
+                take_profit_override: _,
+                stop_loss_override: _,
+            } = action;
+            anyhow::ensure!(kind == PositionActionKind::Open);
+            anyhow::ensure!(id == Some(next_position_id));
 
-                    let timestamp = timestamp.try_into_chrono_datetime()?;
-                    let leverage = leverage.with_context(|| {
-                        format!("Missing leverage on position open action for {next_position_id}")
-                    })?;
+            let timestamp = timestamp.try_into_chrono_datetime()?;
+            let leverage = leverage.with_context(|| {
+                format!("Missing leverage on position open action for {next_position_id}")
+            })?;
 
-                    let PositionsResp {
-                        positions,
-                        pending_close,
-                        closed,
-                    } = contract.raw_query_positions(vec![next_position_id]).await?;
+            let PositionsResp {
+                positions,
+                pending_close,
+                closed,
+            } = contract.raw_query_positions(vec![next_position_id]).await?;
 
-                    let (owner, direction) = if let Some(position) = positions.first() {
-                        (position.owner.as_str().parse()?, position.direction_to_base)
-                    } else if let Some(position) = pending_close.first() {
-                        (position.owner.as_str().parse()?, position.direction_to_base)
-                    } else if let Some(position) = closed.first() {
-                        (position.owner.as_str().parse()?, position.direction_to_base)
-                    } else {
-                        anyhow::bail!("Could not find position {next_position_id}");
-                    };
+            let (owner, direction) = if let Some(position) = positions.first() {
+                (position.owner.as_str().parse()?, position.direction_to_base)
+            } else if let Some(position) = pending_close.first() {
+                (position.owner.as_str().parse()?, position.direction_to_base)
+            } else if let Some(position) = closed.first() {
+                (position.owner.as_str().parse()?, position.direction_to_base)
+            } else {
+                anyhow::bail!("Could not find position {next_position_id}");
+            };
 
-                    #[derive(serde::Serialize)]
-                    #[serde(rename_all = "snake_case")]
-                    struct Record<'a> {
-                        market: &'a MarketId,
-                        id: PositionId,
-                        timestamp: DateTime<Utc>,
-                        owner: Address,
-                        collateral: Collateral,
-                        leverage: LeverageToBase,
-                        direction: DirectionToBase,
-                    }
-                    csv.serialize(&Record {
-                        market: &market.market_id,
-                        id: next_position_id,
-                        timestamp,
-                        owner,
-                        collateral,
-                        leverage,
-                        direction,
-                    })?;
-                    csv.flush()?;
-                    next_position_id = (next_position_id.u64() + 1).to_string().parse()?;
-                }
-                None => break,
+            #[derive(serde::Serialize)]
+            #[serde(rename_all = "snake_case")]
+            struct Record<'a> {
+                market: &'a MarketId,
+                id: PositionId,
+                timestamp: DateTime<Utc>,
+                owner: Address,
+                collateral: Collateral,
+                leverage: LeverageToBase,
+                direction: DirectionToBase,
             }
+            csv.serialize(&Record {
+                market: &market.market_id,
+                id: next_position_id,
+                timestamp,
+                owner,
+                collateral,
+                leverage,
+                direction,
+            })?;
+            csv.flush()?;
+            next_position_id = (next_position_id.u64() + 1).to_string().parse()?;
         }
     }
 
