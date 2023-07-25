@@ -30,7 +30,6 @@ use std::sync::Arc;
 
 // Route Handlers
 
-const FILENAME: &str = "levana-history.csv";
 const TRADER_ACTION_HISTORY_LIMIT: Option<u32> = Some(20);
 const LP_ACTION_HISTORY_LIMIT: Option<u32> = Some(20);
 const POSITIONS_QUERY_CHUNK_SIZE: usize = 3;
@@ -47,7 +46,7 @@ pub(crate) async fn history(
 
     exporter.export().await.map(|csv| {
         let mut res = csv.into_response();
-        let disposition = format!("attachment; filename={FILENAME}");
+        let disposition = format!("attachment; filename=levana-history-{wallet}.csv");
 
         res.headers_mut().insert(
             CONTENT_TYPE,
