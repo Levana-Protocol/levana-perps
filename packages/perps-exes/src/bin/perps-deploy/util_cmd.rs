@@ -14,7 +14,7 @@ use perps_exes::{
 };
 use serde_json::json;
 use shared::storage::{
-    Collateral, DirectionToBase, LeverageToBase, MarketId, Signed, UnsignedDecimal, Usd,
+    Collateral, DirectionToBase, LeverageToBase, MarketId, Signed, UnsignedDecimal, Usd, Notional,
 };
 
 use crate::factory::Factory;
@@ -366,7 +366,7 @@ async fn open_position_csv(
                 id,
                 kind,
                 timestamp,
-                collateral,
+                collateral: _,
                 transfer_collateral: _,
                 leverage,
                 max_gains: _,
@@ -391,15 +391,34 @@ async fn open_position_csv(
                 closed,
             } = contract.raw_query_positions(vec![next_position_id]).await?;
 
-            let (owner, direction) = if let Some(position) = positions.first() {
-                (position.owner.as_str().parse()?, position.direction_to_base)
-            } else if let Some(position) = pending_close.first() {
-                (position.owner.as_str().parse()?, position.direction_to_base)
-            } else if let Some(position) = closed.first() {
-                (position.owner.as_str().parse()?, position.direction_to_base)
-            } else {
-                anyhow::bail!("Could not find position {next_position_id}");
-            };
+            let (owner, direction, deposit_collateral, deposit_collateral_usd, notional_size) =
+                if let Some(position) = positions.first() {
+                    (
+                        position.owner.as_str().parse()?,
+                        position.direction_to_base,
+                        position.deposit_collateral,
+                        position.deposit_collateral_usd,
+                        position.notional_size,
+                    )
+                } else if let Some(position) = pending_close.first() {
+                    (
+                        position.owner.as_str().parse()?,
+                        position.direction_to_base,
+                        position.deposit_collateral,
+                        position.deposit_collateral_usd,
+                        position.notional_size,
+                    )
+                } else if let Some(position) = closed.first() {
+                    (
+                        position.owner.as_str().parse()?,
+                        position.direction_to_base,
+                        position.deposit_collateral,
+                        position.deposit_collateral_usd,
+                        position.notional_size,
+                    )
+                } else {
+                    anyhow::bail!("Could not find position {next_position_id}");
+                };
 
             #[derive(serde::Serialize)]
             #[serde(rename_all = "snake_case")]
@@ -408,18 +427,22 @@ async fn open_position_csv(
                 id: PositionId,
                 timestamp: DateTime<Utc>,
                 owner: Address,
-                collateral: Collateral,
                 leverage: LeverageToBase,
                 direction: DirectionToBase,
+                deposit_collateral: Signed<Collateral>,
+                deposit_collateral_usd: Signed<Usd>,
+                notional_size: Signed<Notional>,
             }
             csv.serialize(&Record {
                 market: &market.market_id,
                 id: next_position_id,
                 timestamp,
                 owner,
-                collateral,
                 leverage,
                 direction,
+                deposit_collateral,
+                deposit_collateral_usd,
+                notional_size,
             })?;
             csv.flush()?;
             next_position_id = (next_position_id.u64() + 1).to_string().parse()?;
