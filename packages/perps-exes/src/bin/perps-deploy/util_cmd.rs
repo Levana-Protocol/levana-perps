@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
@@ -7,6 +7,7 @@ use msg::contracts::market::{
     entry::{PositionAction, PositionActionKind, TradeHistorySummary},
     position::{PositionId, PositionsResp},
 };
+use parking_lot::Mutex;
 use perps_exes::{
     config::{ChainConfig, PythConfig},
     prelude::MarketContract,
@@ -14,8 +15,9 @@ use perps_exes::{
 };
 use serde_json::json;
 use shared::storage::{
-    Collateral, DirectionToBase, LeverageToBase, MarketId, Signed, UnsignedDecimal, Usd, Notional,
+    Collateral, DirectionToBase, LeverageToBase, MarketId, Notional, Signed, UnsignedDecimal, Usd,
 };
+use tokio::task::JoinSet;
 
 use crate::factory::Factory;
 
@@ -343,6 +345,13 @@ struct OpenPositionCsvOpt {
     csv: PathBuf,
 }
 
+struct ToProcess {
+    next: PositionId,
+    last: PositionId,
+    market: MarketContract,
+    market_id: Arc<MarketId>,
+}
+
 async fn open_position_csv(
     opt: crate::cli::Opt,
     OpenPositionCsvOpt {
@@ -353,101 +362,162 @@ async fn open_position_csv(
 ) -> Result<()> {
     let cosmos = opt.connect(network).await?;
     let factory = Factory::from_contract(cosmos.make_contract(factory));
-    let mut csv = ::csv::Writer::from_path(&csv)?;
+    let csv = ::csv::Writer::from_path(&csv)?;
+    let csv = Arc::new(Mutex::new(csv));
 
     let markets = factory.get_markets().await?;
 
+    let mut to_process = Vec::<ToProcess>::new();
+
     for market in markets {
-        let contract = MarketContract::new(market.market);
-        let mut next_position_id: PositionId = "1".parse()?;
+        let market_id = market.market_id.into();
+        let market = MarketContract::new(market.market);
+        to_process.push(ToProcess {
+            next: "1".parse()?,
+            last: market.get_highest_position_id().await?,
+            market,
+            market_id,
+        });
+    }
 
-        while let Some(action) = contract.first_position_action(next_position_id).await? {
-            let PositionAction {
-                id,
-                kind,
-                timestamp,
-                collateral: _,
-                transfer_collateral: _,
-                leverage,
-                max_gains: _,
-                trade_fee: _,
-                delta_neutrality_fee: _,
-                old_owner: _,
-                new_owner: _,
-                take_profit_override: _,
-                stop_loss_override: _,
-            } = action;
-            anyhow::ensure!(kind == PositionActionKind::Open);
-            anyhow::ensure!(id == Some(next_position_id));
+    let to_process = Arc::new(Mutex::new(to_process));
 
-            let timestamp = timestamp.try_into_chrono_datetime()?;
-            let leverage = leverage.with_context(|| {
-                format!("Missing leverage on position open action for {next_position_id}")
-            })?;
+    let mut set = JoinSet::new();
 
-            let PositionsResp {
-                positions,
-                pending_close,
-                closed,
-            } = contract.raw_query_positions(vec![next_position_id]).await?;
+    for _ in 0..30 {
+        let to_process = to_process.clone();
+        let csv = csv.clone();
+        set.spawn(csv_helper(to_process, csv));
+    }
 
-            let (owner, direction, deposit_collateral, deposit_collateral_usd, notional_size) =
-                if let Some(position) = positions.first() {
-                    (
-                        position.owner.as_str().parse()?,
-                        position.direction_to_base,
-                        position.deposit_collateral,
-                        position.deposit_collateral_usd,
-                        position.notional_size,
-                    )
-                } else if let Some(position) = pending_close.first() {
-                    (
-                        position.owner.as_str().parse()?,
-                        position.direction_to_base,
-                        position.deposit_collateral,
-                        position.deposit_collateral_usd,
-                        position.notional_size,
-                    )
-                } else if let Some(position) = closed.first() {
-                    (
-                        position.owner.as_str().parse()?,
-                        position.direction_to_base,
-                        position.deposit_collateral,
-                        position.deposit_collateral_usd,
-                        position.notional_size,
-                    )
-                } else {
-                    anyhow::bail!("Could not find position {next_position_id}");
-                };
-
-            #[derive(serde::Serialize)]
-            #[serde(rename_all = "snake_case")]
-            struct Record<'a> {
-                market: &'a MarketId,
-                id: PositionId,
-                timestamp: DateTime<Utc>,
-                owner: Address,
-                leverage: LeverageToBase,
-                direction: DirectionToBase,
-                deposit_collateral: Signed<Collateral>,
-                deposit_collateral_usd: Signed<Usd>,
-                notional_size: Signed<Notional>,
+    while let Some(res) = set.join_next().await {
+        match res {
+            Ok(Ok(())) => (),
+            Ok(Err(e)) => {
+                set.abort_all();
+                return Err(e);
             }
-            csv.serialize(&Record {
-                market: &market.market_id,
-                id: next_position_id,
-                timestamp,
-                owner,
-                leverage,
-                direction,
-                deposit_collateral,
-                deposit_collateral_usd,
-                notional_size,
-            })?;
-            csv.flush()?;
-            next_position_id = (next_position_id.u64() + 1).to_string().parse()?;
+            Err(e) => {
+                set.abort_all();
+                return Err(e).context("Unexpected panic");
+            }
         }
     }
 
     Ok(())
+}
+
+async fn csv_helper(
+    to_process: Arc<Mutex<Vec<ToProcess>>>,
+    csv: Arc<Mutex<csv::Writer<std::fs::File>>>,
+) -> Result<()> {
+    loop {
+        let (contract, market_id, pos_id) = {
+            let mut to_process_guard = to_process.lock();
+            match to_process_guard.last_mut() {
+                None => break Ok(()),
+                Some(to_process) => {
+                    if to_process.next > to_process.last {
+                        to_process_guard.pop();
+                        continue;
+                    }
+
+                    let pos_id = to_process.next;
+                    to_process.next = (pos_id.u64() + 1).to_string().parse()?;
+                    (
+                        to_process.market.clone(),
+                        to_process.market_id.clone(),
+                        pos_id,
+                    )
+                }
+            }
+        };
+
+        let PositionAction {
+            id,
+            kind,
+            timestamp,
+            collateral: _,
+            transfer_collateral: _,
+            leverage,
+            max_gains: _,
+            trade_fee: _,
+            delta_neutrality_fee: _,
+            old_owner: _,
+            new_owner: _,
+            take_profit_override: _,
+            stop_loss_override: _,
+        } = contract
+            .first_position_action(pos_id)
+            .await?
+            .context("Impossible missing first action for a position")?;
+        anyhow::ensure!(kind == PositionActionKind::Open);
+        anyhow::ensure!(id == Some(pos_id));
+
+        let timestamp = timestamp.try_into_chrono_datetime()?;
+        let leverage = leverage
+            .with_context(|| format!("Missing leverage on position open action for {pos_id}"))?;
+
+        let PositionsResp {
+            positions,
+            pending_close,
+            closed,
+        } = contract.raw_query_positions(vec![pos_id]).await?;
+
+        let (owner, direction, deposit_collateral, deposit_collateral_usd, notional_size) =
+            if let Some(position) = positions.first() {
+                (
+                    position.owner.as_str().parse()?,
+                    position.direction_to_base,
+                    position.deposit_collateral,
+                    position.deposit_collateral_usd,
+                    position.notional_size,
+                )
+            } else if let Some(position) = pending_close.first() {
+                (
+                    position.owner.as_str().parse()?,
+                    position.direction_to_base,
+                    position.deposit_collateral,
+                    position.deposit_collateral_usd,
+                    position.notional_size,
+                )
+            } else if let Some(position) = closed.first() {
+                (
+                    position.owner.as_str().parse()?,
+                    position.direction_to_base,
+                    position.deposit_collateral,
+                    position.deposit_collateral_usd,
+                    position.notional_size,
+                )
+            } else {
+                anyhow::bail!("Could not find position {pos_id}");
+            };
+
+        #[derive(serde::Serialize)]
+        #[serde(rename_all = "snake_case")]
+        struct Record<'a> {
+            market: &'a MarketId,
+            id: PositionId,
+            timestamp: DateTime<Utc>,
+            owner: Address,
+            leverage: LeverageToBase,
+            direction: DirectionToBase,
+            deposit_collateral: Signed<Collateral>,
+            deposit_collateral_usd: Signed<Usd>,
+            notional_size: Signed<Notional>,
+        }
+        let mut csv = csv.lock();
+        csv.serialize(&Record {
+            market: &market_id,
+            id: pos_id,
+            timestamp,
+            owner,
+            leverage,
+            direction,
+            deposit_collateral,
+            deposit_collateral_usd,
+            notional_size,
+        })?;
+        csv.flush()?;
+    }
 }

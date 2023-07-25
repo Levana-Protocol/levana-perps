@@ -20,6 +20,7 @@ use msg::{
     },
     prelude::*,
 };
+use shared::namespace::LAST_POSITION_ID;
 
 use crate::{PositionsInfo, UpdatePositionCollateralImpact};
 
@@ -557,5 +558,15 @@ impl MarketContract {
             .await?;
         anyhow::ensure!(actions.len() <= 1);
         Ok(actions.into_iter().next())
+    }
+
+    pub async fn get_highest_position_id(&self) -> Result<PositionId> {
+        // This should really be a proper query or part of StatusResp
+        let bytes = self
+            .0
+            .get_cosmos()
+            .wasm_raw_query(self.0.get_address(), LAST_POSITION_ID)
+            .await?;
+        serde_json::from_slice(&bytes).context("Invalid position ID")
     }
 }
