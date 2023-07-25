@@ -10,8 +10,9 @@ use msg::{
         market::{
             config::ConfigUpdate,
             entry::{
-                ClosedPositionsResp, ExecuteOwnerMsg, LpInfoResp, PriceWouldTriggerResp,
-                SlippageAssert, StatusResp, TradeHistorySummary,
+                ClosedPositionsResp, ExecuteOwnerMsg, LpInfoResp, PositionAction,
+                PositionActionHistoryResp, PriceWouldTriggerResp, SlippageAssert, StatusResp,
+                TradeHistorySummary,
             },
             position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
         },
@@ -539,5 +540,22 @@ impl MarketContract {
                 addr: trader.to_string().into(),
             })
             .await
+    }
+
+    pub async fn first_position_action(&self, id: PositionId) -> Result<Option<PositionAction>> {
+        let PositionActionHistoryResp {
+            actions,
+            next_start_after: _,
+        } = self
+            .0
+            .query(MarketQueryMsg::PositionActionHistory {
+                id,
+                start_after: None,
+                limit: Some(1),
+                order: Some(OrderInMessage::Ascending),
+            })
+            .await?;
+        anyhow::ensure!(actions.len() <= 1);
+        Ok(actions.into_iter().next())
     }
 }

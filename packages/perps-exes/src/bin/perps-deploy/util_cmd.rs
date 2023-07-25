@@ -1,9 +1,10 @@
 use std::{collections::HashSet, path::PathBuf};
 
 use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, HasAddress, TxBuilder};
 use msg::contracts::market::{
-    entry::TradeHistorySummary,
+    entry::{PositionAction, PositionActionKind, TradeHistorySummary},
     position::{PositionId, PositionsResp},
 };
 use perps_exes::{
@@ -12,7 +13,9 @@ use perps_exes::{
     pyth::{get_oracle_update_msg, VecWithCurr},
 };
 use serde_json::json;
-use shared::storage::{MarketId, Signed, UnsignedDecimal, Usd};
+use shared::storage::{
+    Collateral, DirectionToBase, LeverageToBase, MarketId, Signed, UnsignedDecimal, Usd,
+};
 
 #[derive(clap::Parser)]
 pub(crate) struct UtilOpt {
@@ -37,6 +40,11 @@ enum Sub {
         #[clap(flatten)]
         inner: TradeVolumeOpt,
     },
+    /// Export a CSV with stats on all positioned opened
+    OpenPositionCsv {
+        #[clap(flatten)]
+        inner: OpenPositionCsvOpt,
+    },
 }
 
 impl UtilOpt {
@@ -45,6 +53,7 @@ impl UtilOpt {
             Sub::UpdatePyth { inner } => update_pyth(opt, inner).await,
             Sub::DeployPyth { inner } => deploy_pyth_opt(opt, inner).await,
             Sub::TradeVolume { inner } => trade_volume(opt, inner).await,
+            Sub::OpenPositionCsv { inner } => open_position_csv(opt, inner).await,
         }
     }
 }
@@ -316,5 +325,101 @@ async fn trade_volume(
 
     log::info!("Total trade volume: {total_trade_volume}");
     log::info!("Total realized PnL: {total_realized_pnl}");
+    Ok(())
+}
+
+#[derive(clap::Parser)]
+struct OpenPositionCsvOpt {
+    /// Network to use.
+    #[clap(long, env = "COSMOS_NETWORK")]
+    network: CosmosNetwork,
+    /// Market address
+    #[clap(long)]
+    market: Address,
+    /// Output CSV file
+    #[clap(long)]
+    csv: PathBuf,
+}
+
+async fn open_position_csv(
+    opt: crate::cli::Opt,
+    OpenPositionCsvOpt {
+        network,
+        market,
+        csv,
+    }: OpenPositionCsvOpt,
+) -> Result<()> {
+    let cosmos = opt.connect(network).await?;
+    let contract = MarketContract::new(cosmos.make_contract(market));
+    let mut csv = ::csv::Writer::from_path(&csv)?;
+
+    let mut next_position_id: PositionId = "1".parse()?;
+
+    loop {
+        match contract.first_position_action(next_position_id).await? {
+            Some(PositionAction {
+                id,
+                kind,
+                timestamp,
+                collateral,
+                transfer_collateral: _,
+                leverage,
+                max_gains: _,
+                trade_fee: _,
+                delta_neutrality_fee: _,
+                old_owner: _,
+                new_owner: _,
+                take_profit_override: _,
+                stop_loss_override: _,
+            }) => {
+                anyhow::ensure!(kind == PositionActionKind::Open);
+                anyhow::ensure!(id == Some(next_position_id));
+
+                let timestamp = timestamp.try_into_chrono_datetime()?;
+                let leverage = leverage.with_context(|| {
+                    format!("Missing leverage on position open action for {next_position_id}")
+                })?;
+
+                let PositionsResp {
+                    positions,
+                    pending_close,
+                    closed,
+                } = contract.raw_query_positions(vec![next_position_id]).await?;
+
+                let (owner, direction) = if let Some(position) = positions.first() {
+                    (position.owner.as_str().parse()?, position.direction_to_base)
+                } else if let Some(position) = pending_close.first() {
+                    (position.owner.as_str().parse()?, position.direction_to_base)
+                } else if let Some(position) = closed.first() {
+                    (position.owner.as_str().parse()?, position.direction_to_base)
+                } else {
+                    anyhow::bail!("Could not find position {next_position_id}");
+                };
+
+                #[derive(serde::Serialize)]
+                #[serde(rename_all = "snake_case")]
+                struct Record {
+                    id: PositionId,
+                    timestamp: DateTime<Utc>,
+                    owner: Address,
+                    collateral: Collateral,
+                    leverage: LeverageToBase,
+                    direction: DirectionToBase,
+                }
+                csv.serialize(&Record {
+                    id: next_position_id,
+                    timestamp,
+                    owner,
+                    collateral,
+                    leverage,
+                    direction,
+                })?;
+                csv.flush()?;
+                next_position_id = (next_position_id.u64() + 1).to_string().parse()?;
+            }
+            None => break,
+        }
+    }
+
     Ok(())
 }
