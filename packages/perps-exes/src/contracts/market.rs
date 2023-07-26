@@ -10,8 +10,9 @@ use msg::{
         market::{
             config::ConfigUpdate,
             entry::{
-                ClosedPositionsResp, ExecuteOwnerMsg, LpInfoResp, PriceWouldTriggerResp,
-                SlippageAssert, StatusResp, TradeHistorySummary,
+                ClosedPositionsResp, ExecuteOwnerMsg, LpInfoResp, PositionAction,
+                PositionActionHistoryResp, PriceWouldTriggerResp, SlippageAssert, StatusResp,
+                TradeHistorySummary,
             },
             position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
         },
@@ -19,6 +20,7 @@ use msg::{
     },
     prelude::*,
 };
+use shared::namespace::LAST_POSITION_ID;
 
 use crate::{PositionsInfo, UpdatePositionCollateralImpact};
 
@@ -539,5 +541,32 @@ impl MarketContract {
                 addr: trader.to_string().into(),
             })
             .await
+    }
+
+    pub async fn first_position_action(&self, id: PositionId) -> Result<Option<PositionAction>> {
+        let PositionActionHistoryResp {
+            actions,
+            next_start_after: _,
+        } = self
+            .0
+            .query(MarketQueryMsg::PositionActionHistory {
+                id,
+                start_after: None,
+                limit: Some(1),
+                order: Some(OrderInMessage::Ascending),
+            })
+            .await?;
+        anyhow::ensure!(actions.len() <= 1);
+        Ok(actions.into_iter().next())
+    }
+
+    pub async fn get_highest_position_id(&self) -> Result<PositionId> {
+        // This should really be a proper query or part of StatusResp
+        let bytes = self
+            .0
+            .get_cosmos()
+            .wasm_raw_query(self.0.get_address(), LAST_POSITION_ID)
+            .await?;
+        serde_json::from_slice(&bytes).context("Invalid position ID")
     }
 }
