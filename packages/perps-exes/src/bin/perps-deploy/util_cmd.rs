@@ -343,6 +343,9 @@ struct OpenPositionCsvOpt {
     /// Output CSV file
     #[clap(long)]
     csv: PathBuf,
+    /// How many separate worker tasks to create for parallel loading
+    #[clap(long, default_value = "30")]
+    workers: u32,
 }
 
 struct ToProcess {
@@ -358,6 +361,7 @@ async fn open_position_csv(
         network,
         factory,
         csv,
+        workers,
     }: OpenPositionCsvOpt,
 ) -> Result<()> {
     let cosmos = opt.connect(network).await?;
@@ -384,7 +388,7 @@ async fn open_position_csv(
 
     let mut set = JoinSet::new();
 
-    for _ in 0..30 {
+    for _ in 0..workers {
         let to_process = to_process.clone();
         let csv = csv.clone();
         set.spawn(csv_helper(to_process, csv));
