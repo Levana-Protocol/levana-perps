@@ -12,7 +12,10 @@ pub(crate) struct Opt {
     )]
     pub(crate) bind: SocketAddr,
     #[clap(long, env = "LEVANA_COMPANION_POSTGRES_URI")]
-    pub(crate) postgres_uri: String,
+    pub(crate) postgres_uri: Option<String>,
+
+    #[clap(flatten)]
+    pub(crate) pgopt: Option<PGOpt>,
 }
 
 impl Opt {
@@ -27,4 +30,18 @@ impl Opt {
         });
         env_logger::Builder::from_env(env).init();
     }
+}
+
+#[derive(clap::Parser)]
+pub(crate) struct PGOpt {
+    #[clap(long, env = "PGHOST")]
+    pub(crate) host: String,
+    #[clap(long, env = "PGPORT")]
+    pub(crate) port: String,
+    #[clap(long, env = "PGDATABASE")]
+    pub(crate) database: String,
+    #[clap(long, env = "PGUSER")]
+    pub(crate) user: String,
+    #[clap(long, env = "PGPASSWORD")]
+    pub(crate) password: String,
 }
