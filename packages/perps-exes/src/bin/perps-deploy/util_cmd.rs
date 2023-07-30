@@ -1,3 +1,5 @@
+mod lp_history;
+
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use anyhow::{Context, Result};
@@ -49,6 +51,11 @@ enum Sub {
         #[clap(flatten)]
         inner: OpenPositionCsvOpt,
     },
+    /// Export a CSV with stats on LP actions
+    LpActionCsv {
+        #[clap(flatten)]
+        inner: lp_history::LpActionCsvOpt,
+    },
 }
 
 impl UtilOpt {
@@ -58,6 +65,7 @@ impl UtilOpt {
             Sub::DeployPyth { inner } => deploy_pyth_opt(opt, inner).await,
             Sub::TradeVolume { inner } => trade_volume(opt, inner).await,
             Sub::OpenPositionCsv { inner } => open_position_csv(opt, inner).await,
+            Sub::LpActionCsv { inner } => inner.go(opt).await,
         }
     }
 }
