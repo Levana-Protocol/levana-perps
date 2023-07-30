@@ -587,11 +587,11 @@ impl MarketContract {
                     order: None,
                 })
                 .await?;
+            res.append(&mut actions);
             if next_start_after.is_none() {
                 break Ok(res);
             }
             start_after = next_start_after;
-            res.append(&mut actions);
         }
     }
 }

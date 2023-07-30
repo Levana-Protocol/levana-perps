@@ -64,6 +64,8 @@ async fn go(
         set.spawn(handle_market(market, tx.clone()));
     }
 
+    std::mem::drop(tx);
+
     for _ in 0..workers {
         let csv = csv.clone();
         set.spawn(worker(rx.clone(), csv));
