@@ -11,7 +11,8 @@ use msg::{
         entry::{ExecuteMsg, QueryMsg, StatusResp},
         position::{PositionId, PositionQueryResponse, PositionsResp},
     },
-    prelude::*, token::Token,
+    prelude::*,
+    token::Token,
 };
 use rand::{distributions::uniform::SampleRange, prelude::*};
 
@@ -147,8 +148,7 @@ where
             .parse()
             .unwrap();
 
-        let collateral = self
-            .rand_nonzero_collateral(min_collateral..100.0f64);
+        let collateral = self.rand_nonzero_collateral(min_collateral..100.0f64);
 
         let execute_msg = ExecuteMsg::OpenPosition {
             slippage_assert: None,
@@ -159,7 +159,9 @@ where
             take_profit_override: None,
         };
 
-        self.bridge.mint_collateral(collateral.into_number_gt_zero()).await?;
+        self.bridge
+            .mint_collateral(collateral.into_number_gt_zero())
+            .await?;
         self.bridge
             .mint_and_deposit_lp(
                 NumberGtZero::new(collateral.into_decimal256() * leverage.into_decimal256())
@@ -355,8 +357,15 @@ where
         let value: f64 = self.rng.gen_range(range);
         let value_decimal256: Decimal256 = value.to_string().parse().unwrap_ext();
 
-        let value_128 = self.market_collateral_token.into_u128(value_decimal256).unwrap_ext().unwrap_ext();
-        let value_truncated = self.market_collateral_token.from_u128(value_128).unwrap_ext();
+        let value_128 = self
+            .market_collateral_token
+            .into_u128(value_decimal256)
+            .unwrap_ext()
+            .unwrap_ext();
+        let value_truncated = self
+            .market_collateral_token
+            .from_u128(value_128)
+            .unwrap_ext();
 
         NonZero::new(Collateral::from_decimal256(value_truncated)).unwrap_ext()
     }
