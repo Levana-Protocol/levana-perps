@@ -81,6 +81,7 @@ impl App {
         let mut ctx = ActionContext {
             market_type: self.market_type,
             market_config: &self.market_config,
+            market_collateral_token: self.market_collateral_token.clone(),
             bridge: &self.bridge,
             rng: &mut *self.rng.borrow_mut(),
             get_open_positions: || {

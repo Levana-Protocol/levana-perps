@@ -23,7 +23,7 @@ pub struct App {
     pub bridge: Rc<Bridge>,
     pub market_id: MarketId,
     pub market_type: MarketType,
-    pub market_token: Token,
+    pub market_collateral_token: Token,
     pub market_config: MarketConfig,
     pub controls: Rc<Controls>,
     pub timestamp_loop: RefCell<Option<TimestampLoop>>,
@@ -67,14 +67,14 @@ impl App {
         let stats = Stats::new(bridge.clone());
         let controls = Controls::new();
 
-        let market_token = status.collateral;
+        let market_collateral_token = status.collateral;
         let market_config = status.config;
         let market_id = status.market_id;
         let market_type = status.market_type;
 
         let _self = Rc::new(Self {
             bridge: bridge.clone(),
-            market_token: market_token.clone(),
+            market_collateral_token: market_collateral_token.clone(),
             market_config: market_config.clone(),
             market_id: market_id.clone(),
             market_type: market_type.clone(),
@@ -86,7 +86,7 @@ impl App {
                 bridge,
                 market_id,
                 market_type,
-                market_token,
+                market_collateral_token,
                 market_config,
                 stats.clone(),
                 controls.clone(),

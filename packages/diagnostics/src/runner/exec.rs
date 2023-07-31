@@ -12,6 +12,7 @@ use msg::{
         position::{PositionId, PositionQueryResponse, PositionsResp},
     },
     prelude::*,
+    token::Token,
 };
 use rand::{distributions::uniform::SampleRange, prelude::*};
 
@@ -53,6 +54,7 @@ pub enum ActionLog {
 pub struct ActionContext<'a, R, L, O> {
     pub market_type: MarketType,
     pub market_config: &'a MarketConfig,
+    pub market_collateral_token: Token,
     pub bridge: &'a Bridge,
     pub rng: &'a mut R,
     pub get_open_positions: O,
@@ -146,10 +148,7 @@ where
             .parse()
             .unwrap();
 
-        let collateral = self
-            .rand_number(min_collateral..100.0f64)
-            .to_string()
-            .parse()?;
+        let collateral = self.rand_nonzero_collateral(min_collateral..100.0f64);
 
         let execute_msg = ExecuteMsg::OpenPosition {
             slippage_assert: None,
@@ -160,7 +159,9 @@ where
             take_profit_override: None,
         };
 
-        self.bridge.mint_collateral(collateral).await?;
+        self.bridge
+            .mint_collateral(collateral.into_number_gt_zero())
+            .await?;
         self.bridge
             .mint_and_deposit_lp(
                 NumberGtZero::new(collateral.into_decimal256() * leverage.into_decimal256())
@@ -170,7 +171,7 @@ where
 
         let resp = self
             .bridge
-            .exec_market(execute_msg.clone(), Some(collateral))
+            .exec_market(execute_msg.clone(), Some(collateral.into_number_gt_zero()))
             .await?;
         self.on_log_exec(execute_msg, resp);
 
@@ -300,7 +301,22 @@ where
     }
 
     async fn set_price(&mut self) -> Result<()> {
-        let price: PriceBaseInQuote = self.rand_number(0.3..5.0f64).to_string().parse()?;
+        let old_price = self.query_price().await?;
+
+        let old_price: f64 = old_price
+            .price_base
+            .into_number()
+            .to_string()
+            .parse()
+            .unwrap_ext();
+
+        let log_price = old_price.log(2.0);
+        let log_price = log_price + self.rng.gen_range(-0.1..=0.1);
+        let price = 2.0f64.powf(log_price);
+
+        let price =
+            PriceBaseInQuote::try_from_number(price.to_string().parse().unwrap_ext()).unwrap_ext();
+        //let price: PriceBaseInQuote = self.rand_number(0.3..5.0f64).to_string().parse()?;
         let execute_msg = ExecuteMsg::SetPrice {
             price,
             price_usd: None,
@@ -354,7 +370,19 @@ where
 
     fn rand_nonzero_collateral(&mut self, range: impl SampleRange<f64>) -> NonZero<Collateral> {
         let value: f64 = self.rng.gen_range(range);
-        value.to_string().parse().unwrap()
+        let value_decimal256: Decimal256 = value.to_string().parse().unwrap_ext();
+
+        let value_128 = self
+            .market_collateral_token
+            .into_u128(value_decimal256)
+            .unwrap_ext()
+            .unwrap_ext();
+        let value_truncated = self
+            .market_collateral_token
+            .from_u128(value_128)
+            .unwrap_ext();
+
+        NonZero::new(Collateral::from_decimal256(value_truncated)).unwrap_ext()
     }
 
     fn rand_leverage(
