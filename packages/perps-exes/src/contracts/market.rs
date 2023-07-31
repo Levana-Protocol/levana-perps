@@ -10,9 +10,9 @@ use msg::{
         market::{
             config::ConfigUpdate,
             entry::{
-                ClosedPositionsResp, ExecuteOwnerMsg, LpInfoResp, PositionAction,
-                PositionActionHistoryResp, PriceWouldTriggerResp, SlippageAssert, StatusResp,
-                TradeHistorySummary,
+                ClosedPositionsResp, ExecuteOwnerMsg, LpAction, LpActionHistoryResp, LpInfoResp,
+                PositionAction, PositionActionHistoryResp, PriceWouldTriggerResp, SlippageAssert,
+                StatusResp, TradeHistorySummary,
             },
             position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
         },
@@ -568,5 +568,30 @@ impl MarketContract {
             .wasm_raw_query(self.0.get_address(), LAST_POSITION_ID)
             .await?;
         serde_json::from_slice(&bytes).context("Invalid position ID")
+    }
+
+    pub async fn get_lp_actions(&self, lp: Address) -> Result<Vec<LpAction>> {
+        let mut start_after = None;
+        let mut res = vec![];
+
+        loop {
+            let LpActionHistoryResp {
+                mut actions,
+                next_start_after,
+            } = self
+                .0
+                .query(MarketQueryMsg::LpActionHistory {
+                    addr: lp.get_address_string().into(),
+                    start_after: start_after.take(),
+                    limit: None,
+                    order: None,
+                })
+                .await?;
+            res.append(&mut actions);
+            if next_start_after.is_none() {
+                break Ok(res);
+            }
+            start_after = next_start_after;
+        }
     }
 }

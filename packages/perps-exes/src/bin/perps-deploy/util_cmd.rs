@@ -1,3 +1,5 @@
+mod lp_history;
+
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use anyhow::{Context, Result};
@@ -5,7 +7,7 @@ use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, HasAddress, TxBuilder};
 use msg::contracts::market::{
     entry::{PositionAction, PositionActionKind, TradeHistorySummary},
-    position::{PositionId, PositionsResp},
+    position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
 };
 use parking_lot::Mutex;
 use perps_exes::{
@@ -49,6 +51,11 @@ enum Sub {
         #[clap(flatten)]
         inner: OpenPositionCsvOpt,
     },
+    /// Export a CSV with stats on LP actions
+    LpActionCsv {
+        #[clap(flatten)]
+        inner: lp_history::LpActionCsvOpt,
+    },
 }
 
 impl UtilOpt {
@@ -58,6 +65,7 @@ impl UtilOpt {
             Sub::DeployPyth { inner } => deploy_pyth_opt(opt, inner).await,
             Sub::TradeVolume { inner } => trade_volume(opt, inner).await,
             Sub::OpenPositionCsv { inner } => open_position_csv(opt, inner).await,
+            Sub::LpActionCsv { inner } => inner.go(opt).await,
         }
     }
 }
@@ -468,60 +476,139 @@ async fn csv_helper(
             closed,
         } = contract.raw_query_positions(vec![pos_id]).await?;
 
-        let (owner, direction, deposit_collateral, deposit_collateral_usd, notional_size) =
-            if let Some(position) = positions.first() {
-                (
-                    position.owner.as_str().parse()?,
-                    position.direction_to_base,
-                    position.deposit_collateral,
-                    position.deposit_collateral_usd,
-                    position.notional_size,
-                )
-            } else if let Some(position) = pending_close.first() {
-                (
-                    position.owner.as_str().parse()?,
-                    position.direction_to_base,
-                    position.deposit_collateral,
-                    position.deposit_collateral_usd,
-                    position.notional_size,
-                )
-            } else if let Some(position) = closed.first() {
-                (
-                    position.owner.as_str().parse()?,
-                    position.direction_to_base,
-                    position.deposit_collateral,
-                    position.deposit_collateral_usd,
-                    position.notional_size,
-                )
-            } else {
-                anyhow::bail!("Could not find position {pos_id}");
-            };
-
-        #[derive(serde::Serialize)]
-        #[serde(rename_all = "snake_case")]
-        struct Record<'a> {
-            market: &'a MarketId,
-            id: PositionId,
-            timestamp: DateTime<Utc>,
-            owner: Address,
-            leverage: LeverageToBase,
-            direction: DirectionToBase,
-            deposit_collateral: Signed<Collateral>,
-            deposit_collateral_usd: Signed<Usd>,
-            notional_size: Signed<Notional>,
-        }
-        let mut csv = csv.lock();
-        csv.serialize(&Record {
+        let common = PositionRecordCommon {
             market: &market_id,
             id: pos_id,
             timestamp,
-            owner,
             leverage,
-            direction,
-            deposit_collateral,
-            deposit_collateral_usd,
-            notional_size,
-        })?;
+        };
+
+        let record = if let Some(position) = positions.first() {
+            PositionRecord::from_open(common, position)
+        } else if let Some(position) = pending_close.first() {
+            PositionRecord::from_closed(common, position)
+        } else if let Some(position) = closed.first() {
+            PositionRecord::from_closed(common, position)
+        } else {
+            anyhow::bail!("Could not find position {pos_id}");
+        }?;
+
+        let mut csv = csv.lock();
+        csv.serialize(&record)?;
         csv.flush()?;
+    }
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+enum PositionStatus {
+    Open,
+    Closed,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+struct PositionRecordCommon<'a> {
+    market: &'a MarketId,
+    id: PositionId,
+    timestamp: DateTime<Utc>,
+    leverage: LeverageToBase,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+struct PositionRecord<'a> {
+    market: &'a MarketId,
+    id: PositionId,
+    opened_at: DateTime<Utc>,
+    closed_at: Option<DateTime<Utc>>,
+    leverage: LeverageToBase,
+    owner: Address,
+    direction: DirectionToBase,
+    status: PositionStatus,
+    deposit_collateral: Signed<Collateral>,
+    deposit_collateral_usd: Signed<Usd>,
+    notional_size: Signed<Notional>,
+    pnl_collateral: Signed<Collateral>,
+    pnl_usd: Signed<Usd>,
+    total_fees_collateral: Signed<Collateral>,
+    total_fees_usd: Signed<Usd>,
+}
+
+impl<'a> PositionRecord<'a> {
+    fn from_open(
+        PositionRecordCommon {
+            market,
+            id,
+            timestamp,
+            leverage,
+        }: PositionRecordCommon<'a>,
+        position: &'a PositionQueryResponse,
+    ) -> Result<Self> {
+        let total_fees_collateral = position.borrow_fee_collateral.into_signed()
+            + position.funding_fee_collateral
+            + position.crank_fee_collateral.into_signed()
+            + position.trading_fee_collateral.into_signed()
+            + position.delta_neutrality_fee_collateral;
+        let total_fees_usd = position.borrow_fee_usd.into_signed()
+            + position.funding_fee_usd
+            + position.crank_fee_usd.into_signed()
+            + position.trading_fee_usd.into_signed()
+            + position.delta_neutrality_fee_usd;
+        Ok(Self {
+            market,
+            id,
+            opened_at: timestamp,
+            closed_at: None,
+            leverage,
+            owner: position.owner.as_str().parse()?,
+            direction: position.direction_to_base,
+            deposit_collateral: position.deposit_collateral,
+            deposit_collateral_usd: position.deposit_collateral_usd,
+            notional_size: position.notional_size,
+            pnl_collateral: position.pnl_collateral,
+            pnl_usd: position.pnl_usd,
+            status: PositionStatus::Open,
+            total_fees_collateral,
+            total_fees_usd,
+        })
+    }
+
+    fn from_closed(
+        PositionRecordCommon {
+            market,
+            id,
+            timestamp,
+            leverage,
+        }: PositionRecordCommon<'a>,
+        position: &'a ClosedPosition,
+    ) -> Result<Self> {
+        let total_fees_collateral = position.borrow_fee_collateral.into_signed()
+            + position.funding_fee_collateral
+            + position.crank_fee_collateral.into_signed()
+            + position.trading_fee_collateral.into_signed()
+            + position.delta_neutrality_fee_collateral;
+        let total_fees_usd = position.borrow_fee_usd.into_signed()
+            + position.funding_fee_usd
+            + position.crank_fee_usd.into_signed()
+            + position.trading_fee_usd.into_signed()
+            + position.delta_neutrality_fee_usd;
+        Ok(Self {
+            market,
+            id,
+            opened_at: timestamp,
+            closed_at: Some(position.close_time.try_into_chrono_datetime()?),
+            leverage,
+            owner: position.owner.as_str().parse()?,
+            direction: position.direction_to_base,
+            deposit_collateral: position.deposit_collateral,
+            deposit_collateral_usd: position.deposit_collateral_usd,
+            notional_size: position.notional_size,
+            pnl_collateral: position.pnl_collateral,
+            pnl_usd: position.pnl_usd,
+            status: PositionStatus::Closed,
+            total_fees_collateral,
+            total_fees_usd,
+        })
     }
 }
