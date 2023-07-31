@@ -11,7 +11,7 @@ use msg::{
         entry::{ExecuteMsg, QueryMsg, StatusResp},
         position::{PositionId, PositionQueryResponse, PositionsResp},
     },
-    prelude::*,
+    prelude::*, token::Token,
 };
 use rand::{distributions::uniform::SampleRange, prelude::*};
 
@@ -53,6 +53,7 @@ pub enum ActionLog {
 pub struct ActionContext<'a, R, L, O> {
     pub market_type: MarketType,
     pub market_config: &'a MarketConfig,
+    pub market_collateral_token: Token,
     pub bridge: &'a Bridge,
     pub rng: &'a mut R,
     pub get_open_positions: O,
@@ -147,9 +148,7 @@ where
             .unwrap();
 
         let collateral = self
-            .rand_number(min_collateral..100.0f64)
-            .to_string()
-            .parse()?;
+            .rand_nonzero_collateral(min_collateral..100.0f64);
 
         let execute_msg = ExecuteMsg::OpenPosition {
             slippage_assert: None,
@@ -160,7 +159,7 @@ where
             take_profit_override: None,
         };
 
-        self.bridge.mint_collateral(collateral).await?;
+        self.bridge.mint_collateral(collateral.into_number_gt_zero()).await?;
         self.bridge
             .mint_and_deposit_lp(
                 NumberGtZero::new(collateral.into_decimal256() * leverage.into_decimal256())
@@ -170,7 +169,7 @@ where
 
         let resp = self
             .bridge
-            .exec_market(execute_msg.clone(), Some(collateral))
+            .exec_market(execute_msg.clone(), Some(collateral.into_number_gt_zero()))
             .await?;
         self.on_log_exec(execute_msg, resp);
 
@@ -354,7 +353,12 @@ where
 
     fn rand_nonzero_collateral(&mut self, range: impl SampleRange<f64>) -> NonZero<Collateral> {
         let value: f64 = self.rng.gen_range(range);
-        value.to_string().parse().unwrap()
+        let value_decimal256: Decimal256 = value.to_string().parse().unwrap_ext();
+
+        let value_128 = self.market_collateral_token.into_u128(value_decimal256).unwrap_ext().unwrap_ext();
+        let value_truncated = self.market_collateral_token.from_u128(value_128).unwrap_ext();
+
+        NonZero::new(Collateral::from_decimal256(value_truncated)).unwrap_ext()
     }
 
     fn rand_leverage(
