@@ -301,7 +301,16 @@ where
     }
 
     async fn set_price(&mut self) -> Result<()> {
-        let price: PriceBaseInQuote = self.rand_number(0.3..5.0f64).to_string().parse()?;
+        let old_price = self.query_price().await?;
+
+        let old_price:f64 = old_price.price_base.into_number().to_string().parse().unwrap_ext();
+
+        let log_price = old_price.log(2.0);
+        let log_price = log_price + self.rng.gen_range(-0.1..=0.1);
+        let price = 2.0f64.powf(log_price);
+
+        let price = PriceBaseInQuote::try_from_number(price.to_string().parse().unwrap_ext()).unwrap_ext();
+        //let price: PriceBaseInQuote = self.rand_number(0.3..5.0f64).to_string().parse()?;
         let execute_msg = ExecuteMsg::SetPrice {
             price,
             price_usd: None,
