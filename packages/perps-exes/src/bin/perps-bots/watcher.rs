@@ -38,6 +38,7 @@ pub(crate) enum TaskLabel {
     Balance,
     UltraCrank { index: usize },
     Trader { index: u32 },
+    LiqudityTransactionAlert,
 }
 
 impl TaskLabel {
@@ -54,6 +55,7 @@ impl TaskLabel {
             "liquidity" => Some(TaskLabel::Liquidity),
             "utilization" => Some(TaskLabel::Utilization),
             "balance" => Some(TaskLabel::Balance),
+            "liquditity-transaction-alert" => Some(TaskLabel::LiqudityTransactionAlert),
             // Being lazy, skipping UltraCrank and Trader, they aren't needed
             _ => None,
         }
@@ -184,6 +186,7 @@ impl TaskLabel {
             TaskLabel::Price => config.price,
             TaskLabel::Stats => config.stats,
             TaskLabel::StatsAlert => config.stats_alert,
+            TaskLabel::LiqudityTransactionAlert => config.liquidity_transaction,
         }
     }
 
@@ -206,6 +209,7 @@ impl TaskLabel {
             TaskLabel::Stale => true,
             TaskLabel::Stats => true,
             TaskLabel::StatsAlert => false,
+            TaskLabel::LiqudityTransactionAlert => true,
         }
     }
 
@@ -224,6 +228,7 @@ impl TaskLabel {
             TaskLabel::Stats => "stats".into(),
             TaskLabel::UltraCrank { index } => format!("ultra-crank-{index}").into(),
             TaskLabel::StatsAlert => "stats-alert".into(),
+            TaskLabel::LiqudityTransactionAlert => "liquidity-transaction-alert".into(),
         }
     }
 }

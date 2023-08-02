@@ -62,6 +62,15 @@ pub struct LiquidityConfig {
     pub target_util_delta: Signed<Decimal256>,
 }
 
+#[derive(serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct LiquidityTransactionConfig {
+    /// The amount of lp tokens delta for which alert needs to be raised
+    pub lp_tokens_delta: Signed<Decimal256>,
+    /// The amount of available collateral detal for which alert needs to be raised
+    pub collateral_delta: Signed<Decimal256>,
+}
+
 #[derive(serde::Deserialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct UtilizationConfig {
@@ -277,6 +286,8 @@ pub struct WatcherConfig {
     pub stats_alert: TaskConfig,
     #[serde(default = "defaults::ultra_crank")]
     pub ultra_crank: TaskConfig,
+    #[serde(default = "defaults::liquidity_transaction_alert")]
+    pub liquidity_transaction: TaskConfig,
 }
 
 impl Default for WatcherConfig {
@@ -365,6 +376,12 @@ impl Default for WatcherConfig {
             ultra_crank: TaskConfig {
                 delay: Delay::Constant(120),
                 out_of_date: 180,
+                retries: None,
+                delay_between_retries: None,
+            },
+            liquidity_transaction: TaskConfig {
+                delay: Delay::Constant(120),
+                out_of_date: 120,
                 retries: None,
                 delay_between_retries: None,
             },

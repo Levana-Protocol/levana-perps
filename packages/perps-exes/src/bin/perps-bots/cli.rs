@@ -101,6 +101,10 @@ pub(crate) struct MainnetOpt {
     pub(crate) low_util_ratio: Decimal256,
     #[clap(long, env = "LEVANA_BOTS_HIGH_UTIL_RATIO", default_value = "0.9")]
     pub(crate) high_util_ratio: Decimal256,
+    #[clap(long, env = "LEVANA_BOTS_LP_TOKENS_DELTA", default_value = "5")]
+    pub(crate) ltc_lp_tokens_delta: Decimal256,
+    #[clap(long, env = "LEVANA_BOTS_COLLATERAL_DELTA", default_value = "5")]
+    pub(crate) ltc_collateral_tokens_delta: Decimal256,
 }
 
 impl Opt {

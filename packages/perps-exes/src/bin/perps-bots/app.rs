@@ -4,6 +4,7 @@ pub(crate) mod factory;
 pub(crate) mod faucet;
 mod gas_check;
 mod liquidity;
+mod liquidity_transaction;
 mod price;
 mod stale;
 mod stats;
@@ -76,7 +77,9 @@ impl AppBuilder {
             }
             BotConfigByType::Mainnet { inner } => {
                 // Launch mainnet tasks
-                self.start_stats_alert(inner.clone())?;
+                let mainnet = inner.clone();
+                self.start_stats_alert(mainnet.clone())?;
+                self.start_liquidity_transaction_alert(mainnet)?;
             }
         }
 
