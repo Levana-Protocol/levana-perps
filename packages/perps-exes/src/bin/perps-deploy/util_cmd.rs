@@ -1,4 +1,5 @@
 mod lp_history;
+mod token_balances;
 
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
@@ -56,6 +57,11 @@ enum Sub {
         #[clap(flatten)]
         inner: lp_history::LpActionCsvOpt,
     },
+    /// Get token balances based on open position and LP action CSVs
+    TokenBalances {
+        #[clap(flatten)]
+        inner: token_balances::TokenBalancesOpt,
+    },
 }
 
 impl UtilOpt {
@@ -66,6 +72,7 @@ impl UtilOpt {
             Sub::TradeVolume { inner } => trade_volume(opt, inner).await,
             Sub::OpenPositionCsv { inner } => open_position_csv(opt, inner).await,
             Sub::LpActionCsv { inner } => inner.go(opt).await,
+            Sub::TokenBalances { inner } => inner.go(opt).await,
         }
     }
 }
@@ -528,6 +535,7 @@ struct PositionRecord<'a> {
     status: PositionStatus,
     deposit_collateral: Signed<Collateral>,
     deposit_collateral_usd: Signed<Usd>,
+    active_collateral: Collateral,
     notional_size: Signed<Notional>,
     pnl_collateral: Signed<Collateral>,
     pnl_usd: Signed<Usd>,
@@ -571,6 +579,7 @@ impl<'a> PositionRecord<'a> {
             status: PositionStatus::Open,
             total_fees_collateral,
             total_fees_usd,
+            active_collateral: position.active_collateral.raw(),
         })
     }
 
@@ -609,6 +618,7 @@ impl<'a> PositionRecord<'a> {
             status: PositionStatus::Closed,
             total_fees_collateral,
             total_fees_usd,
+            active_collateral: Collateral::zero(),
         })
     }
 }
