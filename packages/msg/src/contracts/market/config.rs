@@ -116,8 +116,8 @@ impl Default for Config {
     fn default() -> Self {
         // these unwraps are fine since we define the value
         Self {
-            trading_fee_notional_size: "0.0005".parse().unwrap(),
-            trading_fee_counter_collateral: "0.0005".parse().unwrap(),
+            trading_fee_notional_size: "0.001".parse().unwrap(),
+            trading_fee_counter_collateral: "0.001".parse().unwrap(),
             crank_execs: 7,
             max_leverage: Number::try_from("30").unwrap(),
             carry_leverage: "29".parse().unwrap(),
