@@ -145,6 +145,9 @@ impl PerpsMarket {
                     crank_fee_reward: Some(Usd::zero()),
                     // Easier to just go back to the original default than update tests
                     unstake_period_seconds: Some(60 * 60 * 24 * 21),
+                    // Same: original default to fix tests
+                    trading_fee_notional_size: Some("0.0005".parse().unwrap()),
+                    trading_fee_counter_collateral: Some("0.0005".parse().unwrap()),
                     ..Default::default()
                 }),
                 price_admin: DEFAULT_MARKET.price_admin.clone().into(),
