@@ -64,6 +64,10 @@ async fn go(
         set.spawn(handle_market(market, tx.clone()));
     }
 
+    // Without this drop, we get a deadlock below. Reason: as long as the send
+    // side of the channel stays open, receiving on the other end of the channel
+    // will block. When we drop all send sides, the next call to receive will
+    // error out, which we use to detect that there is no more work available.
     std::mem::drop(tx);
 
     for _ in 0..workers {
