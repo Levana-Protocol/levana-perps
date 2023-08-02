@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{borrow::Cow, net::SocketAddr};
 
 #[derive(clap::Parser)]
 pub(crate) struct Opt {
@@ -11,11 +11,9 @@ pub(crate) struct Opt {
         global = true
     )]
     pub(crate) bind: SocketAddr,
-    #[clap(long, env = "LEVANA_COMPANION_POSTGRES_URI")]
-    pub(crate) postgres_uri: Option<String>,
 
-    #[clap(flatten)]
-    pub(crate) pgopt: Option<PGOpt>,
+    #[clap(subcommand)]
+    pub(crate) pgopt: PGOpt,
 }
 
 impl Opt {
@@ -32,16 +30,37 @@ impl Opt {
     }
 }
 
-#[derive(clap::Parser)]
-pub(crate) struct PGOpt {
-    #[clap(long, env = "PGHOST")]
-    pub(crate) host: String,
-    #[clap(long, env = "PGPORT")]
-    pub(crate) port: String,
-    #[clap(long, env = "PGDATABASE")]
-    pub(crate) database: String,
-    #[clap(long, env = "PGUSER")]
-    pub(crate) user: String,
-    #[clap(long, env = "PGPASSWORD")]
-    pub(crate) password: String,
+#[derive(clap::Parser, Clone)]
+pub(crate) enum PGOpt {
+    Uri {
+        #[clap(long, env = "LEVANA_COMPANION_POSTGRES_URI")]
+        postgres_uri: String,
+    },
+    Individual {
+        #[clap(long, env = "PGHOST")]
+        host: String,
+        #[clap(long, env = "PGPORT")]
+        port: String,
+        #[clap(long, env = "PGDATABASE")]
+        database: String,
+        #[clap(long, env = "PGUSER")]
+        user: String,
+        #[clap(long, env = "PGPASSWORD")]
+        password: String,
+    },
+}
+
+impl PGOpt {
+    pub(crate) fn uri(&self) -> Cow<str> {
+        match self {
+            PGOpt::Uri { postgres_uri } => postgres_uri.into(),
+            PGOpt::Individual {
+                host,
+                port,
+                database,
+                user,
+                password,
+            } => format!("postgresql://{user}:{password}@{host}:{port}/{database}").into(),
+        }
+    }
 }

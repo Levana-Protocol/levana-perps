@@ -15,18 +15,7 @@ pub(crate) struct App {
 
 impl App {
     pub(crate) async fn new(opt: Opt) -> Result<App> {
-        let postgres_uri = opt
-            .postgres_uri
-            .clone()
-            .or_else(|| {
-                opt.pgopt.as_ref().map(|pgopt| {
-                    format!(
-                        "postgresql://{}:{}@{}:{}/{}",
-                        pgopt.user, pgopt.password, pgopt.host, pgopt.port, pgopt.database
-                    )
-                })
-            }) // no password escaping considered
-            .unwrap();
+        let postgres_uri = opt.pgopt.uri();
         let db = Db::new(&postgres_uri).await?;
         let mut cosmos_map = HashMap::new();
         for chain_id in ChainId::all() {
