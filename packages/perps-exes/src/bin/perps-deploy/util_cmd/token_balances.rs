@@ -135,7 +135,7 @@ async fn go(
     }
 
     for record in outputs.values() {
-        csv.serialize(&record)?;
+        csv.serialize(record)?;
     }
 
     Ok(())
