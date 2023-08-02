@@ -429,11 +429,20 @@ impl State<'_> {
             .checked_add(liquidity_stats.unlocked)?;
         let liquidity_to_return = liquidity_stats.lp_to_collateral_non_zero(shares_to_withdraw)?;
 
-        if liquidity_to_return.raw() > liquidity_stats.unlocked {
+        let long_interest_protocol = self.open_long_interest(ctx.storage)?;
+        let short_interest_protocol = self.open_short_interest(ctx.storage)?;
+        let net_notional =
+            long_interest_protocol.into_signed() - short_interest_protocol.into_signed();
+        let price = self.spot_price(ctx.storage, None)?;
+        let min_unlocked_liquidity = self.min_unlocked_liquidity(net_notional, price)?;
+        if liquidity_to_return.raw() + min_unlocked_liquidity > liquidity_stats.unlocked {
             return Err(MarketError::InsufficientLiquidityForWithdrawal {
                 requested_lp: shares_to_withdraw,
                 requested_collateral: liquidity_to_return,
-                unlocked: liquidity_stats.unlocked,
+                unlocked: (liquidity_stats.unlocked.into_signed()
+                    - min_unlocked_liquidity.into_signed())
+                .max(Collateral::zero().into_signed())
+                .abs_unsigned(),
             }
             .into());
         }
@@ -622,14 +631,37 @@ impl State<'_> {
         Ok(())
     }
 
+    /// Minimum amount of liquidity needed to allow a carry leverage trade that balances the net notional.
+    pub(crate) fn min_unlocked_liquidity(
+        &self,
+        net_notional: Signed<Notional>,
+        price: PricePoint,
+    ) -> Result<Collateral> {
+        let net_notional_in_collateral = price.notional_to_collateral(net_notional.abs_unsigned());
+        let counter_collateral = net_notional_in_collateral.div_non_zero_dec(
+            NonZero::new(self.config.carry_leverage)
+                .context("Carry leverage of 0 configuration error")?,
+        );
+        Ok(counter_collateral)
+    }
+
     /// Check that there is sufficient unlocked liquidity
     pub(crate) fn check_unlocked_liquidity(
         &self,
-        stats: &LiquidityStats,
+        store: &dyn Storage,
         amount: NonZero<Collateral>,
+        delta_notional: Option<Signed<Notional>>,
     ) -> Result<()> {
-        if amount.raw() > stats.unlocked {
-            Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed lock! not enough unlocked liquidity in the protocol! (asked for {}, only {} available)", amount, stats.unlocked))
+        let stats = self.load_liquidity_stats(store)?;
+        let long_interest_protocol = self.open_long_interest(store)?;
+        let short_interest_protocol = self.open_short_interest(store)?;
+        let net_notional = long_interest_protocol.into_signed()
+            - short_interest_protocol.into_signed()
+            + delta_notional.unwrap_or_else(|| Notional::zero().into_signed());
+        let price = self.spot_price(store, None)?;
+        let min_unlocked_liquidity = self.min_unlocked_liquidity(net_notional, price)?;
+        if min_unlocked_liquidity + amount.raw() > stats.unlocked {
+            Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed lock! not enough unlocked liquidity in the protocol! (asked for {}, only {} available with {} minimum)", amount, stats.unlocked, min_unlocked_liquidity))
         } else {
             Ok(())
         }
@@ -641,7 +673,7 @@ impl State<'_> {
         amount: NonZero<Collateral>,
     ) -> Result<()> {
         let mut stats = self.load_liquidity_stats(ctx.storage)?;
-        self.check_unlocked_liquidity(&stats, amount)?;
+        self.check_unlocked_liquidity(ctx.storage, amount, None)?;
 
         stats.locked = stats.locked.checked_add(amount.raw())?;
         stats.unlocked = stats.unlocked.checked_sub(amount.raw())?;

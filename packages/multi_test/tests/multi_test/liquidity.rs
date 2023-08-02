@@ -713,21 +713,44 @@ fn lp_info_unknown_lp() {
 #[test]
 fn drain_all_liquidity_perp_705() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market_type = market.id.get_market_type();
 
     // Open a position to lock some liquidity
     let trader = market.clone_trader(0).unwrap();
-    let (pos_id, _) = market
+    let (long_pos_id, _) = market
         .exec_open_position(
             &trader,
             "10",
-            "10",
+            "3",
             DirectionToBase::Long,
-            "10",
+            "0.11",
             None,
             None,
             None,
         )
         .unwrap();
+
+    let short_leverage = match market_type {
+        MarketType::CollateralIsQuote => "3",
+        MarketType::CollateralIsBase => "1",
+    };
+
+    let (short_pos_id, _) = market
+        .exec_open_position(
+            &trader,
+            "10",
+            short_leverage,
+            DirectionToBase::Short,
+            "0.11",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    let status = market.query_status().unwrap();
+    // Make sure positions balance each other out so there is 0 min liquidity requirement.
+    assert_eq!(status.long_notional, status.short_notional);
 
     // Withdraw the extra liquidity and make sure there is no unlocked
     // liquidity.  Now our position has all the liquidity in the pool.
@@ -741,19 +764,36 @@ fn drain_all_liquidity_perp_705() {
     market.exec_claim_yield(lp).unwrap();
     market.exec_claim_yield(lp).unwrap_err();
 
-    // Force a take profit on the position
-    market.exec_set_price("10000".parse().unwrap()).unwrap();
+    // Force a take profit on both positions
+    market.exec_set_price("1.2".parse().unwrap()).unwrap();
+    market
+        .exec_crank_till_finished(&Addr::unchecked("crank"))
+        .unwrap();
+    market.exec_set_price("0.8".parse().unwrap()).unwrap();
     // Crank until we realize we need to reset LP balances
+    let mut found_reset = false;
     for _ in 0..100 {
         market.exec_crank_single(&Addr::unchecked("crank")).unwrap();
         let crank_stats = market.query_crank_stats().unwrap();
         if crank_stats == Some(msg::contracts::market::crank::CrankWorkInfo::ResetLpBalances {}) {
+            found_reset = true;
             break;
         }
     }
 
-    // Ensure the position is closed
-    let _res = market.query_closed_position(&trader, pos_id).unwrap();
+    // Ensure the positions are closed with max gains
+    let res = market.query_closed_position(&trader, long_pos_id).unwrap();
+    assert_eq!(
+        res.reason,
+        PositionCloseReason::Liquidated(LiquidationReason::MaxGains)
+    );
+    let res = market.query_closed_position(&trader, short_pos_id).unwrap();
+    assert_eq!(
+        res.reason,
+        PositionCloseReason::Liquidated(LiquidationReason::MaxGains)
+    );
+
+    assert!(found_reset);
 
     // We should be blocked from depositing liquidity right now
     market
@@ -1637,4 +1677,274 @@ fn reinvest_history_perp_1418_partial() {
         events_before_reinvest.actions.len() + 2,
         events_after_reinvest.actions.len()
     );
+}
+
+#[derive(Debug)]
+struct OpenParam {
+    collateral: Number,
+    leverage: LeverageToBase,
+    max_gains: MaxGainsInQuote,
+}
+
+#[test]
+fn carry_leverage_min_liquidity_open() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    let market_type = market.id.get_market_type();
+    let trader = market.clone_trader(0).unwrap();
+
+    let open_param_success = match market_type {
+        MarketType::CollateralIsQuote => OpenParam {
+            collateral: "2307".parse().unwrap(),
+            leverage: "3".parse().unwrap(),
+            max_gains: "1".parse().unwrap(),
+        },
+        MarketType::CollateralIsBase => OpenParam {
+            collateral: "4285".parse().unwrap(),
+            leverage: "3".parse().unwrap(),
+            max_gains: "1".parse().unwrap(),
+        },
+    };
+
+    let (pos_id, _) = market
+        .exec_open_position_raw(
+            &trader,
+            open_param_success.collateral,
+            None,
+            open_param_success.leverage,
+            DirectionToBase::Long,
+            open_param_success.max_gains,
+            None,
+            None,
+        )
+        .unwrap();
+
+    market.exec_close_position(&trader, pos_id, None).unwrap();
+
+    let open_param_fail = match market_type {
+        MarketType::CollateralIsQuote => OpenParam {
+            collateral: "2308".parse().unwrap(),
+            leverage: "3".parse().unwrap(),
+            max_gains: "1".parse().unwrap(),
+        },
+        MarketType::CollateralIsBase => OpenParam {
+            collateral: "4286".parse().unwrap(),
+            leverage: "3".parse().unwrap(),
+            max_gains: "1".parse().unwrap(),
+        },
+    };
+
+    let response = market.exec_open_position_raw(
+        &trader,
+        open_param_fail.collateral,
+        None,
+        open_param_fail.leverage,
+        DirectionToBase::Long,
+        open_param_fail.max_gains,
+        None,
+        None,
+    );
+    assert!(response.is_err());
+
+    market
+        .exec_mint_and_deposit_liquidity(&trader, "2000".parse().unwrap())
+        .unwrap();
+
+    market
+        .exec_open_position_raw(
+            &trader,
+            open_param_fail.collateral,
+            None,
+            open_param_fail.leverage,
+            DirectionToBase::Long,
+            open_param_fail.max_gains,
+            None,
+            None,
+        )
+        .unwrap();
+}
+
+#[test]
+fn carry_leverage_min_liquidity_update_position_size() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    let market_type = market.id.get_market_type();
+    let trader = market.clone_trader(0).unwrap();
+
+    let open_param_success = match market_type {
+        MarketType::CollateralIsQuote => OpenParam {
+            collateral: "2306".parse().unwrap(),
+            leverage: "3".parse().unwrap(),
+            max_gains: "1".parse().unwrap(),
+        },
+        MarketType::CollateralIsBase => OpenParam {
+            collateral: "4284".parse().unwrap(),
+            leverage: "3".parse().unwrap(),
+            max_gains: "1".parse().unwrap(),
+        },
+    };
+
+    let (pos_id, _) = market
+        .exec_open_position_raw(
+            &trader,
+            open_param_success.collateral,
+            None,
+            open_param_success.leverage,
+            DirectionToBase::Long,
+            open_param_success.max_gains,
+            None,
+            None,
+        )
+        .unwrap();
+
+    market
+        .exec_update_position_collateral_impact_size(&trader, pos_id, "1".try_into().unwrap(), None)
+        .unwrap();
+
+    let response = market.exec_update_position_collateral_impact_size(
+        &trader,
+        pos_id,
+        "1".try_into().unwrap(),
+        None,
+    );
+
+    assert!(response.is_err());
+}
+
+#[test]
+fn carry_leverage_min_liquidity_update_leverage() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    let market_type = market.id.get_market_type();
+    let trader = market.clone_trader(0).unwrap();
+
+    let open_param_success = match market_type {
+        MarketType::CollateralIsQuote => OpenParam {
+            collateral: "2000".parse().unwrap(),
+            leverage: "3".parse().unwrap(),
+            max_gains: "1".parse().unwrap(),
+        },
+        MarketType::CollateralIsBase => OpenParam {
+            collateral: "4000".parse().unwrap(),
+            leverage: "3".parse().unwrap(),
+            max_gains: "1".parse().unwrap(),
+        },
+    };
+
+    let (pos_id, _) = market
+        .exec_open_position_raw(
+            &trader,
+            open_param_success.collateral,
+            None,
+            open_param_success.leverage,
+            DirectionToBase::Long,
+            open_param_success.max_gains,
+            None,
+            None,
+        )
+        .unwrap();
+
+    market
+        .exec_update_position_leverage(&trader, pos_id, "3.02".parse().unwrap(), None)
+        .unwrap();
+    let response =
+        market.exec_update_position_leverage(&trader, pos_id, "3.5".parse().unwrap(), None);
+    assert!(response.is_err());
+}
+
+#[test]
+fn carry_leverage_min_liquidity_update_max_gains() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    market
+        .exec_set_config(ConfigUpdate {
+            trading_fee_notional_size: Some("0".parse().unwrap()),
+            trading_fee_counter_collateral: Some("0".parse().unwrap()),
+            delta_neutrality_fee_sensitivity: Some("5000000000000000000".parse().unwrap()),
+            ..Default::default()
+        })
+        .unwrap();
+
+    let market_type = market.id.get_market_type();
+    let trader = market.clone_trader(0).unwrap();
+
+    let open_param_success = match market_type {
+        MarketType::CollateralIsQuote => OpenParam {
+            collateral: "2000".parse().unwrap(),
+            leverage: "3".parse().unwrap(),
+            max_gains: "1".parse().unwrap(),
+        },
+        MarketType::CollateralIsBase => OpenParam {
+            collateral: "4000".parse().unwrap(),
+            leverage: "3".parse().unwrap(),
+            max_gains: "1".parse().unwrap(),
+        },
+    };
+
+    let (pos_id, _) = market
+        .exec_open_position_raw(
+            &trader,
+            open_param_success.collateral,
+            None,
+            open_param_success.leverage,
+            DirectionToBase::Long,
+            open_param_success.max_gains,
+            None,
+            None,
+        )
+        .unwrap();
+
+    market
+        .exec_update_position_max_gains(&trader, pos_id, "1.02".parse().unwrap())
+        .unwrap();
+    let response = market.exec_update_position_max_gains(&trader, pos_id, "1.5".parse().unwrap());
+    assert!(response.is_err());
+}
+
+#[test]
+fn carry_leverage_min_liquidity_withdraw() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    let new_lp = Addr::unchecked("new-lp");
+    market
+        .exec_mint_and_deposit_liquidity(&new_lp, "3000".parse().unwrap())
+        .unwrap();
+
+    let market_type = market.id.get_market_type();
+    let trader = market.clone_trader(0).unwrap();
+
+    let open_param_success = match market_type {
+        MarketType::CollateralIsQuote => OpenParam {
+            collateral: "3460".parse().unwrap(),
+            leverage: "3".parse().unwrap(),
+            max_gains: "1".parse().unwrap(),
+        },
+        MarketType::CollateralIsBase => OpenParam {
+            collateral: "6427".parse().unwrap(),
+            leverage: "3".parse().unwrap(),
+            max_gains: "1".parse().unwrap(),
+        },
+    };
+
+    market
+        .exec_open_position_raw(
+            &trader,
+            open_param_success.collateral,
+            None,
+            open_param_success.leverage,
+            DirectionToBase::Long,
+            open_param_success.max_gains,
+            None,
+            None,
+        )
+        .unwrap();
+
+    let withdraw_amount_fail = Number::from(1505u64);
+    let response = market.exec_withdraw_liquidity(&new_lp, Some(withdraw_amount_fail));
+    assert!(response.is_err());
+
+    let withdraw_amount_success = Number::from(1500u64);
+    market
+        .exec_withdraw_liquidity(&new_lp, Some(withdraw_amount_success))
+        .unwrap();
 }

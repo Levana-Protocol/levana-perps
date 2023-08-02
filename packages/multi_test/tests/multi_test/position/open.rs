@@ -145,6 +145,10 @@ fn position_open_slippage_assert() {
     let price = market.query_current_price().unwrap().price_notional;
 
     market
+        .exec_mint_and_deposit_liquidity(&trader, "2000".parse().unwrap())
+        .unwrap();
+
+    market
         .exec_open_position(
             &trader,
             "10",
@@ -261,6 +265,10 @@ fn position_open_slippage_assert() {
 fn position_open_slippage_assert_exact_queried() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
+
+    market
+        .exec_mint_and_deposit_liquidity(&trader, "2000".parse().unwrap())
+        .unwrap();
 
     for direction in [DirectionToBase::Short, DirectionToBase::Long] {
         let price_point = market.query_current_price().unwrap();

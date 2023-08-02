@@ -276,6 +276,10 @@ fn collateral_edge_size() {
     let market_type = market.id.get_market_type();
     let trader = market.clone_trader(0).unwrap();
 
+    market
+        .exec_mint_and_deposit_liquidity(&trader, "5000".parse().unwrap())
+        .unwrap();
+
     let open_param = match market_type {
         MarketType::CollateralIsQuote => OpenParam {
             collateral: "10".parse().unwrap(),
@@ -342,7 +346,7 @@ fn collateral_edge_size() {
 
     let max_param_collateral = match market_type {
         MarketType::CollateralIsQuote => "9999",
-        MarketType::CollateralIsBase => "99",
+        MarketType::CollateralIsBase => "999",
     };
 
     market

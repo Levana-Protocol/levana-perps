@@ -153,7 +153,7 @@ impl State<'_> {
             DeltaNeutralityFeeReason::PositionOpen,
         )?;
 
-        self.check_unlocked_liquidity(&self.load_liquidity_stats(store)?, pos.counter_collateral)?;
+        self.check_unlocked_liquidity(store, pos.counter_collateral, Some(pos.notional_size))?;
 
         pos.liquidation_margin =
             pos.liquidation_margin(price_point.price_notional, &price_point, &self.config)?;

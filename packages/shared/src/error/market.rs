@@ -35,7 +35,7 @@ pub enum MarketError {
         requested: NonZero<LpToken>,
         available: NonZero<LpToken>,
     },
-    #[error("Insufficient unlocked liquidity for withdrawal. Requested {requested_collateral} ({requested_lp} LP tokens), only {unlocked} liquidity available.")]
+    #[error("Insufficient unlocked liquidity for withdrawal. Requested {requested_collateral} ({requested_lp} LP tokens), only {unlocked} liquidity available until min liquidity.")]
     InsufficientLiquidityForWithdrawal {
         requested_lp: NonZero<LpToken>,
         requested_collateral: NonZero<Collateral>,
