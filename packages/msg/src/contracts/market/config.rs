@@ -120,7 +120,7 @@ impl Default for Config {
             trading_fee_counter_collateral: "0.0005".parse().unwrap(),
             crank_execs: 7,
             max_leverage: Number::try_from("30").unwrap(),
-            carry_leverage: "29".parse().unwrap(),
+            carry_leverage: "10".parse().unwrap(),
             funding_rate_max_annualized: "0.9".parse().unwrap(),
             borrow_fee_rate_min_annualized: "0.01".parse().unwrap(),
             borrow_fee_rate_max_annualized: "0.60".parse().unwrap(),

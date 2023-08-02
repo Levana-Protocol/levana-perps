@@ -154,6 +154,10 @@ fn funding_payment_flips_direction() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
 
+    market
+        .exec_mint_and_deposit_liquidity(&trader, "2000".parse().unwrap())
+        .unwrap();
+
     // Open a massively large long position so that the short position receives a large funding payment
     market
         .exec_open_position(
