@@ -195,9 +195,10 @@ impl Opt {
             low_util_ratio,
             high_util_ratio,
             price_age_alert_threshold_secs,
-            ltc_lp_tokens_delta,
-            ltc_collateral_tokens_delta,
-        }: &MainnetOpt,
+            ltc_num_blocks,
+            ltc_total_liqudity_percent,
+            ltc_total_deposit_percent,
+	}: &MainnetOpt,
     ) -> Result<BotConfig> {
         let price_wallet = seed
             .derive_cosmos_numbered(1)?
@@ -218,8 +219,9 @@ impl Opt {
                     low_util_ratio: *low_util_ratio,
                     high_util_ratio: *high_util_ratio,
                     liquidity_transaction: LiquidityTransactionConfig {
-                        lp_tokens_delta: Signed::from(*ltc_lp_tokens_delta),
-                        collateral_delta: Signed::from(*ltc_collateral_tokens_delta),
+                        number_of_blocks: *ltc_num_blocks,
+                        liqudity_percentage: Signed::from(*ltc_total_liqudity_percent),
+                        total_deposits_percentage: Signed::from(*ltc_total_deposit_percent),
                     },
                 }
                 .into(),

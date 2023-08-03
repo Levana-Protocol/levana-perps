@@ -18,12 +18,12 @@ pub(super) struct LiquidityTransaction {
 }
 
 impl AppBuilder {
-    pub(super) fn start_liquidity_transaction_alert(
+    pub(super) fn start_total_deposits_alert(
         &mut self,
         mainnet: Arc<BotConfigMainnet>,
     ) -> Result<()> {
         self.watch_periodic(
-            TaskLabel::LiqudityTransactionAlert,
+            TaskLabel::TotalDepositAlert,
             LiquidityTransaction { mainnet },
         )
     }
@@ -68,37 +68,38 @@ async fn check_liquidity_transaction_alert(
         RiseDown,
     }
 
-    let diff_total_liqudity =
-        latest_stats.liquidity.total_collateral() - historical_status.liquidity.total_collateral();
-    let change_type = if diff_total_liqudity > Collateral::zero() {
+    let diff_total_deposits =
+        latest_stats.liquidity.total_tokens() - historical_status.liquidity.total_tokens();
+    let change_type = if diff_total_deposits > LpToken::zero() {
         DeltaChange::RiseUp
     } else {
         DeltaChange::RiseDown
     };
 
-    let historical_total_collateral = historical_status.liquidity.total_collateral();
+    let historical_total_tokens = historical_status.liquidity.total_tokens();
     // If this is not ensured, you would get divide by zero errors
     ensure!(
-        historical_total_collateral.gt(&Collateral::zero()),
-        "Historical collateral should be greater than zero"
+        historical_total_tokens.gt(&LpToken::zero()),
+        "Historical tokens should be greater than zero"
     );
 
-    let percentage_change = diff_total_liqudity
+    let percentage_change = diff_total_deposits
         .into_decimal256()
         .into_signed()
         .abs()
-        .checked_div(historical_total_collateral.into_decimal256().into_signed())?.checked_mul("100".parse()?)?;
+        .checked_div(historical_total_tokens.into_decimal256().into_signed())?
+        .checked_mul("100".parse()?)?;
     if mainnet.liquidity_transaction.liqudity_percentage <= percentage_change {
         let msg = match change_type {
             DeltaChange::RiseUp => "increased",
             DeltaChange::RiseDown => "decreased",
         };
-        Ok(WatchedTaskOutput { skip_delay: false, message: format!("Total liquidity {msg} by {percentage_change}% between height {historical_height} and {latest_height}")})
+        Ok(WatchedTaskOutput { skip_delay: false, message: format!("Total deposits {msg} by {percentage_change}% between height {historical_height} and {latest_height}")})
     } else {
         Ok(WatchedTaskOutput {
             skip_delay: false,
             message: format!(
-                "Total liqudity between heights of {} is under the expected delta (Percentage change: {percentage_change}%)",
+                "Total deposits between heights of {} is under the expected delta (Percentage change: {percentage_change}%)",
                 mainnet.liquidity_transaction.number_of_blocks
             ),
         })

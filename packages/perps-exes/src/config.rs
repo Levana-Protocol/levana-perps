@@ -65,10 +65,12 @@ pub struct LiquidityConfig {
 #[derive(serde::Deserialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct LiquidityTransactionConfig {
-    /// The amount of lp tokens delta for which alert needs to be raised
-    pub lp_tokens_delta: Signed<Decimal256>,
-    /// The amount of available collateral detal for which alert needs to be raised
-    pub collateral_delta: Signed<Decimal256>,
+    /// Total number of blocks between which you need to check values
+    pub number_of_blocks: u16,
+    /// Percentage change of total liqudity below/above which we should alert
+    pub liqudity_percentage: Signed<Decimal256>,
+    /// Percentage change of total deposits below/above which we should alert
+    pub total_deposits_percentage: Signed<Decimal256>
 }
 
 #[derive(serde::Deserialize, Clone, Copy, Debug)]
@@ -380,7 +382,7 @@ impl Default for WatcherConfig {
                 delay_between_retries: None,
             },
             liquidity_transaction: TaskConfig {
-                delay: Delay::Constant(120),
+                delay: Delay::Constant(10),
                 out_of_date: 120,
                 retries: None,
                 delay_between_retries: None,

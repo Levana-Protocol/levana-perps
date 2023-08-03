@@ -13,6 +13,7 @@ mod trader;
 mod types;
 mod ultra_crank;
 mod utilization;
+mod total_deposits;
 
 use anyhow::Result;
 pub(crate) use types::*;
@@ -79,7 +80,8 @@ impl AppBuilder {
                 // Launch mainnet tasks
                 let mainnet = inner.clone();
                 self.start_stats_alert(mainnet.clone())?;
-                self.start_liquidity_transaction_alert(mainnet)?;
+                self.start_liquidity_transaction_alert(mainnet.clone())?;
+		self.start_total_deposits_alert(mainnet)?;
             }
         }
 
