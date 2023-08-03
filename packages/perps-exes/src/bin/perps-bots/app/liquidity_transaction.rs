@@ -79,7 +79,7 @@ async fn check_liquidity_transaction_alert(
     let historical_total_collateral = historical_status.liquidity.total_collateral();
     // If this is not ensured, you would get divide by zero errors
     ensure!(
-        historical_total_collateral.gt(&Collateral::zero()),
+        historical_total_collateral.ne(&Collateral::zero()),
         "Historical collateral should be greater than zero"
     );
 

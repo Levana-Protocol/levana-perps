@@ -13,7 +13,7 @@ use crate::{
 use super::{factory::FactoryInfo, App, AppBuilder};
 
 #[derive(Clone)]
-pub(super) struct LiquidityTransaction {
+pub(super) struct DepositsTransaction {
     mainnet: Arc<BotConfigMainnet>,
 }
 
@@ -24,13 +24,13 @@ impl AppBuilder {
     ) -> Result<()> {
         self.watch_periodic(
             TaskLabel::TotalDepositAlert,
-            LiquidityTransaction { mainnet },
+            DepositsTransaction { mainnet },
         )
     }
 }
 
 #[async_trait]
-impl WatchedTaskPerMarket for LiquidityTransaction {
+impl WatchedTaskPerMarket for DepositsTransaction {
     async fn run_single_market(
         &mut self,
         app: &App,
@@ -79,7 +79,7 @@ async fn check_liquidity_transaction_alert(
     let historical_total_tokens = historical_status.liquidity.total_tokens();
     // If this is not ensured, you would get divide by zero errors
     ensure!(
-        historical_total_tokens.gt(&LpToken::zero()),
+        historical_total_tokens.ne(&LpToken::zero()),
         "Historical tokens should be greater than zero"
     );
 
@@ -89,7 +89,7 @@ async fn check_liquidity_transaction_alert(
         .abs()
         .checked_div(historical_total_tokens.into_decimal256().into_signed())?
         .checked_mul("100".parse()?)?;
-    if mainnet.liquidity_transaction.liqudity_percentage <= percentage_change {
+    if mainnet.liquidity_transaction.total_deposits_percentage <= percentage_change {
         let msg = match change_type {
             DeltaChange::RiseUp => "increased",
             DeltaChange::RiseDown => "decreased",
