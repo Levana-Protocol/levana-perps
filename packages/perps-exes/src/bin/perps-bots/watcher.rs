@@ -212,8 +212,8 @@ impl TaskLabel {
             TaskLabel::Stale => true,
             TaskLabel::Stats => true,
             TaskLabel::StatsAlert => false,
-            TaskLabel::LiqudityTransactionAlert => true,
-            TaskLabel::TotalDepositAlert => true,
+            TaskLabel::LiqudityTransactionAlert => false,
+            TaskLabel::TotalDepositAlert => false,
         }
     }
 
