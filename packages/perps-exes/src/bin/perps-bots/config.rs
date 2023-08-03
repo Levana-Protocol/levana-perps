@@ -3,8 +3,8 @@ use std::sync::Arc;
 use cosmos::{Address, CosmosNetwork, HasAddressType, Wallet};
 use perps_exes::{
     config::{
-        ChainConfig, ConfigTestnet, DeploymentInfo, LiquidityConfig, TraderConfig,
-        UtilizationConfig, WatcherConfig,
+        ChainConfig, ConfigTestnet, DeploymentInfo, LiquidityConfig, LiquidityTransactionConfig,
+        TraderConfig, UtilizationConfig, WatcherConfig,
     },
     prelude::*,
 };
@@ -49,6 +49,7 @@ pub(crate) struct BotConfigMainnet {
     pub(crate) min_gas_price: u128,
     pub(crate) low_util_ratio: Decimal256,
     pub(crate) high_util_ratio: Decimal256,
+    pub(crate) liquidity_transaction: LiquidityTransactionConfig,
 }
 
 pub(crate) struct BotConfig {
@@ -194,6 +195,9 @@ impl Opt {
             low_util_ratio,
             high_util_ratio,
             price_age_alert_threshold_secs,
+            ltc_num_blocks,
+            ltc_total_liqudity_percent,
+            ltc_total_deposit_percent,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let price_wallet = seed
@@ -214,6 +218,11 @@ impl Opt {
                     min_gas_price: *min_gas_price,
                     low_util_ratio: *low_util_ratio,
                     high_util_ratio: *high_util_ratio,
+                    liquidity_transaction: LiquidityTransactionConfig {
+                        number_of_blocks: *ltc_num_blocks,
+                        liqudity_percentage: Signed::from(*ltc_total_liqudity_percent),
+                        total_deposits_percentage: Signed::from(*ltc_total_deposit_percent),
+                    },
                 }
                 .into(),
             },
@@ -294,6 +303,7 @@ impl BotConfigMainnet {
             min_gas_price: _,
             low_util_ratio: _,
             high_util_ratio: _,
+            liquidity_transaction: _,
         } = self;
         0
     }

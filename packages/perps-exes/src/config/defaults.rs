@@ -74,6 +74,10 @@ pub(super) fn ultra_crank() -> TaskConfig {
     super::WatcherConfig::default().ultra_crank
 }
 
+pub(super) fn liquidity_transaction_alert() -> TaskConfig {
+    super::WatcherConfig::default().liquidity_transaction
+}
+
 pub(super) fn seconds_till_ultra() -> u32 {
     // 8 minutes
     60 * 8

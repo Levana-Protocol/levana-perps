@@ -101,6 +101,15 @@ pub(crate) struct MainnetOpt {
     pub(crate) low_util_ratio: Decimal256,
     #[clap(long, env = "LEVANA_BOTS_HIGH_UTIL_RATIO", default_value = "0.9")]
     pub(crate) high_util_ratio: Decimal256,
+    /// Total number of blocks between which you need to check values
+    #[clap(long, env = "LEVANA_BOTS_NUM_BLOCKS", default_value = "600")]
+    pub(crate) ltc_num_blocks: u16,
+    /// Percentage change of total liqudity below/above which we should alert
+    #[clap(long, env = "LEVANA_BOTS_LIQUIDITY_PERCENT", default_value = "10")]
+    pub(crate) ltc_total_liqudity_percent: Decimal256,
+    /// Percentage change of total deposit below/above which we should alert
+    #[clap(long, env = "LEVANA_BOTS_DEPOSIT_PERCENT", default_value = "10")]
+    pub(crate) ltc_total_deposit_percent: Decimal256,
 }
 
 impl Opt {
