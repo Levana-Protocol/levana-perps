@@ -55,7 +55,7 @@ export const NETWORKS = {
     "sei-testnet": {
       "rpc_url": "https://sei-testnet-2-rpc.brocha.in",
       "rest_url": "https://sei-testnet-2-rest.brocha.in",
-      "gas_price": "0.025",
+      "gas_price": "0.1",
       "full_denom": "SEI",
       "denom": "usei",
       "chain_id": "atlantic-2",
