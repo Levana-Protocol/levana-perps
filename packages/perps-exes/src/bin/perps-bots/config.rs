@@ -198,7 +198,7 @@ impl Opt {
             ltc_num_blocks,
             ltc_total_liqudity_percent,
             ltc_total_deposit_percent,
-	}: &MainnetOpt,
+        }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let price_wallet = seed
             .derive_cosmos_numbered(1)?

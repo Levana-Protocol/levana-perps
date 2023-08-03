@@ -39,7 +39,7 @@ pub(crate) enum TaskLabel {
     UltraCrank { index: usize },
     Trader { index: u32 },
     LiqudityTransactionAlert,
-    TotalDepositAlert
+    TotalDepositAlert,
 }
 
 impl TaskLabel {
@@ -57,7 +57,7 @@ impl TaskLabel {
             "utilization" => Some(TaskLabel::Utilization),
             "balance" => Some(TaskLabel::Balance),
             "liquditity-transaction-alert" => Some(TaskLabel::LiqudityTransactionAlert),
-	    "total-deposit-alert" => Some(TaskLabel::TotalDepositAlert),
+            "total-deposit-alert" => Some(TaskLabel::TotalDepositAlert),
             // Being lazy, skipping UltraCrank and Trader, they aren't needed
             _ => None,
         }

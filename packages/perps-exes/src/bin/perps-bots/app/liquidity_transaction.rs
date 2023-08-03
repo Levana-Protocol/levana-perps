@@ -87,7 +87,8 @@ async fn check_liquidity_transaction_alert(
         .into_decimal256()
         .into_signed()
         .abs()
-        .checked_div(historical_total_collateral.into_decimal256().into_signed())?.checked_mul("100".parse()?)?;
+        .checked_div(historical_total_collateral.into_decimal256().into_signed())?
+        .checked_mul("100".parse()?)?;
     if mainnet.liquidity_transaction.liqudity_percentage <= percentage_change {
         let msg = match change_type {
             DeltaChange::RiseUp => "increased",

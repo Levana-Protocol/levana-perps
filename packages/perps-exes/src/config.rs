@@ -70,7 +70,7 @@ pub struct LiquidityTransactionConfig {
     /// Percentage change of total liqudity below/above which we should alert
     pub liqudity_percentage: Signed<Decimal256>,
     /// Percentage change of total deposits below/above which we should alert
-    pub total_deposits_percentage: Signed<Decimal256>
+    pub total_deposits_percentage: Signed<Decimal256>,
 }
 
 #[derive(serde::Deserialize, Clone, Copy, Debug)]
@@ -382,8 +382,8 @@ impl Default for WatcherConfig {
                 delay_between_retries: None,
             },
             liquidity_transaction: TaskConfig {
-                delay: Delay::Constant(10),
-                out_of_date: 120,
+                delay: Delay::Constant(120),
+                out_of_date: 180,
                 retries: None,
                 delay_between_retries: None,
             },
