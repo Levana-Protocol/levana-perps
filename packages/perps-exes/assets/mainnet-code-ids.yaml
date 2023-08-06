@@ -77,16 +77,32 @@ hashes:
 - contract-type: pyth-bridge
   gitrev: 98081c4648418e115906c2d960901e699b1381a9
   code-ids:
+    sei-mainnet: 52
     osmosis-mainnet: 102
   hash: 63b504be7d128d78e13cd323f61c0774afa569268cbd8d429f47b225fca15b86
 - contract-type: factory
   gitrev: ed7102d64e97931986338f82663834640d14a826
   code-ids:
-    osmosis-mainnet: 129
     sei-mainnet: 48
+    osmosis-mainnet: 129
   hash: fd9f31f2c60cdaf3d18efdea333d4286b121f7f23b322cbaf820094c556daab4
 - contract-type: market
   gitrev: ed7102d64e97931986338f82663834640d14a826
   code-ids:
     osmosis-mainnet: 130
   hash: 755eb65ef2eabef7290d1edb6318772321daf28c7d8a0d9090cb452d1c4da65e
+- contract-type: market
+  gitrev: 6d6c9eeca52fce4e5c482a724796c481fc374537
+  code-ids:
+    sei-mainnet: 49
+  hash: a96d4b1b2ae08096474fe95a69447d3c552920656033bfdb36652897c34b9b54
+- contract-type: liquidity-token
+  gitrev: 6d6c9eeca52fce4e5c482a724796c481fc374537
+  code-ids:
+    sei-mainnet: 50
+  hash: c0bcc4af03488a0ef9943d1b49c1e8d48d2267b530cc0418ecae25ead2bbb2b0
+- contract-type: position-token
+  gitrev: 6d6c9eeca52fce4e5c482a724796c481fc374537
+  code-ids:
+    sei-mainnet: 51
+  hash: 56b565c5fade7e13de437fa1af0c9b7d178b3d86b9ebd31aa8e03c3e479d2dc7
