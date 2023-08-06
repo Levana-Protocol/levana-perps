@@ -452,3 +452,32 @@ fn price_history_works() {
         prices_asc
     );
 }
+
+#[test]
+fn lp_history_works_bidirectional() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let lp = Addr::unchecked("new_lp");
+
+    let summary = market.query_lp_info(&lp).unwrap().history;
+    assert_eq!(summary.deposit_usd, Usd::zero());
+    assert_eq!(summary.yield_usd, Usd::zero());
+
+    let actions = market.query_lp_action_history(&lp).unwrap().actions;
+    assert_eq!(actions.len(), 0);
+
+    // DEPOSIT
+    for i in 1..100 {
+        market
+            .exec_mint_and_deposit_liquidity(&lp, i.to_string().parse().unwrap())
+            .unwrap();
+    }
+
+    let asc = market
+        .query_lp_action_history_full(&lp, OrderInMessage::Ascending)
+        .unwrap();
+    let mut desc = market
+        .query_lp_action_history_full(&lp, OrderInMessage::Descending)
+        .unwrap();
+    desc.reverse();
+    assert_eq!(asc, desc);
+}

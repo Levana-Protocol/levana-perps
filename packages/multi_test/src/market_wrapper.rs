@@ -39,10 +39,10 @@ use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::crank::CrankWorkInfo;
 use msg::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
-    LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpActionHistoryResp, LpInfoResp,
-    PositionActionHistoryResp, PositionsQueryFeeApproach, PriceForQuery, PriceWouldTriggerResp,
-    QueryMsg, SlippageAssert, SpotPriceHistoryResp, StatusResp, TradeHistorySummary,
-    TraderActionHistoryResp,
+    LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpAction, LpActionHistoryResp,
+    LpInfoResp, PositionActionHistoryResp, PositionsQueryFeeApproach, PriceForQuery,
+    PriceWouldTriggerResp, QueryMsg, SlippageAssert, SpotPriceHistoryResp, StatusResp,
+    TradeHistorySummary, TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
 use msg::contracts::market::{
@@ -680,6 +680,34 @@ impl PerpsMarket {
             limit: None,
             order: None,
         })
+    }
+
+    pub fn query_lp_action_history_full(
+        &self,
+        addr: &Addr,
+        order: OrderInMessage,
+    ) -> Result<Vec<LpAction>> {
+        let mut start_after = None;
+        const LIMIT: Option<u32> = Some(2);
+        let mut res = vec![];
+
+        loop {
+            let LpActionHistoryResp {
+                mut actions,
+                next_start_after,
+            } = self.query(&MarketQueryMsg::LpActionHistory {
+                addr: addr.clone().into(),
+                start_after: start_after.take(),
+                limit: LIMIT,
+                order: Some(order),
+            })?;
+            res.append(&mut actions);
+            if next_start_after.is_none() {
+                break Ok(res);
+            }
+
+            start_after = next_start_after;
+        }
     }
 
     pub fn query_limit_order_history(&self, addr: &Addr) -> Result<LimitOrderHistoryResp> {
