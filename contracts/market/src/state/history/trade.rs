@@ -160,12 +160,12 @@ impl State<'_> {
         T: serde::Serialize + serde::de::DeserializeOwned,
         K: PrimaryKey<'a> + Prefixer<'a> + KeyDeserialize,
     {
-        let mut iter = map.prefix(id).range(
-            store,
-            start_after.map(Bound::exclusive),
-            None,
-            order.unwrap_or(Order::Ascending),
-        );
+        let order = order.unwrap_or(Order::Ascending);
+        let (min, max) = match order {
+            Order::Ascending => (start_after.map(Bound::exclusive), None),
+            Order::Descending => (None, start_after.map(Bound::exclusive)),
+        };
+        let mut iter = map.prefix(id).range(store, min, max, order);
         const MAX_LIMIT: u32 = 20;
         let limit = limit.unwrap_or(MAX_LIMIT).min(MAX_LIMIT).try_into()?;
         let mut actions = Vec::with_capacity(limit);
