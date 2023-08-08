@@ -1,3 +1,5 @@
+mod migrate;
+
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
@@ -13,6 +15,8 @@ use perps_exes::{
 };
 
 use crate::{cli::Opt, factory::Factory, util::get_hash_for_path};
+
+use self::migrate::MigrateOpts;
 
 #[derive(clap::Parser)]
 pub(crate) struct MainnetOpt {
@@ -53,6 +57,11 @@ enum Sub {
         #[clap(flatten)]
         inner: AddMarketOpts,
     },
+    /// Generate market migrate messages to be sent via CW3
+    Migrate {
+        #[clap(flatten)]
+        inner: MigrateOpts,
+    },
 }
 
 pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
@@ -70,6 +79,7 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
         }
         Sub::AddMarket { inner } => add_market(opt, inner).await?,
         Sub::NewPythBridge { inner } => new_pyth_bridge(opt, inner).await?,
+        Sub::Migrate { inner } => inner.go(opt).await?,
     }
     Ok(())
 }
