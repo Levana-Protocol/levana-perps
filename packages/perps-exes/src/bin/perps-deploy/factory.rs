@@ -1,7 +1,9 @@
 use anyhow::Result;
 use cosmos::proto::cosmos::base::abci::v1beta1::TxResponse;
-use cosmos::{Address, Contract, HasCosmos, Wallet};
-use msg::contracts::factory::entry::{FactoryOwnerResp, MarketInfoResponse, MarketsResp, QueryMsg};
+use cosmos::{Address, CodeId, Contract, HasAddress, HasCosmos, Wallet};
+use msg::contracts::factory::entry::{
+    CodeIds, FactoryOwnerResp, MarketInfoResponse, MarketsResp, QueryMsg,
+};
 use msg::prelude::*;
 use msg::shutdown::{ShutdownEffect, ShutdownImpact};
 
@@ -140,6 +142,17 @@ impl Factory {
 
     pub(crate) fn into_contract(self) -> Contract {
         self.0
+    }
+
+    pub(crate) async fn query_market_code_id(&self) -> Result<CodeId> {
+        let CodeIds { market, .. } = self.0.query(FactoryQueryMsg::CodeIds {}).await?;
+        Ok(self.0.get_cosmos().make_code_id(market.u64()))
+    }
+}
+
+impl HasAddress for Factory {
+    fn get_address(&self) -> Address {
+        self.0.get_address()
     }
 }
 
