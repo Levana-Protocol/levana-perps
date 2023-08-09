@@ -94,8 +94,8 @@ hashes:
 - contract-type: market
   gitrev: 6d6c9eeca52fce4e5c482a724796c481fc374537
   code-ids:
+    osmosis-mainnet: 141
     sei-mainnet: 49
-    sei-testnet: 141
   hash: a96d4b1b2ae08096474fe95a69447d3c552920656033bfdb36652897c34b9b54
 - contract-type: liquidity-token
   gitrev: 6d6c9eeca52fce4e5c482a724796c481fc374537
