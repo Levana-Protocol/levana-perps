@@ -525,6 +525,7 @@ async fn add_market(
             initial_borrow_fee_rate,
         },
     };
+    let msg = strip_nulls(msg)?;
     let factory = app.cosmos.make_contract(factory.address);
 
     if is_cw3 {
@@ -548,4 +549,27 @@ async fn add_market(
     }
 
     Ok(())
+}
+
+fn strip_nulls<T: serde::Serialize>(x: T) -> Result<serde_json::Value> {
+    use serde_json::Value;
+    let value = serde_json::to_value(x)?;
+    fn inner(value: Value) -> Value {
+        match value {
+            Value::Null => Value::Null,
+            Value::Bool(x) => Value::Bool(x),
+            Value::Number(x) => Value::Number(x),
+            Value::String(x) => Value::String(x),
+            Value::Array(x) => Value::Array(x.into_iter().map(inner).collect()),
+            Value::Object(x) => Value::Object(
+                x.into_iter()
+                    .flat_map(|(key, value)| match value {
+                        Value::Null => None,
+                        value => Some((key, inner(value))),
+                    })
+                    .collect(),
+            ),
+        }
+    }
+    Ok(inner(value))
 }
