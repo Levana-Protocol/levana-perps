@@ -13,11 +13,13 @@ pub(crate) mod markets;
 pub(crate) mod status;
 
 impl AppBuilder {
-    pub(crate) fn start_rest_api(&mut self) {
+    pub(crate) fn start_rest_api(
+        &mut self,
+        server: hyper::server::Builder<hyper::server::conn::AddrIncoming>,
+    ) {
         let app = self.app.clone();
 
         self.watch_background(async move {
-            let bind = app.bind;
             let router = axum::Router::new()
                 .route("/", get(common::homepage))
                 .route("/factory", get(factory::factory))
@@ -39,9 +41,7 @@ impl AppBuilder {
                 );
             log::info!("Launching server");
 
-            axum::Server::bind(&bind)
-                .serve(router.into_make_service())
-                .await?;
+            server.serve(router.into_make_service()).await?;
             Err(anyhow::anyhow!("Background task should never complete"))
         });
     }

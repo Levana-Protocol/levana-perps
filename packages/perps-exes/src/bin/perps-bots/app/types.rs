@@ -1,5 +1,4 @@
 use std::collections::{HashMap, VecDeque};
-use std::net::SocketAddr;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -62,7 +61,6 @@ pub(crate) struct App {
     pub(crate) cosmos: Cosmos,
     pub(crate) config: BotConfig,
     pub(crate) client: Client,
-    pub(crate) bind: SocketAddr,
     pub(crate) statuses: TaskStatuses,
     pub(crate) live_since: DateTime<Utc>,
     pub(crate) gases: RwLock<HashMap<Address, GasRecords>>,
@@ -141,7 +139,6 @@ impl Opt {
             cosmos,
             config,
             client,
-            bind: self.bind,
             statuses: TaskStatuses::default(),
             live_since: Utc::now(),
             gases: RwLock::new(HashMap::new()),

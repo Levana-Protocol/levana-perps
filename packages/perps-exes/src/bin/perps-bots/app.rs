@@ -16,6 +16,7 @@ mod ultra_crank;
 mod utilization;
 
 use anyhow::Result;
+use hyper::server::conn::AddrIncoming;
 pub(crate) use types::*;
 
 use crate::config::BotConfigByType;
@@ -23,7 +24,10 @@ use crate::config::BotConfigByType;
 use self::gas_check::GasCheckWallet;
 
 impl AppBuilder {
-    pub(crate) async fn start(mut self) -> Result<()> {
+    pub(crate) async fn start(
+        mut self,
+        server: hyper::server::Builder<AddrIncoming>,
+    ) -> Result<()> {
         let family = match &self.app.config.by_type {
             crate::config::BotConfigByType::Testnet { inner } => inner.contract_family.clone(),
             crate::config::BotConfigByType::Mainnet { inner } => {
@@ -33,7 +37,7 @@ impl AppBuilder {
         sentry::configure_scope(|scope| scope.set_tag("bot-name", family));
 
         // Start the tasks that run on all deployments
-        self.start_rest_api();
+        self.start_rest_api(server);
         self.start_factory_task()?;
         self.start_crank_bot()?;
         self.start_price()?;
