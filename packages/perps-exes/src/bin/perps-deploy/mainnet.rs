@@ -1,4 +1,5 @@
 mod migrate;
+mod update_config;
 
 use std::collections::HashMap;
 
@@ -16,7 +17,7 @@ use perps_exes::{
 
 use crate::{cli::Opt, factory::Factory, util::get_hash_for_path};
 
-use self::migrate::MigrateOpts;
+use self::{migrate::MigrateOpts, update_config::UpdateConfigOpts};
 
 #[derive(clap::Parser)]
 pub(crate) struct MainnetOpt {
@@ -62,6 +63,11 @@ enum Sub {
         #[clap(flatten)]
         inner: MigrateOpts,
     },
+    /// Get a CW3 message for updating a config value
+    UpdateConfig {
+        #[clap(flatten)]
+        inner: UpdateConfigOpts,
+    },
 }
 
 pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
@@ -80,6 +86,7 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
         Sub::AddMarket { inner } => add_market(opt, inner).await?,
         Sub::NewPythBridge { inner } => new_pyth_bridge(opt, inner).await?,
         Sub::Migrate { inner } => inner.go(opt).await?,
+        Sub::UpdateConfig { inner } => inner.go(opt).await?,
     }
     Ok(())
 }
