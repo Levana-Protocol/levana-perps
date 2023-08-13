@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Parser;
 
 mod app;
@@ -18,6 +18,10 @@ async fn main_inner() -> Result<()> {
     dotenv::dotenv().ok();
 
     let opt = cli::Opt::parse();
+
+    let server = axum::Server::try_bind(&opt.bind)
+        .with_context(|| format!("Cannot launch bot HTTP service bound to {}", opt.bind))?;
+
     opt.init_logger();
     let _guard = opt.client_key.clone().map(|ck| {
         sentry::init((
@@ -29,5 +33,5 @@ async fn main_inner() -> Result<()> {
             },
         ))
     });
-    opt.into_app_builder().await?.start().await
+    opt.into_app_builder().await?.start(server).await
 }
