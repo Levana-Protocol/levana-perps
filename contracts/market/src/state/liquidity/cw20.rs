@@ -595,6 +595,12 @@ impl State<'_> {
         self.perform_lp_book_keeping(ctx, owner)?;
 
         let mut addr_stats = self.load_liquidity_stats_addr_default(ctx.storage, owner)?;
+
+        // Negative delta means we're transferring our tokens somewhere else, so check if we're in cooldown.
+        if delta.is_negative() {
+            self.ensure_liquidity_cooldown(&addr_stats)?;
+        }
+
         let m = match kind {
             LiquidityTokenKind::Lp => &mut addr_stats.lp,
             LiquidityTokenKind::Xlp => &mut addr_stats.xlp,

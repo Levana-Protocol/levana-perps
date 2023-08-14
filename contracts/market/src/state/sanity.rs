@@ -473,6 +473,7 @@ fn check_lp_info(
         available_crank_rewards,
         unstaking,
         history: _,
+        liquidity_cooldown: _,
     }: &LpInfoResp,
 ) -> Result<()> {
     anyhow::ensure!(lp_amount.is_zero() == lp_collateral.is_zero());

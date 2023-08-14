@@ -757,6 +757,17 @@ pub struct LpInfoResp {
     pub unstaking: Option<UnstakingStatus>,
     /// Historical information on LP activity
     pub history: LpHistorySummary,
+    /// Liquidity cooldown information, if active.
+    pub liquidity_cooldown: Option<LiquidityCooldown>,
+}
+
+/// When a liquidity cooldown period will end
+#[cw_serde]
+pub struct LiquidityCooldown {
+    /// Timestamp when it will end
+    pub at: Timestamp,
+    /// Number of seconds until it will end
+    pub seconds: u64,
 }
 
 /// Status of an ongoing unstaking process.

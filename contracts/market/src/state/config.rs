@@ -54,6 +54,7 @@ pub(crate) fn update_config(
         liquifunding_delay_fuzz_seconds,
         max_liquidity,
         disable_position_nft_exec,
+        liquidity_cooldown_seconds,
     }: ConfigUpdate,
 ) -> Result<()> {
     if let Some(x) = trading_fee_notional_size {
@@ -165,6 +166,9 @@ pub(crate) fn update_config(
     }
     if let Some(x) = disable_position_nft_exec {
         config.disable_position_nft_exec = x;
+    }
+    if let Some(x) = liquidity_cooldown_seconds {
+        config.liquidity_cooldown_seconds = x;
     }
 
     config.validate()?;

@@ -8,7 +8,7 @@ pub use cw20::*;
 use cw_storage_plus::Map;
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::config::MaxLiquidity;
-use msg::contracts::market::entry::{LpInfoResp, UnstakingStatus};
+use msg::contracts::market::entry::{LiquidityCooldown, LpInfoResp, UnstakingStatus};
 use msg::contracts::market::liquidity::events::{
     DeltaNeutralityRatioEvent, DepositEvent, LockEvent, UnlockEvent, WithdrawEvent,
 };
@@ -83,6 +83,8 @@ pub(crate) struct LiquidityStatsByAddr {
     pub(crate) xlp_accrued_yield: Collateral,
     pub(crate) crank_rewards: Collateral,
     pub(crate) unstaking: Option<UnstakingXlp>,
+    /// When the liquidity cooldown period ends, if active.
+    pub(crate) cooldown_ends: Option<Timestamp>,
 }
 
 impl LiquidityStatsByAddr {
@@ -96,6 +98,7 @@ impl LiquidityStatsByAddr {
             xlp_accrued_yield: Collateral::zero(),
             crank_rewards: Collateral::zero(),
             unstaking: None,
+            cooldown_ends: None,
         })
     }
 
@@ -221,7 +224,7 @@ impl State<'_> {
         amount: NonZero<Collateral>,
         stake_to_xlp: bool,
     ) -> Result<()> {
-        let lp_shares = self.liquidity_deposit_inner(ctx, lp_addr, amount)?;
+        let lp_shares = self.liquidity_deposit_inner(ctx, lp_addr, amount, true)?;
         self.lp_history_add_deposit(ctx, lp_addr, lp_shares, amount, stake_to_xlp)?;
         if stake_to_xlp {
             self.liquidity_stake_lp(ctx, lp_addr, Some(lp_shares))?;
@@ -272,7 +275,7 @@ impl State<'_> {
             }
         };
 
-        let lp_shares = self.liquidity_deposit_inner(ctx, lp_addr, yield_to_reinvest)?;
+        let lp_shares = self.liquidity_deposit_inner(ctx, lp_addr, yield_to_reinvest, false)?;
         if stake_to_xlp {
             self.liquidity_stake_lp(ctx, lp_addr, Some(lp_shares))?;
         }
@@ -346,6 +349,7 @@ impl State<'_> {
         ctx: &mut StateContext,
         lp_addr: &Addr,
         amount: NonZero<Collateral>,
+        start_cooldown: bool,
     ) -> Result<NonZero<LpToken>> {
         let mut liquidity_stats = self.load_liquidity_stats(ctx.storage)?;
         self.ensure_max_liquidity(ctx, amount, &liquidity_stats)?;
@@ -368,6 +372,14 @@ impl State<'_> {
 
         let mut stats = self.load_liquidity_stats_addr_default(ctx.storage, lp_addr)?;
         stats.lp = stats.lp.checked_add(new_shares.raw())?;
+
+        if start_cooldown {
+            stats.cooldown_ends = Some(
+                self.now()
+                    .plus_seconds(self.config.liquidity_cooldown_seconds.into()),
+            );
+        }
+
         self.save_liquidity_stats_addr(ctx.storage, lp_addr, &stats)?;
 
         let amount_usd = price.collateral_to_usd_non_zero(amount);
@@ -395,6 +407,7 @@ impl State<'_> {
         // Update liquidity provider's shares
 
         let mut addr_stats = self.load_liquidity_stats_addr(ctx.storage, lp_addr)?;
+        self.ensure_liquidity_cooldown(&addr_stats)?;
         let old_lp = NonZero::new(addr_stats.lp).with_context(|| {
             format!("unable to withdraw, no liquidity deposited for {}", lp_addr)
         })?;
@@ -943,6 +956,7 @@ impl State<'_> {
         let stats = self.load_liquidity_stats(store)?;
 
         let addr_stats = self.load_liquidity_stats_addr_default(store, lp_addr)?;
+        let liquidity_cooldown = self.get_liquidity_cooldown(&addr_stats)?;
 
         let accrued = self
             .calculate_accrued_yield(store, &addr_stats)?
@@ -1004,6 +1018,7 @@ impl State<'_> {
             available_crank_rewards: addr_stats.crank_rewards,
             unstaking,
             history,
+            liquidity_cooldown,
         })
     }
 
@@ -1035,5 +1050,40 @@ impl State<'_> {
         } else {
             Ok(())
         }
+    }
+
+    /// Check if we're in a cooldown period and, if so, return an error.
+    pub(crate) fn ensure_liquidity_cooldown(&self, stats: &LiquidityStatsByAddr) -> Result<()> {
+        match self.get_liquidity_cooldown(stats)? {
+            Some(LiquidityCooldown { at, seconds }) => Err(MarketError::LiquidityCooldown {
+                ends_at: at,
+                seconds_remaining: seconds,
+            }
+            .into_anyhow()),
+            None => Ok(()),
+        }
+    }
+
+    /// Get the liquidity cooldown stats for a provider.
+    ///
+    /// Returning [None] means that no period is currently active.
+    fn get_liquidity_cooldown(
+        &self,
+        stats: &LiquidityStatsByAddr,
+    ) -> Result<Option<LiquidityCooldown>> {
+        let ends = match stats.cooldown_ends {
+            Some(ends) => ends,
+            None => return Ok(None),
+        };
+        if ends <= self.now() {
+            return Ok(None);
+        }
+        Ok(Some(LiquidityCooldown {
+            at: ends,
+            seconds: ends
+                .checked_sub(self.now(), "get_liquidity_cooldown")?
+                .as_nanos()
+                / 1_000_000_000,
+        }))
     }
 }

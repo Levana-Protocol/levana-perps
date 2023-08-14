@@ -87,6 +87,22 @@ pub struct Config {
     /// Even if this is true, queries will still work as usual.
     #[serde(default)]
     pub disable_position_nft_exec: bool,
+    /// The liquidity cooldown period.
+    ///
+    /// After depositing new funds into the market, liquidity providers will
+    /// have a period of time where they cannot withdraw their funds. This is
+    /// intended to prevent an MEV attack where someone can reorder transactions
+    /// to extract fees from traders without taking on any impairment risk.
+    ///
+    /// This protection is only triggered by deposit of new funds; reinvesting
+    /// existing yield does not introduce a cooldown.
+    ///
+    /// While the cooldown is in place, providers are prevented from either
+    /// withdrawing liquidity or transferring their LP and xLP tokens.
+    ///
+    /// For migration purposes, this value defaults to 0, meaning no cooldown period.
+    #[serde(default)]
+    pub liquidity_cooldown_seconds: u32,
 }
 
 /// Maximum liquidity for deposit.
@@ -155,6 +171,8 @@ impl Default for Config {
             liquifunding_delay_fuzz_seconds: 60 * 60 * 4,
             max_liquidity: MaxLiquidity::Unlimited {},
             disable_position_nft_exec: false,
+            // Default to 1 hour
+            liquidity_cooldown_seconds: 60 * 60,
         }
     }
 }
@@ -349,6 +367,7 @@ pub struct ConfigUpdate {
     pub liquifunding_delay_fuzz_seconds: Option<u32>,
     pub max_liquidity: Option<MaxLiquidity>,
     pub disable_position_nft_exec: Option<bool>,
+    pub liquidity_cooldown_seconds: Option<u32>,
 }
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for ConfigUpdate {
@@ -384,6 +403,7 @@ impl<'a> arbitrary::Arbitrary<'a> for ConfigUpdate {
             liquifunding_delay_fuzz_seconds: None,
             max_liquidity: None,
             disable_position_nft_exec: None,
+            liquidity_cooldown_seconds: None,
         })
     }
 }
@@ -421,6 +441,7 @@ impl From<Config> for ConfigUpdate {
             liquifunding_delay_fuzz_seconds: Some(src.liquifunding_delay_fuzz_seconds),
             max_liquidity: Some(src.max_liquidity),
             disable_position_nft_exec: Some(src.disable_position_nft_exec),
+            liquidity_cooldown_seconds: Some(src.liquidity_cooldown_seconds),
         }
     }
 }
