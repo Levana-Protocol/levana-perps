@@ -148,6 +148,7 @@ impl PerpsMarket {
                     // Same: original default to fix tests
                     trading_fee_notional_size: Some("0.0005".parse().unwrap()),
                     trading_fee_counter_collateral: Some("0.0005".parse().unwrap()),
+                    liquidity_cooldown_seconds: Some(0),
                     ..Default::default()
                 }),
                 price_admin: DEFAULT_MARKET.price_admin.clone().into(),

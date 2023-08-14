@@ -135,6 +135,11 @@ pub enum MarketError {
         specified: PriceBaseInQuote,
         bound: PriceBaseInQuote,
     },
+    #[error("Liquidity cooldown in effect, will end in {seconds_remaining} seconds.")]
+    LiquidityCooldown {
+        ends_at: Timestamp,
+        seconds_remaining: u64,
+    },
 }
 
 /// Was the price provided by the trader too high or too low?
@@ -266,6 +271,7 @@ impl MarketError {
                 ErrorId::DeltaNeutralityFeeShortToLong
             }
             MarketError::InvalidTriggerPrice { .. } => ErrorId::InvalidTriggerPrice,
+            MarketError::LiquidityCooldown { .. } => ErrorId::LiquidityCooldown,
         }
     }
 }
