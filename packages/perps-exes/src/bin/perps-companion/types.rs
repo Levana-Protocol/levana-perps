@@ -24,6 +24,8 @@ pub(crate) enum ChainId {
     Stargaze1 = 7,
     #[serde(rename = "uni-6")]
     Uni6 = 8,
+    #[serde(rename = "pacific-1")]
+    Pacific1 = 9,
 }
 
 impl TryFrom<&str> for ChainId {
@@ -40,6 +42,7 @@ impl TryFrom<&str> for ChainId {
             "osmosis-1" => Ok(ChainId::Osmosis1),
             "stargaze-1" => Ok(ChainId::Stargaze1),
             "uni-6" => Ok(ChainId::Uni6),
+            "pacific-1" => Ok(ChainId::Pacific1),
             _ => Err(anyhow::anyhow!("Unknown chain ID: {value}")),
         }
     }
@@ -57,6 +60,7 @@ impl Display for ChainId {
             ChainId::Osmosis1 => "osmosis-1",
             ChainId::Stargaze1 => "stargaze-1",
             ChainId::Uni6 => "uni-6",
+            ChainId::Pacific1 => "pacific-1",
         })
     }
 }
@@ -70,7 +74,7 @@ impl TryFrom<String> for ChainId {
 }
 
 impl ChainId {
-    pub(crate) fn all() -> [ChainId; 8] {
+    pub(crate) fn all() -> [ChainId; 9] {
         [
             ChainId::Atlantic2,
             ChainId::Dragonfire4,
@@ -80,6 +84,7 @@ impl ChainId {
             ChainId::Osmosis1,
             ChainId::Stargaze1,
             ChainId::Uni6,
+            ChainId::Pacific1,
         ]
     }
 
@@ -96,6 +101,7 @@ impl ChainId {
             ChainId::Osmosis1 => CosmosNetwork::OsmosisMainnet,
             ChainId::Stargaze1 => CosmosNetwork::StargazeMainnet,
             ChainId::Uni6 => CosmosNetwork::JunoTestnet,
+            ChainId::Pacific1 => CosmosNetwork::SeiMainnet,
         }
     }
 
@@ -109,6 +115,7 @@ impl ChainId {
             ChainId::Osmosis1 => true,
             ChainId::Stargaze1 => true,
             ChainId::Uni6 => false,
+            ChainId::Pacific1 => true,
         }
     }
 }
