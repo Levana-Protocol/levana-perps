@@ -57,7 +57,7 @@ impl App {
                 let mut config = MarketConfigUpdates::load(&self.market_config)?
                     .markets
                     .get(&market_id)
-                    .with_context(|| format!("No config found for {market_id}"))?
+                    .with_context(|| format!("No MarketConfigUpdate found for {market_id}"))?
                     .clone();
 
                 if self.dev_settings {

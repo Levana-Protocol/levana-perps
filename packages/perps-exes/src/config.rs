@@ -197,7 +197,7 @@ impl ConfigTestnet {
         let wallet_phrase_name = suffix.to_ascii_uppercase();
         let partial_config = self.deployments.get(suffix).with_context(|| {
             format!(
-                "No config found for {}. Valid configs: {}",
+                "No DeploymentInfo found for {}. Valid configs: {}",
                 suffix,
                 self.deployments
                     .keys()

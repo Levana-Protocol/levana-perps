@@ -43,3 +43,8 @@ markets:
       # OSMO/USD
       { id: "5867f5683c757393a0670ef0f701490950fe93fdb006d181c8265a831ac0c5c6", inverted: false }
     ]
+  SEI_USD:
+    feeds: [
+      # SEI/USD
+      { id: "53614f1cb0c031d4af66c04cb9c756234adad0e1cee85303795091499a4084eb", inverted: false }
+    ]
