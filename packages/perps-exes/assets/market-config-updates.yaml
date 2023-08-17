@@ -34,11 +34,10 @@ markets:
     delta_neutrality_fee_cap: 0.015
     delta_neutrality_fee_sensitivity: 50000000
     delta_neutrality_fee_tax: 0.25
-    max_liquidity: !usd
-      amount: "150000"
     trading_fee_notional_size: 0.001
     trading_fee_counter_collateral: 0.001
-    borrow_fee_rate_min_annualized: 0.06
+    borrow_fee_rate_min_annualized: 0.04
+    # Set initial borrow fee to 8%
 
   # Currently only used on CI versions of contracts
   OSMO_USDC:
