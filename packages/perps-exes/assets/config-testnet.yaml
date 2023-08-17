@@ -7,6 +7,12 @@ liquidity:
     OSMO_USDC:
       min: 100000
       max: 100000000
+    SEI_USD:
+      min: 100000
+      max: 100000000
+    OSMO_USD:
+      min: 100000
+      max: 100000000
     ETH_BTC:
       min: 1000
       max: 1000000
