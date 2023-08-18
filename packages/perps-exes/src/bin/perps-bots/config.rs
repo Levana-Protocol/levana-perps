@@ -220,8 +220,8 @@ impl Opt {
                     high_util_ratio: *high_util_ratio,
                     liquidity_transaction: LiquidityTransactionConfig {
                         number_of_blocks: *ltc_num_blocks,
-                        liqudity_percentage: Signed::from(*ltc_total_liqudity_percent),
-                        total_deposits_percentage: Signed::from(*ltc_total_deposit_percent),
+                        liqudity_percentage: *ltc_total_liqudity_percent,
+                        total_deposits_percentage: *ltc_total_deposit_percent,
                     },
                 }
                 .into(),
