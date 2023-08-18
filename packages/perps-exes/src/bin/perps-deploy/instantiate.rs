@@ -2,7 +2,6 @@ use std::{collections::HashSet, str::FromStr};
 
 use anyhow::{Context, Result};
 use cosmos::{Address, CodeId, Contract, ContractAdmin, Cosmos, HasAddress, Wallet};
-use msg::contracts::pyth_bridge::PythMarketPriceFeeds;
 use msg::prelude::*;
 use msg::{
     contracts::{
@@ -42,16 +41,6 @@ pub(crate) struct InstantiateOpt {
 impl App {
     pub(crate) fn make_instantiate_market(&self, market_id: MarketId) -> Result<InstantiateMarket> {
         Ok(InstantiateMarket {
-            price_source: match &self.pyth_info {
-                None => PriceSource::Manual,
-                Some(pyth_info) => {
-                    let feeds = pyth_info
-                        .markets
-                        .get(&market_id)
-                        .with_context(|| format!("No Pyth feed info available for {market_id}"))?;
-                    PriceSource::Pyth(feeds.clone())
-                }
-            },
             cw20_source: Cw20Source::Faucet(self.faucet.clone()),
             config: {
                 let mut config = MarketConfigUpdates::load(&self.market_config)?
@@ -86,9 +75,8 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateOpt) -> Result<()> {
         code_id_source: CodeIdSource::Tracker(app.tracker),
         trading_competition: app.trading_competition,
         faucet_admin: Some(app.wallet_manager),
-        price_admin: app.price_admin,
         initial_borrow_fee_rate: inst_opt.initial_borrow_fee_rate,
-        pyth_info: app.pyth_info.clone(),
+        price_source: app.price_source.clone(),
     })
     .await?;
 
@@ -106,11 +94,6 @@ pub(crate) struct MarketResponse {
     pub(crate) market_id: MarketId,
     pub(crate) market_addr: Address,
     pub(crate) cw20: Address,
-}
-
-pub(crate) enum PriceSource {
-    Manual,
-    Pyth(PythMarketPriceFeeds),
 }
 
 pub(crate) enum Cw20Source {
@@ -141,16 +124,14 @@ pub(crate) struct InstantiateParams<'a> {
     pub(crate) trading_competition: bool,
     /// Address that should be set as a faucet admin
     pub(crate) faucet_admin: Option<Address>,
-    pub(crate) price_admin: Address,
     /// Initial borrow fee rate
     pub(crate) initial_borrow_fee_rate: Decimal256,
-    pub(crate) pyth_info: Option<PythInfo>,
+    pub(crate) price_source: crate::app::PriceSourceConfig,
 }
 
 pub(crate) struct InstantiateMarket {
     pub(crate) market_id: MarketId,
     pub(crate) cw20_source: Cw20Source,
-    pub(crate) price_source: PriceSource,
     pub(crate) config: ConfigUpdate,
 }
 
@@ -167,11 +148,10 @@ pub(crate) async fn instantiate(
         code_id_source,
         trading_competition,
         faucet_admin,
-        price_admin,
         markets,
         family,
         initial_borrow_fee_rate,
-        pyth_info,
+        price_source,
     }: InstantiateParams<'_>,
 ) -> Result<InstantiateResponse> {
     let (
@@ -222,17 +202,20 @@ pub(crate) async fn instantiate(
     log::info!("New factory deployed at {factory}");
     to_log.push((factory_code_id.get_code_id(), factory.get_address()));
 
-    let pyth_bridge = match pyth_info {
-        Some(pyth_info) => {
+    let add_market_price_source = match price_source {
+        crate::app::PriceSourceConfig::Pyth(pyth_info) => {
             let pyth_bridge = pyth_info
                 .make_pyth_bridge(pyth_bridge_code_id.clone(), wallet, &factory)
                 .await?;
             to_log.push((pyth_bridge_code_id.get_code_id(), pyth_bridge.get_address()));
-            Some(pyth_bridge)
+            AddMarketPriceSource::Pyth {
+                info: pyth_info,
+                bridge: pyth_bridge,
+            }
         }
-        None => {
-            log::info!("No Pyth info provided, skipping Pyth bridge instantiation");
-            None
+        crate::app::PriceSourceConfig::Wallet(addr) => {
+            log::info!("No Pyth info provided, skipping Pyth bridge instantiation and using {addr} as price admin");
+            AddMarketPriceSource::Manual(addr)
         }
     };
 
@@ -246,10 +229,9 @@ pub(crate) async fn instantiate(
                 AddMarketParams {
                     trading_competition,
                     faucet_admin,
-                    price_admin,
                     factory: factory.clone(),
                     initial_borrow_fee_rate,
-                    pyth_bridge: pyth_bridge.clone(),
+                    price_source: add_market_price_source.clone(),
                 },
             )
             .await?;
@@ -311,10 +293,15 @@ pub(crate) const INITIAL_BALANCE_AMOUNT: u128 = 1_000_000_000_000_000_000u128;
 pub(crate) struct AddMarketParams {
     pub(crate) trading_competition: bool,
     pub(crate) faucet_admin: Option<Address>,
-    pub(crate) price_admin: Address,
     pub(crate) factory: Contract,
     pub(crate) initial_borrow_fee_rate: Decimal256,
-    pub(crate) pyth_bridge: Option<Contract>,
+    pub(crate) price_source: AddMarketPriceSource,
+}
+
+#[derive(Clone)]
+pub(crate) enum AddMarketPriceSource {
+    Pyth { info: PythInfo, bridge: Contract },
+    Manual(Address),
 }
 
 impl InstantiateMarket {
@@ -325,16 +312,14 @@ impl InstantiateMarket {
         AddMarketParams {
             trading_competition,
             faucet_admin,
-            price_admin,
             factory,
             initial_borrow_fee_rate,
-            pyth_bridge,
+            price_source,
         }: AddMarketParams,
     ) -> Result<MarketResponse> {
         let InstantiateMarket {
             market_id,
             cw20_source,
-            price_source,
             config,
         } = self;
         log::info!(
@@ -415,35 +400,33 @@ impl InstantiateMarket {
         let cw20 = cosmos.make_contract(cw20);
 
         let price_admin = match price_source {
-            PriceSource::Pyth(market_price_feeds) => match &pyth_bridge {
-                None => {
-                    log::warn!("Market {market_id} is configured for pyth, but there is no bridge, so using manual updates instead");
-                    price_admin.to_string().into()
-                }
-                Some(pyth_bridge) => {
-                    log::info!("Setting price feed for market {market_id} to use Pyth Oracle.");
-                    log::info!(
-                        "Main price feeds: {:?}, USD price feeds: {:?}",
-                        market_price_feeds.feeds,
-                        market_price_feeds.feeds_usd
-                    );
-                    pyth_bridge
-                        .execute(
-                            wallet,
-                            vec![],
-                            msg::contracts::pyth_bridge::entry::ExecuteMsg::SetMarketPriceFeeds {
-                                market_id: market_id.clone(),
-                                market_price_feeds,
-                            },
-                        )
-                        .await?;
+            AddMarketPriceSource::Pyth { info, bridge } => {
+                let market_price_feeds = info
+                    .markets
+                    .get(&market_id)
+                    .with_context(|| format!("No Pyth price feed info found for {market_id}"))?;
+                log::info!("Setting price feed for market {market_id} to use Pyth Oracle.");
+                log::info!(
+                    "Main price feeds: {:?}, USD price feeds: {:?}",
+                    market_price_feeds.feeds,
+                    market_price_feeds.feeds_usd
+                );
+                bridge
+                    .execute(
+                        wallet,
+                        vec![],
+                        msg::contracts::pyth_bridge::entry::ExecuteMsg::SetMarketPriceFeeds {
+                            market_id: market_id.clone(),
+                            market_price_feeds: market_price_feeds.clone(),
+                        },
+                    )
+                    .await?;
 
-                    pyth_bridge.get_address_string().into()
-                }
-            },
-            PriceSource::Manual => {
+                bridge.get_address_string().into()
+            }
+            AddMarketPriceSource::Manual(address) => {
                 log::info!("Setting price feed for market {market_id} to use manual updates");
-                price_admin.to_string().into()
+                address.to_string().into()
             }
         };
 
@@ -520,7 +503,7 @@ impl InstantiateMarket {
 
 impl PythInfo {
     pub(crate) async fn make_pyth_bridge(
-        self,
+        &self,
         pyth_bridge_code_id: CodeId,
         wallet: &Wallet,
         factory: &Contract,

@@ -47,6 +47,8 @@ pub struct ConfigTestnet {
     pub liquidity: LiquidityConfig,
     pub utilization: UtilizationConfig,
     pub trader: TraderConfig,
+    /// QA wallet used for price updates
+    pub qa_wallet: RawAddress,
 }
 
 #[derive(serde::Deserialize, Clone, Debug)]
@@ -113,7 +115,6 @@ pub struct DeploymentConfigTestnet {
     pub seconds_till_ultra: u32,
     pub price: bool,
     pub wallet_manager_address: RawAddress,
-    pub price_address: RawAddress,
     #[serde(default)]
     pub dev_settings: bool,
     #[serde(default)]
@@ -150,6 +151,9 @@ pub struct DeploymentConfigTestnet {
     pub max_allowed_price_delta: Decimal256,
     #[serde(default = "defaults::price_age_alert_threshold_secs")]
     pub price_age_alert_threshold_secs: u32,
+    /// Disable Pyth usage and instead use the QA wallet for price update
+    #[serde(default)]
+    pub qa_price_updates: bool,
 }
 
 fn load_yaml<T: serde::de::DeserializeOwned>(

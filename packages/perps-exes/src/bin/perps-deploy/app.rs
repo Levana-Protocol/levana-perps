@@ -20,14 +20,19 @@ pub(crate) struct BasicApp {
 pub(crate) struct App {
     pub(crate) basic: BasicApp,
     pub(crate) wallet_manager: Address,
-    pub(crate) price_admin: Address,
     pub(crate) trading_competition: bool,
     pub(crate) tracker: Tracker,
     pub(crate) faucet: Faucet,
     pub(crate) dev_settings: bool,
     pub(crate) default_market_ids: Vec<MarketId>,
-    pub(crate) pyth_info: Option<PythInfo>,
+    pub(crate) price_source: PriceSourceConfig,
     pub(crate) market_config: PathBuf,
+}
+
+#[derive(Clone)]
+pub(crate) enum PriceSourceConfig {
+    Pyth(PythInfo),
+    Wallet(Address),
 }
 
 /// Complete app for mainnet
@@ -89,47 +94,54 @@ impl Opt {
 
         let DeploymentConfigTestnet {
             wallet_manager_address,
-            price_address: price_admin,
             trading_competition,
             dev_settings,
             default_market_ids,
+            qa_price_updates,
             ..
         } = partial.config;
 
         let (tracker, faucet) = basic.get_tracker_and_faucet()?;
 
-        // only create pyth_info (with markets etc.) if we have a pyth address
-        let pyth_info = match basic.chain_config.pyth {
-            None => None,
-            Some(pyth_address) => {
-                // Pyth config validation
-                for (market_id, market_price_feeds) in &pyth_config.markets {
-                    if market_price_feeds.feeds_usd.is_none() && !market_id.is_notional_usd() {
-                        anyhow::bail!(
-                            "notional is not USD, so there MUST be a USD price feed. MarketId: {}",
-                            market_id
-                        );
-                    }
-                }
+        // only create pyth_info (with markets etc.) if we have a pyth address and do not specify
+        let price_source = if qa_price_updates {
+            PriceSourceConfig::Wallet(
+                config
+                    .qa_wallet
+                    .for_chain(partial.network.get_address_type()),
+            )
+        } else {
+            let pyth_address = basic
+                .chain_config
+                .pyth
+                .with_context(|| format!("No Pyth address found for {family}"))?;
 
-                Some(PythInfo {
-                    address: pyth_address,
-                    markets: pyth_config.markets.clone(),
-                    update_age_tolerance: pyth_config.update_age_tolerance,
-                })
+            // Pyth config validation
+            for (market_id, market_price_feeds) in &pyth_config.markets {
+                if market_price_feeds.feeds_usd.is_none() && !market_id.is_notional_usd() {
+                    anyhow::bail!(
+                        "notional is not USD, so there MUST be a USD price feed. MarketId: {}",
+                        market_id
+                    );
+                }
             }
+
+            PriceSourceConfig::Pyth(PythInfo {
+                address: pyth_address,
+                markets: pyth_config.markets.clone(),
+                update_age_tolerance: pyth_config.update_age_tolerance,
+            })
         };
 
         Ok(App {
             wallet_manager: wallet_manager_address.for_chain(partial.network.get_address_type()),
-            price_admin: price_admin.for_chain(partial.network.get_address_type()),
             trading_competition,
             dev_settings,
             tracker,
             faucet,
             basic,
             default_market_ids,
-            pyth_info,
+            price_source,
             market_config: self.market_config.clone(),
         })
     }
