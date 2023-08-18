@@ -70,7 +70,7 @@ pub struct LiquidityTransactionConfig {
     /// Total number of blocks between which you need to check values
     pub number_of_blocks: u16,
     /// Percentage change of total liqudity below/above which we should alert
-    pub liqudity_percentage: Signed<Decimal256>,
+    pub liqudity_percentage: Decimal256,
     /// Percentage change of total deposits below/above which we should alert
     pub total_deposits_percentage: Decimal256,
 }
