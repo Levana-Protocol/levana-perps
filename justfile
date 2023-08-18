@@ -142,13 +142,13 @@ push-companion-image:
 run-companion:
 	cargo run --bin perps-companion
 
-# Deploy to dragonfire
-deploy-dragonfire:
-	cargo run --bin perps-deploy testnet store-code --network dragonfire
+# Deploy to Osmosis tesntet
+deploy-osmosis-testnet:
+	cargo run --bin perps-deploy testnet store-code --network osmosis-testnet
 
-# Migrate dragonci
-migrate-dragonci:
-	cargo run --bin perps-deploy testnet migrate --family dragonci
+# Migrate osmoci
+migrate-osmoci:
+	cargo run --bin perps-deploy testnet migrate --family osmoci
 
 # Build documentations
 build-docs:

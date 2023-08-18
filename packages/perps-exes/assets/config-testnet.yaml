@@ -58,19 +58,6 @@ deployments:
     default-market-ids:
       - ATOM_USD
       - BTC_USD
-  trade:
-    wallet-manager-address: osmo19a93ag7hf49zqemds0x8nutldv7288drj6fw74
-    price-address: osmo1uvllz6r8aye35rm38jdcjwe7r73wgcxvtsu4c6
-    dev-settings: true
-    price: true
-    crank: true
-    liquidity: true
-    utilization: true
-    balance: true
-    traders: 10
-    default-market-ids:
-      - ATOM_USD
-    trading-competition: true
   ci:
     wallet-manager-address: osmo1ghgpnmxgt6xz463423hhnx8zp99dwt563wnllv
     price-address: osmo1pcma8fhzddx6j0uylpcll4ut673t3qqulpu56l
@@ -94,15 +81,15 @@ deployments:
     dev-settings: true
     price: true
     crank: true
-    liquidity: true
-    utilization: true
-    balance: true
-    traders: 10
+    liquidity: false
+    utilization: false
+    balance: false
+    traders: 0
     default-market-ids:
       - ATOM_USD
-      - OSMO_USDC
-      - ETH_BTC
-      - BTC_USD
+      - OSMO_USD
+      #- ETH_BTC
+      #- BTC_USD
   qa:
     wallet-manager-address: levana1ep4uavfsyw5dp7ymtkpvj8qm4mc8ellph9408d
     price-address: osmo1ssnwszx2dutvlrpwwgefpfyswgrrm059d5mcfe
@@ -137,42 +124,6 @@ overrides:
     watcher:
       # Nodes seem to crash often, let's see if this helps
       retries: 10
-  seitrade:
-    wallet-manager-address: osmo19a93ag7hf49zqemds0x8nutldv7288drj6fw74
-    price-address: osmo1uvllz6r8aye35rm38jdcjwe7r73wgcxvtsu4c6
-    dev-settings: false
-    price: true
-    crank: true
-    liquidity: true
-    utilization: true
-    balance: true
-    traders: 0
-    default-market-ids:
-      - ETH_USD
-      - BTC_USD
-    trading-competition: true
-
-    # Gas is expensive on Sei
-    min-gas: 1000000000
-    min-gas-in-faucet: 2000000000000
-    min-gas-in-gas-wallet: 1000000000000
-    watcher:
-      # Nodes seem to crash often, let's see if this helps
-      retries: 10
-  dragonbeta:
-    wallet-manager-address: osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k
-    price-address: osmo1dfagdh540vrqqnuet5rqvdg3uldhhgdxpttmzl
-    price: true
-    crank: true
-    liquidity: true
-    utilization: true
-    balance: true
-    traders: 10
-    default-market-ids:
-      - ATOM_USD
-      - BTC_USD
-    # Can be removed once Dragonfire supports the Pyth oracle
-    max-price-age-secs: 1
   osmobeta:
     wallet-manager-address: osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k
     price-address: osmo1dfagdh540vrqqnuet5rqvdg3uldhhgdxpttmzl

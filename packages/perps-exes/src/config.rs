@@ -235,11 +235,10 @@ pub struct DeploymentInfo {
     pub wallet_phrase_name: String,
 }
 
-/// Parse a deployment name (like dragonbeta) into network and family (like dragonfire and beta).
+/// Parse a deployment name (like osmobeta) into network and family (like osmosis-testnet and beta).
 pub fn parse_deployment(deployment: &str) -> Result<(CosmosNetwork, &str)> {
     const NETWORKS: &[(CosmosNetwork, &str)] = &[
         (CosmosNetwork::OsmosisTestnet, "osmo"),
-        (CosmosNetwork::Dragonfire, "dragon"),
         (CosmosNetwork::SeiTestnet, "sei"),
     ];
     for (network, prefix) in NETWORKS {
