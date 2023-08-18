@@ -72,7 +72,7 @@ pub struct LiquidityTransactionConfig {
     /// Percentage change of total liqudity below/above which we should alert
     pub liqudity_percentage: Signed<Decimal256>,
     /// Percentage change of total deposits below/above which we should alert
-    pub total_deposits_percentage: Signed<Decimal256>,
+    pub total_deposits_percentage: Decimal256,
 }
 
 #[derive(serde::Deserialize, Clone, Copy, Debug)]
