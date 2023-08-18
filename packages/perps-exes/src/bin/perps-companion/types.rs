@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use anyhow::Result;
 use cosmos::CosmosNetwork;
 use cosmwasm_std::Decimal256;
 use shared::storage::{DirectionToBase, Signed};
@@ -10,6 +11,8 @@ use shared::storage::{DirectionToBase, Signed};
 pub(crate) enum ChainId {
     #[serde(rename = "atlantic-2")]
     Atlantic2 = 1,
+    // Leaving in place for backwards compat in a few places, but not allowing
+    // new positions to be stored.
     #[serde(rename = "dragonfire-4")]
     Dragonfire4 = 2,
     #[serde(rename = "elgafar-1")]
@@ -74,10 +77,9 @@ impl TryFrom<String> for ChainId {
 }
 
 impl ChainId {
-    pub(crate) fn all() -> [ChainId; 9] {
+    pub(crate) fn all() -> [ChainId; 8] {
         [
             ChainId::Atlantic2,
-            ChainId::Dragonfire4,
             ChainId::Elgafar1,
             ChainId::Juno1,
             ChainId::OsmoTest5,
@@ -88,13 +90,13 @@ impl ChainId {
         ]
     }
 
-    pub(crate) fn into_cosmos_network(self) -> CosmosNetwork {
+    pub(crate) fn into_cosmos_network(self) -> Result<CosmosNetwork> {
         // In the future this may be a partial mapping (i.e. to None) if we drop
         // support for some chains. But by keeping the ChainId present, we can
         // load historical data from the database.
-        match self {
+        Ok(match self {
             ChainId::Atlantic2 => CosmosNetwork::SeiTestnet,
-            ChainId::Dragonfire4 => CosmosNetwork::Dragonfire,
+            ChainId::Dragonfire4 => anyhow::bail!("Dragonfire network is no longer supported"),
             ChainId::Elgafar1 => CosmosNetwork::StargazeTestnet,
             ChainId::Juno1 => CosmosNetwork::JunoMainnet,
             ChainId::OsmoTest5 => CosmosNetwork::OsmosisTestnet,
@@ -102,7 +104,7 @@ impl ChainId {
             ChainId::Stargaze1 => CosmosNetwork::StargazeMainnet,
             ChainId::Uni6 => CosmosNetwork::JunoTestnet,
             ChainId::Pacific1 => CosmosNetwork::SeiMainnet,
-        }
+        })
     }
 
     pub(crate) fn is_mainnet(self) -> bool {

@@ -2,7 +2,11 @@ use cosmwasm_std::Decimal256;
 use msg::prelude::*;
 use shared::storage::MarketId;
 
-use crate::{instantiate::AddMarketParams, store_code::PYTH_BRIDGE};
+use crate::{
+    app::PriceSourceConfig,
+    instantiate::{AddMarketParams, AddMarketPriceSource},
+    store_code::PYTH_BRIDGE,
+};
 
 #[derive(clap::Parser)]
 pub(crate) struct AddMarketOpt {
@@ -22,24 +26,25 @@ impl AddMarketOpt {
         let app = opt.load_app(&self.family).await?;
         let factory = app.tracker.get_factory(&self.family).await?.into_contract();
         let instantiate_market = app.make_instantiate_market(self.market)?;
-        let pyth_bridge = match app.pyth_info {
-            Some(pyth_info) => {
+        let price_source = match app.price_source {
+            PriceSourceConfig::Pyth(pyth_info) => {
                 let code_id = app.tracker.require_code_by_type(&opt, PYTH_BRIDGE).await?;
-                Some(
-                    pyth_info
-                        .make_pyth_bridge(code_id, &app.basic.wallet, &factory)
-                        .await?,
-                )
+                let pyth_bridge = pyth_info
+                    .make_pyth_bridge(code_id, &app.basic.wallet, &factory)
+                    .await?;
+                AddMarketPriceSource::Pyth {
+                    info: pyth_info,
+                    bridge: pyth_bridge,
+                }
             }
-            None => None,
+            PriceSourceConfig::Wallet(addr) => AddMarketPriceSource::Manual(addr),
         };
         let add_market_params = AddMarketParams {
             trading_competition: app.trading_competition,
             faucet_admin: Some(app.wallet_manager),
-            price_admin: app.price_admin,
             factory,
             initial_borrow_fee_rate: self.initial_borrow_fee_rate,
-            pyth_bridge,
+            price_source,
         };
         instantiate_market
             .add(&app.basic.wallet, &app.basic.cosmos, add_market_params)

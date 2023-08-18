@@ -11,8 +11,8 @@ use msg::prelude::*;
 use crate::{
     cli::Opt,
     instantiate::{
-        InstantiateMarket, InstantiateParams, InstantiateResponse, MarketResponse, PriceSource,
-        ProtocolCodeIds, INITIAL_BALANCE_AMOUNT,
+        InstantiateMarket, InstantiateParams, InstantiateResponse, MarketResponse, ProtocolCodeIds,
+        INITIAL_BALANCE_AMOUNT,
     },
     store_code::{CW20, FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN, PYTH_BRIDGE},
 };
@@ -91,7 +91,6 @@ pub(crate) async fn go(
         markets.push(InstantiateMarket {
             market_id,
             cw20_source: crate::instantiate::Cw20Source::Existing(cw20.get_address()),
-            price_source: PriceSource::Manual,
             config: ConfigUpdate {
                 // https://phobosfinance.atlassian.net/browse/PERP-710
                 staleness_seconds: Some(60 * 60 * 24 * 7),
@@ -134,9 +133,8 @@ pub(crate) async fn go(
         markets,
         trading_competition: false,
         faucet_admin: None,
-        price_admin: *basic.wallet.address(),
         initial_borrow_fee_rate: "0.01".parse().unwrap(),
-        pyth_info: None,
+        price_source: crate::app::PriceSourceConfig::Wallet(basic.wallet.get_address()),
     })
     .await?;
 

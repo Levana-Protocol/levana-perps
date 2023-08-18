@@ -19,7 +19,11 @@ impl App {
         let db = Db::new(&postgres_uri).await?;
         let mut cosmos_map = HashMap::new();
         for chain_id in ChainId::all() {
-            let cosmos = chain_id.into_cosmos_network().builder().await?.build_lazy();
+            let cosmos = chain_id
+                .into_cosmos_network()?
+                .builder()
+                .await?
+                .build_lazy();
             cosmos_map.insert(chain_id, cosmos);
         }
         Ok(App {
