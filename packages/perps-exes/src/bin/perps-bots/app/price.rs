@@ -1,12 +1,13 @@
-use std::{fmt::Display, sync::Arc};
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use anyhow::Result;
 use axum::async_trait;
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, HasAddress, TxBuilder, Wallet};
 use cosmwasm_std::Decimal256;
 use msg::prelude::{PriceBaseInQuote, PriceCollateralInUsd, Signed, UnsignedDecimal};
 use perps_exes::pyth::{get_latest_price, get_oracle_update_msg};
+use shared::storage::MarketId;
 
 use crate::{
     config::BotConfigByType,
@@ -19,9 +20,18 @@ use crate::{
 
 use super::{factory::FactoryInfo, gas_check::GasCheckWallet, App, AppBuilder};
 
-#[derive(Clone)]
 struct Worker {
     wallet: Arc<Wallet>,
+    stats: HashMap<MarketId, ReasonStats>,
+}
+
+impl Worker {
+    fn add_reason(&mut self, market: &MarketId, reason: &PriceUpdateReason) {
+        self.stats
+            .entry(market.clone())
+            .or_insert_with(|| ReasonStats::new(market.clone()))
+            .add_reason(reason)
+    }
 }
 
 /// Start the background thread to keep options pools up to date.
@@ -45,6 +55,7 @@ impl AppBuilder {
                 crate::watcher::TaskLabel::Price,
                 Worker {
                     wallet: price_wallet,
+                    stats: HashMap::new(),
                 },
             )?;
         }
@@ -60,21 +71,25 @@ impl WatchedTaskPerMarket for Worker {
         _factory: &FactoryInfo,
         market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        let message = app.single_update(&self.wallet, market).await?;
+        let message = app.single_update(market, self).await?;
+        let stats = self
+            .stats
+            .entry(market.market_id.clone())
+            .or_insert_with(|| ReasonStats::new(market.market_id.clone()));
         Ok(WatchedTaskOutput {
             skip_delay: false,
-            message,
+            message: format!("{message}. {stats}"),
         })
     }
 }
 
 impl App {
-    async fn single_update(&self, wallet: &Wallet, market: &Market) -> Result<String> {
+    async fn single_update(&self, market: &Market, worker: &mut Worker) -> Result<String> {
         let mut statuses = vec![];
         let mut builder = TxBuilder::default();
 
         let price_apis = &market
-            .get_price_api(wallet, &self.cosmos, &self.pyth_config)
+            .get_price_api(&worker.wallet, &self.cosmos, &self.pyth_config)
             .await?;
         let pyth_opt = match price_apis {
             PriceApi::Manual(feeds) => {
@@ -82,7 +97,12 @@ impl App {
                     get_latest_price(&self.client, feeds, &self.endpoints).await?;
 
                 if let Some(reason) = self.needs_price_update(market, price).await? {
-                    let (status, msg) = self.get_tx_manual(wallet, market, price, price_usd)?;
+                    worker.add_reason(&market.market_id, &reason);
+                    if reason.is_too_frequent() {
+                        return Ok("Too frequent price updates, skipping".to_owned());
+                    }
+                    let (status, msg) =
+                        self.get_tx_manual(&worker.wallet, market, price, price_usd)?;
                     builder.add_message_mut(msg);
                     statuses.push(format!("Needs manual update: {reason} {status}"));
                     None
@@ -96,7 +116,8 @@ impl App {
                     get_latest_price(&self.client, &pyth.market_price_feeds, &self.endpoints)
                         .await?;
                 if let Some(reason) = self.needs_price_update(market, latest_price).await? {
-                    let msgs = self.get_txs_pyth(wallet, market, pyth).await?;
+                    worker.add_reason(&market.market_id, &reason);
+                    let msgs = self.get_txs_pyth(&worker.wallet, market, pyth).await?;
                     for msg in msgs {
                         builder.add_message_mut(msg);
                     }
@@ -111,7 +132,10 @@ impl App {
         // Take the crank lock for the rest of the execution
         let crank_lock = self.crank_lock.lock().await;
 
-        let res = match builder.sign_and_broadcast(&self.cosmos, wallet).await {
+        let res = match builder
+            .sign_and_broadcast(&self.cosmos, &worker.wallet)
+            .await
+        {
             Ok(res) => res,
             Err(e) => {
                 // PERP-1702: If the price is too old, only complain after a
@@ -193,13 +217,7 @@ impl App {
 
         // Check 1a: if it's too new, we don't update, regardless of anything
         // else that might have happened. This is to prevent gas drainage.
-        if age_secs < self.config.min_price_age_secs.into() {
-            log::info!(
-                "Too frequent gas price update requested for {}, skipping",
-                market
-            );
-            return Ok(None);
-        }
+        let is_too_frequent = age_secs < self.config.min_price_age_secs.into();
 
         // Check 2: has the price moved more than the allowed delta?
         let delta = latest_price
@@ -214,13 +232,14 @@ impl App {
                 old: price.price_base,
                 new: latest_price,
                 delta,
+                is_too_frequent,
             }));
         }
 
         // Check 3: would any triggers happen from this price?
         // We save this for last since it requires a network round trip
         if market.price_would_trigger(latest_price).await? {
-            return Ok(Some(PriceUpdateReason::Triggers));
+            return Ok(Some(PriceUpdateReason::Triggers { is_too_frequent }));
         }
 
         Ok(None)
@@ -277,21 +296,102 @@ enum PriceUpdateReason {
         old: PriceBaseInQuote,
         new: PriceBaseInQuote,
         delta: Decimal256,
+        is_too_frequent: bool,
     },
-    Triggers,
+    Triggers {
+        is_too_frequent: bool,
+    },
     NoPriceFound,
+}
+
+impl PriceUpdateReason {
+    fn is_too_frequent(&self) -> bool {
+        match self {
+            PriceUpdateReason::LastUpdateTooOld(_) => false,
+            PriceUpdateReason::PriceDelta {
+                is_too_frequent, ..
+            } => *is_too_frequent,
+            PriceUpdateReason::Triggers { is_too_frequent } => *is_too_frequent,
+            PriceUpdateReason::NoPriceFound => false,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct ReasonStats {
+    market: MarketId,
+    started_tracking: DateTime<Utc>,
+    too_old: u64,
+    delta: u64,
+    delta_too_frequent: u64,
+    triggers: u64,
+    triggers_too_frequent: u64,
+    no_price_found: u64,
+}
+
+impl Display for ReasonStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let ReasonStats {
+            market,
+            started_tracking,
+            too_old,
+            delta,
+            delta_too_frequent,
+            triggers,
+            triggers_too_frequent,
+            no_price_found,
+        } = self;
+        write!(f, "{market} {started_tracking}: too old {too_old}. Delta: {delta}. Delta too frequent: {delta_too_frequent}. Triggers: {triggers}. Triggers too frequent: {triggers_too_frequent}. No price found: {no_price_found}.")
+    }
+}
+
+impl ReasonStats {
+    fn new(market: MarketId) -> Self {
+        ReasonStats {
+            started_tracking: Utc::now(),
+            too_old: 0,
+            delta: 0,
+            delta_too_frequent: 0,
+            triggers: 0,
+            triggers_too_frequent: 0,
+            no_price_found: 0,
+            market,
+        }
+    }
+    fn add_reason(&mut self, reason: &PriceUpdateReason) {
+        match reason {
+            PriceUpdateReason::LastUpdateTooOld(_) => self.too_old += 1,
+            PriceUpdateReason::PriceDelta {
+                is_too_frequent, ..
+            } => {
+                if *is_too_frequent {
+                    self.delta_too_frequent += 1
+                } else {
+                    self.delta += 1
+                }
+            }
+            PriceUpdateReason::Triggers { is_too_frequent } => {
+                if *is_too_frequent {
+                    self.triggers_too_frequent += 1
+                } else {
+                    self.triggers += 1
+                }
+            }
+            PriceUpdateReason::NoPriceFound => self.no_price_found += 1,
+        }
+    }
 }
 
 impl Display for PriceUpdateReason {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             PriceUpdateReason::LastUpdateTooOld(age) => write!(f, "Last update too old: {age}."),
-            PriceUpdateReason::PriceDelta { old, new, delta } => write!(
+            PriceUpdateReason::PriceDelta { old, new, delta, is_too_frequent } => write!(
                 f,
-                "Large price delta. Old: {old}. New: {new}. Delta: {delta}."
+                "Large price delta. Old: {old}. New: {new}. Delta: {delta}. Too frequent: {is_too_frequent}."
             ),
-            PriceUpdateReason::Triggers => {
-                write!(f, "Price would trigger positions and/or orders.")
+            PriceUpdateReason::Triggers {is_too_frequent}=> {
+                write!(f, "Price would trigger positions and/or orders. Too frequent: {is_too_frequent}.")
             }
             PriceUpdateReason::NoPriceFound => write!(f, "No price point found."),
         }

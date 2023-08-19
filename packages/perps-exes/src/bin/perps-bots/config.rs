@@ -238,7 +238,7 @@ impl Opt {
             max_price_age_secs: max_price_age_secs
                 .unwrap_or_else(perps_exes::config::defaults::max_price_age_secs),
             min_price_age_secs: min_price_age_secs
-                .unwrap_or_else(perps_exes::config::defaults::min_price_age_secs()),
+                .unwrap_or_else(perps_exes::config::defaults::min_price_age_secs),
             max_allowed_price_delta: max_allowed_price_delta
                 .unwrap_or_else(perps_exes::config::defaults::max_allowed_price_delta),
             price_age_alert_threshold_secs: price_age_alert_threshold_secs
