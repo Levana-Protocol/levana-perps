@@ -26,7 +26,7 @@ struct Worker {
 }
 
 impl Worker {
-    fn add_reason(&mut self, market: &MarketId, reason: &PriceUpdateReason) {
+    fn add_reason(&mut self, market: &MarketId, reason: &Option<PriceUpdateReason>) {
         self.stats
             .entry(market.clone())
             .or_insert_with(|| ReasonStats::new(market.clone()))
@@ -96,8 +96,9 @@ impl App {
                 let (price, price_usd) =
                     get_latest_price(&self.client, feeds, &self.endpoints).await?;
 
-                if let Some(reason) = self.needs_price_update(market, price).await? {
-                    worker.add_reason(&market.market_id, &reason);
+                let reason = self.needs_price_update(market, price).await?;
+                worker.add_reason(&market.market_id, &reason);
+                if let Some(reason) = reason {
                     if reason.is_too_frequent() {
                         return Ok("Too frequent price updates, skipping".to_owned());
                     }
@@ -115,8 +116,9 @@ impl App {
                 let (latest_price, _) =
                     get_latest_price(&self.client, &pyth.market_price_feeds, &self.endpoints)
                         .await?;
-                if let Some(reason) = self.needs_price_update(market, latest_price).await? {
-                    worker.add_reason(&market.market_id, &reason);
+                let reason = self.needs_price_update(market, latest_price).await?;
+                worker.add_reason(&market.market_id, &reason);
+                if let Some(reason) = reason {
                     let msgs = self.get_txs_pyth(&worker.wallet, market, pyth).await?;
                     for msg in msgs {
                         builder.add_message_mut(msg);
@@ -321,6 +323,7 @@ impl PriceUpdateReason {
 struct ReasonStats {
     market: MarketId,
     started_tracking: DateTime<Utc>,
+    not_needed: u64,
     too_old: u64,
     delta: u64,
     delta_too_frequent: u64,
@@ -334,6 +337,7 @@ impl Display for ReasonStats {
         let ReasonStats {
             market,
             started_tracking,
+            not_needed,
             too_old,
             delta,
             delta_too_frequent,
@@ -341,7 +345,7 @@ impl Display for ReasonStats {
             triggers_too_frequent,
             no_price_found,
         } = self;
-        write!(f, "{market} {started_tracking}: too old {too_old}. Delta: {delta}. Delta too frequent: {delta_too_frequent}. Triggers: {triggers}. Triggers too frequent: {triggers_too_frequent}. No price found: {no_price_found}.")
+        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Delta too frequent: {delta_too_frequent}. Triggers: {triggers}. Triggers too frequent: {triggers_too_frequent}. No price found: {no_price_found}.")
     }
 }
 
@@ -349,6 +353,7 @@ impl ReasonStats {
     fn new(market: MarketId) -> Self {
         ReasonStats {
             started_tracking: Utc::now(),
+            not_needed: 0,
             too_old: 0,
             delta: 0,
             delta_too_frequent: 0,
@@ -358,7 +363,14 @@ impl ReasonStats {
             market,
         }
     }
-    fn add_reason(&mut self, reason: &PriceUpdateReason) {
+    fn add_reason(&mut self, reason: &Option<PriceUpdateReason>) {
+        let reason = match reason {
+            Some(reason) => reason,
+            None => {
+                self.not_needed += 1;
+                return;
+            }
+        };
         match reason {
             PriceUpdateReason::LastUpdateTooOld(_) => self.too_old += 1,
             PriceUpdateReason::PriceDelta {
