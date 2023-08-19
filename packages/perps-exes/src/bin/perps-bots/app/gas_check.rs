@@ -146,8 +146,9 @@ impl GasCheck {
             };
             if gas >= *min_gas {
                 balances.push(format!(
-                    "Sufficient gas in {name} ({address}). Found: {}.",
-                    pretty_gas(gas)
+                    "Sufficient gas in {name} ({address}). Found: {}. Minimum: {}.",
+                    pretty_gas(gas),
+                    pretty_gas(*min_gas)
                 ));
                 continue;
             }

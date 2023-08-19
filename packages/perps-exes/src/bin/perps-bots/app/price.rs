@@ -191,6 +191,16 @@ impl App {
             return Ok(Some(PriceUpdateReason::LastUpdateTooOld(age)));
         }
 
+        // Check 1a: if it's too new, we don't update, regardless of anything
+        // else that might have happened. This is to prevent gas drainage.
+        if age_secs < self.config.min_price_age_secs.into() {
+            log::info!(
+                "Too frequent gas price update requested for {}, skipping",
+                market
+            );
+            return Ok(None);
+        }
+
         // Check 2: has the price moved more than the allowed delta?
         let delta = latest_price
             .into_non_zero()

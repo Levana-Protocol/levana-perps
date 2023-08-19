@@ -91,6 +91,8 @@ pub(crate) struct MainnetOpt {
     pub(crate) min_gas_price: u128,
     #[clap(long, env = "LEVANA_BOTS_WATCHER_CONFIG")]
     pub(crate) watcher_config: Option<String>,
+    #[clap(long, env = "LEVANA_BOTS_MIN_PRICE_AGE_SECS")]
+    pub(crate) min_price_age_secs: Option<u32>,
     #[clap(long, env = "LEVANA_BOTS_MAX_PRICE_AGE_SECS")]
     pub(crate) max_price_age_secs: Option<u32>,
     #[clap(long, env = "LEVANA_BOTS_MAX_ALLOWED_PRICE_DELTA")]

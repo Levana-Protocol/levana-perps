@@ -88,6 +88,11 @@ pub fn max_price_age_secs() -> u32 {
     60 * 2
 }
 
+pub fn min_price_age_secs() -> u32 {
+    // 1 minute
+    60
+}
+
 pub fn max_allowed_price_delta() -> Decimal256 {
     "0.0005".parse().unwrap()
 }
