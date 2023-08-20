@@ -56,7 +56,7 @@ impl TaskLabel {
             "liquidity" => Some(TaskLabel::Liquidity),
             "utilization" => Some(TaskLabel::Utilization),
             "balance" => Some(TaskLabel::Balance),
-            "liquditity-transaction-alert" => Some(TaskLabel::LiqudityTransactionAlert),
+            "liquidity-transaction-alert" => Some(TaskLabel::LiqudityTransactionAlert),
             "total-deposit-alert" => Some(TaskLabel::TotalDepositAlert),
             // Being lazy, skipping UltraCrank and Trader, they aren't needed
             _ => None,
