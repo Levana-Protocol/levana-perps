@@ -14,6 +14,7 @@ pub(crate) struct State<'a> {
     pub(crate) querier: QuerierWrapper<'a, Empty>,
     pub(crate) factory_address: Addr,
     pub(crate) env: Env,
+    pub(crate) api: &'a dyn Api,
 }
 
 pub(crate) struct StateContext<'a> {
@@ -29,6 +30,7 @@ impl<'a> State<'a> {
                 querier: deps.querier,
                 factory_address,
                 env,
+                api: deps.api,
             },
             deps.storage,
         ))
@@ -48,6 +50,7 @@ impl<'a> StateContext<'a> {
                 querier: deps.querier,
                 factory_address,
                 env,
+                api: deps.api,
             },
             StateContext {
                 storage: deps.storage,
