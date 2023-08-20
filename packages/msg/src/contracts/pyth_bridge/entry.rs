@@ -43,6 +43,11 @@ pub enum ExecuteMsg {
         /// The number of seconds to tolerate
         seconds: u32,
     },
+    /// Sets the Pyth price oracle contract to use
+    SetPythOracle {
+        /// The Pyth oracle address
+        pyth: RawAddr,
+    },
     /// Updates the price
     /// This is not permissioned, anybody can call it
     UpdatePrice {
@@ -76,6 +81,7 @@ impl ExecuteMsg {
             ExecuteMsg::SetMarketPriceFeeds { .. } | ExecuteMsg::SetUpdateAgeTolerance { .. } => {
                 true
             }
+            ExecuteMsg::SetPythOracle { .. } => true,
             ExecuteMsg::UpdatePrice { .. } => false,
         }
     }

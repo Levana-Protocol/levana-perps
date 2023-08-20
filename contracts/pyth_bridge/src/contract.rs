@@ -62,6 +62,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             state.set_pyth_market_price_feeds(&mut ctx, market_id, market_price_feeds)?;
         }
 
+        ExecuteMsg::SetPythOracle { pyth } => {
+            set_pyth_addr(ctx.storage, &pyth.validate(state.api)?)?;
+        }
+
         ExecuteMsg::SetUpdateAgeTolerance { seconds } => {
             state.set_pyth_update_age_tolerance(&mut ctx, seconds.into())?;
         }
