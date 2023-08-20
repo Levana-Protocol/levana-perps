@@ -135,7 +135,7 @@ pub(crate) struct Opt {
         long,
         env = "LEVANA_PERP_CONTRACT_FAMILY",
         global = true,
-        default_value = "dragonqa"
+        default_value = "osmoqa"
     )]
     pub contract_family: String,
     /// Perp factory contract address, overrides the contract family setting
