@@ -61,6 +61,7 @@ pub(crate) struct BotConfig {
     pub(crate) gas_multiplier: Option<f64>,
     pub(crate) execs_per_price: Option<u32>,
     pub(crate) max_price_age_secs: u32,
+    pub(crate) min_price_age_secs: u32,
     pub(crate) max_allowed_price_delta: Decimal256,
     pub(crate) price_age_alert_threshold_secs: u32,
 }
@@ -173,6 +174,7 @@ impl Opt {
             gas_multiplier,
             execs_per_price: partial.execs_per_price,
             max_price_age_secs: partial.max_price_age_secs,
+            min_price_age_secs: partial.min_price_age_secs,
             max_allowed_price_delta: partial.max_allowed_price_delta,
             price_age_alert_threshold_secs: partial.price_age_alert_threshold_secs,
         };
@@ -191,6 +193,7 @@ impl Opt {
             min_gas_price,
             watcher_config,
             max_price_age_secs,
+            min_price_age_secs,
             max_allowed_price_delta,
             low_util_ratio,
             high_util_ratio,
@@ -234,6 +237,8 @@ impl Opt {
             execs_per_price: None,
             max_price_age_secs: max_price_age_secs
                 .unwrap_or_else(perps_exes::config::defaults::max_price_age_secs),
+            min_price_age_secs: min_price_age_secs
+                .unwrap_or_else(perps_exes::config::defaults::min_price_age_secs),
             max_allowed_price_delta: max_allowed_price_delta
                 .unwrap_or_else(perps_exes::config::defaults::max_allowed_price_delta),
             price_age_alert_threshold_secs: price_age_alert_threshold_secs

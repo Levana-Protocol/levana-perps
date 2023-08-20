@@ -146,6 +146,8 @@ pub struct DeploymentConfigTestnet {
     /// Number of seconds before a price update is forced
     #[serde(default = "defaults::max_price_age_secs")]
     pub max_price_age_secs: u32,
+    #[serde(default = "defaults::min_price_age_secs")]
+    pub min_price_age_secs: u32,
     /// Maximum the price can move before we push a price update, e.g. 0.01 means 1%.
     #[serde(default = "defaults::max_allowed_price_delta")]
     pub max_allowed_price_delta: Decimal256,
