@@ -224,7 +224,7 @@ impl State<'_> {
         amount: NonZero<Collateral>,
         stake_to_xlp: bool,
     ) -> Result<()> {
-        let lp_shares = self.liquidity_deposit_inner(ctx, lp_addr, amount, true)?;
+        let lp_shares = self.liquidity_deposit_inner(ctx, lp_addr, amount, !stake_to_xlp)?;
         self.lp_history_add_deposit(ctx, lp_addr, lp_shares, amount, stake_to_xlp)?;
         if stake_to_xlp {
             self.liquidity_stake_lp(ctx, lp_addr, Some(lp_shares))?;

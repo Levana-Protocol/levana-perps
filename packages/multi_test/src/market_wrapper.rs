@@ -913,6 +913,19 @@ impl PerpsMarket {
         )
     }
 
+    pub fn exec_mint_and_deposit_liquidity_xlp(
+        &self,
+        user_addr: &Addr,
+        amount: Number,
+    ) -> Result<AppResponse> {
+        self.exec_mint_tokens(user_addr, amount)?;
+        self.exec_funds(
+            user_addr,
+            &MarketExecuteMsg::DepositLiquidity { stake_to_xlp: true },
+            amount,
+        )
+    }
+
     pub fn exec_mint_and_deposit_liquidity_full(
         &self,
         user_addr: &Addr,

@@ -596,8 +596,10 @@ impl State<'_> {
 
         let mut addr_stats = self.load_liquidity_stats_addr_default(ctx.storage, owner)?;
 
-        // Negative delta means we're transferring our tokens somewhere else, so check if we're in cooldown.
-        if delta.is_negative() {
+        // Negative delta means we're transferring our tokens somewhere else, so
+        // check if we're in cooldown. Transferring xLP tokens is always fine
+        // since they're time-locked.
+        if delta.is_negative() && kind == LiquidityTokenKind::Lp {
             self.ensure_liquidity_cooldown(&addr_stats)?;
         }
 

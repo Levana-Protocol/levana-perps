@@ -2002,21 +2002,13 @@ fn liquidity_cooldown_works() {
         .exec_liquidity_token_transfer(LiquidityTokenKind::Lp, &lp0, &lp1, "1".parse().unwrap())
         .unwrap();
 
-    // It's also OK to stake LP into xLP, but it's not OK to transfer that xLP
+    // It's also OK to stake LP into xLP, and to transfer that xLP
     market
         .exec_stake_lp(&lp1, Some("500".parse().unwrap()))
         .unwrap();
-    let err = market
+    market
         .exec_liquidity_token_transfer(LiquidityTokenKind::Xlp, &lp1, &lp0, "1".parse().unwrap())
-        .unwrap_err();
-    let err = MarketError::try_from_anyhow(&err).unwrap();
-    match err {
-        MarketError::LiquidityCooldown {
-            ends_at: _,
-            seconds_remaining,
-        } => assert_eq!(seconds_remaining, 3600),
-        _ => Err(err).unwrap(),
-    }
+        .unwrap();
 
     // Wait an hour and everything should work
     market.set_time(TimeJump::Hours(1)).unwrap();
@@ -2028,5 +2020,76 @@ fn liquidity_cooldown_works() {
         .unwrap();
     market
         .exec_liquidity_token_transfer(LiquidityTokenKind::Xlp, &lp1, &lp0, "1".parse().unwrap())
+        .unwrap();
+}
+#[test]
+fn liquidity_cooldown_no_cooldown_xlp() {
+    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    market.automatic_time_jump_enabled = false;
+    market
+        .exec_set_config(ConfigUpdate {
+            liquidity_cooldown_seconds: Some(3600),
+            ..Default::default()
+        })
+        .unwrap();
+
+    let lp0 = market.clone_lp(0).unwrap();
+    let lp1 = market.clone_lp(1).unwrap();
+
+    // Do some deposits for both and then wait an hour
+    market
+        .exec_mint_and_deposit_liquidity(&lp0, "1000".parse().unwrap())
+        .unwrap();
+    market
+        .exec_mint_and_deposit_liquidity(&lp1, "1000".parse().unwrap())
+        .unwrap();
+    market.set_time(TimeJump::Hours(1)).unwrap();
+
+    // Have lp0 deposit into LP, and lp1 deposit into xLP.
+
+    // Now start a new deposit for lp1 and check that withdrawing and transferring LP tokens fails.
+    market
+        .exec_mint_and_deposit_liquidity(&lp0, "1000".parse().unwrap())
+        .unwrap();
+    market
+        .exec_mint_and_deposit_liquidity_xlp(&lp1, "1000".parse().unwrap())
+        .unwrap();
+
+    // lp1 can withdraw and transfer all tokens
+    market
+        .exec_withdraw_liquidity(&lp1, Some("1".parse().unwrap()))
+        .unwrap();
+    market
+        .exec_liquidity_token_transfer(LiquidityTokenKind::Lp, &lp1, &lp0, "1".parse().unwrap())
+        .unwrap();
+    market
+        .exec_liquidity_token_transfer(LiquidityTokenKind::Xlp, &lp1, &lp0, "1".parse().unwrap())
+        .unwrap();
+
+    // lp0 cannot withdraw or transfer LP, but can transfer xLP
+    let err = market
+        .exec_withdraw_liquidity(&lp0, Some("1".parse().unwrap()))
+        .unwrap_err();
+    let err = MarketError::try_from_anyhow(&err).unwrap();
+    match err {
+        MarketError::LiquidityCooldown {
+            ends_at: _,
+            seconds_remaining,
+        } => assert_eq!(seconds_remaining, 3600),
+        _ => Err(err).unwrap(),
+    }
+    let err = market
+        .exec_liquidity_token_transfer(LiquidityTokenKind::Lp, &lp0, &lp1, "1".parse().unwrap())
+        .unwrap_err();
+    let err = MarketError::try_from_anyhow(&err).unwrap();
+    match err {
+        MarketError::LiquidityCooldown {
+            ends_at: _,
+            seconds_remaining,
+        } => assert_eq!(seconds_remaining, 3600),
+        _ => Err(err).unwrap(),
+    }
+    market
+        .exec_liquidity_token_transfer(LiquidityTokenKind::Xlp, &lp0, &lp1, "1".parse().unwrap())
         .unwrap();
 }
