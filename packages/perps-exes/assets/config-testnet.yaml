@@ -20,6 +20,9 @@ liquidity:
     ETH_USD:
       min: 1000
       max: 1000000
+    axlETH_USD:
+      min: 1000
+      max: 1000000
     BTC_USD:
       min: 100
       max: 10000

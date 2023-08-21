@@ -2,8 +2,22 @@ markets:
   ETH_USD:
     delta_neutrality_fee_sensitivity: 1000000000
     funding_rate_sensitivity: 1.5
-    # Initial deployment to mainnet probably wants a modified max_liquidity too
-    # Not setting here since it shouldn't be used for testnet deploys
+    trading_fee_notional_size: 0.001
+    trading_fee_counter_collateral: 0.001
+    borrow_fee_rate_min_annualized: 0.03
+    carry_leverage: 10
+    target_utilization: 0.5
+    borrow_fee_sensitivity: 0.083333333333333333
+
+  axlETH_USD:
+    delta_neutrality_fee_sensitivity: 1000000000
+    funding_rate_sensitivity: 1.5
+    trading_fee_notional_size: 0.001
+    trading_fee_counter_collateral: 0.001
+    borrow_fee_rate_min_annualized: 0.03
+    carry_leverage: 10
+    target_utilization: 0.5
+    borrow_fee_sensitivity: 0.083333333333333333
 
   # Internal testing contracts, not yet on mainnet
   ATOM_USD:
