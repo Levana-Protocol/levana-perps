@@ -482,7 +482,7 @@ struct AddMarketOpts {
     #[clap(long)]
     decimal_places: u8,
     /// Initial borrow fee rate
-    #[clap(long, default_value = "0.2")]
+    #[clap(long)]
     initial_borrow_fee_rate: Decimal256,
     /// Pyth bridge contract to use as price admin
     #[clap(long)]
