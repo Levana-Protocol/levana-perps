@@ -20,7 +20,7 @@ osmosis-mainnet:
   explorer: "https://www.mintscan.io/osmosis/txs/"
   gas-multiplier: 1.5
 osmosis-testnet:
-  pyth: osmo1lltupx02sj99suakmuk4sr4ppqf34ajedaxut3ukjwkv6469erwqtpg9t3
+  pyth: osmo12u2vqdecdte84kg6c3d40nwzjsya59hsj048n687m9q3t6wdmqgsq6zrlx # osmo1lltupx02sj99suakmuk4sr4ppqf34ajedaxut3ukjwkv6469erwqtpg9t3
   tracker: osmo1l3ypxctzcdev9dmyydlzrflqz52f0wsqmzkuyq9dvpdnqx69wvvq9zszh2
   faucet: osmo1ycrm74p7uc976hu2z428l27vxj8l44zu0x0yqjr8gh775qr6gtnq9f3zsz
   explorer: "https://testnet.mintscan.io/osmosis-testnet/txs/"
