@@ -2,19 +2,16 @@
 pub(crate) mod market;
 pub(crate) mod pyth;
 
-use cosmwasm_std::{Addr, Deps, DepsMut, Empty, Env, QuerierWrapper, Storage};
-use cw_storage_plus::Item;
-use shared::namespace;
+use cosmwasm_std::{Deps, DepsMut, Empty, Env, QuerierWrapper, Storage};
+use msg::contracts::pyth_bridge::entry::Config;
 use shared::prelude::*;
 
-/// The factory address
-const FACTORY_ADDR: Item<Addr> = Item::new(namespace::FACTORY_ADDR);
+use self::pyth::get_pyth_config;
 
 pub(crate) struct State<'a> {
     pub(crate) querier: QuerierWrapper<'a, Empty>,
-    pub(crate) factory_address: Addr,
+    pub(crate) config: Config,
     pub(crate) env: Env,
-    pub(crate) api: &'a dyn Api,
 }
 
 pub(crate) struct StateContext<'a> {
@@ -24,13 +21,12 @@ pub(crate) struct StateContext<'a> {
 
 impl<'a> State<'a> {
     pub(crate) fn new(deps: Deps<'a>, env: Env) -> Result<(Self, &dyn Storage)> {
-        let factory_address = FACTORY_ADDR.load(deps.storage)?;
+        let config = get_pyth_config(deps.storage)?;
         Ok((
             State {
                 querier: deps.querier,
-                factory_address,
+                config,
                 env,
-                api: deps.api,
             },
             deps.storage,
         ))
@@ -44,13 +40,12 @@ impl<'a> State<'a> {
 impl<'a> StateContext<'a> {
     pub(crate) fn new(deps: DepsMut<'a>, env: Env) -> Result<(State<'a>, Self)> {
         let contract_version = get_contract_version(deps.storage)?;
-        let factory_address = FACTORY_ADDR.load(deps.storage)?;
+        let config = get_pyth_config(deps.storage)?;
         Ok((
             State {
                 querier: deps.querier,
-                factory_address,
+                config,
                 env,
-                api: deps.api,
             },
             StateContext {
                 storage: deps.storage,
@@ -58,10 +53,4 @@ impl<'a> StateContext<'a> {
             },
         ))
     }
-}
-
-pub(crate) fn set_factory_addr(store: &mut dyn Storage, factory_addr: &Addr) -> Result<()> {
-    FACTORY_ADDR.save(store, factory_addr)?;
-
-    Ok(())
 }

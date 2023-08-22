@@ -2,7 +2,7 @@ use crate::state::*;
 use cosmwasm_std::{wasm_execute, SubMsg, SubMsgResponse};
 use msg::contracts::{
     market::entry::ExecuteMsg as MarketExecuteMsg,
-    pyth_bridge::{events::UpdatePriceEvent, MarketPrice, PythMarketPriceFeeds},
+    pyth_bridge::{events::UpdatePriceEvent, MarketPrice},
 };
 use msg::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -28,25 +28,21 @@ impl State<'_> {
     pub(crate) fn market_addr(&self, market_id: MarketId) -> Result<Addr> {
         load_external_map(
             &self.querier,
-            &self.factory_address,
+            &self.config.factory,
             namespace::MARKET_ADDRS,
             &market_id,
         )
     }
 
-    pub(crate) fn market_price(
-        &self,
-        store: &dyn Storage,
-        market_id: &MarketId,
-        age_tolerance_seconds: u64,
-    ) -> Result<MarketPrice> {
-        let PythMarketPriceFeeds { feeds, feeds_usd } =
-            self.get_pyth_market_price_feeds(store, market_id)?;
-
+    pub(crate) fn market_price(&self, age_tolerance_seconds: u64) -> Result<MarketPrice> {
         // for updating market price, it must be set within the configured age tolerance
-        let (price, publish_time) = self.get_pyth_price(store, feeds, age_tolerance_seconds)?;
-        let price_usd = feeds_usd
-            .map(|feeds_usd| self.get_pyth_price(store, feeds_usd, age_tolerance_seconds))
+        let (price, publish_time) =
+            self.get_pyth_price(&self.config.feeds, age_tolerance_seconds)?;
+        let price_usd = self
+            .config
+            .feeds_usd
+            .as_ref()
+            .map(|feeds_usd| self.get_pyth_price(feeds_usd, age_tolerance_seconds))
             .transpose()?;
 
         Ok(MarketPrice {
@@ -61,25 +57,20 @@ impl State<'_> {
     pub(crate) fn update_market_price(
         &self,
         ctx: &mut StateContext,
-        market_id: MarketId,
         execs: Option<u32>,
         reward_addr: RawAddr,
         bail_on_error: bool,
     ) -> Result<()> {
         // In order to make gas simulation more accurate, always attempt an update
         // then erroring out (or not) is handled in the reply handler
-        let market_price = self.market_price(
-            ctx.storage,
-            &market_id,
-            self.get_pyth_update_age_tolerance(ctx.storage)?,
-        )?;
+        let market_price = self.market_price(self.config.update_age_tolerance_seconds.into())?;
 
         let MarketPrice {
             price, price_usd, ..
         } = market_price;
 
         ctx.response.add_event(UpdatePriceEvent {
-            market_id: market_id.clone(),
+            market_id: self.config.market.clone(),
             price,
             price_usd,
         });
@@ -88,14 +79,14 @@ impl State<'_> {
             ctx.storage,
             &ReplyContext {
                 market_price,
-                market_id: market_id.clone(),
+                market_id: self.config.market.clone(),
                 bail_on_error,
             },
         )?;
 
         ctx.response.add_raw_submessage(SubMsg::reply_always(
             wasm_execute(
-                self.market_addr(market_id)?,
+                self.market_addr(self.config.market.clone())?,
                 &MarketExecuteMsg::SetPrice {
                     price,
                     price_usd,

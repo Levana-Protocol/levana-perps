@@ -119,7 +119,7 @@ impl App {
                 let reason = self.needs_price_update(market, latest_price).await?;
                 worker.add_reason(&market.market_id, &reason);
                 if let Some(reason) = reason {
-                    let msgs = self.get_txs_pyth(&worker.wallet, market, pyth).await?;
+                    let msgs = self.get_txs_pyth(&worker.wallet, pyth).await?;
                     for msg in msgs {
                         builder.add_message_mut(msg);
                     }
@@ -270,12 +270,7 @@ impl App {
         ))
     }
 
-    async fn get_txs_pyth(
-        &self,
-        wallet: &Wallet,
-        market: &Market,
-        pyth: &Pyth,
-    ) -> Result<Vec<MsgExecuteContract>> {
+    async fn get_txs_pyth(&self, wallet: &Wallet, pyth: &Pyth) -> Result<Vec<MsgExecuteContract>> {
         let oracle_msg = get_oracle_update_msg(
             &pyth.market_price_feeds,
             &wallet,
@@ -285,7 +280,7 @@ impl App {
         )
         .await?;
         let bridge_msg = pyth
-            .get_bridge_update_msg(wallet.get_address_string(), market.market_id.clone())
+            .get_bridge_update_msg(wallet.get_address_string())
             .await?;
 
         Ok(vec![oracle_msg, bridge_msg])

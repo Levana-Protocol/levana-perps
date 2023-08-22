@@ -6,12 +6,9 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use cosmos::{Address, ContractAdmin, CosmosNetwork, HasAddress};
 use cosmwasm_std::{to_binary, CosmosMsg, Empty};
-use msg::{
-    contracts::{market::entry::NewMarketParams, pyth_bridge::entry::MarketFeeds},
-    token::TokenInit,
-};
+use msg::{contracts::market::entry::NewMarketParams, token::TokenInit};
 use perps_exes::{
-    config::{MarketConfigUpdates, PythConfig},
+    config::{MarketConfigUpdates, PythConfig, PythMarketPriceFeeds},
     prelude::*,
 };
 
@@ -423,7 +420,11 @@ async fn new_pyth_bridge(
     opt: Opt,
     NewPythBridgeOpts { factory, market_id }: NewPythBridgeOpts,
 ) -> Result<()> {
-    let pyth_config = PythConfig::load(opt.config_pyth.as_ref())?
+    let PythMarketPriceFeeds {
+        feeds,
+        feeds_usd,
+        feed_type,
+    } = PythConfig::load(opt.config_pyth.as_ref())?
         .markets
         .remove(&market_id)
         .with_context(|| format!("No Pyth config found for market {market_id}"))?;
@@ -454,10 +455,10 @@ async fn new_pyth_bridge(
                 factory: factory.address.get_address_string().into(),
                 pyth: app.pyth.address.get_address_string().into(),
                 update_age_tolerance_seconds: app.pyth.update_age_tolerance,
-                feeds: vec![MarketFeeds {
-                    market_id,
-                    market_price_feeds: pyth_config.clone(),
-                }],
+                feed_type,
+                market: market_id,
+                feeds,
+                feeds_usd,
             },
             ContractAdmin::Addr(migration_admin),
         )

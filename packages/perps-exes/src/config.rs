@@ -4,9 +4,26 @@ use std::{collections::HashMap, path::Path};
 
 use cosmos::{Address, CosmosNetwork, RawAddress};
 use msg::{
-    contracts::{market::config::ConfigUpdate, pyth_bridge::PythMarketPriceFeeds},
+    contracts::{
+        market::config::ConfigUpdate,
+        pyth_bridge::{entry::FeedType, PythPriceFeed},
+    },
     prelude::*,
 };
+
+#[derive(serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct PythMarketPriceFeeds {
+    /// feed of the base asset in terms of the quote asset
+    pub feeds: Vec<PythPriceFeed>,
+    /// feed of the collateral asset in terms of USD
+    ///
+    /// This is used by the protocol to track USD values. This field is
+    /// optional, as markets with USD as the quote asset do not need to
+    /// provide it.
+    pub feeds_usd: Option<Vec<PythPriceFeed>>,
+    pub feed_type: FeedType,
+}
 
 /// Overall configuration of Pyth, for information valid across all chains.
 #[derive(serde::Deserialize, Debug)]

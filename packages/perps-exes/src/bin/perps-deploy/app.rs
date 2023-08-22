@@ -2,9 +2,10 @@ use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{Context, Result};
 use cosmos::{Address, Cosmos, CosmosNetwork, HasAddress, HasAddressType, Wallet};
-use msg::contracts::pyth_bridge::PythMarketPriceFeeds;
 use msg::prelude::MarketId;
-use perps_exes::config::{ChainConfig, ConfigTestnet, DeploymentConfigTestnet, PythConfig};
+use perps_exes::config::{
+    ChainConfig, ConfigTestnet, DeploymentConfigTestnet, PythConfig, PythMarketPriceFeeds,
+};
 
 use crate::{cli::Opt, faucet::Faucet, tracker::Tracker};
 

@@ -2,11 +2,10 @@ use cosmos::{
     proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, Contract, Cosmos, HasAddress,
 };
 use msg::{
-    contracts::pyth_bridge::{
-        entry::QueryMsg as BridgeQueryMsg, MarketPrice, PythMarketPriceFeeds,
-    },
+    contracts::pyth_bridge::{entry::QueryMsg as BridgeQueryMsg, MarketPrice},
     prelude::*,
 };
+use perps_exes::config::PythMarketPriceFeeds;
 
 #[derive(Clone)]
 pub(crate) struct Pyth {
@@ -34,18 +33,29 @@ impl std::fmt::Debug for Pyth {
 impl Pyth {
     pub async fn new(cosmos: &Cosmos, bridge_addr: Address, market_id: MarketId) -> Result<Self> {
         let bridge = cosmos.make_contract(bridge_addr);
-        let oracle_addr = bridge.query(BridgeQueryMsg::PythAddress {}).await?;
-        let oracle = cosmos.make_contract(oracle_addr);
-        let market_price_feeds = bridge
-            .query(BridgeQueryMsg::MarketPriceFeeds {
-                market_id: market_id.clone(),
-            })
-            .await?;
+        let msg::contracts::pyth_bridge::entry::Config {
+            pyth: oracle_addr,
+            feeds,
+            feeds_usd,
+            feed_type,
+            factory: _,
+            update_age_tolerance_seconds: _,
+            market,
+        } = bridge.query(BridgeQueryMsg::Config {}).await?;
+        anyhow::ensure!(market_id == market);
+        let oracle =
+            cosmos.make_contract(oracle_addr.as_str().parse().with_context(|| {
+                format!("Invalid Pyth oracle contract from Config: {oracle_addr}")
+            })?);
 
         Ok(Self {
             oracle,
             bridge,
-            market_price_feeds,
+            market_price_feeds: PythMarketPriceFeeds {
+                feeds,
+                feeds_usd,
+                feed_type,
+            },
             market_id,
         })
     }
@@ -53,23 +63,17 @@ impl Pyth {
     pub async fn query_price(&self, age_tolerance_seconds: u32) -> Result<MarketPrice> {
         self.bridge
             .query(BridgeQueryMsg::MarketPrice {
-                market_id: self.market_id.clone(),
                 age_tolerance_seconds,
             })
             .await
     }
 
-    pub async fn get_bridge_update_msg(
-        &self,
-        sender: String,
-        market_id: MarketId,
-    ) -> Result<MsgExecuteContract> {
+    pub async fn get_bridge_update_msg(&self, sender: String) -> Result<MsgExecuteContract> {
         Ok(MsgExecuteContract {
             sender,
             contract: self.bridge.get_address_string(),
             msg: serde_json::to_vec(
                 &msg::contracts::pyth_bridge::entry::ExecuteMsg::UpdatePrice {
-                    market_id,
                     execs: None,
                     rewards: None,
                     bail_on_error: false,

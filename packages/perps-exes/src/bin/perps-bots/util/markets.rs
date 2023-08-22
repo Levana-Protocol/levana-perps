@@ -1,8 +1,7 @@
 use cosmos::{Address, Contract, Cosmos, HasAddress, Wallet};
 use msg::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
-use msg::contracts::pyth_bridge::PythMarketPriceFeeds;
 use msg::prelude::*;
-use perps_exes::config::PythConfig;
+use perps_exes::config::{PythConfig, PythMarketPriceFeeds};
 use perps_exes::prelude::MarketContract;
 use std::fmt::Debug;
 
