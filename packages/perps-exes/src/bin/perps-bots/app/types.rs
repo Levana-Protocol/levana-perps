@@ -133,7 +133,7 @@ impl Opt {
 
         let pyth_config = PythConfig::load(self.pyth_config)?;
         let endpoints_stable = VecWithCurr::new(pyth_config.endpoints_stable.clone());
-        let endpoints_edge = VecWithCurr::new(pyth_config.endpoints_edge.clone());
+        let endpoints_edge = VecWithCurr::new(pyth_config.endpoints_edge);
 
         let app = App {
             factory: RwLock::new(Arc::new(factory)),

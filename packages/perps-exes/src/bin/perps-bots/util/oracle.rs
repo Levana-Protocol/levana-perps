@@ -70,13 +70,17 @@ impl Pyth {
             .await
     }
 
-    pub async fn get_bridge_update_msg(&self, sender: String) -> Result<MsgExecuteContract> {
+    pub async fn get_bridge_update_msg(
+        &self,
+        sender: String,
+        execs: Option<u32>,
+    ) -> Result<MsgExecuteContract> {
         Ok(MsgExecuteContract {
             sender,
             contract: self.bridge.get_address_string(),
             msg: serde_json::to_vec(
                 &msg::contracts::pyth_bridge::entry::ExecuteMsg::UpdatePrice {
-                    execs: None,
+                    execs,
                     rewards: None,
                     bail_on_error: false,
                 },

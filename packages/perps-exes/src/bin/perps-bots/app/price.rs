@@ -110,7 +110,9 @@ impl App {
             if reason.is_too_frequent() {
                 return Ok("Too frequent price updates, skipping".to_owned());
             }
-            let msgs = self.get_txs_pyth(&worker.wallet, &pyth).await?;
+            let msgs = self
+                .get_txs_pyth(&worker.wallet, &pyth, self.config.execs_per_price)
+                .await?;
             for msg in msgs {
                 builder.add_message_mut(msg);
             }
@@ -233,7 +235,12 @@ impl App {
         Ok(None)
     }
 
-    async fn get_txs_pyth(&self, wallet: &Wallet, pyth: &Pyth) -> Result<Vec<MsgExecuteContract>> {
+    async fn get_txs_pyth(
+        &self,
+        wallet: &Wallet,
+        pyth: &Pyth,
+        execs: Option<u32>,
+    ) -> Result<Vec<MsgExecuteContract>> {
         let oracle_msg = get_oracle_update_msg(
             &pyth.market_price_feeds,
             &wallet,
@@ -246,7 +253,7 @@ impl App {
         )
         .await?;
         let bridge_msg = pyth
-            .get_bridge_update_msg(wallet.get_address_string())
+            .get_bridge_update_msg(wallet.get_address_string(), execs)
             .await?;
 
         Ok(vec![oracle_msg, bridge_msg])
