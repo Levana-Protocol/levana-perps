@@ -473,11 +473,7 @@ impl PythInfo {
         factory: &Contract,
         market: MarketId,
     ) -> Result<Contract> {
-        let PythMarketPriceFeeds {
-            feeds,
-            feeds_usd,
-            feed_type,
-        } = self
+        let PythMarketPriceFeeds { feeds, feeds_usd } = self
             .markets
             .get(&market)
             .with_context(|| format!("No Pyth price feed info found for {market}"))?;
@@ -490,7 +486,7 @@ impl PythInfo {
                     factory: factory.get_address().to_string().into(),
                     pyth: self.address.to_string().into(),
                     update_age_tolerance_seconds: self.update_age_tolerance,
-                    feed_type: *feed_type,
+                    feed_type: self.feed_type,
                     market,
                     feeds: feeds.clone(),
                     feeds_usd: feeds_usd.clone(),

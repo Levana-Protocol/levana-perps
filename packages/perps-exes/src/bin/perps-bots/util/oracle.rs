@@ -2,7 +2,10 @@ use cosmos::{
     proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, Contract, Cosmos, HasAddress,
 };
 use msg::{
-    contracts::pyth_bridge::{entry::QueryMsg as BridgeQueryMsg, MarketPrice},
+    contracts::pyth_bridge::{
+        entry::{FeedType, QueryMsg as BridgeQueryMsg},
+        MarketPrice,
+    },
     prelude::*,
 };
 use perps_exes::config::PythMarketPriceFeeds;
@@ -13,6 +16,7 @@ pub(crate) struct Pyth {
     pub bridge: Contract,
     pub market_id: MarketId,
     pub market_price_feeds: PythMarketPriceFeeds,
+    pub feed_type: FeedType,
 }
 
 impl std::fmt::Debug for Pyth {
@@ -26,6 +30,7 @@ impl std::fmt::Debug for Pyth {
                 "price_feeds_usd",
                 &format!("{:?}", self.market_price_feeds.feeds_usd),
             )
+            .field("feed_type", &self.feed_type)
             .finish()
     }
 }
@@ -51,12 +56,9 @@ impl Pyth {
         Ok(Self {
             oracle,
             bridge,
-            market_price_feeds: PythMarketPriceFeeds {
-                feeds,
-                feeds_usd,
-                feed_type,
-            },
+            market_price_feeds: PythMarketPriceFeeds { feeds, feeds_usd },
             market_id,
+            feed_type,
         })
     }
 

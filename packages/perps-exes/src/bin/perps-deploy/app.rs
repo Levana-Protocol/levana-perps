@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{Context, Result};
 use cosmos::{Address, Cosmos, CosmosNetwork, HasAddress, HasAddressType, Wallet};
-use msg::prelude::MarketId;
+use msg::{contracts::pyth_bridge::entry::FeedType, prelude::MarketId};
 use perps_exes::config::{
     ChainConfig, ConfigTestnet, DeploymentConfigTestnet, PythConfig, PythMarketPriceFeeds,
 };
@@ -46,6 +46,7 @@ pub(crate) struct AppMainnet {
 #[derive(Clone, Debug)]
 pub(crate) struct PythInfo {
     pub address: Address,
+    pub feed_type: FeedType,
     pub markets: HashMap<MarketId, PythMarketPriceFeeds>,
     pub update_age_tolerance: u32,
 }
@@ -112,13 +113,18 @@ impl Opt {
                     .for_chain(partial.network.get_address_type()),
             )
         } else {
-            let pyth_address = basic
+            let pyth_contract = basic
                 .chain_config
                 .pyth
+                .as_ref()
                 .with_context(|| format!("No Pyth address found for {family}"))?;
 
             // Pyth config validation
-            for (market_id, market_price_feeds) in &pyth_config.markets {
+            for (market_id, market_price_feeds) in pyth_config
+                .markets_stable
+                .iter()
+                .chain(pyth_config.markets_edge.iter())
+            {
                 if market_price_feeds.feeds_usd.is_none() && !market_id.is_notional_usd() {
                     anyhow::bail!(
                         "notional is not USD, so there MUST be a USD price feed. MarketId: {}",
@@ -128,8 +134,12 @@ impl Opt {
             }
 
             PriceSourceConfig::Pyth(PythInfo {
-                address: pyth_address,
-                markets: pyth_config.markets.clone(),
+                address: pyth_contract.contract,
+                feed_type: pyth_contract.r#type,
+                markets: match pyth_contract.r#type {
+                    FeedType::Stable => pyth_config.markets_stable.clone(),
+                    FeedType::Edge => pyth_config.markets_edge.clone(),
+                },
                 update_age_tolerance: pyth_config.update_age_tolerance,
             })
         };
@@ -153,12 +163,18 @@ impl Opt {
         let cosmos = self.connect(network).await?;
         let wallet = self.get_wallet(network)?;
 
-        let pyth_address = chain_config
+        let pyth_contract = chain_config
             .pyth
             .with_context(|| format!("No Pyth configuration found for {network}"))?;
 
+        anyhow::ensure!(pyth_contract.r#type == FeedType::Stable);
+
         // Pyth config validation
-        for (market_id, market_price_feeds) in &pyth_config.markets {
+        for (market_id, market_price_feeds) in pyth_config
+            .markets_stable
+            .iter()
+            .chain(pyth_config.markets_edge.iter())
+        {
             if market_price_feeds.feeds_usd.is_none() && !market_id.is_notional_usd() {
                 anyhow::bail!(
                     "notional is not USD, so there MUST be a USD price feed. MarketId: {}",
@@ -168,8 +184,9 @@ impl Opt {
         }
 
         let pyth = PythInfo {
-            address: pyth_address,
-            markets: pyth_config.markets.clone(),
+            address: pyth_contract.contract,
+            feed_type: pyth_contract.r#type,
+            markets: pyth_config.markets_stable.clone(),
             update_age_tolerance: pyth_config.update_age_tolerance,
         };
 

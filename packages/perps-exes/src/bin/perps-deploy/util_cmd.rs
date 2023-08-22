@@ -11,11 +11,7 @@ use msg::contracts::market::{
     position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
 };
 use parking_lot::Mutex;
-use perps_exes::{
-    config::{ChainConfig, PythConfig},
-    prelude::MarketContract,
-    pyth::{get_oracle_update_msg, VecWithCurr},
-};
+use perps_exes::prelude::MarketContract;
 use serde_json::json;
 use shared::storage::{
     Collateral, DirectionToBase, LeverageToBase, MarketId, Notional, Signed, UnsignedDecimal, Usd,
@@ -97,43 +93,44 @@ struct UpdatePythOpt {
 }
 
 async fn update_pyth(
-    opt: crate::cli::Opt,
-    UpdatePythOpt {
-        market,
-        network,
-        oracle,
-        config_pyth,
-        config_chain,
-    }: UpdatePythOpt,
+    _opt: crate::cli::Opt,
+    _: UpdatePythOpt, // UpdatePythOpt {
+                      //     market,
+                      //     network,
+                      //     oracle,
+                      //     config_pyth,
+                      //     config_chain,
+                      // }: UpdatePythOpt,
 ) -> Result<()> {
-    let basic = opt.load_basic_app(network).await?;
-    let pyth = PythConfig::load(config_pyth)?;
-    let endpoints = VecWithCurr::new(pyth.endpoints.clone());
-    let client = reqwest::Client::new();
-    let feeds = pyth
-        .markets
-        .get(&market)
-        .with_context(|| format!("No Pyth feed data found for {market}"))?;
+    todo!()
+    // let basic = opt.load_basic_app(network).await?;
+    // let pyth = PythConfig::load(config_pyth)?;
+    // let endpoints = VecWithCurr::new(pyth.endpoints.clone());
+    // let client = reqwest::Client::new();
+    // let feeds = pyth
+    //     .markets
+    //     .get(&market)
+    //     .with_context(|| format!("No Pyth feed data found for {market}"))?;
 
-    let oracle = match oracle {
-        Some(oracle) => oracle,
-        None => {
-            let chain = ChainConfig::load(config_chain, network)?;
-            chain
-                .pyth
-                .with_context(|| format!("No Pyth oracle found for network {network}"))?
-        }
-    };
-    let oracle = basic.cosmos.make_contract(oracle);
+    // let oracle = match oracle {
+    //     Some(oracle) => oracle,
+    //     None => {
+    //         let chain = ChainConfig::load(config_chain, network)?;
+    //         chain
+    //             .pyth
+    //             .with_context(|| format!("No Pyth oracle found for network {network}"))?
+    //     }
+    // };
+    // let oracle = basic.cosmos.make_contract(oracle);
 
-    let msg = get_oracle_update_msg(feeds, &basic.wallet, &endpoints, &client, &oracle).await?;
+    // let msg = get_oracle_update_msg(feeds, &basic.wallet, &endpoints, &client, &oracle).await?;
 
-    let builder = TxBuilder::default().add_message(msg);
-    let res = builder
-        .sign_and_broadcast(&basic.cosmos, &basic.wallet)
-        .await?;
-    log::info!("Price set in: {}", res.txhash);
-    Ok(())
+    // let builder = TxBuilder::default().add_message(msg);
+    // let res = builder
+    //     .sign_and_broadcast(&basic.cosmos, &basic.wallet)
+    //     .await?;
+    // log::info!("Price set in: {}", res.txhash);
+    // Ok(())
 }
 
 #[derive(clap::Parser)]

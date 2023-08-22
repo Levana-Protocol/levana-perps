@@ -66,7 +66,8 @@ pub(crate) struct App {
     pub(crate) gases: RwLock<HashMap<Address, GasRecords>>,
     /// Ensure that the crank and price bots don't try to work at the same time
     pub(crate) crank_lock: Mutex<()>,
-    pub endpoints: PythEndpoints,
+    pub endpoints_stable: PythEndpoints,
+    pub endpoints_edge: PythEndpoints,
     pub pyth_config: PythConfig,
 }
 
@@ -132,7 +133,8 @@ impl Opt {
         };
 
         let pyth_config = PythConfig::load(self.pyth_config)?;
-        let endpoints = VecWithCurr::new(pyth_config.endpoints.clone());
+        let endpoints_stable = VecWithCurr::new(pyth_config.endpoints_stable.clone());
+        let endpoints_edge = VecWithCurr::new(pyth_config.endpoints_edge.clone());
 
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
@@ -144,7 +146,8 @@ impl Opt {
             gases: RwLock::new(HashMap::new()),
             frontend_info_testnet,
             crank_lock: Mutex::new(()),
-            endpoints,
+            endpoints_stable,
+            endpoints_edge,
             pyth_config,
         };
         let app = Arc::new(app);

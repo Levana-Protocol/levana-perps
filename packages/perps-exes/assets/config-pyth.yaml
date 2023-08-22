@@ -1,6 +1,7 @@
 update-age-tolerance: 120
-endpoints: ["https://pyth.levana.finance/", "https://xc-mainnet.pyth.network/"]
-markets:
+endpoints-stable: ["https://hermes.pyth.network/"]
+endpoints-edge: ["https://hermes-beta.pyth.network/"]
+markets-stable:
   # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-stable
   ATOM_USD:
     feeds: [
@@ -13,8 +14,8 @@ markets:
       # inverted USDC/USD 
       { id: "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a", inverted: true }
     ]
-    # OSMO_USD (snake_case for compatibility with instantiate message)
-    feeds_usd: [
+    # OSMO_USD
+    feeds-usd: [
       {id: "5867f5683c757393a0670ef0f701490950fe93fdb006d181c8265a831ac0c5c6", inverted: false }
     ]
   ETH_BTC:
@@ -24,8 +25,8 @@ markets:
       # inverted BTC/USD
       {id: "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43", inverted: true }
     ]
-    # BTC_USD (snake_case for compatibility with instantiate message)
-    feeds_usd: [
+    # BTC_USD
+    feeds-usd: [
       {id: "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43", inverted: false }
     ]
   ETH_USD:
@@ -52,4 +53,15 @@ markets:
     feeds: [
       # SEI/USD
       { id: "53614f1cb0c031d4af66c04cb9c756234adad0e1cee85303795091499a4084eb", inverted: false }
+    ]
+
+markets-edge:
+  # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-edge
+  ATOM_USD:
+    feeds: [
+      { id: "61226d39beea19d334f17c2febce27e12646d84675924ebb02b9cdaea68727e3", inverted: false }
+    ]
+  BTC_USD:
+    feeds: [
+      { id: "f9c0172ba10dfa4d19088d94f5bf61d3b54d5bd7483a322a982e1373ee8ea31b", inverted: false }
     ]
