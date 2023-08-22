@@ -18,6 +18,20 @@ pub enum FeedType {
     Edge,
 }
 
+impl FromStr for FeedType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "stable" => Ok(FeedType::Stable),
+            "edge" => Ok(FeedType::Edge),
+            _ => Err(anyhow::anyhow!(
+                "Invalid feed type: {s}. Expected 'stable' or 'edge'"
+            )),
+        }
+    }
+}
+
 /// Instantiate message for pyth bridge
 #[cw_serde]
 pub struct InstantiateMsg {
