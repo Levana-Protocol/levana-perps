@@ -1,11 +1,8 @@
 use cosmos::{Contract, Cosmos, HasAddress};
 use msg::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
 use msg::prelude::*;
-use perps_exes::config::PythMarketPriceFeeds;
 use perps_exes::prelude::MarketContract;
 use std::fmt::Debug;
-
-use super::oracle::Pyth;
 
 #[derive(Clone)]
 pub(crate) struct Market {
@@ -27,12 +24,6 @@ impl Debug for Market {
             .field("name", &self.market_id)
             .finish()
     }
-}
-
-#[derive(Clone, Debug)]
-pub(crate) enum PriceApi<'a> {
-    Pyth(Pyth),
-    Manual(&'a PythMarketPriceFeeds),
 }
 
 pub(crate) async fn get_markets(cosmos: &Cosmos, factory: &Contract) -> Result<Vec<Market>> {

@@ -68,7 +68,6 @@ pub(crate) struct App {
     pub(crate) crank_lock: Mutex<()>,
     pub endpoints_stable: PythEndpoints,
     pub endpoints_edge: PythEndpoints,
-    pub pyth_config: PythConfig,
 }
 
 pub(crate) type PythEndpoints = VecWithCurr<String>;
@@ -148,7 +147,6 @@ impl Opt {
             crank_lock: Mutex::new(()),
             endpoints_stable,
             endpoints_edge,
-            pyth_config,
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {

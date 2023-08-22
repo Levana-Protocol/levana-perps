@@ -107,6 +107,9 @@ impl App {
         let reason = self.needs_price_update(market, latest_price).await?;
         worker.add_reason(&market.market_id, &reason);
         if let Some(reason) = reason {
+            if reason.is_too_frequent() {
+                return Ok("Too frequent price updates, skipping".to_owned());
+            }
             let msgs = self.get_txs_pyth(&worker.wallet, &pyth).await?;
             for msg in msgs {
                 builder.add_message_mut(msg);
