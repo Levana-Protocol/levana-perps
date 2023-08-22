@@ -1,5 +1,9 @@
 sei-testnet:
-  pyth: sei1kpntez76v38yuxhhaaahdmvjxnr5tkr8tq077smefs7uw70rj5yqw2aewy
+  pyth:
+    #contract: sei1kpntez76v38yuxhhaaahdmvjxnr5tkr8tq077smefs7uw70rj5yqw2aewy
+    #type: edge
+    contract: sei1w2rxq6eckak47s25crxlhmq96fzjwdtjgdwavn56ggc0qvxvw7rqczxyfy
+    type: stable
   tracker: sei14k4xcy6dfdyqvpvx6njxptry2urcp98f74lv49m36u7gkdkv7s6qleq4tp
   faucet: sei1czf3age49j99yrkxynmetysh3p2x8tp429mv23jme7zj8hytwhesnqngza
   explorer: "https://www.seiscan.app/atlantic-2/txs/"
@@ -12,15 +16,23 @@ sei-testnet:
   #- https://sei-testnet-rpc.polkachu.com/
   #- https://sei-a2-rpc.brocha.in/
 sei-mainnet:
-  pyth: sei15d2tyq2jzxmpg32y3am3w62dts32qgzmds9qnr6c87r0gwwr7ynqal0x38
+  pyth:
+    contract: sei15d2tyq2jzxmpg32y3am3w62dts32qgzmds9qnr6c87r0gwwr7ynqal0x38
+    type: stable
   rpc-nodes:
     - https://sei-priv.kingnodes.com
 osmosis-mainnet:
-  pyth: osmo13ge29x4e2s63a8ytz2px8gurtyznmue4a69n5275692v3qn3ks8q7cwck7
+  pyth:
+    contract: osmo13ge29x4e2s63a8ytz2px8gurtyznmue4a69n5275692v3qn3ks8q7cwck7
+    type: stable
   explorer: "https://www.mintscan.io/osmosis/txs/"
   gas-multiplier: 1.5
 osmosis-testnet:
-  pyth: osmo12u2vqdecdte84kg6c3d40nwzjsya59hsj048n687m9q3t6wdmqgsq6zrlx # osmo1lltupx02sj99suakmuk4sr4ppqf34ajedaxut3ukjwkv6469erwqtpg9t3
+  pyth:
+    #contract: osmo1lltupx02sj99suakmuk4sr4ppqf34ajedaxut3ukjwkv6469erwqtpg9t3
+    #type: edge
+    contract: osmo1hpdzqku55lmfmptpyj6wdlugqs5etr6teqf7r4yqjjrxjznjhtuqqu5kdh
+    type: stable
   tracker: osmo1l3ypxctzcdev9dmyydlzrflqz52f0wsqmzkuyq9dvpdnqx69wvvq9zszh2
   faucet: osmo1ycrm74p7uc976hu2z428l27vxj8l44zu0x0yqjr8gh775qr6gtnq9f3zsz
   explorer: "https://testnet.mintscan.io/osmosis-testnet/txs/"

@@ -1,20 +1,22 @@
-use std::{collections::HashMap, fmt::Display, sync::Arc};
+use std::{collections::HashMap, fmt::Display, str::FromStr, sync::Arc};
 
 use anyhow::Result;
 use axum::async_trait;
 use chrono::{DateTime, Duration, Utc};
-use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, HasAddress, TxBuilder, Wallet};
+use cosmos::{
+    proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, HasAddress, TxBuilder, Wallet,
+};
 use cosmwasm_std::Decimal256;
-use msg::prelude::{PriceBaseInQuote, PriceCollateralInUsd, Signed, UnsignedDecimal};
+use msg::{
+    contracts::pyth_bridge::entry::FeedType,
+    prelude::{PriceBaseInQuote, Signed, UnsignedDecimal},
+};
 use perps_exes::pyth::{get_latest_price, get_oracle_update_msg};
 use shared::storage::MarketId;
 
 use crate::{
     config::BotConfigByType,
-    util::{
-        markets::{Market, PriceApi},
-        oracle::Pyth,
-    },
+    util::{markets::Market, oracle::Pyth},
     watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
 };
 
@@ -88,48 +90,36 @@ impl App {
         let mut statuses = vec![];
         let mut builder = TxBuilder::default();
 
-        let price_apis = &market
-            .get_price_api(&worker.wallet, &self.cosmos, &self.pyth_config)
-            .await?;
-        let pyth_opt = match price_apis {
-            PriceApi::Manual(feeds) => {
-                let (price, price_usd) =
-                    get_latest_price(&self.client, feeds, &self.endpoints).await?;
+        // Load it up each time in case there are config changes, but we could
+        // theoretically optimize this by doing it at load time instead.
+        let bridge_addr = Address::from_str(&market.price_admin)?;
+        let pyth = Pyth::new(&self.cosmos, bridge_addr, market.market_id.clone()).await?;
 
-                let reason = self.needs_price_update(market, price).await?;
-                worker.add_reason(&market.market_id, &reason);
-                if let Some(reason) = reason {
-                    if reason.is_too_frequent() {
-                        return Ok("Too frequent price updates, skipping".to_owned());
-                    }
-                    let (status, msg) =
-                        self.get_tx_manual(&worker.wallet, market, price, price_usd)?;
-                    builder.add_message_mut(msg);
-                    statuses.push(format!("Needs manual update: {reason} {status}"));
-                    None
-                } else {
-                    return Ok("No manual price update needed".to_owned());
-                }
+        let (latest_price, _) = get_latest_price(
+            &self.client,
+            &pyth.market_price_feeds,
+            match pyth.feed_type {
+                FeedType::Stable => &self.endpoints_stable,
+                FeedType::Edge => &self.endpoints_edge,
+            },
+        )
+        .await?;
+        let reason = self.needs_price_update(market, latest_price).await?;
+        worker.add_reason(&market.market_id, &reason);
+        if let Some(reason) = reason {
+            if reason.is_too_frequent() {
+                return Ok("Too frequent price updates, skipping".to_owned());
             }
-
-            PriceApi::Pyth(pyth) => {
-                let (latest_price, _) =
-                    get_latest_price(&self.client, &pyth.market_price_feeds, &self.endpoints)
-                        .await?;
-                let reason = self.needs_price_update(market, latest_price).await?;
-                worker.add_reason(&market.market_id, &reason);
-                if let Some(reason) = reason {
-                    let msgs = self.get_txs_pyth(&worker.wallet, market, pyth).await?;
-                    for msg in msgs {
-                        builder.add_message_mut(msg);
-                    }
-                    statuses.push(format!("Needs Pyth update: {reason}"));
-                    Some(pyth)
-                } else {
-                    return Ok("No pyth price update needed".to_owned());
-                }
+            let msgs = self
+                .get_txs_pyth(&worker.wallet, &pyth, self.config.execs_per_price)
+                .await?;
+            for msg in msgs {
+                builder.add_message_mut(msg);
             }
-        };
+            statuses.push(format!("Needs Pyth update: {reason}"));
+        } else {
+            return Ok("No pyth price update needed".to_owned());
+        }
 
         // Take the crank lock for the rest of the execution
         let crank_lock = self.crank_lock.lock().await;
@@ -167,13 +157,11 @@ impl App {
         std::mem::drop(crank_lock);
 
         // just for logging pyth prices
-        if let Some(pyth) = pyth_opt {
-            let msg = match pyth.query_price(120).await {
-                Ok(market_price) => format!("Updated pyth price: {market_price:?}"),
-                Err(e) => format!("query_price failed, ignoring: {e:?}."),
-            };
-            statuses.push(msg);
-        }
+        let msg = match pyth.query_price(120).await {
+            Ok(market_price) => format!("Updated pyth price: {market_price:?}"),
+            Err(e) => format!("query_price failed, ignoring: {e:?}."),
+        };
+        statuses.push(msg);
 
         if !res.data.is_empty() {
             statuses.push(format!("Response data from contracts: {}", res.data));
@@ -247,45 +235,25 @@ impl App {
         Ok(None)
     }
 
-    fn get_tx_manual(
-        &self,
-        wallet: &Wallet,
-        market: &Market,
-        price: PriceBaseInQuote,
-        price_usd: Option<PriceCollateralInUsd>,
-    ) -> Result<(String, MsgExecuteContract)> {
-        Ok((
-            format!("Updated price for {}: {}", market.market_id, price),
-            MsgExecuteContract {
-                sender: wallet.get_address_string(),
-                contract: market.market.get_address_string(),
-                msg: serde_json::to_vec(&msg::contracts::market::entry::ExecuteMsg::SetPrice {
-                    price,
-                    price_usd,
-                    execs: self.config.execs_per_price,
-                    rewards: None,
-                })?,
-                funds: vec![],
-            },
-        ))
-    }
-
     async fn get_txs_pyth(
         &self,
         wallet: &Wallet,
-        market: &Market,
         pyth: &Pyth,
+        execs: Option<u32>,
     ) -> Result<Vec<MsgExecuteContract>> {
         let oracle_msg = get_oracle_update_msg(
             &pyth.market_price_feeds,
             &wallet,
-            &self.endpoints,
+            match pyth.feed_type {
+                FeedType::Stable => &self.endpoints_stable,
+                FeedType::Edge => &self.endpoints_edge,
+            },
             &self.client,
             &pyth.oracle,
         )
         .await?;
         let bridge_msg = pyth
-            .get_bridge_update_msg(wallet.get_address_string(), market.market_id.clone())
+            .get_bridge_update_msg(wallet.get_address_string(), execs)
             .await?;
 
         Ok(vec![oracle_msg, bridge_msg])

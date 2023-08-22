@@ -1,31 +1,6 @@
 //! Events for pyth bridge contract
-use super::PythMarketPriceFeeds;
 use cosmwasm_std::Event;
 use shared::prelude::*;
-
-/// Triggered whenever a new price feed is set for a market
-pub struct SetMarketPriceFeedsEvent {
-    /// The market to set the price for
-    pub market_id: MarketId,
-    /// Price feeds for this market
-    pub market_price_feeds: PythMarketPriceFeeds,
-}
-
-impl PerpEvent for SetMarketPriceFeedsEvent {}
-impl From<SetMarketPriceFeedsEvent> for Event {
-    fn from(src: SetMarketPriceFeedsEvent) -> Self {
-        let mut attrs = vec![
-            ("market-id", src.market_id.to_string()),
-            ("price-feeds", format!("{:?}", src.market_price_feeds.feeds)),
-        ];
-
-        if let Some(feeds_usd) = src.market_price_feeds.feeds_usd {
-            attrs.push(("price-feeds-usd", format!("{:?}", feeds_usd)))
-        }
-
-        Event::new("set-price-feeds").add_attributes(attrs)
-    }
-}
 
 /// Triggered whenever a new price feed is set for a market
 pub struct UpdatePriceEvent {

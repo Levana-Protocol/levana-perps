@@ -4,18 +4,38 @@ use std::{collections::HashMap, path::Path};
 
 use cosmos::{Address, CosmosNetwork, RawAddress};
 use msg::{
-    contracts::{market::config::ConfigUpdate, pyth_bridge::PythMarketPriceFeeds},
+    contracts::{
+        market::config::ConfigUpdate,
+        pyth_bridge::{entry::FeedType, PythPriceFeed},
+    },
     prelude::*,
 };
+
+#[derive(serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct PythMarketPriceFeeds {
+    /// feed of the base asset in terms of the quote asset
+    pub feeds: Vec<PythPriceFeed>,
+    /// feed of the collateral asset in terms of USD
+    ///
+    /// This is used by the protocol to track USD values. This field is
+    /// optional, as markets with USD as the quote asset do not need to
+    /// provide it.
+    pub feeds_usd: Option<Vec<PythPriceFeed>>,
+}
 
 /// Overall configuration of Pyth, for information valid across all chains.
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PythConfig {
-    /// How to calculate price feeds for each market.
-    pub markets: HashMap<MarketId, PythMarketPriceFeeds>,
-    /// Endpoints to communicate with to get price data
-    pub endpoints: Vec<String>,
+    /// How to calculate price feeds for each market, using stable IDs.
+    pub markets_stable: HashMap<MarketId, PythMarketPriceFeeds>,
+    /// How to calculate price feeds for each market, using edge IDs.
+    pub markets_edge: HashMap<MarketId, PythMarketPriceFeeds>,
+    /// Endpoints to communicate with to get price data, for stable feeds
+    pub endpoints_stable: Vec<String>,
+    /// Endpoints to communicate with to get price data, for edge feeds
+    pub endpoints_edge: Vec<String>,
     /// How old a price to allow, in seconds
     pub update_age_tolerance: u32,
 }
@@ -29,13 +49,20 @@ pub struct PythConfig {
 pub struct ChainConfig {
     pub tracker: Option<Address>,
     pub faucet: Option<Address>,
-    pub pyth: Option<Address>,
+    pub pyth: Option<PythContract>,
     pub explorer: Option<String>,
     /// Potential RPC endpoints to use
     #[serde(default)]
     pub rpc_nodes: Vec<String>,
     /// Override the gas multiplier
     pub gas_multiplier: Option<f64>,
+}
+
+#[derive(serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct PythContract {
+    pub contract: Address,
+    pub r#type: FeedType,
 }
 
 #[derive(serde::Deserialize, Debug)]

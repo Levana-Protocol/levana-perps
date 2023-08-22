@@ -1,8 +1,36 @@
 //! Entrypoint messages for pyth bridge contract
 
-use super::PythMarketPriceFeeds;
+use super::PythPriceFeed;
 use cosmwasm_schema::QueryResponses;
 use shared::prelude::*;
+
+/// What type of feed?
+#[cw_serde]
+#[derive(Copy)]
+pub enum FeedType {
+    /// Stable CosmWasm
+    ///
+    /// From <https://pyth.network/developers/price-feed-ids#cosmwasm-stable>
+    Stable,
+    /// Edge CosmWasm
+    ///
+    /// From <https://pyth.network/developers/price-feed-ids#cosmwasm-edge>
+    Edge,
+}
+
+impl FromStr for FeedType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "stable" => Ok(FeedType::Stable),
+            "edge" => Ok(FeedType::Edge),
+            _ => Err(anyhow::anyhow!(
+                "Invalid feed type: {s}. Expected 'stable' or 'edge'"
+            )),
+        }
+    }
+}
 
 /// Instantiate message for pyth bridge
 #[cw_serde]
@@ -11,48 +39,51 @@ pub struct InstantiateMsg {
     pub factory: RawAddr,
     /// The Pyth address
     pub pyth: RawAddr,
+    /// Does this use the stable or edge feeds?
+    pub feed_type: FeedType,
     /// The number of seconds to tolerate
     pub update_age_tolerance_seconds: u32,
-    /// Initial price feeds
-    pub feeds: Vec<MarketFeeds>,
+    /// Which market do we support?
+    pub market: MarketId,
+    /// feed of the base asset in terms of the quote asset
+    pub feeds: Vec<PythPriceFeed>,
+    /// feed of the collateral asset in terms of USD
+    ///
+    /// This is used by the protocol to track USD values. This field is
+    /// optional, as markets with USD as the quote asset do not need to
+    /// provide it.
+    pub feeds_usd: Option<Vec<PythPriceFeed>>,
 }
 
-/// Market feeds to set when initiating the contract
+/// Same as [InstantiateMsg], but resolve [RawAddr] into [Addr].
 #[cw_serde]
-pub struct MarketFeeds {
-    /// The market to set the price for
-    pub market_id: MarketId,
-    /// The Pyth price feeds
-    pub market_price_feeds: PythMarketPriceFeeds,
+pub struct Config {
+    /// The factory address
+    pub factory: Addr,
+    /// The Pyth address
+    pub pyth: Addr,
+    /// Does this use the stable or edge feeds?
+    pub feed_type: FeedType,
+    /// The number of seconds to tolerate
+    pub update_age_tolerance_seconds: u32,
+    /// Which market do we support?
+    pub market: MarketId,
+    /// feed of the base asset in terms of the quote asset
+    pub feeds: Vec<PythPriceFeed>,
+    /// feed of the collateral asset in terms of USD
+    ///
+    /// This is used by the protocol to track USD values. This field is
+    /// optional, as markets with USD as the quote asset do not need to
+    /// provide it.
+    pub feeds_usd: Option<Vec<PythPriceFeed>>,
 }
 
 /// Execute message for pyth bridge
 #[cw_serde]
 pub enum ExecuteMsg {
-    /// Sets the price feeds for a market
-    /// This is requires admin authentication
-    SetMarketPriceFeeds {
-        /// The market to set the price for
-        market_id: MarketId,
-        /// The Pyth price feeds
-        market_price_feeds: PythMarketPriceFeeds,
-    },
-    /// Sets the age tolerance for price updates
-    /// This requires admin authentication
-    SetUpdateAgeTolerance {
-        /// The number of seconds to tolerate
-        seconds: u32,
-    },
-    /// Sets the Pyth price oracle contract to use
-    SetPythOracle {
-        /// The Pyth oracle address
-        pyth: RawAddr,
-    },
     /// Updates the price
     /// This is not permissioned, anybody can call it
     UpdatePrice {
-        /// The market to update the price for
-        market_id: MarketId,
         /// How many executions of the crank to perform
         ///
         /// Each time a price is updated in the system, cranking is immediately
@@ -74,55 +105,18 @@ pub enum ExecuteMsg {
     },
 }
 
-impl ExecuteMsg {
-    /// Returns true if the message requires admin authentication
-    pub fn requires_admin(&self) -> bool {
-        match self {
-            ExecuteMsg::SetMarketPriceFeeds { .. } | ExecuteMsg::SetUpdateAgeTolerance { .. } => {
-                true
-            }
-            ExecuteMsg::SetPythOracle { .. } => true,
-            ExecuteMsg::UpdatePrice { .. } => false,
-        }
-    }
-}
-
 /// Query message for liquidity token proxy
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
-    /// * returns [cosmwasm_std::Addr]
-    ///
-    /// The pyth address
-    #[returns(cosmwasm_std::Addr)]
-    PythAddress {},
-    /// * returns [super::AllPythMarketPriceFeeds]
-    ///
-    /// The price feeds for all markets
-    #[returns(super::AllPythMarketPriceFeeds)]
-    AllMarketPriceFeeds {
-        /// Last market id seen (for pagination)
-        start_after: Option<MarketId>,
-        /// Number of markets to return
-        limit: Option<u32>,
-        /// Whether to return ascending or descending
-        order: Option<OrderInMessage>,
-    },
-    /// * returns [PythMarketPriceFeeds]
-    ///
-    /// The price feeds for a given market
-    #[returns(PythMarketPriceFeeds)]
-    MarketPriceFeeds {
-        /// The market to get the price feeds for
-        market_id: MarketId,
-    },
+    /// * returns [Config]
+    #[returns(Config)]
+    Config {},
     /// * returns [super::MarketPrice]
     ///
     /// The prices for a given market
     #[returns(super::MarketPrice)]
     MarketPrice {
-        /// The market to get the prices for
-        market_id: MarketId,
         /// How long can the price be stale for
         age_tolerance_seconds: u32,
     },

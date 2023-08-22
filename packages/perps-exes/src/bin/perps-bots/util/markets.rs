@@ -1,12 +1,8 @@
-use cosmos::{Address, Contract, Cosmos, HasAddress, Wallet};
+use cosmos::{Contract, Cosmos, HasAddress};
 use msg::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
-use msg::contracts::pyth_bridge::PythMarketPriceFeeds;
 use msg::prelude::*;
-use perps_exes::config::PythConfig;
 use perps_exes::prelude::MarketContract;
 use std::fmt::Debug;
-
-use super::oracle::Pyth;
 
 #[derive(Clone)]
 pub(crate) struct Market {
@@ -28,12 +24,6 @@ impl Debug for Market {
             .field("name", &self.market_id)
             .finish()
     }
-}
-
-#[derive(Clone, Debug)]
-pub(crate) enum PriceApi<'a> {
-    Pyth(Pyth),
-    Manual(&'a PythMarketPriceFeeds),
 }
 
 pub(crate) async fn get_markets(cosmos: &Cosmos, factory: &Contract) -> Result<Vec<Market>> {
@@ -78,33 +68,4 @@ pub(crate) async fn get_markets(cosmos: &Cosmos, factory: &Contract) -> Result<V
         }
     }
     Ok(res)
-}
-
-impl Market {
-    pub(crate) async fn get_price_api<'a>(
-        &self,
-        wallet: &Wallet,
-        cosmos: &Cosmos,
-        pyth_config: &'a PythConfig,
-    ) -> Result<PriceApi<'a>> {
-        let Self {
-            price_admin,
-            market_id,
-            ..
-        } = self;
-
-        if *price_admin == wallet.get_address_string() {
-            // Not using Pyth oracle, but still getting the prices from the Pyth endpoint
-            let feeds = pyth_config
-                .markets
-                .get(market_id)
-                .with_context(|| format!("No Pyth config found for market {market_id}"))?;
-
-            Ok(PriceApi::Manual(feeds))
-        } else {
-            let bridge_addr = Address::from_str(price_admin)?;
-            let pyth = Pyth::new(cosmos, bridge_addr, market_id.clone()).await?;
-            Ok(PriceApi::Pyth(pyth))
-        }
-    }
 }

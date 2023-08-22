@@ -6,10 +6,12 @@ use cosmos::proto::cosmwasm::wasm::v1::MsgExecuteContract;
 use cosmos::{Contract, HasAddress};
 use cosmwasm_std::{Binary, Coin, Decimal256, Uint256};
 use itertools::Itertools;
-use msg::contracts::pyth_bridge::{PythMarketPriceFeeds, PythPriceFeed};
+use msg::contracts::pyth_bridge::PythPriceFeed;
 use msg::prelude::*;
 use shared::storage::{PriceBaseInQuote, PriceCollateralInUsd};
 pub use vec_with_curr::VecWithCurr;
+
+use crate::config::PythMarketPriceFeeds;
 
 pub async fn get_oracle_update_msg(
     feeds: &PythMarketPriceFeeds,

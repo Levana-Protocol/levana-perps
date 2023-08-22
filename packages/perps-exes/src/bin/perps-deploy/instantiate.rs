@@ -11,7 +11,7 @@ use msg::{
     },
     token::TokenInit,
 };
-use perps_exes::config::MarketConfigUpdates;
+use perps_exes::config::{MarketConfigUpdates, PythMarketPriceFeeds};
 use perps_exes::prelude::MarketContract;
 
 use crate::app::{App, PythInfo};
@@ -202,26 +202,27 @@ pub(crate) async fn instantiate(
     log::info!("New factory deployed at {factory}");
     to_log.push((factory_code_id.get_code_id(), factory.get_address()));
 
-    let add_market_price_source = match price_source {
-        crate::app::PriceSourceConfig::Pyth(pyth_info) => {
-            let pyth_bridge = pyth_info
-                .make_pyth_bridge(pyth_bridge_code_id.clone(), wallet, &factory)
-                .await?;
-            to_log.push((pyth_bridge_code_id.get_code_id(), pyth_bridge.get_address()));
-            AddMarketPriceSource::Pyth {
-                info: pyth_info,
-                bridge: pyth_bridge,
-            }
-        }
-        crate::app::PriceSourceConfig::Wallet(addr) => {
-            log::info!("No Pyth info provided, skipping Pyth bridge instantiation and using {addr} as price admin");
-            AddMarketPriceSource::Manual(addr)
-        }
-    };
-
     let mut market_res = Vec::<MarketResponse>::new();
 
     for market in markets {
+        let price_admin = match &price_source {
+            crate::app::PriceSourceConfig::Pyth(pyth_info) => {
+                let pyth_bridge = pyth_info
+                    .make_pyth_bridge(
+                        pyth_bridge_code_id.clone(),
+                        wallet,
+                        &factory,
+                        market.market_id.clone(),
+                    )
+                    .await?;
+                to_log.push((pyth_bridge_code_id.get_code_id(), pyth_bridge.get_address()));
+                pyth_bridge.get_address()
+            }
+            crate::app::PriceSourceConfig::Wallet(addr) => {
+                log::info!("No Pyth info provided, skipping Pyth bridge instantiation and using {addr} as price admin");
+                *addr
+            }
+        };
         let res = market
             .add(
                 wallet,
@@ -231,7 +232,7 @@ pub(crate) async fn instantiate(
                     faucet_admin,
                     factory: factory.clone(),
                     initial_borrow_fee_rate,
-                    price_source: add_market_price_source.clone(),
+                    price_admin,
                 },
             )
             .await?;
@@ -295,13 +296,7 @@ pub(crate) struct AddMarketParams {
     pub(crate) faucet_admin: Option<Address>,
     pub(crate) factory: Contract,
     pub(crate) initial_borrow_fee_rate: Decimal256,
-    pub(crate) price_source: AddMarketPriceSource,
-}
-
-#[derive(Clone)]
-pub(crate) enum AddMarketPriceSource {
-    Pyth { info: PythInfo, bridge: Contract },
-    Manual(Address),
+    pub(crate) price_admin: Address,
 }
 
 impl InstantiateMarket {
@@ -314,7 +309,7 @@ impl InstantiateMarket {
             faucet_admin,
             factory,
             initial_borrow_fee_rate,
-            price_source,
+            price_admin,
         }: AddMarketParams,
     ) -> Result<MarketResponse> {
         let InstantiateMarket {
@@ -399,37 +394,6 @@ impl InstantiateMarket {
 
         let cw20 = cosmos.make_contract(cw20);
 
-        let price_admin = match price_source {
-            AddMarketPriceSource::Pyth { info, bridge } => {
-                let market_price_feeds = info
-                    .markets
-                    .get(&market_id)
-                    .with_context(|| format!("No Pyth price feed info found for {market_id}"))?;
-                log::info!("Setting price feed for market {market_id} to use Pyth Oracle.");
-                log::info!(
-                    "Main price feeds: {:?}, USD price feeds: {:?}",
-                    market_price_feeds.feeds,
-                    market_price_feeds.feeds_usd
-                );
-                bridge
-                    .execute(
-                        wallet,
-                        vec![],
-                        msg::contracts::pyth_bridge::entry::ExecuteMsg::SetMarketPriceFeeds {
-                            market_id: market_id.clone(),
-                            market_price_feeds: market_price_feeds.clone(),
-                        },
-                    )
-                    .await?;
-
-                bridge.get_address_string().into()
-            }
-            AddMarketPriceSource::Manual(address) => {
-                log::info!("Setting price feed for market {market_id} to use manual updates");
-                address.to_string().into()
-            }
-        };
-
         let res = factory
             .execute(
                 wallet,
@@ -441,7 +405,7 @@ impl InstantiateMarket {
                             addr: cw20.get_address_string().into(),
                         },
                         config: Some(config),
-                        price_admin,
+                        price_admin: price_admin.get_address_string().into(),
                         initial_borrow_fee_rate,
                     },
                 },
@@ -507,7 +471,12 @@ impl PythInfo {
         pyth_bridge_code_id: CodeId,
         wallet: &Wallet,
         factory: &Contract,
+        market: MarketId,
     ) -> Result<Contract> {
+        let PythMarketPriceFeeds { feeds, feeds_usd } = self
+            .markets
+            .get(&market)
+            .with_context(|| format!("No Pyth price feed info found for {market}"))?;
         let pyth_bridge = pyth_bridge_code_id
             .instantiate(
                 wallet,
@@ -517,7 +486,10 @@ impl PythInfo {
                     factory: factory.get_address().to_string().into(),
                     pyth: self.address.to_string().into(),
                     update_age_tolerance_seconds: self.update_age_tolerance,
-                    feeds: vec![],
+                    feed_type: self.feed_type,
+                    market,
+                    feeds: feeds.clone(),
+                    feeds_usd: feeds_usd.clone(),
                 },
                 ContractAdmin::Sender,
             )

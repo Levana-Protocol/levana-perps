@@ -6,13 +6,16 @@ use std::{collections::HashSet, path::PathBuf, sync::Arc};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, HasAddress, TxBuilder};
-use msg::contracts::market::{
-    entry::{PositionAction, PositionActionKind, TradeHistorySummary},
-    position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
+use msg::contracts::{
+    market::{
+        entry::{PositionAction, PositionActionKind, TradeHistorySummary},
+        position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
+    },
+    pyth_bridge::entry::FeedType,
 };
 use parking_lot::Mutex;
 use perps_exes::{
-    config::{ChainConfig, PythConfig},
+    config::{ChainConfig, PythConfig, PythContract},
     prelude::MarketContract,
     pyth::{get_oracle_update_msg, VecWithCurr},
 };
@@ -85,9 +88,6 @@ struct UpdatePythOpt {
     /// Market ID to do the update for
     #[clap(long)]
     market: MarketId,
-    /// Override the oracle used
-    #[clap(long)]
-    oracle: Option<Address>,
     /// Override Pyth config file
     #[clap(long, env = "LEVANA_BOTS_CONFIG_PYTH")]
     pub(crate) config_pyth: Option<PathBuf>,
@@ -101,29 +101,33 @@ async fn update_pyth(
     UpdatePythOpt {
         market,
         network,
-        oracle,
         config_pyth,
         config_chain,
     }: UpdatePythOpt,
 ) -> Result<()> {
+    let chain = ChainConfig::load(config_chain, network)?;
+    let PythContract {
+        contract: oracle,
+        r#type,
+    } = chain
+        .pyth
+        .with_context(|| format!("No Pyth oracle found for network {network}"))?;
+
     let basic = opt.load_basic_app(network).await?;
     let pyth = PythConfig::load(config_pyth)?;
-    let endpoints = VecWithCurr::new(pyth.endpoints.clone());
-    let client = reqwest::Client::new();
-    let feeds = pyth
-        .markets
-        .get(&market)
-        .with_context(|| format!("No Pyth feed data found for {market}"))?;
+    let endpoints = VecWithCurr::new(match r#type {
+        FeedType::Stable => pyth.endpoints_stable.clone(),
+        FeedType::Edge => pyth.endpoints_edge.clone(),
+    });
 
-    let oracle = match oracle {
-        Some(oracle) => oracle,
-        None => {
-            let chain = ChainConfig::load(config_chain, network)?;
-            chain
-                .pyth
-                .with_context(|| format!("No Pyth oracle found for network {network}"))?
-        }
-    };
+    let client = reqwest::Client::new();
+    let feeds = match r#type {
+        FeedType::Stable => &pyth.markets_stable,
+        FeedType::Edge => &pyth.markets_edge,
+    }
+    .get(&market)
+    .with_context(|| format!("No Pyth feed data found for {market}"))?;
+
     let oracle = basic.cosmos.make_contract(oracle);
 
     let msg = get_oracle_update_msg(feeds, &basic.wallet, &endpoints, &client, &oracle).await?;

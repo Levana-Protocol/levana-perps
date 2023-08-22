@@ -1,12 +1,13 @@
 use crate::state::market::ReplyContext;
+use crate::state::pyth::set_pyth_config;
 
-use super::state::{pyth::set_pyth_addr, set_factory_addr, State, StateContext};
+use super::state::{State, StateContext};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response};
 use cw2::{get_contract_version, set_contract_version};
 use msg::contracts::pyth_bridge::entry::{
-    ExecuteMsg, InstantiateMsg, MarketFeeds, MigrateMsg, QueryMsg,
+    Config, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
 };
 use msg::prelude::*;
 use semver::Version;
@@ -20,23 +21,31 @@ pub fn instantiate(
     deps: DepsMut,
     env: Env,
     _info: MessageInfo,
-    msg: InstantiateMsg,
+    InstantiateMsg {
+        factory,
+        pyth,
+        feed_type,
+        update_age_tolerance_seconds,
+        market,
+        feeds,
+        feeds_usd,
+    }: InstantiateMsg,
 ) -> Result<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    set_factory_addr(deps.storage, &msg.factory.validate(deps.api)?)?;
-    set_pyth_addr(deps.storage, &msg.pyth.validate(deps.api)?)?;
+    set_pyth_config(
+        deps.storage,
+        &Config {
+            factory: factory.validate(deps.api)?,
+            pyth: pyth.validate(deps.api)?,
+            feed_type,
+            update_age_tolerance_seconds,
+            market,
+            feeds,
+            feeds_usd,
+        },
+    )?;
 
-    let (state, mut ctx) = StateContext::new(deps, env)?;
-
-    state.set_pyth_update_age_tolerance(&mut ctx, msg.update_age_tolerance_seconds.into())?;
-
-    for MarketFeeds {
-        market_id,
-        market_price_feeds,
-    } in msg.feeds
-    {
-        state.set_pyth_market_price_feeds(&mut ctx, market_id, market_price_feeds)?;
-    }
+    let (_state, ctx) = StateContext::new(deps, env)?;
 
     Ok(ctx.response.into_response())
 }
@@ -45,40 +54,15 @@ pub fn instantiate(
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     let (state, mut ctx) = StateContext::new(deps, env)?;
 
-    if msg.requires_admin() {
-        assert_auth(
-            &state.factory_address,
-            &state.querier,
-            &info.sender,
-            AuthCheck::Owner,
-        )?;
-    }
-
     match msg {
-        ExecuteMsg::SetMarketPriceFeeds {
-            market_id,
-            market_price_feeds,
-        } => {
-            state.set_pyth_market_price_feeds(&mut ctx, market_id, market_price_feeds)?;
-        }
-
-        ExecuteMsg::SetPythOracle { pyth } => {
-            set_pyth_addr(ctx.storage, &pyth.validate(state.api)?)?;
-        }
-
-        ExecuteMsg::SetUpdateAgeTolerance { seconds } => {
-            state.set_pyth_update_age_tolerance(&mut ctx, seconds.into())?;
-        }
-
         ExecuteMsg::UpdatePrice {
-            market_id,
             execs,
             rewards,
             bail_on_error,
         } => {
             // any user may call UpdatePrice, and they get the crank rewards (if any)
             let reward_addr = rewards.unwrap_or_else(|| info.sender.into());
-            state.update_market_price(&mut ctx, market_id, execs, reward_addr, bail_on_error)?;
+            state.update_market_price(&mut ctx, execs, reward_addr, bail_on_error)?;
         }
     }
 
@@ -100,31 +84,15 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
-    let (state, store) = State::new(deps, env)?;
+    let (state, _store) = State::new(deps, env)?;
 
     match msg {
         QueryMsg::Version {} => get_contract_version(deps.storage)?.query_result(),
-        QueryMsg::PythAddress {} => state.get_pyth_addr(store)?.query_result(),
-        QueryMsg::MarketPriceFeeds { market_id } => state
-            .get_pyth_market_price_feeds(store, &market_id)?
-            .query_result(),
-        QueryMsg::AllMarketPriceFeeds {
-            start_after,
-            limit,
-            order,
-        } => state
-            .get_all_pyth_market_price_feeds(
-                store,
-                start_after.as_ref(),
-                limit,
-                order.map(|x| x.into()),
-            )?
-            .query_result(),
+        QueryMsg::Config {} => state.config.query_result(),
         QueryMsg::MarketPrice {
-            market_id,
             age_tolerance_seconds,
         } => state
-            .market_price(store, &market_id, age_tolerance_seconds.into())?
+            .market_price(age_tolerance_seconds.into())?
             .query_result(),
     }
 }
