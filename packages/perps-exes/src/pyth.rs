@@ -56,7 +56,6 @@ async fn get_wormhole_proofs(
         .sorted()
         .dedup()
         .collect_vec();
-    let all_ids_len = all_ids.len();
 
     // pyth uses this format for array params: https://github.com/axios/axios/blob/9588fcdec8aca45c3ba2f7968988a5d03f23168c/test/specs/helpers/buildURL.spec.js#L31
     let url_params = all_ids
@@ -78,9 +77,6 @@ async fn get_wormhole_proofs(
                 .json()
                 .await?;
 
-            if vaas.len() != all_ids_len {
-                anyhow::bail!("expected {} vaas, got {}", all_ids_len, vaas.len());
-            }
             Ok(vaas)
         })
         .await
