@@ -4,9 +4,11 @@ use cosmos::{Address, CodeId, Contract, HasAddress, HasCosmos, Wallet};
 use msg::contracts::factory::entry::{
     CodeIds, FactoryOwnerResp, MarketInfoResponse, MarketsResp, QueryMsg,
 };
+use msg::contracts::market::entry::NewMarketParams;
 use msg::prelude::*;
 use msg::shutdown::{ShutdownEffect, ShutdownImpact};
 
+#[derive(Clone)]
 pub(crate) struct Factory(Contract);
 
 impl Display for Factory {
@@ -147,6 +149,38 @@ impl Factory {
     pub(crate) async fn query_market_code_id(&self) -> Result<CodeId> {
         let CodeIds { market, .. } = self.0.query(FactoryQueryMsg::CodeIds {}).await?;
         Ok(self.0.get_cosmos().make_code_id(market.u64()))
+    }
+
+    pub(crate) async fn add_market(
+        &self,
+        wallet: &Wallet,
+        new_market: NewMarketParams,
+    ) -> Result<TxResponse> {
+        self.0
+            .execute(
+                wallet,
+                vec![],
+                msg::contracts::factory::entry::ExecuteMsg::AddMarket { new_market },
+            )
+            .await
+    }
+
+    pub(crate) async fn set_price_admin(
+        &self,
+        wallet: &Wallet,
+        market: impl HasAddress,
+        new_admin: impl HasAddress,
+    ) -> Result<TxResponse> {
+        self.0
+            .execute(
+                wallet,
+                vec![],
+                FactoryExecuteMsg::SetMarketPriceAdmin {
+                    market_addr: market.get_address_string().into(),
+                    admin_addr: new_admin.get_address_string().into(),
+                },
+            )
+            .await
     }
 }
 

@@ -1,4 +1,4 @@
-use std::{collections::HashSet, str::FromStr};
+use std::collections::HashSet;
 
 use anyhow::{Context, Result};
 use cosmos::{Address, CodeId, Contract, ContractAdmin, Cosmos, HasAddress, Wallet};
@@ -6,7 +6,6 @@ use msg::prelude::*;
 use msg::{
     contracts::{
         cw20::Cw20Coin,
-        factory::entry::MarketInfoResponse,
         market::{config::ConfigUpdate, entry::NewMarketParams},
     },
     token::TokenInit,
@@ -199,6 +198,7 @@ pub(crate) async fn instantiate(
             ContractAdmin::Sender,
         )
         .await?;
+    let factory = Factory::from_contract(factory);
     log::info!("New factory deployed at {factory}");
     to_log.push((factory_code_id.get_code_id(), factory.get_address()));
 
@@ -247,7 +247,7 @@ pub(crate) async fn instantiate(
         liquidity_token_lp,
         liquidity_token_xlp,
         price_admin: _,
-    } in Factory::from_contract(factory).get_markets().await?
+    } in factory.get_markets().await?
     {
         to_log.push((market_code_id.get_code_id(), market.get_address()));
         to_log.push((
@@ -294,7 +294,7 @@ pub(crate) const INITIAL_BALANCE_AMOUNT: u128 = 1_000_000_000_000_000_000u128;
 pub(crate) struct AddMarketParams {
     pub(crate) trading_competition: bool,
     pub(crate) faucet_admin: Option<Address>,
-    pub(crate) factory: Contract,
+    pub(crate) factory: Factory,
     pub(crate) initial_borrow_fee_rate: Decimal256,
     pub(crate) price_admin: Address,
 }
@@ -395,31 +395,24 @@ impl InstantiateMarket {
         let cw20 = cosmos.make_contract(cw20);
 
         let res = factory
-            .execute(
+            .add_market(
                 wallet,
-                vec![],
-                msg::contracts::factory::entry::ExecuteMsg::AddMarket {
-                    new_market: NewMarketParams {
-                        market_id: market_id.clone(),
-                        token: TokenInit::Cw20 {
-                            addr: cw20.get_address_string().into(),
-                        },
-                        config: Some(config),
-                        price_admin: price_admin.get_address_string().into(),
-                        initial_borrow_fee_rate,
+                NewMarketParams {
+                    market_id: market_id.clone(),
+                    token: TokenInit::Cw20 {
+                        addr: cw20.get_address_string().into(),
                     },
+                    config: Some(config),
+                    price_admin: price_admin.get_address_string().into(),
+                    initial_borrow_fee_rate,
                 },
             )
             .await?;
         log::info!("Market {market_id} added at {}", res.txhash);
 
-        let MarketInfoResponse { market_addr, .. } = factory
-            .query(msg::contracts::factory::entry::QueryMsg::MarketInfo {
-                market_id: market_id.clone(),
-            })
-            .await?;
+        let MarketInfo { market, .. } = factory.get_market(market_id.clone()).await?;
+        let market_addr = market.get_address();
         log::info!("New market address for {market_id}: {market_addr}");
-        let market_addr = Address::from_str(market_addr.as_str())?;
 
         if let Some((trading_competition_index, faucet)) = trading_competition {
             let res = faucet
@@ -452,7 +445,6 @@ impl InstantiateMarket {
                 res.txhash
             );
 
-            let factory = Factory::from_contract(factory.clone());
             let res = factory.disable_trades(wallet, market_id.clone()).await?;
             log::info!("Market shut down in {}", res.txhash);
         }
@@ -470,7 +462,7 @@ impl PythInfo {
         &self,
         pyth_bridge_code_id: CodeId,
         wallet: &Wallet,
-        factory: &Contract,
+        factory: &Factory,
         market: MarketId,
     ) -> Result<Contract> {
         let PythMarketPriceFeeds { feeds, feeds_usd } = self
