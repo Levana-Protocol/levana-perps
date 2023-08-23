@@ -243,21 +243,30 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                 log::info!("Ignoring, assuming we're not using pyth_bridge");
             }
             Ok(info) => {
-                if info.code_id == pyth_bridge_code_id.get_code_id() {
-                    log::info!(
+                // Check if this is a new Hermes Pyth bridge. If the config call
+                // fails, we'll assume that it's an old bridge and we need to
+                // insantiate a new one.
+                let config_res: Result<msg::contracts::pyth_bridge::entry::Config> = price_admin
+                    .query(msg::contracts::pyth_bridge::entry::QueryMsg::Config {})
+                    .await;
+                match config_res {
+                    Ok(_) => {
+                        log::info!("Already on a Hermes Pyth bridge, will test migrating");
+                        if info.code_id == pyth_bridge_code_id.get_code_id() {
+                            log::info!(
                         "Price admin {price_admin} is already using current Pyth bridge code ID {}",
                         info.code_id
                     );
-                } else {
-                    price_admin
-                        .migrate(
-                            &app.basic.wallet,
-                            pyth_bridge_code_id.get_code_id(),
-                            msg::contracts::pyth_bridge::entry::MigrateMsg {},
-                        )
-                        .await?;
-                    log::info!("pyth_bridge price admin contract for {market_id} migrated");
-                    match app
+                        } else {
+                            price_admin
+                                .migrate(
+                                    &app.basic.wallet,
+                                    pyth_bridge_code_id.get_code_id(),
+                                    msg::contracts::pyth_bridge::entry::MigrateMsg {},
+                                )
+                                .await?;
+                            log::info!("pyth_bridge price admin contract for {market_id} migrated");
+                            match app
                         .tracker
                         .migrate(
                             &app.basic.wallet,
@@ -273,6 +282,28 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                             "Logged pyth_bridge price admin contract for {market_id}, update in tracker at: {}",
                             res.txhash
                         ),
+                    }
+                        }
+                    }
+                    Err(_) => {
+                        log::info!("Not on a Hermes Pyth bridge yet, need to instantiate a new bridge and set the owner.");
+                        let pyth_info = match &app.price_source {
+                            crate::app::PriceSourceConfig::Pyth(pyth_info) => pyth_info,
+                            crate::app::PriceSourceConfig::Wallet(_) => anyhow::bail!("Cannot instantiate new Hermes Pyth bridge, PriceSourceConfig is Wallet"),
+                        };
+                        let pyth_bridge = pyth_info
+                            .make_pyth_bridge(
+                                pyth_bridge_code_id.clone(),
+                                &app.basic.wallet,
+                                &factory,
+                                market_id,
+                            )
+                            .await?;
+                        log::info!("Deployed fresh Pyth bridge contract: {pyth_bridge}");
+                        let tx = factory
+                            .set_price_admin(&app.basic.wallet, &market, &pyth_bridge)
+                            .await?;
+                        log::info!("Updated price admin in transaction {}", tx.txhash);
                     }
                 }
             }

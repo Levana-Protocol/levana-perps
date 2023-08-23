@@ -3,7 +3,9 @@ use cosmwasm_std::Decimal256;
 use msg::prelude::*;
 use shared::storage::MarketId;
 
-use crate::{app::PriceSourceConfig, instantiate::AddMarketParams, store_code::PYTH_BRIDGE};
+use crate::{
+    app::PriceSourceConfig, factory::Factory, instantiate::AddMarketParams, store_code::PYTH_BRIDGE,
+};
 
 #[derive(clap::Parser)]
 pub(crate) struct AddMarketOpt {
@@ -22,6 +24,7 @@ impl AddMarketOpt {
     pub(crate) async fn go(self, opt: crate::cli::Opt) -> Result<()> {
         let app = opt.load_app(&self.family).await?;
         let factory = app.tracker.get_factory(&self.family).await?.into_contract();
+        let factory = Factory::from_contract(factory);
         let instantiate_market = app.make_instantiate_market(self.market.clone())?;
         let price_admin = match app.price_source {
             PriceSourceConfig::Pyth(pyth_info) => {
