@@ -267,22 +267,22 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                                 .await?;
                             log::info!("pyth_bridge price admin contract for {market_id} migrated");
                             match app
-                        .tracker
-                        .migrate(
-                            &app.basic.wallet,
-                            pyth_bridge_code_id.get_code_id(),
-                            price_admin.get_address(),
-                        )
-                        .await
-                    {
-                        Err(e) => {
-                            log::warn!("Unable to migrate pyth_bridge price admin contract: {e:?}")
-                        }
-                        Ok(res) => log::info!(
-                            "Logged pyth_bridge price admin contract for {market_id}, update in tracker at: {}",
-                            res.txhash
-                        ),
-                    }
+                                .tracker
+                                .migrate(
+                                    &app.basic.wallet,
+                                    pyth_bridge_code_id.get_code_id(),
+                                    price_admin.get_address(),
+                                )
+                                .await
+                                {
+                                    Err(e) => {
+                                        log::warn!("Unable to migrate pyth_bridge price admin contract: {e:?}")
+                                    }
+                                    Ok(res) => log::info!(
+                                        "Logged pyth_bridge price admin contract for {market_id}, update in tracker at: {}",
+                                        res.txhash
+                                    ),
+                                }
                         }
                     }
                     Err(_) => {
