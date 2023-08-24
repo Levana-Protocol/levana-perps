@@ -572,7 +572,12 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
                 message: successes.join("\n"),
             })
         } else {
-            Err(anyhow::anyhow!("{}", errors.join("\n")))
+            let mut msg = String::new();
+            for line in errors.iter().chain(successes.iter()) {
+                msg += line;
+                msg += "\n";
+            }
+            Err(anyhow::anyhow!("{msg}"))
         }
     }
 }
