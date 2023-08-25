@@ -308,32 +308,58 @@ struct InstantiateFactoryOpts {
     /// Market wind down
     #[clap(long)]
     wind_down: Option<Address>,
+    /// Unique identifier for this market, for ease of use only
+    #[clap(long)]
+    ident: String,
 }
 
 /// Stores mainnet factory contracts
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-struct MainnetFactories {
-    factories: Vec<MainnetFactory>,
+pub(crate) struct MainnetFactories {
+    pub(crate) factories: Vec<MainnetFactory>,
+}
+
+impl MainnetFactories {
+    pub(crate) fn get_by_address(&self, address: Address) -> Option<&MainnetFactory> {
+        self.factories.iter().find(|f| f.address == address)
+    }
+
+    pub(crate) fn get_by_ident(&self, ident: &str) -> Option<&MainnetFactory> {
+        self.factories
+            .iter()
+            .find(|f| f.ident.as_deref() == Some(ident))
+    }
+
+    /// Gets by either address or ident
+    pub(crate) fn get(&self, factory: &str) -> Result<&MainnetFactory> {
+        match factory.parse().ok() {
+            Some(addr) => self.get_by_address(addr),
+            None => self.get_by_ident(factory),
+        }
+        .with_context(|| format!("Unknown factory: {factory}"))
+    }
 }
 
 /// An instantiated factory on mainnet.
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-struct MainnetFactory {
-    address: Address,
-    network: CosmosNetwork,
-    label: String,
-    instantiate_code_id: u64,
-    instantiate_at: DateTime<Utc>,
-    gitrev: String,
-    hash: String,
+pub(crate) struct MainnetFactory {
+    pub(crate) address: Address,
+    pub(crate) network: CosmosNetwork,
+    pub(crate) label: String,
+    pub(crate) instantiate_code_id: u64,
+    pub(crate) instantiate_at: DateTime<Utc>,
+    pub(crate) gitrev: String,
+    pub(crate) hash: String,
+    /// A user-friendly identifier
+    pub(crate) ident: Option<String>,
 }
 
 impl MainnetFactories {
     const PATH: &str = "packages/perps-exes/assets/mainnet-factories.yaml";
 
-    fn load() -> Result<Self> {
+    pub(crate) fn load() -> Result<Self> {
         let mut file = fs_err::File::open(Self::PATH)?;
         serde_yaml::from_reader(&mut file)
             .with_context(|| format!("Error loading MainnetFactories from {}", Self::PATH))
@@ -357,11 +383,17 @@ async fn instantiate_factory(
         dao,
         kill_switch,
         wind_down,
+        ident,
     }: InstantiateFactoryOpts,
 ) -> Result<()> {
     let app = opt.load_app_mainnet(network).await?;
     let code_ids = CodeIds::load()?;
     let mut factories = MainnetFactories::load()?;
+
+    anyhow::ensure!(
+        factories.get(&ident).is_err(),
+        "Identifier already in use: {ident}"
+    );
 
     let StoredCodeId {
         gitrev,
@@ -403,6 +435,7 @@ async fn instantiate_factory(
         instantiate_at: Utc::now(),
         gitrev: gitrev.to_owned(),
         hash,
+        ident: Some(ident),
     });
     factories.save()?;
 
@@ -411,9 +444,9 @@ async fn instantiate_factory(
 
 #[derive(clap::Parser)]
 struct NewPythBridgeOpts {
-    /// Address of the factory contract
+    /// The factory contract address or ident
     #[clap(long)]
-    factory: Address,
+    factory: String,
     /// Market ID
     #[clap(long)]
     market_id: MarketId,
@@ -430,11 +463,7 @@ async fn new_pyth_bridge(
     let code_ids = CodeIds::load()?;
 
     let factories = MainnetFactories::load()?;
-    let factory = factories
-        .factories
-        .into_iter()
-        .find(|x| x.address == factory)
-        .with_context(|| format!("Unknown mainnet factory: {factory}"))?;
+    let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
 
     let pyth_bridge = code_ids.get_simple(ContractType::PythBridge, &opt, factory.network)?;
@@ -469,9 +498,9 @@ async fn new_pyth_bridge(
 
 #[derive(clap::Parser)]
 struct AddMarketOpts {
-    /// Address of the factory contract
+    /// The factory contract address or identifier
     #[clap(long)]
-    factory: Address,
+    factory: String,
     /// New market ID to add
     #[clap(long)]
     market_id: MarketId,
@@ -513,11 +542,7 @@ async fn add_market(
     };
 
     let factories = MainnetFactories::load()?;
-    let factory = factories
-        .factories
-        .into_iter()
-        .find(|x| x.address == factory)
-        .with_context(|| format!("Unknown mainnet factory: {factory}"))?;
+    let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
 
     let msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {

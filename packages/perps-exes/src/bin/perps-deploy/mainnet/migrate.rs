@@ -1,5 +1,5 @@
-use anyhow::{Context, Result};
-use cosmos::{Address, HasAddress};
+use anyhow::Result;
+use cosmos::HasAddress;
 use cosmwasm_std::{to_binary, CosmosMsg, Empty, WasmMsg};
 use msg::prelude::*;
 
@@ -9,9 +9,9 @@ use super::MainnetFactories;
 
 #[derive(clap::Parser)]
 pub(super) struct MigrateOpts {
-    /// Address of the factory contract
+    /// The factory contract address or identifier
     #[clap(long)]
-    factory: Address,
+    factory: String,
     /// New market code ID to use
     #[clap(long)]
     market_code_id: u64,
@@ -31,11 +31,7 @@ async fn go(
     }: MigrateOpts,
 ) -> Result<()> {
     let factories = MainnetFactories::load()?;
-    let factory = factories
-        .factories
-        .into_iter()
-        .find(|x| x.address == factory)
-        .with_context(|| format!("Unknown mainnet factory: {factory}"))?;
+    let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
 
     let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));

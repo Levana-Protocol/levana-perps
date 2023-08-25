@@ -1,0 +1,56 @@
+use std::{fs::File, path::PathBuf};
+
+use crate::{
+    factory::Factory,
+    mainnet::{MainnetFactories, MainnetFactory},
+};
+use cosmos::{Address, HasAddress};
+use csv::Writer;
+use msg::prelude::*;
+
+#[derive(clap::Parser)]
+pub(super) struct ListContractsOpt {
+    /// Factory contracts. Can be the label or the address.
+    #[clap(long)]
+    factory: Vec<String>,
+    /// Destination CSV file.
+    #[clap(long)]
+    output: PathBuf,
+}
+
+impl ListContractsOpt {
+    pub(super) async fn go(self) -> Result<()> {
+        let ListContractsOpt { factory, output } = self;
+        let mut csv = csv::Writer::from_path(&output)?;
+        let factories = MainnetFactories::load()?;
+        for factory in factory {
+            go(factories.get(&factory)?, &mut csv).await?;
+        }
+        Ok(())
+    }
+}
+
+async fn go(factory: &MainnetFactory, csv: &mut Writer<File>) -> Result<()> {
+    let builder = factory.network.builder().await?;
+    let chain_id = builder.chain_id.clone();
+    let cosmos = builder.build().await?;
+    let factory = Factory::from_contract(cosmos.make_contract(factory.address));
+    for market in factory.get_markets().await? {
+        csv.serialize(Record {
+            chain: &chain_id,
+            market_id: &market.market_id,
+            market_contract: market.market.get_address(),
+            pyth_bridge_contract: market.price_admin,
+        })?;
+        csv.flush()?;
+    }
+    Ok(())
+}
+
+#[derive(serde::Serialize)]
+struct Record<'a> {
+    chain: &'a str,
+    market_id: &'a MarketId,
+    market_contract: Address,
+    pyth_bridge_contract: Address,
+}

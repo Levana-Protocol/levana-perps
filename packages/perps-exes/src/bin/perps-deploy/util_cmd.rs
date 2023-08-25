@@ -1,3 +1,4 @@
+mod list_contracts;
 mod lp_history;
 mod token_balances;
 
@@ -65,6 +66,11 @@ enum Sub {
         #[clap(flatten)]
         inner: token_balances::TokenBalancesOpt,
     },
+    /// List contracts for the given factories
+    ListContracts {
+        #[clap(flatten)]
+        inner: list_contracts::ListContractsOpt,
+    },
 }
 
 impl UtilOpt {
@@ -76,6 +82,7 @@ impl UtilOpt {
             Sub::OpenPositionCsv { inner } => open_position_csv(opt, inner).await,
             Sub::LpActionCsv { inner } => inner.go(opt).await,
             Sub::TokenBalances { inner } => inner.go(opt).await,
+            Sub::ListContracts { inner } => inner.go().await,
         }
     }
 }
