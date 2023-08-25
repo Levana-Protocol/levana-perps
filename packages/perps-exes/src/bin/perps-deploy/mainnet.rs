@@ -469,10 +469,6 @@ async fn new_pyth_bridge(
     let pyth_bridge = code_ids.get_simple(ContractType::PythBridge, &opt, factory.network)?;
     let pyth_bridge = app.cosmos.make_code_id(pyth_bridge);
 
-    let migration_admin = Factory::from_contract(app.cosmos.make_contract(factory.address))
-        .query_migration_admin()
-        .await?;
-
     log::info!("Deploying a new Pyth bridge");
     let pyth_bridge = pyth_bridge
         .instantiate(
@@ -488,7 +484,7 @@ async fn new_pyth_bridge(
                 feeds,
                 feeds_usd,
             },
-            ContractAdmin::Addr(migration_admin),
+            ContractAdmin::NoAdmin,
         )
         .await?;
     log::info!("New Pyth bridge contract: {pyth_bridge}");
@@ -544,6 +540,15 @@ async fn add_market(
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
+
+    // For security, ensure that the pyth bridge contract has no admin. We want
+    // to deploy fresh bridges each time there's any config change.
+    let pyth_bridge_info = app.cosmos.contract_info(pyth_bridge).await?;
+    anyhow::ensure!(
+        pyth_bridge_info.admin.is_empty(),
+        "Pyth bridge {pyth_bridge} has an admin set, refusing to launch market. Admin is: {}",
+        pyth_bridge_info.admin
+    );
 
     let msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
         new_market: NewMarketParams {
