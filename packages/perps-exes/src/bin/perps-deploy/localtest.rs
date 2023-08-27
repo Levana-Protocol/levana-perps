@@ -86,12 +86,12 @@ fn init_process(skip_init: bool) -> Result<Option<OsmoLocalProcess>> {
 pub(crate) async fn go(opt: Opt, opts: TestsOpt) -> Result<()> {
     let mut ol = init_process(opts.skip_init)?;
 
-    let raw_wallet = opt.wallet.context("No wallet provided")?;
+    let raw_wallet = opt.wallet.clone().context("No wallet provided")?;
     let network = opts.network;
 
     if let Some(ol) = &mut ol {
         log::info!("Waiting till Network is up");
-        wait_till_network_is_up(raw_wallet, network, ol).await?;
+        wait_till_network_is_up(raw_wallet.clone(), network, ol).await?;
     }
 
     log::info!("Going to Deploy");
@@ -150,7 +150,7 @@ async fn wait_till_network_is_up(
             }
         };
         let address_type = cosmos.get_address_type();
-        let wallet = wallet.for_chain(address_type);
+        let wallet = wallet.for_chain(address_type)?;
 
         let balances = cosmos.all_balances(wallet.get_address_string()).await;
         if balances.is_ok() {

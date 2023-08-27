@@ -48,3 +48,5 @@ stargaze-testnet:
   faucet: stars1pnlmx33qgx7822t7tc73znu0ddkxzcg29rshpls6acdlrrr7snkst4xwq6
   explorer: "https://testnet-explorer.publicawesome.dev/stargaze/tx/"
 osmosis-local: {}
+injective-testnet:
+  explorer: "https://testnet.explorer.injective.network/transaction/"

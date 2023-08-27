@@ -456,6 +456,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d86b93f97252c47b41663388e6d155714a9d0c398b99f1005cbc5f978b29f445"
 
 [[package]]
+name = "bip39"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93f2635620bf0b9d4576eb7bb9a38a55df78bd1205d26fa994b25911a69f212f"
+dependencies = [
+ "bitcoin_hashes",
+ "serde",
+ "unicode-normalization",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -732,11 +743,12 @@ checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 [[package]]
 name = "cosmos"
 version = "0.1.0"
-source = "git+https://github.com/Levana-Protocol/levana-cosmos-rs.git?rev=03fb2b57abb34709fa105c94696e2a7e64e55db9#03fb2b57abb34709fa105c94696e2a7e64e55db9"
+source = "git+https://github.com/Levana-Protocol/levana-cosmos-rs.git?rev=5cb5d396c4c7da78cf0e9389b1d4de6cf42af8f2#5cb5d396c4c7da78cf0e9389b1d4de6cf42af8f2"
 dependencies = [
  "anyhow",
  "base64 0.21.2",
  "bech32",
+ "bip39",
  "bitcoin",
  "chrono",
  "cosmos-sdk-proto",
