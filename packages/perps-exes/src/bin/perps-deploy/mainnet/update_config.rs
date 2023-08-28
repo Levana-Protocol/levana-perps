@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use cosmos::{Address, HasAddress};
+use cosmos::HasAddress;
 use cosmwasm_std::{to_binary, CosmosMsg, Empty, WasmMsg};
 use msg::{
     contracts::market::{config::ConfigUpdate, entry::ExecuteOwnerMsg},
@@ -13,9 +13,9 @@ use super::MainnetFactories;
 
 #[derive(clap::Parser)]
 pub(super) struct UpdateConfigOpts {
-    /// Address of the factory contract
+    /// The factory contract address or identifier
     #[clap(long)]
-    factory: Address,
+    factory: String,
     /// Market ID
     #[clap(long)]
     market: MarketId,
@@ -40,11 +40,7 @@ async fn go(
 ) -> Result<()> {
     let update: ConfigUpdate = serde_json::from_str(&config).context("Invalid ConfigUpdate")?;
     let factories = MainnetFactories::load()?;
-    let factory = factories
-        .factories
-        .into_iter()
-        .find(|x| x.address == factory)
-        .with_context(|| format!("Unknown mainnet factory: {factory}"))?;
+    let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
 
     let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
