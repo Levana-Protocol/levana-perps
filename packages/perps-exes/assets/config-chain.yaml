@@ -50,7 +50,7 @@ stargaze-testnet:
 osmosis-local: {}
 injective-testnet:
   tracker: inj17lq20qy7edhp7jzgtmf7qnjz5hnwlpep05ef3y
-  faucet: inj1ad5mkmv287vp03h6pl2uzv2dtt0km4c0jauq4q
+  faucet: inj1l4afk2mdw9kjlffwkfefh8plg6wvx250fr0tpx
   explorer: "https://testnet.explorer.injective.network/transaction/"
   pyth:
     contract: inj18hckkzqf47mdhd734g6papk6wj20y24rm43sk9
