@@ -224,7 +224,7 @@ impl App {
                 delta,
                 // Special de-debounce logic: if the price movement is too extreme, do the update anyway
                 is_too_frequent: is_too_frequent
-                    && delta <= self.config.max_allowed_price_delta * 2,
+                    && delta <= self.config.max_allowed_price_delta * Decimal256::two(),
             }));
         }
 
