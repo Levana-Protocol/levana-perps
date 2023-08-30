@@ -53,7 +53,7 @@ injective-testnet:
   faucet: inj1l4afk2mdw9kjlffwkfefh8plg6wvx250fr0tpx
   explorer: "https://testnet.explorer.injective.network/transaction/"
   pyth:
-    contract: inj18hckkzqf47mdhd734g6papk6wj20y24rm43sk9
-    type: stable
+    contract: inj18rlflp3735h25jmjx97d22c72sxk260amdjxlu
+    type: edge
   rpc-nodes:
   - https://injective-testnet-rpc.polkachu.com
