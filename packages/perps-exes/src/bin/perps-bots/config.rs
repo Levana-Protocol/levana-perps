@@ -204,11 +204,11 @@ impl Opt {
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let price_wallet = seed
-            .derive_cosmos_numbered(1)?
-            .for_chain(network.get_address_type());
+            .derive_cosmos_numbered(1)
+            .for_chain(network.get_address_type())?;
         let crank_wallet = seed
-            .derive_cosmos_numbered(2)?
-            .for_chain(network.get_address_type());
+            .derive_cosmos_numbered(2)
+            .for_chain(network.get_address_type())?;
         let watcher = match watcher_config {
             Some(yaml) => serde_yaml::from_str(yaml).context("Invalid watcher config on CLI")?,
             None => WatcherConfig::default(),

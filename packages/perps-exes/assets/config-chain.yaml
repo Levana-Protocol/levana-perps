@@ -55,3 +55,5 @@ injective-testnet:
   pyth:
     contract: inj18hckkzqf47mdhd734g6papk6wj20y24rm43sk9
     type: stable
+  rpc-nodes:
+  - https://injective-testnet-rpc.polkachu.com
