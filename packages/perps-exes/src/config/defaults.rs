@@ -89,8 +89,8 @@ pub fn max_price_age_secs() -> u32 {
 }
 
 pub fn min_price_age_secs() -> u32 {
-    // 1 minute
-    60
+    // 30 seconds
+    30
 }
 
 pub fn max_allowed_price_delta() -> Decimal256 {

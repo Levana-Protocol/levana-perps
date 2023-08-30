@@ -222,7 +222,9 @@ impl App {
                 old: price.price_base,
                 new: latest_price,
                 delta,
-                is_too_frequent,
+                // Special de-debounce logic: if the price movement is too extreme, do the update anyway
+                is_too_frequent: is_too_frequent
+                    && delta <= self.config.max_allowed_price_delta * 2,
             }));
         }
 
