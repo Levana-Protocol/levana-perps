@@ -50,8 +50,8 @@ pub fn extract_instantiated_addr(api: &dyn Api, events: &[Event]) -> Result<Addr
     ] {
         if let Some(addr) = extract_attribute(ty, key, events) {
             let addr = addr
-                .strip_prefix("\"")
-                .and_then(|s| s.strip_suffix("\""))
+                .strip_prefix('\"')
+                .and_then(|s| s.strip_suffix('\"'))
                 .unwrap_or(addr);
             let addr = api.addr_validate(addr)?;
             return Ok(addr);
