@@ -69,8 +69,7 @@ impl Opt {
     }
 
     fn get_wallet(&self, network: CosmosNetwork) -> Result<Wallet> {
-        self
-            .wallet
+        self.wallet
             .clone()
             .context("No wallet provided on CLI")?
             .for_chain(network.get_address_type())
