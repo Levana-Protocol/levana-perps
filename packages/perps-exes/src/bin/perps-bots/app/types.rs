@@ -8,9 +8,8 @@ use cosmos::Address;
 use cosmos::Cosmos;
 use cosmos::HasAddressType;
 use cosmos::Wallet;
-use cosmwasm_std::Decimal256;
 use parking_lot::RwLock;
-use perps_exes::config::PythConfig;
+use perps_exes::config::{GasAmount, PythConfig};
 use perps_exes::pyth::VecWithCurr;
 use reqwest::Client;
 use tokio::sync::Mutex;
@@ -27,20 +26,19 @@ use super::gas_check::{GasCheckBuilder, GasCheckWallet};
 
 #[derive(Default, serde::Serialize)]
 pub(crate) struct GasRecords {
-    pub(crate) total: Decimal256,
+    pub(crate) total: GasAmount,
     pub(crate) entries: VecDeque<GasEntry>,
 }
 
 impl GasRecords {
-    pub(crate) fn add_entry(&mut self, timestamp: DateTime<Utc>, amount: u128) {
+    pub(crate) fn add_entry(&mut self, timestamp: DateTime<Utc>, amount: GasAmount) {
         if let Err(e) = self.add_entry_inner(timestamp, amount) {
             log::error!("Error adding gas record {timestamp}/{amount}: {e:?}");
         }
     }
 
-    fn add_entry_inner(&mut self, timestamp: DateTime<Utc>, amount: u128) -> Result<()> {
-        let amount = Decimal256::from_ratio(amount, 1_000_000u32);
-        self.total = self.total.checked_add(amount)?;
+    fn add_entry_inner(&mut self, timestamp: DateTime<Utc>, amount: GasAmount) -> Result<()> {
+        self.total = GasAmount(self.total.0.checked_add(amount.0)?);
         self.entries.push_back(GasEntry { timestamp, amount });
         if self.entries.len() > 1000 {
             self.entries.pop_front();
@@ -52,7 +50,7 @@ impl GasRecords {
 #[derive(serde::Serialize)]
 pub(crate) struct GasEntry {
     pub(crate) timestamp: DateTime<Utc>,
-    pub(crate) amount: Decimal256,
+    pub(crate) amount: GasAmount,
 }
 
 pub(crate) struct App {
@@ -66,8 +64,8 @@ pub(crate) struct App {
     pub(crate) gases: RwLock<HashMap<Address, GasRecords>>,
     /// Ensure that the crank and price bots don't try to work at the same time
     pub(crate) crank_lock: Mutex<()>,
-    pub endpoints_stable: PythEndpoints,
-    pub endpoints_edge: PythEndpoints,
+    pub(crate) endpoints_stable: PythEndpoints,
+    pub(crate) endpoints_edge: PythEndpoints,
 }
 
 pub(crate) type PythEndpoints = VecWithCurr<String>;
@@ -177,7 +175,7 @@ impl AppBuilder {
         &mut self,
         address: Address,
         wallet_name: GasCheckWallet,
-        min_gas: u128,
+        min_gas: GasAmount,
     ) -> Result<()> {
         self.gas_check.add(address, wallet_name, min_gas, false)
     }

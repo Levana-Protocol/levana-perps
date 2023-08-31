@@ -3,7 +3,7 @@ use std::{net::SocketAddr, path::PathBuf, str::FromStr};
 use anyhow::{Context, Result};
 use cosmos::{Address, AddressType, CosmosNetwork, SeedPhrase, Wallet};
 use cosmwasm_std::Decimal256;
-use perps_exes::build_version;
+use perps_exes::{build_version, config::GasAmount};
 
 #[derive(clap::Parser)]
 #[clap(version = build_version())]
@@ -85,10 +85,10 @@ pub(crate) struct MainnetOpt {
     pub(crate) network: CosmosNetwork,
     #[clap(long, env = "COSMOS_GAS_MULTIPLIER")]
     pub(crate) gas_multiplier: Option<f64>,
-    #[clap(long, env = "LEVANA_BOTS_MIN_GAS_CRANK", default_value = "100000000")]
-    pub(crate) min_gas_crank: u128,
-    #[clap(long, env = "LEVANA_BOTS_MIN_GAS_PRICE", default_value = "100000000")]
-    pub(crate) min_gas_price: u128,
+    #[clap(long, env = "LEVANA_BOTS_MIN_GAS_CRANK", default_value = "100")]
+    pub(crate) min_gas_crank: GasAmount,
+    #[clap(long, env = "LEVANA_BOTS_MIN_GAS_PRICE", default_value = "100")]
+    pub(crate) min_gas_price: GasAmount,
     #[clap(long, env = "LEVANA_BOTS_WATCHER_CONFIG")]
     pub(crate) watcher_config: Option<String>,
     #[clap(long, env = "LEVANA_BOTS_MIN_PRICE_AGE_SECS")]

@@ -1,4 +1,5 @@
 sei-testnet:
+  gas-decimals: 6
   pyth:
     #contract: sei1kpntez76v38yuxhhaaahdmvjxnr5tkr8tq077smefs7uw70rj5yqw2aewy
     #type: edge
@@ -16,18 +17,21 @@ sei-testnet:
   #- https://sei-testnet-rpc.polkachu.com/
   #- https://sei-a2-rpc.brocha.in/
 sei-mainnet:
+  gas-decimals: 6
   pyth:
     contract: sei15d2tyq2jzxmpg32y3am3w62dts32qgzmds9qnr6c87r0gwwr7ynqal0x38
     type: stable
   rpc-nodes:
     - https://sei-priv.kingnodes.com
 osmosis-mainnet:
+  gas-decimals: 6
   pyth:
     contract: osmo13ge29x4e2s63a8ytz2px8gurtyznmue4a69n5275692v3qn3ks8q7cwck7
     type: stable
   explorer: "https://www.mintscan.io/osmosis/txs/"
   gas-multiplier: 1.5
 osmosis-testnet:
+  gas-decimals: 6
   pyth:
     #contract: osmo1lltupx02sj99suakmuk4sr4ppqf34ajedaxut3ukjwkv6469erwqtpg9t3
     #type: edge
@@ -40,15 +44,19 @@ osmosis-testnet:
   - https://rpc.osmotest5.osmosis.zone
   gas-multiplier: 1.5
 juno-testnet:
+  gas-decimals: 6
   tracker: juno1u23qyg0j4y5mzhessf0kcnjuqwg48kpufj5vujsq7kxxgxfnv5pqjmkmr4
   faucet: juno15rwad8twfrj34q7ep2sgrz3lqqs7vj939z9p4kccvfu9qm6mn55qxn7gy3
   explorer: "https://testnet.mintscan.io/juno-testnet/txs/"
 stargaze-testnet:
+  gas-decimals: 6
   tracker: stars1vfa0a8846ay2l2ehmqtwxgpcxzes9m598kw6mjh50zgnqhxgwmys7fkew3 
   faucet: stars1pnlmx33qgx7822t7tc73znu0ddkxzcg29rshpls6acdlrrr7snkst4xwq6
   explorer: "https://testnet-explorer.publicawesome.dev/stargaze/tx/"
-osmosis-local: {}
+osmosis-local:
+  gas-decimals: 6
 injective-testnet:
+  gas-decimals: 18
   tracker: inj17lq20qy7edhp7jzgtmf7qnjz5hnwlpep05ef3y
   faucet: inj1l4afk2mdw9kjlffwkfefh8plg6wvx250fr0tpx
   explorer: "https://testnet.explorer.injective.network/transaction/"
