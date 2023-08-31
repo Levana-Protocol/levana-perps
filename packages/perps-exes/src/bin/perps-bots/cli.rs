@@ -44,7 +44,7 @@ pub(crate) enum Sub {
     },
     Mainnet {
         #[clap(flatten)]
-        inner: MainnetOpt,
+        inner: Box<MainnetOpt>,
     },
 }
 
