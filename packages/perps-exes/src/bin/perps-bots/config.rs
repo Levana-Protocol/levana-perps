@@ -1,10 +1,10 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use cosmos::{Address, CosmosNetwork, HasAddressType, Wallet};
 use perps_exes::{
     config::{
-        ChainConfig, ConfigTestnet, DeploymentInfo, LiquidityConfig, LiquidityTransactionConfig,
-        TraderConfig, UtilizationConfig, WatcherConfig,
+        ChainConfig, ConfigTestnet, DeploymentInfo, GasAmount, GasDecimals, LiquidityConfig,
+        LiquidityTransactionConfig, TraderConfig, UtilizationConfig, WatcherConfig,
     },
     prelude::*,
 };
@@ -26,9 +26,9 @@ pub(crate) struct BotConfigTestnet {
     pub(crate) faucet: Address,
     pub(crate) price_api: String,
     pub(crate) contract_family: String,
-    pub(crate) min_gas: u128,
-    pub(crate) min_gas_in_faucet: u128,
-    pub(crate) min_gas_in_gas_wallet: u128,
+    pub(crate) min_gas: GasAmount,
+    pub(crate) min_gas_in_faucet: GasAmount,
+    pub(crate) min_gas_in_gas_wallet: GasAmount,
     pub(crate) explorer: String,
     pub(crate) ultra_crank_wallets: Vec<Wallet>,
     pub(crate) liquidity_config: Option<LiquidityConfig>,
@@ -45,8 +45,8 @@ pub(crate) struct BotConfigTestnet {
 
 pub(crate) struct BotConfigMainnet {
     pub(crate) factory: Address,
-    pub(crate) min_gas_crank: u128,
-    pub(crate) min_gas_price: u128,
+    pub(crate) min_gas_crank: GasAmount,
+    pub(crate) min_gas_price: GasAmount,
     pub(crate) low_util_ratio: Decimal256,
     pub(crate) high_util_ratio: Decimal256,
     pub(crate) liquidity_transaction: LiquidityTransactionConfig,
@@ -64,6 +64,7 @@ pub(crate) struct BotConfig {
     pub(crate) min_price_age_secs: u32,
     pub(crate) max_allowed_price_delta: Decimal256,
     pub(crate) price_age_alert_threshold_secs: u32,
+    pub(crate) gas_decimals: GasDecimals,
 }
 
 impl Opt {
@@ -94,6 +95,7 @@ impl Opt {
             explorer,
             rpc_nodes,
             gas_multiplier,
+            gas_decimals,
         } = ChainConfig::load(testnet.config_chain.as_ref(), network)?;
         let partial = match &testnet.deployment_config {
             Some(s) => serde_yaml::from_str(s)?,
@@ -177,6 +179,7 @@ impl Opt {
             min_price_age_secs: partial.min_price_age_secs,
             max_allowed_price_delta: partial.max_allowed_price_delta,
             price_age_alert_threshold_secs: partial.price_age_alert_threshold_secs,
+            gas_decimals,
         };
 
         Ok((config, Some(faucet_bot_runner)))
@@ -204,15 +207,16 @@ impl Opt {
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let price_wallet = seed
-            .derive_cosmos_numbered(1)?
-            .for_chain(network.get_address_type());
+            .derive_cosmos_numbered(1)
+            .for_chain(network.get_address_type())?;
         let crank_wallet = seed
-            .derive_cosmos_numbered(2)?
-            .for_chain(network.get_address_type());
+            .derive_cosmos_numbered(2)
+            .for_chain(network.get_address_type())?;
         let watcher = match watcher_config {
             Some(yaml) => serde_yaml::from_str(yaml).context("Invalid watcher config on CLI")?,
             None => WatcherConfig::default(),
         };
+        let gas_decimals = ChainConfig::load(None::<PathBuf>, *network)?.gas_decimals;
         Ok(BotConfig {
             by_type: BotConfigByType::Mainnet {
                 inner: BotConfigMainnet {
@@ -243,6 +247,7 @@ impl Opt {
                 .unwrap_or_else(perps_exes::config::defaults::max_allowed_price_delta),
             price_age_alert_threshold_secs: price_age_alert_threshold_secs
                 .unwrap_or_else(perps_exes::config::defaults::price_age_alert_threshold_secs),
+            gas_decimals,
         })
     }
 }

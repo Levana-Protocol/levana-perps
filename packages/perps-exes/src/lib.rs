@@ -64,9 +64,9 @@ impl PerpApp {
 
         let faucet_contract = faucet_contract_addr.map(|x| cosmos.make_contract(x));
 
-        let wallet_address = *raw_wallet.for_chain(cosmos.get_address_type()).address();
         let address_type = cosmos.get_address_type();
-        let wallet = raw_wallet.for_chain(address_type);
+        let wallet = raw_wallet.for_chain(address_type)?;
+        let wallet_address = wallet.get_address();
         Ok(PerpApp {
             wallet_address,
             raw_wallet,

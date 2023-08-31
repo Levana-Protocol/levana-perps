@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use cosmwasm_std::{
-    Api, Attribute, Binary, ContractResult, Empty, Event, QuerierWrapper, QueryRequest, StdError,
+    Api, Binary, ContractResult, Empty, Event, QuerierWrapper, QueryRequest, StdError,
     SystemResult, WasmQuery,
 };
 
@@ -26,14 +26,12 @@ impl From<OrderInMessage> for cosmwasm_std::Order {
 }
 
 /// Extract an attribute for the given parameters from an Event
-pub(crate) fn extract_attribute<T, F>(ty: &str, key: &str, events: &[Event], f: F) -> Option<T>
-where
-    F: FnOnce(&Attribute) -> Option<T>,
-{
+fn extract_attribute<'a>(ty: &str, key: &str, events: &'a [Event]) -> Option<&'a str> {
     events
         .iter()
         .find(|e| e.ty == ty)
-        .and_then(|ev| ev.attributes.iter().find(|a| a.key == key).and_then(f))
+        .and_then(|ev| ev.attributes.iter().find(|a| a.key == key))
+        .map(|attr| attr.value.as_str())
 }
 
 // https://github.com/CosmWasm/wasmd/blob/main/EVENTS.md#standard-events-in-xwasm
@@ -41,14 +39,21 @@ where
 /// Extract contract address from an instantiation event
 pub fn extract_instantiated_addr(api: &dyn Api, events: &[Event]) -> Result<Addr> {
     for (ty, key) in [
+        (
+            "cosmwasm.wasm.v1.EventContractInstantiated",
+            "contract_address",
+        ),
         ("instantiate", "_contract_address"),
         ("instantiate", "_contract_addr"),
         ("wasm", "contract_address"),
         ("instantiate_contract", "contract_address"),
     ] {
-        if let Some(addr) =
-            extract_attribute(ty, key, events, |addr| api.addr_validate(&addr.value).ok())
-        {
+        if let Some(addr) = extract_attribute(ty, key, events) {
+            let addr = addr
+                .strip_prefix('\"')
+                .and_then(|s| s.strip_suffix('\"'))
+                .unwrap_or(addr);
+            let addr = api.addr_validate(addr)?;
             return Ok(addr);
         }
     }

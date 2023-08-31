@@ -1,17 +1,17 @@
 use cosmwasm_std::Decimal256;
 
-use super::TaskConfig;
+use super::{GasAmount, TaskConfig};
 
-pub(super) fn min_gas() -> u128 {
-    1_000_000
+pub(super) fn min_gas() -> GasAmount {
+    "1".parse().unwrap()
 }
 
-pub(super) fn min_gas_in_faucet() -> u128 {
-    10_000_000_000
+pub(super) fn min_gas_in_faucet() -> GasAmount {
+    "10000".parse().unwrap()
 }
 
-pub(super) fn min_gas_in_gas_wallet() -> u128 {
-    10_000_000_000
+pub(super) fn min_gas_in_gas_wallet() -> GasAmount {
+    "10000".parse().unwrap()
 }
 
 pub(super) fn retries() -> usize {

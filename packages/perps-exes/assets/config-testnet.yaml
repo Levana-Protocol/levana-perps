@@ -85,10 +85,11 @@ deployments:
     balance: false
     traders: 0
     default-market-ids:
-      - ATOM_USD
-      - OSMO_USD
+      #- ATOM_USD
+      #- OSMO_USD
       #- ETH_BTC
-      #- BTC_USD
+      - BTC_USD
+      - ETH_USD
   qa:
     wallet-manager-address: levana1ep4uavfsyw5dp7ymtkpvj8qm4mc8ellph9408d
     dev-settings: true

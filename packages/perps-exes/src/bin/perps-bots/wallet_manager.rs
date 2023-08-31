@@ -80,7 +80,7 @@ impl Debug for MintRequest {
 
 impl WalletManager {
     pub(crate) fn new(seed: SeedPhrase, address_type: AddressType) -> Result<Self> {
-        let minter = seed.derive_cosmos_numbered(0)?.for_chain(address_type);
+        let minter = seed.derive_cosmos_numbered(0).for_chain(address_type)?;
         log::info!("Wallet manager minter wallet: {minter}");
         let (send_request, recv_request) = mpsc::channel(100);
         let manager = WalletManager {
@@ -100,8 +100,8 @@ impl WalletManager {
         let wallet = self
             .inner
             .seed
-            .derive_cosmos_numbered(idx)?
-            .for_chain(self.inner.address_type);
+            .derive_cosmos_numbered(idx.into())
+            .for_chain(self.inner.address_type)?;
         log::info!("Got fresh wallet from manager for {desc}: {wallet}",);
         Ok(wallet)
     }

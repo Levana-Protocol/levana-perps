@@ -56,6 +56,57 @@ pub struct ChainConfig {
     pub rpc_nodes: Vec<String>,
     /// Override the gas multiplier
     pub gas_multiplier: Option<f64>,
+    /// Number of decimals in the gas coin
+    pub gas_decimals: GasDecimals,
+}
+
+/// Number of decimals in the gas coin
+#[derive(serde::Deserialize, Clone, Debug, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct GasDecimals(pub u8);
+impl GasDecimals {
+    pub fn from_u128(&self, raw: u128) -> Result<GasAmount> {
+        Decimal256::from_atomics(raw, self.0.into())
+            .with_context(|| {
+                format!(
+                    "GasDecimals::from_u128 failed on {raw} with {} decimals",
+                    self.0
+                )
+            })
+            .map(GasAmount)
+    }
+}
+impl FromStr for GasDecimals {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        s.parse().map(GasDecimals).map_err(From::from)
+    }
+}
+
+#[derive(
+    serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default,
+)]
+pub struct GasAmount(pub Decimal256);
+
+impl FromStr for GasAmount {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        s.parse().map(GasAmount).map_err(|e| e.into())
+    }
+}
+
+impl Display for GasAmount {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl std::fmt::Debug for GasAmount {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "GasAmount{}", self.0)
+    }
 }
 
 #[derive(serde::Deserialize, Clone, Debug)]
@@ -163,13 +214,13 @@ pub struct DeploymentConfigTestnet {
     pub watcher: WatcherConfig,
     /// Minimum gas required in wallet managed by perps bots
     #[serde(default = "defaults::min_gas")]
-    pub min_gas: u128,
+    pub min_gas: GasAmount,
     /// Minimum gas required in the faucet contract
     #[serde(default = "defaults::min_gas_in_faucet")]
-    pub min_gas_in_faucet: u128,
+    pub min_gas_in_faucet: GasAmount,
     /// Minimum gas required in the gas wallet
     #[serde(default = "defaults::min_gas_in_gas_wallet")]
-    pub min_gas_in_gas_wallet: u128,
+    pub min_gas_in_gas_wallet: GasAmount,
     /// Number of seconds before a price update is forced
     #[serde(default = "defaults::max_price_age_secs")]
     pub max_price_age_secs: u32,
@@ -273,6 +324,7 @@ pub fn parse_deployment(deployment: &str) -> Result<(CosmosNetwork, &str)> {
     const NETWORKS: &[(CosmosNetwork, &str)] = &[
         (CosmosNetwork::OsmosisTestnet, "osmo"),
         (CosmosNetwork::SeiTestnet, "sei"),
+        (CosmosNetwork::InjectiveTestnet, "inj"),
     ];
     for (network, prefix) in NETWORKS {
         if let Some(suffix) = deployment.strip_prefix(prefix) {

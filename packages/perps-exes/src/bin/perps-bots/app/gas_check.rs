@@ -12,7 +12,7 @@ use cosmos::{
     proto::cosmos::bank::v1beta1::MsgSend, Address, Coin, Cosmos, HasAddress, TxBuilder, Wallet,
 };
 use cosmwasm_std::Decimal256;
-use msg::prelude::{LpToken, UnsignedDecimal};
+use perps_exes::config::{GasAmount, GasDecimals};
 
 use super::{AppBuilder, GasRecords};
 
@@ -65,7 +65,7 @@ impl GasCheckBuilder {
         &mut self,
         address: Address,
         name: GasCheckWallet,
-        min_gas: u128,
+        min_gas: GasAmount,
         should_refill: bool,
     ) -> Result<()> {
         anyhow::ensure!(
@@ -117,12 +117,6 @@ impl WatchedTask for GasCheck {
     }
 }
 
-fn pretty_gas(x: u128) -> Decimal256 {
-    LpToken::from_u128(x)
-        .ok()
-        .map_or_else(Decimal256::zero, |x| x.into_decimal256())
-}
-
 impl GasCheck {
     async fn single_gas_check(&self, app: &App) -> Result<WatchedTaskOutput> {
         let mut balances = vec![];
@@ -137,18 +131,19 @@ impl GasCheck {
             should_refill,
         } in &self.to_track
         {
-            let gas = match get_gas_balance(&self.app.cosmos, *address).await {
-                Ok(gas) => gas,
-                Err(e) => {
-                    errors.push(format!("Unable to query gas balance for {address}: {e:?}"));
-                    continue;
-                }
-            };
+            let gas =
+                match get_gas_balance(&self.app.cosmos, *address, self.app.config.gas_decimals)
+                    .await
+                {
+                    Ok(gas) => gas,
+                    Err(e) => {
+                        errors.push(format!("Unable to query gas balance for {address}: {e:?}"));
+                        continue;
+                    }
+                };
             if gas >= *min_gas {
                 balances.push(format!(
-                    "Sufficient gas in {name} ({address}). Found: {}. Minimum: {}.",
-                    pretty_gas(gas),
-                    pretty_gas(*min_gas)
+                    "Sufficient gas in {name} ({address}). Found: {gas}. Minimum: {min_gas}."
                 ));
                 continue;
             }
@@ -156,9 +151,7 @@ impl GasCheck {
             if *should_refill {
                 to_refill.push((*address, *min_gas));
                 balances.push(format!(
-                    "Topping off gas in {name} ({address}). Found: {}. Wanted: {}.",
-                    pretty_gas(gas),
-                    pretty_gas(*min_gas)
+                    "Topping off gas in {name} ({address}). Found: {gas}. Wanted: {min_gas}."
                 ));
                 if to_refill.len() >= 20 {
                     balances.push("Already have 20 wallets to fill up, stopping there".to_owned());
@@ -167,9 +160,7 @@ impl GasCheck {
                 }
             } else {
                 errors.push(format!(
-                    "Insufficient gas in {name} ({address}). Found: {}. Wanted: {}.",
-                    pretty_gas(gas),
-                    pretty_gas(*min_gas)
+                    "Insufficient gas in {name} ({address}). Found: {gas}. Wanted: {min_gas}."
                 ));
             }
         }
@@ -230,18 +221,23 @@ impl GasCheck {
 struct Tracked {
     name: GasCheckWallet,
     address: Address,
-    min_gas: u128,
+    min_gas: GasAmount,
     should_refill: bool,
 }
 
-async fn get_gas_balance(cosmos: &Cosmos, address: Address) -> Result<u128> {
+async fn get_gas_balance(
+    cosmos: &Cosmos,
+    address: Address,
+    decimals: GasDecimals,
+) -> Result<GasAmount> {
     let coins = cosmos.all_balances(address).await?;
     for Coin { denom, amount } in coins {
         if &denom == cosmos.get_gas_coin() {
-            return amount
+            let raw = amount
                 .parse()
-                .with_context(|| format!("Invalid gas coin amount {amount:?}"));
+                .with_context(|| format!("Invalid gas coin amount {amount:?}"))?;
+            return decimals.from_u128(raw);
         }
     }
-    Ok(0)
+    Ok(GasAmount(Decimal256::zero()))
 }

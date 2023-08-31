@@ -46,9 +46,9 @@ impl Hatch {
     ) -> Result<Self> {
         let cosmos = network.builder().await?.build().await?;
         let address_type = cosmos.get_address_type();
-        let wallet = wallet.for_chain(address_type);
-        let nft_mint_admin_wallet = nft_mint_admin_wallet.for_chain(address_type);
-        let profile_admin_wallet = profile_admin_wallet.for_chain(address_type);
+        let wallet = wallet.for_chain(address_type)?;
+        let nft_mint_admin_wallet = nft_mint_admin_wallet.for_chain(address_type)?;
+        let profile_admin_wallet = profile_admin_wallet.for_chain(address_type)?;
 
         let contract = Contract::new(cosmos.clone(), hatch_address);
 
@@ -95,7 +95,7 @@ impl NftMint {
     pub async fn new(opt: &HatchEggOpt) -> Result<Self> {
         let cosmos = opt.nft_mint_network.builder().await?.build().await?;
         let address_type = cosmos.get_address_type();
-        let wallet = opt.nft_mint_wallet.for_chain(address_type);
+        let wallet = opt.nft_mint_wallet.for_chain(address_type)?;
 
         let contract = Contract::new(cosmos.clone(), opt.nft_mint_address);
 
@@ -117,7 +117,7 @@ impl Rewards {
     pub async fn new(opt: &HatchEggOpt) -> Result<Self> {
         let cosmos = opt.lvn_rewards_network.builder().await?.build().await?;
         let address_type = cosmos.get_address_type();
-        let wallet = opt.lvn_rewards_wallet.for_chain(address_type);
+        let wallet = opt.lvn_rewards_wallet.for_chain(address_type)?;
 
         let contract = Contract::new(cosmos.clone(), opt.lvn_rewards_address);
 
@@ -195,9 +195,9 @@ async fn main() -> Result<()> {
         Subcommand::HatchEgg { hatch_egg_opt: opt } => {
             let hatch = Hatch::new(
                 opt.hatch_network,
-                opt.hatch_wallet,
-                opt.nft_mint_admin_wallet,
-                opt.profile_admin_wallet,
+                opt.hatch_wallet.clone(),
+                opt.nft_mint_admin_wallet.clone(),
+                opt.profile_admin_wallet.clone(),
                 opt.hatch_address,
             )
             .await?;
