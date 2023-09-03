@@ -150,3 +150,19 @@ overrides:
     min-gas: 1000
     min-gas-in-faucet: 2000000
     min-gas-in-gas-wallet: 1000000
+  seidebug:
+    wallet-manager-address: levana19ta8kepflecc7n2rdruduj9ydt72z2xy0gl5e9
+    dev-settings: true
+    price: true
+    crank: true
+    liquidity: false
+    utilization: false
+    balance: false
+    traders: 0
+    default-market-ids:
+      - BTC_USD
+      - ETH_USD
+    # Gas is expensive on Sei
+    min-gas: 1000
+    min-gas-in-faucet: 2000000
+    min-gas-in-gas-wallet: 1000000
