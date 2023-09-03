@@ -117,9 +117,9 @@ overrides:
       - BTC_USD
 
     # Gas is expensive on Sei
-    min-gas: 1000000000
-    min-gas-in-faucet: 2000000000000
-    min-gas-in-gas-wallet: 1000000000000
+    min-gas: 1000
+    min-gas-in-faucet: 2000000
+    min-gas-in-gas-wallet: 1000000
     watcher:
       # Nodes seem to crash often, let's see if this helps
       retries: 10
