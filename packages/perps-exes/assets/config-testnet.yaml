@@ -134,3 +134,19 @@ overrides:
     default-market-ids:
       - ATOM_USD
       - BTC_USD
+  seidev:
+    wallet-manager-address: osmo1lkc7lnq204m4yeydcdg94stkm50jjyglh7ucel
+    dev-settings: true
+    price: true
+    crank: true
+    liquidity: true
+    utilization: true
+    balance: true
+    traders: 10
+    default-market-ids:
+      - ATOM_USD
+      - BTC_USD
+    # Gas is expensive on Sei
+    min-gas: 1000
+    min-gas-in-faucet: 2000000
+    min-gas-in-gas-wallet: 1000000

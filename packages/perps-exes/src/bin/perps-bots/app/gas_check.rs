@@ -178,7 +178,7 @@ impl GasCheck {
                         to_address: address.get_address_string(),
                         amount: vec![Coin {
                             denom: denom.clone(),
-                            amount: amount.to_string(),
+                            amount: app.config.gas_decimals.to_u128(*amount)?.to_string(),
                         }],
                     });
                 }

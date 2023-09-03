@@ -3,6 +3,7 @@ pub mod defaults;
 use std::{collections::HashMap, path::Path};
 
 use cosmos::{Address, CosmosNetwork, RawAddress};
+use cosmwasm_std::{Uint128, Uint256};
 use msg::{
     contracts::{
         market::config::ConfigUpdate,
@@ -65,7 +66,7 @@ pub struct ChainConfig {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct GasDecimals(pub u8);
 impl GasDecimals {
-    pub fn from_u128(&self, raw: u128) -> Result<GasAmount> {
+    pub fn from_u128(self, raw: u128) -> Result<GasAmount> {
         Decimal256::from_atomics(raw, self.0.into())
             .with_context(|| {
                 format!(
@@ -74,6 +75,18 @@ impl GasDecimals {
                 )
             })
             .map(GasAmount)
+    }
+
+    pub fn to_u128(self, amount: GasAmount) -> Result<u128> {
+        let factor = Decimal256::one().atomics() / Uint256::from_u128(10).pow(self.0.into());
+        let raw = amount.0.atomics() / factor;
+
+        Uint128::try_from(raw).map(|x| x.u128()).with_context(|| {
+            format!(
+                "Unable to convert gas amount {amount} to u128 with decimals {}",
+                self.0
+            )
+        })
     }
 }
 impl FromStr for GasDecimals {
