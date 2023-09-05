@@ -142,7 +142,7 @@ impl Default for Config {
             borrow_fee_rate_max_annualized: "0.60".parse().unwrap(),
             funding_rate_sensitivity: "10".parse().unwrap(),
             mute_events: false,
-            liquifunding_delay_seconds: 60 * 60 * 24,
+            liquifunding_delay_seconds: 60 * 60 * 6,
             price_update_too_old_seconds: 60 * 30,
             staleness_seconds: 60 * 60 * 2,
             protocol_tax: "0.3".parse().unwrap(),
@@ -168,7 +168,7 @@ impl Default for Config {
             crank_fee_reward: "0.001".parse().unwrap(),
             minimum_deposit_usd: "5".parse().unwrap(),
             unpend_limit: 500,
-            liquifunding_delay_fuzz_seconds: 60 * 60 * 4,
+            liquifunding_delay_fuzz_seconds: 60 * 60,
             max_liquidity: MaxLiquidity::Unlimited {},
             disable_position_nft_exec: false,
             // Default to 1 hour
