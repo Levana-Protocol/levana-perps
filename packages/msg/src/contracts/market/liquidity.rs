@@ -189,6 +189,10 @@ pub mod events {
         pub lp_collateral: Collateral,
         /// Total collateral (locked and unlocked) backing xLP tokens
         pub xlp_collateral: Collateral,
+        /// Total number of LP tokens
+        pub total_lp: LpToken,
+        /// Total number of xLP tokens
+        pub total_xlp: LpToken,
     }
 
     impl LiquidityPoolSizeEvent {
@@ -214,6 +218,8 @@ pub mod events {
                 unlocked_usd: price.collateral_to_usd(stats.unlocked),
                 lp_collateral,
                 xlp_collateral,
+                total_lp: stats.total_lp,
+                total_xlp: stats.total_xlp,
             }
         }
     }
@@ -229,6 +235,8 @@ pub mod events {
                 ("unlocked-usd", src.unlocked_usd.to_string()),
                 ("lp-collateral", src.lp_collateral.to_string()),
                 ("xlp-collateral", src.xlp_collateral.to_string()),
+                ("total-lp", src.total_lp.to_string()),
+                ("total-xlp", src.total_xlp.to_string()),
             ])
         }
     }
@@ -244,6 +252,8 @@ pub mod events {
                 unlocked_usd: evt.decimal_attr("unlocked-usd")?,
                 lp_collateral: evt.decimal_attr("lp-collateral")?,
                 xlp_collateral: evt.decimal_attr("xlp-collateral")?,
+                total_lp: evt.decimal_attr("total-lp")?,
+                total_xlp: evt.decimal_attr("total-xlp")?,
             })
         }
     }
