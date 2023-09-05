@@ -73,6 +73,11 @@ pub(crate) enum TestnetSub {
         #[clap(flatten)]
         inner: crate::testnet::disable::CloseAllPositionsOpt,
     },
+    /// Update the configs in all markets with the given message
+    UpdateMarketConfigs {
+        #[clap(flatten)]
+        inner: crate::testnet::update_market_configs::UpdateMarketConfigsOpt,
+    },
 }
 
 #[derive(clap::Parser)]

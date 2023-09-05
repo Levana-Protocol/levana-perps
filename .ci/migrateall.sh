@@ -12,7 +12,7 @@ do
     cargo run --bin perps-deploy testnet store-code
 done
 
-for PERPS_FAMILY in osmodev osmoqa osmodebug osmoci osmobeta seibeta
+for PERPS_FAMILY in injdebug osmobeta osmoci osmodebug osmodev osmoqa seibeta seidebug seidev
 do
     export PERPS_FAMILY
     echo "migrate for family: $PERPS_FAMILY"

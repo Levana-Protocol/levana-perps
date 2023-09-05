@@ -187,6 +187,14 @@ fn pnl_from_liquidation_perp_1404() {
 
     return_unless_market_collateral_base!(&market);
 
+    market
+        .exec_set_config(ConfigUpdate {
+            liquifunding_delay_seconds: Some(60 * 60 * 24),
+            liquifunding_delay_fuzz_seconds: Some(60 * 60 * 4),
+            ..Default::default()
+        })
+        .unwrap();
+
     market.exec_set_price("6.33".parse().unwrap()).unwrap();
     market.exec_crank_till_finished(&trader).unwrap();
     let (pos_id, _) = market
