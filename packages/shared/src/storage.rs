@@ -63,9 +63,9 @@ where
 pub type MonotonicMap<'a, T> = Map<'a, u64, T>;
 
 /// Push a new value to a [MonotonicMap].
-pub fn push_to_monotonic_map<'a, T>(
+pub fn push_to_monotonic_map<T>(
     store: &mut dyn Storage,
-    m: MonotonicMap<'a, T>,
+    m: MonotonicMap<T>,
     t: &T,
 ) -> Result<u64>
 where

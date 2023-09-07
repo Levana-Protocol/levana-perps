@@ -52,7 +52,7 @@ async fn go(
 
     let msg = CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
         contract_addr: market.market.get_address_string(),
-        msg: to_binary(&strip_nulls(&MarketExecuteMsg::Owner(
+        msg: to_binary(&strip_nulls(MarketExecuteMsg::Owner(
             ExecuteOwnerMsg::ConfigUpdate { update },
         ))?)?,
         funds: vec![],

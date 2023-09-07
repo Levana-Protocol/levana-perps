@@ -188,7 +188,7 @@ impl<T: UnsignedDecimal> JsonSchema for Signed<T> {
         };
 
         let mut meta = match obj.metadata {
-            None => Box::new(Metadata::default()),
+            None => Box::<Metadata>::default(),
             Some(m) => m,
         };
 
