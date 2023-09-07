@@ -20,8 +20,8 @@ rm -f "$WASM_DIR/artifacts/gitrev"
 docker  run --rm --tty \
   -u "$(id -u)":"$(id -g)" \
   -v "$(pwd)":/code \
-  -v "$TARGET_CACHE":/code/target \
-  -v "$ARTIFACTS":/code/artifacts \
+  -v "$TARGET_CACHE":/target \
+  -v "$ARTIFACTS":/artifacts \
   -v "$REGISTRY_CACHE":/usr/local/cargo/registry \
   -v "$CARGO_GIT_CACHE":/usr/local/cargo/git \
   cosmwasm/workspace-optimizer:0.14.0
