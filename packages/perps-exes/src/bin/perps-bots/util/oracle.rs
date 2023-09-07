@@ -8,7 +8,7 @@ use msg::{
     },
     prelude::*,
 };
-use shared::{storage::map_key, namespace::PYTH_PREV_MARKET_PRICE};
+use shared::{namespace::PYTH_PREV_MARKET_PRICE, storage::map_key};
 
 use perps_exes::config::PythMarketPriceFeeds;
 
@@ -73,11 +73,15 @@ impl Pyth {
     }
 
     pub async fn prev_market_price_timestamp(&self, market_id: &MarketId) -> Result<Timestamp> {
-        let res = self.bridge.query_raw(map_key(PYTH_PREV_MARKET_PRICE, market_id)).await?;
-        let price:MarketPrice = serde_json::from_slice(&res)?;
-        Ok(Timestamp::from_seconds(price.latest_price_publish_time.try_into()?))
+        let res = self
+            .bridge
+            .query_raw(map_key(PYTH_PREV_MARKET_PRICE, market_id))
+            .await?;
+        let price: MarketPrice = serde_json::from_slice(&res)?;
+        Ok(Timestamp::from_seconds(
+            price.latest_price_publish_time.try_into()?,
+        ))
     }
-
 
     pub async fn get_bridge_update_msg(
         &self,

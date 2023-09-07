@@ -4,8 +4,7 @@ use anyhow::Result;
 use axum::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use cosmos::{
-    proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, HasAddress, TxBuilder,
-    Wallet,
+    proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, HasAddress, TxBuilder, Wallet,
 };
 use cosmwasm_std::Decimal256;
 use msg::{
@@ -112,7 +111,10 @@ impl App {
                 market,
                 &pyth,
                 latest_price,
-                worker.last_successful_price_times.get(&market.market_id).copied(),
+                worker
+                    .last_successful_price_times
+                    .get(&market.market_id)
+                    .copied(),
             )
             .await?;
         worker.add_reason(&market.market_id, &reason);
@@ -150,7 +152,10 @@ impl App {
                 }
 
                 // OK, it was a too old error. Let's find out when the last price update was for the contract.
-                let last_update = pyth.prev_market_price_timestamp(&market.market_id).await?.try_into_chrono_datetime()?;
+                let last_update = pyth
+                    .prev_market_price_timestamp(&market.market_id)
+                    .await?
+                    .try_into_chrono_datetime()?;
                 let now = Utc::now();
                 let age = now - last_update;
                 if u32::try_from(age.num_seconds())? > self.config.price_age_alert_threshold_secs {
@@ -211,7 +216,7 @@ impl App {
             Ok(price_time) => price_time,
             Err(_) => {
                 // Assume this is the first price being set
-                return Ok(Some(PriceUpdateReason::NoPriceFound))
+                return Ok(Some(PriceUpdateReason::NoPriceFound));
             }
         };
 
@@ -227,7 +232,6 @@ impl App {
                 };
             }
         };
-
 
         // Determine the logical "last update" by using both the
         // contract-derived price time and the most recent successfully price
