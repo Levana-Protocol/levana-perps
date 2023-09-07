@@ -169,7 +169,7 @@ fn external_helper<T: serde::de::DeserializeOwned>(
     serde_json_wasm::from_slice(&res).map_err(|err| err.into())
 }
 /// Generate a storage key for a value in a [cw_storage_plus::Map].
-pub(crate) fn map_key<'a, K: PrimaryKey<'a>>(namespace: &str, key: &K) -> Vec<u8> {
+pub fn map_key<'a, K: PrimaryKey<'a>>(namespace: &str, key: &K) -> Vec<u8> {
     // Taken from https://github.com/CosmWasm/cw-storage-plus/blob/69300779519d8ba956fb53725e44e2b59c317b1c/src/helpers.rs#L57
     // If only that was exposed...
 
