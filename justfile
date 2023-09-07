@@ -90,8 +90,8 @@ contracts-test-wasmd:
 # Cache docker images by saving it under wasm
 cache-docker-images:
 	mkdir -p wasm/images
-	-docker load -i ./wasm/images/workspace_0.12.10.tar
-	-[ -f wasm/images/workspace_0.12.10.tar ] || docker pull cosmwasm/workspace-optimizer:0.12.10 && docker save cosmwasm/workspace-optimizer:0.12.10 > wasm/images/workspace_0.12.10.tar
+	-docker load -i ./wasm/images/workspace_0.14.10.tar
+	-[ -f wasm/images/workspace_0.14.10.tar ] || docker pull cosmwasm/workspace-optimizer:0.14.10 && docker save cosmwasm/workspace-optimizer:0.14.10 > wasm/images/workspace_0.14.10.tar
 
 # Typescript check for CI which needs deps installed
 typescript-check:

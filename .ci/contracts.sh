@@ -24,7 +24,7 @@ docker  run --rm --tty \
   -v "$ARTIFACTS":/code/artifacts \
   -v "$REGISTRY_CACHE":/usr/local/cargo/registry \
   -v "$CARGO_GIT_CACHE":/usr/local/cargo/git \
-  cosmwasm/workspace-optimizer:0.12.10
+  cosmwasm/workspace-optimizer:0.14.10
 
 # Only write the gitrev file on success
 git rev-parse HEAD > "$WASM_DIR/artifacts/gitrev"
