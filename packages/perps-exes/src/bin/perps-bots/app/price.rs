@@ -4,8 +4,7 @@ use anyhow::Result;
 use axum::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use cosmos::{
-    proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, HasAddress, TxBuilder, TxResponseExt,
-    Wallet,
+    proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, HasAddress, TxBuilder, Wallet,
 };
 use cosmwasm_std::Decimal256;
 use msg::{
@@ -26,7 +25,7 @@ use super::{factory::FactoryInfo, gas_check::GasCheckWallet, App, AppBuilder};
 struct Worker {
     wallet: Arc<Wallet>,
     stats: HashMap<MarketId, ReasonStats>,
-    last_update: HashMap<MarketId, DateTime<Utc>>,
+    last_successful_price_times: HashMap<MarketId, DateTime<Utc>>,
 }
 
 impl Worker {
@@ -60,7 +59,7 @@ impl AppBuilder {
                 Worker {
                     wallet: price_wallet,
                     stats: HashMap::new(),
-                    last_update: HashMap::new(),
+                    last_successful_price_times: HashMap::new(),
                 },
             )?;
         }
@@ -110,8 +109,12 @@ impl App {
         let reason = self
             .needs_price_update(
                 market,
+                &pyth,
                 latest_price,
-                worker.last_update.get(&market.market_id).copied(),
+                worker
+                    .last_successful_price_times
+                    .get(&market.market_id)
+                    .copied(),
             )
             .await?;
         worker.add_reason(&market.market_id, &reason);
@@ -149,8 +152,10 @@ impl App {
                 }
 
                 // OK, it was a too old error. Let's find out when the last price update was for the contract.
-                let current_price = market.market.current_price().await?;
-                let last_update = current_price.timestamp.try_into_chrono_datetime()?;
+                let last_update = pyth
+                    .prev_market_price_timestamp(&market.market_id)
+                    .await?
+                    .try_into_chrono_datetime()?;
                 let now = Utc::now();
                 let age = now - last_update;
                 if u32::try_from(age.num_seconds())? > self.config.price_age_alert_threshold_secs {
@@ -163,11 +168,13 @@ impl App {
             }
         };
 
-        match res.parse_timestamp() {
+        // the storage should have been updated from the above transaction
+        match pyth.prev_market_price_timestamp(&market.market_id).await {
             Ok(timestamp) => {
+                let datetime = timestamp.try_into_chrono_datetime()?;
                 worker
-                    .last_update
-                    .insert(market.market_id.clone(), timestamp);
+                    .last_successful_price_times
+                    .insert(market.market_id.clone(), datetime);
             }
             Err(e) => {
                 log::error!("Unable to parse price tx response timestamp: {e:?}");
@@ -199,14 +206,14 @@ impl App {
     async fn needs_price_update(
         &self,
         market: &Market,
+        pyth: &Pyth,
         latest_price: PriceBaseInQuote,
-        latest_tx_response: Option<DateTime<Utc>>,
+        last_successful_price_time: Option<DateTime<Utc>>,
     ) -> Result<Option<PriceUpdateReason>> {
+        let market_id = &market.market_id;
         let market = &market.market;
-        let price = market.current_price().await;
-
-        let price = match price {
-            Ok(price) => price,
+        let price_base = match market.current_price().await {
+            Ok(price) => price.price_base,
             Err(e) => {
                 let msg = format!("{e}");
                 return if msg.contains("price_not_found") {
@@ -218,26 +225,28 @@ impl App {
             }
         };
 
+        let price_time = pyth.prev_market_price_timestamp(market_id).await?;
+
         // Determine the logical "last update" by using both the
         // contract-derived price time and the most recent successfully price
         // update we pushed. The reason for this is to avoid double-sending
         // price updates if one of the nodes reports an older price update.
-        let contract_updated = price.timestamp.try_into_chrono_datetime()?;
+        let price_time = price_time.try_into_chrono_datetime()?;
         let updated = (|| {
-            let latest_tx_response = latest_tx_response?;
-            if latest_tx_response < contract_updated {
+            let last_successful_price_time = last_successful_price_time?;
+            if last_successful_price_time < price_time {
                 return None;
             }
             if Utc::now()
-                .signed_duration_since(latest_tx_response)
+                .signed_duration_since(last_successful_price_time)
                 .num_seconds()
                 > self.config.max_price_age_secs.into()
             {
                 return None;
             }
-            Some(latest_tx_response)
+            Some(last_successful_price_time)
         })()
-        .unwrap_or(contract_updated);
+        .unwrap_or(price_time);
 
         // Check 1: is the last price update too old?
         let age = Utc::now().signed_duration_since(updated);
@@ -254,13 +263,13 @@ impl App {
         let delta = latest_price
             .into_non_zero()
             .raw()
-            .checked_div(price.price_base.into_non_zero().raw())?
+            .checked_div(price_base.into_non_zero().raw())?
             .into_signed()
             .checked_sub(Signed::ONE)?
             .abs_unsigned();
         if delta >= self.config.max_allowed_price_delta {
             return Ok(Some(PriceUpdateReason::PriceDelta {
-                old: price.price_base,
+                old: price_base,
                 new: latest_price,
                 delta,
                 is_too_frequent,

@@ -778,7 +778,7 @@ impl<'a> arbitrary::Arbitrary<'a> for PositionId {
     }
 }
 
-#[allow(clippy::derive_hash_xor_eq)]
+#[allow(clippy::derived_hash_with_manual_eq)]
 impl Hash for PositionId {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.u64().hash(state);
