@@ -255,8 +255,6 @@ impl App {
             return Ok(Some(PriceUpdateReason::LastUpdateTooOld(age)));
         }
 
-        log::info!("age: {}, price_time: {}", age, price_time);
-
         // Check 1a: if it's too new, we don't update, regardless of anything
         // else that might have happened. This is to prevent gas drainage.
         let is_too_frequent = age_secs < self.config.min_price_age_secs.into();
