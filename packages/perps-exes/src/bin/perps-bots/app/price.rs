@@ -212,14 +212,6 @@ impl App {
     ) -> Result<Option<PriceUpdateReason>> {
         let market_id = &market.market_id;
         let market = &market.market;
-        let price_time = match pyth.prev_market_price_timestamp(market_id).await {
-            Ok(price_time) => price_time,
-            Err(_) => {
-                // Assume this is the first price being set
-                return Ok(Some(PriceUpdateReason::NoPriceFound));
-            }
-        };
-
         let price_base = match market.current_price().await {
             Ok(price) => price.price_base,
             Err(e) => {
@@ -232,6 +224,8 @@ impl App {
                 };
             }
         };
+
+        let price_time = pyth.prev_market_price_timestamp(market_id).await?;
 
         // Determine the logical "last update" by using both the
         // contract-derived price time and the most recent successfully price
