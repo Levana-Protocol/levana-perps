@@ -166,3 +166,14 @@ overrides:
     min-gas: 1000
     min-gas-in-faucet: 2000000
     min-gas-in-gas-wallet: 1000000
+  injbeta:
+    wallet-manager-address: osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k
+    price: true
+    ultra-crank: 0
+    crank: true
+    liquidity: true
+    utilization: true
+    balance: true
+    traders: 1
+    default-market-ids:
+      - ETH_USD
