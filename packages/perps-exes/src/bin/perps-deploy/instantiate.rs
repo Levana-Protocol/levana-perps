@@ -407,7 +407,8 @@ impl InstantiateMarket {
                     initial_borrow_fee_rate,
                 },
             )
-            .await?;
+            .await
+            .with_context(|| format!("Adding new market {market_id}"))?;
         log::info!("Market {market_id} added at {}", res.txhash);
 
         let MarketInfo { market, .. } = factory.get_market(market_id.clone()).await?;
