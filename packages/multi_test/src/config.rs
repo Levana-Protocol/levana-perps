@@ -39,7 +39,8 @@ pub struct DefaultMarket {
     pub base: String,
     pub quote: String,
     pub initial_price: PriceBaseInQuote,
-    pub price_admin: String,
+    pub spot_price_id: String,
+    pub spot_price_usd_id: String,
     pub cw20_symbol: String,
     pub token_kind: TokenKind,
     pub bootstrap_lp_addr: Addr,
@@ -74,7 +75,8 @@ pub static DEFAULT_MARKET: Lazy<DefaultMarket> = Lazy::new(|| {
             .unwrap_or_else(|_| "1".to_string())
             .parse()
             .unwrap(),
-        price_admin: env::var("MARKET_PRICE_ADMIN").unwrap_or_else(|_| "price-admin".to_string()),
+        spot_price_id: env::var("MARKET_SPOT_PRICE_ID").unwrap_or_else(|_| "foo".to_string()),
+        spot_price_usd_id: env::var("MARKET_SPOT_PRICE_USD_ID").unwrap_or_else(|_| "foo-usd".to_string()),
         cw20_symbol: env::var("MARKET_CW20_SYMBOL").unwrap_or_else(|_| "contract-usd".to_string()),
         token_kind: {
             let token_kind = match std::env::var("MARKET_TOKEN_KIND") {

@@ -9,7 +9,7 @@ use crate::state::{
     meta::meta_init,
     position::{get_position, positions_init, PositionOrId},
     set_factory_addr,
-    token::token_init,
+    token::token_init
 };
 
 use crate::prelude::*;
@@ -31,7 +31,6 @@ use msg::{
 use msg::contracts::market::entry::{LimitOrderResp, SlippageAssert};
 
 use semver::Version;
-use shared::namespace;
 use shared::price::Price;
 
 // version info for migration info
@@ -49,12 +48,13 @@ pub fn instantiate(
         market_id,
         token,
         initial_borrow_fee_rate,
+        spot_price,
     }: InstantiateMsg,
 ) -> Result<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     set_factory_addr(deps.storage, &factory.validate(deps.api)?)?;
-    config_init(deps.storage, config)?;
+    config_init(deps.storage, config, spot_price)?;
     meta_init(deps.storage, &market_id)?;
 
     token_init(deps.storage, &deps.querier, token)?;
@@ -81,6 +81,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     state
         .accumulate_borrow_fee_rate(&mut ctx, state.now())
         .map_err(|e| anyhow::anyhow!("accumulate_borrow_fee_rate failed: {e:?}"))?;
+
+
 
     fn handle_update_position_shared(
         state: &State,
@@ -134,6 +136,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     }
     state.ensure_not_resetting_lps(&mut ctx, &info.msg)?;
 
+    if info.requires_spot_price_append {
+        state.spot_price_append(&mut ctx)?;
+    }
     match info.msg {
         ExecuteMsg::Owner(owner_msg) => {
             state.assert_auth(&info.sender, AuthCheck::Owner)?;
@@ -141,6 +146,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             match owner_msg {
                 ExecuteOwnerMsg::ConfigUpdate { update } => {
                     update_config(&mut state.config, ctx.storage, update)?;
+                }
+                ExecuteOwnerMsg::SetManualPrice{ .. } => {
+                    unimplemented!("FIXME")
                 }
             }
         }
@@ -376,33 +384,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             state.assert_auth(&info.sender, AuthCheck::Addr(liquidity_token_addr))?;
 
             state.liquidity_token_handle_exec(&mut ctx, sender.validate(state.api)?, kind, msg)?;
-        }
-
-        ExecuteMsg::SetPrice {
-            price,
-            price_usd,
-            execs,
-            rewards,
-        } => {
-            let addr: Addr = load_external_map(
-                &state.querier,
-                &state.factory_address,
-                namespace::MARKET_PRICE_ADMINS,
-                &state.env.contract.address,
-            )?;
-
-            state.assert_auth(&info.sender, AuthCheck::Addr(addr))?;
-
-            let market_id = state.market_id(ctx.storage)?;
-            state.spot_price_append(&mut ctx, price, price_usd, market_id)?;
-
-            let rewards = match rewards {
-                None => info.sender,
-                Some(rewards) => rewards.validate(state.api)?,
-            };
-
-            state.crank_exec_batch(&mut ctx, execs, &rewards)?;
-            state.crank_current_price_complete(&mut ctx)?;
         }
 
         ExecuteMsg::TransferDaoFees {} => {

@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use anyhow::{Context, Result};
 use cosmos::{Address, CodeId, Contract, ContractAdmin, Cosmos, HasAddress, Wallet};
+use msg::contracts::market::spot_price::SpotPriceConfig;
 use msg::prelude::*;
 use msg::{
     contracts::{
@@ -54,6 +55,7 @@ impl App {
                 config
             },
             market_id,
+            spot_price: unimplemented!("TODO")
         })
     }
 }
@@ -132,6 +134,7 @@ pub(crate) struct InstantiateMarket {
     pub(crate) market_id: MarketId,
     pub(crate) cw20_source: Cw20Source,
     pub(crate) config: ConfigUpdate,
+    pub(crate) spot_price: SpotPriceConfig,
 }
 
 pub(crate) async fn instantiate(
@@ -223,6 +226,8 @@ pub(crate) async fn instantiate(
                 *addr
             }
         };
+
+        let spot_price = market.spot_price.clone();
         let res = market
             .add(
                 wallet,
@@ -232,7 +237,7 @@ pub(crate) async fn instantiate(
                     faucet_admin,
                     factory: factory.clone(),
                     initial_borrow_fee_rate,
-                    price_admin,
+                    spot_price,
                 },
             )
             .await?;
@@ -246,7 +251,6 @@ pub(crate) async fn instantiate(
         position_token,
         liquidity_token_lp,
         liquidity_token_xlp,
-        price_admin: _,
     } in factory.get_markets().await?
     {
         to_log.push((market_code_id.get_code_id(), market.get_address()));
@@ -296,7 +300,7 @@ pub(crate) struct AddMarketParams {
     pub(crate) faucet_admin: Option<Address>,
     pub(crate) factory: Factory,
     pub(crate) initial_borrow_fee_rate: Decimal256,
-    pub(crate) price_admin: Address,
+    pub(crate) spot_price: SpotPriceConfig,
 }
 
 impl InstantiateMarket {
@@ -309,13 +313,14 @@ impl InstantiateMarket {
             faucet_admin,
             factory,
             initial_borrow_fee_rate,
-            price_admin,
+            spot_price,
         }: AddMarketParams,
     ) -> Result<MarketResponse> {
         let InstantiateMarket {
             market_id,
             cw20_source,
             config,
+            spot_price
         } = self;
         log::info!(
             "Finding CW20 for collateral asset {} for market {market_id}",
@@ -403,8 +408,8 @@ impl InstantiateMarket {
                         addr: cw20.get_address_string().into(),
                     },
                     config: Some(config),
-                    price_admin: price_admin.get_address_string().into(),
                     initial_borrow_fee_rate,
+                    spot_price
                 },
             )
             .await

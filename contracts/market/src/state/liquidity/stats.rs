@@ -255,7 +255,6 @@ impl State<'_> {
             ExecuteMsg::Crank { .. } => false,
             ExecuteMsg::NftProxy { .. } => true,
             ExecuteMsg::LiquidityTokenProxy { .. } => true,
-            ExecuteMsg::SetPrice { .. } => false,
             ExecuteMsg::TransferDaoFees { .. } => true,
             ExecuteMsg::CloseAllPositions {} => true,
             ExecuteMsg::PlaceLimitOrder { .. } => true,

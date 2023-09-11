@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use cosmwasm_std::Order;
-use msg::contracts::market::{entry::PriceForQuery, spot_price::events::SpotPriceEvent};
+use msg::contracts::market::entry::PriceForQuery;
 
 /// Stores spot price history.
 /// Key is a [Timestamp] of when the price was received.
@@ -186,42 +186,45 @@ impl State<'_> {
 
     pub(crate) fn spot_price_append(
         &self,
-        ctx: &mut StateContext,
-        price_base: PriceBaseInQuote,
-        price_usd: Option<PriceCollateralInUsd>,
-        market_id: &MarketId,
+        _ctx: &mut StateContext,
     ) -> Result<()> {
-        let timestamp = self.now();
+        // don't forget to emit the spot price event!
+        todo!()
+        // let market_id = self.market_id(ctx.storage)?;
+        // let timestamp = self.now();
 
-        if PRICES.has(ctx.storage, timestamp) {
-            Err(perp_anyhow!(
-                ErrorId::PriceAlreadyExists,
-                ErrorDomain::SpotPrice,
-                "price already exist for timestamp {}",
-                timestamp
-            ))
-        } else {
-            let market_type = self.market_id(ctx.storage)?.get_market_type();
-            let price_usd = get_price_usd(price_base, price_usd, market_id)?;
-            let price = price_base.into_notional_price(market_type);
-            ctx.response_mut().add_event(SpotPriceEvent {
-                timestamp,
-                price_usd,
-                price_notional: price,
-                price_base: price.into_base_price(market_type),
-            });
-            PRICES
-                .save(
-                    ctx.storage,
-                    timestamp,
-                    &PriceStorage {
-                        price,
-                        price_usd,
-                        price_base,
-                    },
-                )
-                .map_err(|err| err.into())
-        }
+        // if PRICES.has(ctx.storage, timestamp) {
+        //     Err(perp_anyhow!(
+        //         ErrorId::PriceAlreadyExists,
+        //         ErrorDomain::SpotPrice,
+        //         "price already exist for timestamp {}",
+        //         timestamp
+        //     ))
+        // } else {
+        //     let market_type = self.market_id(ctx.storage)?.get_market_type();
+        //     let price_usd = get_price_usd(price_base, price_usd, market_id)?;
+        //     let price = price_base.into_notional_price(market_type);
+        //     ctx.response_mut().add_event(SpotPriceEvent {
+        //         timestamp,
+        //         price_usd,
+        //         price_notional: price,
+        //         price_base: price.into_base_price(market_type),
+        //         // FIXME!
+        //         publish_time: None,
+        //         publish_time_usd: None,
+        //     });
+        //     PRICES
+        //         .save(
+        //             ctx.storage,
+        //             timestamp,
+        //             &PriceStorage {
+        //                 price,
+        //                 price_usd,
+        //                 price_base,
+        //             },
+        //         )
+        //         .map_err(|err| err.into())
+        // }
     }
 }
 
@@ -283,5 +286,41 @@ fn derive_price_usd(price: PriceBaseInQuote, market_id: &MarketId) -> Option<Pri
     } else {
         // Neither asset is USD, so we can't get a price
         None
+    }
+}
+
+pub fn requires_spot_price_append(msg: &ExecuteMsg) -> bool {
+    // explicitly listed to avoid accidentally handling new messages
+    // Receive is checked via the deserialized inner message
+    match msg {
+        // these require a spot_price_append
+        ExecuteMsg::OpenPosition { .. } => true,
+        ExecuteMsg::ClosePosition { .. } => true,
+        ExecuteMsg::CloseAllPositions { .. } => true,
+        ExecuteMsg::UpdatePositionAddCollateralImpactLeverage { .. } => true,
+        ExecuteMsg::UpdatePositionAddCollateralImpactSize { .. } => true,
+        ExecuteMsg::UpdatePositionLeverage { .. } => true,
+        ExecuteMsg::UpdatePositionMaxGains { .. } => true,
+        ExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { .. } => true,
+        ExecuteMsg::UpdatePositionRemoveCollateralImpactSize { .. } => true,
+        ExecuteMsg::DepositLiquidity { .. } => true,
+        ExecuteMsg::WithdrawLiquidity { .. } => true,
+        ExecuteMsg::ReinvestYield { .. } => true,
+        ExecuteMsg::Crank { .. } => true,
+        // These do not require a spot_price_append
+        ExecuteMsg::CancelLimitOrder { .. } => false,
+        ExecuteMsg::ClaimYield { .. } => false,
+        ExecuteMsg::CollectUnstakedLp { .. } => false,
+        ExecuteMsg::LiquidityTokenProxy { .. } => false,
+        ExecuteMsg::NftProxy { .. } => false,
+        ExecuteMsg::Owner { .. } => false,
+        ExecuteMsg::PlaceLimitOrder { .. } => false,
+        ExecuteMsg::ProvideCrankFunds { .. } => false,
+        ExecuteMsg::Receive { .. } => false,
+        ExecuteMsg::SetTriggerOrder { .. } => false,
+        ExecuteMsg::StakeLp { .. } => false,
+        ExecuteMsg::StopUnstakingXlp { .. } => false,
+        ExecuteMsg::TransferDaoFees { .. } => false,
+        ExecuteMsg::UnstakeXlp { .. } => false,
     }
 }

@@ -1,4 +1,3 @@
-pub mod auth;
 pub mod crank_fee;
 pub mod delta_neutrality_fee;
 pub mod delta_neutrality_ratio;

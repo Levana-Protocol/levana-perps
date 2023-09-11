@@ -84,19 +84,19 @@ impl State<'_> {
             },
         )?;
 
-        ctx.response.add_raw_submessage(SubMsg::reply_always(
-            wasm_execute(
-                self.market_addr(self.config.market.clone())?,
-                &MarketExecuteMsg::SetPrice {
-                    price,
-                    price_usd,
-                    execs,
-                    rewards: Some(reward_addr),
-                },
-                vec![],
-            )?,
-            ReplyContext::ID,
-        ));
+        // ctx.response.add_raw_submessage(SubMsg::reply_always(
+        //     wasm_execute(
+        //         self.market_addr(self.config.market.clone())?,
+        //         &MarketExecuteMsg::SetPrice {
+        //             price,
+        //             price_usd,
+        //             execs,
+        //             rewards: Some(reward_addr),
+        //         },
+        //         vec![],
+        //     )?,
+        //     ReplyContext::ID,
+        // ));
 
         Ok(())
     }

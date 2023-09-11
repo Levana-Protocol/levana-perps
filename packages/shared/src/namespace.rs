@@ -2,7 +2,7 @@
 #![allow(missing_docs)]
 
 pub const FACTORY_ADDR: &str = "a";
-pub const MARKET_PRICE_ADMINS: &str = "b";
+// pub const MARKET_PRICE_ADMINS: &str = "b";
 pub const MIGRATION_ADMIN: &str = "c";
 pub const OWNER_ADDR: &str = "d";
 pub const CONFIG: &str = "e";

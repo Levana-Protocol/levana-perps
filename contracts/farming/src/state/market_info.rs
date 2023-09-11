@@ -32,7 +32,6 @@ impl MarketInfo {
             position_token: _,
             liquidity_token_lp,
             liquidity_token_xlp,
-            price_admin: _,
         } = querier.query_wasm_smart(
             factory,
             &msg::contracts::factory::entry::QueryMsg::MarketInfo { market_id },

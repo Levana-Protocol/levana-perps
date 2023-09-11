@@ -94,8 +94,7 @@ impl App {
 
         // Load it up each time in case there are config changes, but we could
         // theoretically optimize this by doing it at load time instead.
-        let bridge_addr = Address::from_str(&market.price_admin)?;
-        let pyth = Pyth::new(&self.cosmos, bridge_addr, market.market_id.clone()).await?;
+        let pyth = Pyth::new(&self.cosmos, market.market_id.clone()).await?;
 
         let (latest_price, _) = get_latest_price(
             &self.client,

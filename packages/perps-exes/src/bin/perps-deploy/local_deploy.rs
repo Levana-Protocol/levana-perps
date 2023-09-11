@@ -97,6 +97,7 @@ pub(crate) async fn go(
                 price_update_too_old_seconds: Some(60 * 60 * 24 * 5),
                 ..ConfigUpdate::default()
             },
+            spot_price: unimplemented!("TODO"),
         });
     }
 
@@ -145,30 +146,31 @@ pub(crate) async fn go(
         cw20: _,
     } in &res.markets
     {
-        let set_price = basic
-            .cosmos
-            .make_contract(*market_addr)
-            .execute(
-                &basic.wallet,
-                vec![],
-                msg::contracts::market::entry::ExecuteMsg::SetPrice {
-                    price: initial_price,
-                    price_usd: if market_id.is_notional_usd() {
-                        None
-                    } else {
-                        Some(collateral_price)
-                    },
-                    execs: None,
-                    rewards: None,
-                },
-            )
-            .await
-            .context("Unable to set price")?;
-        log::info!(
-            "Set initial price in market {} to {initial_price} in {}",
-            market_id,
-            set_price.txhash
-        );
+        bail!("TODO - set initial price");
+        // let set_price = basic
+        //     .cosmos
+        //     .make_contract(*market_addr)
+        //     .execute(
+        //         &basic.wallet,
+        //         vec![],
+        //         msg::contracts::market::entry::ExecuteMsg::SetPrice {
+        //             price: initial_price,
+        //             price_usd: if market_id.is_notional_usd() {
+        //                 None
+        //             } else {
+        //                 Some(collateral_price)
+        //             },
+        //             execs: None,
+        //             rewards: None,
+        //         },
+        //     )
+        //     .await
+        //     .context("Unable to set price")?;
+        // log::info!(
+        //     "Set initial price in market {} to {initial_price} in {}",
+        //     market_id,
+        //     set_price.txhash
+        // );
 
         // Wait until the new price is in the system
         for _ in 0..100 {

@@ -1,5 +1,124 @@
 //! Spot price events
 
+use std::str::FromStr;
+
+use cosmwasm_schema::cw_serde;
+use cosmwasm_std::Addr;
+use pyth_sdk_cw::PriceIdentifier;
+use shared::{storage::{PriceBaseInQuote, PriceCollateralInUsd}, time::Timestamp};
+
+/// The current spot price for this market 
+#[cw_serde]
+pub struct SpotPriceResp {
+    /// Price of the base asset in terms of the quote asset
+    pub price: PriceBaseInQuote,
+    /// Price of the collateral asset in terms of USD
+    ///
+    /// This is used by the protocol to track USD values. This field is
+    /// optional, as markets with USD as the quote asset do not need to
+    /// provide it.
+    pub price_usd: Option<PriceCollateralInUsd>,
+
+    /// Latest price publish time for the feeds composing the price, if available
+    pub publish_time: Option<Timestamp>,
+    /// Latest price publish time for the feeds composing the price_usd, if available
+    pub publish_time_usd: Option<Timestamp>,
+}
+
+/// Spot price config 
+#[cw_serde]
+pub struct SpotPriceConfig {
+    /// sequence of spot price feeds which are composed to generate a single spot price
+    pub feeds: Vec<SpotPriceFeed>,
+    /// if necessary, sequence of spot price feeds which are composed to generate a single USD spot price
+    pub feeds_usd: Option<Vec<SpotPriceFeed>>,
+}
+
+#[cfg(test)]
+impl SpotPriceConfig {
+    pub fn empty() -> Self {
+        Self {
+            feeds: vec![],
+            feeds_usd: None,
+        }
+    }
+}
+
+/// An individual feed used to compose a final spot price
+#[cw_serde]
+pub struct SpotPriceFeed {
+    /// The data for this price feed 
+    pub data: SpotPriceFeedData,
+    /// is this price feed inverted
+    pub inverted: bool,
+}
+
+/// The data for an individual spot price feed
+#[cw_serde]
+pub enum SpotPriceFeedData {
+    /// Pyth price feeds 
+    Pyth {
+        /// The identifier on pyth
+        id: PriceIdentifier,
+        /// Which network to use for the price service
+        network: PythPriceServiceNetwork
+    },
+    /// TODO: Stride liquid staking
+    Stride {
+        /// The stride contract address for getting the redemption rate
+        contract: Addr,
+        /// The IBC denom for the asset
+        denom: String,
+    },
+    /// Native oracle module on the chain
+    NativeOracle {
+        /// The denom to use
+        denom: String
+    },
+    /// Manually set price feed. This is useful for testing 
+    Manual {
+        /// some unique identifier for the storage 
+        id: String
+    }
+}
+
+/// Which network to use for the price service
+#[cw_serde]
+#[derive(Copy)]
+pub enum PythPriceServiceNetwork {
+    /// Stable CosmWasm
+    ///
+    /// From <https://pyth.network/developers/price-feed-ids#cosmwasm-stable>
+    Stable,
+    /// Edge CosmWasm
+    ///
+    /// From <https://pyth.network/developers/price-feed-ids#cosmwasm-edge>
+    Edge,
+}
+
+impl FromStr for PythPriceServiceNetwork {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "stable" => Ok(Self::Stable),
+            "edge" => Ok(Self::Edge),
+            _ => Err(anyhow::anyhow!(
+                "Invalid feed type: {s}. Expected 'stable' or 'edge'"
+            )),
+        }
+    }
+}
+
+/// Price feed
+#[cw_serde]
+pub struct PythPriceFeed {
+    /// The price feed id
+    pub id: PriceIdentifier,
+    /// is this price feed inverted
+    pub inverted: bool,
+}
+
 /// Spot price events
 pub mod events {
     use cosmwasm_std::Event;
@@ -15,17 +134,30 @@ pub mod events {
         pub price_notional: Price,
         /// Price of the base asset in quote
         pub price_base: PriceBaseInQuote,
+        /// publish time, if available
+        pub publish_time: Option<Timestamp>,
+        /// publish time, if available
+        pub publish_time_usd: Option<Timestamp>,
     }
 
     impl PerpEvent for SpotPriceEvent {}
     impl From<SpotPriceEvent> for Event {
         fn from(src: SpotPriceEvent) -> Self {
-            Event::new("spot-price").add_attributes(vec![
+            let mut evt = Event::new("spot-price").add_attributes(vec![
                 ("price-usd", src.price_usd.to_string()),
                 ("price-notional", src.price_notional.to_string()),
                 ("price-base", src.price_base.to_string()),
                 ("time", src.timestamp.to_string()),
-            ])
+            ]);
+
+            if let Some(publish_time) = src.publish_time {
+                evt = evt.add_attribute("publish-time", publish_time.to_string());
+            }
+            if let Some(publish_time_usd) = src.publish_time_usd {
+                evt = evt.add_attribute("publish-time-usd", publish_time_usd.to_string());
+            }
+
+            evt
         }
     }
     impl TryFrom<Event> for SpotPriceEvent {
@@ -37,6 +169,8 @@ pub mod events {
                 price_usd: PriceCollateralInUsd::try_from_number(evt.number_attr("price-usd")?)?,
                 price_notional: Price::try_from_number(evt.number_attr("price-notional")?)?,
                 price_base: PriceBaseInQuote::try_from_number(evt.number_attr("price-base")?)?,
+                publish_time: evt.try_timestamp_attr("publish-time")?,
+                publish_time_usd: evt.try_timestamp_attr("publish-time-usd")?,
             })
         }
     }

@@ -29,7 +29,6 @@ impl Factory {
             position_token,
             liquidity_token_lp,
             liquidity_token_xlp,
-            price_admin,
         } = self
             .0
             .query(QueryMsg::MarketInfo {
@@ -60,7 +59,6 @@ impl Factory {
             position_token,
             liquidity_token_lp,
             liquidity_token_xlp,
-            price_admin: price_admin.into_string().parse()?,
         })
     }
 
@@ -165,23 +163,6 @@ impl Factory {
             .await
     }
 
-    pub(crate) async fn set_price_admin(
-        &self,
-        wallet: &Wallet,
-        market: impl HasAddress,
-        new_admin: impl HasAddress,
-    ) -> Result<TxResponse> {
-        self.0
-            .execute(
-                wallet,
-                vec![],
-                FactoryExecuteMsg::SetMarketPriceAdmin {
-                    market_addr: market.get_address_string().into(),
-                    admin_addr: new_admin.get_address_string().into(),
-                },
-            )
-            .await
-    }
 }
 
 impl HasAddress for Factory {
@@ -196,5 +177,4 @@ pub(crate) struct MarketInfo {
     pub(crate) position_token: Contract,
     pub(crate) liquidity_token_lp: Contract,
     pub(crate) liquidity_token_xlp: Contract,
-    pub(crate) price_admin: Address,
 }

@@ -1,6 +1,6 @@
 use crate::state::*;
 use cw_storage_plus::Item;
-use msg::contracts::market::config::{Config, ConfigUpdate};
+use msg::contracts::market::{config::{Config, ConfigUpdate}, spot_price::SpotPriceConfig};
 
 const CONFIG_STORAGE: Item<Config> = Item::new(namespace::CONFIG);
 
@@ -9,12 +9,14 @@ pub(crate) fn load_config(store: &dyn Storage) -> Result<Config> {
 }
 
 /// called only once, at instantiation
-pub(crate) fn config_init(store: &mut dyn Storage, config: Option<ConfigUpdate>) -> Result<()> {
+pub(crate) fn config_init(store: &mut dyn Storage, config: Option<ConfigUpdate>, spot_price: SpotPriceConfig) -> Result<()> {
+    let mut init_config = Config::new(spot_price);
+
     let update = match config {
-        None => Config::default().into(),
+        None => ConfigUpdate::default(),
         Some(update) => update,
     };
-    let mut init_config = Config::default();
+
     update_config(&mut init_config, store, update)?;
 
     Ok(())
@@ -55,6 +57,7 @@ pub(crate) fn update_config(
         max_liquidity,
         disable_position_nft_exec,
         liquidity_cooldown_seconds,
+        spot_price
     }: ConfigUpdate,
 ) -> Result<()> {
     if let Some(x) = trading_fee_notional_size {
@@ -169,6 +172,10 @@ pub(crate) fn update_config(
     }
     if let Some(x) = liquidity_cooldown_seconds {
         config.liquidity_cooldown_seconds = x;
+    }
+
+    if let Some(x) = spot_price {
+        config.spot_price = x;
     }
 
     config.validate()?;

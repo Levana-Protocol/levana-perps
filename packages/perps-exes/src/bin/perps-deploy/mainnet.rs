@@ -558,8 +558,8 @@ async fn add_market(
                 decimal_places,
             },
             config: Some(market_config_update),
-            price_admin: pyth_bridge.get_address_string().into(),
             initial_borrow_fee_rate,
+            spot_price: unimplemented!("TODO")
         },
     };
     let msg = strip_nulls(msg)?;

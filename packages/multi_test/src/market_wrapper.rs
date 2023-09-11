@@ -45,6 +45,7 @@ use msg::contracts::market::entry::{
     TradeHistorySummary, TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
+use msg::contracts::market::spot_price::{SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData};
 use msg::contracts::market::{
     config::{Config, ConfigUpdate},
     entry::{
@@ -151,7 +152,15 @@ impl PerpsMarket {
                     liquidity_cooldown_seconds: Some(0),
                     ..Default::default()
                 }),
-                price_admin: DEFAULT_MARKET.price_admin.clone().into(),
+                spot_price: SpotPriceConfig {
+                    feeds: vec![SpotPriceFeed { 
+                        data: SpotPriceFeedData::Manual {
+                            id: DEFAULT_MARKET.spot_price_id.clone(),
+                        },
+                        inverted: false 
+                    }],
+                    feeds_usd: None, 
+                },
                 initial_borrow_fee_rate: "0.01".parse().unwrap(),
             },
         };
@@ -750,47 +759,48 @@ impl PerpsMarket {
 
     // market executions
     pub fn exec_refresh_price(&self) -> Result<AppResponse> {
-        let price_resp = self.query_current_price()?;
-        self.exec(
-            &Addr::unchecked(&DEFAULT_MARKET.price_admin),
-            &msg::contracts::market::entry::ExecuteMsg::SetPrice {
-                price: price_resp.price_base,
-                execs: Some(0),
-                price_usd: None,
-                rewards: None,
-            },
-        )
+        // we used to have an explicit "set price" message. 
+        // Now it happens automatically through other actions
+        // TODO: remove this and just explicitly crank where needed?
+        self.exec_crank_n(&Addr::unchecked("refresh-price"), 1)
     }
-    pub fn exec_set_price(&self, price: PriceBaseInQuote) -> Result<AppResponse> {
+    pub fn exec_set_price(&self, price: PriceBaseInQuote) -> Result<Vec<AppResponse>> {
         self.exec_set_price_with_usd(price, None)
     }
 
-    pub fn exec_set_price_and_crank(&self, price: PriceBaseInQuote) -> Result<AppResponse> {
-        self.exec(
-            &Addr::unchecked(&DEFAULT_MARKET.price_admin),
-            &msg::contracts::market::entry::ExecuteMsg::SetPrice {
-                price,
-                execs: None,
-                price_usd: None,
-                rewards: None,
-            },
-        )
+    pub fn exec_set_price_and_crank(&self, price: PriceBaseInQuote) -> Result<Vec<AppResponse>> {
+        let mut responses = self.exec_set_price_with_usd(price, None)?;
+        responses.push(self.exec_crank_n(&Addr::unchecked("set-price"), 1)?);
+
+        Ok(responses)
     }
 
     pub fn exec_set_price_with_usd(
         &self,
         price: PriceBaseInQuote,
         price_usd: Option<PriceCollateralInUsd>,
-    ) -> Result<AppResponse> {
-        self.exec(
-            &Addr::unchecked(&DEFAULT_MARKET.price_admin),
-            &msg::contracts::market::entry::ExecuteMsg::SetPrice {
-                price,
-                execs: Some(0),
-                price_usd,
-                rewards: None,
-            },
-        )
+    ) -> Result<Vec<AppResponse>> {
+        let mut responses = Vec::new();
+
+        responses.push(self.exec(
+            &Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &MarketExecuteMsg::Owner(MarketExecuteOwnerMsg::SetManualPrice { 
+                id: DEFAULT_MARKET.spot_price_id.clone(), 
+                price: price.into_non_zero()
+            })
+        )?);
+
+        if let Some(price_usd) = price_usd {
+            responses.push(self.exec(
+                &Addr::unchecked(&TEST_CONFIG.protocol_owner),
+                &MarketExecuteMsg::Owner(MarketExecuteOwnerMsg::SetManualPrice { 
+                    id: DEFAULT_MARKET.spot_price_usd_id.clone(), 
+                    price: price_usd.into_number().try_into_non_zero().context("price must be greater than zero")?
+                })
+            )?);
+        }
+
+        Ok(responses)
     }
 
     pub fn exec_set_config(&self, config_update: ConfigUpdate) -> Result<AppResponse> {
@@ -1282,15 +1292,6 @@ impl PerpsMarket {
         )?;
 
         Ok(resp.tokens)
-    }
-
-    // outside contract executions that require market info like addr
-    pub fn exec_set_admin_for_price_updates(&self, admin_addr: &Addr) -> Result<AppResponse> {
-        let market_addr = self.addr.to_string();
-        self.exec_factory(&FactoryExecuteMsg::SetMarketPriceAdmin {
-            market_addr: market_addr.into(),
-            admin_addr: admin_addr.clone().into(),
-        })
     }
 
     /// Perform a shutdown action

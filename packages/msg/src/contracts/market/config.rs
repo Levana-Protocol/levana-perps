@@ -1,6 +1,11 @@
 //! Market-wide configuration
-mod defaults;
+
+pub mod defaults;
 use shared::prelude::*;
+
+use self::defaults::ConfigDefaults;
+
+use super::spot_price::SpotPriceConfig;
 
 /// Configuration info for the vAMM
 /// Set by admin-only
@@ -71,14 +76,14 @@ pub struct Config {
     /// Minimum deposit collateral, given in USD
     pub minimum_deposit_usd: Usd,
     /// How many positions can sit in "unpend" before we disable new open/update positions for congestion.
-    #[serde(default = "defaults::unpend_limit")]
+    #[serde(default = "ConfigDefaults::unpend_limit")]
     pub unpend_limit: u32,
     /// The liquifunding delay fuzz factor, in seconds.
     ///
     /// Up to how many seconds will we perform a liquifunding early. This will
     /// be part of a semi-randomly generated value and will allow us to schedule
     /// liquifundings arbitrarily to smooth out spikes in traffic.
-    #[serde(default = "defaults::liquifunding_delay_fuzz_seconds")]
+    #[serde(default = "ConfigDefaults::liquifunding_delay_fuzz_seconds")]
     pub liquifunding_delay_fuzz_seconds: u32,
     /// The maximum amount of liquidity that can be deposited into the market.
     #[serde(default)]
@@ -103,6 +108,9 @@ pub struct Config {
     /// For migration purposes, this value defaults to 0, meaning no cooldown period.
     #[serde(default)]
     pub liquidity_cooldown_seconds: u32,
+
+    /// The spot price config for this market
+    pub spot_price: SpotPriceConfig,
 }
 
 /// Maximum liquidity for deposit.
@@ -128,56 +136,46 @@ impl Default for MaxLiquidity {
     }
 }
 
-impl Default for Config {
-    fn default() -> Self {
+impl Config {
+    /// create a new config with default values and a given spot price config
+    pub fn new(spot_price: SpotPriceConfig) -> Self {
         // these unwraps are fine since we define the value
         Self {
-            trading_fee_notional_size: "0.001".parse().unwrap(),
-            trading_fee_counter_collateral: "0.001".parse().unwrap(),
-            crank_execs: 7,
-            max_leverage: Number::try_from("30").unwrap(),
-            carry_leverage: "10".parse().unwrap(),
-            funding_rate_max_annualized: "0.9".parse().unwrap(),
-            borrow_fee_rate_min_annualized: "0.01".parse().unwrap(),
-            borrow_fee_rate_max_annualized: "0.60".parse().unwrap(),
-            funding_rate_sensitivity: "10".parse().unwrap(),
-            mute_events: false,
-            liquifunding_delay_seconds: 60 * 60 * 6,
-            price_update_too_old_seconds: 60 * 30,
-            staleness_seconds: 60 * 60 * 2,
-            protocol_tax: "0.3".parse().unwrap(),
-            unstake_period_seconds: 60 * 60 * 24 * 45, // 45 days
-            target_utilization: "0.8".parse().unwrap(),
-            // Try to realize the bias over a 3 day period.
-            //
-            // See: https://phobosfinance.atlassian.net/browse/PERP-606
-            //
-            // Spreadsheet calculated this value:
-            //
-            // https://docs.google.com/spreadsheets/d/15EG3I6XnaUKI20ja7XiCqLOjFS80QhKdnoL-PsjzJ-0/edit#gid=0
-            borrow_fee_sensitivity: (Number::ONE / Number::try_from("12").unwrap())
-                .try_into()
-                .unwrap(),
-            max_xlp_rewards_multiplier: "2".parse().unwrap(),
-            min_xlp_rewards_multiplier: "1".parse().unwrap(),
-            delta_neutrality_fee_sensitivity: "50000000".parse().unwrap(),
-            delta_neutrality_fee_cap: "0.005".parse().unwrap(),
-            delta_neutrality_fee_tax: "0.05".parse().unwrap(),
-            limit_order_fee: Collateral::from(0u64),
-            crank_fee_charged: "0.01".parse().unwrap(),
-            crank_fee_reward: "0.001".parse().unwrap(),
-            minimum_deposit_usd: "5".parse().unwrap(),
-            unpend_limit: 500,
-            liquifunding_delay_fuzz_seconds: 60 * 60,
-            max_liquidity: MaxLiquidity::Unlimited {},
-            disable_position_nft_exec: false,
-            // Default to 1 hour
-            liquidity_cooldown_seconds: 60 * 60,
+            trading_fee_notional_size: ConfigDefaults::trading_fee_notional_size(),
+            trading_fee_counter_collateral: ConfigDefaults::trading_fee_counter_collateral(),
+            crank_execs: ConfigDefaults::crank_execs(),
+            max_leverage: ConfigDefaults::max_leverage(),
+            carry_leverage: ConfigDefaults::carry_leverage(),
+            funding_rate_max_annualized: ConfigDefaults::funding_rate_max_annualized(),
+            borrow_fee_rate_min_annualized: ConfigDefaults::borrow_fee_rate_min_annualized(),
+            borrow_fee_rate_max_annualized: ConfigDefaults::borrow_fee_rate_max_annualized(),
+            funding_rate_sensitivity: ConfigDefaults::funding_rate_sensitivity(),
+            mute_events: ConfigDefaults::mute_events(),
+            liquifunding_delay_seconds: ConfigDefaults::liquifunding_delay_seconds(),
+            price_update_too_old_seconds: ConfigDefaults::price_update_too_old_seconds(),
+            staleness_seconds: ConfigDefaults::staleness_seconds(),
+            protocol_tax: ConfigDefaults::protocol_tax(),
+            unstake_period_seconds: ConfigDefaults::unstake_period_seconds(),
+            target_utilization: ConfigDefaults::target_utilization(),
+            borrow_fee_sensitivity: ConfigDefaults::borrow_fee_sensitivity(), 
+            max_xlp_rewards_multiplier: ConfigDefaults::max_xlp_rewards_multiplier(),
+            min_xlp_rewards_multiplier: ConfigDefaults::min_xlp_rewards_multiplier(),
+            delta_neutrality_fee_sensitivity: ConfigDefaults::delta_neutrality_fee_sensitivity(),
+            delta_neutrality_fee_cap: ConfigDefaults::delta_neutrality_fee_cap(),
+            delta_neutrality_fee_tax: ConfigDefaults::delta_neutrality_fee_tax(),
+            limit_order_fee: ConfigDefaults::limit_order_fee(),
+            crank_fee_charged: ConfigDefaults::crank_fee_charged(),
+            crank_fee_reward: ConfigDefaults::crank_fee_reward(),
+            minimum_deposit_usd: ConfigDefaults::minimum_deposit_usd(),
+            unpend_limit: ConfigDefaults::unpend_limit(),
+            liquifunding_delay_fuzz_seconds: ConfigDefaults::liquifunding_delay_fuzz_seconds(),
+            max_liquidity: ConfigDefaults::max_liquidity(),
+            disable_position_nft_exec: ConfigDefaults::disable_position_nft_exec(),
+            liquidity_cooldown_seconds: ConfigDefaults::liquidity_cooldown_seconds(),
+            spot_price,
         }
     }
-}
 
-impl Config {
     /// Ensure that the settings within this [Config] are valid.
     pub fn validate(&self) -> Result<()> {
         // note - crank_execs_after_push and mute_events are inherently always valid
@@ -368,6 +366,7 @@ pub struct ConfigUpdate {
     pub max_liquidity: Option<MaxLiquidity>,
     pub disable_position_nft_exec: Option<bool>,
     pub liquidity_cooldown_seconds: Option<u32>,
+    pub spot_price: Option<SpotPriceConfig>,
 }
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for ConfigUpdate {
@@ -404,6 +403,7 @@ impl<'a> arbitrary::Arbitrary<'a> for ConfigUpdate {
             max_liquidity: None,
             disable_position_nft_exec: None,
             liquidity_cooldown_seconds: None,
+            spot_price: None,
         })
     }
 }
@@ -442,6 +442,7 @@ impl From<Config> for ConfigUpdate {
             max_liquidity: Some(src.max_liquidity),
             disable_position_nft_exec: Some(src.disable_position_nft_exec),
             liquidity_cooldown_seconds: Some(src.liquidity_cooldown_seconds),
+            spot_price: Some(src.spot_price),
         }
     }
 }

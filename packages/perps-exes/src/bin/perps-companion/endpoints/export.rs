@@ -571,10 +571,12 @@ impl IntoResponse for Error {
 mod tests {
     use crate::endpoints::export::{generate_csv, get_action_records};
     use cosmwasm_std::Addr;
+    use msg::contracts::market::config::Config;
     use msg::contracts::market::entry::{
         Fees, LpAction, LpActionKind, PositionAction, PositionActionKind, StatusResp,
     };
     use msg::contracts::market::position::PositionId;
+    use msg::contracts::market::spot_price::{SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData};
     use msg::token::Token;
     use shared::market_type::MarketType;
     use shared::number::{Collateral, Signed};
@@ -593,7 +595,15 @@ mod tests {
                 denom: "".to_string(),
                 decimal_places: 0,
             },
-            config: Default::default(),
+            config: Config::new(SpotPriceConfig {
+                feeds: vec![SpotPriceFeed {
+                    data: SpotPriceFeedData::Manual { 
+                        id: "BASE/QUOTE".to_string(),
+                    },
+                    inverted: false,
+                }],
+                feeds_usd: None,
+            }),
             liquidity: Default::default(),
             next_crank: None,
             last_crank_completed: None,

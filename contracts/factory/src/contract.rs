@@ -1,8 +1,8 @@
 use crate::state::{
     all_contracts::ALL_CONTRACTS,
     auth::{
-        get_admin_market_price, get_admin_migration, get_dao, get_kill_switch, get_owner,
-        get_wind_down, set_admin_market_price, set_admin_migration, set_dao, set_kill_switch,
+        get_admin_migration, get_dao, get_kill_switch, get_owner,
+        get_wind_down, set_admin_migration, set_dao, set_kill_switch,
         set_owner, set_wind_down,
     },
     code_ids::get_code_ids,
@@ -26,7 +26,7 @@ use crate::state::{
 };
 
 use super::state::*;
-use anyhow::{anyhow, Context, Result};
+use anyhow::Result;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response};
@@ -104,8 +104,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     market_id,
                     token,
                     config,
-                    price_admin,
                     initial_borrow_fee_rate,
+                    spot_price,
                 },
         } => {
             if get_market_addr(ctx.storage, &market_id).is_ok() {
@@ -118,7 +118,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 InstantiateMarket {
                     market_id: market_id.clone(),
                     migration_admin: migration_admin.clone(),
-                    price_admin: price_admin.validate(state.api)?,
                 },
             )?;
 
@@ -135,6 +134,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     market_id,
                     token,
                     initial_borrow_fee_rate,
+                    spot_price,
                 },
             )?;
         }
@@ -163,17 +163,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
         ExecuteMsg::SetWindDown { wind_down } => {
             set_wind_down(ctx.storage, &wind_down.validate(state.api)?)?;
-        }
-
-        ExecuteMsg::SetMarketPriceAdmin {
-            market_addr,
-            admin_addr,
-        } => {
-            set_admin_market_price(
-                ctx.storage,
-                &market_addr.validate(state.api)?,
-                &admin_addr.validate(state.api)?,
-            )?;
         }
 
         ExecuteMsg::TransferAllDaoFees {} => {
@@ -211,7 +200,6 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                     let InstantiateMarket {
                         market_id,
                         migration_admin,
-                        price_admin,
                     } = reply_get_instantiate_market(ctx.storage)?;
                     save_market_addr(ctx.storage, &market_id, &addr)?;
                     ctx.response.add_event(InstantiateEvent {
@@ -260,8 +248,6 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                             kind: LiquidityTokenKind::Xlp,
                         },
                     )?;
-
-                    set_admin_market_price(ctx.storage, &addr, &price_admin)?;
                 }
 
                 ReplyId::InstantiatePositionToken => {
@@ -331,8 +317,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
 
         QueryMsg::MarketInfo { market_id } => {
             let market_addr = get_market_addr(store, &market_id)?;
-            let price_admin =
-                get_admin_market_price(store, &market_addr)?.context("No price admin set")?;
             MarketInfoResponse {
                 market_addr,
                 position_token: position_token_addr(store, market_id.clone())?,
@@ -346,7 +330,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                     market_id,
                     LiquidityTokenKind::Xlp,
                 )?,
-                price_admin,
             }
             .query_result()
         }

@@ -117,7 +117,6 @@ impl ShutdownImpact {
             ExecuteMsg::Crank { .. } => Some(Self::Crank),
             ExecuteMsg::NftProxy { .. } => Some(Self::TransferPositions),
             ExecuteMsg::LiquidityTokenProxy { .. } => Some(Self::TransferLp),
-            ExecuteMsg::SetPrice { .. } => Some(Self::SetPrice),
             ExecuteMsg::TransferDaoFees { .. } => Some(Self::TransferDaoFees),
             ExecuteMsg::CloseAllPositions {} => None,
             ExecuteMsg::PlaceLimitOrder { .. } => Some(Self::NewTrades),

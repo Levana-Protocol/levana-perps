@@ -10,7 +10,6 @@ const INSTANTIATE_MARKET: Item<InstantiateMarket> = Item::new(namespace::REPLY_I
 pub struct InstantiateMarket {
     pub market_id: MarketId,
     pub migration_admin: Addr,
-    pub price_admin: Addr,
 }
 
 pub(crate) fn reply_get_instantiate_market(store: &dyn Storage) -> Result<InstantiateMarket> {

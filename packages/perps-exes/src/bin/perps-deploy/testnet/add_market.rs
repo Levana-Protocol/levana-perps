@@ -41,7 +41,7 @@ impl AddMarketOpt {
             faucet_admin: Some(app.wallet_manager),
             factory,
             initial_borrow_fee_rate: self.initial_borrow_fee_rate,
-            price_admin,
+            spot_price: unimplemented!("TODO"),
         };
         instantiate_market
             .add(&app.basic.wallet, &app.basic.cosmos, add_market_params)

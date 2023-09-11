@@ -1,6 +1,7 @@
 //! Entrypoint messages for the market
 use super::order::LimitOrder;
 use super::position::{ClosedPosition, PositionId};
+use super::spot_price::SpotPriceConfig;
 use super::{config::ConfigUpdate, crank::CrankWorkInfo};
 use crate::contracts::market::order::OrderId;
 use crate::{contracts::liquidity_token::LiquidityTokenKind, token::TokenInit};
@@ -16,6 +17,8 @@ pub struct InstantiateMsg {
     pub factory: RawAddr,
     /// Modifications to the default config value
     pub config: Option<ConfigUpdate>,
+    /// Mandatory spot price config
+    pub spot_price: SpotPriceConfig,
     /// Base, quote, and market type
     pub market_id: MarketId,
     /// The token used for collateral
@@ -37,8 +40,8 @@ pub struct NewMarketParams {
     /// config
     pub config: Option<ConfigUpdate>,
 
-    /// The address of the price admin for this market
-    pub price_admin: RawAddr,
+    /// mandatory spot price config
+    pub spot_price: SpotPriceConfig,
 
     /// Initial borrow fee rate, annualized
     pub initial_borrow_fee_rate: Decimal256,
@@ -277,31 +280,6 @@ pub enum ExecuteMsg {
         msg: crate::contracts::liquidity_token::entry::ExecuteMsg,
     },
 
-    /// Updates the price of base asset in terms of quote.
-    /// This msg is permissioned.
-    SetPrice {
-        /// Price of the base asset in terms of the quote asset
-        price: PriceBaseInQuote,
-        /// Price of the collateral asset in terms of USD
-        ///
-        /// This is used by the protocol to track USD values. This field is
-        /// optional, as markets with USD as the quote asset do not need to
-        /// provide it.
-        price_usd: Option<PriceCollateralInUsd>,
-        /// How many executions of the crank to perform
-        ///
-        /// Each time a price is updated in the system, cranking is immediately
-        /// necessary to check for liquidations. As an optimization, the
-        /// protocol includes that cranking as part of price updating. The value
-        /// here represents how many turns of the crank should be performed, or
-        /// use [None] for the default.
-        execs: Option<u32>,
-        /// Which wallet receives crank rewards.
-        ///
-        /// If unspecified, sender receives the rewards.
-        rewards: Option<RawAddr>,
-    },
-
     /// Transfer all available protocol fees to the dao account
     TransferDaoFees {},
 
@@ -326,6 +304,13 @@ pub enum ExecuteOwnerMsg {
         /// New configuration parameters
         update: ConfigUpdate,
     },
+    /// Set manual price (mostly for testing)
+    SetManualPrice {
+        /// The unique price feed identifier
+        id: String,
+        /// Price of the base asset in terms of the quote asset
+        price: NumberGtZero,
+    }
 }
 
 /// Fees held within the market contract.
@@ -992,7 +977,7 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
         // only allow messages for *this* contract - no proxies or cw20 submessages
 
         // prior art for this approach: https://github.com/rust-fuzz/arbitrary/blob/061ca86be699faf1fb584dd7a7843b3541cd5f2c/src/lib.rs#L724
-        match u.int_in_range::<u8>(0..=24)? {
+        match u.int_in_range::<u8>(0..=23)? {
             //0 => Ok(ExecuteMsg::Owner(u.arbitrary()?)),
             0 => Ok(ExecuteMsg::Owner(ExecuteOwnerMsg::ConfigUpdate {
                 update: ConfigUpdate::default(),
@@ -1072,17 +1057,10 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
                 rewards: None,
             }),
 
-            21 => Ok(ExecuteMsg::SetPrice {
-                price: u.arbitrary()?,
-                price_usd: u.arbitrary()?,
-                execs: u.arbitrary()?,
-                rewards: None,
-            }),
+            21 => Ok(ExecuteMsg::TransferDaoFees {}),
 
-            22 => Ok(ExecuteMsg::TransferDaoFees {}),
-
-            23 => Ok(ExecuteMsg::CloseAllPositions {}),
-            24 => Ok(ExecuteMsg::ProvideCrankFunds {}),
+            22 => Ok(ExecuteMsg::CloseAllPositions {}),
+            23 => Ok(ExecuteMsg::ProvideCrankFunds {}),
 
             _ => unreachable!(),
         }

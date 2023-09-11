@@ -38,30 +38,30 @@ impl std::fmt::Debug for Pyth {
 }
 
 impl Pyth {
-    pub async fn new(cosmos: &Cosmos, bridge_addr: Address, market_id: MarketId) -> Result<Self> {
-        let bridge = cosmos.make_contract(bridge_addr);
-        let msg::contracts::pyth_bridge::entry::Config {
-            pyth: oracle_addr,
-            feeds,
-            feeds_usd,
-            feed_type,
-            factory: _,
-            update_age_tolerance_seconds: _,
-            market,
-        } = bridge.query(BridgeQueryMsg::Config {}).await?;
-        anyhow::ensure!(market_id == market);
-        let oracle =
-            cosmos.make_contract(oracle_addr.as_str().parse().with_context(|| {
-                format!("Invalid Pyth oracle contract from Config: {oracle_addr}")
-            })?);
+    pub async fn new(cosmos: &Cosmos, market_id: MarketId) -> Result<Self> {
+        todo!()
+        // let msg::contracts::pyth_bridge::entry::Config {
+        //     pyth: oracle_addr,
+        //     feeds,
+        //     feeds_usd,
+        //     feed_type,
+        //     factory: _,
+        //     update_age_tolerance_seconds: _,
+        //     market,
+        // } = bridge.query(BridgeQueryMsg::Config {}).await?;
+        // anyhow::ensure!(market_id == market);
+        // let oracle =
+        //     cosmos.make_contract(oracle_addr.as_str().parse().with_context(|| {
+        //         format!("Invalid Pyth oracle contract from Config: {oracle_addr}")
+        //     })?);
 
-        Ok(Self {
-            oracle,
-            bridge,
-            market_price_feeds: PythMarketPriceFeeds { feeds, feeds_usd },
-            market_id,
-            feed_type,
-        })
+        // Ok(Self {
+        //     oracle,
+        //     bridge,
+        //     market_price_feeds: PythMarketPriceFeeds { feeds, feeds_usd },
+        //     market_id,
+        //     feed_type,
+        // })
     }
 
     pub async fn query_price(&self, age_tolerance_seconds: u32) -> Result<MarketPrice> {

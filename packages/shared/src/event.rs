@@ -58,6 +58,13 @@ pub trait CosmwasmEventExt {
         self.map_attr_result(key, |s| Timestamp::from_str(s).map_err(|x| x.into()))
     }
 
+    /// Parse a timestamp attribute, if it exists
+    fn try_timestamp_attr(&self, key: &str) -> anyhow::Result<Option<Timestamp>> {
+        self.try_map_attr(key, |s| 
+            Timestamp::from_str(s).map_err(|x| x.into())
+        ).transpose()
+    }
+
     /// Parse an unsigned decimal attribute
     fn decimal_attr<T: UnsignedDecimal>(&self, key: &str) -> anyhow::Result<T> {
         self.map_attr_result(key, |s| {
