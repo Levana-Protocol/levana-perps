@@ -109,7 +109,7 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .layer(
             CorsLayer::new()
                 .allow_origin(tower_http::cors::Any)
-                .allow_methods([Method::GET, Method::HEAD, Method::POST])
+                .allow_methods([Method::GET, Method::HEAD, Method::POST, Method::PUT])
                 .allow_headers([CONTENT_TYPE]),
         )
         .layer(from_fn(error_response_handler));
