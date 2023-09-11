@@ -100,6 +100,7 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .typed_get(common::favicon)
         .typed_get(common::robots_txt)
         .typed_post(pnl::pnl_url)
+        .typed_put(pnl::pnl_url)
         .typed_get(pnl::pnl_html)
         .typed_get(pnl::pnl_image)
         .typed_get(export::history)
