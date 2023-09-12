@@ -128,13 +128,14 @@ async fn update_pyth(
 
     let client = reqwest::Client::new();
     // FIXME
-    let feeds = &pyth.markets_stable
-    // let feeds = match r#type {
-    //     FeedType::Stable => &pyth.markets_stable,
-    //     FeedType::Edge => &pyth.markets_edge,
-    // }
-    .get(&market)
-    .with_context(|| format!("No Pyth feed data found for {market}"))?;
+    let feeds = &pyth
+        .markets_stable
+        // let feeds = match r#type {
+        //     FeedType::Stable => &pyth.markets_stable,
+        //     FeedType::Edge => &pyth.markets_edge,
+        // }
+        .get(&market)
+        .with_context(|| format!("No Pyth feed data found for {market}"))?;
 
     let oracle = basic.cosmos.make_contract(oracle);
 

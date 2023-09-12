@@ -6,7 +6,10 @@ use crate::{
 };
 use cosmwasm_std::Event as CosmosEvent;
 use dominator::traits::MultiStr;
-use msg::{bridge::ExecError, contracts::market::entry::{ExecuteMsg, ExecuteOwnerMsg}};
+use msg::{
+    bridge::ExecError,
+    contracts::market::entry::{ExecuteMsg, ExecuteOwnerMsg},
+};
 
 impl EventView {
     pub fn render(self: Rc<Self>) -> Dom {
@@ -183,9 +186,7 @@ fn execute_msg_label(msg_id: u64, execute_msg: &ExecuteMsg) -> String {
         ExecuteMsg::UpdatePositionLeverage { .. } => "Update Position (leverage)",
         ExecuteMsg::UpdatePositionMaxGains { .. } => "Update Position (max gains)",
         ExecuteMsg::ClosePosition { .. } => "Close Position",
-        ExecuteMsg::Owner(ExecuteOwnerMsg::SetManualPrice{..}) => {
-            "Set Price"
-        },
+        ExecuteMsg::Owner(ExecuteOwnerMsg::SetManualPrice { .. }) => "Set Price",
         ExecuteMsg::Crank { .. } => "Crank",
         _ => "Unknown",
     };

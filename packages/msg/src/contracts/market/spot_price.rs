@@ -1,30 +1,28 @@
-//! Spot price data structures 
+//! Spot price data structures
 
-use std::str::FromStr;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Addr;
 use pyth_sdk_cw::PriceIdentifier;
 use shared::storage::RawAddr;
+use std::str::FromStr;
 
-/// Spot price config 
+/// Spot price config
 #[cw_serde]
 pub enum SpotPriceConfig {
     /// Manual spot price, mostly used for testing purposes
     Manual,
     /// External oracle
     Oracle {
-        /// Pyth configuration, required on chains that use pyth feeds 
+        /// Pyth configuration, required on chains that use pyth feeds
         pyth: Option<PythConfig>,
         /// sequence of spot price feeds which are composed to generate a single spot price
         feeds: Vec<SpotPriceFeed>,
         /// if necessary, sequence of spot price feeds which are composed to generate a single USD spot price
         feeds_usd: Option<Vec<SpotPriceFeed>>,
-    }
+    },
 }
 
-
-
-/// Configuration for pyth 
+/// Configuration for pyth
 #[cw_serde]
 pub struct PythConfig {
     /// The address of the pyth oracle module
@@ -33,11 +31,10 @@ pub struct PythConfig {
     pub age_tolerance_seconds: u32,
 }
 
-
 /// An individual feed used to compose a final spot price
 #[cw_serde]
 pub struct SpotPriceFeed {
-    /// The data for this price feed 
+    /// The data for this price feed
     pub data: SpotPriceFeedData,
     /// is this price feed inverted
     pub inverted: bool,
@@ -46,7 +43,7 @@ pub struct SpotPriceFeed {
 /// The data for an individual spot price feed
 #[cw_serde]
 pub enum SpotPriceFeedData {
-    /// Pyth price feeds 
+    /// Pyth price feeds
     Pyth {
         /// The identifier on pyth
         id: PriceIdentifier,
@@ -63,7 +60,7 @@ pub enum SpotPriceFeedData {
     /// Native oracle module on the sei chain
     Sei {
         /// The denom to use
-        denom: String
+        denom: String,
     },
 }
 
@@ -95,22 +92,21 @@ impl FromStr for PythPriceServiceNetwork {
     }
 }
 
-
 /********* Just for config init *********/
-/// Spot price config for initialization messages 
+/// Spot price config for initialization messages
 #[cw_serde]
 pub enum SpotPriceConfigInit {
     /// Manual spot price, mostly used for testing purposes
     Manual,
     /// External oracle
     Oracle {
-        /// Pyth configuration, required on chains that use pyth feeds 
+        /// Pyth configuration, required on chains that use pyth feeds
         pyth: Option<PythConfigInit>,
         /// sequence of spot price feeds which are composed to generate a single spot price
         feeds: Vec<SpotPriceFeedInit>,
         /// if necessary, sequence of spot price feeds which are composed to generate a single USD spot price
         feeds_usd: Option<Vec<SpotPriceFeedInit>>,
-    }
+    },
 }
 
 /// Configuration for pyth init messages
@@ -125,7 +121,7 @@ pub struct PythConfigInit {
 /// An individual feed used to compose a final spot price
 #[cw_serde]
 pub struct SpotPriceFeedInit {
-    /// The data for this price feed 
+    /// The data for this price feed
     pub data: SpotPriceFeedDataInit,
     /// is this price feed inverted
     pub inverted: bool,
@@ -134,7 +130,7 @@ pub struct SpotPriceFeedInit {
 /// The data for an individual spot price feed
 #[cw_serde]
 pub enum SpotPriceFeedDataInit {
-    /// Pyth price feeds 
+    /// Pyth price feeds
     Pyth {
         /// The identifier on pyth
         id: PriceIdentifier,
@@ -151,7 +147,7 @@ pub enum SpotPriceFeedDataInit {
     /// Native oracle module on the sei chain
     Sei {
         /// The denom to use
-        denom: String
+        denom: String,
     },
 }
 

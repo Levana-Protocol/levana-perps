@@ -1,9 +1,8 @@
 use crate::state::{
     all_contracts::ALL_CONTRACTS,
     auth::{
-        get_admin_migration, get_dao, get_kill_switch, get_owner,
-        get_wind_down, set_admin_migration, set_dao, set_kill_switch,
-        set_owner, set_wind_down,
+        get_admin_migration, get_dao, get_kill_switch, get_owner, get_wind_down,
+        set_admin_migration, set_dao, set_kill_switch, set_owner, set_wind_down,
     },
     code_ids::get_code_ids,
     label::{get_label_suffix, set_label_suffix},
@@ -205,7 +204,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                     ctx.response.add_event(InstantiateEvent {
                         kind: NewContractKind::Market,
                         market_id: market_id.clone(),
-                        addr
+                        addr,
                     });
 
                     // now that the market fully exists, including for factory market lookups

@@ -313,7 +313,7 @@ pub enum ExecuteOwnerMsg {
         /// This is generally used for reporting of values like PnL and trade
         /// volume.
         price_usd: Option<PriceCollateralInUsd>,
-    }
+    },
 }
 
 /// Fees held within the market contract.
@@ -983,7 +983,7 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
         match u.int_in_range::<u8>(0..=23)? {
             //0 => Ok(ExecuteMsg::Owner(u.arbitrary()?)),
             0 => Ok(ExecuteMsg::Owner(ExecuteOwnerMsg::ConfigUpdate {
-                update: Box::<ConfigUpdate>::default()
+                update: Box::<ConfigUpdate>::default(),
             })),
             1 => Ok(ExecuteMsg::OpenPosition {
                 slippage_assert: u.arbitrary()?,

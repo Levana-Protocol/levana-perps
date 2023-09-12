@@ -162,7 +162,6 @@ impl Factory {
             )
             .await
     }
-
 }
 
 impl HasAddress for Factory {

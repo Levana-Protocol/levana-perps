@@ -1,6 +1,9 @@
 use crate::prelude::*;
 use cosmwasm_std::Order;
-use msg::contracts::market::{entry::PriceForQuery, spot_price::{SpotPriceConfig, events::SpotPriceEvent}};
+use msg::contracts::market::{
+    entry::PriceForQuery,
+    spot_price::{events::SpotPriceEvent, SpotPriceConfig},
+};
 
 /// Stores spot price history.
 /// Key is a [Timestamp] of when the price was received.
@@ -34,7 +37,7 @@ impl State<'_> {
             price_usd,
             price_base,
             publish_time,
-            publish_time_usd
+            publish_time_usd,
         }: PriceStorage,
     ) -> Result<PricePoint> {
         let market_id = self.market_id(store)?;
@@ -48,7 +51,7 @@ impl State<'_> {
             is_notional_usd: market_id.is_notional_usd(),
             market_type,
             publish_time,
-            publish_time_usd
+            publish_time_usd,
         })
     }
     fn spot_price_inner(&self, store: &dyn Storage, timestamp: Timestamp) -> Result<PricePoint> {
@@ -110,7 +113,7 @@ impl State<'_> {
                 is_notional_usd: market_id.is_notional_usd(),
                 market_type,
                 publish_time,
-                publish_time_usd
+                publish_time_usd,
             };
 
             self.spot_price_cache
@@ -205,7 +208,7 @@ impl State<'_> {
         }
     }
 
-    pub(crate) fn save_manual_spot_price (
+    pub(crate) fn save_manual_spot_price(
         &self,
         ctx: &mut StateContext,
         price_base: PriceBaseInQuote,
@@ -216,20 +219,21 @@ impl State<'_> {
         let price = price_base.into_notional_price(market_type);
         let price_usd = get_price_usd(price_base, price_usd, market_id)?;
 
-        MANUAL_SPOT_PRICE.save(ctx.storage, &PriceStorage { 
-            price, 
-            price_usd, 
-            price_base: price_base, 
-            publish_time: None, 
-            publish_time_usd: None,
-        }).map_err(|err| err.into())
+        MANUAL_SPOT_PRICE
+            .save(
+                ctx.storage,
+                &PriceStorage {
+                    price,
+                    price_usd,
+                    price_base,
+                    publish_time: None,
+                    publish_time_usd: None,
+                },
+            )
+            .map_err(|err| err.into())
     }
 
-
-    pub(crate) fn spot_price_append(
-        &self,
-        ctx: &mut StateContext,
-    ) -> Result<()> {
+    pub(crate) fn spot_price_append(&self, ctx: &mut StateContext) -> Result<()> {
         let timestamp = self.now();
 
         if PRICES.has(ctx.storage, timestamp) {
@@ -260,11 +264,7 @@ impl State<'_> {
         });
 
         PRICES
-            .save(
-                ctx.storage,
-                timestamp,
-                &price_storage
-            )
+            .save(ctx.storage, timestamp, &price_storage)
             .map_err(|err| err.into())
     }
 }

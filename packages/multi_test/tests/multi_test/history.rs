@@ -381,14 +381,12 @@ fn trade_history_nft_transfer_perp_963() {
 fn price_history_works() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
-    let start_prices = market
-        .query_spot_price_history(None, None, None)
-        .unwrap();
+    let start_prices = market.query_spot_price_history(None, None, None).unwrap();
 
     // there is an initial price due to liquidity deposit, and initial market setup
     let initial_price_len = 2;
 
-    // sanity check to confirm 
+    // sanity check to confirm
     assert_eq!(start_prices.len(), initial_price_len);
 
     for i in initial_price_len..10 {
@@ -403,9 +401,12 @@ fn price_history_works() {
 
     assert_eq!(prices.len(), 10);
 
-    // check just the new prices we added 
+    // check just the new prices we added
     for (i, price) in prices.iter().skip(initial_price_len).enumerate() {
-        assert_eq!(price.price_base, (i+initial_price_len).to_string().parse().unwrap());
+        assert_eq!(
+            price.price_base,
+            (i + initial_price_len).to_string().parse().unwrap()
+        );
     }
 
     let prices = market
@@ -414,8 +415,14 @@ fn price_history_works() {
 
     assert_eq!(prices.len(), 10);
 
-    // check just the new prices we added 
-    for (i, price) in prices.iter().rev().skip(initial_price_len).rev().enumerate() {
+    // check just the new prices we added
+    for (i, price) in prices
+        .iter()
+        .rev()
+        .skip(initial_price_len)
+        .rev()
+        .enumerate()
+    {
         assert_eq!(price.price_base, (9 - i).to_string().parse().unwrap());
     }
 
@@ -436,7 +443,12 @@ fn price_history_works() {
         .collect::<Vec<_>>();
     assert_eq!(
         vec!["9", "8", "7", "6", "5", "4", "3", "2", "1"],
-        prices_desc.iter().rev().skip(initial_price_len - 1).rev().collect::<Vec<_>>()
+        prices_desc
+            .iter()
+            .rev()
+            .skip(initial_price_len - 1)
+            .rev()
+            .collect::<Vec<_>>()
     );
 
     let prices_asc_page_1 = market
@@ -456,7 +468,10 @@ fn price_history_works() {
         .collect::<Vec<_>>();
     assert_eq!(
         vec!["1", "2", "3", "4", "5", "6", "7", "8", "9"],
-        prices_asc.iter().skip(initial_price_len - 1).collect::<Vec<_>>()
+        prices_asc
+            .iter()
+            .skip(initial_price_len - 1)
+            .collect::<Vec<_>>()
     );
 }
 

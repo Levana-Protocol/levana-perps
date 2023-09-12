@@ -6,10 +6,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use cosmos::{Address, ContractAdmin, CosmosNetwork, HasAddress};
 use cosmwasm_std::{to_binary, CosmosMsg, Empty};
-use msg::{
-    contracts::market::entry::NewMarketParams,
-    token::TokenInit,
-};
+use msg::{contracts::market::entry::NewMarketParams, token::TokenInit};
 use perps_exes::{
     config::{MarketConfigUpdates, PythConfig, PythMarketPriceFeeds},
     prelude::*,
@@ -533,7 +530,7 @@ async fn add_market(
             },
             config: Some(market_config_update),
             initial_borrow_fee_rate,
-            spot_price: unimplemented!("TODO")
+            spot_price: unimplemented!("TODO"),
         },
     };
     let msg = strip_nulls(msg)?;

@@ -52,11 +52,9 @@ async fn get_wormhole_proofs(
         .feeds
         .iter()
         .chain(market_price_feeds.feeds_usd.as_deref().unwrap_or_default())
-        .map(|f| {
-            match f.data {
-                SpotPriceFeedData::Pyth { id, ..} => id,
-                _ => unimplemented!("FIXME")
-            }
+        .map(|f| match f.data {
+            SpotPriceFeedData::Pyth { id, .. } => id,
+            _ => unimplemented!("FIXME"),
         })
         .sorted()
         .dedup()
@@ -118,12 +116,11 @@ async fn price_helper(
     endpoint: &str,
     feeds: &[SpotPriceFeed],
 ) -> Result<Decimal256> {
-
     let mut req = client.get(format!("{}api/latest_price_feeds", endpoint));
     for feed in feeds {
         req = match feed.data {
             SpotPriceFeedData::Pyth { id, .. } => req.query(&[("ids[]", id)]),
-            _ => unimplemented!("FIXME")
+            _ => unimplemented!("FIXME"),
         };
     }
 
@@ -153,8 +150,8 @@ async fn price_helper(
 
     for feed in feeds {
         let id = match feed.data {
-            SpotPriceFeedData::Pyth { id, .. } => id, 
-            _ => unimplemented!("FIXME")
+            SpotPriceFeedData::Pyth { id, .. } => id,
+            _ => unimplemented!("FIXME"),
         };
 
         let Price { expo, price } = prices

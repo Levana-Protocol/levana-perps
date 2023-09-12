@@ -1,6 +1,4 @@
-use cosmos::{
-    proto::cosmwasm::wasm::v1::MsgExecuteContract, Contract, Cosmos, HasAddress,
-};
+use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, Contract, Cosmos, HasAddress};
 use msg::prelude::*;
 
 use perps_exes::config::PythMarketPriceFeeds;

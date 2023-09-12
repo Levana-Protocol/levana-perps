@@ -55,7 +55,7 @@ impl App {
                 config
             },
             market_id,
-            spot_price: unimplemented!("TODO")
+            spot_price: unimplemented!("TODO"),
         })
     }
 }
@@ -301,7 +301,7 @@ impl InstantiateMarket {
             market_id,
             cw20_source,
             config,
-            spot_price
+            spot_price,
         } = self;
         log::info!(
             "Finding CW20 for collateral asset {} for market {market_id}",
@@ -390,7 +390,7 @@ impl InstantiateMarket {
                     },
                     config: Some(config),
                     initial_borrow_fee_rate,
-                    spot_price
+                    spot_price,
                 },
             )
             .await

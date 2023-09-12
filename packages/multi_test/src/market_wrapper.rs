@@ -763,10 +763,10 @@ impl PerpsMarket {
     pub fn exec_set_price_and_crank(&self, price: PriceBaseInQuote) -> Result<Vec<AppResponse>> {
         let mut responses = vec![self.exec(
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
-            &MarketExecuteMsg::Owner(MarketExecuteOwnerMsg::SetManualPrice { 
+            &MarketExecuteMsg::Owner(MarketExecuteOwnerMsg::SetManualPrice {
                 price,
                 price_usd: None,
-            })
+            }),
         )?];
 
         responses.push(self.exec_crank(&Addr::unchecked("anybody"))?);
@@ -781,10 +781,7 @@ impl PerpsMarket {
     ) -> Result<AppResponse> {
         self.exec(
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
-            &MarketExecuteMsg::Owner(MarketExecuteOwnerMsg::SetManualPrice { 
-                price,
-                price_usd,
-            })
+            &MarketExecuteMsg::Owner(MarketExecuteOwnerMsg::SetManualPrice { price, price_usd }),
         )
     }
 

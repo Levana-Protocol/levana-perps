@@ -9,7 +9,7 @@ use crate::state::{
     meta::meta_init,
     position::{get_position, positions_init, PositionOrId},
     set_factory_addr,
-    token::token_init
+    token::token_init,
 };
 
 use crate::prelude::*;
@@ -82,8 +82,11 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         .accumulate_borrow_fee_rate(&mut ctx, state.now())
         .map_err(|e| anyhow::anyhow!("accumulate_borrow_fee_rate failed: {e:?}"))?;
 
-
-    fn append_spot_price(state: &mut State, ctx: &mut StateContext, rewards_addr: &Addr) -> Result<()> {
+    fn append_spot_price(
+        state: &mut State,
+        ctx: &mut StateContext,
+        rewards_addr: &Addr,
+    ) -> Result<()> {
         state.spot_price_append(ctx)?;
 
         // tests were setup depending on this logic
@@ -156,7 +159,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 ExecuteOwnerMsg::ConfigUpdate { update } => {
                     update_config(&mut state.config, ctx.storage, *update)?;
                 }
-                ExecuteOwnerMsg::SetManualPrice{ price, price_usd } => {
+                ExecuteOwnerMsg::SetManualPrice { price, price_usd } => {
                     state.save_manual_spot_price(&mut ctx, price, price_usd)?;
                     // the price needed to be set first before doing this
                     // so info.requires_spot_price_append is false

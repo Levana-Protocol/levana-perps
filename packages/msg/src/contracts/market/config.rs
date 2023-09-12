@@ -157,7 +157,7 @@ impl Config {
             protocol_tax: ConfigDefaults::protocol_tax(),
             unstake_period_seconds: ConfigDefaults::unstake_period_seconds(),
             target_utilization: ConfigDefaults::target_utilization(),
-            borrow_fee_sensitivity: ConfigDefaults::borrow_fee_sensitivity(), 
+            borrow_fee_sensitivity: ConfigDefaults::borrow_fee_sensitivity(),
             max_xlp_rewards_multiplier: ConfigDefaults::max_xlp_rewards_multiplier(),
             min_xlp_rewards_multiplier: ConfigDefaults::min_xlp_rewards_multiplier(),
             delta_neutrality_fee_sensitivity: ConfigDefaults::delta_neutrality_fee_sensitivity(),

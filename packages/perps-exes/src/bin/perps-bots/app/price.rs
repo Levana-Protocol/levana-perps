@@ -3,9 +3,7 @@ use std::{collections::HashMap, fmt::Display, sync::Arc};
 use anyhow::Result;
 use axum::async_trait;
 use chrono::{DateTime, Duration, Utc};
-use cosmos::{
-    proto::cosmwasm::wasm::v1::MsgExecuteContract, HasAddress, TxBuilder, Wallet,
-};
+use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, HasAddress, TxBuilder, Wallet};
 use cosmwasm_std::Decimal256;
 use msg::prelude::*;
 use perps_exes::pyth::{get_latest_price, get_oracle_update_msg};

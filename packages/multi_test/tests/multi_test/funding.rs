@@ -565,7 +565,7 @@ fn funding_rates_capped() {
     market
         .exec_set_config(ConfigUpdate {
             delta_neutrality_fee_sensitivity: Some(
-                ConfigDefaults::delta_neutrality_fee_sensitivity()
+                ConfigDefaults::delta_neutrality_fee_sensitivity(),
             ),
             ..Default::default()
         })

@@ -5,7 +5,10 @@ use std::{collections::HashMap, path::Path};
 use cosmos::{Address, CosmosNetwork, RawAddress};
 use cosmwasm_std::{Uint128, Uint256};
 use msg::{
-    contracts::market::{config::ConfigUpdate, spot_price::{SpotPriceFeed, SpotPriceFeedData}},
+    contracts::market::{
+        config::ConfigUpdate,
+        spot_price::{SpotPriceFeed, SpotPriceFeedData},
+    },
     prelude::*,
 };
 

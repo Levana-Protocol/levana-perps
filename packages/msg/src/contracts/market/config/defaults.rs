@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
-use cosmwasm_std::Decimal256;
-use shared::storage::{NumberGtZero, Number, NonZero, Collateral, Usd};
 use super::MaxLiquidity;
+use cosmwasm_std::Decimal256;
+use shared::storage::{Collateral, NonZero, Number, NumberGtZero, Usd};
 
 pub struct ConfigDefaults {}
 
@@ -11,50 +11,50 @@ impl ConfigDefaults {
     }
 
     pub fn trading_fee_counter_collateral() -> Decimal256 {
-         "0.001".parse().unwrap()
+        "0.001".parse().unwrap()
     }
     pub const fn crank_execs() -> u32 {
-         7
+        7
     }
     pub fn max_leverage() -> Number {
-         Number::try_from("30").unwrap()
+        Number::try_from("30").unwrap()
     }
     pub fn funding_rate_sensitivity() -> Decimal256 {
-         "10".parse().unwrap()
+        "10".parse().unwrap()
     }
     pub fn funding_rate_max_annualized() -> Decimal256 {
-         "0.9".parse().unwrap()
+        "0.9".parse().unwrap()
     }
     pub fn borrow_fee_rate_min_annualized() -> NumberGtZero {
-         "0.01".parse().unwrap()
+        "0.01".parse().unwrap()
     }
     pub fn borrow_fee_rate_max_annualized() -> NumberGtZero {
-         "0.60".parse().unwrap()
+        "0.60".parse().unwrap()
     }
     pub fn carry_leverage() -> Decimal256 {
-         "10".parse().unwrap()
+        "10".parse().unwrap()
     }
     pub const fn mute_events() -> bool {
-         false
+        false
     }
     pub const fn liquifunding_delay_seconds() -> u32 {
-         60 * 60 * 6
+        60 * 60 * 6
     }
     pub const fn price_update_too_old_seconds() -> u32 {
-         60 * 30
+        60 * 30
     }
     pub const fn staleness_seconds() -> u32 {
-         60 * 60 * 2
+        60 * 60 * 2
     }
     pub fn protocol_tax() -> Decimal256 {
-         "0.3".parse().unwrap()
+        "0.3".parse().unwrap()
     }
     pub const fn unstake_period_seconds() -> u32 {
         // 45 day
-         60 * 60 * 24 * 45 
+        60 * 60 * 24 * 45
     }
     pub fn target_utilization() -> NonZero<Decimal256> {
-         "0.8".parse().unwrap()
+        "0.8".parse().unwrap()
     }
 
     pub fn borrow_fee_sensitivity() -> NumberGtZero {
@@ -69,31 +69,31 @@ impl ConfigDefaults {
     }
 
     pub fn max_xlp_rewards_multiplier() -> NumberGtZero {
-         "2".parse().unwrap()
+        "2".parse().unwrap()
     }
     pub fn min_xlp_rewards_multiplier() -> NumberGtZero {
-         "1".parse().unwrap()
+        "1".parse().unwrap()
     }
     pub fn delta_neutrality_fee_sensitivity() -> NumberGtZero {
-         "50000000".parse().unwrap()
+        "50000000".parse().unwrap()
     }
     pub fn delta_neutrality_fee_cap() -> NumberGtZero {
-         "0.005".parse().unwrap()
+        "0.005".parse().unwrap()
     }
     pub fn delta_neutrality_fee_tax() -> Decimal256 {
-         "0.05".parse().unwrap()
+        "0.05".parse().unwrap()
     }
     pub fn limit_order_fee() -> Collateral {
-         Collateral::from(0u64)
+        Collateral::from(0u64)
     }
     pub fn crank_fee_charged() -> Usd {
-         "0.01".parse().unwrap()
+        "0.01".parse().unwrap()
     }
     pub fn crank_fee_reward() -> Usd {
-         "0.001".parse().unwrap()
+        "0.001".parse().unwrap()
     }
     pub fn minimum_deposit_usd() -> Usd {
-         "5".parse().unwrap()
+        "5".parse().unwrap()
     }
     pub const fn unpend_limit() -> u32 {
         500
@@ -103,13 +103,13 @@ impl ConfigDefaults {
         60 * 60
     }
     pub const fn max_liquidity() -> MaxLiquidity {
-         MaxLiquidity::Unlimited {}
+        MaxLiquidity::Unlimited {}
     }
     pub const fn disable_position_nft_exec() -> bool {
-         false
+        false
     }
     pub const fn liquidity_cooldown_seconds() -> u32 {
         // Default to 1 hour
-         60 * 60
+        60 * 60
     }
 }
