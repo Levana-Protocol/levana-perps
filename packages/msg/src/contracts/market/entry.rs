@@ -1,7 +1,7 @@
 //! Entrypoint messages for the market
 use super::order::LimitOrder;
 use super::position::{ClosedPosition, PositionId};
-use super::spot_price::SpotPriceConfig;
+use super::spot_price::SpotPriceConfigInit;
 use super::{config::ConfigUpdate, crank::CrankWorkInfo};
 use crate::contracts::market::order::OrderId;
 use crate::{contracts::liquidity_token::LiquidityTokenKind, token::TokenInit};
@@ -18,7 +18,7 @@ pub struct InstantiateMsg {
     /// Modifications to the default config value
     pub config: Option<ConfigUpdate>,
     /// Mandatory spot price config
-    pub spot_price: SpotPriceConfig,
+    pub spot_price: SpotPriceConfigInit,
     /// Base, quote, and market type
     pub market_id: MarketId,
     /// The token used for collateral
@@ -41,7 +41,7 @@ pub struct NewMarketParams {
     pub config: Option<ConfigUpdate>,
 
     /// mandatory spot price config
-    pub spot_price: SpotPriceConfig,
+    pub spot_price: SpotPriceConfigInit,
 
     /// Initial borrow fee rate, annualized
     pub initial_borrow_fee_rate: Decimal256,

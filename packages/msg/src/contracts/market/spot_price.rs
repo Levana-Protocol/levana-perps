@@ -4,7 +4,7 @@ use std::str::FromStr;
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Addr;
 use pyth_sdk_cw::PriceIdentifier;
-
+use shared::storage::RawAddr;
 
 /// Spot price config 
 #[cw_serde]
@@ -22,6 +22,8 @@ pub enum SpotPriceConfig {
     }
 }
 
+
+
 /// Configuration for pyth 
 #[cw_serde]
 pub struct PythConfig {
@@ -30,6 +32,7 @@ pub struct PythConfig {
     /// The age tolerance for pyth price updates
     pub age_tolerance_seconds: u32,
 }
+
 
 /// An individual feed used to compose a final spot price
 #[cw_serde]
@@ -90,6 +93,66 @@ impl FromStr for PythPriceServiceNetwork {
             )),
         }
     }
+}
+
+
+/********* Just for config init *********/
+/// Spot price config for initialization messages 
+#[cw_serde]
+pub enum SpotPriceConfigInit {
+    /// Manual spot price, mostly used for testing purposes
+    Manual,
+    /// External oracle
+    Oracle {
+        /// Pyth configuration, required on chains that use pyth feeds 
+        pyth: Option<PythConfigInit>,
+        /// sequence of spot price feeds which are composed to generate a single spot price
+        feeds: Vec<SpotPriceFeedInit>,
+        /// if necessary, sequence of spot price feeds which are composed to generate a single USD spot price
+        feeds_usd: Option<Vec<SpotPriceFeedInit>>,
+    }
+}
+
+/// Configuration for pyth init messages
+#[cw_serde]
+pub struct PythConfigInit {
+    /// The address of the pyth oracle module
+    pub oracle_address: RawAddr,
+    /// The age tolerance for pyth price updates
+    pub age_tolerance_seconds: u32,
+}
+
+/// An individual feed used to compose a final spot price
+#[cw_serde]
+pub struct SpotPriceFeedInit {
+    /// The data for this price feed 
+    pub data: SpotPriceFeedDataInit,
+    /// is this price feed inverted
+    pub inverted: bool,
+}
+
+/// The data for an individual spot price feed
+#[cw_serde]
+pub enum SpotPriceFeedDataInit {
+    /// Pyth price feeds 
+    Pyth {
+        /// The identifier on pyth
+        id: PriceIdentifier,
+        /// Which network to use for the price service
+        network: PythPriceServiceNetwork,
+    },
+    /// TODO: Stride liquid staking
+    Stride {
+        /// The stride contract address for getting the redemption rate
+        contract: RawAddr,
+        /// The IBC denom for the asset
+        denom: String,
+    },
+    /// Native oracle module on the sei chain
+    Sei {
+        /// The denom to use
+        denom: String
+    },
 }
 
 /// Spot price events

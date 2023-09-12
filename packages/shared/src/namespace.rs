@@ -146,3 +146,4 @@ pub const PYTH_LAST_BLOCK_TIME_UPDATED: &str = "em";
 pub const PYTH_REPLY_CONTEXT: &str = "en";
 pub const RECLAIMABLE_START: &str = "eo";
 pub const PYTH_CONFIG: &str = "ep";
+pub const MANUAL_SPOT_PRICE: &str = "eq";

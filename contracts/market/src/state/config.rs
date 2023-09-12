@@ -1,6 +1,8 @@
 use crate::state::*;
 use cw_storage_plus::Item;
-use msg::contracts::market::{config::{Config, ConfigUpdate}, spot_price::SpotPriceConfig};
+use msg::contracts::market::{config::{Config, ConfigUpdate}, spot_price::{
+    SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData, SpotPriceConfigInit, SpotPriceFeedInit, SpotPriceFeedDataInit, PythConfig
+}};
 
 const CONFIG_STORAGE: Item<Config> = Item::new(namespace::CONFIG);
 
@@ -9,7 +11,45 @@ pub(crate) fn load_config(store: &dyn Storage) -> Result<Config> {
 }
 
 /// called only once, at instantiation
-pub(crate) fn config_init(store: &mut dyn Storage, config: Option<ConfigUpdate>, spot_price: SpotPriceConfig) -> Result<()> {
+pub(crate) fn config_init(api: &dyn Api, store: &mut dyn Storage, config: Option<ConfigUpdate>, spot_price: SpotPriceConfigInit) -> Result<()> {
+    let spot_price:SpotPriceConfig = match spot_price {
+        SpotPriceConfigInit::Manual => SpotPriceConfig::Manual,
+        SpotPriceConfigInit::Oracle { pyth, feeds, feeds_usd } => {
+            fn validate_feeds(api: &dyn Api, feeds: Vec<SpotPriceFeedInit>) -> Result<Vec<SpotPriceFeed>> {
+                feeds.into_iter().map(|feed| Ok(SpotPriceFeed {
+                    data: match feed.data {
+                        SpotPriceFeedDataInit::Pyth { id, network } => SpotPriceFeedData::Pyth {
+                            id,
+                            network
+                        },
+                        SpotPriceFeedDataInit::Stride { contract, denom } => SpotPriceFeedData::Stride {
+                            contract: contract.validate(api)?,
+                            denom,
+                        },
+                        SpotPriceFeedDataInit::Sei { denom } => SpotPriceFeedData::Sei {
+                            denom,
+                        },
+                    },
+                    inverted: feed.inverted,
+                }))
+                .collect()
+            }
+
+            SpotPriceConfig::Oracle {
+                pyth: pyth.map(|pyth| pyth.oracle_address.validate(api).map(|oracle_address| {
+                    PythConfig {
+                        oracle_address,
+                        age_tolerance_seconds: pyth.age_tolerance_seconds,
+                    }
+                })).transpose()?,
+                feeds: validate_feeds(api, feeds)?,
+                feeds_usd: match feeds_usd {
+                    None => None,
+                    Some(feeds_usd) => Some(validate_feeds(api, feeds_usd)?)
+                }
+            }
+        }
+    };
     let mut init_config = Config::new(spot_price);
 
     let update = match config {

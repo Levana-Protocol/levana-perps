@@ -45,7 +45,7 @@ use msg::contracts::market::entry::{
     TradeHistorySummary, TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
-use msg::contracts::market::spot_price::SpotPriceConfig;
+use msg::contracts::market::spot_price::SpotPriceConfigInit;
 use msg::contracts::market::{
     config::{Config, ConfigUpdate},
     entry::{
@@ -152,7 +152,7 @@ impl PerpsMarket {
                     liquidity_cooldown_seconds: Some(0),
                     ..Default::default()
                 }),
-                spot_price: SpotPriceConfig::Manual,
+                spot_price: SpotPriceConfigInit::Manual,
                 initial_borrow_fee_rate: "0.01".parse().unwrap(),
             },
         };
@@ -225,6 +225,7 @@ impl PerpsMarket {
             farming_addr,
         };
 
+        // set an initial price...
         _self.exec_set_price_with_usd(initial_price, collateral_in_usd)?;
 
         if bootstap_lp {
@@ -751,18 +752,24 @@ impl PerpsMarket {
 
     // market executions
     pub fn exec_refresh_price(&self) -> Result<AppResponse> {
-        // we used to have an explicit "set price" message. 
-        // Now it happens automatically through other actions
-        // TODO: remove this and just explicitly crank where needed?
-        self.exec_crank_n(&Addr::unchecked("refresh-price"), 1)
+        let price_resp = self.query_current_price()?;
+        self.exec_set_price(price_resp.price_base)
     }
+
     pub fn exec_set_price(&self, price: PriceBaseInQuote) -> Result<AppResponse> {
         self.exec_set_price_with_usd(price, None)
     }
 
     pub fn exec_set_price_and_crank(&self, price: PriceBaseInQuote) -> Result<Vec<AppResponse>> {
-        let mut responses = vec![self.exec_set_price_with_usd(price, None)?];
-        responses.push(self.exec_crank_n(&Addr::unchecked("set-price"), 1)?);
+        let mut responses = vec![self.exec(
+            &Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &MarketExecuteMsg::Owner(MarketExecuteOwnerMsg::SetManualPrice { 
+                price,
+                price_usd: None,
+            })
+        )?];
+
+        responses.push(self.exec_crank(&Addr::unchecked("anybody"))?);
 
         Ok(responses)
     }
@@ -776,7 +783,7 @@ impl PerpsMarket {
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
             &MarketExecuteMsg::Owner(MarketExecuteOwnerMsg::SetManualPrice { 
                 price,
-                price_usd
+                price_usd,
             })
         )
     }

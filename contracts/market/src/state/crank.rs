@@ -182,28 +182,28 @@ impl State<'_> {
     ///
     /// This is a special optimization to avoid accruing unnecessary "complete
     /// work" items and causing the unpend queue to fill up.
-    /// TBD: is this still needed?
-    // pub(crate) fn crank_current_price_complete(&self, ctx: &mut StateContext) -> Result<()> {
-    //     let work_info = match self.crank_work(ctx.storage)? {
-    //         Some(work_info) => work_info,
-    //         None => return Ok(()),
-    //     };
-    //     let price_point_timestamp = match &work_info {
-    //         CrankWorkInfo::Completed {
-    //             price_point_timestamp,
-    //         } => *price_point_timestamp,
-    //         _ => return Ok(()),
-    //     };
+    pub(crate) fn crank_current_price_complete(&self, ctx: &mut StateContext) -> Result<()> {
+        let work_info = match self.crank_work(ctx.storage)? {
+            Some(work_info) => work_info,
+            None => return Ok(()),
+        };
 
-    //     let current = self.spot_price(ctx.storage, None)?;
+        let price_point_timestamp = match &work_info {
+            CrankWorkInfo::Completed {
+                price_point_timestamp,
+            } => *price_point_timestamp,
+            _ => return Ok(()),
+        };
 
-    //     if price_point_timestamp == current.timestamp {
-    //         // Finish off the price update
-    //         self.crank_exec(ctx, work_info)?;
-    //     }
+        let current = self.spot_price(ctx.storage, None)?;
 
-    //     Ok(())
-    // }
+        if price_point_timestamp == current.timestamp {
+            // Finish off the price update
+            self.crank_exec(ctx, work_info)?;
+        }
+
+        Ok(())
+    }
 
     /// What is the ending timestamp for liquifunding and liquidation?
     ///

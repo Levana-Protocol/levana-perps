@@ -1,11 +1,15 @@
 use crate::prelude::*;
 use cosmwasm_std::Order;
-use msg::contracts::market::entry::PriceForQuery;
+use msg::contracts::market::{entry::PriceForQuery, spot_price::{SpotPriceConfig, events::SpotPriceEvent}};
 
 /// Stores spot price history.
 /// Key is a [Timestamp] of when the price was received.
 /// The price is only valid in the subsequent block.
 const PRICES: Map<Timestamp, PriceStorage> = Map::new(namespace::PRICES);
+
+/// Mostly for testing purposes, where we stash and later read the spot price manually
+/// instead of reaching out to an oracle
+const MANUAL_SPOT_PRICE: Item<PriceStorage> = Item::new(namespace::MANUAL_SPOT_PRICE);
 
 /// The price components that are stored in [PRICES].
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -201,47 +205,67 @@ impl State<'_> {
         }
     }
 
+    pub(crate) fn save_manual_spot_price (
+        &self,
+        ctx: &mut StateContext,
+        price_base: PriceBaseInQuote,
+        price_usd: Option<PriceCollateralInUsd>,
+    ) -> Result<()> {
+        let market_id = self.market_id(ctx.storage)?;
+        let market_type = market_id.get_market_type();
+        let price = price_base.into_notional_price(market_type);
+        let price_usd = get_price_usd(price_base, price_usd, market_id)?;
+
+        MANUAL_SPOT_PRICE.save(ctx.storage, &PriceStorage { 
+            price, 
+            price_usd, 
+            price_base: price_base, 
+            publish_time: None, 
+            publish_time_usd: None,
+        }).map_err(|err| err.into())
+    }
+
+
     pub(crate) fn spot_price_append(
         &self,
-        _ctx: &mut StateContext,
+        ctx: &mut StateContext,
     ) -> Result<()> {
-        // don't forget to emit the spot price event!
-        todo!()
-        // let market_id = self.market_id(ctx.storage)?;
-        // let timestamp = self.now();
+        let timestamp = self.now();
 
-        // if PRICES.has(ctx.storage, timestamp) {
-        //     Err(perp_anyhow!(
-        //         ErrorId::PriceAlreadyExists,
-        //         ErrorDomain::SpotPrice,
-        //         "price already exist for timestamp {}",
-        //         timestamp
-        //     ))
-        // } else {
-        //     let market_type = self.market_id(ctx.storage)?.get_market_type();
-        //     let price_usd = get_price_usd(price_base, price_usd, market_id)?;
-        //     let price = price_base.into_notional_price(market_type);
-        //     ctx.response_mut().add_event(SpotPriceEvent {
-        //         timestamp,
-        //         price_usd,
-        //         price_notional: price,
-        //         price_base: price.into_base_price(market_type),
-        //         // FIXME!
-        //         publish_time: None,
-        //         publish_time_usd: None,
-        //     });
-        //     PRICES
-        //         .save(
-        //             ctx.storage,
-        //             timestamp,
-        //             &PriceStorage {
-        //                 price,
-        //                 price_usd,
-        //                 price_base,
-        //             },
-        //         )
-        //         .map_err(|err| err.into())
-        // }
+        if PRICES.has(ctx.storage, timestamp) {
+            return Ok(());
+            // DISCUSS: This used to be an error... no more?
+            // perp_bail!(
+            //     ErrorId::PriceAlreadyExists,
+            //     ErrorDomain::SpotPrice,
+            //     "price already exist for timestamp {}",
+            //     timestamp
+            // );
+        }
+
+        let price_storage = match self.config.spot_price {
+            SpotPriceConfig::Manual => MANUAL_SPOT_PRICE.load(ctx.storage)?,
+            SpotPriceConfig::Oracle { .. } => {
+                todo!("LOAD EXTERNAL PRICES");
+            }
+        };
+
+        ctx.response_mut().add_event(SpotPriceEvent {
+            timestamp,
+            price_usd: price_storage.price_usd,
+            price_notional: price_storage.price,
+            price_base: price_storage.price_base,
+            publish_time: price_storage.publish_time,
+            publish_time_usd: price_storage.publish_time_usd,
+        });
+
+        PRICES
+            .save(
+                ctx.storage,
+                timestamp,
+                &price_storage
+            )
+            .map_err(|err| err.into())
     }
 }
 

@@ -351,7 +351,7 @@ impl MarketContract {
     ) -> Result<TxResponse> {
         let execute_msg = MarketExecuteMsg::Owner(ExecuteOwnerMsg::SetManualPrice { 
             price,
-            price_usd
+            price_usd,
         });
 
         let response = self.0.execute(wallet, vec![], execute_msg).await?;

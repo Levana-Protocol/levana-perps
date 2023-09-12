@@ -9,7 +9,7 @@
 use cosmwasm_std::{from_binary, MessageInfo};
 use msg::token::Token;
 
-use crate::{prelude::*, state::market::requires_spot_price_append};
+use crate::{prelude::*, state::spot_price::requires_spot_price_append};
 
 /// Perps-specific message info handling native coins versus CW20.
 ///

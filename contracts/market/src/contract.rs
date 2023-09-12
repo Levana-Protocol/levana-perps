@@ -54,7 +54,7 @@ pub fn instantiate(
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     set_factory_addr(deps.storage, &factory.validate(deps.api)?)?;
-    config_init(deps.storage, config, spot_price)?;
+    config_init(deps.api, deps.storage, config, spot_price)?;
     meta_init(deps.storage, &market_id)?;
 
     token_init(deps.storage, &deps.querier, token)?;
@@ -83,6 +83,14 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         .map_err(|e| anyhow::anyhow!("accumulate_borrow_fee_rate failed: {e:?}"))?;
 
 
+    fn append_spot_price(state: &mut State, ctx: &mut StateContext, rewards_addr: &Addr) -> Result<()> {
+        state.spot_price_append(ctx)?;
+
+        // tests were setup depending on this logic
+        state.crank_exec_batch(ctx, Some(0), rewards_addr)?;
+        state.crank_current_price_complete(ctx)?;
+        Ok(())
+    }
 
     fn handle_update_position_shared(
         state: &State,
@@ -137,7 +145,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     state.ensure_not_resetting_lps(&mut ctx, &info.msg)?;
 
     if info.requires_spot_price_append {
-        state.spot_price_append(&mut ctx)?;
+        append_spot_price(&mut state, &mut ctx, &info.sender)?;
     }
     match info.msg {
         ExecuteMsg::Owner(owner_msg) => {
@@ -147,8 +155,11 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 ExecuteOwnerMsg::ConfigUpdate { update } => {
                     update_config(&mut state.config, ctx.storage, *update)?;
                 }
-                ExecuteOwnerMsg::SetManualPrice{ .. } => {
-                    unimplemented!("FIXME")
+                ExecuteOwnerMsg::SetManualPrice{ price, price_usd } => {
+                    state.save_manual_spot_price(&mut ctx, price, price_usd)?;
+                    // the price needed to be set first before doing this
+                    // so info.requires_spot_price_append is false
+                    append_spot_price(&mut state, &mut ctx, &info.sender)?;
                 }
             }
         }

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use anyhow::{Context, Result};
 use cosmos::{Address, CodeId, ContractAdmin, Cosmos, HasAddress, Wallet};
-use msg::contracts::market::spot_price::SpotPriceConfig;
+use msg::contracts::market::spot_price::SpotPriceConfigInit;
 use msg::prelude::*;
 use msg::{
     contracts::{
@@ -134,7 +134,7 @@ pub(crate) struct InstantiateMarket {
     pub(crate) market_id: MarketId,
     pub(crate) cw20_source: Cw20Source,
     pub(crate) config: ConfigUpdate,
-    pub(crate) spot_price: SpotPriceConfig,
+    pub(crate) spot_price: SpotPriceConfigInit,
 }
 
 pub(crate) async fn instantiate(
@@ -281,7 +281,7 @@ pub(crate) struct AddMarketParams {
     pub(crate) faucet_admin: Option<Address>,
     pub(crate) factory: Factory,
     pub(crate) initial_borrow_fee_rate: Decimal256,
-    pub(crate) spot_price: SpotPriceConfig,
+    pub(crate) spot_price: SpotPriceConfigInit,
 }
 
 impl InstantiateMarket {
