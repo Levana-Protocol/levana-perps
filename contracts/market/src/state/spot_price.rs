@@ -351,10 +351,10 @@ impl State<'_> {
                         })?;
 
                     let publish_time =
-                        Some(Timestamp::from_seconds(price.publish_time.try_into()?));
+                        Timestamp::from_seconds(price.publish_time.try_into()?);
                     let price: Number = Number::try_from(price)?;
 
-                    (price, publish_time)
+                    (price, Some(publish_time))
                 }
                 SpotPriceFeedData::Sei { .. } => {
                     // TODO: query the native module and get the price, no publish time
