@@ -350,8 +350,7 @@ impl State<'_> {
                             )
                         })?;
 
-                    let publish_time =
-                        Timestamp::from_seconds(price.publish_time.try_into()?);
+                    let publish_time = Timestamp::from_seconds(price.publish_time.try_into()?);
                     let price: Number = Number::try_from(price)?;
 
                     (price, Some(publish_time))
