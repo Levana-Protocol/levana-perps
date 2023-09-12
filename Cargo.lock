@@ -2333,6 +2333,7 @@ dependencies = [
  "levana_perpswap_cosmos_shared",
  "once_cell",
  "proptest",
+ "pyth-sdk-cw",
  "semver",
  "serde",
 ]

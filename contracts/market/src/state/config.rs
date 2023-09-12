@@ -59,11 +59,19 @@ pub(crate) fn config_init(
             SpotPriceConfig::Oracle {
                 pyth: pyth
                     .map(|pyth| {
-                        pyth.oracle_address
+                        pyth.oracle_address_stable
                             .validate(api)
-                            .map(|oracle_address| PythConfig {
-                                oracle_address,
-                                age_tolerance_seconds: pyth.age_tolerance_seconds,
+                            .and_then(|oracle_address_stable| {
+                                pyth.oracle_address_edge
+                                    .validate(api)
+                                    .map(|oracle_address_edge| {
+                                        (oracle_address_stable, oracle_address_edge)
+                                    })
+                            })
+                            .map(|(oracle_address_stable, oracle_address_edge)| PythConfig {
+                                oracle_address_stable,
+                                oracle_address_edge,
+                                age_tolerance_seconds: pyth.age_tolerance_seconds.into(),
                             })
                     })
                     .transpose()?,

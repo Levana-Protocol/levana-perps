@@ -25,10 +25,12 @@ pub enum SpotPriceConfig {
 /// Configuration for pyth
 #[cw_serde]
 pub struct PythConfig {
-    /// The address of the pyth oracle module
-    pub oracle_address: Addr,
+    /// The address of the pyth oracle module on stable
+    pub oracle_address_stable: Addr,
+    /// The address of the pyth oracle module on edge
+    pub oracle_address_edge: Addr,
     /// The age tolerance for pyth price updates
-    pub age_tolerance_seconds: u32,
+    pub age_tolerance_seconds: u64,
 }
 
 /// An individual feed used to compose a final spot price
@@ -112,8 +114,10 @@ pub enum SpotPriceConfigInit {
 /// Configuration for pyth init messages
 #[cw_serde]
 pub struct PythConfigInit {
-    /// The address of the pyth oracle module
-    pub oracle_address: RawAddr,
+    /// The address of the pyth oracle module on stable
+    pub oracle_address_stable: RawAddr,
+    /// The address of the pyth oracle module on edge
+    pub oracle_address_edge: RawAddr,
     /// The age tolerance for pyth price updates
     pub age_tolerance_seconds: u32,
 }
