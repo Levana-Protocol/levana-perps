@@ -26,7 +26,7 @@ mv -i tmp/{Cargo.lock,LICENSE,rust-toolchain.toml} "$DIR"
 mkdir "$DIR/packages"
 mv -i tmp/packages/{msg,shared} "$DIR/packages"
 mkdir "$DIR/contracts"
-mv -i tmp/contracts/{factory,liquidity_token,position_token,market,pyth_bridge} "$DIR/contracts"
+mv -i tmp/contracts/{factory,liquidity_token,position_token,market} "$DIR/contracts"
 
 rm -rf tmp
 

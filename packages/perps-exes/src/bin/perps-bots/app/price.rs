@@ -1,16 +1,13 @@
-use std::{collections::HashMap, fmt::Display, str::FromStr, sync::Arc};
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use anyhow::Result;
 use axum::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use cosmos::{
-    proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, HasAddress, TxBuilder, Wallet,
+    proto::cosmwasm::wasm::v1::MsgExecuteContract, HasAddress, TxBuilder, Wallet,
 };
 use cosmwasm_std::Decimal256;
-use msg::{
-    contracts::pyth_bridge::entry::FeedType,
-    prelude::{PriceBaseInQuote, Signed, UnsignedDecimal},
-};
+use msg::prelude::*;
 use perps_exes::pyth::{get_latest_price, get_oracle_update_msg};
 use shared::storage::MarketId;
 
@@ -99,10 +96,12 @@ impl App {
         let (latest_price, _) = get_latest_price(
             &self.client,
             &pyth.market_price_feeds,
-            match pyth.feed_type {
-                FeedType::Stable => &self.endpoints_stable,
-                FeedType::Edge => &self.endpoints_edge,
-            },
+            // FIXME
+            &self.endpoints_stable,
+            // match pyth.feed_type {
+            //     FeedType::Stable => &self.endpoints_stable,
+            //     FeedType::Edge => &self.endpoints_edge,
+            // },
         )
         .await?;
         let reason = self
@@ -293,10 +292,12 @@ impl App {
         let oracle_msg = get_oracle_update_msg(
             &pyth.market_price_feeds,
             &wallet,
-            match pyth.feed_type {
-                FeedType::Stable => &self.endpoints_stable,
-                FeedType::Edge => &self.endpoints_edge,
-            },
+            // FIXME
+            &self.endpoints_stable,
+            // match pyth.feed_type {
+            //     FeedType::Stable => &self.endpoints_stable,
+            //     FeedType::Edge => &self.endpoints_edge,
+            // },
             &self.client,
             &pyth.oracle,
         )

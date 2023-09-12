@@ -205,7 +205,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                     ctx.response.add_event(InstantiateEvent {
                         kind: NewContractKind::Market,
                         market_id: market_id.clone(),
-                        addr: addr.clone(),
+                        addr
                     });
 
                     // now that the market fully exists, including for factory market lookups

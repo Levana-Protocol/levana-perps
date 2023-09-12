@@ -1,47 +1,34 @@
-//! Spot price events
+//! Spot price data structures 
 
 use std::str::FromStr;
-
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Addr;
 use pyth_sdk_cw::PriceIdentifier;
-use shared::{storage::{PriceBaseInQuote, PriceCollateralInUsd}, time::Timestamp};
 
-/// The current spot price for this market 
-#[cw_serde]
-pub struct SpotPriceResp {
-    /// Price of the base asset in terms of the quote asset
-    pub price: PriceBaseInQuote,
-    /// Price of the collateral asset in terms of USD
-    ///
-    /// This is used by the protocol to track USD values. This field is
-    /// optional, as markets with USD as the quote asset do not need to
-    /// provide it.
-    pub price_usd: Option<PriceCollateralInUsd>,
-
-    /// Latest price publish time for the feeds composing the price, if available
-    pub publish_time: Option<Timestamp>,
-    /// Latest price publish time for the feeds composing the price_usd, if available
-    pub publish_time_usd: Option<Timestamp>,
-}
 
 /// Spot price config 
 #[cw_serde]
-pub struct SpotPriceConfig {
-    /// sequence of spot price feeds which are composed to generate a single spot price
-    pub feeds: Vec<SpotPriceFeed>,
-    /// if necessary, sequence of spot price feeds which are composed to generate a single USD spot price
-    pub feeds_usd: Option<Vec<SpotPriceFeed>>,
+pub enum SpotPriceConfig {
+    /// Manual spot price, mostly used for testing purposes
+    Manual,
+    /// External oracle
+    Oracle {
+        /// Pyth configuration, required on chains that use pyth feeds 
+        pyth: Option<PythConfig>,
+        /// sequence of spot price feeds which are composed to generate a single spot price
+        feeds: Vec<SpotPriceFeed>,
+        /// if necessary, sequence of spot price feeds which are composed to generate a single USD spot price
+        feeds_usd: Option<Vec<SpotPriceFeed>>,
+    }
 }
 
-#[cfg(test)]
-impl SpotPriceConfig {
-    pub fn empty() -> Self {
-        Self {
-            feeds: vec![],
-            feeds_usd: None,
-        }
-    }
+/// Configuration for pyth 
+#[cw_serde]
+pub struct PythConfig {
+    /// The address of the pyth oracle module
+    pub oracle_address: Addr,
+    /// The age tolerance for pyth price updates
+    pub age_tolerance_seconds: u32,
 }
 
 /// An individual feed used to compose a final spot price
@@ -61,7 +48,7 @@ pub enum SpotPriceFeedData {
         /// The identifier on pyth
         id: PriceIdentifier,
         /// Which network to use for the price service
-        network: PythPriceServiceNetwork
+        network: PythPriceServiceNetwork,
     },
     /// TODO: Stride liquid staking
     Stride {
@@ -70,16 +57,11 @@ pub enum SpotPriceFeedData {
         /// The IBC denom for the asset
         denom: String,
     },
-    /// Native oracle module on the chain
-    NativeOracle {
+    /// Native oracle module on the sei chain
+    Sei {
         /// The denom to use
         denom: String
     },
-    /// Manually set price feed. This is useful for testing 
-    Manual {
-        /// some unique identifier for the storage 
-        id: String
-    }
 }
 
 /// Which network to use for the price service
@@ -108,15 +90,6 @@ impl FromStr for PythPriceServiceNetwork {
             )),
         }
     }
-}
-
-/// Price feed
-#[cw_serde]
-pub struct PythPriceFeed {
-    /// The price feed id
-    pub id: PriceIdentifier,
-    /// is this price feed inverted
-    pub inverted: bool,
 }
 
 /// Spot price events

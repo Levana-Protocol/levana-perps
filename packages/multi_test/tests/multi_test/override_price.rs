@@ -69,6 +69,8 @@ fn status() {
         timestamp: market.now(),
         is_notional_usd: market.id.is_notional_usd(),
         market_type,
+        publish_time: None,
+        publish_time_usd: None,
     };
 
     assert_ne!(status1.long_usd, status2.long_usd);

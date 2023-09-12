@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{Context, Result};
 use cosmos::{Address, Cosmos, CosmosNetwork, HasAddress, HasAddressType, Wallet};
-use msg::{contracts::pyth_bridge::entry::FeedType, prelude::MarketId};
+use msg::prelude::*;
 use perps_exes::config::{
     ChainConfig, ConfigTestnet, DeploymentConfigTestnet, PythConfig, PythMarketPriceFeeds,
 };
@@ -40,13 +40,14 @@ pub(crate) enum PriceSourceConfig {
 pub(crate) struct AppMainnet {
     pub(crate) cosmos: Cosmos,
     pub(crate) wallet: Wallet,
+    #[allow(dead_code)]
     pub(crate) pyth: PythInfo,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub(crate) struct PythInfo {
     pub address: Address,
-    pub feed_type: FeedType,
     pub markets: HashMap<MarketId, PythMarketPriceFeeds>,
     pub update_age_tolerance: u32,
 }
@@ -135,11 +136,12 @@ impl Opt {
 
             PriceSourceConfig::Pyth(PythInfo {
                 address: pyth_contract.contract,
-                feed_type: pyth_contract.r#type,
-                markets: match pyth_contract.r#type {
-                    FeedType::Stable => pyth_config.markets_stable.clone(),
-                    FeedType::Edge => pyth_config.markets_edge.clone(),
-                },
+                //FIXME
+                markets: pyth_config.markets_stable.clone(),
+                // markets: match pyth_contract.r#type {
+                //     FeedType::Stable => pyth_config.markets_stable.clone(),
+                //     FeedType::Edge => pyth_config.markets_edge.clone(),
+                // },
                 update_age_tolerance: pyth_config.update_age_tolerance,
             })
         };
@@ -167,7 +169,8 @@ impl Opt {
             .pyth
             .with_context(|| format!("No Pyth configuration found for {network}"))?;
 
-        anyhow::ensure!(pyth_contract.r#type == FeedType::Stable);
+        // FIXME
+        // anyhow::ensure!(pyth_contract.r#type == FeedType::Stable);
 
         // Pyth config validation
         for (market_id, market_price_feeds) in pyth_config
@@ -185,7 +188,6 @@ impl Opt {
 
         let pyth = PythInfo {
             address: pyth_contract.contract,
-            feed_type: pyth_contract.r#type,
             markets: pyth_config.markets_stable.clone(),
             update_age_tolerance: pyth_config.update_age_tolerance,
         };

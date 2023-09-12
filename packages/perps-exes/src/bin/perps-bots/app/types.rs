@@ -65,6 +65,7 @@ pub(crate) struct App {
     /// Ensure that the crank and price bots don't try to work at the same time
     pub(crate) crank_lock: Mutex<()>,
     pub(crate) endpoints_stable: PythEndpoints,
+    #[allow(dead_code)]
     pub(crate) endpoints_edge: PythEndpoints,
 }
 

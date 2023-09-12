@@ -5,10 +5,7 @@ use std::{collections::HashMap, path::Path};
 use cosmos::{Address, CosmosNetwork, RawAddress};
 use cosmwasm_std::{Uint128, Uint256};
 use msg::{
-    contracts::{
-        market::config::ConfigUpdate,
-        pyth_bridge::{entry::FeedType, PythPriceFeed},
-    },
+    contracts::market::{config::ConfigUpdate, spot_price::{SpotPriceFeed, SpotPriceFeedData}},
     prelude::*,
 };
 
@@ -16,13 +13,13 @@ use msg::{
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PythMarketPriceFeeds {
     /// feed of the base asset in terms of the quote asset
-    pub feeds: Vec<PythPriceFeed>,
+    pub feeds: Vec<SpotPriceFeed>,
     /// feed of the collateral asset in terms of USD
     ///
     /// This is used by the protocol to track USD values. This field is
     /// optional, as markets with USD as the quote asset do not need to
     /// provide it.
-    pub feeds_usd: Option<Vec<PythPriceFeed>>,
+    pub feeds_usd: Option<Vec<SpotPriceFeed>>,
 }
 
 /// Overall configuration of Pyth, for information valid across all chains.
@@ -126,7 +123,7 @@ impl std::fmt::Debug for GasAmount {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PythContract {
     pub contract: Address,
-    pub r#type: FeedType,
+    pub r#type: SpotPriceFeedData,
 }
 
 #[derive(serde::Deserialize, Debug)]

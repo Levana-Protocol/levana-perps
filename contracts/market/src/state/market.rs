@@ -14,6 +14,10 @@ struct PriceStorage {
     price_usd: PriceCollateralInUsd,
     /// Store the original incoming price in base to avoid rounding errors.
     price_base: PriceBaseInQuote,
+    /// Latest price publish time for the feeds composing the price, if available
+    publish_time: Option<Timestamp>,
+    /// Latest price publish time for the feeds composing the price_usd, if available
+    publish_time_usd: Option<Timestamp>,
 }
 
 impl State<'_> {
@@ -25,6 +29,8 @@ impl State<'_> {
             price,
             price_usd,
             price_base,
+            publish_time,
+            publish_time_usd
         }: PriceStorage,
     ) -> Result<PricePoint> {
         let market_id = self.market_id(store)?;
@@ -37,6 +43,8 @@ impl State<'_> {
             price_base,
             is_notional_usd: market_id.is_notional_usd(),
             market_type,
+            publish_time,
+            publish_time_usd
         })
     }
     fn spot_price_inner(&self, store: &dyn Storage, timestamp: Timestamp) -> Result<PricePoint> {
@@ -84,6 +92,12 @@ impl State<'_> {
             let market_type = market_id.get_market_type();
             let price_usd = get_price_usd(base, collateral, market_id)?;
             let price = base.into_notional_price(market_type);
+
+            let (publish_time, publish_time_usd) = self
+                .spot_price_cache
+                .get()
+                .map_or((None, None), |x| (x.publish_time, x.publish_time_usd));
+
             let price = PricePoint {
                 price_notional: price,
                 price_usd,
@@ -91,7 +105,10 @@ impl State<'_> {
                 timestamp: self.now(),
                 is_notional_usd: market_id.is_notional_usd(),
                 market_type,
+                publish_time,
+                publish_time_usd
             };
+
             self.spot_price_cache
                 .set(price)
                 .ok()

@@ -26,16 +26,6 @@ impl AddMarketOpt {
         let factory = app.tracker.get_factory(&self.family).await?.into_contract();
         let factory = Factory::from_contract(factory);
         let instantiate_market = app.make_instantiate_market(self.market.clone())?;
-        let price_admin = match app.price_source {
-            PriceSourceConfig::Pyth(pyth_info) => {
-                let code_id = app.tracker.require_code_by_type(&opt, PYTH_BRIDGE).await?;
-                let pyth_bridge = pyth_info
-                    .make_pyth_bridge(code_id, &app.basic.wallet, &factory, self.market)
-                    .await?;
-                pyth_bridge.get_address()
-            }
-            PriceSourceConfig::Wallet(addr) => addr,
-        };
         let add_market_params = AddMarketParams {
             trading_competition: app.trading_competition,
             faucet_admin: Some(app.wallet_manager),

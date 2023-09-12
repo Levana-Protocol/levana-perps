@@ -7,12 +7,9 @@ use std::{collections::HashSet, path::PathBuf, sync::Arc};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, HasAddress, TxBuilder};
-use msg::contracts::{
-    market::{
-        entry::{PositionAction, PositionActionKind, TradeHistorySummary},
-        position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
-    },
-    pyth_bridge::entry::FeedType,
+use msg::contracts::market::{
+    entry::{PositionAction, PositionActionKind, TradeHistorySummary},
+    position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
 };
 use parking_lot::Mutex;
 use perps_exes::{
@@ -122,16 +119,20 @@ async fn update_pyth(
 
     let basic = opt.load_basic_app(network).await?;
     let pyth = PythConfig::load(config_pyth)?;
-    let endpoints = VecWithCurr::new(match r#type {
-        FeedType::Stable => pyth.endpoints_stable.clone(),
-        FeedType::Edge => pyth.endpoints_edge.clone(),
-    });
+    // FIXME
+    let endpoints = VecWithCurr::new(pyth.endpoints_stable.clone());
+    // let endpoints = VecWithCurr::new(match r#type {
+    //     FeedType::Stable => pyth.endpoints_stable.clone(),
+    //     FeedType::Edge => pyth.endpoints_edge.clone(),
+    // });
 
     let client = reqwest::Client::new();
-    let feeds = match r#type {
-        FeedType::Stable => &pyth.markets_stable,
-        FeedType::Edge => &pyth.markets_edge,
-    }
+    // FIXME
+    let feeds = &pyth.markets_stable
+    // let feeds = match r#type {
+    //     FeedType::Stable => &pyth.markets_stable,
+    //     FeedType::Edge => &pyth.markets_edge,
+    // }
     .get(&market)
     .with_context(|| format!("No Pyth feed data found for {market}"))?;
 

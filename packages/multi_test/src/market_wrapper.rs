@@ -45,7 +45,7 @@ use msg::contracts::market::entry::{
     TradeHistorySummary, TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
-use msg::contracts::market::spot_price::{SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData};
+use msg::contracts::market::spot_price::SpotPriceConfig;
 use msg::contracts::market::{
     config::{Config, ConfigUpdate},
     entry::{
@@ -152,15 +152,7 @@ impl PerpsMarket {
                     liquidity_cooldown_seconds: Some(0),
                     ..Default::default()
                 }),
-                spot_price: SpotPriceConfig {
-                    feeds: vec![SpotPriceFeed { 
-                        data: SpotPriceFeedData::Manual {
-                            id: DEFAULT_MARKET.spot_price_id.clone(),
-                        },
-                        inverted: false 
-                    }],
-                    feeds_usd: None, 
-                },
+                spot_price: SpotPriceConfig::Manual,
                 initial_borrow_fee_rate: "0.01".parse().unwrap(),
             },
         };
@@ -764,12 +756,12 @@ impl PerpsMarket {
         // TODO: remove this and just explicitly crank where needed?
         self.exec_crank_n(&Addr::unchecked("refresh-price"), 1)
     }
-    pub fn exec_set_price(&self, price: PriceBaseInQuote) -> Result<Vec<AppResponse>> {
+    pub fn exec_set_price(&self, price: PriceBaseInQuote) -> Result<AppResponse> {
         self.exec_set_price_with_usd(price, None)
     }
 
     pub fn exec_set_price_and_crank(&self, price: PriceBaseInQuote) -> Result<Vec<AppResponse>> {
-        let mut responses = self.exec_set_price_with_usd(price, None)?;
+        let mut responses = vec![self.exec_set_price_with_usd(price, None)?];
         responses.push(self.exec_crank_n(&Addr::unchecked("set-price"), 1)?);
 
         Ok(responses)
@@ -779,35 +771,21 @@ impl PerpsMarket {
         &self,
         price: PriceBaseInQuote,
         price_usd: Option<PriceCollateralInUsd>,
-    ) -> Result<Vec<AppResponse>> {
-        let mut responses = Vec::new();
-
-        responses.push(self.exec(
+    ) -> Result<AppResponse> {
+        self.exec(
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
             &MarketExecuteMsg::Owner(MarketExecuteOwnerMsg::SetManualPrice { 
-                id: DEFAULT_MARKET.spot_price_id.clone(), 
-                price: price.into_non_zero()
+                price,
+                price_usd
             })
-        )?);
-
-        if let Some(price_usd) = price_usd {
-            responses.push(self.exec(
-                &Addr::unchecked(&TEST_CONFIG.protocol_owner),
-                &MarketExecuteMsg::Owner(MarketExecuteOwnerMsg::SetManualPrice { 
-                    id: DEFAULT_MARKET.spot_price_usd_id.clone(), 
-                    price: price_usd.into_number().try_into_non_zero().context("price must be greater than zero")?
-                })
-            )?);
-        }
-
-        Ok(responses)
+        )
     }
 
     pub fn exec_set_config(&self, config_update: ConfigUpdate) -> Result<AppResponse> {
         self.exec(
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
             &MarketExecuteMsg::Owner(MarketExecuteOwnerMsg::ConfigUpdate {
-                update: config_update,
+                update: Box::new(config_update),
             }),
         )
     }

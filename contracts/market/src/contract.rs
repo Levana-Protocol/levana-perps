@@ -145,7 +145,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
             match owner_msg {
                 ExecuteOwnerMsg::ConfigUpdate { update } => {
-                    update_config(&mut state.config, ctx.storage, update)?;
+                    update_config(&mut state.config, ctx.storage, *update)?;
                 }
                 ExecuteOwnerMsg::SetManualPrice{ .. } => {
                     unimplemented!("FIXME")

@@ -12,9 +12,6 @@ members = [
     "contracts/ibc_execute_proxy",
     "contracts/farming",
 
-    # Third-party, mainnet contracts (i.e. oracles)
-    "contracts/pyth_bridge", 
-
     # Testnet support contracts
     "contracts/cw20",
     "contracts/faucet",

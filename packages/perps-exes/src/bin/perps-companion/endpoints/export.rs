@@ -576,7 +576,7 @@ mod tests {
         Fees, LpAction, LpActionKind, PositionAction, PositionActionKind, StatusResp,
     };
     use msg::contracts::market::position::PositionId;
-    use msg::contracts::market::spot_price::{SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData};
+    use msg::contracts::market::spot_price::SpotPriceConfig;
     use msg::token::Token;
     use shared::market_type::MarketType;
     use shared::number::{Collateral, Signed};
@@ -595,15 +595,7 @@ mod tests {
                 denom: "".to_string(),
                 decimal_places: 0,
             },
-            config: Config::new(SpotPriceConfig {
-                feeds: vec![SpotPriceFeed {
-                    data: SpotPriceFeedData::Manual { 
-                        id: "BASE/QUOTE".to_string(),
-                    },
-                    inverted: false,
-                }],
-                feeds_usd: None,
-            }),
+            config: Config::new(SpotPriceConfig::Manual),
             liquidity: Default::default(),
             next_crank: None,
             last_crank_completed: None,

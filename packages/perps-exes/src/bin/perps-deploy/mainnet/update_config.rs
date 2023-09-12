@@ -60,7 +60,7 @@ async fn go(
                 contract_addr: market.market.get_address_string(),
                 msg: to_binary(&strip_nulls(MarketExecuteMsg::Owner(
                     ExecuteOwnerMsg::ConfigUpdate {
-                        update: update.clone(),
+                        update: Box::new(update.clone()),
                     },
                 ))?)?,
                 funds: vec![],

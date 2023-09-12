@@ -302,14 +302,17 @@ pub enum ExecuteOwnerMsg {
     /// Update the config
     ConfigUpdate {
         /// New configuration parameters
-        update: ConfigUpdate,
+        update: Box<ConfigUpdate>,
     },
     /// Set manual price (mostly for testing)
     SetManualPrice {
-        /// The unique price feed identifier
-        id: String,
-        /// Price of the base asset in terms of the quote asset
-        price: NumberGtZero,
+        /// Price of the base asset in terms of the quote.
+        price: PriceBaseInQuote,
+        /// Price of the collateral asset in terms of USD.
+        ///
+        /// This is generally used for reporting of values like PnL and trade
+        /// volume.
+        price_usd: Option<PriceCollateralInUsd>,
     }
 }
 
@@ -980,7 +983,7 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
         match u.int_in_range::<u8>(0..=23)? {
             //0 => Ok(ExecuteMsg::Owner(u.arbitrary()?)),
             0 => Ok(ExecuteMsg::Owner(ExecuteOwnerMsg::ConfigUpdate {
-                update: ConfigUpdate::default(),
+                update: Box::<ConfigUpdate>::default()
             })),
             1 => Ok(ExecuteMsg::OpenPosition {
                 slippage_assert: u.arbitrary()?,

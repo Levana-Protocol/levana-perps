@@ -139,6 +139,7 @@ pub(crate) async fn go(
     })
     .await?;
 
+    bail!("TODO - set initial price");
     // Set the price for the markets.
     for MarketResponse {
         market_id,
@@ -146,7 +147,6 @@ pub(crate) async fn go(
         cw20: _,
     } in &res.markets
     {
-        bail!("TODO - set initial price");
         // let set_price = basic
         //     .cosmos
         //     .make_contract(*market_addr)

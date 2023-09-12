@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use anyhow::{Context, Result};
-use cosmos::{Address, CodeId, Contract, ContractAdmin, Cosmos, HasAddress, Wallet};
+use cosmos::{Address, CodeId, ContractAdmin, Cosmos, HasAddress, Wallet};
 use msg::contracts::market::spot_price::SpotPriceConfig;
 use msg::prelude::*;
 use msg::{
@@ -11,10 +11,10 @@ use msg::{
     },
     token::TokenInit,
 };
-use perps_exes::config::{MarketConfigUpdates, PythMarketPriceFeeds};
+use perps_exes::config::MarketConfigUpdates;
 use perps_exes::prelude::MarketContract;
 
-use crate::app::{App, PythInfo};
+use crate::app::App;
 use crate::store_code::PYTH_BRIDGE;
 use crate::{
     app::BasicApp,
@@ -208,25 +208,6 @@ pub(crate) async fn instantiate(
     let mut market_res = Vec::<MarketResponse>::new();
 
     for market in markets {
-        let price_admin = match &price_source {
-            crate::app::PriceSourceConfig::Pyth(pyth_info) => {
-                let pyth_bridge = pyth_info
-                    .make_pyth_bridge(
-                        pyth_bridge_code_id.clone(),
-                        wallet,
-                        &factory,
-                        market.market_id.clone(),
-                    )
-                    .await?;
-                to_log.push((pyth_bridge_code_id.get_code_id(), pyth_bridge.get_address()));
-                pyth_bridge.get_address()
-            }
-            crate::app::PriceSourceConfig::Wallet(addr) => {
-                log::info!("No Pyth info provided, skipping Pyth bridge instantiation and using {addr} as price admin");
-                *addr
-            }
-        };
-
         let spot_price = market.spot_price.clone();
         let res = market
             .add(
@@ -460,43 +441,5 @@ impl InstantiateMarket {
             market_addr,
             cw20: cw20.get_address(),
         })
-    }
-}
-
-impl PythInfo {
-    pub(crate) async fn make_pyth_bridge(
-        &self,
-        pyth_bridge_code_id: CodeId,
-        wallet: &Wallet,
-        factory: &Factory,
-        market: MarketId,
-    ) -> Result<Contract> {
-        let PythMarketPriceFeeds { feeds, feeds_usd } = self
-            .markets
-            .get(&market)
-            .with_context(|| format!("No Pyth price feed info found for {market}"))?;
-        let pyth_bridge = pyth_bridge_code_id
-            .instantiate(
-                wallet,
-                "Levana Perps Pyth Bridge".to_string(),
-                vec![],
-                msg::contracts::pyth_bridge::entry::InstantiateMsg {
-                    factory: factory.get_address().to_string().into(),
-                    pyth: self.address.to_string().into(),
-                    update_age_tolerance_seconds: self.update_age_tolerance,
-                    feed_type: self.feed_type,
-                    market,
-                    feeds: feeds.clone(),
-                    feeds_usd: feeds_usd.clone(),
-                },
-                ContractAdmin::Sender,
-            )
-            .await?;
-        log::info!(
-            "New Pyth bridge deployed at {pyth_bridge} w/ update age tolerance of {}",
-            self.update_age_tolerance
-        );
-
-        Ok(pyth_bridge)
     }
 }

@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use cosmos::{Address, ContractAdmin, CosmosNetwork, HasAddress};
 use cosmwasm_std::{to_binary, CosmosMsg, Empty};
 use msg::{
-    contracts::{market::entry::NewMarketParams, pyth_bridge::entry::FeedType},
+    contracts::market::entry::NewMarketParams,
     token::TokenInit,
 };
 use perps_exes::{
@@ -165,13 +165,12 @@ enum ContractType {
     Market,
     LiquidityToken,
     PositionToken,
-    PythBridge,
 }
 
 impl ContractType {
-    fn all() -> [ContractType; 5] {
+    fn all() -> [ContractType; 4] {
         use ContractType::*;
-        [Factory, Market, LiquidityToken, PositionToken, PythBridge]
+        [Factory, Market, LiquidityToken, PositionToken]
     }
 
     fn as_str(self) -> &'static str {
@@ -180,7 +179,6 @@ impl ContractType {
             ContractType::Market => "market",
             ContractType::LiquidityToken => "liquidity_token",
             ContractType::PositionToken => "position_token",
-            ContractType::PythBridge => "pyth_bridge",
         }
     }
 }
@@ -194,7 +192,6 @@ impl FromStr for ContractType {
             "market" => Ok(ContractType::Market),
             "liquidity_token" => Ok(ContractType::LiquidityToken),
             "position_token" => Ok(ContractType::PositionToken),
-            "pyth_bridge" => Ok(ContractType::PythBridge),
             _ => Err(anyhow::anyhow!("Invalid contract type: {s}")),
         }
     }
@@ -465,29 +462,6 @@ async fn new_pyth_bridge(
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
-
-    let pyth_bridge = code_ids.get_simple(ContractType::PythBridge, &opt, factory.network)?;
-    let pyth_bridge = app.cosmos.make_code_id(pyth_bridge);
-
-    log::info!("Deploying a new Pyth bridge");
-    let pyth_bridge = pyth_bridge
-        .instantiate(
-            &app.wallet,
-            format!("{} - {market_id} Pyth bridge", factory.label),
-            vec![],
-            msg::contracts::pyth_bridge::entry::InstantiateMsg {
-                factory: factory.address.get_address_string().into(),
-                pyth: app.pyth.address.get_address_string().into(),
-                update_age_tolerance_seconds: app.pyth.update_age_tolerance,
-                feed_type: FeedType::Stable,
-                market: market_id,
-                feeds,
-                feeds_usd,
-            },
-            ContractAdmin::NoAdmin,
-        )
-        .await?;
-    log::info!("New Pyth bridge contract: {pyth_bridge}");
 
     Ok(())
 }

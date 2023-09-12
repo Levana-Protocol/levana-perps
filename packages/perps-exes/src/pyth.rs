@@ -6,7 +6,7 @@ use cosmos::proto::cosmwasm::wasm::v1::MsgExecuteContract;
 use cosmos::{Contract, HasAddress};
 use cosmwasm_std::{Binary, Coin, Decimal256, Uint256};
 use itertools::Itertools;
-use msg::contracts::pyth_bridge::PythPriceFeed;
+use msg::contracts::market::spot_price::{SpotPriceFeed, SpotPriceFeedData};
 use msg::prelude::*;
 use shared::storage::{PriceBaseInQuote, PriceCollateralInUsd};
 pub use vec_with_curr::VecWithCurr;
@@ -52,7 +52,12 @@ async fn get_wormhole_proofs(
         .feeds
         .iter()
         .chain(market_price_feeds.feeds_usd.as_deref().unwrap_or_default())
-        .map(|f| f.id)
+        .map(|f| {
+            match f.data {
+                SpotPriceFeedData::Pyth { id, ..} => id,
+                _ => unimplemented!("FIXME")
+            }
+        })
         .sorted()
         .dedup()
         .collect_vec();
@@ -111,11 +116,15 @@ pub async fn get_latest_price(
 async fn price_helper(
     client: &reqwest::Client,
     endpoint: &str,
-    feeds: &[PythPriceFeed],
+    feeds: &[SpotPriceFeed],
 ) -> Result<Decimal256> {
+
     let mut req = client.get(format!("{}api/latest_price_feeds", endpoint));
     for feed in feeds {
-        req = req.query(&[("ids[]", feed.id)]);
+        req = match feed.data {
+            SpotPriceFeedData::Pyth { id, .. } => req.query(&[("ids[]", id)]),
+            _ => unimplemented!("FIXME")
+        };
     }
 
     #[derive(serde::Deserialize)]
@@ -143,9 +152,14 @@ async fn price_helper(
     let mut final_price = Decimal256::one();
 
     for feed in feeds {
+        let id = match feed.data {
+            SpotPriceFeedData::Pyth { id, .. } => id, 
+            _ => unimplemented!("FIXME")
+        };
+
         let Price { expo, price } = prices
-            .get(&feed.id.to_hex())
-            .with_context(|| format!("Missing price for ID {}", feed.id))?;
+            .get(&id.to_hex())
+            .with_context(|| format!("Missing price for ID {}", id))?;
 
         anyhow::ensure!(*expo <= 0, "Exponent from Pyth must always be negative");
         let component = Decimal256::from_atomics(*price, expo.abs().try_into()?)?;

@@ -40,6 +40,10 @@ pub struct PricePoint {
     /// Indicates if this market uses collateral as base or quote, needed for
     /// price conversions.
     pub market_type: MarketType,
+    /// Latest price publish time for the feeds composing the price, if available
+    pub publish_time: Option<Timestamp>,
+    /// Latest price publish time for the feeds composing the price_usd, if available
+    pub publish_time_usd: Option<Timestamp>,
 }
 
 impl PricePoint {

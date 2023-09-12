@@ -19,11 +19,11 @@ impl InitUi {
             let bridge = match crate::bridge::Bridge::connect().await {
                 Ok(bridge) => {
                     bridge.exec_market(ExecuteMsg::Owner(ExecuteOwnerMsg::ConfigUpdate {
-                        update:  ConfigUpdate{
+                        update:  Box::new(ConfigUpdate{
                             crank_fee_charged: Some("0.01".parse().unwrap()),
                             crank_fee_reward: Some("0.001".parse().unwrap()),
                             ..Default::default()
-                        }
+                        })
                     }), None).await.unwrap();
 
                     let resp = bridge.query_market::<StatusResp>(QueryMsg::Status { price:None }).await.unwrap();
