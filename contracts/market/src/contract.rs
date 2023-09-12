@@ -147,6 +147,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     if info.requires_spot_price_append {
         append_spot_price(&mut state, &mut ctx, &info.sender)?;
     }
+
     match info.msg {
         ExecuteMsg::Owner(owner_msg) => {
             state.assert_auth(&info.sender, AuthCheck::Owner)?;

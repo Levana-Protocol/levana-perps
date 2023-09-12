@@ -26,6 +26,9 @@ cargo-compile:
 market-test collateral-type token-kind:
 	env MARKET_COLLATERAL_TYPE={{collateral-type}} MARKET_TOKEN_KIND={{token-kind}} cargo test --workspace --locked
 
+temp-test-staleness:
+	env MARKET_COLLATERAL_TYPE=quote MARKET_TOKEN_KIND=cw20 cargo test --package levana_perpswap_multi_test --test multi_test -- staleness::staleness --exact --nocapture
+
 # cargo tests check
 cargo-test-check:
 	just market-test base native

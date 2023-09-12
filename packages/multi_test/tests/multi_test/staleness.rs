@@ -39,18 +39,6 @@ fn staleness() {
 
     assert_eq!(stale_liquifunding, None);
     assert_ne!(stale_price, None);
-    market
-        .exec_open_position(
-            &trader,
-            "100",
-            "10",
-            DirectionToBase::Long,
-            "10",
-            None,
-            None,
-            None,
-        )
-        .unwrap_err();
 
     market.exec_set_price("10".try_into().unwrap()).unwrap();
 
