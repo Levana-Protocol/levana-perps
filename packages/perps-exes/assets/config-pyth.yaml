@@ -71,3 +71,13 @@ markets-edge:
     feeds: [
       { id: "ca80ba6dc32e08d06f1aa886011eed1d77c77be9eb761cc10d72b7d0a2fd57a6", inverted: false }
     ]
+  OSMO_USDC:
+    feeds: [
+      { id: "d9437c194a4b00ba9d7652cd9af3905e73ee15a2ca4152ac1f8d430cc322b857", inverted: false }
+    ]
+    feeds-usd: [
+      # Hacky solution: provide a price and its inverse to get 1. Should be
+      # fixed correctly in new oracle approach.
+      { id: "d9437c194a4b00ba9d7652cd9af3905e73ee15a2ca4152ac1f8d430cc322b857", inverted: false },
+      { id: "d9437c194a4b00ba9d7652cd9af3905e73ee15a2ca4152ac1f8d430cc322b857", inverted: true }
+    ]
