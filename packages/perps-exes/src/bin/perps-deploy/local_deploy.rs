@@ -4,7 +4,8 @@ use anyhow::{Context, Result};
 use cosmos::{ContractAdmin, CosmosNetwork, HasAddress};
 use msg::contracts::{
     cw20::{entry::InstantiateMinter, Cw20Coin},
-    market::config::ConfigUpdate,
+    farming::entry::OwnerExecuteMsg,
+    market::{config::ConfigUpdate, entry::ExecuteOwnerMsg},
 };
 use msg::prelude::*;
 
@@ -135,7 +136,6 @@ pub(crate) async fn go(
     })
     .await?;
 
-    bail!("TODO - set initial price");
     // Set the price for the markets.
     for MarketResponse {
         market_id,
@@ -143,30 +143,28 @@ pub(crate) async fn go(
         cw20: _,
     } in &res.markets
     {
-        // let set_price = basic
-        //     .cosmos
-        //     .make_contract(*market_addr)
-        //     .execute(
-        //         &basic.wallet,
-        //         vec![],
-        //         msg::contracts::market::entry::ExecuteMsg::SetPrice {
-        //             price: initial_price,
-        //             price_usd: if market_id.is_notional_usd() {
-        //                 None
-        //             } else {
-        //                 Some(collateral_price)
-        //             },
-        //             execs: None,
-        //             rewards: None,
-        //         },
-        //     )
-        //     .await
-        //     .context("Unable to set price")?;
-        // log::info!(
-        //     "Set initial price in market {} to {initial_price} in {}",
-        //     market_id,
-        //     set_price.txhash
-        // );
+        let set_price = basic
+            .cosmos
+            .make_contract(*market_addr)
+            .execute(
+                &basic.wallet,
+                vec![],
+                msg::contracts::market::entry::ExecuteMsg::Owner(ExecuteOwnerMsg::SetManualPrice {
+                    price: initial_price,
+                    price_usd: if market_id.is_notional_usd() {
+                        None
+                    } else {
+                        Some(collateral_price)
+                    },
+                }),
+            )
+            .await
+            .context("Unable to set price")?;
+        log::info!(
+            "Set initial price in market {} to {initial_price} in {}",
+            market_id,
+            set_price.txhash
+        );
 
         // Wait until the new price is in the system
         for _ in 0..100 {
