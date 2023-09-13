@@ -127,7 +127,7 @@ impl Opt {
             PriceSourceConfig::Oracle(self.get_oracle_info(
                 &basic.chain_config,
                 &basic.price_config,
-                family,
+                partial.network,
             )?)
         };
 
@@ -148,19 +148,19 @@ impl Opt {
         &self,
         chain_config: &ChainConfig,
         global_price_config: &PriceConfig,
-        family: &str,
+        network: CosmosNetwork,
     ) -> Result<OracleInfo> {
         let chain_spot_price_config = chain_config
             .spot_price
             .as_ref()
-            .with_context(|| format!("No spot price config found for {family}"))?;
+            .with_context(|| format!("No spot price config found for {:?}", network))?;
 
         let mut markets = HashMap::new();
 
         for (market_id, price_feed_configs) in global_price_config
             .networks
-            .get(family)
-            .context("No price feed config found for {family}")?
+            .get(&network)
+            .with_context(|| format!("No price feed config found for {:?}", network))?
             .iter()
         {
             let mut feeds = vec![];
@@ -192,12 +192,14 @@ impl Opt {
                                 PythPriceServiceNetwork::Edge => &global_price_config.pyth.edge,
                                 PythPriceServiceNetwork::Stable => &global_price_config.pyth.stable,
                             },
-                            None => bail!("No pyth config found for {family}"),
+                            None => bail!("No pyth config found for {:?}", network),
                         };
                         let id = id_lookup
                             .feed_ids
                             .get(&key)
-                            .context("No pyth config found for {id} on {family}")?
+                            .with_context(|| {
+                                format!("No pyth config found for {} on {:?}", key, network)
+                            })?
                             .clone();
 
                         feeds.push(SpotPriceFeed {

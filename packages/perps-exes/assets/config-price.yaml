@@ -95,3 +95,54 @@ networks:
       feeds-usd: [
         !constant { price: "1", inverted: false }
       ]
+    OSMO_USDC:
+      feeds: [
+        !pyth { key: "OSMO_USD", inverted: false },
+        !pyth { key: "USDC_USD", inverted: true }
+      ]
+      feeds-usd: [
+        !pyth { key: "OSMO_USD", inverted: false }
+      ]
+    ETH_BTC:
+      feeds: [
+        !pyth { key: "ETH_USD", inverted: false },
+        !pyth { key: "BTC_USD", inverted: true }
+      ]
+      feeds-usd: [
+        !pyth { key: "BTC_USD", inverted: false }
+      ]
+    ETH_USD:
+      feeds: [
+        !pyth { key: "ETH_USD", inverted: false },
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    axlETH_USD:
+      feeds: [
+        !pyth { key: "ETH_USD", inverted: false },
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    BTC_USD:
+      feeds: [
+        !pyth { key: "BTC_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    OSMO_USD:
+      feeds: [
+        !pyth { key: "OSMO_USD", inverted: false}
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    SEI_USD:
+      feeds: [
+        !pyth { key: "SEI_USD", inverted: false}
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]

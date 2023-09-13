@@ -117,11 +117,7 @@ async fn update_pyth(
         .context("No Pyth oracle found for network {network}")?;
     let basic = opt.load_basic_app(network).await?;
 
-    let oracle_info = opt.get_oracle_info(
-        &basic.chain_config,
-        &basic.price_config,
-        &network.to_string(),
-    )?;
+    let oracle_info = opt.get_oracle_info(&basic.chain_config, &basic.price_config, network)?;
 
     // FIXME
     let endpoints = VecWithCurr::new(match pyth.r#type {

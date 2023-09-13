@@ -66,7 +66,7 @@ pub struct ChainStrideConfig {
 pub struct PriceConfig {
     pub pyth: PythPriceConfig,
     /// Mappings from a key to price feed  
-    pub networks: HashMap<String, HashMap<MarketId, MarketPriceFeedConfigs>>,
+    pub networks: HashMap<CosmosNetwork, HashMap<MarketId, MarketPriceFeedConfigs>>,
 }
 
 /// Overall configuration of Pyth, for information valid across all chains.

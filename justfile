@@ -155,6 +155,7 @@ run-companion:
 # Deploy to Osmosis tesntet
 deploy-osmosis-testnet:
 	cargo run --bin perps-deploy testnet store-code --network osmosis-testnet
+	cargo run --bin perps-deploy testnet instantiate --family osmodev
 
 # Deploy to Sei tesntet
 deploy-sei-testnet:
