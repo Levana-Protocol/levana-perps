@@ -14,9 +14,11 @@ markets-stable:
       # inverted USDC/USD 
       { id: "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a", inverted: true }
     ]
-    # OSMO_USD
     feeds-usd: [
-      {id: "5867f5683c757393a0670ef0f701490950fe93fdb006d181c8265a831ac0c5c6", inverted: false }
+      # Hacky solution: provide a price and its inverse to get 1. Should be
+      # fixed correctly in new oracle approach.
+      { id: "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a", inverted: false },
+      { id: "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a", inverted: true }
     ]
   ETH_BTC:
     feeds: [
@@ -68,4 +70,14 @@ markets-edge:
   ETH_USD:
     feeds: [
       { id: "ca80ba6dc32e08d06f1aa886011eed1d77c77be9eb761cc10d72b7d0a2fd57a6", inverted: false }
+    ]
+  OSMO_USDC:
+    feeds: [
+      { id: "d9437c194a4b00ba9d7652cd9af3905e73ee15a2ca4152ac1f8d430cc322b857", inverted: false }
+    ]
+    feeds-usd: [
+      # Hacky solution: provide a price and its inverse to get 1. Should be
+      # fixed correctly in new oracle approach.
+      { id: "d9437c194a4b00ba9d7652cd9af3905e73ee15a2ca4152ac1f8d430cc322b857", inverted: false },
+      { id: "d9437c194a4b00ba9d7652cd9af3905e73ee15a2ca4152ac1f8d430cc322b857", inverted: true }
     ]
