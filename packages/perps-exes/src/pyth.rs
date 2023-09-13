@@ -7,7 +7,6 @@ use msg::prelude::*;
 use pyth_sdk_cw::PriceIdentifier;
 pub use vec_with_curr::VecWithCurr;
 
-
 pub async fn get_oracle_update_msg(
     ids: &[PriceIdentifier],
     sender: impl HasAddress,
@@ -67,4 +66,3 @@ async fn get_wormhole_proofs(
         })
         .await
 }
-

@@ -29,31 +29,23 @@ pub(crate) fn config_init(
             feeds,
             feeds_usd,
         } => {
-            fn map_feeds (
-                feeds: Vec<SpotPriceFeedInit>,
-            ) -> Vec<SpotPriceFeed> {
+            fn map_feeds(feeds: Vec<SpotPriceFeedInit>) -> Vec<SpotPriceFeed> {
                 feeds
                     .into_iter()
-                    .map(|feed| {
-                        SpotPriceFeed {
-                            data: match feed.data {
-                                SpotPriceFeedDataInit::Constant { price } => {
-                                    SpotPriceFeedData::Constant { price }
-                                }
-                                SpotPriceFeedDataInit::Pyth { id } => {
-                                    SpotPriceFeedData::Pyth { id }
-                                }
-                                SpotPriceFeedDataInit::Stride { denom } => {
-                                    SpotPriceFeedData::Stride {
-                                        denom,
-                                    }
-                                }
-                                SpotPriceFeedDataInit::Sei { denom } => {
-                                    SpotPriceFeedData::Sei { denom }
-                                }
-                            },
-                            inverted: feed.inverted,
-                        }
+                    .map(|feed| SpotPriceFeed {
+                        data: match feed.data {
+                            SpotPriceFeedDataInit::Constant { price } => {
+                                SpotPriceFeedData::Constant { price }
+                            }
+                            SpotPriceFeedDataInit::Pyth { id } => SpotPriceFeedData::Pyth { id },
+                            SpotPriceFeedDataInit::Stride { denom } => {
+                                SpotPriceFeedData::Stride { denom }
+                            }
+                            SpotPriceFeedDataInit::Sei { denom } => {
+                                SpotPriceFeedData::Sei { denom }
+                            }
+                        },
+                        inverted: feed.inverted,
                     })
                     .collect()
             }
@@ -72,11 +64,10 @@ pub(crate) fn config_init(
                     .transpose()?,
                 stride: stride
                     .map(|stride| {
-                        stride.contract_address
+                        stride
+                            .contract_address
                             .validate(api)
-                            .map(|contract_address| StrideConfig {
-                                contract_address,
-                            })
+                            .map(|contract_address| StrideConfig { contract_address })
                     })
                     .transpose()?,
                 feeds: map_feeds(feeds),

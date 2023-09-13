@@ -36,7 +36,7 @@ INTERMEDIATE_SHA=$(sha256sum -- "$WASM" | sed 's,../target,target,g')
 echo "$INTERMEDIATE_SHA" >>"$INTERMEDIATE_SHAS"
 
 OPTIMIZED_WASM="$WASM_DIR/artifacts/levana_perpswap_cosmos_$CONTRACT_NAME.wasm"
-$WASM_OPT -Os "$WASM" -o "$OPTIMIZED_WASM"
+$WASM_OPT -Os --signext-lowering "$WASM" -o "$OPTIMIZED_WASM" 
 done
 
 cd "$WASM_DIR/artifacts"

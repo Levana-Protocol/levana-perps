@@ -7,10 +7,7 @@ use chrono::{DateTime, Utc};
 use cosmos::{Address, ContractAdmin, CosmosNetwork, HasAddress};
 use cosmwasm_std::{to_binary, CosmosMsg, Empty};
 use msg::{contracts::market::entry::NewMarketParams, token::TokenInit};
-use perps_exes::{
-    config::{MarketConfigUpdates},
-    prelude::*,
-};
+use perps_exes::{config::MarketConfigUpdates, prelude::*};
 
 use crate::{cli::Opt, factory::Factory, util::get_hash_for_path};
 

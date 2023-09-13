@@ -2,9 +2,13 @@ use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{Context, Result};
 use cosmos::{Address, Cosmos, CosmosNetwork, HasAddress, HasAddressType, Wallet};
-use msg::{prelude::*, contracts::market::spot_price::{PythPriceServiceNetwork, SpotPriceFeed, SpotPriceFeedData}};
+use msg::{
+    contracts::market::spot_price::{PythPriceServiceNetwork, SpotPriceFeed, SpotPriceFeedData},
+    prelude::*,
+};
 use perps_exes::config::{
-    ChainConfig, ConfigTestnet, DeploymentConfigTestnet, PriceConfig, ChainPythConfig, ChainStrideConfig, MarketPriceFeedConfig,
+    ChainConfig, ChainPythConfig, ChainStrideConfig, ConfigTestnet, DeploymentConfigTestnet,
+    MarketPriceFeedConfig, PriceConfig,
 };
 
 use crate::{cli::Opt, faucet::Faucet, tracker::Tracker};
@@ -120,7 +124,11 @@ impl Opt {
                     .for_chain(partial.network.get_address_type()),
             )
         } else {
-            PriceSourceConfig::Oracle(self.get_oracle_info(&basic.chain_config, &basic.price_config, family)?)
+            PriceSourceConfig::Oracle(self.get_oracle_info(
+                &basic.chain_config,
+                &basic.price_config,
+                family,
+            )?)
         };
 
         Ok(App {
@@ -136,7 +144,12 @@ impl Opt {
         })
     }
 
-    pub fn get_oracle_info(&self, chain_config: &ChainConfig, global_price_config: &PriceConfig, family: &str) -> Result<OracleInfo> {
+    pub fn get_oracle_info(
+        &self,
+        chain_config: &ChainConfig,
+        global_price_config: &PriceConfig,
+        family: &str,
+    ) -> Result<OracleInfo> {
         let chain_spot_price_config = chain_config
             .spot_price
             .as_ref()
@@ -144,7 +157,12 @@ impl Opt {
 
         let mut markets = HashMap::new();
 
-        for (market_id, price_feed_configs) in global_price_config.networks.get(family).context("No price feed config found for {family}")?.iter() {
+        for (market_id, price_feed_configs) in global_price_config
+            .networks
+            .get(family)
+            .context("No price feed config found for {family}")?
+            .iter()
+        {
             let mut feeds = vec![];
             let mut feeds_usd = vec![];
 
@@ -170,15 +188,17 @@ impl Opt {
                     }
                     MarketPriceFeedConfig::Pyth { key, inverted } => {
                         let id_lookup = match chain_spot_price_config.pyth.as_ref() {
-                            Some(pyth) => {
-                                match pyth.r#type {
-                                    PythPriceServiceNetwork::Edge => &global_price_config.pyth.edge,
-                                    PythPriceServiceNetwork::Stable => &global_price_config.pyth.stable,
-                                }
+                            Some(pyth) => match pyth.r#type {
+                                PythPriceServiceNetwork::Edge => &global_price_config.pyth.edge,
+                                PythPriceServiceNetwork::Stable => &global_price_config.pyth.stable,
                             },
                             None => bail!("No pyth config found for {family}"),
                         };
-                        let id = id_lookup.feed_ids.get(&key).context("No pyth config found for {id} on {family}")?.clone();
+                        let id = id_lookup
+                            .feed_ids
+                            .get(&key)
+                            .context("No pyth config found for {id} on {family}")?
+                            .clone();
 
                         feeds.push(SpotPriceFeed {
                             data: SpotPriceFeedData::Pyth { id },
@@ -188,15 +208,15 @@ impl Opt {
                 }
             }
 
-            markets.insert(market_id.clone(), OracleMarketPriceFeeds {
-                feeds,
-                feeds_usd,
-            });
+            markets.insert(
+                market_id.clone(),
+                OracleMarketPriceFeeds { feeds, feeds_usd },
+            );
         }
         Ok(OracleInfo {
-            pyth: chain_spot_price_config.pyth.clone(), 
-            stride: chain_spot_price_config.stride.clone(), 
-            markets
+            pyth: chain_spot_price_config.pyth.clone(),
+            stride: chain_spot_price_config.stride.clone(),
+            markets,
         })
     }
 
@@ -208,10 +228,7 @@ impl Opt {
 
         // TODO - get OracleInfo for mainnet
 
-        Ok(AppMainnet {
-            cosmos,
-            wallet,
-        })
+        Ok(AppMainnet { cosmos, wallet })
     }
 }
 

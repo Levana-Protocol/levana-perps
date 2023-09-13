@@ -132,7 +132,7 @@ impl Opt {
 
         let price_config = PriceConfig::load(self.price_config)?;
         let endpoints_stable = VecWithCurr::new(price_config.pyth.stable.endpoints.clone());
-        let endpoints_edge = VecWithCurr::new(price_config.pyth.edge.endpoints.clone());
+        let endpoints_edge = VecWithCurr::new(price_config.pyth.edge.endpoints);
 
         let app = App {
             factory: RwLock::new(Arc::new(factory)),

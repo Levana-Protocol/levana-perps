@@ -1,8 +1,13 @@
 use std::collections::HashMap;
 
-use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, Contract, Cosmos, HasAddress};
+use cosmos::{Contract, Cosmos, HasAddress};
 use cosmwasm_std::Uint256;
-use msg::{prelude::*, contracts::market::spot_price::{SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData, PythPriceServiceNetwork}};
+use msg::{
+    contracts::market::spot_price::{
+        PythPriceServiceNetwork, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData,
+    },
+    prelude::*,
+};
 use perps_exes::pyth::VecWithCurr;
 
 use super::markets::Market;
@@ -11,12 +16,12 @@ use super::markets::Market;
 pub(crate) struct Oracle {
     pub market_id: MarketId,
     pub spot_price_config: SpotPriceConfig,
-    pub pyth:Option<PythOracle>,
+    pub pyth: Option<PythOracle>,
 }
 
 #[derive(Clone)]
 pub struct PythOracle {
-    pub contract:Contract,
+    pub contract: Contract,
     pub endpoints: VecWithCurr<String>,
 }
 
@@ -30,17 +35,22 @@ impl std::fmt::Debug for Oracle {
         }
 
         // TODO - add more debug info
-            // .field("price_feed", &self.market_price_feeds.feeds)
-            // .field(
-            //     "price_feeds_usd",
-            //     &format!("{:?}", self.market_price_feeds.feeds_usd),
-            // )
+        // .field("price_feed", &self.market_price_feeds.feeds)
+        // .field(
+        //     "price_feeds_usd",
+        //     &format!("{:?}", self.market_price_feeds.feeds_usd),
+        // )
         f.finish()
     }
 }
 
 impl Oracle {
-    pub async fn new(cosmos: &Cosmos, market: &Market, pyth_endpoints_stable: VecWithCurr<String>, pyth_endpoints_edge: VecWithCurr<String>) -> Result<Self> {
+    pub async fn new(
+        cosmos: &Cosmos,
+        market: &Market,
+        pyth_endpoints_stable: VecWithCurr<String>,
+        pyth_endpoints_edge: VecWithCurr<String>,
+    ) -> Result<Self> {
         let market_id = market.market_id.clone();
         let status = market.market.status().await?;
 
@@ -48,32 +58,32 @@ impl Oracle {
 
         let pyth = match &spot_price_config {
             SpotPriceConfig::Manual => None,
-            SpotPriceConfig::Oracle { pyth, .. } => {
-                match pyth {
-                    None => None,
-                    Some(pyth) => {
-                        let addr = pyth.contract_address.as_str().parse().with_context(|| {
-                            format!("Invalid Pyth oracle contract from Config: {}", pyth.contract_address)
-                        })?;
-                        Some(PythOracle {
-                            contract: cosmos.make_contract(addr),
-                            endpoints: match pyth.network {
-                                PythPriceServiceNetwork::Stable => pyth_endpoints_stable,
-                                PythPriceServiceNetwork::Edge => pyth_endpoints_edge,
-                            },
-                        })
-                    }
+            SpotPriceConfig::Oracle { pyth, .. } => match pyth {
+                None => None,
+                Some(pyth) => {
+                    let addr = pyth.contract_address.as_str().parse().with_context(|| {
+                        format!(
+                            "Invalid Pyth oracle contract from Config: {}",
+                            pyth.contract_address
+                        )
+                    })?;
+                    Some(PythOracle {
+                        contract: cosmos.make_contract(addr),
+                        endpoints: match pyth.network {
+                            PythPriceServiceNetwork::Stable => pyth_endpoints_stable,
+                            PythPriceServiceNetwork::Edge => pyth_endpoints_edge,
+                        },
+                    })
                 }
-            }
+            },
         };
-        
+
         Ok(Self {
             pyth,
             market_id,
             spot_price_config,
         })
     }
-
 
     pub async fn query_price(&self, _age_tolerance_seconds: u32) -> Result<PricePoint> {
         todo!()
@@ -96,26 +106,6 @@ impl Oracle {
         // ))
     }
 
-    pub async fn get_bridge_update_msg(
-        &self,
-        _sender: String,
-        _execs: Option<u32>,
-    ) -> Result<MsgExecuteContract> {
-        todo!()
-        // Ok(MsgExecuteContract {
-        //     sender,
-        //     contract: self.bridge.get_address_string(),
-        //     msg: serde_json::to_vec(
-        //         &msg::contracts::pyth_bridge::entry::ExecuteMsg::UpdatePrice {
-        //             execs,
-        //             rewards: None,
-        //             bail_on_error: false,
-        //         },
-        //     )?,
-        //     funds: vec![],
-        // })
-    }
-
     pub async fn get_latest_price(
         &self,
         client: &reqwest::Client,
@@ -123,9 +113,10 @@ impl Oracle {
         match &self.spot_price_config {
             SpotPriceConfig::Manual => {
                 unimplemented!("FIXME: support manual oracle w/ contract query")
-            },
-            SpotPriceConfig::Oracle { feeds, feeds_usd, .. } => {
-
+            }
+            SpotPriceConfig::Oracle {
+                feeds, feeds_usd, ..
+            } => {
                 let base = price_helper(client, self.pyth.as_ref(), feeds).await?;
                 let base = PriceBaseInQuote::try_from_number(base.into_signed())?;
 
@@ -135,9 +126,7 @@ impl Oracle {
                 Ok((base, collateral))
             }
         }
-
     }
-
 }
 
 // FIXME: move out of pyth, handle more than just pyth
@@ -146,7 +135,6 @@ async fn price_helper(
     pyth: Option<&PythOracle>,
     feeds: &[SpotPriceFeed],
 ) -> Result<Decimal256> {
-
     #[derive(serde::Deserialize)]
     struct PythRecord {
         id: String,
@@ -160,31 +148,30 @@ async fn price_helper(
 
     let pyth_prices = match pyth {
         None => HashMap::new(),
-        Some(pyth) => pyth.endpoints
-            .try_any_from_curr_async(|endpoint| async move {
-                let mut req = client.get(format!("{}api/latest_price_feeds", endpoint));
-                for feed in feeds {
-                    match feed.data {
-                        SpotPriceFeedData::Pyth { id, .. } => {
+        Some(pyth) => {
+            pyth.endpoints
+                .try_any_from_curr_async(|endpoint| async move {
+                    let mut req = client.get(format!("{}api/latest_price_feeds", endpoint));
+                    for feed in feeds {
+                        if let SpotPriceFeedData::Pyth { id, .. } = feed.data {
                             req = req.query(&[("ids[]", id)]);
-                        },
-                        _ => { /* noop */ },
+                        }
                     }
-                }
 
-                let records = req
-                    .send()
-                    .await?
-                    .error_for_status()?
-                    .json::<Vec<PythRecord>>()
-                    .await?;
+                    let records = req
+                        .send()
+                        .await?
+                        .error_for_status()?
+                        .json::<Vec<PythRecord>>()
+                        .await?;
 
-                Ok(records
-                    .into_iter()
-                    .map(|PythRecord { id, price }| (id, price))
-                    .collect::<HashMap<_, _>>())
-            })
-            .await?
+                    Ok(records
+                        .into_iter()
+                        .map(|PythRecord { id, price }| (id, price))
+                        .collect::<HashMap<_, _>>())
+                })
+                .await?
+        }
     };
 
     let mut final_price = Decimal256::one();
@@ -198,16 +185,14 @@ async fn price_helper(
 
                 anyhow::ensure!(*expo <= 0, "Exponent from Pyth must always be negative");
                 Decimal256::from_atomics(*price, expo.abs().try_into()?)?
-            },
-            SpotPriceFeedData::Constant { price } => {
-                price.into_decimal256()
-            },
+            }
+            SpotPriceFeedData::Constant { price } => price.into_decimal256(),
             SpotPriceFeedData::Sei { .. } => {
                 unimplemented!("FIXME: reach out to sei oracle");
-            },
+            }
             SpotPriceFeedData::Stride { .. } => {
                 unimplemented!("FIXME: reach out to stride");
-            },
+            }
         };
 
         if feed.inverted {

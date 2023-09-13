@@ -5,13 +5,10 @@ use std::{collections::HashMap, path::Path};
 use cosmos::{Address, CosmosNetwork, RawAddress};
 use cosmwasm_std::{Uint128, Uint256};
 use msg::{
-    contracts::market::{
-        config::ConfigUpdate, spot_price::{PythPriceServiceNetwork},
-    },
+    contracts::market::{config::ConfigUpdate, spot_price::PythPriceServiceNetwork},
     prelude::*,
 };
 use pyth_sdk_cw::PriceIdentifier;
-
 
 /// Configuration for chainwide data.
 ///
@@ -55,14 +52,13 @@ pub struct ChainPythConfig {
     pub r#type: PythPriceServiceNetwork,
 }
 
-/// Configuration for stride 
+/// Configuration for stride
 #[derive(serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ChainStrideConfig {
     /// The address of the redemption rate contract
     pub contract: Address,
 }
-
 
 /// Overall configuration of prices, for information valid across all chains.
 #[derive(serde::Deserialize, Debug)]
@@ -77,9 +73,9 @@ pub struct PriceConfig {
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PythPriceConfig {
-    /// Configuration for stable feeds 
+    /// Configuration for stable feeds
     pub stable: PythPriceServiceConfig,
-    /// Configuration for edge feeds 
+    /// Configuration for edge feeds
     pub edge: PythPriceServiceConfig,
 }
 
@@ -106,24 +102,11 @@ pub struct MarketPriceFeedConfigs {
 #[derive(serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum MarketPriceFeedConfig {
-    Pyth {
-        key: String,
-        inverted: bool
-    },
-    Constant {
-        price: NumberGtZero,
-        inverted: bool
-    },
-    Sei {
-        denom: String,
-        inverted: bool
-    },
-    Stride {
-        denom: String,
-        inverted: bool
-    }
+    Pyth { key: String, inverted: bool },
+    Constant { price: NumberGtZero, inverted: bool },
+    Sei { denom: String, inverted: bool },
+    Stride { denom: String, inverted: bool },
 }
-
 
 /// Number of decimals in the gas coin
 #[derive(serde::Deserialize, Clone, Debug, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -185,7 +168,6 @@ impl std::fmt::Debug for GasAmount {
         write!(f, "GasAmount{}", self.0)
     }
 }
-
 
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]

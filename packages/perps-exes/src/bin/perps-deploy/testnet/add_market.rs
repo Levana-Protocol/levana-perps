@@ -3,9 +3,7 @@ use cosmwasm_std::Decimal256;
 use msg::prelude::*;
 use shared::storage::MarketId;
 
-use crate::{
-    app::PriceSourceConfig, factory::Factory, instantiate::AddMarketParams, store_code::PYTH_BRIDGE,
-};
+use crate::{app::PriceSourceConfig, factory::Factory, instantiate::AddMarketParams};
 
 #[derive(clap::Parser)]
 pub(crate) struct AddMarketOpt {

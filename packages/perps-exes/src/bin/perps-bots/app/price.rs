@@ -89,7 +89,13 @@ impl App {
 
         // Load it up each time in case there are config changes, but we could
         // theoretically optimize this by doing it at load time instead.
-        let oracle = Oracle::new(&self.cosmos, &market, self.endpoints_stable.clone(), self.endpoints_edge.clone()).await?;
+        let oracle = Oracle::new(
+            &self.cosmos,
+            market,
+            self.endpoints_stable.clone(),
+            self.endpoints_edge.clone(),
+        )
+        .await?;
 
         let (latest_price, _) = oracle.get_latest_price(&self.client).await?;
         let reason = self
@@ -137,7 +143,7 @@ impl App {
                 }
 
                 // OK, it was a too old error. Let's find out when the last price update was for the contract.
-                let last_update = oracle 
+                let last_update = oracle
                     .prev_market_price_timestamp(&market.market_id)
                     .await?
                     .try_into_chrono_datetime()?;
@@ -283,7 +289,7 @@ impl App {
                     &wallet,
                     &pyth.endpoints,
                     &self.client,
-                    &pyth.contract
+                    &pyth.contract,
                 )
                 .await?;
 

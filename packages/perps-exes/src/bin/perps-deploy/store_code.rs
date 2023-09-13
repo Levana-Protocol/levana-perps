@@ -51,14 +51,7 @@ impl FromStr for Contracts {
 impl Contracts {
     pub fn names(&self) -> &[&str] {
         match self {
-            Contracts::PerpsProtocol => &[
-                CW20,
-                FACTORY,
-                LIQUIDITY_TOKEN,
-                MARKET,
-                POSITION_TOKEN,
-                PYTH_BRIDGE,
-            ],
+            Contracts::PerpsProtocol => &[CW20, FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN],
             Contracts::Hatching => &[HATCHING],
             Contracts::IbcExecuteProxy => &[IBC_EXECUTE_PROXY],
             Contracts::LvnRewards => &[LVN_REWARDS],
@@ -71,7 +64,6 @@ pub(crate) const FACTORY: &str = "factory";
 pub(crate) const LIQUIDITY_TOKEN: &str = "liquidity_token";
 pub(crate) const MARKET: &str = "market";
 pub(crate) const POSITION_TOKEN: &str = "position_token";
-pub(crate) const PYTH_BRIDGE: &str = "pyth_bridge";
 pub(crate) const HATCHING: &str = "hatching";
 pub(crate) const IBC_EXECUTE_PROXY: &str = "ibc_execute_proxy";
 pub(crate) const LVN_REWARDS: &str = "rewards";

@@ -5,7 +5,7 @@ use msg::contracts::{factory::entry::CodeIds, tracker::entry::ContractResp};
 use crate::{
     cli::Opt,
     factory::{Factory, MarketInfo},
-    store_code::{FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN, PYTH_BRIDGE},
+    store_code::{FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN},
 };
 
 #[derive(clap::Parser)]
@@ -31,7 +31,6 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         .require_code_by_type(&opt, LIQUIDITY_TOKEN)
         .await?;
     let market_code_id = app.tracker.require_code_by_type(&opt, MARKET).await?;
-    let pyth_bridge_code_id = app.tracker.require_code_by_type(&opt, PYTH_BRIDGE).await?;
 
     let factory = match app
         .tracker

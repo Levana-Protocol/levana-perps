@@ -2,7 +2,9 @@ use std::collections::HashSet;
 
 use anyhow::{Context, Result};
 use cosmos::{Address, CodeId, ContractAdmin, Cosmos, HasAddress, Wallet};
-use msg::contracts::market::spot_price::SpotPriceConfigInit;
+use msg::contracts::market::spot_price::{
+    PythConfigInit, PythPriceServiceNetwork, SpotPriceConfigInit, StrideConfigInit,
+};
 use msg::prelude::*;
 use msg::{
     contracts::{
@@ -14,8 +16,7 @@ use msg::{
 use perps_exes::config::MarketConfigUpdates;
 use perps_exes::prelude::MarketContract;
 
-use crate::app::App;
-use crate::store_code::PYTH_BRIDGE;
+use crate::app::{App, PriceSourceConfig};
 use crate::{
     app::BasicApp,
     cli::Opt,
@@ -54,8 +55,46 @@ impl App {
                 }
                 config
             },
+            spot_price: match &self.price_source {
+                PriceSourceConfig::Wallet(_) => SpotPriceConfigInit::Manual,
+                PriceSourceConfig::Oracle(oracle) => {
+                    let market = oracle
+                        .markets
+                        .get(&market_id)
+                        .with_context(|| format!("No oracle market found for {market_id}"))?;
+
+                    let global_price_config = &self.basic.price_config;
+
+                    SpotPriceConfigInit::Oracle {
+                        pyth: oracle.pyth.as_ref().map(|pyth| PythConfigInit {
+                            contract_address: pyth.contract.get_address_string().into(),
+                            age_tolerance_seconds: match pyth.r#type {
+                                PythPriceServiceNetwork::Stable => {
+                                    global_price_config.pyth.stable.update_age_tolerance
+                                }
+                                PythPriceServiceNetwork::Edge => {
+                                    global_price_config.pyth.edge.update_age_tolerance
+                                }
+                            },
+                            network: pyth.r#type,
+                        }),
+                        stride: oracle.stride.as_ref().map(|stride| StrideConfigInit {
+                            contract_address: stride.contract.get_address_string().into(),
+                        }),
+                        feeds: market
+                            .feeds
+                            .iter()
+                            .map(|feed| feed.clone().into())
+                            .collect(),
+                        feeds_usd: market
+                            .feeds_usd
+                            .iter()
+                            .map(|feed| feed.clone().into())
+                            .collect(),
+                    }
+                }
+            },
             market_id,
-            spot_price: unimplemented!("TODO"),
         })
     }
 }
@@ -112,7 +151,6 @@ pub(crate) struct ProtocolCodeIds {
     pub(crate) position_token_code_id: CodeId,
     pub(crate) liquidity_token_code_id: CodeId,
     pub(crate) market_code_id: CodeId,
-    pub(crate) pyth_bridge_code_id: CodeId,
 }
 
 /// Parameters to instantiate, used to avoid too many function parameters.
@@ -164,7 +202,6 @@ pub(crate) async fn instantiate(
             position_token_code_id,
             liquidity_token_code_id,
             market_code_id,
-            pyth_bridge_code_id,
         },
     ) = match code_id_source {
         CodeIdSource::Tracker(tracker) => {
@@ -173,7 +210,6 @@ pub(crate) async fn instantiate(
                 position_token_code_id: tracker.require_code_by_type(opt, POSITION_TOKEN).await?,
                 liquidity_token_code_id: tracker.require_code_by_type(opt, LIQUIDITY_TOKEN).await?,
                 market_code_id: tracker.require_code_by_type(opt, MARKET).await?,
-                pyth_bridge_code_id: tracker.require_code_by_type(opt, PYTH_BRIDGE).await?,
             };
             (Some(tracker), ids)
         }

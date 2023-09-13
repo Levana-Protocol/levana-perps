@@ -3,8 +3,7 @@ use cosmwasm_std::Order;
 use msg::contracts::market::{
     entry::PriceForQuery,
     spot_price::{
-        events::SpotPriceEvent, PythConfig, SpotPriceConfig,
-        SpotPriceFeed, SpotPriceFeedData,
+        events::SpotPriceEvent, PythConfig, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData,
     },
 };
 use pyth_sdk_cw::PriceFeedResponse;
@@ -261,8 +260,8 @@ impl State<'_> {
             } => {
                 let (price_amount, publish_time) = self.get_oracle_price(pyth.as_ref(), feeds)?;
 
-                let (price_amount_usd, publish_time_usd) = self.get_oracle_price(pyth.as_ref(), feeds_usd)?;
-
+                let (price_amount_usd, publish_time_usd) =
+                    self.get_oracle_price(pyth.as_ref(), feeds_usd)?;
 
                 let market_id = self.market_id(ctx.storage)?;
                 let market_type = market_id.get_market_type();
@@ -342,9 +341,7 @@ impl State<'_> {
                     (price, Some(publish_time))
                 }
 
-                SpotPriceFeedData::Constant { price } => {
-                    (price.into_number(), None)
-                }
+                SpotPriceFeedData::Constant { price } => (price.into_number(), None),
                 SpotPriceFeedData::Sei { .. } => {
                     // TODO: query the native module and get the price, no publish time
                     todo!("Implement SEI price feed")
@@ -421,7 +418,7 @@ fn get_price_usd(
     market_id: &MarketId,
 ) -> Result<PriceCollateralInUsd> {
     // FIXME: we probably don't need this anymore at all
-    // just define price_usd with the correct multiplier 
+    // just define price_usd with the correct multiplier
     match (derive_price_usd(price, market_id), price_usd) {
         (None, None) => anyhow::bail!("Must provide a price in USD"),
         (None, Some(price_usd)) => Ok(price_usd),

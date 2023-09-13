@@ -3,7 +3,7 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Addr;
 use pyth_sdk_cw::PriceIdentifier;
-use shared::storage::{RawAddr, NumberGtZero};
+use shared::storage::{NumberGtZero, RawAddr};
 use std::str::FromStr;
 
 /// Spot price config
@@ -30,16 +30,15 @@ impl SpotPriceConfig {
     pub fn all_unique_pyth_ids(&self) -> Vec<PriceIdentifier> {
         match self {
             Self::Manual => vec![],
-            Self::Oracle { feeds, feeds_usd, ..} => {
+            Self::Oracle {
+                feeds, feeds_usd, ..
+            } => {
                 let mut ids = vec![];
                 for feed in feeds.iter().chain(feeds_usd.iter()) {
-                    match feed.data {
-                        SpotPriceFeedData::Pyth { id, .. } => {
-                            if !ids.contains(&id) {
-                                ids.push(id);
-                            }
+                    if let SpotPriceFeedData::Pyth { id, .. } = feed.data {
+                        if !ids.contains(&id) {
+                            ids.push(id);
                         }
-                        _ => {}
                     }
                 }
 
@@ -62,7 +61,7 @@ pub struct PythConfig {
     pub network: PythPriceServiceNetwork,
 }
 
-/// Configuration for stride 
+/// Configuration for stride
 #[cw_serde]
 pub struct StrideConfig {
     /// The address of the redemption rate contract
@@ -81,10 +80,10 @@ pub struct SpotPriceFeed {
 /// The data for an individual spot price feed
 #[cw_serde]
 pub enum SpotPriceFeedData {
-    /// Hardcoded value 
+    /// Hardcoded value
     Constant {
         /// The constant price
-        price: NumberGtZero 
+        price: NumberGtZero,
     },
     /// Pyth price feeds
     Pyth {
@@ -163,7 +162,7 @@ pub struct PythConfigInit {
     pub network: PythPriceServiceNetwork,
 }
 
-/// Configuration for stride 
+/// Configuration for stride
 #[cw_serde]
 pub struct StrideConfigInit {
     /// The address of the redemption rate contract
@@ -179,13 +178,22 @@ pub struct SpotPriceFeedInit {
     pub inverted: bool,
 }
 
+impl From<SpotPriceFeed> for SpotPriceFeedInit {
+    fn from(src: SpotPriceFeed) -> Self {
+        Self {
+            data: src.data.into(),
+            inverted: src.inverted,
+        }
+    }
+}
+
 /// The data for an individual spot price feed
 #[cw_serde]
 pub enum SpotPriceFeedDataInit {
-    /// Hardcoded value 
+    /// Hardcoded value
     Constant {
         /// The constant price
-        price: NumberGtZero 
+        price: NumberGtZero,
     },
     /// Pyth price feeds
     Pyth {
@@ -202,6 +210,16 @@ pub enum SpotPriceFeedDataInit {
         /// The denom to use
         denom: String,
     },
+}
+impl From<SpotPriceFeedData> for SpotPriceFeedDataInit {
+    fn from(src: SpotPriceFeedData) -> Self {
+        match src {
+            SpotPriceFeedData::Constant { price } => Self::Constant { price },
+            SpotPriceFeedData::Pyth { id } => Self::Pyth { id },
+            SpotPriceFeedData::Stride { denom } => Self::Stride { denom },
+            SpotPriceFeedData::Sei { denom } => Self::Sei { denom },
+        }
+    }
 }
 
 /// Spot price events

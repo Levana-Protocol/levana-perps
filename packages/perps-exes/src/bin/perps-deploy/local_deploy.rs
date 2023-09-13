@@ -14,7 +14,7 @@ use crate::{
         InstantiateMarket, InstantiateParams, InstantiateResponse, MarketResponse, ProtocolCodeIds,
         INITIAL_BALANCE_AMOUNT,
     },
-    store_code::{CW20, FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN, PYTH_BRIDGE},
+    store_code::{CW20, FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN},
 };
 
 #[derive(clap::Parser)]
@@ -117,10 +117,6 @@ pub(crate) async fn go(
         market_code_id: basic
             .cosmos
             .store_code_path(&basic.wallet, opt.get_contract_path(MARKET))
-            .await?,
-        pyth_bridge_code_id: basic
-            .cosmos
-            .store_code_path(&basic.wallet, opt.get_contract_path(PYTH_BRIDGE))
             .await?,
     };
 
