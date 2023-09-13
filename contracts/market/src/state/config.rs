@@ -4,7 +4,7 @@ use msg::contracts::market::{
     config::{Config, ConfigUpdate},
     spot_price::{
         PythConfig, SpotPriceConfig, SpotPriceConfigInit, SpotPriceFeed, SpotPriceFeedData,
-        SpotPriceFeedDataInit, SpotPriceFeedInit,
+        SpotPriceFeedDataInit, SpotPriceFeedInit, StrideConfig,
     },
 };
 
@@ -25,24 +25,26 @@ pub(crate) fn config_init(
         SpotPriceConfigInit::Manual => SpotPriceConfig::Manual,
         SpotPriceConfigInit::Oracle {
             pyth,
+            stride,
             feeds,
             feeds_usd,
         } => {
-            fn validate_feeds(
-                api: &dyn Api,
+            fn map_feeds (
                 feeds: Vec<SpotPriceFeedInit>,
-            ) -> Result<Vec<SpotPriceFeed>> {
+            ) -> Vec<SpotPriceFeed> {
                 feeds
                     .into_iter()
                     .map(|feed| {
-                        Ok(SpotPriceFeed {
+                        SpotPriceFeed {
                             data: match feed.data {
-                                SpotPriceFeedDataInit::Pyth { id, network } => {
-                                    SpotPriceFeedData::Pyth { id, network }
+                                SpotPriceFeedDataInit::Constant { price } => {
+                                    SpotPriceFeedData::Constant { price }
                                 }
-                                SpotPriceFeedDataInit::Stride { contract, denom } => {
+                                SpotPriceFeedDataInit::Pyth { id } => {
+                                    SpotPriceFeedData::Pyth { id }
+                                }
+                                SpotPriceFeedDataInit::Stride { denom } => {
                                     SpotPriceFeedData::Stride {
-                                        contract: contract.validate(api)?,
                                         denom,
                                     }
                                 }
@@ -51,7 +53,7 @@ pub(crate) fn config_init(
                                 }
                             },
                             inverted: feed.inverted,
-                        })
+                        }
                     })
                     .collect()
             }
@@ -59,27 +61,26 @@ pub(crate) fn config_init(
             SpotPriceConfig::Oracle {
                 pyth: pyth
                     .map(|pyth| {
-                        pyth.oracle_address_stable
+                        pyth.contract_address
                             .validate(api)
-                            .and_then(|oracle_address_stable| {
-                                pyth.oracle_address_edge
-                                    .validate(api)
-                                    .map(|oracle_address_edge| {
-                                        (oracle_address_stable, oracle_address_edge)
-                                    })
-                            })
-                            .map(|(oracle_address_stable, oracle_address_edge)| PythConfig {
-                                oracle_address_stable,
-                                oracle_address_edge,
+                            .map(|contract_address| PythConfig {
+                                contract_address,
                                 age_tolerance_seconds: pyth.age_tolerance_seconds.into(),
+                                network: pyth.network,
                             })
                     })
                     .transpose()?,
-                feeds: validate_feeds(api, feeds)?,
-                feeds_usd: match feeds_usd {
-                    None => None,
-                    Some(feeds_usd) => Some(validate_feeds(api, feeds_usd)?),
-                },
+                stride: stride
+                    .map(|stride| {
+                        stride.contract_address
+                            .validate(api)
+                            .map(|contract_address| StrideConfig {
+                                contract_address,
+                            })
+                    })
+                    .transpose()?,
+                feeds: map_feeds(feeds),
+                feeds_usd: map_feeds(feeds_usd),
             }
         }
     };

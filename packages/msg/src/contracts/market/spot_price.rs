@@ -3,7 +3,7 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Addr;
 use pyth_sdk_cw::PriceIdentifier;
-use shared::storage::RawAddr;
+use shared::storage::{RawAddr, NumberGtZero};
 use std::str::FromStr;
 
 /// Spot price config
@@ -15,22 +15,58 @@ pub enum SpotPriceConfig {
     Oracle {
         /// Pyth configuration, required on chains that use pyth feeds
         pyth: Option<PythConfig>,
+        /// Stride configuration, required on chains that use stride
+        stride: Option<StrideConfig>,
         /// sequence of spot price feeds which are composed to generate a single spot price
         feeds: Vec<SpotPriceFeed>,
         /// if necessary, sequence of spot price feeds which are composed to generate a single USD spot price
-        feeds_usd: Option<Vec<SpotPriceFeed>>,
+        feeds_usd: Vec<SpotPriceFeed>,
     },
+}
+
+impl SpotPriceConfig {
+    /// Helper to get all the unique pyth ids
+    /// useful for pushing price updates in one fell swoop
+    pub fn all_unique_pyth_ids(&self) -> Vec<PriceIdentifier> {
+        match self {
+            Self::Manual => vec![],
+            Self::Oracle { feeds, feeds_usd, ..} => {
+                let mut ids = vec![];
+                for feed in feeds.iter().chain(feeds_usd.iter()) {
+                    match feed.data {
+                        SpotPriceFeedData::Pyth { id, .. } => {
+                            if !ids.contains(&id) {
+                                ids.push(id);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                ids
+            }
+        }
+    }
 }
 
 /// Configuration for pyth
 #[cw_serde]
 pub struct PythConfig {
-    /// The address of the pyth oracle module on stable
-    pub oracle_address_stable: Addr,
-    /// The address of the pyth oracle module on edge
-    pub oracle_address_edge: Addr,
+    /// The address of the pyth oracle contract
+    pub contract_address: Addr,
     /// The age tolerance for pyth price updates
     pub age_tolerance_seconds: u64,
+    /// Which network to use for the price service
+    /// This isn't used for any internal logic, but clients must use the appropriate
+    /// price service endpoint to match this
+    pub network: PythPriceServiceNetwork,
+}
+
+/// Configuration for stride 
+#[cw_serde]
+pub struct StrideConfig {
+    /// The address of the redemption rate contract
+    pub contract_address: Addr,
 }
 
 /// An individual feed used to compose a final spot price
@@ -45,17 +81,18 @@ pub struct SpotPriceFeed {
 /// The data for an individual spot price feed
 #[cw_serde]
 pub enum SpotPriceFeedData {
+    /// Hardcoded value 
+    Constant {
+        /// The constant price
+        price: NumberGtZero 
+    },
     /// Pyth price feeds
     Pyth {
         /// The identifier on pyth
         id: PriceIdentifier,
-        /// Which network to use for the price service
-        network: PythPriceServiceNetwork,
     },
     /// TODO: Stride liquid staking
     Stride {
-        /// The stride contract address for getting the redemption rate
-        contract: Addr,
         /// The IBC denom for the asset
         denom: String,
     },
@@ -104,22 +141,33 @@ pub enum SpotPriceConfigInit {
     Oracle {
         /// Pyth configuration, required on chains that use pyth feeds
         pyth: Option<PythConfigInit>,
+        /// Stride configuration, required on chains that use stride feeds
+        stride: Option<StrideConfigInit>,
         /// sequence of spot price feeds which are composed to generate a single spot price
         feeds: Vec<SpotPriceFeedInit>,
         /// if necessary, sequence of spot price feeds which are composed to generate a single USD spot price
-        feeds_usd: Option<Vec<SpotPriceFeedInit>>,
+        feeds_usd: Vec<SpotPriceFeedInit>,
     },
 }
 
 /// Configuration for pyth init messages
 #[cw_serde]
 pub struct PythConfigInit {
-    /// The address of the pyth oracle module on stable
-    pub oracle_address_stable: RawAddr,
-    /// The address of the pyth oracle module on edge
-    pub oracle_address_edge: RawAddr,
+    /// The address of the pyth oracle contract
+    pub contract_address: RawAddr,
     /// The age tolerance for pyth price updates
     pub age_tolerance_seconds: u32,
+    /// Which network to use for the price service
+    /// This isn't used for any internal logic, but clients must use the appropriate
+    /// price service endpoint to match this
+    pub network: PythPriceServiceNetwork,
+}
+
+/// Configuration for stride 
+#[cw_serde]
+pub struct StrideConfigInit {
+    /// The address of the redemption rate contract
+    pub contract_address: RawAddr,
 }
 
 /// An individual feed used to compose a final spot price
@@ -134,17 +182,18 @@ pub struct SpotPriceFeedInit {
 /// The data for an individual spot price feed
 #[cw_serde]
 pub enum SpotPriceFeedDataInit {
+    /// Hardcoded value 
+    Constant {
+        /// The constant price
+        price: NumberGtZero 
+    },
     /// Pyth price feeds
     Pyth {
         /// The identifier on pyth
         id: PriceIdentifier,
-        /// Which network to use for the price service
-        network: PythPriceServiceNetwork,
     },
     /// TODO: Stride liquid staking
     Stride {
-        /// The stride contract address for getting the redemption rate
-        contract: RawAddr,
         /// The IBC denom for the asset
         denom: String,
     },

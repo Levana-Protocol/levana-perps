@@ -3,7 +3,7 @@ use cosmwasm_std::Order;
 use msg::contracts::market::{
     entry::PriceForQuery,
     spot_price::{
-        events::SpotPriceEvent, PythConfig, PythPriceServiceNetwork, SpotPriceConfig,
+        events::SpotPriceEvent, PythConfig, SpotPriceConfig,
         SpotPriceFeed, SpotPriceFeedData,
     },
 };
@@ -255,28 +255,21 @@ impl State<'_> {
             SpotPriceConfig::Manual => MANUAL_SPOT_PRICE.load(ctx.storage)?,
             SpotPriceConfig::Oracle {
                 pyth,
+                stride: _,
                 feeds,
                 feeds_usd,
             } => {
                 let (price_amount, publish_time) = self.get_oracle_price(pyth.as_ref(), feeds)?;
 
-                let (price_usd, publish_time_usd) = match feeds_usd {
-                    None => (None, None),
-                    Some(feeds_usd) => {
-                        let (price_amount_usd, publish_time_usd) =
-                            self.get_oracle_price(pyth.as_ref(), feeds_usd)?;
-                        (
-                            Some(PriceCollateralInUsd::from_non_zero(price_amount_usd)),
-                            publish_time_usd,
-                        )
-                    }
-                };
+                let (price_amount_usd, publish_time_usd) = self.get_oracle_price(pyth.as_ref(), feeds_usd)?;
+
 
                 let market_id = self.market_id(ctx.storage)?;
                 let market_type = market_id.get_market_type();
                 let price_base = PriceBaseInQuote::from_non_zero(price_amount);
                 let price = price_base.into_notional_price(market_type);
-                let price_usd = get_price_usd(price_base, price_usd, market_id)?;
+                let price_usd = PriceCollateralInUsd::from_non_zero(price_amount_usd);
+                let price_usd = get_price_usd(price_base, Some(price_usd), market_id)?;
 
                 PriceStorage {
                     price,
@@ -311,21 +304,14 @@ impl State<'_> {
 
         for SpotPriceFeed { data, inverted } in feeds {
             let (price, publish_time) = match data {
-                SpotPriceFeedData::Pyth { id, network } => {
+                SpotPriceFeedData::Pyth { id } => {
                     let pyth = pyth.context("pyth feeds need a pyth config!")?;
 
-                    let price_feed_response: PriceFeedResponse = match network {
-                        PythPriceServiceNetwork::Stable => pyth_sdk_cw::query_price_feed(
-                            &self.querier,
-                            pyth.oracle_address_stable.clone(),
-                            *id,
-                        )?,
-                        PythPriceServiceNetwork::Edge => pyth_sdk_cw::query_price_feed(
-                            &self.querier,
-                            pyth.oracle_address_edge.clone(),
-                            *id,
-                        )?,
-                    };
+                    let price_feed_response: PriceFeedResponse = pyth_sdk_cw::query_price_feed(
+                        &self.querier,
+                        pyth.contract_address.clone(),
+                        *id,
+                    )?;
 
                     let price_feed = price_feed_response.price_feed;
 
@@ -354,6 +340,10 @@ impl State<'_> {
                     let price: Number = Number::try_from(price)?;
 
                     (price, Some(publish_time))
+                }
+
+                SpotPriceFeedData::Constant { price } => {
+                    (price.into_number(), None)
                 }
                 SpotPriceFeedData::Sei { .. } => {
                     // TODO: query the native module and get the price, no publish time
@@ -430,6 +420,8 @@ fn get_price_usd(
     price_usd: Option<PriceCollateralInUsd>,
     market_id: &MarketId,
 ) -> Result<PriceCollateralInUsd> {
+    // FIXME: we probably don't need this anymore at all
+    // just define price_usd with the correct multiplier 
     match (derive_price_usd(price, market_id), price_usd) {
         (None, None) => anyhow::bail!("Must provide a price in USD"),
         (None, Some(price_usd)) => Ok(price_usd),

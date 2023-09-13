@@ -2,9 +2,9 @@ use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{Context, Result};
 use cosmos::{Address, Cosmos, CosmosNetwork, HasAddress, HasAddressType, Wallet};
-use msg::prelude::*;
+use msg::{prelude::*, contracts::market::spot_price::{PythPriceServiceNetwork, SpotPriceFeed, SpotPriceFeedData}};
 use perps_exes::config::{
-    ChainConfig, ConfigTestnet, DeploymentConfigTestnet, PythConfig, PythMarketPriceFeeds,
+    ChainConfig, ConfigTestnet, DeploymentConfigTestnet, PriceConfig, ChainPythConfig, ChainStrideConfig, MarketPriceFeedConfig,
 };
 
 use crate::{cli::Opt, faucet::Faucet, tracker::Tracker};
@@ -14,6 +14,7 @@ pub(crate) struct BasicApp {
     pub(crate) cosmos: Cosmos,
     pub(crate) wallet: Wallet,
     pub(crate) chain_config: ChainConfig,
+    pub(crate) price_config: PriceConfig,
     pub(crate) network: CosmosNetwork,
 }
 
@@ -26,30 +27,33 @@ pub(crate) struct App {
     pub(crate) faucet: Faucet,
     pub(crate) dev_settings: bool,
     pub(crate) default_market_ids: Vec<MarketId>,
-    pub(crate) price_source: PriceSourceConfig,
     pub(crate) market_config: PathBuf,
+    pub(crate) price_source: PriceSourceConfig,
 }
 
 #[derive(Clone)]
 pub(crate) enum PriceSourceConfig {
-    Pyth(PythInfo),
+    Oracle(OracleInfo),
     Wallet(Address),
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct OracleInfo {
+    pub pyth: Option<ChainPythConfig>,
+    pub stride: Option<ChainStrideConfig>,
+    pub markets: HashMap<MarketId, OracleMarketPriceFeeds>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct OracleMarketPriceFeeds {
+    pub feeds: Vec<SpotPriceFeed>,
+    pub feeds_usd: Vec<SpotPriceFeed>,
 }
 
 /// Complete app for mainnet
 pub(crate) struct AppMainnet {
     pub(crate) cosmos: Cosmos,
     pub(crate) wallet: Wallet,
-    #[allow(dead_code)]
-    pub(crate) pyth: PythInfo,
-}
-
-#[allow(dead_code)]
-#[derive(Clone, Debug)]
-pub(crate) struct PythInfo {
-    pub address: Address,
-    pub markets: HashMap<MarketId, PythMarketPriceFeeds>,
-    pub update_age_tolerance: u32,
 }
 
 impl Opt {
@@ -80,18 +84,20 @@ impl Opt {
         let cosmos = self.connect(network).await?;
         let wallet = self.get_wallet(network)?;
         let chain_config = ChainConfig::load(self.config_chain.as_ref(), network)?;
+        let price_config = PriceConfig::load(self.config_price.as_ref())?;
 
         Ok(BasicApp {
             cosmos,
             wallet,
             chain_config,
+            price_config,
             network,
         })
     }
 
     pub(crate) async fn load_app(&self, family: &str) -> Result<App> {
         let config = ConfigTestnet::load(self.config_testnet.as_ref())?;
-        let pyth_config = PythConfig::load(self.config_pyth.as_ref())?;
+        let price_config = PriceConfig::load(self.config_price.as_ref())?;
         let partial = config.get_deployment_info(family)?;
         let basic = self.load_basic_app(partial.network).await?;
 
@@ -114,36 +120,7 @@ impl Opt {
                     .for_chain(partial.network.get_address_type()),
             )
         } else {
-            let pyth_contract = basic
-                .chain_config
-                .pyth
-                .as_ref()
-                .with_context(|| format!("No Pyth address found for {family}"))?;
-
-            // Pyth config validation
-            for (market_id, market_price_feeds) in pyth_config
-                .markets_stable
-                .iter()
-                .chain(pyth_config.markets_edge.iter())
-            {
-                if market_price_feeds.feeds_usd.is_none() && !market_id.is_notional_usd() {
-                    anyhow::bail!(
-                        "notional is not USD, so there MUST be a USD price feed. MarketId: {}",
-                        market_id
-                    );
-                }
-            }
-
-            PriceSourceConfig::Pyth(PythInfo {
-                address: pyth_contract.contract,
-                //FIXME
-                markets: pyth_config.markets_stable.clone(),
-                // markets: match pyth_contract.r#type {
-                //     FeedType::Stable => pyth_config.markets_stable.clone(),
-                //     FeedType::Edge => pyth_config.markets_edge.clone(),
-                // },
-                update_age_tolerance: pyth_config.update_age_tolerance,
-            })
+            PriceSourceConfig::Oracle(self.get_oracle_info(&basic.chain_config, &basic.price_config, family)?)
         };
 
         Ok(App {
@@ -159,41 +136,79 @@ impl Opt {
         })
     }
 
+    pub fn get_oracle_info(&self, chain_config: &ChainConfig, global_price_config: &PriceConfig, family: &str) -> Result<OracleInfo> {
+        let chain_spot_price_config = chain_config
+            .spot_price
+            .as_ref()
+            .with_context(|| format!("No spot price config found for {family}"))?;
+
+        let mut markets = HashMap::new();
+
+        for (market_id, price_feed_configs) in global_price_config.networks.get(family).context("No price feed config found for {family}")?.iter() {
+            let mut feeds = vec![];
+            let mut feeds_usd = vec![];
+
+            for feed_config in price_feed_configs.feeds.clone() {
+                match feed_config {
+                    MarketPriceFeedConfig::Constant { price, inverted } => {
+                        feeds.push(SpotPriceFeed {
+                            data: SpotPriceFeedData::Constant { price },
+                            inverted,
+                        });
+                    }
+                    MarketPriceFeedConfig::Sei { denom, inverted } => {
+                        feeds.push(SpotPriceFeed {
+                            data: SpotPriceFeedData::Sei { denom },
+                            inverted,
+                        });
+                    }
+                    MarketPriceFeedConfig::Stride { denom, inverted } => {
+                        feeds.push(SpotPriceFeed {
+                            data: SpotPriceFeedData::Stride { denom },
+                            inverted,
+                        });
+                    }
+                    MarketPriceFeedConfig::Pyth { key, inverted } => {
+                        let id_lookup = match chain_spot_price_config.pyth.as_ref() {
+                            Some(pyth) => {
+                                match pyth.r#type {
+                                    PythPriceServiceNetwork::Edge => &global_price_config.pyth.edge,
+                                    PythPriceServiceNetwork::Stable => &global_price_config.pyth.stable,
+                                }
+                            },
+                            None => bail!("No pyth config found for {family}"),
+                        };
+                        let id = id_lookup.feed_ids.get(&key).context("No pyth config found for {id} on {family}")?.clone();
+
+                        feeds.push(SpotPriceFeed {
+                            data: SpotPriceFeedData::Pyth { id },
+                            inverted,
+                        });
+                    }
+                }
+            }
+
+            markets.insert(market_id.clone(), OracleMarketPriceFeeds {
+                feeds,
+                feeds_usd,
+            });
+        }
+        Ok(OracleInfo {
+            pyth: chain_spot_price_config.pyth.clone(), 
+            stride: chain_spot_price_config.stride.clone(), 
+            markets
+        })
+    }
+
     pub(crate) async fn load_app_mainnet(&self, network: CosmosNetwork) -> Result<AppMainnet> {
-        let pyth_config = PythConfig::load(self.config_pyth.as_ref())?;
+        let price_config = PriceConfig::load(self.config_price.as_ref())?;
         let chain_config = ChainConfig::load(self.config_chain.as_ref(), network)?;
         let cosmos = self.connect(network).await?;
         let wallet = self.get_wallet(network)?;
 
-        let pyth_contract = chain_config
-            .pyth
-            .with_context(|| format!("No Pyth configuration found for {network}"))?;
-
-        // FIXME
-        // anyhow::ensure!(pyth_contract.r#type == FeedType::Stable);
-
-        // Pyth config validation
-        for (market_id, market_price_feeds) in pyth_config
-            .markets_stable
-            .iter()
-            .chain(pyth_config.markets_edge.iter())
-        {
-            if market_price_feeds.feeds_usd.is_none() && !market_id.is_notional_usd() {
-                anyhow::bail!(
-                    "notional is not USD, so there MUST be a USD price feed. MarketId: {}",
-                    market_id
-                );
-            }
-        }
-
-        let pyth = PythInfo {
-            address: pyth_contract.contract,
-            markets: pyth_config.markets_stable.clone(),
-            update_age_tolerance: pyth_config.update_age_tolerance,
-        };
+        // TODO - get OracleInfo for mainnet
 
         Ok(AppMainnet {
-            pyth,
             cosmos,
             wallet,
         })

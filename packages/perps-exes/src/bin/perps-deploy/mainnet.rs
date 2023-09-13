@@ -8,7 +8,7 @@ use cosmos::{Address, ContractAdmin, CosmosNetwork, HasAddress};
 use cosmwasm_std::{to_binary, CosmosMsg, Empty};
 use msg::{contracts::market::entry::NewMarketParams, token::TokenInit};
 use perps_exes::{
-    config::{MarketConfigUpdates, PythConfig, PythMarketPriceFeeds},
+    config::{MarketConfigUpdates},
     prelude::*,
 };
 
@@ -44,12 +44,6 @@ enum Sub {
         #[clap(flatten)]
         inner: InstantiateFactoryOpts,
     },
-    /// Set up the Pyth price bridge without setting up the market
-    NewPythBridge {
-        #[clap(flatten)]
-        inner: NewPythBridgeOpts,
-    },
-
     /// Add a new market to an existing factory
     AddMarket {
         #[clap(flatten)]
@@ -81,7 +75,6 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
             instantiate_factory(opt, inner).await?;
         }
         Sub::AddMarket { inner } => add_market(opt, inner).await?,
-        Sub::NewPythBridge { inner } => new_pyth_bridge(opt, inner).await?,
         Sub::Migrate { inner } => inner.go(opt).await?,
         Sub::UpdateConfig { inner } => inner.go(opt).await?,
     }
@@ -446,23 +439,6 @@ struct NewPythBridgeOpts {
     market_id: MarketId,
 }
 
-async fn new_pyth_bridge(
-    opt: Opt,
-    NewPythBridgeOpts { factory, market_id }: NewPythBridgeOpts,
-) -> Result<()> {
-    let PythMarketPriceFeeds { feeds, feeds_usd } = PythConfig::load(opt.config_pyth.as_ref())?
-        .markets_stable
-        .remove(&market_id)
-        .with_context(|| format!("No Pyth config found for market {market_id}"))?;
-    let code_ids = CodeIds::load()?;
-
-    let factories = MainnetFactories::load()?;
-    let factory = factories.get(&factory)?;
-    let app = opt.load_app_mainnet(factory.network).await?;
-
-    Ok(())
-}
-
 #[derive(clap::Parser)]
 struct AddMarketOpts {
     /// The factory contract address or identifier
@@ -480,9 +456,6 @@ struct AddMarketOpts {
     /// Initial borrow fee rate
     #[clap(long)]
     initial_borrow_fee_rate: Decimal256,
-    /// Pyth bridge contract to use as price admin
-    #[clap(long)]
-    pyth_bridge: Address,
     /// Instead of executing, print out CW3 multisig instructions
     #[clap(long)]
     cw3: bool,
@@ -496,7 +469,6 @@ async fn add_market(
         collateral,
         decimal_places,
         initial_borrow_fee_rate,
-        pyth_bridge,
         cw3: is_cw3,
     }: AddMarketOpts,
 ) -> Result<()> {
@@ -511,15 +483,6 @@ async fn add_market(
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
-
-    // For security, ensure that the pyth bridge contract has no admin. We want
-    // to deploy fresh bridges each time there's any config change.
-    let pyth_bridge_info = app.cosmos.contract_info(pyth_bridge).await?;
-    anyhow::ensure!(
-        pyth_bridge_info.admin.is_empty(),
-        "Pyth bridge {pyth_bridge} has an admin set, refusing to launch market. Admin is: {}",
-        pyth_bridge_info.admin
-    );
 
     let msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
         new_market: NewMarketParams {

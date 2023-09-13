@@ -146,6 +146,7 @@ pub(crate) async fn instantiate(
                 wallet,
                 network: _,
                 chain_config: _,
+                price_config: _,
             },
         code_id_source,
         trading_competition,

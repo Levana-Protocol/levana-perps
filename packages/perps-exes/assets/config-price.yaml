@@ -1,0 +1,89 @@
+pyth:
+  stable: 
+    update-age-tolerance: 120
+    endpoints: ["https://hermes.pyth.network/"]
+    # Pyth price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-stable
+    feed-ids:
+      ATOM_USD: "b00b60f88b03a6a625a8d1c048c3f66653edf217439983d037e7222c4e612819"
+      OSMO_USD: "5867f5683c757393a0670ef0f701490950fe93fdb006d181c8265a831ac0c5c6"
+      USDC_USD: "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a"
+      ETH_USD: "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace"
+      BTC_USD: "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43"
+      SEI_USD: "53614f1cb0c031d4af66c04cb9c756234adad0e1cee85303795091499a4084eb"
+  edge: 
+    update-age-tolerance: 120
+    endpoints: ["https://hermes-beta.pyth.network/"]
+    # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-edge
+    feed-ids:
+      ATOM_USD: "61226d39beea19d334f17c2febce27e12646d84675924ebb02b9cdaea68727e3"
+      BTC_USD: "f9c0172ba10dfa4d19088d94f5bf61d3b54d5bd7483a322a982e1373ee8ea31b"
+      ETH_USD: "ca80ba6dc32e08d06f1aa886011eed1d77c77be9eb761cc10d72b7d0a2fd57a6"
+
+networks: 
+  osmosis-mainnet:
+    ATOM_USD:
+      feeds: [
+        !pyth { key: "ATOM_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    OSMO_USDC:
+      feeds: [
+        !pyth { key: "OSMO_USD", inverted: false },
+        !pyth { key: "USDC_USD", inverted: true }
+      ]
+      feeds-usd: [
+        !pyth { key: "OSMO_USD", inverted: false }
+      ]
+    ETH_BTC:
+      feeds: [
+        !pyth { key: "ETH_USD", inverted: false },
+        !pyth { key: "BTC_USD", inverted: true }
+      ]
+      feeds-usd: [
+        !pyth { key: "BTC_USD", inverted: false }
+      ]
+    ETH_USD:
+      feeds: [
+        !pyth { key: "ETH_USD", inverted: false },
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    axlETH_USD:
+      feeds: [
+        !pyth { key: "ETH_USD", inverted: false },
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    BTC_USD:
+      feeds: [
+        !pyth { key: "BTC_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    OSMO_USD:
+      feeds: [
+        !pyth { key: "OSMO_USD", inverted: false}
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    SEI_USD:
+      feeds: [
+        !pyth { key: "SEI_USD", inverted: false}
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+  sei-testnet:
+    ATOM_USD:
+      feeds: [
+        !pyth { key: "ATOM_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
