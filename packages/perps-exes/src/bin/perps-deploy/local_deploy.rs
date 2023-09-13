@@ -5,7 +5,11 @@ use cosmos::{ContractAdmin, CosmosNetwork, HasAddress};
 use msg::contracts::{
     cw20::{entry::InstantiateMinter, Cw20Coin},
     farming::entry::OwnerExecuteMsg,
-    market::{config::ConfigUpdate, entry::ExecuteOwnerMsg},
+    market::{
+        config::ConfigUpdate,
+        entry::ExecuteOwnerMsg,
+        spot_price::{SpotPriceConfig, SpotPriceConfigInit},
+    },
 };
 use msg::prelude::*;
 
@@ -98,7 +102,7 @@ pub(crate) async fn go(
                 price_update_too_old_seconds: Some(60 * 60 * 24 * 5),
                 ..ConfigUpdate::default()
             },
-            spot_price: unimplemented!("TODO"),
+            spot_price: SpotPriceConfigInit::Manual,
         });
     }
 
