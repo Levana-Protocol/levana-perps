@@ -9,11 +9,10 @@ use std::str::FromStr;
 /// Spot price config
 #[cw_serde]
 pub enum SpotPriceConfig {
-    /// Manual spot price, mostly used for testing purposes
+    /// Manual spot price
     Manual {
         /// The admin address for manual spot price updates
-        /// if unset, will fallback to the contract owner
-        admin: Option<Addr>,
+        admin: Addr,
     },
     /// External oracle
     Oracle {
@@ -138,11 +137,10 @@ impl FromStr for PythPriceServiceNetwork {
 /// Spot price config for initialization messages
 #[cw_serde]
 pub enum SpotPriceConfigInit {
-    /// Manual spot price, mostly used for testing purposes
+    /// Manual spot price
     Manual {
         /// The admin address for manual spot price updates
-        /// if unset, will fallback to the contract owner
-        admin: Option<RawAddr>,
+        admin: RawAddr,
     },
     /// External oracle
     Oracle {

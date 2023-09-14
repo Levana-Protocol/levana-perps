@@ -57,7 +57,7 @@ impl App {
             },
             spot_price: match &self.price_source {
                 PriceSourceConfig::Wallet(admin) => SpotPriceConfigInit::Manual {
-                    admin: Some(admin.get_address_string().into()),
+                    admin: admin.get_address_string().into(),
                 },
                 PriceSourceConfig::Oracle(oracle) => {
                     let market = oracle

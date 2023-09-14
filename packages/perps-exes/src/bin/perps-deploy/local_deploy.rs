@@ -102,7 +102,9 @@ pub(crate) async fn go(
                 price_update_too_old_seconds: Some(60 * 60 * 24 * 5),
                 ..ConfigUpdate::default()
             },
-            spot_price: SpotPriceConfigInit::Manual { admin: None },
+            spot_price: SpotPriceConfigInit::Manual {
+                admin: basic.wallet.get_address_string().into(),
+            },
         });
     }
 
