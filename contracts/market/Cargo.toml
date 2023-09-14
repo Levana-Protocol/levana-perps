@@ -21,6 +21,7 @@ backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
 sanity = []
+sei = ["sei-cosmwasm"]
 
 
 [dependencies]
@@ -36,7 +37,7 @@ cw-utils = "1.0.1"
 once_cell = "1"
 indoc = "1.0.8"
 pyth-sdk-cw = "1.2.0"
-sei-cosmwasm = "0.4.10"
+sei-cosmwasm = { version = "0.4.10", optional = true }
 
 [dev-dependencies]
 cosmwasm-schema = "1.1.9"

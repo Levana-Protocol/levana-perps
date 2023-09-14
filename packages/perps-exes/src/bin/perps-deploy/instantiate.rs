@@ -2,8 +2,10 @@ use std::collections::HashSet;
 
 use anyhow::{Context, Result};
 use cosmos::{Address, CodeId, ContractAdmin, Cosmos, HasAddress, Wallet};
+use msg::contracts::market::config::Config as MarketConfig;
+use msg::contracts::market::entry::StatusResp;
 use msg::contracts::market::spot_price::{
-    PythConfigInit, PythPriceServiceNetwork, SpotPriceConfigInit, StrideConfigInit,
+    PythConfigInit, PythPriceServiceNetwork, SpotPriceConfig, SpotPriceConfigInit, StrideConfigInit,
 };
 use msg::prelude::*;
 use msg::{
@@ -244,7 +246,7 @@ pub(crate) async fn instantiate(
     log::info!("New factory deployed at {factory}");
     to_log.push((factory_code_id.get_code_id(), factory.get_address()));
 
-    let mut market_res = Vec::<MarketResponse>::new();
+    let mut market_res = Vec::<(MarketResponse, SpotPriceConfigInit)>::new();
 
     for market in markets {
         let spot_price = market.spot_price.clone();
@@ -257,11 +259,11 @@ pub(crate) async fn instantiate(
                     faucet_admin,
                     factory: factory.clone(),
                     initial_borrow_fee_rate,
-                    spot_price,
+                    spot_price: spot_price.clone(),
                 },
             )
             .await?;
-        market_res.push(res);
+        market_res.push((res, spot_price));
     }
 
     let factory_addr = factory.get_address();
@@ -293,9 +295,43 @@ pub(crate) async fn instantiate(
         log::info!("Logged new contracts in tracker at {}", res.txhash);
     }
 
+    // Sanity check the markets. Might be removed one day, but for now it's helpful to debug.
+    for (market, spot_price) in market_res.iter() {
+        match spot_price {
+            SpotPriceConfigInit::Manual { .. } => {
+                log::info!("not doing initial crank for {} because it's a manual market so an initial price must be added first", market.market_id);
+            }
+            SpotPriceConfigInit::Oracle {
+                feeds, feeds_usd, ..
+            } => {
+                if feeds.iter().chain(feeds_usd.iter()).any(|f| match f.data {
+                    msg::contracts::market::spot_price::SpotPriceFeedData::Pyth { .. } => true,
+                    _ => false,
+                }) {
+                    log::info!("not doing initial crank for {} because it contains pyth feeds which may need a publish first", market.market_id);
+                } else {
+                    log::info!("doing initial crank to sanity check that spot price oracle is working for {}", market.market_id);
+                    let contract = cosmos.make_contract(market.market_addr);
+                    contract
+                        .execute(
+                            wallet,
+                            vec![],
+                            msg::contracts::market::entry::ExecuteMsg::Crank {
+                                execs: None,
+                                rewards: None,
+                            },
+                        )
+                        .await?;
+                }
+            }
+        }
+    }
+
+    log::info!("Done!");
+
     Ok(InstantiateResponse {
         factory: factory_addr,
-        markets: market_res,
+        markets: market_res.into_iter().map(|(market, _)| market).collect(),
     })
 }
 

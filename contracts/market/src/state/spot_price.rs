@@ -1,6 +1,8 @@
 use crate::prelude::*;
 use anyhow::ensure;
-use cosmwasm_std::{Order, QuerierWrapper};
+use cosmwasm_std::Order;
+#[cfg(feature = "sei")]
+use cosmwasm_std::QuerierWrapper;
 use msg::contracts::market::{
     entry::PriceForQuery,
     spot_price::{
@@ -8,6 +10,7 @@ use msg::contracts::market::{
     },
 };
 use pyth_sdk_cw::PriceFeedResponse;
+#[cfg(feature = "sei")]
 use sei_cosmwasm::{ExchangeRatesResponse, SeiQuerier};
 
 /// Stores spot price history.
@@ -278,7 +281,9 @@ impl State<'_> {
         {
             ensure!(
                 price_storage.price_usd == price_usd,
-                "Price in USD mismatch"
+                "Price in USD mismatch {} != {}",
+                price_storage.price_usd,
+                price_usd
             );
         }
 
@@ -345,20 +350,27 @@ impl State<'_> {
 
                 SpotPriceFeedData::Constant { price } => (price.into_number(), None),
                 SpotPriceFeedData::Sei { denom } => {
-                    let querier = QuerierWrapper::new(&*self.querier);
-                    let querier = SeiQuerier::new(&querier);
-                    let res: ExchangeRatesResponse = querier.query_exchange_rates()?;
-                    let pair = res
-                        .denom_oracle_exchange_rate_pairs
-                        .iter()
-                        .find(|x| x.denom == *denom)
-                        .with_context(|| format!("no such denom {denom}"))?;
+                    #[cfg(feature = "sei")]
+                    {
+                        let querier = QuerierWrapper::new(&*self.querier);
+                        let querier = SeiQuerier::new(&querier);
+                        let res: ExchangeRatesResponse = querier.query_exchange_rates()?;
+                        let pair = res
+                            .denom_oracle_exchange_rate_pairs
+                            .iter()
+                            .find(|x| x.denom == *denom)
+                            .with_context(|| format!("no such denom {denom}"))?;
 
-                    let price: Decimal256 = pair.oracle_exchange_rate.exchange_rate.into();
-                    let price = Number::try_from(price)?;
+                        let price: Decimal256 = pair.oracle_exchange_rate.exchange_rate.into();
+                        let price = Number::try_from(price)?;
 
-                    // pair does have a `last_update`, but it's in block height
-                    (price, None)
+                        // pair does have a `last_update`, but it's in block height
+                        (price, None)
+                    }
+                    #[cfg(not(feature = "sei"))]
+                    {
+                        bail!("SEI price feed for {denom} is only available on sei network")
+                    }
                 }
 
                 SpotPriceFeedData::Stride { .. } => {
