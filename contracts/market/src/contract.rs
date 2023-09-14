@@ -24,6 +24,7 @@ use msg::{
             PriceWouldTriggerResp, SpotPriceHistoryResp,
         },
         position::{events::PositionSaveReason, PositionId, PositionOrPendingClose, PositionsResp},
+        spot_price::SpotPriceConfig,
     },
     shutdown::ShutdownImpact,
 };
@@ -163,6 +164,19 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         }
 
         ExecuteMsg::SetManualPrice { price, price_usd } => {
+            match &state.config.spot_price {
+                SpotPriceConfig::Manual { admin } => match admin {
+                    Some(admin) => {
+                        state.assert_auth(&info.sender, AuthCheck::Addr(admin.clone()))?;
+                    }
+                    None => {
+                        state.assert_auth(&info.sender, AuthCheck::Owner)?;
+                    }
+                },
+                SpotPriceConfig::Oracle { .. } => {
+                    anyhow::bail!("Cannot set manual spot price on this market, it uses an oracle");
+                }
+            }
             state.save_manual_spot_price(&mut ctx, price, price_usd)?;
             // the price needed to be set first before doing this
             // so info.requires_spot_price_append is false
