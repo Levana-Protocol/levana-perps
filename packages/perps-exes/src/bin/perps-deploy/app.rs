@@ -157,17 +157,10 @@ impl Opt {
 
         let mut markets = HashMap::new();
 
-        for (market_id, price_feed_configs) in global_price_config
-            .networks
-            .get(&network)
-            .with_context(|| format!("No price feed config found for {:?}", network))?
-            .iter()
-        {
+        let map_feeds = |feed_configs: &[MarketPriceFeedConfig]| -> Result<Vec<SpotPriceFeed>> {
             let mut feeds = vec![];
-            let mut feeds_usd = vec![];
-
-            for feed_config in price_feed_configs.feeds.clone() {
-                match feed_config {
+            for feed_config in feed_configs {
+                match feed_config.clone() {
                     MarketPriceFeedConfig::Constant { price, inverted } => {
                         feeds.push(SpotPriceFeed {
                             data: SpotPriceFeedData::Constant { price },
@@ -210,9 +203,21 @@ impl Opt {
                 }
             }
 
+            Ok(feeds)
+        };
+
+        for (market_id, price_feed_configs) in global_price_config
+            .networks
+            .get(&network)
+            .with_context(|| format!("No price feed config found for {:?}", network))?
+            .iter()
+        {
             markets.insert(
                 market_id.clone(),
-                OracleMarketPriceFeeds { feeds, feeds_usd },
+                OracleMarketPriceFeeds {
+                    feeds: map_feeds(&price_feed_configs.feeds)?,
+                    feeds_usd: map_feeds(&price_feed_configs.feeds_usd)?,
+                },
             );
         }
         Ok(OracleInfo {

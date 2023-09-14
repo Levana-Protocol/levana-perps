@@ -77,6 +77,9 @@ build-contracts-arm64:
 build-contracts-native:
 	./.ci/native-contract-build.sh
 
+build-contracts-native-sei:
+	env SEI="true" ./.ci/native-contract-build.sh
+
 # Deploy contracts to LocalOsmosis
 local-deploy:
 	COSMOS_WALLET=osmosis-local cargo run --bin perps-deploy local-deploy --network osmosis-local
@@ -153,9 +156,14 @@ run-companion:
 	cargo run --bin perps-companion
 
 # Deploy to Osmosis tesntet
-deploy-osmosis-testnet:
+deploy-osmosis-ci:
 	cargo run --bin perps-deploy testnet store-code --network osmosis-testnet
-	cargo run --bin perps-deploy testnet instantiate --family osmodev
+	cargo run --bin perps-deploy testnet instantiate --family osmoci
+
+# Deploy to Sei ci
+deploy-sei-ci:
+	cargo run --bin perps-deploy testnet store-code --network sei-testnet
+	cargo run --bin perps-deploy testnet instantiate --family seici
 
 # Deploy to Sei tesntet
 deploy-sei-testnet:
