@@ -89,10 +89,14 @@ impl State<'_> {
         }
     }
 
-    /// Override the current price with the given value.
+    /// For queries that provide a fresh price from the outside
+    /// override the current price with the given value.
     ///
     /// This doesn't store any data in the contract. Instead, it only updates an
     /// in-memory representation.
+    ///
+    /// Since users are providing the price, the `publish_time` is always None
+    /// and the `timestamp` is always now
     pub(crate) fn override_current_price(
         &self,
         store: &dyn Storage,
@@ -103,11 +107,6 @@ impl State<'_> {
             let market_type = market_id.get_market_type();
             let price = base.into_notional_price(market_type);
 
-            let (publish_time, publish_time_usd) = self
-                .spot_price_cache
-                .get()
-                .map_or((None, None), |x| (x.publish_time, x.publish_time_usd));
-
             let price = PricePoint {
                 price_notional: price,
                 price_usd: collateral,
@@ -115,8 +114,8 @@ impl State<'_> {
                 timestamp: self.now(),
                 is_notional_usd: market_id.is_notional_usd(),
                 market_type,
-                publish_time,
-                publish_time_usd,
+                publish_time: None,
+                publish_time_usd: None,
             };
 
             self.spot_price_cache
