@@ -14,6 +14,7 @@ pub struct TestConfig {
     pub cw20_decimals: u8,
     pub new_user_funds: Number,
     pub rewards_token_denom: String,
+    pub manual_price_owner: String,
 }
 
 pub static TEST_CONFIG: Lazy<TestConfig> = Lazy::new(|| TestConfig {
@@ -32,6 +33,8 @@ pub static TEST_CONFIG: Lazy<TestConfig> = Lazy::new(|| TestConfig {
         .try_into()
         .unwrap(),
     rewards_token_denom: "REWARDS_DENOM".to_string(),
+    manual_price_owner: env::var("MANUAL_PRICE_OWNER")
+        .unwrap_or_else(|_| "manual-price-owner".to_string()),
 });
 
 // Config/defaults for the typical scenario of creating a single market at a time
@@ -39,7 +42,6 @@ pub struct DefaultMarket {
     pub base: String,
     pub quote: String,
     pub initial_price: PriceBaseInQuote,
-    pub price_admin: String,
     pub cw20_symbol: String,
     pub token_kind: TokenKind,
     pub bootstrap_lp_addr: Addr,
@@ -74,7 +76,6 @@ pub static DEFAULT_MARKET: Lazy<DefaultMarket> = Lazy::new(|| {
             .unwrap_or_else(|_| "1".to_string())
             .parse()
             .unwrap(),
-        price_admin: env::var("MARKET_PRICE_ADMIN").unwrap_or_else(|_| "price-admin".to_string()),
         cw20_symbol: env::var("MARKET_CW20_SYMBOL").unwrap_or_else(|_| "contract-usd".to_string()),
         token_kind: {
             let token_kind = match std::env::var("MARKET_TOKEN_KIND") {

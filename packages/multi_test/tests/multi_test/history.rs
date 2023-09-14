@@ -381,12 +381,15 @@ fn trade_history_nft_transfer_perp_963() {
 fn price_history_works() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
-    let start_len = market
-        .query_spot_price_history(None, None, None)
-        .unwrap()
-        .len();
+    let start_prices = market.query_spot_price_history(None, None, None).unwrap();
 
-    for i in 2..=10 {
+    // there is an initial price due to liquidity deposit, and initial market setup
+    let initial_price_len = 2;
+
+    // sanity check to confirm
+    assert_eq!(start_prices.len(), initial_price_len);
+
+    for i in initial_price_len..10 {
         market
             .exec_set_price(format!("{}", i).parse().unwrap())
             .unwrap();
@@ -396,20 +399,31 @@ fn price_history_works() {
         .query_spot_price_history(None, None, Some(OrderInMessage::Ascending))
         .unwrap();
 
-    assert_eq!(prices.len() - start_len, 9);
+    assert_eq!(prices.len(), 10);
 
-    for (i, price) in prices.iter().enumerate() {
-        assert_eq!(price.price_base, (i + 1).to_string().parse().unwrap());
+    // check just the new prices we added
+    for (i, price) in prices.iter().skip(initial_price_len).enumerate() {
+        assert_eq!(
+            price.price_base,
+            (i + initial_price_len).to_string().parse().unwrap()
+        );
     }
 
     let prices = market
         .query_spot_price_history(None, None, Some(OrderInMessage::Descending))
         .unwrap();
 
-    assert_eq!(prices.len() - start_len, 9);
+    assert_eq!(prices.len(), 10);
 
-    for i in 1..=prices.len() {
-        assert_eq!(prices[10 - i].price_base, i.to_string().parse().unwrap());
+    // check just the new prices we added
+    for (i, price) in prices
+        .iter()
+        .rev()
+        .skip(initial_price_len)
+        .rev()
+        .enumerate()
+    {
+        assert_eq!(price.price_base, (9 - i).to_string().parse().unwrap());
     }
 
     let prices_desc_page_1 = market
@@ -428,8 +442,13 @@ fn price_history_works() {
         .map(|p| p.price_base.to_string())
         .collect::<Vec<_>>();
     assert_eq!(
-        vec!["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"],
+        vec!["9", "8", "7", "6", "5", "4", "3", "2", "1"],
         prices_desc
+            .iter()
+            .rev()
+            .skip(initial_price_len - 1)
+            .rev()
+            .collect::<Vec<_>>()
     );
 
     let prices_asc_page_1 = market
@@ -448,8 +467,11 @@ fn price_history_works() {
         .map(|p| p.price_base.to_string())
         .collect::<Vec<_>>();
     assert_eq!(
-        vec!["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
+        vec!["1", "2", "3", "4", "5", "6", "7", "8", "9"],
         prices_asc
+            .iter()
+            .skip(initial_price_len - 1)
+            .collect::<Vec<_>>()
     );
 }
 

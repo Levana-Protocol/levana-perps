@@ -24,32 +24,36 @@ impl FarmingEmissions {
     }
 
     fn check_last_remaining_rewards(&self, lp: &Addr) -> Result<()> {
-        println!("checking last remaining rewards");
-        let market = self.market.borrow_mut();
-        let last_action_time = self.actions.last().unwrap().at_seconds;
-        let remaining_emissions_seconds = self.emissions_duration_seconds - last_action_time;
-        let token = market.rewards_token();
+        if let Some(last_action) = self.actions.last() {
+            println!("checking last remaining rewards");
+            let market = self.market.borrow_mut();
+            let last_action_time = last_action.at_seconds;
+            let remaining_emissions_seconds = self.emissions_duration_seconds - last_action_time;
+            let token = market.rewards_token();
 
-        market
-            .set_time(TimeJump::Seconds(remaining_emissions_seconds.into()))
-            .unwrap();
+            market
+                .set_time(TimeJump::Seconds(remaining_emissions_seconds.into()))
+                .unwrap();
 
-        let balance_before_claim = market.query_reward_token_balance(&token, lp);
-        let farmer_stats_before_claim = market.query_farming_farmer_stats(lp).unwrap();
+            let balance_before_claim = market.query_reward_token_balance(&token, lp);
+            let farmer_stats_before_claim = market.query_farming_farmer_stats(lp).unwrap();
 
-        if farmer_stats_before_claim.emission_rewards == LvnToken::zero() {
-            println!("No LVN rewards to check");
-            return Ok(());
+            if farmer_stats_before_claim.emission_rewards == LvnToken::zero() {
+                println!("No LVN rewards to check");
+                return Ok(());
+            }
+
+            market.exec_farming_claim_emissions(lp).unwrap();
+
+            let balance_after_claim = market.query_reward_token_balance(&token, lp);
+
+            token.assert_eq(
+                NonZero::new(farmer_stats_before_claim.emission_rewards).unwrap(),
+                NonZero::new(balance_after_claim - balance_before_claim).unwrap(),
+            );
+        } else {
+            println!("no last remaining rewards");
         }
-
-        market.exec_farming_claim_emissions(lp).unwrap();
-
-        let balance_after_claim = market.query_reward_token_balance(&token, lp);
-
-        token.assert_eq(
-            NonZero::new(farmer_stats_before_claim.emission_rewards).unwrap(),
-            NonZero::new(balance_after_claim - balance_before_claim).unwrap(),
-        );
 
         Ok(())
     }

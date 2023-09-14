@@ -4,7 +4,6 @@ members = [
     "contracts/liquidity_token",
     "contracts/market",
     "contracts/position_token",
-    "contracts/pyth_bridge", 
     "packages/msg",
     "packages/shared",
 ]

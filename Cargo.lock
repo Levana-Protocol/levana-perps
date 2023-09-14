@@ -2333,6 +2333,7 @@ dependencies = [
  "levana_perpswap_cosmos_shared",
  "once_cell",
  "proptest",
+ "pyth-sdk-cw",
  "semver",
  "serde",
 ]
@@ -2375,25 +2376,6 @@ dependencies = [
  "semver",
  "serde",
  "serde-json-wasm 0.5.1",
- "thiserror",
-]
-
-[[package]]
-name = "levana_perpswap_cosmos_pyth_bridge"
-version = "0.1.0-beta.15"
-dependencies = [
- "anyhow",
- "cosmwasm-schema",
- "cosmwasm-std",
- "cw-storage-plus",
- "cw-utils",
- "cw2",
- "levana_perpswap_cosmos_msg",
- "levana_perpswap_cosmos_shared",
- "pyth-sdk-cw",
- "schemars",
- "semver",
- "serde",
  "thiserror",
 ]
 

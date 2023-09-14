@@ -4,7 +4,12 @@ use anyhow::{Context, Result};
 use cosmos::{ContractAdmin, CosmosNetwork, HasAddress};
 use msg::contracts::{
     cw20::{entry::InstantiateMinter, Cw20Coin},
-    market::config::ConfigUpdate,
+    farming::entry::OwnerExecuteMsg,
+    market::{
+        config::ConfigUpdate,
+        entry::ExecuteOwnerMsg,
+        spot_price::{SpotPriceConfig, SpotPriceConfigInit},
+    },
 };
 use msg::prelude::*;
 
@@ -14,7 +19,7 @@ use crate::{
         InstantiateMarket, InstantiateParams, InstantiateResponse, MarketResponse, ProtocolCodeIds,
         INITIAL_BALANCE_AMOUNT,
     },
-    store_code::{CW20, FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN, PYTH_BRIDGE},
+    store_code::{CW20, FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN},
 };
 
 #[derive(clap::Parser)]
@@ -97,6 +102,9 @@ pub(crate) async fn go(
                 price_update_too_old_seconds: Some(60 * 60 * 24 * 5),
                 ..ConfigUpdate::default()
             },
+            spot_price: SpotPriceConfigInit::Manual {
+                admin: basic.wallet.get_address_string().into(),
+            },
         });
     }
 
@@ -116,10 +124,6 @@ pub(crate) async fn go(
         market_code_id: basic
             .cosmos
             .store_code_path(&basic.wallet, opt.get_contract_path(MARKET))
-            .await?,
-        pyth_bridge_code_id: basic
-            .cosmos
-            .store_code_path(&basic.wallet, opt.get_contract_path(PYTH_BRIDGE))
             .await?,
     };
 
@@ -151,15 +155,11 @@ pub(crate) async fn go(
             .execute(
                 &basic.wallet,
                 vec![],
-                msg::contracts::market::entry::ExecuteMsg::SetPrice {
+                msg::contracts::market::entry::ExecuteMsg::SetManualPrice {
                     price: initial_price,
-                    price_usd: if market_id.is_notional_usd() {
-                        None
-                    } else {
-                        Some(collateral_price)
-                    },
-                    execs: None,
-                    rewards: None,
+                    price_usd: initial_price
+                        .try_into_usd(&market_id)
+                        .unwrap_or(collateral_price),
                 },
             )
             .await

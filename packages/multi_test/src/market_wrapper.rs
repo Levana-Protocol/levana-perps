@@ -45,6 +45,7 @@ use msg::contracts::market::entry::{
     TradeHistorySummary, TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
+use msg::contracts::market::spot_price::SpotPriceConfigInit;
 use msg::contracts::market::{
     config::{Config, ConfigUpdate},
     entry::{
@@ -151,7 +152,9 @@ impl PerpsMarket {
                     liquidity_cooldown_seconds: Some(0),
                     ..Default::default()
                 }),
-                price_admin: DEFAULT_MARKET.price_admin.clone().into(),
+                spot_price: SpotPriceConfigInit::Manual {
+                    admin: TEST_CONFIG.manual_price_owner.as_str().into(),
+                },
                 initial_borrow_fee_rate: "0.01".parse().unwrap(),
             },
         };
@@ -224,6 +227,7 @@ impl PerpsMarket {
             farming_addr,
         };
 
+        // set an initial price...
         _self.exec_set_price_with_usd(initial_price, collateral_in_usd)?;
 
         if bootstap_lp {
@@ -751,30 +755,27 @@ impl PerpsMarket {
     // market executions
     pub fn exec_refresh_price(&self) -> Result<AppResponse> {
         let price_resp = self.query_current_price()?;
-        self.exec(
-            &Addr::unchecked(&DEFAULT_MARKET.price_admin),
-            &msg::contracts::market::entry::ExecuteMsg::SetPrice {
-                price: price_resp.price_base,
-                execs: Some(0),
-                price_usd: None,
-                rewards: None,
-            },
-        )
+        self.exec_set_price(price_resp.price_base)
     }
+
     pub fn exec_set_price(&self, price: PriceBaseInQuote) -> Result<AppResponse> {
         self.exec_set_price_with_usd(price, None)
     }
 
-    pub fn exec_set_price_and_crank(&self, price: PriceBaseInQuote) -> Result<AppResponse> {
-        self.exec(
-            &Addr::unchecked(&DEFAULT_MARKET.price_admin),
-            &msg::contracts::market::entry::ExecuteMsg::SetPrice {
+    pub fn exec_set_price_and_crank(&self, price: PriceBaseInQuote) -> Result<Vec<AppResponse>> {
+        let mut responses = vec![self.exec(
+            &Addr::unchecked(&TEST_CONFIG.manual_price_owner),
+            &MarketExecuteMsg::SetManualPrice {
                 price,
-                execs: None,
-                price_usd: None,
-                rewards: None,
+                price_usd: price
+                    .try_into_usd(&self.id)
+                    .unwrap_or(PriceCollateralInUsd::one()),
             },
-        )
+        )?];
+
+        responses.push(self.exec_crank(&Addr::unchecked("anybody"))?);
+
+        Ok(responses)
     }
 
     pub fn exec_set_price_with_usd(
@@ -783,12 +784,14 @@ impl PerpsMarket {
         price_usd: Option<PriceCollateralInUsd>,
     ) -> Result<AppResponse> {
         self.exec(
-            &Addr::unchecked(&DEFAULT_MARKET.price_admin),
-            &msg::contracts::market::entry::ExecuteMsg::SetPrice {
+            &Addr::unchecked(&TEST_CONFIG.manual_price_owner),
+            &MarketExecuteMsg::SetManualPrice {
                 price,
-                execs: Some(0),
-                price_usd,
-                rewards: None,
+                price_usd: price_usd.unwrap_or(
+                    price
+                        .try_into_usd(&self.id)
+                        .unwrap_or(PriceCollateralInUsd::one()),
+                ),
             },
         )
     }
@@ -797,7 +800,7 @@ impl PerpsMarket {
         self.exec(
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
             &MarketExecuteMsg::Owner(MarketExecuteOwnerMsg::ConfigUpdate {
-                update: config_update,
+                update: Box::new(config_update),
             }),
         )
     }
@@ -1282,15 +1285,6 @@ impl PerpsMarket {
         )?;
 
         Ok(resp.tokens)
-    }
-
-    // outside contract executions that require market info like addr
-    pub fn exec_set_admin_for_price_updates(&self, admin_addr: &Addr) -> Result<AppResponse> {
-        let market_addr = self.addr.to_string();
-        self.exec_factory(&FactoryExecuteMsg::SetMarketPriceAdmin {
-            market_addr: market_addr.into(),
-            admin_addr: admin_addr.clone().into(),
-        })
     }
 
     /// Perform a shutdown action

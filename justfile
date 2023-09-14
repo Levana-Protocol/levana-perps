@@ -65,13 +65,13 @@ build-contracts:
 	./.ci/contracts.sh
 
 # Build contracts with Cosmos Docker tooling for arm64
-# only for development purposes, not deplying mainnet contracts
+# only for development purposes, not deploying mainnet contracts
 # as per the docker tool's internal rules, these builds will have the architecture extension in the name
 build-contracts-arm64:
 	env OPTIMIZER_ARM64="true" ./.ci/contracts.sh
 
 # Build contracts with native tooling
-# only for development purposes, not deplying mainnet contracts
+# only for development purposes, not deploying mainnet contracts
 # the filenames are consolidated to be like regular docker builds so they can be
 # deployed with our tooling easily
 build-contracts-native:
@@ -155,6 +155,11 @@ run-companion:
 # Deploy to Osmosis tesntet
 deploy-osmosis-testnet:
 	cargo run --bin perps-deploy testnet store-code --network osmosis-testnet
+	cargo run --bin perps-deploy testnet instantiate --family osmodev
+
+# Deploy to Sei tesntet
+deploy-sei-testnet:
+	cargo run --bin perps-deploy testnet store-code --network sei-testnet
 
 # Migrate osmoci
 migrate-osmoci:

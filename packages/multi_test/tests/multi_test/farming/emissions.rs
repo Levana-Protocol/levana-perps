@@ -906,7 +906,7 @@ proptest! {
     })]
 
     #[test]
-    //#[cfg_attr(not(feature = "proptest"), ignore)]
+    #[cfg_attr(not(feature = "proptest"), ignore)]
     fn proptest_farming_emissions(
         strategy in FarmingEmissions::new_strategy()
     ) {

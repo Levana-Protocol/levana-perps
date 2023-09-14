@@ -7,16 +7,14 @@ use std::{collections::HashSet, path::PathBuf, sync::Arc};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, HasAddress, TxBuilder};
-use msg::contracts::{
-    market::{
-        entry::{PositionAction, PositionActionKind, TradeHistorySummary},
-        position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
-    },
-    pyth_bridge::entry::FeedType,
+use msg::contracts::market::{
+    entry::{PositionAction, PositionActionKind, TradeHistorySummary},
+    position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
+    spot_price::{PythPriceServiceNetwork, SpotPriceFeedData},
 };
 use parking_lot::Mutex;
 use perps_exes::{
-    config::{ChainConfig, PythConfig, PythContract},
+    config::ChainConfig,
     prelude::MarketContract,
     pyth::{get_oracle_update_msg, VecWithCurr},
 };
@@ -113,31 +111,40 @@ async fn update_pyth(
     }: UpdatePythOpt,
 ) -> Result<()> {
     let chain = ChainConfig::load(config_chain, network)?;
-    let PythContract {
-        contract: oracle,
-        r#type,
-    } = chain
-        .pyth
-        .with_context(|| format!("No Pyth oracle found for network {network}"))?;
-
+    let pyth = chain
+        .spot_price
+        .and_then(|spot_price| spot_price.pyth)
+        .context("No Pyth oracle found for network {network}")?;
     let basic = opt.load_basic_app(network).await?;
-    let pyth = PythConfig::load(config_pyth)?;
-    let endpoints = VecWithCurr::new(match r#type {
-        FeedType::Stable => pyth.endpoints_stable.clone(),
-        FeedType::Edge => pyth.endpoints_edge.clone(),
+
+    let oracle_info = opt.get_oracle_info(&basic.chain_config, &basic.price_config, network)?;
+
+    // FIXME
+    let endpoints = VecWithCurr::new(match pyth.r#type {
+        PythPriceServiceNetwork::Stable => basic.price_config.pyth.stable.endpoints.clone(),
+        PythPriceServiceNetwork::Edge => basic.price_config.pyth.edge.endpoints.clone(),
     });
 
     let client = reqwest::Client::new();
-    let feeds = match r#type {
-        FeedType::Stable => &pyth.markets_stable,
-        FeedType::Edge => &pyth.markets_edge,
-    }
-    .get(&market)
-    .with_context(|| format!("No Pyth feed data found for {market}"))?;
+    // FIXME
+    let market = oracle_info
+        .markets
+        .get(&market)
+        .with_context(|| format!("No oracle feed data found for {market}"))?;
 
-    let oracle = basic.cosmos.make_contract(oracle);
+    let oracle = basic.cosmos.make_contract(pyth.contract);
 
-    let msg = get_oracle_update_msg(feeds, &basic.wallet, &endpoints, &client, &oracle).await?;
+    let ids = market
+        .feeds
+        .iter()
+        .chain(market.feeds_usd.iter())
+        .filter_map(|feed| match feed.data {
+            SpotPriceFeedData::Pyth { id } => Some(id),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    let msg = get_oracle_update_msg(&ids, &basic.wallet, &endpoints, &client, &oracle).await?;
 
     let builder = TxBuilder::default().add_message(msg);
     let res = builder

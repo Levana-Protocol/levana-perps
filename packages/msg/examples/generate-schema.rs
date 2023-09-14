@@ -111,9 +111,6 @@ fn main() {
     write_position_token();
     finalize("position_token");
 
-    write_pyth_bridge();
-    finalize("pyth_bridge");
-
     write_error();
     finalize("error");
 }
@@ -237,20 +234,6 @@ fn write_ibc_execute_proxy() {
 
     write_api!(
     name: "ibc_execute_proxy",
-    instantiate: InstantiateMsg,
-    execute: ExecuteMsg,
-    query: QueryMsg,
-    migrate: MigrateMsg,
-    );
-}
-
-fn write_pyth_bridge() {
-    use levana_perpswap_cosmos_msg::contracts::pyth_bridge::entry::{
-        ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
-    };
-
-    write_api!(
-    name: "pyth_bridge",
     instantiate: InstantiateMsg,
     execute: ExecuteMsg,
     query: QueryMsg,

@@ -40,7 +40,6 @@ async fn go(factory: &MainnetFactory, csv: &mut Writer<File>) -> Result<()> {
             chain: &chain_id,
             market_id: &market.market_id,
             market_contract: market.market.get_address(),
-            pyth_bridge_contract: market.price_admin,
         })?;
         csv.flush()?;
     }
@@ -52,5 +51,4 @@ struct Record<'a> {
     chain: &'a str,
     market_id: &'a MarketId,
     market_contract: Address,
-    pyth_bridge_contract: Address,
 }

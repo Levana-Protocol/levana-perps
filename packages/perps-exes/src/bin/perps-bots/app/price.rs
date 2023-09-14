@@ -1,22 +1,24 @@
-use std::{collections::HashMap, fmt::Display, str::FromStr, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+    sync::Arc,
+};
 
 use anyhow::Result;
 use axum::async_trait;
 use chrono::{DateTime, Duration, Utc};
-use cosmos::{
-    proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, HasAddress, TxBuilder, Wallet,
-};
+use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, TxBuilder, Wallet};
 use cosmwasm_std::Decimal256;
 use msg::{
-    contracts::pyth_bridge::entry::FeedType,
-    prelude::{PriceBaseInQuote, Signed, UnsignedDecimal},
+    contracts::market::spot_price::{SpotPriceConfig, SpotPriceFeedData},
+    prelude::*,
 };
-use perps_exes::pyth::{get_latest_price, get_oracle_update_msg};
+use perps_exes::pyth::get_oracle_update_msg;
 use shared::storage::MarketId;
 
 use crate::{
     config::BotConfigByType,
-    util::{markets::Market, oracle::Pyth},
+    util::{markets::Market, oracle::Oracle},
     watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
 };
 
@@ -94,22 +96,19 @@ impl App {
 
         // Load it up each time in case there are config changes, but we could
         // theoretically optimize this by doing it at load time instead.
-        let bridge_addr = Address::from_str(&market.price_admin)?;
-        let pyth = Pyth::new(&self.cosmos, bridge_addr, market.market_id.clone()).await?;
-
-        let (latest_price, _) = get_latest_price(
-            &self.client,
-            &pyth.market_price_feeds,
-            match pyth.feed_type {
-                FeedType::Stable => &self.endpoints_stable,
-                FeedType::Edge => &self.endpoints_edge,
-            },
+        let oracle = Oracle::new(
+            &self.cosmos,
+            market,
+            self.endpoints_stable.clone(),
+            self.endpoints_edge.clone(),
         )
         .await?;
+
+        let (latest_price, _) = oracle.get_latest_price(&self.client).await?;
         let reason = self
             .needs_price_update(
                 market,
-                &pyth,
+                &oracle,
                 latest_price,
                 worker
                     .last_successful_price_times
@@ -122,12 +121,10 @@ impl App {
             if reason.is_too_frequent() {
                 return Ok("Too frequent price updates, skipping".to_owned());
             }
-            let msgs = self
-                .get_txs_pyth(&worker.wallet, &pyth, self.config.execs_per_price)
-                .await?;
-            for msg in msgs {
+            if let Some(msg) = self.get_tx_pyth(&worker.wallet, &oracle).await? {
                 builder.add_message_mut(msg);
             }
+
             statuses.push(format!("Needs Pyth update: {reason}"));
         } else {
             return Ok("No pyth price update needed".to_owned());
@@ -152,7 +149,7 @@ impl App {
                 }
 
                 // OK, it was a too old error. Let's find out when the last price update was for the contract.
-                let last_update = pyth
+                let last_update = oracle
                     .prev_market_price_timestamp(&market.market_id)
                     .await?
                     .try_into_chrono_datetime()?;
@@ -169,7 +166,7 @@ impl App {
         };
 
         // the storage should have been updated from the above transaction
-        match pyth.prev_market_price_timestamp(&market.market_id).await {
+        match oracle.prev_market_price_timestamp(&market.market_id).await {
             Ok(timestamp) => {
                 let datetime = timestamp.try_into_chrono_datetime()?;
                 worker
@@ -184,7 +181,7 @@ impl App {
         std::mem::drop(crank_lock);
 
         // just for logging pyth prices
-        let msg = match pyth.query_price(120).await {
+        let msg = match oracle.query_price(120).await {
             Ok(market_price) => format!("Updated pyth price: {market_price:?}"),
             Err(e) => format!("query_price failed, ignoring: {e:?}."),
         };
@@ -206,7 +203,7 @@ impl App {
     async fn needs_price_update(
         &self,
         market: &Market,
-        pyth: &Pyth,
+        oracle: &Oracle,
         latest_price: PriceBaseInQuote,
         last_successful_price_time: Option<DateTime<Utc>>,
     ) -> Result<Option<PriceUpdateReason>> {
@@ -225,7 +222,7 @@ impl App {
             }
         };
 
-        let price_time = pyth.prev_market_price_timestamp(market_id).await?;
+        let price_time = oracle.prev_market_price_timestamp(market_id).await?;
 
         // Determine the logical "last update" by using both the
         // contract-derived price time and the most recent successfully price
@@ -285,28 +282,45 @@ impl App {
         Ok(None)
     }
 
-    async fn get_txs_pyth(
+    async fn get_tx_pyth(
         &self,
         wallet: &Wallet,
-        pyth: &Pyth,
-        execs: Option<u32>,
-    ) -> Result<Vec<MsgExecuteContract>> {
-        let oracle_msg = get_oracle_update_msg(
-            &pyth.market_price_feeds,
-            &wallet,
-            match pyth.feed_type {
-                FeedType::Stable => &self.endpoints_stable,
-                FeedType::Edge => &self.endpoints_edge,
-            },
-            &self.client,
-            &pyth.oracle,
-        )
-        .await?;
-        let bridge_msg = pyth
-            .get_bridge_update_msg(wallet.get_address_string(), execs)
-            .await?;
+        oracle: &Oracle,
+    ) -> Result<Option<MsgExecuteContract>> {
+        match &oracle.pyth {
+            None => Ok(None),
+            Some(pyth) => {
+                let mut unique_pyth_ids = HashSet::new();
+                if let SpotPriceConfig::Oracle {
+                    feeds, feeds_usd, ..
+                } = &oracle.spot_price_config
+                {
+                    for feed in feeds.iter().chain(feeds_usd.iter()) {
+                        if let SpotPriceFeedData::Pyth { id, .. } = feed.data {
+                            unique_pyth_ids.insert(id);
+                        }
+                    }
+                }
 
-        Ok(vec![oracle_msg, bridge_msg])
+                match unique_pyth_ids.is_empty() {
+                    true => Ok(None),
+                    false => {
+                        let unique_pyth_ids = unique_pyth_ids.into_iter().collect::<Vec<_>>();
+
+                        let msg = get_oracle_update_msg(
+                            &unique_pyth_ids,
+                            &wallet,
+                            &pyth.endpoints,
+                            &self.client,
+                            &pyth.contract,
+                        )
+                        .await?;
+
+                        Ok(Some(msg))
+                    }
+                }
+            }
+        }
     }
 }
 

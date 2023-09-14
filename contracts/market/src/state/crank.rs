@@ -187,6 +187,7 @@ impl State<'_> {
             Some(work_info) => work_info,
             None => return Ok(()),
         };
+
         let price_point_timestamp = match &work_info {
             CrankWorkInfo::Completed {
                 price_point_timestamp,

@@ -9,7 +9,7 @@ use cosmos::Cosmos;
 use cosmos::HasAddressType;
 use cosmos::Wallet;
 use parking_lot::RwLock;
-use perps_exes::config::{GasAmount, PythConfig};
+use perps_exes::config::{GasAmount, PriceConfig};
 use perps_exes::pyth::VecWithCurr;
 use reqwest::Client;
 use tokio::sync::Mutex;
@@ -65,6 +65,7 @@ pub(crate) struct App {
     /// Ensure that the crank and price bots don't try to work at the same time
     pub(crate) crank_lock: Mutex<()>,
     pub(crate) endpoints_stable: PythEndpoints,
+    #[allow(dead_code)]
     pub(crate) endpoints_edge: PythEndpoints,
 }
 
@@ -129,9 +130,9 @@ impl Opt {
             ),
         };
 
-        let pyth_config = PythConfig::load(self.pyth_config)?;
-        let endpoints_stable = VecWithCurr::new(pyth_config.endpoints_stable.clone());
-        let endpoints_edge = VecWithCurr::new(pyth_config.endpoints_edge);
+        let price_config = PriceConfig::load(self.price_config)?;
+        let endpoints_stable = VecWithCurr::new(price_config.pyth.stable.endpoints.clone());
+        let endpoints_edge = VecWithCurr::new(price_config.pyth.edge.endpoints);
 
         let app = App {
             factory: RwLock::new(Arc::new(factory)),

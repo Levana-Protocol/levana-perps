@@ -8,6 +8,5 @@ pub mod ibc_execute_proxy;
 pub mod liquidity_token;
 pub mod market;
 pub mod position_token;
-pub mod pyth_bridge;
 pub mod rewards;
 pub mod tracker;

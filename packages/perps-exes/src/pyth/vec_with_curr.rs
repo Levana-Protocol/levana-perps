@@ -4,9 +4,10 @@ use std::sync::{
     Arc,
 };
 
+#[derive(Clone)]
 pub struct VecWithCurr<A> {
     vec: Vec<Arc<A>>,
-    curr: AtomicUsize,
+    curr: Arc<AtomicUsize>,
 }
 
 impl<A> VecWithCurr<A> {
@@ -16,11 +17,11 @@ impl<A> VecWithCurr<A> {
     {
         VecWithCurr {
             vec: vec.into_iter().map(Arc::new).collect(),
-            curr: 0.into(),
+            curr: Arc::new(0.into()),
         }
     }
 
-    pub(crate) async fn try_any_from_curr_async<F, FR, R>(&self, f: F) -> Result<R>
+    pub async fn try_any_from_curr_async<F, FR, R>(&self, f: F) -> Result<R>
     where
         F: Fn(Arc<A>) -> FR,
         FR: futures::future::Future<Output = Result<R>>,

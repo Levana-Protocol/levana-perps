@@ -7,13 +7,13 @@ pub(crate) mod fees;
 pub(crate) mod funding;
 pub(crate) mod history;
 pub(crate) mod liquidity;
-pub(crate) mod market;
 pub(crate) mod meta;
 pub(crate) mod order;
 pub(crate) mod position;
 #[cfg(feature = "sanity")]
 pub(crate) mod sanity;
 pub(crate) mod shutdown;
+pub(crate) mod spot_price;
 pub(crate) mod stale;
 pub(crate) mod status;
 pub(crate) mod token;

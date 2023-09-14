@@ -32,8 +32,8 @@ pub(crate) struct Opt {
     #[clap(subcommand)]
     pub(crate) sub: Sub,
     /// Override the Pyth config file
-    #[clap(long, env = "LEVANA_BOTS_PYTH_CONFIG")]
-    pub(crate) pyth_config: Option<PathBuf>,
+    #[clap(long, env = "LEVANA_BOTS_PRICE_CONFIG")]
+    pub(crate) price_config: Option<PathBuf>,
 }
 
 #[derive(clap::Parser)]
