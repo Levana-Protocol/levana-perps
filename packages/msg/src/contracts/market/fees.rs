@@ -510,7 +510,7 @@ mod tests {
         let config = Config {
             trading_fee_notional_size: "0.01".parse().unwrap(),
             trading_fee_counter_collateral: "0.02".parse().unwrap(),
-            ..Config::new(SpotPriceConfig::Manual {admin: None })
+            ..Config::new(SpotPriceConfig::Manual { admin: None })
         };
         assert_eq!(
             config

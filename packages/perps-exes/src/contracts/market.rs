@@ -349,8 +349,7 @@ impl MarketContract {
         price: PriceBaseInQuote,
         price_usd: PriceCollateralInUsd,
     ) -> Result<TxResponse> {
-        let execute_msg =
-            MarketExecuteMsg::SetManualPrice { price, price_usd };
+        let execute_msg = MarketExecuteMsg::SetManualPrice { price, price_usd };
 
         let response = self.0.execute(wallet, vec![], execute_msg).await?;
         Ok(response)

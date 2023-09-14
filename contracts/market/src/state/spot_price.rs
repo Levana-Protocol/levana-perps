@@ -433,7 +433,6 @@ fn get_price_usd(
     }
 }
 
-
 pub fn requires_spot_price_append(msg: &ExecuteMsg) -> bool {
     // explicitly listed to avoid accidentally handling new messages
     // Receive is checked via the deserialized inner message
@@ -467,7 +466,7 @@ pub fn requires_spot_price_append(msg: &ExecuteMsg) -> bool {
         ExecuteMsg::StopUnstakingXlp { .. } => false,
         ExecuteMsg::TransferDaoFees { .. } => false,
         ExecuteMsg::UnstakeXlp { .. } => false,
-        // Does do a spot_price_append, but it's handled internally after the price is set 
+        // Does do a spot_price_append, but it's handled internally after the price is set
         ExecuteMsg::SetManualPrice { .. } => false,
     }
 }

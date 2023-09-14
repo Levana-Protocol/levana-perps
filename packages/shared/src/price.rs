@@ -274,7 +274,6 @@ impl PriceCollateralInUsd {
         ))
         .expect("collateral_to_usd_non_zero: Impossible! Output cannot be 0")
     }
-
 }
 
 /// The price of the pair as used internally by the protocol, given as `collateral / notional`.

@@ -59,7 +59,9 @@ impl PerpApp {
         let factory_contract = Contract::new(cosmos.clone(), factory_contract_addr);
 
         let market_info: MarketInfoResponse = factory_contract
-            .query(msg::contracts::factory::entry::QueryMsg::MarketInfo { market_id: market_id.clone() })
+            .query(msg::contracts::factory::entry::QueryMsg::MarketInfo {
+                market_id: market_id.clone(),
+            })
             .await?;
         let market_contract = cosmos.make_contract(market_info.market_addr.into_string().parse()?);
 

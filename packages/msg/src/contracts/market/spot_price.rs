@@ -33,7 +33,7 @@ impl SpotPriceConfig {
     /// useful for pushing price updates in one fell swoop
     pub fn all_unique_pyth_ids(&self) -> Vec<PriceIdentifier> {
         match self {
-            Self::Manual{..} => vec![],
+            Self::Manual { .. } => vec![],
             Self::Oracle {
                 feeds, feeds_usd, ..
             } => {
@@ -142,7 +142,7 @@ pub enum SpotPriceConfigInit {
     Manual {
         /// The admin address for manual spot price updates
         /// if unset, will fallback to the contract owner
-        admin: Option<RawAddr>
+        admin: Option<RawAddr>,
     },
     /// External oracle
     Oracle {

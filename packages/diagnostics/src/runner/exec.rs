@@ -319,7 +319,7 @@ where
         //let price: PriceBaseInQuote = self.rand_number(0.3..5.0f64).to_string().parse()?;
         let execute_msg = ExecuteMsg::SetManualPrice {
             price,
-            price_usd: PriceCollateralInUsd::one() 
+            price_usd: PriceCollateralInUsd::one(),
         };
         let resp = self.bridge.exec_market(execute_msg.clone(), None).await?;
         self.on_log_exec(execute_msg, resp);

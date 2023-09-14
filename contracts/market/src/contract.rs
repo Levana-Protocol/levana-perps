@@ -89,7 +89,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     ) -> Result<()> {
         state.spot_price_append(ctx)?;
 
-        // required to keep gas estimations more reliable 
+        // required to keep gas estimations more reliable
         state.crank_exec_batch(ctx, Some(0), rewards_addr)?;
         state.crank_current_price_complete(ctx)?;
         Ok(())

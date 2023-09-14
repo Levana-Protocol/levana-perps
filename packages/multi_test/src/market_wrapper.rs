@@ -765,7 +765,9 @@ impl PerpsMarket {
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
             &MarketExecuteMsg::SetManualPrice {
                 price,
-                price_usd: price.try_into_usd(&self.id).unwrap_or(PriceCollateralInUsd::one()),
+                price_usd: price
+                    .try_into_usd(&self.id)
+                    .unwrap_or(PriceCollateralInUsd::one()),
             },
         )?];
 
@@ -781,9 +783,13 @@ impl PerpsMarket {
     ) -> Result<AppResponse> {
         self.exec(
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
-            &MarketExecuteMsg::SetManualPrice { 
-                price, 
-                price_usd: price_usd.unwrap_or(price.try_into_usd(&self.id).unwrap_or(PriceCollateralInUsd::one())),
+            &MarketExecuteMsg::SetManualPrice {
+                price,
+                price_usd: price_usd.unwrap_or(
+                    price
+                        .try_into_usd(&self.id)
+                        .unwrap_or(PriceCollateralInUsd::one()),
+                ),
             },
         )
     }
