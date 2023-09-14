@@ -125,7 +125,6 @@ impl App {
                 builder.add_message_mut(msg);
             }
 
-            // FIXME - crank here?
             statuses.push(format!("Needs Pyth update: {reason}"));
         } else {
             return Ok("No pyth price update needed".to_owned());
