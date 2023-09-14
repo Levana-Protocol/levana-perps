@@ -215,12 +215,12 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         price_base: PriceBaseInQuote,
-        price_usd: Option<PriceCollateralInUsd>,
+        price_usd: PriceCollateralInUsd,
     ) -> Result<()> {
         let market_id = self.market_id(ctx.storage)?;
         let market_type = market_id.get_market_type();
         let price = price_base.into_notional_price(market_type);
-        let price_usd = get_price_usd(price_base, price_usd, market_id)?;
+        let price_usd = get_price_usd(price_base, Some(price_usd), market_id)?;
 
         MANUAL_SPOT_PRICE
             .save(
@@ -251,7 +251,7 @@ impl State<'_> {
         }
 
         let price_storage = match &self.config.spot_price {
-            SpotPriceConfig::Manual => MANUAL_SPOT_PRICE.load(ctx.storage)?,
+            SpotPriceConfig::Manual { .. } => MANUAL_SPOT_PRICE.load(ctx.storage)?,
             SpotPriceConfig::Oracle {
                 pyth,
                 stride: _,
@@ -419,7 +419,7 @@ fn get_price_usd(
 ) -> Result<PriceCollateralInUsd> {
     // FIXME: we probably don't need this anymore at all
     // just define price_usd with the correct multiplier
-    match (derive_price_usd(price, market_id), price_usd) {
+    match (price.try_into_usd(market_id), price_usd) {
         (None, None) => anyhow::bail!("Must provide a price in USD"),
         (None, Some(price_usd)) => Ok(price_usd),
         (Some(price_usd), None) => Ok(price_usd),
@@ -433,47 +433,6 @@ fn get_price_usd(
     }
 }
 
-fn derive_price_usd(price: PriceBaseInQuote, market_id: &MarketId) -> Option<PriceCollateralInUsd> {
-    // For comments below, assume we're dealing with a pair between USD and ATOM
-    if market_id.get_base() == "USD" {
-        Some(match market_id.get_market_type() {
-            MarketType::CollateralIsQuote => {
-                // Base == USD, quote == collateral == ATOM
-                // price = ATOM/USD
-                // Return value = USD/ATOM
-                //
-                // Therefore, we need to invert the numbers
-                PriceCollateralInUsd::from_non_zero(price.into_non_zero().inverse())
-            }
-            MarketType::CollateralIsBase => {
-                // Base == collateral == USD
-                // Return value == USD/USD
-                // QED it's one
-                PriceCollateralInUsd::one()
-            }
-        })
-    } else if market_id.get_quote() == "USD" {
-        Some(match market_id.get_market_type() {
-            MarketType::CollateralIsQuote => {
-                // Collateral == quote == USD
-                // Return value = USD/USD
-                // QED it's one
-                PriceCollateralInUsd::one()
-            }
-            MarketType::CollateralIsBase => {
-                // Collateral == base == ATOM
-                // Quote == USD
-                // Price = USD/ATOM
-                // Return value = USD/ATOM
-                // QED same number
-                PriceCollateralInUsd::from_non_zero(price.into_non_zero())
-            }
-        })
-    } else {
-        // Neither asset is USD, so we can't get a price
-        None
-    }
-}
 
 pub fn requires_spot_price_append(msg: &ExecuteMsg) -> bool {
     // explicitly listed to avoid accidentally handling new messages
@@ -508,5 +467,7 @@ pub fn requires_spot_price_append(msg: &ExecuteMsg) -> bool {
         ExecuteMsg::StopUnstakingXlp { .. } => false,
         ExecuteMsg::TransferDaoFees { .. } => false,
         ExecuteMsg::UnstakeXlp { .. } => false,
+        // Does do a spot_price_append, but it's handled internally after the price is set 
+        ExecuteMsg::SetManualPrice { .. } => false,
     }
 }

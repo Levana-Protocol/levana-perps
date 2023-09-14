@@ -22,7 +22,12 @@ pub(crate) fn config_init(
     spot_price: SpotPriceConfigInit,
 ) -> Result<()> {
     let spot_price: SpotPriceConfig = match spot_price {
-        SpotPriceConfigInit::Manual => SpotPriceConfig::Manual,
+        SpotPriceConfigInit::Manual { admin } => SpotPriceConfig::Manual {
+            admin: admin
+                .map(|admin| admin.validate(api))
+                .transpose()
+                .context("invalid manual price admin address")?,
+        },
         SpotPriceConfigInit::Oracle {
             pyth,
             stride,

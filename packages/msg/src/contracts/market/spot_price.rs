@@ -10,7 +10,11 @@ use std::str::FromStr;
 #[cw_serde]
 pub enum SpotPriceConfig {
     /// Manual spot price, mostly used for testing purposes
-    Manual,
+    Manual {
+        /// The admin address for manual spot price updates
+        /// if unset, will fallback to the contract owner
+        admin: Option<Addr>,
+    },
     /// External oracle
     Oracle {
         /// Pyth configuration, required on chains that use pyth feeds
@@ -29,7 +33,7 @@ impl SpotPriceConfig {
     /// useful for pushing price updates in one fell swoop
     pub fn all_unique_pyth_ids(&self) -> Vec<PriceIdentifier> {
         match self {
-            Self::Manual => vec![],
+            Self::Manual{..} => vec![],
             Self::Oracle {
                 feeds, feeds_usd, ..
             } => {
@@ -135,7 +139,11 @@ impl FromStr for PythPriceServiceNetwork {
 #[cw_serde]
 pub enum SpotPriceConfigInit {
     /// Manual spot price, mostly used for testing purposes
-    Manual,
+    Manual {
+        /// The admin address for manual spot price updates
+        /// if unset, will fallback to the contract owner
+        admin: Option<RawAddr>
+    },
     /// External oracle
     Oracle {
         /// Pyth configuration, required on chains that use pyth feeds

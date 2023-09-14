@@ -347,10 +347,10 @@ impl MarketContract {
         &self,
         wallet: &Wallet,
         price: PriceBaseInQuote,
-        price_usd: Option<PriceCollateralInUsd>,
+        price_usd: PriceCollateralInUsd,
     ) -> Result<TxResponse> {
         let execute_msg =
-            MarketExecuteMsg::Owner(ExecuteOwnerMsg::SetManualPrice { price, price_usd });
+            MarketExecuteMsg::SetManualPrice { price, price_usd };
 
         let response = self.0.execute(wallet, vec![], execute_msg).await?;
         Ok(response)

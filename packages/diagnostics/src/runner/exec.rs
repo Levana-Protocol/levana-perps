@@ -317,10 +317,10 @@ where
         let price =
             PriceBaseInQuote::try_from_number(price.to_string().parse().unwrap_ext()).unwrap_ext();
         //let price: PriceBaseInQuote = self.rand_number(0.3..5.0f64).to_string().parse()?;
-        let execute_msg = ExecuteMsg::Owner(ExecuteOwnerMsg::SetManualPrice {
+        let execute_msg = ExecuteMsg::SetManualPrice {
             price,
-            price_usd: None,
-        });
+            price_usd: PriceCollateralInUsd::one() 
+        };
         let resp = self.bridge.exec_market(execute_msg.clone(), None).await?;
         self.on_log_exec(execute_msg, resp);
         Ok(())

@@ -595,7 +595,7 @@ mod tests {
                 denom: "".to_string(),
                 decimal_places: 0,
             },
-            config: Config::new(SpotPriceConfig::Manual),
+            config: Config::new(SpotPriceConfig::Manual { admin: None }),
             liquidity: Default::default(),
             next_crank: None,
             last_crank_completed: None,

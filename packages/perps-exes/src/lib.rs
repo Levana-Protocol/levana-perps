@@ -36,6 +36,7 @@ pub struct PerpApp {
     pub raw_wallet: RawWallet,
     pub wallet: Wallet,
     pub market: MarketContract,
+    pub market_id: MarketId,
     faucet_contract: Option<Contract>,
     pub cosmos: Cosmos,
 }
@@ -58,7 +59,7 @@ impl PerpApp {
         let factory_contract = Contract::new(cosmos.clone(), factory_contract_addr);
 
         let market_info: MarketInfoResponse = factory_contract
-            .query(msg::contracts::factory::entry::QueryMsg::MarketInfo { market_id })
+            .query(msg::contracts::factory::entry::QueryMsg::MarketInfo { market_id: market_id.clone() })
             .await?;
         let market_contract = cosmos.make_contract(market_info.market_addr.into_string().parse()?);
 
@@ -72,6 +73,7 @@ impl PerpApp {
             raw_wallet,
             wallet,
             market: MarketContract::new(market_contract),
+            market_id,
             faucet_contract,
             cosmos,
         })
@@ -123,7 +125,7 @@ impl PerpApp {
     pub async fn set_price(
         &self,
         price: PriceBaseInQuote,
-        price_usd: Option<PriceCollateralInUsd>,
+        price_usd: PriceCollateralInUsd,
     ) -> Result<TxResponse> {
         self.market.set_price(&self.wallet, price, price_usd).await
     }

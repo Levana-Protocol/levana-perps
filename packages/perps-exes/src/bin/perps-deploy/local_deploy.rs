@@ -102,7 +102,7 @@ pub(crate) async fn go(
                 price_update_too_old_seconds: Some(60 * 60 * 24 * 5),
                 ..ConfigUpdate::default()
             },
-            spot_price: SpotPriceConfigInit::Manual,
+            spot_price: SpotPriceConfigInit::Manual {admin: None },
         });
     }
 
@@ -153,14 +153,10 @@ pub(crate) async fn go(
             .execute(
                 &basic.wallet,
                 vec![],
-                msg::contracts::market::entry::ExecuteMsg::Owner(ExecuteOwnerMsg::SetManualPrice {
+                msg::contracts::market::entry::ExecuteMsg::SetManualPrice {
                     price: initial_price,
-                    price_usd: if market_id.is_notional_usd() {
-                        None
-                    } else {
-                        Some(collateral_price)
-                    },
-                }),
+                    price_usd: initial_price.try_into_usd(&market_id).unwrap_or(collateral_price)
+                },
             )
             .await
             .context("Unable to set price")?;

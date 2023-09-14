@@ -159,13 +159,14 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 ExecuteOwnerMsg::ConfigUpdate { update } => {
                     update_config(&mut state.config, ctx.storage, *update)?;
                 }
-                ExecuteOwnerMsg::SetManualPrice { price, price_usd } => {
-                    state.save_manual_spot_price(&mut ctx, price, price_usd)?;
-                    // the price needed to be set first before doing this
-                    // so info.requires_spot_price_append is false
-                    append_spot_price(&mut state, &mut ctx, &info.sender)?;
-                }
             }
+        }
+
+        ExecuteMsg::SetManualPrice { price, price_usd } => {
+            state.save_manual_spot_price(&mut ctx, price, price_usd)?;
+            // the price needed to be set first before doing this
+            // so info.requires_spot_price_append is false
+            append_spot_price(&mut state, &mut ctx, &info.sender)?;
         }
 
         // cw20

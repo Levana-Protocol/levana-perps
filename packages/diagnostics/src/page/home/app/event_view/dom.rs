@@ -186,7 +186,7 @@ fn execute_msg_label(msg_id: u64, execute_msg: &ExecuteMsg) -> String {
         ExecuteMsg::UpdatePositionLeverage { .. } => "Update Position (leverage)",
         ExecuteMsg::UpdatePositionMaxGains { .. } => "Update Position (max gains)",
         ExecuteMsg::ClosePosition { .. } => "Close Position",
-        ExecuteMsg::Owner(ExecuteOwnerMsg::SetManualPrice { .. }) => "Set Price",
+        ExecuteMsg::SetManualPrice { .. } => "Set Manual Price",
         ExecuteMsg::Crank { .. } => "Crank",
         _ => "Unknown",
     };

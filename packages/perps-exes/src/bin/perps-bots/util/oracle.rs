@@ -57,7 +57,7 @@ impl Oracle {
         let spot_price_config = status.config.spot_price;
 
         let pyth = match &spot_price_config {
-            SpotPriceConfig::Manual => None,
+            SpotPriceConfig::Manual { .. } => None,
             SpotPriceConfig::Oracle { pyth, .. } => match pyth {
                 None => None,
                 Some(pyth) => {
@@ -111,7 +111,7 @@ impl Oracle {
         client: &reqwest::Client,
     ) -> Result<(PriceBaseInQuote, PriceCollateralInUsd)> {
         match &self.spot_price_config {
-            SpotPriceConfig::Manual => {
+            SpotPriceConfig::Manual { .. } => {
                 unimplemented!("FIXME: support manual oracle w/ contract query")
             }
             SpotPriceConfig::Oracle {

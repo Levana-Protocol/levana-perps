@@ -293,6 +293,17 @@ pub enum ExecuteMsg {
     /// The person who calls this receives no benefits. It's intended for the
     /// DAO to use to incentivize cranking.
     ProvideCrankFunds {},
+
+    /// Set manual price (mostly for testing)
+    SetManualPrice {
+        /// Price of the base asset in terms of the quote.
+        price: PriceBaseInQuote,
+        /// Price of the collateral asset in terms of USD.
+        ///
+        /// This is generally used for reporting of values like PnL and trade
+        /// volume.
+        price_usd: PriceCollateralInUsd,
+    },
 }
 
 /// Owner-only messages
@@ -303,16 +314,6 @@ pub enum ExecuteOwnerMsg {
     ConfigUpdate {
         /// New configuration parameters
         update: Box<ConfigUpdate>,
-    },
-    /// Set manual price (mostly for testing)
-    SetManualPrice {
-        /// Price of the base asset in terms of the quote.
-        price: PriceBaseInQuote,
-        /// Price of the collateral asset in terms of USD.
-        ///
-        /// This is generally used for reporting of values like PnL and trade
-        /// volume.
-        price_usd: Option<PriceCollateralInUsd>,
     },
 }
 

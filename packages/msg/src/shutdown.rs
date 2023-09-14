@@ -51,6 +51,8 @@ pub enum ShutdownImpact {
     TransferDaoFees,
     /// Turning the crank
     Crank,
+    /// Setting manual price
+    SetManualPrice,
 }
 
 impl ShutdownImpact {
@@ -70,6 +72,7 @@ impl ShutdownImpact {
             (ShutdownWallet::WindDown, ShutdownImpact::SetPrice) => false,
             (ShutdownWallet::WindDown, ShutdownImpact::TransferDaoFees) => false,
             (ShutdownWallet::WindDown, ShutdownImpact::Crank) => false,
+            (ShutdownWallet::WindDown, ShutdownImpact::SetManualPrice) => false,
         }
     }
 
@@ -122,6 +125,7 @@ impl ShutdownImpact {
             ExecuteMsg::PlaceLimitOrder { .. } => Some(Self::NewTrades),
             ExecuteMsg::CancelLimitOrder { .. } => Some(Self::ClosePositions),
             ExecuteMsg::ProvideCrankFunds {} => Some(Self::Crank),
+            ExecuteMsg::SetManualPrice { .. } => Some(Self::SetManualPrice),
         }
     }
 }

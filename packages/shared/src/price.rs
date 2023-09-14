@@ -170,6 +170,50 @@ impl PriceBaseInQuote {
     pub fn from_non_zero(raw: NonZero<Decimal256>) -> Self {
         Self(raw)
     }
+
+    /// Derive the USD price from base and market type.
+    /// This is only possible when one of the assets is USD.
+    pub fn try_into_usd(&self, market_id: &MarketId) -> Option<PriceCollateralInUsd> {
+        // For comments below, assume we're dealing with a pair between USD and ATOM
+        if market_id.get_base() == "USD" {
+            Some(match market_id.get_market_type() {
+                MarketType::CollateralIsQuote => {
+                    // Base == USD, quote == collateral == ATOM
+                    // price = ATOM/USD
+                    // Return value = USD/ATOM
+                    //
+                    // Therefore, we need to invert the numbers
+                    PriceCollateralInUsd::from_non_zero(self.into_non_zero().inverse())
+                }
+                MarketType::CollateralIsBase => {
+                    // Base == collateral == USD
+                    // Return value == USD/USD
+                    // QED it's one
+                    PriceCollateralInUsd::one()
+                }
+            })
+        } else if market_id.get_quote() == "USD" {
+            Some(match market_id.get_market_type() {
+                MarketType::CollateralIsQuote => {
+                    // Collateral == quote == USD
+                    // Return value = USD/USD
+                    // QED it's one
+                    PriceCollateralInUsd::one()
+                }
+                MarketType::CollateralIsBase => {
+                    // Collateral == base == ATOM
+                    // Quote == USD
+                    // Price = USD/ATOM
+                    // Return value = USD/ATOM
+                    // QED same number
+                    PriceCollateralInUsd::from_non_zero(self.into_non_zero())
+                }
+            })
+        } else {
+            // Neither asset is USD, so we can't get a price
+            None
+        }
+    }
 }
 
 /// PriceBaseInQuote converted to USD
@@ -230,6 +274,7 @@ impl PriceCollateralInUsd {
         ))
         .expect("collateral_to_usd_non_zero: Impossible! Output cannot be 0")
     }
+
 }
 
 /// The price of the pair as used internally by the protocol, given as `collateral / notional`.

@@ -152,7 +152,7 @@ impl PerpsMarket {
                     liquidity_cooldown_seconds: Some(0),
                     ..Default::default()
                 }),
-                spot_price: SpotPriceConfigInit::Manual,
+                spot_price: SpotPriceConfigInit::Manual { admin: None },
                 initial_borrow_fee_rate: "0.01".parse().unwrap(),
             },
         };
@@ -763,10 +763,10 @@ impl PerpsMarket {
     pub fn exec_set_price_and_crank(&self, price: PriceBaseInQuote) -> Result<Vec<AppResponse>> {
         let mut responses = vec![self.exec(
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
-            &MarketExecuteMsg::Owner(MarketExecuteOwnerMsg::SetManualPrice {
+            &MarketExecuteMsg::SetManualPrice {
                 price,
-                price_usd: None,
-            }),
+                price_usd: price.try_into_usd(&self.id).unwrap_or(PriceCollateralInUsd::one()),
+            },
         )?];
 
         responses.push(self.exec_crank(&Addr::unchecked("anybody"))?);
@@ -781,7 +781,10 @@ impl PerpsMarket {
     ) -> Result<AppResponse> {
         self.exec(
             &Addr::unchecked(&TEST_CONFIG.protocol_owner),
-            &MarketExecuteMsg::Owner(MarketExecuteOwnerMsg::SetManualPrice { price, price_usd }),
+            &MarketExecuteMsg::SetManualPrice { 
+                price, 
+                price_usd: price_usd.unwrap_or(price.try_into_usd(&self.id).unwrap_or(PriceCollateralInUsd::one())),
+            },
         )
     }
 

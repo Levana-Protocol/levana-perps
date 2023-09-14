@@ -78,7 +78,7 @@ pub(crate) enum Subcommand {
         price: PriceBaseInQuote,
         /// Price of collateral assert in terms of USD
         #[clap(long)]
-        price_usd: Option<PriceCollateralInUsd>,
+        price_usd: PriceCollateralInUsd,
     },
     /// Crank
     Crank {},
