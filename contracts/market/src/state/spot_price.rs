@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use anyhow::ensure;
 use cosmwasm_std::Order;
 use msg::contracts::market::{
     entry::PriceForQuery,
@@ -100,7 +101,6 @@ impl State<'_> {
         if let Some(PriceForQuery { base, collateral }) = price {
             let market_id = self.market_id(store)?;
             let market_type = market_id.get_market_type();
-            let price_usd = get_price_usd(base, collateral, market_id)?;
             let price = base.into_notional_price(market_type);
 
             let (publish_time, publish_time_usd) = self
@@ -110,7 +110,7 @@ impl State<'_> {
 
             let price = PricePoint {
                 price_notional: price,
-                price_usd,
+                price_usd: collateral,
                 price_base: base,
                 timestamp: self.now(),
                 is_notional_usd: market_id.is_notional_usd(),
@@ -220,7 +220,6 @@ impl State<'_> {
         let market_id = self.market_id(ctx.storage)?;
         let market_type = market_id.get_market_type();
         let price = price_base.into_notional_price(market_type);
-        let price_usd = get_price_usd(price_base, Some(price_usd), market_id)?;
 
         MANUAL_SPOT_PRICE
             .save(
@@ -268,7 +267,6 @@ impl State<'_> {
                 let price_base = PriceBaseInQuote::from_non_zero(price_amount);
                 let price = price_base.into_notional_price(market_type);
                 let price_usd = PriceCollateralInUsd::from_non_zero(price_amount_usd);
-                let price_usd = get_price_usd(price_base, Some(price_usd), market_id)?;
 
                 PriceStorage {
                     price,
@@ -279,6 +277,17 @@ impl State<'_> {
                 }
             }
         };
+
+        // sanity check
+        if let Some(price_usd) = price_storage
+            .price_base
+            .try_into_usd(self.market_id(ctx.storage)?)
+        {
+            ensure!(
+                price_storage.price_usd == price_usd,
+                "Price in USD mismatch"
+            );
+        }
 
         ctx.response_mut().add_event(SpotPriceEvent {
             timestamp,
@@ -409,27 +418,6 @@ mod tests {
         .unwrap();
 
         assert_eq!(eth_btc, Number::try_from("0.062758112133468261").unwrap());
-    }
-}
-
-fn get_price_usd(
-    price: PriceBaseInQuote,
-    price_usd: Option<PriceCollateralInUsd>,
-    market_id: &MarketId,
-) -> Result<PriceCollateralInUsd> {
-    // FIXME: we probably don't need this anymore at all
-    // just define price_usd with the correct multiplier
-    match (price.try_into_usd(market_id), price_usd) {
-        (None, None) => anyhow::bail!("Must provide a price in USD"),
-        (None, Some(price_usd)) => Ok(price_usd),
-        (Some(price_usd), None) => Ok(price_usd),
-        (Some(x), Some(y)) => {
-            if x == y {
-                Ok(y)
-            } else {
-                Err(anyhow::anyhow!("Provided conflicting price information in USD. Price base in quote: {price}. Price collateral in USD: {y}. Derived price: {x}"))
-            }
-        }
     }
 }
 

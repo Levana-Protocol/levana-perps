@@ -359,7 +359,19 @@ pub struct PriceForQuery {
     /// Price of the collateral asset in terms of USD
     ///
     /// This is optional if the notional asset is USD and required otherwise.
-    pub collateral: Option<PriceCollateralInUsd>,
+    pub collateral: PriceCollateralInUsd,
+}
+
+impl PriceForQuery {
+    /// Create a PriceForQuery with a base price and USD-market, without specifying the USD price
+    pub fn from_usd_market(base: PriceBaseInQuote, market_id: &MarketId) -> Result<Self> {
+        Ok(Self {
+            base,
+            collateral: base
+                .try_into_usd(market_id)
+                .context("cannot derive price query for non-USD market")?,
+        })
+    }
 }
 
 /// Query messages on the market contract

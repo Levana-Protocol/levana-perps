@@ -52,7 +52,7 @@ fn status() {
 
     let new_price = PriceForQuery {
         base: "42".parse().unwrap(),
-        collateral: Some("42".parse().unwrap()),
+        collateral: "42".parse().unwrap(),
     };
 
     let status1 = market.query_status().unwrap();
@@ -64,7 +64,7 @@ fn status() {
     let market_type = market.id.get_market_type();
     let price_point = PricePoint {
         price_notional: new_price.base.into_notional_price(market_type),
-        price_usd: new_price.collateral.unwrap(),
+        price_usd: new_price.collateral,
         price_base: new_price.base,
         timestamp: market.now(),
         is_notional_usd: market.id.is_notional_usd(),
@@ -121,19 +121,13 @@ fn positions() {
     let longreal = market.query_position(long).unwrap();
     let shortreal = market.query_position(short).unwrap();
 
-    let pricehigh = PriceForQuery {
-        base: "101".parse().unwrap(),
-        collateral: None,
-    };
+    let pricehigh = PriceForQuery::from_usd_market("101".parse().unwrap(), &market.id).unwrap();
     let longhigh = market.query_position_with_price(long, pricehigh).unwrap();
     let shorthigh = market.query_position_with_price(short, pricehigh).unwrap();
     assert!(longhigh.pnl_collateral > longreal.pnl_collateral);
     assert!(shorthigh.pnl_collateral < shortreal.pnl_collateral);
 
-    let pricelow = PriceForQuery {
-        base: "99".parse().unwrap(),
-        collateral: None,
-    };
+    let pricelow = PriceForQuery::from_usd_market("99".parse().unwrap(), &market.id).unwrap();
     let longlow = market.query_position_with_price(long, pricelow).unwrap();
     let shortlow = market.query_position_with_price(short, pricelow).unwrap();
     assert!(longlow.pnl_collateral < longreal.pnl_collateral);
@@ -183,10 +177,7 @@ fn liquidate_positions() {
     let longreal = market.query_position(long).unwrap();
     let shortreal = market.query_position(short).unwrap();
 
-    let pricehigh = PriceForQuery {
-        base: "200".parse().unwrap(),
-        collateral: None,
-    };
+    let pricehigh = PriceForQuery::from_usd_market("200".parse().unwrap(), &market.id).unwrap();
     let longhigh = market
         .query_position_pending_close_with_price(long, pricehigh)
         .unwrap();
@@ -204,10 +195,7 @@ fn liquidate_positions() {
     assert!(longhigh.pnl_collateral > longreal.pnl_collateral);
     assert!(shorthigh.pnl_collateral < shortreal.pnl_collateral);
 
-    let pricelow = PriceForQuery {
-        base: "50".parse().unwrap(),
-        collateral: None,
-    };
+    let pricelow = PriceForQuery::from_usd_market("50".parse().unwrap(), &market.id).unwrap();
     let longlow = market
         .query_position_pending_close_with_price(long, pricelow)
         .unwrap();
