@@ -239,14 +239,8 @@ impl State<'_> {
         let timestamp = self.now();
 
         if PRICES.has(ctx.storage, timestamp) {
+            // if price changes within the same block, we don't care - first come first serve 
             return Ok(());
-            // DISCUSS: This used to be an error... no more?
-            // perp_bail!(
-            //     ErrorId::PriceAlreadyExists,
-            //     ErrorDomain::SpotPrice,
-            //     "price already exist for timestamp {}",
-            //     timestamp
-            // );
         }
 
         let price_storage = match &self.config.spot_price {
