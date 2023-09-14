@@ -30,7 +30,7 @@ WASM="$RELEASE_DIR/levana_perpswap_cosmos_$CONTRACT_NAME.wasm"
 echo "BUILDING $CONTRACT_NAME"
 cd "$CONTRACT_PATH"
 
-if [[ $CONTRACT_NAME == "market" && $SEI == "true" ]]; then
+if [[ $CONTRACT_NAME == "market" && -n "${SEI:-}" ]]; then
     echo ""
     echo "---Building with SEI feature---"
     echo ""
