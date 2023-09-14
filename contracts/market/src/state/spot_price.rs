@@ -121,8 +121,7 @@ impl State<'_> {
 
             self.spot_price_cache
                 .set(price)
-                .ok()
-                .context("override_current_price: current price already loaded")?;
+                .map_err(|_| anyhow!("override_current_price: current price already loaded"))?;
         }
         Ok(())
     }
@@ -239,7 +238,7 @@ impl State<'_> {
         let timestamp = self.now();
 
         if PRICES.has(ctx.storage, timestamp) {
-            // if price changes within the same block, we don't care - first come first serve 
+            // if price changes within the same block, we don't care - first come first serve
             return Ok(());
         }
 
