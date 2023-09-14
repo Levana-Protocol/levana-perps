@@ -149,9 +149,9 @@ pub enum SpotPriceConfigInit {
         /// Stride configuration, required on chains that use stride feeds
         stride: Option<StrideConfigInit>,
         /// sequence of spot price feeds which are composed to generate a single spot price
-        feeds: Vec<SpotPriceFeedInit>,
+        feeds: Vec<SpotPriceFeed>,
         /// if necessary, sequence of spot price feeds which are composed to generate a single USD spot price
-        feeds_usd: Vec<SpotPriceFeedInit>,
+        feeds_usd: Vec<SpotPriceFeed>,
     },
 }
 
@@ -173,59 +173,6 @@ pub struct PythConfigInit {
 pub struct StrideConfigInit {
     /// The address of the redemption rate contract
     pub contract_address: RawAddr,
-}
-
-/// An individual feed used to compose a final spot price
-#[cw_serde]
-pub struct SpotPriceFeedInit {
-    /// The data for this price feed
-    pub data: SpotPriceFeedDataInit,
-    /// is this price feed inverted
-    pub inverted: bool,
-}
-
-impl From<SpotPriceFeed> for SpotPriceFeedInit {
-    fn from(src: SpotPriceFeed) -> Self {
-        Self {
-            data: src.data.into(),
-            inverted: src.inverted,
-        }
-    }
-}
-
-/// The data for an individual spot price feed
-#[cw_serde]
-pub enum SpotPriceFeedDataInit {
-    /// Hardcoded value
-    Constant {
-        /// The constant price
-        price: NumberGtZero,
-    },
-    /// Pyth price feeds
-    Pyth {
-        /// The identifier on pyth
-        id: PriceIdentifier,
-    },
-    /// TODO: Stride liquid staking
-    Stride {
-        /// The IBC denom for the asset
-        denom: String,
-    },
-    /// Native oracle module on the sei chain
-    Sei {
-        /// The denom to use
-        denom: String,
-    },
-}
-impl From<SpotPriceFeedData> for SpotPriceFeedDataInit {
-    fn from(src: SpotPriceFeedData) -> Self {
-        match src {
-            SpotPriceFeedData::Constant { price } => Self::Constant { price },
-            SpotPriceFeedData::Pyth { id } => Self::Pyth { id },
-            SpotPriceFeedData::Stride { denom } => Self::Stride { denom },
-            SpotPriceFeedData::Sei { denom } => Self::Sei { denom },
-        }
-    }
 }
 
 /// Spot price events

@@ -2,10 +2,7 @@ use crate::state::*;
 use cw_storage_plus::Item;
 use msg::contracts::market::{
     config::{Config, ConfigUpdate},
-    spot_price::{
-        PythConfig, SpotPriceConfig, SpotPriceConfigInit, SpotPriceFeed, SpotPriceFeedData,
-        SpotPriceFeedDataInit, SpotPriceFeedInit, StrideConfig,
-    },
+    spot_price::{PythConfig, SpotPriceConfig, SpotPriceConfigInit, StrideConfig},
 };
 
 const CONFIG_STORAGE: Item<Config> = Item::new(namespace::CONFIG);
@@ -30,52 +27,29 @@ pub(crate) fn config_init(
             stride,
             feeds,
             feeds_usd,
-        } => {
-            fn map_feeds(feeds: Vec<SpotPriceFeedInit>) -> Vec<SpotPriceFeed> {
-                feeds
-                    .into_iter()
-                    .map(|feed| SpotPriceFeed {
-                        data: match feed.data {
-                            SpotPriceFeedDataInit::Constant { price } => {
-                                SpotPriceFeedData::Constant { price }
-                            }
-                            SpotPriceFeedDataInit::Pyth { id } => SpotPriceFeedData::Pyth { id },
-                            SpotPriceFeedDataInit::Stride { denom } => {
-                                SpotPriceFeedData::Stride { denom }
-                            }
-                            SpotPriceFeedDataInit::Sei { denom } => {
-                                SpotPriceFeedData::Sei { denom }
-                            }
-                        },
-                        inverted: feed.inverted,
-                    })
-                    .collect()
-            }
-
-            SpotPriceConfig::Oracle {
-                pyth: pyth
-                    .map(|pyth| {
-                        pyth.contract_address
-                            .validate(api)
-                            .map(|contract_address| PythConfig {
-                                contract_address,
-                                age_tolerance_seconds: pyth.age_tolerance_seconds.into(),
-                                network: pyth.network,
-                            })
-                    })
-                    .transpose()?,
-                stride: stride
-                    .map(|stride| {
-                        stride
-                            .contract_address
-                            .validate(api)
-                            .map(|contract_address| StrideConfig { contract_address })
-                    })
-                    .transpose()?,
-                feeds: map_feeds(feeds),
-                feeds_usd: map_feeds(feeds_usd),
-            }
-        }
+        } => SpotPriceConfig::Oracle {
+            pyth: pyth
+                .map(|pyth| {
+                    pyth.contract_address
+                        .validate(api)
+                        .map(|contract_address| PythConfig {
+                            contract_address,
+                            age_tolerance_seconds: pyth.age_tolerance_seconds.into(),
+                            network: pyth.network,
+                        })
+                })
+                .transpose()?,
+            stride: stride
+                .map(|stride| {
+                    stride
+                        .contract_address
+                        .validate(api)
+                        .map(|contract_address| StrideConfig { contract_address })
+                })
+                .transpose()?,
+            feeds,
+            feeds_usd,
+        },
     };
     let mut init_config = Config::new(spot_price);
 
