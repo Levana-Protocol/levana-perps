@@ -1,4 +1,5 @@
 use crate::state::*;
+use anyhow::ensure;
 use cw_storage_plus::Item;
 use msg::contracts::market::{
     config::{Config, ConfigUpdate},
@@ -27,29 +28,34 @@ pub(crate) fn config_init(
             stride,
             feeds,
             feeds_usd,
-        } => SpotPriceConfig::Oracle {
-            pyth: pyth
-                .map(|pyth| {
-                    pyth.contract_address
-                        .validate(api)
-                        .map(|contract_address| PythConfig {
-                            contract_address,
-                            age_tolerance_seconds: pyth.age_tolerance_seconds.into(),
-                            network: pyth.network,
-                        })
-                })
-                .transpose()?,
-            stride: stride
-                .map(|stride| {
-                    stride
-                        .contract_address
-                        .validate(api)
-                        .map(|contract_address| StrideConfig { contract_address })
-                })
-                .transpose()?,
-            feeds,
-            feeds_usd,
-        },
+        } => {
+            ensure!(!feeds.is_empty(), "feeds cannot be empty");
+            ensure!(!feeds_usd.is_empty(), "feeds_usd cannot be empty");
+
+            SpotPriceConfig::Oracle {
+                pyth: pyth
+                    .map(|pyth| {
+                        pyth.contract_address
+                            .validate(api)
+                            .map(|contract_address| PythConfig {
+                                contract_address,
+                                age_tolerance_seconds: pyth.age_tolerance_seconds.into(),
+                                network: pyth.network,
+                            })
+                    })
+                    .transpose()?,
+                stride: stride
+                    .map(|stride| {
+                        stride
+                            .contract_address
+                            .validate(api)
+                            .map(|contract_address| StrideConfig { contract_address })
+                    })
+                    .transpose()?,
+                feeds,
+                feeds_usd,
+            }
+        }
     };
     let mut init_config = Config::new(spot_price);
 
