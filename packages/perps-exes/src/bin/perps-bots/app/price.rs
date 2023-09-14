@@ -1,11 +1,18 @@
-use std::{collections::HashMap, fmt::Display, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+    sync::Arc,
+};
 
 use anyhow::Result;
 use axum::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, TxBuilder, Wallet};
 use cosmwasm_std::Decimal256;
-use msg::prelude::*;
+use msg::{
+    contracts::market::spot_price::{SpotPriceConfig, SpotPriceFeedData},
+    prelude::*,
+};
 use perps_exes::pyth::get_oracle_update_msg;
 use shared::storage::MarketId;
 
@@ -284,16 +291,35 @@ impl App {
         match &oracle.pyth {
             None => Ok(None),
             Some(pyth) => {
-                let msg = get_oracle_update_msg(
-                    &oracle.spot_price_config.all_unique_pyth_ids(),
-                    &wallet,
-                    &pyth.endpoints,
-                    &self.client,
-                    &pyth.contract,
-                )
-                .await?;
+                let mut unique_pyth_ids = HashSet::new();
+                if let SpotPriceConfig::Oracle {
+                    feeds, feeds_usd, ..
+                } = &oracle.spot_price_config
+                {
+                    for feed in feeds.iter().chain(feeds_usd.iter()) {
+                        if let SpotPriceFeedData::Pyth { id, .. } = feed.data {
+                            unique_pyth_ids.insert(id);
+                        }
+                    }
+                }
 
-                Ok(Some(msg))
+                match unique_pyth_ids.is_empty() {
+                    true => Ok(None),
+                    false => {
+                        let unique_pyth_ids = unique_pyth_ids.into_iter().collect::<Vec<_>>();
+
+                        let msg = get_oracle_update_msg(
+                            &unique_pyth_ids,
+                            &wallet,
+                            &pyth.endpoints,
+                            &self.client,
+                            &pyth.contract,
+                        )
+                        .await?;
+
+                        Ok(Some(msg))
+                    }
+                }
             }
         }
     }

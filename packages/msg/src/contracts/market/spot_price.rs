@@ -27,30 +27,6 @@ pub enum SpotPriceConfig {
     },
 }
 
-impl SpotPriceConfig {
-    /// Helper to get all the unique pyth ids
-    /// useful for pushing price updates in one fell swoop
-    pub fn all_unique_pyth_ids(&self) -> Vec<PriceIdentifier> {
-        match self {
-            Self::Manual { .. } => vec![],
-            Self::Oracle {
-                feeds, feeds_usd, ..
-            } => {
-                let mut ids = vec![];
-                for feed in feeds.iter().chain(feeds_usd.iter()) {
-                    if let SpotPriceFeedData::Pyth { id, .. } = feed.data {
-                        if !ids.contains(&id) {
-                            ids.push(id);
-                        }
-                    }
-                }
-
-                ids
-            }
-        }
-    }
-}
-
 /// Configuration for pyth
 #[cw_serde]
 pub struct PythConfig {
