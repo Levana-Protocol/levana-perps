@@ -82,7 +82,30 @@ networks:
   sei-testnet:
     ATOM_USD:
       feeds: [
-        !pyth { key: "ATOM_USD", inverted: false }
+        !sei { denom: "uatom", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    OSMO_USDC:
+      feeds: [
+        !pyth { key: "OSMO_USD", inverted: false },
+        !pyth { key: "USDC_USD", inverted: true }
+      ]
+      feeds-usd: [
+        !pyth { key: "OSMO_USD", inverted: false }
+      ]
+    ETH_BTC:
+      feeds: [
+        !sei { denom: "ueth", inverted: false },
+        !sei { denom: "ubtc", inverted: true },
+      ]
+      feeds-usd: [
+        !sei { denom: "ubtc", inverted: false },
+      ]
+    BTC_USD:
+      feeds: [
+        !sei { denom: "ubtc", inverted: false },
       ]
       feeds-usd: [
         !constant { price: "1", inverted: false }

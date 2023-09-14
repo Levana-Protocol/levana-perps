@@ -14,6 +14,7 @@ import {
   QueryClient,
   createProtobufRpcClient,
   ProtobufRpcClient,
+  StdFee,
 } from "@cosmjs/stargate";
 import { DirectSecp256k1HdWallet, Registry } from "@cosmjs/proto-signing";
 import { ENV_SEED_PHRASE, NETWORKS } from "./config";
@@ -31,6 +32,7 @@ export interface Wallet {
   address: string;
   account: Account;
   rpcClient: ProtobufRpcClient;
+  config: any
 }
 
 type RegistryUpdater = (registry: Registry) => void;
@@ -81,6 +83,7 @@ export async function getWallet(
     signer,
     account,
     rpcClient,
+    config
   };
 }
 
@@ -113,10 +116,19 @@ export async function instantiateContract(
 
 export async function uploadContract(wallet, contract_path) {
   const contents = await fs.readFile(contract_path);
+
+  let fee:"auto" | StdFee = "auto";
+
+  if(wallet.config.denom === "usei" && contract_path.includes("market")) {
+    // uploading to sei has issues with gas price and estimation, just use the max for this
+    const gasPrice = GasPrice.fromString(`${wallet.config.gas_price}${wallet.config.denom}`);
+    fee = calculateFee(10000000, gasPrice);
+  }
+
   const uploadReceipt = await wallet.client.upload(
     wallet.address,
     contents,
-    "auto"
+    fee,
   );
   const { codeId } = uploadReceipt;
 

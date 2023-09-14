@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use anyhow::ensure;
-use cosmwasm_std::Order;
+use cosmwasm_std::{Order, QuerierWrapper};
 use msg::contracts::market::{
     entry::PriceForQuery,
     spot_price::{
@@ -8,6 +8,7 @@ use msg::contracts::market::{
     },
 };
 use pyth_sdk_cw::PriceFeedResponse;
+use sei_cosmwasm::{ExchangeRatesResponse, SeiQuerier};
 
 /// Stores spot price history.
 /// Key is a [Timestamp] of when the price was received.
@@ -343,10 +344,23 @@ impl State<'_> {
                 }
 
                 SpotPriceFeedData::Constant { price } => (price.into_number(), None),
-                SpotPriceFeedData::Sei { .. } => {
-                    // TODO: query the native module and get the price, no publish time
-                    todo!("Implement SEI price feed")
+                SpotPriceFeedData::Sei { denom } => {
+                    let querier = QuerierWrapper::new(&*self.querier);
+                    let querier = SeiQuerier::new(&querier);
+                    let res: ExchangeRatesResponse = querier.query_exchange_rates()?;
+                    let pair = res
+                        .denom_oracle_exchange_rate_pairs
+                        .iter()
+                        .find(|x| x.denom == *denom)
+                        .with_context(|| format!("no such denom {denom}"))?;
+
+                    let price: Decimal256 = pair.oracle_exchange_rate.exchange_rate.into();
+                    let price = Number::try_from(price)?;
+
+                    // pair does have a `last_update`, but it's in block height
+                    (price, None)
                 }
+
                 SpotPriceFeedData::Stride { .. } => {
                     // TODO: query the contract and get the redemption price etc., no publish time
                     todo!("Implement Stride price feed")
