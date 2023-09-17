@@ -312,7 +312,7 @@ impl AppBuilder {
                 };
                 let before = tokio::time::Instant::now();
                 let res = task
-                    .run_single(
+                    .run_single_with_timeout(
                         &app,
                         Heartbeat {
                             task_status: task_status.clone(),
@@ -508,7 +508,26 @@ pub(crate) struct WatchedTaskOutput {
 #[async_trait]
 pub(crate) trait WatchedTask: Send + Sync + 'static {
     async fn run_single(&mut self, app: &App, heartbeat: Heartbeat) -> Result<WatchedTaskOutput>;
+    async fn run_single_with_timeout(
+        &mut self,
+        app: &App,
+        heartbeat: Heartbeat,
+    ) -> Result<WatchedTaskOutput> {
+        match tokio::time::timeout(
+            tokio::time::Duration::from_secs(MAX_TASK_SECONDS),
+            self.run_single(app, heartbeat),
+        )
+        .await
+        {
+            Ok(x) => x,
+            Err(e) => Err(anyhow::anyhow!(
+                "Running a single task took too long, killing. Elapsed time: {e}"
+            )),
+        }
+    }
 }
+
+const MAX_TASK_SECONDS: u64 = 180;
 
 pub(crate) struct Heartbeat {
     task_status: Arc<RwLock<TaskStatus>>,
