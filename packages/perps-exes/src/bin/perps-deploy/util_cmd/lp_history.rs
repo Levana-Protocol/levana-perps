@@ -10,9 +10,8 @@ use msg::{
     },
     prelude::*,
 };
-use parking_lot::Mutex;
 use perps_exes::prelude::MarketContract;
-use tokio::task::JoinSet;
+use tokio::{sync::Mutex, task::JoinSet};
 
 #[derive(clap::Parser)]
 pub(super) struct LpActionCsvOpt {
@@ -201,7 +200,7 @@ async fn worker(
             record.last_action = Some(timestamp);
         }
 
-        let mut csv = csv.lock();
+        let mut csv = csv.lock().await;
         csv.serialize(&record)?;
         csv.flush()?;
     }

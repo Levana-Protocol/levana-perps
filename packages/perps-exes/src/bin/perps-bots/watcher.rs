@@ -9,12 +9,12 @@ use axum::response::IntoResponse;
 use axum::{async_trait, Json};
 use chrono::{DateTime, Duration, Utc};
 use once_cell::sync::OnceCell;
-use parking_lot::RwLock;
 use perps_exes::build_version;
 use perps_exes::config::{TaskConfig, WatcherConfig};
 use rand::Rng;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::StatusCode;
+use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 
 use crate::app::factory::FrontendInfoTestnet;
@@ -299,7 +299,7 @@ impl AppBuilder {
             let mut retries = 0;
             loop {
                 let old_counts = {
-                    let mut guard = task_status.write();
+                    let mut guard = task_status.write().await;
                     let old = &*guard;
                     *guard = TaskStatus {
                         last_result: old.last_result.clone(),
@@ -326,7 +326,7 @@ impl AppBuilder {
                     }) => {
                         log::info!("{label}: Success! {message}");
                         {
-                            let mut guard = task_status.write();
+                            let mut guard = task_status.write().await;
                             let old = &*guard;
                             let title = label.to_string();
                             if label.triggers_alert(None) {
@@ -401,9 +401,9 @@ impl AppBuilder {
                         // We want to get to first failure quickly so we don't
                         // have a misleading success status page. So if this
                         // failed and there are no prior attempts, don't retry.
-                        if retries >= max_retries || task_status.read().counts.total() == 0 {
+                        if retries >= max_retries || task_status.read().await.counts.total() == 0 {
                             retries = 0;
-                            let mut guard = task_status.write();
+                            let mut guard = task_status.write().await;
                             let old = &*guard;
                             let title = label.to_string();
                             let new_error_message = format!("{err:?}");
@@ -465,7 +465,7 @@ impl AppBuilder {
                             };
                         } else {
                             {
-                                let mut guard = task_status.write();
+                                let mut guard = task_status.write().await;
                                 let old = &*guard;
                                 *guard = TaskStatus {
                                     last_result: old.last_result.clone(),
@@ -515,8 +515,8 @@ pub(crate) struct Heartbeat {
 }
 
 impl Heartbeat {
-    pub(crate) fn reset_too_old(&self) {
-        let mut guard = self.task_status.write();
+    pub(crate) async fn reset_too_old(&self) {
+        let mut guard = self.task_status.write().await;
         let old = &*guard;
         *guard = TaskStatus {
             last_result: old.last_result.clone(),
@@ -541,7 +541,7 @@ pub(crate) trait WatchedTaskPerMarket: Send + Sync + 'static {
 #[async_trait]
 impl<T: WatchedTaskPerMarket> WatchedTask for T {
     async fn run_single(&mut self, app: &App, heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
-        let factory = app.get_factory_info();
+        let factory = app.get_factory_info().await;
         let mut successes = vec![];
         let mut errors = vec![];
         let mut total_skip_delay = false;
@@ -564,7 +564,7 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
                     addr = market.market
                 )),
             }
-            heartbeat.reset_too_old();
+            heartbeat.reset_too_old().await;
         }
         if errors.is_empty() {
             Ok(WatchedTaskOutput {
@@ -591,8 +591,9 @@ struct RenderedStatus {
 }
 
 impl TaskStatuses {
-    fn statuses(&self, selected_label: Option<TaskLabel>) -> Vec<RenderedStatus> {
-        let mut all_statuses = self
+    async fn statuses(&self, selected_label: Option<TaskLabel>) -> Vec<RenderedStatus> {
+        let mut all_statuses = vec![];
+        for (label, status) in self
             .statuses
             .get()
             .expect("Status map isn't available yet")
@@ -601,28 +602,27 @@ impl TaskStatuses {
                 None => true,
                 Some(label) => **curr_label == label,
             })
-            .map(|(label, status)| {
-                let label = *label;
-                let status = status.read().clone();
-                let short = status.short(label, selected_label);
-                RenderedStatus {
-                    label,
-                    status,
-                    short,
-                }
-            })
-            .collect::<Vec<_>>();
+        {
+            let label = *label;
+            let status = status.read().await.clone();
+            let short = status.short(label, selected_label);
+            all_statuses.push(RenderedStatus {
+                label,
+                status,
+                short,
+            });
+        }
 
         all_statuses.sort_by_key(|x| (x.short, x.label));
         all_statuses
     }
 
-    pub(crate) fn statuses_html(
+    pub(crate) async fn statuses_html(
         &self,
         app: &App,
         label: Option<TaskLabel>,
     ) -> axum::response::Response {
-        let template = self.to_template(app, label);
+        let template = self.to_template(app, label).await;
         let mut res = template.render().unwrap().into_response();
         res.headers_mut().append(
             CONTENT_TYPE,
@@ -636,12 +636,12 @@ impl TaskStatuses {
         res
     }
 
-    pub(crate) fn statuses_json(
+    pub(crate) async fn statuses_json(
         &self,
         app: &App,
         label: Option<TaskLabel>,
     ) -> axum::response::Response {
-        let template = self.to_template(app, label);
+        let template = self.to_template(app, label).await;
 
         let mut res = Json(&template).into_response();
 
@@ -652,9 +652,9 @@ impl TaskStatuses {
         res
     }
 
-    pub(crate) fn statuses_text(&self, label: Option<TaskLabel>) -> axum::response::Response {
+    pub(crate) async fn statuses_text(&self, label: Option<TaskLabel>) -> axum::response::Response {
         let mut response_builder = ResponseBuilder::default();
-        let statuses = self.statuses(label);
+        let statuses = self.statuses(label).await;
         let alert = statuses.iter().any(|x| x.short.alert());
         statuses
             .into_iter()
@@ -868,10 +868,14 @@ struct StatusTemplate<'a> {
 }
 
 impl TaskStatuses {
-    fn to_template<'a>(&'a self, app: &'a App, label: Option<TaskLabel>) -> StatusTemplate<'a> {
-        let statuses = self.statuses(label);
+    async fn to_template<'a>(
+        &'a self,
+        app: &'a App,
+        label: Option<TaskLabel>,
+    ) -> StatusTemplate<'a> {
+        let statuses = self.statuses(label).await;
         let alert = statuses.iter().any(|x| x.short.alert());
-        let frontend_info_testnet = app.get_frontend_info_testnet();
+        let frontend_info_testnet = app.get_frontend_info_testnet().await;
         StatusTemplate {
             statuses,
             family: match &app.config.by_type {

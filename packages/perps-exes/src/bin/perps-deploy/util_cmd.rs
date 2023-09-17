@@ -14,7 +14,6 @@ use msg::contracts::{
     },
     pyth_bridge::entry::FeedType,
 };
-use parking_lot::Mutex;
 use perps_exes::{
     config::{ChainConfig, PythConfig, PythContract},
     prelude::MarketContract,
@@ -24,7 +23,7 @@ use serde_json::json;
 use shared::storage::{
     Collateral, DirectionToBase, LeverageToBase, MarketId, Notional, Signed, UnsignedDecimal, Usd,
 };
-use tokio::task::JoinSet;
+use tokio::{sync::Mutex, task::JoinSet};
 
 use crate::factory::Factory;
 
@@ -443,7 +442,7 @@ async fn csv_helper(
 ) -> Result<()> {
     loop {
         let (contract, market_id, pos_id) = {
-            let mut to_process_guard = to_process.lock();
+            let mut to_process_guard = to_process.lock().await;
             match to_process_guard.last_mut() {
                 None => break Ok(()),
                 Some(to_process) => {
@@ -511,7 +510,7 @@ async fn csv_helper(
             anyhow::bail!("Could not find position {pos_id}");
         }?;
 
-        let mut csv = csv.lock();
+        let mut csv = csv.lock().await;
         csv.serialize(&record)?;
         csv.flush()?;
     }

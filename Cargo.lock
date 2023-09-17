@@ -2685,7 +2685,6 @@ dependencies = [
  "log",
  "mime",
  "once_cell",
- "parking_lot 0.12.1",
  "pyth-sdk-cw",
  "rand 0.8.5",
  "reqwest",

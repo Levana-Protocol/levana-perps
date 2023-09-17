@@ -57,11 +57,11 @@ impl<'a> From<&'a FactoryInfo> for FactoryInfoJson<'a> {
 }
 
 pub(crate) async fn factory(app: State<Arc<App>>) -> impl IntoResponse {
-    let factory_info = app.get_factory_info();
+    let factory_info = app.get_factory_info().await;
     match &app.config.by_type {
         BotConfigByType::Testnet { inner } => Json(FactoryResp {
             factory_info: factory_info.as_ref().into(),
-            frontend_info_testnet: app.get_frontend_info_testnet().as_deref(),
+            frontend_info_testnet: app.get_frontend_info_testnet().await.as_deref(),
             network: app.config.network,
             price_api: &inner.price_api,
             explorer: &inner.explorer,

@@ -82,7 +82,7 @@ async fn update(app: &App) -> Result<WatchedTaskOutput> {
                 &inner.rpc_nodes,
             )
             .await?;
-            app.set_frontend_info_testnet(frontend_info_testnet)?;
+            app.set_frontend_info_testnet(frontend_info_testnet).await?;
             (message, factory_info)
         }
         BotConfigByType::Mainnet { inner } => {
@@ -93,7 +93,7 @@ async fn update(app: &App) -> Result<WatchedTaskOutput> {
         skip_delay: false,
         message,
     };
-    app.set_factory_info(info);
+    app.set_factory_info(info).await;
     Ok(output)
 }
 
