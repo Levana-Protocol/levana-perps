@@ -530,12 +530,33 @@ impl Heartbeat {
 
 #[async_trait]
 pub(crate) trait WatchedTaskPerMarket: Send + Sync + 'static {
+    #[allow(unused_variables)]
     async fn run_single_market(
         &mut self,
         app: &App,
         factory_info: &FactoryInfo,
         market: &Market,
-    ) -> Result<WatchedTaskOutput>;
+    ) -> Result<WatchedTaskOutput> {
+        // Default implementation for tasks that don't need to run single-market
+        Ok(WatchedTaskOutput {
+            skip_delay: false,
+            message: "".to_string(),
+        })
+    }
+
+    #[allow(unused_variables)]
+    async fn run_multi_market(
+        &mut self,
+        app: &App,
+        factory_info: &FactoryInfo,
+        markets: &[Market],
+    ) -> Result<WatchedTaskOutput> {
+        // Default implementation for tasks that don't need to run multi-market
+        Ok(WatchedTaskOutput {
+            skip_delay: false,
+            message: "".to_string(),
+        })
+    }
 }
 
 #[async_trait]
@@ -566,6 +587,19 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
             }
             heartbeat.reset_too_old();
         }
+
+        match self.run_multi_market(app, &factory, &factory.markets).await {
+            Ok(WatchedTaskOutput {
+                skip_delay,
+                message,
+            }) => {
+                successes.push(format!("multi-market: {message}",));
+                total_skip_delay = skip_delay || total_skip_delay;
+            }
+            Err(e) => errors.push(format!("multi-market: {e:?}",)),
+        }
+        heartbeat.reset_too_old();
+
         if errors.is_empty() {
             Ok(WatchedTaskOutput {
                 skip_delay: total_skip_delay,
