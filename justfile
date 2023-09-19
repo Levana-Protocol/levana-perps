@@ -171,6 +171,7 @@ deploy-sei-testnet:
 
 # Migrate osmoci
 migrate-osmoci:
+	cargo run --bin perps-deploy testnet store-code --network osmosis-testnet
 	cargo run --bin perps-deploy testnet migrate --family osmoci
 
 # Build documentations
