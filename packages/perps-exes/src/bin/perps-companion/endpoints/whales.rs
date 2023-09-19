@@ -51,10 +51,12 @@ async fn whales_inner(app: &App, headers: &HeaderMap) -> Result<Response> {
 
     let accept = headers.get("accept");
 
-    if accept.map_or(false, |value| value.as_bytes().starts_with(b"text/html")) {
-        whale_data.to_html()
-    } else {
+    if accept.map_or(false, |value| {
+        value.as_bytes().starts_with(b"application/json")
+    }) {
         Ok(Json(whale_data).into_response())
+    } else {
+        whale_data.to_html()
     }
 }
 
