@@ -85,34 +85,13 @@ impl Oracle {
         })
     }
 
-    pub async fn query_price(&self, _age_tolerance_seconds: u32) -> Result<PricePoint> {
-        todo!()
-        // self.bridge
-        //     .query(BridgeQueryMsg::MarketPrice {
-        //         age_tolerance_seconds,
-        //     })
-        //     .await
-    }
-
-    pub async fn prev_market_price_timestamp(&self, _market_id: &MarketId) -> Result<Timestamp> {
-        todo!()
-        // let res = self
-        //     .bridge
-        //     .query_raw(map_key(PYTH_PREV_MARKET_PRICE, market_id))
-        //     .await?;
-        // let price: MarketPrice = serde_json::from_slice(&res)?;
-        // Ok(Timestamp::from_seconds(
-        //     price.latest_price_publish_time.try_into()?,
-        // ))
-    }
-
     pub async fn get_latest_price(
         &self,
         client: &reqwest::Client,
     ) -> Result<(PriceBaseInQuote, PriceCollateralInUsd)> {
         match &self.spot_price_config {
             SpotPriceConfig::Manual { .. } => {
-                unimplemented!("FIXME: support manual oracle w/ contract query")
+                bail!("Manual markets do not use an oracle")
             }
             SpotPriceConfig::Oracle {
                 feeds, feeds_usd, ..
@@ -129,7 +108,6 @@ impl Oracle {
     }
 }
 
-// FIXME: move out of pyth, handle more than just pyth
 async fn price_helper(
     client: &reqwest::Client,
     pyth: Option<&PythOracle>,

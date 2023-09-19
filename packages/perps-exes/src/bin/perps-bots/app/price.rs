@@ -27,7 +27,7 @@ use super::{factory::FactoryInfo, gas_check::GasCheckWallet, App, AppBuilder};
 struct Worker {
     wallet: Arc<Wallet>,
     stats: HashMap<MarketId, ReasonStats>,
-    last_successful_price_times: HashMap<MarketId, DateTime<Utc>>,
+    last_successful_price_publish_times: HashMap<MarketId, DateTime<Utc>>,
 }
 
 impl Worker {
@@ -61,7 +61,7 @@ impl AppBuilder {
                 Worker {
                     wallet: price_wallet,
                     stats: HashMap::new(),
-                    last_successful_price_times: HashMap::new(),
+                    last_successful_price_publish_times: HashMap::new(),
                 },
             )?;
         }
@@ -91,6 +91,9 @@ impl WatchedTaskPerMarket for Worker {
 
 impl App {
     async fn single_update(&self, market: &Market, worker: &mut Worker) -> Result<String> {
+        // Take the crank lock for the duration of this execution
+        let _crank_lock = self.crank_lock.lock().await;
+
         let mut statuses = vec![];
         let mut builder = TxBuilder::default();
 
@@ -104,34 +107,37 @@ impl App {
         )
         .await?;
 
-        let (latest_price, _) = oracle.get_latest_price(&self.client).await?;
-        let reason = self
+        let (oracle_price, _) = oracle.get_latest_price(&self.client).await?;
+
+        let (market_price, reason) = self
             .needs_price_update(
                 market,
-                &oracle,
-                latest_price,
+                oracle_price,
                 worker
-                    .last_successful_price_times
+                    .last_successful_price_publish_times
                     .get(&market.market_id)
                     .copied(),
             )
             .await?;
         worker.add_reason(&market.market_id, &reason);
+
         if let Some(reason) = reason {
             if reason.is_too_frequent() {
                 return Ok("Too frequent price updates, skipping".to_owned());
             }
-            if let Some(msg) = self.get_tx_pyth(&worker.wallet, &oracle).await? {
-                builder.add_message_mut(msg);
-            }
 
-            statuses.push(format!("Needs Pyth update: {reason}"));
+            statuses.push(format!("Needs price update: {reason}"));
         } else {
             return Ok("No pyth price update needed".to_owned());
         }
 
-        // Take the crank lock for the rest of the execution
-        let crank_lock = self.crank_lock.lock().await;
+        let pyth_msg = self.get_tx_pyth(&worker.wallet, &oracle).await?;
+        let is_pyth = pyth_msg.is_some();
+        if let Some(msg) = pyth_msg {
+            builder.add_message_mut(msg);
+        }
+
+        builder.add_message_mut(market.market.get_crank_msg(&worker.wallet, Some(1))?);
 
         let res = match builder
             .sign_and_broadcast(&self.cosmos, &worker.wallet)
@@ -149,43 +155,43 @@ impl App {
                 }
 
                 // OK, it was a too old error. Let's find out when the last price update was for the contract.
-                let last_update = oracle
-                    .prev_market_price_timestamp(&market.market_id)
-                    .await?
-                    .try_into_chrono_datetime()?;
-                let now = Utc::now();
-                let age = now - last_update;
-                if u32::try_from(age.num_seconds())? > self.config.price_age_alert_threshold_secs {
-                    return Err(e);
+                if let Some(prev_publish_time) = market_price.and_then(|price| price.publish_time) {
+                    let last_update = prev_publish_time.try_into_chrono_datetime()?;
+                    let now = Utc::now();
+                    let age = now - last_update;
+                    if u32::try_from(age.num_seconds())?
+                        > self.config.price_age_alert_threshold_secs
+                    {
+                        return Err(e);
+                    } else {
+                        return Ok(format!(
+                            "Ignoring failed price update. Price age in contract is: {age}"
+                        ));
+                    }
                 } else {
-                    return Ok(format!(
-                        "Ignoring failed price update. Price age in contract is: {age}"
-                    ));
+                    // no publish time, so we can't tell how old the price is
+                    return Err(e);
                 }
             }
         };
 
-        // the storage should have been updated from the above transaction
-        match oracle.prev_market_price_timestamp(&market.market_id).await {
-            Ok(timestamp) => {
-                let datetime = timestamp.try_into_chrono_datetime()?;
+        // the market must have been updated from the above transaction
+        let updated_price = market.market.current_price().await?;
+        match updated_price.publish_time {
+            Some(publish_time) => {
+                let timestamp = publish_time.try_into_chrono_datetime()?;
                 worker
-                    .last_successful_price_times
-                    .insert(market.market_id.clone(), datetime);
+                    .last_successful_price_publish_times
+                    .insert(market.market_id.clone(), timestamp);
             }
-            Err(e) => {
-                log::error!("Unable to parse price tx response timestamp: {e:?}");
+            None => {
+                if is_pyth {
+                    log::error!("No publish time, but it must exist in a pyth-based price update");
+                }
             }
         }
 
-        std::mem::drop(crank_lock);
-
-        // just for logging pyth prices
-        let msg = match oracle.query_price(120).await {
-            Ok(market_price) => format!("Updated pyth price: {market_price:?}"),
-            Err(e) => format!("query_price failed, ignoring: {e:?}."),
-        };
-        statuses.push(msg);
+        statuses.push(format!("Updated price: {market_price:?}"));
 
         if !res.data.is_empty() {
             statuses.push(format!("Response data from contracts: {}", res.data));
@@ -203,83 +209,93 @@ impl App {
     async fn needs_price_update(
         &self,
         market: &Market,
-        oracle: &Oracle,
-        latest_price: PriceBaseInQuote,
-        last_successful_price_time: Option<DateTime<Utc>>,
-    ) -> Result<Option<PriceUpdateReason>> {
-        let market_id = &market.market_id;
+        oracle_price: PriceBaseInQuote,
+        last_successful_price_publish_time: Option<DateTime<Utc>>,
+    ) -> Result<(Option<PricePoint>, Option<PriceUpdateReason>)> {
         let market = &market.market;
-        let price_base = match market.current_price().await {
-            Ok(price) => price.price_base,
+        let market_price: PricePoint = match market.current_price().await {
+            Ok(price) => price,
             Err(e) => {
                 let msg = format!("{e}");
                 return if msg.contains("price_not_found") {
                     // Assume this is the first price being set
-                    Ok(Some(PriceUpdateReason::NoPriceFound))
+                    Ok((None, Some(PriceUpdateReason::NoPriceFound)))
                 } else {
                     Err(e)
                 };
             }
         };
 
-        let price_time = oracle.prev_market_price_timestamp(market_id).await?;
+        let mut is_too_frequent = false;
 
-        // Determine the logical "last update" by using both the
-        // contract-derived price time and the most recent successfully price
-        // update we pushed. The reason for this is to avoid double-sending
-        // price updates if one of the nodes reports an older price update.
-        let price_time = price_time.try_into_chrono_datetime()?;
-        let updated = (|| {
-            let last_successful_price_time = last_successful_price_time?;
-            if last_successful_price_time < price_time {
-                return None;
-            }
-            if Utc::now()
-                .signed_duration_since(last_successful_price_time)
-                .num_seconds()
-                > self.config.max_price_age_secs.into()
-            {
-                return None;
-            }
-            Some(last_successful_price_time)
-        })()
-        .unwrap_or(price_time);
+        if let Some(publish_time) = market_price.publish_time {
+            // Determine the logical "last update" by using both the
+            // contract-derived price time and the most recent successfully price
+            // update we pushed. The reason for this is to avoid double-sending
+            // price updates if one of the nodes reports an older price update.
 
-        // Check 1: is the last price update too old?
-        let age = Utc::now().signed_duration_since(updated);
-        let age_secs = age.num_seconds();
-        if age_secs > self.config.max_price_age_secs.into() {
-            return Ok(Some(PriceUpdateReason::LastUpdateTooOld(age)));
+            let publish_time = publish_time.try_into_chrono_datetime()?;
+            let updated = (|| {
+                let last_successful_price_publish_time = last_successful_price_publish_time?;
+                if last_successful_price_publish_time < publish_time {
+                    return None;
+                }
+                if Utc::now()
+                    .signed_duration_since(last_successful_price_publish_time)
+                    .num_seconds()
+                    > self.config.max_price_age_secs.into()
+                {
+                    return None;
+                }
+                Some(last_successful_price_publish_time)
+            })()
+            .unwrap_or(publish_time);
+
+            // Check 1: is the last price update too old?
+            let age = Utc::now().signed_duration_since(updated);
+            let age_secs = age.num_seconds();
+            if age_secs > self.config.max_price_age_secs.into() {
+                return Ok((
+                    Some(market_price),
+                    Some(PriceUpdateReason::LastUpdateTooOld(age)),
+                ));
+            }
+
+            // Check 1a: if it's too new, we don't update, regardless of anything
+            // else that might have happened. This is to prevent gas drainage.
+            is_too_frequent = age_secs < self.config.min_price_age_secs.into();
         }
 
-        // Check 1a: if it's too new, we don't update, regardless of anything
-        // else that might have happened. This is to prevent gas drainage.
-        let is_too_frequent = age_secs < self.config.min_price_age_secs.into();
-
         // Check 2: has the price moved more than the allowed delta?
-        let delta = latest_price
+        let delta = oracle_price
             .into_non_zero()
             .raw()
-            .checked_div(price_base.into_non_zero().raw())?
+            .checked_div(market_price.price_base.into_non_zero().raw())?
             .into_signed()
             .checked_sub(Signed::ONE)?
             .abs_unsigned();
         if delta >= self.config.max_allowed_price_delta {
-            return Ok(Some(PriceUpdateReason::PriceDelta {
-                old: price_base,
-                new: latest_price,
-                delta,
-                is_too_frequent,
-            }));
+            return Ok((
+                Some(market_price),
+                Some(PriceUpdateReason::PriceDelta {
+                    old: market_price.price_base,
+                    new: oracle_price,
+                    delta,
+                    is_too_frequent,
+                }),
+            ));
         }
 
         // Check 3: would any triggers happen from this price?
         // We save this for last since it requires a network round trip
-        if market.price_would_trigger(latest_price).await? {
-            return Ok(Some(PriceUpdateReason::Triggers { is_too_frequent }));
+        if market.price_would_trigger(oracle_price).await? {
+            return Ok((
+                Some(market_price),
+                Some(PriceUpdateReason::Triggers { is_too_frequent }),
+            ));
         }
 
-        Ok(None)
+        Ok((Some(market_price), None))
     }
 
     async fn get_tx_pyth(
