@@ -1,8 +1,15 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use cosmos::HasAddress;
-use msg::contracts::{factory::entry::CodeIds, tracker::entry::ContractResp};
+use msg::contracts::{
+    factory::entry::CodeIds,
+    market::spot_price::{
+        PythConfigInit, PythPriceServiceNetwork, SpotPriceConfigInit, StrideConfigInit,
+    },
+    tracker::entry::ContractResp,
+};
 
 use crate::{
+    app::PriceSourceConfig,
     cli::Opt,
     factory::{Factory, MarketInfo},
     store_code::{FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN},
@@ -147,7 +154,52 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                 .migrate(
                     &app.basic.wallet,
                     market_code_id.get_code_id(),
-                    msg::contracts::market::entry::MigrateMsg {},
+                    msg::contracts::market::entry::MigrateMsg {
+                        // Temporary migration for current markets
+                        spot_price: match &app.price_source {
+                            PriceSourceConfig::Wallet(admin) => SpotPriceConfigInit::Manual {
+                                admin: admin.get_address_string().into(),
+                            },
+                            PriceSourceConfig::Oracle(oracle) => {
+                                let market = oracle.markets.get(&market_id).with_context(|| {
+                                    format!("No oracle market found for {market_id}")
+                                })?;
+
+                                let global_price_config = &app.basic.price_config;
+
+                                SpotPriceConfigInit::Oracle {
+                                    pyth: oracle.pyth.as_ref().map(|pyth| PythConfigInit {
+                                        contract_address: pyth.contract.get_address_string().into(),
+                                        age_tolerance_seconds: match pyth.r#type {
+                                            PythPriceServiceNetwork::Stable => {
+                                                global_price_config.pyth.stable.update_age_tolerance
+                                            }
+                                            PythPriceServiceNetwork::Edge => {
+                                                global_price_config.pyth.edge.update_age_tolerance
+                                            }
+                                        },
+                                        network: pyth.r#type,
+                                    }),
+                                    stride: oracle.stride.as_ref().map(|stride| StrideConfigInit {
+                                        contract_address: stride
+                                            .contract
+                                            .get_address_string()
+                                            .into(),
+                                    }),
+                                    feeds: market
+                                        .feeds
+                                        .iter()
+                                        .map(|feed| feed.clone().into())
+                                        .collect(),
+                                    feeds_usd: market
+                                        .feeds_usd
+                                        .iter()
+                                        .map(|feed| feed.clone().into())
+                                        .collect(),
+                                }
+                            }
+                        },
+                    },
                 )
                 .await?;
             log::info!("Market contract for {market_id} migrated");

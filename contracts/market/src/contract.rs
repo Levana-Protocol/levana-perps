@@ -664,7 +664,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
 pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response> {
     /////////// START TEMPORARY MIGRATION CODE ///////////
     // Temporary migration to fix the config for new oracles
-    // TODO: delete when done with migrations
+    // It won't break re-migrating since the new setup is additive (spot_price field on config)
+    // Nevertheless, should delete when done with migrations
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
     struct OldConfig {
         pub trading_fee_notional_size: Decimal256,
