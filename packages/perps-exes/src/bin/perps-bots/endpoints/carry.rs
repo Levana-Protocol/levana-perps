@@ -155,7 +155,7 @@ pub(crate) async fn carry_inner(
 
     res_str += format!("cc_addr: {}\n", cc_addr).as_str();
 
-    let factory = app.get_factory_info();
+    let factory = app.get_factory_info().await;
     let market_iter = factory.markets.iter().filter(|market| {
         market_id
             .as_ref()
