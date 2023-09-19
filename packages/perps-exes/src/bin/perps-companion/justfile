@@ -22,7 +22,7 @@ db-reset:
 
 # Run application
 run:
-	cargo run --bin perps-companion -- --postgres-uri postgresql://postgres:postgres@localhost/companion
+	cargo run --bin perps-companion uri --postgres-uri postgresql://postgres:postgres@localhost/companion
 
 # Postgres terminate connection
 pg-terminate-conn:

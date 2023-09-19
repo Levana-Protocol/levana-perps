@@ -1,9 +1,10 @@
 use cosmos::HasAddress;
 use cosmwasm_std::Decimal256;
 use msg::prelude::*;
+use perps_exes::contracts::Factory;
 use shared::storage::MarketId;
 
-use crate::{app::PriceSourceConfig, factory::Factory, instantiate::AddMarketParams};
+use crate::{app::PriceSourceConfig, instantiate::AddMarketParams};
 
 #[derive(clap::Parser)]
 pub(crate) struct AddMarketOpt {

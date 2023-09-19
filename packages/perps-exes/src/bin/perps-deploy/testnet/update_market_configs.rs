@@ -2,7 +2,7 @@ use anyhow::Context;
 use msg::contracts::market::config::ConfigUpdate;
 use perps_exes::prelude::MarketContract;
 
-use crate::factory::Factory;
+use perps_exes::contracts::Factory;
 
 #[derive(clap::Parser)]
 pub(crate) struct UpdateMarketConfigsOpt {

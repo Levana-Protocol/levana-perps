@@ -5,9 +5,10 @@ use msg::{
     contracts::market::{config::ConfigUpdate, entry::ExecuteOwnerMsg},
     prelude::MarketExecuteMsg,
 };
+use perps_exes::contracts::Factory;
 use shared::storage::MarketId;
 
-use crate::{cli::Opt, factory::Factory, mainnet::strip_nulls};
+use crate::{cli::Opt, mainnet::strip_nulls};
 
 use super::MainnetFactories;
 

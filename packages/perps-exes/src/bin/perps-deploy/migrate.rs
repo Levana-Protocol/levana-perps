@@ -1,10 +1,10 @@
 use anyhow::Result;
 use cosmos::HasAddress;
 use msg::contracts::{factory::entry::CodeIds, tracker::entry::ContractResp};
+use perps_exes::contracts::{Factory, MarketInfo};
 
 use crate::{
     cli::Opt,
-    factory::{Factory, MarketInfo},
     store_code::{FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN},
 };
 

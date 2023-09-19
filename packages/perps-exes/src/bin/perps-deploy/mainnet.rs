@@ -7,9 +7,13 @@ use chrono::{DateTime, Utc};
 use cosmos::{Address, ContractAdmin, CosmosNetwork, HasAddress};
 use cosmwasm_std::{to_binary, CosmosMsg, Empty};
 use msg::{contracts::market::entry::NewMarketParams, token::TokenInit};
-use perps_exes::{config::MarketConfigUpdates, prelude::*};
+use perps_exes::{
+    config::{MainnetFactories, MainnetFactory, MarketConfigUpdates},
+    contracts::Factory,
+    prelude::*,
+};
 
-use crate::{cli::Opt, factory::Factory, util::get_hash_for_path};
+use crate::{cli::Opt, util::get_hash_for_path};
 
 use self::{migrate::MigrateOpts, update_config::UpdateConfigOpts};
 
@@ -297,65 +301,6 @@ struct InstantiateFactoryOpts {
     ident: String,
 }
 
-/// Stores mainnet factory contracts
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub(crate) struct MainnetFactories {
-    pub(crate) factories: Vec<MainnetFactory>,
-}
-
-impl MainnetFactories {
-    pub(crate) fn get_by_address(&self, address: Address) -> Option<&MainnetFactory> {
-        self.factories.iter().find(|f| f.address == address)
-    }
-
-    pub(crate) fn get_by_ident(&self, ident: &str) -> Option<&MainnetFactory> {
-        self.factories
-            .iter()
-            .find(|f| f.ident.as_deref() == Some(ident))
-    }
-
-    /// Gets by either address or ident
-    pub(crate) fn get(&self, factory: &str) -> Result<&MainnetFactory> {
-        match factory.parse().ok() {
-            Some(addr) => self.get_by_address(addr),
-            None => self.get_by_ident(factory),
-        }
-        .with_context(|| format!("Unknown factory: {factory}"))
-    }
-}
-
-/// An instantiated factory on mainnet.
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub(crate) struct MainnetFactory {
-    pub(crate) address: Address,
-    pub(crate) network: CosmosNetwork,
-    pub(crate) label: String,
-    pub(crate) instantiate_code_id: u64,
-    pub(crate) instantiate_at: DateTime<Utc>,
-    pub(crate) gitrev: String,
-    pub(crate) hash: String,
-    /// A user-friendly identifier
-    pub(crate) ident: Option<String>,
-}
-
-impl MainnetFactories {
-    const PATH: &str = "packages/perps-exes/assets/mainnet-factories.yaml";
-
-    pub(crate) fn load() -> Result<Self> {
-        let mut file = fs_err::File::open(Self::PATH)?;
-        serde_yaml::from_reader(&mut file)
-            .with_context(|| format!("Error loading MainnetFactories from {}", Self::PATH))
-    }
-
-    fn save(&self) -> Result<()> {
-        let mut file = fs_err::File::create(Self::PATH)?;
-        serde_yaml::to_writer(&mut file, self)
-            .with_context(|| format!("Error saving MainnetFactories to {}", Self::PATH))
-    }
-}
-
 async fn instantiate_factory(
     opt: Opt,
     InstantiateFactoryOpts {
@@ -420,6 +365,7 @@ async fn instantiate_factory(
         gitrev: gitrev.to_owned(),
         hash,
         ident: Some(ident),
+        canonical: false,
     });
     factories.save()?;
 

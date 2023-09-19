@@ -2,8 +2,9 @@ use anyhow::Result;
 use cosmos::HasAddress;
 use cosmwasm_std::{to_binary, CosmosMsg, Empty, WasmMsg};
 use msg::prelude::*;
+use perps_exes::contracts::Factory;
 
-use crate::{cli::Opt, factory::Factory};
+use crate::cli::Opt;
 
 use super::MainnetFactories;
 

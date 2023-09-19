@@ -29,6 +29,10 @@ pub(crate) enum ChainId {
     Uni6 = 8,
     #[serde(rename = "pacific-1")]
     Pacific1 = 9,
+    #[serde(rename = "injective-1")]
+    Injective1 = 10,
+    #[serde(rename = "injective-888")]
+    Injective888 = 11,
 }
 
 impl TryFrom<&str> for ChainId {
@@ -64,6 +68,8 @@ impl Display for ChainId {
             ChainId::Stargaze1 => "stargaze-1",
             ChainId::Uni6 => "uni-6",
             ChainId::Pacific1 => "pacific-1",
+            ChainId::Injective1 => "injective-1",
+            ChainId::Injective888 => "injective-888",
         })
     }
 }
@@ -104,7 +110,25 @@ impl ChainId {
             ChainId::Stargaze1 => CosmosNetwork::StargazeMainnet,
             ChainId::Uni6 => CosmosNetwork::JunoTestnet,
             ChainId::Pacific1 => CosmosNetwork::SeiMainnet,
+            ChainId::Injective1 => CosmosNetwork::InjectiveMainnet,
+            ChainId::Injective888 => CosmosNetwork::InjectiveTestnet,
         })
+    }
+
+    pub(crate) fn from_cosmos_network(network: CosmosNetwork) -> Result<Self> {
+        match network {
+            CosmosNetwork::JunoTestnet => Ok(ChainId::Uni6),
+            CosmosNetwork::JunoMainnet => Ok(ChainId::Juno1),
+            CosmosNetwork::OsmosisMainnet => Ok(ChainId::Osmosis1),
+            CosmosNetwork::OsmosisTestnet => Ok(ChainId::OsmoTest5),
+            CosmosNetwork::SeiMainnet => Ok(ChainId::Pacific1),
+            CosmosNetwork::SeiTestnet => Ok(ChainId::Atlantic2),
+            CosmosNetwork::StargazeTestnet => Ok(ChainId::Elgafar1),
+            CosmosNetwork::StargazeMainnet => Ok(ChainId::Stargaze1),
+            CosmosNetwork::InjectiveMainnet => Ok(ChainId::Injective1),
+            CosmosNetwork::InjectiveTestnet => Ok(ChainId::Injective888),
+            _ => Err(anyhow::anyhow!("Unsupported network: {network}")),
+        }
     }
 
     pub(crate) fn is_mainnet(self) -> bool {
@@ -118,6 +142,8 @@ impl ChainId {
             ChainId::Stargaze1 => true,
             ChainId::Uni6 => false,
             ChainId::Pacific1 => true,
+            ChainId::Injective1 => true,
+            ChainId::Injective888 => false,
         }
     }
 }

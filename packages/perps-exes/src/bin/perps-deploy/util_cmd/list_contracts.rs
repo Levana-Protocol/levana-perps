@@ -1,12 +1,12 @@
 use std::{fs::File, path::PathBuf};
 
-use crate::{
-    factory::Factory,
-    mainnet::{MainnetFactories, MainnetFactory},
-};
 use cosmos::{Address, HasAddress};
 use csv::Writer;
 use msg::prelude::*;
+use perps_exes::{
+    config::{MainnetFactories, MainnetFactory},
+    contracts::Factory,
+};
 
 #[derive(clap::Parser)]
 pub(super) struct ListContractsOpt {
