@@ -10,6 +10,8 @@ pyth:
       ETH_USD: "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace"
       BTC_USD: "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43"
       SEI_USD: "53614f1cb0c031d4af66c04cb9c756234adad0e1cee85303795091499a4084eb"
+      EVMOS_USD: "c19405e4c8bdcbf2a66c37ae05a27d385c8309e9d648ed20dc6ee717e7d30e17"
+      AKT_USD: "4ea5bb4d2f5900cc2e97ba534240950740b4d3b89fe712a94a7304fd2fd92702"
   edge: 
     update-age-tolerance: 120
     endpoints: ["https://hermes-beta.pyth.network/"]
@@ -78,6 +80,20 @@ networks:
       ]
       feeds-usd: [
         !pyth { key: "SEI_USD", inverted: false}
+      ]
+    EVMOS_USD:
+      feeds: [
+        !pyth { key: "EVMOS_USD", inverted: false}
+      ]
+      feeds-usd: [
+        !pyth { key: "EVMOS_USD", inverted: false}
+      ]
+    AKT_USD:
+      feeds: [
+        !pyth { key: "AKT_USD", inverted: false}
+      ]
+      feeds-usd: [
+        !pyth { key: "AKT_USD", inverted: false}
       ]
   sei-testnet:
     ATOM_USD:
