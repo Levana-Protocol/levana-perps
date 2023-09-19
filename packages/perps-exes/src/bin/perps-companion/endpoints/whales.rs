@@ -144,7 +144,7 @@ async fn worker(
     send_market: Sender<WhaleMarketData>,
     client: reqwest::Client,
 ) -> Result<()> {
-    while let Some(work) = recv_work.recv().await.ok() {
+    while let Ok(work) = recv_work.recv().await {
         log::info!("Work: {work:?}");
         match work {
             Work::Factory(network, factory, send_work) => {
@@ -199,7 +199,7 @@ async fn load_whale_market_data(
             .error_for_status()?
             .json::<Vec<AprDailyAvg>>()
             .await
-            .map_err(|e| anyhow::Error::from(e))
+            .map_err(anyhow::Error::from)
     }
     .await
     .with_context(|| format!("Error while loading data from {url}"))?;
