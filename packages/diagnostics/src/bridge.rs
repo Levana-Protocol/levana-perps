@@ -173,7 +173,6 @@ impl Bridge {
             msg_id,
             user: match &msg {
                 ClientToBridgeMsg::ExecMarket { exec_msg, .. } => match exec_msg {
-                    ExecuteMsg::SetPrice { .. } => CONFIG.price_admin_addr.clone(),
                     ExecuteMsg::Owner(_) => CONFIG.protocol_owner_addr.clone(),
                     _ => CONFIG.user_addr.clone(),
                 },

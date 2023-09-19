@@ -1,6 +1,10 @@
 use crate::state::*;
+use anyhow::ensure;
 use cw_storage_plus::Item;
-use msg::contracts::market::config::{Config, ConfigUpdate};
+use msg::contracts::market::{
+    config::{Config, ConfigUpdate},
+    spot_price::{PythConfig, SpotPriceConfig, SpotPriceConfigInit, StrideConfig},
+};
 
 const CONFIG_STORAGE: Item<Config> = Item::new(namespace::CONFIG);
 
@@ -9,12 +13,57 @@ pub(crate) fn load_config(store: &dyn Storage) -> Result<Config> {
 }
 
 /// called only once, at instantiation
-pub(crate) fn config_init(store: &mut dyn Storage, config: Option<ConfigUpdate>) -> Result<()> {
+pub(crate) fn config_init(
+    api: &dyn Api,
+    store: &mut dyn Storage,
+    config: Option<ConfigUpdate>,
+    spot_price: SpotPriceConfigInit,
+) -> Result<()> {
+    let spot_price: SpotPriceConfig = match spot_price {
+        SpotPriceConfigInit::Manual { admin } => SpotPriceConfig::Manual {
+            admin: admin.validate(api)?,
+        },
+        SpotPriceConfigInit::Oracle {
+            pyth,
+            stride,
+            feeds,
+            feeds_usd,
+        } => {
+            ensure!(!feeds.is_empty(), "feeds cannot be empty");
+            ensure!(!feeds_usd.is_empty(), "feeds_usd cannot be empty");
+
+            SpotPriceConfig::Oracle {
+                pyth: pyth
+                    .map(|pyth| {
+                        pyth.contract_address
+                            .validate(api)
+                            .map(|contract_address| PythConfig {
+                                contract_address,
+                                age_tolerance_seconds: pyth.age_tolerance_seconds.into(),
+                                network: pyth.network,
+                            })
+                    })
+                    .transpose()?,
+                stride: stride
+                    .map(|stride| {
+                        stride
+                            .contract_address
+                            .validate(api)
+                            .map(|contract_address| StrideConfig { contract_address })
+                    })
+                    .transpose()?,
+                feeds,
+                feeds_usd,
+            }
+        }
+    };
+    let mut init_config = Config::new(spot_price);
+
     let update = match config {
-        None => Config::default().into(),
+        None => ConfigUpdate::default(),
         Some(update) => update,
     };
-    let mut init_config = Config::default();
+
     update_config(&mut init_config, store, update)?;
 
     Ok(())
@@ -55,6 +104,7 @@ pub(crate) fn update_config(
         max_liquidity,
         disable_position_nft_exec,
         liquidity_cooldown_seconds,
+        spot_price,
     }: ConfigUpdate,
 ) -> Result<()> {
     if let Some(x) = trading_fee_notional_size {
@@ -169,6 +219,10 @@ pub(crate) fn update_config(
     }
     if let Some(x) = liquidity_cooldown_seconds {
         config.liquidity_cooldown_seconds = x;
+    }
+
+    if let Some(x) = spot_price {
+        config.spot_price = x;
     }
 
     config.validate()?;

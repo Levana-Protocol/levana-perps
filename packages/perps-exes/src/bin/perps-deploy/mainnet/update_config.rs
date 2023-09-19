@@ -16,9 +16,9 @@ pub(super) struct UpdateConfigOpts {
     /// The factory contract address or identifier
     #[clap(long)]
     factory: String,
-    /// Market ID
+    /// Market ID, if omitted updates all markets
     #[clap(long)]
-    market: MarketId,
+    market: Option<MarketId>,
     /// Update config JSON message
     #[clap(long)]
     config: String,
@@ -45,19 +45,29 @@ async fn go(
 
     let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
 
-    let market = factory.get_market(market).await?;
+    let markets = match market {
+        Some(market) => vec![factory.get_market(market).await?],
+        None => factory.get_markets().await?,
+    };
 
     let owner = factory.query_owner().await?;
     log::info!("CW3 contract: {owner}");
 
-    let msg = CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
-        contract_addr: market.market.get_address_string(),
-        msg: to_binary(&strip_nulls(&MarketExecuteMsg::Owner(
-            ExecuteOwnerMsg::ConfigUpdate { update },
-        ))?)?,
-        funds: vec![],
-    });
-    log::info!("Message: {}", serde_json::to_string(&msg)?);
+    let msgs = markets
+        .into_iter()
+        .map(|market| {
+            anyhow::Ok(CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
+                contract_addr: market.market.get_address_string(),
+                msg: to_binary(&strip_nulls(MarketExecuteMsg::Owner(
+                    ExecuteOwnerMsg::ConfigUpdate {
+                        update: Box::new(update.clone()),
+                    },
+                ))?)?,
+                funds: vec![],
+            }))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    log::info!("Message: {}", serde_json::to_string(&msgs)?);
 
     Ok(())
 }

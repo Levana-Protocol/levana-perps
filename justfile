@@ -60,12 +60,25 @@ cargo-full-check:
 	just cargo-fmt-check
 
 # Build contracts with Cosmos Docker tooling
+# This is used for reproducible builds, suitable for mainnet
 build-contracts:
 	./.ci/contracts.sh
 
+# Build contracts with Cosmos Docker tooling for arm64
+# only for development purposes, not deploying mainnet contracts
+# as per the docker tool's internal rules, these builds will have the architecture extension in the name
+build-contracts-arm64:
+	env OPTIMIZER_ARM64="true" ./.ci/contracts.sh
+
 # Build contracts with native tooling
+# only for development purposes, not deploying mainnet contracts
+# the filenames are consolidated to be like regular docker builds so they can be
+# deployed with our tooling easily
 build-contracts-native:
 	./.ci/native-contract-build.sh
+
+build-contracts-native-sei:
+	env SEI="true" ./.ci/native-contract-build.sh
 
 # Deploy contracts to LocalOsmosis
 local-deploy:
@@ -90,8 +103,8 @@ contracts-test-wasmd:
 # Cache docker images by saving it under wasm
 cache-docker-images:
 	mkdir -p wasm/images
-	-docker load -i ./wasm/images/workspace_0.12.10.tar
-	-[ -f wasm/images/workspace_0.12.10.tar ] || docker pull cosmwasm/workspace-optimizer:0.12.10 && docker save cosmwasm/workspace-optimizer:0.12.10 > wasm/images/workspace_0.12.10.tar
+	-docker load -i ./wasm/images/workspace_0.14.0.tar
+	-[ -f wasm/images/workspace_0.14.0.tar ] || docker pull cosmwasm/workspace-optimizer:0.14.0 && docker save cosmwasm/workspace-optimizer:0.14.0 > wasm/images/workspace_0.14.0.tar
 
 # Typescript check for CI which needs deps installed
 typescript-check:
@@ -143,8 +156,18 @@ run-companion:
 	cargo run --bin perps-companion
 
 # Deploy to Osmosis tesntet
-deploy-osmosis-testnet:
+deploy-osmosis-ci:
 	cargo run --bin perps-deploy testnet store-code --network osmosis-testnet
+	cargo run --bin perps-deploy testnet instantiate --family osmoci
+
+# Deploy to Sei ci
+deploy-sei-ci:
+	cargo run --bin perps-deploy testnet store-code --network sei-testnet
+	cargo run --bin perps-deploy testnet instantiate --family seici
+
+# Deploy to Sei tesntet
+deploy-sei-testnet:
+	cargo run --bin perps-deploy testnet store-code --network sei-testnet
 
 # Migrate osmoci
 migrate-osmoci:

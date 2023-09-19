@@ -255,12 +255,12 @@ impl State<'_> {
             ExecuteMsg::Crank { .. } => false,
             ExecuteMsg::NftProxy { .. } => true,
             ExecuteMsg::LiquidityTokenProxy { .. } => true,
-            ExecuteMsg::SetPrice { .. } => false,
             ExecuteMsg::TransferDaoFees { .. } => true,
             ExecuteMsg::CloseAllPositions {} => true,
             ExecuteMsg::PlaceLimitOrder { .. } => true,
             ExecuteMsg::CancelLimitOrder { .. } => true,
             ExecuteMsg::ProvideCrankFunds {} => false,
+            ExecuteMsg::SetManualPrice { .. } => false,
         };
         if touches_liquidity && self.should_reset_lp_balances(ctx.storage)? {
             Err(anyhow::anyhow!(

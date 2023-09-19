@@ -24,6 +24,7 @@ use msg::{
             PriceWouldTriggerResp, SpotPriceHistoryResp,
         },
         position::{events::PositionSaveReason, PositionId, PositionOrPendingClose, PositionsResp},
+        spot_price::SpotPriceConfig,
     },
     shutdown::ShutdownImpact,
 };
@@ -31,7 +32,6 @@ use msg::{
 use msg::contracts::market::entry::{LimitOrderResp, SlippageAssert};
 
 use semver::Version;
-use shared::namespace;
 use shared::price::Price;
 
 // version info for migration info
@@ -49,12 +49,13 @@ pub fn instantiate(
         market_id,
         token,
         initial_borrow_fee_rate,
+        spot_price,
     }: InstantiateMsg,
 ) -> Result<Response> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     set_factory_addr(deps.storage, &factory.validate(deps.api)?)?;
-    config_init(deps.storage, config)?;
+    config_init(deps.api, deps.storage, config, spot_price)?;
     meta_init(deps.storage, &market_id)?;
 
     token_init(deps.storage, &deps.querier, token)?;
@@ -81,6 +82,19 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     state
         .accumulate_borrow_fee_rate(&mut ctx, state.now())
         .map_err(|e| anyhow::anyhow!("accumulate_borrow_fee_rate failed: {e:?}"))?;
+
+    fn append_spot_price(
+        state: &mut State,
+        ctx: &mut StateContext,
+        rewards_addr: &Addr,
+    ) -> Result<()> {
+        state.spot_price_append(ctx)?;
+
+        // required to keep gas estimations more reliable
+        state.crank_exec_batch(ctx, Some(0), rewards_addr)?;
+        state.crank_current_price_complete(ctx)?;
+        Ok(())
+    }
 
     fn handle_update_position_shared(
         state: &State,
@@ -134,15 +148,34 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     }
     state.ensure_not_resetting_lps(&mut ctx, &info.msg)?;
 
+    if info.requires_spot_price_append {
+        append_spot_price(&mut state, &mut ctx, &info.sender)?;
+    }
+
     match info.msg {
         ExecuteMsg::Owner(owner_msg) => {
             state.assert_auth(&info.sender, AuthCheck::Owner)?;
 
             match owner_msg {
                 ExecuteOwnerMsg::ConfigUpdate { update } => {
-                    update_config(&mut state.config, ctx.storage, update)?;
+                    update_config(&mut state.config, ctx.storage, *update)?;
                 }
             }
+        }
+
+        ExecuteMsg::SetManualPrice { price, price_usd } => {
+            match &state.config.spot_price {
+                SpotPriceConfig::Manual { admin } => {
+                    state.assert_auth(&info.sender, AuthCheck::Addr(admin.clone()))?;
+                }
+                SpotPriceConfig::Oracle { .. } => {
+                    anyhow::bail!("Cannot set manual spot price on this market, it uses an oracle");
+                }
+            }
+            state.save_manual_spot_price(&mut ctx, price, price_usd)?;
+            // the price needed to be set first before doing this
+            // so info.requires_spot_price_append is false
+            append_spot_price(&mut state, &mut ctx, &info.sender)?;
         }
 
         // cw20
@@ -376,33 +409,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             state.assert_auth(&info.sender, AuthCheck::Addr(liquidity_token_addr))?;
 
             state.liquidity_token_handle_exec(&mut ctx, sender.validate(state.api)?, kind, msg)?;
-        }
-
-        ExecuteMsg::SetPrice {
-            price,
-            price_usd,
-            execs,
-            rewards,
-        } => {
-            let addr: Addr = load_external_map(
-                &state.querier,
-                &state.factory_address,
-                namespace::MARKET_PRICE_ADMINS,
-                &state.env.contract.address,
-            )?;
-
-            state.assert_auth(&info.sender, AuthCheck::Addr(addr))?;
-
-            let market_id = state.market_id(ctx.storage)?;
-            state.spot_price_append(&mut ctx, price, price_usd, market_id)?;
-
-            let rewards = match rewards {
-                None => info.sender,
-                Some(rewards) => rewards.validate(state.api)?,
-            };
-
-            state.crank_exec_batch(&mut ctx, execs, &rewards)?;
-            state.crank_current_price_complete(&mut ctx)?;
         }
 
         ExecuteMsg::TransferDaoFees {} => {

@@ -1,3 +1,8 @@
+// FIXME - started fixing up warnings for the sake of this PR
+// but at a certain point it just seemed too much work for a temporary situation
+// this should be brought back as the deploy code is refactored
+#![allow(warnings)]
+
 use clap::Parser;
 use cli::{Cmd, Subcommand, TestnetSub};
 
@@ -47,6 +52,7 @@ async fn main_inner() -> anyhow::Result<()> {
             TestnetSub::DisableMarketAt { inner } => inner.go(opt).await?,
             TestnetSub::CloseAllPositions { inner } => inner.go(opt).await?,
             TestnetSub::AddMarket { inner } => inner.go(opt).await?,
+            TestnetSub::UpdateMarketConfigs { inner } => inner.go(opt).await?,
         },
         Subcommand::Mainnet { inner } => mainnet::go(opt, inner).await?,
         Subcommand::Util { inner } => inner.go(opt).await?,

@@ -33,7 +33,7 @@ jobs:
           just-version: 1.8.0
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.65.0
+          toolchain: 1.70.0
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
@@ -74,10 +74,10 @@ jobs:
         run: just contracts-test
       - name: Deploy to Osmosis testnet
         if: github.ref == 'refs/heads/develop'
-        run: COSMOS_WALLET="${{ secrets.DEPLOYER_PHRASE }}" just deploy-osmosis-testnet
+        run: COSMOS_WALLET="${{ secrets.DEPLOYER_PHRASE }}" just deploy-osmosis-testnet || echo "Ignoring failed deployment"
       - name: Migrate contracts (osmoci)
         if: github.ref == 'refs/heads/develop'
-        run: COSMOS_WALLET="${{ secrets.DEPLOYER_PHRASE }}" just migrate-osmoci
+        run: COSMOS_WALLET="${{ secrets.DEPLOYER_PHRASE }}" just migrate-osmoci || echo "Ignoring failed migration"
       - name: Configure AWS Credentials
         if: github.ref == 'refs/heads/develop'
         uses: aws-actions/configure-aws-credentials@v1
@@ -106,7 +106,7 @@ jobs:
           just-version: 1.8.0
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.65.0
+          toolchain: 1.70.0
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:

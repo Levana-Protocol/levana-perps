@@ -347,14 +347,10 @@ impl MarketContract {
         &self,
         wallet: &Wallet,
         price: PriceBaseInQuote,
-        price_usd: Option<PriceCollateralInUsd>,
+        price_usd: PriceCollateralInUsd,
     ) -> Result<TxResponse> {
-        let execute_msg = MarketExecuteMsg::SetPrice {
-            price,
-            price_usd,
-            execs: None,
-            rewards: None,
-        };
+        let execute_msg = MarketExecuteMsg::SetManualPrice { price, price_usd };
+
         let response = self.0.execute(wallet, vec![], execute_msg).await?;
         Ok(response)
     }
@@ -411,6 +407,18 @@ impl MarketContract {
                 },
             )
             .await
+    }
+
+    pub fn get_crank_msg(&self, wallet: &Wallet, execs: Option<u32>) -> Result<MsgExecuteContract> {
+        Ok(MsgExecuteContract {
+            sender: wallet.get_address_string(),
+            contract: self.get_address_string(),
+            msg: serde_json::to_vec(&MarketExecuteMsg::Crank {
+                execs,
+                rewards: None,
+            })?,
+            funds: Vec::new(),
+        })
     }
 
     pub async fn update_max_gains(
@@ -524,7 +532,9 @@ impl MarketContract {
             .execute(
                 wallet,
                 vec![],
-                MarketExecuteMsg::Owner(ExecuteOwnerMsg::ConfigUpdate { update }),
+                MarketExecuteMsg::Owner(ExecuteOwnerMsg::ConfigUpdate {
+                    update: Box::new(update),
+                }),
             )
             .await
     }

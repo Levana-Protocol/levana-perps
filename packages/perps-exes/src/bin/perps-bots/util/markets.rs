@@ -14,7 +14,6 @@ pub(crate) struct Market {
     #[allow(dead_code)]
     pub(crate) liquidity_token_xlp: Contract,
     pub(crate) market_id: MarketId,
-    pub(crate) price_admin: String,
 }
 
 impl Debug for Market {
@@ -48,7 +47,6 @@ pub(crate) async fn get_markets(cosmos: &Cosmos, factory: &Contract) -> Result<V
                 position_token,
                 liquidity_token_lp,
                 liquidity_token_xlp,
-                price_admin,
             } = factory
                 .query(msg::contracts::factory::entry::QueryMsg::MarketInfo {
                     market_id: market_id.clone(),
@@ -63,7 +61,6 @@ pub(crate) async fn get_markets(cosmos: &Cosmos, factory: &Contract) -> Result<V
                 liquidity_token_xlp: cosmos
                     .make_contract(liquidity_token_xlp.into_string().parse()?),
                 market_id,
-                price_admin: price_admin.into_string(),
             });
         }
     }

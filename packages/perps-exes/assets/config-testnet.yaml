@@ -150,3 +150,43 @@ overrides:
     min-gas: 1000
     min-gas-in-faucet: 2000000
     min-gas-in-gas-wallet: 1000000
+  seidebug:
+    wallet-manager-address: levana19ta8kepflecc7n2rdruduj9ydt72z2xy0gl5e9
+    dev-settings: true
+    price: true
+    crank: true
+    liquidity: false
+    utilization: false
+    balance: false
+    traders: 0
+    default-market-ids:
+      - BTC_USD
+      - ETH_USD
+    # Gas is expensive on Sei
+    min-gas: 1000
+    min-gas-in-faucet: 2000000
+    min-gas-in-gas-wallet: 1000000
+  injbeta:
+    wallet-manager-address: osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k
+    price: true
+    ultra-crank: 0
+    crank: true
+    liquidity: true
+    utilization: true
+    balance: true
+    traders: 1
+    default-market-ids:
+      - ETH_USD
+  # osmoci:
+  #   wallet-manager-address: osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k
+  #   price: true
+  #   crank: false
+  #   liquidity: false
+  #   utilization: false
+  #   balance: false
+  #   traders: 1
+  #   default-market-ids:
+  #     - ATOM_USD
+  #     - OSMO_USDC
+  #     - ETH_BTC
+  #     - BTC_USD

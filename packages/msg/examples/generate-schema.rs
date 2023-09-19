@@ -111,9 +111,6 @@ fn main() {
     write_position_token();
     finalize("position_token");
 
-    write_pyth_bridge();
-    finalize("pyth_bridge");
-
     write_error();
     finalize("error");
 }
@@ -244,20 +241,6 @@ fn write_ibc_execute_proxy() {
     );
 }
 
-fn write_pyth_bridge() {
-    use levana_perpswap_cosmos_msg::contracts::pyth_bridge::entry::{
-        ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
-    };
-
-    write_api!(
-    name: "pyth_bridge",
-    instantiate: InstantiateMsg,
-    execute: ExecuteMsg,
-    query: QueryMsg,
-    migrate: MigrateMsg,
-    );
-}
-
 fn write_error() {
     // this doesn't use the `write_api!()` helper
     // since it's not part a contract entry
@@ -268,5 +251,5 @@ fn write_error() {
     let path = paths.schema.join("error.json");
     let obj = cosmwasm_schema::schema_for!(PerpError);
     let json = serde_json::to_string_pretty(&obj).unwrap();
-    std::fs::write(&path, json).unwrap();
+    std::fs::write(path, json).unwrap();
 }

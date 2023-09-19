@@ -5,41 +5,10 @@ use std::{collections::HashMap, path::Path};
 use cosmos::{Address, CosmosNetwork, RawAddress};
 use cosmwasm_std::{Uint128, Uint256};
 use msg::{
-    contracts::{
-        market::config::ConfigUpdate,
-        pyth_bridge::{entry::FeedType, PythPriceFeed},
-    },
+    contracts::market::{config::ConfigUpdate, spot_price::PythPriceServiceNetwork},
     prelude::*,
 };
-
-#[derive(serde::Deserialize, Debug, Clone)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct PythMarketPriceFeeds {
-    /// feed of the base asset in terms of the quote asset
-    pub feeds: Vec<PythPriceFeed>,
-    /// feed of the collateral asset in terms of USD
-    ///
-    /// This is used by the protocol to track USD values. This field is
-    /// optional, as markets with USD as the quote asset do not need to
-    /// provide it.
-    pub feeds_usd: Option<Vec<PythPriceFeed>>,
-}
-
-/// Overall configuration of Pyth, for information valid across all chains.
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct PythConfig {
-    /// How to calculate price feeds for each market, using stable IDs.
-    pub markets_stable: HashMap<MarketId, PythMarketPriceFeeds>,
-    /// How to calculate price feeds for each market, using edge IDs.
-    pub markets_edge: HashMap<MarketId, PythMarketPriceFeeds>,
-    /// Endpoints to communicate with to get price data, for stable feeds
-    pub endpoints_stable: Vec<String>,
-    /// Endpoints to communicate with to get price data, for edge feeds
-    pub endpoints_edge: Vec<String>,
-    /// How old a price to allow, in seconds
-    pub update_age_tolerance: u32,
-}
+use pyth_sdk_cw::PriceIdentifier;
 
 /// Configuration for chainwide data.
 ///
@@ -50,7 +19,7 @@ pub struct PythConfig {
 pub struct ChainConfig {
     pub tracker: Option<Address>,
     pub faucet: Option<Address>,
-    pub pyth: Option<PythContract>,
+    pub spot_price: Option<ChainSpotPriceConfig>,
     pub explorer: Option<String>,
     /// Potential RPC endpoints to use
     #[serde(default)]
@@ -59,6 +28,84 @@ pub struct ChainConfig {
     pub gas_multiplier: Option<f64>,
     /// Number of decimals in the gas coin
     pub gas_decimals: GasDecimals,
+}
+
+/// Spot price config for a given chain
+#[derive(serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct ChainSpotPriceConfig {
+    /// Pyth configuration, required on chains that use pyth feeds
+    pub pyth: Option<ChainPythConfig>,
+    /// Stride configuration, required on chains that use stride
+    pub stride: Option<ChainStrideConfig>,
+}
+
+/// Configuration for pyth
+#[derive(serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct ChainPythConfig {
+    /// The address of the pyth oracle contract
+    pub contract: Address,
+    /// Which network to use for the price service
+    /// This isn't used for any internal logic, but clients must use the appropriate
+    /// price service endpoint to match this
+    pub r#type: PythPriceServiceNetwork,
+}
+
+/// Configuration for stride
+#[derive(serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct ChainStrideConfig {
+    /// The address of the redemption rate contract
+    pub contract: Address,
+}
+
+/// Overall configuration of prices, for information valid across all chains.
+#[derive(serde::Deserialize, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct PriceConfig {
+    pub pyth: PythPriceConfig,
+    /// Mappings from a key to price feed  
+    pub networks: HashMap<CosmosNetwork, HashMap<MarketId, MarketPriceFeedConfigs>>,
+}
+
+/// Overall configuration of Pyth, for information valid across all chains.
+#[derive(serde::Deserialize, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct PythPriceConfig {
+    /// Configuration for stable feeds
+    pub stable: PythPriceServiceConfig,
+    /// Configuration for edge feeds
+    pub edge: PythPriceServiceConfig,
+}
+
+/// Overall configuration of Pyth, for information valid across all chains.
+#[derive(serde::Deserialize, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct PythPriceServiceConfig {
+    /// How old a price to allow, in seconds
+    pub update_age_tolerance: u32,
+    /// Endpoints to communicate with to get price data
+    pub endpoints: Vec<String>,
+    /// Mappings from a key to price feed  id
+    pub feed_ids: HashMap<String, PriceIdentifier>,
+}
+#[derive(serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct MarketPriceFeedConfigs {
+    /// feed of the base asset in terms of the quote asset
+    pub feeds: Vec<MarketPriceFeedConfig>,
+    /// feed of the collateral asset in terms of USD
+    pub feeds_usd: Vec<MarketPriceFeedConfig>,
+}
+
+#[derive(serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub enum MarketPriceFeedConfig {
+    Pyth { key: String, inverted: bool },
+    Constant { price: NumberGtZero, inverted: bool },
+    Sei { denom: String, inverted: bool },
+    Stride { denom: String, inverted: bool },
 }
 
 /// Number of decimals in the gas coin
@@ -120,13 +167,6 @@ impl std::fmt::Debug for GasAmount {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "GasAmount{}", self.0)
     }
-}
-
-#[derive(serde::Deserialize, Clone, Debug)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-pub struct PythContract {
-    pub contract: Address,
-    pub r#type: FeedType,
 }
 
 #[derive(serde::Deserialize, Debug)]
@@ -316,11 +356,11 @@ impl ConfigTestnet {
     }
 }
 
-impl PythConfig {
+impl PriceConfig {
     pub fn load(config_file: Option<impl AsRef<Path>>) -> Result<Self> {
         load_yaml(
-            "config-pyth.yaml",
-            include_bytes!("../assets/config-pyth.yaml"),
+            "config-price.yaml",
+            include_bytes!("../assets/config-price.yaml"),
             config_file,
         )
     }

@@ -6,14 +6,8 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use cosmos::{Address, ContractAdmin, CosmosNetwork, HasAddress};
 use cosmwasm_std::{to_binary, CosmosMsg, Empty};
-use msg::{
-    contracts::{market::entry::NewMarketParams, pyth_bridge::entry::FeedType},
-    token::TokenInit,
-};
-use perps_exes::{
-    config::{MarketConfigUpdates, PythConfig, PythMarketPriceFeeds},
-    prelude::*,
-};
+use msg::{contracts::market::entry::NewMarketParams, token::TokenInit};
+use perps_exes::{config::MarketConfigUpdates, prelude::*};
 
 use crate::{cli::Opt, factory::Factory, util::get_hash_for_path};
 
@@ -47,12 +41,6 @@ enum Sub {
         #[clap(flatten)]
         inner: InstantiateFactoryOpts,
     },
-    /// Set up the Pyth price bridge without setting up the market
-    NewPythBridge {
-        #[clap(flatten)]
-        inner: NewPythBridgeOpts,
-    },
-
     /// Add a new market to an existing factory
     AddMarket {
         #[clap(flatten)]
@@ -84,7 +72,6 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
             instantiate_factory(opt, inner).await?;
         }
         Sub::AddMarket { inner } => add_market(opt, inner).await?,
-        Sub::NewPythBridge { inner } => new_pyth_bridge(opt, inner).await?,
         Sub::Migrate { inner } => inner.go(opt).await?,
         Sub::UpdateConfig { inner } => inner.go(opt).await?,
     }
@@ -165,13 +152,12 @@ enum ContractType {
     Market,
     LiquidityToken,
     PositionToken,
-    PythBridge,
 }
 
 impl ContractType {
-    fn all() -> [ContractType; 5] {
+    fn all() -> [ContractType; 4] {
         use ContractType::*;
-        [Factory, Market, LiquidityToken, PositionToken, PythBridge]
+        [Factory, Market, LiquidityToken, PositionToken]
     }
 
     fn as_str(self) -> &'static str {
@@ -180,7 +166,6 @@ impl ContractType {
             ContractType::Market => "market",
             ContractType::LiquidityToken => "liquidity_token",
             ContractType::PositionToken => "position_token",
-            ContractType::PythBridge => "pyth_bridge",
         }
     }
 }
@@ -194,7 +179,6 @@ impl FromStr for ContractType {
             "market" => Ok(ContractType::Market),
             "liquidity_token" => Ok(ContractType::LiquidityToken),
             "position_token" => Ok(ContractType::PositionToken),
-            "pyth_bridge" => Ok(ContractType::PythBridge),
             _ => Err(anyhow::anyhow!("Invalid contract type: {s}")),
         }
     }
@@ -452,46 +436,6 @@ struct NewPythBridgeOpts {
     market_id: MarketId,
 }
 
-async fn new_pyth_bridge(
-    opt: Opt,
-    NewPythBridgeOpts { factory, market_id }: NewPythBridgeOpts,
-) -> Result<()> {
-    let PythMarketPriceFeeds { feeds, feeds_usd } = PythConfig::load(opt.config_pyth.as_ref())?
-        .markets_stable
-        .remove(&market_id)
-        .with_context(|| format!("No Pyth config found for market {market_id}"))?;
-    let code_ids = CodeIds::load()?;
-
-    let factories = MainnetFactories::load()?;
-    let factory = factories.get(&factory)?;
-    let app = opt.load_app_mainnet(factory.network).await?;
-
-    let pyth_bridge = code_ids.get_simple(ContractType::PythBridge, &opt, factory.network)?;
-    let pyth_bridge = app.cosmos.make_code_id(pyth_bridge);
-
-    log::info!("Deploying a new Pyth bridge");
-    let pyth_bridge = pyth_bridge
-        .instantiate(
-            &app.wallet,
-            format!("{} - {market_id} Pyth bridge", factory.label),
-            vec![],
-            msg::contracts::pyth_bridge::entry::InstantiateMsg {
-                factory: factory.address.get_address_string().into(),
-                pyth: app.pyth.address.get_address_string().into(),
-                update_age_tolerance_seconds: app.pyth.update_age_tolerance,
-                feed_type: FeedType::Stable,
-                market: market_id,
-                feeds,
-                feeds_usd,
-            },
-            ContractAdmin::NoAdmin,
-        )
-        .await?;
-    log::info!("New Pyth bridge contract: {pyth_bridge}");
-
-    Ok(())
-}
-
 #[derive(clap::Parser)]
 struct AddMarketOpts {
     /// The factory contract address or identifier
@@ -509,9 +453,6 @@ struct AddMarketOpts {
     /// Initial borrow fee rate
     #[clap(long)]
     initial_borrow_fee_rate: Decimal256,
-    /// Pyth bridge contract to use as price admin
-    #[clap(long)]
-    pyth_bridge: Address,
     /// Instead of executing, print out CW3 multisig instructions
     #[clap(long)]
     cw3: bool,
@@ -525,7 +466,6 @@ async fn add_market(
         collateral,
         decimal_places,
         initial_borrow_fee_rate,
-        pyth_bridge,
         cw3: is_cw3,
     }: AddMarketOpts,
 ) -> Result<()> {
@@ -541,15 +481,6 @@ async fn add_market(
     let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
 
-    // For security, ensure that the pyth bridge contract has no admin. We want
-    // to deploy fresh bridges each time there's any config change.
-    let pyth_bridge_info = app.cosmos.contract_info(pyth_bridge).await?;
-    anyhow::ensure!(
-        pyth_bridge_info.admin.is_empty(),
-        "Pyth bridge {pyth_bridge} has an admin set, refusing to launch market. Admin is: {}",
-        pyth_bridge_info.admin
-    );
-
     let msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
         new_market: NewMarketParams {
             market_id,
@@ -558,8 +489,8 @@ async fn add_market(
                 decimal_places,
             },
             config: Some(market_config_update),
-            price_admin: pyth_bridge.get_address_string().into(),
             initial_borrow_fee_rate,
+            spot_price: unimplemented!("TODO"),
         },
     };
     let msg = strip_nulls(msg)?;

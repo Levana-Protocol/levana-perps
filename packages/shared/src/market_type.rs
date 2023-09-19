@@ -412,6 +412,8 @@ mod tests {
             timestamp: Default::default(),
             is_notional_usd: market_id.is_notional_usd(),
             market_type: market_id.get_market_type(),
+            publish_time: None,
+            publish_time_usd: None,
         };
 
         let in_usd = price_point.notional_to_usd("50".parse().unwrap());

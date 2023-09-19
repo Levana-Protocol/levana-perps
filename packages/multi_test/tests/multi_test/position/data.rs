@@ -17,6 +17,8 @@ fn position_data_long() {
         price_base: price.into_base_price(market_type),
         is_notional_usd: true,
         market_type,
+        publish_time: None,
+        publish_time_usd: None,
     };
 
     let pos = Position {
@@ -85,6 +87,8 @@ fn position_data_short() {
         price_base: price.into_base_price(market_type),
         is_notional_usd: true,
         market_type,
+        publish_time: None,
+        publish_time_usd: None,
     };
 
     let pos = Position {
@@ -151,6 +155,8 @@ fn position_data_infinite_max_gains() {
         price_base: price.into_base_price(market_type),
         is_notional_usd: true,
         market_type,
+        publish_time: None,
+        publish_time_usd: None,
     };
 
     let pos = Position {
@@ -227,6 +233,8 @@ fn position_data_open_flip_short() {
                 price_base,
                 is_notional_usd: true,
                 market_type,
+                publish_time: None,
+                publish_time_usd: None,
             },
             entry_price,
             MarketType::CollateralIsBase,
@@ -293,6 +301,8 @@ fn position_data_open_flip_long() {
                 price_base,
                 is_notional_usd: true,
                 market_type,
+                publish_time: None,
+                publish_time_usd: None,
             },
             entry_price,
             MarketType::CollateralIsBase,

@@ -1,7 +1,7 @@
 use levana_perpswap_multi_test::return_unless_market_collateral_quote;
 use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::contracts::market::config::{Config, ConfigUpdate};
+use msg::contracts::market::config::{defaults::ConfigDefaults, ConfigUpdate};
 use msg::prelude::*;
 
 #[test]
@@ -565,7 +565,7 @@ fn funding_rates_capped() {
     market
         .exec_set_config(ConfigUpdate {
             delta_neutrality_fee_sensitivity: Some(
-                Config::default().delta_neutrality_fee_sensitivity,
+                ConfigDefaults::delta_neutrality_fee_sensitivity(),
             ),
             ..Default::default()
         })

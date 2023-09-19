@@ -73,6 +73,11 @@ pub(crate) enum TestnetSub {
         #[clap(flatten)]
         inner: crate::testnet::disable::CloseAllPositionsOpt,
     },
+    /// Update the configs in all markets with the given message
+    UpdateMarketConfigs {
+        #[clap(flatten)]
+        inner: crate::testnet::update_market_configs::UpdateMarketConfigsOpt,
+    },
 }
 
 #[derive(clap::Parser)]
@@ -124,9 +129,9 @@ pub(crate) struct Opt {
     /// Directory containing the generated WASM files.
     #[clap(long, default_value = "./wasm/artifacts", env = "PERPS_WASM_DIR")]
     wasm_dir: PathBuf,
-    /// Override Pyth config file
-    #[clap(long, env = "LEVANA_BOTS_CONFIG_PYTH")]
-    pub(crate) config_pyth: Option<PathBuf>,
+    /// Override Price config file
+    #[clap(long, env = "LEVANA_BOTS_CONFIG_PRICE")]
+    pub(crate) config_price: Option<PathBuf>,
     /// Override chain config file
     #[clap(long, env = "LEVANA_BOTS_CONFIG_CHAIN")]
     pub(crate) config_chain: Option<PathBuf>,
