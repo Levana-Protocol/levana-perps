@@ -8,11 +8,10 @@ use cosmos::Address;
 use cosmos::Cosmos;
 use cosmos::HasAddressType;
 use cosmos::Wallet;
-use parking_lot::RwLock;
 use perps_exes::config::{GasAmount, PriceConfig};
 use perps_exes::pyth::VecWithCurr;
 use reqwest::Client;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 
 use crate::app::factory::{get_factory_info_mainnet, get_factory_info_testnet};
 use crate::cli::Opt;
@@ -198,26 +197,29 @@ impl AppBuilder {
 }
 
 impl App {
-    pub(crate) fn get_factory_info(&self) -> Arc<FactoryInfo> {
-        self.factory.read().clone()
+    pub(crate) async fn get_factory_info(&self) -> Arc<FactoryInfo> {
+        self.factory.read().await.clone()
     }
 
-    pub(crate) fn set_factory_info(&self, info: FactoryInfo) {
-        *self.factory.write() = Arc::new(info);
+    pub(crate) async fn set_factory_info(&self, info: FactoryInfo) {
+        *self.factory.write().await = Arc::new(info);
     }
 
-    pub(crate) fn get_frontend_info_testnet(&self) -> Option<Arc<FrontendInfoTestnet>> {
-        self.frontend_info_testnet
-            .as_ref()
-            .map(|x| x.read().clone())
+    pub(crate) async fn get_frontend_info_testnet(&self) -> Option<Arc<FrontendInfoTestnet>> {
+        if let Some(x) = self.frontend_info_testnet.as_ref() {
+            Some(x.read().await.clone())
+        } else {
+            None
+        }
     }
 
-    pub(crate) fn set_frontend_info_testnet(&self, info: FrontendInfoTestnet) -> Result<()> {
+    pub(crate) async fn set_frontend_info_testnet(&self, info: FrontendInfoTestnet) -> Result<()> {
         *self
             .frontend_info_testnet
             .as_ref()
             .context("Tried to set frontend_info_testnet with a mainnet config")?
-            .write() = Arc::new(info);
+            .write()
+            .await = Arc::new(info);
         Ok(())
     }
 }
