@@ -15,7 +15,7 @@ use cosmos::{Address, Contract};
 use cosmwasm_std::{Decimal256, Uint256};
 use msg::{
     contracts::market::{
-        entry::{QueryMsg, StatusResp},
+        entry::QueryMsg,
         position::{PositionId, PositionsResp},
     },
     prelude::{NonZero, PricePoint, Signed, SignedLeverageToNotional, UnsignedDecimal, Usd},
@@ -27,6 +27,7 @@ use reqwest::{
 use resvg::usvg::{TreeParsing, TreeTextToPath};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use shared::storage::{MarketId, MarketType};
 
 use crate::{
     app::App,
@@ -163,6 +164,12 @@ impl PositionInfo {
             Err(_) => "unknown contract".into(),
         };
         let contract = MarketContract(cosmos.make_contract(*address));
+
+        #[derive(serde::Deserialize)]
+        struct StatusResp {
+            market_id: MarketId,
+            market_type: MarketType,
+        }
 
         let status = contract
             .query::<StatusResp>(QueryMsg::Status { price: None }, QueryType::Status)
