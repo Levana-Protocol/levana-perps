@@ -15,6 +15,7 @@ use msg::contracts::market::{
 use parking_lot::Mutex;
 use perps_exes::{
     config::ChainConfig,
+    contracts::Factory,
     prelude::MarketContract,
     pyth::{get_oracle_update_msg, VecWithCurr},
 };
@@ -23,8 +24,6 @@ use shared::storage::{
     Collateral, DirectionToBase, LeverageToBase, MarketId, Notional, Signed, UnsignedDecimal, Usd,
 };
 use tokio::task::JoinSet;
-
-use crate::factory::Factory;
 
 #[derive(clap::Parser)]
 pub(crate) struct UtilOpt {

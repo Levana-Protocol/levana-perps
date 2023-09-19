@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::cli::Opt;
-use crate::factory::Factory;
+use perps_exes::contracts::Factory;
 
 #[derive(clap::Parser)]
 pub(crate) struct EnableMarketOpt {

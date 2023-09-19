@@ -104,7 +104,7 @@ pub(super) async fn pnl_image(
         .map(PnlInfo::image)
 }
 
-pub(super) async fn css(_: PnlCssRoute) -> Css<&'static str> {
+pub(super) async fn pnl_css(_: PnlCssRoute) -> Css<&'static str> {
     Css(include_str!("../../../../static/pnl.css"))
 }
 

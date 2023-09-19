@@ -28,6 +28,7 @@ factories:
   gitrev: c4857a2ea087dc47a008c292a8f242c42dfa4ae7
   hash: a51dc3e96751e5099a439d1df99cebfefac2726d022aa35920a80a3f37542568
   ident: osmomainnet1
+  canonical: true
 - address: sei18rdj3asllguwr6lnyu2sw8p8nut0shuj3sme27ndvvw4gakjnjqqper95h
   network: sei-mainnet
   label: Levana Perpetual Swaps
@@ -36,3 +37,4 @@ factories:
   gitrev: ed7102d64e97931986338f82663834640d14a826
   hash: fd9f31f2c60cdaf3d18efdea333d4286b121f7f23b322cbaf820094c556daab4
   ident: seimainnet1
+  canonical: true

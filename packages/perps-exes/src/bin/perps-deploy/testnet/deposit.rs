@@ -1,9 +1,8 @@
 use anyhow::Result;
 use msg::prelude::*;
-use perps_exes::prelude::MarketContract;
+use perps_exes::{contracts::Factory, prelude::MarketContract};
 
 use crate::cli::Opt;
-use crate::factory::Factory;
 
 #[derive(clap::Parser)]
 pub(crate) struct DepositOpt {

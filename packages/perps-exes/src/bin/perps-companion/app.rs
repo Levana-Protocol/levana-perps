@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use anyhow::{Context, Result};
-use cosmos::Cosmos;
+use cosmos::{Cosmos, CosmosNetwork};
+use perps_exes::{config::MainnetFactories, contracts::Factory};
 
 use crate::{cli::Opt, db::handle::Db, types::ChainId};
 
@@ -11,6 +12,8 @@ pub(crate) struct App {
     pub(crate) cosmos: HashMap<ChainId, Cosmos>,
     pub(crate) opt: Opt,
     pub(crate) db: Db,
+    pub(crate) factories: Vec<(Factory, CosmosNetwork)>,
+    pub(crate) client: reqwest::Client,
 }
 
 impl App {
@@ -26,10 +29,33 @@ impl App {
                 .build_lazy();
             cosmos_map.insert(chain_id, cosmos);
         }
+
+        let factories = MainnetFactories::load_hard_coded()?
+            .factories
+            .into_iter()
+            .filter(|x| x.canonical)
+            .map(|factory| {
+                let chain_id = ChainId::from_cosmos_network(factory.network)?;
+                let cosmos = cosmos_map
+                    .get(&chain_id)
+                    .with_context(|| format!("No Cosmos client found for {chain_id}"))?;
+                Ok((
+                    Factory::from_contract(cosmos.make_contract(factory.address)),
+                    factory.network,
+                ))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let client = reqwest::ClientBuilder::new()
+            .user_agent("Companion server")
+            .build()?;
+
         Ok(App {
             cosmos: cosmos_map,
             opt,
             db,
+            factories,
+            client,
         })
     }
 

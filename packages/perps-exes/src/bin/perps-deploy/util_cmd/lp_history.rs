@@ -1,6 +1,6 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
-use crate::{cli::Opt, factory::Factory};
+use crate::cli::Opt;
 use cosmos::{Address, CosmosNetwork};
 use msg::{
     contracts::{
@@ -11,7 +11,7 @@ use msg::{
     prelude::*,
 };
 use parking_lot::Mutex;
-use perps_exes::prelude::MarketContract;
+use perps_exes::{contracts::Factory, prelude::MarketContract};
 use tokio::task::JoinSet;
 
 #[derive(clap::Parser)]
@@ -93,7 +93,7 @@ async fn go(
 }
 
 async fn handle_market(
-    market: crate::factory::MarketInfo,
+    market: perps_exes::contracts::MarketInfo,
     tx: async_channel::Sender<ToProcess>,
 ) -> Result<()> {
     let mut seen = HashSet::new();
