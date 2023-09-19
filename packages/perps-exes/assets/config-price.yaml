@@ -12,6 +12,7 @@ pyth:
       SEI_USD: "53614f1cb0c031d4af66c04cb9c756234adad0e1cee85303795091499a4084eb"
       EVMOS_USD: "c19405e4c8bdcbf2a66c37ae05a27d385c8309e9d648ed20dc6ee717e7d30e17"
       AKT_USD: "4ea5bb4d2f5900cc2e97ba534240950740b4d3b89fe712a94a7304fd2fd92702"
+      DOT_USD: "ca3eed9b267293f6595901c734c7525ce8ef49adafe8284606ceb307afa2ca5b"
   edge: 
     update-age-tolerance: 120
     endpoints: ["https://hermes-beta.pyth.network/"]
@@ -94,6 +95,13 @@ networks:
       ]
       feeds-usd: [
         !pyth { key: "AKT_USD", inverted: false}
+      ]
+    DOT_USD:
+      feeds: [
+        !pyth { key: "DOT_USD", inverted: false}
+      ]
+      feeds-usd: [
+        !pyth { key: "DOT_USD", inverted: false}
       ]
   sei-testnet:
     ATOM_USD:
