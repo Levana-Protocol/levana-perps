@@ -700,7 +700,7 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response> {
         pub disable_position_nft_exec: bool,
         pub liquidity_cooldown_seconds: u32,
     }
-    const OLD_CONFIG_STORAGE: Item<OldConfig> = Item::new("e");
+    const OLD_CONFIG_STORAGE: Item<OldConfig> = Item::new(namespace::CONFIG);
 
     let old_config = OLD_CONFIG_STORAGE.load(deps.storage)?;
 
@@ -743,7 +743,7 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response> {
             }
         }
     };
-    const NEW_CONFIG_STORAGE: Item<Config> = Item::new("e");
+    const NEW_CONFIG_STORAGE: Item<Config> = Item::new(namespace::CONFIG);
 
     NEW_CONFIG_STORAGE.save(
         deps.storage,
