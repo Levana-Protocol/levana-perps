@@ -4,7 +4,7 @@ use cosmwasm_std::Order;
 #[cfg(feature = "sei")]
 use cosmwasm_std::QuerierWrapper;
 use msg::contracts::market::{
-    entry::PriceForQuery,
+    entry::{OracleFeedPriceResp, PriceForQuery},
     spot_price::{
         events::SpotPriceEvent, PythConfig, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData,
     },
@@ -326,83 +326,13 @@ impl State<'_> {
         let mut acc_price: Option<(Number, Option<Timestamp>)> = None;
 
         for SpotPriceFeed { data, inverted } in feeds {
-            let (price, publish_time) = match data {
-                SpotPriceFeedData::Pyth { id } => {
-                    let pyth = pyth.context("pyth feeds need a pyth config!")?;
-
-                    let price_feed_response: PriceFeedResponse = pyth_sdk_cw::query_price_feed(
-                        &self.querier,
-                        pyth.contract_address.clone(),
-                        *id,
-                    )?;
-
-                    let price_feed = price_feed_response.price_feed;
-
-                    let price = if validate_age {
-                        let current_block_time_seconds =
-                            self.env.block.time.seconds().try_into()?;
-                        price_feed
-                            // alternative: .get_emaprice_no_older_than()
-                            .get_price_no_older_than(
-                                current_block_time_seconds,
-                                pyth.age_tolerance_seconds,
-                            )
-                            .ok_or_else(|| {
-                                perp_error!(
-                                    ErrorId::PriceTooOld,
-                                    ErrorDomain::Pyth,
-                                    "Current price is not available. Price id: {}, inverted: {}, Current block time: {}, price publish time: {}, diff: {}, age_tolerance: {}",
-                                    id,
-                                    inverted,
-                                    current_block_time_seconds,
-                                    price_feed.get_price_unchecked().publish_time,
-                                    (price_feed.get_price_unchecked().publish_time - current_block_time_seconds).abs(),
-                                    pyth.age_tolerance_seconds
-                                )
-                            })?
-                    } else {
-                        price_feed.get_price_unchecked()
-                    };
-
-                    let publish_time = Timestamp::from_seconds(price.publish_time.try_into()?);
-                    let price: Number = Number::try_from(price)?;
-
-                    (price, Some(publish_time))
-                }
-
-                SpotPriceFeedData::Constant { price } => (price.into_number(), None),
-                SpotPriceFeedData::Sei { denom } => {
-                    #[cfg(feature = "sei")]
-                    {
-                        let querier = QuerierWrapper::new(&*self.querier);
-                        let querier = SeiQuerier::new(&querier);
-                        let res: ExchangeRatesResponse = querier.query_exchange_rates()?;
-                        let pair = res
-                            .denom_oracle_exchange_rate_pairs
-                            .iter()
-                            .find(|x| x.denom == *denom)
-                            .with_context(|| format!("no such denom {denom}"))?;
-
-                        let price: Decimal256 = pair.oracle_exchange_rate.exchange_rate.into();
-                        let price = Number::try_from(price)?;
-
-                        // pair does have a `last_update`, but it's in block height
-                        (price, None)
-                    }
-                    #[cfg(not(feature = "sei"))]
-                    {
-                        bail!("SEI price feed for {denom} is only available on sei network")
-                    }
-                }
-
-                SpotPriceFeedData::Stride { .. } => {
-                    // TODO: query the contract and get the redemption price etc., no publish time
-                    todo!("Implement Stride price feed")
-                }
-            };
+            let OracleFeedPriceResp {
+                price,
+                publish_time,
+            } = self.get_oracle_price_for_feed(pyth, data, validate_age)?;
 
             acc_price = match acc_price {
-                None => Some((price, publish_time)),
+                None => Some((price.into_number(), publish_time)),
                 Some((prev_price, prev_publish_time)) => {
                     let publish_time = publish_time.max(prev_publish_time);
                     let next_price =
@@ -418,6 +348,98 @@ impl State<'_> {
                 Ok((price, publish_time))
             }
             None => anyhow::bail!("No price feeds provided"),
+        }
+    }
+
+    pub(crate) fn get_oracle_price_for_feed(
+        &self,
+        pyth: Option<&PythConfig>,
+        feed_data: &SpotPriceFeedData,
+        validate_age: bool,
+    ) -> Result<OracleFeedPriceResp> {
+        match feed_data {
+            SpotPriceFeedData::Pyth { id } => {
+                let pyth = pyth.context("pyth feeds need a pyth config!")?;
+
+                let price_feed_response: PriceFeedResponse = pyth_sdk_cw::query_price_feed(
+                    &self.querier,
+                    pyth.contract_address.clone(),
+                    *id,
+                )?;
+
+                let price_feed = price_feed_response.price_feed;
+
+                let price = if validate_age {
+                    let current_block_time_seconds = self.env.block.time.seconds().try_into()?;
+
+                    price_feed
+                        // alternative: .get_emaprice_no_older_than()
+                        .get_price_no_older_than(
+                            current_block_time_seconds,
+                            pyth.age_tolerance_seconds,
+                        )
+                        .ok_or_else(|| {
+                            perp_error!(
+                                ErrorId::PriceTooOld,
+                                ErrorDomain::Pyth,
+                                "Current price is not available. Price id: {}, Current block time: {}, price publish time: {}, diff: {}, age_tolerance: {}",
+                                id,
+                                current_block_time_seconds,
+                                price_feed.get_price_unchecked().publish_time,
+                                (price_feed.get_price_unchecked().publish_time - current_block_time_seconds).abs(),
+                                pyth.age_tolerance_seconds
+                            )
+                        })?
+                } else {
+                    price_feed.get_price_unchecked()
+                };
+
+                let publish_time = Timestamp::from_seconds(price.publish_time.try_into()?);
+                let price = Number::try_from(price)?;
+                let price = NumberGtZero::try_from(price).context("price must be > 0")?;
+
+                Ok(OracleFeedPriceResp {
+                    price,
+                    publish_time: Some(publish_time),
+                })
+            }
+
+            SpotPriceFeedData::Constant { price } => Ok(OracleFeedPriceResp {
+                price: *price,
+                publish_time: None,
+            }),
+            SpotPriceFeedData::Sei { denom } => {
+                #[cfg(feature = "sei")]
+                {
+                    let querier = QuerierWrapper::new(&*self.querier);
+                    let querier = SeiQuerier::new(&querier);
+                    let res: ExchangeRatesResponse = querier.query_exchange_rates()?;
+                    let pair = res
+                        .denom_oracle_exchange_rate_pairs
+                        .iter()
+                        .find(|x| x.denom == *denom)
+                        .with_context(|| format!("no such denom {denom}"))?;
+
+                    let price: Decimal256 = pair.oracle_exchange_rate.exchange_rate.into();
+                    let price = Number::try_from(price)?;
+                    let price = NumberGtZero::try_from(price).context("price must be > 0")?;
+
+                    // pair does have a `last_update`, but it's in block height
+                    Ok(OracleFeedPriceResp {
+                        price,
+                        publish_time: None,
+                    })
+                }
+                #[cfg(not(feature = "sei"))]
+                {
+                    bail!("SEI price feed for {denom} is only available on sei network")
+                }
+            }
+
+            SpotPriceFeedData::Stride { .. } => {
+                // TODO: query the contract and get the redemption price etc., no publish time
+                todo!("Implement Stride price feed")
+            }
         }
     }
 }

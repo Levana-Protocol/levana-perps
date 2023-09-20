@@ -1,7 +1,7 @@
 //! Entrypoint messages for the market
 use super::order::LimitOrder;
 use super::position::{ClosedPosition, PositionId};
-use super::spot_price::SpotPriceConfigInit;
+use super::spot_price::{SpotPriceConfigInit, SpotPriceFeedData};
 use super::{config::ConfigUpdate, crank::CrankWorkInfo};
 use crate::contracts::market::order::OrderId;
 use crate::{contracts::liquidity_token::LiquidityTokenKind, token::TokenInit};
@@ -436,6 +436,17 @@ pub enum QueryMsg {
     #[returns(shared::prelude::PricePoint)]
     OraclePrice {},
 
+    /// * returns [OracleFeedPriceResp]
+    ///
+    /// Gets the current price from the "oracle" for a specific single feed
+    /// This may be more up-to-date than the spot price which was
+    /// validated and pushed into the contract storage via execution messages
+    #[returns(OracleFeedPriceResp)]
+    OracleFeedPrice {
+        /// The feed to query
+        data: SpotPriceFeedData,
+    },
+
     /// * returns [super::position::PositionsResp]
     ///
     /// Maps the given PositionIds into Positions
@@ -626,6 +637,15 @@ pub enum QueryMsg {
         /// The new price of the base asset in terms of quote
         price: PriceBaseInQuote,
     },
+}
+
+/// Response for [QueryMsg::OracleFeedPrice]
+#[cw_serde]
+pub struct OracleFeedPriceResp {
+    /// The raw price from the feed
+    pub price: NumberGtZero,
+    /// Publish time of the price, if available
+    pub publish_time: Option<Timestamp>,
 }
 
 /// When querying an open position, how do we calculate PnL vis-a-vis fees?

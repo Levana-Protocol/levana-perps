@@ -482,6 +482,20 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 .query_result()
         }
 
+        QueryMsg::OracleFeedPrice { data } => match &state.config.spot_price {
+            SpotPriceConfig::Manual { .. } => {
+                bail!("Cannot get oracle feed price on this market, it uses a manual price");
+            }
+            SpotPriceConfig::Oracle {
+                pyth,
+                stride: _,
+                feeds: _,
+                feeds_usd: _,
+            } => state
+                .get_oracle_price_for_feed(pyth.as_ref(), &data, false)?
+                .query_result(),
+        },
+
         QueryMsg::Positions {
             position_ids,
             skip_calc_pending_fees,
