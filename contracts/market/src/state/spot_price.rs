@@ -24,7 +24,7 @@ const MANUAL_SPOT_PRICE: Item<PriceStorage> = Item::new(namespace::MANUAL_SPOT_P
 
 /// The price components that are stored in [PRICES].
 #[derive(serde::Serialize, serde::Deserialize)]
-struct PriceStorage {
+pub(crate) struct PriceStorage {
     price: Price,
     price_usd: PriceCollateralInUsd,
     /// Store the original incoming price in base to avoid rounding errors.
@@ -36,7 +36,7 @@ struct PriceStorage {
 }
 
 impl State<'_> {
-    fn make_price_point(
+    pub(crate) fn make_price_point(
         &self,
         store: &dyn Storage,
         timestamp: Timestamp,
@@ -245,20 +245,43 @@ impl State<'_> {
             return Ok(());
         }
 
+        let price_storage = self.get_oracle_price_storage(ctx.storage)?;
+
+        ctx.response_mut().add_event(SpotPriceEvent {
+            timestamp,
+            price_usd: price_storage.price_usd,
+            price_notional: price_storage.price,
+            price_base: price_storage.price_base,
+            publish_time: price_storage.publish_time,
+            publish_time_usd: price_storage.publish_time_usd,
+        });
+
+        PRICES
+            .save(ctx.storage, timestamp, &price_storage)
+            .map_err(|err| err.into())
+    }
+
+    pub(crate) fn get_oracle_price_storage(&self, store: &dyn Storage) -> Result<PriceStorage> {
         let price_storage = match &self.config.spot_price {
-            SpotPriceConfig::Manual { .. } => MANUAL_SPOT_PRICE.load(ctx.storage)?,
+            SpotPriceConfig::Manual { .. } => {
+                // although this isn't exactly a real external oracle, at this point in the code
+                // we treat it as such, since it isn't necessarily pushed into the PRICES storage yet.
+                // in other words, "oracle" here means "known price that isn't yet stored in the contract"
+                MANUAL_SPOT_PRICE.load(store)?
+            }
             SpotPriceConfig::Oracle {
                 pyth,
                 stride: _,
                 feeds,
                 feeds_usd,
             } => {
-                let (price_amount, publish_time) = self.get_oracle_price(pyth.as_ref(), feeds)?;
+                let (price_amount, publish_time) =
+                    self.get_oracle_price_for_feeds(pyth.as_ref(), feeds)?;
 
                 let (price_amount_usd, publish_time_usd) =
-                    self.get_oracle_price(pyth.as_ref(), feeds_usd)?;
+                    self.get_oracle_price_for_feeds(pyth.as_ref(), feeds_usd)?;
 
-                let market_id = self.market_id(ctx.storage)?;
+                let market_id = self.market_id(store)?;
                 let market_type = market_id.get_market_type();
                 let price_base = PriceBaseInQuote::from_non_zero(price_amount);
                 let price = price_base.into_notional_price(market_type);
@@ -277,7 +300,7 @@ impl State<'_> {
         // sanity check
         if let Some(price_usd) = price_storage
             .price_base
-            .try_into_usd(self.market_id(ctx.storage)?)
+            .try_into_usd(self.market_id(store)?)
         {
             ensure!(
                 price_storage.price_usd == price_usd,
@@ -287,21 +310,10 @@ impl State<'_> {
             );
         }
 
-        ctx.response_mut().add_event(SpotPriceEvent {
-            timestamp,
-            price_usd: price_storage.price_usd,
-            price_notional: price_storage.price,
-            price_base: price_storage.price_base,
-            publish_time: price_storage.publish_time,
-            publish_time_usd: price_storage.publish_time_usd,
-        });
-
-        PRICES
-            .save(ctx.storage, timestamp, &price_storage)
-            .map_err(|err| err.into())
+        Ok(price_storage)
     }
 
-    pub(crate) fn get_oracle_price(
+    pub(crate) fn get_oracle_price_for_feeds(
         &self,
         pyth: Option<&PythConfig>,
         feeds: &[SpotPriceFeed],

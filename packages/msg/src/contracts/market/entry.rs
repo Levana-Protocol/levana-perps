@@ -399,6 +399,8 @@ pub enum QueryMsg {
     /// * returns [shared::prelude::PricePoint]
     ///
     /// Gets the spot price, if no time is supplied, then it's current
+    /// This is the spot price as seen by the contract storage
+    /// i.e. the price that was pushed via execution messages
     #[returns(shared::prelude::PricePoint)]
     SpotPrice {
         /// Timestamp when the price should be effective.
@@ -419,6 +421,14 @@ pub enum QueryMsg {
         /// Order to sort by, if None then it will be descending
         order: Option<OrderInMessage>,
     },
+
+    /// * returns [shared::prelude::PricePoint]
+    ///
+    /// Gets the current price from the oracle (if this market has one)
+    /// This may be more up-to-date than the spot price which was
+    /// validated and pushed into the contract storage via execution messages
+    #[returns(shared::prelude::PricePoint)]
+    OraclePrice {},
 
     /// * returns [super::position::PositionsResp]
     ///
