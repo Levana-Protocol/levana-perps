@@ -24,7 +24,7 @@ if [ -n "${SEI:-}" ]; then
     echo "If this script failed, it would left extra \`default = [\"sei\"]\` line in contracts' Cargo.toml."
     
     for i in contracts/market/; do
-        grep -q '^default = \["sei"\]$' "${i}/Cargo.toml" || $SED -i'.bak' -e '/\[features\]/ a default = ["sei"]' "${i}/Cargo.toml"
+        grep -q '^default = \["sei"\]$' "${i}/Cargo.toml" || $SED -i -e '/\[features\]/ a default = ["sei"]' "${i}/Cargo.toml"
     done
 fi
 
@@ -63,6 +63,6 @@ git rev-parse HEAD > "$WASM_DIR/artifacts/gitrev"
 
 if [ -n "${SEI:-}" ]; then
     for i in contracts/market/; do
-        $SED -i'.bak' -e '/default = \["sei"\]/ d' "${i}/Cargo.toml"
+        $SED -i -e '/default = \["sei"\]/ d' "${i}/Cargo.toml"
     done
 fi
