@@ -63,6 +63,6 @@ git rev-parse HEAD > "$WASM_DIR/artifacts/gitrev"
 
 if [ "${SEI:-}" = 'true' ]; then
     for i in contracts/market/; do
-        $SED -i'.bak' -e '/defaul = \["sei"\]/ d' "${i}/Cargo.toml"
+        $SED -i'.bak' -e '/default = \["sei"\]/ d' "${i}/Cargo.toml"
     done
 fi
