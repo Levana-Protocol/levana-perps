@@ -86,8 +86,8 @@ pub struct PythPriceConfig {
 pub struct PythPriceServiceConfig {
     /// How old a price to allow, in seconds
     pub update_age_tolerance: u32,
-    /// Endpoints to communicate with to get price data
-    pub endpoints: Vec<String>,
+    /// Endpoint to communicate with to get price data
+    pub endpoint: String,
     /// Mappings from a key to price feed  id
     pub feed_ids: HashMap<String, PriceIdentifier>,
 }

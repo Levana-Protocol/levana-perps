@@ -1,7 +1,7 @@
 pyth:
   stable: 
     update-age-tolerance: 120
-    endpoints: ["https://hermes.pyth.network/"]
+    endpoint: "https://hermes.pyth.network/"
     # Pyth price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-stable
     feed-ids:
       ATOM_USD: "b00b60f88b03a6a625a8d1c048c3f66653edf217439983d037e7222c4e612819"
@@ -12,7 +12,7 @@ pyth:
       SEI_USD: "53614f1cb0c031d4af66c04cb9c756234adad0e1cee85303795091499a4084eb"
   edge: 
     update-age-tolerance: 120
-    endpoints: ["https://hermes-beta.pyth.network/"]
+    endpoint: "https://hermes-beta.pyth.network/"
     # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-edge
     feed-ids:
       ATOM_USD: "61226d39beea19d334f17c2febce27e12646d84675924ebb02b9cdaea68727e3"

@@ -102,8 +102,8 @@ impl App {
         let oracle = Oracle::new(
             &self.cosmos,
             market,
-            self.endpoints_stable.clone(),
-            self.endpoints_edge.clone(),
+            &self.endpoint_stable,
+            &self.endpoint_edge,
         )
         .await?;
 
@@ -326,7 +326,7 @@ impl App {
                         let msg = get_oracle_update_msg(
                             &unique_pyth_ids,
                             &wallet,
-                            &pyth.endpoints,
+                            &pyth.endpoint,
                             &self.client,
                             &pyth.contract,
                         )
