@@ -64,11 +64,17 @@ cargo-full-check:
 build-contracts:
 	./.ci/contracts.sh
 
+build-contracts-sei:
+	env SEI="true" ./.ci/contracts.sh
+
 # Build contracts with Cosmos Docker tooling for arm64
 # only for development purposes, not deploying mainnet contracts
 # as per the docker tool's internal rules, these builds will have the architecture extension in the name
 build-contracts-arm64:
 	env OPTIMIZER_ARM64="true" ./.ci/contracts.sh
+
+build-contracts-sei-arm64:
+	env SEI="true" OPTIMIZER_ARM64="true" ./.ci/contracts.sh
 
 # Build contracts with native tooling
 # only for development purposes, not deploying mainnet contracts
