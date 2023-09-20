@@ -1,20 +1,17 @@
-mod vec_with_curr;
-
 use cosmos::proto::cosmwasm::wasm::v1::MsgExecuteContract;
 use cosmos::{Contract, HasAddress};
 use cosmwasm_std::{Binary, Coin};
 use msg::prelude::*;
 use pyth_sdk_cw::PriceIdentifier;
-pub use vec_with_curr::VecWithCurr;
 
 pub async fn get_oracle_update_msg(
     ids: &[PriceIdentifier],
     sender: impl HasAddress,
-    endpoints: &VecWithCurr<String>,
+    endpoint: &str,
     client: &reqwest::Client,
     oracle: &Contract,
 ) -> Result<MsgExecuteContract> {
-    let vaas = get_wormhole_proofs(ids, endpoints, client).await?;
+    let vaas = get_wormhole_proofs(ids, endpoint, client).await?;
     let vaas_binary = vaas
         .iter()
         .map(|vaa| Binary::from_base64(vaa).map_err(|err| err.into()))
@@ -39,7 +36,7 @@ pub async fn get_oracle_update_msg(
 
 async fn get_wormhole_proofs(
     ids: &[PriceIdentifier],
-    endpoints: &VecWithCurr<String>,
+    endpoint: &str,
     client: &reqwest::Client,
 ) -> Result<Vec<String>> {
     // pyth uses this format for array params: https://github.com/axios/axios/blob/9588fcdec8aca45c3ba2f7968988a5d03f23168c/test/specs/helpers/buildURL.spec.js#L31
@@ -50,19 +47,15 @@ async fn get_wormhole_proofs(
         .join("&");
     let url_params = &url_params;
 
-    endpoints
-        .try_any_from_curr_async(|endpoint| async move {
-            let url = format!("{endpoint}api/latest_vaas?{url_params}");
+    let url = format!("{endpoint}api/latest_vaas?{url_params}");
 
-            let vaas: Vec<String> = client
-                .get(url)
-                .send()
-                .await?
-                .error_for_status()?
-                .json()
-                .await?;
+    let vaas: Vec<String> = client
+        .get(url)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
 
-            Ok(vaas)
-        })
-        .await
+    Ok(vaas)
 }

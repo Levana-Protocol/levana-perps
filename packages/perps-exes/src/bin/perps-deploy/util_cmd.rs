@@ -13,10 +13,7 @@ use msg::contracts::market::{
     spot_price::{PythPriceServiceNetwork, SpotPriceFeedData},
 };
 use perps_exes::{
-    config::ChainConfig,
-    contracts::Factory,
-    prelude::MarketContract,
-    pyth::{get_oracle_update_msg, VecWithCurr},
+    config::ChainConfig, contracts::Factory, prelude::MarketContract, pyth::get_oracle_update_msg,
 };
 use serde_json::json;
 use shared::storage::{
@@ -118,10 +115,10 @@ async fn update_pyth(
     let oracle_info = opt.get_oracle_info(&basic.chain_config, &basic.price_config, network)?;
 
     // FIXME
-    let endpoints = VecWithCurr::new(match pyth.r#type {
-        PythPriceServiceNetwork::Stable => basic.price_config.pyth.stable.endpoints.clone(),
-        PythPriceServiceNetwork::Edge => basic.price_config.pyth.edge.endpoints.clone(),
-    });
+    let endpoint = match pyth.r#type {
+        PythPriceServiceNetwork::Stable => &basic.price_config.pyth.stable.endpoint,
+        PythPriceServiceNetwork::Edge => &basic.price_config.pyth.edge.endpoint,
+    };
 
     let client = reqwest::Client::new();
     // FIXME
@@ -142,7 +139,7 @@ async fn update_pyth(
         })
         .collect::<Vec<_>>();
 
-    let msg = get_oracle_update_msg(&ids, &basic.wallet, &endpoints, &client, &oracle).await?;
+    let msg = get_oracle_update_msg(&ids, &basic.wallet, endpoint, &client, &oracle).await?;
 
     let builder = TxBuilder::default().add_message(msg);
     let res = builder

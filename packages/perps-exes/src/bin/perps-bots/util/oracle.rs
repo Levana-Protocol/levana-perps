@@ -8,7 +8,6 @@ use msg::{
     },
     prelude::*,
 };
-use perps_exes::pyth::VecWithCurr;
 
 use super::markets::Market;
 
@@ -22,7 +21,7 @@ pub(crate) struct Oracle {
 #[derive(Clone)]
 pub struct PythOracle {
     pub contract: Contract,
-    pub endpoints: VecWithCurr<String>,
+    pub endpoint: String,
 }
 
 impl std::fmt::Debug for Oracle {
@@ -48,8 +47,8 @@ impl Oracle {
     pub async fn new(
         cosmos: &Cosmos,
         market: &Market,
-        pyth_endpoints_stable: VecWithCurr<String>,
-        pyth_endpoints_edge: VecWithCurr<String>,
+        pyth_endpoint_stable: impl Into<String>,
+        pyth_endpoint_edge: impl Into<String>,
     ) -> Result<Self> {
         let market_id = market.market_id.clone();
         let status = market.market.status().await?;
@@ -69,9 +68,9 @@ impl Oracle {
                     })?;
                     Some(PythOracle {
                         contract: cosmos.make_contract(addr),
-                        endpoints: match pyth.network {
-                            PythPriceServiceNetwork::Stable => pyth_endpoints_stable,
-                            PythPriceServiceNetwork::Edge => pyth_endpoints_edge,
+                        endpoint: match pyth.network {
+                            PythPriceServiceNetwork::Stable => pyth_endpoint_stable.into(),
+                            PythPriceServiceNetwork::Edge => pyth_endpoint_edge.into(),
                         },
                     })
                 }
@@ -127,28 +126,24 @@ async fn price_helper(
     let pyth_prices = match pyth {
         None => HashMap::new(),
         Some(pyth) => {
-            pyth.endpoints
-                .try_any_from_curr_async(|endpoint| async move {
-                    let mut req = client.get(format!("{}api/latest_price_feeds", endpoint));
-                    for feed in feeds {
-                        if let SpotPriceFeedData::Pyth { id, .. } = feed.data {
-                            req = req.query(&[("ids[]", id)]);
-                        }
-                    }
+            let mut req = client.get(format!("{}api/latest_price_feeds", pyth.endpoint));
+            for feed in feeds {
+                if let SpotPriceFeedData::Pyth { id, .. } = feed.data {
+                    req = req.query(&[("ids[]", id)]);
+                }
+            }
 
-                    let records = req
-                        .send()
-                        .await?
-                        .error_for_status()?
-                        .json::<Vec<PythRecord>>()
-                        .await?;
-
-                    Ok(records
-                        .into_iter()
-                        .map(|PythRecord { id, price }| (id, price))
-                        .collect::<HashMap<_, _>>())
-                })
+            let records = req
+                .send()
                 .await?
+                .error_for_status()?
+                .json::<Vec<PythRecord>>()
+                .await?;
+
+            records
+                .into_iter()
+                .map(|PythRecord { id, price }| (id, price))
+                .collect::<HashMap<_, _>>()
         }
     };
 
