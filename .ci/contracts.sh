@@ -13,18 +13,25 @@ REGISTRY_CACHE="$WASM_DIR/registry"
 CARGO_GIT_CACHE="$WASM_DIR/git"
 ARTIFACTS="$WASM_DIR/artifacts"
 
+if [[ -n "${OPTIMIZER_ARM64:-}" ]]; then
+    echo "sed on OSX is weird. Use gsed instead"
+    SED=gsed
+else
+    SED=sed
+fi
+
 if [ -n "${SEI:-}" ]; then
     echo "If this script failed, it would left extra \`default = [\"sei\"]\` line in contracts' Cargo.toml."
     
     for i in contracts/market/; do
-        grep -q '^default = \["sei"\]$' "${i}/Cargo.toml" || sed -i'.bak' -e '/\[features\]/ a default = ["sei"]' "${i}/Cargo.toml"
+        grep -q '^default = \["sei"\]$' "${i}/Cargo.toml" || $SED -i'.bak' -e '/\[features\]/ a default = ["sei"]' "${i}/Cargo.toml"
     done
 fi
 
-if [[ ! -n "${OPTIMIZER_ARM64:-}" ]]; then
-    OPTIMIZER_VERSION="cosmwasm/workspace-optimizer":0.14.0
-else
+if [[ -n "${OPTIMIZER_ARM64:-}" ]]; then
     OPTIMIZER_VERSION="cosmwasm/workspace-optimizer-arm64":0.14.0
+else
+    OPTIMIZER_VERSION="cosmwasm/workspace-optimizer":0.14.0
 fi
 
 mkdir -p "$TARGET_CACHE" "$REGISTRY_CACHE" "$ARTIFACTS" "$CARGO_GIT_CACHE"
@@ -56,6 +63,6 @@ git rev-parse HEAD > "$WASM_DIR/artifacts/gitrev"
 
 if [ "${SEI:-}" = 'true' ]; then
     for i in contracts/market/; do
-        sed -i'.bak' -e '/defaul = \["sei"\]/ d' "${i}/Cargo.toml"
+        $SED -i'.bak' -e '/defaul = \["sei"\]/ d' "${i}/Cargo.toml"
     done
 fi
