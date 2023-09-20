@@ -4,7 +4,7 @@ use cosmwasm_std::Order;
 #[cfg(feature = "sei")]
 use cosmwasm_std::QuerierWrapper;
 use msg::contracts::market::{
-    entry::{OracleFeedPriceResp, PriceForQuery},
+    entry::{OraclePriceFeedResp, PriceForQuery},
     spot_price::{
         events::SpotPriceEvent, PythConfig, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData,
     },
@@ -33,6 +33,18 @@ pub(crate) struct PriceStorage {
     publish_time: Option<Timestamp>,
     /// Latest price publish time for the feeds composing the price_usd, if available
     publish_time_usd: Option<Timestamp>,
+}
+
+/// internal struct for satisfying both OraclePrice queries and spot price storage
+pub(crate) struct OraclePriceInternal {
+    /// Information about each price feed used to compose the final price
+    /// For manual spot prices, this will be empty
+    pub feeds: Vec<OraclePriceFeedResp>,
+    /// Information about each price feed used to compose the final usd price
+    /// For manual spot prices, this will be empty
+    pub feeds_usd: Vec<OraclePriceFeedResp>,
+    /// The final, composed price.
+    pub composed_price: PriceStorage,
 }
 
 impl State<'_> {
@@ -245,7 +257,8 @@ impl State<'_> {
             return Ok(());
         }
 
-        let price_storage = self.get_oracle_price_storage(ctx.storage, true)?;
+        let oracle_price = self.get_oracle_price(ctx.storage, true)?;
+        let price_storage = oracle_price.composed_price;
 
         ctx.response_mut().add_event(SpotPriceEvent {
             timestamp,
@@ -261,17 +274,22 @@ impl State<'_> {
             .map_err(|err| err.into())
     }
 
-    pub(crate) fn get_oracle_price_storage(
+    pub(crate) fn get_oracle_price(
         &self,
         store: &dyn Storage,
         validate_age: bool,
-    ) -> Result<PriceStorage> {
-        let price_storage = match &self.config.spot_price {
+    ) -> Result<OraclePriceInternal> {
+        let oracle_price = match self.config.spot_price.clone() {
             SpotPriceConfig::Manual { .. } => {
                 // although this isn't exactly a real external oracle, at this point in the code
                 // we treat it as such, since it isn't necessarily pushed into the PRICES storage yet.
                 // in other words, "oracle" here means "known price that isn't yet stored in the contract"
-                MANUAL_SPOT_PRICE.load(store)?
+                let composed_price = MANUAL_SPOT_PRICE.load(store)?;
+                OraclePriceInternal {
+                    feeds: vec![],
+                    feeds_usd: vec![],
+                    composed_price,
+                }
             }
             SpotPriceConfig::Oracle {
                 pyth,
@@ -279,11 +297,19 @@ impl State<'_> {
                 feeds,
                 feeds_usd,
             } => {
-                let (price_amount, publish_time) =
-                    self.get_oracle_price_for_feeds(pyth.as_ref(), feeds, validate_age)?;
+                let oracle_feeds = feeds
+                    .into_iter()
+                    .map(|feed| self.get_oracle_price_for_feed(pyth.as_ref(), feed, validate_age))
+                    .collect::<Result<Vec<_>>>()?;
 
-                let (price_amount_usd, publish_time_usd) =
-                    self.get_oracle_price_for_feeds(pyth.as_ref(), feeds_usd, validate_age)?;
+                let oracle_feeds_usd = feeds_usd
+                    .into_iter()
+                    .map(|feed| self.get_oracle_price_for_feed(pyth.as_ref(), feed, validate_age))
+                    .collect::<Result<Vec<_>>>()?;
+
+                let (price_amount, publish_time) = compose_oracle_feeds(&oracle_feeds)?;
+
+                let (price_amount_usd, publish_time_usd) = compose_oracle_feeds(&oracle_feeds_usd)?;
 
                 let market_id = self.market_id(store)?;
                 let market_type = market_id.get_market_type();
@@ -291,73 +317,46 @@ impl State<'_> {
                 let price = price_base.into_notional_price(market_type);
                 let price_usd = PriceCollateralInUsd::from_non_zero(price_amount_usd);
 
-                PriceStorage {
+                let composed_price = PriceStorage {
                     price,
                     price_usd,
                     price_base,
                     publish_time,
                     publish_time_usd,
+                };
+
+                OraclePriceInternal {
+                    feeds: oracle_feeds,
+                    feeds_usd: oracle_feeds_usd,
+                    composed_price,
                 }
             }
         };
 
         // sanity check
-        if let Some(price_usd) = price_storage
+        if let Some(price_usd) = oracle_price
+            .composed_price
             .price_base
             .try_into_usd(self.market_id(store)?)
         {
             ensure!(
-                price_storage.price_usd == price_usd,
+                oracle_price.composed_price.price_usd == price_usd,
                 "Price in USD mismatch {} != {}",
-                price_storage.price_usd,
+                oracle_price.composed_price.price_usd,
                 price_usd
             );
         }
 
-        Ok(price_storage)
-    }
-
-    pub(crate) fn get_oracle_price_for_feeds(
-        &self,
-        pyth: Option<&PythConfig>,
-        feeds: &[SpotPriceFeed],
-        validate_age: bool,
-    ) -> Result<(NumberGtZero, Option<Timestamp>)> {
-        let mut acc_price: Option<(Number, Option<Timestamp>)> = None;
-
-        for SpotPriceFeed { data, inverted } in feeds {
-            let OracleFeedPriceResp {
-                price,
-                publish_time,
-            } = self.get_oracle_price_for_feed(pyth, data, validate_age)?;
-
-            acc_price = match acc_price {
-                None => Some((price.into_number(), publish_time)),
-                Some((prev_price, prev_publish_time)) => {
-                    let publish_time = publish_time.max(prev_publish_time);
-                    let next_price =
-                        compose_price(prev_price.into_number(), price.into_number(), *inverted)?;
-                    Some((next_price, publish_time))
-                }
-            }
-        }
-
-        match acc_price {
-            Some((price, publish_time)) => {
-                let price = NumberGtZero::try_from(price)?;
-                Ok((price, publish_time))
-            }
-            None => anyhow::bail!("No price feeds provided"),
-        }
+        Ok(oracle_price)
     }
 
     pub(crate) fn get_oracle_price_for_feed(
         &self,
         pyth: Option<&PythConfig>,
-        feed_data: &SpotPriceFeedData,
+        feed: SpotPriceFeed,
         validate_age: bool,
-    ) -> Result<OracleFeedPriceResp> {
-        match feed_data {
+    ) -> Result<OraclePriceFeedResp> {
+        let (mut price, publish_time) = match &feed.data {
             SpotPriceFeedData::Pyth { id } => {
                 let pyth = pyth.context("pyth feeds need a pyth config!")?;
 
@@ -398,16 +397,10 @@ impl State<'_> {
                 let price = Number::try_from(price)?;
                 let price = NumberGtZero::try_from(price).context("price must be > 0")?;
 
-                Ok(OracleFeedPriceResp {
-                    price,
-                    publish_time: Some(publish_time),
-                })
+                (price, Some(publish_time))
             }
 
-            SpotPriceFeedData::Constant { price } => Ok(OracleFeedPriceResp {
-                price: *price,
-                publish_time: None,
-            }),
+            SpotPriceFeedData::Constant { price } => (*price, None),
             SpotPriceFeedData::Sei { denom } => {
                 #[cfg(feature = "sei")]
                 {
@@ -425,10 +418,7 @@ impl State<'_> {
                     let price = NumberGtZero::try_from(price).context("price must be > 0")?;
 
                     // pair does have a `last_update`, but it's in block height
-                    Ok(OracleFeedPriceResp {
-                        price,
-                        publish_time: None,
-                    })
+                    (price, None)
                 }
                 #[cfg(not(feature = "sei"))]
                 {
@@ -438,18 +428,53 @@ impl State<'_> {
 
             SpotPriceFeedData::Stride { .. } => {
                 // TODO: query the contract and get the redemption price etc., no publish time
-                todo!("Implement Stride price feed")
+                bail!("Implement Stride price feed")
             }
+        };
+
+        if feed.inverted {
+            price = (Number::ONE / price.into_number())
+                .try_into_non_zero()
+                .context("price must be > 0")?;
         }
+
+        Ok(OraclePriceFeedResp {
+            feed,
+            price,
+            publish_time,
+        })
     }
 }
 
-fn compose_price(prev: Number, mut curr: Number, curr_inverted: bool) -> Result<Number> {
-    if curr_inverted {
-        curr = Number::ONE / curr;
+// given a list of oracle feeds, compose them into a single price and publish_time
+fn compose_oracle_feeds(
+    feeds: &[OraclePriceFeedResp],
+) -> Result<(NumberGtZero, Option<Timestamp>)> {
+    let mut acc_price: Option<(Number, Option<Timestamp>)> = None;
+
+    for OraclePriceFeedResp {
+        price,
+        publish_time,
+        feed: _,
+    } in feeds
+    {
+        acc_price = match acc_price {
+            None => Some((price.into_number(), *publish_time)),
+            Some((prev_price, prev_publish_time)) => {
+                let publish_time = publish_time.max(&prev_publish_time);
+                let next_price = prev_price.into_number() * price.into_number();
+                Some((next_price, *publish_time))
+            }
+        }
     }
 
-    Ok(prev * curr)
+    match acc_price {
+        Some((price, publish_time)) => {
+            let price = NumberGtZero::try_from(price)?;
+            Ok((price, publish_time))
+        }
+        None => anyhow::bail!("No price feeds provided"),
+    }
 }
 
 #[cfg(test)]
@@ -457,7 +482,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn pyth_route_compose() {
+    fn price_inverted_compose() {
         let eth_usd = pyth_sdk_cw::Price {
             price: 179276800001,
             conf: 0,
@@ -472,12 +497,10 @@ mod tests {
             publish_time: 0,
         };
 
-        let eth_btc = compose_price(
-            eth_usd.try_into().unwrap(),
-            btc_usd.try_into().unwrap(),
-            true,
-        )
-        .unwrap();
+        let eth = Number::try_from(eth_usd).unwrap();
+        let btc = Number::try_from(btc_usd).unwrap();
+        let btc = Number::ONE / btc;
+        let eth_btc = eth * btc;
 
         assert_eq!(eth_btc, Number::try_from("0.062758112133468261").unwrap());
     }

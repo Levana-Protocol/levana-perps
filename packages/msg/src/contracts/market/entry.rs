@@ -1,7 +1,7 @@
 //! Entrypoint messages for the market
 use super::order::LimitOrder;
 use super::position::{ClosedPosition, PositionId};
-use super::spot_price::{SpotPriceConfigInit, SpotPriceFeedData};
+use super::spot_price::{SpotPriceConfigInit, SpotPriceFeed};
 use super::{config::ConfigUpdate, crank::CrankWorkInfo};
 use crate::contracts::market::order::OrderId;
 use crate::{contracts::liquidity_token::LiquidityTokenKind, token::TokenInit};
@@ -422,9 +422,12 @@ pub enum QueryMsg {
         order: Option<OrderInMessage>,
     },
 
-    /// * returns [shared::prelude::PricePoint]
+    /// * returns [OraclePriceResp]
     ///
     /// Gets the current price from the "oracle"
+    ///
+    /// Also returns prices for each feed used to compose the final price
+    ///
     /// This may be more up-to-date than the spot price which was
     /// validated and pushed into the contract storage via execution messages
     ///
@@ -433,19 +436,8 @@ pub enum QueryMsg {
     /// which may (or may not) become a _real_ spot price in contract storage
     ///
     /// However, in the case of manual spot prices, these are typically identical values
-    #[returns(shared::prelude::PricePoint)]
+    #[returns(OraclePriceResp)]
     OraclePrice {},
-
-    /// * returns [OracleFeedPriceResp]
-    ///
-    /// Gets the current price from the "oracle" for a specific single feed
-    /// This may be more up-to-date than the spot price which was
-    /// validated and pushed into the contract storage via execution messages
-    #[returns(OracleFeedPriceResp)]
-    OracleFeedPrice {
-        /// The feed to query
-        data: SpotPriceFeedData,
-    },
 
     /// * returns [super::position::PositionsResp]
     ///
@@ -639,12 +631,27 @@ pub enum QueryMsg {
     },
 }
 
-/// Response for [QueryMsg::OracleFeedPrice]
+/// Response for [QueryMsg::OraclePrice]
 #[cw_serde]
-pub struct OracleFeedPriceResp {
-    /// The raw price from the feed
+pub struct OraclePriceResp {
+    /// Information about each price feed used to compose the final price
+    /// For manual spot prices, this will be empty
+    pub feeds: Vec<OraclePriceFeedResp>,
+    /// Information about each price feed used to compose the final usd price
+    /// For manual spot prices, this will be empty
+    pub feeds_usd: Vec<OraclePriceFeedResp>,
+    /// The final, composed price. See [QueryMsg::OraclePrice] for more information
+    pub composed_price: PricePoint,
+}
+
+/// Part of [OraclePriceResp]
+#[cw_serde]
+pub struct OraclePriceFeedResp {
+    /// The feed used to get the price
+    pub feed: SpotPriceFeed,
+    /// will be inverted if feed.inverted is true
     pub price: NumberGtZero,
-    /// Publish time of the price, if available
+    /// publish time for this feed, if it exists
     pub publish_time: Option<Timestamp>,
 }
 
