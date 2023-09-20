@@ -399,6 +399,8 @@ pub enum QueryMsg {
     /// * returns [shared::prelude::PricePoint]
     ///
     /// Gets the spot price, if no time is supplied, then it's current
+    /// This is the spot price as seen by the contract storage
+    /// i.e. the price that was pushed via execution messages
     #[returns(shared::prelude::PricePoint)]
     SpotPrice {
         /// Timestamp when the price should be effective.
@@ -419,6 +421,20 @@ pub enum QueryMsg {
         /// Order to sort by, if None then it will be descending
         order: Option<OrderInMessage>,
     },
+
+    /// * returns [shared::prelude::PricePoint]
+    ///
+    /// Gets the current price from the "oracle"
+    /// This may be more up-to-date than the spot price which was
+    /// validated and pushed into the contract storage via execution messages
+    ///
+    /// This query also works for markets configured with a manual spot price
+    /// in other words, "oracle" here means "the latest _potential_ spot price"
+    /// which may (or may not) become a _real_ spot price in contract storage
+    ///
+    /// However, in the case of manual spot prices, these are typically identical values
+    #[returns(shared::prelude::PricePoint)]
+    OraclePrice {},
 
     /// * returns [super::position::PositionsResp]
     ///

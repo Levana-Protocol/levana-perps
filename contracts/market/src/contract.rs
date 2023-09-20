@@ -459,6 +459,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
         }
 
         QueryMsg::SpotPrice { timestamp } => state.spot_price(store, timestamp)?.query_result(),
+
         QueryMsg::SpotPriceHistory {
             start_after,
             limit,
@@ -472,6 +473,13 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             )?;
 
             SpotPriceHistoryResp { price_points }.query_result()
+        }
+
+        QueryMsg::OraclePrice {} => {
+            let price_storage = state.get_oracle_price_storage(store, false)?;
+            state
+                .make_price_point(store, state.now(), price_storage)?
+                .query_result()
         }
 
         QueryMsg::Positions {
