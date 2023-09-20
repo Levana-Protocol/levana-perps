@@ -45,6 +45,13 @@ impl MarketContract {
     }
 
     pub async fn status(&self) -> Result<StatusResp> {
+        self.status_relaxed().await
+    }
+
+    /// Like status, but doesn't insist on the result being StatusResp.
+    ///
+    /// Useful for working around the overly aggressive cw_serde deny_unknown_fields.
+    pub async fn status_relaxed<T: serde::de::DeserializeOwned>(&self) -> Result<T> {
         self.0.query(MarketQueryMsg::Status { price: None }).await
     }
 

@@ -9,7 +9,6 @@ use cli::{Cmd, Subcommand, TestnetSub};
 mod app;
 mod chain_tests;
 mod cli;
-mod factory;
 mod faucet;
 mod init_chain;
 mod instantiate;

@@ -1,15 +1,21 @@
 use anyhow::Result;
 use cosmos::proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmos::{Address, CodeId, Contract, HasAddress, HasCosmos, Wallet};
-use msg::contracts::factory::entry::{
-    CodeIds, FactoryOwnerResp, MarketInfoResponse, MarketsResp, QueryMsg,
-};
+use msg::contracts::factory::entry::{CodeIds, FactoryOwnerResp, MarketsResp, QueryMsg};
 use msg::contracts::market::entry::NewMarketParams;
 use msg::prelude::*;
 use msg::shutdown::{ShutdownEffect, ShutdownImpact};
 
 #[derive(Clone)]
-pub(crate) struct Factory(Contract);
+pub struct Factory(Contract);
+
+impl std::fmt::Debug for Factory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Factory")
+            .field(&self.0.get_address())
+            .finish()
+    }
+}
 
 impl Display for Factory {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -18,13 +24,21 @@ impl Display for Factory {
 }
 
 impl Factory {
-    pub(crate) fn from_contract(contract: Contract) -> Self {
+    pub fn from_contract(contract: Contract) -> Self {
         Factory(contract)
     }
 
-    pub(crate) async fn get_market(&self, market_id: impl Into<MarketId>) -> Result<MarketInfo> {
+    pub async fn get_market(&self, market_id: impl Into<MarketId>) -> Result<MarketInfo> {
         let market_id = market_id.into();
-        let MarketInfoResponse {
+
+        #[derive(serde::Deserialize)]
+        struct MarketInfoResponseRelaxed {
+            market_addr: Addr,
+            position_token: Addr,
+            liquidity_token_lp: Addr,
+            liquidity_token_xlp: Addr,
+        }
+        let MarketInfoResponseRelaxed {
             market_addr,
             position_token,
             liquidity_token_lp,
@@ -62,7 +76,7 @@ impl Factory {
         })
     }
 
-    pub(crate) async fn get_markets(&self) -> Result<Vec<MarketInfo>> {
+    pub async fn get_markets(&self) -> Result<Vec<MarketInfo>> {
         let mut start_after = None;
         let mut res = vec![];
 
@@ -88,7 +102,7 @@ impl Factory {
         Ok(res)
     }
 
-    pub(crate) async fn query_owner(&self) -> Result<Address> {
+    pub async fn query_owner(&self) -> Result<Address> {
         let FactoryOwnerResp { owner, .. } = self.0.query(QueryMsg::FactoryOwner {}).await?;
         owner
             .into_string()
@@ -96,7 +110,7 @@ impl Factory {
             .with_context(|| format!("Invalid factory owner found for factory {}", self.0))
     }
 
-    pub(crate) async fn query_migration_admin(&self) -> Result<Address> {
+    pub async fn query_migration_admin(&self) -> Result<Address> {
         let FactoryOwnerResp {
             admin_migration, ..
         } = self.0.query(QueryMsg::FactoryOwner {}).await?;
@@ -108,11 +122,7 @@ impl Factory {
         })
     }
 
-    pub(crate) async fn disable_trades(
-        &self,
-        wallet: &Wallet,
-        market: MarketId,
-    ) -> Result<TxResponse> {
+    pub async fn disable_trades(&self, wallet: &Wallet, market: MarketId) -> Result<TxResponse> {
         self.0
             .execute(
                 wallet,
@@ -126,7 +136,7 @@ impl Factory {
             .await
     }
 
-    pub(crate) async fn enable_all(&self, wallet: &Wallet) -> Result<TxResponse> {
+    pub async fn enable_all(&self, wallet: &Wallet) -> Result<TxResponse> {
         self.0
             .execute(
                 wallet,
@@ -140,16 +150,16 @@ impl Factory {
             .await
     }
 
-    pub(crate) fn into_contract(self) -> Contract {
+    pub fn into_contract(self) -> Contract {
         self.0
     }
 
-    pub(crate) async fn query_market_code_id(&self) -> Result<CodeId> {
+    pub async fn query_market_code_id(&self) -> Result<CodeId> {
         let CodeIds { market, .. } = self.0.query(FactoryQueryMsg::CodeIds {}).await?;
         Ok(self.0.get_cosmos().make_code_id(market.u64()))
     }
 
-    pub(crate) async fn add_market(
+    pub async fn add_market(
         &self,
         wallet: &Wallet,
         new_market: NewMarketParams,
@@ -170,10 +180,25 @@ impl HasAddress for Factory {
     }
 }
 
-pub(crate) struct MarketInfo {
-    pub(crate) market_id: MarketId,
-    pub(crate) market: Contract,
-    pub(crate) position_token: Contract,
-    pub(crate) liquidity_token_lp: Contract,
-    pub(crate) liquidity_token_xlp: Contract,
+pub struct MarketInfo {
+    pub market_id: MarketId,
+    pub market: Contract,
+    pub position_token: Contract,
+    pub liquidity_token_lp: Contract,
+    pub liquidity_token_xlp: Contract,
+}
+
+impl std::fmt::Debug for MarketInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MarketInfo")
+            .field("market_id", &self.market_id)
+            .field("market", &self.market.get_address())
+            .field("position_token", &self.position_token.get_address())
+            .field("liquidity_token_lp", &self.liquidity_token_lp.get_address())
+            .field(
+                "liquidity_token_xlp",
+                &self.liquidity_token_xlp.get_address(),
+            )
+            .finish()
+    }
 }

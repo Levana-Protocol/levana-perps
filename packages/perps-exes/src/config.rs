@@ -2,6 +2,7 @@ pub mod defaults;
 
 use std::{collections::HashMap, path::Path};
 
+use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, RawAddress};
 use cosmwasm_std::{Uint128, Uint256};
 use msg::{
@@ -85,8 +86,8 @@ pub struct PythPriceConfig {
 pub struct PythPriceServiceConfig {
     /// How old a price to allow, in seconds
     pub update_age_tolerance: u32,
-    /// Endpoints to communicate with to get price data
-    pub endpoints: Vec<String>,
+    /// Endpoint to communicate with to get price data
+    pub endpoint: String,
     /// Mappings from a key to price feed  id
     pub feed_ids: HashMap<String, PriceIdentifier>,
 }
@@ -565,5 +566,73 @@ impl MarketConfigUpdates {
         let mut file = fs_err::File::open(path)?;
         serde_yaml::from_reader(&mut file)
             .with_context(|| format!("Error loading MarketConfigUpdates from {}", path.display()))
+    }
+}
+
+/// Stores mainnet factory contracts
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct MainnetFactories {
+    pub factories: Vec<MainnetFactory>,
+}
+
+impl MainnetFactories {
+    pub fn get_by_address(&self, address: Address) -> Option<&MainnetFactory> {
+        self.factories.iter().find(|f| f.address == address)
+    }
+
+    pub fn get_by_ident(&self, ident: &str) -> Option<&MainnetFactory> {
+        self.factories
+            .iter()
+            .find(|f| f.ident.as_deref() == Some(ident))
+    }
+
+    /// Gets by either address or ident
+    pub fn get(&self, factory: &str) -> Result<&MainnetFactory> {
+        match factory.parse().ok() {
+            Some(addr) => self.get_by_address(addr),
+            None => self.get_by_ident(factory),
+        }
+        .with_context(|| format!("Unknown factory: {factory}"))
+    }
+}
+
+/// An instantiated factory on mainnet.
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct MainnetFactory {
+    pub address: Address,
+    pub network: CosmosNetwork,
+    pub label: String,
+    pub instantiate_code_id: u64,
+    pub instantiate_at: DateTime<Utc>,
+    pub gitrev: String,
+    pub hash: String,
+    /// A user-friendly identifier
+    pub ident: Option<String>,
+    /// Manually set flag to indicate that this factory should be included in any full mainnet stats.
+    #[serde(default)]
+    pub canonical: bool,
+}
+
+impl MainnetFactories {
+    const PATH: &str = "packages/perps-exes/assets/mainnet-factories.yaml";
+
+    pub fn load_hard_coded() -> Result<Self> {
+        serde_yaml::from_slice(include_bytes!("../assets/mainnet-factories.yaml")).context(
+            "Error loading MainnetFactories from compile-time ../assets/mainnet-factories.yaml",
+        )
+    }
+
+    pub fn load() -> Result<Self> {
+        let mut file = fs_err::File::open(Self::PATH)?;
+        serde_yaml::from_reader(&mut file)
+            .with_context(|| format!("Error loading MainnetFactories from {}", Self::PATH))
+    }
+
+    pub fn save(&self) -> Result<()> {
+        let mut file = fs_err::File::create(Self::PATH)?;
+        serde_yaml::to_writer(&mut file, self)
+            .with_context(|| format!("Error saving MainnetFactories to {}", Self::PATH))
     }
 }

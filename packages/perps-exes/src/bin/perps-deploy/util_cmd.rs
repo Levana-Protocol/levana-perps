@@ -12,19 +12,14 @@ use msg::contracts::market::{
     position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
     spot_price::{PythPriceServiceNetwork, SpotPriceFeedData},
 };
-use parking_lot::Mutex;
 use perps_exes::{
-    config::ChainConfig,
-    prelude::MarketContract,
-    pyth::{get_oracle_update_msg, VecWithCurr},
+    config::ChainConfig, contracts::Factory, prelude::MarketContract, pyth::get_oracle_update_msg,
 };
 use serde_json::json;
 use shared::storage::{
     Collateral, DirectionToBase, LeverageToBase, MarketId, Notional, Signed, UnsignedDecimal, Usd,
 };
-use tokio::task::JoinSet;
-
-use crate::factory::Factory;
+use tokio::{sync::Mutex, task::JoinSet};
 
 #[derive(clap::Parser)]
 pub(crate) struct UtilOpt {
@@ -120,10 +115,10 @@ async fn update_pyth(
     let oracle_info = opt.get_oracle_info(&basic.chain_config, &basic.price_config, network)?;
 
     // FIXME
-    let endpoints = VecWithCurr::new(match pyth.r#type {
-        PythPriceServiceNetwork::Stable => basic.price_config.pyth.stable.endpoints.clone(),
-        PythPriceServiceNetwork::Edge => basic.price_config.pyth.edge.endpoints.clone(),
-    });
+    let endpoint = match pyth.r#type {
+        PythPriceServiceNetwork::Stable => &basic.price_config.pyth.stable.endpoint,
+        PythPriceServiceNetwork::Edge => &basic.price_config.pyth.edge.endpoint,
+    };
 
     let client = reqwest::Client::new();
     // FIXME
@@ -144,7 +139,7 @@ async fn update_pyth(
         })
         .collect::<Vec<_>>();
 
-    let msg = get_oracle_update_msg(&ids, &basic.wallet, &endpoints, &client, &oracle).await?;
+    let msg = get_oracle_update_msg(&ids, &basic.wallet, endpoint, &client, &oracle).await?;
 
     let builder = TxBuilder::default().add_message(msg);
     let res = builder
@@ -450,7 +445,7 @@ async fn csv_helper(
 ) -> Result<()> {
     loop {
         let (contract, market_id, pos_id) = {
-            let mut to_process_guard = to_process.lock();
+            let mut to_process_guard = to_process.lock().await;
             match to_process_guard.last_mut() {
                 None => break Ok(()),
                 Some(to_process) => {
@@ -518,7 +513,7 @@ async fn csv_helper(
             anyhow::bail!("Could not find position {pos_id}");
         }?;
 
-        let mut csv = csv.lock();
+        let mut csv = csv.lock().await;
         csv.serialize(&record)?;
         csv.flush()?;
     }

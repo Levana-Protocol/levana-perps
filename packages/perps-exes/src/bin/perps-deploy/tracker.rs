@@ -4,8 +4,9 @@ use cosmos::{
 };
 use msg::contracts::tracker::entry::{CodeIdResp, ContractResp, ExecuteMsg, QueryMsg};
 use msg::prelude::*;
+use perps_exes::contracts::Factory;
 
-use crate::{cli::Opt, factory::Factory, util::get_hash_for_path};
+use crate::{cli::Opt, util::get_hash_for_path};
 
 pub(crate) struct Tracker(pub(crate) Contract);
 

@@ -33,12 +33,12 @@ async fn helper(app: State<Arc<App>>, headers: HeaderMap, label: Option<TaskLabe
     let accept = headers.get("accept");
 
     if accept.map_or(false, |value| value.as_bytes().starts_with(b"text/html")) {
-        app.statuses.statuses_html(&app.0, label)
+        app.statuses.statuses_html(&app.0, label).await
     } else if accept.map_or(false, |value| {
         value.as_bytes().starts_with(b"application/json")
     }) {
-        app.statuses.statuses_json(&app.0, label)
+        app.statuses.statuses_json(&app.0, label).await
     } else {
-        app.statuses.statuses_text(label)
+        app.statuses.statuses_text(label).await
     }
 }

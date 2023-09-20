@@ -1,6 +1,7 @@
 mod common;
 mod export;
 pub(crate) mod pnl;
+mod whales;
 
 use std::sync::Arc;
 
@@ -43,6 +44,10 @@ pub(crate) struct BuildVersionRoute;
 #[derive(TypedPath)]
 #[typed_path("/pnl.css")]
 pub(crate) struct PnlCssRoute;
+
+#[derive(TypedPath)]
+#[typed_path("/whale.css")]
+pub(crate) struct WhaleCssRoute;
 
 #[derive(TypedPath)]
 #[typed_path("/error.css")]
@@ -95,7 +100,7 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .typed_get(common::homepage)
         .typed_get(common::healthz)
         .typed_get(common::build_version)
-        .typed_get(pnl::css)
+        .typed_get(pnl::pnl_css)
         .typed_get(common::error_css)
         .typed_get(common::favicon)
         .typed_get(common::robots_txt)
@@ -104,6 +109,8 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .typed_get(pnl::pnl_html)
         .typed_get(pnl::pnl_image)
         .typed_get(export::history)
+        .typed_get(whales::whales)
+        .typed_get(whales::whale_css)
         .with_state(app)
         .fallback(common::not_found)
         .layer(

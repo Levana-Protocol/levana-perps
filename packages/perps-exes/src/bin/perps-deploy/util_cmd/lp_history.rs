@@ -1,6 +1,6 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
-use crate::{cli::Opt, factory::Factory};
+use crate::cli::Opt;
 use cosmos::{Address, CosmosNetwork};
 use msg::{
     contracts::{
@@ -10,9 +10,8 @@ use msg::{
     },
     prelude::*,
 };
-use parking_lot::Mutex;
-use perps_exes::prelude::MarketContract;
-use tokio::task::JoinSet;
+use perps_exes::{contracts::Factory, prelude::MarketContract};
+use tokio::{sync::Mutex, task::JoinSet};
 
 #[derive(clap::Parser)]
 pub(super) struct LpActionCsvOpt {
@@ -93,7 +92,7 @@ async fn go(
 }
 
 async fn handle_market(
-    market: crate::factory::MarketInfo,
+    market: perps_exes::contracts::MarketInfo,
     tx: async_channel::Sender<ToProcess>,
 ) -> Result<()> {
     let mut seen = HashSet::new();
@@ -201,7 +200,7 @@ async fn worker(
             record.last_action = Some(timestamp);
         }
 
-        let mut csv = csv.lock();
+        let mut csv = csv.lock().await;
         csv.serialize(&record)?;
         csv.flush()?;
     }

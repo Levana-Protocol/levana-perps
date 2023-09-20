@@ -194,7 +194,7 @@ impl GasCheck {
                 }
                 Ok(tx) => {
                     log::info!("Filled up gas in {}", tx.txhash);
-                    let mut gases = app.gases.write();
+                    let mut gases = app.gases.write().await;
                     for (address, amount) in to_refill {
                         gases
                             .entry(address)

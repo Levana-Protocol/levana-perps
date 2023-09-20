@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use msg::{contracts::tracker::entry::ContractResp, prelude::*};
 use perps_exes::prelude::MarketContract;
 
-use crate::factory::{Factory, MarketInfo};
+use perps_exes::contracts::{Factory, MarketInfo};
 
 #[derive(clap::Parser)]
 pub(crate) struct DisableMarketAtOpt {

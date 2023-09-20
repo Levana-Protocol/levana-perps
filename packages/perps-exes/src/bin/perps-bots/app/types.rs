@@ -1,5 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use chrono::DateTime;
@@ -8,11 +9,9 @@ use cosmos::Address;
 use cosmos::Cosmos;
 use cosmos::HasAddressType;
 use cosmos::Wallet;
-use parking_lot::RwLock;
 use perps_exes::config::{GasAmount, PriceConfig};
-use perps_exes::pyth::VecWithCurr;
 use reqwest::Client;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 
 use crate::app::factory::{get_factory_info_mainnet, get_factory_info_testnet};
 use crate::cli::Opt;
@@ -64,12 +63,10 @@ pub(crate) struct App {
     pub(crate) gases: RwLock<HashMap<Address, GasRecords>>,
     /// Ensure that the crank and price bots don't try to work at the same time
     pub(crate) crank_lock: Mutex<()>,
-    pub(crate) endpoints_stable: PythEndpoints,
+    pub(crate) endpoint_stable: String,
     #[allow(dead_code)]
-    pub(crate) endpoints_edge: PythEndpoints,
+    pub(crate) endpoint_edge: String,
 }
-
-pub(crate) type PythEndpoints = VecWithCurr<String>;
 
 /// Helper data structure for building up an application.
 pub(crate) struct AppBuilder {
@@ -101,7 +98,10 @@ impl Opt {
 
     pub(crate) async fn into_app_builder(self) -> Result<AppBuilder> {
         let (config, faucet_bot_runner) = self.get_bot_config()?;
-        let client = Client::builder().user_agent("perps-bots").build()?;
+        let client = Client::builder()
+            .user_agent("perps-bots")
+            .timeout(Duration::from_secs(config.http_timeout_seconds.into()))
+            .build()?;
         let cosmos = self.make_cosmos(&config).await?;
 
         let gas_wallet = match &self.sub {
@@ -131,8 +131,6 @@ impl Opt {
         };
 
         let price_config = PriceConfig::load(self.price_config)?;
-        let endpoints_stable = VecWithCurr::new(price_config.pyth.stable.endpoints.clone());
-        let endpoints_edge = VecWithCurr::new(price_config.pyth.edge.endpoints);
 
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
@@ -144,8 +142,8 @@ impl Opt {
             gases: RwLock::new(HashMap::new()),
             frontend_info_testnet,
             crank_lock: Mutex::new(()),
-            endpoints_stable,
-            endpoints_edge,
+            endpoint_stable: price_config.pyth.stable.endpoint,
+            endpoint_edge: price_config.pyth.edge.endpoint,
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {
@@ -198,26 +196,29 @@ impl AppBuilder {
 }
 
 impl App {
-    pub(crate) fn get_factory_info(&self) -> Arc<FactoryInfo> {
-        self.factory.read().clone()
+    pub(crate) async fn get_factory_info(&self) -> Arc<FactoryInfo> {
+        self.factory.read().await.clone()
     }
 
-    pub(crate) fn set_factory_info(&self, info: FactoryInfo) {
-        *self.factory.write() = Arc::new(info);
+    pub(crate) async fn set_factory_info(&self, info: FactoryInfo) {
+        *self.factory.write().await = Arc::new(info);
     }
 
-    pub(crate) fn get_frontend_info_testnet(&self) -> Option<Arc<FrontendInfoTestnet>> {
-        self.frontend_info_testnet
-            .as_ref()
-            .map(|x| x.read().clone())
+    pub(crate) async fn get_frontend_info_testnet(&self) -> Option<Arc<FrontendInfoTestnet>> {
+        if let Some(x) = self.frontend_info_testnet.as_ref() {
+            Some(x.read().await.clone())
+        } else {
+            None
+        }
     }
 
-    pub(crate) fn set_frontend_info_testnet(&self, info: FrontendInfoTestnet) -> Result<()> {
+    pub(crate) async fn set_frontend_info_testnet(&self, info: FrontendInfoTestnet) -> Result<()> {
         *self
             .frontend_info_testnet
             .as_ref()
             .context("Tried to set frontend_info_testnet with a mainnet config")?
-            .write() = Arc::new(info);
+            .write()
+            .await = Arc::new(info);
         Ok(())
     }
 }

@@ -16,13 +16,13 @@ use msg::{
     token::TokenInit,
 };
 use perps_exes::config::MarketConfigUpdates;
+use perps_exes::contracts::{Factory, MarketInfo};
 use perps_exes::prelude::MarketContract;
 
 use crate::app::{App, PriceSourceConfig};
 use crate::{
     app::BasicApp,
     cli::Opt,
-    factory::{Factory, MarketInfo},
     faucet::Faucet,
     store_code::{FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN},
     tracker::Tracker,
