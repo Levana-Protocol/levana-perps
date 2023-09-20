@@ -171,7 +171,13 @@ deploy-sei-testnet:
 
 # Migrate osmoci
 migrate-osmoci:
+	cargo run --bin perps-deploy testnet store-code --network osmosis-testnet
 	cargo run --bin perps-deploy testnet migrate --family osmoci
+
+# Migrate seici
+migrate-seici:
+	cargo run --bin perps-deploy testnet store-code --network sei-testnet
+	cargo run --bin perps-deploy testnet migrate --family seici
 
 # Build documentations
 build-docs:
