@@ -12,6 +12,12 @@ RUN chmod +x /usr/bin/pid1
 
 ENV AMBER_YAML=/etc/amber.yaml
 
+ADD https://levana-tools.s3.us-west-2.amazonaws.com/base_image/health_check.sh /health_check.sh
+ADD https://levana-tools.s3.us-west-2.amazonaws.com/base_image/logging.sh /logging.sh
+
+RUN apk add --no-cache bash aws-cli && chmod a+x /health_check.sh /logging.sh
+
+
 ENTRYPOINT [ "pid1" ]
 
-CMD ["/usr/bin/amber", "--amber-yaml", "/etc/amber.yaml", "--unmasked", "exec", "/usr/bin/perps-bots"]
+CMD ["/logging.sh", "/usr/bin/amber", "--amber-yaml", "/etc/amber.yaml", "--unmasked", "exec", "/usr/bin/perps-bots"]

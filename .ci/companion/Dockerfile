@@ -13,6 +13,11 @@ RUN fc-cache -fv
 
 COPY perps-companion /usr/bin/perps-companion
 
+ADD https://levana-tools.s3.us-west-2.amazonaws.com/base_image/health_check.sh /health_check.sh
+ADD https://levana-tools.s3.us-west-2.amazonaws.com/base_image/logging.sh /logging.sh
+
+RUN apk add --no-cache bash aws-cli && chmod a+x /health_check.sh /logging.sh
+
 ENTRYPOINT [ "pid1" ]
 
-CMD [ "perps-companion" ]
+CMD [ "/logging.sh", "/usr/bin/perps-companion" ]
