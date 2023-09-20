@@ -64,6 +64,7 @@ pub(crate) struct BotConfig {
     pub(crate) max_allowed_price_delta: Decimal256,
     pub(crate) price_age_alert_threshold_secs: u32,
     pub(crate) gas_decimals: GasDecimals,
+    pub(crate) http_timeout_seconds: u32,
 }
 
 impl Opt {
@@ -81,6 +82,7 @@ impl Opt {
         &self,
         testnet: &TestnetOpt,
     ) -> Result<(BotConfig, Option<FaucetBotRunner>)> {
+        let http_timeout_seconds = testnet.http_timeout_seconds;
         let config = ConfigTestnet::load(testnet.config_testnet.as_ref())?;
         let DeploymentInfo {
             config: partial,
@@ -178,6 +180,7 @@ impl Opt {
             max_allowed_price_delta: partial.max_allowed_price_delta,
             price_age_alert_threshold_secs: partial.price_age_alert_threshold_secs,
             gas_decimals,
+            http_timeout_seconds,
         };
 
         Ok((config, Some(faucet_bot_runner)))
@@ -202,6 +205,7 @@ impl Opt {
             ltc_num_blocks,
             ltc_total_liqudity_percent,
             ltc_total_deposit_percent,
+            http_timeout_seconds,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let price_wallet = seed
@@ -245,6 +249,7 @@ impl Opt {
             price_age_alert_threshold_secs: price_age_alert_threshold_secs
                 .unwrap_or_else(perps_exes::config::defaults::price_age_alert_threshold_secs),
             gas_decimals,
+            http_timeout_seconds: *http_timeout_seconds,
         })
     }
 }

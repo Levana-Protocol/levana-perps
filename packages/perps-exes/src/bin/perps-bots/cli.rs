@@ -73,6 +73,9 @@ pub(crate) struct TestnetOpt {
     /// Override chain config file
     #[clap(long, env = "LEVANA_BOTS_CONFIG_CHAIN")]
     pub(crate) config_chain: Option<PathBuf>,
+    /// Number of seconds before HTTP connections (especially to Pyth) will time out
+    #[clap(long, env = "LEVANA_BOTS_HTTP_TIMEOUT_SECONDS", default_value_t = 10)]
+    pub(crate) http_timeout_seconds: u32,
 }
 
 #[derive(clap::Parser)]
@@ -112,6 +115,9 @@ pub(crate) struct MainnetOpt {
     /// Percentage change of total deposit below/above which we should alert
     #[clap(long, env = "LEVANA_BOTS_DEPOSIT_PERCENT", default_value = "10")]
     pub(crate) ltc_total_deposit_percent: Decimal256,
+    /// Number of seconds before HTTP connections (especially to Pyth) will time out
+    #[clap(long, env = "LEVANA_BOTS_HTTP_TIMEOUT_SECONDS", default_value_t = 10)]
+    pub(crate) http_timeout_seconds: u32,
 }
 
 impl Opt {

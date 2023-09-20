@@ -1,5 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use chrono::DateTime;
@@ -97,7 +98,10 @@ impl Opt {
 
     pub(crate) async fn into_app_builder(self) -> Result<AppBuilder> {
         let (config, faucet_bot_runner) = self.get_bot_config()?;
-        let client = Client::builder().user_agent("perps-bots").build()?;
+        let client = Client::builder()
+            .user_agent("perps-bots")
+            .timeout(Duration::from_secs(config.http_timeout_seconds.into()))
+            .build()?;
         let cosmos = self.make_cosmos(&config).await?;
 
         let gas_wallet = match &self.sub {
