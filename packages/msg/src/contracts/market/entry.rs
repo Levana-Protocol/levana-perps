@@ -424,9 +424,15 @@ pub enum QueryMsg {
 
     /// * returns [shared::prelude::PricePoint]
     ///
-    /// Gets the current price from the oracle (if this market has one)
+    /// Gets the current price from the "oracle"
     /// This may be more up-to-date than the spot price which was
     /// validated and pushed into the contract storage via execution messages
+    /// 
+    /// This query also works for markets configured with a manual spot price
+    /// in other words, "oracle" here means "the latest _potential_ spot price"
+    /// which may (or may not) become a _real_ spot price in contract storage
+    /// 
+    /// However, in the case of manual spot prices, these are typically identical values
     #[returns(shared::prelude::PricePoint)]
     OraclePrice {},
 
