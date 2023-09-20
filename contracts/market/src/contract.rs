@@ -476,7 +476,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
         }
 
         QueryMsg::OraclePrice {} => {
-            let price_storage = state.get_oracle_price_storage(store)?;
+            let price_storage = state.get_oracle_price_storage(store, false)?;
             state
                 .make_price_point(store, state.now(), price_storage)?
                 .query_result()

@@ -245,7 +245,7 @@ impl State<'_> {
             return Ok(());
         }
 
-        let price_storage = self.get_oracle_price_storage(ctx.storage)?;
+        let price_storage = self.get_oracle_price_storage(ctx.storage, true)?;
 
         ctx.response_mut().add_event(SpotPriceEvent {
             timestamp,
@@ -261,7 +261,11 @@ impl State<'_> {
             .map_err(|err| err.into())
     }
 
-    pub(crate) fn get_oracle_price_storage(&self, store: &dyn Storage) -> Result<PriceStorage> {
+    pub(crate) fn get_oracle_price_storage(
+        &self,
+        store: &dyn Storage,
+        validate_age: bool,
+    ) -> Result<PriceStorage> {
         let price_storage = match &self.config.spot_price {
             SpotPriceConfig::Manual { .. } => {
                 // although this isn't exactly a real external oracle, at this point in the code
@@ -276,10 +280,10 @@ impl State<'_> {
                 feeds_usd,
             } => {
                 let (price_amount, publish_time) =
-                    self.get_oracle_price_for_feeds(pyth.as_ref(), feeds)?;
+                    self.get_oracle_price_for_feeds(pyth.as_ref(), feeds, validate_age)?;
 
                 let (price_amount_usd, publish_time_usd) =
-                    self.get_oracle_price_for_feeds(pyth.as_ref(), feeds_usd)?;
+                    self.get_oracle_price_for_feeds(pyth.as_ref(), feeds_usd, validate_age)?;
 
                 let market_id = self.market_id(store)?;
                 let market_type = market_id.get_market_type();
@@ -317,6 +321,7 @@ impl State<'_> {
         &self,
         pyth: Option<&PythConfig>,
         feeds: &[SpotPriceFeed],
+        validate_age: bool,
     ) -> Result<(NumberGtZero, Option<Timestamp>)> {
         let mut acc_price: Option<(Number, Option<Timestamp>)> = None;
 
@@ -333,26 +338,31 @@ impl State<'_> {
 
                     let price_feed = price_feed_response.price_feed;
 
-                    let current_block_time_seconds = self.env.block.time.seconds().try_into()?;
-                    let price = price_feed
-                        // alternative: .get_emaprice_no_older_than()
-                        .get_price_no_older_than(
-                            current_block_time_seconds,
-                            pyth.age_tolerance_seconds,
-                        )
-                        .ok_or_else(|| {
-                            perp_error!(
-                                ErrorId::PriceTooOld,
-                                ErrorDomain::Pyth,
-                                "Current price is not available. Price id: {}, inverted: {}, Current block time: {}, price publish time: {}, diff: {}, age_tolerance: {}",
-                                id,
-                                inverted,
+                    let price = if validate_age {
+                        let current_block_time_seconds =
+                            self.env.block.time.seconds().try_into()?;
+                        price_feed
+                            // alternative: .get_emaprice_no_older_than()
+                            .get_price_no_older_than(
                                 current_block_time_seconds,
-                                price_feed.get_price_unchecked().publish_time,
-                                (price_feed.get_price_unchecked().publish_time - current_block_time_seconds).abs(),
-                                pyth.age_tolerance_seconds
+                                pyth.age_tolerance_seconds,
                             )
-                        })?;
+                            .ok_or_else(|| {
+                                perp_error!(
+                                    ErrorId::PriceTooOld,
+                                    ErrorDomain::Pyth,
+                                    "Current price is not available. Price id: {}, inverted: {}, Current block time: {}, price publish time: {}, diff: {}, age_tolerance: {}",
+                                    id,
+                                    inverted,
+                                    current_block_time_seconds,
+                                    price_feed.get_price_unchecked().publish_time,
+                                    (price_feed.get_price_unchecked().publish_time - current_block_time_seconds).abs(),
+                                    pyth.age_tolerance_seconds
+                                )
+                            })?
+                    } else {
+                        price_feed.get_price_unchecked()
+                    };
 
                     let publish_time = Timestamp::from_seconds(price.publish_time.try_into()?);
                     let price: Number = Number::try_from(price)?;
