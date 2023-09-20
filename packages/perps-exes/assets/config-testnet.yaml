@@ -44,7 +44,7 @@ deployments:
     liquidity: true
     utilization: true
     balance: true
-    traders: 10
+    traders: 3
     default-market-ids:
       - ATOM_USD
       - BTC_USD
@@ -56,7 +56,7 @@ deployments:
     liquidity: true
     utilization: true
     balance: true
-    traders: 10
+    traders: 3
     default-market-ids:
       - ATOM_USD
       - BTC_USD
@@ -68,7 +68,7 @@ deployments:
     liquidity: true
     utilization: true
     balance: true
-    traders: 10
+    traders: 3
     default-market-ids:
       - ATOM_USD
       - OSMO_USDC
@@ -123,17 +123,6 @@ overrides:
     watcher:
       # Nodes seem to crash often, let's see if this helps
       retries: 10
-  osmobeta:
-    wallet-manager-address: osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k
-    price: true
-    crank: true
-    liquidity: true
-    utilization: true
-    balance: true
-    traders: 100
-    default-market-ids:
-      - ATOM_USD
-      - BTC_USD
   seidev:
     wallet-manager-address: osmo1lkc7lnq204m4yeydcdg94stkm50jjyglh7ucel
     dev-settings: true
@@ -142,7 +131,7 @@ overrides:
     liquidity: true
     utilization: true
     balance: true
-    traders: 10
+    traders: 3
     default-market-ids:
       - ATOM_USD
       - BTC_USD
