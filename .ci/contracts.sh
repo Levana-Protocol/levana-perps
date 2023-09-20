@@ -48,7 +48,7 @@ docker  run --rm --tty \
 -v "$CARGO_GIT_CACHE":/usr/local/cargo/git \
 $OPTIMIZER_VERSION
 
-if [ "${SEI:-}" = 'true' ]; then
+if [ -n "${SEI:-}" ]; then
     for i in "${ARTIFACTS}/"*market*; do
         mv "${i}" "${i%.wasm}-sei.wasm"
     done
@@ -61,7 +61,7 @@ rm -rf ./artifacts
 # Only write the gitrev file on success
 git rev-parse HEAD > "$WASM_DIR/artifacts/gitrev"
 
-if [ "${SEI:-}" = 'true' ]; then
+if [ -n "${SEI:-}" ]; then
     for i in contracts/market/; do
         $SED -i'.bak' -e '/default = \["sei"\]/ d' "${i}/Cargo.toml"
     done
