@@ -23,7 +23,8 @@ impl App {
                 .into_cosmos_network()?
                 .builder()
                 .await?
-                .build_lazy();
+                .build_lazy()
+                .await;
             cosmos_map.insert(chain_id, cosmos);
         }
         Ok(App {

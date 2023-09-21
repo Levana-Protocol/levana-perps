@@ -296,7 +296,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                 // to make sure we have enough
                 let mut builder = CosmosBuilder::clone(&*basic.cosmos.get_first_builder());
                 builder.config.gas_estimate_multiplier = 1.5;
-                let cosmos = builder.build_lazy();
+                let cosmos = builder.build_lazy().await;
 
                 let tokenfactory = TokenFactory::new(basic.cosmos.clone(), basic.wallet.clone());
 
