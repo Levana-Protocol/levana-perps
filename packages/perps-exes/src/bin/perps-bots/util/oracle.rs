@@ -185,24 +185,30 @@ async fn price_helper(
     let pyth_prices = match pyth {
         None => HashMap::new(),
         Some(pyth) => {
+            let mut has_pyth_ids = false;
             let mut req = client.get(format!("{}api/latest_price_feeds", pyth.endpoint));
             for feed in feeds {
                 if let SpotPriceFeedData::Pyth { id, .. } = feed.data {
                     req = req.query(&[("ids[]", id)]);
+                    has_pyth_ids = true;
                 }
             }
 
-            let records = req
-                .send()
-                .await?
-                .error_for_status()?
-                .json::<Vec<PythRecord>>()
-                .await?;
+            if has_pyth_ids {
+                let records = req
+                    .send()
+                    .await?
+                    .error_for_status()?
+                    .json::<Vec<PythRecord>>()
+                    .await?;
 
-            records
-                .into_iter()
-                .map(|PythRecord { id, price }| (id, price))
-                .collect::<HashMap<_, _>>()
+                records
+                    .into_iter()
+                    .map(|PythRecord { id, price }| (id, price))
+                    .collect::<HashMap<_, _>>()
+            } else {
+                HashMap::new()
+            }
         }
     };
 
