@@ -12,7 +12,7 @@ use msg::{
             entry::{
                 ClosedPositionsResp, ExecuteOwnerMsg, LpAction, LpActionHistoryResp, LpInfoResp,
                 PositionAction, PositionActionHistoryResp, PriceWouldTriggerResp, SlippageAssert,
-                StatusResp, TradeHistorySummary,
+                StatusResp, TradeHistorySummary, OraclePriceResp,
             },
             position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
         },
@@ -610,5 +610,12 @@ impl MarketContract {
             }
             start_after = next_start_after;
         }
+    }
+
+    pub async fn get_oracle_price(&self) -> Result<OraclePriceResp> {
+        self
+            .0
+            .query(MarketQueryMsg::OraclePrice {  })
+            .await
     }
 }
