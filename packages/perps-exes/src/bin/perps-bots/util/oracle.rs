@@ -1,11 +1,10 @@
-use std::collections::{hash_map::Entry, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
-use anyhow::ensure;
 use cosmos::{Contract, Cosmos, HasAddress};
 use cosmwasm_std::Uint256;
 use msg::{
     contracts::market::{
-        entry::{OraclePriceFeedResp, OraclePriceResp},
+        entry::OraclePriceResp,
         spot_price::{PythPriceServiceNetwork, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData},
     },
     prelude::*,
@@ -104,15 +103,12 @@ impl Oracle {
                     }
                 };
 
-                let oracle_price = SanitizedOraclePrice::try_new(
-                    pyth_prices,
-                    self.market.market.get_oracle_price().await?,
-                )?;
+                let oracle_price = self.market.market.get_oracle_price().await?;
 
-                let base = oracle_price.compose_feeds(feeds)?;
+                let base = compose_oracle_feeds(&oracle_price, &pyth_prices, feeds)?;
                 let base = PriceBaseInQuote::from_non_zero(base);
 
-                let collateral = oracle_price.compose_feeds(feeds_usd)?;
+                let collateral = compose_oracle_feeds(&oracle_price, &pyth_prices, feeds_usd)?;
                 let collateral = PriceCollateralInUsd::from_non_zero(collateral);
 
                 Ok((base, collateral))
@@ -121,117 +117,46 @@ impl Oracle {
     }
 }
 
-// oracle prices may be duplicated and/or inverted, so we need to sanitize first
-struct SanitizedOraclePrice {
-    // pyth id -> price
-    pub pyth: HashMap<String, NumberGtZero>,
-    // sei denom -> price
-    pub sei: HashMap<String, NumberGtZero>,
-    // stride denom -> redemption price
-    pub stride: HashMap<String, NumberGtZero>,
-}
+pub fn compose_oracle_feeds(
+    oracle_price: &OraclePriceResp,
+    pyth_prices: &HashMap<String, NumberGtZero>,
+    feeds: &[SpotPriceFeed],
+) -> Result<NumberGtZero> {
+    let mut final_price = Decimal256::one();
 
-impl SanitizedOraclePrice {
-    pub fn try_new(
-        pyth: HashMap<String, NumberGtZero>,
-        oracle_price: OraclePriceResp,
-    ) -> Result<Self> {
-        let mut sei = HashMap::new();
-        let mut stride = HashMap::new();
-
-        let all_feeds_iter = oracle_price
-            .feeds
-            .iter()
-            .chain(oracle_price.feeds_usd.iter());
-
-        for OraclePriceFeedResp {
-            feed,
-            price,
-            publish_time: _,
-        } in all_feeds_iter
-        {
-            match &feed.data {
-                SpotPriceFeedData::Sei { denom } => {
-                    if let Entry::Vacant(entry) = sei.entry(denom.clone()) {
-                        entry.insert(if feed.inverted {
-                            Number::ONE
-                                .checked_div(price.into_number())
-                                .and_then(NumberGtZero::try_from)
-                                .with_context(|| {
-                                    format!("unable to invert sei price of {price} for {denom}")
-                                })?
-                        } else {
-                            *price
-                        });
-                    }
-                }
-                SpotPriceFeedData::Stride { denom } => {
-                    if let Entry::Vacant(entry) = stride.entry(denom.clone()) {
-                        entry.insert(if feed.inverted {
-                            Number::ONE
-                                .checked_div(price.into_number())
-                                .and_then(NumberGtZero::try_from)
-                                .with_context(|| format!("unable to invert stride redemption price of {price} for {denom}"))?
-                        } else {
-                            *price
-                        });
-                    }
-                }
-                SpotPriceFeedData::Constant { .. } => {
-                    // ignore constants, they are mixed in price_helper directly
-                }
-                SpotPriceFeedData::Pyth { id } => {
-                    // just a sanity check, pyth prices are already sanitized
-                    ensure!(
-                        pyth.contains_key(&id.to_hex()),
-                        "missing pyth price for {id}"
-                    )
-                }
-            }
-        }
-
-        Ok(Self { pyth, sei, stride })
-    }
-
-    pub fn compose_feeds(&self, feeds: &[SpotPriceFeed]) -> Result<NumberGtZero> {
-        let mut final_price = Decimal256::one();
-
-        for feed in feeds {
-            let component = match &feed.data {
-                SpotPriceFeedData::Pyth { id, .. } => self
-                    .pyth
-                    .get(&id.to_hex())
-                    .with_context(|| format!("Missing pyth price for ID {}", id))?
-                    .into_decimal256(),
-                SpotPriceFeedData::Constant { price } => price.into_decimal256(),
-                SpotPriceFeedData::Sei { denom } => self
-                    .sei
+    for feed in feeds {
+        let component = match &feed.data {
+            // pyth uses the latest-and-greatest from hermes, not the contract price
+            SpotPriceFeedData::Pyth { id, .. } => pyth_prices
+                .get(&id.to_hex())
+                .with_context(|| format!("Missing pyth price for ID {}", id))?
+                .into_decimal256(),
+            SpotPriceFeedData::Constant { price } => price.into_decimal256(),
+            SpotPriceFeedData::Sei { denom } => oracle_price
+                .sei
+                .get(denom)
+                .with_context(|| format!("Missing price for Sei denom: {denom}"))?
+                .into_decimal256(),
+            SpotPriceFeedData::Stride { denom } => {
+                let redemption_value = oracle_price
+                    .stride
                     .get(denom)
-                    .with_context(|| format!("Missing price for Sei denom: {denom}"))?
-                    .into_decimal256(),
-                SpotPriceFeedData::Stride { denom } => {
-                    let redemption_value = self
-                        .stride
-                        .get(denom)
-                        .with_context(|| {
-                            format!("Missing redemption price for Stride denom: {denom}")
-                        })?
-                        .into_decimal256();
+                    .with_context(|| format!("Missing redemption price for Stride denom: {denom}"))?
+                    .into_decimal256();
 
-                    unimplemented!("FIXME: use stride redemption value of {redemption_value}");
-                }
-            };
-
-            if feed.inverted {
-                final_price = final_price.checked_div(component)?;
-            } else {
-                final_price = final_price.checked_mul(component)?;
+                unimplemented!("FIXME: use stride redemption value of {redemption_value}");
             }
-        }
+        };
 
-        NumberGtZero::try_from_decimal(final_price)
-            .with_context(|| format!("unable to convert price of {final_price} to NumberGtZero"))
+        if feed.inverted {
+            final_price = final_price.checked_div(component)?;
+        } else {
+            final_price = final_price.checked_mul(component)?;
+        }
     }
+
+    NumberGtZero::try_from_decimal(final_price)
+        .with_context(|| format!("unable to convert price of {final_price} to NumberGtZero"))
 }
 
 async fn fetch_pyth_prices(

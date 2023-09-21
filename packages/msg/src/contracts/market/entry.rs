@@ -1,13 +1,15 @@
 //! Entrypoint messages for the market
 use super::order::LimitOrder;
 use super::position::{ClosedPosition, PositionId};
-use super::spot_price::{SpotPriceConfigInit, SpotPriceFeed};
+use super::spot_price::SpotPriceConfigInit;
 use super::{config::ConfigUpdate, crank::CrankWorkInfo};
 use crate::contracts::market::order::OrderId;
 use crate::{contracts::liquidity_token::LiquidityTokenKind, token::TokenInit};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Binary, Decimal256, Uint128};
+use pyth_sdk_cw::PriceIdentifier;
 use shared::prelude::*;
+use std::collections::BTreeMap;
 use std::fmt::Formatter;
 
 /// The InstantiateMsg comes from Factory only
@@ -424,18 +426,12 @@ pub enum QueryMsg {
 
     /// * returns [OraclePriceResp]
     ///
-    /// Gets the current price from the "oracle"
+    /// Gets the current price from the oracle (for markets configured with an oracle)
     ///
     /// Also returns prices for each feed used to compose the final price
     ///
     /// This may be more up-to-date than the spot price which was
     /// validated and pushed into the contract storage via execution messages
-    ///
-    /// This query also works for markets configured with a manual spot price
-    /// in other words, "oracle" here means "the latest _potential_ spot price"
-    /// which may (or may not) become a _real_ spot price in contract storage
-    ///
-    /// However, in the case of manual spot prices, these are typically identical values
     #[returns(OraclePriceResp)]
     OraclePrice {},
 
@@ -634,25 +630,23 @@ pub enum QueryMsg {
 /// Response for [QueryMsg::OraclePrice]
 #[cw_serde]
 pub struct OraclePriceResp {
-    /// Information about each price feed used to compose the final price
-    /// For manual spot prices, this will be empty
-    pub feeds: Vec<OraclePriceFeedResp>,
-    /// Information about each price feed used to compose the final usd price
-    /// For manual spot prices, this will be empty
-    pub feeds_usd: Vec<OraclePriceFeedResp>,
-    /// The final, composed price. See [QueryMsg::OraclePrice] for more information
+    /// A map of each pyth id used in this market to the price and publish time
+    pub pyth: BTreeMap<PriceIdentifier, OraclePriceFeedPythResp>,
+    /// A map of each sei denom used in this market to the price
+    pub sei: BTreeMap<String, NumberGtZero>,
+    /// A map of each stride denom used in this market to the redemption price
+    pub stride: BTreeMap<String, NumberGtZero>,
+    /// The final, composed price. See [QueryMsg::OraclePrice] for more information about this value
     pub composed_price: PricePoint,
 }
 
 /// Part of [OraclePriceResp]
 #[cw_serde]
-pub struct OraclePriceFeedResp {
-    /// The feed used to get the price
-    pub feed: SpotPriceFeed,
-    /// will be inverted if feed.inverted is true
+pub struct OraclePriceFeedPythResp {
+    /// The pyth price
     pub price: NumberGtZero,
-    /// publish time for this feed, if it exists
-    pub publish_time: Option<Timestamp>,
+    /// The pyth publish time
+    pub publish_time: Timestamp,
 }
 
 /// When querying an open position, how do we calculate PnL vis-a-vis fees?
