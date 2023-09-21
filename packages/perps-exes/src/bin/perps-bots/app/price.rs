@@ -101,7 +101,7 @@ impl App {
         // theoretically optimize this by doing it at load time instead.
         let oracle = Oracle::new(
             &self.cosmos,
-            market,
+            market.clone(),
             &self.endpoint_stable,
             &self.endpoint_edge,
         )

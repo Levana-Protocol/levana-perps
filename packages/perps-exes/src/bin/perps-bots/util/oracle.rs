@@ -13,7 +13,7 @@ use super::markets::Market;
 
 #[derive(Clone)]
 pub(crate) struct Oracle {
-    pub market_id: MarketId,
+    pub market: Market,
     pub spot_price_config: SpotPriceConfig,
     pub pyth: Option<PythOracle>,
 }
@@ -28,7 +28,7 @@ impl std::fmt::Debug for Oracle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut f = f.debug_struct("Oracle");
 
-        f.field("market_id", &self.market_id);
+        f.field("market_id", &self.market.market_id);
         if let Some(pyth) = &self.pyth {
             f.field("pyth_oracle_contract", &pyth.contract.get_address());
         }
@@ -46,11 +46,10 @@ impl std::fmt::Debug for Oracle {
 impl Oracle {
     pub async fn new(
         cosmos: &Cosmos,
-        market: &Market,
+        market: Market,
         pyth_endpoint_stable: impl Into<String>,
         pyth_endpoint_edge: impl Into<String>,
     ) -> Result<Self> {
-        let market_id = market.market_id.clone();
         let status = market.market.status().await?;
 
         let spot_price_config = status.config.spot_price;
@@ -79,7 +78,7 @@ impl Oracle {
 
         Ok(Self {
             pyth,
-            market_id,
+            market,
             spot_price_config,
         })
     }
