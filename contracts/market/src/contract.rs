@@ -22,8 +22,8 @@ use msg::{
     contracts::market::{
         config::MaxLiquidity,
         entry::{
-            DeltaNeutralityFeeResp, InstantiateMsg, MigrateMsg, PositionsQueryFeeApproach,
-            PriceWouldTriggerResp, SpotPriceHistoryResp,
+            DeltaNeutralityFeeResp, InstantiateMsg, MigrateMsg, OraclePriceResp,
+            PositionsQueryFeeApproach, PriceWouldTriggerResp, SpotPriceHistoryResp,
         },
         position::{events::PositionSaveReason, PositionId, PositionOrPendingClose, PositionsResp},
         spot_price::{PythConfig, SpotPriceConfig, SpotPriceConfigInit, StrideConfig},
@@ -476,10 +476,16 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
         }
 
         QueryMsg::OraclePrice {} => {
-            let price_storage = state.get_oracle_price_storage(store, false)?;
-            state
-                .make_price_point(store, state.now(), price_storage)?
-                .query_result()
+            let oracle_price = state.get_oracle_price(store, false)?;
+            let composed_price =
+                state.make_price_point(store, state.now(), oracle_price.composed_price)?;
+
+            OraclePriceResp {
+                feeds: oracle_price.feeds,
+                feeds_usd: oracle_price.feeds_usd,
+                composed_price,
+            }
+            .query_result()
         }
 
         QueryMsg::Positions {
