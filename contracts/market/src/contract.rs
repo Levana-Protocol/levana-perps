@@ -475,25 +475,26 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             SpotPriceHistoryResp { price_points }.query_result()
         }
 
-        QueryMsg::OraclePrice {} => {
-            match state.config.spot_price.clone() {
-                SpotPriceConfig::Manual { .. } => {
-                    bail!("there is no oracle for this market, it uses a manual price instead");
-                },
-                SpotPriceConfig::Oracle { feeds, feeds_usd, .. } => {
-                    let oracle_price = state.get_oracle_price(false)?;
-                    let market_id = state.market_id(store)?;
-                    let price_storage = oracle_price.compose_price(&market_id, &feeds, &feeds_usd)?;
-                    let price_point = state.make_price_point(store, state.now(), price_storage)?;
-                    OraclePriceResp{ 
-                        pyth: oracle_price.pyth, 
-                        sei: oracle_price.sei, 
-                        stride: oracle_price.stride, 
-                        composed_price: price_point 
-                    }.query_result()
-                }
+        QueryMsg::OraclePrice {} => match state.config.spot_price.clone() {
+            SpotPriceConfig::Manual { .. } => {
+                bail!("there is no oracle for this market, it uses a manual price instead");
             }
-        }
+            SpotPriceConfig::Oracle {
+                feeds, feeds_usd, ..
+            } => {
+                let oracle_price = state.get_oracle_price(false)?;
+                let market_id = state.market_id(store)?;
+                let price_storage = oracle_price.compose_price(market_id, &feeds, &feeds_usd)?;
+                let price_point = state.make_price_point(store, state.now(), price_storage)?;
+                OraclePriceResp {
+                    pyth: oracle_price.pyth,
+                    sei: oracle_price.sei,
+                    stride: oracle_price.stride,
+                    composed_price: price_point,
+                }
+                .query_result()
+            }
+        },
 
         QueryMsg::Positions {
             position_ids,

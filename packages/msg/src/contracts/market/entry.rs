@@ -640,11 +640,10 @@ pub struct OraclePriceResp {
     pub composed_price: PricePoint,
 }
 
-
 /// Part of [OraclePriceResp]
 #[cw_serde]
 pub struct OraclePriceFeedPythResp {
-    /// The pyth price 
+    /// The pyth price
     pub price: NumberGtZero,
     /// The pyth publish time
     pub publish_time: Timestamp,

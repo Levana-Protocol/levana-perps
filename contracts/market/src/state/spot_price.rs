@@ -1,19 +1,17 @@
-use std::collections::{BTreeMap, btree_map::Entry};
+use std::collections::{btree_map::Entry, BTreeMap};
 
 use crate::prelude::*;
 use anyhow::ensure;
 use cosmwasm_std::Order;
+#[cfg(feature = "sei")]
+use cosmwasm_std::QuerierWrapper;
 use msg::contracts::market::{
-    entry::{PriceForQuery, OraclePriceFeedPythResp},
-    spot_price::{
-        events::SpotPriceEvent, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData,
-    },
+    entry::{OraclePriceFeedPythResp, PriceForQuery},
+    spot_price::{events::SpotPriceEvent, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData},
 };
 use pyth_sdk_cw::{PriceFeedResponse, PriceIdentifier};
 #[cfg(feature = "sei")]
 use sei_cosmwasm::{ExchangeRatesResponse, SeiQuerier};
-#[cfg(feature = "sei")]
-use cosmwasm_std::QuerierWrapper;
 
 /// Stores spot price history.
 /// Key is a [Timestamp] of when the price was received.
@@ -48,10 +46,15 @@ pub(crate) struct OraclePriceInternal {
 }
 
 impl OraclePriceInternal {
-    pub fn compose_price(&self, market_id: &MarketId, feeds: &[SpotPriceFeed], feeds_usd: &[SpotPriceFeed]) -> Result<PriceStorage> {
-        let (price_amount, publish_time) = self.compose_price_feeds(&feeds)?;
+    pub fn compose_price(
+        &self,
+        market_id: &MarketId,
+        feeds: &[SpotPriceFeed],
+        feeds_usd: &[SpotPriceFeed],
+    ) -> Result<PriceStorage> {
+        let (price_amount, publish_time) = self.compose_price_feeds(feeds)?;
 
-        let (price_amount_usd, publish_time_usd) = self.compose_price_feeds(&feeds_usd)?;
+        let (price_amount_usd, publish_time_usd) = self.compose_price_feeds(feeds_usd)?;
 
         let market_type = market_id.get_market_type();
         let price_base = PriceBaseInQuote::from_non_zero(price_amount);
@@ -68,36 +71,31 @@ impl OraclePriceInternal {
     }
 
     // given a list of feeds, compose them into a single price and publish_time (if available)
-    pub fn compose_price_feeds(&self, feeds: &[SpotPriceFeed]) -> Result<(NumberGtZero, Option<Timestamp>)> {
+    pub fn compose_price_feeds(
+        &self,
+        feeds: &[SpotPriceFeed],
+    ) -> Result<(NumberGtZero, Option<Timestamp>)> {
         let mut acc_price: Option<(Number, Option<Timestamp>)> = None;
 
-        for SpotPriceFeed { data, inverted } in feeds
-        {
+        for SpotPriceFeed { data, inverted } in feeds {
             let (price, publish_time) = match data {
-                SpotPriceFeedData::Pyth { id } => {
-                    self
-                        .pyth
-                        .get(id)
-                        .map(|x| (x.price, Some(x.publish_time)))
-                        .with_context(|| format!("no pyth price for id {}", id))?
-                },
-                SpotPriceFeedData::Sei { denom } => {
-                    self
-                        .sei
-                        .get(denom)
-                        .map(|x| (*x, None))
-                        .with_context(|| format!("no sei price for denom {}", denom))?
-                },
+                SpotPriceFeedData::Pyth { id } => self
+                    .pyth
+                    .get(id)
+                    .map(|x| (x.price, Some(x.publish_time)))
+                    .with_context(|| format!("no pyth price for id {}", id))?,
+                SpotPriceFeedData::Sei { denom } => self
+                    .sei
+                    .get(denom)
+                    .map(|x| (*x, None))
+                    .with_context(|| format!("no sei price for denom {}", denom))?,
                 SpotPriceFeedData::Stride { denom } => {
-                    self
-                        .stride
+                    self.stride
                         .get(denom)
                         .map(|x| (*x, None))
                         .with_context(|| format!("no stride price for denom {}", denom))?
-                },
-                SpotPriceFeedData::Constant { price } => {
-                    (*price, None)
-                },
+                }
+                SpotPriceFeedData::Constant { price } => (*price, None),
             };
 
             let price = if *inverted {
@@ -335,30 +333,23 @@ impl State<'_> {
             // if price changes within the same block, we don't care - first come first serve
             return Ok(());
         }
-        
+
         let market_id = self.market_id(ctx.storage)?;
 
         let price_storage = match self.config.spot_price.clone() {
-            SpotPriceConfig::Manual { .. } => {
-                MANUAL_SPOT_PRICE.load(ctx.storage)?
-            }
+            SpotPriceConfig::Manual { .. } => MANUAL_SPOT_PRICE.load(ctx.storage)?,
             SpotPriceConfig::Oracle {
                 pyth: _,
                 stride: _,
                 feeds,
                 feeds_usd,
-            } => {
-                self
-                    .get_oracle_price(true)?
-                    .compose_price(&market_id, &feeds, &feeds_usd)?
-            }
+            } => self
+                .get_oracle_price(true)?
+                .compose_price(market_id, &feeds, &feeds_usd)?,
         };
 
         // sanity check
-        if let Some(price_usd) = price_storage
-            .price_base
-            .try_into_usd(market_id)
-        {
+        if let Some(price_usd) = price_storage.price_base.try_into_usd(market_id) {
             ensure!(
                 price_storage.price_usd == price_usd,
                 "Price in USD mismatch {} != {}",
@@ -381,10 +372,7 @@ impl State<'_> {
             .map_err(|err| err.into())
     }
 
-    pub(crate) fn get_oracle_price(
-        &self,
-        validate_age: bool,
-    ) -> Result<OraclePriceInternal> {
+    pub(crate) fn get_oracle_price(&self, validate_age: bool) -> Result<OraclePriceInternal> {
         match self.config.spot_price.clone() {
             SpotPriceConfig::Manual { .. } => {
                 bail!("Manual spot price does not have an oracle price");
@@ -395,7 +383,6 @@ impl State<'_> {
                 feeds,
                 feeds_usd,
             } => {
-
                 let mut pyth = BTreeMap::new();
                 let mut stride = BTreeMap::new();
                 #[cfg(feature = "sei")]
@@ -407,18 +394,22 @@ impl State<'_> {
                     match &feed.data {
                         SpotPriceFeedData::Pyth { id } => {
                             if let Entry::Vacant(entry) = pyth.entry(*id) {
-                                let pyth_config = pyth_config.as_ref().context("pyth feeds need a pyth config!")?;
+                                let pyth_config = pyth_config
+                                    .as_ref()
+                                    .context("pyth feeds need a pyth config!")?;
 
-                                let price_feed_response: PriceFeedResponse = pyth_sdk_cw::query_price_feed(
-                                    &self.querier,
-                                    pyth_config.contract_address.clone(),
-                                    *id,
-                                )?;
+                                let price_feed_response: PriceFeedResponse =
+                                    pyth_sdk_cw::query_price_feed(
+                                        &self.querier,
+                                        pyth_config.contract_address.clone(),
+                                        *id,
+                                    )?;
 
                                 let price_feed = price_feed_response.price_feed;
 
                                 let price = if validate_age {
-                                    let current_block_time_seconds = self.env.block.time.seconds().try_into()?;
+                                    let current_block_time_seconds =
+                                        self.env.block.time.seconds().try_into()?;
 
                                     price_feed
                                         // alternative: .get_emaprice_no_older_than()
@@ -442,9 +433,11 @@ impl State<'_> {
                                     price_feed.get_price_unchecked()
                                 };
 
-                                let publish_time = Timestamp::from_seconds(price.publish_time.try_into()?);
+                                let publish_time =
+                                    Timestamp::from_seconds(price.publish_time.try_into()?);
                                 let price = Number::try_from(price)?;
-                                let price = NumberGtZero::try_from(price).context("price must be > 0")?;
+                                let price =
+                                    NumberGtZero::try_from(price).context("price must be > 0")?;
 
                                 entry.insert(OraclePriceFeedPythResp {
                                     price,
@@ -459,17 +452,20 @@ impl State<'_> {
                                 if let Entry::Vacant(entry) = sei.entry(denom.clone()) {
                                     let querier = QuerierWrapper::new(&*self.querier);
                                     let querier = SeiQuerier::new(&querier);
-                                    let res: ExchangeRatesResponse = querier.query_exchange_rates()?;
+                                    let res: ExchangeRatesResponse =
+                                        querier.query_exchange_rates()?;
                                     let pair = res
                                         .denom_oracle_exchange_rate_pairs
                                         .iter()
                                         .find(|x| x.denom == *denom)
                                         .with_context(|| format!("no such denom {denom}"))?;
-                
-                                    let price: Decimal256 = pair.oracle_exchange_rate.exchange_rate.into();
+
+                                    let price: Decimal256 =
+                                        pair.oracle_exchange_rate.exchange_rate.into();
                                     let price = Number::try_from(price)?;
-                                    let price = NumberGtZero::try_from(price).context("price must be > 0")?;
-                
+                                    let price = NumberGtZero::try_from(price)
+                                        .context("price must be > 0")?;
+
                                     entry.insert(price);
                                 }
                             }
@@ -487,24 +483,16 @@ impl State<'_> {
                         }
 
                         SpotPriceFeedData::Constant { .. } => {
-                            // nothing to do here, constant prices are used without a lookup 
+                            // nothing to do here, constant prices are used without a lookup
                         }
                     }
                 }
 
-                Ok(OraclePriceInternal {
-                    pyth,
-                    stride,
-                    sei,
-                })
-
+                Ok(OraclePriceInternal { pyth, stride, sei })
             }
         }
-
     }
-
 }
-
 
 #[cfg(test)]
 mod tests {
