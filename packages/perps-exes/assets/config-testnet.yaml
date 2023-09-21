@@ -190,3 +190,17 @@ overrides:
   #     - OSMO_USDC
   #     - ETH_BTC
   #     - BTC_USD
+  #
+  # seici:
+  #   wallet-manager-address: sei12g96ahplpf78558cv5pyunus2m66guykwjceut
+  #   price: true
+  #   crank: false
+  #   liquidity: false
+  #   utilization: false
+  #   balance: false
+  #   traders: 1
+  #   default-market-ids:
+  #     - ATOM_USD
+  #     - OSMO_USDC
+  #     - ETH_BTC
+  #     - BTC_USD
