@@ -1,11 +1,12 @@
-use std::collections::{HashMap, hash_map::Entry};
+use std::collections::{hash_map::Entry, HashMap};
 
 use cosmos::{Contract, Cosmos, HasAddress};
 use cosmwasm_std::Uint256;
 use msg::{
-    contracts::market::{spot_price::{
-        PythPriceServiceNetwork, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData,
-    }, entry::{OraclePriceResp, OraclePriceFeedResp}},
+    contracts::market::{
+        entry::{OraclePriceFeedResp, OraclePriceResp},
+        spot_price::{PythPriceServiceNetwork, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData},
+    },
     prelude::*,
 };
 
@@ -94,12 +95,14 @@ impl Oracle {
             SpotPriceConfig::Oracle {
                 feeds, feeds_usd, ..
             } => {
-                let oracle_price:SanitizedOraclePrice = self.market.market.get_oracle_price().await?.try_into()?;
+                let oracle_price: SanitizedOraclePrice =
+                    self.market.market.get_oracle_price().await?.try_into()?;
 
                 let base = price_helper(client, self.pyth.as_ref(), &oracle_price, feeds).await?;
                 let base = PriceBaseInQuote::from_non_zero(base);
 
-                let collateral = price_helper(client, self.pyth.as_ref(), &oracle_price, feeds_usd).await?;
+                let collateral =
+                    price_helper(client, self.pyth.as_ref(), &oracle_price, feeds_usd).await?;
                 let collateral = PriceCollateralInUsd::from_non_zero(collateral);
 
                 Ok((base, collateral))
@@ -123,17 +126,27 @@ impl TryFrom<OraclePriceResp> for SanitizedOraclePrice {
         let mut sei = HashMap::new();
         let mut stride = HashMap::new();
 
-        let all_feeds_iter = oracle_price.feeds.iter().chain(oracle_price.feeds_usd.iter());
+        let all_feeds_iter = oracle_price
+            .feeds
+            .iter()
+            .chain(oracle_price.feeds_usd.iter());
 
-        for OraclePriceFeedResp { feed, price, publish_time: _ } in all_feeds_iter {
+        for OraclePriceFeedResp {
+            feed,
+            price,
+            publish_time: _,
+        } in all_feeds_iter
+        {
             match &feed.data {
                 SpotPriceFeedData::Sei { denom } => {
                     if let Entry::Vacant(entry) = sei.entry(denom.clone()) {
                         entry.insert(if feed.inverted {
                             Number::ONE
                                 .checked_div(price.into_number())
-                                .and_then(|x| NumberGtZero::try_from(x))
-                                .with_context(|| format!("unable to invert sei price of {price} for {denom}"))?
+                                .and_then(NumberGtZero::try_from)
+                                .with_context(|| {
+                                    format!("unable to invert sei price of {price} for {denom}")
+                                })?
                         } else {
                             *price
                         });
@@ -144,18 +157,18 @@ impl TryFrom<OraclePriceResp> for SanitizedOraclePrice {
                         entry.insert(if feed.inverted {
                             Number::ONE
                                 .checked_div(price.into_number())
-                                .and_then(|x| NumberGtZero::try_from(x))
+                                .and_then(NumberGtZero::try_from)
                                 .with_context(|| format!("unable to invert stride redemption price of {price} for {denom}"))?
                         } else {
                             *price
                         });
                     }
-                },
+                }
                 SpotPriceFeedData::Constant { .. } => {
                     // ignore constants, they are mixed in price_helper directly
                 }
                 SpotPriceFeedData::Pyth { .. } => {
-                    // ignore pyth, they are mixed in via hermes fetching 
+                    // ignore pyth, they are mixed in via hermes fetching
                 }
             }
         }
@@ -228,13 +241,11 @@ async fn price_helper(
                 Decimal256::from_atomics(*price, expo.abs().try_into()?)?
             }
             SpotPriceFeedData::Constant { price } => price.into_decimal256(),
-            SpotPriceFeedData::Sei { denom } => {
-                oracle_price
-                    .sei
-                    .get(denom)
-                    .with_context(|| format!("Missing price for Sei denom: {denom}"))?
-                    .into_decimal256()
-            }
+            SpotPriceFeedData::Sei { denom } => oracle_price
+                .sei
+                .get(denom)
+                .with_context(|| format!("Missing price for Sei denom: {denom}"))?
+                .into_decimal256(),
             SpotPriceFeedData::Stride { denom } => {
                 let redemption_value = oracle_price
                     .stride
@@ -253,5 +264,6 @@ async fn price_helper(
         }
     }
 
-    NumberGtZero::try_from_decimal(final_price).with_context(|| format!("unable to convert price of {final_price} to NumberGtZero"))
+    NumberGtZero::try_from_decimal(final_price)
+        .with_context(|| format!("unable to convert price of {final_price} to NumberGtZero"))
 }
