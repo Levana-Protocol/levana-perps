@@ -114,9 +114,6 @@ pub(crate) struct Opt {
     /// Override gRPC endpoint
     #[clap(long, env = "COSMOS_GRPC", global = true)]
     pub(crate) cosmos_grpc: Option<String>,
-    /// Use RPC instead of gRPC
-    #[clap(long, env = "COSMOS_RPC", global = true)]
-    pub(crate) cosmos_rpc: Option<String>,
     /// Override chain ID
     #[clap(long, env = "COSMOS_CHAIN_ID", global = true)]
     pub(crate) cosmos_chain_id: Option<String>,
