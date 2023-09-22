@@ -67,3 +67,59 @@ markets:
     borrow_fee_rate_max_annualized: "0.30"
     target_utilization: "0.5"
     funding_rate_sensitivity: 1
+
+  EVMOS_USD:
+    trading_fee_notional_size: 0.002
+    trading_fee_counter_collateral: 0.002
+    max_leverage: 5
+    carry_leverage: 3
+    funding_rate_sensitivity: 2
+    target_utilization: 0.5
+    liquifunding_delay_seconds: 21600
+    liquifunding_delay_fuzz_seconds: 3600
+    delta_neutrality_fee_cap: 0.03
+    delta_neutrality_fee_tax: 0.35
+
+    # Different from AKT
+    borrow_fee_rate_min_annualized: 0.2
+    borrow_fee_rate_max_annualized: 0.9
+    borrow_fee_sensitivity: 0.166666667
+    delta_neutrality_fee_sensitivity: 20000000
+
+    # Starting borrow fee: 0.35
+
+  AKT_USD:
+    trading_fee_notional_size: 0.002
+    trading_fee_counter_collateral: 0.002
+    max_leverage: 5
+    carry_leverage: 3
+    funding_rate_sensitivity: 2
+    target_utilization: 0.5
+    liquifunding_delay_seconds: 21600
+    liquifunding_delay_fuzz_seconds: 3600
+    delta_neutrality_fee_cap: 0.03
+    delta_neutrality_fee_tax: 0.35
+
+    # Different from EVMOS
+    borrow_fee_rate_min_annualized: 0.06
+    borrow_fee_rate_max_annualized: 0.6
+    borrow_fee_sensitivity: 0.01333333333
+    delta_neutrality_fee_sensitivity: 30000000
+
+    # Starting borrow fee: 0.1
+
+  DOT_USD:
+    trading_fee_notional_size: 0.001
+    trading_fee_counter_collateral: 0.001
+    funding_rate_sensitivity: 1.5
+    funding_rate_max_annualized: 0.9
+    borrow_fee_rate_min_annualized: 0.05
+    liquifunding_delay_seconds: 21600
+    target_utilization: 0.5
+    borrow_fee_sensitivity: 0.083333333
+    delta_neutrality_fee_sensitivity: 400000000
+    delta_neutrality_fee_cap: 0.005
+    delta_neutrality_fee_tax: 0.05
+    liquifunding_delay_fuzz_seconds: 3600
+
+    # Starting borrow fee: 0.1
