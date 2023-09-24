@@ -1,7 +1,7 @@
 use anyhow::Result;
 use axum::async_trait;
+use chrono::{Duration, Utc};
 use cosmos::Wallet;
-use msg::contracts::market;
 use msg::contracts::market::crank::CrankWorkInfo;
 use perps_exes::prelude::MarketContract;
 
@@ -103,7 +103,7 @@ impl App {
         &self,
         crank_wallet: &Wallet,
         market: &MarketContract,
-        work: &CrankWorkInfo,
+        work: &CrankReason,
         execs: Option<u32>,
     ) -> Result<WatchedTaskOutput> {
         let txres = market.crank_single(crank_wallet, execs).await?;
@@ -116,10 +116,33 @@ impl App {
         })
     }
 
-    async fn check_crank(
-        &self,
-        market: &MarketContract,
-    ) -> Result<Option<market::crank::CrankWorkInfo>> {
-        Ok(market.status().await?.next_crank)
+    async fn check_crank(&self, market: &MarketContract) -> Result<Option<CrankReason>> {
+        let status = market.status().await?;
+        if let Some(work) = status.next_crank {
+            Ok(Some(CrankReason::WorkAvailable(work)))
+        } else {
+            match status.last_crank_completed {
+                None => Ok(Some(CrankReason::NoPriorCrank)),
+                Some(timestamp) => {
+                    let timestamp = timestamp.try_into_chrono_datetime()?;
+                    let now = Utc::now();
+                    let age = now.signed_duration_since(timestamp);
+                    if age.num_seconds() > MAX_CRANK_AGE {
+                        Ok(Some(CrankReason::OldLastCrank(age)))
+                    } else {
+                        Ok(None)
+                    }
+                }
+            }
+        }
     }
+}
+
+const MAX_CRANK_AGE: i64 = 60 * 10;
+
+#[derive(Debug)]
+enum CrankReason {
+    WorkAvailable(CrankWorkInfo),
+    OldLastCrank(Duration),
+    NoPriorCrank,
 }
