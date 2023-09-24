@@ -17,6 +17,6 @@ ADD https://raw.githubusercontent.com/Levana-Protocol/docker-images/health_check
 ADD https://raw.githubusercontent.com/Levana-Protocol/docker-images/health_check/images/base_image/logging.sh /logging.sh
 RUN apk add --no-cache curl bash aws-cli && chmod a+x /health_check.sh /logging.sh
 
-ENTRYPOINT [ "pid1", "/logging.sh" ]
+ENTRYPOINT [ "pid1" ]
 
 CMD [ "perps-companion" ]
