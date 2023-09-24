@@ -126,7 +126,7 @@ impl App {
                 Some(timestamp) => {
                     let timestamp = timestamp.try_into_chrono_datetime()?;
                     let now = Utc::now();
-                    let age = now.signed_duration_since(&timestamp);
+                    let age = now.signed_duration_since(timestamp);
                     if age.num_seconds() > MAX_CRANK_AGE {
                         Ok(Some(CrankReason::OldLastCrank(age)))
                     } else {
