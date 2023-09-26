@@ -289,10 +289,7 @@ impl App {
         // Check 3: would any triggers happen from this price?
         // We save this for last since it requires a network round trip
         if market.price_would_trigger(oracle_price).await? {
-            return Ok((
-                Some(market_price),
-                Some(PriceUpdateReason::Triggers { is_too_frequent }),
-            ));
+            return Ok((Some(market_price), Some(PriceUpdateReason::Triggers)));
         }
 
         Ok((Some(market_price), None))
@@ -348,9 +345,7 @@ enum PriceUpdateReason {
         delta: Decimal256,
         is_too_frequent: bool,
     },
-    Triggers {
-        is_too_frequent: bool,
-    },
+    Triggers,
     NoPriceFound,
 }
 
@@ -361,7 +356,7 @@ impl PriceUpdateReason {
             PriceUpdateReason::PriceDelta {
                 is_too_frequent, ..
             } => *is_too_frequent,
-            PriceUpdateReason::Triggers { is_too_frequent } => *is_too_frequent,
+            PriceUpdateReason::Triggers => false,
             PriceUpdateReason::NoPriceFound => false,
         }
     }
@@ -376,7 +371,6 @@ struct ReasonStats {
     delta: u64,
     delta_too_frequent: u64,
     triggers: u64,
-    triggers_too_frequent: u64,
     no_price_found: u64,
 }
 
@@ -390,10 +384,9 @@ impl Display for ReasonStats {
             delta,
             delta_too_frequent,
             triggers,
-            triggers_too_frequent,
             no_price_found,
         } = self;
-        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Delta too frequent: {delta_too_frequent}. Triggers: {triggers}. Triggers too frequent: {triggers_too_frequent}. No price found: {no_price_found}.")
+        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Delta too frequent: {delta_too_frequent}. Triggers: {triggers}. No price found: {no_price_found}.")
     }
 }
 
@@ -406,7 +399,6 @@ impl ReasonStats {
             delta: 0,
             delta_too_frequent: 0,
             triggers: 0,
-            triggers_too_frequent: 0,
             no_price_found: 0,
             market,
         }
@@ -430,13 +422,7 @@ impl ReasonStats {
                     self.delta += 1
                 }
             }
-            PriceUpdateReason::Triggers { is_too_frequent } => {
-                if *is_too_frequent {
-                    self.triggers_too_frequent += 1
-                } else {
-                    self.triggers += 1
-                }
-            }
+            PriceUpdateReason::Triggers => self.triggers += 1,
             PriceUpdateReason::NoPriceFound => self.no_price_found += 1,
         }
     }
@@ -450,8 +436,8 @@ impl Display for PriceUpdateReason {
                 f,
                 "Large price delta. Old: {old}. New: {new}. Delta: {delta}. Too frequent: {is_too_frequent}."
             ),
-            PriceUpdateReason::Triggers {is_too_frequent}=> {
-                write!(f, "Price would trigger positions and/or orders. Too frequent: {is_too_frequent}.")
+            PriceUpdateReason::Triggers => {
+                write!(f, "Price would trigger positions and/or orders.")
             }
             PriceUpdateReason::NoPriceFound => write!(f, "No price point found."),
         }
