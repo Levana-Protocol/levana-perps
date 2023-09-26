@@ -13,6 +13,7 @@ pyth:
       EVMOS_USD: "c19405e4c8bdcbf2a66c37ae05a27d385c8309e9d648ed20dc6ee717e7d30e17"
       AKT_USD: "4ea5bb4d2f5900cc2e97ba534240950740b4d3b89fe712a94a7304fd2fd92702"
       DOT_USD: "ca3eed9b267293f6595901c734c7525ce8ef49adafe8284606ceb307afa2ca5b"
+      INJ_USD: "7a5bc1d2b56ad029048cd63964b3ad2776eadf812edc1a43a31406cb54bff592"
   edge: 
     update-age-tolerance: 120
     endpoint: "https://hermes-beta.pyth.network/"
@@ -23,6 +24,14 @@ pyth:
       ETH_USD: "ca80ba6dc32e08d06f1aa886011eed1d77c77be9eb761cc10d72b7d0a2fd57a6"
 
 networks: 
+  injective-mainnet:
+    INJ_USD:
+      feeds: [
+        !pyth { key: "INJ_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !pyth { key: "INJ_USD", inverted: false }
+      ]
   osmosis-mainnet:
     ATOM_USD:
       feeds: [
