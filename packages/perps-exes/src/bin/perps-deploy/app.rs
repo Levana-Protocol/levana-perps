@@ -230,8 +230,6 @@ impl Opt {
         let cosmos = self.connect(network).await?;
         let wallet = self.get_wallet(network)?;
 
-        // TODO - get OracleInfo for mainnet
-
         Ok(AppMainnet { cosmos, wallet })
     }
 }
