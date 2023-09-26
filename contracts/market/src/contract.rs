@@ -1,7 +1,7 @@
 mod perps_info;
 
 use crate::state::{
-    config::{config_init, update_config},
+    config::{config_init, convert_spot_price_init, update_config},
     crank::crank_init,
     delta_neutrality_fee::DELTA_NEUTRALITY_FUND,
     fees::fees_init,
@@ -13,7 +13,6 @@ use crate::state::{
 };
 
 use crate::prelude::*;
-use anyhow::ensure;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Response};
@@ -26,7 +25,7 @@ use msg::{
             PositionsQueryFeeApproach, PriceWouldTriggerResp, SpotPriceHistoryResp,
         },
         position::{events::PositionSaveReason, PositionId, PositionOrPendingClose, PositionsResp},
-        spot_price::{PythConfig, SpotPriceConfig, SpotPriceConfigInit, StrideConfig},
+        spot_price::SpotPriceConfig,
     },
     shutdown::ShutdownImpact,
 };
@@ -161,7 +160,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
             match owner_msg {
                 ExecuteOwnerMsg::ConfigUpdate { update } => {
-                    update_config(&mut state.config, ctx.storage, *update)?;
+                    update_config(&mut state.config, state.api, ctx.storage, *update)?;
                 }
             }
         }
@@ -727,44 +726,7 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response> {
     let old_config = OLD_CONFIG_STORAGE.load(deps.storage)?;
 
     // just copy-pasted from init_config()
-    let spot_price: SpotPriceConfig = match msg.spot_price {
-        SpotPriceConfigInit::Manual { admin } => SpotPriceConfig::Manual {
-            admin: admin.validate(deps.api)?,
-        },
-        SpotPriceConfigInit::Oracle {
-            pyth,
-            stride,
-            feeds,
-            feeds_usd,
-        } => {
-            ensure!(!feeds.is_empty(), "feeds cannot be empty");
-            ensure!(!feeds_usd.is_empty(), "feeds_usd cannot be empty");
-
-            SpotPriceConfig::Oracle {
-                pyth: pyth
-                    .map(|pyth| {
-                        pyth.contract_address
-                            .validate(deps.api)
-                            .map(|contract_address| PythConfig {
-                                contract_address,
-                                age_tolerance_seconds: pyth.age_tolerance_seconds.into(),
-                                network: pyth.network,
-                            })
-                    })
-                    .transpose()?,
-                stride: stride
-                    .map(|stride| {
-                        stride
-                            .contract_address
-                            .validate(deps.api)
-                            .map(|contract_address| StrideConfig { contract_address })
-                    })
-                    .transpose()?,
-                feeds,
-                feeds_usd,
-            }
-        }
-    };
+    let spot_price: SpotPriceConfig = convert_spot_price_init(deps.api, msg.spot_price)?;
     const NEW_CONFIG_STORAGE: Item<Config> = Item::new(namespace::CONFIG);
 
     NEW_CONFIG_STORAGE.save(

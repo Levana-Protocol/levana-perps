@@ -131,6 +131,33 @@ pub enum SpotPriceConfigInit {
     },
 }
 
+impl From<SpotPriceConfig> for SpotPriceConfigInit {
+    fn from(src: SpotPriceConfig) -> Self {
+        match src {
+            SpotPriceConfig::Manual { admin } => Self::Manual {
+                admin: RawAddr::from(admin),
+            },
+            SpotPriceConfig::Oracle {
+                pyth,
+                stride,
+                feeds,
+                feeds_usd,
+            } => Self::Oracle {
+                pyth: pyth.map(|pyth| PythConfigInit {
+                    contract_address: RawAddr::from(pyth.contract_address),
+                    age_tolerance_seconds: pyth.age_tolerance_seconds as u32,
+                    network: pyth.network,
+                }),
+                stride: stride.map(|stride| StrideConfigInit {
+                    contract_address: RawAddr::from(stride.contract_address),
+                }),
+                feeds,
+                feeds_usd,
+            },
+        }
+    }
+}
+
 /// Configuration for pyth init messages
 #[cw_serde]
 pub struct PythConfigInit {
