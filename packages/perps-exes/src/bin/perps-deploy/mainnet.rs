@@ -30,9 +30,9 @@ enum Sub {
         /// Network to use.
         #[clap(long, env = "COSMOS_NETWORK")]
         network: CosmosNetwork,
-        /// Override the market code ID
+        /// Override the code ID, only works if to-upload is specified and has a single value
         #[clap(long)]
-        market_code_id: Option<u64>,
+        code_id: Option<u64>,
         /// Contract that granted store code rights
         #[clap(long)]
         granter: Option<Address>,
@@ -66,11 +66,11 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
     match inner.sub {
         Sub::StorePerpsContracts {
             network,
-            market_code_id,
+            code_id,
             granter,
             to_upload,
         } => {
-            store_perps_contracts(opt, network, market_code_id, granter, &to_upload).await?;
+            store_perps_contracts(opt, network, code_id, granter, &to_upload).await?;
         }
         Sub::InstantiateFactory { inner } => {
             instantiate_factory(opt, inner).await?;
@@ -201,7 +201,7 @@ struct StoredContract {
 async fn store_perps_contracts(
     opt: Opt,
     network: CosmosNetwork,
-    market_code_id: Option<u64>,
+    code_id: Option<u64>,
     granter: Option<Address>,
     to_upload: &[ContractType],
 ) -> Result<()> {
@@ -237,12 +237,16 @@ async fn store_perps_contracts(
                 log::info!("{contract_type:?} already found under code ID {code_id}");
             }
             None => {
-                let code_id = match (contract_type, market_code_id) {
-                    (ContractType::Market, Some(code_id)) => {
-                        log::info!("Using market code ID from the command line: {code_id}");
+                let code_id = match code_id {
+                    Some(code_id) => {
+                        anyhow::ensure!(
+                            to_upload.len() == 1,
+                            "Can only provide a code ID if there is exactly one to-upload value"
+                        );
+                        log::info!("Using code ID from the command line: {code_id}");
                         code_id
                     }
-                    _ => {
+                    None => {
                         log::info!("Storing {contract_type:?}...");
                         let code_id = match granter {
                             None => {

@@ -70,3 +70,12 @@ injective-testnet:
       type: edge
   rpc-nodes:
   - https://injective-testnet-rpc.polkachu.com
+injective-mainnet:
+  gas-decimals: 18
+  explorer: "https://explorer.injective.network/transaction/"
+  spot-price:
+    pyth:
+      contract: inj12j43nf2f0qumnt2zrrmpvnsqgzndxefujlvr08
+      type: stable
+  rpc-nodes:
+  - https://sentry.tm.injective.network
