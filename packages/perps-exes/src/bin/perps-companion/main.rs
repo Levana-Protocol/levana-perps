@@ -8,6 +8,7 @@ use anyhow::Result;
 use app::App;
 use clap::Parser;
 use cli::Opt;
+use pid1::Pid1Settings;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -15,6 +16,7 @@ async fn main() -> Result<()> {
 }
 
 async fn main_inner() -> Result<()> {
+    pid1::relaunch_if_pid1(Pid1Settings { log: true })?;
     dotenv::dotenv().ok();
     let opt = Opt::parse();
     opt.init_logger();
