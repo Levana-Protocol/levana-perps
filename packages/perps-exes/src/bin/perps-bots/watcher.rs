@@ -565,7 +565,11 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
         let mut errors = vec![];
         let mut total_skip_delay = false;
         for market in &factory.markets {
-            match self.run_single_market(app, &factory, market).await {
+            let market_start_time = Utc::now();
+            let res = self.run_single_market(app, &factory, market).await;
+            let time_used = Utc::now() - market_start_time;
+            log::debug!("Time used for market {}: {time_used}.", market.market_id);
+            match res {
                 Ok(WatchedTaskOutput {
                     skip_delay,
                     message,

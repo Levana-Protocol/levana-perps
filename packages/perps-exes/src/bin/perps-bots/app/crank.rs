@@ -72,6 +72,7 @@ impl App {
             Some(work) => work,
         };
 
+        let lock_start_time = Utc::now();
         let _crank_lock = match self.crank_lock.try_lock() {
             Ok(crank_lock) => crank_lock,
             Err(_) => {
@@ -85,18 +86,27 @@ impl App {
                 });
             }
         };
+        let lock_acquire_time = Utc::now() - lock_start_time;
+        log::debug!("Time spent waiting for price lock: {lock_acquire_time}");
 
         for execs in CRANK_EXECS {
-            match self
+            let crank_start = Utc::now();
+            let res = self
                 .try_with_execs(crank_wallet, market, &work, Some(*execs))
-                .await
-            {
+                .await;
+            let crank_time = Utc::now() - crank_start;
+            log::debug!("Crank for {execs} takes {crank_time}");
+            match res {
                 Ok(x) => return Ok(x),
                 Err(e) => log::warn!("Cranking with execs=={execs} failed: {e:?}"),
             }
         }
 
-        self.try_with_execs(crank_wallet, market, &work, None).await
+        let crank_start = Utc::now();
+        let res = self.try_with_execs(crank_wallet, market, &work, None).await;
+        let crank_time = Utc::now() - crank_start;
+        log::debug!("Crank for None takes {crank_time}");
+        res
     }
 
     async fn try_with_execs(
