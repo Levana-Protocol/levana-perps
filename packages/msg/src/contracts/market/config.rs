@@ -5,7 +5,7 @@ use shared::prelude::*;
 
 use self::defaults::ConfigDefaults;
 
-use super::spot_price::SpotPriceConfig;
+use super::spot_price::{SpotPriceConfig, SpotPriceConfigInit};
 
 /// Configuration info for the vAMM
 /// Set by admin-only
@@ -366,7 +366,7 @@ pub struct ConfigUpdate {
     pub max_liquidity: Option<MaxLiquidity>,
     pub disable_position_nft_exec: Option<bool>,
     pub liquidity_cooldown_seconds: Option<u32>,
-    pub spot_price: Option<SpotPriceConfig>,
+    pub spot_price: Option<SpotPriceConfigInit>,
 }
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for ConfigUpdate {
@@ -442,7 +442,7 @@ impl From<Config> for ConfigUpdate {
             max_liquidity: Some(src.max_liquidity),
             disable_position_nft_exec: Some(src.disable_position_nft_exec),
             liquidity_cooldown_seconds: Some(src.liquidity_cooldown_seconds),
-            spot_price: Some(src.spot_price),
+            spot_price: Some(src.spot_price.into()),
         }
     }
 }

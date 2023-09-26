@@ -19,58 +19,21 @@ pub(crate) fn config_init(
     config: Option<ConfigUpdate>,
     spot_price: SpotPriceConfigInit,
 ) -> Result<()> {
-    let spot_price: SpotPriceConfig = match spot_price {
-        SpotPriceConfigInit::Manual { admin } => SpotPriceConfig::Manual {
-            admin: admin.validate(api)?,
-        },
-        SpotPriceConfigInit::Oracle {
-            pyth,
-            stride,
-            feeds,
-            feeds_usd,
-        } => {
-            ensure!(!feeds.is_empty(), "feeds cannot be empty");
-            ensure!(!feeds_usd.is_empty(), "feeds_usd cannot be empty");
-
-            SpotPriceConfig::Oracle {
-                pyth: pyth
-                    .map(|pyth| {
-                        pyth.contract_address
-                            .validate(api)
-                            .map(|contract_address| PythConfig {
-                                contract_address,
-                                age_tolerance_seconds: pyth.age_tolerance_seconds.into(),
-                                network: pyth.network,
-                            })
-                    })
-                    .transpose()?,
-                stride: stride
-                    .map(|stride| {
-                        stride
-                            .contract_address
-                            .validate(api)
-                            .map(|contract_address| StrideConfig { contract_address })
-                    })
-                    .transpose()?,
-                feeds,
-                feeds_usd,
-            }
-        }
-    };
-    let mut init_config = Config::new(spot_price);
+    let mut init_config = Config::new(convert_spot_price_init(api, spot_price)?);
 
     let update = match config {
         None => ConfigUpdate::default(),
         Some(update) => update,
     };
 
-    update_config(&mut init_config, store, update)?;
+    update_config(&mut init_config, api, store, update)?;
 
     Ok(())
 }
 
 pub(crate) fn update_config(
     config: &mut Config,
+    api: &dyn Api,
     store: &mut dyn Storage,
     ConfigUpdate {
         trading_fee_notional_size,
@@ -222,7 +185,7 @@ pub(crate) fn update_config(
     }
 
     if let Some(x) = spot_price {
-        config.spot_price = x;
+        config.spot_price = convert_spot_price_init(api, x)?;
     }
 
     config.validate()?;
@@ -230,4 +193,48 @@ pub(crate) fn update_config(
     CONFIG_STORAGE.save(store, config)?;
 
     Ok(())
+}
+
+pub(crate) fn convert_spot_price_init(
+    api: &dyn Api,
+    spot_price: SpotPriceConfigInit,
+) -> Result<SpotPriceConfig> {
+    Ok(match spot_price {
+        SpotPriceConfigInit::Manual { admin } => SpotPriceConfig::Manual {
+            admin: admin.validate(api)?,
+        },
+        SpotPriceConfigInit::Oracle {
+            pyth,
+            stride,
+            feeds,
+            feeds_usd,
+        } => {
+            ensure!(!feeds.is_empty(), "feeds cannot be empty");
+            ensure!(!feeds_usd.is_empty(), "feeds_usd cannot be empty");
+
+            SpotPriceConfig::Oracle {
+                pyth: pyth
+                    .map(|pyth| {
+                        pyth.contract_address
+                            .validate(api)
+                            .map(|contract_address| PythConfig {
+                                contract_address,
+                                age_tolerance_seconds: pyth.age_tolerance_seconds.into(),
+                                network: pyth.network,
+                            })
+                    })
+                    .transpose()?,
+                stride: stride
+                    .map(|stride| {
+                        stride
+                            .contract_address
+                            .validate(api)
+                            .map(|contract_address| StrideConfig { contract_address })
+                    })
+                    .transpose()?,
+                feeds,
+                feeds_usd,
+            }
+        }
+    })
 }
