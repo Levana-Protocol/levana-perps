@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use pid1::Pid1Settings;
 
 mod app;
 mod cli;
@@ -15,6 +16,7 @@ async fn main() -> Result<()> {
 }
 
 async fn main_inner() -> Result<()> {
+    pid1::relaunch_if_pid1(Pid1Settings { log: true })?;
     dotenv::dotenv().ok();
 
     let opt = cli::Opt::parse();
