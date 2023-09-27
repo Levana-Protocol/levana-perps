@@ -142,7 +142,7 @@ async fn go(opt: Opt, MigrateOpts { factory, gitrev }: MigrateOpts) -> Result<()
         let info = pos.info().await?;
         if info.code_id != position_token_code_id {
             msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
-                contract_addr: xlp.get_address_string(),
+                contract_addr: pos.get_address_string(),
                 new_code_id: position_token_code_id,
                 msg: to_binary(&msg::contracts::position_token::entry::MigrateMsg {})?,
             }));
