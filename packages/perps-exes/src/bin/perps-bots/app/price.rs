@@ -128,7 +128,7 @@ impl App {
 
             statuses.push(format!("Needs price update: {reason}"));
         } else {
-            return Ok("No pyth price update needed".to_owned());
+            return Ok("No price update needed".to_owned());
         }
 
         let pyth_msg = self.get_tx_pyth(&worker.wallet, &oracle).await?;
