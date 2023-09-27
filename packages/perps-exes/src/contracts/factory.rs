@@ -9,6 +9,12 @@ use msg::shutdown::{ShutdownEffect, ShutdownImpact};
 #[derive(Clone)]
 pub struct Factory(Contract);
 
+pub struct ConfiguredCodeIds {
+    pub market: CodeId,
+    pub position_token: CodeId,
+    pub liquidity_token: CodeId,
+}
+
 impl std::fmt::Debug for Factory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("Factory")
@@ -154,9 +160,17 @@ impl Factory {
         self.0
     }
 
-    pub async fn query_market_code_id(&self) -> Result<CodeId> {
-        let CodeIds { market, .. } = self.0.query(FactoryQueryMsg::CodeIds {}).await?;
-        Ok(self.0.get_cosmos().make_code_id(market.u64()))
+    pub async fn query_code_ids(&self) -> Result<ConfiguredCodeIds> {
+        let CodeIds {
+            market,
+            position_token,
+            liquidity_token,
+        } = self.0.query(FactoryQueryMsg::CodeIds {}).await?;
+        Ok(ConfiguredCodeIds {
+            market: self.0.get_cosmos().make_code_id(market.u64()),
+            position_token: self.0.get_cosmos().make_code_id(position_token.u64()),
+            liquidity_token: self.0.get_cosmos().make_code_id(liquidity_token.u64()),
+        })
     }
 
     pub async fn add_market(

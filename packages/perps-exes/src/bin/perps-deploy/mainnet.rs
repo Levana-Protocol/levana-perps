@@ -1,7 +1,10 @@
 mod migrate;
 mod update_config;
 
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::PathBuf,
+};
 
 use chrono::{DateTime, Utc};
 use cosmos::{Address, ContractAdmin, CosmosNetwork, HasAddress};
@@ -149,6 +152,27 @@ impl CodeIds {
     ) -> Result<u64> {
         self.get(contract_type, opt, network).map(|x| x.code_id)
     }
+
+    fn get_by_gitrev(
+        &self,
+        contract_type: ContractType,
+        network: CosmosNetwork,
+        gitrev: &str,
+    ) -> Result<u64> {
+        let mut iter = self
+            .hashes
+            .iter()
+            .filter(|x| x.gitrev == gitrev && x.contract_type == contract_type)
+            .flat_map(|x| x.code_ids.get(&network).copied());
+        let first = iter
+            .next()
+            .with_context(|| format!("No {contract_type:?} contract found for gitrev {gitrev}"))?;
+        anyhow::ensure!(
+            iter.next().is_none(),
+            "Found multiple {contract_type:?} contracts for gitrev {gitrev}"
+        );
+        Ok(first)
+    }
 }
 
 struct StoredCodeId<'a> {
@@ -202,7 +226,7 @@ impl FromStr for ContractType {
 struct StoredContract {
     contract_type: ContractType,
     gitrev: String,
-    code_ids: HashMap<CosmosNetwork, u64>,
+    code_ids: BTreeMap<CosmosNetwork, u64>,
     hash: String,
 }
 
@@ -233,7 +257,7 @@ async fn store_perps_contracts(
                 code_ids.hashes.push(StoredContract {
                     contract_type,
                     gitrev: gitrev.clone(),
-                    code_ids: HashMap::new(),
+                    code_ids: BTreeMap::new(),
                     hash: hash.clone(),
                 });
                 code_ids.hashes.last_mut().expect("last cannot be null")
@@ -416,6 +440,40 @@ struct AddMarketOpts {
     cw3: bool,
 }
 
+fn get_spot_price_config(
+    oracle: &OracleInfo,
+    price_config: &PriceConfig,
+    market_id: &MarketId,
+) -> Result<SpotPriceConfigInit> {
+    let market = oracle
+        .markets
+        .get(&market_id)
+        .with_context(|| format!("No oracle market found for {market_id}"))?;
+    Ok(SpotPriceConfigInit::Oracle {
+        pyth: oracle.pyth.as_ref().map(|pyth| PythConfigInit {
+            contract_address: pyth.contract.get_address_string().into(),
+            age_tolerance_seconds: match pyth.r#type {
+                PythPriceServiceNetwork::Stable => price_config.pyth.stable.update_age_tolerance,
+                PythPriceServiceNetwork::Edge => price_config.pyth.edge.update_age_tolerance,
+            },
+            network: pyth.r#type,
+        }),
+        stride: oracle.stride.as_ref().map(|stride| StrideConfigInit {
+            contract_address: stride.contract.get_address_string().into(),
+        }),
+        feeds: market
+            .feeds
+            .iter()
+            .map(|feed| feed.clone().into())
+            .collect(),
+        feeds_usd: market
+            .feeds_usd
+            .iter()
+            .map(|feed| feed.clone().into())
+            .collect(),
+    })
+}
+
 async fn add_market(
     opt: Opt,
     AddMarketOpts {
@@ -441,13 +499,10 @@ async fn add_market(
     let chain_config = ChainConfig::load(None::<PathBuf>, factory.network)?;
     let price_config = PriceConfig::load(None::<PathBuf>)?;
     let oracle = opt.get_oracle_info(&chain_config, &price_config, factory.network)?;
-    let market = oracle
-        .markets
-        .get(&market_id)
-        .with_context(|| format!("No oracle market found for {market_id}"))?;
 
     let msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
         new_market: NewMarketParams {
+            spot_price: get_spot_price_config(&oracle, &price_config, &market_id)?,
             market_id,
             token: TokenInit::Native {
                 denom: collateral,
@@ -455,33 +510,6 @@ async fn add_market(
             },
             config: Some(market_config_update),
             initial_borrow_fee_rate,
-            spot_price: SpotPriceConfigInit::Oracle {
-                pyth: oracle.pyth.as_ref().map(|pyth| PythConfigInit {
-                    contract_address: pyth.contract.get_address_string().into(),
-                    age_tolerance_seconds: match pyth.r#type {
-                        PythPriceServiceNetwork::Stable => {
-                            price_config.pyth.stable.update_age_tolerance
-                        }
-                        PythPriceServiceNetwork::Edge => {
-                            price_config.pyth.edge.update_age_tolerance
-                        }
-                    },
-                    network: pyth.r#type,
-                }),
-                stride: oracle.stride.as_ref().map(|stride| StrideConfigInit {
-                    contract_address: stride.contract.get_address_string().into(),
-                }),
-                feeds: market
-                    .feeds
-                    .iter()
-                    .map(|feed| feed.clone().into())
-                    .collect(),
-                feeds_usd: market
-                    .feeds_usd
-                    .iter()
-                    .map(|feed| feed.clone().into())
-                    .collect(),
-            },
         },
     };
     let msg = strip_nulls(msg)?;
