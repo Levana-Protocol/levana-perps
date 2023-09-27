@@ -1,7 +1,10 @@
 mod migrate;
 mod update_config;
 
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::PathBuf,
+};
 
 use chrono::{DateTime, Utc};
 use cosmos::{Address, ContractAdmin, CosmosNetwork, HasAddress};
@@ -202,7 +205,7 @@ impl FromStr for ContractType {
 struct StoredContract {
     contract_type: ContractType,
     gitrev: String,
-    code_ids: HashMap<CosmosNetwork, u64>,
+    code_ids: BTreeMap<CosmosNetwork, u64>,
     hash: String,
 }
 
@@ -233,7 +236,7 @@ async fn store_perps_contracts(
                 code_ids.hashes.push(StoredContract {
                     contract_type,
                     gitrev: gitrev.clone(),
-                    code_ids: HashMap::new(),
+                    code_ids: BTreeMap::new(),
                     hash: hash.clone(),
                 });
                 code_ids.hashes.last_mut().expect("last cannot be null")

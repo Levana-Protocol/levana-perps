@@ -748,7 +748,7 @@ checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 [[package]]
 name = "cosmos"
 version = "0.1.0"
-source = "git+https://github.com/Levana-Protocol/levana-cosmos-rs.git?rev=3029d50ccde41dc82871524a7e47b55370412b46#3029d50ccde41dc82871524a7e47b55370412b46"
+source = "git+https://github.com/Levana-Protocol/levana-cosmos-rs.git?rev=ec73e7b49c9a4f54c616bc92111a1dd97ff34db4#ec73e7b49c9a4f54c616bc92111a1dd97ff34db4"
 dependencies = [
  "anyhow",
  "base64 0.21.3",
