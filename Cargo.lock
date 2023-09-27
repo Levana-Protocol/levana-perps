@@ -2774,7 +2774,7 @@ checksum = "5be167a7af36ee22fe3115051bc51f6e6c7054c9348e28deb4f49bd6f705a315"
 [[package]]
 name = "pid1"
 version = "0.1.0"
-source = "git+https://github.com/fpco/pid1-rs#91bd4e1f0c369d26aacd3741059d8c6062d55cce"
+source = "git+https://github.com/fpco/pid1-rs#922ff2338080d734f7580d1b56e703c7480a2b37"
 dependencies = [
  "nix",
  "signal-hook",
