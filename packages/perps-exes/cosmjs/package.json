@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "upload:sei": "ts-node ./src/upload.ts --target=sei-testnet --contract=market",
+    "upload:sei-mainnet": "ts-node ./src/upload.ts --target=sei-mainnet --contract=market",
     "upload:osmosis": "ts-node ./src/upload.ts --target=osmosis-testnet --contract=market",
     "upload:osmosis-mainnet": "ts-node ./src/upload-granter.ts --target=osmosis-mainnet --contract=market",
     "crank": "ts-node ./src/crank.ts --target=sei-testnet"

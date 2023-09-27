@@ -60,5 +60,14 @@ export const NETWORKS = {
       "denom": "usei",
       "chain_id": "atlantic-2",
       "addr_prefix": "sei"
+    },
+    "sei-mainnet": {
+      "rpc_url": "https://rpc.wallet.pacific-1.sei.io",
+      "rest_url": "https://sei-testnet-2-rest.brocha.in",
+      "gas_price": "0.1",
+      "full_denom": "SEI",
+      "denom": "usei",
+      "chain_id": "pacific-1",
+      "addr_prefix": "sei"
     }
 }
