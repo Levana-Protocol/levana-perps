@@ -719,6 +719,7 @@ pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response> {
         pub liquifunding_delay_fuzz_seconds: u32,
         pub max_liquidity: MaxLiquidity,
         pub disable_position_nft_exec: bool,
+        #[serde(default)]
         pub liquidity_cooldown_seconds: u32,
     }
     const OLD_CONFIG_STORAGE: Item<OldConfig> = Item::new(namespace::CONFIG);
