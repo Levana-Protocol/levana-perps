@@ -63,7 +63,7 @@ export const NETWORKS = {
     },
     "sei-mainnet": {
       "rpc_url": "https://rpc.wallet.pacific-1.sei.io",
-      "rest_url": "https://sei-testnet-2-rest.brocha.in",
+      "rest_url": "https://rest.wallet.pacific-1.sei.io/",
       "gas_price": "0.1",
       "full_denom": "SEI",
       "denom": "usei",
