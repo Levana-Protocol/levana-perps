@@ -18,9 +18,14 @@ pub(super) struct MigrateOpts {
     /// The factory contract address or identifier
     #[clap(long)]
     factory: String,
-    /// The gitrev for the contracts we want to use
     #[clap(long)]
-    gitrev: String,
+    market_code_id: u64,
+    #[clap(long)]
+    factory_code_id: u64,
+    #[clap(long)]
+    liquidity_token_code_id: u64,
+    #[clap(long)]
+    position_token_code_id: u64,
 }
 
 impl MigrateOpts {
@@ -29,7 +34,16 @@ impl MigrateOpts {
     }
 }
 
-async fn go(opt: Opt, MigrateOpts { factory, gitrev }: MigrateOpts) -> Result<()> {
+async fn go(
+    opt: Opt,
+    MigrateOpts {
+        factory,
+        market_code_id,
+        factory_code_id,
+        liquidity_token_code_id,
+        position_token_code_id,
+    }: MigrateOpts,
+) -> Result<()> {
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
@@ -37,15 +51,6 @@ async fn go(opt: Opt, MigrateOpts { factory, gitrev }: MigrateOpts) -> Result<()
     let chain_config = ChainConfig::load(None::<PathBuf>, factory.network)?;
     let price_config = PriceConfig::load(None::<PathBuf>)?;
     let oracle = opt.get_oracle_info(&chain_config, &price_config, factory.network)?;
-
-    let code_ids = CodeIds::load()?;
-    let factory_code_id =
-        code_ids.get_by_gitrev(ContractType::Factory, factory.network, &gitrev)?;
-    let market_code_id = code_ids.get_by_gitrev(ContractType::Market, factory.network, &gitrev)?;
-    let liquidity_token_code_id =
-        code_ids.get_by_gitrev(ContractType::LiquidityToken, factory.network, &gitrev)?;
-    let position_token_code_id =
-        code_ids.get_by_gitrev(ContractType::PositionToken, factory.network, &gitrev)?;
 
     let factory = app.cosmos.make_contract(factory.address);
     let current_factory_code_id = factory.info().await?.code_id;
