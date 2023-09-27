@@ -248,3 +248,10 @@ networks:
       feeds-usd: [
         !pyth { key: "SEI_USD", inverted: false}
       ]
+    DOT_USD:
+      feeds: [
+        !pyth { key: "DOT_USD", inverted: false}
+      ]
+      feeds-usd: [
+        !pyth { key: "DOT_USD", inverted: false}
+      ]

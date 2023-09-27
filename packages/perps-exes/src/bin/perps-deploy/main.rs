@@ -18,6 +18,7 @@ mod localtest;
 mod mainnet;
 mod migrate;
 mod migrate_rewards;
+mod spot_price_config;
 mod store_code;
 mod testnet;
 mod tracker;

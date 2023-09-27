@@ -24,7 +24,9 @@ use perps_exes::{
     prelude::*,
 };
 
-use crate::{app::OracleInfo, cli::Opt, util::get_hash_for_path};
+use crate::{
+    app::OracleInfo, cli::Opt, spot_price_config::get_spot_price_config, util::get_hash_for_path,
+};
 
 use self::{migrate::MigrateOpts, update_config::UpdateConfigOpts};
 
@@ -438,40 +440,6 @@ struct AddMarketOpts {
     /// Instead of executing, print out CW3 multisig instructions
     #[clap(long)]
     cw3: bool,
-}
-
-fn get_spot_price_config(
-    oracle: &OracleInfo,
-    price_config: &PriceConfig,
-    market_id: &MarketId,
-) -> Result<SpotPriceConfigInit> {
-    let market = oracle
-        .markets
-        .get(&market_id)
-        .with_context(|| format!("No oracle market found for {market_id}"))?;
-    Ok(SpotPriceConfigInit::Oracle {
-        pyth: oracle.pyth.as_ref().map(|pyth| PythConfigInit {
-            contract_address: pyth.contract.get_address_string().into(),
-            age_tolerance_seconds: match pyth.r#type {
-                PythPriceServiceNetwork::Stable => price_config.pyth.stable.update_age_tolerance,
-                PythPriceServiceNetwork::Edge => price_config.pyth.edge.update_age_tolerance,
-            },
-            network: pyth.r#type,
-        }),
-        stride: oracle.stride.as_ref().map(|stride| StrideConfigInit {
-            contract_address: stride.contract.get_address_string().into(),
-        }),
-        feeds: market
-            .feeds
-            .iter()
-            .map(|feed| feed.clone().into())
-            .collect(),
-        feeds_usd: market
-            .feeds_usd
-            .iter()
-            .map(|feed| feed.clone().into())
-            .collect(),
-    })
 }
 
 async fn add_market(
