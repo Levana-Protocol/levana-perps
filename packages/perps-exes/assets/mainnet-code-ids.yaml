@@ -62,8 +62,8 @@ hashes:
 - contract-type: factory
   gitrev: ed7102d64e97931986338f82663834640d14a826
   code-ids:
-    osmosis-mainnet: 129
     sei-mainnet: 48
+    osmosis-mainnet: 129
   hash: fd9f31f2c60cdaf3d18efdea333d4286b121f7f23b322cbaf820094c556daab4
 - contract-type: market
   gitrev: ed7102d64e97931986338f82663834640d14a826
@@ -73,8 +73,8 @@ hashes:
 - contract-type: market
   gitrev: 6d6c9eeca52fce4e5c482a724796c481fc374537
   code-ids:
-    sei-mainnet: 49
     osmosis-mainnet: 141
+    sei-mainnet: 49
   hash: a96d4b1b2ae08096474fe95a69447d3c552920656033bfdb36652897c34b9b54
 - contract-type: liquidity-token
   gitrev: 6d6c9eeca52fce4e5c482a724796c481fc374537
@@ -89,20 +89,24 @@ hashes:
 - contract-type: market
   gitrev: faa2881b21575d6859113229544046b9df878385
   code-ids:
+    osmosis-mainnet: 186
     injective-mainnet: 122
   hash: 03461a038e41d3245aba36542df619619a4f876b3527b969f60f529d25b9e42d
 - contract-type: factory
   gitrev: faa2881b21575d6859113229544046b9df878385
   code-ids:
     injective-mainnet: 120
+    osmosis-mainnet: 185
   hash: 5e3660570dbc1c8129f97f496027ce8895cd11604334a65bc5b3403691456b10
 - contract-type: liquidity-token
   gitrev: faa2881b21575d6859113229544046b9df878385
   code-ids:
+    osmosis-mainnet: 188
     injective-mainnet: 121
   hash: 1a0bfffeea8b67ae0c7809dfc613ef8fff59d0ec01bbfdea2e138649a90fda28
 - contract-type: position-token
   gitrev: faa2881b21575d6859113229544046b9df878385
   code-ids:
     injective-mainnet: 123
+    osmosis-mainnet: 189
   hash: 2499ca74b8e97ed72377c4c921d5a07d99e5ac9480e29e8fae0909617d395c8c
