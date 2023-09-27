@@ -69,6 +69,9 @@ impl Opt {
         if let Some(chain_id) = &self.cosmos_chain_id {
             builder.chain_id = chain_id.clone();
         }
+        if let Some(gas_multiplier) = self.cosmos_gas_multiplier {
+            builder.config.gas_estimate_multiplier = gas_multiplier;
+        }
         log::info!("Connecting to {}", builder.grpc_url);
 
         builder.build().await
