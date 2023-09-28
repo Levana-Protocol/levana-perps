@@ -202,7 +202,7 @@ impl TaskLabel {
             TaskLabel::GetFactory => true,
             TaskLabel::Crank => true,
             TaskLabel::Price => true,
-            TaskLabel::TrackBalance => true,
+            TaskLabel::TrackBalance => false,
             TaskLabel::GasCheck => false,
             TaskLabel::UltraCrank { index: _ } => false,
             TaskLabel::Liquidity => false,
