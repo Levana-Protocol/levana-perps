@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::{Context, Result};
 use clap::Parser;
 use pid1::Pid1Settings;
@@ -16,7 +18,10 @@ async fn main() -> Result<()> {
 }
 
 async fn main_inner() -> Result<()> {
-    pid1::relaunch_if_pid1(Pid1Settings { log: true })?;
+    pid1::relaunch_if_pid1(Pid1Settings {
+        log: true,
+        timeout: Duration::from_secs(2),
+    })?;
     dotenv::dotenv().ok();
 
     let opt = cli::Opt::parse();
