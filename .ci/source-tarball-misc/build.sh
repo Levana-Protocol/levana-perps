@@ -16,7 +16,7 @@ mkdir -p "$TARGET_CACHE" "$REGISTRY_CACHE" "$ARTIFACTS" "$CARGO_GIT_CACHE"
 docker  run --rm --tty \
   -u "$(id -u)":"$(id -g)" \
   -v "$(pwd)":/code \
-  -v "$TARGET_CACHE":/code/target \
+  -v "$TARGET_CACHE":/target \
   -v "$ARTIFACTS":/code/artifacts \
   -v "$REGISTRY_CACHE":/usr/local/cargo/registry \
   -v "$CARGO_GIT_CACHE":/usr/local/cargo/git \
