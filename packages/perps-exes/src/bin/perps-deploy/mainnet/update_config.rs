@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::{Context, Result};
 use cosmos::HasAddress;
 use cosmwasm_std::{to_binary, CosmosMsg, Empty, WasmMsg};
@@ -5,10 +7,13 @@ use msg::{
     contracts::market::{config::ConfigUpdate, entry::ExecuteOwnerMsg},
     prelude::MarketExecuteMsg,
 };
-use perps_exes::contracts::Factory;
+use perps_exes::{
+    config::{ChainConfig, PriceConfig},
+    contracts::Factory,
+};
 use shared::storage::MarketId;
 
-use crate::{cli::Opt, mainnet::strip_nulls};
+use crate::{cli::Opt, mainnet::strip_nulls, spot_price_config::get_spot_price_config};
 
 use super::MainnetFactories;
 
@@ -23,6 +28,9 @@ pub(super) struct UpdateConfigOpts {
     /// Update config JSON message
     #[clap(long)]
     config: String,
+    /// Add in the spot price config
+    #[clap(long)]
+    spot_price: bool,
 }
 
 impl UpdateConfigOpts {
@@ -37,12 +45,24 @@ async fn go(
         factory,
         market,
         config,
+        spot_price,
     }: UpdateConfigOpts,
 ) -> Result<()> {
     let update: ConfigUpdate = serde_json::from_str(&config).context("Invalid ConfigUpdate")?;
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
+
+    let spot_price_helper = if spot_price {
+        Some({
+            let chain_config = ChainConfig::load(None::<PathBuf>, factory.network)?;
+            let price_config = PriceConfig::load(None::<PathBuf>)?;
+            let oracle = opt.get_oracle_info(&chain_config, &price_config, factory.network)?;
+            move |market_id| get_spot_price_config(&oracle, &price_config, &market_id)
+        })
+    } else {
+        None
+    };
 
     let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
 
@@ -57,11 +77,15 @@ async fn go(
     let msgs = markets
         .into_iter()
         .map(|market| {
+            let mut update = update.clone();
+            if let Some(helper) = &spot_price_helper {
+                update.spot_price = Some(helper(market.market_id)?);
+            }
             anyhow::Ok(CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
                 contract_addr: market.market.get_address_string(),
                 msg: to_binary(&strip_nulls(MarketExecuteMsg::Owner(
                     ExecuteOwnerMsg::ConfigUpdate {
-                        update: Box::new(update.clone()),
+                        update: Box::new(update),
                     },
                 ))?)?,
                 funds: vec![],

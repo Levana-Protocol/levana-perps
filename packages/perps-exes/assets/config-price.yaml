@@ -63,13 +63,12 @@ networks:
       feeds-usd: [
         !sei { denom: "ueth", inverted: false },
       ]
-    # Temporary, still waiting for native oracle support for this
     SEI_USD:
       feeds: [
-        !pyth { key: "SEI_USD", inverted: false }
+        !sei { denom: "usei", inverted: false }
       ]
       feeds-usd: [
-        !pyth { key: "SEI_USD", inverted: false }
+        !sei { denom: "usei", inverted: false }
       ]
   osmosis-mainnet:
     ATOM_USD:
