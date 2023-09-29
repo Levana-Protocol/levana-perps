@@ -84,7 +84,7 @@ networks:
         !pyth { key: "USDC_USD", inverted: true }
       ]
       feeds-usd: [
-        !pyth { key: "OSMO_USD", inverted: false }
+        !pyth { key: "USDC_USD", inverted: false }
       ]
     ETH_BTC:
       feeds: [
@@ -164,7 +164,7 @@ networks:
         !pyth { key: "USDC_USD", inverted: true }
       ]
       feeds-usd: [
-        !pyth { key: "OSMO_USD", inverted: false }
+        !pyth { key: "USDC_USD", inverted: false }
       ]
     ETH_BTC:
       feeds: [
@@ -202,7 +202,7 @@ networks:
         !pyth { key: "USDC_USD", inverted: true }
       ]
       feeds-usd: [
-        !pyth { key: "OSMO_USD", inverted: false }
+        !pyth { key: "USDC_USD", inverted: false }
       ]
     ETH_BTC:
       feeds: [
