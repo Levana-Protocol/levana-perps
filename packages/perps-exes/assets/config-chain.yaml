@@ -10,6 +10,7 @@ sei-testnet:
   faucet: sei1czf3age49j99yrkxynmetysh3p2x8tp429mv23jme7zj8hytwhesnqngza
   explorer: "https://www.seiscan.app/atlantic-2/txs/"
   rpc-nodes:
+  - https://test-sei.kingnodes.com
   - https://rpc-testnet.sei-apis.com
   #- https://rpc-sei-testnet.rhinostake.com/
   #- https://rpc.atlantic-2.seinetwork.io/
