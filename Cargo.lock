@@ -2774,7 +2774,8 @@ checksum = "5be167a7af36ee22fe3115051bc51f6e6c7054c9348e28deb4f49bd6f705a315"
 [[package]]
 name = "pid1"
 version = "0.1.0"
-source = "git+https://github.com/fpco/pid1-rs#a4169369f9a80659a9891ce91cb290665fc098a1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f78818193025c4b3096314a747441c142cfacbd13c093c57e7339453c5e9aa1f"
 dependencies = [
  "nix",
  "signal-hook",
