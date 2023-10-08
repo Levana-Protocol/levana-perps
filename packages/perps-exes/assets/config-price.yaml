@@ -15,6 +15,7 @@ pyth:
       DOT_USD: "ca3eed9b267293f6595901c734c7525ce8ef49adafe8284606ceb307afa2ca5b"
       INJ_USD: "7a5bc1d2b56ad029048cd63964b3ad2776eadf812edc1a43a31406cb54bff592"
       EUR_USD: a995d00bb36a63cef7fd2c287dc105fc8f3d93779f062f09551b0af3e81ec30b
+      GBP_USD: 84c2dde9633d93d1bcad84e7dc41c9d56578b7ec52fabedc1f335d673df0a7c1
       USD_CNH: eef52e09c878ad41f6a81803e3640fe04dceea727de894edd4ea117e2e332e66
       XAU_USD: 765d2ba906dbc32ca17cc11f5310a89e9ee1f6420508c63861f2f8ba4ee34bb2
   edge: 
@@ -260,6 +261,13 @@ networks:
     EUR_USDC:
       feeds: [
         !pyth { key: "EUR_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    GBP_USDC:
+      feeds: [
+        !pyth { key: "GBP_USD", inverted: false }
       ]
       feeds-usd: [
         !constant { price: "1", inverted: false }
