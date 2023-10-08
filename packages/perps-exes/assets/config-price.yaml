@@ -14,6 +14,9 @@ pyth:
       AKT_USD: "4ea5bb4d2f5900cc2e97ba534240950740b4d3b89fe712a94a7304fd2fd92702"
       DOT_USD: "ca3eed9b267293f6595901c734c7525ce8ef49adafe8284606ceb307afa2ca5b"
       INJ_USD: "7a5bc1d2b56ad029048cd63964b3ad2776eadf812edc1a43a31406cb54bff592"
+      EUR_USD: a995d00bb36a63cef7fd2c287dc105fc8f3d93779f062f09551b0af3e81ec30b
+      USD_CNH: eef52e09c878ad41f6a81803e3640fe04dceea727de894edd4ea117e2e332e66
+      XAU_USD: 765d2ba906dbc32ca17cc11f5310a89e9ee1f6420508c63861f2f8ba4ee34bb2
   edge: 
     update-age-tolerance: 120
     endpoint: "https://hermes-beta.pyth.network/"
@@ -253,4 +256,25 @@ networks:
       ]
       feeds-usd: [
         !pyth { key: "DOT_USD", inverted: false}
+      ]
+    EUR_USDC:
+      feeds: [
+        !pyth { key: "EUR_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    CNH_USDC:
+      feeds: [
+        !pyth { key: "USD_CNH", inverted: true }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    GOLD_USDC:
+      feeds: [
+        !pyth { key: "XAU_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
       ]
