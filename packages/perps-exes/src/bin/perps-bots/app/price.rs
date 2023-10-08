@@ -107,8 +107,12 @@ impl App {
         )
         .await?;
 
+        let start_time = Utc::now();
         let (oracle_price, _) = oracle.get_latest_price(&self.client).await?;
+        let time_spent = Utc::now() - start_time;
+        log::debug!("get_latest_price took {time_spent}");
 
+        let start_time = Utc::now();
         let (market_price, reason) = self
             .needs_price_update(
                 market,
@@ -120,6 +124,8 @@ impl App {
             )
             .await?;
         worker.add_reason(&market.market_id, &reason);
+        let time_spent = Utc::now() - start_time;
+        log::debug!("needs_price_update took {time_spent}");
 
         if let Some(reason) = reason {
             if reason.is_too_frequent() {
@@ -131,18 +137,24 @@ impl App {
             return Ok("No price update needed".to_owned());
         }
 
+        let start_time = Utc::now();
         let pyth_msg = self.get_tx_pyth(&worker.wallet, &oracle).await?;
         let is_pyth = pyth_msg.is_some();
         if let Some(msg) = pyth_msg {
             builder.add_message_mut(msg);
         }
+        let time_spent = Utc::now() - start_time;
+        log::debug!("get_tx_pyth took {time_spent}");
 
         builder.add_message_mut(market.market.get_crank_msg(&worker.wallet, Some(1))?);
 
-        let res = match builder
+        let start_time = Utc::now();
+        let res = builder
             .sign_and_broadcast(&self.cosmos, &worker.wallet)
-            .await
-        {
+            .await;
+        let time_spent = Utc::now() - start_time;
+        log::debug!("sign_and_broadcast took {time_spent}");
+        let res = match res {
             Ok(res) => res,
             Err(e) => {
                 // PERP-1702: If the price is too old, only complain after a
@@ -175,8 +187,11 @@ impl App {
             }
         };
 
+        let start_time = Utc::now();
         // the market must have been updated from the above transaction
         let updated_price = market.market.current_price().await?;
+        let time_spent = Utc::now() - start_time;
+        log::debug!("current_price took {time_spent}");
         match updated_price.publish_time {
             Some(publish_time) => {
                 let timestamp = publish_time.try_into_chrono_datetime()?;
