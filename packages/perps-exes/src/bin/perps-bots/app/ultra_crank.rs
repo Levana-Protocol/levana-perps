@@ -97,7 +97,9 @@ impl App {
                 message: format!("Crank is only {age} seconds out of date, not doing anything"),
             });
         }
-        let res = market.crank_single(wallet, None).await?;
+        let res = market
+            .crank_single(wallet, None, self.config.get_crank_rewards_wallet())
+            .await?;
         Ok(WatchedTaskOutput {
             skip_delay: true,
             message: format!("Completed an ultracrank in {}", res.txhash),

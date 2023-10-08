@@ -79,7 +79,7 @@ pub async fn test_wallet_balance_decrease(perp_app: &PerpApp) -> Result<()> {
         )
         .await?;
 
-    perp_app.crank().await?;
+    perp_app.crank(None).await?;
 
     let positions = perp_app.all_open_positions().await?;
 
@@ -134,7 +134,7 @@ pub async fn test_update_collateral(perp_app: &PerpApp) -> Result<()> {
     // as of right now, it's just to make the tests pass
     let slippage_fee = Signed::<Collateral>::from_number(tx.first_delta_neutrality_fee_amount());
 
-    perp_app.crank().await?;
+    perp_app.crank(None).await?;
 
     let initial_balance = perp_app.cw20_balance().await?;
 
@@ -379,7 +379,7 @@ pub(crate) async fn test_pnl_on_liquidation(perp_app: &PerpApp) -> Result<()> {
     perp_app
         .open_position(collateral, direction, leverage, max_gains, None, None, None)
         .await?;
-    perp_app.crank().await?;
+    perp_app.crank(None).await?;
 
     let positions = perp_app.all_open_positions().await?;
 
@@ -394,7 +394,7 @@ pub(crate) async fn test_pnl_on_liquidation(perp_app: &PerpApp) -> Result<()> {
         .unwrap_or(PriceCollateralInUsd::one());
     let res = perp_app.set_price(new_price, price_usd).await?;
     log::info!("Price set to force liquidation in: {}", res.txhash);
-    perp_app.crank().await?;
+    perp_app.crank(None).await?;
 
     let closed = perp_app
         .get_closed_positions()
