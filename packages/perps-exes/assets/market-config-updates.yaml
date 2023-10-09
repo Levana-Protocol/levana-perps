@@ -24,6 +24,10 @@ markets:
     delta_neutrality_fee_sensitivity: 200000000
     funding_rate_sensitivity: 2
 
+  stATOM_USD:
+    delta_neutrality_fee_sensitivity: 200000000
+    funding_rate_sensitivity: 2
+
   OSMO_USD:
     max_leverage: 10
     carry_leverage: 5

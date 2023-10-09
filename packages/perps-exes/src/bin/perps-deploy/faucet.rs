@@ -52,6 +52,7 @@ impl Faucet {
         let name = name.into();
         let tap_amount = match name.as_str() {
             "ATOM" => "1000",
+            "stATOM" => "1000",
             "USDC" => "20000",
             "BTC" => "1",
             "OSMO" => "2000",
