@@ -4,6 +4,7 @@ use chrono::{Duration, Utc};
 use cosmos::Wallet;
 use msg::contracts::market::crank::CrankWorkInfo;
 use perps_exes::prelude::MarketContract;
+use shared::storage::RawAddr;
 
 use crate::config::BotConfigByType;
 use crate::util::markets::Market;
@@ -92,7 +93,13 @@ impl App {
         for execs in CRANK_EXECS {
             let crank_start = Utc::now();
             let res = self
-                .try_with_execs(crank_wallet, market, &work, Some(*execs))
+                .try_with_execs(
+                    crank_wallet,
+                    market,
+                    &work,
+                    Some(*execs),
+                    self.config.get_crank_rewards_wallet(),
+                )
                 .await;
             let crank_time = Utc::now() - crank_start;
             log::debug!("Crank for {execs} takes {crank_time}");
@@ -103,7 +110,15 @@ impl App {
         }
 
         let crank_start = Utc::now();
-        let res = self.try_with_execs(crank_wallet, market, &work, None).await;
+        let res = self
+            .try_with_execs(
+                crank_wallet,
+                market,
+                &work,
+                None,
+                self.config.get_crank_rewards_wallet(),
+            )
+            .await;
         let crank_time = Utc::now() - crank_start;
         log::debug!("Crank for None takes {crank_time}");
         res
@@ -115,8 +130,9 @@ impl App {
         market: &MarketContract,
         work: &CrankReason,
         execs: Option<u32>,
+        rewards: Option<RawAddr>,
     ) -> Result<WatchedTaskOutput> {
-        let txres = market.crank_single(crank_wallet, execs).await?;
+        let txres = market.crank_single(crank_wallet, execs, rewards).await?;
         Ok(WatchedTaskOutput {
             skip_delay: true,
             message: format!(

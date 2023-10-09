@@ -1,6 +1,6 @@
 use std::{path::PathBuf, sync::Arc};
 
-use cosmos::{Address, CosmosNetwork, HasAddressType, Wallet};
+use cosmos::{Address, CosmosNetwork, HasAddress, HasAddressType, Wallet};
 use perps_exes::{
     config::{
         ChainConfig, ConfigTestnet, DeploymentInfo, GasAmount, GasDecimals, LiquidityConfig,
@@ -50,6 +50,7 @@ pub(crate) struct BotConfigMainnet {
     pub(crate) low_util_ratio: Decimal256,
     pub(crate) high_util_ratio: Decimal256,
     pub(crate) liquidity_transaction: LiquidityTransactionConfig,
+    pub(crate) crank_rewards: Address,
 }
 
 pub(crate) struct BotConfig {
@@ -65,6 +66,18 @@ pub(crate) struct BotConfig {
     pub(crate) price_age_alert_threshold_secs: u32,
     pub(crate) gas_decimals: GasDecimals,
     pub(crate) http_timeout_seconds: u32,
+}
+
+impl BotConfig {
+    /// Get the desintation wallet for crank rewards.
+    pub(crate) fn get_crank_rewards_wallet(&self) -> Option<RawAddr> {
+        match &self.by_type {
+            BotConfigByType::Testnet { inner: _ } => None,
+            BotConfigByType::Mainnet { inner } => {
+                Some(inner.crank_rewards.get_address_string().into())
+            }
+        }
+    }
 }
 
 impl Opt {
@@ -206,6 +219,7 @@ impl Opt {
             ltc_total_liqudity_percent,
             ltc_total_deposit_percent,
             http_timeout_seconds,
+            crank_rewards,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let price_wallet = seed
@@ -232,6 +246,7 @@ impl Opt {
                         liqudity_percentage: *ltc_total_liqudity_percent,
                         total_deposits_percentage: *ltc_total_deposit_percent,
                     },
+                    crank_rewards: *crank_rewards,
                 }
                 .into(),
             },
@@ -316,6 +331,7 @@ impl BotConfigMainnet {
             low_util_ratio: _,
             high_util_ratio: _,
             liquidity_transaction: _,
+            crank_rewards: _,
         } = self;
         0
     }

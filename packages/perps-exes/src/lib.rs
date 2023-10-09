@@ -140,8 +140,8 @@ impl PerpApp {
         self.market.close_position(&self.wallet, position_id).await
     }
 
-    pub async fn crank(&self) -> Result<()> {
-        self.market.crank(&self.wallet).await
+    pub async fn crank(&self, rewards: Option<RawAddr>) -> Result<()> {
+        self.market.crank(&self.wallet, rewards).await
     }
 
     pub async fn tap_faucet(&self) -> Result<TxResponse> {
