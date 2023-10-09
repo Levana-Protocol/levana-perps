@@ -48,7 +48,9 @@
           {% for market in data.markets %}
             <tr>
               <td>{{ market.chain }}</td>
-              <td>{{ market.market_id }}</td>
+              <td>
+                <a target="_blank" href="https://trade.levana.finance/{{market.chain}}/trade/{{market.market_id}}">{{ market.market_id }}</a>
+              </td>
               <td>{{ market.long_funding }}</td>
               <td>{{ market.short_funding }}</td>
               <td>{{ market.lp_apr_1d }}</td>

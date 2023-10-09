@@ -1,4 +1,4 @@
-use std::{borrow::Cow, sync::Arc};
+use std::{borrow::Cow, fmt::Display, sync::Arc};
 
 use anyhow::{Context, Result};
 use askama::Template;
@@ -77,7 +77,7 @@ struct WhaleData {
 #[derive(serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
 struct WhaleMarketData {
-    chain: CosmosNetwork,
+    chain: SimpleCosmosNetwork,
     market_id: MarketId,
     long_funding: String,
     short_funding: String,
@@ -85,6 +85,24 @@ struct WhaleMarketData {
     xlp_apr_1d: Cow<'static, str>,
     lp_apr_7d: Cow<'static, str>,
     xlp_apr_7d: Cow<'static, str>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+enum SimpleCosmosNetwork {
+    Injective,
+    Osmosis,
+    Sei,
+}
+
+impl Display for SimpleCosmosNetwork {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(match self {
+            SimpleCosmosNetwork::Injective => "injective",
+            SimpleCosmosNetwork::Osmosis => "osmosis",
+            SimpleCosmosNetwork::Sei => "sei",
+        })
+    }
 }
 
 fn ratio_to_percent(r: Signed<Decimal256>) -> String {
@@ -205,8 +223,16 @@ async fn load_whale_market_data(
     .await?;
 
     Ok(WhaleMarketData {
-        chain: network,
-        market_id: market_info.market_id,
+        chain: match network {
+            CosmosNetwork::OsmosisMainnet => SimpleCosmosNetwork::Osmosis,
+            CosmosNetwork::SeiMainnet => SimpleCosmosNetwork::Sei,
+            CosmosNetwork::InjectiveMainnet => SimpleCosmosNetwork::Injective,
+            _ => anyhow::bail!("Unsupported network: {network}"),
+        },
+        market_id: match market_info.market_id.as_str() {
+            "axlETH_USD" => "ETH_USD".parse()?,
+            _ => market_info.market_id,
+        },
         long_funding: ratio_to_percent(long_funding),
         short_funding: ratio_to_percent(short_funding),
         lp_apr_1d,
