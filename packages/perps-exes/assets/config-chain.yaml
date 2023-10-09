@@ -40,6 +40,8 @@ osmosis-testnet:
       #type: edge
       contract: osmo1hpdzqku55lmfmptpyj6wdlugqs5etr6teqf7r4yqjjrxjznjhtuqqu5kdh
       type: stable
+    stride:
+      contract: osmo1345tvsyt9kkzapffpr2hg04a6qrlfrczt7gy8amn6ku6ca5us77q0rtqqz
   tracker: osmo1l3ypxctzcdev9dmyydlzrflqz52f0wsqmzkuyq9dvpdnqx69wvvq9zszh2
   faucet: osmo1ycrm74p7uc976hu2z428l27vxj8l44zu0x0yqjr8gh775qr6gtnq9f3zsz
   explorer: "https://testnet.mintscan.io/osmosis-testnet/txs/"

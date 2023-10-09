@@ -70,6 +70,7 @@ deployments:
     balance: true
     traders: 3
     default-market-ids:
+      - stATOM_USD
       - ATOM_USD
       - OSMO_USDC
       - ETH_BTC

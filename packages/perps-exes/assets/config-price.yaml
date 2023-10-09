@@ -200,6 +200,15 @@ networks:
       feeds-usd: [
         !pyth { key: "ATOM_USD", inverted: false }
       ]
+    stATOM_USD:
+      feeds: [
+        !stride { denom: "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590", inverted: false },
+        !pyth { key: "ATOM_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !stride { denom: "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590", inverted: false },
+        !pyth { key: "ATOM_USD", inverted: false }
+      ]
     OSMO_USDC:
       feeds: [
         !pyth { key: "OSMO_USD", inverted: false },
