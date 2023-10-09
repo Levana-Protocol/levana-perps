@@ -212,12 +212,12 @@ async fn load_whale_market_data(
     } = market.status_relaxed().await?;
 
     let (lp_apr_1d, xlp_apr_1d) = get_aprs(
-        &client,
+        client,
         &format!("https://indexer.levana.finance/apr_daily_avg?market={market}"),
     )
     .await?;
     let (lp_apr_7d, xlp_apr_7d) = get_aprs(
-        &client,
+        client,
         &format!("https://indexer.levana.finance/apr?market={market}"),
     )
     .await?;
