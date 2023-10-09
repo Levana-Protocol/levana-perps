@@ -118,6 +118,9 @@ pub(crate) struct MainnetOpt {
     /// Number of seconds before HTTP connections (especially to Pyth) will time out
     #[clap(long, env = "LEVANA_BOTS_HTTP_TIMEOUT_SECONDS", default_value_t = 10)]
     pub(crate) http_timeout_seconds: u32,
+    /// Rewards destination wallet
+    #[clap(long, env = "LEVANA_BOTS_CRANK_REWARDS")]
+    pub(crate) crank_rewards: Address,
 }
 
 impl Opt {

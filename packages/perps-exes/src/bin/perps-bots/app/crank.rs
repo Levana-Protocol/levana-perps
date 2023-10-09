@@ -4,6 +4,7 @@ use chrono::{Duration, Utc};
 use cosmos::Wallet;
 use msg::contracts::market::crank::CrankWorkInfo;
 use perps_exes::prelude::MarketContract;
+use shared::storage::RawAddr;
 
 use crate::config::BotConfigByType;
 use crate::util::markets::Market;
@@ -72,6 +73,7 @@ impl App {
             Some(work) => work,
         };
 
+        let lock_start_time = Utc::now();
         let _crank_lock = match self.crank_lock.try_lock() {
             Ok(crank_lock) => crank_lock,
             Err(_) => {
@@ -85,18 +87,41 @@ impl App {
                 });
             }
         };
+        let lock_acquire_time = Utc::now() - lock_start_time;
+        log::debug!("Time spent waiting for price lock: {lock_acquire_time}");
 
         for execs in CRANK_EXECS {
-            match self
-                .try_with_execs(crank_wallet, market, &work, Some(*execs))
-                .await
-            {
+            let crank_start = Utc::now();
+            let res = self
+                .try_with_execs(
+                    crank_wallet,
+                    market,
+                    &work,
+                    Some(*execs),
+                    self.config.get_crank_rewards_wallet(),
+                )
+                .await;
+            let crank_time = Utc::now() - crank_start;
+            log::debug!("Crank for {execs} takes {crank_time}");
+            match res {
                 Ok(x) => return Ok(x),
                 Err(e) => log::warn!("Cranking with execs=={execs} failed: {e:?}"),
             }
         }
 
-        self.try_with_execs(crank_wallet, market, &work, None).await
+        let crank_start = Utc::now();
+        let res = self
+            .try_with_execs(
+                crank_wallet,
+                market,
+                &work,
+                None,
+                self.config.get_crank_rewards_wallet(),
+            )
+            .await;
+        let crank_time = Utc::now() - crank_start;
+        log::debug!("Crank for None takes {crank_time}");
+        res
     }
 
     async fn try_with_execs(
@@ -105,8 +130,9 @@ impl App {
         market: &MarketContract,
         work: &CrankReason,
         execs: Option<u32>,
+        rewards: Option<RawAddr>,
     ) -> Result<WatchedTaskOutput> {
-        let txres = market.crank_single(crank_wallet, execs).await?;
+        let txres = market.crank_single(crank_wallet, execs, rewards).await?;
         Ok(WatchedTaskOutput {
             skip_delay: true,
             message: format!(

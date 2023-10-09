@@ -53,8 +53,8 @@ export const NETWORKS = {
       "addr_prefix": "stars"
     },
     "sei-testnet": {
-      "rpc_url": "https://test-sei.kingnodes.com",
-      "rest_url": "https://sei-testnet-2-rest.brocha.in",
+      "rpc_url": "https://rpc-testnet.sei-apis.com",
+      "rest_url": "https://rest-testnet.sei-apis.com",
       "gas_price": "0.1",
       "full_denom": "SEI",
       "denom": "usei",

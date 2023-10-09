@@ -171,7 +171,7 @@ async fn main_inner() -> Result<()> {
             log::debug!("Raw log: {}", tx.raw_log);
         }
         cli::Subcommand::Crank {} => {
-            perp_contract.crank().await?;
+            perp_contract.crank(None).await?;
         }
         cli::Subcommand::AllClosePositions {} => {
             let closed_positions = perp_contract.get_closed_positions().await?;

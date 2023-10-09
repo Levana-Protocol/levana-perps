@@ -389,12 +389,12 @@ impl MarketContract {
         Ok(result)
     }
 
-    pub async fn crank(&self, wallet: &Wallet) -> Result<()> {
+    pub async fn crank(&self, wallet: &Wallet, rewards: Option<RawAddr>) -> Result<()> {
         while self.status().await?.next_crank.is_some() {
             log::info!("Crank started");
             let execute_msg = MarketExecuteMsg::Crank {
                 execs: None,
-                rewards: None,
+                rewards: rewards.clone(),
             };
             let tx = self.0.execute(wallet, vec![], execute_msg).await?;
             log::info!("{}", tx.txhash);
@@ -403,16 +403,14 @@ impl MarketContract {
         Ok(())
     }
 
-    pub async fn crank_single(&self, wallet: &Wallet, execs: Option<u32>) -> Result<TxResponse> {
+    pub async fn crank_single(
+        &self,
+        wallet: &Wallet,
+        execs: Option<u32>,
+        rewards: Option<RawAddr>,
+    ) -> Result<TxResponse> {
         self.0
-            .execute(
-                wallet,
-                vec![],
-                MarketExecuteMsg::Crank {
-                    execs,
-                    rewards: None,
-                },
-            )
+            .execute(wallet, vec![], MarketExecuteMsg::Crank { execs, rewards })
             .await
     }
 

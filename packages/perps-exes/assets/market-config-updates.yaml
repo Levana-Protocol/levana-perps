@@ -136,3 +136,78 @@ markets:
     delta_neutrality_fee_tax: 0.1
 
     # Starting borrow fee: 0.16
+
+  EUR_USDC:
+    trading_fee_notional_size: 0.001
+    trading_fee_counter_collateral: 0.001
+    max_leverage: 100
+    carry_leverage: 95
+    funding_rate_sensitivity: 1
+    funding_rate_max_annualized: 0.45
+    borrow_fee_rate_min_annualized: 0.03
+    borrow_fee_rate_max_annualized: 0.3
+    target_utilization: 0.5
+    borrow_fee_sensitivity: 0.03333333333
+    delta_neutrality_fee_sensitivity: 50000000000
+    delta_neutrality_fee_cap: 0.0001
+    delta_neutrality_fee_tax: 0.05
+    liquifunding_delay_seconds: 21600
+    liquifunding_delay_fuzz_seconds: 3600
+
+    # Starting borrow fee: 0.05
+
+  GBP_USDC:
+    trading_fee_notional_size: 0.001
+    trading_fee_counter_collateral: 0.001
+    max_leverage: 100
+    carry_leverage: 95
+    funding_rate_sensitivity: 1
+    funding_rate_max_annualized: 0.45
+    borrow_fee_rate_min_annualized: 0.03
+    borrow_fee_rate_max_annualized: 0.3
+    target_utilization: 0.5
+    borrow_fee_sensitivity: 0.03333333333
+    delta_neutrality_fee_sensitivity: 50000000000
+    delta_neutrality_fee_cap: 0.0001
+    delta_neutrality_fee_tax: 0.05
+    liquifunding_delay_seconds: 21600
+    liquifunding_delay_fuzz_seconds: 3600
+
+    # Starting borrow fee: 0.05
+
+  CNH_USDC:
+    trading_fee_notional_size: 0.001
+    trading_fee_counter_collateral: 0.001
+    max_leverage: 100
+    carry_leverage: 95
+    funding_rate_sensitivity: 1
+    funding_rate_max_annualized: 0.45
+    borrow_fee_rate_min_annualized: 0.03
+    borrow_fee_rate_max_annualized: 0.3
+    target_utilization: 0.5
+    borrow_fee_sensitivity: 0.03333333333
+    delta_neutrality_fee_sensitivity: 50000000000
+    delta_neutrality_fee_cap: 0.0001
+    delta_neutrality_fee_tax: 0.05
+    liquifunding_delay_seconds: 21600
+    liquifunding_delay_fuzz_seconds: 3600
+
+    # Starting borrow fee: 0.05
+  GOLD_USDC:
+    trading_fee_notional_size: 0.001
+    trading_fee_counter_collateral: 0.001
+    max_leverage: 100
+    carry_leverage: 95
+    funding_rate_sensitivity: 1
+    funding_rate_max_annualized: 0.45
+    borrow_fee_rate_min_annualized: 0.03
+    borrow_fee_rate_max_annualized: 0.3
+    target_utilization: 0.5
+    borrow_fee_sensitivity: 0.03333333333
+    delta_neutrality_fee_sensitivity: 50000000000
+    delta_neutrality_fee_cap: 0.0001
+    delta_neutrality_fee_tax: 0.05
+    liquifunding_delay_seconds: 21600
+    liquifunding_delay_fuzz_seconds: 3600
+
+    # Starting borrow fee: 0.05
