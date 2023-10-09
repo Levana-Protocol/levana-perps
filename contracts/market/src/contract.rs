@@ -21,11 +21,11 @@ use msg::{
     contracts::market::{
         config::MaxLiquidity,
         entry::{
-            DeltaNeutralityFeeResp, InstantiateMsg, MigrateMsg, OraclePriceResp,
+            DeltaNeutralityFeeResp, InitialPrice, InstantiateMsg, MigrateMsg, OraclePriceResp,
             PositionsQueryFeeApproach, PriceWouldTriggerResp, SpotPriceHistoryResp,
         },
         position::{events::PositionSaveReason, PositionId, PositionOrPendingClose, PositionsResp},
-        spot_price::SpotPriceConfig,
+        spot_price::{SpotPriceConfig, SpotPriceConfigInit},
     },
     shutdown::ShutdownImpact,
 };
@@ -52,8 +52,21 @@ pub fn instantiate(
         token,
         initial_borrow_fee_rate,
         spot_price,
+        initial_price,
     }: InstantiateMsg,
 ) -> Result<Response> {
+    // Validate initial price
+    match (&spot_price, &initial_price) {
+        (SpotPriceConfigInit::Manual { .. }, Some(_)) => (),
+        (SpotPriceConfigInit::Manual { .. }, None) => {
+            anyhow::bail!("Maual price config used, but no initial price set")
+        }
+        (SpotPriceConfigInit::Oracle { .. }, None) => (),
+        (SpotPriceConfigInit::Oracle { .. }, Some(_)) => {
+            anyhow::bail!("Cannot set initial price for oracle price updates")
+        }
+    }
+
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     set_factory_addr(deps.storage, &factory.validate(deps.api)?)?;
@@ -70,6 +83,10 @@ pub fn instantiate(
     let (state, mut ctx) = StateContext::new(deps, env)?;
     state.initialize_borrow_fee_rate(&mut ctx, initial_borrow_fee_rate)?;
     state.initialize_funding_totals(&mut ctx)?;
+
+    if let Some(InitialPrice { price, price_usd }) = initial_price {
+        state.save_manual_spot_price(&mut ctx, price, price_usd)?;
+    }
 
     ctx.into_response(&state)
 }

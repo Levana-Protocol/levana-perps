@@ -33,6 +33,7 @@ pub(crate) struct App {
     pub(crate) default_market_ids: Vec<MarketId>,
     pub(crate) market_config: PathBuf,
     pub(crate) price_source: PriceSourceConfig,
+    pub(crate) config_testnet: ConfigTestnet,
 }
 
 #[derive(Clone)]
@@ -141,6 +142,7 @@ impl Opt {
             default_market_ids,
             price_source,
             market_config: self.market_config.clone(),
+            config_testnet: config,
         })
     }
 

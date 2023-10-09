@@ -21,12 +21,26 @@ pub struct InstantiateMsg {
     pub config: Option<ConfigUpdate>,
     /// Mandatory spot price config
     pub spot_price: SpotPriceConfigInit,
+    /// Initial price to use in the contract
+    ///
+    /// This is required when doing manual price updates, and prohibited for oracle based price updates. It would make more sense to include this in [SpotPriceConfigInit], but that will create more complications in config update logic.
+    pub initial_price: Option<InitialPrice>,
     /// Base, quote, and market type
     pub market_id: MarketId,
     /// The token used for collateral
     pub token: TokenInit,
     /// Initial borrow fee rate when launching the protocol, annualized
     pub initial_borrow_fee_rate: Decimal256,
+}
+
+/// Initial price when instantiating a contract
+#[cw_serde]
+#[derive(Copy)]
+pub struct InitialPrice {
+    /// Price of base in terms of quote
+    pub price: PriceBaseInQuote,
+    /// Price of collateral in terms of USD
+    pub price_usd: PriceCollateralInUsd,
 }
 
 /// Config info passed on to all sub-contracts in order to
@@ -47,6 +61,9 @@ pub struct NewMarketParams {
 
     /// Initial borrow fee rate, annualized
     pub initial_borrow_fee_rate: Decimal256,
+
+    /// Initial price, only provided for manual price updates
+    pub initial_price: Option<InitialPrice>,
 }
 
 /// There are two sources of slippage in the protocol:

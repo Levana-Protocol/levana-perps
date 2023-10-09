@@ -478,6 +478,7 @@ async fn add_market(
             },
             config: Some(market_config_update),
             initial_borrow_fee_rate,
+            initial_price: None,
         },
     };
     let msg = strip_nulls(msg)?;
