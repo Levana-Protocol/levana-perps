@@ -61,6 +61,12 @@ pub enum ExecuteMsg {
         owner: RawAddr,
     },
 
+    /// Change the migrationadmin
+    SetMigrationAdmin {
+        /// New migration admin
+        migration_admin: RawAddr,
+    },
+
     /// Change the dao addr
     SetDao {
         /// New DAO
@@ -230,6 +236,7 @@ impl ExecuteMsg {
             ExecuteMsg::SetPositionTokenCodeId { .. } => true,
             ExecuteMsg::SetLiquidityTokenCodeId { .. } => true,
             ExecuteMsg::SetOwner { .. } => true,
+            ExecuteMsg::SetMigrationAdmin { .. } => true,
             ExecuteMsg::SetDao { .. } => true,
             ExecuteMsg::SetKillSwitch { .. } => true,
             ExecuteMsg::SetWindDown { .. } => true,

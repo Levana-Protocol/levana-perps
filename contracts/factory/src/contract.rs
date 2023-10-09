@@ -152,6 +152,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             set_owner(ctx.storage, &owner.validate(state.api)?)?;
         }
 
+        ExecuteMsg::SetMigrationAdmin { migration_admin } => {
+            set_admin_migration(ctx.storage, &migration_admin.validate(state.api)?)?;
+        }
+
         ExecuteMsg::SetDao { dao } => {
             set_dao(ctx.storage, &dao.validate(state.api)?)?;
         }
