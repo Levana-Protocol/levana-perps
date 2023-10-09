@@ -635,7 +635,7 @@ pub struct OraclePriceResp {
     /// A map of each sei denom used in this market to the price
     pub sei: BTreeMap<String, NumberGtZero>,
     /// A map of each stride denom used in this market to the redemption price
-    pub stride: BTreeMap<String, NumberGtZero>,
+    pub stride: BTreeMap<String, OraclePriceFeedStrideResp>,
     /// The final, composed price. See [QueryMsg::OraclePrice] for more information about this value
     pub composed_price: PricePoint,
 }
@@ -646,6 +646,15 @@ pub struct OraclePriceFeedPythResp {
     /// The pyth price
     pub price: NumberGtZero,
     /// The pyth publish time
+    pub publish_time: Timestamp,
+}
+
+/// Part of [OraclePriceResp]
+#[cw_serde]
+pub struct OraclePriceFeedStrideResp {
+    /// The redemption rate
+    pub redemption_rate: NumberGtZero,
+    /// The redemption price publish time
     pub publish_time: Timestamp,
 }
 

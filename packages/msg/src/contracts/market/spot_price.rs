@@ -69,7 +69,7 @@ pub enum SpotPriceFeedData {
         /// The identifier on pyth
         id: PriceIdentifier,
     },
-    /// TODO: Stride liquid staking
+    /// Stride liquid staking
     Stride {
         /// The IBC denom for the asset
         denom: String,

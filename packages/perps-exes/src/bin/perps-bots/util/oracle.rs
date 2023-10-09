@@ -138,13 +138,15 @@ pub fn compose_oracle_feeds(
                 .with_context(|| format!("Missing price for Sei denom: {denom}"))?
                 .into_decimal256(),
             SpotPriceFeedData::Stride { denom } => {
-                let redemption_value = oracle_price
+                // TODO - should stride also be like pyth, query the latest-and-greatest from off-chain endpoint?
+                let redemption_rate = oracle_price
                     .stride
                     .get(denom)
                     .with_context(|| format!("Missing redemption price for Stride denom: {denom}"))?
+                    .redemption_rate
                     .into_decimal256();
 
-                unimplemented!("FIXME: use stride redemption value of {redemption_value}");
+                unimplemented!("FIXME: use stride redemption rate of {redemption_rate}");
             }
         };
 

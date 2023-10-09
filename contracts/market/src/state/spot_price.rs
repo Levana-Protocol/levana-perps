@@ -2,16 +2,17 @@ use std::collections::{btree_map::Entry, BTreeMap};
 
 use crate::prelude::*;
 use anyhow::ensure;
-use cosmwasm_std::Order;
 #[cfg(feature = "sei")]
 use cosmwasm_std::QuerierWrapper;
+use cosmwasm_std::{Binary, Order};
 use msg::contracts::market::{
-    entry::{OraclePriceFeedPythResp, PriceForQuery},
+    entry::{OraclePriceFeedPythResp, OraclePriceFeedStrideResp, PriceForQuery},
     spot_price::{events::SpotPriceEvent, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData},
 };
 use pyth_sdk_cw::{PriceFeedResponse, PriceIdentifier};
 #[cfg(feature = "sei")]
 use sei_cosmwasm::{ExchangeRatesResponse, SeiQuerier};
+use serde::{Deserialize, Serialize};
 
 /// Stores spot price history.
 /// Key is a [Timestamp] of when the price was received.
@@ -42,7 +43,7 @@ pub(crate) struct OraclePriceInternal {
     /// A map of each sei denom used in this market to the price
     pub sei: BTreeMap<String, NumberGtZero>,
     /// A map of each stride denom used in this market to the redemption price
-    pub stride: BTreeMap<String, NumberGtZero>,
+    pub stride: BTreeMap<String, OraclePriceFeedStrideResp>,
 }
 
 impl OraclePriceInternal {
@@ -89,12 +90,11 @@ impl OraclePriceInternal {
                     .get(denom)
                     .map(|x| (*x, None))
                     .with_context(|| format!("no sei price for denom {}", denom))?,
-                SpotPriceFeedData::Stride { denom } => {
-                    self.stride
-                        .get(denom)
-                        .map(|x| (*x, None))
-                        .with_context(|| format!("no stride price for denom {}", denom))?
-                }
+                SpotPriceFeedData::Stride { denom } => self
+                    .stride
+                    .get(denom)
+                    .map(|x| (x.redemption_rate, Some(x.publish_time)))
+                    .with_context(|| format!("no stride redemption rate for denom {}", denom))?,
                 SpotPriceFeedData::Constant { price } => (*price, None),
             };
 
@@ -379,7 +379,7 @@ impl State<'_> {
             }
             SpotPriceConfig::Oracle {
                 pyth: pyth_config,
-                stride: _,
+                stride: stride_config,
                 feeds,
                 feeds_usd,
             } => {
@@ -476,9 +476,49 @@ impl State<'_> {
                         }
 
                         SpotPriceFeedData::Stride { denom } => {
-                            if let Entry::Vacant(_entry) = stride.entry(denom.clone()) {
-                                // TODO: query the contract and get the redemption price etc., no publish time
-                                bail!("Implement Stride price feed for {denom}")
+                            if let Entry::Vacant(entry) = stride.entry(denom.clone()) {
+                                let stride_address = &stride_config
+                                    .as_ref()
+                                    .context("stride config not set")?
+                                    .contract_address;
+
+                                #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+                                #[serde(rename_all = "snake_case")]
+                                enum StrideQuery {
+                                    RedemptionRate {
+                                        /// The denom should be the ibc hash of an stToken as it lives on the oracle chain
+                                        /// (e.g. ibc/{hash(transfer/channel-326/stuatom)} on Osmosis)
+                                        denom: String,
+                                        /// Params should always be None
+                                        params: Option<Binary>,
+                                    },
+                                }
+
+                                #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+                                #[serde(rename_all = "snake_case")]
+                                pub struct RedemptionRateResponse {
+                                    pub redemption_rate: Decimal256,
+                                    pub update_time: u64,
+                                }
+
+                                let resp: RedemptionRateResponse = self.querier.query_wasm_smart(
+                                    stride_address,
+                                    &StrideQuery::RedemptionRate {
+                                        denom: denom.to_string(),
+                                        params: None,
+                                    },
+                                )?;
+
+                                let publish_time =
+                                    Timestamp::from_seconds(resp.update_time);
+                                let redemption_rate = Number::try_from(resp.redemption_rate)?;
+                                let redemption_rate = NumberGtZero::try_from(redemption_rate)
+                                    .context("redemption_rate must be > 0")?;
+
+                                entry.insert(OraclePriceFeedStrideResp {
+                                    redemption_rate,
+                                    publish_time,
+                                });
                             }
                         }
 
