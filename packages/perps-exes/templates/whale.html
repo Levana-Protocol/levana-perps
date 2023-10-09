@@ -31,8 +31,6 @@
     <div class="content">
       <img src="https://static.levana.finance/images/logo.svg" alt="Levana Logo" class="logo">
 
-      <p>Note: APRs given below use the one day average, not the seven day average. This will give more up-to-date information, but will not align with the more stable APR numbers shown in the Levana Perps interface.</p>
-
       <table>
         <thead>
           <tr>
@@ -42,6 +40,8 @@
             <th>Short funding</th>
             <th>LP APR (1d)</th>
             <th>xLP APR (1d)</th>
+            <th>LP APR (7d)</th>
+            <th>xLP APR (7d)</th>
           </tr>
         </thead>
         <tbody>
@@ -51,8 +51,10 @@
               <td>{{ market.market_id }}</td>
               <td>{{ market.long_funding }}</td>
               <td>{{ market.short_funding }}</td>
-              <td>{{ market.lp_apr }}</td>
-              <td>{{ market.xlp_apr }}</td>
+              <td>{{ market.lp_apr_1d }}</td>
+              <td>{{ market.xlp_apr_1d }}</td>
+              <td>{{ market.lp_apr_7d }}</td>
+              <td>{{ market.xlp_apr_7d }}</td>
             </tr>
           {% endfor %}
         </tbody>

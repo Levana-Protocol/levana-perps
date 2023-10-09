@@ -19,6 +19,7 @@ use perps_exes::{
     contracts::{Factory, MarketInfo},
     prelude::MarketContract,
 };
+use reqwest::Client;
 use shared::storage::{MarketId, Signed, UnsignedDecimal};
 use tokio::task::JoinSet;
 
@@ -80,8 +81,10 @@ struct WhaleMarketData {
     market_id: MarketId,
     long_funding: String,
     short_funding: String,
-    lp_apr: Cow<'static, str>,
-    xlp_apr: Cow<'static, str>,
+    lp_apr_1d: Cow<'static, str>,
+    xlp_apr_1d: Cow<'static, str>,
+    lp_apr_7d: Cow<'static, str>,
+    xlp_apr_7d: Cow<'static, str>,
 }
 
 fn ratio_to_percent(r: Signed<Decimal256>) -> String {
@@ -190,10 +193,33 @@ async fn load_whale_market_data(
         short_funding,
     } = market.status_relaxed().await?;
 
-    let url = format!("https://indexer.levana.finance/apr_daily_avg?market={market}");
+    let (lp_apr_1d, xlp_apr_1d) = get_aprs(
+        &client,
+        &format!("https://indexer.levana.finance/apr_daily_avg?market={market}"),
+    )
+    .await?;
+    let (lp_apr_7d, xlp_apr_7d) = get_aprs(
+        &client,
+        &format!("https://indexer.levana.finance/apr?market={market}"),
+    )
+    .await?;
+
+    Ok(WhaleMarketData {
+        chain: network,
+        market_id: market_info.market_id,
+        long_funding: ratio_to_percent(long_funding),
+        short_funding: ratio_to_percent(short_funding),
+        lp_apr_1d,
+        xlp_apr_1d,
+        lp_apr_7d,
+        xlp_apr_7d,
+    })
+}
+
+async fn get_aprs(client: &Client, url: &str) -> Result<(Cow<'static, str>, Cow<'static, str>)> {
     let aprs = async {
         client
-            .get(&url)
+            .get(url)
             .send()
             .await?
             .error_for_status()?
@@ -203,17 +229,9 @@ async fn load_whale_market_data(
     }
     .await
     .with_context(|| format!("Error while loading data from {url}"))?;
-    let (lp_apr, xlp_apr) = match aprs.into_iter().max_by_key(|x| x.date) {
+    Ok(match aprs.into_iter().max_by_key(|x| x.date) {
         Some(AprDailyAvg { lp, xlp, date: _ }) => (to_percent(&lp).into(), to_percent(&xlp).into()),
         None => ("-".into(), "-".into()),
-    };
-    Ok(WhaleMarketData {
-        chain: network,
-        market_id: market_info.market_id,
-        long_funding: ratio_to_percent(long_funding),
-        short_funding: ratio_to_percent(short_funding),
-        lp_apr,
-        xlp_apr,
     })
 }
 
