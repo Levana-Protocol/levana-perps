@@ -36,6 +36,23 @@ trader:
   max-util-delta: 0.05
   min-borrow-fee: 0.1
   max-borrow-fee: 0.2
+# Initial prices used for manually set markets
+initial-prices:
+  ATOM_USD:
+    price: 7
+    price_usd: 1
+  stATOM_USD:
+    price: 8
+    price_usd: 1
+  ETH_BTC:
+    price: 0.5
+    price_usd: 28000
+  OSMO_USDC:
+    price: 0.3
+    price_usd: 1
+  BTC_USD:
+    price: 28000
+    price_usd: 28000
 deployments:
   beta:
     wallet-manager-address: osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k

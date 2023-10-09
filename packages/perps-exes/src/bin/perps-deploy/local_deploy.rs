@@ -12,6 +12,7 @@ use msg::contracts::{
     },
 };
 use msg::prelude::*;
+use perps_exes::config::ConfigTestnet;
 
 use crate::{
     cli::Opt,
@@ -46,6 +47,7 @@ pub(crate) async fn go(
     }: LocalDeployOpt,
 ) -> Result<InstantiateResponse> {
     let basic = opt.load_basic_app(network).await?;
+    let config_testnet = ConfigTestnet::load(opt.config_testnet.as_ref())?;
 
     match network {
         CosmosNetwork::JunoLocal | CosmosNetwork::OsmosisLocal | CosmosNetwork::WasmdLocal => (),
@@ -132,6 +134,7 @@ pub(crate) async fn go(
     let res = crate::instantiate::instantiate(InstantiateParams {
         opt: &opt,
         basic: &basic,
+        config_testnet: &config_testnet,
         code_id_source: crate::instantiate::CodeIdSource::Existing(ids),
         family: "localperps".to_owned(),
         markets,

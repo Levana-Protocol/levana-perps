@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use anyhow::{Context, Result};
 use cosmos::{Address, CodeId, ContractAdmin, Cosmos, HasAddress, Wallet};
 use msg::contracts::market::config::Config as MarketConfig;
-use msg::contracts::market::entry::StatusResp;
+use msg::contracts::market::entry::{InitialPrice, StatusResp};
 use msg::contracts::market::spot_price::{
     PythConfigInit, PythPriceServiceNetwork, SpotPriceConfig, SpotPriceConfigInit, StrideConfigInit,
 };
@@ -15,7 +15,7 @@ use msg::{
     },
     token::TokenInit,
 };
-use perps_exes::config::MarketConfigUpdates;
+use perps_exes::config::{ConfigTestnet, MarketConfigUpdates};
 use perps_exes::contracts::{Factory, MarketInfo};
 use perps_exes::prelude::MarketContract;
 
@@ -109,6 +109,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateOpt) -> Result<()> {
     instantiate(InstantiateParams {
         opt: &opt,
         basic: &app.basic,
+        config_testnet: &app.config_testnet,
         family: inst_opt.family,
         markets: inst_opt
             .market_id
@@ -161,6 +162,7 @@ pub(crate) struct ProtocolCodeIds {
 pub(crate) struct InstantiateParams<'a> {
     pub(crate) opt: &'a Opt,
     pub(crate) basic: &'a BasicApp,
+    pub(crate) config_testnet: &'a ConfigTestnet,
     pub(crate) code_id_source: CodeIdSource,
     pub(crate) family: String,
     pub(crate) markets: Vec<InstantiateMarket>,
@@ -190,6 +192,7 @@ pub(crate) async fn instantiate(
                 chain_config: _,
                 price_config: _,
             },
+        config_testnet,
         code_id_source,
         trading_competition,
         faucet_admin,
@@ -254,6 +257,7 @@ pub(crate) async fn instantiate(
             .add(
                 wallet,
                 cosmos,
+                config_testnet,
                 AddMarketParams {
                     trading_competition,
                     faucet_admin,
@@ -364,6 +368,7 @@ impl InstantiateMarket {
         self,
         wallet: &Wallet,
         cosmos: &Cosmos,
+        config_testnet: &ConfigTestnet,
         AddMarketParams {
             trading_competition,
             faucet_admin,
@@ -455,6 +460,16 @@ impl InstantiateMarket {
 
         let cw20 = cosmos.make_contract(cw20);
 
+        let initial_price = match &spot_price {
+            SpotPriceConfigInit::Manual { .. } => Some(
+                *config_testnet
+                    .initial_prices
+                    .get(&market_id)
+                    .with_context(|| format!("No initial prices found for {market_id}"))?,
+            ),
+            SpotPriceConfigInit::Oracle { .. } => None,
+        };
+
         let res = factory
             .add_market(
                 wallet,
@@ -466,6 +481,7 @@ impl InstantiateMarket {
                     config: Some(config),
                     initial_borrow_fee_rate,
                     spot_price,
+                    initial_price,
                 },
             )
             .await

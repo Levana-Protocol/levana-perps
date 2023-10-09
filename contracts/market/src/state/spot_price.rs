@@ -337,7 +337,9 @@ impl State<'_> {
         let market_id = self.market_id(ctx.storage)?;
 
         let price_storage = match self.config.spot_price.clone() {
-            SpotPriceConfig::Manual { .. } => MANUAL_SPOT_PRICE.load(ctx.storage)?,
+            SpotPriceConfig::Manual { .. } => MANUAL_SPOT_PRICE.may_load(ctx.storage)?.context(
+                "This contract has manual price updates, and no price has been set yet.",
+            )?,
             SpotPriceConfig::Oracle {
                 pyth: _,
                 stride: _,

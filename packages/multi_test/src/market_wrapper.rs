@@ -39,10 +39,10 @@ use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::crank::CrankWorkInfo;
 use msg::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
-    LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpAction, LpActionHistoryResp,
-    LpInfoResp, PositionActionHistoryResp, PositionsQueryFeeApproach, PriceForQuery,
-    PriceWouldTriggerResp, QueryMsg, SlippageAssert, SpotPriceHistoryResp, StatusResp,
-    TradeHistorySummary, TraderActionHistoryResp,
+    InitialPrice, LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpAction,
+    LpActionHistoryResp, LpInfoResp, PositionActionHistoryResp, PositionsQueryFeeApproach,
+    PriceForQuery, PriceWouldTriggerResp, QueryMsg, SlippageAssert, SpotPriceHistoryResp,
+    StatusResp, TradeHistorySummary, TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
 use msg::contracts::market::spot_price::SpotPriceConfigInit;
@@ -156,6 +156,12 @@ impl PerpsMarket {
                     admin: TEST_CONFIG.manual_price_owner.as_str().into(),
                 },
                 initial_borrow_fee_rate: "0.01".parse().unwrap(),
+                initial_price: Some(InitialPrice {
+                    price: initial_price,
+                    price_usd: collateral_in_usd.unwrap_or_else(|| {
+                        PriceCollateralInUsd::from_non_zero(initial_price.into_non_zero())
+                    }),
+                }),
             },
         };
 
@@ -226,9 +232,6 @@ impl PerpsMarket {
             automatic_time_jump_enabled: true,
             farming_addr,
         };
-
-        // set an initial price...
-        _self.exec_set_price_with_usd(initial_price, collateral_in_usd)?;
 
         if bootstap_lp {
             // do not go through app get_user, since we want to _always_ bootstrap this user

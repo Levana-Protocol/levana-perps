@@ -6,7 +6,9 @@ use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, RawAddress};
 use cosmwasm_std::{Uint128, Uint256};
 use msg::{
-    contracts::market::{config::ConfigUpdate, spot_price::PythPriceServiceNetwork},
+    contracts::market::{
+        config::ConfigUpdate, entry::InitialPrice, spot_price::PythPriceServiceNetwork,
+    },
     prelude::*,
 };
 use pyth_sdk_cw::PriceIdentifier;
@@ -181,6 +183,7 @@ pub struct ConfigTestnet {
     pub trader: TraderConfig,
     /// QA wallet used for price updates
     pub qa_wallet: RawAddress,
+    pub initial_prices: HashMap<MarketId, InitialPrice>,
 }
 
 #[derive(serde::Deserialize, Clone, Debug)]

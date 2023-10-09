@@ -46,7 +46,12 @@ impl AddMarketOpt {
             spot_price: get_spot_price_config(&oracle, &price_config, &self.market)?,
         };
         instantiate_market
-            .add(&app.basic.wallet, &app.basic.cosmos, add_market_params)
+            .add(
+                &app.basic.wallet,
+                &app.basic.cosmos,
+                &app.config_testnet,
+                add_market_params,
+            )
             .await?;
         Ok(())
     }

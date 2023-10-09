@@ -383,8 +383,8 @@ fn price_history_works() {
 
     let start_prices = market.query_spot_price_history(None, None, None).unwrap();
 
-    // there is an initial price due to liquidity deposit, and initial market setup
-    let initial_price_len = 2;
+    // there is an initial price due to liquidity deposit
+    let initial_price_len = 1;
 
     // sanity check to confirm
     assert_eq!(start_prices.len(), initial_price_len);
@@ -446,7 +446,7 @@ fn price_history_works() {
         prices_desc
             .iter()
             .rev()
-            .skip(initial_price_len - 1)
+            .skip(initial_price_len)
             .rev()
             .collect::<Vec<_>>()
     );
@@ -470,7 +470,7 @@ fn price_history_works() {
         vec!["1", "2", "3", "4", "5", "6", "7", "8", "9"],
         prices_asc
             .iter()
-            .skip(initial_price_len - 1)
+            .skip(initial_price_len)
             .collect::<Vec<_>>()
     );
 }

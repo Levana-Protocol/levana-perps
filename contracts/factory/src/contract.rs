@@ -105,6 +105,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     config,
                     initial_borrow_fee_rate,
                     spot_price,
+                    initial_price,
                 },
         } => {
             if get_market_addr(ctx.storage, &market_id).is_ok() {
@@ -134,6 +135,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     token,
                     initial_borrow_fee_rate,
                     spot_price,
+                    initial_price,
                 },
             )?;
         }
