@@ -7,3 +7,13 @@ table td {
     border: 1px solid #fff;
     padding: 5px;
 }
+
+a,
+a:visited {
+    color: rgb(156, 43, 255);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
