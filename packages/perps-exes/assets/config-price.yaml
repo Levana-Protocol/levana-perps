@@ -6,7 +6,6 @@ pyth:
     feed-ids:
       ATOM_USD: "b00b60f88b03a6a625a8d1c048c3f66653edf217439983d037e7222c4e612819"
       OSMO_USD: "5867f5683c757393a0670ef0f701490950fe93fdb006d181c8265a831ac0c5c6"
-      USDC_USD: "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a"
       ETH_USD: "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace"
       BTC_USD: "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43"
       SEI_USD: "53614f1cb0c031d4af66c04cb9c756234adad0e1cee85303795091499a4084eb"
@@ -85,10 +84,9 @@ networks:
     OSMO_USDC:
       feeds: [
         !pyth { key: "OSMO_USD", inverted: false },
-        !pyth { key: "USDC_USD", inverted: true }
       ]
       feeds-usd: [
-        !pyth { key: "OSMO_USD", inverted: false }
+        !constant { price: "1", inverted: false }
       ]
     ETH_BTC:
       feeds: [
@@ -165,10 +163,9 @@ networks:
     OSMO_USDC:
       feeds: [
         !pyth { key: "OSMO_USD", inverted: false },
-        !pyth { key: "USDC_USD", inverted: true }
       ]
       feeds-usd: [
-        !pyth { key: "OSMO_USD", inverted: false }
+        !constant { price: "1", inverted: false }
       ]
     ETH_BTC:
       feeds: [
@@ -203,10 +200,9 @@ networks:
     OSMO_USDC:
       feeds: [
         !pyth { key: "OSMO_USD", inverted: false },
-        !pyth { key: "USDC_USD", inverted: true }
       ]
       feeds-usd: [
-        !pyth { key: "OSMO_USD", inverted: false }
+        !constant { price: "1", inverted: false }
       ]
     ETH_BTC:
       feeds: [
