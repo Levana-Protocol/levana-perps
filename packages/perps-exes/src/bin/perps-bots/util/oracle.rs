@@ -143,7 +143,7 @@ pub fn compose_oracle_feeds(
                 oracle_price
                     .stride
                     .get(denom)
-                    .with_context(|| format!("Missing redemption price for Stride denom: {denom}"))?
+                    .with_context(|| format!("Missing redemption rate for Stride denom: {denom}"))?
                     .redemption_rate
                     .into_decimal256()
             }
