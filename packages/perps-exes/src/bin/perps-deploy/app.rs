@@ -175,21 +175,31 @@ impl Opt {
                             inverted,
                         });
                     }
-                    MarketPriceFeedConfig::Stride { denom, inverted } => {
+                    MarketPriceFeedConfig::Stride {
+                        denom,
+                        inverted,
+                        age_tolerance,
+                    } => {
                         feeds.push(SpotPriceFeed {
-                            data: SpotPriceFeedData::Stride { denom },
+                            data: SpotPriceFeedData::Stride {
+                                denom,
+                                age_tolerance_seconds: age_tolerance,
+                            },
                             inverted,
                         });
                     }
                     MarketPriceFeedConfig::Pyth { key, inverted } => {
-                        let id_lookup = match chain_spot_price_config.pyth.as_ref() {
-                            Some(pyth) => match pyth.r#type {
-                                PythPriceServiceNetwork::Edge => &global_price_config.pyth.edge,
-                                PythPriceServiceNetwork::Stable => &global_price_config.pyth.stable,
-                            },
-                            None => bail!("No pyth config found for {:?}", network),
+                        let chain_pyth_config = chain_spot_price_config
+                            .pyth
+                            .as_ref()
+                            .context(format!("No pyth config found for {:?}", network))?;
+
+                        let pyth_config = match chain_pyth_config.r#type {
+                            PythPriceServiceNetwork::Edge => &global_price_config.pyth.edge,
+                            PythPriceServiceNetwork::Stable => &global_price_config.pyth.stable,
                         };
-                        let id = id_lookup
+
+                        let id = pyth_config
                             .feed_ids
                             .get(&key)
                             .with_context(|| {
@@ -198,7 +208,10 @@ impl Opt {
                             .clone();
 
                         feeds.push(SpotPriceFeed {
-                            data: SpotPriceFeedData::Pyth { id },
+                            data: SpotPriceFeedData::Pyth {
+                                id,
+                                age_tolerance_seconds: pyth_config.update_age_tolerance,
+                            },
                             inverted,
                         });
                     }

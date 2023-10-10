@@ -32,8 +32,6 @@ pub enum SpotPriceConfig {
 pub struct PythConfig {
     /// The address of the pyth oracle contract
     pub contract_address: Addr,
-    /// The age tolerance for pyth price updates
-    pub age_tolerance_seconds: u64,
     /// Which network to use for the price service
     /// This isn't used for any internal logic, but clients must use the appropriate
     /// price service endpoint to match this
@@ -68,11 +66,15 @@ pub enum SpotPriceFeedData {
     Pyth {
         /// The identifier on pyth
         id: PriceIdentifier,
+        /// price age tolerance, in seconds
+        age_tolerance_seconds: u32,
     },
     /// Stride liquid staking
     Stride {
         /// The IBC denom for the asset
         denom: String,
+        /// price age tolerance, in seconds
+        age_tolerance_seconds: u32,
     },
     /// Native oracle module on the sei chain
     Sei {
@@ -145,7 +147,6 @@ impl From<SpotPriceConfig> for SpotPriceConfigInit {
             } => Self::Oracle {
                 pyth: pyth.map(|pyth| PythConfigInit {
                     contract_address: RawAddr::from(pyth.contract_address),
-                    age_tolerance_seconds: pyth.age_tolerance_seconds as u32,
                     network: pyth.network,
                 }),
                 stride: stride.map(|stride| StrideConfigInit {
@@ -163,8 +164,6 @@ impl From<SpotPriceConfig> for SpotPriceConfigInit {
 pub struct PythConfigInit {
     /// The address of the pyth oracle contract
     pub contract_address: RawAddr,
-    /// The age tolerance for pyth price updates
-    pub age_tolerance_seconds: u32,
     /// Which network to use for the price service
     /// This isn't used for any internal logic, but clients must use the appropriate
     /// price service endpoint to match this

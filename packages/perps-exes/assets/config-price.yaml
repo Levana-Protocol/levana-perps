@@ -1,5 +1,9 @@
 pyth:
   stable: 
+    # although this is set on each feed in the market config
+    # for the sake of simplicity, it's only defined top-level in deploy config
+    # and then at runtime it's duplicated for each feed as-needed
+    # note that stride does _not_ have this approach, but is instead defined in each feed directly
     update-age-tolerance: 120
     endpoint: "https://hermes.pyth.network/"
     # Pyth price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-stable
@@ -199,11 +203,11 @@ networks:
       ]
     stATOM_USD:
       feeds: [
-        !stride { denom: "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590", inverted: false },
+        !stride { denom: "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590", inverted: false, age_tolerance: 600 },
         !pyth { key: "ATOM_USD", inverted: false }
       ]
       feeds-usd: [
-        !stride { denom: "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590", inverted: false },
+        !stride { denom: "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590", inverted: false, age_tolerance: 600 },
         !pyth { key: "ATOM_USD", inverted: false }
       ]
     OSMO_USDC:

@@ -105,10 +105,23 @@ pub struct MarketPriceFeedConfigs {
 #[derive(serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum MarketPriceFeedConfig {
-    Pyth { key: String, inverted: bool },
-    Constant { price: NumberGtZero, inverted: bool },
-    Sei { denom: String, inverted: bool },
-    Stride { denom: String, inverted: bool },
+    Pyth {
+        key: String,
+        inverted: bool,
+    },
+    Constant {
+        price: NumberGtZero,
+        inverted: bool,
+    },
+    Sei {
+        denom: String,
+        inverted: bool,
+    },
+    Stride {
+        denom: String,
+        inverted: bool,
+        age_tolerance: u32,
+    },
 }
 
 /// Number of decimals in the gas coin

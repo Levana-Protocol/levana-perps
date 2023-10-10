@@ -20,10 +20,6 @@ pub(crate) fn get_spot_price_config(
     Ok(SpotPriceConfigInit::Oracle {
         pyth: oracle.pyth.as_ref().map(|pyth| PythConfigInit {
             contract_address: pyth.contract.get_address_string().into(),
-            age_tolerance_seconds: match pyth.r#type {
-                PythPriceServiceNetwork::Stable => price_config.pyth.stable.update_age_tolerance,
-                PythPriceServiceNetwork::Edge => price_config.pyth.edge.update_age_tolerance,
-            },
             network: pyth.r#type,
         }),
         stride: oracle.stride.as_ref().map(|stride| StrideConfigInit {

@@ -137,7 +137,7 @@ pub fn compose_oracle_feeds(
                 .get(denom)
                 .with_context(|| format!("Missing price for Sei denom: {denom}"))?
                 .into_decimal256(),
-            SpotPriceFeedData::Stride { denom } => {
+            SpotPriceFeedData::Stride { denom, .. } => {
                 // we _could_ query the redemption rate from stride chain, but it's not needed
                 // contract price is good enough
                 oracle_price
