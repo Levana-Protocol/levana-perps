@@ -73,8 +73,8 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
                     serde_json::to_string(&actual)?,
                     serde_json::to_string(&expected)?
                 );
+                needed_update.insert(key, expected);
             }
-            needed_update.insert(key, expected);
         }
 
         if !needed_update.is_empty() {
