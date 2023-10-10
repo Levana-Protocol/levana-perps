@@ -517,20 +517,22 @@ impl State<'_> {
                                 )?;
 
                                 if validate_age {
-                                    let time_diff = u64::try_from(current_block_time_seconds)?
-                                        - resp.update_time;
-
-                                    if time_diff > (*age_tolerance_seconds).into() {
-                                        perp_bail!(
-                                            ErrorId::PriceTooOld,
-                                            ErrorDomain::Stride,
-                                            "Current price is not available. Price denom: {}, Current block time: {}, price publish time: {}, diff: {}, age_tolerance: {}",
-                                            denom,
-                                            current_block_time_seconds,
-                                            resp.update_time,
-                                            time_diff,
-                                            age_tolerance_seconds
-                                        )
+                                    if let Some(time_diff) =
+                                        u64::try_from(current_block_time_seconds)?
+                                            .checked_sub(resp.update_time)
+                                    {
+                                        if time_diff > (*age_tolerance_seconds).into() {
+                                            perp_bail!(
+                                                ErrorId::PriceTooOld,
+                                                ErrorDomain::Stride,
+                                                "Current price is not available. Price denom: {}, Current block time: {}, price publish time: {}, diff: {}, age_tolerance: {}",
+                                                denom,
+                                                current_block_time_seconds,
+                                                resp.update_time,
+                                                time_diff,
+                                                age_tolerance_seconds
+                                            )
+                                        }
                                     }
                                 }
 
