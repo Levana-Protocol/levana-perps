@@ -16,7 +16,6 @@ markets:
     trading_fee_notional_size: 0.001
     trading_fee_counter_collateral: 0.001
     borrow_fee_rate_min_annualized: 0.03
-    carry_leverage: 10
     target_utilization: 0.5
     borrow_fee_sensitivity: 0.083333333333333333
     carry_leverage: 15
