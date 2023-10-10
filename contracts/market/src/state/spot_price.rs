@@ -425,7 +425,7 @@ impl State<'_> {
                                             perp_error!(
                                                 ErrorId::PriceTooOld,
                                                 ErrorDomain::Pyth,
-                                                "Current price is not available from pyth. Price id: {}, Current block time: {}, price publish time: {}, diff: {}, age_tolerance: {}",
+                                                "Current price is not available. Price id: {}, Current block time: {}, price publish time: {}, diff: {}, age_tolerance: {}",
                                                 id,
                                                 current_block_time_seconds,
                                                 price_feed.get_price_unchecked().publish_time,
@@ -523,8 +523,8 @@ impl State<'_> {
                                     if time_diff > (*age_tolerance_seconds).into() {
                                         perp_bail!(
                                             ErrorId::PriceTooOld,
-                                            ErrorDomain::Pyth,
-                                            "Current price is not available from stride. Price denom: {}, Current block time: {}, price publish time: {}, diff: {}, age_tolerance: {}",
+                                            ErrorDomain::Stride,
+                                            "Current price is not available. Price denom: {}, Current block time: {}, price publish time: {}, diff: {}, age_tolerance: {}",
                                             denom,
                                             current_block_time_seconds,
                                             resp.update_time,
