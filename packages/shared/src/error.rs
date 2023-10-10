@@ -91,6 +91,7 @@ pub enum ErrorDomain {
     Faucet,
     Pyth,
     Farming,
+    Stride,
 }
 
 /// Generate a [PerpError] value

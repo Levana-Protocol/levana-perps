@@ -132,7 +132,7 @@ async fn update_pyth(
         .iter()
         .chain(market.feeds_usd.iter())
         .filter_map(|feed| match feed.data {
-            SpotPriceFeedData::Pyth { id } => Some(id),
+            SpotPriceFeedData::Pyth { id, .. } => Some(id),
             _ => None,
         })
         .collect::<Vec<_>>();

@@ -219,7 +219,6 @@ pub(crate) fn convert_spot_price_init(
                             .validate(api)
                             .map(|contract_address| PythConfig {
                                 contract_address,
-                                age_tolerance_seconds: pyth.age_tolerance_seconds.into(),
                                 network: pyth.network,
                             })
                     })

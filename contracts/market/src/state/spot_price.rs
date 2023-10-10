@@ -80,7 +80,7 @@ impl OraclePriceInternal {
 
         for SpotPriceFeed { data, inverted } in feeds {
             let (price, publish_time) = match data {
-                SpotPriceFeedData::Pyth { id } => self
+                SpotPriceFeedData::Pyth { id, .. } => self
                     .pyth
                     .get(id)
                     .map(|x| (x.price, Some(x.publish_time)))
@@ -90,7 +90,7 @@ impl OraclePriceInternal {
                     .get(denom)
                     .map(|x| (*x, None))
                     .with_context(|| format!("no sei price for denom {}", denom))?,
-                SpotPriceFeedData::Stride { denom } => self
+                SpotPriceFeedData::Stride { denom, .. } => self
                     .stride
                     .get(denom)
                     .map(|x| (x.redemption_rate, Some(x.publish_time)))
@@ -392,9 +392,14 @@ impl State<'_> {
                 #[cfg(not(feature = "sei"))]
                 let sei = BTreeMap::new();
 
+                let current_block_time_seconds = self.env.block.time.seconds().try_into()?;
+
                 for feed in feeds.iter().chain(feeds_usd.iter()) {
                     match &feed.data {
-                        SpotPriceFeedData::Pyth { id } => {
+                        SpotPriceFeedData::Pyth {
+                            id,
+                            age_tolerance_seconds,
+                        } => {
                             if let Entry::Vacant(entry) = pyth.entry(*id) {
                                 let pyth_config = pyth_config
                                     .as_ref()
@@ -410,14 +415,11 @@ impl State<'_> {
                                 let price_feed = price_feed_response.price_feed;
 
                                 let price = if validate_age {
-                                    let current_block_time_seconds =
-                                        self.env.block.time.seconds().try_into()?;
-
                                     price_feed
                                         // alternative: .get_emaprice_no_older_than()
                                         .get_price_no_older_than(
                                             current_block_time_seconds,
-                                            pyth_config.age_tolerance_seconds,
+                                            (*age_tolerance_seconds).into(),
                                         )
                                         .ok_or_else(|| {
                                             perp_error!(
@@ -428,7 +430,7 @@ impl State<'_> {
                                                 current_block_time_seconds,
                                                 price_feed.get_price_unchecked().publish_time,
                                                 (price_feed.get_price_unchecked().publish_time - current_block_time_seconds).abs(),
-                                                pyth_config.age_tolerance_seconds
+                                                age_tolerance_seconds
                                             )
                                         })?
                                 } else {
@@ -477,7 +479,10 @@ impl State<'_> {
                             }
                         }
 
-                        SpotPriceFeedData::Stride { denom } => {
+                        SpotPriceFeedData::Stride {
+                            denom,
+                            age_tolerance_seconds,
+                        } => {
                             if let Entry::Vacant(entry) = stride.entry(denom.clone()) {
                                 let stride_address = &stride_config
                                     .as_ref()
@@ -510,6 +515,24 @@ impl State<'_> {
                                         params: None,
                                     },
                                 )?;
+
+                                if validate_age {
+                                    let time_diff = u64::try_from(current_block_time_seconds)?
+                                        - resp.update_time;
+
+                                    if time_diff > (*age_tolerance_seconds).into() {
+                                        perp_bail!(
+                                            ErrorId::PriceTooOld,
+                                            ErrorDomain::Stride,
+                                            "Current price is not available. Price denom: {}, Current block time: {}, price publish time: {}, diff: {}, age_tolerance: {}",
+                                            denom,
+                                            current_block_time_seconds,
+                                            resp.update_time,
+                                            time_diff,
+                                            age_tolerance_seconds
+                                        )
+                                    }
+                                }
 
                                 let publish_time = Timestamp::from_seconds(resp.update_time);
                                 let redemption_rate = Number::try_from(resp.redemption_rate)?;
