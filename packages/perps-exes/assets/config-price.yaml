@@ -156,6 +156,20 @@ networks:
       feeds-usd: [
         !pyth { key: "DOT_USD", inverted: false}
       ]
+    EUR_USDC:
+      feeds: [
+        !pyth { key: "EUR_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    GBP_USDC:
+      feeds: [
+        !pyth { key: "GBP_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
   sei-testnet:
     ATOM_USD:
       feeds: [
