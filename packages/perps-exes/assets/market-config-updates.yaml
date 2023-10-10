@@ -5,9 +5,10 @@ markets:
     trading_fee_notional_size: 0.001
     trading_fee_counter_collateral: 0.001
     borrow_fee_rate_min_annualized: 0.03
-    carry_leverage: 10
     target_utilization: 0.5
     borrow_fee_sensitivity: 0.083333333333333333
+    carry_leverage: 15
+    liquidity_cooldown_seconds: 3600
 
   axlETH_USD:
     delta_neutrality_fee_sensitivity: 1000000000
@@ -18,15 +19,33 @@ markets:
     carry_leverage: 10
     target_utilization: 0.5
     borrow_fee_sensitivity: 0.083333333333333333
+    carry_leverage: 15
+    liquidity_cooldown_seconds: 3600
 
-  # Internal testing contracts, not yet on mainnet
   ATOM_USD:
     delta_neutrality_fee_sensitivity: 200000000
     funding_rate_sensitivity: 2
+    carry_leverage: 15
+    liquidity_cooldown_seconds: 3600
 
   stATOM_USD:
-    delta_neutrality_fee_sensitivity: 200000000
+    trading_fee_notional_size: 0.001
+    trading_fee_counter_collateral: 0.001
+    max_leverage: 30
     funding_rate_sensitivity: 2
+    borrow_fee_rate_min_annualized: 0.03
+    borrow_fee_rate_max_annualized: 0.6
+    liquifunding_delay_seconds: 21600
+    liquifunding_delay_fuzz_seconds: 3600
+    target_utilization: 0.5
+    borrow_fee_sensitivity: 0.083333333
+    delta_neutrality_fee_sensitivity: 200000000
+    delta_neutrality_fee_cap: 0.005
+    delta_neutrality_fee_tax: 0.05
+    carry_leverage: 15
+    liquidity_cooldown_seconds: 3600
+
+    # initial borrow fee: 0.05
 
   OSMO_USD:
     max_leverage: 10
@@ -40,6 +59,7 @@ markets:
     trading_fee_notional_size: 0.001
     trading_fee_counter_collateral: 0.001
     borrow_fee_rate_min_annualized: 0.06
+    liquidity_cooldown_seconds: 3600
 
   SEI_USD:
     max_leverage: 10
@@ -53,17 +73,21 @@ markets:
     trading_fee_notional_size: 0.001
     trading_fee_counter_collateral: 0.001
     borrow_fee_rate_min_annualized: 0.04
+    liquidity_cooldown_seconds: 3600
     # Set initial borrow fee to 8%
 
   # Currently only used on CI versions of contracts
   OSMO_USDC:
     max_leverage: 10
-    carry_leverage: 9
+    carry_leverage: 5
     delta_neutrality_fee_cap: 0.015
     delta_neutrality_fee_sensitivity: 50000000
     delta_neutrality_fee_tax: 0.25
+    liquidity_cooldown_seconds: 3600
   ETH_BTC:
     delta_neutrality_fee_sensitivity: 1000000000
+    carry_leverage: 15
+    liquidity_cooldown_seconds: 3600
   BTC_USD:
     delta_neutrality_fee_sensitivity: 5000000000
     borrow_fee_sensitivity: "0.03333333333"
@@ -71,6 +95,8 @@ markets:
     borrow_fee_rate_max_annualized: "0.30"
     target_utilization: "0.5"
     funding_rate_sensitivity: 1
+    carry_leverage: 15
+    liquidity_cooldown_seconds: 3600
 
   EVMOS_USD:
     trading_fee_notional_size: 0.002
@@ -83,6 +109,7 @@ markets:
     liquifunding_delay_fuzz_seconds: 3600
     delta_neutrality_fee_cap: 0.03
     delta_neutrality_fee_tax: 0.35
+    liquidity_cooldown_seconds: 3600
 
     # Different from AKT
     borrow_fee_rate_min_annualized: 0.2
@@ -103,6 +130,7 @@ markets:
     liquifunding_delay_fuzz_seconds: 3600
     delta_neutrality_fee_cap: 0.03
     delta_neutrality_fee_tax: 0.35
+    liquidity_cooldown_seconds: 3600
 
     # Different from EVMOS
     borrow_fee_rate_min_annualized: 0.06
@@ -125,6 +153,8 @@ markets:
     delta_neutrality_fee_cap: 0.005
     delta_neutrality_fee_tax: 0.05
     liquifunding_delay_fuzz_seconds: 3600
+    carry_leverage: 15
+    liquidity_cooldown_seconds: 3600
 
     # Starting borrow fee: 0.1
 
@@ -138,6 +168,8 @@ markets:
     delta_neutrality_fee_sensitivity: 100000000
     delta_neutrality_fee_cap: 0.005
     delta_neutrality_fee_tax: 0.1
+    carry_leverage: 15
+    liquidity_cooldown_seconds: 3600
 
     # Starting borrow fee: 0.16
 
@@ -145,7 +177,7 @@ markets:
     trading_fee_notional_size: 0.001
     trading_fee_counter_collateral: 0.001
     max_leverage: 100
-    carry_leverage: 95
+    carry_leverage: 25
     funding_rate_sensitivity: 1
     funding_rate_max_annualized: 0.45
     borrow_fee_rate_min_annualized: 0.03
@@ -157,6 +189,7 @@ markets:
     delta_neutrality_fee_tax: 0.05
     liquifunding_delay_seconds: 21600
     liquifunding_delay_fuzz_seconds: 3600
+    liquidity_cooldown_seconds: 3600
 
     # Starting borrow fee: 0.05
 
@@ -164,7 +197,7 @@ markets:
     trading_fee_notional_size: 0.001
     trading_fee_counter_collateral: 0.001
     max_leverage: 100
-    carry_leverage: 95
+    carry_leverage: 25
     funding_rate_sensitivity: 1
     funding_rate_max_annualized: 0.45
     borrow_fee_rate_min_annualized: 0.03
@@ -176,6 +209,7 @@ markets:
     delta_neutrality_fee_tax: 0.05
     liquifunding_delay_seconds: 21600
     liquifunding_delay_fuzz_seconds: 3600
+    liquidity_cooldown_seconds: 3600
 
     # Starting borrow fee: 0.05
 
@@ -183,7 +217,7 @@ markets:
     trading_fee_notional_size: 0.001
     trading_fee_counter_collateral: 0.001
     max_leverage: 100
-    carry_leverage: 95
+    carry_leverage: 25
     funding_rate_sensitivity: 1
     funding_rate_max_annualized: 0.45
     borrow_fee_rate_min_annualized: 0.03
@@ -195,13 +229,14 @@ markets:
     delta_neutrality_fee_tax: 0.05
     liquifunding_delay_seconds: 21600
     liquifunding_delay_fuzz_seconds: 3600
+    liquidity_cooldown_seconds: 3600
 
     # Starting borrow fee: 0.05
   GOLD_USDC:
     trading_fee_notional_size: 0.001
     trading_fee_counter_collateral: 0.001
     max_leverage: 100
-    carry_leverage: 95
+    carry_leverage: 25
     funding_rate_sensitivity: 1
     funding_rate_max_annualized: 0.45
     borrow_fee_rate_min_annualized: 0.03
@@ -213,5 +248,6 @@ markets:
     delta_neutrality_fee_tax: 0.05
     liquifunding_delay_seconds: 21600
     liquifunding_delay_fuzz_seconds: 3600
+    liquidity_cooldown_seconds: 3600
 
     # Starting borrow fee: 0.05
