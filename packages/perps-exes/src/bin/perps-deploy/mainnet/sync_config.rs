@@ -68,7 +68,7 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
                 format!("Missing actual config value {key} for market {}", market_id)
             })?;
             if actual != expected {
-                log::info!(
+                println!(
                     "Mismatched paramter for {market_id}: {key}. Actual: {}. Expected: {}.",
                     serde_json::to_string(&actual)?,
                     serde_json::to_string(&expected)?
@@ -93,10 +93,10 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
     }
 
     if updates.is_empty() {
-        log::info!("No updates necessary");
+        println!("No updates necessary");
     } else {
-        log::info!("CW3 contract: {owner}");
-        log::info!("Message: {}", serde_json::to_string(&updates)?);
+        println!("CW3 contract: {owner}");
+        println!("Message: {}", serde_json::to_string(&updates)?);
     }
 
     Ok(())
