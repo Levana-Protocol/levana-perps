@@ -30,6 +30,8 @@ osmosis-mainnet:
     pyth:
       contract: osmo13ge29x4e2s63a8ytz2px8gurtyznmue4a69n5275692v3qn3ks8q7cwck7
       type: stable
+    stride:
+      contract: osmo1df5d9wr6s3xp49qe3sgzyd6gwr4yxwl2ydey08rgac5u02wqnvyq0pd5m9
   explorer: "https://www.mintscan.io/osmosis/txs/"
   gas-multiplier: 1.5
 osmosis-testnet:
