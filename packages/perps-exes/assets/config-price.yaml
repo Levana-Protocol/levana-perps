@@ -203,11 +203,11 @@ networks:
       ]
     stATOM_USD:
       feeds: [
-        !stride { denom: "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590", inverted: false, age_tolerance: 600 },
+        !stride { denom: "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590", inverted: false, age_tolerance: 43200 },
         !pyth { key: "ATOM_USD", inverted: false }
       ]
       feeds-usd: [
-        !stride { denom: "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590", inverted: false, age_tolerance: 600 },
+        !stride { denom: "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590", inverted: false, age_tolerance: 43200 },
         !pyth { key: "ATOM_USD", inverted: false }
       ]
     OSMO_USDC:
