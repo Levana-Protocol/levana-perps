@@ -1,4 +1,5 @@
 mod migrate;
+mod sync_config;
 mod update_config;
 
 use std::{
@@ -28,7 +29,7 @@ use crate::{
     app::OracleInfo, cli::Opt, spot_price_config::get_spot_price_config, util::get_hash_for_path,
 };
 
-use self::{migrate::MigrateOpts, update_config::UpdateConfigOpts};
+use self::{migrate::MigrateOpts, sync_config::SyncConfigOpts, update_config::UpdateConfigOpts};
 
 #[derive(clap::Parser)]
 pub(crate) struct MainnetOpt {
@@ -73,6 +74,11 @@ enum Sub {
         #[clap(flatten)]
         inner: UpdateConfigOpts,
     },
+    /// Synchronize on-chain config with market config updates file
+    SyncConfig {
+        #[clap(flatten)]
+        inner: SyncConfigOpts,
+    },
 }
 
 pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
@@ -91,6 +97,7 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
         Sub::AddMarket { inner } => add_market(opt, inner).await?,
         Sub::Migrate { inner } => inner.go(opt).await?,
         Sub::UpdateConfig { inner } => inner.go(opt).await?,
+        Sub::SyncConfig { inner } => inner.go(opt).await?,
     }
     Ok(())
 }
