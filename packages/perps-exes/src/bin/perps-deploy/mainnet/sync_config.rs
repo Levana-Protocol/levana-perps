@@ -2,9 +2,12 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use cosmos::HasAddress;
-use cosmwasm_std::{to_binary, CosmosMsg, Empty, WasmMsg};
+use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, WasmMsg};
 use msg::{
-    contracts::market::{config::ConfigUpdate, entry::ExecuteOwnerMsg},
+    contracts::market::{
+        config::{Config, ConfigUpdate},
+        entry::ExecuteOwnerMsg,
+    },
     prelude::MarketExecuteMsg,
 };
 use perps_exes::{
@@ -48,22 +51,44 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
             .markets
             .get(&market_id)
             .with_context(|| format!("No market config update found for {market_id}"))?;
+        let default_config = Config::new(
+            msg::contracts::market::spot_price::SpotPriceConfig::Manual {
+                admin: Addr::unchecked("ignored"),
+            },
+        );
 
         let mut actual_config = match serde_json::to_value(actual_config)? {
             serde_json::Value::Object(o) => o,
             _ => anyhow::bail!("Actual config is not an object"),
         };
-        let expected_config = match serde_json::to_value(expected_config.clone())? {
+        let mut expected_config = match serde_json::to_value(expected_config.clone())? {
+            serde_json::Value::Object(o) => o,
+            _ => anyhow::bail!("Expected config is not an object"),
+        };
+        let default_config = match serde_json::to_value(default_config.clone())? {
             serde_json::Value::Object(o) => o,
             _ => anyhow::bail!("Expected config is not an object"),
         };
 
+        for key in expected_config.keys() {
+            anyhow::ensure!(default_config.contains_key(key));
+            anyhow::ensure!(actual_config.contains_key(key));
+        }
+
         let mut needed_update = serde_json::Map::new();
 
-        for (key, expected) in expected_config {
-            if expected.is_null() {
+        for (key, default_value) in default_config {
+            if key == "spot_price" {
                 continue;
             }
+            let expected_value = expected_config
+                .remove(&key)
+                .with_context(|| format!("Missing key in expected_config: {key}"))?;
+            let expected = if expected_value.is_null() {
+                default_value
+            } else {
+                expected_value
+            };
             let actual = actual_config.remove(&key).with_context(|| {
                 format!("Missing actual config value {key} for market {}", market_id)
             })?;
