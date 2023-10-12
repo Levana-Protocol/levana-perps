@@ -92,6 +92,7 @@ deployments:
       - OSMO_USDC
       - ETH_BTC
       - BTC_USD
+      - axlETH_USD
   debug:
     # Seed phrase: soldier speak spawn sword vivid robot brand stage promote pride grant bench degree bulk armor now sketch extend wheel echo figure net wedding unveil
     wallet-manager-address: levana19ta8kepflecc7n2rdruduj9ydt72z2xy0gl5e9
