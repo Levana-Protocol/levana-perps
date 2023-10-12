@@ -173,6 +173,24 @@ overrides:
     min-gas: 1000
     min-gas-in-faucet: 2000000
     min-gas-in-gas-wallet: 1000000
+  seici:
+    wallet-manager-address: osmo1ghgpnmxgt6xz463423hhnx8zp99dwt563wnllv
+    dev-settings: true
+    price: true
+    crank: true
+    liquidity: true
+    utilization: true
+    balance: true
+    traders: 3
+    default-market-ids:
+      - ATOM_USD
+      - OSMO_USDC
+      - ETH_BTC
+      - BTC_USD
+    # Gas is expensive on Sei
+    min-gas: 1000
+    min-gas-in-faucet: 2000000
+    min-gas-in-gas-wallet: 1000000
   injbeta:
     wallet-manager-address: osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k
     price: true
