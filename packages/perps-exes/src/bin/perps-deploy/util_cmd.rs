@@ -115,8 +115,8 @@ async fn update_pyth(
     let oracle_info = opt.get_oracle_info(&basic.chain_config, &basic.price_config, network)?;
 
     let endpoint = match pyth.r#type {
-        PythPriceServiceNetwork::Stable => &basic.price_config.pyth.stable.endpoint,
-        PythPriceServiceNetwork::Edge => &basic.price_config.pyth.edge.endpoint,
+        PythPriceServiceNetwork::Stable => &opt.pyth_endpoint_stable,
+        PythPriceServiceNetwork::Edge => &opt.pyth_endpoint_edge,
     };
 
     let client = reqwest::Client::new();

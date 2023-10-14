@@ -9,7 +9,7 @@ use cosmos::Address;
 use cosmos::Cosmos;
 use cosmos::HasAddressType;
 use cosmos::Wallet;
-use perps_exes::config::{GasAmount, PriceConfig};
+use perps_exes::config::GasAmount;
 use reqwest::Client;
 use tokio::sync::{Mutex, RwLock};
 
@@ -64,7 +64,6 @@ pub(crate) struct App {
     /// Ensure that the crank and price bots don't try to work at the same time
     pub(crate) crank_lock: Mutex<()>,
     pub(crate) endpoint_stable: String,
-    #[allow(dead_code)]
     pub(crate) endpoint_edge: String,
 }
 
@@ -130,8 +129,6 @@ impl Opt {
             ),
         };
 
-        let price_config = PriceConfig::load(self.price_config)?;
-
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
             cosmos,
@@ -142,8 +139,8 @@ impl Opt {
             gases: RwLock::new(HashMap::new()),
             frontend_info_testnet,
             crank_lock: Mutex::new(()),
-            endpoint_stable: price_config.pyth.stable.endpoint,
-            endpoint_edge: price_config.pyth.edge.endpoint,
+            endpoint_stable: self.pyth_endpoint_stable,
+            endpoint_edge: self.pyth_endpoint_edge,
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {

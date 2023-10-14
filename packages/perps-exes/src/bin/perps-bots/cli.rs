@@ -34,6 +34,20 @@ pub(crate) struct Opt {
     /// Override the Pyth config file
     #[clap(long, env = "LEVANA_BOTS_PRICE_CONFIG")]
     pub(crate) price_config: Option<PathBuf>,
+    /// The stable Pyth endpoint
+    #[clap(
+        long,
+        env = "LEVANA_BOTS_PYTH_ENDPOINT_STABLE",
+        default_value = "https://hermes.pyth.network/"
+    )]
+    pub(crate) pyth_endpoint_stable: String,
+    /// The edge Pyth endpoint
+    #[clap(
+        long,
+        env = "LEVANA_BOTS_PYTH_ENDPOINT_EDGE",
+        default_value = "https://hermes-beta.pyth.network/"
+    )]
+    pub(crate) pyth_endpoint_edge: String,
 }
 
 #[derive(clap::Parser)]
