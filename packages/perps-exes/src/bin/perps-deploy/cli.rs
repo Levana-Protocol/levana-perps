@@ -145,6 +145,20 @@ pub(crate) struct Opt {
         default_value = "packages/perps-exes/assets/market-config-updates.yaml"
     )]
     pub(crate) market_config: PathBuf,
+    /// The stable Pyth endpoint
+    #[clap(
+        long,
+        env = "LEVANA_BOTS_PYTH_ENDPOINT_STABLE",
+        default_value = "https://hermes.pyth.network/"
+    )]
+    pub(crate) pyth_endpoint_stable: String,
+    /// The edge Pyth endpoint
+    #[clap(
+        long,
+        env = "LEVANA_BOTS_PYTH_ENDPOINT_EDGE",
+        default_value = "https://hermes-beta.pyth.network/"
+    )]
+    pub(crate) pyth_endpoint_edge: String,
 }
 
 impl Opt {

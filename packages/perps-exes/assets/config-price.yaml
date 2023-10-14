@@ -5,7 +5,6 @@ pyth:
     # and then at runtime it's duplicated for each feed as-needed
     # note that stride does _not_ have this approach, but is instead defined in each feed directly
     update-age-tolerance: 120
-    endpoint: "https://hermes.pyth.network/"
     # Pyth price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-stable
     feed-ids:
       ATOM_USD: "b00b60f88b03a6a625a8d1c048c3f66653edf217439983d037e7222c4e612819"
@@ -23,7 +22,6 @@ pyth:
       XAU_USD: 765d2ba906dbc32ca17cc11f5310a89e9ee1f6420508c63861f2f8ba4ee34bb2
   edge: 
     update-age-tolerance: 120
-    endpoint: "https://hermes-beta.pyth.network/"
     # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-edge
     feed-ids:
       ATOM_USD: "61226d39beea19d334f17c2febce27e12646d84675924ebb02b9cdaea68727e3"
