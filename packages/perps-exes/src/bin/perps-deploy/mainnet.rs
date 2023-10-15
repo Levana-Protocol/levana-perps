@@ -8,7 +8,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use cosmos::{Address, ContractAdmin, CosmosNetwork, HasAddress};
+use cosmos::{Address, ContractAdmin, CosmosNetwork, HasAddress, TxBuilder};
 use cosmwasm_std::{to_binary, CosmosMsg, Empty};
 use msg::{
     contracts::market::{
@@ -444,9 +444,6 @@ struct AddMarketOpts {
     /// Initial borrow fee rate
     #[clap(long)]
     initial_borrow_fee_rate: Decimal256,
-    /// Instead of executing, print out CW3 multisig instructions
-    #[clap(long)]
-    cw3: bool,
 }
 
 async fn add_market(
@@ -457,7 +454,6 @@ async fn add_market(
         collateral,
         decimal_places,
         initial_borrow_fee_rate,
-        cw3: is_cw3,
     }: AddMarketOpts,
 ) -> Result<()> {
     let market_config_update = {
@@ -491,25 +487,27 @@ async fn add_market(
     let msg = strip_nulls(msg)?;
     let factory = app.cosmos.make_contract(factory.address);
 
-    if is_cw3 {
-        let factory = Factory::from_contract(factory);
-        log::info!("Need to make a proposal");
+    let factory = Factory::from_contract(factory);
+    log::info!("Need to make a proposal");
 
-        let owner = factory.query_owner().await?;
-        log::info!("CW3 contract: {owner}");
-        log::info!(
-            "Message: {}",
-            serde_json::to_string(&CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
-                contract_addr: factory.to_string(),
-                msg: to_binary(&msg)?,
-                funds: vec![]
-            }))?
-        );
-    } else {
-        log::info!("Calling AddMarket on the factory");
-        let res = factory.execute(&app.wallet, vec![], msg).await?;
-        log::info!("New market added in transaction: {}", res.txhash);
-    }
+    let owner = factory.query_owner().await?;
+    log::info!("CW3 contract: {owner}");
+    log::info!(
+        "Message: {}",
+        serde_json::to_string(&CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
+            contract_addr: factory.to_string(),
+            msg: to_binary(&msg)?,
+            funds: vec![]
+        }))?
+    );
+
+    let simres = TxBuilder::default()
+        .add_execute_message(factory, owner, vec![], &msg)?
+        .simulate(&app.cosmos, &[owner])
+        .await
+        .context("Could not simulate message")?;
+    log::info!("Simulation completed successfully");
+    log::debug!("Simulation response: {simres:?}");
 
     Ok(())
 }
