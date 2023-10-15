@@ -191,6 +191,15 @@ networks:
       feeds-usd: [
         !constant { price: "1", inverted: false }
       ]
+    stATOM_USD:
+      feeds: [
+        !stride { denom: "ibc/C140AFD542AE77BD7DCC83F13FDD8C5E5BB8C4929785E6EC2F4C636F98F17901", inverted: false, age_tolerance: 43200 },
+        !pyth { key: "ATOM_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !stride { denom: "ibc/C140AFD542AE77BD7DCC83F13FDD8C5E5BB8C4929785E6EC2F4C636F98F17901", inverted: false, age_tolerance: 43200 },
+        !pyth { key: "ATOM_USD", inverted: false }
+      ]
   sei-testnet:
     ATOM_USD:
       feeds: [
