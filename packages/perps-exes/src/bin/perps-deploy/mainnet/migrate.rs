@@ -1,15 +1,15 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use cosmos::HasAddress;
-use cosmwasm_std::{to_binary, CosmosMsg, Empty, WasmMsg};
+use cosmos::{Address, Cosmos, HasAddress, TxBuilder};
+use cosmwasm_std::{from_binary, to_binary, CosmosMsg, Empty, WasmMsg};
 use msg::prelude::*;
 use perps_exes::{
     config::{ChainConfig, PriceConfig},
     contracts::{ConfiguredCodeIds, Factory},
 };
 
-use crate::{cli::Opt, mainnet::get_spot_price_config};
+use crate::{cli::Opt, mainnet::get_spot_price_config, util::add_cosmos_msg};
 
 use super::{CodeIds, ContractType, MainnetFactories};
 
@@ -91,11 +91,18 @@ async fn go(
         }));
     }
 
+    let mut builder = TxBuilder::default();
+    let mut signers = vec![];
+
     if !factory_msgs.is_empty() {
         log::info!("Update factory message");
         let owner = factory.query_owner().await?;
         log::info!("CW3 contract: {owner}");
         log::info!("Message: {}", serde_json::to_string(&factory_msgs)?);
+        signers.push(owner);
+        for msg in &factory_msgs {
+            add_cosmos_msg(&mut builder, owner, msg)?;
+        }
     }
 
     let mut msgs = Vec::<CosmosMsg<Empty>>::new();
@@ -158,6 +165,21 @@ async fn go(
         log::info!("Migrate existing markets");
         log::info!("CW3 contract: {migration_admin}");
         log::info!("Message: {}", serde_json::to_string(&msgs)?);
+        signers.push(migration_admin);
+        for msg in &msgs {
+            add_cosmos_msg(&mut builder, migration_admin, msg)?;
+        }
+    }
+
+    if signers.is_empty() {
+        log::info!("No messages generated");
+    } else {
+        let res = builder
+            .simulate(&app.cosmos, &signers)
+            .await
+            .context("Unable to simulate CW3 messages")?;
+        log::info!("Successfully simulated messages");
+        log::debug!("Full simulate response: {res:?}");
     }
 
     Ok(())
