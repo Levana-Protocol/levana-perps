@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use cosmos::HasAddress;
+use cosmos::{HasAddress, TxBuilder};
 use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, WasmMsg};
 use msg::{
     contracts::market::{
@@ -16,7 +16,7 @@ use perps_exes::{
     prelude::MarketContract,
 };
 
-use crate::mainnet::strip_nulls;
+use crate::{mainnet::strip_nulls, util::add_cosmos_msg};
 
 #[derive(clap::Parser)]
 pub(super) struct SyncConfigOpts {
@@ -122,6 +122,17 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
     } else {
         println!("CW3 contract: {owner}");
         println!("Message: {}", serde_json::to_string(&updates)?);
+
+        let mut builder = TxBuilder::default();
+        for update in &updates {
+            add_cosmos_msg(&mut builder, owner, update)?;
+        }
+        let res = builder
+            .simulate(&app.cosmos, &[owner])
+            .await
+            .context("Error while simulating")?;
+        log::info!("Successfully simulated messages");
+        log::debug!("Simulate response: {res:?}");
     }
 
     Ok(())
