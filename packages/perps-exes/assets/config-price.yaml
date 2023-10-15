@@ -20,6 +20,7 @@ pyth:
       GBP_USD: 84c2dde9633d93d1bcad84e7dc41c9d56578b7ec52fabedc1f335d673df0a7c1
       USD_CNH: eef52e09c878ad41f6a81803e3640fe04dceea727de894edd4ea117e2e332e66
       XAU_USD: 765d2ba906dbc32ca17cc11f5310a89e9ee1f6420508c63861f2f8ba4ee34bb2
+      BNB_USD: 2f95862b045670cd22bee3114c39763a4a08beeb663b145d283c31d7d1101c4f
   edge: 
     update-age-tolerance: 120
     # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-edge
@@ -28,6 +29,7 @@ pyth:
       BTC_USD: "f9c0172ba10dfa4d19088d94f5bf61d3b54d5bd7483a322a982e1373ee8ea31b"
       ETH_USD: "ca80ba6dc32e08d06f1aa886011eed1d77c77be9eb761cc10d72b7d0a2fd57a6"
       INJ_USD: "2d9315a88f3019f8efa88dfe9c0f0843712da0bac814461e27733f6b83eb51b3"
+      BNB_USD: "ecf553770d9b10965f8fb64771e93f5690a182edc32be4a3236e0caaa6e0581a"
 
 networks: 
   injective-testnet:
@@ -52,6 +54,13 @@ networks:
       feeds-usd: [
         !pyth { key: "ETH_USD", inverted: false }
       ]
+    BNB_USDT:
+      feeds: [
+        !pyth { key: "BNB_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
   injective-mainnet:
     INJ_USD:
       feeds: [
@@ -59,6 +68,13 @@ networks:
       ]
       feeds-usd: [
         !pyth { key: "INJ_USD", inverted: false }
+      ]
+    BNB_USDT:
+      feeds: [
+        !pyth { key: "BNB_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
       ]
   sei-mainnet:
     ETH_USD:
@@ -164,6 +180,13 @@ networks:
     GBP_USDC:
       feeds: [
         !pyth { key: "GBP_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    BNB_USDC:
+      feeds: [
+        !pyth { key: "BNB_USD", inverted: false }
       ]
       feeds-usd: [
         !constant { price: "1", inverted: false }
@@ -303,6 +326,13 @@ networks:
     GOLD_USDC:
       feeds: [
         !pyth { key: "XAU_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    BNB_USDC:
+      feeds: [
+        !pyth { key: "BNB_USD", inverted: false }
       ]
       feeds-usd: [
         !constant { price: "1", inverted: false }
