@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use cosmos::{Address, AddressType, CosmosNetwork, SeedPhrase, Wallet};
 use cosmwasm_std::Decimal256;
 use perps_exes::{build_version, config::GasAmount};
+use shared::storage::MarketId;
 
 #[derive(clap::Parser)]
 #[clap(version = build_version())]
@@ -135,6 +136,9 @@ pub(crate) struct MainnetOpt {
     /// Rewards destination wallet
     #[clap(long, env = "LEVANA_BOTS_CRANK_REWARDS")]
     pub(crate) crank_rewards: Address,
+    /// List of markets that should be ignored
+    #[clap(long, env = "LEVANA_BOTS_IGNORED_MARKETS", value_delimiter = ',')]
+    pub(crate) ignored_markets: Vec<MarketId>,
 }
 
 impl Opt {

@@ -2,6 +2,7 @@ use cosmos::{Contract, Cosmos, HasAddress};
 use msg::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
 use msg::prelude::*;
 use perps_exes::prelude::MarketContract;
+use std::collections::HashSet;
 use std::fmt::Debug;
 
 #[derive(Clone)]
@@ -25,7 +26,11 @@ impl Debug for Market {
     }
 }
 
-pub(crate) async fn get_markets(cosmos: &Cosmos, factory: &Contract) -> Result<Vec<Market>> {
+pub(crate) async fn get_markets(
+    cosmos: &Cosmos,
+    factory: &Contract,
+    ignored_markets: &HashSet<MarketId>,
+) -> Result<Vec<Market>> {
     let mut res = vec![];
     let mut start_after = None;
 
@@ -42,6 +47,9 @@ pub(crate) async fn get_markets(cosmos: &Cosmos, factory: &Contract) -> Result<V
         }
 
         for market_id in markets {
+            if ignored_markets.contains(&market_id) {
+                continue;
+            }
             let MarketInfoResponse {
                 market_addr,
                 position_token,

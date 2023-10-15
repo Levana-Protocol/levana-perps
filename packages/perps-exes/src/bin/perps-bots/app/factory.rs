@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use axum::async_trait;
@@ -86,7 +86,7 @@ async fn update(app: &App) -> Result<WatchedTaskOutput> {
             (message, factory_info)
         }
         BotConfigByType::Mainnet { inner } => {
-            get_factory_info_mainnet(&app.cosmos, inner.factory).await?
+            get_factory_info_mainnet(&app.cosmos, inner.factory, &inner.ignored_markets).await?
         }
     };
     let output = WatchedTaskOutput {
@@ -100,10 +100,11 @@ async fn update(app: &App) -> Result<WatchedTaskOutput> {
 pub(crate) async fn get_factory_info_mainnet(
     cosmos: &Cosmos,
     factory: Address,
+    ignored_markets: &HashSet<MarketId>,
 ) -> Result<(String, FactoryInfo)> {
     let message = format!("Using hard-coded factory address {factory}");
 
-    let markets = get_markets(cosmos, &cosmos.make_contract(factory)).await?;
+    let markets = get_markets(cosmos, &cosmos.make_contract(factory), ignored_markets).await?;
 
     let factory_info = FactoryInfo {
         factory,
@@ -203,7 +204,7 @@ pub(crate) async fn get_contract(
 
 async fn get_tokens_markets(cosmos: &Cosmos, factory: Address) -> Result<(Vec<Cw20>, Vec<Market>)> {
     let factory = cosmos.make_contract(factory);
-    let markets = get_markets(cosmos, &factory).await?;
+    let markets = get_markets(cosmos, &factory, &HashSet::new()).await?;
     let mut tokens = vec![];
     for market in &markets {
         let denom = market.market_id.get_collateral().to_owned();

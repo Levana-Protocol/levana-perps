@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use cosmos::{Address, CosmosNetwork, HasAddress, HasAddressType, Wallet};
 use perps_exes::{
@@ -51,6 +51,7 @@ pub(crate) struct BotConfigMainnet {
     pub(crate) high_util_ratio: Decimal256,
     pub(crate) liquidity_transaction: LiquidityTransactionConfig,
     pub(crate) crank_rewards: Address,
+    pub(crate) ignored_markets: HashSet<MarketId>,
 }
 
 pub(crate) struct BotConfig {
@@ -220,6 +221,7 @@ impl Opt {
             ltc_total_deposit_percent,
             http_timeout_seconds,
             crank_rewards,
+            ignored_markets,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let price_wallet = seed
@@ -247,6 +249,7 @@ impl Opt {
                         total_deposits_percentage: *ltc_total_deposit_percent,
                     },
                     crank_rewards: *crank_rewards,
+                    ignored_markets: ignored_markets.iter().cloned().collect(),
                 }
                 .into(),
             },
@@ -332,6 +335,7 @@ impl BotConfigMainnet {
             high_util_ratio: _,
             liquidity_transaction: _,
             crank_rewards: _,
+            ignored_markets: _,
         } = self;
         0
     }

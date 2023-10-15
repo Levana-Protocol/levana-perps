@@ -124,7 +124,9 @@ impl Opt {
                 (factory, Some(RwLock::new(Arc::new(frontend))))
             }
             BotConfigByType::Mainnet { inner } => (
-                get_factory_info_mainnet(&cosmos, inner.factory).await?.1,
+                get_factory_info_mainnet(&cosmos, inner.factory, &inner.ignored_markets)
+                    .await?
+                    .1,
                 None,
             ),
         };
