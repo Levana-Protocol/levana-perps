@@ -107,7 +107,7 @@ impl App {
         let start_time = Utc::now();
         let (oracle_price, _) = oracle.get_latest_price(&self.client).await?;
         let time_spent = Utc::now() - start_time;
-        log::debug!("get_latest_price took {time_spent}");
+        log::info!("get_latest_price took {time_spent}");
 
         let start_time = Utc::now();
         let (market_price, reason) = self
@@ -137,8 +137,8 @@ impl App {
         let start_time = Utc::now();
         let pyth_msg = self.get_tx_pyth(&worker.wallet, &oracle).await?;
         let is_pyth = pyth_msg.is_some();
-        if let Some(msg) = pyth_msg {
-            builder.add_message_mut(msg);
+        if let Some(msg) = &pyth_msg {
+            builder.add_message_mut(msg.clone());
         }
         let time_spent = Utc::now() - start_time;
         log::debug!("get_tx_pyth took {time_spent}");
@@ -160,6 +160,13 @@ impl App {
                 // Hacky way to check if we're getting this error, we could
                 // parse the error correctly, but this is Good Enough.
                 if !format!("{e:?}").contains("price_too_old") {
+                    match &pyth_msg {
+                        None => log::error!("price_too_old occurred with no pyth_msg: {e:?}"),
+                        Some(pyth_msg) => match std::str::from_utf8(&pyth_msg.msg) {
+                            Ok(msg) => log::error!("price_too_old occurred with execute message {msg}, error was {e:?}"),
+                            Err(_) => log::error!("price_too_old occurred with execute message {:?}, error was {e:?}", pyth_msg.msg),
+                        },
+                    }
                     return Err(e);
                 }
 
