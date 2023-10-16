@@ -10,7 +10,7 @@ mod util;
 pub(crate) mod wallet_manager;
 pub(crate) mod watcher;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 16)]
 async fn main() -> Result<()> {
     main_inner().await
 }

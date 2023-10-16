@@ -11,7 +11,7 @@ use cosmos::HasAddressType;
 use cosmos::Wallet;
 use perps_exes::config::GasAmount;
 use reqwest::Client;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 
 use crate::app::factory::{get_factory_info_mainnet, get_factory_info_testnet};
 use crate::cli::Opt;
@@ -61,8 +61,6 @@ pub(crate) struct App {
     pub(crate) statuses: TaskStatuses,
     pub(crate) live_since: DateTime<Utc>,
     pub(crate) gases: RwLock<HashMap<Address, GasRecords>>,
-    /// Ensure that the crank and price bots don't try to work at the same time
-    pub(crate) crank_lock: Mutex<()>,
     pub(crate) endpoint_stable: String,
     pub(crate) endpoint_edge: String,
 }
@@ -140,7 +138,6 @@ impl Opt {
             live_since: Utc::now(),
             gases: RwLock::new(HashMap::new()),
             frontend_info_testnet,
-            crank_lock: Mutex::new(()),
             endpoint_stable: self.pyth_endpoint_stable,
             endpoint_edge: self.pyth_endpoint_edge,
         };

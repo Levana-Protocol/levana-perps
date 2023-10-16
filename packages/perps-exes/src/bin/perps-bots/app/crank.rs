@@ -73,23 +73,6 @@ impl App {
             Some(work) => work,
         };
 
-        let lock_start_time = Utc::now();
-        let _crank_lock = match self.crank_lock.try_lock() {
-            Ok(crank_lock) => crank_lock,
-            Err(_) => {
-                log::info!("Crank lock is held by the price bot, waiting for price bot to finish and then retrying");
-                // Don't take the lock, we're just waiting till the price bot
-                // finishes and then dropping the lock.
-                let _ = self.crank_lock.lock().await;
-                return Ok(WatchedTaskOutput {
-                    skip_delay: true,
-                    message: "Crank lock was held, retrying".to_owned(),
-                });
-            }
-        };
-        let lock_acquire_time = Utc::now() - lock_start_time;
-        log::debug!("Time spent waiting for price lock: {lock_acquire_time}");
-
         for execs in CRANK_EXECS {
             let crank_start = Utc::now();
             let res = self
