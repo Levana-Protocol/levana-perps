@@ -44,7 +44,15 @@ pub(crate) struct InstantiateOpt {
 impl App {
     pub(crate) fn make_instantiate_market(&self, market_id: MarketId) -> Result<InstantiateMarket> {
         Ok(InstantiateMarket {
-            cw20_source: Cw20Source::Faucet(self.faucet.clone()),
+            // TODO - maybe make this configurable via yaml files
+            collateral: match market_id.as_str() {
+                "nBTC_USD" => CollateralSource::Native {
+                    denom: "ibc/5946AD5E947FF47B521103044C74B6FC3DD242227433EE9278F2B044B2AA2DF0"
+                        .to_string(),
+                    decimal_places: 14,
+                },
+                _ => CollateralSource::Cw20(Cw20Source::Faucet(self.faucet.clone())),
+            },
             config: {
                 let mut config = MarketConfigUpdates::load(&self.market_config)?
                     .markets
@@ -130,7 +138,13 @@ pub(crate) struct InstantiateResponse {
 pub(crate) struct MarketResponse {
     pub(crate) market_id: MarketId,
     pub(crate) market_addr: Address,
-    pub(crate) cw20: Address,
+    pub(crate) collateral: CollateralResponse,
+}
+
+#[derive(serde::Serialize)]
+pub(crate) enum CollateralResponse {
+    Cw20(Address),
+    Native { denom: String, decimal_places: u8 },
 }
 
 pub(crate) enum Cw20Source {
@@ -168,9 +182,14 @@ pub(crate) struct InstantiateParams<'a> {
 
 pub(crate) struct InstantiateMarket {
     pub(crate) market_id: MarketId,
-    pub(crate) cw20_source: Cw20Source,
+    pub(crate) collateral: CollateralSource,
     pub(crate) config: ConfigUpdate,
     pub(crate) spot_price: SpotPriceConfigInit,
+}
+
+pub(crate) enum CollateralSource {
+    Cw20(Cw20Source),
+    Native { denom: String, decimal_places: u8 },
 }
 
 pub(crate) async fn instantiate(
@@ -371,87 +390,116 @@ impl InstantiateMarket {
     ) -> Result<MarketResponse> {
         let InstantiateMarket {
             market_id,
-            cw20_source,
+            collateral,
             config,
             spot_price,
         } = self;
-        log::info!(
-            "Finding CW20 for collateral asset {} for market {market_id}",
-            market_id.get_collateral()
-        );
-        let (cw20, trading_competition) = match cw20_source {
-            Cw20Source::Existing(address) => {
-                anyhow::ensure!(
-                    !trading_competition,
-                    "Cannot use existing CW20 with trading competition"
+
+        let (collateral, trading_competition) = match collateral {
+            CollateralSource::Cw20(cw20_source) => {
+                log::info!(
+                    "Finding CW20 for collateral asset {} for market {market_id}",
+                    market_id.get_collateral()
                 );
-                (address, None)
-            }
-            Cw20Source::Faucet(faucet) => {
-                let (cw20, trading_competition) = if trading_competition {
-                    log::info!("Trading competition, creating a fresh CW20");
-                    let index = faucet
-                        .next_trading_index(market_id.get_collateral())
-                        .await?;
-                    faucet
-                        .deploy_token(wallet, market_id.get_collateral(), Some(index))
-                        .await?;
-                    let address = faucet
-                        .get_cw20(market_id.get_collateral(), Some(index))
-                        .await?
-                        .context(
-                            "CW20 for trading competition still not available after deploying it",
-                        )?;
-                    (address, Some(index))
-                } else {
-                    let address = match faucet.get_cw20(market_id.get_collateral(), None).await? {
-                        Some(addr) => {
-                            log::info!("Using existing CW20");
-                            addr
-                        }
-                        None => {
-                            log::info!("Deploying fresh CW20");
-                            faucet
-                                .deploy_token(wallet, market_id.get_collateral(), None)
+                let (cw20, trading_competition) = match cw20_source {
+                    Cw20Source::Existing(address) => {
+                        anyhow::ensure!(
+                            !trading_competition,
+                            "Cannot use existing CW20 with trading competition"
+                        );
+                        (address, None)
+                    }
+                    Cw20Source::Faucet(faucet) => {
+                        let (cw20, trading_competition) = if trading_competition {
+                            log::info!("Trading competition, creating a fresh CW20");
+                            let index = faucet
+                                .next_trading_index(market_id.get_collateral())
                                 .await?;
                             faucet
+                                .deploy_token(wallet, market_id.get_collateral(), Some(index))
+                                .await?;
+                            let address = faucet
+                                .get_cw20(market_id.get_collateral(), Some(index))
+                                .await?
+                                .context(
+                                    "CW20 for trading competition still not available after deploying it",
+                                )?;
+                            (address, Some(index))
+                        } else {
+                            let address = match faucet
                                 .get_cw20(market_id.get_collateral(), None)
                                 .await?
-                                .context("CW20 still not available after deploying it")?
+                            {
+                                Some(addr) => {
+                                    log::info!("Using existing CW20");
+                                    addr
+                                }
+                                None => {
+                                    log::info!("Deploying fresh CW20");
+                                    faucet
+                                        .deploy_token(wallet, market_id.get_collateral(), None)
+                                        .await?;
+                                    faucet
+                                        .get_cw20(market_id.get_collateral(), None)
+                                        .await?
+                                        .context("CW20 still not available after deploying it")?
+                                }
+                            };
+                            (address, None)
+                        };
+
+                        if let Some(new_admin) = faucet_admin {
+                            // Try adding the wallet manager address as a faucet admin. Ignore errors, it
+                            // (probably) just means we've already added that address.
+                            if faucet.is_admin(new_admin).await? {
+                                log::info!(
+                                    "{new_admin} is already a faucet admin for {}",
+                                    faucet.get_address()
+                                );
+                            } else {
+                                log::info!(
+                                    "Trying to set {new_admin} as a faucet admin on {}",
+                                    faucet.get_address()
+                                );
+                                let res = faucet.add_admin(wallet, new_admin).await?;
+                                log::info!("Admin set in {}", res.txhash);
+                            }
                         }
-                    };
-                    (address, None)
-                };
 
-                if let Some(new_admin) = faucet_admin {
-                    // Try adding the wallet manager address as a faucet admin. Ignore errors, it
-                    // (probably) just means we've already added that address.
-                    if faucet.is_admin(new_admin).await? {
-                        log::info!(
-                            "{new_admin} is already a faucet admin for {}",
-                            faucet.get_address()
-                        );
-                    } else {
-                        log::info!(
-                            "Trying to set {new_admin} as a faucet admin on {}",
-                            faucet.get_address()
-                        );
-                        let res = faucet.add_admin(wallet, new_admin).await?;
-                        log::info!("Admin set in {}", res.txhash);
+                        let res = faucet
+                            .mint(wallet, cw20, make_initial_balances(&[wallet.get_address()]))
+                            .await?;
+                        log::info!("Minted in {}", res.txhash);
+                        (cw20, trading_competition.map(|index| (index, faucet)))
                     }
-                }
+                };
+                log::info!("Using CW20 {cw20}");
 
-                let res = faucet
-                    .mint(wallet, cw20, make_initial_balances(&[wallet.get_address()]))
-                    .await?;
-                log::info!("Minted in {}", res.txhash);
-                (cw20, trading_competition.map(|index| (index, faucet)))
+                let cw20 = cosmos.make_contract(cw20);
+
+                (
+                    CollateralResponse::Cw20(cw20.get_address()),
+                    trading_competition,
+                )
+            }
+            CollateralSource::Native {
+                denom,
+                decimal_places,
+            } => {
+                log::info!("Using native denom {denom} for market {market_id}",);
+                anyhow::ensure!(
+                    !trading_competition,
+                    "Cannot use native denom with trading competition"
+                );
+                (
+                    CollateralResponse::Native {
+                        denom,
+                        decimal_places,
+                    },
+                    None,
+                )
             }
         };
-        log::info!("Using CW20 {cw20}");
-
-        let cw20 = cosmos.make_contract(cw20);
-
         let initial_price = match &spot_price {
             SpotPriceConfigInit::Manual { .. } => Some(
                 *config_testnet
@@ -467,8 +515,17 @@ impl InstantiateMarket {
                 wallet,
                 NewMarketParams {
                     market_id: market_id.clone(),
-                    token: TokenInit::Cw20 {
-                        addr: cw20.get_address_string().into(),
+                    token: match &collateral {
+                        CollateralResponse::Cw20(addr) => TokenInit::Cw20 {
+                            addr: addr.to_string().into(),
+                        },
+                        CollateralResponse::Native {
+                            denom,
+                            decimal_places,
+                        } => TokenInit::Native {
+                            denom: denom.clone(),
+                            decimal_places: *decimal_places,
+                        },
                     },
                     config: Some(config),
                     initial_borrow_fee_rate,
@@ -522,7 +579,7 @@ impl InstantiateMarket {
         Ok(MarketResponse {
             market_id,
             market_addr,
-            cw20: cw20.get_address(),
+            collateral,
         })
     }
 }
