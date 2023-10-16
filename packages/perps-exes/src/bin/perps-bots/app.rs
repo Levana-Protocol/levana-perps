@@ -84,8 +84,17 @@ impl AppBuilder {
                 // Launch mainnet tasks
                 let mainnet = inner.clone();
                 self.start_stats_alert(mainnet.clone())?;
-                self.start_liquidity_transaction_alert(mainnet.clone())?;
-                self.start_total_deposits_alert(mainnet)?;
+
+                // Bug in Osmosis, don't run there
+                match self.app.cosmos.get_network() {
+                    cosmos::CosmosNetwork::OsmosisMainnet
+                    | cosmos::CosmosNetwork::OsmosisTestnet
+                    | cosmos::CosmosNetwork::OsmosisLocal => (),
+                    _ => {
+                        self.start_liquidity_transaction_alert(mainnet.clone())?;
+                        self.start_total_deposits_alert(mainnet)?;
+                    }
+                }
             }
         }
 
