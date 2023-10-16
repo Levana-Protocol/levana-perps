@@ -97,7 +97,7 @@ pub(crate) async fn go(
 
         markets.push(InstantiateMarket {
             market_id,
-            collateral_source: crate::instantiate::CollateralSource::Cw20(
+            collateral: crate::instantiate::CollateralSource::Cw20(
                 crate::instantiate::Cw20Source::Existing(cw20.get_address()),
             ),
             config: ConfigUpdate {

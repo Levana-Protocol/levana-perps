@@ -45,7 +45,7 @@ impl App {
     pub(crate) fn make_instantiate_market(&self, market_id: MarketId) -> Result<InstantiateMarket> {
         Ok(InstantiateMarket {
             // TODO - maybe make this configurable via yaml files
-            collateral_source: match market_id.as_str() {
+            collateral: match market_id.as_str() {
                 "nBTC_USD" => CollateralSource::Native {
                     denom: "ibc/5946AD5E947FF47B521103044C74B6FC3DD242227433EE9278F2B044B2AA2DF0"
                         .to_string(),
@@ -182,7 +182,7 @@ pub(crate) struct InstantiateParams<'a> {
 
 pub(crate) struct InstantiateMarket {
     pub(crate) market_id: MarketId,
-    pub(crate) collateral_source: CollateralSource,
+    pub(crate) collateral: CollateralSource,
     pub(crate) config: ConfigUpdate,
     pub(crate) spot_price: SpotPriceConfigInit,
 }
@@ -390,12 +390,12 @@ impl InstantiateMarket {
     ) -> Result<MarketResponse> {
         let InstantiateMarket {
             market_id,
-            collateral_source,
+            collateral,
             config,
             spot_price,
         } = self;
 
-        let (collateral, trading_competition) = match collateral_source {
+        let (collateral, trading_competition) = match collateral {
             CollateralSource::Cw20(cw20_source) => {
                 log::info!(
                     "Finding CW20 for collateral asset {} for market {market_id}",
