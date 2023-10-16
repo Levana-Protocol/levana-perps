@@ -91,9 +91,6 @@ impl WatchedTaskPerMarket for Worker {
 
 impl App {
     async fn single_update(&self, market: &Market, worker: &mut Worker) -> Result<String> {
-        // Take the crank lock for the duration of this execution
-        let _crank_lock = self.crank_lock.lock().await;
-
         let mut statuses = vec![];
         let mut builder = TxBuilder::default();
 
