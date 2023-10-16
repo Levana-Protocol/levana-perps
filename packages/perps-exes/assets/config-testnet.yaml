@@ -26,6 +26,9 @@ liquidity:
     BTC_USD:
       min: 100
       max: 10000
+    nBTC_USD:
+      min: 100
+      max: 10000
   min-util-delta: -0.05
   max-util-delta: 0.02
   target-util-delta: -0.02
@@ -87,6 +90,7 @@ deployments:
     balance: true
     traders: 3
     default-market-ids:
+      - nBTC_USD
       - stATOM_USD
       - ATOM_USD
       - OSMO_USDC
