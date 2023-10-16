@@ -695,10 +695,7 @@ pub enum PositionsQueryFeeApproach {
 
 /// Placeholder migration message
 #[cw_serde]
-pub struct MigrateMsg {
-    /// temporary migration for spot price config
-    pub spot_price: SpotPriceConfigInit,
-}
+pub struct MigrateMsg {}
 
 /// The summary for trade history
 #[cw_serde]
