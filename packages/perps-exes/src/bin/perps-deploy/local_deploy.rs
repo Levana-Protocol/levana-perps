@@ -97,7 +97,9 @@ pub(crate) async fn go(
 
         markets.push(InstantiateMarket {
             market_id,
-            cw20_source: crate::instantiate::Cw20Source::Existing(cw20.get_address()),
+            collateral_source: crate::instantiate::CollateralSource::Cw20(
+                crate::instantiate::Cw20Source::Existing(cw20.get_address()),
+            ),
             config: ConfigUpdate {
                 // https://phobosfinance.atlassian.net/browse/PERP-710
                 staleness_seconds: Some(60 * 60 * 24 * 7),
@@ -149,7 +151,7 @@ pub(crate) async fn go(
     for MarketResponse {
         market_id,
         market_addr,
-        cw20: _,
+        collateral: _,
     } in &res.markets
     {
         let set_price = basic
