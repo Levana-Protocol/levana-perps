@@ -1,7 +1,7 @@
 mod perps_info;
 
 use crate::state::{
-    config::{config_init, convert_spot_price_init, update_config},
+    config::{config_init, update_config},
     crank::crank_init,
     delta_neutrality_fee::DELTA_NEUTRALITY_FUND,
     fees::fees_init,
@@ -19,7 +19,6 @@ use cosmwasm_std::{Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Respons
 use cw2::{get_contract_version, set_contract_version};
 use msg::{
     contracts::market::{
-        config::MaxLiquidity,
         entry::{
             DeltaNeutralityFeeResp, InitialPrice, InstantiateMsg, MigrateMsg, OraclePriceResp,
             PositionsQueryFeeApproach, PriceWouldTriggerResp, SpotPriceHistoryResp,
@@ -33,7 +32,6 @@ use msg::{
 use msg::contracts::market::entry::{LimitOrderResp, SlippageAssert};
 
 use semver::Version;
-use serde::{Deserialize, Serialize};
 use shared::price::Price;
 
 // version info for migration info
@@ -699,94 +697,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response> {
-    /////////// START TEMPORARY MIGRATION CODE ///////////
-    // Temporary migration to fix the config for new oracles
-    // It won't break re-migrating since the new setup is additive (spot_price field on config)
-    // Nevertheless, should delete when done with migrations
-    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-    struct OldConfig {
-        pub trading_fee_notional_size: Decimal256,
-        pub trading_fee_counter_collateral: Decimal256,
-        pub crank_execs: u32,
-        pub max_leverage: Number,
-        pub funding_rate_sensitivity: Decimal256,
-        pub funding_rate_max_annualized: Decimal256,
-        pub borrow_fee_rate_min_annualized: NumberGtZero,
-        pub borrow_fee_rate_max_annualized: NumberGtZero,
-        pub carry_leverage: Decimal256,
-        pub mute_events: bool,
-        pub liquifunding_delay_seconds: u32,
-        pub price_update_too_old_seconds: u32,
-        pub staleness_seconds: u32,
-        pub protocol_tax: Decimal256,
-        pub unstake_period_seconds: u32,
-        pub target_utilization: NonZero<Decimal256>,
-        pub borrow_fee_sensitivity: NumberGtZero,
-        pub max_xlp_rewards_multiplier: NumberGtZero,
-        pub min_xlp_rewards_multiplier: NumberGtZero,
-        pub delta_neutrality_fee_sensitivity: NumberGtZero,
-        pub delta_neutrality_fee_cap: NumberGtZero,
-        pub delta_neutrality_fee_tax: Decimal256,
-        pub limit_order_fee: Collateral,
-        pub crank_fee_charged: Usd,
-        pub crank_fee_reward: Usd,
-        pub minimum_deposit_usd: Usd,
-        pub unpend_limit: u32,
-        pub liquifunding_delay_fuzz_seconds: u32,
-        pub max_liquidity: MaxLiquidity,
-        pub disable_position_nft_exec: bool,
-        #[serde(default)]
-        pub liquidity_cooldown_seconds: u32,
-    }
-    const OLD_CONFIG_STORAGE: Item<OldConfig> = Item::new(namespace::CONFIG);
-
-    let old_config = OLD_CONFIG_STORAGE.load(deps.storage)?;
-
-    // just copy-pasted from init_config()
-    let spot_price: SpotPriceConfig = convert_spot_price_init(deps.api, msg.spot_price)?;
-    const NEW_CONFIG_STORAGE: Item<Config> = Item::new(namespace::CONFIG);
-
-    NEW_CONFIG_STORAGE.save(
-        deps.storage,
-        &Config {
-            trading_fee_notional_size: old_config.trading_fee_notional_size,
-            trading_fee_counter_collateral: old_config.trading_fee_counter_collateral,
-            crank_execs: old_config.crank_execs,
-            max_leverage: old_config.max_leverage,
-            funding_rate_sensitivity: old_config.funding_rate_sensitivity,
-            funding_rate_max_annualized: old_config.funding_rate_max_annualized,
-            borrow_fee_rate_min_annualized: old_config.borrow_fee_rate_min_annualized,
-            borrow_fee_rate_max_annualized: old_config.borrow_fee_rate_max_annualized,
-            carry_leverage: old_config.carry_leverage,
-            mute_events: old_config.mute_events,
-            liquifunding_delay_seconds: old_config.liquifunding_delay_seconds,
-            price_update_too_old_seconds: old_config.price_update_too_old_seconds,
-            staleness_seconds: old_config.staleness_seconds,
-            protocol_tax: old_config.protocol_tax,
-            unstake_period_seconds: old_config.unstake_period_seconds,
-            target_utilization: old_config.target_utilization,
-            borrow_fee_sensitivity: old_config.borrow_fee_sensitivity,
-            max_xlp_rewards_multiplier: old_config.max_xlp_rewards_multiplier,
-            min_xlp_rewards_multiplier: old_config.min_xlp_rewards_multiplier,
-            delta_neutrality_fee_sensitivity: old_config.delta_neutrality_fee_sensitivity,
-            delta_neutrality_fee_cap: old_config.delta_neutrality_fee_cap,
-            delta_neutrality_fee_tax: old_config.delta_neutrality_fee_tax,
-            limit_order_fee: old_config.limit_order_fee,
-            crank_fee_charged: old_config.crank_fee_charged,
-            crank_fee_reward: old_config.crank_fee_reward,
-            minimum_deposit_usd: old_config.minimum_deposit_usd,
-            unpend_limit: old_config.unpend_limit,
-            liquifunding_delay_fuzz_seconds: old_config.liquifunding_delay_fuzz_seconds,
-            max_liquidity: old_config.max_liquidity,
-            disable_position_nft_exec: old_config.disable_position_nft_exec,
-            liquidity_cooldown_seconds: old_config.liquidity_cooldown_seconds,
-            spot_price,
-        },
-    )?;
-
-    /////////// END TEMPORARY MIGRATION CODE ///////////
-
+pub fn migrate(deps: DepsMut, env: Env, MigrateMsg {}: MigrateMsg) -> Result<Response> {
     let (_state, ctx) = StateContext::new(deps, env)?;
 
     // Note, we use _state instead of state to avoid warnings when compiling without the sanity

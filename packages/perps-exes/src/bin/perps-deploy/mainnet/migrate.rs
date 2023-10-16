@@ -128,9 +128,7 @@ async fn go(
             msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
                 contract_addr: market.get_address_string(),
                 new_code_id: market_code_id,
-                msg: to_binary(&msg::contracts::market::entry::MigrateMsg {
-                    spot_price: get_spot_price_config(&oracle, &price_config, &market_id)?,
-                })?,
+                msg: to_binary(&msg::contracts::market::entry::MigrateMsg {})?,
             }));
         }
 
