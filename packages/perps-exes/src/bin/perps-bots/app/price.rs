@@ -143,7 +143,11 @@ impl App {
         let time_spent = Utc::now() - start_time;
         log::debug!("get_tx_pyth took {time_spent}");
 
-        builder.add_message_mut(market.market.get_crank_msg(&worker.wallet, Some(1))?);
+        builder.add_message_mut(market.market.get_crank_msg(
+            &worker.wallet,
+            Some(1),
+            self.config.get_crank_rewards_wallet(),
+        )?);
 
         let start_time = Utc::now();
         let res = builder

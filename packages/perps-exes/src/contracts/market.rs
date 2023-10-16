@@ -414,14 +414,16 @@ impl MarketContract {
             .await
     }
 
-    pub fn get_crank_msg(&self, wallet: &Wallet, execs: Option<u32>) -> Result<MsgExecuteContract> {
+    pub fn get_crank_msg(
+        &self,
+        wallet: &Wallet,
+        execs: Option<u32>,
+        rewards: Option<RawAddr>,
+    ) -> Result<MsgExecuteContract> {
         Ok(MsgExecuteContract {
             sender: wallet.get_address_string(),
             contract: self.get_address_string(),
-            msg: serde_json::to_vec(&MarketExecuteMsg::Crank {
-                execs,
-                rewards: None,
-            })?,
+            msg: serde_json::to_vec(&MarketExecuteMsg::Crank { execs, rewards })?,
             funds: Vec::new(),
         })
     }
