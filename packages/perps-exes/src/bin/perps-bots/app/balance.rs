@@ -121,7 +121,7 @@ async fn single_market(
     if let Some(pos) = market.get_first_position(*worker.wallet.address()).await? {
         let pos = market.query_position(pos).await?;
         if pos.direction_to_base != direction {
-            log::info!(
+            tracing::info!(
                 "Balancing {market_id} by closing {:?} position {}",
                 pos.direction_to_base,
                 pos.id
@@ -174,7 +174,7 @@ async fn single_market(
         .into_decimal256()
         .checked_div(leverage_divider)?
         .checked_mul(random_multiplier)?;
-    log::info!("collateral_for_balance: {}", collateral_for_balance);
+    tracing::info!("collateral_for_balance: {}", collateral_for_balance);
 
     let needed_collateral = Collateral::from_decimal256(
         collateral_for_balance
@@ -190,7 +190,7 @@ async fn single_market(
             ),
     );
 
-    log::info!(
+    tracing::info!(
             "Need to balance {market_id} by opening a {direction:?} with {needed_collateral} deposit. Net notional {net_notional}."
         );
 

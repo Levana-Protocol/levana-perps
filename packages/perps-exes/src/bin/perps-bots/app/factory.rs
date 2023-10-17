@@ -134,7 +134,7 @@ pub(crate) async fn get_factory_info_testnet(
     let faucet_gas_amount = match get_faucet_gas_amount(cosmos, faucet).await {
         Ok(x) => x,
         Err(e) => {
-            log::warn!("Error on get_faucet_gas_amount: {e:?}");
+            tracing::warn!("Error on get_faucet_gas_amount: {e:?}");
             None
         }
     };
@@ -142,7 +142,7 @@ pub(crate) async fn get_factory_info_testnet(
     let faucet_collateral_amount = match get_faucet_collateral_amount(cosmos, faucet).await {
         Ok(x) => x,
         Err(e) => {
-            log::warn!("Error on get_faucet_collateral_amount: {e:?}");
+            tracing::warn!("Error on get_faucet_collateral_amount: {e:?}");
             HashMap::new()
         }
     };
@@ -293,8 +293,8 @@ async fn get_rpc_info(
     for handle in handles {
         match handle.await {
             Ok(Ok(pair)) => results.push(pair),
-            Ok(Err(e)) => log::warn!("{e:?}"),
-            Err(e) => log::warn!("{e:?}"),
+            Ok(Err(e)) => tracing::warn!("{e:?}"),
+            Err(e) => tracing::warn!("{e:?}"),
         }
     }
 

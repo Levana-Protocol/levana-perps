@@ -189,11 +189,11 @@ impl GasCheck {
                 .await
             {
                 Err(e) => {
-                    log::error!("Error filling up gas: {e:?}");
+                    tracing::error!("Error filling up gas: {e:?}");
                     errors.push(format!("{e:?}"))
                 }
                 Ok(tx) => {
-                    log::info!("Filled up gas in {}", tx.txhash);
+                    tracing::info!("Filled up gas in {}", tx.txhash);
                     let mut gases = app.gases.write().await;
                     for (address, amount) in to_refill {
                         gases

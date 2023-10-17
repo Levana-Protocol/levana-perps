@@ -10,7 +10,7 @@ mod util;
 pub(crate) mod wallet_manager;
 pub(crate) mod watcher;
 
-#[tokio::main(flavor="multi_thread", worker_threads = 16)]
+#[tokio::main(flavor = "multi_thread", worker_threads = 16)]
 async fn main() -> Result<()> {
     main_inner().await
 }
@@ -20,20 +20,10 @@ async fn main_inner() -> Result<()> {
     dotenv::dotenv().ok();
 
     let opt = cli::Opt::parse();
+    opt.init_logger()?;
 
     let server = axum::Server::try_bind(&opt.bind)
         .with_context(|| format!("Cannot launch bot HTTP service bound to {}", opt.bind))?;
 
-    opt.init_logger();
-    let _guard = opt.client_key.clone().map(|ck| {
-        sentry::init((
-            ck,
-            sentry::ClientOptions {
-                release: sentry::release_name!(),
-                session_mode: sentry::SessionMode::Request,
-                ..Default::default()
-            },
-        ))
-    });
     opt.into_app_builder().await?.start(server).await
 }

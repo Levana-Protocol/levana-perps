@@ -110,7 +110,7 @@ impl App {
         let start_time = Utc::now();
         let (oracle_price, _) = oracle.get_latest_price(&self.client).await?;
         let time_spent = Utc::now() - start_time;
-        log::debug!("get_latest_price took {time_spent}");
+        tracing::debug!("get_latest_price took {time_spent}");
 
         let start_time = Utc::now();
         let (market_price, reason) = self
@@ -125,7 +125,7 @@ impl App {
             .await?;
         worker.add_reason(&market.market_id, &reason);
         let time_spent = Utc::now() - start_time;
-        log::debug!("needs_price_update took {time_spent}");
+        tracing::debug!("needs_price_update took {time_spent}");
 
         if let Some(reason) = reason {
             if reason.is_too_frequent() {
@@ -144,7 +144,7 @@ impl App {
             builder.add_message_mut(msg);
         }
         let time_spent = Utc::now() - start_time;
-        log::debug!("get_tx_pyth took {time_spent}");
+        tracing::debug!("get_tx_pyth took {time_spent}");
 
         builder.add_message_mut(market.market.get_crank_msg(&worker.wallet, Some(1))?);
 
@@ -153,7 +153,7 @@ impl App {
             .sign_and_broadcast(&self.cosmos, &worker.wallet)
             .await;
         let time_spent = Utc::now() - start_time;
-        log::debug!("sign_and_broadcast took {time_spent}");
+        tracing::debug!("sign_and_broadcast took {time_spent}");
         let res = match res {
             Ok(res) => res,
             Err(e) => {
@@ -191,7 +191,7 @@ impl App {
         // the market must have been updated from the above transaction
         let updated_price = market.market.current_price().await?;
         let time_spent = Utc::now() - start_time;
-        log::debug!("current_price took {time_spent}");
+        tracing::debug!("current_price took {time_spent}");
         match updated_price.publish_time {
             Some(publish_time) => {
                 let timestamp = publish_time.try_into_chrono_datetime()?;
@@ -201,7 +201,7 @@ impl App {
             }
             None => {
                 if is_pyth {
-                    log::error!("No publish time, but it must exist in a pyth-based price update");
+                    tracing::error!("No publish time, but it must exist in a pyth-based price update");
                 }
             }
         }

@@ -81,7 +81,7 @@ impl Debug for MintRequest {
 impl WalletManager {
     pub(crate) fn new(seed: SeedPhrase, address_type: AddressType) -> Result<Self> {
         let minter = seed.derive_cosmos_numbered(0).for_chain(address_type)?;
-        log::info!("Wallet manager minter wallet: {minter}");
+        tracing::info!("Wallet manager minter wallet: {minter}");
         let (send_request, recv_request) = mpsc::channel(100);
         let manager = WalletManager {
             inner: Arc::new(Inner {
@@ -102,7 +102,7 @@ impl WalletManager {
             .seed
             .derive_cosmos_numbered(idx.into())
             .for_chain(self.inner.address_type)?;
-        log::info!("Got fresh wallet from manager for {desc}: {wallet}",);
+        tracing::info!("Got fresh wallet from manager for {desc}: {wallet}",);
         Ok(wallet)
     }
 
@@ -157,7 +157,7 @@ async fn background(mut recv_request: mpsc::Receiver<MintRequest>, minter: Walle
 
         let res = process_requests(&cosmos, &minter, &requests).await;
         if let Err(e) = &res {
-            log::error!("Wallet manager: error processing requests: {e:?}");
+            tracing::error!("Wallet manager: error processing requests: {e:?}");
         }
 
         for req in requests {
@@ -165,7 +165,7 @@ async fn background(mut recv_request: mpsc::Receiver<MintRequest>, minter: Walle
                 Ok(()) => Ok(()),
                 Err(e) => Err(anyhow::anyhow!("{e:?}")),
             }) {
-                log::error!("Error sending on_ready: {e:?}");
+                tracing::error!("Error sending on_ready: {e:?}");
             }
         }
     }
