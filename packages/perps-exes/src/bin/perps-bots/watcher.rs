@@ -160,14 +160,26 @@ pub(crate) struct TaskError {
     pub(crate) updated: DateTime<Utc>,
 }
 
+enum OutOfDateType {
+    Not,
+    Slightly,
+    Very,
+}
+
 impl TaskStatus {
-    fn is_out_of_date(&self) -> bool {
+    fn is_out_of_date(&self) -> OutOfDateType {
         match self.current_run_started {
             Some(started) => {
-                let out_of_date = started + self.out_of_date;
-                out_of_date <= Utc::now()
+                let now = Utc::now();
+                if started + Duration::seconds(300) <= now {
+                    OutOfDateType::Very
+                } else if started + self.out_of_date <= now {
+                    OutOfDateType::Slightly
+                } else {
+                    OutOfDateType::Not
+                }
             }
-            None => false,
+            None => OutOfDateType::Not,
         }
     }
 }
@@ -713,14 +725,11 @@ impl TaskStatus {
     fn short(&self, label: TaskLabel, selected_label: Option<TaskLabel>) -> ShortStatus {
         match self.last_result.value.as_ref() {
             TaskResultValue::Ok(_) => {
-                if self.is_out_of_date() {
-                    if label.triggers_alert(selected_label) {
-                        ShortStatus::OutOfDate
-                    } else {
-                        ShortStatus::OutOfDateNoAlert
-                    }
-                } else {
-                    ShortStatus::Success
+                match (self.is_out_of_date(), label.triggers_alert(selected_label)) {
+                    (OutOfDateType::Not, _) => ShortStatus::Success,
+                    (_, false) => ShortStatus::OutOfDateNoAlert,
+                    (OutOfDateType::Slightly, true) => ShortStatus::OutOfDate,
+                    (OutOfDateType::Very, true) => ShortStatus::Error,
                 }
             }
             TaskResultValue::Err(_) => {
