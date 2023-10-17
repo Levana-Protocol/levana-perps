@@ -106,7 +106,7 @@ impl App {
     }
 }
 
-const MAX_CRANK_AGE: i64 = 60 * 10;
+const MAX_CRANK_AGE: i64 = 240;
 
 #[derive(Debug)]
 enum CrankReason {

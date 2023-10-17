@@ -103,7 +103,9 @@ impl Stale {
     }
 }
 
-const MAX_ALLOWED_CRANK_AGE_SECS: i64 = 240;
+// This should be at least 60 seconds more than MAX_CRANK_AGE in crank_watch to avoid spurious
+// errors
+const MAX_ALLOWED_CRANK_AGE_SECS: i64 = 300;
 
 struct Msg<'a> {
     msg: &'a str,
