@@ -642,6 +642,12 @@ pub(crate) trait WatchedTaskPerMarketParallel: Send + Sync + 'static {
 
 pub(crate) struct ParallelWatcher<T>(Arc<T>);
 
+impl<T> ParallelWatcher<T> {
+    pub(crate) fn new(t: T) -> Self {
+        ParallelWatcher(Arc::new(t))
+    }
+}
+
 #[async_trait]
 impl<T: WatchedTaskPerMarketParallel> WatchedTask for ParallelWatcher<T> {
     async fn run_single(&mut self, app: Arc<App>, _: Heartbeat) -> Result<WatchedTaskOutput> {
