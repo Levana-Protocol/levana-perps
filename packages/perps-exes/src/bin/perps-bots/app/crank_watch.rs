@@ -57,30 +57,23 @@ async fn check_market(
         Some(work) => work,
     };
 
-    match work {
+    trigger_crank
+        .trigger_crank(market.market.get_address())
+        .await?;
+
+    let message = match work {
         CrankReason::WorkAvailable(work) => {
-            trigger_crank
-                .trigger_crank(market.market.get_address())
-                .await?;
-            Ok(WatchedTaskOutput {
-                skip_delay: false,
-                message: format!("Triggering crank because work is available: {work:?}"),
-            })
+            format!("Triggering crank because work is available: {work:?}")
         }
         CrankReason::OldLastCrank(age) => {
-            trigger_crank
-                .trigger_crank(market.market.get_address())
-                .await?;
-            Ok(WatchedTaskOutput {
-                skip_delay: false,
-                message: format!("Triggering crank because of old last crank, age: {age}"),
-            })
+            format!("Triggering crank because of old last crank, age: {age}")
         }
-        CrankReason::NoPriorCrank => Ok(WatchedTaskOutput {
-            skip_delay: false,
-            message: "No crank work needed".to_owned(),
-        }),
-    }
+        CrankReason::NoPriorCrank => "No crank work needed".to_owned(),
+    };
+    Ok(WatchedTaskOutput {
+        skip_delay: false,
+        message,
+    })
 }
 
 impl App {
