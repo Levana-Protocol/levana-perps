@@ -197,6 +197,9 @@ async fn update_oracles(
     markets: &[Market],
     offchain_price_data: &OffchainPriceData,
 ) -> Result<String> {
+    if offchain_price_data.stable_ids.is_empty() && offchain_price_data.edge_ids.is_empty() {
+        return Ok("No Pyth IDs found, no Pyth oracle update needed".to_owned());
+    }
     let mut stable_contract = None;
     let mut edge_contract = None;
 

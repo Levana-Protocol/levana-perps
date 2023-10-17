@@ -41,6 +41,10 @@ async fn get_wormhole_proofs(
     endpoint: &str,
     client: &reqwest::Client,
 ) -> Result<Vec<String>> {
+    anyhow::ensure!(
+        !ids.is_empty(),
+        "Cannot get wormhole proofs with no price IDs"
+    );
     // pyth uses this format for array params: https://github.com/axios/axios/blob/9588fcdec8aca45c3ba2f7968988a5d03f23168c/test/specs/helpers/buildURL.spec.js#L31
     let url_params = ids
         .iter()
