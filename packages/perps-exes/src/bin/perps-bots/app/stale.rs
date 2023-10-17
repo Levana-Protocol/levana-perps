@@ -90,10 +90,20 @@ impl Stale {
         } else if status.congested {
             Err(mk_message("Protocol is in congested state").to_anyhow())
         } else {
-            Ok(mk_message("Protocol is neither stale nor congested").to_string())
+            let age = Utc::now().signed_duration_since(last_crank_completed);
+            if age > chrono::Duration::seconds(MAX_ALLOWED_CRANK_AGE_SECS) {
+                Err(mk_message(&format!(
+                    "Crank has not been run since {last_crank_completed}, age of {age} is too high"
+                ))
+                .to_anyhow())
+            } else {
+                Ok(mk_message("Protocol is neither stale nor congested").to_string())
+            }
         }
     }
 }
+
+const MAX_ALLOWED_CRANK_AGE_SECS: i64 = 240;
 
 struct Msg<'a> {
     msg: &'a str,
