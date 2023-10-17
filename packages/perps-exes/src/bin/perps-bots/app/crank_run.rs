@@ -129,6 +129,21 @@ impl App {
             }
         }
 
+        // NOTE: in theory this approach may end up running needless cranks. The
+        // reason: supposed the crank watcher sees some crank work needs to be
+        // done for market X, triggers the work, and then, before the crank run
+        // completes, it checks again and _still_ sees that work needs to be
+        // done. It will queue up an extra crank, and we'll simply run it. We
+        // could approach this in a few ways, such as clearing any pending
+        // cranks from the queue for the same market after running the crank.
+        // However, we'll start off conservatively and simply run each time. Due
+        // to the delays in place for checking the price and crank workloads and
+        // the lack of a delay here, it should be a rare occurrence. Over time,
+        // we can check if there are a significant number of times that we try
+        // to run a crank from the bots and no work happens. It may be worth
+        // capturing those event logs here and keeping some stats on "useless
+        // cranks performed."
+
         let rewards = self.config.get_crank_rewards_wallet();
         for execs in CRANK_EXECS {
             let crank_start = Utc::now();
