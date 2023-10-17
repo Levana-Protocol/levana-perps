@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use axum::async_trait;
 use chrono::Utc;
-use cosmos::Wallet;
+use cosmos::{HasAddress, Wallet};
 use msg::contracts::market;
 use perps_exes::prelude::MarketContract;
 use perps_exes::timestamp_to_date_time;
@@ -98,7 +98,13 @@ impl App {
             });
         }
         let res = market
-            .crank_single(wallet, None, self.config.get_crank_rewards_wallet())
+            .crank_single(
+                wallet,
+                None,
+                self.config
+                    .get_crank_rewards_wallet()
+                    .map(|a| a.get_address_string().into()),
+            )
             .await?;
         Ok(WatchedTaskOutput {
             skip_delay: true,

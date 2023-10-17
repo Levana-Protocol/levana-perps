@@ -1,6 +1,6 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
-use cosmos::{Address, CosmosNetwork, HasAddress, HasAddressType, Wallet};
+use cosmos::{Address, CosmosNetwork, HasAddressType, Wallet};
 use perps_exes::{
     config::{
         ChainConfig, ConfigTestnet, DeploymentInfo, GasAmount, GasDecimals, LiquidityConfig,
@@ -71,12 +71,10 @@ pub(crate) struct BotConfig {
 
 impl BotConfig {
     /// Get the desintation wallet for crank rewards.
-    pub(crate) fn get_crank_rewards_wallet(&self) -> Option<RawAddr> {
+    pub(crate) fn get_crank_rewards_wallet(&self) -> Option<Address> {
         match &self.by_type {
             BotConfigByType::Testnet { inner: _ } => None,
-            BotConfigByType::Mainnet { inner } => {
-                Some(inner.crank_rewards.get_address_string().into())
-            }
+            BotConfigByType::Mainnet { inner } => Some(inner.crank_rewards),
         }
     }
 }

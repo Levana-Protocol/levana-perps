@@ -27,7 +27,8 @@ use crate::util::markets::Market;
 pub(crate) enum TaskLabel {
     GetFactory,
     Stale,
-    Crank,
+    CrankWatch,
+    CrankRun,
     Price,
     TrackBalance,
     Stats,
@@ -47,7 +48,8 @@ impl TaskLabel {
         match s {
             "get-factory" => Some(TaskLabel::GetFactory),
             "stale" => Some(TaskLabel::Stale),
-            "crank" => Some(TaskLabel::Crank),
+            "crank-watch" => Some(TaskLabel::CrankWatch),
+            "crank-run" => Some(TaskLabel::CrankRun),
             "price" => Some(TaskLabel::Price),
             "track-balance" => Some(TaskLabel::TrackBalance),
             "stats" => Some(TaskLabel::Stats),
@@ -195,7 +197,8 @@ impl TaskLabel {
             TaskLabel::Trader { index: _ } => config.trader,
             TaskLabel::Utilization => config.utilization,
             TaskLabel::TrackBalance => config.track_balance,
-            TaskLabel::Crank => config.crank,
+            TaskLabel::CrankWatch => config.crank_watch,
+            TaskLabel::CrankRun => config.crank_run,
             TaskLabel::GetFactory => config.get_factory,
             TaskLabel::Price => config.price,
             TaskLabel::Stats => config.stats,
@@ -212,7 +215,8 @@ impl TaskLabel {
         }
         match self {
             TaskLabel::GetFactory => true,
-            TaskLabel::Crank => true,
+            TaskLabel::CrankWatch => true,
+            TaskLabel::CrankRun => true,
             TaskLabel::Price => true,
             TaskLabel::TrackBalance => false,
             TaskLabel::GasCheck => false,
@@ -232,7 +236,8 @@ impl TaskLabel {
     fn ident(self) -> Cow<'static, str> {
         match self {
             TaskLabel::GetFactory => "get-factory".into(),
-            TaskLabel::Crank => "crank".into(),
+            TaskLabel::CrankWatch => "crank-watch".into(),
+            TaskLabel::CrankRun => "crank-run".into(),
             TaskLabel::Price => "price".into(),
             TaskLabel::TrackBalance => "track-balance".into(),
             TaskLabel::GasCheck => "gas-check".into(),

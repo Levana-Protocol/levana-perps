@@ -7,7 +7,7 @@ use std::{
 use anyhow::Result;
 use axum::async_trait;
 use chrono::{DateTime, Duration, Utc};
-use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, TxBuilder, Wallet};
+use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, HasAddress, TxBuilder, Wallet};
 use cosmwasm_std::Decimal256;
 use msg::{
     contracts::market::spot_price::{SpotPriceConfig, SpotPriceFeedData},
@@ -22,12 +22,15 @@ use crate::{
     watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
 };
 
-use super::{factory::FactoryInfo, gas_check::GasCheckWallet, App, AppBuilder};
+use super::{
+    crank_run::TriggerCrank, factory::FactoryInfo, gas_check::GasCheckWallet, App, AppBuilder,
+};
 
 struct Worker {
     wallet: Arc<Wallet>,
     stats: HashMap<MarketId, ReasonStats>,
     last_successful_price_publish_times: HashMap<MarketId, DateTime<Utc>>,
+    trigger_crank: TriggerCrank,
 }
 
 impl Worker {
@@ -41,7 +44,7 @@ impl Worker {
 
 /// Start the background thread to keep options pools up to date.
 impl AppBuilder {
-    pub(super) fn start_price(&mut self) -> Result<()> {
+    pub(super) fn start_price(&mut self, trigger_crank: TriggerCrank) -> Result<()> {
         if let Some(price_wallet) = self.app.config.price_wallet.clone() {
             match &self.app.config.by_type {
                 BotConfigByType::Testnet { inner } => {
@@ -62,6 +65,7 @@ impl AppBuilder {
                     wallet: price_wallet,
                     stats: HashMap::new(),
                     last_successful_price_publish_times: HashMap::new(),
+                    trigger_crank,
                 },
             )?;
         }
@@ -143,12 +147,6 @@ impl App {
         let time_spent = Utc::now() - start_time;
         log::debug!("get_tx_pyth took {time_spent}");
 
-        builder.add_message_mut(market.market.get_crank_msg(
-            &worker.wallet,
-            Some(1),
-            self.config.get_crank_rewards_wallet(),
-        )?);
-
         let start_time = Utc::now();
         let res = builder
             .sign_and_broadcast(&self.cosmos, &worker.wallet)
@@ -194,6 +192,11 @@ impl App {
                 }
             }
         };
+
+        worker
+            .trigger_crank
+            .trigger_crank(market.market.get_address())
+            .await?;
 
         let start_time = Utc::now();
         // the market must have been updated from the above transaction

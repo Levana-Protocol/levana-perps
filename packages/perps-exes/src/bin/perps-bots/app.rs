@@ -1,5 +1,6 @@
 mod balance;
-mod crank;
+mod crank_run;
+mod crank_watch;
 pub(crate) mod factory;
 pub(crate) mod faucet;
 mod gas_check;
@@ -39,11 +40,16 @@ impl AppBuilder {
         // Start the tasks that run on all deployments
         self.start_rest_api(server);
         self.start_factory_task()?;
-        self.start_crank_bot()?;
-        self.start_price()?;
         self.track_stale()?;
         self.track_stats()?;
         self.track_balance()?;
+
+        // These three services are tied together closely, see docs on the
+        // crank_run module for more explanation.
+        if let Some(trigger_crank) = self.start_crank_run()? {
+            self.start_price(trigger_crank.clone())?;
+            self.start_crank_watch(trigger_crank)?;
+        }
 
         match &self.app.config.by_type {
             // Run tasks that can only run in testnet.
