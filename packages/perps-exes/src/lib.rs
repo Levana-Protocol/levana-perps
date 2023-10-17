@@ -4,7 +4,6 @@ pub mod discovery;
 pub mod prelude;
 pub mod pyth;
 
-use chrono::{DateTime, TimeZone, Utc};
 use cosmos::{
     proto::cosmos::base::abci::v1beta1::TxResponse, Address, Contract, Cosmos, CosmosNetwork,
     HasAddress, HasAddressType, RawWallet, Wallet,
@@ -235,17 +234,4 @@ impl FromStr for UpdatePositionCollateralImpact {
             )),
         }
     }
-}
-
-/// Convert from CosmWasm to chrono representation of a timestamp.
-pub fn timestamp_to_date_time(
-    timestamp: impl Into<cosmwasm_std::Timestamp>,
-) -> Result<DateTime<Utc>> {
-    let timestamp = timestamp.into();
-    Utc.timestamp_opt(
-        timestamp.seconds().try_into()?,
-        timestamp.subsec_nanos().try_into()?,
-    )
-    .single()
-    .context("Could not convert last_crank_completed into DateTime<Utc>")
 }

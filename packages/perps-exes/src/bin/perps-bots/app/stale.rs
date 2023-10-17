@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use cosmos::{Address, HasAddress};
 use dashmap::DashMap;
 use msg::prelude::*;
-use perps_exes::{contracts::MarketContract, timestamp_to_date_time};
+use perps_exes::contracts::MarketContract;
 
 use crate::{
     config::BotConfigByType,
@@ -63,8 +63,8 @@ impl Stale {
         let status = market.status().await?;
         let last_crank_completed = status
             .last_crank_completed
-            .context("No cranks completed yet")?;
-        let last_crank_completed = timestamp_to_date_time(last_crank_completed)?;
+            .context("No cranks completed yet")?
+            .try_into_chrono_datetime()?;
 
         let address = market.get_address();
         let mut stats = self
