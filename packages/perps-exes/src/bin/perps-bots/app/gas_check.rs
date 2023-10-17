@@ -112,8 +112,12 @@ impl AppBuilder {
 
 #[async_trait]
 impl WatchedTask for GasCheck {
-    async fn run_single(&mut self, app: &App, _heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
-        self.single_gas_check(app).await
+    async fn run_single(
+        &mut self,
+        app: Arc<App>,
+        _heartbeat: Heartbeat,
+    ) -> Result<WatchedTaskOutput> {
+        self.single_gas_check(&app).await
     }
 }
 

@@ -80,7 +80,7 @@ impl AppBuilder {
 
 #[async_trait]
 impl WatchedTask for Worker {
-    async fn run_single(&mut self, app: &App, _: Heartbeat) -> Result<WatchedTaskOutput> {
+    async fn run_single(&mut self, app: Arc<App>, _: Heartbeat) -> Result<WatchedTaskOutput> {
         app.crank(&self.crank_wallet, &mut self.recv).await
     }
 }
