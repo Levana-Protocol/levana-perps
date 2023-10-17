@@ -3,10 +3,9 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use axum::async_trait;
 use chrono::Utc;
-use cosmos::Wallet;
+use cosmos::{HasAddress, Wallet};
 use msg::contracts::market;
 use perps_exes::prelude::MarketContract;
-use perps_exes::timestamp_to_date_time;
 
 use crate::config::BotConfigTestnet;
 use crate::util::markets::Market;
@@ -84,8 +83,9 @@ impl App {
                 message: "No crank messages waiting".to_owned(),
             });
         }
-        let last_crank_completed = last_crank_completed.context("No cranks have completed")?;
-        let last_crank_completed = timestamp_to_date_time(last_crank_completed)?;
+        let last_crank_completed = last_crank_completed
+            .context("No cranks have completed")?
+            .try_into_chrono_datetime()?;
         let age = Utc::now()
             .signed_duration_since(last_crank_completed)
             .num_seconds();
@@ -98,7 +98,13 @@ impl App {
             });
         }
         let res = market
-            .crank_single(wallet, None, self.config.get_crank_rewards_wallet())
+            .crank_single(
+                wallet,
+                None,
+                self.config
+                    .get_crank_rewards_wallet()
+                    .map(|a| a.get_address_string().into()),
+            )
             .await?;
         Ok(WatchedTaskOutput {
             skip_delay: true,

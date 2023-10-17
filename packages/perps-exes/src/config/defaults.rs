@@ -46,8 +46,12 @@ pub(super) fn track_balance() -> TaskConfig {
     super::WatcherConfig::default().track_balance
 }
 
-pub(super) fn crank() -> TaskConfig {
-    super::WatcherConfig::default().crank
+pub(super) fn crank_watch() -> TaskConfig {
+    super::WatcherConfig::default().crank_watch
+}
+
+pub(super) fn crank_run() -> TaskConfig {
+    super::WatcherConfig::default().crank_run
 }
 
 pub(super) fn get_factory() -> TaskConfig {

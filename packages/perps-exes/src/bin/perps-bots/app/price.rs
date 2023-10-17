@@ -7,7 +7,7 @@ use std::{
 use anyhow::Result;
 use axum::async_trait;
 use chrono::{DateTime, Duration, Utc};
-use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, TxBuilder, Wallet};
+use cosmos::{proto::cosmwasm::wasm::v1::MsgExecuteContract, HasAddress, TxBuilder, Wallet};
 use cosmwasm_std::Decimal256;
 use msg::{
     contracts::market::spot_price::{SpotPriceConfig, SpotPriceFeedData},
@@ -22,12 +22,15 @@ use crate::{
     watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
 };
 
-use super::{factory::FactoryInfo, gas_check::GasCheckWallet, App, AppBuilder};
+use super::{
+    crank_run::TriggerCrank, factory::FactoryInfo, gas_check::GasCheckWallet, App, AppBuilder,
+};
 
 struct Worker {
     wallet: Arc<Wallet>,
     stats: HashMap<MarketId, ReasonStats>,
     last_successful_price_publish_times: HashMap<MarketId, DateTime<Utc>>,
+    trigger_crank: TriggerCrank,
 }
 
 impl Worker {
@@ -41,7 +44,7 @@ impl Worker {
 
 /// Start the background thread to keep options pools up to date.
 impl AppBuilder {
-    pub(super) fn start_price(&mut self) -> Result<()> {
+    pub(super) fn start_price(&mut self, trigger_crank: TriggerCrank) -> Result<()> {
         if let Some(price_wallet) = self.app.config.price_wallet.clone() {
             match &self.app.config.by_type {
                 BotConfigByType::Testnet { inner } => {
@@ -62,6 +65,7 @@ impl AppBuilder {
                     wallet: price_wallet,
                     stats: HashMap::new(),
                     last_successful_price_publish_times: HashMap::new(),
+                    trigger_crank,
                 },
             )?;
         }
@@ -92,7 +96,6 @@ impl WatchedTaskPerMarket for Worker {
 impl App {
     async fn single_update(&self, market: &Market, worker: &mut Worker) -> Result<String> {
         let mut statuses = vec![];
-        let mut builder = TxBuilder::default();
 
         // Load it up each time in case there are config changes, but we could
         // theoretically optimize this by doing it at load time instead.
@@ -137,63 +140,71 @@ impl App {
         let start_time = Utc::now();
         let pyth_msg = self.get_tx_pyth(&worker.wallet, &oracle).await?;
         let is_pyth = pyth_msg.is_some();
-        if let Some(msg) = &pyth_msg {
-            builder.add_message_mut(msg.clone());
-        }
         let time_spent = Utc::now() - start_time;
         log::debug!("get_tx_pyth took {time_spent}");
+        if let Some(pyth_msg) = pyth_msg {
+            let mut builder = TxBuilder::default();
+            builder.add_message_mut(pyth_msg.clone());
 
-        builder.add_message_mut(market.market.get_crank_msg(
-            &worker.wallet,
-            Some(1),
-            self.config.get_crank_rewards_wallet(),
-        )?);
+            let start_time = Utc::now();
+            let res = builder
+                .sign_and_broadcast(&self.cosmos, &worker.wallet)
+                .await;
+            let time_spent = Utc::now() - start_time;
+            log::debug!("sign_and_broadcast took {time_spent}");
+            let res = match res {
+                Ok(res) => res,
+                Err(e) => {
+                    // PERP-1702: If the price is too old, only complain after a
+                    // longer period of time to avoid spurious alerts.
 
-        let start_time = Utc::now();
-        let res = builder
-            .sign_and_broadcast(&self.cosmos, &worker.wallet)
-            .await;
-        let time_spent = Utc::now() - start_time;
-        log::debug!("sign_and_broadcast took {time_spent}");
-        let res = match res {
-            Ok(res) => res,
-            Err(e) => {
-                // PERP-1702: If the price is too old, only complain after a
-                // longer period of time to avoid spurious alerts.
-
-                // Hacky way to check if we're getting this error, we could
-                // parse the error correctly, but this is Good Enough.
-                if !format!("{e:?}").contains("price_too_old") {
-                    match &pyth_msg {
-                        None => log::error!("price_too_old occurred with no pyth_msg: {e:?}"),
-                        Some(pyth_msg) => match std::str::from_utf8(&pyth_msg.msg) {
+                    // Hacky way to check if we're getting this error, we could
+                    // parse the error correctly, but this is Good Enough.
+                    if !format!("{e:?}").contains("price_too_old") {
+                        match std::str::from_utf8(&pyth_msg.msg) {
                             Ok(msg) => log::error!("price_too_old occurred with execute message {msg}, error was {e:?}"),
                             Err(_) => log::error!("price_too_old occurred with execute message {:?}, error was {e:?}", pyth_msg.msg),
-                        },
-                    }
-                    return Err(e);
-                }
-
-                // OK, it was a too old error. Let's find out when the last price update was for the contract.
-                if let Some(prev_publish_time) = market_price.and_then(|price| price.publish_time) {
-                    let last_update = prev_publish_time.try_into_chrono_datetime()?;
-                    let now = Utc::now();
-                    let age = now - last_update;
-                    if u32::try_from(age.num_seconds())?
-                        > self.config.price_age_alert_threshold_secs
-                    {
+                        }
                         return Err(e);
-                    } else {
-                        return Ok(format!(
-                            "Ignoring failed price update. Price age in contract is: {age}"
-                        ));
                     }
-                } else {
-                    // no publish time, so we can't tell how old the price is
-                    return Err(e);
+
+                    // OK, it was a too old error. Let's find out when the last price update was for the contract.
+                    if let Some(prev_publish_time) =
+                        market_price.and_then(|price| price.publish_time)
+                    {
+                        let last_update = prev_publish_time.try_into_chrono_datetime()?;
+                        let now = Utc::now();
+                        let age = now - last_update;
+                        if u32::try_from(age.num_seconds())?
+                            > self.config.price_age_alert_threshold_secs
+                        {
+                            return Err(e);
+                        } else {
+                            return Ok(format!(
+                                "Ignoring failed price update. Price age in contract is: {age}"
+                            ));
+                        }
+                    } else {
+                        // no publish time, so we can't tell how old the price is
+                        return Err(e);
+                    }
                 }
+            };
+
+            if !res.data.is_empty() {
+                statuses.push(format!("Response data from contracts: {}", res.data));
             }
-        };
+
+            statuses.push(format!(
+                "Prices updated in oracles with txhash {}",
+                res.txhash
+            ));
+        }
+
+        worker
+            .trigger_crank
+            .trigger_crank(market.market.get_address())
+            .await?;
 
         let start_time = Utc::now();
         // the market must have been updated from the above transaction
@@ -215,15 +226,6 @@ impl App {
         }
 
         statuses.push(format!("Updated price: {market_price:?}"));
-
-        if !res.data.is_empty() {
-            statuses.push(format!("Response data from contracts: {}", res.data));
-        }
-
-        statuses.push(format!(
-            "Prices updated in oracles with txhash {}",
-            res.txhash
-        ));
 
         Ok(statuses.join("\n"))
     }

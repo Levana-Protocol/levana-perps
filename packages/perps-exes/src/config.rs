@@ -426,8 +426,10 @@ pub struct WatcherConfig {
     pub utilization: TaskConfig,
     #[serde(default = "defaults::track_balance")]
     pub track_balance: TaskConfig,
-    #[serde(default = "defaults::crank")]
-    pub crank: TaskConfig,
+    #[serde(default = "defaults::crank_watch")]
+    pub crank_watch: TaskConfig,
+    #[serde(default = "defaults::crank_run")]
+    pub crank_run: TaskConfig,
     #[serde(default = "defaults::get_factory")]
     pub get_factory: TaskConfig,
     #[serde(default = "defaults::price")]
@@ -488,8 +490,15 @@ impl Default for WatcherConfig {
                 retries: None,
                 delay_between_retries: None,
             },
-            crank: TaskConfig {
+            crank_watch: TaskConfig {
                 delay: Delay::Constant(30),
+                out_of_date: 60,
+                retries: None,
+                delay_between_retries: None,
+            },
+            crank_run: TaskConfig {
+                // We block internally within the crank run service
+                delay: Delay::Constant(0),
                 out_of_date: 60,
                 retries: None,
                 delay_between_retries: None,

@@ -65,8 +65,12 @@ struct FactoryUpdate;
 
 #[async_trait]
 impl WatchedTask for FactoryUpdate {
-    async fn run_single(&mut self, app: &App, _heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
-        update(app).await
+    async fn run_single(
+        &mut self,
+        app: Arc<App>,
+        _heartbeat: Heartbeat,
+    ) -> Result<WatchedTaskOutput> {
+        update(&app).await
     }
 }
 

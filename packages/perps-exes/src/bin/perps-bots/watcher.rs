@@ -27,7 +27,8 @@ use crate::util::markets::Market;
 pub(crate) enum TaskLabel {
     GetFactory,
     Stale,
-    Crank,
+    CrankWatch,
+    CrankRun,
     Price,
     TrackBalance,
     Stats,
@@ -47,7 +48,8 @@ impl TaskLabel {
         match s {
             "get-factory" => Some(TaskLabel::GetFactory),
             "stale" => Some(TaskLabel::Stale),
-            "crank" => Some(TaskLabel::Crank),
+            "crank-watch" => Some(TaskLabel::CrankWatch),
+            "crank-run" => Some(TaskLabel::CrankRun),
             "price" => Some(TaskLabel::Price),
             "track-balance" => Some(TaskLabel::TrackBalance),
             "stats" => Some(TaskLabel::Stats),
@@ -195,7 +197,8 @@ impl TaskLabel {
             TaskLabel::Trader { index: _ } => config.trader,
             TaskLabel::Utilization => config.utilization,
             TaskLabel::TrackBalance => config.track_balance,
-            TaskLabel::Crank => config.crank,
+            TaskLabel::CrankWatch => config.crank_watch,
+            TaskLabel::CrankRun => config.crank_run,
             TaskLabel::GetFactory => config.get_factory,
             TaskLabel::Price => config.price,
             TaskLabel::Stats => config.stats,
@@ -212,7 +215,8 @@ impl TaskLabel {
         }
         match self {
             TaskLabel::GetFactory => true,
-            TaskLabel::Crank => true,
+            TaskLabel::CrankWatch => true,
+            TaskLabel::CrankRun => true,
             TaskLabel::Price => true,
             TaskLabel::TrackBalance => false,
             TaskLabel::GasCheck => false,
@@ -232,7 +236,8 @@ impl TaskLabel {
     fn ident(self) -> Cow<'static, str> {
         match self {
             TaskLabel::GetFactory => "get-factory".into(),
-            TaskLabel::Crank => "crank".into(),
+            TaskLabel::CrankWatch => "crank-watch".into(),
+            TaskLabel::CrankRun => "crank-run".into(),
             TaskLabel::Price => "price".into(),
             TaskLabel::TrackBalance => "track-balance".into(),
             TaskLabel::GasCheck => "gas-check".into(),
@@ -325,7 +330,7 @@ impl AppBuilder {
                 let before = tokio::time::Instant::now();
                 let res = task
                     .run_single_with_timeout(
-                        &app,
+                        app.clone(),
                         Heartbeat {
                             task_status: task_status.clone(),
                         },
@@ -519,10 +524,14 @@ pub(crate) struct WatchedTaskOutput {
 
 #[async_trait]
 pub(crate) trait WatchedTask: Send + Sync + 'static {
-    async fn run_single(&mut self, app: &App, heartbeat: Heartbeat) -> Result<WatchedTaskOutput>;
+    async fn run_single(
+        &mut self,
+        app: Arc<App>,
+        heartbeat: Heartbeat,
+    ) -> Result<WatchedTaskOutput>;
     async fn run_single_with_timeout(
         &mut self,
-        app: &App,
+        app: Arc<App>,
         heartbeat: Heartbeat,
     ) -> Result<WatchedTaskOutput> {
         match tokio::time::timeout(
@@ -571,14 +580,18 @@ pub(crate) trait WatchedTaskPerMarket: Send + Sync + 'static {
 
 #[async_trait]
 impl<T: WatchedTaskPerMarket> WatchedTask for T {
-    async fn run_single(&mut self, app: &App, heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
+    async fn run_single(
+        &mut self,
+        app: Arc<App>,
+        heartbeat: Heartbeat,
+    ) -> Result<WatchedTaskOutput> {
         let factory = app.get_factory_info().await;
         let mut successes = vec![];
         let mut errors = vec![];
         let mut total_skip_delay = false;
         for market in &factory.markets {
             let market_start_time = Utc::now();
-            let res = self.run_single_market(app, &factory, market).await;
+            let res = self.run_single_market(&app, &factory, market).await;
             let time_used = Utc::now() - market_start_time;
             log::debug!("Time used for market {}: {time_used}.", market.market_id);
             match res {
@@ -600,6 +613,88 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
                 )),
             }
             heartbeat.reset_too_old().await;
+        }
+        if errors.is_empty() {
+            Ok(WatchedTaskOutput {
+                skip_delay: total_skip_delay,
+                message: successes.join("\n"),
+            })
+        } else {
+            let mut msg = String::new();
+            for line in errors.iter().chain(successes.iter()) {
+                msg += line;
+                msg += "\n";
+            }
+            Err(anyhow::anyhow!("{msg}"))
+        }
+    }
+}
+
+#[async_trait]
+pub(crate) trait WatchedTaskPerMarketParallel: Send + Sync + 'static {
+    async fn run_single_market(
+        self: Arc<Self>,
+        app: &App,
+        factory_info: &FactoryInfo,
+        market: &Market,
+    ) -> Result<WatchedTaskOutput>;
+}
+
+pub(crate) struct ParallelWatcher<T>(Arc<T>);
+
+impl<T> ParallelWatcher<T> {
+    pub(crate) fn new(t: T) -> Self {
+        ParallelWatcher(Arc::new(t))
+    }
+}
+
+#[async_trait]
+impl<T: WatchedTaskPerMarketParallel> WatchedTask for ParallelWatcher<T> {
+    async fn run_single(&mut self, app: Arc<App>, _: Heartbeat) -> Result<WatchedTaskOutput> {
+        let factory = app.get_factory_info().await;
+        let mut successes = vec![];
+        let mut errors = vec![];
+        let mut total_skip_delay = false;
+
+        let mut set = JoinSet::new();
+        for market in &factory.markets {
+            let factory = factory.clone();
+            let market = market.clone();
+            let inner = self.0.clone();
+            let app = app.clone();
+            set.spawn(async move {
+                let market_start_time = Utc::now();
+                let res = inner.run_single_market(&app, &factory, &market).await;
+                let time_used = Utc::now() - market_start_time;
+                log::debug!("Time used for market {}: {time_used}.", market.market_id);
+                (market, res)
+            });
+        }
+
+        while let Some(res_outer) = set.join_next().await {
+            match res_outer {
+                Ok((market, res)) => match res {
+                    Ok(WatchedTaskOutput {
+                        skip_delay,
+                        message,
+                    }) => {
+                        successes.push(format!(
+                            "{market} {addr}: {message}",
+                            market = market.market_id,
+                            addr = market.market
+                        ));
+                        total_skip_delay = skip_delay || total_skip_delay;
+                    }
+                    Err(e) => errors.push(format!(
+                        "{market} {addr}: {e:?}",
+                        market = market.market_id,
+                        addr = market.market
+                    )),
+                },
+                Err(panic) => errors.push(format!(
+                    "Code bug, panic occurred in parallel market watcher: {panic:?}"
+                )),
+            }
         }
         if errors.is_empty() {
             Ok(WatchedTaskOutput {
