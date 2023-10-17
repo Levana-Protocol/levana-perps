@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
-use cosmos::{Contract, Cosmos, HasAddress};
+use chrono::{DateTime, NaiveDateTime, Utc};
+use cosmos::Contract;
 use cosmwasm_std::Uint256;
 use msg::{
     contracts::market::{
@@ -9,15 +10,11 @@ use msg::{
     },
     prelude::*,
 };
+use pyth_sdk_cw::PriceIdentifier;
+
+use crate::app::App;
 
 use super::markets::Market;
-
-#[derive(Clone)]
-pub(crate) struct Oracle {
-    pub market: Market,
-    pub spot_price_config: SpotPriceConfig,
-    pub pyth: Option<PythOracle>,
-}
 
 #[derive(Clone)]
 pub struct PythOracle {
@@ -25,101 +22,107 @@ pub struct PythOracle {
     pub endpoint: String,
 }
 
-impl std::fmt::Debug for Oracle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut f = f.debug_struct("Oracle");
-
-        f.field("market_id", &self.market.market_id);
-        if let Some(pyth) = &self.pyth {
-            f.field("pyth_oracle_contract", &pyth.contract.get_address());
-        }
-
-        // TODO - add more debug info
-        // .field("price_feed", &self.market_price_feeds.feeds)
-        // .field(
-        //     "price_feeds_usd",
-        //     &format!("{:?}", self.market_price_feeds.feeds_usd),
-        // )
-        f.finish()
-    }
+pub(crate) struct OffchainPriceData {
+    /// Store the stable and edge values together since the IDs cannot overlap
+    pub(crate) values: HashMap<PriceIdentifier, NonZero<Decimal256>>,
+    pub(crate) stable_ids: HashSet<PriceIdentifier>,
+    pub(crate) edge_ids: HashSet<PriceIdentifier>,
+    /// The oldest publish time queried
+    pub(crate) oldest_publish_time: Option<DateTime<Utc>>,
 }
 
-impl Oracle {
-    pub async fn new(
-        cosmos: &Cosmos,
-        market: Market,
-        pyth_endpoint_stable: impl Into<String>,
-        pyth_endpoint_edge: impl Into<String>,
-    ) -> Result<Self> {
-        let status = market.market.status().await?;
+impl OffchainPriceData {
+    pub(crate) async fn load(app: &App, markets: &[Market]) -> Result<OffchainPriceData> {
+        // For now this is only Pyth data
+        let mut stable_feeds = HashSet::new();
+        let mut edge_feeds = HashSet::new();
 
-        let spot_price_config = status.config.spot_price;
-
-        let pyth = match &spot_price_config {
-            SpotPriceConfig::Manual { .. } => None,
-            SpotPriceConfig::Oracle { pyth, .. } => match pyth {
-                None => None,
-                Some(pyth) => {
-                    let addr = pyth.contract_address.as_str().parse().with_context(|| {
-                        format!(
-                            "Invalid Pyth oracle contract from Config: {}",
-                            pyth.contract_address
-                        )
-                    })?;
-                    Some(PythOracle {
-                        contract: cosmos.make_contract(addr),
-                        endpoint: match pyth.network {
-                            PythPriceServiceNetwork::Stable => pyth_endpoint_stable.into(),
-                            PythPriceServiceNetwork::Edge => pyth_endpoint_edge.into(),
-                        },
-                    })
+        for market in markets {
+            match &market.status.config.spot_price {
+                SpotPriceConfig::Manual { .. } => (),
+                SpotPriceConfig::Oracle {
+                    pyth,
+                    stride: _,
+                    feeds,
+                    feeds_usd,
+                } => {
+                    for SpotPriceFeed { data, inverted: _ } in feeds.iter().chain(feeds_usd.iter())
+                    {
+                        match data {
+                            SpotPriceFeedData::Constant { .. } => (),
+                            SpotPriceFeedData::Pyth {
+                                id,
+                                age_tolerance_seconds: _,
+                            } => {
+                                match pyth.as_ref().with_context(|| format!("Invalid config found, {} has a Pyth feed but not Pyth config", market.market_id))?.network {
+                                PythPriceServiceNetwork::Stable => stable_feeds.insert(*id),
+                                PythPriceServiceNetwork::Edge => edge_feeds.insert(*id)
+                            };
+                            }
+                            SpotPriceFeedData::Stride { .. } => (),
+                            SpotPriceFeedData::Sei { .. } => (),
+                        }
+                    }
                 }
-            },
-        };
+            }
+        }
 
-        Ok(Self {
-            pyth,
-            market,
-            spot_price_config,
+        let mut values = HashMap::new();
+        let mut oldest_publish_time = None;
+        fetch_pyth_prices(
+            &app.client,
+            &app.endpoint_stable,
+            &stable_feeds,
+            &mut values,
+            &mut oldest_publish_time,
+        )
+        .await?;
+        fetch_pyth_prices(
+            &app.client,
+            &app.endpoint_edge,
+            &edge_feeds,
+            &mut values,
+            &mut oldest_publish_time,
+        )
+        .await?;
+
+        Ok(OffchainPriceData {
+            values,
+            stable_ids: stable_feeds,
+            edge_ids: edge_feeds,
+            oldest_publish_time,
         })
     }
+}
 
-    pub async fn get_latest_price(
-        &self,
-        client: &reqwest::Client,
-    ) -> Result<(PriceBaseInQuote, PriceCollateralInUsd)> {
-        match &self.spot_price_config {
-            SpotPriceConfig::Manual { .. } => {
-                bail!("Manual markets do not use an oracle")
-            }
-            SpotPriceConfig::Oracle {
-                feeds, feeds_usd, ..
-            } => {
-                let pyth_prices = match &self.pyth {
-                    None => HashMap::new(),
-                    Some(pyth) => {
-                        fetch_pyth_prices(client, pyth, feeds.iter().chain(feeds_usd.iter()))
-                            .await?
-                    }
-                };
+pub(crate) async fn get_latest_price(
+    offchain_price_data: &OffchainPriceData,
+    market: &Market,
+) -> Result<(PriceBaseInQuote, PriceCollateralInUsd)> {
+    match &market.status.config.spot_price {
+        SpotPriceConfig::Manual { .. } => {
+            bail!("Manual markets do not use an oracle")
+        }
+        SpotPriceConfig::Oracle {
+            feeds, feeds_usd, ..
+        } => {
+            let oracle_price = market.market.get_oracle_price().await?;
 
-                let oracle_price = self.market.market.get_oracle_price().await?;
+            let base = compose_oracle_feeds(&oracle_price, &offchain_price_data.values, feeds)?;
+            let base = PriceBaseInQuote::from_non_zero(base);
 
-                let base = compose_oracle_feeds(&oracle_price, &pyth_prices, feeds)?;
-                let base = PriceBaseInQuote::from_non_zero(base);
+            let collateral =
+                compose_oracle_feeds(&oracle_price, &offchain_price_data.values, feeds_usd)?;
+            let collateral = PriceCollateralInUsd::from_non_zero(collateral);
 
-                let collateral = compose_oracle_feeds(&oracle_price, &pyth_prices, feeds_usd)?;
-                let collateral = PriceCollateralInUsd::from_non_zero(collateral);
-
-                Ok((base, collateral))
-            }
+            Ok((base, collateral))
         }
     }
 }
 
-pub fn compose_oracle_feeds(
+fn compose_oracle_feeds(
     oracle_price: &OraclePriceResp,
-    pyth_prices: &HashMap<String, NumberGtZero>,
+    pyth_prices: &HashMap<PriceIdentifier, NumberGtZero>,
     feeds: &[SpotPriceFeed],
 ) -> Result<NumberGtZero> {
     let mut final_price = Decimal256::one();
@@ -128,7 +131,7 @@ pub fn compose_oracle_feeds(
         let component = match &feed.data {
             // pyth uses the latest-and-greatest from hermes, not the contract price
             SpotPriceFeedData::Pyth { id, .. } => pyth_prices
-                .get(&id.to_hex())
+                .get(id)
                 .with_context(|| format!("Missing pyth price for ID {}", id))?
                 .into_decimal256(),
             SpotPriceFeedData::Constant { price } => price.into_decimal256(),
@@ -162,59 +165,71 @@ pub fn compose_oracle_feeds(
 
 async fn fetch_pyth_prices(
     client: &reqwest::Client,
-    pyth: &PythOracle,
-    feeds: impl Iterator<Item = &SpotPriceFeed>,
-) -> Result<HashMap<String, NumberGtZero>> {
+    endpoint: &str,
+    ids: &HashSet<PriceIdentifier>,
+    values: &mut HashMap<PriceIdentifier, NonZero<Decimal256>>,
+    oldest_publish_time: &mut Option<DateTime<Utc>>,
+) -> Result<()> {
     #[derive(serde::Deserialize)]
     struct PythRecord {
-        id: String,
+        id: PriceIdentifier,
         price: PythPrice,
     }
     #[derive(serde::Deserialize)]
     struct PythPrice {
         expo: i8,
         price: Uint256,
+        publish_time: i64,
     }
 
-    let mut req = client.get(format!("{}api/latest_price_feeds", pyth.endpoint));
-
-    let mut ids = HashSet::new();
-
-    for feed in feeds {
-        if let SpotPriceFeedData::Pyth { id, .. } = feed.data {
-            // only fetch unique ids
-            if !ids.contains(&id) {
-                req = req.query(&[("ids[]", id)]);
-                ids.insert(id);
-            }
-        }
+    if ids.is_empty() {
+        return Ok(());
     }
 
-    if !ids.is_empty() {
-        let records = req
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<Vec<PythRecord>>()
-            .await?;
+    let mut req = client.get(format!("{}api/latest_price_feeds", endpoint));
+    for id in ids {
+        req = req.query(&[("ids[]", id)])
+    }
 
-        let mut output = HashMap::new();
-        for PythRecord {
+    let records = req
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<Vec<PythRecord>>()
+        .await?;
+
+    for PythRecord {
+        id,
+        price: PythPrice {
+            expo,
+            price,
+            publish_time,
+        },
+    } in records
+    {
+        anyhow::ensure!(expo <= 0, "Exponent from Pyth must always be negative");
+        let price = Decimal256::from_atomics(price, expo.abs().try_into()?)?;
+        values.insert(
             id,
-            price: PythPrice { expo, price },
-        } in records
-        {
-            anyhow::ensure!(expo <= 0, "Exponent from Pyth must always be negative");
-            let price = Decimal256::from_atomics(price, expo.abs().try_into()?)?;
-            output.insert(
-                id,
-                NumberGtZero::try_from_decimal(price).with_context(|| {
-                    format!("unable to convert pyth price of {price} to NumberGtZero")
-                })?,
-            );
+            NumberGtZero::try_from_decimal(price).with_context(|| {
+                format!("unable to convert pyth price of {price} to NumberGtZero")
+            })?,
+        );
+
+        match NaiveDateTime::from_timestamp_opt(publish_time, 0) {
+            Some(publish_time) => {
+                let publish_time = publish_time.and_utc();
+                match *oldest_publish_time {
+                    None => *oldest_publish_time = Some(publish_time),
+                    Some(oldest) => {
+                        if publish_time < oldest {
+                            *oldest_publish_time = Some(publish_time);
+                        }
+                    }
+                }
+            }
+            None => log::error!("Could not convert Pyth publish time to NaiveDateTime, ignoring"),
         }
-        Ok(output)
-    } else {
-        Ok(HashMap::new())
     }
+    Ok(())
 }
