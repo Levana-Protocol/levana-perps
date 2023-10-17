@@ -1,5 +1,6 @@
 use cosmos::{Contract, Cosmos, HasAddress};
 use msg::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
+use msg::contracts::market::entry::StatusResp;
 use msg::prelude::*;
 use perps_exes::prelude::MarketContract;
 use std::collections::HashSet;
@@ -15,6 +16,7 @@ pub(crate) struct Market {
     #[allow(dead_code)]
     pub(crate) liquidity_token_xlp: Contract,
     pub(crate) market_id: MarketId,
+    pub(crate) status: StatusResp,
 }
 
 impl Debug for Market {
@@ -60,10 +62,11 @@ pub(crate) async fn get_markets(
                     market_id: market_id.clone(),
                 })
                 .await?;
+            let market =
+                MarketContract::new(cosmos.make_contract(market_addr.into_string().parse()?));
             res.push(Market {
-                market: MarketContract::new(
-                    cosmos.make_contract(market_addr.into_string().parse()?),
-                ),
+                status: market.status().await?,
+                market,
                 position_token: cosmos.make_contract(position_token.into_string().parse()?),
                 liquidity_token_lp: cosmos.make_contract(liquidity_token_lp.into_string().parse()?),
                 liquidity_token_xlp: cosmos

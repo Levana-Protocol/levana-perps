@@ -64,7 +64,6 @@ pub(crate) struct BotConfig {
     pub(crate) max_price_age_secs: u32,
     pub(crate) min_price_age_secs: u32,
     pub(crate) max_allowed_price_delta: Decimal256,
-    pub(crate) price_age_alert_threshold_secs: u32,
     pub(crate) gas_decimals: GasDecimals,
     pub(crate) http_timeout_seconds: u32,
 }
@@ -190,7 +189,6 @@ impl Opt {
             max_price_age_secs: partial.max_price_age_secs,
             min_price_age_secs: partial.min_price_age_secs,
             max_allowed_price_delta: partial.max_allowed_price_delta,
-            price_age_alert_threshold_secs: partial.price_age_alert_threshold_secs,
             gas_decimals,
             http_timeout_seconds,
         };
@@ -213,7 +211,6 @@ impl Opt {
             max_allowed_price_delta,
             low_util_ratio,
             high_util_ratio,
-            price_age_alert_threshold_secs,
             ltc_num_blocks,
             ltc_total_liqudity_percent,
             ltc_total_deposit_percent,
@@ -262,8 +259,6 @@ impl Opt {
                 .unwrap_or_else(perps_exes::config::defaults::min_price_age_secs),
             max_allowed_price_delta: max_allowed_price_delta
                 .unwrap_or_else(perps_exes::config::defaults::max_allowed_price_delta),
-            price_age_alert_threshold_secs: price_age_alert_threshold_secs
-                .unwrap_or_else(perps_exes::config::defaults::price_age_alert_threshold_secs),
             gas_decimals,
             http_timeout_seconds: *http_timeout_seconds,
         })

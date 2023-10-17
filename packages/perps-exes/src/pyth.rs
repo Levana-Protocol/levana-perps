@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use cosmos::proto::cosmwasm::wasm::v1::MsgExecuteContract;
 use cosmos::{Contract, HasAddress};
 use cosmwasm_std::{Binary, Coin};
@@ -5,7 +7,7 @@ use msg::prelude::*;
 use pyth_sdk_cw::PriceIdentifier;
 
 pub async fn get_oracle_update_msg(
-    ids: &[PriceIdentifier],
+    ids: &HashSet<PriceIdentifier>,
     sender: impl HasAddress,
     endpoint: &str,
     client: &reqwest::Client,
@@ -35,7 +37,7 @@ pub async fn get_oracle_update_msg(
 }
 
 async fn get_wormhole_proofs(
-    ids: &[PriceIdentifier],
+    ids: &HashSet<PriceIdentifier>,
     endpoint: &str,
     client: &reqwest::Client,
 ) -> Result<Vec<String>> {

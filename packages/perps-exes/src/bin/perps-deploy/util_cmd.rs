@@ -135,7 +135,7 @@ async fn update_pyth(
             SpotPriceFeedData::Pyth { id, .. } => Some(id),
             _ => None,
         })
-        .collect::<Vec<_>>();
+        .collect::<HashSet<_>>();
 
     let msg = get_oracle_update_msg(&ids, &basic.wallet, endpoint, &client, &oracle).await?;
 
