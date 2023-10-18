@@ -10,30 +10,41 @@ mod util;
 pub(crate) mod wallet_manager;
 pub(crate) mod watcher;
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 16)]
-async fn main() -> Result<()> {
-    main_inner().await
+fn main() -> Result<()> {
+    Pid1Settings::new().enable_log(true).launch()?;
+    main_inner()
 }
 
-async fn main_inner() -> Result<()> {
-    Pid1Settings::new().enable_log(true).launch()?;
+fn main_inner() -> Result<()> {
     dotenv::dotenv().ok();
 
     let opt = cli::Opt::parse();
 
-    let server = axum::Server::try_bind(&opt.bind)
-        .with_context(|| format!("Cannot launch bot HTTP service bound to {}", opt.bind))?;
-
-    opt.init_logger();
-    let _guard = opt.client_key.clone().map(|ck| {
+    let _guard = opt.sentry_dsn.clone().map(|sentry_dsn| {
         sentry::init((
-            ck,
+            sentry_dsn,
             sentry::ClientOptions {
                 release: sentry::release_name!(),
                 session_mode: sentry::SessionMode::Request,
+                debug: true,
                 ..Default::default()
             },
         ))
     });
-    opt.into_app_builder().await?.start(server).await
+    opt.init_logger()?;
+
+    // We do not use tokio macro because of this:
+    // https://docs.sentry.io/platforms/rust/#async-main-function
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(16)
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let server = axum::Server::try_bind(&opt.bind)
+                .with_context(|| format!("Cannot launch bot HTTP service bound to {}", opt.bind))?;
+
+            opt.into_app_builder().await?.start(server).await
+        })
+        .map_err(anyhow::Error::msg)
 }

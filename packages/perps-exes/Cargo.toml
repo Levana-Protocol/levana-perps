@@ -67,6 +67,7 @@ sentry = { version = "0.31", default-features = false, features = [ # Newer sent
 	"tracing",
 	"tower",
 ] }
+sentry-tracing = "0.31.7"
 async-channel = "1.9"
 hyper = "0.14"
 pid1 = "0.1.0"

@@ -5,6 +5,8 @@ use cosmos::{Address, AddressType, CosmosNetwork, SeedPhrase, Wallet};
 use cosmwasm_std::Decimal256;
 use perps_exes::{build_version, config::GasAmount};
 use shared::storage::MarketId;
+use tracing::Level;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 #[derive(clap::Parser)]
 #[clap(version = build_version())]
@@ -20,7 +22,7 @@ pub(crate) struct Opt {
     pub(crate) bind: SocketAddr,
     /// Sentry client key
     #[arg(short, long, env = "SENTRY_KEY")]
-    pub(crate) client_key: Option<String>,
+    pub(crate) sentry_dsn: Option<String>,
     /// Override the gRPC URL
     #[clap(long, env = "COSMOS_GRPC")]
     pub(crate) grpc_url: Option<String>,
@@ -143,16 +145,30 @@ pub(crate) struct MainnetOpt {
 }
 
 impl Opt {
-    pub(crate) fn init_logger(&self) {
-        let env = env_logger::Env::default().default_filter_or(if self.verbose {
+    pub(crate) fn init_logger(&self) -> Result<()> {
+        let env_directive = if self.verbose {
             format!(
                 "{}=debug,cosmos=debug,levana=debug,info",
                 env!("CARGO_CRATE_NAME")
             )
+            .parse()?
         } else {
-            "info".to_owned()
-        });
-        env_logger::Builder::from_env(env).init();
+            Level::INFO.into()
+        };
+
+        let subscriber = tracing_subscriber::registry().with(
+            fmt::Layer::default()
+                .and_then(EnvFilter::from_default_env().add_directive(env_directive)),
+        );
+
+        if let Some(_) = &self.sentry_dsn {
+            subscriber.with(sentry_tracing::layer()).init();
+            tracing::info!("Initialized Logging with Sentry tracing");
+        } else {
+            subscriber.init();
+            tracing::info!("Initialized Logging");
+        }
+        Ok(())
     }
 
     pub(crate) fn get_wallet(
