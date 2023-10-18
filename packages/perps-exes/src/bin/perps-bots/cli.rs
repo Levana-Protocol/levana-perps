@@ -161,7 +161,7 @@ impl Opt {
                 .and_then(EnvFilter::from_default_env().add_directive(env_directive)),
         );
 
-        if let Some(_) = &self.sentry_dsn {
+        if self.sentry_dsn.is_some() {
             subscriber.with(sentry_tracing::layer()).init();
             tracing::info!("Initialized Logging with Sentry tracing");
         } else {
