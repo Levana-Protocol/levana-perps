@@ -9,7 +9,6 @@
 //! 6. Crank update will watch its channel for work items and immediately jump into sending a transaction to up to X markets at once (I'm thinking 3 due to gas concerns)
 //! 7. The goal here is to get info as quickly as possible that work needs to be done, as opposed to needing to loop through all the markets. I think a big contributing factor last week is the sheer number of markets we have on Osmosis now, it takes a while to process them serially
 
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -94,7 +93,6 @@ impl App {
         recv: &mut tokio::sync::mpsc::Receiver<CrankNeeded>,
     ) -> Result<WatchedTaskOutput> {
         const MAX_WAIT_SECONDS: u64 = 20;
-        const MAX_CRANKS_PER_TX: usize = 3;
 
         // Wait for up to 20 seconds for new work to appear. If it doesn't, update our status message that no cranking was needed.
         let crank_needed = tokio::time::timeout(
@@ -116,19 +114,6 @@ impl App {
             Ok(Some(crank_needed)) => crank_needed,
         };
 
-        // Get a few more work items, but we don't want to crank the same market multiple times.
-        let mut markets = HashSet::new();
-        markets.insert(crank_needed.market_contract);
-        while markets.len() < MAX_CRANKS_PER_TX {
-            match recv.try_recv() {
-                Ok(crank_needed) => {
-                    markets.insert(crank_needed.market_contract);
-                }
-                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => break,
-                Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => anyhow::bail!("Impossible Disconnected returned from crank needed queue, this indicates a code bug"),
-            }
-        }
-
         // NOTE: in theory this approach may end up running needless cranks. The
         // reason: supposed the crank watcher sees some crank work needs to be
         // done for market X, triggers the work, and then, before the crank run
@@ -148,7 +133,12 @@ impl App {
         for execs in CRANK_EXECS {
             let crank_start = Utc::now();
             let res = self
-                .try_with_execs(crank_wallet, &markets, Some(*execs), rewards)
+                .try_with_execs(
+                    crank_wallet,
+                    crank_needed.market_contract,
+                    Some(*execs),
+                    rewards,
+                )
                 .await;
             let crank_time = Utc::now() - crank_start;
             tracing::debug!("Crank for {execs} takes {crank_time}");
@@ -160,7 +150,7 @@ impl App {
 
         let crank_start = Utc::now();
         let res = self
-            .try_with_execs(crank_wallet, &markets, None, rewards)
+            .try_with_execs(crank_wallet, crank_needed.market_contract, None, rewards)
             .await;
         let crank_time = Utc::now() - crank_start;
         tracing::debug!("Crank for None takes {crank_time}");
@@ -170,31 +160,30 @@ impl App {
     async fn try_with_execs(
         &self,
         crank_wallet: &Wallet,
-        markets: &HashSet<Address>,
+        market: Address,
         execs: Option<u32>,
         rewards: Option<Address>,
     ) -> Result<WatchedTaskOutput> {
         let mut builder = TxBuilder::default();
 
-        for market in markets {
-            builder.add_execute_message_mut(
-                *market,
-                crank_wallet,
-                vec![],
-                MarketExecuteMsg::Crank {
-                    execs,
-                    rewards: rewards.map(|a| a.get_address_string().into()),
-                },
-            )?;
-        }
+        builder.add_execute_message_mut(
+            market,
+            crank_wallet,
+            vec![],
+            MarketExecuteMsg::Crank {
+                execs,
+                rewards: rewards.map(|a| a.get_address_string().into()),
+            },
+        )?;
 
         let txres = builder
             .sign_and_broadcast(&self.cosmos, crank_wallet)
-            .await?;
+            .await
+            .with_context(|| format!("Unable to turn crank for market {market}"))?;
         Ok(WatchedTaskOutput {
             skip_delay: true,
             message: format!(
-                "Successfully turned the crank for markets {markets:?} in transaction {}",
+                "Successfully turned the crank for market {market} in transaction {}",
                 txres.txhash
             ),
         })
