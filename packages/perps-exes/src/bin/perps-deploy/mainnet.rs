@@ -247,6 +247,7 @@ async fn store_perps_contracts(
     to_upload: &[ContractType],
 ) -> Result<()> {
     let app = opt.load_app_mainnet(network).await?;
+    let wallet = app.get_wallet()?;
     let mut code_ids = CodeIds::load()?;
     let gitrev = opt.get_gitrev()?;
 
@@ -290,14 +291,10 @@ async fn store_perps_contracts(
                     None => {
                         log::info!("Storing {contract_type:?}...");
                         let code_id = match granter {
-                            None => {
-                                app.cosmos
-                                    .store_code_path(&app.wallet, &contract_path)
-                                    .await?
-                            }
+                            None => app.cosmos.store_code_path(wallet, &contract_path).await?,
                             Some(granter) => {
                                 app.cosmos
-                                    .store_code_path_authz(&app.wallet, &contract_path, granter)
+                                    .store_code_path_authz(wallet, &contract_path, granter)
                                     .await?
                                     .1
                             }
@@ -361,6 +358,7 @@ async fn instantiate_factory(
     }: InstantiateFactoryOpts,
 ) -> Result<()> {
     let app = opt.load_app_mainnet(network).await?;
+    let wallet = app.get_wallet()?;
     let code_ids = CodeIds::load()?;
     let mut factories = MainnetFactories::load()?;
 
@@ -382,7 +380,7 @@ async fn instantiate_factory(
     let migration_admin = migration_admin.unwrap_or(owner);
     let factory = factory
         .instantiate(
-            &app.wallet,
+            wallet,
             factory_label.clone(),
             vec![],
             msg::contracts::factory::entry::InstantiateMsg {

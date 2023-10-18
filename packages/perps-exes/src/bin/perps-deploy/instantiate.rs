@@ -195,14 +195,7 @@ pub(crate) enum CollateralSource {
 pub(crate) async fn instantiate(
     InstantiateParams {
         opt,
-        basic:
-            BasicApp {
-                cosmos,
-                wallet,
-                network: _,
-                chain_config: _,
-                price_config: _,
-            },
+        basic,
         config_testnet,
         code_id_source,
         trading_competition,
@@ -236,6 +229,9 @@ pub(crate) async fn instantiate(
 
     let mut to_log: Vec<(u64, Address)> = vec![];
     let label_suffix = format!(" - {family}");
+
+    let wallet = basic.get_wallet()?;
+    let cosmos = &basic.cosmos;
 
     let factory = factory_code_id
         .instantiate(

@@ -65,6 +65,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
     } = inst_opt;
 
     let basic = opt.load_basic_app(network).await?;
+    let wallet = basic.get_wallet()?;
     let (tracker, _) = basic.get_tracker_and_faucet()?;
 
     let label_suffix = if prod { "" } else { " (testnet)" };
@@ -88,7 +89,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                         .require_code_by_type(&opt, IBC_EXECUTE_PROXY)
                         .await?
                         .instantiate(
-                            &basic.wallet,
+                            wallet,
                             format!("Levana IbcExecute{label_suffix}"),
                             vec![],
                             msg::contracts::ibc_execute_proxy::entry::InstantiateMsg {
@@ -105,7 +106,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                     let mut minters = HashSet::new();
                     minters.insert(ibc_contract.get_address_string());
                     mint_contract
-                        .execute(&basic.wallet, vec![], NftExecuteMsg::AddMinters { minters })
+                        .execute(wallet, vec![], NftExecuteMsg::AddMinters { minters })
                         .await?;
 
                     let info = ibc_contract.info().await?;
@@ -159,7 +160,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
             let code_id = tracker.require_code_by_type(&opt, HATCHING).await?;
             let contract = code_id
                 .instantiate(
-                    &basic.wallet,
+                    wallet,
                     format!("Levana Hatching{label_suffix}"),
                     vec![],
                     msg::contracts::hatching::entry::InstantiateMsg {
@@ -179,7 +180,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                     .cosmos
                     .make_contract(burn_egg_contract.parse()?)
                     .execute(
-                        &basic.wallet,
+                        wallet,
                         vec![],
                         NftExecuteMsg::AddMinters {
                             minters: minters.clone(),
@@ -189,7 +190,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                 basic
                     .cosmos
                     .make_contract(burn_dust_contract.parse()?)
-                    .execute(&basic.wallet, vec![], NftExecuteMsg::AddMinters { minters })
+                    .execute(wallet, vec![], NftExecuteMsg::AddMinters { minters })
                     .await?;
 
                 log::info!("giving hatching contract profile admin permissions");
@@ -208,7 +209,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                     .cosmos
                     .make_contract(profile_contract.parse()?)
                     .execute(
-                        &basic.wallet,
+                        wallet,
                         vec![],
                         ProfileExecuteMsg::Admin {
                             message: ProfileAdminExecuteMsg::AddAdmin {
@@ -239,7 +240,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                 );
                 let resp = contract
                     .execute(
-                        &basic.wallet,
+                        wallet,
                         vec![],
                         HatchingExecuteMsg::SetBabyDragonExtras {
                             extras: chunk.to_vec(),
@@ -259,7 +260,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
             let code_id = tracker.require_code_by_type(&opt, LVN_REWARDS).await?;
             let contract = code_id
                 .instantiate(
-                    &basic.wallet,
+                    wallet,
                     format!("Levana Rewards{label_suffix}"),
                     vec![],
                     msg::contracts::rewards::entry::InstantiateMsg {
@@ -298,7 +299,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                 builder.config.gas_estimate_multiplier = 1.5;
                 let cosmos = builder.build_lazy().await;
 
-                let tokenfactory = TokenFactory::new(basic.cosmos.clone(), basic.wallet.clone());
+                let tokenfactory = TokenFactory::new(basic.cosmos.clone(), wallet.clone());
 
                 tokenfactory.mint(lvn_denom.clone(), AMOUNT).await?;
 
@@ -307,8 +308,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                     amount: AMOUNT.to_string(),
                 };
 
-                basic
-                    .wallet
+                wallet
                     .send_coins(&cosmos, contract.get_address(), vec![coin])
                     .await?;
             }
@@ -359,17 +359,19 @@ async fn instantiate_testnet_nft_contract(
         },
     }
 
+    let wallet = app.get_wallet()?;
+
     let contract = app
         .cosmos
         .make_code_id(code_id)
         .instantiate(
-            &app.wallet,
+            wallet,
             label.clone(),
             vec![],
             InstantiateMsg {
                 name: label.clone(),
                 symbol: "WHTVR".to_string(),
-                minter: vec![app.wallet.get_address_string()].into_iter().collect(),
+                minter: vec![wallet.get_address_string()].into_iter().collect(),
                 allow_burn: true,
                 royalties: RoyaltyInfo::NoRoyalties {},
             },
@@ -417,19 +419,20 @@ async fn instantiate_testnet_profile_contract(
         pub withdraw_dest: String,
     }
 
+    let wallet = app.get_wallet()?;
     let contract = app
         .cosmos
         .make_code_id(code_id)
         .instantiate(
-            &app.wallet,
+            wallet,
             label.clone(),
             vec![],
             InstantiateMsg {
                 dragons: eggs_contract.into(),
                 loot: dust_contract.into(),
                 dragon_rider: dragon_riders_contract.into(),
-                admin: app.wallet.get_address_string(),
-                withdraw_dest: app.wallet.get_address_string(),
+                admin: wallet.get_address_string(),
+                withdraw_dest: wallet.get_address_string(),
             },
             ContractAdmin::Sender,
         )

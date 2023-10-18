@@ -13,6 +13,7 @@ pub(crate) struct EnableMarketOpt {
 impl EnableMarketOpt {
     pub(crate) async fn go(self, opt: Opt) -> Result<()> {
         let app = opt.load_app(&self.family).await?;
+        let wallet = app.basic.get_wallet()?;
         let factory = app
             .tracker
             .get_contract_by_family("factory", &self.family, None)
@@ -25,7 +26,7 @@ impl EnableMarketOpt {
                 Factory::from_contract(app.basic.cosmos.make_contract(address.parse()?))
             }
         };
-        let res = factory.enable_all(&app.basic.wallet).await?;
+        let res = factory.enable_all(wallet).await?;
         log::info!("Enabled market in {}", res.txhash);
 
         log::info!("Don't forget to deposit liquidity into the contract!");

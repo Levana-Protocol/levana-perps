@@ -27,6 +27,7 @@ pub(crate) struct MigrateRewardsOpt {
 
 pub(crate) async fn go(global_opt: Opt, opt: MigrateRewardsOpt) -> Result<()> {
     let basic = global_opt.load_basic_app(opt.network).await?;
+    let wallet = basic.get_wallet()?;
     let (tracker, _) = basic.get_tracker_and_faucet()?;
 
     match opt.contracts {
@@ -37,7 +38,7 @@ pub(crate) async fn go(global_opt: Opt, opt: MigrateRewardsOpt) -> Result<()> {
                 .get_code_id();
             let contract = basic.cosmos.make_contract(opt.hatch_address);
             let msg = HatchMigrateMsg {};
-            contract.migrate(&basic.wallet, code_id, msg).await?;
+            contract.migrate(wallet, code_id, msg).await?;
 
             println!(
                 "migrated hatching contract, code id: {code_id}, address: {}",

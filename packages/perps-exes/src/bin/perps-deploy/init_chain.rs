@@ -37,19 +37,20 @@ pub(crate) async fn go(
     let gas_coin = app.cosmos.get_gas_coin().clone();
 
     log::info!("Storing code...");
+    let wallet = app.get_wallet()?;
     let cw20_code_id = app
         .cosmos
-        .store_code_path(&app.wallet, opt.get_contract_path(CW20))
+        .store_code_path(wallet, opt.get_contract_path(CW20))
         .await?;
     log::info!("CW20: {cw20_code_id}");
     let faucet_code_id = app
         .cosmos
-        .store_code_path(&app.wallet, opt.get_contract_path(FAUCET))
+        .store_code_path(wallet, opt.get_contract_path(FAUCET))
         .await?;
     log::info!("Faucet: {faucet_code_id}");
     let tracker_code_id = app
         .cosmos
-        .store_code_path(&app.wallet, opt.get_contract_path(TRACKER))
+        .store_code_path(wallet, opt.get_contract_path(TRACKER))
         .await?;
     log::info!("Tracker: {tracker_code_id}");
 
@@ -57,7 +58,7 @@ pub(crate) async fn go(
 
     let tracker = tracker_code_id
         .instantiate(
-            &app.wallet,
+            wallet,
             "Levana Perps Tracker",
             vec![],
             msg::contracts::tracker::entry::InstantiateMsg {},
@@ -68,7 +69,7 @@ pub(crate) async fn go(
 
     let faucet = faucet_code_id
         .instantiate(
-            &app.wallet,
+            wallet,
             "Levana Perps Faucet",
             vec![],
             msg::contracts::faucet::entry::InstantiateMsg {
@@ -85,8 +86,7 @@ pub(crate) async fn go(
     log::info!("New faucet contract: {faucet}");
 
     log::info!("Sending gas funds to faucet");
-    let res = app
-        .wallet
+    let res = wallet
         .send_gas_coin(&app.cosmos, &faucet, gas_to_send * 1_000_000)
         .await?;
     log::info!("Gas sent in {}", res.txhash);

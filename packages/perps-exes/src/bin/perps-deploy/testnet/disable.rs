@@ -16,6 +16,7 @@ pub(crate) struct DisableMarketAtOpt {
 impl DisableMarketAtOpt {
     pub(crate) async fn go(&self, opt: crate::cli::Opt) -> Result<()> {
         let app = opt.load_app(&self.family).await?;
+        let wallet = app.basic.get_wallet()?;
         let factory = app
             .tracker
             .get_contract_by_family("factory", &self.family, None)
@@ -40,9 +41,7 @@ impl DisableMarketAtOpt {
         let markets = factory.get_markets().await?;
         for market in markets {
             log::info!("Shutting down trades in market {}", market.market_id);
-            let res = factory
-                .disable_trades(&app.basic.wallet, market.market_id)
-                .await?;
+            let res = factory.disable_trades(wallet, market.market_id).await?;
             log::info!("Trades shut down in {}", res.txhash);
         }
         Ok(())
@@ -59,6 +58,7 @@ pub(crate) struct CloseAllPositionsOpt {
 impl CloseAllPositionsOpt {
     pub(crate) async fn go(&self, opt: crate::cli::Opt) -> Result<()> {
         let app = opt.load_app(&self.family).await?;
+        let wallet = app.basic.get_wallet()?;
         let factory = app.tracker.get_factory(&self.family).await?;
         let markets = factory.get_markets().await?;
 
@@ -68,7 +68,7 @@ impl CloseAllPositionsOpt {
         {
             let market = MarketContract::new(market);
             log::info!("Closing all positions for {market_id}");
-            let res = market.close_all_positions(&app.basic.wallet).await?;
+            let res = market.close_all_positions(wallet).await?;
             log::info!("Closed in {}", res.txhash);
         }
         Ok(())

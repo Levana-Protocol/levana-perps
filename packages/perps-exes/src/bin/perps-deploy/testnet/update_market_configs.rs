@@ -18,6 +18,7 @@ impl UpdateMarketConfigsOpt {
         let update = serde_json::from_str::<ConfigUpdate>(&self.update)
             .context("Invalid config update message")?;
         let app = opt.load_app(&self.family).await?;
+        let wallet = app.basic.get_wallet()?;
         let factory = app
             .tracker
             .get_contract_by_family("factory", &self.family, None)
@@ -37,7 +38,7 @@ impl UpdateMarketConfigsOpt {
             log::info!("Updating market: {}", market.market_id);
             let market_contract = MarketContract::new(market.market);
             let res = market_contract
-                .config_update(&app.basic.wallet, update.clone())
+                .config_update(wallet, update.clone())
                 .await?;
             log::info!("Updated {} in {}", market.market_id, res.txhash);
         }

@@ -92,13 +92,14 @@ pub(crate) async fn go(
     };
 
     let basic = opt.load_basic_app(network).await?;
+    let wallet = basic.get_wallet()?;
     let (tracker, _) = basic.get_tracker_and_faucet()?;
 
     store_code(
         &opt,
         &basic.cosmos,
         network,
-        &basic.wallet,
+        wallet,
         &tracker,
         contracts.names(),
     )
