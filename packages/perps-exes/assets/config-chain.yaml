@@ -11,7 +11,7 @@ sei-testnet:
   explorer: "https://www.seiscan.app/atlantic-2/txs/"
   rpc-nodes:
   - https://rpc.atlantic-2.seinetwork.io
-  - https://rpc-testnet.sei-apis.com
+  #- https://rpc-testnet.sei-apis.com
   #- https://rpc-sei-testnet.rhinostake.com/
   #- https://rpc.atlantic-2.seinetwork.io/
   #- https://sei-testnet-rpc.polkachu.com/
