@@ -32,6 +32,7 @@ pub(crate) struct OffchainPriceData {
 }
 
 impl OffchainPriceData {
+    #[tracing::instrument(skip_all)]
     pub(crate) async fn load(app: &App, markets: &[Market]) -> Result<OffchainPriceData> {
         // For now this is only Pyth data
         let mut stable_feeds = HashSet::new();
@@ -163,6 +164,7 @@ fn compose_oracle_feeds(
         .with_context(|| format!("unable to convert price of {final_price} to NumberGtZero"))
 }
 
+#[tracing::instrument(skip_all)]
 async fn fetch_pyth_prices(
     client: &reqwest::Client,
     endpoint: &str,

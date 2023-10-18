@@ -42,6 +42,7 @@ impl WatchedTaskPerMarketParallel for Worker {
     }
 }
 
+#[tracing::instrument(skip_all)]
 async fn check_market(
     trigger_crank: &TriggerCrank,
     app: &App,
@@ -77,6 +78,7 @@ async fn check_market(
 }
 
 impl App {
+    #[tracing::instrument(skip_all)]
     async fn check_crank(&self, market: &MarketContract) -> Result<Option<CrankReason>> {
         let status = market.status().await?;
         if let Some(work) = status.next_crank {

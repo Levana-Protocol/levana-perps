@@ -34,6 +34,7 @@ pub(crate) struct TriggerCrank {
 }
 
 impl TriggerCrank {
+    #[tracing::instrument(skip_all)]
     pub(crate) async fn trigger_crank(&self, contract: Address) -> Result<()> {
         self.send
             .send(CrankNeeded {
