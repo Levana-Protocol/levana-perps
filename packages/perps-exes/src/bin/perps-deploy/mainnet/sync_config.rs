@@ -87,6 +87,9 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
             let expected = if expected_value.is_null() {
                 default_value
             } else {
+                if default_value == expected_value {
+                    println!("Unnecessary config update {key} for market {market_id}");
+                }
                 expected_value
             };
             let actual = actual_config.remove(&key).with_context(|| {

@@ -2,50 +2,32 @@ markets:
   ETH_USD:
     delta_neutrality_fee_sensitivity: 1000000000
     funding_rate_sensitivity: 1.5
-    trading_fee_notional_size: 0.001
-    trading_fee_counter_collateral: 0.001
     borrow_fee_rate_min_annualized: 0.03
     target_utilization: 0.5
-    borrow_fee_sensitivity: 0.083333333333333333
     carry_leverage: 15
-    liquidity_cooldown_seconds: 3600
 
   axlETH_USD:
     delta_neutrality_fee_sensitivity: 1000000000
     funding_rate_sensitivity: 1.5
-    trading_fee_notional_size: 0.001
-    trading_fee_counter_collateral: 0.001
     borrow_fee_rate_min_annualized: 0.03
     target_utilization: 0.5
-    borrow_fee_sensitivity: 0.083333333333333333
     carry_leverage: 15
-    liquidity_cooldown_seconds: 3600
 
   ATOM_USD:
     delta_neutrality_fee_sensitivity: 200000000
     funding_rate_sensitivity: 2
     carry_leverage: 15
-    liquidity_cooldown_seconds: 3600
     borrow_fee_sensitivity: 0.083333333
     borrow_fee_rate_min_annualized: 0.1
     target_utilization: 0.5
 
   stATOM_USD:
-    trading_fee_notional_size: 0.001
-    trading_fee_counter_collateral: 0.001
-    max_leverage: 30
     funding_rate_sensitivity: 2
     borrow_fee_rate_min_annualized: 0.03
-    borrow_fee_rate_max_annualized: 0.6
-    liquifunding_delay_seconds: 21600
-    liquifunding_delay_fuzz_seconds: 3600
     target_utilization: 0.5
     borrow_fee_sensitivity: 0.083333333
     delta_neutrality_fee_sensitivity: 200000000
-    delta_neutrality_fee_cap: 0.005
-    delta_neutrality_fee_tax: 0.05
     carry_leverage: 15
-    liquidity_cooldown_seconds: 3600
 
     # initial borrow fee: 0.05
 
@@ -56,26 +38,16 @@ markets:
     target_utilization: 0.5
     borrow_fee_sensitivity: 0.01333333333
     delta_neutrality_fee_cap: 0.015
-    delta_neutrality_fee_sensitivity: 50000000
     delta_neutrality_fee_tax: 0.25
-    trading_fee_notional_size: 0.001
-    trading_fee_counter_collateral: 0.001
     borrow_fee_rate_min_annualized: 0.06
-    liquidity_cooldown_seconds: 3600
 
   SEI_USD:
-    max_leverage: 30
     carry_leverage: 15
     funding_rate_sensitivity: 2
     target_utilization: 0.5
     borrow_fee_sensitivity: 0.01333333333
-    delta_neutrality_fee_cap: 0.005
     delta_neutrality_fee_sensitivity: 200000000
-    delta_neutrality_fee_tax: 0.05
-    trading_fee_notional_size: 0.001
-    trading_fee_counter_collateral: 0.001
     borrow_fee_rate_min_annualized: 0.04
-    liquidity_cooldown_seconds: 3600
     # Set initial borrow fee to 8%
 
   # Currently only used on CI versions of contracts
@@ -98,7 +70,6 @@ markets:
     target_utilization: "0.5"
     funding_rate_sensitivity: 1
     carry_leverage: 15
-    liquidity_cooldown_seconds: 3600
 
   nBTC_USD:
     delta_neutrality_fee_sensitivity: 5000000000
@@ -153,43 +124,29 @@ markets:
     # Starting borrow fee: 0.1
 
   DOT_USD:
-    trading_fee_notional_size: 0.001
-    trading_fee_counter_collateral: 0.001
     funding_rate_sensitivity: 1.5
-    funding_rate_max_annualized: 0.9
     borrow_fee_rate_min_annualized: 0.05
-    liquifunding_delay_seconds: 21600
     target_utilization: 0.5
     borrow_fee_sensitivity: 0.083333333
     delta_neutrality_fee_sensitivity: 100000000
-    delta_neutrality_fee_cap: 0.005
-    delta_neutrality_fee_tax: 0.05
-    liquifunding_delay_fuzz_seconds: 3600
     carry_leverage: 15
-    liquidity_cooldown_seconds: 3600
 
     # Starting borrow fee: 0.1
 
   INJ_USD:
-    trading_fee_notional_size: 0.001
-    trading_fee_counter_collateral: 0.001
     funding_rate_sensitivity: 2
     borrow_fee_rate_min_annualized: 0.08
     target_utilization: 0.5
     borrow_fee_sensitivity: 0.083333333
     delta_neutrality_fee_sensitivity: 100000000
-    delta_neutrality_fee_cap: 0.005
     delta_neutrality_fee_tax: 0.1
     carry_leverage: 15
-    liquidity_cooldown_seconds: 3600
     max_liquidity: !usd
       amount: "250000"
 
     # Starting borrow fee: 0.16
 
   EUR_USDC:
-    trading_fee_notional_size: 0.001
-    trading_fee_counter_collateral: 0.001
     max_leverage: 100
     carry_leverage: 25
     funding_rate_sensitivity: 1
@@ -200,16 +157,10 @@ markets:
     borrow_fee_sensitivity: 0.03333333333
     delta_neutrality_fee_sensitivity: 50000000000
     delta_neutrality_fee_cap: 0.0001
-    delta_neutrality_fee_tax: 0.05
-    liquifunding_delay_seconds: 21600
-    liquifunding_delay_fuzz_seconds: 3600
-    liquidity_cooldown_seconds: 3600
 
     # Starting borrow fee: 0.05
 
   GBP_USDC:
-    trading_fee_notional_size: 0.001
-    trading_fee_counter_collateral: 0.001
     max_leverage: 100
     carry_leverage: 25
     funding_rate_sensitivity: 1
@@ -220,10 +171,6 @@ markets:
     borrow_fee_sensitivity: 0.03333333333
     delta_neutrality_fee_sensitivity: 50000000000
     delta_neutrality_fee_cap: 0.0001
-    delta_neutrality_fee_tax: 0.05
-    liquifunding_delay_seconds: 21600
-    liquifunding_delay_fuzz_seconds: 3600
-    liquidity_cooldown_seconds: 3600
 
     # Starting borrow fee: 0.05
 
@@ -267,34 +214,18 @@ markets:
     # Starting borrow fee: 0.05
 
   BNB_USDC:
-    trading_fee_notional_size: 0.001
-    trading_fee_counter_collateral: 0.001
     funding_rate_sensitivity: 1.5
-    funding_rate_max_annualized: 0.9
     borrow_fee_rate_min_annualized: 0.03
-    liquifunding_delay_seconds: 21600
     target_utilization: 0.5
     borrow_fee_sensitivity: 0.083333333
     delta_neutrality_fee_sensitivity: 300000000
-    delta_neutrality_fee_cap: 0.005
-    delta_neutrality_fee_tax: 0.05
-    liquifunding_delay_fuzz_seconds: 3600
     carry_leverage: 15
-    liquidity_cooldown_seconds: 3600
   BNB_USDT:
-    trading_fee_notional_size: 0.001
-    trading_fee_counter_collateral: 0.001
     funding_rate_sensitivity: 1.5
-    funding_rate_max_annualized: 0.9
     borrow_fee_rate_min_annualized: 0.03
-    liquifunding_delay_seconds: 21600
     target_utilization: 0.5
     borrow_fee_sensitivity: 0.083333333
     delta_neutrality_fee_sensitivity: 300000000
-    delta_neutrality_fee_cap: 0.005
-    delta_neutrality_fee_tax: 0.05
-    liquifunding_delay_fuzz_seconds: 3600
     carry_leverage: 15
-    liquidity_cooldown_seconds: 3600
 
     # Starting borrow fee: 0.05
