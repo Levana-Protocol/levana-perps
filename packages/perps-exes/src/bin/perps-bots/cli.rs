@@ -164,7 +164,7 @@ impl Opt {
         let env_var = format!("LEVANA_BOTS_PHRASE_{wallet_phrase_name}_{wallet_type}");
         let phrase = get_env(&env_var)?;
         let wallet = Wallet::from_phrase(&phrase, address_type)?;
-        log::info!("Wallet address for {wallet_type}: {wallet}");
+        tracing::info!("Wallet address for {wallet_type}: {wallet}");
         Ok(wallet)
     }
 
@@ -182,7 +182,7 @@ impl Opt {
         let env_var = "LEVANA_BOTS_PHRASE_FAUCET";
         let phrase = get_env(env_var)?;
         let wallet = Wallet::from_phrase(&phrase, address_type)?;
-        log::info!("Wallet address for faucet: {wallet}");
+        tracing::info!("Wallet address for faucet: {wallet}");
         Ok(wallet)
     }
 
@@ -191,7 +191,7 @@ impl Opt {
         let env_var = "LEVANA_BOTS_PHRASE_GAS";
         let phrase = get_env(env_var)?;
         let wallet = Wallet::from_phrase(&phrase, address_type)?;
-        log::info!("Wallet address for gas: {wallet}");
+        tracing::info!("Wallet address for gas: {wallet}");
         Ok(wallet)
     }
 
@@ -207,7 +207,7 @@ impl Opt {
         let wallet = seed
             .derive_cosmos_numbered(index.into())
             .for_chain(address_type)?;
-        log::info!("Crank bot wallet: {wallet}");
+        tracing::info!("Crank bot wallet: {wallet}");
         Ok(wallet)
     }
 }

@@ -179,20 +179,20 @@ impl FaucetBotRunner {
                     let txhash = Arc::new(res.txhash);
                     for req in reqs {
                         if let Err(e) = req.tx.send(Ok(txhash.clone())) {
-                            log::warn!("Faucet tapper no longer waiting: {e:?}");
+                            tracing::warn!("Faucet tapper no longer waiting: {e:?}");
                         }
                     }
                     break;
                 }
                 Err(e) => {
-                    log::error!("{e:?}");
+                    tracing::error!("{e:?}");
                     retries += 1;
                     if retries >= 10 {
                         for req in reqs {
                             if let Err(e) = req.tx.send(Err(FaucetTapError::Contract {
                                 inner: e.to_string(),
                             })) {
-                                log::warn!("Faucet tapper no longer waiting: {e:?}");
+                                tracing::warn!("Faucet tapper no longer waiting: {e:?}");
                             }
                         }
                         break;

@@ -346,7 +346,7 @@ impl AppBuilder {
                         skip_delay,
                         message,
                     }) => {
-                        log::info!("{label}: Success! {message}");
+                        tracing::info!("{label}: Success! {message}");
                         {
                             let mut guard = task_status.write().await;
                             let old = &*guard;
@@ -417,7 +417,7 @@ impl AppBuilder {
                         }
                     }
                     Err(err) => {
-                        log::warn!("{label}: Error: {err:?}");
+                        tracing::warn!("{label}: Error: {err:?}");
                         retries += 1;
                         let max_retries = config.retries.unwrap_or(app.config.watcher.retries);
                         // We want to get to first failure quickly so we don't
@@ -598,7 +598,7 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
             let market_start_time = Utc::now();
             let res = self.run_single_market(&app, &factory, market).await;
             let time_used = Utc::now() - market_start_time;
-            log::debug!("Time used for market {}: {time_used}.", market.market_id);
+            tracing::debug!("Time used for market {}: {time_used}.", market.market_id);
             match res {
                 Ok(WatchedTaskOutput {
                     skip_delay,
@@ -671,7 +671,7 @@ impl<T: WatchedTaskPerMarketParallel> WatchedTask for ParallelWatcher<T> {
                 let market_start_time = Utc::now();
                 let res = inner.run_single_market(&app, &factory, &market).await;
                 let time_used = Utc::now() - market_start_time;
-                log::debug!("Time used for market {}: {time_used}.", market.market_id);
+                tracing::debug!("Time used for market {}: {time_used}.", market.market_id);
                 (market, res)
             });
         }

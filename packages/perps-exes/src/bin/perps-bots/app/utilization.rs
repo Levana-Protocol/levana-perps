@@ -106,7 +106,7 @@ async fn single_market(
             })
         }
     } else if util < min_util {
-        log::info!("Low utilization ratio, opening positions.");
+        tracing::info!("Low utilization ratio, opening positions.");
 
         let balance = market
             .get_collateral_balance(&status, worker.wallet.get_address())
