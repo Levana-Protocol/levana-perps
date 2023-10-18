@@ -322,7 +322,10 @@ async fn get_rpc_info(
     })
 }
 
-async fn get_height(node: Arc<String>, client: reqwest::Client) -> Result<(Arc<String>, u64)> {
+pub(crate) async fn get_height(
+    node: Arc<String>,
+    client: reqwest::Client,
+) -> Result<(Arc<String>, u64)> {
     let node_clone = node.clone();
     tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
         let url = if node.ends_with('/') {

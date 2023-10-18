@@ -7,6 +7,7 @@ mod gas_check;
 mod liquidity;
 mod liquidity_transaction;
 mod price;
+mod rpc_health;
 mod stale;
 mod stats;
 mod stats_alert;
@@ -90,6 +91,7 @@ impl AppBuilder {
                 // Launch mainnet tasks
                 let mainnet = inner.clone();
                 self.start_stats_alert(mainnet.clone())?;
+                self.start_rpc_health(mainnet.clone())?;
 
                 // Bug in Osmosis, don't run there
                 match self.app.cosmos.get_network() {

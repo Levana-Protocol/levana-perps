@@ -442,6 +442,8 @@ pub struct WatcherConfig {
     pub ultra_crank: TaskConfig,
     #[serde(default = "defaults::liquidity_transaction_alert")]
     pub liquidity_transaction: TaskConfig,
+    #[serde(default = "defaults::rpc_health")]
+    pub rpc_health: TaskConfig,
 }
 
 impl Default for WatcherConfig {
@@ -543,6 +545,12 @@ impl Default for WatcherConfig {
             liquidity_transaction: TaskConfig {
                 delay: Delay::Constant(120),
                 out_of_date: 180,
+                retries: None,
+                delay_between_retries: None,
+            },
+            rpc_health: TaskConfig {
+                delay: Delay::Constant(300),
+                out_of_date: 500,
                 retries: None,
                 delay_between_retries: None,
             },

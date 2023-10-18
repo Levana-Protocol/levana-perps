@@ -137,6 +137,9 @@ pub(crate) struct MainnetOpt {
     /// List of markets that should be ignored
     #[clap(long, env = "LEVANA_BOTS_IGNORED_MARKETS", value_delimiter = ',')]
     pub(crate) ignored_markets: Vec<MarketId>,
+    /// Used for RPC health checks
+    #[clap(long, env = "LEVANA_BOTS_RPC_ENDPOINT")]
+    pub(crate) rpc_endpoint: String,
 }
 
 impl Opt {

@@ -52,6 +52,8 @@ pub(crate) struct BotConfigMainnet {
     pub(crate) liquidity_transaction: LiquidityTransactionConfig,
     pub(crate) crank_rewards: Address,
     pub(crate) ignored_markets: HashSet<MarketId>,
+    /// Used for checking RPC health, not for making queries
+    pub(crate) rpc_endpoint: Arc<String>,
 }
 
 pub(crate) struct BotConfig {
@@ -217,6 +219,7 @@ impl Opt {
             http_timeout_seconds,
             crank_rewards,
             ignored_markets,
+            rpc_endpoint,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let price_wallet = seed
@@ -245,6 +248,7 @@ impl Opt {
                     },
                     crank_rewards: *crank_rewards,
                     ignored_markets: ignored_markets.iter().cloned().collect(),
+                    rpc_endpoint: Arc::new(rpc_endpoint.clone()),
                 }
                 .into(),
             },
@@ -329,6 +333,7 @@ impl BotConfigMainnet {
             liquidity_transaction: _,
             crank_rewards: _,
             ignored_markets: _,
+            rpc_endpoint: _,
         } = self;
         0
     }

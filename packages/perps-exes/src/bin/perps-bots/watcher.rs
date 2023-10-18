@@ -41,6 +41,7 @@ pub(crate) enum TaskLabel {
     Trader { index: u32 },
     LiqudityTransactionAlert,
     TotalDepositAlert,
+    RpcHealth,
 }
 
 impl TaskLabel {
@@ -60,6 +61,7 @@ impl TaskLabel {
             "balance" => Some(TaskLabel::Balance),
             "liquidity-transaction-alert" => Some(TaskLabel::LiqudityTransactionAlert),
             "total-deposit-alert" => Some(TaskLabel::TotalDepositAlert),
+            "rpc-health" => Some(TaskLabel::RpcHealth),
             // Being lazy, skipping UltraCrank and Trader, they aren't needed
             _ => None,
         }
@@ -205,6 +207,7 @@ impl TaskLabel {
             TaskLabel::StatsAlert => config.stats_alert,
             TaskLabel::LiqudityTransactionAlert => config.liquidity_transaction,
             TaskLabel::TotalDepositAlert => config.liquidity_transaction,
+            TaskLabel::RpcHealth => config.rpc_health,
         }
     }
 
@@ -230,6 +233,7 @@ impl TaskLabel {
             TaskLabel::StatsAlert => false,
             TaskLabel::LiqudityTransactionAlert => false,
             TaskLabel::TotalDepositAlert => false,
+            TaskLabel::RpcHealth => false,
         }
     }
 
@@ -251,6 +255,7 @@ impl TaskLabel {
             TaskLabel::StatsAlert => "stats-alert".into(),
             TaskLabel::LiqudityTransactionAlert => "liquidity-transaction-alert".into(),
             TaskLabel::TotalDepositAlert => "total-deposit-alert".into(),
+            TaskLabel::RpcHealth => "rpc-health".into(),
         }
     }
 }
