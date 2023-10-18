@@ -193,11 +193,11 @@ networks:
       ]
     stATOM_USD:
       feeds: [
-        !stride { denom: "ibc/C140AFD542AE77BD7DCC83F13FDD8C5E5BB8C4929785E6EC2F4C636F98F17901", inverted: false, age_tolerance: 43200 },
+        !stride { denom: "ibc/C140AFD542AE77BD7DCC83F13FDD8C5E5BB8C4929785E6EC2F4C636F98F17901", inverted: false, age_tolerance: 604800 },
         !pyth { key: "ATOM_USD", inverted: false }
       ]
       feeds-usd: [
-        !stride { denom: "ibc/C140AFD542AE77BD7DCC83F13FDD8C5E5BB8C4929785E6EC2F4C636F98F17901", inverted: false, age_tolerance: 43200 },
+        !stride { denom: "ibc/C140AFD542AE77BD7DCC83F13FDD8C5E5BB8C4929785E6EC2F4C636F98F17901", inverted: false, age_tolerance: 604800 },
         !pyth { key: "ATOM_USD", inverted: false }
       ]
   sei-testnet:
@@ -247,11 +247,11 @@ networks:
       ]
     stATOM_USD:
       feeds: [
-        !stride { denom: "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590", inverted: false, age_tolerance: 43200 },
+        !stride { denom: "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590", inverted: false, age_tolerance: 604800 },
         !pyth { key: "ATOM_USD", inverted: false }
       ]
       feeds-usd: [
-        !stride { denom: "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590", inverted: false, age_tolerance: 43200 },
+        !stride { denom: "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590", inverted: false, age_tolerance: 604800 },
         !pyth { key: "ATOM_USD", inverted: false }
       ]
     OSMO_USDC:

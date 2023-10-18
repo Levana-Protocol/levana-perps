@@ -11,12 +11,12 @@ use msg::{
     prelude::MarketExecuteMsg,
 };
 use perps_exes::{
-    config::{MainnetFactories, MarketConfigUpdates},
+    config::{ChainConfig, MainnetFactories, MarketConfigUpdates, PriceConfig},
     contracts::{Factory, MarketInfo},
     prelude::MarketContract,
 };
 
-use crate::{mainnet::strip_nulls, util::add_cosmos_msg};
+use crate::{mainnet::strip_nulls, spot_price_config::get_spot_price_config, util::add_cosmos_msg};
 
 #[derive(clap::Parser)]
 pub(super) struct SyncConfigOpts {
@@ -33,6 +33,11 @@ impl SyncConfigOpts {
 async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) -> Result<()> {
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
+
+    let chain_config = ChainConfig::load(None::<PathBuf>, factory.network)?;
+    let price_config = PriceConfig::load(None::<PathBuf>)?;
+    let oracle = opt.get_oracle_info(&chain_config, &price_config, factory.network)?;
+
     let app = opt.load_app_mainnet(factory.network).await?;
     let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
     let markets = factory.get_markets().await?;
@@ -78,19 +83,21 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
         let mut needed_update = serde_json::Map::new();
 
         for (key, default_value) in default_config {
-            if key == "spot_price" {
-                continue;
-            }
-            let expected_value = expected_config
-                .remove(&key)
-                .with_context(|| format!("Missing key in expected_config: {key}"))?;
-            let expected = if expected_value.is_null() {
-                default_value
+            let expected = if key == "spot_price" {
+                let spot_price_config = get_spot_price_config(&oracle, &price_config, &market_id)?;
+                serde_json::to_value(spot_price_config)?
             } else {
-                if default_value == expected_value {
-                    println!("Unnecessary config update {key} for market {market_id}");
+                let expected_value = expected_config
+                    .remove(&key)
+                    .with_context(|| format!("Missing key in expected_config: {key}"))?;
+                if expected_value.is_null() {
+                    default_value
+                } else {
+                    if default_value == expected_value {
+                        println!("Unnecessary config update {key} for market {market_id}");
+                    }
+                    expected_value
                 }
-                expected_value
             };
             let actual = actual_config.remove(&key).with_context(|| {
                 format!("Missing actual config value {key} for market {}", market_id)
