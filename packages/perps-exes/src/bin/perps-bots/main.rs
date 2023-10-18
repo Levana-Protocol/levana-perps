@@ -26,7 +26,7 @@ fn main_inner() -> Result<()> {
             sentry::ClientOptions {
                 release: sentry::release_name!(),
                 session_mode: sentry::SessionMode::Request,
-                debug: true,
+                debug: false,
                 ..Default::default()
             },
         ))
