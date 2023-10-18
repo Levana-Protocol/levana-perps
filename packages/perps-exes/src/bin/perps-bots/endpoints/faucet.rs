@@ -61,7 +61,7 @@ async fn bot_inner(
                 Ok(true) => inner.faucet_bot.tap(app, recipient, cw20s).await,
                 Ok(false) => Err(FaucetTapError::InvalidCaptcha {}),
                 Err(e) => {
-                    log::error!("Cannot query captcha service: {e:?}");
+                    tracing::error!("Cannot query captcha service: {e:?}");
                     Err(FaucetTapError::CannotQueryCaptcha {})
                 }
             }

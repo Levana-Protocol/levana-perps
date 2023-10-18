@@ -228,7 +228,9 @@ async fn fetch_pyth_prices(
                     }
                 }
             }
-            None => log::error!("Could not convert Pyth publish time to NaiveDateTime, ignoring"),
+            None => {
+                tracing::error!("Could not convert Pyth publish time to NaiveDateTime, ignoring")
+            }
         }
     }
     Ok(())

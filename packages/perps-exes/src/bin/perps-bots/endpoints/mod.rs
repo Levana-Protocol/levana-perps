@@ -39,7 +39,7 @@ impl AppBuilder {
                         .allow_methods([Method::GET, Method::HEAD, Method::POST])
                         .allow_headers([CONTENT_TYPE]),
                 );
-            log::info!("Launching server");
+            tracing::info!("Launching server");
 
             server.serve(router.into_make_service()).await?;
             Err(anyhow::anyhow!("Background task should never complete"))

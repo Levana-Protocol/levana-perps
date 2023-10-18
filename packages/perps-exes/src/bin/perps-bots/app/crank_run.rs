@@ -151,10 +151,10 @@ impl App {
                 .try_with_execs(crank_wallet, &markets, Some(*execs), rewards)
                 .await;
             let crank_time = Utc::now() - crank_start;
-            log::debug!("Crank for {execs} takes {crank_time}");
+            tracing::debug!("Crank for {execs} takes {crank_time}");
             match res {
                 Ok(x) => return Ok(x),
-                Err(e) => log::warn!("Cranking with execs=={execs} failed: {e:?}"),
+                Err(e) => tracing::warn!("Cranking with execs=={execs} failed: {e:?}"),
             }
         }
 
@@ -163,7 +163,7 @@ impl App {
             .try_with_execs(crank_wallet, &markets, None, rewards)
             .await;
         let crank_time = Utc::now() - crank_start;
-        log::debug!("Crank for None takes {crank_time}");
+        tracing::debug!("Crank for None takes {crank_time}");
         res
     }
 

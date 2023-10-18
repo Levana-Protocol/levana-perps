@@ -5,6 +5,8 @@ use cosmos::{Address, AddressType, CosmosNetwork, SeedPhrase, Wallet};
 use cosmwasm_std::Decimal256;
 use perps_exes::{build_version, config::GasAmount};
 use shared::storage::MarketId;
+use tracing::Level;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 #[derive(clap::Parser)]
 #[clap(version = build_version())]
@@ -20,7 +22,7 @@ pub(crate) struct Opt {
     pub(crate) bind: SocketAddr,
     /// Sentry client key
     #[arg(short, long, env = "SENTRY_KEY")]
-    pub(crate) client_key: Option<String>,
+    pub(crate) sentry_dsn: Option<String>,
     /// Override the gRPC URL
     #[clap(long, env = "COSMOS_GRPC")]
     pub(crate) grpc_url: Option<String>,
@@ -143,16 +145,30 @@ pub(crate) struct MainnetOpt {
 }
 
 impl Opt {
-    pub(crate) fn init_logger(&self) {
-        let env = env_logger::Env::default().default_filter_or(if self.verbose {
+    pub(crate) fn init_logger(&self) -> Result<()> {
+        let env_directive = if self.verbose {
             format!(
                 "{}=debug,cosmos=debug,levana=debug,info",
                 env!("CARGO_CRATE_NAME")
             )
+            .parse()?
         } else {
-            "info".to_owned()
-        });
-        env_logger::Builder::from_env(env).init();
+            Level::INFO.into()
+        };
+
+        let subscriber = tracing_subscriber::registry().with(
+            fmt::Layer::default()
+                .and_then(EnvFilter::from_default_env().add_directive(env_directive)),
+        );
+
+        if self.sentry_dsn.is_some() {
+            subscriber.with(sentry_tracing::layer()).init();
+            tracing::info!("Initialized Logging with Sentry tracing");
+        } else {
+            subscriber.init();
+            tracing::info!("Initialized Logging");
+        }
+        Ok(())
     }
 
     pub(crate) fn get_wallet(
@@ -164,7 +180,7 @@ impl Opt {
         let env_var = format!("LEVANA_BOTS_PHRASE_{wallet_phrase_name}_{wallet_type}");
         let phrase = get_env(&env_var)?;
         let wallet = Wallet::from_phrase(&phrase, address_type)?;
-        log::info!("Wallet address for {wallet_type}: {wallet}");
+        tracing::info!("Wallet address for {wallet_type}: {wallet}");
         Ok(wallet)
     }
 
@@ -182,7 +198,7 @@ impl Opt {
         let env_var = "LEVANA_BOTS_PHRASE_FAUCET";
         let phrase = get_env(env_var)?;
         let wallet = Wallet::from_phrase(&phrase, address_type)?;
-        log::info!("Wallet address for faucet: {wallet}");
+        tracing::info!("Wallet address for faucet: {wallet}");
         Ok(wallet)
     }
 
@@ -191,7 +207,7 @@ impl Opt {
         let env_var = "LEVANA_BOTS_PHRASE_GAS";
         let phrase = get_env(env_var)?;
         let wallet = Wallet::from_phrase(&phrase, address_type)?;
-        log::info!("Wallet address for gas: {wallet}");
+        tracing::info!("Wallet address for gas: {wallet}");
         Ok(wallet)
     }
 
@@ -207,7 +223,7 @@ impl Opt {
         let wallet = seed
             .derive_cosmos_numbered(index.into())
             .for_chain(address_type)?;
-        log::info!("Crank bot wallet: {wallet}");
+        tracing::info!("Crank bot wallet: {wallet}");
         Ok(wallet)
     }
 }
