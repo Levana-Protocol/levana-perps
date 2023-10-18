@@ -28,7 +28,7 @@ fn main_inner() -> Result<()> {
                 release: sentry::release_name!(),
                 session_mode: sentry::SessionMode::Application,
                 debug: false,
-		// Have 1% sampling rate at production
+                // Have 1% sampling rate at production
                 traces_sample_rate: 0.01,
                 ..Default::default()
             },
