@@ -47,6 +47,7 @@ pub(crate) async fn go(
     }: LocalDeployOpt,
 ) -> Result<InstantiateResponse> {
     let basic = opt.load_basic_app(network).await?;
+    let wallet = basic.get_wallet()?;
     let config_testnet = ConfigTestnet::load(opt.config_testnet.as_ref())?;
 
     match network {
@@ -63,13 +64,13 @@ pub(crate) async fn go(
     // Deploy a fresh tracker to local
     let cw20_code_id = basic
         .cosmos
-        .store_code_path(&basic.wallet, opt.get_contract_path(CW20))
+        .store_code_path(wallet, opt.get_contract_path(CW20))
         .await?;
     let mut markets = Vec::<InstantiateMarket>::new();
     for market_id in market_id {
         let cw20 = cw20_code_id
             .instantiate(
-                &basic.wallet,
+                wallet,
                 "CW20",
                 vec![],
                 msg::contracts::cw20::entry::InstantiateMsg {
@@ -77,11 +78,11 @@ pub(crate) async fn go(
                     symbol: market_id.get_collateral().to_owned(),
                     decimals: 6,
                     initial_balances: vec![Cw20Coin {
-                        address: basic.wallet.get_address_string(),
+                        address: wallet.get_address_string(),
                         amount: INITIAL_BALANCE_AMOUNT.into(),
                     }],
                     minter: InstantiateMinter {
-                        minter: basic.wallet.get_address_string().into(),
+                        minter: wallet.get_address_string().into(),
                         cap: None,
                     },
                     marketing: None,
@@ -107,7 +108,7 @@ pub(crate) async fn go(
                 ..ConfigUpdate::default()
             },
             spot_price: SpotPriceConfigInit::Manual {
-                admin: basic.wallet.get_address_string().into(),
+                admin: wallet.get_address_string().into(),
             },
         });
     }
@@ -115,19 +116,19 @@ pub(crate) async fn go(
     let ids = ProtocolCodeIds {
         factory_code_id: basic
             .cosmos
-            .store_code_path(&basic.wallet, opt.get_contract_path(FACTORY))
+            .store_code_path(wallet, opt.get_contract_path(FACTORY))
             .await?,
         position_token_code_id: basic
             .cosmos
-            .store_code_path(&basic.wallet, opt.get_contract_path(POSITION_TOKEN))
+            .store_code_path(wallet, opt.get_contract_path(POSITION_TOKEN))
             .await?,
         liquidity_token_code_id: basic
             .cosmos
-            .store_code_path(&basic.wallet, opt.get_contract_path(LIQUIDITY_TOKEN))
+            .store_code_path(wallet, opt.get_contract_path(LIQUIDITY_TOKEN))
             .await?,
         market_code_id: basic
             .cosmos
-            .store_code_path(&basic.wallet, opt.get_contract_path(MARKET))
+            .store_code_path(wallet, opt.get_contract_path(MARKET))
             .await?,
     };
 
@@ -143,7 +144,7 @@ pub(crate) async fn go(
         trading_competition: false,
         faucet_admin: None,
         initial_borrow_fee_rate: "0.01".parse().unwrap(),
-        price_source: crate::app::PriceSourceConfig::Wallet(basic.wallet.get_address()),
+        price_source: crate::app::PriceSourceConfig::Wallet(wallet.get_address()),
     })
     .await?;
 
@@ -158,7 +159,7 @@ pub(crate) async fn go(
             .cosmos
             .make_contract(*market_addr)
             .execute(
-                &basic.wallet,
+                wallet,
                 vec![],
                 msg::contracts::market::entry::ExecuteMsg::SetManualPrice {
                     price: initial_price,

@@ -29,6 +29,7 @@ pub(crate) struct AddMarketOpt {
 impl AddMarketOpt {
     pub(crate) async fn go(self, opt: crate::cli::Opt) -> Result<()> {
         let app = opt.load_app(&self.family).await?;
+        let wallet = app.basic.get_wallet()?;
         let factory = app.tracker.get_factory(&self.family).await?.into_contract();
 
         let chain_config = ChainConfig::load(None::<PathBuf>, app.basic.network)?;
@@ -47,7 +48,7 @@ impl AddMarketOpt {
         };
         instantiate_market
             .add(
-                &app.basic.wallet,
+                wallet,
                 &app.basic.cosmos,
                 &app.config_testnet,
                 add_market_params,

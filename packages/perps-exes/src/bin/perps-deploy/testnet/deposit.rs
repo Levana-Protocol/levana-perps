@@ -20,6 +20,7 @@ pub(crate) struct DepositOpt {
 impl DepositOpt {
     pub(crate) async fn go(self, opt: Opt) -> Result<()> {
         let app = opt.load_app(&self.family).await?;
+        let wallet = app.basic.get_wallet()?;
         let factory = app
             .tracker
             .get_contract_by_family("factory", &self.family, None)
@@ -37,9 +38,7 @@ impl DepositOpt {
         log::info!("Found market address {}", market.market);
         let market = MarketContract::new(market.market);
         let status = market.status().await?;
-        let res = market
-            .deposit(&app.basic.wallet, &status, self.amount)
-            .await?;
+        let res = market.deposit(wallet, &status, self.amount).await?;
         log::info!("Deposited collateral in {}", res.txhash);
 
         Ok(())

@@ -27,6 +27,7 @@ pub(crate) struct MigrateOpt {
 
 pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) -> Result<()> {
     let app = opt.load_app(&family).await?;
+    let wallet = app.basic.get_wallet()?;
 
     let factory_code_id = app.tracker.require_code_by_type(&opt, FACTORY).await?;
     let position_token_code_id = app
@@ -64,7 +65,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
     } else {
         factory
             .migrate(
-                &app.basic.wallet,
+                wallet,
                 factory_code_id.get_code_id(),
                 msg::contracts::factory::entry::MigrateMsg {},
             )
@@ -72,7 +73,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         log::info!("Migrated the factory itself to {}", factory_code_id);
         let res = app
             .tracker
-            .migrate(&app.basic.wallet, factory_code_id.get_code_id(), &factory)
+            .migrate(wallet, factory_code_id.get_code_id(), &factory)
             .await?;
         log::info!("Tracked factory migration in: {}", res.txhash);
     }
@@ -89,7 +90,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
     } else {
         let res = factory
             .execute(
-                &app.basic.wallet,
+                wallet,
                 vec![],
                 msg::contracts::factory::entry::ExecuteMsg::SetLiquidityTokenCodeId {
                     code_id: liquidity_token_code_id.get_code_id().to_string(),
@@ -107,7 +108,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
     } else {
         let res = factory
             .execute(
-                &app.basic.wallet,
+                wallet,
                 vec![],
                 msg::contracts::factory::entry::ExecuteMsg::SetMarketCodeId {
                     code_id: market_code_id.get_code_id().to_string(),
@@ -125,7 +126,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
     } else {
         let res = factory
             .execute(
-                &app.basic.wallet,
+                wallet,
                 vec![],
                 msg::contracts::factory::entry::ExecuteMsg::SetPositionTokenCodeId {
                     code_id: position_token_code_id.get_code_id().to_string(),
@@ -152,7 +153,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         } else {
             market
                 .migrate(
-                    &app.basic.wallet,
+                    wallet,
                     market_code_id.get_code_id(),
                     msg::contracts::market::entry::MigrateMsg {},
                 )
@@ -160,11 +161,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
             log::info!("Market contract for {market_id} migrated");
             match app
                 .tracker
-                .migrate(
-                    &app.basic.wallet,
-                    market_code_id.get_code_id(),
-                    market.get_address(),
-                )
+                .migrate(wallet, market_code_id.get_code_id(), market.get_address())
                 .await
             {
                 Err(e) => log::warn!(
@@ -184,7 +181,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         } else {
             position_token
                 .migrate(
-                    &app.basic.wallet,
+                    wallet,
                     position_token_code_id.get_code_id(),
                     msg::contracts::position_token::entry::MigrateMsg {},
                 )
@@ -193,7 +190,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
             match app
                 .tracker
                 .migrate(
-                    &app.basic.wallet,
+                    wallet,
                     position_token_code_id.get_code_id(),
                     position_token.get_address(),
                 )
@@ -214,7 +211,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                 log::info!("Skipping {kind} liquidity token contract migration for {market_id}");
             } else {
                 lt.migrate(
-                    &app.basic.wallet,
+                    wallet,
                     liquidity_token_code_id.get_code_id(),
                     msg::contracts::position_token::entry::MigrateMsg {},
                 )
@@ -223,7 +220,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                 match app
                     .tracker
                     .migrate(
-                        &app.basic.wallet,
+                        wallet,
                         liquidity_token_code_id.get_code_id(),
                         lt.get_address(),
                     )

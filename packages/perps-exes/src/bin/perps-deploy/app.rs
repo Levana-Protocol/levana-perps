@@ -1,11 +1,14 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{Context, Result};
-use cosmos::{Address, Cosmos, CosmosNetwork, HasAddress, HasAddressType, Wallet};
+use cosmos::{
+    Address, AddressType, Cosmos, CosmosNetwork, HasAddress, HasAddressType, RawWallet, Wallet,
+};
 use msg::{
     contracts::market::spot_price::{PythPriceServiceNetwork, SpotPriceFeed, SpotPriceFeedData},
     prelude::*,
 };
+use once_cell::sync::OnceCell;
 use perps_exes::config::{
     ChainConfig, ChainPythConfig, ChainStrideConfig, ConfigTestnet, DeploymentConfigTestnet,
     MarketPriceFeedConfig, PriceConfig,
@@ -13,10 +16,24 @@ use perps_exes::config::{
 
 use crate::{cli::Opt, faucet::Faucet, tracker::Tracker};
 
+pub(crate) struct LazyWallet(Option<Wallet>);
+
+impl LazyWallet {
+    fn new(raw: Option<RawWallet>, address_type: AddressType) -> Result<Self> {
+        raw.map(|raw| raw.for_chain(address_type))
+            .transpose()
+            .map(LazyWallet)
+    }
+
+    fn get(&self) -> Result<&Wallet> {
+        self.0.as_ref().context("No wallet provided on CLI")
+    }
+}
+
 /// Basic app configuration for talking to a chain
 pub(crate) struct BasicApp {
     pub(crate) cosmos: Cosmos,
-    pub(crate) wallet: Wallet,
+    wallet: LazyWallet,
     pub(crate) chain_config: ChainConfig,
     pub(crate) price_config: PriceConfig,
     pub(crate) network: CosmosNetwork,
@@ -58,7 +75,13 @@ pub(crate) struct OracleMarketPriceFeeds {
 /// Complete app for mainnet
 pub(crate) struct AppMainnet {
     pub(crate) cosmos: Cosmos,
-    pub(crate) wallet: Wallet,
+    wallet: LazyWallet,
+}
+
+impl AppMainnet {
+    pub(crate) fn get_wallet(&self) -> Result<&Wallet> {
+        self.wallet.get()
+    }
 }
 
 impl Opt {
@@ -78,16 +101,13 @@ impl Opt {
         builder.build().await
     }
 
-    fn get_wallet(&self, network: CosmosNetwork) -> Result<Wallet> {
-        self.wallet
-            .clone()
-            .context("No wallet provided on CLI")?
-            .for_chain(network.get_address_type())
+    fn get_lazy_wallet(&self, network: CosmosNetwork) -> Result<LazyWallet> {
+        LazyWallet::new(self.wallet.clone(), network.get_address_type())
     }
 
     pub(crate) async fn load_basic_app(&self, network: CosmosNetwork) -> Result<BasicApp> {
         let cosmos = self.connect(network).await?;
-        let wallet = self.get_wallet(network)?;
+        let wallet = self.get_lazy_wallet(network)?;
         let chain_config = ChainConfig::load(self.config_chain.as_ref(), network)?;
         let price_config = PriceConfig::load(self.config_price.as_ref())?;
 
@@ -246,7 +266,7 @@ impl Opt {
         let price_config = PriceConfig::load(self.config_price.as_ref())?;
         let chain_config = ChainConfig::load(self.config_chain.as_ref(), network)?;
         let cosmos = self.connect(network).await?;
-        let wallet = self.get_wallet(network)?;
+        let wallet = self.get_lazy_wallet(network)?;
 
         Ok(AppMainnet { cosmos, wallet })
     }
@@ -268,5 +288,9 @@ impl BasicApp {
             Tracker::from_contract(self.cosmos.make_contract(tracker)),
             Faucet::from_contract(self.cosmos.make_contract(faucet)),
         ))
+    }
+
+    pub(crate) fn get_wallet(&self) -> Result<&Wallet> {
+        self.wallet.get()
     }
 }
