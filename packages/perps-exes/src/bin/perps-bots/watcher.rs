@@ -334,27 +334,27 @@ impl AppBuilder {
                                     // Was a success, still a success, do nothing
                                     TaskResultValue::Ok(_) => (),
                                     TaskResultValue::Err(err) => {
-                                        sentry::with_scope(
-                                            |scope| scope.set_tag("part-name", title.clone()),
-                                            || {
-                                                sentry::capture_message(
-                                                    &format!("{title} Recovered: {err}"),
-                                                    sentry::Level::Info,
-                                                )
-                                            },
-                                        );
+                                        // sentry::with_scope(
+                                        //     |scope| scope.set_tag("part-name", title.clone()),
+                                        //     || {
+                                        //         sentry::capture_message(
+                                        //             &format!("{title} Recovered: {err}"),
+                                        //             sentry::Level::Info,
+                                        //         )
+                                        //     },
+                                        // );
                                     }
                                     TaskResultValue::NotYetRun => {
                                         // Bot newly started
-                                        sentry::with_scope(
-                                            |scope| scope.set_tag("part-name", title.clone()),
-                                            || {
-                                                sentry::capture_message(
-                                            &format!("{title}: Bot restarted. This piece of the bots is not currently broken"),
-                                            sentry::Level::Info,
-                                        )
-                                            },
-                                        );
+                                        // sentry::with_scope(
+                                        //     |scope| scope.set_tag("part-name", title.clone()),
+                                        //     || {
+                                        //         sentry::capture_message(
+                                        //     &format!("{title}: Bot restarted. This piece of the bots is not currently broken"),
+                                        //     sentry::Level::Info,
+                                        // )
+                                        //     },
+                                        // );
                                     }
                                 }
                             }
@@ -417,36 +417,36 @@ impl AppBuilder {
                                     // Previous state is a different error. Update Sentry.
                                     TaskResultValue::Err(e) => {
                                         // New error occurs.
-                                        sentry::with_scope(
-                                            |scope| scope.set_tag("part-name", title.clone()),
-                                            || {
-                                                sentry::capture_message(
-                                                    &format!("{title}: {new_error_message}"),
-                                                    sentry::Level::Error,
-                                                )
-                                            },
-                                        );
-                                        sentry::with_scope(
-                                            |scope| scope.set_tag("part-name", title.clone()),
-                                            || {
-                                                sentry::capture_message(
-                                                    &format!("{title} May Recover: {e:?}"),
-                                                    sentry::Level::Info,
-                                                )
-                                            },
-                                        );
+                                        // sentry::with_scope(
+                                        //     |scope| scope.set_tag("part-name", title.clone()),
+                                        //     || {
+                                        //         sentry::capture_message(
+                                        //             &format!("{title}: {new_error_message}"),
+                                        //             sentry::Level::Error,
+                                        //         )
+                                        //     },
+                                        // );
+                                        // sentry::with_scope(
+                                        //     |scope| scope.set_tag("part-name", title.clone()),
+                                        //     || {
+                                        //         sentry::capture_message(
+                                        //             &format!("{title} May Recover: {e:?}"),
+                                        //             sentry::Level::Info,
+                                        //         )
+                                        //     },
+                                        // );
                                     }
                                     // Previous state is either unknown (NotYetRun), Ok Update Sentry.
                                     _ => {
-                                        sentry::with_scope(
-                                            |scope| scope.set_tag("part-name", title.clone()),
-                                            || {
-                                                sentry::capture_message(
-                                                    &format!("{title}: {new_error_message}"),
-                                                    sentry::Level::Error,
-                                                )
-                                            },
-                                        );
+                                        // sentry::with_scope(
+                                        //     |scope| scope.set_tag("part-name", title.clone()),
+                                        //     || {
+                                        //         sentry::capture_message(
+                                        //             &format!("{title}: {new_error_message}"),
+                                        //             sentry::Level::Error,
+                                        //         )
+                                        //     },
+                                        // );
                                     }
                                 }
                             }

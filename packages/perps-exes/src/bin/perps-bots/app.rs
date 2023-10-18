@@ -15,8 +15,11 @@ mod types;
 mod ultra_crank;
 mod utilization;
 
+use std::net::SocketAddr;
+
 use anyhow::Result;
 use hyper::server::conn::AddrIncoming;
+use tracing::instrument;
 pub(crate) use types::*;
 
 use crate::config::BotConfigByType;
@@ -26,24 +29,24 @@ use self::gas_check::GasCheckWallet;
 impl AppBuilder {
     pub(crate) async fn start(
         mut self,
-        server: hyper::server::Builder<AddrIncoming>,
+        server: SocketAddr,
     ) -> Result<()> {
-        let family = match &self.app.config.by_type {
-            crate::config::BotConfigByType::Testnet { inner } => inner.contract_family.clone(),
-            crate::config::BotConfigByType::Mainnet { inner } => {
-                format!("Factory address {}", inner.factory)
-            }
-        };
-        sentry::configure_scope(|scope| scope.set_tag("bot-name", family));
+        // let family = match &self.app.config.by_type {
+        //     crate::config::BotConfigByType::Testnet { inner } => inner.contract_family.clone(),
+        //     crate::config::BotConfigByType::Mainnet { inner } => {
+        //         format!("Factory address {}", inner.factory)
+        //     }
+        // };
+        // sentry::configure_scope(|scope| scope.set_tag("bot-name", family));
 
         // Start the tasks that run on all deployments
-        self.start_rest_api(server);
-        self.start_factory_task()?;
-        self.start_crank_bot()?;
-        self.start_price()?;
-        self.track_stale()?;
-        self.track_stats()?;
-        self.track_balance()?;
+        self.start_rest_api(server)?;
+        // self.start_factory_task()?;
+        // self.start_crank_bot()?;
+        // self.start_price()?;
+        // self.track_stale()?;
+        // self.track_stats()?;
+        // self.track_balance()?;
 
         match &self.app.config.by_type {
             // Run tasks that can only run in testnet.
@@ -83,15 +86,15 @@ impl AppBuilder {
             BotConfigByType::Mainnet { inner } => {
                 // Launch mainnet tasks
                 let mainnet = inner.clone();
-                self.start_stats_alert(mainnet.clone())?;
-                self.start_liquidity_transaction_alert(mainnet.clone())?;
-                self.start_total_deposits_alert(mainnet)?;
+                // self.start_stats_alert(mainnet.clone())?;
+                // self.start_liquidity_transaction_alert(mainnet.clone())?;
+                // self.start_total_deposits_alert(mainnet)?;
             }
         }
 
         // Gas task must always be launched last so that it includes all wallets specified above
-        let gas_check = self.gas_check.build(self.app.clone());
-        self.start_gas_task(gas_check)?;
+        // let gas_check = self.gas_check.build(self.app.clone());
+        // self.start_gas_task(gas_check)?;
 
         self.watcher.wait(&self.app).await
     }

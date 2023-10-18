@@ -1,4 +1,5 @@
 use std::collections::{HashMap, VecDeque};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -11,7 +12,9 @@ use cosmos::HasAddressType;
 use cosmos::Wallet;
 use perps_exes::config::GasAmount;
 use reqwest::Client;
+use sentry::ClientInitGuard;
 use tokio::sync::{Mutex, RwLock};
+use tracing::instrument;
 
 use crate::app::factory::{get_factory_info_mainnet, get_factory_info_testnet};
 use crate::cli::Opt;
@@ -72,6 +75,7 @@ pub(crate) struct AppBuilder {
     pub(crate) app: Arc<App>,
     pub(crate) watcher: Watcher,
     pub(crate) gas_check: GasCheckBuilder,
+    pub(crate) sentry_guard: ClientInitGuard,
 }
 
 impl Opt {
@@ -95,7 +99,7 @@ impl Opt {
         builder.build().await
     }
 
-    pub(crate) async fn into_app_builder(self) -> Result<AppBuilder> {
+    pub(crate) async fn into_app_builder(self, sentry_guard: Option<ClientInitGuard>, addr: SocketAddr) -> Result<()> {
         let (config, faucet_bot_runner) = self.get_bot_config()?;
         let client = Client::builder()
             .user_agent("perps-bots")
@@ -149,11 +153,15 @@ impl Opt {
             app,
             watcher: Watcher::default(),
             gas_check: GasCheckBuilder::new(gas_wallet.map(Arc::new)),
+	    sentry_guard: sentry_guard.unwrap(),
         };
-        if let Some(faucet_bot_runner) = faucet_bot_runner {
-            builder.launch_faucet_task(faucet_bot_runner);
-        }
-        Ok(builder)
+
+	let result = builder.start(addr).await;
+        // if let Some(faucet_bot_runner) = faucet_bot_runner {
+        //     builder.launch_faucet_task(faucet_bot_runner);
+        // }
+	Ok(())
+        // result
     }
 }
 

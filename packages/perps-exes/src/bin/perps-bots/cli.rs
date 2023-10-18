@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use cosmos::{Address, AddressType, CosmosNetwork, SeedPhrase, Wallet};
 use cosmwasm_std::Decimal256;
 use perps_exes::{build_version, config::GasAmount};
+use sentry::ClientInitGuard;
 use shared::storage::MarketId;
 use tracing::Level;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
@@ -144,7 +145,7 @@ pub(crate) struct MainnetOpt {
 }
 
 impl Opt {
-    pub(crate) fn init_logger(&self) -> Result<()> {
+    pub(crate) fn init_logger(&self, sentry_guard: &Option<ClientInitGuard>) -> Result<()> {
         let env = if self.verbose {
             format!(
                 "{}=debug,cosmos=debug,levana=debug,info",
@@ -155,27 +156,21 @@ impl Opt {
             Level::INFO.into()
         };
 
-        let sentry_guard = self.client_key.clone().map(|ck| {
-            sentry::init((
-                ck,
-                sentry::ClientOptions {
-                    release: sentry::release_name!(),
-                    // Have it as 1 in prod
-                    traces_sample_rate: 100.0,
-                    session_mode: sentry::SessionMode::Request,
-                    ..Default::default()
-                },
-            ))
-        });
-
         let subscriber = tracing_subscriber::registry()
-            .with(fmt::Layer::default().and_then(EnvFilter::from_default_env().add_directive(env)));
+            .with(fmt::Layer::default().and_then(EnvFilter::from_default_env().add_directive(env)))
+	    .with(sentry_tracing::layer())
+            .init();
 
-        if let Some(_) = sentry_guard {
-            subscriber.with(sentry_tracing::layer()).init()
-        } else {
-            subscriber.init()
-        }
+        // if let Some(_) = sentry_guard {
+        //     subscriber
+        //         .with(sentry_tracing::layer())
+        //         .init();
+        //     tracing::info!("Initialized Logging with Sentry tracing");
+        // } else {
+        //     subscriber.init();
+        //     tracing::info!("Initialized Logging");
+        // }
+
         Ok(())
     }
 

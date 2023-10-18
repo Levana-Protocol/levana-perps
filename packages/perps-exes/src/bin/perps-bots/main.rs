@@ -1,6 +1,10 @@
-use anyhow::{Context, Result};
+use std::net::SocketAddr;
+
+use anyhow::{bail, Context, Result};
 use clap::Parser;
+use cli::Opt;
 use pid1::Pid1Settings;
+use sentry::{IntoDsn, ClientInitGuard};
 
 mod app;
 mod cli;
@@ -10,20 +14,51 @@ mod util;
 pub(crate) mod wallet_manager;
 pub(crate) mod watcher;
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 16)]
-async fn main() -> Result<()> {
-    main_inner().await
+fn main() -> Result<()> {
+    Pid1Settings::new().enable_log(true).launch()?;
+    main_inner()
 }
 
-async fn main_inner() -> Result<()> {
-    Pid1Settings::new().enable_log(true).launch()?;
+fn main_inner() -> Result<()> {
     dotenv::dotenv().ok();
 
     let opt = cli::Opt::parse();
-    opt.init_logger()?;
 
-    let server = axum::Server::try_bind(&opt.bind)
-        .with_context(|| format!("Cannot launch bot HTTP service bound to {}", opt.bind))?;
+    let sentry_guard = if let Some(sentry_dsn) = opt.client_key.clone() {
+        let guard = sentry::init((
+            sentry_dsn,
+            sentry::ClientOptions {
+                release: sentry::release_name!(),
+                // Have it as 0. in prod
+                sample_rate: 1.0,
+                traces_sample_rate: 1.0,
+                session_mode: sentry::SessionMode::Request,
+                debug: true,
+                ..Default::default()
+            },
+        ));
+        Some(guard)
+    } else {
+        None
+    };
 
-    opt.into_app_builder().await?.start(server).await
+    opt.init_logger(&sentry_guard)?;
+
+    let addr = opt.bind.clone();
+
+    tokio_spwan(sentry_guard, addr, opt)
+}
+
+fn tokio_spwan(sentry_guard: Option<ClientInitGuard>, addr: SocketAddr, opt: Opt) -> Result<()> {
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(16)
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            opt.into_app_builder(sentry_guard, addr).await
+            // app.start(addr).await
+
+        })
+        .map_err(anyhow::Error::msg)
 }
