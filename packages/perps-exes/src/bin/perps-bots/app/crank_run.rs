@@ -16,8 +16,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use axum::async_trait;
-use chrono::Utc;
-use cosmos::{Address, HasAddress, TxBuilder, Wallet};
+use cosmos::{HasAddress, TxBuilder, Wallet};
 use msg::prelude::MarketExecuteMsg;
 use perps_exes::prelude::MarketContract;
 
@@ -78,7 +77,7 @@ impl App {
         recv: &CrankReceiver,
     ) -> Result<WatchedTaskOutput> {
         // Wait for up to 20 seconds for new work to appear. If it doesn't, update our status message that no cranking was needed.
-        let crank_needed = match recv.receive_with_timeout().await {
+        let market = match recv.receive_with_timeout().await {
             None => {
                 return Ok(WatchedTaskOutput {
                     // Irrelevant, no delay here
@@ -89,58 +88,42 @@ impl App {
             Some(crank_needed) => crank_needed,
         };
 
-        // NOTE: in theory this approach may end up running needless cranks. The
-        // reason: supposed the crank watcher sees some crank work needs to be
-        // done for market X, triggers the work, and then, before the crank run
-        // completes, it checks again and _still_ sees that work needs to be
-        // done. It will queue up an extra crank, and we'll simply run it. We
-        // could approach this in a few ways, such as clearing any pending
-        // cranks from the queue for the same market after running the crank.
-        // However, we'll start off conservatively and simply run each time. Due
-        // to the delays in place for checking the price and crank workloads and
-        // the lack of a delay here, it should be a rare occurrence. Over time,
-        // we can check if there are a significant number of times that we try
-        // to run a crank from the bots and no work happens. It may be worth
-        // capturing those event logs here and keeping some stats on "useless
-        // cranks performed."
+        let rewards = self
+            .config
+            .get_crank_rewards_wallet()
+            .map(|a| a.get_address_string().into());
 
-        let rewards = self.config.get_crank_rewards_wallet();
+        let mut actual_execs = None;
+
+        // Simulate decreasing numbers of execs until we find one that looks like it will pass.
         for execs in CRANK_EXECS {
-            let crank_start = Utc::now();
-            let res = self
-                .try_with_execs(
+            match TxBuilder::default()
+                .add_execute_message(
+                    market,
                     crank_wallet,
-                    crank_needed,
-                    Some(*execs),
-                    rewards,
-                    &recv.trigger,
-                )
-                .await;
-            let crank_time = Utc::now() - crank_start;
-            tracing::debug!("Crank for {execs} takes {crank_time}");
-            match res {
-                Ok(x) => return Ok(x),
-                Err(e) => tracing::warn!("Cranking with execs=={execs} failed: {e:?}"),
+                    vec![],
+                    MarketExecuteMsg::Crank {
+                        execs: Some(*execs),
+                        rewards: rewards.clone(),
+                    },
+                )?
+                .simulate(&self.cosmos, &[crank_wallet.get_address()])
+                .await
+            {
+                Ok(_) => {
+                    actual_execs = Some(*execs);
+                    break;
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to simulate crank against market {market} with execs {execs}: {e:?}")
+                }
             }
         }
 
-        let crank_start = Utc::now();
-        let res = self
-            .try_with_execs(crank_wallet, crank_needed, None, rewards, &recv.trigger)
-            .await;
-        let crank_time = Utc::now() - crank_start;
-        tracing::debug!("Crank for None takes {crank_time}");
-        res
-    }
-
-    async fn try_with_execs(
-        &self,
-        crank_wallet: &Wallet,
-        market: Address,
-        execs: Option<u32>,
-        rewards: Option<Address>,
-        trigger: &TriggerCrank,
-    ) -> Result<WatchedTaskOutput> {
+        // Now that we've determined how many execs we think will work, now
+        // submit the actual transaction. We separate out in this way to avoid
+        // confusion about whether this fails during simulation or broadcasting,
+        // so during Osmosis epochs we can safely ignore just the broadcasting.
         let mut builder = TxBuilder::default();
 
         builder.add_execute_message_mut(
@@ -148,15 +131,26 @@ impl App {
             crank_wallet,
             vec![],
             MarketExecuteMsg::Crank {
-                execs,
-                rewards: rewards.map(|a| a.get_address_string().into()),
+                execs: actual_execs,
+                rewards,
             },
         )?;
 
-        let txres = builder
+        let txres = match builder
             .sign_and_broadcast(&self.cosmos, crank_wallet)
             .await
-            .with_context(|| format!("Unable to turn crank for market {market}"))?;
+            .with_context(|| format!("Unable to turn crank for market {market}"))
+        {
+            Ok(txres) => txres,
+            Err(e) => {
+                if self.is_osmosis_epoch() {
+                    return Ok(WatchedTaskOutput { skip_delay: false, message: format!("Ignoring crank run error since we think we're in the Osmosis epoch, error: {e:?}")
+                    });
+                } else {
+                    return Err(e);
+                }
+            }
+        };
 
         // Successfully cranked, check if there's more work and, if so, schedule it to be started again
         let more_work = match MarketContract::new(self.cosmos.make_contract(market))
@@ -166,7 +160,7 @@ impl App {
             Ok(status) => match status.next_crank {
                 None => Cow::Borrowed("No additional work found waiting."),
                 Some(work) => {
-                    trigger.trigger_crank(market).await;
+                    recv.trigger.trigger_crank(market).await;
                     format!("Found additional work, scheduling next crank: {work:?}").into()
                 }
             },

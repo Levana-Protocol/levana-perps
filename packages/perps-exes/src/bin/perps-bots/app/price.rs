@@ -345,15 +345,23 @@ async fn update_oracles(
     // those can probably be better handled by not sending those updates
     // instead.
 
-    let res = TxBuilder::default()
+    match TxBuilder::default()
         .add_message(msg)
         .sign_and_broadcast(&app.cosmos, &worker.wallet)
-        .await?;
-
-    Ok(format!(
-        "Prices updated in Pyth oracle contract with txhash {}",
-        res.txhash
-    ))
+        .await
+    {
+        Ok(res) => Ok(format!(
+            "Prices updated in Pyth oracle contract with txhash {}",
+            res.txhash
+        )),
+        Err(e) => {
+            if app.is_osmosis_epoch() {
+                Ok(format!("Unable to update Pyth oracle, but assuming it's because we're in the epoch: {e:?}"))
+            } else {
+                Err(e)
+            }
+        }
+    }
 }
 
 type NeedPriceUpdateInner = (
