@@ -152,6 +152,6 @@ impl App {
         }
 
         let time = Utc::now().naive_utc().time();
-        time.hour() == 17 && time.minute() < 15
+        time.hour() == 17 && time.minute() >= 10 && time.minute() < 25
     }
 }
