@@ -356,6 +356,11 @@ async fn update_oracles(
     ))
 }
 
+type NeedPriceUpdateInner = (
+    Option<PricePoint>,
+    Option<(PriceUpdateReason, NeedsOracleUpdate)>,
+);
+
 impl App {
     /// Does the market need a price update?
     #[tracing::instrument(skip_all)]
@@ -364,10 +369,7 @@ impl App {
         market: &Market,
         oracle_price: PriceBaseInQuote,
         last_successful_price_publish_time: Option<DateTime<Utc>>,
-    ) -> Result<(
-        Option<PricePoint>,
-        Option<(PriceUpdateReason, NeedsOracleUpdate)>,
-    )> {
+    ) -> Result<NeedPriceUpdateInner> {
         let market_contract = &market.market;
         let market_price: PricePoint = match market_contract.current_price().await {
             Ok(price) => price,
