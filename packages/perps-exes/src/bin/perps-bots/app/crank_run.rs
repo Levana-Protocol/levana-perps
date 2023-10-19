@@ -9,6 +9,9 @@
 //! 6. Crank update will watch its channel for work items and immediately jump into sending a transaction to up to X markets at once (I'm thinking 3 due to gas concerns)
 //! 7. The goal here is to get info as quickly as possible that work needs to be done, as opposed to needing to loop through all the markets. I think a big contributing factor last week is the sheer number of markets we have on Osmosis now, it takes a while to process them serially
 
+mod trigger_crank;
+
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -16,37 +19,20 @@ use axum::async_trait;
 use chrono::Utc;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
 use msg::prelude::MarketExecuteMsg;
+use perps_exes::prelude::MarketContract;
 
 use crate::config::BotConfigByType;
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
+use self::trigger_crank::CrankReceiver;
+
 use super::gas_check::GasCheckWallet;
 use super::{App, AppBuilder};
-
-pub(crate) struct CrankNeeded {
-    market_contract: Address,
-}
-
-#[derive(Clone)]
-pub(crate) struct TriggerCrank {
-    send: Arc<tokio::sync::mpsc::Sender<CrankNeeded>>,
-}
-
-impl TriggerCrank {
-    #[tracing::instrument(skip_all)]
-    pub(crate) async fn trigger_crank(&self, contract: Address) -> Result<()> {
-        self.send
-            .send(CrankNeeded {
-                market_contract: contract,
-            })
-            .await
-            .context("Failed to trigger a crank, this indicates a code bug in crank_run")
-    }
-}
+pub(crate) use trigger_crank::TriggerCrank;
 
 struct Worker {
     crank_wallet: Wallet,
-    recv: tokio::sync::mpsc::Receiver<CrankNeeded>,
+    recv: CrankReceiver,
 }
 
 /// Start the background thread to turn the crank on the crank bots.
@@ -65,13 +51,12 @@ impl AppBuilder {
                 )?,
             }
 
-            let (send, recv) = tokio::sync::mpsc::channel(50);
+            let recv = CrankReceiver::new();
+            let send = recv.trigger.clone();
 
             let worker = Worker { crank_wallet, recv };
             self.watch_periodic(crate::watcher::TaskLabel::CrankRun, worker)?;
-            Ok(Some(TriggerCrank {
-                send: Arc::new(send),
-            }))
+            Ok(Some(send))
         } else {
             Ok(None)
         }
@@ -91,28 +76,18 @@ impl App {
     async fn crank(
         &self,
         crank_wallet: &Wallet,
-        recv: &mut tokio::sync::mpsc::Receiver<CrankNeeded>,
+        recv: &CrankReceiver,
     ) -> Result<WatchedTaskOutput> {
-        const MAX_WAIT_SECONDS: u64 = 20;
-
         // Wait for up to 20 seconds for new work to appear. If it doesn't, update our status message that no cranking was needed.
-        let crank_needed = tokio::time::timeout(
-            tokio::time::Duration::from_secs(MAX_WAIT_SECONDS),
-            recv.recv(),
-        )
-        .await;
-        let crank_needed = match crank_needed {
-            Err(_) => {
+        let crank_needed = match recv.receive_with_timeout().await {
+            None => {
                 return Ok(WatchedTaskOutput {
                     // Irrelevant, no delay here
                     skip_delay: false,
                     message: "No crank work needed".to_owned(),
                 });
             }
-            Ok(None) => anyhow::bail!(
-                "Impossible None returned from crank needed queue, this indicates a code bug"
-            ),
-            Ok(Some(crank_needed)) => crank_needed,
+            Some(crank_needed) => crank_needed,
         };
 
         // NOTE: in theory this approach may end up running needless cranks. The
@@ -136,9 +111,10 @@ impl App {
             let res = self
                 .try_with_execs(
                     crank_wallet,
-                    crank_needed.market_contract,
+                    crank_needed,
                     Some(*execs),
                     rewards,
+                    &recv.trigger,
                 )
                 .await;
             let crank_time = Utc::now() - crank_start;
@@ -151,7 +127,7 @@ impl App {
 
         let crank_start = Utc::now();
         let res = self
-            .try_with_execs(crank_wallet, crank_needed.market_contract, None, rewards)
+            .try_with_execs(crank_wallet, crank_needed, None, rewards, &recv.trigger)
             .await;
         let crank_time = Utc::now() - crank_start;
         tracing::debug!("Crank for None takes {crank_time}");
@@ -164,6 +140,7 @@ impl App {
         market: Address,
         execs: Option<u32>,
         rewards: Option<Address>,
+        trigger: &TriggerCrank,
     ) -> Result<WatchedTaskOutput> {
         let mut builder = TxBuilder::default();
 
@@ -181,11 +158,27 @@ impl App {
             .sign_and_broadcast(&self.cosmos, crank_wallet)
             .await
             .with_context(|| format!("Unable to turn crank for market {market}"))?;
+
+        // Successfully cranked, check if there's more work and, if so, schedule it to be started again
+        let more_work = match MarketContract::new(self.cosmos.make_contract(market))
+            .status()
+            .await
+        {
+            Ok(status) => match status.next_crank {
+                None => Cow::Borrowed("No additional work found waiting."),
+                Some(work) => {
+                    trigger.trigger_crank(market).await;
+                    format!("Found additional work, scheduling next crank: {work:?}").into()
+                }
+            },
+            Err(e) => format!("Failed getting status to check for new crank work: {e:?}.").into(),
+        };
+
         Ok(WatchedTaskOutput {
             skip_delay: true,
             message: format!(
-                "Successfully turned the crank for market {market} in transaction {}",
-                txres.txhash
+                "Successfully turned the crank for market {market} in transaction {}. {}",
+                txres.txhash, more_work
             ),
         })
     }

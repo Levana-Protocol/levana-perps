@@ -158,7 +158,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
             successes.push("Warning, did not find a Pyth publish timestamp".to_owned());
         }
         for market in markets_to_update {
-            worker.trigger_crank.trigger_crank(market).await?;
+            worker.trigger_crank.trigger_crank(market).await;
         }
     }
 
