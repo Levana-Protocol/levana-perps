@@ -64,7 +64,7 @@ deployments:
     liquidity: true
     utilization: true
     balance: true
-    traders: 3
+    traders: 0
     default-market-ids:
       - ATOM_USD
       - BTC_USD
@@ -76,7 +76,7 @@ deployments:
     liquidity: true
     utilization: true
     balance: true
-    traders: 3
+    traders: 0
     default-market-ids:
       - ATOM_USD
       - BTC_USD
@@ -88,7 +88,7 @@ deployments:
     liquidity: true
     utilization: true
     balance: true
-    traders: 3
+    traders: 0
     default-market-ids:
       - nBTC_USD
       - stATOM_USD
@@ -154,7 +154,7 @@ overrides:
     liquidity: true
     utilization: true
     balance: true
-    traders: 3
+    traders: 0
     default-market-ids:
       - ATOM_USD
       - BTC_USD
@@ -186,7 +186,7 @@ overrides:
     liquidity: true
     utilization: true
     balance: true
-    traders: 3
+    traders: 0
     default-market-ids:
       - ATOM_USD
       - OSMO_USDC
@@ -204,6 +204,6 @@ overrides:
     liquidity: true
     utilization: true
     balance: true
-    traders: 1
+    traders: 0
     default-market-ids:
       - ETH_USD
