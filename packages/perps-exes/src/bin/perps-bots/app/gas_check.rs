@@ -181,10 +181,23 @@ impl GasCheck {
                 }
             }
 
-            match builder
-                .sign_and_broadcast(&self.app.cosmos, &gas_wallet)
-                .await
-            {
+            let res = async {
+                let simres = builder
+                    .simulate(&self.app.cosmos, &[gas_wallet.get_address()])
+                    .await?;
+
+                // There's a bug in Cosmos where simulating gas for transfering
+                // funds is always underestimated. We override the gas
+                // multiplier here in particular to avoid bumping the gas costs
+                // for the rest of the bot system.
+                let gas_to_request = simres.gas_used * 16 / 10;
+                builder
+                    .sign_and_broadcast_with_gas(&self.app.cosmos, &gas_wallet, gas_to_request)
+                    .await
+            }
+            .await;
+
+            match res {
                 Err(e) => {
                     tracing::error!("Error filling up gas: {e:?}");
                     errors.push(format!("{e:?}"))
