@@ -3576,7 +3576,6 @@ dependencies = [
  "reqwest",
  "rustls 0.21.7",
  "sentry-core",
- "sentry-tower",
  "sentry-tracing",
  "tokio",
  "ureq",
@@ -3594,17 +3593,6 @@ dependencies = [
  "sentry-types",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "sentry-tower"
-version = "0.31.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ffe3ab7bf7f65c9f8ccd20aa136ce5b2140aa6d6a11339e823cd43a7d694a9e"
-dependencies = [
- "sentry-core",
- "tower-layer",
- "tower-service",
 ]
 
 [[package]]

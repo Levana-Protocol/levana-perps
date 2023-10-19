@@ -84,6 +84,7 @@ impl WatchedTask for Worker {
     }
 }
 
+#[tracing::instrument(skip_all)]
 async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedTaskOutput> {
     let factory = app.get_factory_info().await;
     let mut successes = vec![];
@@ -178,6 +179,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
     }
 }
 
+#[tracing::instrument(skip_all)]
 async fn check_market_needs_price_update(
     app: &App,
     offchain_price_data: Arc<OffchainPriceData>,
@@ -301,6 +303,7 @@ async fn update_oracles(
 
 impl App {
     /// Does the market need a price update?
+    #[tracing::instrument(skip_all)]
     async fn needs_price_update(
         &self,
         market: &Market,

@@ -20,18 +20,20 @@ fn main_inner() -> Result<()> {
 
     let opt = cli::Opt::parse();
 
+    opt.init_logger()?;
     let _guard = opt.sentry_dsn.clone().map(|sentry_dsn| {
         sentry::init((
             sentry_dsn,
             sentry::ClientOptions {
                 release: sentry::release_name!(),
-                session_mode: sentry::SessionMode::Request,
+                session_mode: sentry::SessionMode::Application,
                 debug: false,
+                // Have 1% sampling rate at production
+                traces_sample_rate: 0.01,
                 ..Default::default()
             },
         ))
     });
-    opt.init_logger()?;
 
     // We do not use tokio macro because of this:
     // https://docs.sentry.io/platforms/rust/#async-main-function
