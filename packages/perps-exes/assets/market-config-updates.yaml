@@ -142,8 +142,6 @@ markets:
     delta_neutrality_fee_sensitivity: 100000000
     delta_neutrality_fee_tax: 0.1
     carry_leverage: 15
-    max_liquidity: !usd
-      amount: "250000"
 
     # Starting borrow fee: 0.16
 
