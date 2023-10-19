@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Timelike, Utc};
 use cosmos::{Address, HasAddress};
 use dashmap::DashMap;
 use msg::prelude::*;
@@ -45,11 +45,11 @@ struct StaleMarket {
 impl WatchedTaskPerMarketParallel for Stale {
     async fn run_single_market(
         self: Arc<Self>,
-        _app: &App,
+        app: &App,
         _factory: &FactoryInfo,
         market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        self.check_stale_single(&market.market)
+        self.check_stale_single(&market.market, app)
             .await
             .map(|message| WatchedTaskOutput {
                 skip_delay: false,
@@ -59,7 +59,7 @@ impl WatchedTaskPerMarketParallel for Stale {
 }
 
 impl Stale {
-    async fn check_stale_single(&self, market: &MarketContract) -> Result<String> {
+    async fn check_stale_single(&self, market: &MarketContract, app: &App) -> Result<String> {
         let status = market.status().await?;
         let last_crank_completed = status
             .last_crank_completed
@@ -92,10 +92,14 @@ impl Stale {
         } else {
             let age = Utc::now().signed_duration_since(last_crank_completed);
             if age > chrono::Duration::seconds(MAX_ALLOWED_CRANK_AGE_SECS) {
-                Err(mk_message(&format!(
+                if app.is_osmosis_epoch() {
+                    Ok(mk_message(&format!("Last crank is too old (not run since {last_crank_completed}, age is {age}), but we think we're in an Osmosis epoch so ignoring")).to_string())
+                } else {
+                    Err(mk_message(&format!(
                     "Crank has not been run since {last_crank_completed}, age of {age} is too high"
                 ))
-                .to_anyhow())
+                    .to_anyhow())
+                }
             } else {
                 Ok(mk_message("Protocol is neither stale nor congested").to_string())
             }
@@ -136,5 +140,18 @@ impl Display for Msg<'_> {
 impl Msg<'_> {
     fn to_anyhow(&self) -> anyhow::Error {
         anyhow!("{}", self)
+    }
+}
+
+impl App {
+    /// Do we think we're in the middle of an Osmosis epoch?
+    pub(crate) fn is_osmosis_epoch(&self) -> bool {
+        match self.cosmos.get_network() {
+            cosmos::CosmosNetwork::OsmosisMainnet => (),
+            _ => return false,
+        }
+
+        let time = Utc::now().naive_utc().time();
+        time.hour() == 17 && time.minute() < 15
     }
 }
