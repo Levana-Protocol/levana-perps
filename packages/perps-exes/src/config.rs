@@ -251,8 +251,9 @@ pub struct LiquidityBounds {
 #[derive(serde::Deserialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct DeploymentConfigTestnet {
+    /// How many crank run wallets to set up
     #[serde(default)]
-    pub crank: bool,
+    pub crank: u32,
     /// How many ultracrank wallets to set up
     #[serde(default)]
     pub ultra_crank: u32,

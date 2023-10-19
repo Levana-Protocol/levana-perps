@@ -52,6 +52,12 @@ impl AppBuilder {
             self.start_crank_watch(trigger_crank)?;
         }
 
+        self.alert_on_low_gas(
+            self.get_gas_wallet_address(),
+            GasCheckWallet::GasWallet,
+            self.app.config.min_gas_in_gas_wallet,
+        )?;
+
         match &self.app.config.by_type {
             // Run tasks that can only run in testnet.
             BotConfigByType::Testnet { inner } => {
@@ -60,22 +66,14 @@ impl AppBuilder {
 
                 // Establish some gas checks
                 let faucet_bot_address = inner.faucet_bot.get_wallet_address();
-                self.refill_gas(&inner, faucet_bot_address, GasCheckWallet::FaucetBot)?;
+                self.refill_gas(faucet_bot_address, GasCheckWallet::FaucetBot)?;
 
                 self.alert_on_low_gas(
                     inner.faucet,
                     GasCheckWallet::FaucetContract,
                     inner.min_gas_in_faucet,
                 )?;
-                if let Some(gas_wallet) = self.get_gas_wallet_address() {
-                    self.alert_on_low_gas(
-                        gas_wallet,
-                        GasCheckWallet::GasWallet,
-                        inner.min_gas_in_gas_wallet,
-                    )?;
-                }
                 self.refill_gas(
-                    &inner,
                     inner.wallet_manager.get_minter_address(),
                     GasCheckWallet::WalletManager,
                 )?;

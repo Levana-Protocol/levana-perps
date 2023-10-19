@@ -60,7 +60,7 @@ async fn check_market(
 
     trigger_crank
         .trigger_crank(market.market.get_address())
-        .await?;
+        .await;
 
     let message = match work {
         CrankReason::WorkAvailable(work) => {

@@ -18,7 +18,6 @@ use shared::storage::MarketId;
 use tokio::task::JoinSet;
 
 use crate::{
-    config::BotConfigByType,
     util::{
         markets::Market,
         oracle::{get_latest_price, OffchainPriceData},
@@ -50,19 +49,7 @@ impl Worker {
 impl AppBuilder {
     pub(super) fn start_price(&mut self, trigger_crank: TriggerCrank) -> Result<()> {
         if let Some(price_wallet) = self.app.config.price_wallet.clone() {
-            match &self.app.config.by_type {
-                BotConfigByType::Testnet { inner } => {
-                    let inner = inner.clone();
-                    self.refill_gas(&inner, *price_wallet.address(), GasCheckWallet::Price)?;
-                }
-                BotConfigByType::Mainnet { inner } => {
-                    self.alert_on_low_gas(
-                        *price_wallet.address(),
-                        GasCheckWallet::Price,
-                        inner.min_gas_price,
-                    )?;
-                }
-            }
+            self.refill_gas(price_wallet.get_address(), GasCheckWallet::Price)?;
             self.watch_periodic(
                 crate::watcher::TaskLabel::Price,
                 Worker {
@@ -158,7 +145,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
             successes.push("Warning, did not find a Pyth publish timestamp".to_owned());
         }
         for market in markets_to_update {
-            worker.trigger_crank.trigger_crank(market).await?;
+            worker.trigger_crank.trigger_crank(market).await;
         }
     }
 

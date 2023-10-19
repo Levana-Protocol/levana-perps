@@ -5,10 +5,9 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use chrono::DateTime;
 use chrono::Utc;
-use cosmos::Address;
 use cosmos::Cosmos;
-use cosmos::HasAddressType;
 use cosmos::Wallet;
+use cosmos::{Address, HasAddress};
 use perps_exes::config::GasAmount;
 use reqwest::Client;
 use tokio::sync::RwLock;
@@ -101,13 +100,6 @@ impl Opt {
             .build()?;
         let cosmos = self.make_cosmos(&config).await?;
 
-        let gas_wallet = match &self.sub {
-            crate::cli::Sub::Testnet { .. } => {
-                Some(self.get_gas_wallet(cosmos.get_address_type())?)
-            }
-            crate::cli::Sub::Mainnet { .. } => None,
-        };
-
         let (factory, frontend_info_testnet) = match &config.by_type {
             BotConfigByType::Testnet { inner } => {
                 let (_, factory, frontend) = get_factory_info_testnet(
@@ -143,9 +135,9 @@ impl Opt {
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {
+            gas_check: GasCheckBuilder::new(app.config.gas_wallet.clone()),
             app,
             watcher: Watcher::default(),
-            gas_check: GasCheckBuilder::new(gas_wallet.map(Arc::new)),
         };
         if let Some(faucet_bot_runner) = faucet_bot_runner {
             builder.launch_faucet_task(faucet_bot_runner);
@@ -158,12 +150,11 @@ impl AppBuilder {
     /// Track and refill gas to the default gas level
     pub(crate) fn refill_gas(
         &mut self,
-        testnet: &BotConfigTestnet,
         address: Address,
         wallet_name: GasCheckWallet,
     ) -> Result<()> {
         self.gas_check
-            .add(address, wallet_name, testnet.min_gas, true)
+            .add(address, wallet_name, self.app.config.min_gas, true)
     }
 
     pub(crate) fn alert_on_low_gas(
@@ -175,8 +166,8 @@ impl AppBuilder {
         self.gas_check.add(address, wallet_name, min_gas, false)
     }
 
-    pub(crate) fn get_gas_wallet_address(&self) -> Option<Address> {
-        self.gas_check.get_wallet_address()
+    pub(crate) fn get_gas_wallet_address(&self) -> Address {
+        self.app.config.gas_wallet.get_address()
     }
 
     /// Get a wallet from the wallet manager and track its gas funds.
@@ -186,7 +177,7 @@ impl AppBuilder {
         desc: ManagedWallet,
     ) -> Result<Wallet> {
         let wallet = testnet.wallet_manager.get_wallet(desc)?;
-        self.refill_gas(testnet, *wallet.address(), GasCheckWallet::Managed(desc))?;
+        self.refill_gas(*wallet.address(), GasCheckWallet::Managed(desc))?;
         Ok(wallet)
     }
 }

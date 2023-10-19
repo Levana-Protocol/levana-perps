@@ -60,7 +60,7 @@ deployments:
   beta:
     wallet-manager-address: osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k
     price: true
-    crank: true
+    crank: 4
     liquidity: true
     utilization: true
     balance: true
@@ -72,7 +72,7 @@ deployments:
     wallet-manager-address: osmo1lkc7lnq204m4yeydcdg94stkm50jjyglh7ucel
     dev-settings: true
     price: true
-    crank: true
+    crank: 4
     liquidity: true
     utilization: true
     balance: true
@@ -84,7 +84,7 @@ deployments:
     wallet-manager-address: osmo1ghgpnmxgt6xz463423hhnx8zp99dwt563wnllv
     dev-settings: true
     price: true
-    crank: true
+    crank: 4
     liquidity: true
     utilization: true
     balance: true
@@ -102,7 +102,7 @@ deployments:
     wallet-manager-address: levana19ta8kepflecc7n2rdruduj9ydt72z2xy0gl5e9
     dev-settings: true
     price: true
-    crank: true
+    crank: 4
     liquidity: false
     utilization: false
     balance: false
@@ -117,7 +117,7 @@ deployments:
     wallet-manager-address: levana1ep4uavfsyw5dp7ymtkpvj8qm4mc8ellph9408d
     dev-settings: true
     price: false
-    crank: true
+    crank: 4
     ignore-stale: true
     default-market-ids:
       - ATOM_USD
@@ -130,7 +130,7 @@ overrides:
     wallet-manager-address: osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k
     price: true
     ultra-crank: 2
-    crank: true
+    crank: 4
     liquidity: true
     utilization: true
     balance: true
@@ -150,7 +150,7 @@ overrides:
     wallet-manager-address: osmo1lkc7lnq204m4yeydcdg94stkm50jjyglh7ucel
     dev-settings: true
     price: true
-    crank: true
+    crank: 4
     liquidity: true
     utilization: true
     balance: true
@@ -166,7 +166,7 @@ overrides:
     wallet-manager-address: levana19ta8kepflecc7n2rdruduj9ydt72z2xy0gl5e9
     dev-settings: true
     price: true
-    crank: true
+    crank: 4
     liquidity: false
     utilization: false
     balance: false
@@ -182,7 +182,7 @@ overrides:
     wallet-manager-address: osmo1ghgpnmxgt6xz463423hhnx8zp99dwt563wnllv
     dev-settings: true
     price: true
-    crank: true
+    crank: 4
     liquidity: true
     utilization: true
     balance: true
@@ -200,7 +200,7 @@ overrides:
     wallet-manager-address: osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k
     price: true
     ultra-crank: 0
-    crank: true
+    crank: 4
     liquidity: true
     utilization: true
     balance: true

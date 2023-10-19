@@ -28,7 +28,7 @@ pub(crate) enum TaskLabel {
     GetFactory,
     Stale,
     CrankWatch,
-    CrankRun,
+    CrankRun { index: usize },
     Price,
     TrackBalance,
     Stats,
@@ -50,7 +50,6 @@ impl TaskLabel {
             "get-factory" => Some(TaskLabel::GetFactory),
             "stale" => Some(TaskLabel::Stale),
             "crank-watch" => Some(TaskLabel::CrankWatch),
-            "crank-run" => Some(TaskLabel::CrankRun),
             "price" => Some(TaskLabel::Price),
             "track-balance" => Some(TaskLabel::TrackBalance),
             "stats" => Some(TaskLabel::Stats),
@@ -62,8 +61,12 @@ impl TaskLabel {
             "liquidity-transaction-alert" => Some(TaskLabel::LiqudityTransactionAlert),
             "total-deposit-alert" => Some(TaskLabel::TotalDepositAlert),
             "rpc-health" => Some(TaskLabel::RpcHealth),
-            // Being lazy, skipping UltraCrank and Trader, they aren't needed
-            _ => None,
+            _ => {
+                // Being lazy, skipping UltraCrank and Trader, they aren't needed
+                let index = s.strip_prefix("crank-run-")?;
+                let index = index.parse().ok()?;
+                Some(TaskLabel::CrankRun { index })
+            }
         }
     }
 }
@@ -73,6 +76,7 @@ impl Display for TaskLabel {
         match self {
             TaskLabel::Trader { index } => write!(f, "Trader #{index}"),
             TaskLabel::UltraCrank { index } => write!(f, "Ultra crank #{index}"),
+            TaskLabel::CrankRun { index } => write!(f, "Crank run #{index}"),
             x => write!(f, "{x:?}"),
         }
     }
@@ -200,7 +204,7 @@ impl TaskLabel {
             TaskLabel::Utilization => config.utilization,
             TaskLabel::TrackBalance => config.track_balance,
             TaskLabel::CrankWatch => config.crank_watch,
-            TaskLabel::CrankRun => config.crank_run,
+            TaskLabel::CrankRun { index: _ } => config.crank_run,
             TaskLabel::GetFactory => config.get_factory,
             TaskLabel::Price => config.price,
             TaskLabel::Stats => config.stats,
@@ -219,7 +223,7 @@ impl TaskLabel {
         match self {
             TaskLabel::GetFactory => true,
             TaskLabel::CrankWatch => true,
-            TaskLabel::CrankRun => true,
+            TaskLabel::CrankRun { index: _ } => true,
             TaskLabel::Price => true,
             TaskLabel::TrackBalance => false,
             TaskLabel::GasCheck => false,
@@ -241,7 +245,7 @@ impl TaskLabel {
         match self {
             TaskLabel::GetFactory => "get-factory".into(),
             TaskLabel::CrankWatch => "crank-watch".into(),
-            TaskLabel::CrankRun => "crank-run".into(),
+            TaskLabel::CrankRun { index } => format!("crank-run-{index}").into(),
             TaskLabel::Price => "price".into(),
             TaskLabel::TrackBalance => "track-balance".into(),
             TaskLabel::GasCheck => "gas-check".into(),

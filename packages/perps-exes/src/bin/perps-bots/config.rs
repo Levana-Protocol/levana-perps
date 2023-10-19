@@ -26,9 +26,7 @@ pub(crate) struct BotConfigTestnet {
     pub(crate) faucet: Address,
     pub(crate) price_api: String,
     pub(crate) contract_family: String,
-    pub(crate) min_gas: GasAmount,
     pub(crate) min_gas_in_faucet: GasAmount,
-    pub(crate) min_gas_in_gas_wallet: GasAmount,
     pub(crate) explorer: String,
     pub(crate) ultra_crank_wallets: Vec<Wallet>,
     pub(crate) liquidity_config: Option<LiquidityConfig>,
@@ -45,8 +43,6 @@ pub(crate) struct BotConfigTestnet {
 
 pub(crate) struct BotConfigMainnet {
     pub(crate) factory: Address,
-    pub(crate) min_gas_crank: GasAmount,
-    pub(crate) min_gas_price: GasAmount,
     pub(crate) low_util_ratio: Decimal256,
     pub(crate) high_util_ratio: Decimal256,
     pub(crate) liquidity_transaction: LiquidityTransactionConfig,
@@ -60,7 +56,7 @@ pub(crate) struct BotConfig {
     pub(crate) by_type: BotConfigByType,
     pub(crate) network: CosmosNetwork,
     pub(crate) price_wallet: Option<Arc<Wallet>>,
-    pub(crate) crank_wallet: Option<Wallet>,
+    pub(crate) crank_wallets: Vec<Wallet>,
     pub(crate) watcher: WatcherConfig,
     pub(crate) gas_multiplier: Option<f64>,
     pub(crate) max_price_age_secs: u32,
@@ -68,6 +64,12 @@ pub(crate) struct BotConfig {
     pub(crate) max_allowed_price_delta: Decimal256,
     pub(crate) gas_decimals: GasDecimals,
     pub(crate) http_timeout_seconds: u32,
+    /// Default minimum gas amount
+    pub(crate) min_gas: GasAmount,
+    /// The amount of gas in the gas wallet used to top off other wallets
+    pub(crate) min_gas_in_gas_wallet: GasAmount,
+    /// Wallet used to refill gas for other wallets
+    pub(crate) gas_wallet: Arc<Wallet>,
 }
 
 impl BotConfig {
@@ -128,9 +130,7 @@ impl Opt {
             faucet,
             price_api: config.price_api.clone(),
             contract_family: testnet.deployment.clone(),
-            min_gas: partial.min_gas,
             min_gas_in_faucet: partial.min_gas_in_faucet,
-            min_gas_in_gas_wallet: partial.min_gas_in_gas_wallet,
             explorer: explorer
                 .with_context(|| format!("No explorer found for network {network}"))?,
             ultra_crank_wallets: (1..=partial.ultra_crank)
@@ -167,16 +167,17 @@ impl Opt {
                 .filter(|s| !s.is_empty())
                 .cloned(),
         };
+        let gas_wallet = Arc::new(self.get_gas_wallet(network.get_address_type())?);
         let config = BotConfig {
             by_type: BotConfigByType::Testnet {
                 inner: Arc::new(testnet),
             },
             network,
-            crank_wallet: if partial.crank {
-                Some(self.get_crank_wallet(network.get_address_type(), &wallet_phrase_name, 0)?)
-            } else {
-                None
-            },
+            crank_wallets: (0..partial.crank)
+                .map(|idx| {
+                    self.get_crank_wallet(network.get_address_type(), &wallet_phrase_name, idx)
+                })
+                .collect::<Result<_>>()?,
             price_wallet: if partial.price {
                 Some(Arc::new(self.get_wallet(
                     network.get_address_type(),
@@ -193,6 +194,9 @@ impl Opt {
             max_allowed_price_delta: partial.max_allowed_price_delta,
             gas_decimals,
             http_timeout_seconds,
+            min_gas: partial.min_gas,
+            min_gas_in_gas_wallet: partial.min_gas_in_gas_wallet,
+            gas_wallet,
         };
 
         Ok((config, Some(faucet_bot_runner)))
@@ -205,8 +209,8 @@ impl Opt {
             seed,
             network,
             gas_multiplier,
-            min_gas_crank,
-            min_gas_price,
+            min_gas,
+            min_gas_refill,
             watcher_config,
             max_price_age_secs,
             min_price_age_secs,
@@ -220,14 +224,21 @@ impl Opt {
             crank_rewards,
             ignored_markets,
             rpc_endpoint,
+            crank_wallets,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
-        let price_wallet = seed
+        let gas_wallet = seed
             .derive_cosmos_numbered(1)
             .for_chain(network.get_address_type())?;
-        let crank_wallet = seed
+        let price_wallet = seed
             .derive_cosmos_numbered(2)
             .for_chain(network.get_address_type())?;
+        let crank_wallets = (0..*crank_wallets)
+            .map(|idx| {
+                seed.derive_cosmos_numbered(idx + 3)
+                    .for_chain(network.get_address_type())
+            })
+            .collect::<Result<_>>()?;
         let watcher = match watcher_config {
             Some(yaml) => serde_yaml::from_str(yaml).context("Invalid watcher config on CLI")?,
             None => WatcherConfig::default(),
@@ -237,8 +248,6 @@ impl Opt {
             by_type: BotConfigByType::Mainnet {
                 inner: BotConfigMainnet {
                     factory: *factory,
-                    min_gas_crank: *min_gas_crank,
-                    min_gas_price: *min_gas_price,
                     low_util_ratio: *low_util_ratio,
                     high_util_ratio: *high_util_ratio,
                     liquidity_transaction: LiquidityTransactionConfig {
@@ -254,7 +263,7 @@ impl Opt {
             },
             network: *network,
             price_wallet: Some(price_wallet.into()),
-            crank_wallet: Some(crank_wallet),
+            crank_wallets,
             watcher,
             gas_multiplier: *gas_multiplier,
             max_price_age_secs: max_price_age_secs
@@ -265,6 +274,9 @@ impl Opt {
                 .unwrap_or_else(perps_exes::config::defaults::max_allowed_price_delta),
             gas_decimals,
             http_timeout_seconds: *http_timeout_seconds,
+            min_gas: *min_gas,
+            min_gas_in_gas_wallet: *min_gas_refill,
+            gas_wallet: Arc::new(gas_wallet),
         })
     }
 }
@@ -273,7 +285,7 @@ impl BotConfig {
     /// Used to determine how many connections to allow in the pool.
     pub(crate) fn total_bot_count(&self) -> usize {
         self.price_wallet.as_ref().map_or(0, |_| 1)
-            + self.crank_wallet.as_ref().map_or(0, |_| 1)
+            + self.crank_wallets.len()
             + self.by_type.total_bot_count()
     }
 }
@@ -295,9 +307,7 @@ impl BotConfigTestnet {
             faucet: _,
             price_api: _,
             contract_family: _,
-            min_gas: _,
             min_gas_in_faucet: _,
-            min_gas_in_gas_wallet: _,
             explorer: _,
             ultra_crank_wallets,
             liquidity_config,
@@ -326,8 +336,6 @@ impl BotConfigMainnet {
         // Just future proofing in case we add some optional bots in the future
         let BotConfigMainnet {
             factory: _,
-            min_gas_crank: _,
-            min_gas_price: _,
             low_util_ratio: _,
             high_util_ratio: _,
             liquidity_transaction: _,
