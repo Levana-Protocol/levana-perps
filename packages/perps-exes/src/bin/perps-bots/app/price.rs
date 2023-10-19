@@ -10,7 +10,7 @@ use chrono::{DateTime, Duration, Utc};
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
 use cosmwasm_std::Decimal256;
 use msg::{
-    contracts::market::spot_price::{PythPriceServiceNetwork, SpotPriceConfig},
+    contracts::market::spot_price::{PythPriceServiceNetwork, SpotPriceConfig, SpotPriceFeedData},
     prelude::*,
 };
 use perps_exes::pyth::get_oracle_update_msg;
@@ -37,7 +37,11 @@ struct Worker {
 }
 
 impl Worker {
-    fn add_reason(&mut self, market: &MarketId, reason: &Option<PriceUpdateReason>) {
+    fn add_reason(
+        &mut self,
+        market: &MarketId,
+        reason: &Option<(PriceUpdateReason, NeedsOracleUpdate)>,
+    ) {
         self.stats
             .entry(market.clone())
             .or_insert_with(|| ReasonStats::new(market.clone()))
@@ -77,6 +81,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
     let mut successes = vec![];
     let mut errors = vec![];
     let mut markets_to_update = vec![];
+    let mut any_needs_oracle_update = NeedsOracleUpdate::No;
 
     // Load any offchain data, in batch, needed by the individual spot price configs
     let offchain_price_data = Arc::new(OffchainPriceData::load(&app, &factory.markets).await?);
@@ -113,10 +118,13 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
         match res {
             Ok(reason) => {
                 worker.add_reason(&market.market_id, &reason);
-                successes.push(if let Some(reason) = reason {
+                successes.push(if let Some((reason, needs_oracle_update)) = reason {
                     if reason.is_too_frequent() {
                         format!("{}: Too frequent price updates, skipping", market.market_id)
                     } else {
+                        if let NeedsOracleUpdate::Yes = needs_oracle_update {
+                            any_needs_oracle_update = NeedsOracleUpdate::Yes;
+                        }
                         markets_to_update.push(market.market.get_address());
                         format!("{}: Needs price update: {reason}", market.market_id)
                     }
@@ -135,7 +143,17 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
     if markets_to_update.is_empty() {
         successes.push("No markets need updating".to_owned());
     } else {
-        successes.push(update_oracles(worker, &app, &factory.markets, &offchain_price_data).await?);
+        match any_needs_oracle_update {
+            NeedsOracleUpdate::Yes => {
+                successes.push(
+                    update_oracles(worker, &app, &factory.markets, &offchain_price_data).await?,
+                );
+            }
+            NeedsOracleUpdate::No => {
+                successes.push("No markets needed an oracle update".to_owned());
+            }
+        }
+
         if let Some(oldest_publish_time) = offchain_price_data.oldest_publish_time {
             worker.last_successful_price_publish_time = Some(oldest_publish_time);
             successes.push(format!(
@@ -147,6 +165,11 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
         for market in markets_to_update {
             worker.trigger_crank.trigger_crank(market).await;
         }
+    }
+
+    // Add the stats
+    for (market_id, reason_stats) in &worker.stats {
+        successes.push(format!("Stats {market_id}: {reason_stats}"));
     }
 
     // Generate the correct output
@@ -166,13 +189,58 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
     }
 }
 
+enum NeedsOracleUpdate {
+    Yes,
+    No,
+}
+
+impl App {
+    /// We don't bother with an oracle update if all feeds used by this contract are less than X seconds old
+    async fn needs_oracle_update(&self, market: &Market) -> Result<NeedsOracleUpdate> {
+        // Check that we actually use Pyth before making a smart contract query
+        let uses_pyth = match &market.status.config.spot_price {
+            SpotPriceConfig::Manual { .. } => false,
+            SpotPriceConfig::Oracle {
+                pyth: _,
+                stride: _,
+                feeds,
+                feeds_usd,
+            } => feeds.iter().chain(feeds_usd.iter()).any(|x| match x.data {
+                SpotPriceFeedData::Constant { .. } => false,
+                SpotPriceFeedData::Pyth { .. } => true,
+                SpotPriceFeedData::Stride { .. } => false,
+                SpotPriceFeedData::Sei { .. } => false,
+            }),
+        };
+
+        if !uses_pyth {
+            return Ok(NeedsOracleUpdate::No);
+        }
+
+        let oracle_price = market.market.get_oracle_price().await?;
+
+        let now = Utc::now();
+        for x in oracle_price.pyth.values() {
+            let updated = x.publish_time.try_into_chrono_datetime()?;
+            let age = now.signed_duration_since(updated);
+            if age.num_seconds() > MAX_ORACLE_AGE_SECONDS {
+                return Ok(NeedsOracleUpdate::Yes);
+            }
+        }
+
+        Ok(NeedsOracleUpdate::No)
+    }
+}
+
+const MAX_ORACLE_AGE_SECONDS: i64 = 10;
+
 #[tracing::instrument(skip_all)]
 async fn check_market_needs_price_update(
     app: &App,
     offchain_price_data: Arc<OffchainPriceData>,
     market: &Market,
     last_successful_price_publish_time: Option<DateTime<Utc>>,
-) -> Result<Option<PriceUpdateReason>> {
+) -> Result<Option<(PriceUpdateReason, NeedsOracleUpdate)>> {
     let (oracle_price, _) = get_latest_price(&offchain_price_data, market).await?;
     let (_market_price, reason) = app
         .needs_price_update(market, oracle_price, last_successful_price_publish_time)
@@ -296,15 +364,21 @@ impl App {
         market: &Market,
         oracle_price: PriceBaseInQuote,
         last_successful_price_publish_time: Option<DateTime<Utc>>,
-    ) -> Result<(Option<PricePoint>, Option<PriceUpdateReason>)> {
-        let market = &market.market;
-        let market_price: PricePoint = match market.current_price().await {
+    ) -> Result<(
+        Option<PricePoint>,
+        Option<(PriceUpdateReason, NeedsOracleUpdate)>,
+    )> {
+        let market_contract = &market.market;
+        let market_price: PricePoint = match market_contract.current_price().await {
             Ok(price) => price,
             Err(e) => {
                 let msg = format!("{e}");
                 return if msg.contains("price_not_found") {
                     // Assume this is the first price being set
-                    Ok((None, Some(PriceUpdateReason::NoPriceFound)))
+                    Ok((
+                        None,
+                        Some((PriceUpdateReason::NoPriceFound, NeedsOracleUpdate::Yes)),
+                    ))
                 } else {
                     Err(e)
                 };
@@ -342,7 +416,10 @@ impl App {
             if age_secs > self.config.max_price_age_secs.into() {
                 return Ok((
                     Some(market_price),
-                    Some(PriceUpdateReason::LastUpdateTooOld(age)),
+                    Some((
+                        PriceUpdateReason::LastUpdateTooOld(age),
+                        self.needs_oracle_update(market).await?,
+                    )),
                 ));
             }
 
@@ -362,19 +439,27 @@ impl App {
         if delta >= self.config.max_allowed_price_delta {
             return Ok((
                 Some(market_price),
-                Some(PriceUpdateReason::PriceDelta {
-                    old: market_price.price_base,
-                    new: oracle_price,
-                    delta,
-                    is_too_frequent,
-                }),
+                Some((
+                    PriceUpdateReason::PriceDelta {
+                        old: market_price.price_base,
+                        new: oracle_price,
+                        delta,
+                        is_too_frequent,
+                    },
+                    self.needs_oracle_update(market).await?,
+                )),
             ));
         }
 
         // Check 3: would any triggers happen from this price?
         // We save this for last since it requires a network round trip
-        if market.price_would_trigger(oracle_price).await? {
-            return Ok((Some(market_price), Some(PriceUpdateReason::Triggers)));
+        if market_contract.price_would_trigger(oracle_price).await? {
+            // In this case we always do an oracle update, we want to make sure
+            // this specific price point makes it into the contract.
+            return Ok((
+                Some(market_price),
+                Some((PriceUpdateReason::Triggers, NeedsOracleUpdate::Yes)),
+            ));
         }
 
         Ok((Some(market_price), None))
@@ -416,6 +501,7 @@ struct ReasonStats {
     delta_too_frequent: u64,
     triggers: u64,
     no_price_found: u64,
+    oracle_update: u64,
 }
 
 impl Display for ReasonStats {
@@ -429,8 +515,9 @@ impl Display for ReasonStats {
             delta_too_frequent,
             triggers,
             no_price_found,
+            oracle_update,
         } = self;
-        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Delta too frequent: {delta_too_frequent}. Triggers: {triggers}. No price found: {no_price_found}.")
+        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Delta too frequent: {delta_too_frequent}. Triggers: {triggers}. No price found: {no_price_found}. Oracle update: {oracle_update}.")
     }
 }
 
@@ -444,11 +531,12 @@ impl ReasonStats {
             delta_too_frequent: 0,
             triggers: 0,
             no_price_found: 0,
+            oracle_update: 0,
             market,
         }
     }
-    fn add_reason(&mut self, reason: &Option<PriceUpdateReason>) {
-        let reason = match reason {
+    fn add_reason(&mut self, reason: &Option<(PriceUpdateReason, NeedsOracleUpdate)>) {
+        let (reason, needs_oracle_update) = match reason {
             Some(reason) => reason,
             None => {
                 self.not_needed += 1;
@@ -468,6 +556,9 @@ impl ReasonStats {
             }
             PriceUpdateReason::Triggers => self.triggers += 1,
             PriceUpdateReason::NoPriceFound => self.no_price_found += 1,
+        }
+        if let NeedsOracleUpdate::Yes = needs_oracle_update {
+            self.oracle_update += 1
         }
     }
 }
