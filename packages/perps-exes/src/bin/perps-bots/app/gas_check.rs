@@ -20,7 +20,7 @@ pub(crate) struct GasCheckBuilder {
     tracked_wallets: HashSet<Address>,
     tracked_names: HashSet<GasCheckWallet>,
     to_track: Vec<Tracked>,
-    gas_wallet: Option<Arc<Wallet>>,
+    gas_wallet: Arc<Wallet>,
 }
 
 /// Description of which wallet is being tracked
@@ -52,7 +52,7 @@ impl Display for GasCheckWallet {
 }
 
 impl GasCheckBuilder {
-    pub(crate) fn new(gas_wallet: Option<Arc<Wallet>>) -> GasCheckBuilder {
+    pub(crate) fn new(gas_wallet: Arc<Wallet>) -> GasCheckBuilder {
         GasCheckBuilder {
             tracked_wallets: Default::default(),
             tracked_names: Default::default(),
@@ -85,10 +85,6 @@ impl GasCheckBuilder {
         Ok(())
     }
 
-    pub(crate) fn get_wallet_address(&self) -> Option<Address> {
-        self.gas_wallet.as_ref().map(|x| *x.address())
-    }
-
     pub(crate) fn build(&mut self, app: Arc<App>) -> GasCheck {
         GasCheck {
             to_track: std::mem::take(&mut self.to_track),
@@ -100,7 +96,7 @@ impl GasCheckBuilder {
 
 pub(crate) struct GasCheck {
     to_track: Vec<Tracked>,
-    gas_wallet: Option<Arc<Wallet>>,
+    gas_wallet: Arc<Wallet>,
     app: Arc<App>,
 }
 
@@ -171,10 +167,7 @@ impl GasCheck {
         if !to_refill.is_empty() {
             let mut builder = TxBuilder::default();
             let denom = self.app.cosmos.get_gas_coin();
-            let gas_wallet = self
-                .gas_wallet
-                .clone()
-                .context("Cannot refill gas automatically on mainnet")?;
+            let gas_wallet = self.gas_wallet.clone();
             {
                 for (address, amount) in &to_refill {
                     builder.add_message_mut(MsgSend {

@@ -21,7 +21,6 @@ use cosmos::{Address, HasAddress, TxBuilder, Wallet};
 use msg::prelude::MarketExecuteMsg;
 use perps_exes::prelude::MarketContract;
 
-use crate::config::BotConfigByType;
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
 use self::trigger_crank::CrankReceiver;
@@ -47,17 +46,7 @@ impl AppBuilder {
         let crank_wallets = self.app.config.crank_wallets.clone();
 
         for (idx, crank_wallet) in crank_wallets.into_iter().enumerate() {
-            match &self.app.config.by_type {
-                BotConfigByType::Testnet { inner } => {
-                    let inner = inner.clone();
-                    self.refill_gas(&inner, *crank_wallet.address(), GasCheckWallet::Crank(idx))?
-                }
-                BotConfigByType::Mainnet { inner } => self.alert_on_low_gas(
-                    *crank_wallet.address(),
-                    GasCheckWallet::Crank(idx),
-                    inner.min_gas_crank,
-                )?,
-            }
+            self.refill_gas(crank_wallet.get_address(), GasCheckWallet::Crank(idx + 1))?;
 
             let worker = Worker {
                 crank_wallet,

@@ -105,10 +105,12 @@ pub(crate) struct MainnetOpt {
     pub(crate) network: CosmosNetwork,
     #[clap(long, env = "COSMOS_GAS_MULTIPLIER")]
     pub(crate) gas_multiplier: Option<f64>,
-    #[clap(long, env = "LEVANA_BOTS_MIN_GAS_CRANK", default_value = "100")]
-    pub(crate) min_gas_crank: GasAmount,
-    #[clap(long, env = "LEVANA_BOTS_MIN_GAS_PRICE", default_value = "100")]
-    pub(crate) min_gas_price: GasAmount,
+    /// Used for both price and crank wallets
+    #[clap(long, env = "LEVANA_BOTS_MIN_GAS")]
+    pub(crate) min_gas: GasAmount,
+    /// Minimum required in the refill wallet used to top off price and crank wallets
+    #[clap(long, env = "LEVANA_BOTS_MIN_GAS_REFILL")]
+    pub(crate) min_gas_refill: GasAmount,
     #[clap(long, env = "LEVANA_BOTS_WATCHER_CONFIG")]
     pub(crate) watcher_config: Option<String>,
     #[clap(long, env = "LEVANA_BOTS_MIN_PRICE_AGE_SECS")]
