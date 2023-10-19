@@ -38,28 +38,38 @@ struct Worker {
 /// Start the background thread to turn the crank on the crank bots.
 impl AppBuilder {
     pub(super) fn start_crank_run(&mut self) -> Result<Option<TriggerCrank>> {
-        if let Some(crank_wallet) = self.app.config.crank_wallet.clone() {
+        if self.app.config.crank_wallets.is_empty() {
+            return Ok(None);
+        }
+
+        let recv = CrankReceiver::new();
+
+        let crank_wallets = self.app.config.crank_wallets.clone();
+
+        for (idx, crank_wallet) in crank_wallets.into_iter().enumerate() {
             match &self.app.config.by_type {
                 BotConfigByType::Testnet { inner } => {
                     let inner = inner.clone();
-                    self.refill_gas(&inner, *crank_wallet.address(), GasCheckWallet::Crank)?
+                    self.refill_gas(&inner, *crank_wallet.address(), GasCheckWallet::Crank(idx))?
                 }
                 BotConfigByType::Mainnet { inner } => self.alert_on_low_gas(
                     *crank_wallet.address(),
-                    GasCheckWallet::Crank,
+                    GasCheckWallet::Crank(idx),
                     inner.min_gas_crank,
                 )?,
             }
 
-            let recv = CrankReceiver::new();
-            let send = recv.trigger.clone();
-
-            let worker = Worker { crank_wallet, recv };
-            self.watch_periodic(crate::watcher::TaskLabel::CrankRun, worker)?;
-            Ok(Some(send))
-        } else {
-            Ok(None)
+            let worker = Worker {
+                crank_wallet,
+                recv: recv.clone(),
+            };
+            self.watch_periodic(
+                crate::watcher::TaskLabel::CrankRun { index: idx + 1 },
+                worker,
+            )?;
         }
+
+        Ok(Some(recv.trigger))
     }
 }
 

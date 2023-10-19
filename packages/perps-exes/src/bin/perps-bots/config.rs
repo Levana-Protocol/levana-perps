@@ -60,7 +60,7 @@ pub(crate) struct BotConfig {
     pub(crate) by_type: BotConfigByType,
     pub(crate) network: CosmosNetwork,
     pub(crate) price_wallet: Option<Arc<Wallet>>,
-    pub(crate) crank_wallet: Option<Wallet>,
+    pub(crate) crank_wallets: Vec<Wallet>,
     pub(crate) watcher: WatcherConfig,
     pub(crate) gas_multiplier: Option<f64>,
     pub(crate) max_price_age_secs: u32,
@@ -172,11 +172,11 @@ impl Opt {
                 inner: Arc::new(testnet),
             },
             network,
-            crank_wallet: if partial.crank {
-                Some(self.get_crank_wallet(network.get_address_type(), &wallet_phrase_name, 0)?)
-            } else {
-                None
-            },
+            crank_wallets: (0..partial.crank)
+                .map(|idx| {
+                    self.get_crank_wallet(network.get_address_type(), &wallet_phrase_name, idx)
+                })
+                .collect::<Result<_>>()?,
             price_wallet: if partial.price {
                 Some(Arc::new(self.get_wallet(
                     network.get_address_type(),
@@ -220,14 +220,21 @@ impl Opt {
             crank_rewards,
             ignored_markets,
             rpc_endpoint,
+            crank_wallets,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
-        let price_wallet = seed
+        let refill_wallet = seed
             .derive_cosmos_numbered(1)
             .for_chain(network.get_address_type())?;
-        let crank_wallet = seed
+        let price_wallet = seed
             .derive_cosmos_numbered(2)
             .for_chain(network.get_address_type())?;
+        let crank_wallets = (0..*crank_wallets)
+            .map(|idx| {
+                seed.derive_cosmos_numbered(idx + 3)
+                    .for_chain(network.get_address_type())
+            })
+            .collect::<Result<_>>()?;
         let watcher = match watcher_config {
             Some(yaml) => serde_yaml::from_str(yaml).context("Invalid watcher config on CLI")?,
             None => WatcherConfig::default(),
@@ -254,7 +261,7 @@ impl Opt {
             },
             network: *network,
             price_wallet: Some(price_wallet.into()),
-            crank_wallet: Some(crank_wallet),
+            crank_wallets,
             watcher,
             gas_multiplier: *gas_multiplier,
             max_price_age_secs: max_price_age_secs
@@ -273,7 +280,7 @@ impl BotConfig {
     /// Used to determine how many connections to allow in the pool.
     pub(crate) fn total_bot_count(&self) -> usize {
         self.price_wallet.as_ref().map_or(0, |_| 1)
-            + self.crank_wallet.as_ref().map_or(0, |_| 1)
+            + self.crank_wallets.len()
             + self.by_type.total_bot_count()
     }
 }
