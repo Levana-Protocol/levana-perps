@@ -818,6 +818,7 @@ struct ResponseBuilder {
 #[serde(rename_all = "kebab-case")]
 enum ShortStatus {
     Error,
+    OutOfDateError,
     OutOfDate,
     ErrorNoAlert,
     OutOfDateNoAlert,
@@ -833,7 +834,7 @@ impl TaskStatus {
                     (OutOfDateType::Not, _) => ShortStatus::Success,
                     (_, false) => ShortStatus::OutOfDateNoAlert,
                     (OutOfDateType::Slightly, true) => ShortStatus::OutOfDate,
-                    (OutOfDateType::Very, true) => ShortStatus::Error,
+                    (OutOfDateType::Very, true) => ShortStatus::OutOfDateError,
                 }
             }
             TaskResultValue::Err(_) => {
@@ -852,6 +853,7 @@ impl ShortStatus {
     fn as_str(self) -> &'static str {
         match self {
             ShortStatus::OutOfDate => "OUT OF DATE",
+            ShortStatus::OutOfDateError => "ERROR DUE TO OUT OF DATE",
             ShortStatus::OutOfDateNoAlert => "OUT OF DATE (no alert)",
             ShortStatus::Success => "SUCCESS",
             ShortStatus::Error => "ERROR",
@@ -863,7 +865,8 @@ impl ShortStatus {
     fn alert(&self) -> bool {
         match self {
             ShortStatus::Error => true,
-            ShortStatus::OutOfDate => true,
+            ShortStatus::OutOfDateError => true,
+            ShortStatus::OutOfDate => false,
             ShortStatus::ErrorNoAlert => false,
             ShortStatus::OutOfDateNoAlert => false,
             ShortStatus::Success => false,
@@ -874,6 +877,7 @@ impl ShortStatus {
     fn css_class(self) -> &'static str {
         match self {
             ShortStatus::Error => "error",
+            ShortStatus::OutOfDateError => "error",
             ShortStatus::OutOfDate => "out-of-date",
             ShortStatus::ErrorNoAlert => "error-no-alert",
             ShortStatus::OutOfDateNoAlert => "out-of-date-no-alert",
