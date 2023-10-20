@@ -8,12 +8,12 @@ use axum::http::HeaderValue;
 use axum::response::IntoResponse;
 use axum::{async_trait, Json};
 use chrono::{DateTime, Duration, Utc};
-use once_cell::sync::OnceCell;
 use perps_exes::build_version;
 use perps_exes::config::{TaskConfig, WatcherConfig};
 use rand::Rng;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::StatusCode;
+use tokio::sync::OnceCell;
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 
@@ -732,6 +732,11 @@ struct RenderedStatus {
 impl TaskStatuses {
     async fn statuses(&self, selected_label: Option<TaskLabel>) -> Vec<RenderedStatus> {
         let mut all_statuses = vec![];
+
+        while !self.statuses.initialized() {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await
+        }
+
         for (label, status) in self
             .statuses
             .get()
