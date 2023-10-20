@@ -116,19 +116,17 @@ impl AppBuilder {
         set.spawn(start_rest_api(self.app, statuses, server));
 
         // Both tasks should run forever, so if they don't it's an error
-        while let Some(res) = set.join_next().await {
-            set.abort_all();
-            return match res {
-                Err(e) => Err(anyhow::anyhow!("Unexpected task panic: {e:?}")),
-                Ok(Err(e)) => Err(e),
-                Ok(Ok(())) => Err(anyhow::anyhow!(
-                    "Either REST server or watcher exited early"
-                )),
-            };
+        let res = set.join_next().await;
+        set.abort_all();
+        match res {
+            Some(Err(e)) => Err(anyhow::anyhow!("Unexpected task panic: {e:?}")),
+            Some(Ok(Err(e))) => Err(e),
+            Some(Ok(Ok(()))) => Err(anyhow::anyhow!(
+                "Either REST server or watcher exited early"
+            )),
+            None => Err(anyhow::anyhow!(
+                "Impossible for the join set to ever complete"
+            )),
         }
-
-        Err(anyhow::anyhow!(
-            "Impossible for the join set to ever complete"
-        ))
     }
 }
