@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use axum::{extract::State, response::IntoResponse, Json};
 use chrono::{DateTime, Utc};
@@ -6,12 +6,11 @@ use cosmos::{Address, CosmosNetwork, HasAddress};
 use shared::storage::MarketId;
 
 use crate::{
-    app::{
-        factory::{FactoryInfo, FrontendInfoTestnet},
-        App,
-    },
+    app::factory::{FactoryInfo, FrontendInfoTestnet},
     config::BotConfigByType,
 };
+
+use super::RestApp;
 
 #[derive(serde::Serialize)]
 struct FactoryResp<'a> {
@@ -56,7 +55,8 @@ impl<'a> From<&'a FactoryInfo> for FactoryInfoJson<'a> {
     }
 }
 
-pub(crate) async fn factory(app: State<Arc<App>>) -> impl IntoResponse {
+pub(crate) async fn factory(rest_app: State<RestApp>) -> impl IntoResponse {
+    let app = rest_app.0.app;
     let factory_info = app.get_factory_info().await;
     match &app.config.by_type {
         BotConfigByType::Testnet { inner } => Json(FactoryResp {

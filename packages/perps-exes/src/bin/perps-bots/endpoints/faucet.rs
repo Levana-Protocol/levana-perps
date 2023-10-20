@@ -9,6 +9,8 @@ use crate::{
     config::{BotConfigByType, BotConfigTestnet},
 };
 
+use super::RestApp;
+
 #[derive(serde::Deserialize)]
 pub(crate) struct FaucetQuery {
     cw20s: Vec<Address>,
@@ -31,10 +33,10 @@ pub(crate) enum FaucetResponse {
 }
 
 pub(crate) async fn bot(
-    State(app): State<Arc<App>>,
+    State(rest_app): State<RestApp>,
     Json(query): Json<FaucetQuery>,
 ) -> Json<FaucetResponse> {
-    Json(match bot_inner(&app, query).await {
+    Json(match bot_inner(&rest_app.app, query).await {
         Ok(txhash) => FaucetResponse::Success {
             message: format!("Faucet successfully tapped in {txhash}"),
             txhash: txhash.to_string(),

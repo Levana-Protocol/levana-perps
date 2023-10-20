@@ -12,12 +12,14 @@ use cosmwasm_std::Decimal256;
 use msg::prelude::{MarketId, MarketType, UnsignedDecimal};
 use perps_exes::PositionsInfo;
 
+use super::RestApp;
+
 pub(crate) async fn carry(
-    app: State<Arc<App>>,
+    State(rest_app): State<RestApp>,
     headers: HeaderMap,
     params: axum::extract::Query<CarryParams>,
 ) -> Response {
-    match carry_inner(app, headers, &params).await {
+    match carry_inner(rest_app.app, headers, &params).await {
         Ok(res) => res,
         Err(err) => err.to_string().into_response(),
     }
@@ -130,7 +132,7 @@ pub(crate) struct CarryParams {
 }
 
 pub(crate) async fn carry_inner(
-    app: State<Arc<App>>,
+    app: Arc<App>,
     _headers: HeaderMap,
     CarryParams {
         addr: cc_addr,

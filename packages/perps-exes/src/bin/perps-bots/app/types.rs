@@ -16,7 +16,6 @@ use crate::app::factory::{get_factory_info_mainnet, get_factory_info_testnet};
 use crate::cli::Opt;
 use crate::config::{BotConfig, BotConfigByType, BotConfigTestnet};
 use crate::wallet_manager::ManagedWallet;
-use crate::watcher::TaskStatuses;
 use crate::watcher::Watcher;
 
 use super::factory::{FactoryInfo, FrontendInfoTestnet};
@@ -57,7 +56,6 @@ pub(crate) struct App {
     pub(crate) cosmos: Cosmos,
     pub(crate) config: BotConfig,
     pub(crate) client: Client,
-    pub(crate) statuses: TaskStatuses,
     pub(crate) live_since: DateTime<Utc>,
     pub(crate) gases: RwLock<HashMap<Address, GasRecords>>,
     pub(crate) endpoint_stable: String,
@@ -126,7 +124,6 @@ impl Opt {
             cosmos,
             config,
             client,
-            statuses: TaskStatuses::default(),
             live_since: Utc::now(),
             gases: RwLock::new(HashMap::new()),
             frontend_info_testnet,

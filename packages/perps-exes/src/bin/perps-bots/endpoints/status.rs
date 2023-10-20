@@ -7,14 +7,22 @@ use axum::{
 };
 use reqwest::StatusCode;
 
-use crate::{app::App, watcher::TaskLabel};
+use crate::{
+    app::App,
+    watcher::{TaskLabel, TaskStatuses},
+};
 
-pub(crate) async fn all(app: State<Arc<App>>, headers: HeaderMap) -> Response {
-    helper(app, headers, None).await
+use super::RestApp;
+
+pub(crate) async fn all(
+    State(RestApp { app, statuses }): State<RestApp>,
+    headers: HeaderMap,
+) -> Response {
+    helper(app, statuses, headers, None).await
 }
 
 pub(crate) async fn single(
-    app: State<Arc<App>>,
+    State(RestApp { app, statuses }): State<RestApp>,
     headers: HeaderMap,
     label: axum::extract::Path<String>,
 ) -> Response {
@@ -26,19 +34,24 @@ pub(crate) async fn single(
             return res;
         }
     };
-    helper(app, headers, Some(label)).await
+    helper(app, statuses, headers, Some(label)).await
 }
 
-async fn helper(app: State<Arc<App>>, headers: HeaderMap, label: Option<TaskLabel>) -> Response {
+async fn helper(
+    app: Arc<App>,
+    statuses: TaskStatuses,
+    headers: HeaderMap,
+    label: Option<TaskLabel>,
+) -> Response {
     let accept = headers.get("accept");
 
     if accept.map_or(false, |value| value.as_bytes().starts_with(b"text/html")) {
-        app.statuses.statuses_html(&app.0, label).await
+        statuses.statuses_html(&app, label).await
     } else if accept.map_or(false, |value| {
         value.as_bytes().starts_with(b"application/json")
     }) {
-        app.statuses.statuses_json(&app.0, label).await
+        statuses.statuses_json(&app, label).await
     } else {
-        app.statuses.statuses_text(label).await
+        statuses.statuses_text(label).await
     }
 }

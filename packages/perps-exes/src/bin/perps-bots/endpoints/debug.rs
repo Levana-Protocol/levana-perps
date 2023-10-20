@@ -1,9 +1,7 @@
-use std::sync::Arc;
-
 use axum::{extract::State, http::HeaderMap, response::IntoResponse, Json};
 
-use crate::app::App;
+use super::RestApp;
 
-pub(crate) async fn gases(app: State<Arc<App>>, _headers: HeaderMap) -> impl IntoResponse {
-    Json(&*app.gases.read().await).into_response()
+pub(crate) async fn gases(rest_app: State<RestApp>, _headers: HeaderMap) -> impl IntoResponse {
+    Json(&*rest_app.app.gases.read().await).into_response()
 }
