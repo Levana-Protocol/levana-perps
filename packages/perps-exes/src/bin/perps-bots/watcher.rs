@@ -13,7 +13,6 @@ use perps_exes::config::{TaskConfig, WatcherConfig};
 use rand::Rng;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::StatusCode;
-use tokio::sync::OnceCell;
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 
@@ -103,11 +102,17 @@ pub(crate) struct Watcher {
     statuses: StatusMap,
 }
 
+// TODO: Consider renaming Watcher to WatcherBuilder and RunWatcher to Watcher
+pub(crate) struct RunWatcher {
+    to_spawn: Vec<ToSpawn>,
+    set: JoinSet<Result<()>>,
+}
+
 pub(crate) type StatusMap = HashMap<TaskLabel, Arc<RwLock<TaskStatus>>>;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub(crate) struct TaskStatuses {
-    statuses: Arc<OnceCell<StatusMap>>,
+    statuses: Arc<StatusMap>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -265,11 +270,23 @@ impl TaskLabel {
 }
 
 impl Watcher {
-    pub(crate) async fn wait(mut self, app: &App) -> Result<()> {
-        app.statuses
-            .statuses
-            .set(self.statuses)
-            .map_err(|_| anyhow::anyhow!("app.statuses.statuses set twice"))?;
+    pub(crate) fn build(self) -> (TaskStatuses, RunWatcher) {
+        let Watcher {
+            to_spawn,
+            set,
+            statuses,
+        } = self;
+        (
+            TaskStatuses {
+                statuses: Arc::new(statuses),
+            },
+            RunWatcher { to_spawn, set },
+        )
+    }
+}
+
+impl RunWatcher {
+    pub(crate) async fn wait(mut self) -> Result<()> {
         for ToSpawn { future, label } in self.to_spawn {
             self.set.spawn(async move {
                 future
@@ -732,15 +749,8 @@ struct RenderedStatus {
 impl TaskStatuses {
     async fn statuses(&self, selected_label: Option<TaskLabel>) -> Vec<RenderedStatus> {
         let mut all_statuses = vec![];
-
-        while !self.statuses.initialized() {
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await
-        }
-
         for (label, status) in self
             .statuses
-            .get()
-            .expect("Status map isn't available yet")
             .iter()
             .filter(|(curr_label, _)| match selected_label {
                 None => true,
