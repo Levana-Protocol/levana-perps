@@ -19,10 +19,9 @@ mod utilization;
 
 use anyhow::Result;
 use hyper::server::conn::AddrIncoming;
-use tokio::task::JoinSet;
 pub(crate) use types::*;
 
-use crate::{config::BotConfigByType, endpoints::start_rest_api};
+use crate::config::BotConfigByType;
 
 use self::gas_check::GasCheckWallet;
 
@@ -108,25 +107,8 @@ impl AppBuilder {
         let gas_check = self.gas_check.build(self.app.clone());
         self.start_gas_task(gas_check)?;
 
-        // OK, we've built up everything that needs to be watched. Time to start
-        // both the REST server and the bots processes themselves.
-        let mut set = JoinSet::new();
-        let (statuses, watcher) = self.watcher.build();
-        set.spawn(watcher.wait());
-        set.spawn(start_rest_api(self.app, statuses, server));
-
-        // Both tasks should run forever, so if they don't it's an error
-        let res = set.join_next().await;
-        set.abort_all();
-        match res {
-            Some(Err(e)) => Err(anyhow::anyhow!("Unexpected task panic: {e:?}")),
-            Some(Ok(Err(e))) => Err(e),
-            Some(Ok(Ok(()))) => Err(anyhow::anyhow!(
-                "Either REST server or watcher exited early"
-            )),
-            None => Err(anyhow::anyhow!(
-                "Impossible for the join set to ever complete"
-            )),
-        }
+        // Start waiting on all tasks. This function internally is responsible
+        // for launching the final task: the REST API
+        self.watcher.wait(self.app, server).await
     }
 }
