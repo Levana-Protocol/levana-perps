@@ -8,6 +8,7 @@ use axum::http::HeaderValue;
 use axum::response::IntoResponse;
 use axum::{async_trait, Json};
 use chrono::{DateTime, Duration, Utc};
+use hyper::server::conn::AddrIncoming;
 use perps_exes::build_version;
 use perps_exes::config::{TaskConfig, WatcherConfig};
 use rand::Rng;
@@ -19,6 +20,7 @@ use tokio::task::JoinSet;
 use crate::app::factory::FrontendInfoTestnet;
 use crate::app::AppBuilder;
 use crate::app::{factory::FactoryInfo, App};
+use crate::endpoints::start_rest_api;
 use crate::util::markets::Market;
 
 /// Different kinds of tasks that we can watch
@@ -100,12 +102,6 @@ pub(crate) struct Watcher {
     to_spawn: Vec<ToSpawn>,
     set: JoinSet<Result<()>>,
     statuses: StatusMap,
-}
-
-// TODO: Consider renaming Watcher to WatcherBuilder and RunWatcher to Watcher
-pub(crate) struct RunWatcher {
-    to_spawn: Vec<ToSpawn>,
-    set: JoinSet<Result<()>>,
 }
 
 pub(crate) type StatusMap = HashMap<TaskLabel, Arc<RwLock<TaskStatus>>>;
@@ -270,23 +266,18 @@ impl TaskLabel {
 }
 
 impl Watcher {
-    pub(crate) fn build(self) -> (TaskStatuses, RunWatcher) {
-        let Watcher {
-            to_spawn,
-            set,
-            statuses,
-        } = self;
-        (
+    pub(crate) async fn wait(
+        mut self,
+        app: Arc<App>,
+        server: hyper::server::Builder<AddrIncoming>,
+    ) -> Result<()> {
+        self.set.spawn(start_rest_api(
+            app,
             TaskStatuses {
-                statuses: Arc::new(statuses),
+                statuses: Arc::new(self.statuses),
             },
-            RunWatcher { to_spawn, set },
-        )
-    }
-}
-
-impl RunWatcher {
-    pub(crate) async fn wait(mut self) -> Result<()> {
+            server,
+        ));
         for ToSpawn { future, label } in self.to_spawn {
             self.set.spawn(async move {
                 future
