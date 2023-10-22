@@ -2787,6 +2787,7 @@ dependencies = [
  "log",
  "mime",
  "once_cell",
+ "parking_lot 0.12.1",
  "pid1",
  "pyth-sdk-cw",
  "rand",

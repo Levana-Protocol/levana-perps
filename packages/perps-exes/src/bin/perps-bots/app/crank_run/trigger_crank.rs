@@ -21,7 +21,7 @@ use std::{
 
 use async_channel::{RecvError, TrySendError};
 use cosmos::Address;
-use tokio::sync::Mutex;
+use parking_lot::Mutex;
 
 /// The sending side only, for price and crank watch bots to trigger a run.
 #[derive(Clone)]
@@ -38,6 +38,8 @@ struct Queue {
     fifo: VecDeque<Address>,
     /// HashSet matching everything in fifo for efficient checking
     set: HashSet<Address>,
+    /// The number of active crank guards, used for sanity checking only
+    crank_guards: usize,
 }
 
 enum PopResult {
@@ -48,14 +50,30 @@ enum PopResult {
     },
 }
 
+/// Ensures that only one crank runner is working on a given market at a time.
+pub(crate) struct CrankGuard {
+    queue: Arc<Mutex<Queue>>,
+    address: Address,
+}
+
+impl Drop for CrankGuard {
+    fn drop(&mut self) {
+        let mut queue = self.queue.lock();
+        let was_present = queue.set.remove(&self.address);
+        assert!(was_present);
+        assert!(queue.crank_guards > 0);
+        queue.crank_guards -= 1;
+    }
+}
+
 impl Queue {
     fn pop(&mut self) -> PopResult {
-        assert_eq!(self.fifo.len(), self.set.len());
+        assert_eq!(self.fifo.len() + self.crank_guards, self.set.len());
         match self.fifo.pop_front() {
             None => PopResult::QueueIsEmpty,
             Some(address) => {
-                let was_present = self.set.remove(&address);
-                assert!(was_present);
+                assert!(self.set.contains(&address));
+                self.crank_guards += 1;
                 PopResult::ValueFound {
                     address,
                     more_work_exists: !self.set.is_empty(),
@@ -66,7 +84,7 @@ impl Queue {
 
     /// Returns true if a new value was added to the queue
     fn push(&mut self, new: Address) -> bool {
-        assert_eq!(self.fifo.len(), self.set.len());
+        assert_eq!(self.fifo.len() + self.crank_guards, self.set.len());
         if self.set.contains(&new) {
             false
         } else {
@@ -87,7 +105,7 @@ pub(crate) struct CrankReceiver {
 impl TriggerCrank {
     #[tracing::instrument(skip_all)]
     pub(crate) async fn trigger_crank(&self, contract: Address) {
-        let added = self.queue.lock().await.push(contract);
+        let added = self.queue.lock().push(contract);
         if added {
             match self.send.try_send(()) {
                 Ok(()) => (),
@@ -114,7 +132,7 @@ impl CrankReceiver {
         }
     }
 
-    pub(super) async fn receive_with_timeout(&self) -> Option<Address> {
+    pub(super) async fn receive_with_timeout(&self) -> Option<(Address, CrankGuard)> {
         // This unfortunately requires more care than it seems like it should.
         // It's possible that the timeout used on receive will end up missing an
         // update. Therefore, we always recheck the queue after a we finish,
@@ -135,7 +153,7 @@ impl CrankReceiver {
         }
 
         // OK, we're done waiting. Try to pop a value from the queue.
-        match self.trigger.queue.lock().await.pop() {
+        match self.trigger.queue.lock().pop() {
             PopResult::QueueIsEmpty => {
                 // No work item found, so return None and don't do anything to the channel.
                 None
@@ -158,7 +176,13 @@ impl CrankReceiver {
                         ),
                     }
                 }
-                Some(address)
+                Some((
+                    address,
+                    CrankGuard {
+                        queue: self.trigger.queue.clone(),
+                        address,
+                    },
+                ))
             }
         }
     }
