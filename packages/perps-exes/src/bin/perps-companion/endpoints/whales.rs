@@ -4,14 +4,14 @@ use anyhow::{Context, Result};
 use askama::Template;
 use async_channel::{Receiver, Sender};
 use axum::{
-    extract::State,
+    extract::{Query, State},
     http::HeaderValue,
     response::{IntoResponse, Response},
     Json,
 };
 use axum_extra::{response::Css, routing::TypedPath};
 use chrono::NaiveDate;
-use cosmos::CosmosNetwork;
+use cosmos::{Address, CosmosNetwork, HasAddress};
 use cosmwasm_std::Decimal256;
 use futures::StreamExt;
 use hyper::{header::CONTENT_TYPE, HeaderMap, StatusCode};
@@ -35,8 +35,19 @@ pub(super) async fn whale_css(_: WhaleCssRoute) -> Css<&'static str> {
 #[typed_path("/whales")]
 pub(crate) struct Whales;
 
-pub(super) async fn whales(_: Whales, app: State<Arc<App>>, headers: HeaderMap) -> Response {
-    match whales_inner(&app, &headers).await {
+#[derive(serde::Deserialize)]
+pub(crate) struct WhalesQuery {
+    #[serde(default)]
+    show_addresses: bool,
+}
+
+pub(super) async fn whales(
+    _: Whales,
+    Query(WhalesQuery { show_addresses }): Query<WhalesQuery>,
+    app: State<Arc<App>>,
+    headers: HeaderMap,
+) -> Response {
+    match whales_inner(&app, show_addresses, &headers).await {
         Ok(res) => res,
         Err(e) => {
             log::error!("Error loading whales page: {e:?}");
@@ -47,8 +58,8 @@ pub(super) async fn whales(_: Whales, app: State<Arc<App>>, headers: HeaderMap) 
     }
 }
 
-async fn whales_inner(app: &App, headers: &HeaderMap) -> Result<Response> {
-    let whale_data = load_whale_data(app).await?;
+async fn whales_inner(app: &App, show_addresses: bool, headers: &HeaderMap) -> Result<Response> {
+    let whale_data = load_whale_data(app, show_addresses).await?;
 
     let accept = headers.get("accept");
 
@@ -72,6 +83,7 @@ struct HtmlData<'a> {
 #[serde(rename_all = "kebab-case")]
 struct WhaleData {
     markets: Vec<WhaleMarketData>,
+    show_addresses: bool,
 }
 
 #[derive(serde::Serialize)]
@@ -79,6 +91,7 @@ struct WhaleData {
 struct WhaleMarketData {
     chain: SimpleCosmosNetwork,
     market_id: MarketId,
+    address: Address,
     long_funding: String,
     short_funding: String,
     lp_apr_1d: Cow<'static, str>,
@@ -119,7 +132,7 @@ enum Work {
     Market(CosmosNetwork, MarketInfo),
 }
 
-async fn load_whale_data(app: &App) -> Result<WhaleData> {
+async fn load_whale_data(app: &App, show_addresses: bool) -> Result<WhaleData> {
     let mut set = JoinSet::<Result<()>>::new();
     let (send_work, recv_work) = async_channel::unbounded::<Work>();
     let (send_market, recv_market) = async_channel::unbounded::<WhaleMarketData>();
@@ -157,7 +170,10 @@ async fn load_whale_data(app: &App) -> Result<WhaleData> {
 
     let mut markets = recv_market.collect::<Vec<_>>().await;
     markets.sort_by_cached_key(|x| (x.chain.to_string(), x.market_id.to_string()));
-    Ok(WhaleData { markets })
+    Ok(WhaleData {
+        markets,
+        show_addresses,
+    })
 }
 
 async fn worker(
@@ -223,6 +239,7 @@ async fn load_whale_market_data(
     .await?;
 
     Ok(WhaleMarketData {
+        address: market.get_address(),
         chain: match network {
             CosmosNetwork::OsmosisMainnet => SimpleCosmosNetwork::Osmosis,
             CosmosNetwork::SeiMainnet => SimpleCosmosNetwork::Sei,
