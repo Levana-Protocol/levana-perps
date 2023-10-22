@@ -70,6 +70,28 @@ impl TaskLabel {
             }
         }
     }
+
+    fn show_output(&self) -> bool {
+        match self {
+            TaskLabel::GetFactory => false,
+            TaskLabel::Stale => false,
+            TaskLabel::CrankWatch => true,
+            TaskLabel::CrankRun { index: _ } => true,
+            TaskLabel::Price => true,
+            TaskLabel::TrackBalance => false,
+            TaskLabel::Stats => false,
+            TaskLabel::StatsAlert => false,
+            TaskLabel::GasCheck => false,
+            TaskLabel::Liquidity => false,
+            TaskLabel::Utilization => false,
+            TaskLabel::Balance => false,
+            TaskLabel::UltraCrank { index: _ } => false,
+            TaskLabel::Trader { index: _ } => false,
+            TaskLabel::LiqudityTransactionAlert => false,
+            TaskLabel::TotalDepositAlert => false,
+            TaskLabel::RpcHealth => false,
+        }
+    }
 }
 
 impl Display for TaskLabel {
@@ -358,7 +380,11 @@ impl AppBuilder {
                         skip_delay,
                         message,
                     }) => {
-                        tracing::info!("{label}: Success! {message}");
+                        if label.show_output() {
+                            tracing::info!("{label}: Success! {message}");
+                        } else {
+                            tracing::debug!("{label}: Success! {message}");
+                        }
                         {
                             let mut guard = task_status.write().await;
                             let old = &*guard;
@@ -429,7 +455,11 @@ impl AppBuilder {
                         }
                     }
                     Err(err) => {
-                        tracing::warn!("{label}: Error: {err:?}");
+                        if label.show_output() {
+                            tracing::warn!("{label}: Error: {err:?}");
+                        } else {
+                            tracing::debug!("{label}: Error: {err:?}");
+                        }
                         retries += 1;
                         let max_retries = config.retries.unwrap_or(app.config.watcher.retries);
                         // We want to get to first failure quickly so we don't
