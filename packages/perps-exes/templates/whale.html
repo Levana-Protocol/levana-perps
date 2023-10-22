@@ -36,6 +36,9 @@
           <tr>
             <th>Chain</th>
             <th>Market</th>
+            {% if data.show_addresses %}
+              <th>Address</th>
+            {% endif %}
             <th>Long funding</th>
             <th>Short funding</th>
             <th>LP APR (1d)</th>
@@ -51,6 +54,9 @@
               <td>
                 <a target="_blank" href="https://trade.levana.finance/{{market.chain}}/trade/{{market.market_id}}">{{ market.market_id }}</a>
               </td>
+              {% if data.show_addresses %}
+                <td><code>{{ market.address }}</code></td>
+              {% endif %}
               <td>{{ market.long_funding }}</td>
               <td>{{ market.short_funding }}</td>
               <td>{{ market.lp_apr_1d }}</td>
