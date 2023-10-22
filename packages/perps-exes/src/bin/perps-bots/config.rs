@@ -133,9 +133,13 @@ impl Opt {
             min_gas_in_faucet: partial.min_gas_in_faucet,
             explorer: explorer
                 .with_context(|| format!("No explorer found for network {network}"))?,
-            ultra_crank_wallets: (1..=partial.ultra_crank)
+            ultra_crank_wallets: (0..partial.ultra_crank)
                 .map(|index| {
-                    self.get_crank_wallet(network.get_address_type(), &wallet_phrase_name, index)
+                    self.get_crank_wallet(
+                        network.get_address_type(),
+                        &wallet_phrase_name,
+                        index + partial.crank,
+                    )
                 })
                 .collect::<Result<_>>()?,
             liquidity_config: if partial.liquidity {
