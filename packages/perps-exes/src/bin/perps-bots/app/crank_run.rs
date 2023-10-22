@@ -77,7 +77,7 @@ impl App {
         recv: &CrankReceiver,
     ) -> Result<WatchedTaskOutput> {
         // Wait for up to 20 seconds for new work to appear. If it doesn't, update our status message that no cranking was needed.
-        let market = match recv.receive_with_timeout().await {
+        let (market, crank_guard) = match recv.receive_with_timeout().await {
             None => {
                 return Ok(WatchedTaskOutput {
                     // Irrelevant, no delay here
@@ -153,6 +153,7 @@ impl App {
         };
 
         // Successfully cranked, check if there's more work and, if so, schedule it to be started again
+        std::mem::drop(crank_guard);
         let more_work = match MarketContract::new(self.cosmos.make_contract(market))
             .status()
             .await
