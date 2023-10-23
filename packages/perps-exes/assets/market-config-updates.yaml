@@ -241,5 +241,17 @@ markets:
     liquifunding_delay_seconds: 21600
     liquifunding_delay_fuzz_seconds: 3600
     liquidity_cooldown_seconds: 3600
+  SOL_USDT:
+    delta_neutrality_fee_sensitivity: 400000000
+    funding_rate_sensitivity: 1.5
+    carry_leverage: 15
+    borrow_fee_sensitivity: 0.083333333
+    borrow_fee_rate_min_annualized: 0.03
+    target_utilization: 0.5
+    delta_neutrality_fee_cap: 0.05
+    delta_neutrality_fee_tax: 0.1
+    liquifunding_delay_seconds: 21600
+    liquifunding_delay_fuzz_seconds: 3600
+    liquidity_cooldown_seconds: 3600
 
     # Starting borrow fee: 0.05
