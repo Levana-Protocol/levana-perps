@@ -273,4 +273,4 @@ create-lvn-grant-relayer-channel path-name juno-port osmosis-port:
 
 # faucet is a workaround for the fact that the tool will try (and fail) to load a faucet for mainnet, so we supply a dummy 
 injective-transfer-dao-fees:
-    cargo run --bin perps-qa transfer-dao-fees --factory-contract-address inj1vdu3s39dl8t5l88tyqwuhzklsx9587adv8cnn9 --network injective-mainnet --faucet-contract-address inj1vdu3s39dl8t5l88tyqwuhzklsx9587adv8cnn9
+	cargo run --bin perps-deploy mainnet transfer-dao-fees --factory injmainnet1

@@ -1,6 +1,7 @@
 mod migrate;
 mod send_treasury;
 mod sync_config;
+mod transfer_dao_fees;
 mod update_config;
 
 use std::{
@@ -32,7 +33,7 @@ use crate::{
 
 use self::{
     migrate::MigrateOpts, send_treasury::SendTreasuryOpts, sync_config::SyncConfigOpts,
-    update_config::UpdateConfigOpts,
+    transfer_dao_fees::TransferDaoFeesOpts, update_config::UpdateConfigOpts,
 };
 
 #[derive(clap::Parser)]
@@ -88,6 +89,11 @@ enum Sub {
         #[clap(flatten)]
         inner: SendTreasuryOpts,
     },
+    /// Transfer accumulated fees from the markets to the dao treasury
+    TransferDaoFees {
+        #[clap(flatten)]
+        inner: TransferDaoFeesOpts,
+    },
 }
 
 pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
@@ -108,6 +114,7 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
         Sub::UpdateConfig { inner } => inner.go(opt).await?,
         Sub::SyncConfig { inner } => inner.go(opt).await?,
         Sub::SendTreasury { inner } => inner.go(opt).await?,
+        Sub::TransferDaoFees { inner } => inner.go(opt).await?,
     }
     Ok(())
 }
