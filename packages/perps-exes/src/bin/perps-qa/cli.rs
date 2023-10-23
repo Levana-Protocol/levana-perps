@@ -120,8 +120,6 @@ pub(crate) enum Subcommand {
         #[clap(flatten)]
         inner: crate::capping::Opt,
     },
-    /// Transfer dao fees
-    TransferDaoFees {},
 }
 
 #[derive(clap::Parser)]
