@@ -1,4 +1,5 @@
 mod migrate;
+mod send_treasury;
 mod sync_config;
 mod update_config;
 
@@ -29,7 +30,10 @@ use crate::{
     app::OracleInfo, cli::Opt, spot_price_config::get_spot_price_config, util::get_hash_for_path,
 };
 
-use self::{migrate::MigrateOpts, sync_config::SyncConfigOpts, update_config::UpdateConfigOpts};
+use self::{
+    migrate::MigrateOpts, send_treasury::SendTreasuryOpts, sync_config::SyncConfigOpts,
+    update_config::UpdateConfigOpts,
+};
 
 #[derive(clap::Parser)]
 pub(crate) struct MainnetOpt {
@@ -79,6 +83,11 @@ enum Sub {
         #[clap(flatten)]
         inner: SyncConfigOpts,
     },
+    /// Create a CW3 message to send funds from the treasury wallet
+    SendTreasury {
+        #[clap(flatten)]
+        inner: SendTreasuryOpts,
+    },
 }
 
 pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
@@ -98,6 +107,7 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
         Sub::Migrate { inner } => inner.go(opt).await?,
         Sub::UpdateConfig { inner } => inner.go(opt).await?,
         Sub::SyncConfig { inner } => inner.go(opt).await?,
+        Sub::SendTreasury { inner } => inner.go(opt).await?,
     }
     Ok(())
 }

@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use cosmos::{Address, TxBuilder};
-use cosmwasm_std::{CosmosMsg, Empty, WasmMsg};
+use cosmos::{proto::cosmos::bank::v1beta1::MsgSend, Address, HasAddress, TxBuilder};
+use cosmwasm_std::{BankMsg, CosmosMsg, Empty, WasmMsg};
 use sha2::{Digest, Sha256};
 
 pub(crate) fn get_hash_for_path(path: &Path) -> Result<String> {
@@ -19,7 +19,24 @@ pub(crate) fn add_cosmos_msg(
     msg: &CosmosMsg<Empty>,
 ) -> Result<()> {
     match msg {
-        CosmosMsg::Bank(_) => anyhow::bail!("No support for bank"),
+        CosmosMsg::Bank(bank) => match bank {
+            BankMsg::Send { to_address, amount } => {
+                builder.add_message_mut(MsgSend {
+                    from_address: sender.get_address_string(),
+                    to_address: to_address.clone(),
+                    amount: amount
+                        .iter()
+                        .map(|cosmwasm_std::Coin { denom, amount }| cosmos::Coin {
+                            denom: denom.clone(),
+                            amount: amount.to_string(),
+                        })
+                        .collect(),
+                });
+                Ok(())
+            }
+            BankMsg::Burn { amount } => anyhow::bail!("No support for burn"),
+            _ => anyhow::bail!("Unknown BankMsg variant"),
+        },
         CosmosMsg::Custom(_) => anyhow::bail!("No support for custom"),
         CosmosMsg::Staking(_) => anyhow::bail!("No support for staking"),
         CosmosMsg::Distribution(_) => anyhow::bail!("No support for distribution"),
