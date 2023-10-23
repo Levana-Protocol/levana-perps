@@ -143,10 +143,6 @@ impl PerpApp {
         self.market.crank(&self.wallet, rewards).await
     }
 
-    pub async fn transfer_dao_fees(&self) -> Result<TxResponse> {
-        self.market.transfer_dao_fees(&self.wallet).await
-    }
-
     pub async fn tap_faucet(&self) -> Result<TxResponse> {
         let cw20_address = match self.market.status().await?.collateral {
             Token::Cw20 {
