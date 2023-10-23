@@ -423,7 +423,13 @@ impl App {
             // Check 1: is the last price update too old?
             let age = Utc::now().signed_duration_since(updated);
             let age_secs = age.num_seconds();
-            if age_secs > self.config.max_price_age_secs.into() {
+            // Determine how old a price triggers a price update. We check
+            // the defaults for the bots, the feeds themselves, and then add
+            // a 10 second buffer to give time for transactions to land on
+            // chain.
+            let max_price_age_secs =
+                market.max_price_age_with_default(self.config.max_price_age_secs) - 10;
+            if age_secs > max_price_age_secs.into() {
                 return Ok((
                     Some(market_price),
                     Some((
@@ -586,5 +592,32 @@ impl Display for PriceUpdateReason {
             }
             PriceUpdateReason::NoPriceFound => write!(f, "No price point found."),
         }
+    }
+}
+
+impl Market {
+    fn max_price_age_with_default(&self, default_max_age: u32) -> u32 {
+        let mut ret = default_max_age;
+        match &self.status.config.spot_price {
+            SpotPriceConfig::Manual { .. } => (),
+            SpotPriceConfig::Oracle {
+                feeds, feeds_usd, ..
+            } => feeds
+                .iter()
+                .chain(feeds_usd.iter())
+                .for_each(|feed| match &feed.data {
+                    SpotPriceFeedData::Constant { .. } => (),
+                    SpotPriceFeedData::Pyth {
+                        age_tolerance_seconds,
+                        ..
+                    } => ret = ret.min(*age_tolerance_seconds),
+                    SpotPriceFeedData::Stride {
+                        age_tolerance_seconds,
+                        ..
+                    } => ret = ret.min(*age_tolerance_seconds),
+                    SpotPriceFeedData::Sei { .. } => (),
+                }),
+        }
+        ret
     }
 }
