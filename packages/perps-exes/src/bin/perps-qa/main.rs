@@ -40,13 +40,17 @@ async fn main_inner() -> Result<()> {
     }
     let cosmos = builder.build().await?;
 
-    if let cli::Subcommand::TransferDaoFees {  }  = subcommand {
-
+    if let cli::Subcommand::TransferDaoFees {} = subcommand {
         let builder = network.builder().await?;
         let cosmos = builder.build().await?;
         let factory_contract = Contract::new(cosmos.clone(), factory_address);
 
-        let resp:MarketsResp = factory_contract.query(&msg::contracts::factory::entry::QueryMsg::Markets { start_after: None, limit: None }).await?;
+        let resp: MarketsResp = factory_contract
+            .query(&msg::contracts::factory::entry::QueryMsg::Markets {
+                start_after: None,
+                limit: None,
+            })
+            .await?;
         for market_id in resp.markets {
             log::debug!("transferring dao fees for market id {market_id}");
             let app = PerpApp::new(
@@ -55,7 +59,8 @@ async fn main_inner() -> Result<()> {
                 Some(faucet_address),
                 market_id,
                 network,
-            ).await?;
+            )
+            .await?;
             log::debug!("wallet address {}", app.wallet_address);
 
             let resp = app.transfer_dao_fees().await?;
@@ -63,7 +68,6 @@ async fn main_inner() -> Result<()> {
         }
         Ok(())
     } else {
-
         let perp_contract = PerpApp::new(
             opt.wallet,
             factory_address,
@@ -321,9 +325,9 @@ async fn main_inner() -> Result<()> {
                 log::debug!("Raw log: {}", tx.raw_log);
             }
             cli::Subcommand::CappingReport { inner } => inner.go(perp_contract).await?,
-            cli::Subcommand::TransferDaoFees { } => {
+            cli::Subcommand::TransferDaoFees {} => {
                 unreachable!("This is a placeholder for the real transfer dao fees command which was executed above")
-            } 
+            }
         }
         Ok(())
     }

@@ -414,12 +414,9 @@ impl MarketContract {
             .await
     }
 
-    pub async fn transfer_dao_fees(
-        &self,
-        wallet: &Wallet,
-    ) -> Result<TxResponse> {
+    pub async fn transfer_dao_fees(&self, wallet: &Wallet) -> Result<TxResponse> {
         self.0
-            .execute(wallet, vec![], MarketExecuteMsg::TransferDaoFees {  })
+            .execute(wallet, vec![], MarketExecuteMsg::TransferDaoFees {})
             .await
     }
 
