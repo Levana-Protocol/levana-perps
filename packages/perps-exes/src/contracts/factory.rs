@@ -117,15 +117,35 @@ impl Factory {
     }
 
     pub async fn query_migration_admin(&self) -> Result<Address> {
-        let FactoryOwnerResp {
-            admin_migration, ..
-        } = self.0.query(QueryMsg::FactoryOwner {}).await?;
-        admin_migration.into_string().parse().with_context(|| {
-            format!(
-                "Invalid factory migration admin found for factory {}",
-                self.0
-            )
-        })
+        self.query_owners()
+            .await?
+            .admin_migration
+            .into_string()
+            .parse()
+            .with_context(|| {
+                format!(
+                    "Invalid factory migration admin found for factory {}",
+                    self.0
+                )
+            })
+    }
+
+    pub async fn query_dao(&self) -> Result<Address> {
+        self.query_owners()
+            .await?
+            .dao
+            .into_string()
+            .parse()
+            .with_context(|| {
+                format!(
+                    "Invalid factory migration admin found for factory {}",
+                    self.0
+                )
+            })
+    }
+
+    pub async fn query_owners(&self) -> Result<FactoryOwnerResp> {
+        self.0.query(QueryMsg::FactoryOwner {}).await
     }
 
     pub async fn disable_trades(&self, wallet: &Wallet, market: MarketId) -> Result<TxResponse> {
