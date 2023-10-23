@@ -270,3 +270,7 @@ create-nft-mint-relayer-channel path-name juno-port stargaze-port:
 	rly transact channel {{path-name}} --src-port {{juno-port}} --dst-port {{stargaze-port}} --order unordered --version nft-mint-001 --debug --override
 create-lvn-grant-relayer-channel path-name juno-port osmosis-port:
 	rly transact channel {{path-name}} --src-port {{juno-port}} --dst-port {{osmosis-port}} --order unordered --version lvn-grant-001 --debug --override
+
+# faucet is a workaround for the fact that the tool will try (and fail) to load a faucet for mainnet, so we supply a dummy 
+injective-transfer-dao-fees:
+    cargo run --bin perps-qa transfer-dao-fees --factory-contract-address inj1vdu3s39dl8t5l88tyqwuhzklsx9587adv8cnn9 --network injective-mainnet --faucet-contract-address inj1vdu3s39dl8t5l88tyqwuhzklsx9587adv8cnn9
