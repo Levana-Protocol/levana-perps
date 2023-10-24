@@ -75,7 +75,7 @@ impl WatchedTask for Worker {
     }
 }
 
-const CRANK_EXECS: &[u32] = &[30, 25, 20, 15, 10, 7, 6, 5, 4, 3, 2, 1];
+const CRANK_EXECS: &[u32] = &[20, 7, 4, 1];
 
 impl App {
     async fn crank(
