@@ -16,10 +16,17 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use axum::async_trait;
-use cosmos::{HasAddress, TxBuilder, Wallet};
+use cosmos::proto::cosmos::base::abci::v1beta1::TxResponse;
+use cosmos::{Address, HasAddress, TxBuilder, Wallet};
+use msg::contracts::market::spot_price::{
+    PythPriceServiceNetwork, SpotPriceConfig, SpotPriceFeedData,
+};
 use msg::prelude::MarketExecuteMsg;
 use perps_exes::prelude::MarketContract;
+use perps_exes::pyth::get_oracle_update_msg;
+use shared::storage::RawAddr;
 
+use crate::util::oracle::OffchainPriceData;
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
 use self::trigger_crank::CrankReceiver;
@@ -132,20 +139,36 @@ impl App {
             vec![],
             MarketExecuteMsg::Crank {
                 execs: actual_execs,
-                rewards,
+                rewards: rewards.clone(),
             },
         )?;
 
-        let txres = match builder
+        let (txres, did_price_update) = match builder
             .sign_and_broadcast(&self.cosmos, crank_wallet)
             .await
             .with_context(|| format!("Unable to turn crank for market {market}"))
         {
-            Ok(txres) => txres,
+            Ok(txres) => (txres, false),
             Err(e) => {
                 if self.is_osmosis_epoch() {
                     return Ok(WatchedTaskOutput { skip_delay: false, message: format!("Ignoring crank run error since we think we're in the Osmosis epoch, error: {e:?}")
                     });
+                }
+
+                // Check if we hit price_too_old and, if so, try again with a transaction that includes an oracle update.
+                if format!("{e:?}").contains("price_too_old") {
+                    match self
+                        .try_crank_with_oracle(market, crank_wallet, rewards)
+                        .await
+                    {
+                        Ok(txres) => (txres, true),
+                        Err(e2) => {
+                            log::error!(
+                                "Got price_too_old and cranking with oracle failed too: {e2:?}"
+                            );
+                            return Err(e);
+                        }
+                    }
                 } else {
                     return Err(e);
                 }
@@ -171,9 +194,88 @@ impl App {
         Ok(WatchedTaskOutput {
             skip_delay: true,
             message: format!(
-                "Successfully turned the crank for market {market} in transaction {}. {}",
+                "Successfully turned the crank for market {market} in transaction {}. Included oracle update: {did_price_update}. {}",
                 txres.txhash, more_work
             ),
         })
     }
+
+    async fn try_crank_with_oracle(
+        &self,
+        market: Address,
+        crank_wallet: &Wallet,
+        rewards: Option<RawAddr>,
+    ) -> Result<TxResponse> {
+        let market_contract = MarketContract::new(self.cosmos.make_contract(market));
+        let status = market_contract.status().await?;
+        let (pyth_network, pyth_oracle) = get_pyth_network(&status.config.spot_price)?;
+
+        let mut builder = TxBuilder::default();
+
+        let factory = self.get_factory_info().await;
+        let offchain_price_data = OffchainPriceData::load(self, &factory.markets).await?;
+        let update_msg = get_oracle_update_msg(
+            match pyth_network {
+                PythPriceServiceNetwork::Stable => &offchain_price_data.stable_ids,
+                PythPriceServiceNetwork::Edge => &offchain_price_data.edge_ids,
+            },
+            crank_wallet,
+            match pyth_network {
+                PythPriceServiceNetwork::Stable => &self.endpoint_stable,
+                PythPriceServiceNetwork::Edge => &self.endpoint_edge,
+            },
+            &self.client,
+            &self.cosmos.make_contract(pyth_oracle),
+        )
+        .await?;
+        builder.add_message_mut(update_msg);
+
+        // Do 0 execs, consider this an extreme case where we simply want to make sure some price gets added immediately
+        builder.add_execute_message_mut(
+            market,
+            crank_wallet,
+            vec![],
+            MarketExecuteMsg::Crank {
+                execs: Some(0),
+                rewards,
+            },
+        )?;
+
+        builder
+            .sign_and_broadcast(&self.cosmos, crank_wallet)
+            .await
+            .with_context(|| format!("Unable to update oracle and turn crank for market {market}"))
+    }
+}
+
+fn get_pyth_network(spot_price: &SpotPriceConfig) -> Result<(PythPriceServiceNetwork, Address)> {
+    let (pyth, feeds, feeds_usd) = match spot_price {
+        SpotPriceConfig::Manual { .. } => {
+            anyhow::bail!("Manual oracle used, no Pyth updates possible")
+        }
+        SpotPriceConfig::Oracle {
+            pyth,
+            feeds,
+            feeds_usd,
+            ..
+        } => (pyth, feeds, feeds_usd),
+    };
+
+    let uses_pyth = feeds
+        .iter()
+        .chain(feeds_usd.iter())
+        .any(|feed| match &feed.data {
+            SpotPriceFeedData::Constant { .. } => false,
+            SpotPriceFeedData::Pyth { .. } => true,
+            SpotPriceFeedData::Stride { .. } => false,
+            SpotPriceFeedData::Sei { .. } => false,
+        });
+
+    anyhow::ensure!(uses_pyth, "This market doesn't use Pyth");
+
+    let pyth = pyth
+        .as_ref()
+        .context("Pyth feeds found but no pyth config found")?;
+
+    Ok((pyth.network, pyth.contract_address.as_str().parse()?))
 }
