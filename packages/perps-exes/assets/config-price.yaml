@@ -22,6 +22,7 @@ pyth:
       XAU_USD: 765d2ba906dbc32ca17cc11f5310a89e9ee1f6420508c63861f2f8ba4ee34bb2
       BNB_USD: 2f95862b045670cd22bee3114c39763a4a08beeb663b145d283c31d7d1101c4f
       SOL_USD: ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d
+      LINK_USD: 8ac0c70fff57e9aefdf5edf44b51d62c2d433653cbb2cf5cc06bb115af04d221
   edge: 
     update-age-tolerance: 120
     # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-edge
@@ -32,6 +33,7 @@ pyth:
       INJ_USD: "2d9315a88f3019f8efa88dfe9c0f0843712da0bac814461e27733f6b83eb51b3"
       BNB_USD: "ecf553770d9b10965f8fb64771e93f5690a182edc32be4a3236e0caaa6e0581a"
       SOL_USD: "fe650f0367d4a7ef9815a593ea15d36593f0643aaaf0149bb04be67ab851decd"
+      LINK_USD: "83be4ed61dd8a3518d198098ce37240c494710a7b9d85e35d9fceac21df08994"
 
 networks: 
   injective-testnet:
@@ -70,6 +72,13 @@ networks:
       feeds-usd: [
         !constant { price: "1", inverted: false }
       ]
+    LINK_USDT:
+      feeds: [
+        !pyth { key: "LINK_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
 
   injective-mainnet:
     INJ_USD:
@@ -82,6 +91,13 @@ networks:
     BNB_USDT:
       feeds: [
         !pyth { key: "BNB_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    LINK_USDT:
+      feeds: [
+        !pyth { key: "LINK_USD", inverted: false }
       ]
       feeds-usd: [
         !constant { price: "1", inverted: false }
