@@ -35,6 +35,7 @@ pyth:
       BNB_USD: "ecf553770d9b10965f8fb64771e93f5690a182edc32be4a3236e0caaa6e0581a"
       SOL_USD: "fe650f0367d4a7ef9815a593ea15d36593f0643aaaf0149bb04be67ab851decd"
       LINK_USD: "83be4ed61dd8a3518d198098ce37240c494710a7b9d85e35d9fceac21df08994"
+      AXL_USD: "72fe21b4ba5661f194b5f17bfadcc59eddd3e0e53198d040e5091c6dfb558108"
 
 networks: 
   injective-testnet:
@@ -79,6 +80,13 @@ networks:
       ]
       feeds-usd: [
         !constant { price: "1", inverted: false }
+      ]
+    AXL_USD:
+      feeds: [
+        !pyth { key: "AXL_USD", inverted: false}
+      ]
+      feeds-usd: [
+        !pyth { key: "AXL_USD", inverted: false}
       ]
 
   injective-mainnet:
