@@ -143,25 +143,40 @@ impl App {
             },
         )?;
 
-        let (txres, did_price_update) = match builder
+        enum RunResult {
+            NormalRun(TxResponse),
+            RunWithOracle(TxResponse),
+            OutOfGas,
+        }
+
+        let run_result = match builder
             .sign_and_broadcast(&self.cosmos, crank_wallet)
             .await
             .with_context(|| format!("Unable to turn crank for market {market}"))
         {
-            Ok(txres) => (txres, false),
+            Ok(txres) => RunResult::NormalRun(txres),
             Err(e) => {
                 if self.is_osmosis_epoch() {
                     return Ok(WatchedTaskOutput { skip_delay: false, message: format!("Ignoring crank run error since we think we're in the Osmosis epoch, error: {e:?}")
                     });
                 }
 
+                let error_as_str = format!("{e:?}");
+
+                // If we got an "out of gas" code 11 error, we want to ignore
+                // it. This usually happens when new work comes in. The logic
+                // below to check if new work is available will cause a new
+                // crank run to be scheduled, if one is needed.
+                if error_as_str.contains("out of gas") || error_as_str.contains("code 11") {
+                    RunResult::OutOfGas
+                }
                 // Check if we hit price_too_old and, if so, try again with a transaction that includes an oracle update.
-                if format!("{e:?}").contains("price_too_old") {
+                else if format!("{e:?}").contains("price_too_old") {
                     match self
                         .try_crank_with_oracle(market, crank_wallet, rewards)
                         .await
                     {
-                        Ok(txres) => (txres, true),
+                        Ok(txres) => RunResult::RunWithOracle(txres),
                         Err(e2) => {
                             log::error!(
                                 "Got price_too_old and cranking with oracle failed too: {e2:?}"
@@ -193,10 +208,19 @@ impl App {
 
         Ok(WatchedTaskOutput {
             skip_delay: true,
-            message: format!(
-                "Successfully turned the crank for market {market} in transaction {}. Included oracle update: {did_price_update}. {}",
-                txres.txhash, more_work
-            ),
+            message: match run_result {
+                RunResult::NormalRun(txres) => format!(
+                    "Successfully turned the crank for market {market} in transaction {}. {}",
+                    txres.txhash, more_work
+                ),
+                RunResult::RunWithOracle(txres) => format!(
+                    "Successfully updated oracles and turned the crank for market {market} in transaction {}. {}",
+                    txres.txhash, more_work
+                ),
+                RunResult::OutOfGas => format!(
+                    "Got an 'out of gas' code 11 when trying to crank. {more_work}"
+                )
+            },
         })
     }
 
