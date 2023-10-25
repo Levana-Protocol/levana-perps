@@ -66,6 +66,7 @@ impl Faucet {
             "EVMOS" => "10000",
             "AKT" => "10000",
             "DOT" => "500",
+            "AXL" => "2000",
             name => anyhow::bail!("Unknown collateral type: {name}"),
         }
         .parse()?;

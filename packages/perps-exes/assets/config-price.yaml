@@ -23,6 +23,7 @@ pyth:
       BNB_USD: 2f95862b045670cd22bee3114c39763a4a08beeb663b145d283c31d7d1101c4f
       SOL_USD: ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d
       LINK_USD: 8ac0c70fff57e9aefdf5edf44b51d62c2d433653cbb2cf5cc06bb115af04d221
+      AXL_USD: 60144b1d5c9e9851732ad1d9760e3485ef80be39b984f6bf60f82b28a2b7f126
   edge: 
     update-age-tolerance: 120
     # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-edge
@@ -34,6 +35,7 @@ pyth:
       BNB_USD: "ecf553770d9b10965f8fb64771e93f5690a182edc32be4a3236e0caaa6e0581a"
       SOL_USD: "fe650f0367d4a7ef9815a593ea15d36593f0643aaaf0149bb04be67ab851decd"
       LINK_USD: "83be4ed61dd8a3518d198098ce37240c494710a7b9d85e35d9fceac21df08994"
+      AXL_USD: "72fe21b4ba5661f194b5f17bfadcc59eddd3e0e53198d040e5091c6dfb558108"
 
 networks: 
   injective-testnet:
@@ -78,6 +80,13 @@ networks:
       ]
       feeds-usd: [
         !constant { price: "1", inverted: false }
+      ]
+    AXL_USD:
+      feeds: [
+        !pyth { key: "AXL_USD", inverted: false}
+      ]
+      feeds-usd: [
+        !pyth { key: "AXL_USD", inverted: false}
       ]
 
   injective-mainnet:
@@ -233,6 +242,13 @@ networks:
       feeds-usd: [
         !constant { price: "1", inverted: false }
       ]
+    AXL_USD:
+      feeds: [
+        !pyth { key: "AXL_USD", inverted: false}
+      ]
+      feeds-usd: [
+        !pyth { key: "AXL_USD", inverted: false}
+      ]
   sei-testnet:
     ATOM_USD:
       feeds: [
@@ -247,6 +263,13 @@ networks:
       ]
       feeds-usd: [
         !constant { price: "1", inverted: false }
+      ]
+    OSMO_USD:
+      feeds: [
+        !pyth { key: "OSMO_USD", inverted: false },
+      ]
+      feeds-usd: [
+        !pyth { key: "OSMO_USD", inverted: false },
       ]
     ETH_BTC:
       feeds: [

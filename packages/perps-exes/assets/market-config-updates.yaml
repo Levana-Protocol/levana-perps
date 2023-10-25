@@ -271,3 +271,16 @@ markets:
     delta_neutrality_fee_tax: 0.25
 
     # Starting borrow fee: 0.05
+
+  AXL_USD:
+    max_leverage: 10
+    carry_leverage: 5
+    funding_rate_sensitivity: 2
+    target_utilization: 0.5
+    delta_neutrality_fee_sensitivity: 20000000
+    borrow_fee_sensitivity: 0.083333333
+    delta_neutrality_fee_cap: 0.015
+    delta_neutrality_fee_tax: 0.5
+    borrow_fee_rate_min_annualized: 0.09
+
+    # Starting borrow fee: 0.17
