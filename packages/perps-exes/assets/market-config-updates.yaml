@@ -20,6 +20,7 @@ markets:
     borrow_fee_sensitivity: 0.083333333
     borrow_fee_rate_min_annualized: 0.1
     target_utilization: 0.5
+    delta_neutrality_fee_tax: 0.25
 
   stATOM_USD:
     funding_rate_sensitivity: 2
@@ -28,6 +29,7 @@ markets:
     borrow_fee_sensitivity: 0.083333333
     delta_neutrality_fee_sensitivity: 200000000
     carry_leverage: 15
+    delta_neutrality_fee_tax: 0.25
 
     # initial borrow fee: 0.05
 
@@ -51,6 +53,7 @@ markets:
     borrow_fee_sensitivity: 0.01333333333
     delta_neutrality_fee_sensitivity: 200000000
     borrow_fee_rate_min_annualized: 0.04
+    delta_neutrality_fee_tax: 0.25
     # Set initial borrow fee to 8%
 
   # Currently only used on CI versions of contracts
@@ -95,7 +98,7 @@ markets:
     liquifunding_delay_seconds: 21600
     liquifunding_delay_fuzz_seconds: 3600
     delta_neutrality_fee_cap: 0.03
-    delta_neutrality_fee_tax: 0.35
+    delta_neutrality_fee_tax: 0.5
     liquidity_cooldown_seconds: 3600
 
     # Different from AKT
@@ -116,7 +119,7 @@ markets:
     liquifunding_delay_seconds: 21600
     liquifunding_delay_fuzz_seconds: 3600
     delta_neutrality_fee_cap: 0.03
-    delta_neutrality_fee_tax: 0.35
+    delta_neutrality_fee_tax: 0.5
     liquidity_cooldown_seconds: 3600
 
     # Different from EVMOS
@@ -134,6 +137,7 @@ markets:
     borrow_fee_sensitivity: 0.083333333
     delta_neutrality_fee_sensitivity: 100000000
     carry_leverage: 15
+    delta_neutrality_fee_tax: 0.25
 
     # Starting borrow fee: 0.1
 
@@ -143,7 +147,7 @@ markets:
     target_utilization: 0.5
     borrow_fee_sensitivity: 0.083333333
     delta_neutrality_fee_sensitivity: 100000000
-    delta_neutrality_fee_tax: 0.1
+    delta_neutrality_fee_tax: 0.25
     carry_leverage: 15
 
     # Starting borrow fee: 0.16
@@ -222,6 +226,7 @@ markets:
     borrow_fee_sensitivity: 0.083333333
     delta_neutrality_fee_sensitivity: 300000000
     carry_leverage: 15
+    delta_neutrality_fee_tax: 0.25
   BNB_USDT:
     funding_rate_sensitivity: 1.5
     borrow_fee_rate_min_annualized: 0.03
@@ -229,6 +234,7 @@ markets:
     borrow_fee_sensitivity: 0.083333333
     delta_neutrality_fee_sensitivity: 300000000
     carry_leverage: 15
+    delta_neutrality_fee_tax: 0.25
 
     # Starting borrow fee: 0.05
 
@@ -239,7 +245,7 @@ markets:
     borrow_fee_sensitivity: 0.083333333
     borrow_fee_rate_min_annualized: 0.03
     target_utilization: 0.5
-    delta_neutrality_fee_tax: 0.1
+    delta_neutrality_fee_tax: 0.25
   SOL_USDT:
     delta_neutrality_fee_sensitivity: 400000000
     funding_rate_sensitivity: 1.5
@@ -247,7 +253,7 @@ markets:
     borrow_fee_sensitivity: 0.083333333
     borrow_fee_rate_min_annualized: 0.03
     target_utilization: 0.5
-    delta_neutrality_fee_tax: 0.1
+    delta_neutrality_fee_tax: 0.25
 
     # Starting borrow fee: 0.05
 
