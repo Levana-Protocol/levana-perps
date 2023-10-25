@@ -14,7 +14,7 @@ markets:
     carry_leverage: 15
 
   ATOM_USD:
-    delta_neutrality_fee_sensitivity: 200000000
+    delta_neutrality_fee_sensitivity: 100000000
     funding_rate_sensitivity: 2
     carry_leverage: 15
     borrow_fee_sensitivity: 0.083333333
@@ -27,7 +27,7 @@ markets:
     borrow_fee_rate_min_annualized: 0.03
     target_utilization: 0.5
     borrow_fee_sensitivity: 0.083333333
-    delta_neutrality_fee_sensitivity: 200000000
+    delta_neutrality_fee_sensitivity: 100000000
     carry_leverage: 15
     delta_neutrality_fee_tax: 0.25
 
@@ -51,7 +51,7 @@ markets:
     funding_rate_sensitivity: 2
     target_utilization: 0.5
     borrow_fee_sensitivity: 0.01333333333
-    delta_neutrality_fee_sensitivity: 200000000
+    delta_neutrality_fee_sensitivity: 50000000
     borrow_fee_rate_min_annualized: 0.04
     delta_neutrality_fee_tax: 0.25
     # Set initial borrow fee to 8%
@@ -105,7 +105,7 @@ markets:
     borrow_fee_rate_min_annualized: 0.2
     borrow_fee_rate_max_annualized: 0.9
     borrow_fee_sensitivity: 0.166666667
-    delta_neutrality_fee_sensitivity: 20000000
+    delta_neutrality_fee_sensitivity: 2000000
 
     # Starting borrow fee: 0.35
 
@@ -126,7 +126,7 @@ markets:
     borrow_fee_rate_min_annualized: 0.06
     borrow_fee_rate_max_annualized: 0.6
     borrow_fee_sensitivity: 0.01333333333
-    delta_neutrality_fee_sensitivity: 30000000
+    delta_neutrality_fee_sensitivity: 5000000
 
     # Starting borrow fee: 0.1
 
@@ -146,7 +146,7 @@ markets:
     borrow_fee_rate_min_annualized: 0.08
     target_utilization: 0.5
     borrow_fee_sensitivity: 0.083333333
-    delta_neutrality_fee_sensitivity: 100000000
+    delta_neutrality_fee_sensitivity: 50000000
     delta_neutrality_fee_tax: 0.25
     carry_leverage: 15
 
@@ -224,7 +224,7 @@ markets:
     borrow_fee_rate_min_annualized: 0.03
     target_utilization: 0.5
     borrow_fee_sensitivity: 0.083333333
-    delta_neutrality_fee_sensitivity: 300000000
+    delta_neutrality_fee_sensitivity: 200000000
     carry_leverage: 15
     delta_neutrality_fee_tax: 0.25
   BNB_USDT:
@@ -232,7 +232,7 @@ markets:
     borrow_fee_rate_min_annualized: 0.03
     target_utilization: 0.5
     borrow_fee_sensitivity: 0.083333333
-    delta_neutrality_fee_sensitivity: 300000000
+    delta_neutrality_fee_sensitivity: 200000000
     carry_leverage: 15
     delta_neutrality_fee_tax: 0.25
 
