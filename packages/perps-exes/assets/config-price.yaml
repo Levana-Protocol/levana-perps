@@ -264,6 +264,13 @@ networks:
       feeds-usd: [
         !constant { price: "1", inverted: false }
       ]
+    OSMO_USD:
+      feeds: [
+        !pyth { key: "OSMO_USD", inverted: false },
+      ]
+      feeds-usd: [
+        !pyth { key: "OSMO_USD", inverted: false },
+      ]
     ETH_BTC:
       feeds: [
         !sei { denom: "ueth", inverted: false },

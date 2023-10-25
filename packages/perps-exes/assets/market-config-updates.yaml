@@ -32,8 +32,8 @@ markets:
     # initial borrow fee: 0.05
 
   OSMO_USD:
-    max_leverage: 10
-    carry_leverage: 5
+    max_leverage: 4
+    carry_leverage: 2
     funding_rate_sensitivity: 2
     target_utilization: 0.5
     delta_neutrality_fee_sensitivity: 12000000
