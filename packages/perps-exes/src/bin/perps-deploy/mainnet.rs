@@ -24,7 +24,7 @@ use msg::{
 use perps_exes::{
     config::{
         ChainConfig, ConfigUpdateAndBorrowFee, MainnetFactories, MainnetFactory,
-        MarketConfigUpdates, PriceConfig,
+        MarketConfigUpdates, NativeAsset, PriceConfig,
     },
     contracts::Factory,
     prelude::*,
@@ -453,23 +453,9 @@ struct AddMarketOpts {
     /// New market ID to add
     #[clap(long)]
     market_id: MarketId,
-    /// Denom of the native coin used for collateral
-    #[clap(long)]
-    collateral: String,
-    /// Decimal places used by this collateral asset
-    #[clap(long)]
-    decimal_places: u8,
 }
 
-async fn add_market(
-    opt: Opt,
-    AddMarketOpts {
-        factory,
-        market_id,
-        collateral,
-        decimal_places,
-    }: AddMarketOpts,
-) -> Result<()> {
+async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpts) -> Result<()> {
     let ConfigUpdateAndBorrowFee {
         config: market_config_update,
         initial_borrow_fee_rate,
@@ -488,14 +474,23 @@ async fn add_market(
     let price_config = PriceConfig::load(None::<PathBuf>)?;
     let oracle = opt.get_oracle_info(&chain_config, &price_config, factory.network)?;
 
+    let collateral_name = market_id.get_collateral();
+    let token = chain_config
+        .assets
+        .get(collateral_name)
+        .with_context(|| {
+            format!(
+                "No definition for asset {collateral_name} for network {}",
+                factory.network
+            )
+        })?
+        .into();
+
     let msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
         new_market: NewMarketParams {
             spot_price: get_spot_price_config(&oracle, &price_config, &market_id)?,
             market_id,
-            token: TokenInit::Native {
-                denom: collateral,
-                decimal_places,
-            },
+            token,
             config: Some(market_config_update),
             initial_borrow_fee_rate,
             initial_price: None,
