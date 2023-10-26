@@ -21,7 +21,6 @@ markets:
 
   ATOM_USD:
     config:
-      delta_neutrality_fee_sensitivity: 50000000
       funding_rate_sensitivity: 2
       carry_leverage: 15
       borrow_fee_sensitivity: 0.083333333
@@ -37,7 +36,6 @@ markets:
       borrow_fee_rate_min_annualized: 0.03
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.083333333
-      delta_neutrality_fee_sensitivity: 50000000
       carry_leverage: 15
       delta_neutrality_fee_tax: 0.25
 
