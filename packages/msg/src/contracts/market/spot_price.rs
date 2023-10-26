@@ -81,6 +81,14 @@ pub enum SpotPriceFeedData {
         /// The denom to use
         denom: String,
     },
+    /// Simple contract with a QueryMsg::Price call
+    Simple {
+        /// The contract to use
+        contract: Addr,
+        /// price age tolerance, in seconds
+        /// If used, a timestamp must be available on the price response
+        age_tolerance_seconds: Option<u32>,
+    },
 }
 
 /// Which network to use for the price service
@@ -127,9 +135,9 @@ pub enum SpotPriceConfigInit {
         /// Stride configuration, required on chains that use stride feeds
         stride: Option<StrideConfigInit>,
         /// sequence of spot price feeds which are composed to generate a single spot price
-        feeds: Vec<SpotPriceFeed>,
+        feeds: Vec<SpotPriceFeedInit>,
         /// if necessary, sequence of spot price feeds which are composed to generate a single USD spot price
-        feeds_usd: Vec<SpotPriceFeed>,
+        feeds_usd: Vec<SpotPriceFeedInit>,
     },
 }
 
@@ -152,8 +160,94 @@ impl From<SpotPriceConfig> for SpotPriceConfigInit {
                 stride: stride.map(|stride| StrideConfigInit {
                     contract_address: RawAddr::from(stride.contract_address),
                 }),
-                feeds,
-                feeds_usd,
+                feeds: feeds.iter().map(|feed| feed.clone().into()).collect(),
+                feeds_usd: feeds_usd
+                    .iter()
+                    .map(|feed_usd| feed_usd.clone().into())
+                    .collect(),
+            },
+        }
+    }
+}
+
+/// An individual feed used to compose a final spot price
+#[cw_serde]
+pub struct SpotPriceFeedInit {
+    /// The data for this price feed
+    pub data: SpotPriceFeedDataInit,
+    /// is this price feed inverted
+    pub inverted: bool,
+}
+impl From<SpotPriceFeed> for SpotPriceFeedInit {
+    fn from(src: SpotPriceFeed) -> Self {
+        Self {
+            data: src.data.into(),
+            inverted: src.inverted,
+        }
+    }
+}
+
+/// The data for an individual spot price feed
+#[cw_serde]
+pub enum SpotPriceFeedDataInit {
+    /// Hardcoded value
+    Constant {
+        /// The constant price
+        price: NumberGtZero,
+    },
+    /// Pyth price feeds
+    Pyth {
+        /// The identifier on pyth
+        id: PriceIdentifier,
+        /// price age tolerance, in seconds
+        age_tolerance_seconds: u32,
+    },
+    /// Stride liquid staking
+    Stride {
+        /// The IBC denom for the asset
+        denom: String,
+        /// price age tolerance, in seconds
+        age_tolerance_seconds: u32,
+    },
+    /// Native oracle module on the sei chain
+    Sei {
+        /// The denom to use
+        denom: String,
+    },
+    /// Simple contract with a QueryMsg::Price call
+    Simple {
+        /// The contract to use
+        contract: RawAddr,
+        /// price age tolerance, in seconds
+        /// If used, a timestamp must be available on the price response
+        age_tolerance_seconds: Option<u32>,
+    },
+}
+impl From<SpotPriceFeedData> for SpotPriceFeedDataInit {
+    fn from(src: SpotPriceFeedData) -> Self {
+        match src {
+            SpotPriceFeedData::Constant { price } => SpotPriceFeedDataInit::Constant { price },
+            SpotPriceFeedData::Pyth {
+                id,
+                age_tolerance_seconds,
+            } => SpotPriceFeedDataInit::Pyth {
+                id,
+                age_tolerance_seconds,
+            },
+            SpotPriceFeedData::Stride {
+                denom,
+                age_tolerance_seconds,
+            } => SpotPriceFeedDataInit::Stride {
+                denom,
+                age_tolerance_seconds,
+            },
+            SpotPriceFeedData::Sei { denom } => SpotPriceFeedDataInit::Sei { denom },
+            SpotPriceFeedData::Simple {
+                contract,
+                age_tolerance_seconds,
+            } => SpotPriceFeedDataInit::Simple {
+                contract: contract.into(),
+                age_tolerance_seconds,
             },
         }
     }

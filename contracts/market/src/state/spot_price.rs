@@ -6,7 +6,10 @@ use anyhow::ensure;
 use cosmwasm_std::QuerierWrapper;
 use cosmwasm_std::{Binary, Order};
 use msg::contracts::market::{
-    entry::{OraclePriceFeedPythResp, OraclePriceFeedStrideResp, PriceForQuery},
+    entry::{
+        OraclePriceFeedPythResp, OraclePriceFeedSimpleResp, OraclePriceFeedStrideResp,
+        PriceForQuery,
+    },
     spot_price::{events::SpotPriceEvent, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData},
 };
 use pyth_sdk_cw::{PriceFeedResponse, PriceIdentifier};
@@ -44,6 +47,8 @@ pub(crate) struct OraclePriceInternal {
     pub sei: BTreeMap<String, NumberGtZero>,
     /// A map of each stride denom used in this market to the redemption price
     pub stride: BTreeMap<String, OraclePriceFeedStrideResp>,
+    /// A map of each simple contract used in this market to the redemption price
+    pub simple: BTreeMap<Addr, OraclePriceFeedSimpleResp>,
 }
 
 impl OraclePriceInternal {
@@ -96,6 +101,11 @@ impl OraclePriceInternal {
                     .map(|x| (x.redemption_rate, Some(x.publish_time)))
                     .with_context(|| format!("no stride redemption rate for denom {}", denom))?,
                 SpotPriceFeedData::Constant { price } => (*price, None),
+                SpotPriceFeedData::Simple { contract, .. } => self
+                    .simple
+                    .get(contract)
+                    .map(|x| (x.value, x.timestamp))
+                    .with_context(|| format!("no simple price for contract {}", contract))?,
             };
 
             let price = if *inverted {
@@ -387,6 +397,7 @@ impl State<'_> {
             } => {
                 let mut pyth = BTreeMap::new();
                 let mut stride = BTreeMap::new();
+                let mut simple = BTreeMap::new();
                 #[cfg(feature = "sei")]
                 let mut sei = BTreeMap::new();
                 #[cfg(not(feature = "sei"))]
@@ -551,10 +562,61 @@ impl State<'_> {
                         SpotPriceFeedData::Constant { .. } => {
                             // nothing to do here, constant prices are used without a lookup
                         }
+                        SpotPriceFeedData::Simple {
+                            contract,
+                            age_tolerance_seconds,
+                        } => {
+                            if let Entry::Vacant(entry) = simple.entry(contract.clone()) {
+                                #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+                                #[serde(rename_all = "snake_case")]
+                                enum SimpleQuery {
+                                    Price {},
+                                }
+
+                                let resp: OraclePriceFeedSimpleResp = self
+                                    .querier
+                                    .query_wasm_smart(contract, &SimpleQuery::Price {})?;
+
+                                if let (true, Some(age_tolerance_seconds)) =
+                                    (validate_age, age_tolerance_seconds)
+                                {
+                                    let publish_time = resp.timestamp.with_context(|| {
+                                        format!(
+                                            "no publish time for simple price contract: {}",
+                                            contract
+                                        )
+                                    })?;
+                                    let time_diff = self
+                                        .now()
+                                        .checked_sub(publish_time, "simple oracle price time")?;
+                                    if time_diff
+                                        > Duration::from_seconds((*age_tolerance_seconds).into())
+                                    {
+                                        perp_bail!(
+                                            ErrorId::PriceTooOld,
+                                            ErrorDomain::SimpleOracle,
+                                            "Current price is not available on simple oracle. Price contract: {}, Current block time: {}, price publish time: {}, diff: {:?}, age_tolerance: {}",
+                                            contract,
+                                            current_block_time_seconds,
+                                            publish_time,
+                                            time_diff,
+                                            age_tolerance_seconds
+                                        )
+                                    }
+                                }
+
+                                entry.insert(resp);
+                            }
+                        }
                     }
                 }
 
-                Ok(OraclePriceInternal { pyth, stride, sei })
+                Ok(OraclePriceInternal {
+                    pyth,
+                    stride,
+                    sei,
+                    simple,
+                })
             }
         }
     }

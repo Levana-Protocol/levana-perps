@@ -144,6 +144,11 @@ pub enum MarketPriceFeedConfig {
         inverted: bool,
         age_tolerance: u32,
     },
+    Simple {
+        contract: Address,
+        inverted: bool,
+        age_tolerance: Option<u32>,
+    },
 }
 
 /// Number of decimals in the gas coin

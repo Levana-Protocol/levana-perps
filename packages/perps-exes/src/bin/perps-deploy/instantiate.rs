@@ -311,7 +311,7 @@ pub(crate) async fn instantiate(
                 feeds, feeds_usd, ..
             } => {
                 if feeds.iter().chain(feeds_usd.iter()).any(|f| match f.data {
-                    msg::contracts::market::spot_price::SpotPriceFeedData::Pyth { .. } => true,
+                    msg::contracts::market::spot_price::SpotPriceFeedDataInit::Pyth { .. } => true,
                     _ => false,
                 }) {
                     log::info!("not doing initial crank for {} because it contains pyth feeds which may need a publish first", market.market_id);

@@ -3,7 +3,10 @@ use anyhow::ensure;
 use cw_storage_plus::Item;
 use msg::contracts::market::{
     config::{Config, ConfigUpdate},
-    spot_price::{PythConfig, SpotPriceConfig, SpotPriceConfigInit, StrideConfig},
+    spot_price::{
+        PythConfig, SpotPriceConfig, SpotPriceConfigInit, SpotPriceFeed, SpotPriceFeedData,
+        SpotPriceFeedDataInit, SpotPriceFeedInit, StrideConfig,
+    },
 };
 
 const CONFIG_STORAGE: Item<Config> = Item::new(namespace::CONFIG);
@@ -212,6 +215,49 @@ pub(crate) fn convert_spot_price_init(
             ensure!(!feeds.is_empty(), "feeds cannot be empty");
             ensure!(!feeds_usd.is_empty(), "feeds_usd cannot be empty");
 
+            fn map_feeds(
+                api: &dyn Api,
+                feeds: Vec<SpotPriceFeedInit>,
+            ) -> Result<Vec<SpotPriceFeed>> {
+                feeds
+                    .into_iter()
+                    .map(|feed| {
+                        Ok(SpotPriceFeed {
+                            inverted: feed.inverted,
+                            data: match feed.data {
+                                SpotPriceFeedDataInit::Constant { price } => {
+                                    SpotPriceFeedData::Constant { price }
+                                }
+                                SpotPriceFeedDataInit::Pyth {
+                                    id,
+                                    age_tolerance_seconds,
+                                } => SpotPriceFeedData::Pyth {
+                                    id,
+                                    age_tolerance_seconds,
+                                },
+                                SpotPriceFeedDataInit::Stride {
+                                    denom,
+                                    age_tolerance_seconds,
+                                } => SpotPriceFeedData::Stride {
+                                    denom,
+                                    age_tolerance_seconds,
+                                },
+                                SpotPriceFeedDataInit::Sei { denom } => {
+                                    SpotPriceFeedData::Sei { denom }
+                                }
+                                SpotPriceFeedDataInit::Simple {
+                                    contract,
+                                    age_tolerance_seconds,
+                                } => SpotPriceFeedData::Simple {
+                                    contract: contract.validate(api)?,
+                                    age_tolerance_seconds,
+                                },
+                            },
+                        })
+                    })
+                    .collect()
+            }
+
             SpotPriceConfig::Oracle {
                 pyth: pyth
                     .map(|pyth| {
@@ -231,8 +277,8 @@ pub(crate) fn convert_spot_price_init(
                             .map(|contract_address| StrideConfig { contract_address })
                     })
                     .transpose()?,
-                feeds,
-                feeds_usd,
+                feeds: map_feeds(api, feeds)?,
+                feeds_usd: map_feeds(api, feeds_usd)?,
             }
         }
     })

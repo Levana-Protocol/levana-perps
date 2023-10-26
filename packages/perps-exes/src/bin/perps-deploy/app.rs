@@ -235,6 +235,23 @@ impl Opt {
                             inverted,
                         });
                     }
+                    MarketPriceFeedConfig::Simple {
+                        contract,
+                        inverted,
+                        age_tolerance,
+                    } => {
+                        feeds.push(SpotPriceFeed {
+                            data: SpotPriceFeedData::Simple {
+                                contract: Addr::unchecked(
+                                    contract
+                                        .for_chain(network.get_address_type())
+                                        .get_address_string(),
+                                ),
+                                age_tolerance_seconds: age_tolerance,
+                            },
+                            inverted,
+                        });
+                    }
                 }
             }
 

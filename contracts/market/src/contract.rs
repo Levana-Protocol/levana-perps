@@ -504,6 +504,11 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                     pyth: oracle_price.pyth,
                     sei: oracle_price.sei,
                     stride: oracle_price.stride,
+                    simple: oracle_price
+                        .simple
+                        .into_iter()
+                        .map(|(key, value)| (key.into(), value))
+                        .collect(),
                     composed_price: price_point,
                 }
                 .query_result()
