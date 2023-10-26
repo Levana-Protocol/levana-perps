@@ -21,9 +21,6 @@ pub(crate) struct AddMarketOpt {
     /// Which market to deposit into
     #[clap(long)]
     market: MarketId,
-    /// Initial borrow fee rate
-    #[clap(long, default_value = "0.2")]
-    pub(crate) initial_borrow_fee_rate: Decimal256,
 }
 
 impl AddMarketOpt {
@@ -43,7 +40,6 @@ impl AddMarketOpt {
             trading_competition: app.trading_competition,
             faucet_admin: Some(app.wallet_manager),
             factory,
-            initial_borrow_fee_rate: self.initial_borrow_fee_rate,
             spot_price: get_spot_price_config(&oracle, &price_config, &self.market)?,
         };
         instantiate_market

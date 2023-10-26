@@ -584,10 +584,17 @@ pub enum Delay {
     Random { low: u64, high: u64 },
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MarketConfigUpdates {
-    pub markets: HashMap<MarketId, ConfigUpdate>,
+    pub markets: HashMap<MarketId, ConfigUpdateAndBorrowFee>,
+}
+
+#[derive(serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub struct ConfigUpdateAndBorrowFee {
+    pub config: ConfigUpdate,
+    pub initial_borrow_fee_rate: Decimal256,
 }
 
 impl MarketConfigUpdates {

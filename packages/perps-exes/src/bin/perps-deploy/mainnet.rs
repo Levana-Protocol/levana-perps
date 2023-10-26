@@ -22,7 +22,10 @@ use msg::{
     token::TokenInit,
 };
 use perps_exes::{
-    config::{ChainConfig, MainnetFactories, MainnetFactory, MarketConfigUpdates, PriceConfig},
+    config::{
+        ChainConfig, ConfigUpdateAndBorrowFee, MainnetFactories, MainnetFactory,
+        MarketConfigUpdates, PriceConfig,
+    },
     contracts::Factory,
     prelude::*,
 };
@@ -456,9 +459,6 @@ struct AddMarketOpts {
     /// Decimal places used by this collateral asset
     #[clap(long)]
     decimal_places: u8,
-    /// Initial borrow fee rate
-    #[clap(long)]
-    initial_borrow_fee_rate: Decimal256,
 }
 
 async fn add_market(
@@ -468,10 +468,12 @@ async fn add_market(
         market_id,
         collateral,
         decimal_places,
-        initial_borrow_fee_rate,
     }: AddMarketOpts,
 ) -> Result<()> {
-    let market_config_update = {
+    let ConfigUpdateAndBorrowFee {
+        config: market_config_update,
+        initial_borrow_fee_rate,
+    } = {
         let mut market_config_updates = MarketConfigUpdates::load(&opt.market_config)?;
         market_config_updates
             .markets

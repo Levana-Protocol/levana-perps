@@ -11,7 +11,9 @@ use msg::{
     prelude::MarketExecuteMsg,
 };
 use perps_exes::{
-    config::{ChainConfig, MainnetFactories, MarketConfigUpdates, PriceConfig},
+    config::{
+        ChainConfig, ConfigUpdateAndBorrowFee, MainnetFactories, MarketConfigUpdates, PriceConfig,
+    },
     contracts::{Factory, MarketInfo},
     prelude::MarketContract,
 };
@@ -52,7 +54,10 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
     {
         let market = MarketContract::new(market);
         let actual_config = market.status().await?.config;
-        let expected_config = market_config_updates
+        let ConfigUpdateAndBorrowFee {
+            config: expected_config,
+            initial_borrow_fee_rate: _,
+        } = market_config_updates
             .markets
             .get(&market_id)
             .with_context(|| format!("No market config update found for {market_id}"))?;
