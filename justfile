@@ -157,6 +157,11 @@ build-companion-image:
 push-companion-image:
 	docker push ghcr.io/levana-protocol/levana-perps/companion:{{GIT_SHA}}
 
+# Download health-check binary
+download-health-check:
+	env GH_TOKEN="$LEVANA_DEVOPS_REPO_PAT" gh release download v0.1 --repo https://github.com/Levana-Protocol/devops/
+	cp health-check ./.ci/bots
+
 # Run companion
 run-companion:
 	cargo run --bin perps-companion

@@ -21,7 +21,7 @@ jobs:
         with:
           just-version: 1.8.0
       - name: Log in to the Container registry
-        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -35,6 +35,10 @@ jobs:
         with:
           workspaces: |
             .
+      - name: Download health-check
+        run: just download-health-check
+        env:
+          LEVANA_DEVOPS_REPO_PAT: ${{ secrets.LEVANA_DEVOPS_REPO_PAT }}
       - name: Dependencies
         run: sudo apt install musl-tools -y
       - name: Build bots binary
