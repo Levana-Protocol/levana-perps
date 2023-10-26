@@ -10,6 +10,7 @@ use msg::{
         config::ConfigUpdate, entry::InitialPrice, spot_price::PythPriceServiceNetwork,
     },
     prelude::*,
+    token::TokenInit,
 };
 use pyth_sdk_cw::PriceIdentifier;
 
@@ -31,6 +32,29 @@ pub struct ChainConfig {
     pub gas_multiplier: Option<f64>,
     /// Number of decimals in the gas coin
     pub gas_decimals: GasDecimals,
+    #[serde(default)]
+    pub assets: HashMap<String, NativeAsset>,
+}
+
+#[derive(serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct NativeAsset {
+    pub denom: String,
+    pub decimal_places: u8,
+}
+
+impl From<&NativeAsset> for TokenInit {
+    fn from(
+        NativeAsset {
+            denom,
+            decimal_places,
+        }: &NativeAsset,
+    ) -> Self {
+        TokenInit::Native {
+            denom: denom.clone(),
+            decimal_places: *decimal_places,
+        }
+    }
 }
 
 /// Spot price config for a given chain
@@ -584,10 +608,17 @@ pub enum Delay {
     Random { low: u64, high: u64 },
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MarketConfigUpdates {
-    pub markets: HashMap<MarketId, ConfigUpdate>,
+    pub markets: HashMap<MarketId, ConfigUpdateAndBorrowFee>,
+}
+
+#[derive(serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub struct ConfigUpdateAndBorrowFee {
+    pub config: ConfigUpdate,
+    pub initial_borrow_fee_rate: Decimal256,
 }
 
 impl MarketConfigUpdates {

@@ -112,6 +112,7 @@ impl Opt {
             rpc_nodes,
             gas_multiplier,
             gas_decimals,
+            assets: _,
         } = ChainConfig::load(testnet.config_chain.as_ref(), network)?;
         let partial = match &testnet.deployment_config {
             Some(s) => serde_yaml::from_str(s)?,

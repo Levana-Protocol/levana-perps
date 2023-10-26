@@ -107,6 +107,7 @@ pub(crate) async fn go(
                 price_update_too_old_seconds: Some(60 * 60 * 24 * 5),
                 ..ConfigUpdate::default()
             },
+            initial_borrow_fee_rate: "0.01".parse().unwrap(),
             spot_price: SpotPriceConfigInit::Manual {
                 admin: wallet.get_address_string().into(),
             },
@@ -143,7 +144,6 @@ pub(crate) async fn go(
         markets,
         trading_competition: false,
         faucet_admin: None,
-        initial_borrow_fee_rate: "0.01".parse().unwrap(),
         price_source: crate::app::PriceSourceConfig::Wallet(wallet.get_address()),
     })
     .await?;

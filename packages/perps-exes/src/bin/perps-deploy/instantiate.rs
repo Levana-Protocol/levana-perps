@@ -15,7 +15,7 @@ use msg::{
     },
     token::TokenInit,
 };
-use perps_exes::config::{ConfigTestnet, MarketConfigUpdates};
+use perps_exes::config::{ConfigTestnet, ConfigUpdateAndBorrowFee, MarketConfigUpdates};
 use perps_exes::contracts::{Factory, MarketInfo};
 use perps_exes::prelude::MarketContract;
 
@@ -36,13 +36,22 @@ pub(crate) struct InstantiateOpt {
     /// Markets to instantiate
     #[clap(long, env = "PERPS_MARKET_ID")]
     pub(crate) market_id: Option<Vec<MarketId>>,
-    /// Initial borrow fee rate
-    #[clap(long, default_value = "0.2")]
-    pub(crate) initial_borrow_fee_rate: Decimal256,
 }
 
 impl App {
     pub(crate) fn make_instantiate_market(&self, market_id: MarketId) -> Result<InstantiateMarket> {
+        let ConfigUpdateAndBorrowFee {
+            mut config,
+            initial_borrow_fee_rate,
+        } = MarketConfigUpdates::load(&self.market_config)?
+            .markets
+            .get(&market_id)
+            .with_context(|| format!("No MarketConfigUpdate found for {market_id}"))?
+            .clone();
+
+        if self.dev_settings {
+            config.unstake_period_seconds = Some(60 * 60);
+        }
         Ok(InstantiateMarket {
             // TODO - maybe make this configurable via yaml files
             collateral: match market_id.as_str() {
@@ -53,18 +62,8 @@ impl App {
                 },
                 _ => CollateralSource::Cw20(Cw20Source::Faucet(self.faucet.clone())),
             },
-            config: {
-                let mut config = MarketConfigUpdates::load(&self.market_config)?
-                    .markets
-                    .get(&market_id)
-                    .with_context(|| format!("No MarketConfigUpdate found for {market_id}"))?
-                    .clone();
-
-                if self.dev_settings {
-                    config.unstake_period_seconds = Some(60 * 60);
-                }
-                config
-            },
+            config,
+            initial_borrow_fee_rate,
             spot_price: match &self.price_source {
                 PriceSourceConfig::Wallet(admin) => SpotPriceConfigInit::Manual {
                     admin: admin.get_address_string().into(),
@@ -120,7 +119,6 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateOpt) -> Result<()> {
         code_id_source: CodeIdSource::Tracker(app.tracker),
         trading_competition: app.trading_competition,
         faucet_admin: Some(app.wallet_manager),
-        initial_borrow_fee_rate: inst_opt.initial_borrow_fee_rate,
         price_source: app.price_source.clone(),
     })
     .await?;
@@ -175,8 +173,6 @@ pub(crate) struct InstantiateParams<'a> {
     pub(crate) trading_competition: bool,
     /// Address that should be set as a faucet admin
     pub(crate) faucet_admin: Option<Address>,
-    /// Initial borrow fee rate
-    pub(crate) initial_borrow_fee_rate: Decimal256,
     pub(crate) price_source: crate::app::PriceSourceConfig,
 }
 
@@ -184,6 +180,7 @@ pub(crate) struct InstantiateMarket {
     pub(crate) market_id: MarketId,
     pub(crate) collateral: CollateralSource,
     pub(crate) config: ConfigUpdate,
+    pub(crate) initial_borrow_fee_rate: Decimal256,
     pub(crate) spot_price: SpotPriceConfigInit,
 }
 
@@ -202,7 +199,6 @@ pub(crate) async fn instantiate(
         faucet_admin,
         markets,
         family,
-        initial_borrow_fee_rate,
         price_source,
     }: InstantiateParams<'_>,
 ) -> Result<InstantiateResponse> {
@@ -269,7 +265,6 @@ pub(crate) async fn instantiate(
                     trading_competition,
                     faucet_admin,
                     factory: factory.clone(),
-                    initial_borrow_fee_rate,
                     spot_price: spot_price.clone(),
                 },
             )
@@ -366,7 +361,6 @@ pub(crate) struct AddMarketParams {
     pub(crate) trading_competition: bool,
     pub(crate) faucet_admin: Option<Address>,
     pub(crate) factory: Factory,
-    pub(crate) initial_borrow_fee_rate: Decimal256,
     pub(crate) spot_price: SpotPriceConfigInit,
 }
 
@@ -380,7 +374,6 @@ impl InstantiateMarket {
             trading_competition,
             faucet_admin,
             factory,
-            initial_borrow_fee_rate,
             spot_price,
         }: AddMarketParams,
     ) -> Result<MarketResponse> {
@@ -388,6 +381,7 @@ impl InstantiateMarket {
             market_id,
             collateral,
             config,
+            initial_borrow_fee_rate,
             spot_price,
         } = self;
 
