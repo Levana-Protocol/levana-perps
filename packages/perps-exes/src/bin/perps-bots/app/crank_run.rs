@@ -175,13 +175,15 @@ impl App {
                     match self
                         .try_crank_with_oracle(market, crank_wallet, rewards)
                         .await
-                    {
+                        .with_context(|| {
+                            format!("Unable to update oracle and turn crank for market {market}")
+                        }) {
                         Ok(txres) => RunResult::RunWithOracle(txres),
                         Err(e2) => {
                             log::error!(
                                 "Got price_too_old and cranking with oracle failed too: {e2:?}"
                             );
-                            return Err(e);
+                            return Err(e2);
                         }
                     }
                 } else {
