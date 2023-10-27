@@ -47,7 +47,6 @@ pub(crate) struct BotConfigMainnet {
     pub(crate) high_util_ratio: Decimal256,
     pub(crate) liquidity_transaction: LiquidityTransactionConfig,
     pub(crate) crank_rewards: Address,
-    pub(crate) ignored_markets: HashSet<MarketId>,
     /// Used for checking RPC health, not for making queries
     pub(crate) rpc_endpoint: Arc<String>,
 }
@@ -70,6 +69,7 @@ pub(crate) struct BotConfig {
     pub(crate) min_gas_in_gas_wallet: GasAmount,
     /// Wallet used to refill gas for other wallets
     pub(crate) gas_wallet: Arc<Wallet>,
+    pub(crate) ignored_markets: HashSet<MarketId>,
 }
 
 impl BotConfig {
@@ -202,6 +202,7 @@ impl Opt {
             min_gas: partial.min_gas,
             min_gas_in_gas_wallet: partial.min_gas_in_gas_wallet,
             gas_wallet,
+            ignored_markets: self.ignored_markets.iter().cloned().collect(),
         };
 
         Ok((config, Some(faucet_bot_runner)))
@@ -227,7 +228,6 @@ impl Opt {
             ltc_total_deposit_percent,
             http_timeout_seconds,
             crank_rewards,
-            ignored_markets,
             rpc_endpoint,
             crank_wallets,
         }: &MainnetOpt,
@@ -261,7 +261,6 @@ impl Opt {
                         total_deposits_percentage: *ltc_total_deposit_percent,
                     },
                     crank_rewards: *crank_rewards,
-                    ignored_markets: ignored_markets.iter().cloned().collect(),
                     rpc_endpoint: Arc::new(rpc_endpoint.clone()),
                 }
                 .into(),
@@ -282,6 +281,7 @@ impl Opt {
             min_gas: *min_gas,
             min_gas_in_gas_wallet: *min_gas_refill,
             gas_wallet: Arc::new(gas_wallet),
+            ignored_markets: self.ignored_markets.iter().cloned().collect(),
         })
     }
 }
@@ -345,7 +345,6 @@ impl BotConfigMainnet {
             high_util_ratio: _,
             liquidity_transaction: _,
             crank_rewards: _,
-            ignored_markets: _,
             rpc_endpoint: _,
         } = self;
         0
