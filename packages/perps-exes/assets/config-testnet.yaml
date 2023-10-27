@@ -94,7 +94,8 @@ deployments:
     traders: 0
     default-market-ids:
       - nBTC_USD
-      - stATOM_USD
+      # disabled for now
+      # - stATOM_USD
       - ATOM_USD
       - OSMO_USDC
       - ETH_BTC

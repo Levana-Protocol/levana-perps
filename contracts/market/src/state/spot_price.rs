@@ -578,7 +578,8 @@ impl State<'_> {
                                     .query_wasm_smart(contract, &SimpleQuery::Price {})?;
 
                                 if validate_age {
-                                    let publish_time = resp.timestamp.unwrap_or(resp.block_info.time.into());
+                                    let publish_time =
+                                        resp.timestamp.unwrap_or(resp.block_info.time.into());
                                     let time_diff = self
                                         .now()
                                         .checked_sub(publish_time, "simple oracle price time")?;
