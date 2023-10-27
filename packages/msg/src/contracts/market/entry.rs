@@ -6,7 +6,7 @@ use super::{config::ConfigUpdate, crank::CrankWorkInfo};
 use crate::contracts::market::order::OrderId;
 use crate::{contracts::liquidity_token::LiquidityTokenKind, token::TokenInit};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Binary, Decimal256, Uint128};
+use cosmwasm_std::{Binary, BlockInfo, Decimal256, Uint128};
 use pyth_sdk_cw::PriceIdentifier;
 use shared::prelude::*;
 use std::collections::BTreeMap;
@@ -653,6 +653,8 @@ pub struct OraclePriceResp {
     pub sei: BTreeMap<String, NumberGtZero>,
     /// A map of each stride denom used in this market to the redemption price
     pub stride: BTreeMap<String, OraclePriceFeedStrideResp>,
+    /// A map of each simple contract used in this market to the contract price
+    pub simple: BTreeMap<RawAddr, OraclePriceFeedSimpleResp>,
     /// The final, composed price. See [QueryMsg::OraclePrice] for more information about this value
     pub composed_price: PricePoint,
 }
@@ -673,6 +675,17 @@ pub struct OraclePriceFeedStrideResp {
     pub redemption_rate: NumberGtZero,
     /// The redemption price publish time
     pub publish_time: Timestamp,
+}
+
+/// Part of [OraclePriceResp]
+#[cw_serde]
+pub struct OraclePriceFeedSimpleResp {
+    /// The price value
+    pub value: NumberGtZero,
+    /// The block info when this price was set
+    pub block_info: BlockInfo,
+    /// Optional timestamp for the price, independent of block_info.time
+    pub timestamp: Option<Timestamp>,
 }
 
 /// When querying an open position, how do we calculate PnL vis-a-vis fees?

@@ -107,12 +107,13 @@ impl Opt {
                     inner.faucet,
                     &inner.contract_family,
                     &inner.rpc_nodes,
+                    &config.ignored_markets,
                 )
                 .await?;
                 (factory, Some(RwLock::new(Arc::new(frontend))))
             }
             BotConfigByType::Mainnet { inner } => (
-                get_factory_info_mainnet(&cosmos, inner.factory, &inner.ignored_markets)
+                get_factory_info_mainnet(&cosmos, inner.factory, &config.ignored_markets)
                     .await?
                     .1,
                 None,

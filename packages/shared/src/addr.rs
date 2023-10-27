@@ -8,7 +8,7 @@ use cosmwasm_std::{Addr, Api};
 /// a parameter is an address, and ensure that we go through a proper validation
 /// step when using it.
 #[cw_serde]
-#[derive(Eq)]
+#[derive(Eq, Ord, PartialOrd)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct RawAddr(String);
 

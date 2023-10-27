@@ -295,6 +295,7 @@ fn get_pyth_network(spot_price: &SpotPriceConfig) -> Result<(PythPriceServiceNet
             SpotPriceFeedData::Pyth { .. } => true,
             SpotPriceFeedData::Stride { .. } => false,
             SpotPriceFeedData::Sei { .. } => false,
+            SpotPriceFeedData::Simple { .. } => false,
         });
 
     anyhow::ensure!(uses_pyth, "This market doesn't use Pyth");

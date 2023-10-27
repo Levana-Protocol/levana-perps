@@ -62,6 +62,7 @@ impl OffchainPriceData {
                             }
                             SpotPriceFeedData::Stride { .. } => (),
                             SpotPriceFeedData::Sei { .. } => (),
+                            SpotPriceFeedData::Simple { .. } => (),
                         }
                     }
                 }
@@ -151,6 +152,12 @@ fn compose_oracle_feeds(
                     .redemption_rate
                     .into_decimal256()
             }
+            SpotPriceFeedData::Simple { contract, .. } => oracle_price
+                .simple
+                .get(&RawAddr::from(contract))
+                .with_context(|| format!("Missing price for Simple contract: {contract}"))?
+                .value
+                .into_decimal256(),
         };
 
         if feed.inverted {

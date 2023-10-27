@@ -92,6 +92,7 @@ pub enum ErrorDomain {
     Pyth,
     Farming,
     Stride,
+    SimpleOracle,
 }
 
 /// Generate a [PerpError] value

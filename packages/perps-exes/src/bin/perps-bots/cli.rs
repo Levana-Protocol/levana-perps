@@ -51,6 +51,9 @@ pub(crate) struct Opt {
         default_value = "https://hermes-beta.pyth.network/"
     )]
     pub(crate) pyth_endpoint_edge: String,
+    /// List of markets that should be ignored
+    #[clap(long, env = "LEVANA_BOTS_IGNORED_MARKETS", value_delimiter = ',')]
+    pub(crate) ignored_markets: Vec<MarketId>,
 }
 
 #[derive(clap::Parser)]
@@ -138,9 +141,6 @@ pub(crate) struct MainnetOpt {
     /// Rewards destination wallet
     #[clap(long, env = "LEVANA_BOTS_CRANK_REWARDS")]
     pub(crate) crank_rewards: Address,
-    /// List of markets that should be ignored
-    #[clap(long, env = "LEVANA_BOTS_IGNORED_MARKETS", value_delimiter = ',')]
-    pub(crate) ignored_markets: Vec<MarketId>,
     /// Used for RPC health checks
     #[clap(long, env = "LEVANA_BOTS_RPC_ENDPOINT")]
     pub(crate) rpc_endpoint: String,

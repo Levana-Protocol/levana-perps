@@ -210,6 +210,7 @@ impl App {
                 SpotPriceFeedData::Pyth { .. } => true,
                 SpotPriceFeedData::Stride { .. } => false,
                 SpotPriceFeedData::Sei { .. } => false,
+                SpotPriceFeedData::Simple { .. } => false,
             }),
         };
 
@@ -616,6 +617,10 @@ impl Market {
                         ..
                     } => ret = ret.min(*age_tolerance_seconds),
                     SpotPriceFeedData::Sei { .. } => (),
+                    SpotPriceFeedData::Simple {
+                        age_tolerance_seconds,
+                        ..
+                    } => ret = ret.min(*age_tolerance_seconds),
                 }),
         }
         ret

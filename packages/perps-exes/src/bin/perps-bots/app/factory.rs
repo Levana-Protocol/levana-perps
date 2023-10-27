@@ -84,13 +84,15 @@ async fn update(app: &App) -> Result<WatchedTaskOutput> {
                 inner.faucet,
                 &inner.contract_family,
                 &inner.rpc_nodes,
+                &app.config.ignored_markets,
             )
             .await?;
             app.set_frontend_info_testnet(frontend_info_testnet).await?;
             (message, factory_info)
         }
         BotConfigByType::Mainnet { inner } => {
-            get_factory_info_mainnet(&app.cosmos, inner.factory, &inner.ignored_markets).await?
+            get_factory_info_mainnet(&app.cosmos, inner.factory, &app.config.ignored_markets)
+                .await?
         }
     };
     let output = WatchedTaskOutput {
@@ -126,13 +128,14 @@ pub(crate) async fn get_factory_info_testnet(
     faucet: Address,
     family: &str,
     rpc_nodes: &[Arc<String>],
+    ignored_markets: &HashSet<MarketId>,
 ) -> Result<(String, FactoryInfo, FrontendInfoTestnet)> {
     let (factory, gitrev) = get_contract(cosmos, tracker, family, "factory")
         .await
         .context("Unable to get 'factory' contract")?;
     let message = format!("Successfully loaded factory address {factory} from tracker {tracker}",);
 
-    let (cw20s, markets) = get_tokens_markets(cosmos, factory)
+    let (cw20s, markets) = get_tokens_markets(cosmos, factory, ignored_markets)
         .await
         .with_context(|| format!("Unable to get_tokens_market for factory {factory}"))?;
     let faucet_gas_amount = match get_faucet_gas_amount(cosmos, faucet).await {
@@ -206,9 +209,13 @@ pub(crate) async fn get_contract(
     Ok((addr, gitrev))
 }
 
-async fn get_tokens_markets(cosmos: &Cosmos, factory: Address) -> Result<(Vec<Cw20>, Vec<Market>)> {
+async fn get_tokens_markets(
+    cosmos: &Cosmos,
+    factory: Address,
+    ignored_markets: &HashSet<MarketId>,
+) -> Result<(Vec<Cw20>, Vec<Market>)> {
     let factory = cosmos.make_contract(factory);
-    let markets = get_markets(cosmos, &factory, &HashSet::new()).await?;
+    let markets = get_markets(cosmos, &factory, ignored_markets).await?;
     let mut tokens = vec![];
     for market in &markets {
         let denom = market.market_id.get_collateral().to_owned();
