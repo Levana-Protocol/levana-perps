@@ -3,6 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, HasAddress, Wallet};
+use msg::contracts::market::entry::StatusResp;
 use perps_exes::{config::UtilizationConfig, prelude::*};
 
 use crate::{
@@ -44,7 +45,7 @@ impl WatchedTaskPerMarket for Utilization {
         _factory: &FactoryInfo,
         market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, &market.market, self.testnet.faucet).await
+        single_market(self, &market.market, self.testnet.faucet, &market.status).await
     }
 }
 
@@ -52,9 +53,8 @@ async fn single_market(
     worker: &Utilization,
     market: &MarketContract,
     faucet: Address,
+    status: &StatusResp,
 ) -> Result<WatchedTaskOutput> {
-    let status = market.status().await?;
-
     if status.is_stale() {
         return Ok(WatchedTaskOutput {
             skip_delay: false,
@@ -141,7 +141,12 @@ async fn single_market(
         }
 
         // Maybe make these config values?
-        let leverage: LeverageToBase = "8".parse().unwrap();
+        let leverage = status.config.max_leverage.min("8".parse().unwrap());
+        let leverage = LeverageToBase::from(
+            leverage
+                .try_into_non_zero()
+                .context("Leverage was not non-zero")?,
+        );
         let max_gains: MaxGainsInQuote = match (status.market_type, direction) {
             (MarketType::CollateralIsBase, DirectionToBase::Long) => MaxGainsInQuote::PosInfinity,
             _ => "2".parse().unwrap(),
