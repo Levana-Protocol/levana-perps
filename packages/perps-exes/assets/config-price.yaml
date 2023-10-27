@@ -418,10 +418,10 @@ networks:
       ]
     ryETH_USD:
       feeds: [
-        !simple { contract: "osmo10y2xkd5ep6lctmdtcvx6yssfzcafqjkplchfafh7dpxtljn4gz2sdzzhur", inverted: false },
+        !simple { contract: "osmo10y2xkd5ep6lctmdtcvx6yssfzcafqjkplchfafh7dpxtljn4gz2sdzzhur", inverted: false, age_tolerance: 604800 },
         !pyth { key: "ETH_USD", inverted: false },
       ]
       feeds-usd: [
-        !simple { contract: "osmo10y2xkd5ep6lctmdtcvx6yssfzcafqjkplchfafh7dpxtljn4gz2sdzzhur", inverted: false },
+        !simple { contract: "osmo10y2xkd5ep6lctmdtcvx6yssfzcafqjkplchfafh7dpxtljn4gz2sdzzhur", inverted: false, age_tolerance: 604800 },
         !pyth { key: "ETH_USD", inverted: false },
       ]

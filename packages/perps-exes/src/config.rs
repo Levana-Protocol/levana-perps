@@ -147,7 +147,7 @@ pub enum MarketPriceFeedConfig {
     Simple {
         contract: Address,
         inverted: bool,
-        age_tolerance: Option<u32>,
+        age_tolerance: u32,
     },
 }
 

@@ -620,11 +620,7 @@ impl Market {
                     SpotPriceFeedData::Simple {
                         age_tolerance_seconds,
                         ..
-                    } => {
-                        if let Some(age_tolerance_seconds) = age_tolerance_seconds {
-                            ret = ret.min(*age_tolerance_seconds)
-                        }
-                    }
+                    } => ret = ret.min(*age_tolerance_seconds),
                 }),
         }
         ret

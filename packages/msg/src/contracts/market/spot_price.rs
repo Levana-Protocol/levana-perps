@@ -86,8 +86,7 @@ pub enum SpotPriceFeedData {
         /// The contract to use
         contract: Addr,
         /// price age tolerance, in seconds
-        /// If used, a timestamp must be available on the price response
-        age_tolerance_seconds: Option<u32>,
+        age_tolerance_seconds: u32,
     },
 }
 
@@ -219,8 +218,7 @@ pub enum SpotPriceFeedDataInit {
         /// The contract to use
         contract: RawAddr,
         /// price age tolerance, in seconds
-        /// If used, a timestamp must be available on the price response
-        age_tolerance_seconds: Option<u32>,
+        age_tolerance_seconds: u32,
     },
 }
 impl From<SpotPriceFeedData> for SpotPriceFeedDataInit {
