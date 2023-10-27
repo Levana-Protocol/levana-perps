@@ -138,7 +138,13 @@ async fn single_market(
                     addr,
                     decimal_places: _,
                 } => addr.as_str().parse()?,
-                msg::token::Token::Native { .. } => anyhow::bail!("No support for native coins"),
+                msg::token::Token::Native { .. } => {
+                    // Not treating this as an error, we simply won't provide liquidity
+                    return Ok(WatchedTaskOutput {
+                        skip_delay: false,
+                        message: "No support for native coins".to_owned(),
+                    });
+                }
             };
             worker
                 .testnet
