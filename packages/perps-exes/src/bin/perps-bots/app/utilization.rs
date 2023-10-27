@@ -109,7 +109,7 @@ async fn single_market(
         tracing::info!("Low utilization ratio, opening positions.");
 
         let balance = market
-            .get_collateral_balance(&status, worker.wallet.get_address())
+            .get_collateral_balance(status, worker.wallet.get_address())
             .await?;
         let cw20 = match &status.collateral {
             msg::token::Token::Cw20 {
@@ -133,7 +133,7 @@ async fn single_market(
                     worker.app.cosmos.clone(),
                     worker.wallet.get_address(),
                     "200000".parse().unwrap(),
-                    &status,
+                    status,
                     cw20,
                     faucet,
                 )
@@ -211,7 +211,7 @@ async fn single_market(
         let res = market
             .open_position(
                 &worker.wallet,
-                &status,
+                status,
                 deposit_collateral,
                 direction,
                 leverage,
