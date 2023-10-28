@@ -654,6 +654,7 @@ pub struct OraclePriceResp {
     /// A map of each stride denom used in this market to the redemption price
     pub stride: BTreeMap<String, OraclePriceFeedStrideResp>,
     /// A map of each simple contract used in this market to the contract price
+    #[serde(default)]
     pub simple: BTreeMap<RawAddr, OraclePriceFeedSimpleResp>,
     /// The final, composed price. See [QueryMsg::OraclePrice] for more information about this value
     pub composed_price: PricePoint,
