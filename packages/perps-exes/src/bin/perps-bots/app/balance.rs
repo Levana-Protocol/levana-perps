@@ -36,10 +36,7 @@ impl WatchedTaskPerMarket for TrackBalance {
     ) -> Result<WatchedTaskOutput> {
         check_balance_single(&market.market)
             .await
-            .map(|()| WatchedTaskOutput {
-                skip_delay: false,
-                message: "Market is in balance".to_owned(),
-            })
+            .map(|()| WatchedTaskOutput::new("Market is in balance".to_owned()))
     }
 }
 
@@ -105,10 +102,9 @@ async fn single_market(
     if instant_abs * Decimal256::from_str("3").unwrap()
         <= status.config.delta_neutrality_fee_cap.raw()
     {
-        return Ok(WatchedTaskOutput {
-            skip_delay: false,
-            message: "Protocol is within 1/3 of the cap".to_owned(),
-        });
+        return Ok(WatchedTaskOutput::new(
+            "Protocol is within 1/3 of the cap".to_owned(),
+        ));
     }
 
     let direction = if instant.is_negative() {
@@ -127,10 +123,7 @@ async fn single_market(
                 pos.id
             );
             market.close_position(&worker.wallet, pos.id).await?;
-            return Ok(WatchedTaskOutput {
-                skip_delay: true,
-                message: "Closed a position".to_owned(),
-            });
+            return Ok(WatchedTaskOutput::new("Closed a position").skip_delay());
         }
     }
 
@@ -224,8 +217,5 @@ async fn single_market(
         )
         .await?;
 
-    Ok(WatchedTaskOutput {
-        skip_delay: true,
-        message: "Opened a new position to balance the protocol".to_owned(),
-    })
+    Ok(WatchedTaskOutput::new("Opened a new position to balance the protocol").skip_delay())
 }

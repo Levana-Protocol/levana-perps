@@ -128,10 +128,9 @@ async fn single_market(
             let max_deposit = max_liquidity.checked_sub(lp_info.lp_collateral)?;
             let to_deposit = to_deposit.min(max_deposit);
             if to_deposit < Collateral::one() {
-                return Ok(WatchedTaskOutput {
-                    skip_delay: false,
-                    message: "Too little collateral to warrant a deposit, skipping".to_owned(),
-                });
+                return Ok(WatchedTaskOutput::new(
+                    "Too little collateral to warrant a deposit, skipping",
+                ));
             }
             let cw20 = match &status.collateral {
                 msg::token::Token::Cw20 {
@@ -140,10 +139,9 @@ async fn single_market(
                 } => addr.as_str().parse()?,
                 msg::token::Token::Native { .. } => {
                     // Not treating this as an error, we simply won't provide liquidity
-                    return Ok(WatchedTaskOutput {
-                        skip_delay: false,
-                        message: "No support for native coins".to_owned(),
-                    });
+                    return Ok(WatchedTaskOutput::new(
+                        "No support for native coins".to_owned(),
+                    ));
                 }
             };
             worker
@@ -160,26 +158,17 @@ async fn single_market(
                 .await?;
             let to_deposit = NonZero::new(to_deposit).context("to_deposit is 0")?;
             market.deposit(&worker.wallet, &status, to_deposit).await?;
-            WatchedTaskOutput {
-                skip_delay: true,
-                message: format!("Deposited {to_deposit} liquidity"),
-            }
+            WatchedTaskOutput::new(format!("Deposited {to_deposit} liquidity")).skip_delay()
         }
         Action::Withdraw(to_withdraw) => {
             if let Some(cooldown) = lp_info.liquidity_cooldown {
-                WatchedTaskOutput {
-                    skip_delay: false,
-                    message: format!("Want to withdraw {to_withdraw}, but liquidity cooldown in affect for {} seconds until {}", cooldown.seconds, cooldown.at)
-                }
+                WatchedTaskOutput::new(format!("Want to withdraw {to_withdraw}, but liquidity cooldown in affect for {} seconds until {}", cooldown.seconds, cooldown.at))
             } else {
                 let max_withdrawal = lp_info.lp_collateral.checked_sub(min_liquidity)?;
                 let to_withdraw = to_withdraw.min(max_withdrawal);
                 assert!(to_withdraw <= lp_info.lp_collateral);
                 if to_withdraw < Collateral::one() {
-                    WatchedTaskOutput {
-                        skip_delay: false,
-                        message: "Won't withdraw less than 1 liquidity".to_owned(),
-                    }
+                    WatchedTaskOutput::new("Won't withdraw less than 1 liquidity")
                 } else {
                     let lp_tokens = to_withdraw.into_decimal256()
                         * status.liquidity.total_tokens().into_decimal256()
@@ -187,16 +176,11 @@ async fn single_market(
                     let lp_tokens = NonZero::new(LpToken::from_decimal256(lp_tokens))
                         .context("Somehow got 0 to withdraw")?;
                     market.withdraw(&worker.wallet, lp_tokens).await?;
-                    WatchedTaskOutput {
-                        skip_delay: true,
-                        message: format!("Withdrew {to_withdraw} collateral"),
-                    }
+                    WatchedTaskOutput::new(format!("Withdrew {to_withdraw} collateral"))
+                        .skip_delay()
                 }
             }
         }
-        Action::None => WatchedTaskOutput {
-            skip_delay: false,
-            message: "No actions needed".to_owned(),
-        },
+        Action::None => WatchedTaskOutput::new("No actions needed"),
     })
 }

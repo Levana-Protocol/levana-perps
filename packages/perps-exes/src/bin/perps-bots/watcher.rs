@@ -167,7 +167,7 @@ pub(crate) struct TaskResult {
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum TaskResultValue {
-    Ok(String),
+    Ok(Cow<'static, str>),
     Err(String),
     NotYetRun,
 }
@@ -379,6 +379,7 @@ impl AppBuilder {
                     Ok(WatchedTaskOutput {
                         skip_delay,
                         message,
+                        suppress,
                     }) => {
                         if label.show_output() {
                             tracing::info!("{label}: Success! {message}");
@@ -420,7 +421,11 @@ impl AppBuilder {
                             }
                             *guard = TaskStatus {
                                 last_result: TaskResult {
-                                    value: TaskResultValue::Ok(message).into(),
+                                    value: if suppress {
+                                        guard.last_result.value.clone()
+                                    } else {
+                                        TaskResultValue::Ok(message).into()
+                                    },
                                     updated: Utc::now(),
                                 },
                                 last_retry_error: None,
@@ -565,8 +570,29 @@ impl AppBuilder {
 
 #[derive(Debug)]
 pub(crate) struct WatchedTaskOutput {
-    pub(crate) skip_delay: bool,
-    pub(crate) message: String,
+    skip_delay: bool,
+    suppress: bool,
+    message: Cow<'static, str>,
+}
+
+impl WatchedTaskOutput {
+    pub(crate) fn new(message: impl Into<Cow<'static, str>>) -> Self {
+        WatchedTaskOutput {
+            skip_delay: false,
+            suppress: false,
+            message: message.into(),
+        }
+    }
+
+    pub(crate) fn skip_delay(mut self) -> Self {
+        self.skip_delay = true;
+        self
+    }
+
+    pub(crate) fn suppress(mut self) -> Self {
+        self.suppress = true;
+        self
+    }
 }
 
 #[async_trait]
@@ -645,7 +671,11 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
                 Ok(WatchedTaskOutput {
                     skip_delay,
                     message,
+                    suppress,
                 }) => {
+                    if suppress {
+                        errors.push(format!("Found a 'suppress' which is not supported for per-market updates: {message}"));
+                    }
                     successes.push(format!(
                         "{market} {addr}: {message}",
                         market = market.market_id,
@@ -664,7 +694,8 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
         if errors.is_empty() {
             Ok(WatchedTaskOutput {
                 skip_delay: total_skip_delay,
-                message: successes.join("\n"),
+                message: successes.join("\n").into(),
+                suppress: false,
             })
         } else {
             let mut msg = String::new();
@@ -724,7 +755,11 @@ impl<T: WatchedTaskPerMarketParallel> WatchedTask for ParallelWatcher<T> {
                     Ok(WatchedTaskOutput {
                         skip_delay,
                         message,
+                        suppress,
                     }) => {
+                        if suppress {
+                            errors.push(format!("Found a 'suppress' which is not supported for per-market updates: {message}"));
+                        }
                         successes.push(format!(
                             "{market} {addr}: {message}",
                             market = market.market_id,
@@ -746,7 +781,8 @@ impl<T: WatchedTaskPerMarketParallel> WatchedTask for ParallelWatcher<T> {
         if errors.is_empty() {
             Ok(WatchedTaskOutput {
                 skip_delay: total_skip_delay,
-                message: successes.join("\n"),
+                message: successes.join("\n").into(),
+                suppress: false,
             })
         } else {
             let mut msg = String::new();

@@ -56,18 +56,14 @@ async fn single_market(
     status: &StatusResp,
 ) -> Result<WatchedTaskOutput> {
     if status.is_stale() {
-        return Ok(WatchedTaskOutput {
-            skip_delay: false,
-            message: "Protocol is currently stale, skipping".to_owned(),
-        });
+        return Ok(WatchedTaskOutput::new(
+            "Protocol is currently stale, skipping",
+        ));
     }
 
     let total = status.liquidity.total_collateral();
     if total.is_zero() {
-        return Ok(WatchedTaskOutput {
-            skip_delay: false,
-            message: "No deposited collateral".to_owned(),
-        });
+        return Ok(WatchedTaskOutput::new("No deposited collateral"));
     }
     let util = status
         .liquidity
@@ -90,20 +86,15 @@ async fn single_market(
             .get_some_positions(worker.wallet.get_address(), Some(20))
             .await?;
         if positions.is_empty() {
-            Ok(WatchedTaskOutput {
-                skip_delay: false,
-                message: "High utilization ratio, but I don't have any positions to close"
-                    .to_owned(),
-            })
+            Ok(WatchedTaskOutput::new(
+                "High utilization ratio, but I don't have any positions to close",
+            ))
         } else {
             let message = format!(
                 "High utilization ratio, time to unlock some liquidity. Closing {positions:?}"
             );
             market.close_positions(&worker.wallet, positions).await?;
-            Ok(WatchedTaskOutput {
-                skip_delay: true,
-                message,
-            })
+            Ok(WatchedTaskOutput::new(message).skip_delay())
         }
     } else if util < min_util {
         tracing::info!("Low utilization ratio, opening positions.");
@@ -223,15 +214,9 @@ async fn single_market(
             .await
             .with_context(|| desc.clone())?;
 
-        Ok(WatchedTaskOutput {
-            skip_delay: true,
-            message: format!("Success! {desc} {}", res.txhash),
-        })
+        Ok(WatchedTaskOutput::new(format!("Success! {desc} {}", res.txhash)).skip_delay())
     } else {
-        Ok(WatchedTaskOutput {
-            skip_delay: false,
-            message: "No work to do".to_owned(),
-        })
+        Ok(WatchedTaskOutput::new("No work to do"))
     }
 }
 

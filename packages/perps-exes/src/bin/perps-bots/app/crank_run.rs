@@ -86,11 +86,7 @@ impl App {
         // Wait for up to 20 seconds for new work to appear. If it doesn't, update our status message that no cranking was needed.
         let (market, crank_guard) = match recv.receive_with_timeout().await {
             None => {
-                return Ok(WatchedTaskOutput {
-                    // Irrelevant, no delay here
-                    skip_delay: false,
-                    message: "No crank work needed".to_owned(),
-                });
+                return Ok(WatchedTaskOutput::new("No crank work needed").suppress());
             }
             Some(crank_needed) => crank_needed,
         };
@@ -157,8 +153,7 @@ impl App {
             Ok(txres) => RunResult::NormalRun(txres),
             Err(e) => {
                 if self.is_osmosis_epoch() {
-                    return Ok(WatchedTaskOutput { skip_delay: false, message: format!("Ignoring crank run error since we think we're in the Osmosis epoch, error: {e:?}")
-                    });
+                    return Ok(WatchedTaskOutput::new(format!("Ignoring crank run error since we think we're in the Osmosis epoch, error: {e:?}")));
                 }
 
                 let error_as_str = format!("{e:?}");
@@ -208,9 +203,8 @@ impl App {
             Err(e) => format!("Failed getting status to check for new crank work: {e:?}.").into(),
         };
 
-        Ok(WatchedTaskOutput {
-            skip_delay: true,
-            message: match run_result {
+        Ok(WatchedTaskOutput::new(
+            match run_result {
                 RunResult::NormalRun(txres) => format!(
                     "Successfully turned the crank for market {market} in transaction {}. {}",
                     txres.txhash, more_work
@@ -222,8 +216,8 @@ impl App {
                 RunResult::OutOfGas => format!(
                     "Got an 'out of gas' code 11 when trying to crank. {more_work}"
                 )
-            },
-        })
+            }).skip_delay()
+        )
     }
 
     async fn try_crank_with_oracle(

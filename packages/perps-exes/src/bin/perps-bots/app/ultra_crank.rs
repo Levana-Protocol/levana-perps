@@ -74,10 +74,7 @@ impl App {
         } = market.status().await?;
         if next_crank.is_none() {
             *activated = false;
-            return Ok(WatchedTaskOutput {
-                skip_delay: false,
-                message: "No crank messages waiting".to_owned(),
-            });
+            return Ok(WatchedTaskOutput::new("No crank messages waiting"));
         }
         let last_crank_completed = last_crank_completed
             .context("No cranks have completed")?
@@ -88,10 +85,9 @@ impl App {
         if age >= testnet.seconds_till_ultra.into() {
             *activated = true;
         } else if !*activated {
-            return Ok(WatchedTaskOutput {
-                skip_delay: false,
-                message: format!("Crank is only {age} seconds out of date, not doing anything"),
-            });
+            return Ok(WatchedTaskOutput::new(format!(
+                "Crank is only {age} seconds out of date, not doing anything"
+            )));
         }
         let res = market
             .crank_single(
@@ -102,9 +98,9 @@ impl App {
                     .map(|a| a.get_address_string().into()),
             )
             .await?;
-        Ok(WatchedTaskOutput {
-            skip_delay: true,
-            message: format!("Completed an ultracrank in {}", res.txhash),
-        })
+        Ok(WatchedTaskOutput::new(format!(
+            "Completed an ultracrank in {}",
+            res.txhash
+        )))
     }
 }

@@ -34,10 +34,7 @@ impl WatchedTaskPerMarket for StatsAlert {
     ) -> Result<WatchedTaskOutput> {
         check_stats_alert(&market.market, &self.mainnet)
             .await
-            .map(|()| WatchedTaskOutput {
-                skip_delay: false,
-                message: "Market stats are within acceptable parameters".to_owned(),
-            })
+            .map(|()| WatchedTaskOutput::new("Market stats are within acceptable parameters"))
     }
 }
 

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -49,12 +50,7 @@ async fn check_market(
     market: &Market,
 ) -> Result<WatchedTaskOutput> {
     let work = match app.check_crank(&market.market).await? {
-        None => {
-            return Ok(WatchedTaskOutput {
-                skip_delay: false,
-                message: "No crank messages waiting".to_owned(),
-            })
-        }
+        None => return Ok(WatchedTaskOutput::new("No crank messages waiting")),
         Some(work) => work,
     };
 
@@ -62,19 +58,15 @@ async fn check_market(
         .trigger_crank(market.market.get_address())
         .await;
 
-    let message = match work {
+    Ok(WatchedTaskOutput::new(match work {
         CrankReason::WorkAvailable(work) => {
-            format!("Triggering crank because work is available: {work:?}")
+            format!("Triggering crank because work is available: {work:?}").into()
         }
         CrankReason::OldLastCrank(age) => {
-            format!("Triggering crank because of old last crank, age: {age}")
+            format!("Triggering crank because of old last crank, age: {age}").into()
         }
-        CrankReason::NoPriorCrank => "No crank work needed".to_owned(),
-    };
-    Ok(WatchedTaskOutput {
-        skip_delay: false,
-        message,
-    })
+        CrankReason::NoPriorCrank => Cow::Borrowed("No crank work needed"),
+    }))
 }
 
 impl App {

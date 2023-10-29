@@ -44,10 +44,7 @@ async fn check(app: &App, endpoint: Arc<String>) -> Result<WatchedTaskOutput> {
     let delta = rpc_height.abs_diff(grpc_height);
 
     if delta < ALLOWED_DELTA {
-        Ok(WatchedTaskOutput {
-            skip_delay: false,
-            message: format!("RPC endpoint {endpoint} looks healthy. Delta: {delta}. RPC height: {rpc_height}. gRPC height: {grpc_height}.")
-        })
+        Ok(WatchedTaskOutput::new(format!("RPC endpoint {endpoint} looks healthy. Delta: {delta}. RPC height: {rpc_height}. gRPC height: {grpc_height}.")))
     } else {
         Err(anyhow::anyhow!("RPC endpoint {endpoint} has too high a block height delta {delta}. RPC height: {rpc_height}. gRPC height: {grpc_height}."))
     }
