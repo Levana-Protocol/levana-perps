@@ -257,6 +257,13 @@ networks:
       feeds-usd: [
         !pyth { key: "AXL_USD", inverted: false}
       ]
+    LINK_USDC:
+      feeds: [
+        !pyth { key: "LINK_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
   sei-testnet:
     ATOM_USD:
       feeds: [

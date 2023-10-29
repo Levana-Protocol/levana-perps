@@ -38,6 +38,9 @@ osmosis-mainnet:
     OSMO:
       denom: uosmo
       decimal-places: 6
+    USDC:
+      denom: ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4
+      decimal-places: 6
 osmosis-testnet:
   gas-decimals: 6
   spot-price: 
