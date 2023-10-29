@@ -159,6 +159,10 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
             successes.push(format!(
                 "Treating Pyth update timestamp as {oldest_publish_time}"
             ));
+            let age = Utc::now().signed_duration_since(oldest_publish_time);
+            if age.num_seconds() > 10 {
+                successes.push(format!("Warning, Pyth update timestamp is older than expected, updates may fail. Age: {age}. Timestamp: {oldest_publish_time}"));
+            }
         } else {
             successes.push("Warning, did not find a Pyth publish timestamp".to_owned());
         }
