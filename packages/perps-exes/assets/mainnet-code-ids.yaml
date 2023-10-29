@@ -141,3 +141,8 @@ hashes:
     osmosis-mainnet: 227
     injective-mainnet: 137
   hash: 0eeb000780267d576b00882fa01cd26d585b558596fd4b7d17e033c1aab2c204
+- contract-type: factory
+  gitrev: 0be391bc72848aa186f1f1cfd8e499c5b34835ec
+  code-ids:
+    osmosis-mainnet: 257
+  hash: 9bc41de0ad9e49a5013a9faf4fd635f540afc4392f4d71684621db711d0eb081
