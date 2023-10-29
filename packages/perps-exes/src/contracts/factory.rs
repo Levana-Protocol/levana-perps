@@ -130,6 +130,14 @@ impl Factory {
             })
     }
 
+    pub async fn query_wind_down(&self) -> Result<Address> {
+        let FactoryOwnerResp { wind_down, .. } = self.0.query(QueryMsg::FactoryOwner {}).await?;
+        wind_down
+            .into_string()
+            .parse()
+            .with_context(|| format!("Invalid wind down found for factory {}", self.0))
+    }
+
     pub async fn query_dao(&self) -> Result<Address> {
         self.query_owners()
             .await?
