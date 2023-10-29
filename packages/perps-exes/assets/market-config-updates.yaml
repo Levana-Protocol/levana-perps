@@ -320,3 +320,16 @@ markets:
       carry_leverage: 15
 
     initial-borrow-fee-rate: 0.05
+
+
+  BTC_INJ: # FIXME need real parameters
+    config:
+      funding_rate_sensitivity: 2
+      borrow_fee_rate_min_annualized: 0.08
+      target_utilization: 0.5
+      borrow_fee_sensitivity: 0.083333333
+      delta_neutrality_fee_sensitivity: 16000000
+      delta_neutrality_fee_tax: 0.25
+      carry_leverage: 15
+
+    initial-borrow-fee-rate: 0.16
