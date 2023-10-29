@@ -3,6 +3,7 @@ mod send_treasury;
 mod sync_config;
 mod transfer_dao_fees;
 mod update_config;
+mod wind_down;
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -37,6 +38,7 @@ use crate::{
 use self::{
     migrate::MigrateOpts, send_treasury::SendTreasuryOpts, sync_config::SyncConfigOpts,
     transfer_dao_fees::TransferDaoFeesOpts, update_config::UpdateConfigOpts,
+    wind_down::WindDownOpts,
 };
 
 #[derive(clap::Parser)]
@@ -97,6 +99,11 @@ enum Sub {
         #[clap(flatten)]
         inner: TransferDaoFeesOpts,
     },
+    /// Create a CW3 message to perform a market wind down operation
+    WindDown {
+        #[clap(flatten)]
+        inner: WindDownOpts,
+    },
 }
 
 pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
@@ -118,6 +125,7 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
         Sub::SyncConfig { inner } => inner.go(opt).await?,
         Sub::SendTreasury { inner } => inner.go(opt).await?,
         Sub::TransferDaoFees { inner } => inner.go(opt).await?,
+        Sub::WindDown { inner } => inner.go(opt).await?,
     }
     Ok(())
 }
