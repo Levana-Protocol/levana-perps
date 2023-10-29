@@ -273,6 +273,31 @@ markets:
 
     initial-borrow-fee-rate: 0.05
 
+  DOGE_USDC:
+    config:
+      delta_neutrality_fee_sensitivity: 150000000
+      funding_rate_sensitivity: 1.5
+      carry_leverage: 15
+      borrow_fee_sensitivity: 0.083333333
+      borrow_fee_rate_min_annualized: 0.03
+      target_utilization: 0.5
+      delta_neutrality_fee_tax: 0.25
+
+      initial-borrow-fee-rate: 0.05
+
+  LUNA_USDC:
+    config:
+      delta_neutrality_fee_sensitivity: 3500000
+      max_leverage: 4
+      carry_leverage: 2
+      funding_rate_sensitivity: 2
+      borrow_fee_sensitivity: 0.083333333
+      borrow_fee_rate_min_annualized: 0.03
+      target_utilization: 0.5
+      delta_neutrality_fee_tax: 0.5
+
+      initial-borrow-fee-rate: 0.05
+
   LINK_USDC:
     config:
       delta_neutrality_fee_sensitivity: 125000000
