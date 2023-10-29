@@ -51,10 +51,7 @@ impl WatchedTaskPerMarketParallel for Stale {
     ) -> Result<WatchedTaskOutput> {
         self.check_stale_single(&market.market, app)
             .await
-            .map(|message| WatchedTaskOutput {
-                skip_delay: false,
-                message,
-            })
+            .map(WatchedTaskOutput::new)
     }
 }
 

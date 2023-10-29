@@ -93,14 +93,12 @@ async fn check_liquidity_transaction_alert(
             DeltaChange::RiseUp => "increased",
             DeltaChange::RiseDown => "decreased",
         };
-        Ok(WatchedTaskOutput { skip_delay: false, message: format!("Total liquidity {msg} by {percentage_change}% between height {historical_height} and {latest_height}")})
+        Ok(WatchedTaskOutput::new(format!("Total liquidity {msg} by {percentage_change}% between height {historical_height} and {latest_height}")))
     } else {
-        Ok(WatchedTaskOutput {
-            skip_delay: false,
-            message: format!(
+        Ok(WatchedTaskOutput::new(
+            format!(
                 "Total liqudity between heights of {} is under the expected delta (Percentage change: {percentage_change}%)",
                 mainnet.liquidity_transaction.number_of_blocks
-            ),
-        })
+            )))
     }
 }

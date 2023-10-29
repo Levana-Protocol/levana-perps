@@ -95,10 +95,7 @@ async fn update(app: &App) -> Result<WatchedTaskOutput> {
                 .await?
         }
     };
-    let output = WatchedTaskOutput {
-        skip_delay: false,
-        message,
-    };
+    let output = WatchedTaskOutput::new(message);
     app.set_factory_info(info).await;
     Ok(output)
 }

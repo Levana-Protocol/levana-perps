@@ -182,10 +182,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
     if is_error {
         Err(anyhow::anyhow!({ msg }))
     } else {
-        Ok(WatchedTaskOutput {
-            skip_delay: false,
-            message: msg,
-        })
+        Ok(WatchedTaskOutput::new(msg))
     }
 }
 

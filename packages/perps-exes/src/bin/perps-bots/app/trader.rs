@@ -118,10 +118,7 @@ async fn single_market(
 
     let total = status.liquidity.total_collateral();
     if total.is_zero() {
-        return Ok(WatchedTaskOutput {
-            skip_delay: false,
-            message: "No liquidity available".to_owned(),
-        });
+        return Ok(WatchedTaskOutput::new("No liquidity available".to_owned()));
     }
     let util_ratio = status
         .liquidity
@@ -229,8 +226,5 @@ async fn single_market(
             format!("Opened new position: {deposit} {direction:?} {leverage}x")
         }
     };
-    Ok(WatchedTaskOutput {
-        skip_delay: false,
-        message,
-    })
+    Ok(WatchedTaskOutput::new(message))
 }
