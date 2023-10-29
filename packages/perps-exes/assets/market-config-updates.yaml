@@ -283,7 +283,7 @@ markets:
       target_utilization: 0.5
       delta_neutrality_fee_tax: 0.25
 
-      initial-borrow-fee-rate: 0.05
+    initial-borrow-fee-rate: 0.05
 
   LUNA_USDC:
     config:
@@ -296,7 +296,7 @@ markets:
       target_utilization: 0.5
       delta_neutrality_fee_tax: 0.5
 
-      initial-borrow-fee-rate: 0.05
+    initial-borrow-fee-rate: 0.05
 
   LINK_USDC:
     config:
