@@ -247,6 +247,7 @@ markets:
       delta_neutrality_fee_sensitivity: 200000000
       carry_leverage: 15
       delta_neutrality_fee_tax: 0.25
+      liquidity_cooldown_seconds: 23400
 
     initial-borrow-fee-rate: 0.08
   BNB_USDC:
