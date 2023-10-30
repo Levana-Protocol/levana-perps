@@ -15,12 +15,13 @@ use cosmos::{Address, CosmosNetwork, HasAddress};
 use cosmwasm_std::Decimal256;
 use futures::StreamExt;
 use hyper::{header::CONTENT_TYPE, HeaderMap, StatusCode};
+use msg::contracts::market::liquidity::LiquidityStats;
 use perps_exes::{
     contracts::{Factory, MarketInfo},
     prelude::MarketContract,
 };
 use reqwest::Client;
-use shared::storage::{MarketId, Signed, UnsignedDecimal};
+use shared::storage::{LpToken, MarketId, Signed, UnsignedDecimal};
 use tokio::task::JoinSet;
 
 use crate::{app::App, types::ContractEnvironment};
@@ -98,6 +99,7 @@ struct WhaleMarketData {
     xlp_apr_1d: Cow<'static, str>,
     lp_apr_7d: Cow<'static, str>,
     xlp_apr_7d: Cow<'static, str>,
+    lp_value: Cow<'static, str>,
 }
 
 #[derive(serde::Serialize)]
@@ -205,8 +207,9 @@ async fn worker(
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 struct StatusRelaxed {
-    pub long_funding: Signed<Decimal256>,
-    pub short_funding: Signed<Decimal256>,
+    long_funding: Signed<Decimal256>,
+    short_funding: Signed<Decimal256>,
+    liquidity: LiquidityStats,
 }
 
 #[derive(serde::Deserialize)]
@@ -225,6 +228,7 @@ async fn load_whale_market_data(
     let StatusRelaxed {
         long_funding,
         short_funding,
+        liquidity,
     } = market.status_relaxed().await?;
 
     let (lp_apr_1d, xlp_apr_1d) = get_aprs(
@@ -256,6 +260,10 @@ async fn load_whale_market_data(
         xlp_apr_1d,
         lp_apr_7d,
         xlp_apr_7d,
+        lp_value: match liquidity.lp_to_collateral(LpToken::one()) {
+            Ok(value) => value.to_string().chars().take(5).collect::<String>().into(),
+            Err(_) => "-".into(),
+        },
     })
 }
 
