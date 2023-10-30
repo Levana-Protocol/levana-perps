@@ -109,6 +109,10 @@ impl ConfigDefaults {
         false
     }
     pub const fn liquidity_cooldown_seconds() -> u32 {
+        // FIXME in the future, bump to 6 hours. Holding off for now because
+        // otherwise we'll get confusing messages from sync-config. Wait until
+        // we're about to migrate contracts again.
+
         // Default to 1 hour
         60 * 60
     }
