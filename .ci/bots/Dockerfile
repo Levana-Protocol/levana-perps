@@ -14,6 +14,6 @@ RUN apk add --no-cache curl bash aws-cli
 
 ENV AMBER_YAML=/etc/amber.yaml
 
-ENTRYPOINT [ "health-check" ]
+ENTRYPOINT [ "health-check", "--task-output-timeout", "120" ]
 
 CMD ["/usr/bin/amber", "--amber-yaml", "/etc/amber.yaml", "--unmasked", "exec", "/usr/bin/perps-bots"]
