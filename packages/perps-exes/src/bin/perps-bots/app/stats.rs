@@ -28,10 +28,7 @@ impl WatchedTaskPerMarket for Stats {
     ) -> Result<WatchedTaskOutput> {
         let status = market.market.status().await?;
         let market_stats = MarketStats { status };
-        Ok(WatchedTaskOutput {
-            message: market_stats.to_string(),
-            skip_delay: false,
-        })
+        Ok(WatchedTaskOutput::new(market_stats.to_string()))
     }
 }
 

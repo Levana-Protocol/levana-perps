@@ -24,6 +24,8 @@ pyth:
       SOL_USD: ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d
       LINK_USD: 8ac0c70fff57e9aefdf5edf44b51d62c2d433653cbb2cf5cc06bb115af04d221
       AXL_USD: 60144b1d5c9e9851732ad1d9760e3485ef80be39b984f6bf60f82b28a2b7f126
+      DOGE_USD: dcef50dd0a4cd2dcc17e45df1676dcb336a11a61c69df7a0299b0150c672d25c
+      LUNA_USD: e6ccd3f878cf338e6732bf59f60943e8ca2c28402fc4d9c258503b2edbe74a31
   edge: 
     update-age-tolerance: 120
     # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-edge
@@ -264,6 +266,21 @@ networks:
       feeds-usd: [
         !constant { price: "1", inverted: false }
       ]
+    DOGE_USDC:
+      feeds: [
+        !pyth { key: "DOGE_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    LUNA_USDC:
+      feeds: [
+        !pyth { key: "LUNA_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+
   sei-testnet:
     ATOM_USD:
       feeds: [
@@ -439,4 +456,18 @@ networks:
       feeds-usd: [
         !simple { contract: "osmo10y2xkd5ep6lctmdtcvx6yssfzcafqjkplchfafh7dpxtljn4gz2sdzzhur", inverted: false, age_tolerance: 604800 },
         !pyth { key: "ETH_USD", inverted: false },
+      ]
+    DOGE_USDC:
+      feeds: [
+        !pyth { key: "DOGE_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    LUNA_USDC:
+      feeds: [
+        !pyth { key: "LUNA_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
       ]

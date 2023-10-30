@@ -216,9 +216,11 @@ impl GasCheck {
         }
 
         if errors.is_empty() {
-            Ok(WatchedTaskOutput {
-                message: balances.join("\n"),
-                skip_delay,
+            let output = WatchedTaskOutput::new(balances.join("\n"));
+            Ok(if skip_delay {
+                output.skip_delay()
+            } else {
+                output
             })
         } else {
             errors.append(&mut balances);
