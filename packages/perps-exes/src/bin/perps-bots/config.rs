@@ -232,17 +232,23 @@ impl Opt {
             crank_wallets,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
-        let gas_wallet = seed
-            .derive_cosmos_numbered(1)
-            .for_chain(network.get_address_type())?;
-        let price_wallet = seed
-            .derive_cosmos_numbered(2)
-            .for_chain(network.get_address_type())?;
+        let get_wallet = |index| match network.get_address_type() {
+            cosmos::AddressType::Cosmos
+            | cosmos::AddressType::Juno
+            | cosmos::AddressType::Osmo
+            | cosmos::AddressType::Wasm
+            | cosmos::AddressType::Sei
+            | cosmos::AddressType::Stargaze => seed
+                .derive_cosmos_numbered(index)
+                .for_chain(network.get_address_type()),
+            cosmos::AddressType::Injective => seed
+                .derive_ethereum_numbered(index)
+                .for_chain(network.get_address_type()),
+        };
+        let gas_wallet = get_wallet(1)?;
+        let price_wallet = get_wallet(2)?;
         let crank_wallets = (0..*crank_wallets)
-            .map(|idx| {
-                seed.derive_cosmos_numbered(idx + 3)
-                    .for_chain(network.get_address_type())
-            })
+            .map(|idx| get_wallet(idx + 3))
             .collect::<Result<_>>()?;
         let watcher = match watcher_config {
             Some(yaml) => serde_yaml::from_str(yaml).context("Invalid watcher config on CLI")?,
