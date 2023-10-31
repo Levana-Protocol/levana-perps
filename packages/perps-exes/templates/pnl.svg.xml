@@ -240,10 +240,10 @@
 {% if info.display_usd %}
   {% if info.display_percentage %}
     <g class="earnings double">
-      <text x="24" y="172">{{info.earnings_usd}}</text>
+      <text x="24" y="168">{{info.earnings_usd}}</text>
     </g>
     <g class="earnings double">
-      <text x="24" y="210">{{info.earnings_percentage}}</text>
+      <text x="24" y="206">{{info.earnings_percentage}}</text>
     </g>
   {% else %}
     <g class="earnings single">
