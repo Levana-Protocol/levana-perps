@@ -406,7 +406,7 @@ markets:
       borrow_fee_sensitivity: 0.083333333
       delta_neutrality_fee_cap: 0.015
       delta_neutrality_fee_tax: 0.5
-      borrow_fee_rate_min_annualized: 0.06
+      borrow_fee_rate_min_annualized: 0.08
       liquidity_cooldown_seconds: 23400
 
-    initial-borrow-fee-rate: 0.12
+    initial-borrow-fee-rate: 0.16
