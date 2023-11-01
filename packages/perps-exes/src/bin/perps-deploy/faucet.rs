@@ -69,6 +69,7 @@ impl Faucet {
             "AXL" => "2000",
             "ryETH" => "2",
             "INJ" => "1000",
+            "TIA" => "2000",
             name => anyhow::bail!("Unknown collateral type: {name}"),
         }
         .parse()?;

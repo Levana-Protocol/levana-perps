@@ -392,3 +392,21 @@ markets:
       liquidity_cooldown_seconds: 23400
 
     initial-borrow-fee-rate: 0.16
+
+
+  TIA_USD:
+    config:
+      trading_fee_notional_size: 0.002
+      trading_fee_counter_collateral: 0.002
+      max_leverage: 10
+      carry_leverage: 5
+      funding_rate_sensitivity: 2
+      target_utilization: 0.5
+      delta_neutrality_fee_sensitivity: 12000000
+      borrow_fee_sensitivity: 0.083333333
+      delta_neutrality_fee_cap: 0.015
+      delta_neutrality_fee_tax: 0.5
+      borrow_fee_rate_min_annualized: 0.08
+      liquidity_cooldown_seconds: 23400
+
+    initial-borrow-fee-rate: 0.16
