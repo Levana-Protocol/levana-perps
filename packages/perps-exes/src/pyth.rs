@@ -52,16 +52,33 @@ async fn get_wormhole_proofs(
         .collect::<Vec<String>>()
         .join("&");
     let url_params = &url_params;
-
     let url = format!("{endpoint}api/latest_vaas?{url_params}");
 
-    let vaas: Vec<String> = client
-        .get(url)
-        .send()
-        .await?
-        .error_for_status()?
-        .json()
-        .await?;
+    let vaas: Vec<String> = fetch_json_with_retry(|| client.get(&url)).await?;
 
     Ok(vaas)
+}
+
+pub async fn fetch_json_with_retry<T, F>(make_req: F) -> Result<T>
+where
+    F: Fn() -> reqwest::RequestBuilder,
+    T: serde::de::DeserializeOwned,
+{
+    const DELAYS_MILLIS: [u64; 5] = [100, 200, 400, 800, 1600];
+    let mut attempt = 0;
+    loop {
+        let req = make_req();
+        let res = async move { req.send().await?.error_for_status()?.json().await }.await;
+        match res {
+            Ok(x) => break Ok(x),
+            Err(e) => match DELAYS_MILLIS.get(attempt) {
+                Some(delay) => {
+                    attempt += 1;
+                    tracing::warn!("Error on HTTP request, sleeping {delay}ms and retring. Attempt {attempt}/{}. Error: {e:?}.", DELAYS_MILLIS.len());
+                    tokio::time::sleep(tokio::time::Duration::from_millis(*delay)).await;
+                }
+                None => break Err(e.into()),
+            },
+        }
+    }
 }
