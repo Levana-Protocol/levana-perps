@@ -10,6 +10,7 @@ use msg::{
     },
     prelude::*,
 };
+use perps_exes::pyth::fetch_json_with_retry;
 use pyth_sdk_cw::PriceIdentifier;
 
 use crate::app::App;
@@ -195,17 +196,15 @@ async fn fetch_pyth_prices(
         return Ok(());
     }
 
-    let mut req = client.get(format!("{}api/latest_price_feeds", endpoint));
-    for id in ids {
-        req = req.query(&[("ids[]", id)])
-    }
-
-    let records = req
-        .send()
-        .await?
-        .error_for_status()?
-        .json::<Vec<PythRecord>>()
-        .await?;
+    let base = format!("{}api/latest_price_feeds", endpoint);
+    let records: Vec<PythRecord> = fetch_json_with_retry(|| {
+        let mut req = client.get(&base);
+        for id in ids {
+            req = req.query(&[("ids[]", id)])
+        }
+        req
+    })
+    .await?;
 
     for PythRecord {
         id,
