@@ -26,6 +26,7 @@ pyth:
       AXL_USD: 60144b1d5c9e9851732ad1d9760e3485ef80be39b984f6bf60f82b28a2b7f126
       DOGE_USD: dcef50dd0a4cd2dcc17e45df1676dcb336a11a61c69df7a0299b0150c672d25c
       LUNA_USD: e6ccd3f878cf338e6732bf59f60943e8ca2c28402fc4d9c258503b2edbe74a31
+      TIA_USD: 09f7c1d7dfbb7df2b8fe3d3d87ee94a2259d212da4f30c1f0540d066dfa44723
   edge: 
     update-age-tolerance: 120
     # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-edge
@@ -259,6 +260,13 @@ networks:
       feeds-usd: [
         !pyth { key: "AXL_USD", inverted: false}
       ]
+    TIA_USD:
+      feeds: [
+        !pyth { key: "TIA_USD", inverted: false}
+      ]
+      feeds-usd: [
+        !pyth { key: "TIA_USD", inverted: false}
+      ]
     LINK_USDC:
       feeds: [
         !pyth { key: "LINK_USD", inverted: false }
@@ -478,4 +486,11 @@ networks:
       ]
       feeds-usd: [
         !pyth { key: "INJ_USD", inverted: false}
+      ]
+    TIA_USD:
+      feeds: [
+        !pyth { key: "TIA_USD", inverted: false}
+      ]
+      feeds-usd: [
+        !pyth { key: "TIA_USD", inverted: false}
       ]
