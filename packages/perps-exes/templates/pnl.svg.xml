@@ -226,7 +226,7 @@
 </g>
 <path d="M0.375 24C0.375 10.9523 10.9523 0.375 24 0.375H576C589.048 0.375 599.625 10.9523 599.625 24V313.5C599.625 326.548 589.048 337.125 576 337.125H24C10.9523 337.125 0.375 326.548 0.375 313.5V24Z" stroke="#4D4653" stroke-width="0.75"/>
 
-{% if info.display_usd and info.display_percentage %}
+{% if info.display_usd && info.display_percentage %}
   <g class="market-title">
     <text x="24" y="132">{{info.market_title}}</text>
   </g>
@@ -534,6 +534,23 @@
   .stat-value.small {
     font-size: 11px;
   }
+
+  #entry-price-stat {
+    transform: translate(24px, 294px)
+  }
+
+  #exit-price-stat {
+    transform: translate(140px, 294px)
+  }
+
+  #leverage-stat {
+    transform: translate(250px, 294px)
+  }
+
+  #wallet-stat {
+    transform: translate(350px, 294px)
+  }
+
 </style>
 
 <linearGradient id="paint0_linear_0_1" x1="841.356" y1="56.0492" x2="797.922" y2="-10.9347" gradientUnits="userSpaceOnUse">
@@ -549,35 +566,4 @@
 <stop offset="1" stop-color="#22292F" stop-opacity="0"/>
 </linearGradient>
 </defs>
-
-<script>
-  function go() {
-    const margin = 16;
-    const yValue = 294;
-    let alignAccumulator = 24;
-
-    const entryPriceElem = document.getElementById("entry-price-stat");
-    const exitPriceElem = document.getElementById("exit-price-stat");
-    const leverageElem = document.getElementById("leverage-stat");
-    const walletElem = document.getElementById("wallet-stat");
-
-    let width = entryPriceElem.getBBox().width;
-    entryPriceElem.setAttribute("transform", "translate(" + alignAccumulator + ", " + yValue + ")");
-    alignAccumulator += width + margin;
-
-    width = exitPriceElem.getBBox().width;
-    exitPriceElem.setAttribute("transform", "translate(" + alignAccumulator + ", " + yValue + ")");
-    alignAccumulator += width + margin;
-
-    width = leverageElem.getBBox().width;
-    leverageElem.setAttribute("transform", "translate(" + alignAccumulator + ", " + yValue + ")");
-    alignAccumulator += width + margin;
-
-    if (walletElem) {
-      width = walletElem.getBBox().width;
-      walletElem.setAttribute("transform", "translate(" + alignAccumulator + ", " + yValue + ")");
-      alignAccumulator += width + margin;
-    }
-  }
-</script>
 </svg>
