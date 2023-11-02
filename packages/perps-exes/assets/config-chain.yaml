@@ -44,6 +44,9 @@ osmosis-mainnet:
     TIA:
       denom: ibc/D79E7D83AB399BFFF93433E54FAA480C191248FC556924A2A8351AE2638B3877
       decimal-places: 6
+    nBTC:
+      denom: ibc/75345531D87BD90BF108BE7240BD721CB2CB0A1F16D4EBA71B09EC3C43E15C8F
+      decimal-places: 14
 osmosis-testnet:
   gas-decimals: 6
   spot-price: 
