@@ -70,7 +70,7 @@ impl PnlInfo {
             .map_err(|e| Error::Database { msg: e.to_string() })?
             .ok_or(Error::InvalidPage)?;
         Ok(PnlInfo {
-            pnl_display: pnl,
+            pnl: PnlDetails::Usd(pnl), // FIXME
             host: host.hostname().to_owned(),
             image_url: PnlImage { pnl_id }.to_uri().to_string(),
             html_url: PnlHtml { pnl_id }.to_uri().to_string(),
@@ -81,6 +81,7 @@ impl PnlInfo {
             leverage,
             amplitude_key: environment.amplitude_key(),
             chain: chain.to_string(),
+            wallet: None, // FIXME
         })
     }
 }
@@ -389,7 +390,6 @@ impl IntoResponse for Error {
 #[template(path = "pnl.html")]
 struct PnlInfo {
     amplitude_key: &'static str,
-    pnl_display: String,
     host: String,
     chain: String,
     image_url: String,
@@ -399,6 +399,29 @@ struct PnlInfo {
     entry_price: String,
     exit_price: String,
     leverage: String,
+    wallet: Option<Address>,
+    pnl: PnlDetails,
+}
+
+enum PnlDetails {
+    Usd(String),
+    #[allow(dead_code)] // FIXME
+    Percentage(String),
+    #[allow(dead_code)] // FIXME
+    Both {
+        usd: String,
+        percentage: String,
+    },
+}
+
+impl Display for PnlDetails {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            PnlDetails::Usd(usd) => write!(f, "{usd}"),
+            PnlDetails::Percentage(percentage) => write!(f, "{percentage}"),
+            PnlDetails::Both { usd, percentage } => write!(f, "{usd} / {percentage}"),
+        }
+    }
 }
 
 struct UsdDisplay(Signed<Usd>);

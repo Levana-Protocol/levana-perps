@@ -31,7 +31,14 @@
     <div class="content">
       <img src="https://static.levana.finance/images/logo.svg" alt="Levana Logo" class="logo">
       <div class="pnl">
-        {{ pnl_display }}
+        {% match pnl %}
+          {% when PnlDetails::Usd with (usd) %}
+            {{ usd }}
+          {% when PnlDetails::Percentage with (percentage) %}
+            {{ percentage }}
+          {% when PnlDetails::Both with { usd, percentage } %}
+            {{ usd }} / {{ percentage }}
+        {% endmatch %}
       </div>
       <div class="market-info">
         {{ market_id }} - {{ direction }}
@@ -77,7 +84,7 @@
 
       var API_KEY = '{{ amplitude_key }}'
 
-      var pnl = '{{ pnl_display }}'
+      var pnl = '{{ pnl }}'
       var direction = '{{ direction }}'
       var market = '{{ market_id }}'
       var chain = '{{ chain }}'
