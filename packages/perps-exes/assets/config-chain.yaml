@@ -95,3 +95,7 @@ injective-mainnet:
       type: stable
   rpc-nodes:
   - https://sentry.tm.injective.network
+  assets:
+    INJ:
+      denom: inj
+      decimal-places: 18
