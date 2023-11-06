@@ -122,6 +122,14 @@ networks:
       feeds-usd: [
         !constant { price: "1", inverted: false }
       ]
+    BTC_INJ:
+      feeds: [
+        !pyth { key: "BTC_USD", inverted: false},
+        !pyth { key: "INJ_USD", inverted: true}
+      ]
+      feeds-usd: [
+        !pyth { key: "INJ_USD", inverted: false}
+      ]
   sei-mainnet:
     ETH_USD:
       feeds: [
