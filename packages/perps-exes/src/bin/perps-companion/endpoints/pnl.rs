@@ -57,12 +57,14 @@ impl PnlInfo {
         let PositionInfoFromDb {
             market_id,
             environment,
-            pnl,
+            pnl_usd,
+            pnl_percentage,
             direction,
             entry_price,
             exit_price,
             leverage,
             chain,
+            wallet,
         } = app
             .db
             .get_url_detail(pnl_id)
@@ -76,7 +78,15 @@ impl PnlInfo {
             .to_owned();
 
         Ok(PnlInfo {
-            pnl: PnlDetails::Usd(pnl), // FIXME
+            pnl: match (pnl_usd, pnl_percentage) {
+                (None, None) => PnlDetails::Usd("PnL value missing".to_owned()),
+                (None, Some(pnl_percentage)) => PnlDetails::Percentage(pnl_percentage),
+                (Some(pnl_usd), None) => PnlDetails::Usd(pnl_usd),
+                (Some(pnl_usd), Some(pnl_percentage)) => PnlDetails::Both {
+                    usd: pnl_usd,
+                    percentage: pnl_percentage,
+                },
+            },
             host: host.hostname().to_owned(),
             image_url: PnlImage { pnl_id }.to_uri().to_string(),
             html_url: PnlHtml { pnl_id }.to_uri().to_string(),
@@ -87,7 +97,7 @@ impl PnlInfo {
             leverage,
             amplitude_key: environment.amplitude_key(),
             chain: chain.to_string(),
-            wallet: None, // FIXME
+            wallet,
             quote_currency,
         })
     }
@@ -123,6 +133,8 @@ pub(crate) struct PositionInfo {
     pub(crate) chain: ChainId,
     pub(crate) position_id: PositionId,
     pub(crate) pnl_type: PnlType,
+    #[serde(default)]
+    pub(crate) display_wallet: bool,
 }
 
 struct MarketContract(Contract);
@@ -163,6 +175,7 @@ impl PositionInfo {
             address,
             position_id,
             pnl_type,
+            display_wallet,
         } = &self;
         let cosmos = app.cosmos.get(chain).ok_or(Error::UnknownChainId)?;
 
@@ -259,17 +272,26 @@ impl PositionInfo {
             }
             .to_string(),
             environment: ContractEnvironment::from_market(*chain, &label),
-            pnl: match pnl_type {
-                PnlType::Usd => UsdDisplay(pos.pnl_usd).to_string(),
-                PnlType::Percent => match deposit_collateral_usd.try_into_positive_value() {
-                    None => "Negative collateral".to_owned(),
+            pnl_usd: match pnl_type {
+                PnlType::Percent => None,
+                _ => Some(UsdDisplay(pos.pnl_usd).to_string()),
+            },
+            pnl_percentage: match pnl_type {
+                PnlType::Usd => None,
+                _ => match deposit_collateral_usd.try_into_positive_value() {
+                    None => None,
                     Some(deposit) => {
                         let percent = pos.pnl_usd.into_number() / deposit.into_number()
                             * Decimal256::from_ratio(100u32, 1u32).into_signed();
                         let plus = if percent.is_negative() { "" } else { "+" };
-                        format!("{plus}{}%", TwoDecimalPoints(percent))
+                        Some(format!("{plus}{}%", TwoDecimalPoints(percent)))
                     }
                 },
+            },
+            wallet: if *display_wallet {
+                Some(pos.owner.to_string())
+            } else {
+                None
             },
             info: self,
         })
@@ -406,7 +428,7 @@ struct PnlInfo {
     entry_price: String,
     exit_price: String,
     leverage: String,
-    wallet: Option<Address>,
+    wallet: Option<String>,
     pnl: PnlDetails,
     quote_currency: String,
 }

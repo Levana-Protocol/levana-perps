@@ -214,6 +214,7 @@ impl Display for DirectionForDb {
 pub(crate) enum PnlType {
     Usd = 1,
     Percent = 2,
+    Both = 3,
 }
 
 impl From<PnlType> for String {
@@ -221,6 +222,7 @@ impl From<PnlType> for String {
         match val {
             PnlType::Usd => "Usd".into(),
             PnlType::Percent => "Percent".into(),
+            PnlType::Both => "Both".into(),
         }
     }
 }
