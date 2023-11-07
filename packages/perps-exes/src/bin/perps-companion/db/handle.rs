@@ -58,7 +58,7 @@ impl Db {
                     chain,
                     position_id,
                     pnl_type,
-                    display_wallet,
+                    display_wallet: _,
                 },
             market_id,
             pnl_usd,
