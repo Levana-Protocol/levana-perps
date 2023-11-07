@@ -159,19 +159,19 @@
 
 {% match info.pnl %}
   {% when PnlDetails::Both with { usd, percentage } %}
-    <text class="earnings double" x="24" y="168">+{{usd}} USD</text>
-    <text class="earnings double" x="24" y="206">+{{percentage}}%</text>
+    <text class="earnings double" x="24" y="168">{{usd}}</text>
+    <text class="earnings double" x="24" y="206">{{percentage}}</text>
   {% when PnlDetails::Usd with (usd) %}
-    <text class="earnings single" x="24" y="194">+{{usd}} USD</text>
+    <text class="earnings single" x="24" y="194">{{usd}}</text>
   {% when PnlDetails::Percentage with (percentage) %}
-    <text class="earnings single" x="24" y="194">+{{percentage}}%</text>
+    <text class="earnings single" x="24" y="194">{{percentage}}</text>
 {% endmatch %}
 
 <text class="stat-title" x="24" y="294">Entry price</text>
-<text class="stat-value" x="24" y="312">{{info.entry_price}} USD</text>
+<text class="stat-value" x="24" y="312">{{info.entry_price}} {{info.quote_currency}}</text>
 
 <text class="stat-title" x="114" y="294">Exit price</text>
-<text class="stat-value" x="114" y="312">{{info.exit_price}} USD</text>
+<text class="stat-value" x="114" y="312">{{info.exit_price}} {{info.quote_currency}}</text>
 
 <text class="stat-title" x="204" y="294">Leverage</text>
 <text class="stat-value" x="204" y="312">{{info.leverage}}x</text>

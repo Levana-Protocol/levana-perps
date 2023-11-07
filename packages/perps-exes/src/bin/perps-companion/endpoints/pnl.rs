@@ -69,6 +69,12 @@ impl PnlInfo {
             .await
             .map_err(|e| Error::Database { msg: e.to_string() })?
             .ok_or(Error::InvalidPage)?;
+
+        let quote_currency = market_id
+            .split_once('/')
+            .map_or("", |(_, quote_currency)| quote_currency)
+            .to_owned();
+
         Ok(PnlInfo {
             pnl: PnlDetails::Usd(pnl), // FIXME
             host: host.hostname().to_owned(),
@@ -82,6 +88,7 @@ impl PnlInfo {
             amplitude_key: environment.amplitude_key(),
             chain: chain.to_string(),
             wallet: None, // FIXME
+            quote_currency,
         })
     }
 }
@@ -401,6 +408,7 @@ struct PnlInfo {
     leverage: String,
     wallet: Option<Address>,
     pnl: PnlDetails,
+    quote_currency: String,
 }
 
 enum PnlDetails {
