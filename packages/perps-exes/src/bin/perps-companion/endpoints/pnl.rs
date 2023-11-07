@@ -79,7 +79,7 @@ impl PnlInfo {
 
         Ok(PnlInfo {
             pnl: match (pnl_usd, pnl_percentage) {
-                (None, None) => PnlDetails::Usd("PnL value missing".to_owned()),
+                (None, None) => return Err(Error::PnlValueMissing),
                 (None, Some(pnl_percentage)) => PnlDetails::Percentage(pnl_percentage),
                 (Some(pnl_usd), None) => PnlDetails::Usd(pnl_usd),
                 (Some(pnl_usd), Some(pnl_percentage)) => PnlDetails::Both {
@@ -382,6 +382,8 @@ pub(crate) enum Error {
     Database { msg: String },
     #[error("Page not found")]
     InvalidPage,
+    #[error("Missing PnL values")]
+    PnlValueMissing
 }
 
 impl IntoResponse for Error {
@@ -403,6 +405,7 @@ impl IntoResponse for Error {
                     StatusCode::INTERNAL_SERVER_ERROR
                 }
                 Error::InvalidPage => StatusCode::NOT_FOUND,
+                Error::PnlValueMissing => StatusCode::INTERNAL_SERVER_ERROR,
             },
             error: self.clone(),
         }
