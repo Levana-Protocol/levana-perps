@@ -1,4 +1,5 @@
 //! Entrypoint messages for the factory
+
 use crate::{
     contracts::market::entry::NewMarketParams,
     shutdown::{ShutdownEffect, ShutdownImpact},
@@ -161,6 +162,17 @@ pub enum QueryMsg {
         market_id: MarketId,
     },
 
+    /// * returns [MarketInfosResp]
+    ///
+    /// All the markets
+    #[returns(MarketInfosResponse)]
+    MarketInfos {
+        /// Last seen market ID in a [MarketInfosResp] for enumeration
+        start_after: Option<MarketId>,
+        /// Defaults to [MARKETS_QUERY_LIMIT_DEFAULT]
+        limit: Option<u32>,
+    },
+
     /// * returns [AddrIsContractResp]
     ///
     /// given an address, checks if it's any of the registered protocol contracts.
@@ -210,6 +222,28 @@ pub struct MigrateMsg {}
 /// Information about a specific market, returned from [QueryMsg::MarketInfo].
 #[cw_serde]
 pub struct MarketInfoResponse {
+    /// Address of the market
+    pub market_addr: Addr,
+    /// Address of the position token
+    pub position_token: Addr,
+    /// Address of the LP liquidity token
+    pub liquidity_token_lp: Addr,
+    /// Address of the xLP liquidity token
+    pub liquidity_token_xlp: Addr,
+}
+
+/// Information about multiple market, returned from [QueryMsg::MarketInfos].
+#[cw_serde]
+pub struct MarketInfosResponse {
+    /// The requested markets
+    pub markets: Vec<MarketInfoResponseWithId>,
+}
+
+/// Information about a specific market, returned from [QueryMsg::MarketInfo].
+#[cw_serde]
+pub struct MarketInfoResponseWithId {
+    /// The market id
+    pub id: MarketId,
     /// Address of the market
     pub market_addr: Addr,
     /// Address of the position token

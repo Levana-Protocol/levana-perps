@@ -34,7 +34,8 @@ use msg::contracts::{
     factory::{
         entry::{
             AddrIsContractResp, ContractType, ExecuteMsg, FactoryOwnerResp, InstantiateMsg,
-            MarketInfoResponse, MigrateMsg, QueryMsg,
+            MarketInfoResponse, MarketInfoResponseWithId, MarketInfosResponse, MigrateMsg,
+            QueryMsg,
         },
         events::{InstantiateEvent, NewContractKind},
     },
@@ -338,6 +339,32 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             }
             .query_result()
         }
+
+        QueryMsg::MarketInfos { start_after, limit } => MarketInfosResponse {
+            markets: markets(store, start_after, limit)?
+                .markets
+                .into_iter()
+                .map(|market_id| {
+                    let market_addr = get_market_addr(store, &market_id)?;
+                    Ok(MarketInfoResponseWithId {
+                        id: market_id.clone(),
+                        market_addr,
+                        position_token: position_token_addr(store, market_id.clone())?,
+                        liquidity_token_lp: liquidity_token_addr(
+                            store,
+                            market_id.clone(),
+                            LiquidityTokenKind::Lp,
+                        )?,
+                        liquidity_token_xlp: liquidity_token_addr(
+                            store,
+                            market_id,
+                            LiquidityTokenKind::Xlp,
+                        )?,
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?,
+        }
+        .query_result(),
 
         QueryMsg::AddrIsContract { addr } => {
             let addr = addr.validate(state.api)?;

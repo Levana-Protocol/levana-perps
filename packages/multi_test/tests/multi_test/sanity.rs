@@ -1,5 +1,6 @@
 use levana_perpswap_multi_test::return_unless_market_collateral_base;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
+use msg::contracts::factory::entry::MarketInfosResponse;
 use msg::prelude::*;
 
 #[test]
@@ -160,6 +161,22 @@ fn sanity_spot_price() {
 
     return_unless_market_collateral_base!(&market);
     assert!(!price_resp.price_usd.into_number().approx_eq(old_price_usd));
+}
+
+#[test]
+fn sanity_market_info() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    let resp: MarketInfosResponse = market
+        .query_factory(&FactoryQueryMsg::MarketInfos {
+            start_after: None,
+            limit: None,
+        })
+        .unwrap();
+
+    let ids: Vec<MarketId> = resp.markets.iter().map(|info| info.id.clone()).collect();
+
+    assert_eq!(ids, vec![market.id]);
 }
 
 fn open_position_and_assert(
