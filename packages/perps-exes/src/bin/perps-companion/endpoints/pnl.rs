@@ -438,9 +438,7 @@ struct PnlInfo {
 
 enum PnlDetails {
     Usd(String),
-    #[allow(dead_code)] // FIXME
     Percentage(String),
-    #[allow(dead_code)] // FIXME
     Both {
         usd: String,
         percentage: String,
