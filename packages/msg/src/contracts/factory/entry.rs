@@ -162,7 +162,7 @@ pub enum QueryMsg {
         market_id: MarketId,
     },
 
-    /// * returns [MarketInfosResp]
+    /// * returns [MarketInfosResponse]
     ///
     /// All the markets
     #[returns(MarketInfosResponse)]
