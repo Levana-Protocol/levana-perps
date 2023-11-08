@@ -383,7 +383,7 @@ pub(crate) enum Error {
     #[error("Page not found")]
     InvalidPage,
     #[error("Missing PnL values")]
-    PnlValueMissing
+    PnlValueMissing,
 }
 
 impl IntoResponse for Error {
@@ -439,10 +439,7 @@ struct PnlInfo {
 enum PnlDetails {
     Usd(String),
     Percentage(String),
-    Both {
-        usd: String,
-        percentage: String,
-    },
+    Both { usd: String, percentage: String },
 }
 
 impl Display for PnlDetails {
