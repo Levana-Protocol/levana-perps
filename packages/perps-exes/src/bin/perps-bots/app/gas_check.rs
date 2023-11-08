@@ -244,7 +244,7 @@ async fn get_gas_balance(
 ) -> Result<GasAmount> {
     let coins = cosmos.all_balances(address).await?;
     for Coin { denom, amount } in coins {
-        if &denom == cosmos.get_cosmos_builder().gas_coin() {
+        if denom == cosmos.get_cosmos_builder().gas_coin() {
             let raw = amount
                 .parse()
                 .with_context(|| format!("Invalid gas coin amount {amount:?}"))?;
