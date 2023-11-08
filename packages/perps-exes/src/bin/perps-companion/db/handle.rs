@@ -58,14 +58,17 @@ impl Db {
                     chain,
                     position_id,
                     pnl_type,
+                    display_wallet: _,
                 },
             market_id,
-            pnl,
+            pnl_usd,
+            pnl_percentage,
             direction,
             entry_price,
             exit_price,
             leverage,
             environment,
+            wallet,
         }: PositionInfoToDb,
     ) -> Result<i64> {
         let market = self
@@ -77,18 +80,20 @@ impl Db {
         let url_id = query_scalar!(
             r#"
                 INSERT INTO position_detail
-                (market, position_id, pnl, direction, entry_price, exit_price, leverage, pnl_type)
-                VALUES($1, $2, $3, $4, $5, $6, $7, $8)
+                (market, position_id, pnl_usd, pnl_percentage, direction, entry_price, exit_price, leverage, pnl_type, wallet)
+                VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 RETURNING url_id
             "#,
             market,
             position_id,
-            pnl,
+            pnl_usd,
+            pnl_percentage,
             direction as i32,
             TwoDecimalPoints(entry_price.into_number()).to_string(),
             TwoDecimalPoints(exit_price.into_number()).to_string(),
             leverage,
             pnl_type as i32,
+            wallet,
         )
         .fetch_one(&self.pool)
         .await?;
@@ -101,13 +106,15 @@ impl Db {
             r#"
                 SELECT
                     market_id,
-                    pnl,
+                    pnl_usd,
+                    pnl_percentage,
                     entry_price,
                     exit_price,
                     leverage,
                     direction as "direction: DirectionForDb",
                     environment as "environment: ContractEnvironment",
-                    chain as "chain: ChainId"
+                    chain as "chain: ChainId",
+                    wallet
                 FROM position_detail INNER JOIN market
                 ON position_detail.market = market.id
                 WHERE url_id=$1

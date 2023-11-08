@@ -57,20 +57,36 @@ impl PnlInfo {
         let PositionInfoFromDb {
             market_id,
             environment,
-            pnl,
+            pnl_usd,
+            pnl_percentage,
             direction,
             entry_price,
             exit_price,
             leverage,
             chain,
+            wallet,
         } = app
             .db
             .get_url_detail(pnl_id)
             .await
             .map_err(|e| Error::Database { msg: e.to_string() })?
             .ok_or(Error::InvalidPage)?;
+
+        let quote_currency = market_id
+            .split_once('/')
+            .map_or("", |(_, quote_currency)| quote_currency)
+            .to_owned();
+
         Ok(PnlInfo {
-            pnl_display: pnl,
+            pnl: match (pnl_usd, pnl_percentage) {
+                (None, None) => return Err(Error::PnlValueMissing),
+                (None, Some(pnl_percentage)) => PnlDetails::Percentage(pnl_percentage),
+                (Some(pnl_usd), None) => PnlDetails::Usd(pnl_usd),
+                (Some(pnl_usd), Some(pnl_percentage)) => PnlDetails::Both {
+                    usd: pnl_usd,
+                    percentage: pnl_percentage,
+                },
+            },
             host: host.hostname().to_owned(),
             image_url: PnlImage { pnl_id }.to_uri().to_string(),
             html_url: PnlHtml { pnl_id }.to_uri().to_string(),
@@ -81,6 +97,8 @@ impl PnlInfo {
             leverage,
             amplitude_key: environment.amplitude_key(),
             chain: chain.to_string(),
+            wallet,
+            quote_currency,
         })
     }
 }
@@ -115,6 +133,8 @@ pub(crate) struct PositionInfo {
     pub(crate) chain: ChainId,
     pub(crate) position_id: PositionId,
     pub(crate) pnl_type: PnlType,
+    #[serde(default)]
+    pub(crate) display_wallet: bool,
 }
 
 struct MarketContract(Contract);
@@ -155,6 +175,7 @@ impl PositionInfo {
             address,
             position_id,
             pnl_type,
+            display_wallet,
         } = &self;
         let cosmos = app.cosmos.get(chain).ok_or(Error::UnknownChainId)?;
 
@@ -251,17 +272,26 @@ impl PositionInfo {
             }
             .to_string(),
             environment: ContractEnvironment::from_market(*chain, &label),
-            pnl: match pnl_type {
-                PnlType::Usd => UsdDisplay(pos.pnl_usd).to_string(),
-                PnlType::Percent => match deposit_collateral_usd.try_into_positive_value() {
-                    None => "Negative collateral".to_owned(),
+            pnl_usd: match pnl_type {
+                PnlType::Percent => None,
+                _ => Some(UsdDisplay(pos.pnl_usd).to_string()),
+            },
+            pnl_percentage: match pnl_type {
+                PnlType::Usd => None,
+                _ => match deposit_collateral_usd.try_into_positive_value() {
+                    None => None,
                     Some(deposit) => {
                         let percent = pos.pnl_usd.into_number() / deposit.into_number()
                             * Decimal256::from_ratio(100u32, 1u32).into_signed();
                         let plus = if percent.is_negative() { "" } else { "+" };
-                        format!("{plus}{}%", TwoDecimalPoints(percent))
+                        Some(format!("{plus}{}%", TwoDecimalPoints(percent)))
                     }
                 },
+            },
+            wallet: if *display_wallet {
+                Some(pos.owner.to_string())
+            } else {
+                None
             },
             info: self,
         })
@@ -352,6 +382,8 @@ pub(crate) enum Error {
     Database { msg: String },
     #[error("Page not found")]
     InvalidPage,
+    #[error("Missing PnL values")]
+    PnlValueMissing,
 }
 
 impl IntoResponse for Error {
@@ -373,6 +405,7 @@ impl IntoResponse for Error {
                     StatusCode::INTERNAL_SERVER_ERROR
                 }
                 Error::InvalidPage => StatusCode::NOT_FOUND,
+                Error::PnlValueMissing => StatusCode::INTERNAL_SERVER_ERROR,
             },
             error: self.clone(),
         }
@@ -389,7 +422,6 @@ impl IntoResponse for Error {
 #[template(path = "pnl.html")]
 struct PnlInfo {
     amplitude_key: &'static str,
-    pnl_display: String,
     host: String,
     chain: String,
     image_url: String,
@@ -399,6 +431,25 @@ struct PnlInfo {
     entry_price: String,
     exit_price: String,
     leverage: String,
+    wallet: Option<String>,
+    pnl: PnlDetails,
+    quote_currency: String,
+}
+
+enum PnlDetails {
+    Usd(String),
+    Percentage(String),
+    Both { usd: String, percentage: String },
+}
+
+impl Display for PnlDetails {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            PnlDetails::Usd(usd) => write!(f, "{usd}"),
+            PnlDetails::Percentage(percentage) => write!(f, "{percentage}"),
+            PnlDetails::Both { usd, percentage } => write!(f, "{usd} / {percentage}"),
+        }
+    }
 }
 
 struct UsdDisplay(Signed<Usd>);
