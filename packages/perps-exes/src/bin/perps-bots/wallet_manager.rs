@@ -7,7 +7,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use cosmos::{
-    proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, AddressType, Cosmos, HasAddress,
+    proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, AddressHrp, Cosmos, HasAddress,
     SeedPhrase, TxBuilder, Wallet,
 };
 use msg::{
@@ -53,7 +53,7 @@ impl Display for ManagedWallet {
 
 struct Inner {
     seed: SeedPhrase,
-    address_type: AddressType,
+    address_type: AddressHrp,
     send_request: mpsc::Sender<MintRequest>,
     minter_address: Address,
 }
@@ -79,8 +79,11 @@ impl Debug for MintRequest {
 }
 
 impl WalletManager {
-    pub(crate) fn new(seed: SeedPhrase, address_type: AddressType) -> Result<Self> {
-        let minter = seed.derive_cosmos_numbered(0).for_chain(address_type)?;
+    pub(crate) fn new(seed: SeedPhrase, address_type: AddressHrp) -> Result<Self> {
+        let minter = seed
+            .clone()
+            .with_cosmos_numbered(0)
+            .with_hrp(address_type)?;
         tracing::info!("Wallet manager minter wallet: {minter}");
         let (send_request, recv_request) = mpsc::channel(100);
         let manager = WalletManager {
@@ -88,7 +91,7 @@ impl WalletManager {
                 seed,
                 address_type,
                 send_request,
-                minter_address: *minter.address(),
+                minter_address: minter.get_address(),
             }),
         };
         tokio::task::spawn(background(recv_request, minter));
@@ -100,8 +103,9 @@ impl WalletManager {
         let wallet = self
             .inner
             .seed
-            .derive_cosmos_numbered(idx.into())
-            .for_chain(self.inner.address_type)?;
+            .clone()
+            .with_cosmos_numbered(idx.into())
+            .with_hrp(self.inner.address_type)?;
         tracing::info!("Got fresh wallet from manager for {desc}: {wallet}",);
         Ok(wallet)
     }
@@ -178,7 +182,7 @@ async fn process_requests(
 ) -> Result<()> {
     let mut tx_builder = TxBuilder::default();
     for req in requests {
-        tx_builder.add_message_mut(MsgExecuteContract {
+        tx_builder.add_message(MsgExecuteContract {
             sender: minter.get_address_string(),
             contract: req.faucet.get_address_string(),
             msg: serde_json::to_vec(&msg::contracts::faucet::entry::ExecuteMsg::OwnerMsg(

@@ -6,8 +6,9 @@ pub mod pyth;
 
 use cosmos::{
     proto::cosmos::base::abci::v1beta1::TxResponse, Address, Contract, Cosmos, CosmosNetwork,
-    HasAddress, HasAddressType, RawWallet, Wallet,
+    HasAddress, Wallet,
 };
+use cosmos::{HasAddressHrp, SeedPhrase};
 use msg::contracts::market::position::ClosedPosition;
 use msg::prelude::*;
 use msg::{
@@ -32,7 +33,7 @@ pub fn build_version() -> &'static str {
 
 pub struct PerpApp {
     pub wallet_address: Address,
-    pub raw_wallet: RawWallet,
+    pub raw_wallet: SeedPhrase,
     pub wallet: Wallet,
     pub market: MarketContract,
     pub market_id: MarketId,
@@ -47,7 +48,7 @@ pub struct PositionsInfo {
 
 impl PerpApp {
     pub async fn new(
-        raw_wallet: RawWallet,
+        raw_wallet: SeedPhrase,
         factory_contract_addr: Address,
         faucet_contract_addr: Option<Address>,
         market_id: MarketId,
@@ -55,7 +56,7 @@ impl PerpApp {
     ) -> Result<PerpApp> {
         let builder = network.builder().await?;
         let cosmos = builder.build().await?;
-        let factory_contract = Contract::new(cosmos.clone(), factory_contract_addr);
+        let factory_contract = cosmos.make_contract(factory_contract_addr);
 
         let market_info: MarketInfoResponse = factory_contract
             .query(msg::contracts::factory::entry::QueryMsg::MarketInfo {
@@ -66,8 +67,7 @@ impl PerpApp {
 
         let faucet_contract = faucet_contract_addr.map(|x| cosmos.make_contract(x));
 
-        let address_type = cosmos.get_address_type();
-        let wallet = raw_wallet.for_chain(address_type)?;
+        let wallet = raw_wallet.with_hrp(cosmos.get_address_hrp())?;
         let wallet_address = wallet.get_address();
         Ok(PerpApp {
             wallet_address,
@@ -135,7 +135,10 @@ impl PerpApp {
         self.market.get_closed_positions(&self.wallet).await
     }
 
-    pub async fn close_position(&self, position_id: PositionId) -> Result<TxResponse> {
+    pub async fn close_position(
+        &self,
+        position_id: PositionId,
+    ) -> Result<TxResponse, cosmos::Error> {
         self.market.close_position(&self.wallet, position_id).await
     }
 
@@ -164,6 +167,7 @@ impl PerpApp {
             .context("No faucet available")?
             .execute(&self.wallet, vec![], execute_msg)
             .await
+            .map_err(|e| e.into())
     }
 
     pub async fn update_max_gains(

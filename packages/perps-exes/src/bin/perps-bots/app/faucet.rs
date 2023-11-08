@@ -202,7 +202,11 @@ impl FaucetBotRunner {
         }
     }
 
-    async fn try_tap(&self, contract: &Contract, reqs: &[TapRequest]) -> Result<TxResponse> {
+    async fn try_tap(
+        &self,
+        contract: &Contract,
+        reqs: &[TapRequest],
+    ) -> cosmos::Result<TxResponse> {
         contract
             .execute(
                 &self.wallet,

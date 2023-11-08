@@ -143,8 +143,8 @@ impl Msg<'_> {
 impl App {
     /// Do we think we're in the middle of an Osmosis epoch?
     pub(crate) fn is_osmosis_epoch(&self) -> bool {
-        match self.cosmos.get_network() {
-            cosmos::CosmosNetwork::OsmosisMainnet => (),
+        match self.cosmos.get_cosmos_builder().chain_id() {
+            "osmosis-1" => (),
             _ => return false,
         }
 

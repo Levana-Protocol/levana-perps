@@ -74,13 +74,12 @@ async fn go(
             }
             Err(err) => {
                 if err
-                    .root_cause()
                     .to_string()
                     .contains("No DAO fees available to transfer")
                 {
                     log::info!("No DAO fees available on {}", market.market_id);
                 } else {
-                    return Err(err);
+                    return Err(err.into());
                 }
             }
         }

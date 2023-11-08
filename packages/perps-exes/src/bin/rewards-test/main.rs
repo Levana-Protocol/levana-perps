@@ -7,7 +7,9 @@ use crate::cli::{Cmd, Subcommand};
 use anyhow::Result;
 use clap::Parser;
 use cli::HatchEggOpt;
-use cosmos::{Address, Contract, Cosmos, CosmosNetwork, HasAddressType, RawWallet, Wallet};
+use cosmos::{
+    Address, Contract, Cosmos, CosmosNetwork, HasAddress, HasAddressHrp, SeedPhrase, Wallet,
+};
 use mock_nft::Metadata;
 use msg::contracts::hatching::{
     config::Config as HatchConfig,
@@ -39,35 +41,29 @@ struct Hatch {
 impl Hatch {
     pub async fn new(
         network: CosmosNetwork,
-        wallet: RawWallet,
-        nft_mint_admin_wallet: RawWallet,
-        profile_admin_wallet: RawWallet,
+        wallet: SeedPhrase,
+        nft_mint_admin_wallet: SeedPhrase,
+        profile_admin_wallet: SeedPhrase,
         hatch_address: Address,
     ) -> Result<Self> {
         let cosmos = network.builder().await?.build().await?;
-        let address_type = cosmos.get_address_type();
-        let wallet = wallet.for_chain(address_type)?;
-        let nft_mint_admin_wallet = nft_mint_admin_wallet.for_chain(address_type)?;
-        let profile_admin_wallet = profile_admin_wallet.for_chain(address_type)?;
+        let address_type = cosmos.get_address_hrp();
+        let wallet = wallet.with_hrp(address_type)?;
+        let nft_mint_admin_wallet = nft_mint_admin_wallet.with_hrp(address_type)?;
+        let profile_admin_wallet = profile_admin_wallet.with_hrp(address_type)?;
 
-        let contract = Contract::new(cosmos.clone(), hatch_address);
+        let contract = cosmos.make_contract(hatch_address);
 
         let config: HatchConfig = contract.query(HatchQueryMsg::Config {}).await?;
 
-        let burn_egg_contract = Contract::new(
-            cosmos.clone(),
-            config.nft_burn_contracts.egg.to_string().parse().unwrap(),
-        );
+        let burn_egg_contract =
+            cosmos.make_contract(config.nft_burn_contracts.egg.to_string().parse().unwrap());
 
-        let burn_dust_contract = Contract::new(
-            cosmos.clone(),
-            config.nft_burn_contracts.dust.to_string().parse().unwrap(),
-        );
+        let burn_dust_contract =
+            cosmos.make_contract(config.nft_burn_contracts.dust.to_string().parse().unwrap());
 
-        let profile_contract = Contract::new(
-            cosmos.clone(),
-            config.profile_contract.to_string().parse().unwrap(),
-        );
+        let profile_contract =
+            cosmos.make_contract(config.profile_contract.to_string().parse().unwrap());
 
         Ok(Self {
             cosmos,
@@ -94,10 +90,10 @@ struct NftMint {
 impl NftMint {
     pub async fn new(opt: &HatchEggOpt) -> Result<Self> {
         let cosmos = opt.nft_mint_network.builder().await?.build().await?;
-        let address_type = cosmos.get_address_type();
-        let wallet = opt.nft_mint_wallet.for_chain(address_type)?;
+        let address_type = cosmos.get_address_hrp();
+        let wallet = opt.nft_mint_wallet.with_hrp(address_type)?;
 
-        let contract = Contract::new(cosmos.clone(), opt.nft_mint_address);
+        let contract = cosmos.make_contract(opt.nft_mint_address);
 
         Ok(Self {
             cosmos,
@@ -116,10 +112,10 @@ struct Rewards {
 impl Rewards {
     pub async fn new(opt: &HatchEggOpt) -> Result<Self> {
         let cosmos = opt.lvn_rewards_network.builder().await?.build().await?;
-        let address_type = cosmos.get_address_type();
-        let wallet = opt.lvn_rewards_wallet.for_chain(address_type)?;
+        let address_type = cosmos.get_address_hrp();
+        let wallet = opt.lvn_rewards_wallet.with_hrp(address_type)?;
 
-        let contract = Contract::new(cosmos.clone(), opt.lvn_rewards_address);
+        let contract = cosmos.make_contract(opt.lvn_rewards_address);
 
         Ok(Self {
             cosmos,
@@ -132,7 +128,7 @@ impl Rewards {
 async fn get_lvn_balance(rewards: &Rewards, denom: &String) -> Result<u128> {
     let balances = rewards
         .cosmos
-        .all_balances(rewards.wallet.address())
+        .all_balances(rewards.wallet.get_address())
         .await?;
 
     let amount = balances
@@ -229,7 +225,7 @@ async fn main() -> Result<()> {
             } else {
                 let info = mint_test(
                     &hatch,
-                    hatch.wallet.address().to_string(),
+                    hatch.wallet.get_address_string(),
                     &opt.path_to_hatchery,
                     opt.mint_eggs_start_skip,
                     opt.mint_eggs_count,
@@ -258,8 +254,8 @@ async fn main() -> Result<()> {
                         &hatch.wallet,
                         vec![],
                         HatchExecMsg::Hatch {
-                            nft_mint_owner: nft_mint.wallet.address().to_string(),
-                            lvn_grant_address: rewards.wallet.address().to_string(),
+                            nft_mint_owner: nft_mint.wallet.get_address_string(),
+                            lvn_grant_address: rewards.wallet.get_address_string(),
                             profile: true,
                             eggs,
                             dusts: vec![],
@@ -335,7 +331,7 @@ async fn main() -> Result<()> {
                     match rewards
                         .contract
                         .query::<Option<RewardsInfoResp>>(RewardsInfo {
-                            addr: rewards.wallet.address().to_string().into(),
+                            addr: rewards.wallet.get_address_string().into(),
                         })
                         .await
                     {
@@ -345,11 +341,7 @@ async fn main() -> Result<()> {
                                     log::info!("No rewards found yet");
                                 }
                                 Some(resp) => {
-                                    log::info!(
-                                        "Rewards found for {}, {:#?}",
-                                        rewards.wallet.address(),
-                                        resp
-                                    );
+                                    log::info!("Rewards found for {}, {:#?}", rewards.wallet, resp);
 
                                     // After confirming the rewards contract has received the rewards,
                                     // check the recipient to see if they've received the portion that's
@@ -394,12 +386,12 @@ async fn main() -> Result<()> {
 }
 
 async fn clear_lvn_rewards(rewards: &Rewards) -> Result<()> {
-    log::info!("Clearing our rewards for {}...", rewards.wallet.address());
+    log::info!("Clearing our rewards for {}...", rewards.wallet);
     loop {
         let res = rewards
             .contract
             .query::<Option<RewardsInfoResp>>(RewardsInfo {
-                addr: rewards.wallet.address().to_string().into(),
+                addr: rewards.wallet.get_address_string().into(),
             })
             .await?;
 
@@ -430,11 +422,11 @@ async fn clear_lvn_rewards(rewards: &Rewards) -> Result<()> {
     Ok(())
 }
 
-async fn get_hatch_status(hatch: &Hatch, details: bool) -> Result<MaybeHatchStatusResp> {
+async fn get_hatch_status(hatch: &Hatch, details: bool) -> cosmos::Result<MaybeHatchStatusResp> {
     hatch
         .contract
         .query(HatchQueryMsg::HatchStatusByOwner {
-            owner: hatch.wallet.address().to_string().into(),
+            owner: hatch.wallet.get_address_string().into(),
             details,
         })
         .await
@@ -550,14 +542,14 @@ async fn mint_eggs(
                     break;
                 }
                 Err(err) => {
-                    let s = err.root_cause().to_string();
+                    let s = err.to_string();
                     if s.contains("remint a token") || s.contains("already claimed") {
                         log::warn!(
                             "token {} was already minted or claimed, trying the next one...",
                             dragon_extra.id
                         );
                     } else {
-                        return Err(err);
+                        return Err(err.into());
                     }
                 }
             }

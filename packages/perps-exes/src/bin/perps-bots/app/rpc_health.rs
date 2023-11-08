@@ -46,7 +46,7 @@ async fn check(app: &App, endpoint: Arc<String>) -> Result<WatchedTaskOutput> {
         format!("RPC endpoint {endpoint} is showing block height {rpc_height}"),
         format!(
             "gRPC endpoint {} is showing block height {grpc_height}",
-            app.cosmos.get_grpc_url()
+            app.cosmos.get_cosmos_builder().grpc_url()
         ),
     ];
 

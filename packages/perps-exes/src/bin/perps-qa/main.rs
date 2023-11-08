@@ -35,7 +35,7 @@ async fn main_inner() -> Result<()> {
 
     let mut builder = network.builder().await?;
     if let Some(grpc) = opt.cosmos_grpc {
-        builder.grpc_url = grpc;
+        builder.set_grpc_url(grpc);
     }
     let cosmos = builder.build().await?;
 

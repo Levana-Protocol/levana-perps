@@ -166,15 +166,15 @@ impl GasCheck {
         }
         if !to_refill.is_empty() {
             let mut builder = TxBuilder::default();
-            let denom = self.app.cosmos.get_gas_coin();
+            let denom = self.app.cosmos.get_cosmos_builder().gas_coin();
             let gas_wallet = self.gas_wallet.clone();
             {
                 for (address, amount) in &to_refill {
-                    builder.add_message_mut(MsgSend {
+                    builder.add_message(MsgSend {
                         from_address: gas_wallet.get_address_string(),
                         to_address: address.get_address_string(),
                         amount: vec![Coin {
-                            denom: denom.clone(),
+                            denom: denom.to_owned(),
                             amount: app.config.gas_decimals.to_u128(*amount)?.to_string(),
                         }],
                     });
@@ -244,7 +244,7 @@ async fn get_gas_balance(
 ) -> Result<GasAmount> {
     let coins = cosmos.all_balances(address).await?;
     for Coin { denom, amount } in coins {
-        if &denom == cosmos.get_gas_coin() {
+        if &denom == cosmos.get_cosmos_builder().gas_coin() {
             let raw = amount
                 .parse()
                 .with_context(|| format!("Invalid gas coin amount {amount:?}"))?;

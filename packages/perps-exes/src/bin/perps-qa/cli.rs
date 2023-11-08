@@ -1,4 +1,4 @@
-use cosmos::{Address, CosmosNetwork, RawWallet};
+use cosmos::{Address, CosmosNetwork, SeedPhrase};
 use msg::{contracts::market::position::PositionId, prelude::*};
 use perps_exes::{build_version, UpdatePositionCollateralImpact};
 
@@ -154,7 +154,7 @@ pub(crate) struct Opt {
     pub market_id: MarketId,
     /// Mnemonic phrase for the Wallet
     #[clap(long, env = "COSMOS_WALLET")]
-    pub wallet: RawWallet,
+    pub wallet: SeedPhrase,
     /// Turn on verbose logging
     #[clap(long, short, global = true)]
     verbose: bool,

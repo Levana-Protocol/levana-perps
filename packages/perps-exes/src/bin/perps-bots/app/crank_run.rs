@@ -129,7 +129,7 @@ impl App {
         // so during Osmosis epochs we can safely ignore just the broadcasting.
         let mut builder = TxBuilder::default();
 
-        builder.add_execute_message_mut(
+        builder.add_execute_message(
             market,
             crank_wallet,
             vec![],
@@ -248,10 +248,10 @@ impl App {
             &self.cosmos.make_contract(pyth_oracle),
         )
         .await?;
-        builder.add_message_mut(update_msg);
+        builder.add_message(update_msg);
 
         // Do 0 execs, consider this an extreme case where we simply want to make sure some price gets added immediately
-        builder.add_execute_message_mut(
+        builder.add_execute_message(
             market,
             crank_wallet,
             vec![],

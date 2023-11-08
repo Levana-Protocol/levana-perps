@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use cosmos::RawWallet;
+use cosmos::SeedPhrase;
 use perps_exes::build_version;
 
 use crate::localtest;
@@ -122,7 +122,7 @@ pub(crate) struct Opt {
     pub(crate) cosmos_chain_id: Option<String>,
     /// Mnemonic phrase for the Wallet
     #[clap(long, env = "COSMOS_WALLET")]
-    pub(crate) wallet: Option<RawWallet>,
+    pub(crate) wallet: Option<SeedPhrase>,
     /// Turn on verbose logging
     #[clap(long, short, global = true)]
     verbose: bool,

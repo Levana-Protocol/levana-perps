@@ -1,6 +1,7 @@
 use anyhow::Result;
 use cosmos::{
-    proto::cosmos::base::abci::v1beta1::TxResponse, Address, Contract, HasAddress, Wallet,
+    proto::cosmos::base::abci::v1beta1::TxResponse, Address, Contract, HasAddress, HasAddressHrp,
+    HasContract, HasCosmos, Wallet,
 };
 use cosmwasm_std::Decimal256;
 use msg::contracts::{
@@ -15,6 +16,21 @@ use shared::storage::UnsignedDecimal;
 #[derive(Clone)]
 pub(crate) struct Faucet(Contract);
 
+impl HasCosmos for Faucet {
+    fn get_cosmos(&self) -> &cosmos::Cosmos {
+        self.0.get_cosmos()
+    }
+}
+impl HasContract for Faucet {
+    fn get_contract(&self) -> &Contract {
+        &self.0
+    }
+}
+impl HasAddressHrp for Faucet {
+    fn get_address_hrp(&self) -> cosmos::AddressHrp {
+        self.0.get_address_hrp()
+    }
+}
 impl HasAddress for Faucet {
     fn get_address(&self) -> Address {
         self.0.get_address()
@@ -129,7 +145,7 @@ impl Faucet {
         wallet: &Wallet,
         cw20: impl HasAddress,
         balances: Vec<Cw20Coin>,
-    ) -> Result<TxResponse> {
+    ) -> cosmos::Result<TxResponse> {
         self.0
             .execute(
                 wallet,
@@ -149,7 +165,7 @@ impl Faucet {
         name: impl Into<String>,
         trading_competition_index: u32,
         market: impl HasAddress,
-    ) -> Result<TxResponse> {
+    ) -> cosmos::Result<TxResponse> {
         self.0
             .execute(
                 wallet,
@@ -177,7 +193,7 @@ impl Faucet {
         &self,
         wallet: &Wallet,
         new_admin: impl HasAddress,
-    ) -> Result<TxResponse> {
+    ) -> cosmos::Result<TxResponse> {
         self.0
             .execute(
                 wallet,

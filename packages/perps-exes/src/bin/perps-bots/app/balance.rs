@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::async_trait;
-use cosmos::{Address, Wallet};
+use cosmos::{Address, HasAddress, Wallet};
 use msg::prelude::*;
 use perps_exes::contracts::MarketContract;
 use rand::Rng;
@@ -114,7 +114,10 @@ async fn single_market(
     };
 
     // Check if we have a position to close.
-    if let Some(pos) = market.get_first_position(*worker.wallet.address()).await? {
+    if let Some(pos) = market
+        .get_first_position(worker.wallet.get_address())
+        .await?
+    {
         let pos = market.query_position(pos).await?;
         if pos.direction_to_base != direction {
             tracing::info!(

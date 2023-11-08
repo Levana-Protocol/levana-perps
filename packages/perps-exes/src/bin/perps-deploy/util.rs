@@ -21,7 +21,7 @@ pub(crate) fn add_cosmos_msg(
     match msg {
         CosmosMsg::Bank(bank) => match bank {
             BankMsg::Send { to_address, amount } => {
-                builder.add_message_mut(MsgSend {
+                builder.add_message(MsgSend {
                     from_address: sender.get_address_string(),
                     to_address: to_address.clone(),
                     amount: amount
@@ -47,23 +47,29 @@ pub(crate) fn add_cosmos_msg(
                 contract_addr,
                 msg,
                 funds,
-            } => builder.add_execute_message_mut(
-                contract_addr.parse::<Address>()?,
-                sender,
-                convert_funds(funds),
-                convert_msg(msg)?,
-            ),
+            } => builder
+                .add_execute_message(
+                    contract_addr.parse::<Address>()?,
+                    sender,
+                    convert_funds(funds),
+                    convert_msg(msg)?,
+                )
+                .map_err(|e| e.into())
+                .map(|_| ()),
             WasmMsg::Instantiate { .. } => anyhow::bail!("No support for Instantiate"),
             WasmMsg::Migrate {
                 contract_addr,
                 new_code_id,
                 msg,
-            } => builder.add_migrate_message_mut(
-                contract_addr.parse::<Address>()?,
-                sender,
-                *new_code_id,
-                convert_msg(msg)?,
-            ),
+            } => builder
+                .add_migrate_message(
+                    contract_addr.parse::<Address>()?,
+                    sender,
+                    *new_code_id,
+                    convert_msg(msg)?,
+                )
+                .map(|_| ())
+                .map_err(|e| e.into()),
             WasmMsg::UpdateAdmin { .. } => anyhow::bail!("No support for UpdateAdmin"),
             WasmMsg::ClearAdmin { contract_addr } => anyhow::bail!("No support for ClearAdmin"),
             _ => anyhow::bail!("Unknown Wasm variant"),

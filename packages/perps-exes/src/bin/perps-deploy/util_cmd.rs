@@ -140,8 +140,10 @@ async fn update_pyth(
 
     let msg = get_oracle_update_msg(&ids, wallet, endpoint, &client, &oracle).await?;
 
-    let builder = TxBuilder::default().add_message(msg);
-    let res = builder.sign_and_broadcast(&basic.cosmos, wallet).await?;
+    let res = TxBuilder::default()
+        .add_message(msg)
+        .sign_and_broadcast(&basic.cosmos, wallet)
+        .await?;
     log::info!("Price set in: {}", res.txhash);
     Ok(())
 }
@@ -184,7 +186,7 @@ async fn deploy_pyth_opt(
     let pyth_oracle = basic.cosmos.store_code_path(wallet, &pyth_oracle).await?;
     log::info!("Uploaded Pyth oracle contract: {pyth_oracle}");
 
-    let gas_denom = basic.cosmos.get_gas_coin();
+    let gas_denom = basic.cosmos.get_cosmos_builder().gas_coin();
 
     let wormhole_init_msg = json!({
         "chain_id": 60014,
@@ -213,17 +215,17 @@ async fn deploy_pyth_opt(
     log::info!("Deployed new wormhole contract: {wormhole}");
 
     let mut builder = TxBuilder::default();
-    builder.add_execute_message_mut(&wormhole, wallet, vec![], json!({
+    builder.add_execute_message(&wormhole, wallet, vec![], json!({
         "submit_v_a_a": {
             "vaa": "AQAAAAABAHrDGygsKu7rN/M4XuDeX45CHTC55a6Lo9Q3XBx3qG53FZu2l9nEVtb4wC0iqUsSebZbDWqZV+fThXQjhFrHWOMAYQrB0gAAAAMAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAABTkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAENvcmUCAAAAAAABE1jMOuXAl7ITzjyBl54bn5VwdGql/2y5Ulib3oYsJe9DkhMvudSkIVcRTehGAZO986L8+B+GoJdl9HYv0RB6AIazLXoJd5JqIFEx2HMdOcvrjIKy/YL67ScR1Zrw8kmdFucm9rIRs5dWwEJEG+bYZQtptU6+cV4jQ1TOW000j7dLlY6JZuLsPb1JWKfN619zifomlBUZ8IYzScIjtzpt3ud0o7+ROVPWlSYNiLwaolpO7jY+8AAKwAdnJ7NfvqLawo/uXMsP6naOr0XO0Ta52eJJA0ZK6In1yKcj/BT5MSS3xziEPLuJ6GTIYsOM3czPldLMN6TcA2qNIytI9izdRzFBL0iQ2nmPaJajMx9ktIwS0dV/2cvnCBFxqhvh02yv44Z5EPmcCeNHiZwZw4GStuc4fM12gnfBfasbelAnwLPPF44hrS53rgZxFUnPux+cep2AluheFIfzVRXQKpJ1NQSo11RxufSe22++vImPQD5Hc+lf6xXoDJqZyDSN"
         }
     }))?;
-    builder.add_execute_message_mut(&wormhole, wallet, vec![], json!({
+    builder.add_execute_message(&wormhole, wallet, vec![], json!({
         "submit_v_a_a": {
             "vaa": "AQAAAAENABLms5xtqQxd/Twijtu3jHpMl8SI/4o0bRYakdsGflHWOMFyFvNoqpvfSDa4ZFqYAYymfS/sh9dpyr/fJAa/eQoAAu9CsogJGmcO81VllvT0cyNxeIKIHq844DNFB40HoVbzEreFtk2ubpqH49MocvWcsZMfcozs9RF2KYG69IMDZo8BA87yYWuExOUR/wMynghT8b1+6axbpx1wpNdhCL3flPacKoqE5O6UBl6AA8M06JkYSUNjThIEPQ3aeNk5ltoHPRkBBOdtFmudrJj2AhB8xLRKyCho+vALY999JPF3qjkeBQkCQTtxBGQ05nx3Cxmuzff84dFDXqC+cmLj5MGPUN3IF1wBBdlFDoIW10HgIGpQ+Tt1Ckfgoli4Drj+0TFMwwCz2QUJLeJc0202YJe3EDri0YQSEym6OqLXxsxTJz8RrxR5gRABBodHfI3uyJ02oj55SP6wdN+VNi/I3L2K6RCsVWod7h51XFa5211xDJQJOO15vBiVo2RlI6WLxV9HWiNDWjc+z90BB/sGc0hk953vThkklzYlExcVMNrqgfB/u59piv5+ZsbUTbITIxRPJlfUpThqlUu5Tu+fZBSMM6725Hfq+ixcmEwBCIdp6CIWMQ0YJ9m9SGRewj6Q3k74qN6Z4tNR0d8xhghWYkjYDNyDvcrDgrPDDGcDUr6H+Qaaq1A30LdHII6unGUBCel5ZJf/kQbQ0cYuGE2DcWKChwzvYaHuE9b8SFtSGtzOJVyW99G8qNjn59RUtleDqDC93J2UCSCRomjTEezYTCYBDEaMn7bUECaEH/n41zaPownU2+o+pLvS/sz5SpLMiiCiJjOKjiEmzRb3Dq8VtPyb4sP6Gd7xTgcZVqYF6dGsQWIBDiP8tr1EW3wlr7ciJQway8Bh7ZZLqd4TJmCa4BKs37lpQrKhAqLemauWMnhZo0orSadn29ti4KH7Jq9g/kT9SWoAEGuwusd6xos0dkXy+xrXieqb12+5sjJPJa4G+X5lJG8ULfcX9mLnOUgxcYLGLOh9ecc97w26EuUkLfwDg4KBLP4AEm2gPF5WyxWu7OrcHhekV1OrTcDse/anXKAxQ+1KKU9vYbw/R4pFeDPkMITs18mFvy9VpV8WiqwOAw/EnoReSXEBYm6dml2eND8AAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEwXWRZ8Q/UBwgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAENvcmUCAAAAAAACE1jMOuXAl7ITzjyBl54bn5VwdGql/2y5Ulib3oYsJe9DkhMvudSkIVcRTehGAZO986L8+B+GoJdl9HYv0RB6AIazLXoJd5JqIFEx2HMdOcvrjIKy/YL67ScR1Zrw8kmdFucm9rIRs5dWwEJEG+bYZQtptU6+cV4jQ1TOW000j7dLlY6JZuLsPb1JWKfNZrlZDhxB4LImk3v5IX0dZ/1OkfV0o7+ROVPWlSYNiLwaolpO7jY+8AAKwAdnJ7NfvqLawo/uXMsP6naOr0XO0Ta52eJJA0ZK6In1yKcj/BT5MSS3xziEPLuJ6GTIYsOM3czPldLMN6TcA2qNIytI9izdRzFBL0iQ2nmPaJajMx9ktIwS0dV/2cvnCBFxqhvh02yv44Z5EPmcCeNHiZwZw4GStuc4fM12gnfBfasbelAnwLPPF44hrS53rgZxFUnPux+cep2AluheFIfzVRXQKpJ1NQSo11RxufSe22++vImPQD5Hc+lf6xXoDJqZyDSN"
         }
     }))?;
-    builder.add_execute_message_mut(&wormhole, wallet, vec![], json!({
+    builder.add_execute_message(&wormhole, wallet, vec![], json!({
         "submit_v_a_a": {
             "vaa": "AQAAAAINAM5FR02eGx53kKLSEIceGV21OnD/1vI3z+cOJoajKFmsQ8hKMyJnqO9m9ZcZz5HMjfAQH9fDaqGHjVE5JBZg7cABA3XMkGFWrlMHhmYcDNmu9ER0e8PY1aqEysam0pM9ThoDHP+jA4PUr4Ex6SnZ8gP0YLBzCaZH1s0yqxzHckCJOSwABFIwUVbPyQNDEo+X5JkxG1yuF09Ij/IvvAlZGZGgpz2OavOvuKWWhEHTq4Q3g2QHSBc56YUK1cleas/Mhx6VG8MBBaeVbu/CPnyUWhlm1d2+nkvjdsL1TkXj1dqIwvhpJRDHQpseqGCulNkpvZfoSSOhgYfnd6o9tBmBOoDeuEzI0isABhsqTz0mZmCOCqlnN2ieO6V5OBD/OlL/KK1X2O+yCWdzXcVTei5D7xD1g9FEwSoWBlQsIH9bea8Iw4ZW06xAcTMBCGtiyOEwrzQRs8DZG1tQ3LAe1fKTlj+QH8Nuew5QEU3OIDNzsy60WXHO+CiOXZKNDtUc2G4qMAawr2plw5bACQgACek6tNLIIokBpfRSWTQACywm0dxnmgXkf98P8yMdmPvCBxAxWf9BFt8oMu6mmzgnUoNDTmzUpK8E0l+nqCmQtwcBCqZD9M9hXf/wb/1lgw9/bPZRLavDaQ1dniEP3HEoQtwnCLiywi4iTJkoDNJeXov7QOPRxVuMQXdOKHweLDUq7PwBC4nB6F+qIKMGAZZMzGp5wK5Tz9JvsQhj2zd4NCjNkTkKFjNGVYI52zzZ1CDP5COg34TIQ5l5Di4wgBG0tj5rgBUBDKMdy1ZKyBoFOiaNgJDnIJf5TzZnEdDF0TgVrx7H1H5mLi0b3iJngRPRWWPaEAtmi6JsDDJZcNBxFLg8Vpj0YJcBDcn9o5wNWS2e2SzSK1QlzGs3Qw4jbwLQ0fii70WgC94mIjwKbrNjyLJf079XI0odk2SXbO+4Ng51WiZ8u7Z0s5UBEI2wHkRKsQA92LbJb463eVi0C6eoX+/s8yrQC3pHwK51JCFiYklZd+CcCYndUPKAwhRT03VoQ2COrNF/T9/kdgAAEmECUijvWvg3ywYLzZhvz6hMzvdbP6EARoz9JOf635kWOTjzuEGjNJbCcG0CCPqrCIvRVbLiD9dMYluxzIxDZ3oBY8U8QJ4MXfoAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEbFoFTXgz0eQgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAENvcmUCAAAAAAADE1jMOuXAl7ITzjyBl54bn5VwdGql/2y5Ulib3oYsJe9DkhMvudSkIVcRTehGAZO986L8+B+GoJdl9HYv0RB6AIazLXoJd5JqIFEx2HMdOcvrjIKy/YL67ScR1Zrw8kmdFucm9rIRs5dWwEJEG+bYZQtptU6+cV4jQ1TOW000j7dLlY6JZuLsPb1JWKfNFefK8HxOPcjnxGn5LIzYj7gAWiB0o7+ROVPWlSYNiLwaolpO7jY+8AAKwAdnJ7NfvqLawo/uXMsP6naOr0XO0Ta52eJJA0ZK6In1yKcj/BT5MSS3xziEPLuJ6GTIYsOM3czPldLMN6TcA2qNIytI9izdRzFBL0iQ2nmPaJajMx9ktIwS0dV/2cvnCBFxqhvh02yv44Z5EPmcCeNHiZwZw4GStuc4fM12gnfBfasbelAnwLPPF44hrS53rgZxFUnPux+cep2AluheFIfzVRXQKpJ1NQSo11RxufSe22++vImPQD5Hc+lf6xXoDJqZyDSN"
         }

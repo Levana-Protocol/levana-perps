@@ -75,19 +75,19 @@ impl Opt {
         tracing::info!("Creating connection to network {}", config.network);
         if let Some(grpc) = &self.grpc_url {
             tracing::info!("Overriding gRPC URL to: {grpc}");
-            builder.grpc_url = grpc.clone();
+            builder.set_grpc_url(grpc);
         }
         if let Some(chain_id) = &self.chain_id {
             tracing::info!("Overriding chain ID to: {chain_id}");
-            builder.chain_id = chain_id.clone();
+            builder.set_chain_id(chain_id.clone());
         }
         if let Some(gas_multiplier) = config.gas_multiplier {
             tracing::info!("Overriding gas multiplier to: {gas_multiplier}");
-            builder.config.gas_estimate_multiplier = gas_multiplier;
+            builder.set_gas_estimate_multiplier(Some(gas_multiplier));
         }
-        builder.set_connection_count(config.total_bot_count().try_into()?);
-        builder.set_referer_header("https://bots.levana.exchange/".to_owned());
-        builder.build().await
+        builder.set_connection_count(Some(config.total_bot_count().try_into()?));
+        builder.set_referer_header(Some("https://bots.levana.exchange/".to_owned()));
+        builder.build().await.map_err(|e| e.into())
     }
 
     pub(crate) async fn into_app_builder(self) -> Result<AppBuilder> {
@@ -175,7 +175,7 @@ impl AppBuilder {
         desc: ManagedWallet,
     ) -> Result<Wallet> {
         let wallet = testnet.wallet_manager.get_wallet(desc)?;
-        self.refill_gas(*wallet.address(), GasCheckWallet::Managed(desc))?;
+        self.refill_gas(wallet.get_address(), GasCheckWallet::Managed(desc))?;
         Ok(wallet)
     }
 }

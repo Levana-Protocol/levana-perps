@@ -29,7 +29,7 @@ impl AppBuilder {
         for (index, wallet) in ultra_crank_wallets.into_iter().enumerate() {
             // People like things that start at 1, not 0
             let index = index + 1;
-            self.refill_gas(*wallet.address(), GasCheckWallet::UltraCrank(index))?;
+            self.refill_gas(wallet.get_address(), GasCheckWallet::UltraCrank(index))?;
             let worker = Worker {
                 wallet,
                 activated: false,
