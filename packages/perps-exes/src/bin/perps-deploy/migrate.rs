@@ -53,7 +53,8 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
     if app
         .basic
         .cosmos
-        .contract_info(factory.get_address_string())
+        .make_contract(factory.get_address())
+        .info()
         .await?
         .code_id
         == factory_code_id.get_code_id()

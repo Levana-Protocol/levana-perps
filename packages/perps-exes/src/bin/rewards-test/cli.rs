@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use cosmos::{Address, CosmosNetwork, RawWallet};
+use cosmos::{Address, CosmosNetwork, SeedPhrase};
 use msg::prelude::NumberGtZero;
 use perps_exes::build_version;
 
@@ -37,11 +37,11 @@ pub(crate) struct Opt {
 pub(crate) struct HatchEggOpt {
     /// Mnemonic phrase for the nft mint admin wallet
     #[clap(long, env = "NFT_MINT_ADMIN_COSMOS_WALLET")]
-    pub nft_mint_admin_wallet: RawWallet,
+    pub nft_mint_admin_wallet: SeedPhrase,
 
     /// Mnemonic phrase for the profile admin wallet
     #[clap(long, env = "PROFILE_ADMIN_COSMOS_WALLET")]
-    pub profile_admin_wallet: RawWallet,
+    pub profile_admin_wallet: SeedPhrase,
 
     /// Network to use for hatching
     #[clap(long, env = "HATCH_COSMOS_NETWORK")]
@@ -49,7 +49,7 @@ pub(crate) struct HatchEggOpt {
 
     /// Mnemonic phrase for the hatching wallet
     #[clap(long, env = "HATCH_COSMOS_WALLET")]
-    pub hatch_wallet: RawWallet,
+    pub hatch_wallet: SeedPhrase,
 
     /// Network to use for the minted nft rewards
     #[clap(long, env = "NFT_MINT_COSMOS_NETWORK")]
@@ -57,7 +57,7 @@ pub(crate) struct HatchEggOpt {
 
     /// Mnemonic phrase for the minted nft rewards wallet
     #[clap(long, env = "NFT_MINT_COSMOS_WALLET")]
-    pub nft_mint_wallet: RawWallet,
+    pub nft_mint_wallet: SeedPhrase,
 
     /// Network to use for LVN rewards
     #[clap(long, env = "LVN_REWARDS_COSMOS_NETWORK")]
@@ -65,7 +65,7 @@ pub(crate) struct HatchEggOpt {
 
     /// Mnemonic phrase for the lvn rewards wallet. This is the wallet that is receiving rewards.
     #[clap(long, env = "LVN_REWARDS_COSMOS_WALLET")]
-    pub lvn_rewards_wallet: RawWallet,
+    pub lvn_rewards_wallet: SeedPhrase,
 
     /// hatching contract address
     #[clap(
@@ -138,11 +138,11 @@ pub(crate) struct MintTestOpt {
 
     /// Mnemonic phrase for the nft mint admin wallet
     #[clap(long, env = "NFT_MINT_ADMIN_COSMOS_WALLET")]
-    pub nft_mint_admin_wallet: RawWallet,
+    pub nft_mint_admin_wallet: SeedPhrase,
 
     /// Mnemonic phrase for the profile admin wallet
     #[clap(long, env = "PROFILE_ADMIN_COSMOS_WALLET")]
-    pub profile_admin_wallet: RawWallet,
+    pub profile_admin_wallet: SeedPhrase,
 
     /// Network to use for hatching
     #[clap(long, env = "HATCH_COSMOS_NETWORK")]
@@ -150,7 +150,7 @@ pub(crate) struct MintTestOpt {
 
     /// Mnemonic phrase for the hatching wallet
     #[clap(long, env = "HATCH_COSMOS_WALLET")]
-    pub hatch_wallet: RawWallet,
+    pub hatch_wallet: SeedPhrase,
 
     /// Path to hatchery so we can load the CSV for babydragon extra meta
     #[clap(long, default_value = "../levana-hatchery")]

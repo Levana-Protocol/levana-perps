@@ -15,7 +15,7 @@ impl Tracker {
         Tracker(contract)
     }
 
-    pub(crate) async fn get_code_by_hash(&self, hash: String) -> Result<CodeIdResp> {
+    pub(crate) async fn get_code_by_hash(&self, hash: String) -> cosmos::Result<CodeIdResp> {
         self.0.query(QueryMsg::CodeByHash { hash }).await
     }
 
@@ -42,7 +42,7 @@ impl Tracker {
         code_id: u64,
         hash: String,
         gitrev: String,
-    ) -> Result<TxResponse> {
+    ) -> cosmos::Result<TxResponse> {
         self.0
             .execute(
                 wallet,
@@ -62,11 +62,11 @@ impl Tracker {
         wallet: &Wallet,
         to_log: &[(u64, Address)],
         family: impl Into<String>,
-    ) -> Result<TxResponse> {
+    ) -> cosmos::Result<TxResponse> {
         let mut builder = TxBuilder::default();
         let family = family.into();
         for (code_id, addr) in to_log.iter().copied() {
-            builder.add_message_mut(MsgExecuteContract {
+            builder.add_message(MsgExecuteContract {
                 sender: wallet.get_address_string(),
                 contract: self.0.get_address_string(),
                 msg: serde_json::to_vec(&ExecuteMsg::Instantiate {
@@ -87,7 +87,7 @@ impl Tracker {
         contract_type: impl Into<String>,
         family: impl Into<String>,
         sequence: Option<u32>,
-    ) -> Result<ContractResp> {
+    ) -> cosmos::Result<ContractResp> {
         self.0
             .query(QueryMsg::ContractByFamily {
                 contract_type: contract_type.into(),
@@ -102,7 +102,7 @@ impl Tracker {
         wallet: &Wallet,
         new_code_id: u64,
         address: impl HasAddress,
-    ) -> Result<TxResponse> {
+    ) -> cosmos::Result<TxResponse> {
         self.0
             .execute(
                 wallet,

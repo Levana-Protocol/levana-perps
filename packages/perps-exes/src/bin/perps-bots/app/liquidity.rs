@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::async_trait;
-use cosmos::{Address, Wallet};
+use cosmos::{Address, HasAddress, Wallet};
 use cosmwasm_std::Fraction;
 use perps_exes::{config::LiquidityConfig, prelude::*};
 
@@ -149,7 +149,7 @@ async fn single_market(
                 .wallet_manager
                 .mint(
                     worker.app.cosmos.clone(),
-                    *worker.wallet.address(),
+                    worker.wallet.get_address(),
                     to_deposit,
                     &status,
                     cw20,

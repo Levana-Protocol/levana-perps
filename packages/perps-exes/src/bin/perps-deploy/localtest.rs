@@ -1,4 +1,4 @@
-use cosmos::{CosmosNetwork, HasAddress, HasAddressType, RawWallet};
+use cosmos::{CosmosNetwork, HasAddress, HasAddressHrp, SeedPhrase};
 use msg::prelude::*;
 use perps_exes::PerpApp;
 
@@ -123,7 +123,7 @@ pub(crate) async fn go(opt: Opt, opts: TestsOpt) -> Result<()> {
 }
 
 async fn wait_till_network_is_up(
-    wallet: RawWallet,
+    wallet: SeedPhrase,
     network: CosmosNetwork,
     ol: &mut OsmoLocalProcess,
 ) -> Result<()> {
@@ -149,10 +149,10 @@ async fn wait_till_network_is_up(
                 continue;
             }
         };
-        let address_type = cosmos.get_address_type();
-        let wallet = wallet.for_chain(address_type)?;
+        let address_type = cosmos.get_address_hrp();
+        let wallet = wallet.with_hrp(address_type)?;
 
-        let balances = cosmos.all_balances(wallet.get_address_string()).await;
+        let balances = cosmos.all_balances(wallet.get_address()).await;
         if balances.is_ok() {
             return Ok(());
         } else {

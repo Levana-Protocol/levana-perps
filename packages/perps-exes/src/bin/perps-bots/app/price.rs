@@ -360,7 +360,7 @@ async fn update_oracles(
             if app.is_osmosis_epoch() {
                 Ok(format!("Unable to update Pyth oracle, but assuming it's because we're in the epoch: {e:?}"))
             } else {
-                Err(e)
+                Err(e.into())
             }
         }
     }
@@ -392,7 +392,7 @@ impl App {
                         Some((PriceUpdateReason::NoPriceFound, NeedsOracleUpdate::Yes)),
                     ))
                 } else {
-                    Err(e)
+                    Err(e.into())
                 };
             }
         };

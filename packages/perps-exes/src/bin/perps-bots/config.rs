@@ -1,6 +1,6 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
-use cosmos::{Address, CosmosNetwork, HasAddressType, Wallet};
+use cosmos::{Address, CosmosNetwork, HasAddressHrp, Wallet};
 use perps_exes::{
     config::{
         ChainConfig, ConfigTestnet, DeploymentInfo, GasAmount, GasDecimals, LiquidityConfig,
@@ -119,7 +119,7 @@ impl Opt {
             None => partial,
         };
 
-        let faucet_bot_wallet = self.get_faucet_bot_wallet(network.get_address_type())?;
+        let faucet_bot_wallet = self.get_faucet_bot_wallet(network.get_address_hrp())?;
         let faucet = faucet.with_context(|| format!("No faucet found for {network}"))?;
         let (faucet_bot, faucet_bot_runner) =
             FaucetBot::new(faucet_bot_wallet, testnet.hcaptcha_secret.clone(), faucet);
@@ -137,7 +137,7 @@ impl Opt {
             ultra_crank_wallets: (0..partial.ultra_crank)
                 .map(|index| {
                     self.get_crank_wallet(
-                        network.get_address_type(),
+                        network.get_address_hrp(),
                         &wallet_phrase_name,
                         index + partial.crank,
                     )
@@ -163,7 +163,7 @@ impl Opt {
             balance: partial.balance,
             wallet_manager: WalletManager::new(
                 self.get_wallet_seed(&wallet_phrase_name, "WALLET_MANAGER")?,
-                network.get_address_type(),
+                network.get_address_hrp(),
             )?,
             faucet_bot,
             maintenance: testnet
@@ -172,7 +172,7 @@ impl Opt {
                 .filter(|s| !s.is_empty())
                 .cloned(),
         };
-        let gas_wallet = Arc::new(self.get_gas_wallet(network.get_address_type())?);
+        let gas_wallet = Arc::new(self.get_gas_wallet(network.get_address_hrp())?);
         let config = BotConfig {
             by_type: BotConfigByType::Testnet {
                 inner: Arc::new(testnet),
@@ -180,12 +180,12 @@ impl Opt {
             network,
             crank_wallets: (0..partial.crank)
                 .map(|idx| {
-                    self.get_crank_wallet(network.get_address_type(), &wallet_phrase_name, idx)
+                    self.get_crank_wallet(network.get_address_hrp(), &wallet_phrase_name, idx)
                 })
                 .collect::<Result<_>>()?,
             price_wallet: if partial.price {
                 Some(Arc::new(self.get_wallet(
-                    network.get_address_type(),
+                    network.get_address_hrp(),
                     &wallet_phrase_name,
                     "PRICE",
                 )?))
@@ -232,24 +232,19 @@ impl Opt {
             crank_wallets,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
-        let get_wallet = |index| match network.get_address_type() {
-            cosmos::AddressType::Cosmos
-            | cosmos::AddressType::Juno
-            | cosmos::AddressType::Osmo
-            | cosmos::AddressType::Wasm
-            | cosmos::AddressType::Sei
-            | cosmos::AddressType::Stargaze => seed
-                .derive_cosmos_numbered(index)
-                .for_chain(network.get_address_type()),
-            cosmos::AddressType::Injective => seed
-                .derive_ethereum_numbered(index)
-                .for_chain(network.get_address_type()),
+        let hrp = network.get_address_hrp();
+        let get_wallet = |index| {
+            let path = hrp.default_derivation_path_with_index(index);
+            let mut seed = seed.clone();
+            seed.derivation_path = Some(path);
+            seed.with_hrp(hrp)
         };
+
         let gas_wallet = get_wallet(1)?;
         let price_wallet = get_wallet(2)?;
         let crank_wallets = (0..*crank_wallets)
             .map(|idx| get_wallet(idx + 3))
-            .collect::<Result<_>>()?;
+            .collect::<Result<_, _>>()?;
         let watcher = match watcher_config {
             Some(yaml) => serde_yaml::from_str(yaml).context("Invalid watcher config on CLI")?,
             None => WatcherConfig::default(),

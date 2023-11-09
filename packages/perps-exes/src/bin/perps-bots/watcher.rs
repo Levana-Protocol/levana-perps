@@ -1099,7 +1099,7 @@ impl TaskStatuses {
                 }
             },
             build_version: build_version(),
-            grpc: app.cosmos.get_first_builder().grpc_url.clone(),
+            grpc: app.cosmos.get_cosmos_builder().grpc_url().to_owned(),
             frontend_info_testnet,
             live_since: app.live_since,
             now: Utc::now(),

@@ -178,7 +178,7 @@ pub(crate) async fn go(
 
         // Wait until the new price is in the system
         for _ in 0..100 {
-            let spot_price: Result<PricePoint> = basic
+            let spot_price: Result<PricePoint, _> = basic
                 .cosmos
                 .make_contract(*market_addr)
                 .query(msg::contracts::market::entry::QueryMsg::SpotPrice { timestamp: None })

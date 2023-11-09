@@ -1,6 +1,6 @@
 use cosmos::{
     proto::{cosmos::base::abci::v1beta1::TxResponse, cosmwasm::wasm::v1::MsgExecuteContract},
-    Address, Contract, HasAddress, HasCosmos, TxBuilder, Wallet,
+    Address, Contract, HasAddress, HasAddressHrp, HasContract, HasCosmos, TxBuilder, Wallet,
 };
 
 use cosmwasm_std::to_binary;
@@ -33,9 +33,24 @@ impl Display for MarketContract {
     }
 }
 
+impl HasAddressHrp for MarketContract {
+    fn get_address_hrp(&self) -> cosmos::AddressHrp {
+        self.0.get_address_hrp()
+    }
+}
 impl HasAddress for MarketContract {
     fn get_address(&self) -> Address {
         self.0.get_address()
+    }
+}
+impl HasContract for MarketContract {
+    fn get_contract(&self) -> &Contract {
+        &self.0
+    }
+}
+impl HasCosmos for MarketContract {
+    fn get_cosmos(&self) -> &cosmos::Cosmos {
+        self.0.get_cosmos()
     }
 }
 
@@ -44,24 +59,28 @@ impl MarketContract {
         MarketContract(contract)
     }
 
-    pub async fn status(&self) -> Result<StatusResp> {
+    pub async fn status(&self) -> Result<StatusResp, cosmos::Error> {
         self.status_relaxed().await
     }
 
     /// Like status, but doesn't insist on the result being StatusResp.
     ///
     /// Useful for working around the overly aggressive cw_serde deny_unknown_fields.
-    pub async fn status_relaxed<T: serde::de::DeserializeOwned>(&self) -> Result<T> {
+    pub async fn status_relaxed<T: serde::de::DeserializeOwned>(&self) -> Result<T, cosmos::Error> {
         self.0.query(MarketQueryMsg::Status { price: None }).await
     }
 
-    pub async fn status_at_height(&self, height: u64) -> Result<StatusResp> {
-        self.0
-            .query_at_height(MarketQueryMsg::Status { price: None }, height)
+    pub async fn status_at_height(&self, height: u64) -> Result<StatusResp, cosmos::Error> {
+        // Maybe worth an improvement to cosmos-rs to make this nicer
+        self.get_cosmos()
+            .clone()
+            .at_height(Some(height))
+            .make_contract(self.0.get_address())
+            .query(MarketQueryMsg::Status { price: None })
             .await
     }
 
-    pub async fn current_price(&self) -> Result<PricePoint> {
+    pub async fn current_price(&self) -> Result<PricePoint, cosmos::Error> {
         self.0
             .query(MarketQueryMsg::SpotPrice { timestamp: None })
             .await
@@ -96,6 +115,7 @@ impl MarketContract {
             },
         )
         .await
+        .map_err(|e| e.into())
     }
 
     pub async fn deposit(
@@ -119,7 +139,7 @@ impl MarketContract {
         &self,
         wallet: &Wallet,
         lp_tokens: NonZero<LpToken>,
-    ) -> Result<TxResponse> {
+    ) -> Result<TxResponse, cosmos::Error> {
         self.0
             .execute(
                 wallet,
@@ -225,7 +245,11 @@ impl MarketContract {
             .with_context(|| format!("Could not query position #{pos_id}"))
     }
 
-    pub async fn close_position(&self, wallet: &Wallet, pos: PositionId) -> Result<TxResponse> {
+    pub async fn close_position(
+        &self,
+        wallet: &Wallet,
+        pos: PositionId,
+    ) -> Result<TxResponse, cosmos::Error> {
         self.0
             .execute(
                 wallet,
@@ -238,7 +262,7 @@ impl MarketContract {
             .await
     }
 
-    pub async fn lp_info(&self, addr: impl HasAddress) -> Result<LpInfoResp> {
+    pub async fn lp_info(&self, addr: impl HasAddress) -> Result<LpInfoResp, cosmos::Error> {
         self.0
             .query(MarketQueryMsg::LpInfo {
                 liquidity_provider: addr.get_address_string().into(),
@@ -249,7 +273,7 @@ impl MarketContract {
     pub async fn close_positions(&self, wallet: &Wallet, positions: Vec<PositionId>) -> Result<()> {
         let mut builder = TxBuilder::default();
         for pos in positions {
-            builder.add_message_mut(MsgExecuteContract {
+            builder.add_message(MsgExecuteContract {
                 sender: wallet.get_address_string(),
                 contract: self.0.get_address_string(),
                 msg: serde_json::to_vec(&MarketExecuteMsg::ClosePosition {
@@ -257,7 +281,7 @@ impl MarketContract {
                     slippage_assert: None,
                 })?,
                 funds: vec![],
-            })
+            });
         }
         builder
             .sign_and_broadcast(self.0.get_cosmos(), wallet)
@@ -321,7 +345,7 @@ impl MarketContract {
     pub async fn raw_query_positions(
         &self,
         position_ids: Vec<PositionId>,
-    ) -> Result<PositionsResp> {
+    ) -> Result<PositionsResp, cosmos::Error> {
         self.0
             .query(MarketQueryMsg::Positions {
                 position_ids,
@@ -408,7 +432,7 @@ impl MarketContract {
         wallet: &Wallet,
         execs: Option<u32>,
         rewards: Option<RawAddr>,
-    ) -> Result<TxResponse> {
+    ) -> Result<TxResponse, cosmos::Error> {
         self.0
             .execute(wallet, vec![], MarketExecuteMsg::Crank { execs, rewards })
             .await
@@ -508,7 +532,10 @@ impl MarketContract {
                     }
                 }
             };
-            self.0.execute(wallet, vec![], execute_msg).await
+            self.0
+                .execute(wallet, vec![], execute_msg)
+                .await
+                .map_err(|e| e.into())
         }
     }
 
@@ -520,7 +547,11 @@ impl MarketContract {
         Ok(would_trigger)
     }
 
-    pub async fn config_update(&self, wallet: &Wallet, update: ConfigUpdate) -> Result<TxResponse> {
+    pub async fn config_update(
+        &self,
+        wallet: &Wallet,
+        update: ConfigUpdate,
+    ) -> Result<TxResponse, cosmos::Error> {
         self.0
             .execute(
                 wallet,
@@ -532,13 +563,16 @@ impl MarketContract {
             .await
     }
 
-    pub async fn close_all_positions(&self, wallet: &Wallet) -> Result<TxResponse> {
+    pub async fn close_all_positions(&self, wallet: &Wallet) -> Result<TxResponse, cosmos::Error> {
         self.0
             .execute(wallet, vec![], MarketExecuteMsg::CloseAllPositions {})
             .await
     }
 
-    pub async fn trade_history_summary(&self, trader: Address) -> Result<TradeHistorySummary> {
+    pub async fn trade_history_summary(
+        &self,
+        trader: Address,
+    ) -> Result<TradeHistorySummary, cosmos::Error> {
         self.0
             .query(MarketQueryMsg::TradeHistorySummary {
                 addr: trader.to_string().into(),
@@ -565,11 +599,7 @@ impl MarketContract {
 
     pub async fn get_highest_position_id(&self) -> Result<PositionId> {
         // This should really be a proper query or part of StatusResp
-        let bytes = self
-            .0
-            .get_cosmos()
-            .wasm_raw_query(self.0.get_address(), LAST_POSITION_ID)
-            .await?;
+        let bytes = self.0.query_raw(LAST_POSITION_ID).await?;
         serde_json::from_slice(&bytes).context("Invalid position ID")
     }
 
@@ -598,7 +628,7 @@ impl MarketContract {
         }
     }
 
-    pub async fn get_oracle_price(&self) -> Result<OraclePriceResp> {
+    pub async fn get_oracle_price(&self) -> Result<OraclePriceResp, cosmos::Error> {
         self.0.query(MarketQueryMsg::OraclePrice {}).await
     }
 }

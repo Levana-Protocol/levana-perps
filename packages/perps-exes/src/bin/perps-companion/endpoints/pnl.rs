@@ -180,7 +180,7 @@ impl PositionInfo {
         let cosmos = app.cosmos.get(chain).ok_or(Error::UnknownChainId)?;
 
         // TODO check the database first to see if we need to insert this at all.
-        let label = match cosmos.contract_info(*address).await {
+        let label = match cosmos.make_contract(*address).info().await {
             Ok(info) => Cow::Owned(info.label),
             Err(_) => "unknown contract".into(),
         };

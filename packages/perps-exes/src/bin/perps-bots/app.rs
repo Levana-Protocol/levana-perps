@@ -18,6 +18,7 @@ mod ultra_crank;
 mod utilization;
 
 use anyhow::Result;
+use cosmos::HasAddressHrp;
 use hyper::server::conn::AddrIncoming;
 pub(crate) use types::*;
 
@@ -91,10 +92,8 @@ impl AppBuilder {
                 self.start_rpc_health(mainnet.clone())?;
 
                 // Bug in Osmosis, don't run there
-                match self.app.cosmos.get_network() {
-                    cosmos::CosmosNetwork::OsmosisMainnet
-                    | cosmos::CosmosNetwork::OsmosisTestnet
-                    | cosmos::CosmosNetwork::OsmosisLocal => (),
+                match self.app.cosmos.get_address_hrp().as_str() {
+                    "osmo" => (),
                     _ => {
                         self.start_liquidity_transaction_alert(mainnet.clone())?;
                         self.start_total_deposits_alert(mainnet)?;

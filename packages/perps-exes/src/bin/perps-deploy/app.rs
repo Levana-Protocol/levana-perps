@@ -2,7 +2,8 @@ use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{Context, Result};
 use cosmos::{
-    Address, AddressType, Cosmos, CosmosNetwork, HasAddress, HasAddressType, RawWallet, Wallet,
+    error::WalletError, Address, AddressHrp, Cosmos, CosmosNetwork, HasAddress, HasAddressHrp,
+    SeedPhrase, Wallet,
 };
 use msg::{
     contracts::market::spot_price::{PythPriceServiceNetwork, SpotPriceFeed, SpotPriceFeedData},
@@ -19,8 +20,8 @@ use crate::{cli::Opt, faucet::Faucet, tracker::Tracker};
 pub(crate) struct LazyWallet(Option<Wallet>);
 
 impl LazyWallet {
-    fn new(raw: Option<RawWallet>, address_type: AddressType) -> Result<Self> {
-        raw.map(|raw| raw.for_chain(address_type))
+    fn new(raw: Option<SeedPhrase>, address_type: AddressHrp) -> Result<Self, WalletError> {
+        raw.map(|raw| raw.with_hrp(address_type))
             .transpose()
             .map(LazyWallet)
     }
@@ -85,24 +86,25 @@ impl AppMainnet {
 }
 
 impl Opt {
-    pub(crate) async fn connect(&self, network: CosmosNetwork) -> Result<Cosmos> {
+    pub(crate) async fn connect(
+        &self,
+        network: CosmosNetwork,
+    ) -> Result<Cosmos, cosmos::error::BuilderError> {
         let mut builder = network.builder().await?;
         if let Some(grpc) = &self.cosmos_grpc {
-            builder.grpc_url = grpc.clone();
+            builder.set_grpc_url(grpc);
         }
         if let Some(chain_id) = &self.cosmos_chain_id {
-            builder.chain_id = chain_id.clone();
+            builder.set_chain_id(chain_id.clone());
         }
-        if let Some(gas_multiplier) = self.cosmos_gas_multiplier {
-            builder.config.gas_estimate_multiplier = gas_multiplier;
-        }
-        log::info!("Connecting to {}", builder.grpc_url);
+        builder.set_gas_estimate_multiplier(self.cosmos_gas_multiplier);
+        log::info!("Connecting to {}", builder.grpc_url());
 
         builder.build().await
     }
 
-    fn get_lazy_wallet(&self, network: CosmosNetwork) -> Result<LazyWallet> {
-        LazyWallet::new(self.wallet.clone(), network.get_address_type())
+    fn get_lazy_wallet(&self, network: CosmosNetwork) -> Result<LazyWallet, WalletError> {
+        LazyWallet::new(self.wallet.clone(), network.get_address_hrp())
     }
 
     pub(crate) async fn load_basic_app(&self, network: CosmosNetwork) -> Result<BasicApp> {
@@ -139,11 +141,7 @@ impl Opt {
 
         // only create pyth_info (with markets etc.) if we have a pyth address and do not specify
         let price_source = if qa_price_updates {
-            PriceSourceConfig::Wallet(
-                config
-                    .qa_wallet
-                    .for_chain(partial.network.get_address_type()),
-            )
+            PriceSourceConfig::Wallet(config.qa_wallet.with_hrp(partial.network.get_address_hrp()))
         } else {
             PriceSourceConfig::Oracle(self.get_oracle_info(
                 &basic.chain_config,
@@ -153,7 +151,7 @@ impl Opt {
         };
 
         Ok(App {
-            wallet_manager: wallet_manager_address.for_chain(partial.network.get_address_type()),
+            wallet_manager: wallet_manager_address.with_hrp(partial.network.get_address_hrp()),
             trading_competition,
             dev_settings,
             tracker,
@@ -244,7 +242,8 @@ impl Opt {
                             data: SpotPriceFeedData::Simple {
                                 contract: Addr::unchecked(
                                     contract
-                                        .for_chain(network.get_address_type())
+                                        .raw()
+                                        .with_hrp(network.get_address_hrp())
                                         .get_address_string(),
                                 ),
                                 age_tolerance_seconds: age_tolerance,
@@ -299,8 +298,8 @@ impl BasicApp {
             .chain_config
             .faucet
             .with_context(|| format!("No faucet found for {}", self.network))?;
-        anyhow::ensure!(tracker.get_address_type() == self.network.get_address_type());
-        anyhow::ensure!(faucet.get_address_type() == self.network.get_address_type());
+        anyhow::ensure!(tracker.get_address_hrp() == self.network.get_address_hrp());
+        anyhow::ensure!(faucet.get_address_hrp() == self.network.get_address_hrp());
         Ok((
             Tracker::from_contract(self.cosmos.make_contract(tracker)),
             Faucet::from_contract(self.cosmos.make_contract(faucet)),

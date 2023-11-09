@@ -34,7 +34,7 @@ pub(crate) async fn go(
     }: InitChainOpt,
 ) -> Result<()> {
     let app = opt.load_basic_app(network).await?;
-    let gas_coin = app.cosmos.get_gas_coin().clone();
+    let gas_coin = app.cosmos.get_cosmos_builder().gas_coin().to_owned();
 
     log::info!("Storing code...");
     let wallet = app.get_wallet()?;
