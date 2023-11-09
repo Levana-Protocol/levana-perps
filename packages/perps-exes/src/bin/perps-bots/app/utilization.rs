@@ -83,7 +83,7 @@ async fn single_market(
 
     if util > max_util {
         let positions = market
-            .get_some_positions(worker.wallet.get_address(), Some(20))
+            .get_some_positions(worker.wallet.get_address(), Some(5))
             .await?;
         if positions.is_empty() {
             Ok(WatchedTaskOutput::new(
