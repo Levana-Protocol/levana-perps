@@ -26,6 +26,9 @@ pub(crate) struct Opt {
     /// Override the gRPC URL
     #[clap(long, env = "COSMOS_GRPC")]
     pub(crate) grpc_url: Option<String>,
+    /// Provide optional gRPC fallbacks URLs
+    #[clap(long, env = "COSMOS_GRPC_FALLBACKS", value_delimiter = ',')]
+    pub(crate) grpc_fallbacks: Vec<String>,
     /// Override the chain ID
     #[clap(long, env = "COSMOS_CHAIN_ID")]
     pub(crate) chain_id: Option<String>,

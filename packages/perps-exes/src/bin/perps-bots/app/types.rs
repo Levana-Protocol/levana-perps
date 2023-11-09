@@ -77,6 +77,9 @@ impl Opt {
             tracing::info!("Overriding gRPC URL to: {grpc}");
             builder.set_grpc_url(grpc);
         }
+        for fallback in &self.grpc_fallbacks {
+            builder.add_grpc_fallback_url(fallback);
+        }
         if let Some(chain_id) = &self.chain_id {
             tracing::info!("Overriding chain ID to: {chain_id}");
             builder.set_chain_id(chain_id.clone());
