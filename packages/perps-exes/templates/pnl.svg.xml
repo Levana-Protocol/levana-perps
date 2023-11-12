@@ -167,19 +167,19 @@
     <text class="earnings single" x="24" y="194">{{percentage}}</text>
 {% endmatch %}
 
-<text class="stat-title" x="24" y="294">Entry price</text>
-<text class="stat-value" x="24" y="312">{{info.entry_price}} {{info.quote_currency}}</text>
+<text class="stat-title" x="24" y="262">Entry price</text>
+<text class="stat-value" x="24" y="280">{{info.entry_price}} {{info.quote_currency}}</text>
 
-<text class="stat-title" x="114" y="294">Exit price</text>
-<text class="stat-value" x="114" y="312">{{info.exit_price}} {{info.quote_currency}}</text>
+<text class="stat-title" x="114" y="262">Exit price</text>
+<text class="stat-value" x="114" y="280">{{info.exit_price}} {{info.quote_currency}}</text>
 
-<text class="stat-title" x="204" y="294">Leverage</text>
-<text class="stat-value" x="204" y="312">{{info.leverage}}x</text>
+<text class="stat-title" x="204" y="262">Leverage</text>
+<text class="stat-value" x="204" y="280">{{info.leverage}}x</text>
 
 {% match info.wallet %}
   {% when Some with (wallet) %}
-    <text class="stat-title" x="294" y="294">Wallet</text>
-    <text class="stat-value small" x="294" y="312">{{wallet}}</text>
+    <text class="stat-title" x="294" y="262">Wallet</text>
+    <text class="stat-value small" x="294" y="280">{{wallet}}</text>
   {% when None %}
 {% endmatch %}
 
