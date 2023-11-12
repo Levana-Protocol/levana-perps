@@ -8,7 +8,6 @@ use crate::{cli::Opt, db::handle::Db, types::ChainId};
 
 pub(crate) struct App {
     /// Map from chain ID to a Cosmos connection
-    #[allow(dead_code)]
     pub(crate) cosmos: HashMap<ChainId, Cosmos>,
     pub(crate) opt: Opt,
     pub(crate) db: Db,
@@ -22,12 +21,36 @@ impl App {
         let db = Db::new(&postgres_uri).await?;
         let mut cosmos_map = HashMap::new();
         for chain_id in ChainId::all() {
-            let cosmos = chain_id
-                .into_cosmos_network()?
-                .builder()
-                .await?
-                .build_lazy()
-                .await;
+            let network = chain_id.into_cosmos_network()?;
+            let mut builder = network.builder().await?;
+
+            let grpc = match chain_id {
+                ChainId::Atlantic2
+                | ChainId::Dragonfire4
+                | ChainId::Elgafar1
+                | ChainId::Juno1
+                | ChainId::OsmoTest5
+                | ChainId::Stargaze1
+                | ChainId::Uni6
+                | ChainId::Injective888 => None,
+                ChainId::Osmosis1 => {
+                    Some((&opt.osmosis_mainnet_primary, &opt.osmosis_mainnet_fallbacks))
+                }
+                ChainId::Pacific1 => Some((&opt.sei_mainnet_primary, &opt.sei_mainnet_fallbacks)),
+                ChainId::Injective1 => Some((
+                    &opt.injective_mainnet_primary,
+                    &opt.injective_mainnet_fallbacks,
+                )),
+            };
+
+            if let Some((primary, fallbacks)) = grpc {
+                builder.set_grpc_url(primary);
+                for fallback in fallbacks {
+                    builder.add_grpc_fallback_url(fallback);
+                }
+            }
+
+            let cosmos = builder.build_lazy().await;
             cosmos_map.insert(chain_id, cosmos);
         }
 
