@@ -43,7 +43,7 @@ impl LiquidityStats {
         let total_collateral = self.total_collateral();
 
         anyhow::ensure!(
-            !total_collateral.is_zero(),
+            !total_collateral.approx_eq(Collateral::zero()),
             "LiquidityStats::lp_to_collateral: no liquidity is in the pool"
         );
         let total_tokens = self.total_tokens();
