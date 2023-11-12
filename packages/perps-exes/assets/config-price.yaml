@@ -27,6 +27,8 @@ pyth:
       DOGE_USD: dcef50dd0a4cd2dcc17e45df1676dcb336a11a61c69df7a0299b0150c672d25c
       LUNA_USD: e6ccd3f878cf338e6732bf59f60943e8ca2c28402fc4d9c258503b2edbe74a31
       TIA_USD: 09f7c1d7dfbb7df2b8fe3d3d87ee94a2259d212da4f30c1f0540d066dfa44723
+      DYDX_USD: 6489800bb8974169adfe35937bf6736507097d13c190d760c557108c7e93a81b
+      RUNE_USD: 5fcf71143bb70d41af4fa9aa1287e2efd3c5911cee59f909f915c9f61baacb1e
   edge: 
     update-age-tolerance: 120
     # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-edge
@@ -299,6 +301,20 @@ networks:
     LUNA_USDC:
       feeds: [
         !pyth { key: "LUNA_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    DYDX_USDC:
+      feeds: [
+        !pyth { key: "DYDX_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    RUNE_USDC:
+      feeds: [
+        !pyth { key: "RUNE_USD", inverted: false }
       ]
       feeds-usd: [
         !constant { price: "1", inverted: false }
