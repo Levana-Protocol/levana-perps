@@ -52,7 +52,7 @@ pub(super) async fn whales(
         Ok(res) => res,
         Err(e) => {
             log::error!("Error loading whales page: {e:?}");
-            let mut res = "Internal error occurred".into_response();
+            let mut res = format!("{e:?}").into_response();
             *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
             res
         }

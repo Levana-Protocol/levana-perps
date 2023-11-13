@@ -12,6 +12,52 @@ pub(crate) struct Opt {
     )]
     pub(crate) bind: SocketAddr,
 
+    /// Primary mainnet GRPC Override for Osmosis.
+    #[clap(
+        long,
+        env = "LEVANA_COMPANION_OSMOSIS_MAINNET_PRIMARY_GRPC",
+        default_value = "https://grpc.dev-osmosis.zone:443"
+    )]
+    pub(crate) osmosis_mainnet_primary: String,
+    /// Primary mainnet GRPC Override for Sei.
+    #[clap(
+        long,
+        env = "LEVANA_COMPANION_SEI_MAINNET_PRIMARY_GRPC",
+        default_value = "https://grpc.sei-apis.com"
+    )]
+    pub(crate) sei_mainnet_primary: String,
+    /// Primary mainnet GRPC Override for Injective.
+    #[clap(
+        long,
+        env = "LEVANA_COMPANION_INJECTIVE_MAINNET_PRIMARY_GRPC",
+        default_value = "primary: https://inj-priv-grpc.kingnodes"
+    )]
+    pub(crate) injective_mainnet_primary: String,
+    /// Fallback GRPC endpoints for Osmosis mainnet.
+    #[clap(
+        long,
+        env = "LEVANA_COMPANION_OSMOSIS_MAINNET_FALLBACKS_GRPC",
+        value_delimiter = ',',
+        default_value = "https://osmo-priv-grpc.kingnodes.com"
+    )]
+    pub(crate) osmosis_mainnet_fallbacks: Vec<String>,
+    /// Fallback GRPC endpoints for Injective mainnet.
+    #[clap(
+        long,
+        env = "LEVANA_COMPANION_INJECTIVE_MAINNET_FALLBACKS_GRPC",
+        value_delimiter = ',',
+        default_value = "https://sentry.chain.grpc.injective.network"
+    )]
+    pub(crate) injective_mainnet_fallbacks: Vec<String>,
+    /// Fallback GRPC endpoints for Sei mainnet.
+    #[clap(
+        long,
+        env = "LEVANA_COMPANION_SEI_MAINNET_FALLBACKS_GRPC",
+        value_delimiter = ',',
+        default_value = "https://sei-grpc.lavenderfive.com"
+    )]
+    pub(crate) sei_mainnet_fallbacks: Vec<String>,
+
     #[clap(subcommand)]
     pub(crate) pgopt: PGOpt,
 }
