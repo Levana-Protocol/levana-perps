@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     extract::State,
-    http::HeaderMap,
+    http::{HeaderMap, HeaderValue},
     response::{IntoResponse, Response},
 };
 use reqwest::StatusCode;
@@ -44,8 +44,11 @@ async fn helper(
     label: Option<TaskLabel>,
 ) -> Response {
     let accept = headers.get("accept");
+    let user_agent = headers.get("user-agent");
 
-    if accept.map_or(false, |value| value.as_bytes().starts_with(b"text/html")) {
+    if is_uptime_robot(user_agent).unwrap_or_default() {
+        statuses.statuses_text(label).await
+    } else if accept.map_or(false, |value| value.as_bytes().starts_with(b"text/html")) {
         statuses.statuses_html(&app, label).await
     } else if accept.map_or(false, |value| {
         value.as_bytes().starts_with(b"application/json")
@@ -54,4 +57,10 @@ async fn helper(
     } else {
         statuses.statuses_text(label).await
     }
+}
+
+fn is_uptime_robot(user_agent: Option<&HeaderValue>) -> Option<bool> {
+    let user_agent = user_agent?;
+    let user_agent = std::str::from_utf8(user_agent.as_bytes()).ok()?;
+    Some(user_agent.contains("UptimeRobot"))
 }
