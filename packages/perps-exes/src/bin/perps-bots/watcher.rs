@@ -835,7 +835,7 @@ impl TaskStatuses {
     ) -> axum::response::Response {
         let template = self.to_template(app, label).await;
         let mut res = template.render().unwrap().into_response();
-        res.headers_mut().append(
+        res.headers_mut().insert(
             CONTENT_TYPE,
             HeaderValue::from_static("text/html; charset=utf-8"),
         );
