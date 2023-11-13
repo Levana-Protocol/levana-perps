@@ -118,7 +118,9 @@ impl App {
                     break;
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to simulate crank against market {market} with execs {execs}: {e:?}")
+                    tracing::warn!(
+                        "Failed to simulate crank against market {market} with execs {execs}: {e}"
+                    )
                 }
             }
         }
