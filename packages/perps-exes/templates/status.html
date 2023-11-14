@@ -79,6 +79,8 @@
             </tbody>
         </table>
 
+        <pre>{{ node_health }}</pre>
+
         {% for status in statuses %}
           <div class="panel panel-default">
             <h2 id="{{ status.label.ident() }}">{{ status.label }}</h2>
