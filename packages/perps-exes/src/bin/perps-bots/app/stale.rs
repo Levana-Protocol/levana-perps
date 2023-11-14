@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::async_trait;
-use chrono::{DateTime, Timelike, Utc};
+use chrono::{DateTime, Utc};
 use cosmos::{Address, HasAddress};
 use dashmap::DashMap;
 use msg::prelude::*;
@@ -143,12 +143,6 @@ impl Msg<'_> {
 impl App {
     /// Do we think we're in the middle of an Osmosis epoch?
     pub(crate) fn is_osmosis_epoch(&self) -> bool {
-        match self.cosmos.get_cosmos_builder().chain_id() {
-            "osmosis-1" => (),
-            _ => return false,
-        }
-
-        let time = Utc::now().naive_utc().time();
-        time.hour() == 17 && time.minute() >= 10 && time.minute() < 25
+        self.cosmos.is_chain_paused()
     }
 }
