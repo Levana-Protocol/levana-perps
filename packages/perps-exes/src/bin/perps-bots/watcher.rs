@@ -375,6 +375,20 @@ impl AppBuilder {
                         },
                     )
                     .await;
+                let res = match res {
+                    Ok(x) => Ok(x),
+                    Err(err) => {
+                        if app.cosmos.is_chain_paused() {
+                            Ok(WatchedTaskOutput {
+                            skip_delay: false,
+                            suppress: false,
+                            message: format!("Ignoring an error because the chain appears to be paused (Osmosis epoch). Error was:\n{err:?}").into()
+                        })
+                        } else {
+                            Err(err)
+                        }
+                    }
+                };
                 match res {
                     Ok(WatchedTaskOutput {
                         skip_delay,
