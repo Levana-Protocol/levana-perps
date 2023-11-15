@@ -1,9 +1,14 @@
+use std::{fmt::Write, sync::Arc};
+
 use axum::{
+    extract::State,
     http::HeaderValue,
     response::{IntoResponse, Response},
 };
 use axum_extra::response::Css;
 use reqwest::{header::CONTENT_TYPE, StatusCode};
+
+use crate::app::App;
 
 use super::{
     BuildVersionRoute, ErrorCssRoute, ErrorPage, Favicon, HealthRoute, HomeRoute, RobotRoute,
@@ -17,8 +22,13 @@ Not sure what you thought you'd find, but you didn't find it.
 Better luck next time."#
 }
 
-pub(crate) async fn healthz(_: HealthRoute) -> &'static str {
-    "Yup, I'm alive"
+pub(crate) async fn healthz(_: HealthRoute, app: State<Arc<App>>) -> String {
+    let mut res = "Yup, I'm alive. gRPC node health check\n\n".to_owned();
+    for (chain_id, cosmos) in &app.cosmos {
+        writeln!(&mut res, "{chain_id}:").unwrap();
+        writeln!(&mut res, "{}", cosmos.node_health_report()).unwrap();
+    }
+    res
 }
 
 pub(crate) async fn build_version(_: BuildVersionRoute) -> &'static str {
