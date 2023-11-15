@@ -88,7 +88,7 @@ impl Opt {
             tracing::info!("Overriding gas multiplier to: {gas_multiplier}");
             builder.set_gas_estimate_multiplier(Some(gas_multiplier));
         }
-        builder.set_connection_count(Some(config.total_bot_count().try_into()?));
+        builder.set_connection_count(Some(config.total_bot_count()));
         builder.set_referer_header(Some("https://bots.levana.exchange/".to_owned()));
         builder.build().await.map_err(|e| e.into())
     }
