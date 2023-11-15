@@ -877,8 +877,15 @@ impl TaskStatuses {
         res
     }
 
-    pub(crate) async fn statuses_text(&self, label: Option<TaskLabel>) -> axum::response::Response {
-        let mut response_builder = ResponseBuilder::default();
+    pub(crate) async fn statuses_text(
+        &self,
+        app: &App,
+        label: Option<TaskLabel>,
+    ) -> axum::response::Response {
+        let mut response_builder = ResponseBuilder {
+            buffer: format!("{}\n\n", app.cosmos.node_health_report()),
+            any_errors: false,
+        };
         let statuses = self.statuses(label).await;
         let alert = statuses.iter().any(|x| x.short.alert());
         statuses
@@ -894,7 +901,6 @@ impl TaskStatuses {
     }
 }
 
-#[derive(Default)]
 struct ResponseBuilder {
     buffer: String,
     any_errors: bool,
@@ -1091,6 +1097,7 @@ struct StatusTemplate<'a> {
     live_since: DateTime<Utc>,
     now: DateTime<Utc>,
     alert: bool,
+    node_health: String,
 }
 
 impl TaskStatuses {
@@ -1118,6 +1125,7 @@ impl TaskStatuses {
             live_since: app.live_since,
             now: Utc::now(),
             alert,
+            node_health: app.cosmos.node_health_report().to_string(),
         }
     }
 }

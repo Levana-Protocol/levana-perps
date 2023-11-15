@@ -47,7 +47,7 @@ async fn helper(
     let user_agent = headers.get("user-agent");
 
     if is_uptime_robot(user_agent).unwrap_or_default() {
-        statuses.statuses_text(label).await
+        statuses.statuses_text(&app, label).await
     } else if accept.map_or(false, |value| value.as_bytes().starts_with(b"text/html")) {
         statuses.statuses_html(&app, label).await
     } else if accept.map_or(false, |value| {
@@ -55,7 +55,7 @@ async fn helper(
     }) {
         statuses.statuses_json(&app, label).await
     } else {
-        statuses.statuses_text(label).await
+        statuses.statuses_text(&app, label).await
     }
 }
 
