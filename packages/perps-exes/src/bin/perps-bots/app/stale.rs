@@ -130,10 +130,7 @@ fn is_weekend() -> bool {
 }
 
 fn is_245_market(market_id: &MarketId) -> bool {
-    match market_id.get_base() {
-        "EUR" | "GBP" => true,
-        _ => false,
-    }
+    matches!(market_id.get_base(), "EUR" | "GBP")
 }
 
 // This should be at least 60 seconds more than MAX_CRANK_AGE in crank_watch to avoid spurious
