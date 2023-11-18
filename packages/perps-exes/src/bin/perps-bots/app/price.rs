@@ -19,7 +19,7 @@ use tokio::task::JoinSet;
 
 use crate::{
     util::{
-        markets::Market,
+        markets::{is_245_market, is_weekend, Market},
         oracle::{get_latest_price, OffchainPriceData},
     },
     watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
@@ -244,9 +244,14 @@ async fn check_market_needs_price_update(
     market: &Market,
     last_successful_price_publish_time: Option<DateTime<Utc>>,
 ) -> Result<Option<(PriceUpdateReason, NeedsOracleUpdate)>> {
-    let (oracle_price, _) = get_latest_price(&offchain_price_data, market).await?;
+    let (oracle_price, updated) = get_latest_price(&offchain_price_data, market).await?;
     let (_market_price, reason) = app
-        .needs_price_update(market, oracle_price, last_successful_price_publish_time)
+        .needs_price_update(
+            market,
+            oracle_price,
+            updated,
+            last_successful_price_publish_time,
+        )
         .await?;
     Ok(reason)
 }
@@ -379,6 +384,7 @@ impl App {
         &self,
         market: &Market,
         oracle_price: PriceBaseInQuote,
+        market_price_updated: DateTime<Utc>,
         last_successful_price_publish_time: Option<DateTime<Utc>>,
     ) -> Result<NeedPriceUpdateInner> {
         let market_contract = &market.market;
@@ -399,6 +405,25 @@ impl App {
         };
 
         let mut is_too_frequent = false;
+
+        // Check if the price from Pyth is too old
+        // FIXME don't use a hard-coded seconds value
+        if Utc::now()
+            .signed_duration_since(market_price_updated)
+            .num_seconds()
+            > 180
+        {
+            // Not bothering with the price update, but need to determine if
+            // it's a 24/5 market or an actual error
+            if is_245_market(&market.market_id) && is_weekend() {
+                return Ok((None, None));
+            } else {
+                anyhow::bail!(
+                    "Pyth price update is too old for market {}",
+                    market.market_id
+                );
+            }
+        }
 
         if let Some(publish_time) = market_price.publish_time {
             // Determine the logical "last update" by using both the
