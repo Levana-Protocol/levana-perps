@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::async_trait;
-use chrono::{DateTime, Datelike, Timelike, Utc};
+use chrono::{DateTime, Utc};
 use cosmos::{Address, HasAddress};
 use dashmap::DashMap;
 use msg::prelude::*;
@@ -10,7 +10,7 @@ use perps_exes::contracts::MarketContract;
 
 use crate::{
     config::BotConfigByType,
-    util::markets::Market,
+    util::markets::{is_245_market, is_weekend, Market},
     watcher::{ParallelWatcher, TaskLabel, WatchedTaskOutput, WatchedTaskPerMarketParallel},
 };
 
@@ -117,20 +117,6 @@ impl Stale {
             }
         }
     }
-}
-
-fn is_weekend() -> bool {
-    let now = Utc::now().naive_utc();
-    match now.weekday() {
-        chrono::Weekday::Mon => now.hour() < 12,
-        chrono::Weekday::Tue | chrono::Weekday::Wed | chrono::Weekday::Thu => false,
-        chrono::Weekday::Fri => now.hour() > 18,
-        chrono::Weekday::Sat | chrono::Weekday::Sun => true,
-    }
-}
-
-fn is_245_market(market_id: &MarketId) -> bool {
-    matches!(market_id.get_base(), "EUR" | "GBP")
 }
 
 // This should be at least 60 seconds more than MAX_CRANK_AGE in crank_watch to avoid spurious

@@ -125,7 +125,8 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                         if let NeedsOracleUpdate::Yes = needs_oracle_update {
                             any_needs_oracle_update = NeedsOracleUpdate::Yes;
                         }
-                        markets_to_update.push(market.market.get_address());
+                        markets_to_update
+                            .push((market.market.get_address(), market.market_id.clone()));
                         format!("{}: Needs price update: {reason}", market.market_id)
                     }
                 } else {
@@ -166,8 +167,8 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
         } else {
             successes.push("Warning, did not find a Pyth publish timestamp".to_owned());
         }
-        for market in markets_to_update {
-            worker.trigger_crank.trigger_crank(market).await;
+        for (market, market_id) in markets_to_update {
+            worker.trigger_crank.trigger_crank(market, market_id).await;
         }
     }
 
