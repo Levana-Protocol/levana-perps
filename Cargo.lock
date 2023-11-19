@@ -736,7 +736,7 @@ checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 [[package]]
 name = "cosmos"
 version = "0.1.0"
-source = "git+https://github.com/Levana-Protocol/levana-cosmos-rs.git?rev=adfb3c5a8959b5fd4cbb9dead7cbded60a2db2f6#adfb3c5a8959b5fd4cbb9dead7cbded60a2db2f6"
+source = "git+https://github.com/Levana-Protocol/levana-cosmos-rs.git?rev=afde3e72ec4b0d9de010b9879c3bed77e585a37c#afde3e72ec4b0d9de010b9879c3bed77e585a37c"
 dependencies = [
  "base64 0.21.3",
  "bech32",
@@ -747,7 +747,6 @@ dependencies = [
  "fs-err",
  "hex",
  "hkd32",
- "log",
  "once_cell",
  "parking_lot 0.12.1",
  "prost 0.11.9",
@@ -761,6 +760,7 @@ dependencies = [
  "tiny-keccak",
  "tokio",
  "tonic",
+ "tracing",
 ]
 
 [[package]]
