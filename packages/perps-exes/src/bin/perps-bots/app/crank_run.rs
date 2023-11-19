@@ -26,6 +26,7 @@ use perps_exes::prelude::MarketContract;
 use perps_exes::pyth::get_oracle_update_msg;
 use shared::storage::RawAddr;
 
+use crate::util::markets::{is_245_market, is_weekend};
 use crate::util::oracle::OffchainPriceData;
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
@@ -84,7 +85,7 @@ impl App {
         recv: &CrankReceiver,
     ) -> Result<WatchedTaskOutput> {
         // Wait for up to 20 seconds for new work to appear. If it doesn't, update our status message that no cranking was needed.
-        let (market, crank_guard) = match recv.receive_with_timeout().await {
+        let (market, market_id, crank_guard) = match recv.receive_with_timeout().await {
             None => {
                 return Ok(WatchedTaskOutput::new("No crank work needed").suppress());
             }
@@ -169,6 +170,10 @@ impl App {
                 }
                 // Check if we hit price_too_old and, if so, try again with a transaction that includes an oracle update.
                 else if format!("{e:?}").contains("price_too_old") {
+                    // We ignore price too old for 24/5 markets on the weekends
+                    if is_245_market(&market_id) && is_weekend() {
+                        return Ok(WatchedTaskOutput::new("Ignoring failed crank due to price_too_old for 24/5 market on the weekend"));
+                    }
                     match self
                         .try_crank_with_oracle(market, crank_wallet, rewards)
                         .await
@@ -198,7 +203,7 @@ impl App {
             Ok(status) => match status.next_crank {
                 None => Cow::Borrowed("No additional work found waiting."),
                 Some(work) => {
-                    recv.trigger.trigger_crank(market).await;
+                    recv.trigger.trigger_crank(market, market_id).await;
                     format!("Found additional work, scheduling next crank: {work:?}").into()
                 }
             },

@@ -10,7 +10,7 @@ use perps_exes::contracts::MarketContract;
 
 use crate::{
     config::BotConfigByType,
-    util::markets::Market,
+    util::markets::{is_245_market, is_weekend, Market},
     watcher::{ParallelWatcher, TaskLabel, WatchedTaskOutput, WatchedTaskPerMarketParallel},
 };
 
@@ -49,14 +49,19 @@ impl WatchedTaskPerMarketParallel for Stale {
         _factory: &FactoryInfo,
         market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        self.check_stale_single(&market.market, app)
+        self.check_stale_single(&market.market, &market.market_id, app)
             .await
             .map(WatchedTaskOutput::new)
     }
 }
 
 impl Stale {
-    async fn check_stale_single(&self, market: &MarketContract, app: &App) -> Result<String> {
+    async fn check_stale_single(
+        &self,
+        market: &MarketContract,
+        market_id: &MarketId,
+        app: &App,
+    ) -> Result<String> {
         let status = market.status().await?;
         let last_crank_completed = status
             .last_crank_completed
@@ -83,7 +88,17 @@ impl Stale {
             stale: &stats,
         };
         if status.is_stale() {
-            Err(mk_message("Protocol is in stale state").to_anyhow())
+            // Hacky solution, need something better that tracks updates from
+            // Pyth. For now: hard-code a list of markets that do not have
+            // updates over the weekend.
+            if is_245_market(market_id) && is_weekend() {
+                Ok(mk_message(
+                    "Ignoring stale state since it's the weekend and this is a 24/5 market",
+                )
+                .to_string())
+            } else {
+                Err(mk_message("Protocol is in stale state").to_anyhow())
+            }
         } else if status.congested {
             Err(mk_message("Protocol is in congested state").to_anyhow())
         } else {

@@ -25,7 +25,7 @@ pub struct PythOracle {
 
 pub(crate) struct OffchainPriceData {
     /// Store the stable and edge values together since the IDs cannot overlap
-    pub(crate) values: HashMap<PriceIdentifier, NonZero<Decimal256>>,
+    pub(crate) values: HashMap<PriceIdentifier, (NonZero<Decimal256>, DateTime<Utc>)>,
     pub(crate) stable_ids: HashSet<PriceIdentifier>,
     pub(crate) edge_ids: HashSet<PriceIdentifier>,
     /// The oldest publish time queried
@@ -101,42 +101,41 @@ impl OffchainPriceData {
 pub(crate) async fn get_latest_price(
     offchain_price_data: &OffchainPriceData,
     market: &Market,
-) -> Result<(PriceBaseInQuote, PriceCollateralInUsd)> {
+) -> Result<(PriceBaseInQuote, DateTime<Utc>)> {
     match &market.status.config.spot_price {
         SpotPriceConfig::Manual { .. } => {
             bail!("Manual markets do not use an oracle")
         }
-        SpotPriceConfig::Oracle {
-            feeds, feeds_usd, ..
-        } => {
+        SpotPriceConfig::Oracle { feeds, .. } => {
             let oracle_price = market.market.get_oracle_price().await?;
 
-            let base = compose_oracle_feeds(&oracle_price, &offchain_price_data.values, feeds)?;
+            let (base, updated) =
+                compose_oracle_feeds(&oracle_price, &offchain_price_data.values, feeds)?;
             let base = PriceBaseInQuote::from_non_zero(base);
 
-            let collateral =
-                compose_oracle_feeds(&oracle_price, &offchain_price_data.values, feeds_usd)?;
-            let collateral = PriceCollateralInUsd::from_non_zero(collateral);
-
-            Ok((base, collateral))
+            Ok((base, updated))
         }
     }
 }
 
 fn compose_oracle_feeds(
     oracle_price: &OraclePriceResp,
-    pyth_prices: &HashMap<PriceIdentifier, NumberGtZero>,
+    pyth_prices: &HashMap<PriceIdentifier, (NumberGtZero, DateTime<Utc>)>,
     feeds: &[SpotPriceFeed],
-) -> Result<NumberGtZero> {
+) -> Result<(NumberGtZero, DateTime<Utc>)> {
     let mut final_price = Decimal256::one();
+    let mut updated = Utc::now();
 
     for feed in feeds {
         let component = match &feed.data {
             // pyth uses the latest-and-greatest from hermes, not the contract price
-            SpotPriceFeedData::Pyth { id, .. } => pyth_prices
-                .get(id)
-                .with_context(|| format!("Missing pyth price for ID {}", id))?
-                .into_decimal256(),
+            SpotPriceFeedData::Pyth { id, .. } => {
+                let (price, pyth_update) = pyth_prices
+                    .get(id)
+                    .with_context(|| format!("Missing pyth price for ID {}", id))?;
+                updated = updated.min(*pyth_update);
+                price.into_decimal256()
+            }
             SpotPriceFeedData::Constant { price } => price.into_decimal256(),
             SpotPriceFeedData::Sei { denom } => oracle_price
                 .sei
@@ -168,8 +167,10 @@ fn compose_oracle_feeds(
         }
     }
 
-    NumberGtZero::try_from_decimal(final_price)
-        .with_context(|| format!("unable to convert price of {final_price} to NumberGtZero"))
+    let price = NumberGtZero::try_from_decimal(final_price)
+        .with_context(|| format!("unable to convert price of {final_price} to NumberGtZero"))?;
+
+    Ok((price, updated))
 }
 
 #[tracing::instrument(skip_all)]
@@ -177,7 +178,7 @@ async fn fetch_pyth_prices(
     client: &reqwest::Client,
     endpoint: &str,
     ids: &HashSet<PriceIdentifier>,
-    values: &mut HashMap<PriceIdentifier, NonZero<Decimal256>>,
+    values: &mut HashMap<PriceIdentifier, (NonZero<Decimal256>, DateTime<Utc>)>,
     oldest_publish_time: &mut Option<DateTime<Utc>>,
 ) -> Result<()> {
     #[derive(serde::Deserialize)]
@@ -215,16 +216,7 @@ async fn fetch_pyth_prices(
         },
     } in records
     {
-        anyhow::ensure!(expo <= 0, "Exponent from Pyth must always be negative");
-        let price = Decimal256::from_atomics(price, expo.abs().try_into()?)?;
-        values.insert(
-            id,
-            NumberGtZero::try_from_decimal(price).with_context(|| {
-                format!("unable to convert pyth price of {price} to NumberGtZero")
-            })?,
-        );
-
-        match NaiveDateTime::from_timestamp_opt(publish_time, 0) {
+        let publish_time = match NaiveDateTime::from_timestamp_opt(publish_time, 0) {
             Some(publish_time) => {
                 let publish_time = publish_time.and_utc();
                 match *oldest_publish_time {
@@ -235,11 +227,18 @@ async fn fetch_pyth_prices(
                         }
                     }
                 }
+                publish_time
             }
             None => {
-                tracing::error!("Could not convert Pyth publish time to NaiveDateTime, ignoring")
+                tracing::error!("Could not convert Pyth publish time to NaiveDateTime, ignoring");
+                Utc::now()
             }
-        }
+        };
+        anyhow::ensure!(expo <= 0, "Exponent from Pyth must always be negative");
+        let price = Decimal256::from_atomics(price, expo.abs().try_into()?)?;
+        let price = NumberGtZero::try_from_decimal(price)
+            .with_context(|| format!("unable to convert pyth price of {price} to NumberGtZero"))?;
+        values.insert(id, (price, publish_time));
     }
     Ok(())
 }

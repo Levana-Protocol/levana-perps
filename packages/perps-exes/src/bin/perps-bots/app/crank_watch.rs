@@ -55,7 +55,7 @@ async fn check_market(
     };
 
     trigger_crank
-        .trigger_crank(market.market.get_address())
+        .trigger_crank(market.market.get_address(), market.market_id.clone())
         .await;
 
     Ok(WatchedTaskOutput::new(match work {
