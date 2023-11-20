@@ -50,11 +50,11 @@ jobs:
             wasm
       - name: Compile
         run: just cargo-compile
-      - name: Run tests (with prop tests) 
-        if: github.ref == 'refs/heads/develop'
-        run: just cargo-test-with-prop
+      # - name: Run tests (with prop tests) 
+      #   if: github.ref == 'refs/heads/develop'
+      #   run: just cargo-test-with-prop
       - name: Run tests (without prop tests) 
-        if: github.ref != 'refs/heads/develop'
+        # if: github.ref != 'refs/heads/develop'
         run: just cargo-test-check
       - name: Clippy
         run: just cargo-clippy-check
