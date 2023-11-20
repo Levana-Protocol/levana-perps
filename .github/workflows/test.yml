@@ -50,9 +50,9 @@ jobs:
             wasm
       - name: Compile
         run: just cargo-compile
-      - name: Skipping prop tests for now
-        # if: github.ref == 'refs/heads/develop'
-        # run: just cargo-test-with-prop
+      # - name: Run tests (with prop tests) 
+      #   if: github.ref == 'refs/heads/develop'
+      #   run: just cargo-test-with-prop
       - name: Run tests (without prop tests) 
         # if: github.ref != 'refs/heads/develop'
         run: just cargo-test-check
