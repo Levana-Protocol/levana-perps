@@ -97,6 +97,7 @@ impl Opt {
         if let Some(chain_id) = &self.cosmos_chain_id {
             builder.set_chain_id(chain_id.clone());
         }
+        builder.set_referer_header(Some("https://querier.levana.finance".to_owned()));
         builder.set_gas_estimate_multiplier(self.cosmos_gas_multiplier);
         log::info!("Connecting to {}", builder.grpc_url());
 
