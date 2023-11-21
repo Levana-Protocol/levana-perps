@@ -429,7 +429,6 @@ markets:
       borrow_fee_sensitivity: 0.083333333
       borrow_fee_rate_min_annualized: 0.03
       target_utilization: 0.5
-      delta_neutrality_fee_cap: 0.005
       delta_neutrality_fee_tax: 0.1
       liquidity_cooldown_seconds: 23400
 
@@ -510,13 +509,11 @@ markets:
 
   DYDX_USDC:
     config:
-      max_leverage: 30
       carry_leverage: 15
       funding_rate_sensitivity: 2
       target_utilization: 0.5
       delta_neutrality_fee_sensitivity: 75000000
       borrow_fee_sensitivity: 0.083333333
-      delta_neutrality_fee_cap: 0.005
       delta_neutrality_fee_tax: 0.25
       borrow_fee_rate_min_annualized: 0.03
       liquidity_cooldown_seconds: 23400
@@ -525,13 +522,11 @@ markets:
 
   RUNE_USDC:
     config:
-      max_leverage: 30
       carry_leverage: 15
       funding_rate_sensitivity: 2
       target_utilization: 0.5
       delta_neutrality_fee_sensitivity: 90000000
       borrow_fee_sensitivity: 0.083333333
-      delta_neutrality_fee_cap: 0.005
       delta_neutrality_fee_tax: 0.25
       borrow_fee_rate_min_annualized: 0.12
       liquidity_cooldown_seconds: 23400
