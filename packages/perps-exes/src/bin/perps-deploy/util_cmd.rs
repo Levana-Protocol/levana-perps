@@ -2,7 +2,11 @@ mod list_contracts;
 mod lp_history;
 mod token_balances;
 
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
@@ -384,6 +388,16 @@ async fn open_position_csv(
         workers,
     }: OpenPositionCsvOpt,
 ) -> Result<()> {
+    let old_data = Arc::new(match load_old_data(&csv) {
+        Ok(x) => {
+            tracing::info!("Loaded {} records from old CSV", x.len());
+            x
+        }
+        Err(e) => {
+            tracing::info!("Unable to load old CSV data from {}: {e:?}", csv.display());
+            HashMap::new()
+        }
+    });
     let cosmos = opt.connect(network).await?;
     let factory = Factory::from_contract(cosmos.make_contract(factory));
     let csv = ::csv::Writer::from_path(&csv)?;
@@ -409,9 +423,11 @@ async fn open_position_csv(
     let mut set = JoinSet::new();
 
     for _ in 0..workers {
-        let to_process = to_process.clone();
-        let csv = csv.clone();
-        set.spawn(csv_helper(to_process, csv));
+        set.spawn(csv_helper(
+            to_process.clone(),
+            csv.clone(),
+            old_data.clone(),
+        ));
     }
 
     while let Some(res) = set.join_next().await {
@@ -434,6 +450,7 @@ async fn open_position_csv(
 async fn csv_helper(
     to_process: Arc<Mutex<Vec<ToProcess>>>,
     csv: Arc<Mutex<csv::Writer<std::fs::File>>>,
+    old_data: Arc<HashMap<(MarketId, PositionId), PositionRecord>>,
 ) -> Result<()> {
     loop {
         let (contract, market_id, pos_id) = {
@@ -456,6 +473,13 @@ async fn csv_helper(
                 }
             }
         };
+
+        if let Some(record) = old_data.get(&(MarketId::clone(&market_id), pos_id)) {
+            let mut csv = csv.lock().await;
+            csv.serialize(&record)?;
+            csv.flush()?;
+            continue;
+        }
 
         let PositionAction {
             id,
@@ -489,7 +513,7 @@ async fn csv_helper(
         } = contract.raw_query_positions(vec![pos_id]).await?;
 
         let common = PositionRecordCommon {
-            market: &market_id,
+            market: MarketId::clone(&market_id),
             id: pos_id,
             timestamp,
             leverage,
@@ -511,7 +535,7 @@ async fn csv_helper(
     }
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum PositionStatus {
     Open,
@@ -520,17 +544,17 @@ enum PositionStatus {
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "snake_case")]
-struct PositionRecordCommon<'a> {
-    market: &'a MarketId,
+struct PositionRecordCommon {
+    market: MarketId,
     id: PositionId,
     timestamp: DateTime<Utc>,
     leverage: LeverageToBase,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-struct PositionRecord<'a> {
-    market: &'a MarketId,
+struct PositionRecord {
+    market: MarketId,
     id: PositionId,
     opened_at: DateTime<Utc>,
     closed_at: Option<DateTime<Utc>>,
@@ -548,15 +572,24 @@ struct PositionRecord<'a> {
     total_fees_usd: Signed<Usd>,
 }
 
-impl<'a> PositionRecord<'a> {
+fn load_old_data(
+    path: &Path,
+) -> Result<HashMap<(MarketId, PositionId), PositionRecord>, csv::Error> {
+    csv::Reader::from_path(path)?
+        .into_deserialize()
+        .map(|res: Result<PositionRecord, _>| res.map(|rec| ((rec.market.clone(), rec.id), rec)))
+        .collect()
+}
+
+impl PositionRecord {
     fn from_open(
         PositionRecordCommon {
             market,
             id,
             timestamp,
             leverage,
-        }: PositionRecordCommon<'a>,
-        position: &'a PositionQueryResponse,
+        }: PositionRecordCommon,
+        position: &PositionQueryResponse,
     ) -> Result<Self> {
         let total_fees_collateral = position.borrow_fee_collateral.into_signed()
             + position.funding_fee_collateral
@@ -569,7 +602,7 @@ impl<'a> PositionRecord<'a> {
             + position.trading_fee_usd.into_signed()
             + position.delta_neutrality_fee_usd;
         Ok(Self {
-            market,
+            market: market.clone(),
             id,
             opened_at: timestamp,
             closed_at: None,
@@ -594,8 +627,8 @@ impl<'a> PositionRecord<'a> {
             id,
             timestamp,
             leverage,
-        }: PositionRecordCommon<'a>,
-        position: &'a ClosedPosition,
+        }: PositionRecordCommon,
+        position: &ClosedPosition,
     ) -> Result<Self> {
         let total_fees_collateral = position.borrow_fee_collateral.into_signed()
             + position.funding_fee_collateral
