@@ -16,7 +16,7 @@ serde = { version = "1.0.141", features = ["derive"] }
 serde_json = "1.0.89"
 serde_yaml = "0.9.2"
 log = "0.4.17"
-cosmos = { git = "https://github.com/Levana-Protocol/levana-cosmos-rs.git", rev = "afde3e72ec4b0d9de010b9879c3bed77e585a37c" }
+cosmos = { git = "https://github.com/Levana-Protocol/levana-cosmos-rs.git", rev = "f46ce152e721ba7f2ef69313bfe7ffc73f264db2" }
 cosmwasm-std = "1.1.9"
 tokio = { version = "1.33.0", default-features = false, features = [
 	"time",
