@@ -7,7 +7,7 @@ use dashmap::DashMap;
 use itertools::Itertools;
 use msg::contracts::market::{
     entry::StatusResp,
-    spot_price::{SpotPriceConfig, SpotPriceFeedData},
+    spot_price::{PythConfig, PythPriceServiceNetwork, SpotPriceConfig, SpotPriceFeedData},
 };
 use pyth_sdk_cw::PriceIdentifier;
 
@@ -79,33 +79,47 @@ fn get_ids_from_status(status: &StatusResp) -> IdsCache {
     match &status.config.spot_price {
         SpotPriceConfig::Manual { .. } => IdsCache::default(),
         SpotPriceConfig::Oracle {
-            pyth: _,
+            pyth,
             stride: _,
             feeds,
             feeds_usd,
         } => {
-            let ids = feeds
-                .iter()
-                .chain(feeds_usd)
-                .flat_map(|feed| match feed.data {
-                    SpotPriceFeedData::Constant { .. } => None,
-                    SpotPriceFeedData::Pyth {
-                        id,
-                        age_tolerance_seconds: _,
-                    } => Some(id),
-                    SpotPriceFeedData::Stride { .. } => None,
-                    SpotPriceFeedData::Sei { .. } => None,
-                    SpotPriceFeedData::Simple { .. } => None,
-                })
-                // Get rid of duplicates
-                .collect::<HashSet<_>>()
-                .into_iter()
-                .sorted()
-                .collect_vec();
-            IdsCache {
-                ids: ids.into_boxed_slice().into(),
+            if is_pyth_stable(pyth.as_ref()) {
+                let ids = feeds
+                    .iter()
+                    .chain(feeds_usd)
+                    .flat_map(|feed| match feed.data {
+                        SpotPriceFeedData::Constant { .. } => None,
+                        SpotPriceFeedData::Pyth {
+                            id,
+                            age_tolerance_seconds: _,
+                        } => Some(id),
+                        SpotPriceFeedData::Stride { .. } => None,
+                        SpotPriceFeedData::Sei { .. } => None,
+                        SpotPriceFeedData::Simple { .. } => None,
+                    })
+                    // Get rid of duplicates
+                    .collect::<HashSet<_>>()
+                    .into_iter()
+                    .sorted()
+                    .collect_vec()
+                    .into_boxed_slice()
+                    .into();
+                IdsCache { ids }
+            } else {
+                IdsCache::default()
             }
         }
+    }
+}
+
+fn is_pyth_stable(pyth: Option<&PythConfig>) -> bool {
+    match pyth {
+        Some(pyth) => match pyth.network {
+            PythPriceServiceNetwork::Stable => true,
+            PythPriceServiceNetwork::Edge => false,
+        },
+        None => false,
     }
 }
 
