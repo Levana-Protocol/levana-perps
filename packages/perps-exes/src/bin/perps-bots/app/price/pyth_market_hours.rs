@@ -87,7 +87,6 @@ fn get_ids_from_status(status: &StatusResp) -> IdsCache {
             let ids = feeds
                 .iter()
                 .chain(feeds_usd)
-                .into_iter()
                 .flat_map(|feed| match feed.data {
                     SpotPriceFeedData::Constant { .. } => None,
                     SpotPriceFeedData::Pyth {
