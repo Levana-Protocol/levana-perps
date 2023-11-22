@@ -532,3 +532,8 @@ markets:
       liquidity_cooldown_seconds: 23400
 
     initial-borrow-fee-rate: 0.25
+
+  # Coinbase stock, intended only for testing of off-hours markets
+  COIN_USDC:
+    config: {}
+    initial-borrow-fee-rate: 0.05

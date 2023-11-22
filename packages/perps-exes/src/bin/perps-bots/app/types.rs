@@ -20,6 +20,7 @@ use crate::watcher::Watcher;
 
 use super::factory::{FactoryInfo, FrontendInfoTestnet};
 use super::gas_check::{GasCheckBuilder, GasCheckWallet};
+use super::price::pyth_market_hours::PythMarketHours;
 
 #[derive(Default, serde::Serialize)]
 pub(crate) struct GasRecords {
@@ -60,6 +61,7 @@ pub(crate) struct App {
     pub(crate) gases: RwLock<HashMap<Address, GasRecords>>,
     pub(crate) endpoint_stable: String,
     pub(crate) endpoint_edge: String,
+    pub(crate) pyth_market_hours: PythMarketHours,
 }
 
 /// Helper data structure for building up an application.
@@ -133,6 +135,7 @@ impl Opt {
             frontend_info_testnet,
             endpoint_stable: self.pyth_endpoint_stable,
             endpoint_edge: self.pyth_endpoint_edge,
+            pyth_market_hours: Default::default(),
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {
