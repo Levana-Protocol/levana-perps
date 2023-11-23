@@ -76,6 +76,7 @@ impl Faucet {
             "USDT" => "20000",
             "BTC" => "1",
             "OSMO" => "2000",
+            "stOSMO" => "2000",
             "SEI" => "2000",
             "ETH" => "2",
             "axlETH" => "2",
