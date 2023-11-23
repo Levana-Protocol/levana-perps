@@ -1,4 +1,3 @@
-use chrono::{Datelike, Timelike, Utc};
 use cosmos::{Contract, Cosmos, HasAddress};
 use msg::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
 use msg::contracts::market::entry::StatusResp;
@@ -77,18 +76,4 @@ pub(crate) async fn get_markets(
         }
     }
     Ok(res)
-}
-
-pub(crate) fn is_weekend() -> bool {
-    let now = Utc::now().naive_utc();
-    match now.weekday() {
-        chrono::Weekday::Mon => now.hour() < 12,
-        chrono::Weekday::Tue | chrono::Weekday::Wed | chrono::Weekday::Thu => false,
-        chrono::Weekday::Fri => now.hour() > 18,
-        chrono::Weekday::Sat | chrono::Weekday::Sun => true,
-    }
-}
-
-pub(crate) fn is_245_market(market_id: &MarketId) -> bool {
-    matches!(market_id.get_base(), "EUR" | "GBP")
 }

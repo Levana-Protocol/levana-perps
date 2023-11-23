@@ -26,7 +26,6 @@ use perps_exes::prelude::MarketContract;
 use perps_exes::pyth::get_oracle_update_msg;
 use shared::storage::RawAddr;
 
-use crate::util::markets::{is_245_market, is_weekend};
 use crate::util::oracle::OffchainPriceData;
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
@@ -169,16 +168,16 @@ impl App {
                     RunResult::OutOfGas
                 }
                 // Check if we hit price_too_old and, if so, try again with a transaction that includes an oracle update.
-                else if format!("{e:?}").contains("price_too_old") {
-                    // We ignore price too old for 24/5 markets on the weekends
-                    if is_245_market(&market_id) && is_weekend() {
-                        return Ok(WatchedTaskOutput::new("Ignoring failed crank due to price_too_old for 24/5 market on the weekend"));
+                else if error_as_str.contains("price_too_old") {
+                    // We ignore price too old if Pyth updates are closed
+                    if self.pyth_prices_closed(market, None).await? {
+                        return Ok(WatchedTaskOutput::new(format!("Ignoring failed crank for {market_id} due to price_too_old since Pyth prices are currently closed")));
                     }
                     match self
                         .try_crank_with_oracle(market, crank_wallet, rewards)
                         .await
                         .with_context(|| {
-                            format!("Unable to update oracle and turn crank for market {market}")
+                            format!("Unable to update oracle and turn crank for market {market_id} ({market})")
                         }) {
                         Ok(txres) => RunResult::RunWithOracle(txres),
                         Err(e2) => {
@@ -271,7 +270,12 @@ impl App {
         builder
             .sign_and_broadcast(&self.cosmos, crank_wallet)
             .await
-            .with_context(|| format!("Unable to update oracle and turn crank for market {market}"))
+            .with_context(|| {
+                format!(
+                    "Unable to update oracle and turn crank for market {} ({market})",
+                    status.market_id
+                )
+            })
     }
 }
 

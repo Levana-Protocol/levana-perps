@@ -1,3 +1,5 @@
+pub(crate) mod pyth_market_hours;
+
 use std::{
     collections::HashMap,
     fmt::{Display, Write},
@@ -19,7 +21,7 @@ use tokio::task::JoinSet;
 
 use crate::{
     util::{
-        markets::{is_245_market, is_weekend, Market},
+        markets::Market,
         oracle::{get_latest_price, OffchainPriceData},
     },
     watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
@@ -244,6 +246,12 @@ async fn check_market_needs_price_update(
     market: &Market,
     last_successful_price_publish_time: Option<DateTime<Utc>>,
 ) -> Result<Option<(PriceUpdateReason, NeedsOracleUpdate)>> {
+    if app
+        .pyth_prices_closed(market.market.get_address(), Some(&market.status))
+        .await?
+    {
+        return Ok(None);
+    }
     let (oracle_price, updated) = get_latest_price(&offchain_price_data, market).await?;
     let (_market_price, reason) = app
         .needs_price_update(
@@ -347,11 +355,9 @@ async fn update_oracles(
     // out-of-date prices. However, since we're no longer updating the market
     // contract here, that's not relevant, so that logic has been removed.
     // Overall: we want to treat _any_ failure to update prices in the Pyth
-    // contract as an immediate error. To our knowledge at time of writing, such
-    // as situation should never happen. We may need to revise this in the
-    // future for cases of known out-of-date prices, such as 24/5 markets, but
-    // those can probably be better handled by not sending those updates
-    // instead.
+    // contract as an immediate error. The one exception for now: if Pyth
+    // reports that prices for this market are currently closed, we ignore such
+    // an error.
 
     match TxBuilder::default()
         .add_message(msg)
@@ -414,8 +420,11 @@ impl App {
             > 180
         {
             // Not bothering with the price update, but need to determine if
-            // it's a 24/5 market or an actual error
-            if is_245_market(&market.market_id) && is_weekend() {
+            // Pyth prices are closed or it's an actual error
+            if self
+                .pyth_prices_closed(market.market.get_address(), Some(&market.status))
+                .await?
+            {
                 return Ok((None, None));
             } else {
                 anyhow::bail!(
