@@ -31,6 +31,7 @@ pyth:
       RUNE_USD: 5fcf71143bb70d41af4fa9aa1287e2efd3c5911cee59f909f915c9f61baacb1e
       AVAX_USD: 93da3352f9f1d105fdfe4971cfa80e9dd777bfc5d0f683ebb6e1294b92137bb7
       COIN_USD: fee33f2a978bf32dd6b662b65ba8083c6773b494f8401194ec1870c640860245
+      PYTH_USD: 0bbf28e9a841a1cc788f6a361b17ca072d0ea3098a1e5df1c3922d06719579ff
   edge: 
     update-age-tolerance: 120
     # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-edge
@@ -328,6 +329,13 @@ networks:
       feeds-usd: [
         !constant { price: "1", inverted: false }
       ]
+    PYTH_USDC:
+      feeds: [
+        !pyth { key: "PYTH_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
 
   sei-testnet:
     ATOM_USD:
@@ -534,6 +542,13 @@ networks:
     AVAX_USDC:
       feeds: [
         !pyth { key: "AVAX_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    PYTH_USDC:
+      feeds: [
+        !pyth { key: "PYTH_USD", inverted: false }
       ]
       feeds-usd: [
         !constant { price: "1", inverted: false }
