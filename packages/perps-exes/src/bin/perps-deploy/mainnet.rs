@@ -1,3 +1,4 @@
+mod contracts_csv;
 mod migrate;
 mod send_treasury;
 mod sync_config;
@@ -36,9 +37,9 @@ use crate::{
 };
 
 use self::{
-    migrate::MigrateOpts, send_treasury::SendTreasuryOpts, sync_config::SyncConfigOpts,
-    transfer_dao_fees::TransferDaoFeesOpts, update_config::UpdateConfigOpts,
-    wind_down::WindDownOpts,
+    contracts_csv::ContractsCsvOpts, migrate::MigrateOpts, send_treasury::SendTreasuryOpts,
+    sync_config::SyncConfigOpts, transfer_dao_fees::TransferDaoFeesOpts,
+    update_config::UpdateConfigOpts, wind_down::WindDownOpts,
 };
 
 #[derive(clap::Parser)]
@@ -104,6 +105,11 @@ enum Sub {
         #[clap(flatten)]
         inner: WindDownOpts,
     },
+    /// Exports all contract addresses for a factory to a CSV file
+    ContractsCsv {
+        #[clap(flatten)]
+        inner: ContractsCsvOpts,
+    },
 }
 
 pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
@@ -126,6 +132,7 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
         Sub::SendTreasury { inner } => inner.go(opt).await?,
         Sub::TransferDaoFees { inner } => inner.go(opt).await?,
         Sub::WindDown { inner } => inner.go(opt).await?,
+        Sub::ContractsCsv { inner } => inner.go(opt).await?,
     }
     Ok(())
 }
