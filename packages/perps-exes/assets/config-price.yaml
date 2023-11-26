@@ -345,6 +345,15 @@ networks:
         !stride { denom: "ibc/D176154B0C63D1F9C6DCFB4F70349EBF2E2B5A87A05902F57A6AE92B863E9AEC", inverted: false, age_tolerance: 604800 },
         !pyth { key: "OSMO_USD", inverted: false }
       ]
+    ryETH_USD:
+      feeds: [
+        !simple { contract: "osmo1556egspjm44k54mdqrwkatfrk6e4mzdeum3q32fp3d2lr95rh5cq0g2hcg", inverted: false, age_tolerance: 604800 },
+        !pyth { key: "ETH_USD", inverted: false },
+      ]
+      feeds-usd: [
+        !simple { contract: "osmo1556egspjm44k54mdqrwkatfrk6e4mzdeum3q32fp3d2lr95rh5cq0g2hcg", inverted: false, age_tolerance: 604800 },
+        !pyth { key: "ETH_USD", inverted: false },
+      ]
 
   sei-testnet:
     ATOM_USD:
