@@ -1,0 +1,7 @@
+# List all recipies
+default:
+	just --list --unsorted
+
+# Generate wallet report
+gen-wallet-report:
+	cargo run --bin perps-qa wallet-report --wallet-addr inj13lzkzpuraxxmm5nefac64fpqwdacjd7jrr0arh
