@@ -1,3 +1,4 @@
+mod check_price_feed_health;
 mod contracts_csv;
 mod migrate;
 mod send_treasury;
@@ -37,9 +38,10 @@ use crate::{
 };
 
 use self::{
-    contracts_csv::ContractsCsvOpts, migrate::MigrateOpts, send_treasury::SendTreasuryOpts,
-    sync_config::SyncConfigOpts, transfer_dao_fees::TransferDaoFeesOpts,
-    update_config::UpdateConfigOpts, wind_down::WindDownOpts,
+    check_price_feed_health::CheckPriceFeedHealthOpts, contracts_csv::ContractsCsvOpts,
+    migrate::MigrateOpts, send_treasury::SendTreasuryOpts, sync_config::SyncConfigOpts,
+    transfer_dao_fees::TransferDaoFeesOpts, update_config::UpdateConfigOpts,
+    wind_down::WindDownOpts,
 };
 
 #[derive(clap::Parser)]
@@ -110,6 +112,11 @@ enum Sub {
         #[clap(flatten)]
         inner: ContractsCsvOpts,
     },
+    /// Check the health of all the price feeds for a factory
+    CheckPriceFeedHealth {
+        #[clap(flatten)]
+        inner: CheckPriceFeedHealthOpts,
+    },
 }
 
 pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
@@ -133,6 +140,7 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
         Sub::TransferDaoFees { inner } => inner.go(opt).await?,
         Sub::WindDown { inner } => inner.go(opt).await?,
         Sub::ContractsCsv { inner } => inner.go(opt).await?,
+        Sub::CheckPriceFeedHealth { inner } => inner.go(opt).await?,
     }
     Ok(())
 }
