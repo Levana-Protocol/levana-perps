@@ -1,5 +1,6 @@
 mod capping;
 mod cli;
+mod wallet;
 
 use crate::cli::Cmd;
 use anyhow::Result;
@@ -296,6 +297,8 @@ async fn main_inner() -> Result<()> {
             log::debug!("Raw log: {}", tx.raw_log);
         }
         cli::Subcommand::CappingReport { inner } => inner.go(perp_contract).await?,
+        cli::Subcommand::WalletReport { inner } => inner.run(cosmos).await?,
+
     }
     Ok(())
 }

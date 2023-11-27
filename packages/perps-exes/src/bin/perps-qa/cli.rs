@@ -120,6 +120,11 @@ pub(crate) enum Subcommand {
         #[clap(flatten)]
         inner: crate::capping::Opt,
     },
+    /// Generate a CSV file with historical wallet balances
+    WalletReport {
+        #[clap(flatten)]
+        inner: crate::wallet::Opt,
+    }
 }
 
 #[derive(clap::Parser)]
