@@ -124,7 +124,7 @@ pub(crate) enum Subcommand {
     WalletReport {
         #[clap(flatten)]
         inner: crate::wallet::Opt,
-    }
+    },
 }
 
 #[derive(clap::Parser)]

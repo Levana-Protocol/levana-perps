@@ -298,7 +298,6 @@ async fn main_inner() -> Result<()> {
         }
         cli::Subcommand::CappingReport { inner } => inner.go(perp_contract).await?,
         cli::Subcommand::WalletReport { inner } => inner.run(cosmos).await?,
-
     }
     Ok(())
 }

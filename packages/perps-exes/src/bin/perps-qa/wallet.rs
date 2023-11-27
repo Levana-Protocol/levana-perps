@@ -45,13 +45,12 @@ impl Opt {
 
             let inj_coin = balance
                 .into_iter()
-                .filter(|item| item.denom == "inj")
-                .next()
+                .find(|item| item.denom == "inj")
                 .context("No balance found for injective")?;
 
             let new_balance = BigDecimal::from_str(&inj_coin.amount)?;
             let change = &old_balance - &new_balance;
-            let percentage_diff = if &old_balance == &BigDecimal::zero() {
+            let percentage_diff = if old_balance == BigDecimal::zero() {
                 BigDecimal::zero()
             } else {
                 (change / old_balance) * 100
@@ -64,7 +63,7 @@ impl Opt {
             })?;
             csv.flush()?;
             old_balance = new_balance;
-            next_height = next_height - self.lookback_height_count;
+            next_height -= self.lookback_height_count;
         }
         Ok(())
     }
