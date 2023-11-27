@@ -47,6 +47,9 @@ osmosis-mainnet:
     nBTC:
       denom: ibc/75345531D87BD90BF108BE7240BD721CB2CB0A1F16D4EBA71B09EC3C43E15C8F
       decimal-places: 14
+    stOSMO:
+      denom: ibc/D176154B0C63D1F9C6DCFB4F70349EBF2E2B5A87A05902F57A6AE92B863E9AEC
+      decimal-places: 6
 osmosis-testnet:
   gas-decimals: 6
   spot-price: 
