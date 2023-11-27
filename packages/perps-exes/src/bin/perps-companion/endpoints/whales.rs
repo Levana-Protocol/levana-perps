@@ -252,6 +252,7 @@ async fn load_whale_market_data(
         },
         market_id: match market_info.market_id.as_str() {
             "axlETH_USD" => "ETH_USD".parse()?,
+            "ryETH_USD" => "YieldETH_USD".parse()?,
             _ => market_info.market_id,
         },
         long_funding: ratio_to_percent(long_funding),
