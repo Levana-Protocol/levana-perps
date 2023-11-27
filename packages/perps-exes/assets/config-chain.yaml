@@ -50,6 +50,9 @@ osmosis-mainnet:
     stOSMO:
       denom: ibc/D176154B0C63D1F9C6DCFB4F70349EBF2E2B5A87A05902F57A6AE92B863E9AEC
       decimal-places: 6
+    ryETH:
+      denom: ibc/FBB3FEF80ED2344D821D4F95C31DBFD33E4E31D5324CAD94EF756E67B749F668
+      decimal-places: 18
 osmosis-testnet:
   gas-decimals: 6
   spot-price: 
