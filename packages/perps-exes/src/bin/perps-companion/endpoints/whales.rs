@@ -5,6 +5,7 @@ use askama::Template;
 use async_channel::{Receiver, Sender};
 use axum::{
     extract::{Query, State},
+    http::header::HeaderMap,
     http::HeaderValue,
     response::{IntoResponse, Response},
     Json,
@@ -14,7 +15,7 @@ use chrono::NaiveDate;
 use cosmos::{Address, CosmosNetwork, HasAddress};
 use cosmwasm_std::Decimal256;
 use futures::StreamExt;
-use hyper::{header::CONTENT_TYPE, HeaderMap, StatusCode};
+
 use msg::contracts::market::liquidity::LiquidityStats;
 use perps_exes::{
     contracts::{Factory, MarketInfo},
@@ -42,6 +43,7 @@ pub(crate) struct WhalesQuery {
     show_addresses: bool,
 }
 
+#[axum::debug_handler]
 pub(super) async fn whales(
     _: Whales,
     Query(WhalesQuery { show_addresses }): Query<WhalesQuery>,
@@ -53,7 +55,7 @@ pub(super) async fn whales(
         Err(e) => {
             log::error!("Error loading whales page: {e:?}");
             let mut res = format!("{e:?}").into_response();
-            *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+            *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
             res
         }
     }
@@ -296,7 +298,7 @@ impl WhaleData {
         .render()?;
         let mut res = s.into_response();
         res.headers_mut().insert(
-            CONTENT_TYPE,
+            http::header::CONTENT_TYPE,
             HeaderValue::from_static("text/html; charset=utf-8"),
         );
         Ok(res)

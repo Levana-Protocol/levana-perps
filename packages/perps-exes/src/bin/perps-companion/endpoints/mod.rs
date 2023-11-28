@@ -7,21 +7,20 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use askama::Template;
+use axum::extract::Request;
 use axum::{
     extract::rejection::PathRejection,
-    http::Request,
     middleware::{from_fn, Next},
     response::{Html, IntoResponse, Response},
     Json,
 };
 use axum_extra::routing::{RouterExt, TypedPath};
 use cosmos::Address;
-use reqwest::{
-    header::{ACCEPT, CONTENT_TYPE},
-    Method, StatusCode,
-};
+use http::status::StatusCode;
+
 use serde::Deserialize;
 use serde_json::json;
+use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
 
 use crate::app::App;
@@ -116,22 +115,27 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .layer(
             CorsLayer::new()
                 .allow_origin(tower_http::cors::Any)
-                .allow_methods([Method::GET, Method::HEAD, Method::POST, Method::PUT])
-                .allow_headers([CONTENT_TYPE]),
+                .allow_methods([
+                    http::method::Method::GET,
+                    http::method::Method::HEAD,
+                    http::method::Method::POST,
+                    http::method::Method::PUT,
+                ])
+                .allow_headers([http::header::CONTENT_TYPE]),
         )
         .layer(from_fn(error_response_handler));
 
     log::info!("Launching server");
-    axum::Server::bind(&bind)
-        .serve(router.into_make_service())
+    let listener = TcpListener::bind(&bind).await?;
+    axum::serve(listener, router.into_make_service())
         .await
         .context("Background task should never complete")
 }
 
-async fn error_response_handler<B>(request: Request<B>, next: Next<B>) -> Response {
+async fn error_response_handler(request: Request, next: Next) -> Response {
     let accept_header = request
         .headers()
-        .get(&ACCEPT)
+        .get(&http::header::ACCEPT)
         .map(|value| value.as_ref().to_owned());
 
     let mut response = next.run(request).await;

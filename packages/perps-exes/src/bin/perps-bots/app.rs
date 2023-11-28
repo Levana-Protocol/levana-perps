@@ -19,7 +19,9 @@ mod utilization;
 
 use anyhow::Result;
 use cosmos::HasAddressHrp;
-use hyper::server::conn::AddrIncoming;
+
+use tokio::net::TcpListener;
+
 pub(crate) use types::*;
 
 use crate::config::BotConfigByType;
@@ -27,10 +29,7 @@ use crate::config::BotConfigByType;
 use self::gas_check::GasCheckWallet;
 
 impl AppBuilder {
-    pub(crate) async fn start(
-        mut self,
-        server: hyper::server::Builder<AddrIncoming>,
-    ) -> Result<()> {
+    pub(crate) async fn start(mut self, listener: TcpListener) -> Result<()> {
         let family = match &self.app.config.by_type {
             crate::config::BotConfigByType::Testnet { inner } => inner.contract_family.clone(),
             crate::config::BotConfigByType::Mainnet { inner } => {
@@ -108,6 +107,6 @@ impl AppBuilder {
 
         // Start waiting on all tasks. This function internally is responsible
         // for launching the final task: the REST API
-        self.watcher.wait(self.app, server).await
+        self.watcher.wait(self.app, listener).await
     }
 }

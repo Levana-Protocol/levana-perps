@@ -8,12 +8,12 @@ use axum::http::HeaderValue;
 use axum::response::IntoResponse;
 use axum::{async_trait, Json};
 use chrono::{DateTime, Duration, Utc};
-use hyper::server::conn::AddrIncoming;
+
 use perps_exes::build_version;
 use perps_exes::config::{TaskConfig, WatcherConfig};
 use rand::Rng;
-use reqwest::header::CONTENT_TYPE;
-use reqwest::StatusCode;
+
+use tokio::net::TcpListener;
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 
@@ -288,17 +288,13 @@ impl TaskLabel {
 }
 
 impl Watcher {
-    pub(crate) async fn wait(
-        mut self,
-        app: Arc<App>,
-        server: hyper::server::Builder<AddrIncoming>,
-    ) -> Result<()> {
+    pub(crate) async fn wait(mut self, app: Arc<App>, listener: TcpListener) -> Result<()> {
         self.set.spawn(start_rest_api(
             app,
             TaskStatuses {
                 statuses: Arc::new(self.statuses),
             },
-            server,
+            listener,
         ));
         for ToSpawn { future, label } in self.to_spawn {
             self.set.spawn(async move {
@@ -850,12 +846,12 @@ impl TaskStatuses {
         let template = self.to_template(app, label).await;
         let mut res = template.render().unwrap().into_response();
         res.headers_mut().insert(
-            CONTENT_TYPE,
+            http::header::CONTENT_TYPE,
             HeaderValue::from_static("text/html; charset=utf-8"),
         );
 
         if template.alert {
-            *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+            *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
         }
 
         res
@@ -871,7 +867,7 @@ impl TaskStatuses {
         let mut res = Json(&template).into_response();
 
         if template.alert {
-            *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+            *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
         }
 
         res
@@ -894,7 +890,7 @@ impl TaskStatuses {
         let mut res = response_builder.into_response();
 
         if alert {
-            *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+            *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
         }
 
         res
@@ -1030,7 +1026,7 @@ impl ResponseBuilder {
     fn into_response(self) -> axum::response::Response {
         let mut res = self.buffer.into_response();
         if self.any_errors {
-            *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+            *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
         }
         res
     }

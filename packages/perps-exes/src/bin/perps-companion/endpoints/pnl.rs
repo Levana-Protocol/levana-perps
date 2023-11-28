@@ -4,15 +4,16 @@ use anyhow::{Context, Result};
 use askama::Template;
 use axum::{
     extract::State,
-    headers::Host,
     http::HeaderValue,
     response::{Html, IntoResponse, Response},
-    Json, TypedHeader,
+    Json,
 };
 use axum_extra::response::Css;
 use axum_extra::routing::TypedPath;
+use axum_extra::TypedHeader;
 use cosmos::{Address, Contract};
 use cosmwasm_std::{Decimal256, Uint256};
+use headers::Host;
 use msg::{
     contracts::market::{
         entry::QueryMsg,
@@ -20,10 +21,7 @@ use msg::{
     },
     prelude::{NonZero, PricePoint, Signed, SignedLeverageToNotional, UnsignedDecimal, Usd},
 };
-use reqwest::{
-    header::{CACHE_CONTROL, CONTENT_TYPE},
-    StatusCode,
-};
+
 use resvg::usvg::{TreeParsing, TreeTextToPath};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -87,7 +85,7 @@ impl PnlInfo {
                     percentage: pnl_percentage,
                 },
             },
-            host: host.hostname().to_owned(),
+            host: host.to_string(),
             image_url: PnlImage { pnl_id }.to_uri().to_string(),
             html_url: PnlHtml { pnl_id }.to_uri().to_string(),
             market_id,
@@ -308,7 +306,7 @@ impl PnlInfo {
             Ok(res) => res,
             Err(e) => {
                 let mut res = format!("Error while rendering SVG: {e:?}").into_response();
-                *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+                *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
                 res
             }
         }
@@ -340,10 +338,12 @@ impl PnlInfo {
         // Take the binary PNG output and return is as a response
         let png = pixmap.encode_png()?;
         let mut res = png.into_response();
-        res.headers_mut()
-            .insert(CONTENT_TYPE, HeaderValue::from_static("image/png"));
         res.headers_mut().insert(
-            CACHE_CONTROL,
+            http::header::CONTENT_TYPE,
+            HeaderValue::from_static("image/png"),
+        );
+        res.headers_mut().insert(
+            http::header::CACHE_CONTROL,
             HeaderValue::from_static("public, max-age=86400"),
         );
         Ok(res)
@@ -390,22 +390,22 @@ impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let mut response = ErrorPage {
             code: match &self {
-                Error::UnknownChainId => StatusCode::BAD_REQUEST,
-                Error::PositionNotFound => StatusCode::BAD_REQUEST,
-                Error::PositionStillOpen => StatusCode::BAD_REQUEST,
+                Error::UnknownChainId => http::status::StatusCode::BAD_REQUEST,
+                Error::PositionNotFound => http::status::StatusCode::BAD_REQUEST,
+                Error::PositionStillOpen => http::status::StatusCode::BAD_REQUEST,
                 Error::FailedToQueryContract { query_type, msg: _ } => match query_type {
-                    QueryType::Status => StatusCode::BAD_REQUEST,
-                    QueryType::EntryPrice => StatusCode::INTERNAL_SERVER_ERROR,
-                    QueryType::ExitPrice => StatusCode::INTERNAL_SERVER_ERROR,
-                    QueryType::Positions => StatusCode::INTERNAL_SERVER_ERROR,
+                    QueryType::Status => http::status::StatusCode::BAD_REQUEST,
+                    QueryType::EntryPrice => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                    QueryType::ExitPrice => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                    QueryType::Positions => http::status::StatusCode::INTERNAL_SERVER_ERROR,
                 },
-                Error::Path { msg: _ } => StatusCode::BAD_REQUEST,
+                Error::Path { msg: _ } => http::status::StatusCode::BAD_REQUEST,
                 Error::Database { msg } => {
                     log::error!("Database serror: {msg}");
-                    StatusCode::INTERNAL_SERVER_ERROR
+                    http::status::StatusCode::INTERNAL_SERVER_ERROR
                 }
-                Error::InvalidPage => StatusCode::NOT_FOUND,
-                Error::PnlValueMissing => StatusCode::INTERNAL_SERVER_ERROR,
+                Error::InvalidPage => http::status::StatusCode::NOT_FOUND,
+                Error::PnlValueMissing => http::status::StatusCode::INTERNAL_SERVER_ERROR,
             },
             error: self.clone(),
         }
