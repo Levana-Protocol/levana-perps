@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT\n                    market_id,\n                    pnl_usd,\n                    pnl_percentage,\n                    entry_price,\n                    exit_price,\n                    leverage,\n                    direction as \"direction: DirectionForDb\",\n                    environment as \"environment: ContractEnvironment\",\n                    chain as \"chain: ChainId\",\n                    wallet\n                FROM position_detail INNER JOIN market\n                ON position_detail.market = market.id\n                WHERE url_id=$1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "market_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "pnl_usd",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "pnl_percentage",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "entry_price",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "exit_price",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "leverage",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "direction: DirectionForDb",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "environment: ContractEnvironment",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "chain: ChainId",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "wallet",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "d240ae35f2dec2b421b51a597a05780dcd81417fcdb86632baf443429b8cb2ef"
+}
