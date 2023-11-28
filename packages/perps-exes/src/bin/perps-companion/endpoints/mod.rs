@@ -8,7 +8,6 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use askama::Template;
 use axum::extract::Request;
-use axum::handler::Handler;
 use axum::{
     extract::rejection::PathRejection,
     middleware::{from_fn, Next},
