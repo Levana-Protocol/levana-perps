@@ -19,6 +19,9 @@ pub(crate) struct Opt {
     /// How many heights back we need to find data
     #[clap(long, default_value_t = 50)]
     lookback_height_count: i64,
+    /// Start height
+    #[clap(long)]
+    start_height: Option<i64>,
 }
 
 #[derive(serde::Serialize)]
@@ -32,8 +35,12 @@ struct Record {
 impl Opt {
     pub(crate) async fn run(&self, cosmos: Cosmos) -> Result<()> {
         let address = Address::from_str(&self.wallet_addr)?;
-        let latest_block = cosmos.clone().get_latest_block_info().await?;
-        let mut next_height = latest_block.height;
+        let latest_height = if let Some(height) = self.start_height {
+            height
+        } else {
+            cosmos.clone().get_latest_block_info().await?.height
+        };
+        let mut next_height = latest_height;
         let mut csv = csv::Writer::from_path(&self.csv)?;
         let mut old_balance = BigDecimal::zero();
         for _ in 0..self.total_datapoints {
