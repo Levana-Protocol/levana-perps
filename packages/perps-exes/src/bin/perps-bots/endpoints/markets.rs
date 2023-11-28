@@ -3,7 +3,6 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-
 pub(crate) async fn markets() -> Response {
     let mut res = "Redirecting".into_response();
     res.headers_mut().append(

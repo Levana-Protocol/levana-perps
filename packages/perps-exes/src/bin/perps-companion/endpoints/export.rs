@@ -20,7 +20,6 @@ use msg::prelude::{
 };
 use perps_exes::prelude::{Collateral, UnsignedDecimal};
 
-
 use serde::Serialize;
 use shared::storage::MarketId;
 use std::collections::HashMap;
@@ -552,7 +551,9 @@ impl IntoResponse for Error {
                 Error::UnknownChainId => http::status::StatusCode::BAD_REQUEST,
                 Error::FailedToQueryContract { query_type, msg: _ } => match query_type {
                     QueryType::Status => http::status::StatusCode::BAD_REQUEST,
-                    QueryType::TraderActionHistory => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                    QueryType::TraderActionHistory => {
+                        http::status::StatusCode::INTERNAL_SERVER_ERROR
+                    }
                     QueryType::LpActionHistory => http::status::StatusCode::INTERNAL_SERVER_ERROR,
                     QueryType::Positions => http::status::StatusCode::INTERNAL_SERVER_ERROR,
                     QueryType::Markets => http::status::StatusCode::BAD_REQUEST,

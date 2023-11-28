@@ -3,17 +3,17 @@ use std::{borrow::Cow, fmt::Display, sync::Arc};
 use anyhow::{Context, Result};
 use askama::Template;
 use axum::{
-    extract::{State},
+    extract::State,
     http::HeaderValue,
     response::{Html, IntoResponse, Response},
-    Json
+    Json,
 };
 use axum_extra::response::Css;
 use axum_extra::routing::TypedPath;
 use axum_extra::TypedHeader;
-use headers::Host;
 use cosmos::{Address, Contract};
 use cosmwasm_std::{Decimal256, Uint256};
+use headers::Host;
 use msg::{
     contracts::market::{
         entry::QueryMsg,
@@ -100,7 +100,6 @@ impl PnlInfo {
         })
     }
 }
-
 
 pub(super) async fn pnl_html(
     PnlHtml { pnl_id }: PnlHtml,
@@ -339,8 +338,10 @@ impl PnlInfo {
         // Take the binary PNG output and return is as a response
         let png = pixmap.encode_png()?;
         let mut res = png.into_response();
-        res.headers_mut()
-            .insert(http::header::CONTENT_TYPE, HeaderValue::from_static("image/png"));
+        res.headers_mut().insert(
+            http::header::CONTENT_TYPE,
+            HeaderValue::from_static("image/png"),
+        );
         res.headers_mut().insert(
             http::header::CACHE_CONTROL,
             HeaderValue::from_static("public, max-age=86400"),

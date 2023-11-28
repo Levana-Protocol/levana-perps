@@ -6,7 +6,6 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-
 use crate::{
     app::App,
     watcher::{TaskLabel, TaskStatuses},

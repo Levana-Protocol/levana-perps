@@ -5,9 +5,10 @@ use askama::Template;
 use async_channel::{Receiver, Sender};
 use axum::{
     extract::{Query, State},
+    http::header::HeaderMap,
     http::HeaderValue,
     response::{IntoResponse, Response},
-    Json, http::header::HeaderMap
+    Json,
 };
 use axum_extra::{response::Css, routing::TypedPath};
 use chrono::NaiveDate;

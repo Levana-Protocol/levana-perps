@@ -13,7 +13,6 @@ use perps_exes::build_version;
 use perps_exes::config::{TaskConfig, WatcherConfig};
 use rand::Rng;
 
-
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
@@ -289,11 +288,7 @@ impl TaskLabel {
 }
 
 impl Watcher {
-    pub(crate) async fn wait(
-        mut self,
-        app: Arc<App>,
-        listener: TcpListener,
-    ) -> Result<()> {
+    pub(crate) async fn wait(mut self, app: Arc<App>, listener: TcpListener) -> Result<()> {
         self.set.spawn(start_rest_api(
             app,
             TaskStatuses {

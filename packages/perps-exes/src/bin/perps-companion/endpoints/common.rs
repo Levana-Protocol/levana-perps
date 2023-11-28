@@ -7,7 +7,6 @@ use axum::{
 };
 use axum_extra::response::Css;
 
-
 use crate::app::App;
 
 use super::{
@@ -37,15 +36,19 @@ pub(crate) async fn build_version(_: BuildVersionRoute) -> &'static str {
 
 pub(crate) async fn favicon(_: Favicon) -> Response {
     let mut res = include_bytes!("../../../../static/favicon.ico").into_response();
-    res.headers_mut()
-        .insert(http::header::CONTENT_TYPE, HeaderValue::from_static("image/x-icon"));
+    res.headers_mut().insert(
+        http::header::CONTENT_TYPE,
+        HeaderValue::from_static("image/x-icon"),
+    );
     res
 }
 
 pub(crate) async fn robots_txt(_: RobotRoute) -> Response {
     let mut res = include_str!("../../../../static/robots.txt").into_response();
-    res.headers_mut()
-        .insert(http::header::CONTENT_TYPE, HeaderValue::from_static("text/plain"));
+    res.headers_mut().insert(
+        http::header::CONTENT_TYPE,
+        HeaderValue::from_static("text/plain"),
+    );
     res
 }
 

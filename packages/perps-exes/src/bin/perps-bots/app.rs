@@ -29,10 +29,7 @@ use crate::config::BotConfigByType;
 use self::gas_check::GasCheckWallet;
 
 impl AppBuilder {
-    pub(crate) async fn start(
-        mut self,
-        listener: TcpListener,
-    ) -> Result<()> {
+    pub(crate) async fn start(mut self, listener: TcpListener) -> Result<()> {
         let family = match &self.app.config.by_type {
             crate::config::BotConfigByType::Testnet { inner } => inner.contract_family.clone(),
             crate::config::BotConfigByType::Mainnet { inner } => {

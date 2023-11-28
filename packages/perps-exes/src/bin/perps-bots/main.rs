@@ -44,7 +44,10 @@ fn main_inner() -> Result<()> {
         .build()
         .unwrap()
         .block_on(async {
-	    let listener = TcpListener::bind(&opt.bind).await.context(format!("Cannot launch bot HTTP service bound to {}", opt.bind))?;
+            let listener = TcpListener::bind(&opt.bind).await.context(format!(
+                "Cannot launch bot HTTP service bound to {}",
+                opt.bind
+            ))?;
             opt.into_app_builder().await?.start(listener).await
         })
         .map_err(anyhow::Error::msg)
