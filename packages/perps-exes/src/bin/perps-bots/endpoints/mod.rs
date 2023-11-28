@@ -3,6 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use axum::routing::{get, post};
 use reqwest::{header::CONTENT_TYPE, Method};
+use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
 
 use crate::{app::App, watcher::TaskStatuses};
@@ -24,7 +25,7 @@ pub(crate) struct RestApp {
 pub(crate) async fn start_rest_api(
     app: Arc<App>,
     statuses: TaskStatuses,
-    server: hyper::server::Builder<hyper::server::conn::AddrIncoming>,
+    listener: TcpListener,
 ) -> Result<()> {
     let router = axum::Router::new()
         .route("/", get(common::homepage))
@@ -42,11 +43,15 @@ pub(crate) async fn start_rest_api(
         .layer(
             CorsLayer::new()
                 .allow_origin(tower_http::cors::Any)
-                .allow_methods([Method::GET, Method::HEAD, Method::POST])
-                .allow_headers([CONTENT_TYPE]),
+                .allow_methods([
+                    http::method::Method::GET,
+                    http::method::Method::HEAD,
+                    http::method::Method::POST,
+                ])
+                .allow_headers([http::header::CONTENT_TYPE]),
         );
     tracing::info!("Launching server");
 
-    server.serve(router.into_make_service()).await?;
+    axum::serve(listener, router.into_make_service()).await?;
     Err(anyhow::anyhow!("Background task should never complete"))
 }

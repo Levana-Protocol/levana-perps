@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use pid1::Pid1Settings;
+use tokio::net::TcpListener;
 
 mod app;
 mod cli;
@@ -43,10 +44,8 @@ fn main_inner() -> Result<()> {
         .build()
         .unwrap()
         .block_on(async {
-            let server = axum::Server::try_bind(&opt.bind)
-                .with_context(|| format!("Cannot launch bot HTTP service bound to {}", opt.bind))?;
-
-            opt.into_app_builder().await?.start(server).await
+	    let listener = TcpListener::bind(&opt.bind).await.context(format!("Cannot launch bot HTTP service bound to {}", opt.bind))?;
+            opt.into_app_builder().await?.start(listener).await
         })
         .map_err(anyhow::Error::msg)
 }

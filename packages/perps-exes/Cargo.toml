@@ -39,17 +39,17 @@ reqwest = { version = "0.11.11", default-features = false, features = [
 	"gzip",
 ] }
 chrono = { version = "0.4.31", features = ["serde"] }
-axum = { version = "0.6", features = ["headers", "tracing"] }
-axum-extra = { version = "0.7", features = ["typed-routing"] }
-tower-http = { version = "0.3.4", features = ["cors", "auth"] }
-futures = "0.3.26"
-tokio-tungstenite = "*"
-tokio-util = { version = "0.7.7", features = ["full"] }
+axum = { version = "0.7.1", features = [ "tracing", "macros"] }
+axum-extra = { version = "0.9.0", features = ["typed-routing", "typed-header"] }
+tower-http = { version = "0.5.0", features = ["cors", "auth"] }
+futures = "0.3.29"
+tokio-tungstenite = "0.20.1"
+tokio-util = { version = "0.7.10", features = ["full"] }
 cw-multi-test = "0.16.2"
 rand = "0.8"
 pyth-sdk-cw = "1.0.0"
 csv = "1.2.2"
-tonic = "0.8.3"
+tonic = "0.10.2"
 askama = "0.12"
 cw-utils = "1.0.1"
 thiserror = "1.0.50"
@@ -72,10 +72,12 @@ async-channel = "2.1.1"
 hyper = "0.14"
 pid1 = "0.1.0"
 dashmap = "5.5.3"
-tracing = "0.1.39"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 parking_lot = "0.12.1"
 bigdecimal = { version = "0.4.2", features = ["serde"]}
+http = "1.0.0"
+headers = "0.4.0"
 
 [features]
 default = []

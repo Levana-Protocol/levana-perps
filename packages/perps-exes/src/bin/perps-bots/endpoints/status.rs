@@ -30,7 +30,7 @@ pub(crate) async fn single(
         Some(label) => label,
         None => {
             let mut res = "Invalid status label".into_response();
-            *res.status_mut() = StatusCode::BAD_REQUEST;
+            *res.status_mut() = http::status::StatusCode::BAD_REQUEST;
             return res;
         }
     };
