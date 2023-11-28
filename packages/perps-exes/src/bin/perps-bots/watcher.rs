@@ -8,12 +8,12 @@ use axum::http::HeaderValue;
 use axum::response::IntoResponse;
 use axum::{async_trait, Json};
 use chrono::{DateTime, Duration, Utc};
-use hyper::server::conn::AddrIncoming;
+
 use perps_exes::build_version;
 use perps_exes::config::{TaskConfig, WatcherConfig};
 use rand::Rng;
-use reqwest::header::CONTENT_TYPE;
-use reqwest::StatusCode;
+
+
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;

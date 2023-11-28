@@ -6,7 +6,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use axum_extra::response::Css;
-use reqwest::{header::CONTENT_TYPE, StatusCode};
+
 
 use crate::app::App;
 

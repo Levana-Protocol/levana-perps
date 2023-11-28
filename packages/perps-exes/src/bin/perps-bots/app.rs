@@ -19,9 +19,9 @@ mod utilization;
 
 use anyhow::Result;
 use cosmos::HasAddressHrp;
-use hyper::server::conn::AddrIncoming;
+
 use tokio::net::TcpListener;
-use tokio_util::net::Listener;
+
 pub(crate) use types::*;
 
 use crate::config::BotConfigByType;

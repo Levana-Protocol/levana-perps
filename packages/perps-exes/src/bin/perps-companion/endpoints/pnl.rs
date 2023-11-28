@@ -6,7 +6,7 @@ use axum::{
     extract::{State},
     http::HeaderValue,
     response::{Html, IntoResponse, Response},
-    Json, body::Body
+    Json
 };
 use axum_extra::response::Css;
 use axum_extra::routing::TypedPath;
@@ -21,10 +21,7 @@ use msg::{
     },
     prelude::{NonZero, PricePoint, Signed, SignedLeverageToNotional, UnsignedDecimal, Usd},
 };
-use reqwest::{
-    header::{CACHE_CONTROL, CONTENT_TYPE},
-    StatusCode,
-};
+
 use resvg::usvg::{TreeParsing, TreeTextToPath};
 use serde::Deserialize;
 use serde_json::{json, Value};

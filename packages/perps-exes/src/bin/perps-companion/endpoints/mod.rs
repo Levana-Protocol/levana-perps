@@ -18,10 +18,7 @@ use axum::handler::Handler;
 use axum_extra::routing::{RouterExt, TypedPath};
 use cosmos::Address;
 use http::status::StatusCode;
-use reqwest::{
-    header::{ACCEPT, CONTENT_TYPE},
-    Method,
-};
+
 use serde::Deserialize;
 use serde_json::json;
 use tokio::net::TcpListener;

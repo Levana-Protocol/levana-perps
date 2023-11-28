@@ -19,8 +19,8 @@ use msg::prelude::{
     DirectionToBase, FactoryQueryMsg, MarketQueryMsg, OrderInMessage, RawAddr, Signed,
 };
 use perps_exes::prelude::{Collateral, UnsignedDecimal};
-use reqwest::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
-use reqwest::StatusCode;
+
+
 use serde::Serialize;
 use shared::storage::MarketId;
 use std::collections::HashMap;

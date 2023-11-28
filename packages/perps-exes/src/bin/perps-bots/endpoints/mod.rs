@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::routing::{get, post};
-use reqwest::{header::CONTENT_TYPE, Method};
+
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
 

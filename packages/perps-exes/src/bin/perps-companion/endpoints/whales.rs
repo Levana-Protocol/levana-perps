@@ -14,7 +14,7 @@ use chrono::NaiveDate;
 use cosmos::{Address, CosmosNetwork, HasAddress};
 use cosmwasm_std::Decimal256;
 use futures::StreamExt;
-use hyper::{header::CONTENT_TYPE};
+
 use msg::contracts::market::liquidity::LiquidityStats;
 use perps_exes::{
     contracts::{Factory, MarketInfo},

@@ -5,7 +5,7 @@ use axum::{
     http::{HeaderMap, HeaderValue},
     response::{IntoResponse, Response},
 };
-use reqwest::StatusCode;
+
 
 use crate::{
     app::App,
