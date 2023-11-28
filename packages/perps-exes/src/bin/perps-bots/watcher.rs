@@ -995,7 +995,7 @@ impl ResponseBuilder {
             short,
         }: RenderedStatus,
     ) -> std::fmt::Result {
-        writeln!(&mut self.buffer, "# {label:?}. Status: {}", short.as_str())?;
+        writeln!(&mut self.buffer, "# {label}. Status: {}", short.as_str())?;
 
         if let Some(started) = current_run_started {
             writeln!(&mut self.buffer, "Currently running, started at {started}")?;
@@ -1007,7 +1007,7 @@ impl ResponseBuilder {
                 writeln!(&mut self.buffer, "{msg}")?;
             }
             TaskResultValue::Err(err) => {
-                writeln!(&mut self.buffer, "{err:?}")?;
+                writeln!(&mut self.buffer, "{err}")?;
             }
             TaskResultValue::NotYetRun => writeln!(&mut self.buffer, "{}", NOT_YET_RUN_MESSAGE)?,
         }
