@@ -1,6 +1,6 @@
 pub mod defaults;
 
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, iter::Sum, path::Path};
 
 use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, RawAddress};
@@ -92,7 +92,7 @@ pub struct ChainStrideConfig {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PriceConfig {
     pub pyth: PythPriceConfig,
-    /// Mappings from a key to price feed  
+    /// Mappings from a key to price feed
     pub networks: HashMap<CosmosNetwork, HashMap<MarketId, MarketPriceFeedConfigs>>,
 }
 
@@ -191,6 +191,13 @@ impl FromStr for GasDecimals {
     serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default,
 )]
 pub struct GasAmount(pub Decimal256);
+
+impl Sum<GasAmount> for GasAmount {
+    fn sum<I: Iterator<Item = GasAmount>>(iter: I) -> Self {
+        let total = iter.fold(Decimal256::zero(), |acc, x| acc + x.0);
+        GasAmount(total)
+    }
+}
 
 impl FromStr for GasAmount {
     type Err = anyhow::Error;
