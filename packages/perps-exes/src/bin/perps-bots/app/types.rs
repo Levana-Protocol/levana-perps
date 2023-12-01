@@ -60,6 +60,43 @@ pub(crate) struct GasEntry {
     pub(crate) amount: GasAmount,
 }
 
+#[derive(serde::Serialize)]
+pub(crate) struct GasSingleEntry {
+    pub(crate) timestamp: DateTime<Utc>,
+    pub(crate) amount: i64,
+}
+
+#[derive(serde::Serialize)]
+pub(crate) struct GasUsage {
+    pub(crate) total: i64,
+    pub(crate) entries: VecDeque<GasSingleEntry>,
+    pub(crate) usage_per_hour: i64,
+}
+
+impl GasUsage {
+    pub(crate) fn add_entry(&mut self, timestamp: DateTime<Utc>, amount: i64) {
+        if let Err(e) = self.add_entry_inner(timestamp, amount) {
+            tracing::error!("Error adding gas record {timestamp}/{amount}: {e:?}");
+        }
+    }
+
+    fn add_entry_inner(&mut self, timestamp: DateTime<Utc>, amount: i64) -> Result<()> {
+        self.total += amount;
+        self.entries.push_back(GasSingleEntry { timestamp, amount });
+        if self.entries.len() > 1000 {
+            self.entries.pop_front();
+        }
+        // Lets compute usage per hour
+        let timestamp_before_hour = Utc::now() - Duration::from_secs(1);
+        let entries_since_hour = self
+            .entries
+            .iter()
+            .filter(|item| item.timestamp >= timestamp_before_hour);
+        self.usage_per_hour = entries_since_hour.map(|item| item.amount).sum();
+        Ok(())
+    }
+}
+
 pub(crate) struct App {
     factory: RwLock<Arc<FactoryInfo>>,
     frontend_info_testnet: Option<RwLock<Arc<FrontendInfoTestnet>>>,
@@ -67,7 +104,8 @@ pub(crate) struct App {
     pub(crate) config: BotConfig,
     pub(crate) client: Client,
     pub(crate) live_since: DateTime<Utc>,
-    pub(crate) gases: RwLock<HashMap<Address, GasRecords>>,
+    pub(crate) gas_refill: RwLock<HashMap<Address, GasRecords>>,
+    pub(crate) gas_usage: RwLock<HashMap<Address, GasUsage>>,
     pub(crate) endpoint_stable: String,
     pub(crate) endpoint_edge: String,
     pub(crate) pyth_market_hours: PythMarketHours,
@@ -140,7 +178,8 @@ impl Opt {
             config,
             client,
             live_since: Utc::now(),
-            gases: RwLock::new(HashMap::new()),
+            gas_refill: RwLock::new(HashMap::new()),
+            gas_usage: RwLock::new(HashMap::new()),
             frontend_info_testnet,
             endpoint_stable: self.pyth_endpoint_stable,
             endpoint_edge: self.pyth_endpoint_edge,

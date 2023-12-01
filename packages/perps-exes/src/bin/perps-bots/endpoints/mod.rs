@@ -39,6 +39,7 @@ pub(crate) async fn start_rest_api(
         .route("/status/:label", get(status::single))
         .route("/markets", get(markets::markets))
         .route("/debug/gas-usage", get(debug::gases))
+        .route("/debug/price-wallet-usage", get(debug::price_wallet))
         .with_state(RestApp { app, statuses })
         .layer(
             CorsLayer::new()

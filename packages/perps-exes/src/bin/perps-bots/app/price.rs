@@ -27,7 +27,7 @@ use crate::{
     watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
 };
 
-use super::{crank_run::TriggerCrank, gas_check::GasCheckWallet, App, AppBuilder};
+use super::{crank_run::TriggerCrank, gas_check::GasCheckWallet, App, AppBuilder, GasUsage};
 
 struct Worker {
     wallet: Arc<Wallet>,
@@ -364,10 +364,21 @@ async fn update_oracles(
         .sign_and_broadcast(&app.cosmos, &worker.wallet)
         .await
     {
-        Ok(res) => Ok(format!(
-            "Prices updated in Pyth oracle contract with txhash {}",
-            res.txhash
-        )),
+        Ok(res) => {
+            let mut gas_used = app.gas_usage.write().await;
+            gas_used
+                .entry(worker.wallet.get_address())
+                .or_insert_with(|| GasUsage {
+                    total: Default::default(),
+                    entries: Default::default(),
+                    usage_per_hour: Default::default(),
+                })
+                .add_entry(Utc::now(), res.gas_used);
+            Ok(format!(
+                "Prices updated in Pyth oracle contract with txhash {}",
+                res.txhash
+            ))
+        }
         Err(e) => {
             if app.is_osmosis_epoch() {
                 Ok(format!("Unable to update Pyth oracle, but assuming it's because we're in the epoch: {e:?}"))
