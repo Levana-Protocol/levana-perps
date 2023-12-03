@@ -50,5 +50,4 @@ fn main_inner() -> Result<()> {
             ))?;
             opt.into_app_builder().await?.start(listener).await
         })
-        .map_err(anyhow::Error::msg)
 }
