@@ -105,8 +105,7 @@ impl FundUsed {
         self.total += amount
             .iter()
             .map(|item| item.amount.clone())
-            .sum::<BigDecimal>()
-            ;
+            .sum::<BigDecimal>();
         self.entries.push_back(GasSingleEntry { timestamp, amount });
         if self.entries.len() > 1000 {
             self.entries.pop_front();

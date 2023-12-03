@@ -369,10 +369,8 @@ async fn update_oracles(
         Ok(res) => {
             let funds = msg.funds;
             if !funds.is_empty() {
-                let funds: Result<Vec<FundsCoin>> = funds
-                    .into_iter()
-                    .map(FundsCoin::try_from)
-                    .collect();
+                let funds: Result<Vec<FundsCoin>> =
+                    funds.into_iter().map(FundsCoin::try_from).collect();
                 match funds {
                     Ok(funds) => {
                         let mut funds_used = app.funds_used.write().await;
