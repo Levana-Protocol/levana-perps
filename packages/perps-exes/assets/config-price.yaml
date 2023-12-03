@@ -266,11 +266,11 @@ networks:
       ]
     stATOM_USD:
       feeds: [
-        !stride { denom: "ibc/C140AFD542AE77BD7DCC83F13FDD8C5E5BB8C4929785E6EC2F4C636F98F17901", inverted: false, age_tolerance: 604800 },
+        !stride { denom: "ibc/C140AFD542AE77BD7DCC83F13FDD8C5E5BB8C4929785E6EC2F4C636F98F17901", inverted: false, age_tolerance: 43200 },
         !pyth { key: "ATOM_USD", inverted: false }
       ]
       feeds-usd: [
-        !stride { denom: "ibc/C140AFD542AE77BD7DCC83F13FDD8C5E5BB8C4929785E6EC2F4C636F98F17901", inverted: false, age_tolerance: 604800 },
+        !stride { denom: "ibc/C140AFD542AE77BD7DCC83F13FDD8C5E5BB8C4929785E6EC2F4C636F98F17901", inverted: false, age_tolerance: 43200 },
         !pyth { key: "ATOM_USD", inverted: false }
       ]
     SOL_USDC:
@@ -345,20 +345,20 @@ networks:
       ]
     stOSMO_USD:
       feeds: [
-        !stride { denom: "ibc/D176154B0C63D1F9C6DCFB4F70349EBF2E2B5A87A05902F57A6AE92B863E9AEC", inverted: false, age_tolerance: 604800 },
+        !stride { denom: "ibc/D176154B0C63D1F9C6DCFB4F70349EBF2E2B5A87A05902F57A6AE92B863E9AEC", inverted: false, age_tolerance: 43200 },
         !pyth { key: "OSMO_USD", inverted: false }
       ]
       feeds-usd: [
-        !stride { denom: "ibc/D176154B0C63D1F9C6DCFB4F70349EBF2E2B5A87A05902F57A6AE92B863E9AEC", inverted: false, age_tolerance: 604800 },
+        !stride { denom: "ibc/D176154B0C63D1F9C6DCFB4F70349EBF2E2B5A87A05902F57A6AE92B863E9AEC", inverted: false, age_tolerance: 43200 },
         !pyth { key: "OSMO_USD", inverted: false }
       ]
     ryETH_USD:
       feeds: [
-        !simple { contract: "osmo1556egspjm44k54mdqrwkatfrk6e4mzdeum3q32fp3d2lr95rh5cq0g2hcg", inverted: false, age_tolerance: 604800 },
+        !simple { contract: "osmo1556egspjm44k54mdqrwkatfrk6e4mzdeum3q32fp3d2lr95rh5cq0g2hcg", inverted: false, age_tolerance: 43200 },
         !pyth { key: "ETH_USD", inverted: false },
       ]
       feeds-usd: [
-        !simple { contract: "osmo1556egspjm44k54mdqrwkatfrk6e4mzdeum3q32fp3d2lr95rh5cq0g2hcg", inverted: false, age_tolerance: 604800 },
+        !simple { contract: "osmo1556egspjm44k54mdqrwkatfrk6e4mzdeum3q32fp3d2lr95rh5cq0g2hcg", inverted: false, age_tolerance: 43200 },
         !pyth { key: "ETH_USD", inverted: false },
       ]
 
