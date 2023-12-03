@@ -27,7 +27,9 @@ use crate::{
     watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
 };
 
-use super::{crank_run::TriggerCrank, gas_check::GasCheckWallet, App, AppBuilder, GasUsage};
+use super::{
+    crank_run::TriggerCrank, gas_check::GasCheckWallet, App, AppBuilder, FundUsed, FundsCoin,
+};
 
 struct Worker {
     wallet: Arc<Wallet>,
@@ -360,20 +362,32 @@ async fn update_oracles(
     // an error.
 
     match TxBuilder::default()
-        .add_message(msg)
+        .add_message(msg.clone())
         .sign_and_broadcast(&app.cosmos, &worker.wallet)
         .await
     {
         Ok(res) => {
-            let mut gas_used = app.gas_usage.write().await;
-            gas_used
-                .entry(worker.wallet.get_address())
-                .or_insert_with(|| GasUsage {
-                    total: Default::default(),
-                    entries: Default::default(),
-                    usage_per_hour: Default::default(),
-                })
-                .add_entry(Utc::now(), res.gas_used);
+            let funds = msg.funds;
+            if !funds.is_empty() {
+                let funds: Result<Vec<FundsCoin>> = funds
+                    .into_iter()
+                    .map(FundsCoin::try_from)
+                    .collect();
+                match funds {
+                    Ok(funds) => {
+                        let mut funds_used = app.funds_used.write().await;
+                        funds_used
+                            .entry(worker.wallet.get_address())
+                            .or_insert_with(|| FundUsed {
+                                total: Default::default(),
+                                entries: Default::default(),
+                                usage_per_hour: Default::default(),
+                            })
+                            .add_entry(Utc::now(), funds);
+                    }
+                    Err(e) => tracing::error!("Error converting coins to fundscoin: {e}"),
+                }
+            }
             Ok(format!(
                 "Prices updated in Pyth oracle contract with txhash {}",
                 res.txhash

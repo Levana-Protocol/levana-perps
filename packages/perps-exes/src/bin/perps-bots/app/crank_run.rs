@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use axum::async_trait;
-use chrono::Utc;
+
 use cosmos::proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
 use msg::contracts::market::spot_price::{
@@ -27,7 +27,6 @@ use perps_exes::prelude::MarketContract;
 use perps_exes::pyth::get_oracle_update_msg;
 use shared::storage::RawAddr;
 
-use crate::app::GasUsage;
 use crate::util::oracle::OffchainPriceData;
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
@@ -154,18 +153,7 @@ impl App {
             .await
             .with_context(|| format!("Unable to turn crank for market {market}"))
         {
-            Ok(txres) => {
-                let mut gas_used = self.gas_usage.write().await;
-                gas_used
-                    .entry(crank_wallet.get_address())
-                    .or_insert_with(|| GasUsage {
-                        total: Default::default(),
-                        entries: Default::default(),
-                        usage_per_hour: Default::default(),
-                    })
-                    .add_entry(Utc::now(), txres.gas_used);
-                RunResult::NormalRun(txres)
-            }
+            Ok(txres) => RunResult::NormalRun(txres),
             Err(e) => {
                 if self.is_osmosis_epoch() {
                     return Ok(WatchedTaskOutput::new(format!("Ignoring crank run error since we think we're in the Osmosis epoch, error: {e:?}")));
@@ -280,7 +268,7 @@ impl App {
             },
         )?;
 
-        let tx = builder
+        builder
             .sign_and_broadcast(&self.cosmos, crank_wallet)
             .await
             .with_context(|| {
@@ -288,19 +276,7 @@ impl App {
                     "Unable to update oracle and turn crank for market {} ({market})",
                     status.market_id
                 )
-            });
-        if let Ok(txres) = &tx {
-            let mut gas_used = self.gas_usage.write().await;
-            gas_used
-                .entry(crank_wallet.get_address())
-                .or_insert_with(|| GasUsage {
-                    total: Default::default(),
-                    entries: Default::default(),
-                    usage_per_hour: Default::default(),
-                })
-                .add_entry(Utc::now(), txres.gas_used);
-        }
-        tx
+            })
     }
 }
 

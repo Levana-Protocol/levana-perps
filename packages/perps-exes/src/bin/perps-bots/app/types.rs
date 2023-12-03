@@ -1,15 +1,18 @@
 use std::collections::{HashMap, VecDeque};
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
+use bigdecimal::BigDecimal;
 use chrono::DateTime;
 use chrono::Utc;
-use cosmos::Cosmos;
 use cosmos::Wallet;
 use cosmos::{Address, HasAddress};
+use cosmos::{Coin, Cosmos};
 use perps_exes::config::GasAmount;
 use reqwest::Client;
+use serde::Serialize;
 use tokio::sync::RwLock;
 
 use crate::app::factory::{get_factory_info_mainnet, get_factory_info_testnet};
@@ -63,25 +66,47 @@ pub(crate) struct GasEntry {
 #[derive(serde::Serialize)]
 pub(crate) struct GasSingleEntry {
     pub(crate) timestamp: DateTime<Utc>,
-    pub(crate) amount: i64,
+    pub(crate) amount: Vec<FundsCoin>,
+}
+
+#[derive(Serialize, Debug)]
+pub(crate) struct FundsCoin {
+    denom: String,
+    amount: BigDecimal,
+}
+
+impl TryFrom<Coin> for FundsCoin {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Coin) -> Result<Self> {
+        let amount = BigDecimal::from_str(&value.amount)?;
+        Ok(FundsCoin {
+            denom: value.denom,
+            amount,
+        })
+    }
 }
 
 #[derive(serde::Serialize)]
-pub(crate) struct GasUsage {
-    pub(crate) total: i64,
+pub(crate) struct FundUsed {
+    pub(crate) total: BigDecimal,
     pub(crate) entries: VecDeque<GasSingleEntry>,
-    pub(crate) usage_per_hour: i64,
+    pub(crate) usage_per_hour: BigDecimal,
 }
 
-impl GasUsage {
-    pub(crate) fn add_entry(&mut self, timestamp: DateTime<Utc>, amount: i64) {
+impl FundUsed {
+    pub(crate) fn add_entry(&mut self, timestamp: DateTime<Utc>, amount: Vec<FundsCoin>) {
         if let Err(e) = self.add_entry_inner(timestamp, amount) {
-            tracing::error!("Error adding gas record {timestamp}/{amount}: {e:?}");
+            tracing::error!("Error adding funds used during {timestamp} {e:?}");
         }
     }
 
-    fn add_entry_inner(&mut self, timestamp: DateTime<Utc>, amount: i64) -> Result<()> {
-        self.total += amount;
+    fn add_entry_inner(&mut self, timestamp: DateTime<Utc>, amount: Vec<FundsCoin>) -> Result<()> {
+        self.total += amount
+            .iter()
+            .map(|item| item.amount.clone())
+            .sum::<BigDecimal>()
+            ;
         self.entries.push_back(GasSingleEntry { timestamp, amount });
         if self.entries.len() > 1000 {
             self.entries.pop_front();
@@ -92,7 +117,14 @@ impl GasUsage {
             .entries
             .iter()
             .filter(|item| item.timestamp >= timestamp_before_hour);
-        self.usage_per_hour = entries_since_hour.map(|item| item.amount).sum();
+        self.usage_per_hour = entries_since_hour
+            .map(|item| {
+                item.amount
+                    .iter()
+                    .map(|item| item.amount.clone())
+                    .sum::<BigDecimal>()
+            })
+            .sum();
         Ok(())
     }
 }
@@ -105,7 +137,7 @@ pub(crate) struct App {
     pub(crate) client: Client,
     pub(crate) live_since: DateTime<Utc>,
     pub(crate) gas_refill: RwLock<HashMap<Address, GasRecords>>,
-    pub(crate) gas_usage: RwLock<HashMap<Address, GasUsage>>,
+    pub(crate) funds_used: RwLock<HashMap<Address, FundUsed>>,
     pub(crate) endpoint_stable: String,
     pub(crate) endpoint_edge: String,
     pub(crate) pyth_market_hours: PythMarketHours,
@@ -179,7 +211,7 @@ impl Opt {
             client,
             live_since: Utc::now(),
             gas_refill: RwLock::new(HashMap::new()),
-            gas_usage: RwLock::new(HashMap::new()),
+            funds_used: RwLock::new(HashMap::new()),
             frontend_info_testnet,
             endpoint_stable: self.pyth_endpoint_stable,
             endpoint_edge: self.pyth_endpoint_edge,
