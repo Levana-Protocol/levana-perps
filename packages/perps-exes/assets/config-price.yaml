@@ -32,6 +32,7 @@ pyth:
       AVAX_USD: 93da3352f9f1d105fdfe4971cfa80e9dd777bfc5d0f683ebb6e1294b92137bb7
       COIN_USD: fee33f2a978bf32dd6b662b65ba8083c6773b494f8401194ec1870c640860245
       PYTH_USD: 0bbf28e9a841a1cc788f6a361b17ca072d0ea3098a1e5df1c3922d06719579ff
+      NTRN_USD: a8e6517966a52cb1df864b2764f3629fde3f21d2b640b5c572fcd654cbccd65e
   edge: 
     update-age-tolerance: 120
     # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-edge
@@ -361,6 +362,13 @@ networks:
         !simple { contract: "osmo1556egspjm44k54mdqrwkatfrk6e4mzdeum3q32fp3d2lr95rh5cq0g2hcg", inverted: false, age_tolerance: 604800 },
         !pyth { key: "ETH_USD", inverted: false },
       ]
+    NTRN_USDC:
+      feeds: [
+        !pyth { key: "NTRN_USD", inverted: false },
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
 
   sei-testnet:
     ATOM_USD:
@@ -405,6 +413,13 @@ networks:
       ]
       feeds-usd: [
         !sei { denom: "ueth", inverted: false },
+      ]
+    NTRN_USDC:
+      feeds: [
+        !pyth { key: "NTRN_USD", inverted: false },
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
       ]
   osmosis-testnet:
     ATOM_USD:
