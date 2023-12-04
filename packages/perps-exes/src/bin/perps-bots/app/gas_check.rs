@@ -200,7 +200,11 @@ impl GasCheck {
                 // for the rest of the bot system.
                 let gas_to_request = (simres.gas_used * factor) / 10;
                 let result = builder
-                    .sign_and_broadcast_with_cosmos_gas(&self.app.cosmos, &gas_wallet, gas_to_request)
+                    .sign_and_broadcast_with_cosmos_gas(
+                        &self.app.cosmos,
+                        &gas_wallet,
+                        gas_to_request,
+                    )
                     .await;
 
                 if let Err(e) = &result {
