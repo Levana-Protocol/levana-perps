@@ -54,7 +54,9 @@ pub(crate) struct BotConfigMainnet {
 pub(crate) struct BotConfig {
     pub(crate) by_type: BotConfigByType,
     pub(crate) network: CosmosNetwork,
+    /// Wallet used to update Pyth oracle contract
     pub(crate) price_wallet: Option<Arc<Wallet>>,
+    /// Wallets that are used to perform cranking
     pub(crate) crank_wallets: Vec<Wallet>,
     pub(crate) watcher: WatcherConfig,
     pub(crate) gas_multiplier: Option<f64>,

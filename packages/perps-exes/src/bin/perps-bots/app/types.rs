@@ -22,10 +22,12 @@ use super::factory::{FactoryInfo, FrontendInfoTestnet};
 use super::gas_check::{GasCheckBuilder, GasCheckWallet};
 use super::price::pyth_market_hours::PythMarketHours;
 
-#[derive(Default, serde::Serialize)]
+#[derive(serde::Serialize)]
 pub(crate) struct GasRecords {
     pub(crate) total: GasAmount,
     pub(crate) entries: VecDeque<GasEntry>,
+    pub(crate) wallet_type: GasCheckWallet,
+    pub(crate) usage_per_hour: GasAmount,
 }
 
 impl GasRecords {
@@ -41,6 +43,13 @@ impl GasRecords {
         if self.entries.len() > 1000 {
             self.entries.pop_front();
         }
+        // Lets compute usage per hour
+        let timestamp_before_hour = Utc::now() - Duration::from_secs(1);
+        let entries_since_hour = self
+            .entries
+            .iter()
+            .filter(|item| item.timestamp >= timestamp_before_hour);
+        self.usage_per_hour = entries_since_hour.map(|item| item.amount).sum();
         Ok(())
     }
 }

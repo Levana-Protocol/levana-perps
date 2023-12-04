@@ -13,6 +13,7 @@ use cosmos::{
 };
 use cosmwasm_std::Decimal256;
 use perps_exes::config::{GasAmount, GasDecimals};
+use serde::Serialize;
 
 use super::{AppBuilder, GasRecords};
 
@@ -24,7 +25,7 @@ pub(crate) struct GasCheckBuilder {
 }
 
 /// Description of which wallet is being tracked
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
 pub(crate) enum GasCheckWallet {
     FaucetBot,
     FaucetContract,
@@ -149,7 +150,7 @@ impl GasCheck {
             }
 
             if *should_refill {
-                to_refill.push((*address, *min_gas));
+                to_refill.push((*address, *min_gas, *name));
                 balances.push(format!(
                     "Topping off gas in {name} ({address}). Found: {gas}. Wanted: {min_gas}."
                 ));
@@ -169,7 +170,7 @@ impl GasCheck {
             let denom = self.app.cosmos.get_cosmos_builder().gas_coin();
             let gas_wallet = self.gas_wallet.clone();
             {
-                for (address, amount) in &to_refill {
+                for (address, amount, _) in &to_refill {
                     builder.add_message(MsgSend {
                         from_address: gas_wallet.get_address_string(),
                         to_address: address.get_address_string(),
@@ -205,10 +206,15 @@ impl GasCheck {
                 Ok(tx) => {
                     tracing::info!("Filled up gas in {}", tx.txhash);
                     let mut gases = app.gases.write().await;
-                    for (address, amount) in to_refill {
+                    for (address, amount, name) in to_refill {
                         gases
                             .entry(address)
-                            .or_insert_with(GasRecords::default)
+                            .or_insert_with(|| GasRecords {
+                                total: Default::default(),
+                                entries: Default::default(),
+                                wallet_type: name,
+                                usage_per_hour: Default::default(),
+                            })
                             .add_entry(now, amount);
                     }
                 }

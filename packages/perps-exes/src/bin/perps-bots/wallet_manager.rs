@@ -14,6 +14,7 @@ use msg::{
     contracts::{cw20::Cw20Coin, market::entry::StatusResp},
     prelude::{Collateral, UnsignedDecimal},
 };
+use serde::Serialize;
 use tokio::sync::{mpsc, oneshot};
 
 #[derive(Clone)]
@@ -21,7 +22,7 @@ pub(crate) struct WalletManager {
     inner: Arc<Inner>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Serialize)]
 pub(crate) enum ManagedWallet {
     Balance,
     Liquidity,
