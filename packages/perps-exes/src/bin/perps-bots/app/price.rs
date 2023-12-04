@@ -22,14 +22,13 @@ use tokio::task::JoinSet;
 use crate::{
     util::{
         markets::Market,
+        misc::track_tx_fees,
         oracle::{get_latest_price, OffchainPriceData},
     },
     watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
 };
 
-use super::{
-    crank_run::TriggerCrank, gas_check::GasCheckWallet, App, AppBuilder, FundUsed, FundsCoin,
-};
+use super::{crank_run::TriggerCrank, gas_check::GasCheckWallet, App, AppBuilder};
 
 struct Worker {
     wallet: Arc<Wallet>,
@@ -367,27 +366,7 @@ async fn update_oracles(
         .await
     {
         Ok(res) => {
-            let auth_info = res.tx.auth_info;
-            if let Some(auth_info) = auth_info {
-                if let Some(fee) = auth_info.fee {
-                    let funds: Result<Vec<FundsCoin>> =
-                        fee.amount.into_iter().map(FundsCoin::try_from).collect();
-                    match funds {
-                        Ok(funds) => {
-                            let mut funds_used = app.funds_used.write().await;
-                            funds_used
-                                .entry(worker.wallet.get_address())
-                                .or_insert_with(|| FundUsed {
-                                    total: Default::default(),
-                                    entries: Default::default(),
-                                    usage_per_hour: Default::default(),
-                                })
-                                .add_entry(Utc::now(), funds);
-                        }
-                        Err(e) => tracing::error!("Error converting coins to fundscoin: {e}"),
-                    }
-                }
-            }
+            track_tx_fees(app, worker.wallet.get_address(), &res).await;
             Ok(format!(
                 "Prices updated in Pyth oracle contract with txhash {}",
                 res.response.txhash
