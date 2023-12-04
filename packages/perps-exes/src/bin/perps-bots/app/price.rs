@@ -22,6 +22,7 @@ use tokio::task::JoinSet;
 use crate::{
     util::{
         markets::Market,
+        misc::track_tx_fees,
         oracle::{get_latest_price, OffchainPriceData},
     },
     watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
@@ -360,14 +361,17 @@ async fn update_oracles(
     // an error.
 
     match TxBuilder::default()
-        .add_message(msg)
-        .sign_and_broadcast(&app.cosmos, &worker.wallet)
+        .add_message(msg.clone())
+        .sign_and_broadcast_cosmos_tx(&app.cosmos, &worker.wallet)
         .await
     {
-        Ok(res) => Ok(format!(
-            "Prices updated in Pyth oracle contract with txhash {}",
-            res.txhash
-        )),
+        Ok(res) => {
+            track_tx_fees(app, worker.wallet.get_address(), &res).await;
+            Ok(format!(
+                "Prices updated in Pyth oracle contract with txhash {}",
+                res.response.txhash
+            ))
+        }
         Err(e) => {
             if app.is_osmosis_epoch() {
                 Ok(format!("Unable to update Pyth oracle, but assuming it's because we're in the epoch: {e:?}"))

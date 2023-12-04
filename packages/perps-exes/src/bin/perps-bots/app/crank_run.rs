@@ -16,6 +16,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use axum::async_trait;
+
 use cosmos::proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
 use msg::contracts::market::spot_price::{
@@ -26,6 +27,7 @@ use perps_exes::prelude::MarketContract;
 use perps_exes::pyth::get_oracle_update_msg;
 use shared::storage::RawAddr;
 
+use crate::util::misc::track_tx_fees;
 use crate::util::oracle::OffchainPriceData;
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
@@ -148,11 +150,14 @@ impl App {
         }
 
         let run_result = match builder
-            .sign_and_broadcast(&self.cosmos, crank_wallet)
+            .sign_and_broadcast_cosmos_tx(&self.cosmos, crank_wallet)
             .await
             .with_context(|| format!("Unable to turn crank for market {market}"))
         {
-            Ok(txres) => RunResult::NormalRun(txres),
+            Ok(txres) => {
+                track_tx_fees(self, crank_wallet.get_address(), &txres).await;
+                RunResult::NormalRun(txres.response)
+            }
             Err(e) => {
                 if self.is_osmosis_epoch() {
                     return Ok(WatchedTaskOutput::new(format!("Ignoring crank run error since we think we're in the Osmosis epoch, error: {e:?}")));
@@ -267,15 +272,19 @@ impl App {
             },
         )?;
 
-        builder
-            .sign_and_broadcast(&self.cosmos, crank_wallet)
+        let result = builder
+            .sign_and_broadcast_cosmos_tx(&self.cosmos, crank_wallet)
             .await
             .with_context(|| {
                 format!(
                     "Unable to update oracle and turn crank for market {} ({market})",
                     status.market_id
                 )
-            })
+            });
+        if let Ok(cosmos_tx) = &result {
+            track_tx_fees(self, crank_wallet.get_address(), cosmos_tx).await;
+        }
+        result.map(|item| item.response)
     }
 }
 
