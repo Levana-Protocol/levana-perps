@@ -363,32 +363,34 @@ async fn update_oracles(
 
     match TxBuilder::default()
         .add_message(msg.clone())
-        .sign_and_broadcast(&app.cosmos, &worker.wallet)
+        .sign_and_broadcast_cosmos_tx(&app.cosmos, &worker.wallet)
         .await
     {
         Ok(res) => {
-            let funds = msg.funds;
-            if !funds.is_empty() {
-                let funds: Result<Vec<FundsCoin>> =
-                    funds.into_iter().map(FundsCoin::try_from).collect();
-                match funds {
-                    Ok(funds) => {
-                        let mut funds_used = app.funds_used.write().await;
-                        funds_used
-                            .entry(worker.wallet.get_address())
-                            .or_insert_with(|| FundUsed {
-                                total: Default::default(),
-                                entries: Default::default(),
-                                usage_per_hour: Default::default(),
-                            })
-                            .add_entry(Utc::now(), funds);
+            let auth_info = res.tx.auth_info;
+            if let Some(auth_info) = auth_info {
+                if let Some(fee) = auth_info.fee {
+                    let funds: Result<Vec<FundsCoin>> =
+                        fee.amount.into_iter().map(FundsCoin::try_from).collect();
+                    match funds {
+                        Ok(funds) => {
+                            let mut funds_used = app.funds_used.write().await;
+                            funds_used
+                                .entry(worker.wallet.get_address())
+                                .or_insert_with(|| FundUsed {
+                                    total: Default::default(),
+                                    entries: Default::default(),
+                                    usage_per_hour: Default::default(),
+                                })
+                                .add_entry(Utc::now(), funds);
+                        }
+                        Err(e) => tracing::error!("Error converting coins to fundscoin: {e}"),
                     }
-                    Err(e) => tracing::error!("Error converting coins to fundscoin: {e}"),
                 }
             }
             Ok(format!(
                 "Prices updated in Pyth oracle contract with txhash {}",
-                res.txhash
+                res.response.txhash
             ))
         }
         Err(e) => {
