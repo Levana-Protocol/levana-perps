@@ -200,7 +200,7 @@ impl GasCheck {
                 // for the rest of the bot system.
                 let gas_to_request = (simres.gas_used * factor) / 10;
                 let result = builder
-                    .sign_and_broadcast_with_gas(&self.app.cosmos, &gas_wallet, gas_to_request)
+                    .sign_and_broadcast_with_cosmos_gas(&self.app.cosmos, &gas_wallet, gas_to_request)
                     .await;
 
                 if let Err(e) = &result {
@@ -228,7 +228,7 @@ impl GasCheck {
                     errors.push(format!("{e:?}"))
                 }
                 Ok(tx) => {
-                    tracing::info!("Filled up gas in {}", tx.txhash);
+                    tracing::info!("Filled up gas in {}", tx.response.txhash);
                     let mut gases = app.gas_refill.write().await;
                     for (address, amount, name) in to_refill {
                         gases
