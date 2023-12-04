@@ -9,7 +9,8 @@ use anyhow::{Context, Result};
 use axum::async_trait;
 use chrono::Utc;
 use cosmos::{
-    proto::cosmos::bank::v1beta1::MsgSend, Address, Coin, Cosmos, HasAddress, TxBuilder, Wallet,
+    error::CosmosSdkError, proto::cosmos::bank::v1beta1::MsgSend, Address, Coin, Cosmos,
+    HasAddress, TxBuilder, Wallet,
 };
 use cosmwasm_std::Decimal256;
 use perps_exes::config::{GasAmount, GasDecimals};
@@ -182,33 +183,52 @@ impl GasCheck {
                 }
             }
 
-            let res = async {
-                let simres = builder
-                    .simulate(&self.app.cosmos, &[gas_wallet.get_address()])
-                    .await?;
+            let simres = builder
+                .simulate(&self.app.cosmos, &[gas_wallet.get_address()])
+                .await?;
 
+            const ALLOWED_ATTEMPTS: i32 = 4;
+            let mut factor = 16;
+
+            let mut attempt_no = 0;
+
+            let result = loop {
+                attempt_no += 1;
                 // There's a bug in Cosmos where simulating gas for transfering
                 // funds is always underestimated. We override the gas
                 // multiplier here in particular to avoid bumping the gas costs
                 // for the rest of the bot system.
-                let gas_to_request = simres.gas_used * 16 / 10;
-                builder
-                    .sign_and_broadcast_with_cosmos_gas(
-                        &self.app.cosmos,
-                        &gas_wallet,
-                        gas_to_request,
-                    )
-                    .await
-            }
-            .await;
+                let gas_to_request = (simres.gas_used * factor) / 10;
+                let result = builder
+                    .sign_and_broadcast_with_gas(&self.app.cosmos, &gas_wallet, gas_to_request)
+                    .await;
 
-            match res {
+                if let Err(e) = &result {
+                    match e {
+                        cosmos::Error::TransactionFailed { code, .. } => {
+                            if code == &CosmosSdkError::OutOfGas {
+                                factor += 1;
+                            } else {
+                                break result;
+                            }
+                        }
+                        _ => break result,
+                    }
+                } else {
+                    break result;
+                }
+                if attempt_no > ALLOWED_ATTEMPTS {
+                    break result;
+                }
+            };
+
+            match result {
                 Err(e) => {
                     tracing::error!("Error filling up gas: {e:?}");
                     errors.push(format!("{e:?}"))
                 }
                 Ok(tx) => {
-                    tracing::info!("Filled up gas in {}", tx.response.txhash);
+                    tracing::info!("Filled up gas in {}", tx.txhash);
                     let mut gases = app.gas_refill.write().await;
                     for (address, amount, name) in to_refill {
                         gases
