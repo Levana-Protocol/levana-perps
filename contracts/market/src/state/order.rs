@@ -47,7 +47,6 @@ impl State<'_> {
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
     ) -> Result<()> {
-        self.ensure_not_stale(ctx.storage)?;
         self.ensure_not_congested(ctx.storage, CongestionReason::PlaceLimit)?;
 
         let last_order_id = LAST_ORDER_ID
