@@ -661,10 +661,7 @@ pub fn requires_spot_price_append(msg: &ExecuteMsg) -> bool {
         ExecuteMsg::UpdatePositionRemoveCollateralImpactSize { .. } => true,
         ExecuteMsg::DepositLiquidity { .. } => true,
         ExecuteMsg::WithdrawLiquidity { .. } => true,
-        ExecuteMsg::ReinvestYield { .. } => true,
         ExecuteMsg::Crank { .. } => true,
-        ExecuteMsg::PlaceLimitOrder { .. } => true,
-        ExecuteMsg::SetTriggerOrder { .. } => true,
         // These do not require a spot_price_append
         ExecuteMsg::CancelLimitOrder { .. } => false,
         ExecuteMsg::ClaimYield { .. } => false,
@@ -678,6 +675,9 @@ pub fn requires_spot_price_append(msg: &ExecuteMsg) -> bool {
         ExecuteMsg::StopUnstakingXlp { .. } => false,
         ExecuteMsg::TransferDaoFees { .. } => false,
         ExecuteMsg::UnstakeXlp { .. } => false,
+        ExecuteMsg::ReinvestYield { .. } => false,
+        ExecuteMsg::PlaceLimitOrder { .. } => false,
+        ExecuteMsg::SetTriggerOrder { .. } => false,
         // Does do a spot_price_append, but it's handled internally after the price is set
         ExecuteMsg::SetManualPrice { .. } => false,
     }

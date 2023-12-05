@@ -685,7 +685,7 @@ fn lagging_crank_perp_1350_short() {
 }
 
 #[test]
-fn cannot_place_when_stale() {
+fn can_place_when_stale() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
 
@@ -707,7 +707,7 @@ fn cannot_place_when_stale() {
     // now jump a staleness (the crank of limit order won't be enough to get out of it, since it will process the previous work)
     market.set_time(TimeJump::Staleness(1)).unwrap();
     assert!(market.query_status().unwrap().is_stale());
-    let err = market
+    market
         .exec_place_limit_order(
             &trader,
             // So much collateral that we can't open it because of insufficient liquidity
@@ -719,10 +719,7 @@ fn cannot_place_when_stale() {
             None,
             None,
         )
-        .unwrap_err()
-        .downcast::<PerpError>()
         .unwrap();
-    assert_eq!(err.id, ErrorId::Stale);
 }
 
 #[test]
