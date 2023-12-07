@@ -66,13 +66,13 @@ pub(crate) struct GasEntry {
 #[derive(serde::Serialize)]
 pub(crate) struct GasSingleEntry {
     pub(crate) timestamp: DateTime<Utc>,
-    pub(crate) amount: Vec<FundsCoin>,
+    pub(crate) amount: BigDecimal,
 }
 
 #[derive(Serialize, Debug)]
 pub(crate) struct FundsCoin {
     denom: String,
-    amount: BigDecimal,
+    pub(crate) amount: BigDecimal,
 }
 
 impl TryFrom<Coin> for FundsCoin {
@@ -95,34 +95,23 @@ pub(crate) struct FundUsed {
 }
 
 impl FundUsed {
-    pub(crate) fn add_entry(&mut self, timestamp: DateTime<Utc>, amount: Vec<FundsCoin>) {
+    pub(crate) fn add_entry(&mut self, timestamp: DateTime<Utc>, amount: BigDecimal) {
         if let Err(e) = self.add_entry_inner(timestamp, amount) {
             tracing::error!("Error adding funds used during {timestamp} {e:?}");
         }
     }
 
-    fn add_entry_inner(&mut self, timestamp: DateTime<Utc>, amount: Vec<FundsCoin>) -> Result<()> {
-        self.total += amount
-            .iter()
-            .map(|item| item.amount.clone())
-            .sum::<BigDecimal>();
+    fn add_entry_inner(&mut self, timestamp: DateTime<Utc>, amount: BigDecimal) -> Result<()> {
         self.entries.push_back(GasSingleEntry { timestamp, amount });
         if self.entries.len() > 1000 {
             self.entries.pop_front();
         }
-        // Lets compute usage per hour
-        let timestamp_before_hour = Utc::now() - Duration::from_secs(1);
-        let entries_since_hour = self
+        let timestamp_before_hour = Utc::now() - Duration::from_secs(60 * 60);
+        self.usage_per_hour = self
             .entries
             .iter()
-            .filter(|item| item.timestamp >= timestamp_before_hour);
-        self.usage_per_hour = entries_since_hour
-            .map(|item| {
-                item.amount
-                    .iter()
-                    .map(|item| item.amount.clone())
-                    .sum::<BigDecimal>()
-            })
+            .filter(|item| item.timestamp >= timestamp_before_hour)
+            .map(|item| &item.amount)
             .sum();
         Ok(())
     }
