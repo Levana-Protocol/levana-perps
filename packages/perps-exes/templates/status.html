@@ -41,6 +41,17 @@
         pre {
             white-space: pre-wrap;
         }
+
+	.node-health {
+	    border: 1px solid #ddd;
+	    border-radius: 5px;
+	    padding: 10px;
+	    margin-bottom: 10px;
+	}
+
+	.node-health p:last-child {
+	    margin-bottom: 0;
+	}
     </style>
   </head>
   <body>
@@ -79,7 +90,11 @@
             </tbody>
         </table>
 
-        <pre>{{ node_health }}</pre>
+	<div class="node-health">
+	  {% for node in node_health %}
+	    <p>{{ node.description }}</p>
+	  {% endfor %}
+	</div>
 
         {% for status in statuses %}
           <div class="panel panel-default">
