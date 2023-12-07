@@ -19,13 +19,13 @@ pub(super) struct MigrateOpts {
     #[clap(long)]
     factory: String,
     #[clap(long)]
-    market_code_id: u64,
+    market_code_id: Option<u64>,
     #[clap(long)]
-    factory_code_id: u64,
+    factory_code_id: Option<u64>,
     #[clap(long)]
-    liquidity_token_code_id: u64,
+    liquidity_token_code_id: Option<u64>,
     #[clap(long)]
-    position_token_code_id: u64,
+    position_token_code_id: Option<u64>,
 }
 
 impl MigrateOpts {
@@ -63,32 +63,38 @@ async fn go(
     } = factory.query_code_ids().await?;
 
     let mut factory_msgs = vec![];
-    if current_market_code_id.get_code_id() != market_code_id {
-        factory_msgs.push(CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
-            contract_addr: factory.get_address_string(),
-            msg: to_binary(&FactoryExecuteMsg::SetMarketCodeId {
-                code_id: market_code_id.to_string(),
-            })?,
-            funds: vec![],
-        }));
+    if let Some(market_code_id) = market_code_id {
+        if current_market_code_id.get_code_id() != market_code_id {
+            factory_msgs.push(CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
+                contract_addr: factory.get_address_string(),
+                msg: to_binary(&FactoryExecuteMsg::SetMarketCodeId {
+                    code_id: market_code_id.to_string(),
+                })?,
+                funds: vec![],
+            }));
+        }
     }
-    if current_liquidity_token_code_id.get_code_id() != liquidity_token_code_id {
-        factory_msgs.push(CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
-            contract_addr: factory.get_address_string(),
-            msg: to_binary(&FactoryExecuteMsg::SetLiquidityTokenCodeId {
-                code_id: liquidity_token_code_id.to_string(),
-            })?,
-            funds: vec![],
-        }));
+    if let Some(liquidity_token_code_id) = liquidity_token_code_id {
+        if current_liquidity_token_code_id.get_code_id() != liquidity_token_code_id {
+            factory_msgs.push(CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
+                contract_addr: factory.get_address_string(),
+                msg: to_binary(&FactoryExecuteMsg::SetLiquidityTokenCodeId {
+                    code_id: liquidity_token_code_id.to_string(),
+                })?,
+                funds: vec![],
+            }));
+        }
     }
-    if current_position_token_code_id.get_code_id() != position_token_code_id {
-        factory_msgs.push(CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
-            contract_addr: factory.get_address_string(),
-            msg: to_binary(&FactoryExecuteMsg::SetPositionTokenCodeId {
-                code_id: position_token_code_id.to_string(),
-            })?,
-            funds: vec![],
-        }));
+    if let Some(position_token_code_id) = position_token_code_id {
+        if current_position_token_code_id.get_code_id() != position_token_code_id {
+            factory_msgs.push(CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
+                contract_addr: factory.get_address_string(),
+                msg: to_binary(&FactoryExecuteMsg::SetPositionTokenCodeId {
+                    code_id: position_token_code_id.to_string(),
+                })?,
+                funds: vec![],
+            }));
+        }
     }
 
     let mut builder = TxBuilder::default();
@@ -108,12 +114,14 @@ async fn go(
     let mut msgs = Vec::<CosmosMsg<Empty>>::new();
     let migration_admin = factory.query_migration_admin().await?;
 
-    if current_factory_code_id != factory_code_id {
-        msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
-            contract_addr: factory.get_address_string(),
-            new_code_id: factory_code_id,
-            msg: to_binary(&msg::contracts::factory::entry::MigrateMsg {})?,
-        }));
+    if let Some(factory_code_id) = factory_code_id {
+        if current_factory_code_id != factory_code_id {
+            msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
+                contract_addr: factory.get_address_string(),
+                new_code_id: factory_code_id,
+                msg: to_binary(&msg::contracts::factory::entry::MigrateMsg {})?,
+            }));
+        }
     }
 
     for market in factory.get_markets().await? {
@@ -124,38 +132,44 @@ async fn go(
         let market = market.market;
         let info = market.info().await?;
         anyhow::ensure!(info.admin == migration_admin.get_address_string(), "Invalid migration admin set up. Factory says: {migration_admin}. But market contract {market} has {}.", info.admin);
-        if info.code_id != market_code_id {
-            msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
-                contract_addr: market.get_address_string(),
-                new_code_id: market_code_id,
-                msg: to_binary(&msg::contracts::market::entry::MigrateMsg {})?,
-            }));
+        if let Some(market_code_id) = market_code_id {
+            if info.code_id != market_code_id {
+                msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
+                    contract_addr: market.get_address_string(),
+                    new_code_id: market_code_id,
+                    msg: to_binary(&msg::contracts::market::entry::MigrateMsg {})?,
+                }));
+            }
         }
 
-        let info = lp.info().await?;
-        if info.code_id != liquidity_token_code_id {
-            msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
-                contract_addr: lp.get_address_string(),
-                new_code_id: liquidity_token_code_id,
-                msg: to_binary(&msg::contracts::liquidity_token::entry::MigrateMsg {})?,
-            }));
-        }
-        let info = xlp.info().await?;
-        if info.code_id != liquidity_token_code_id {
-            msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
-                contract_addr: xlp.get_address_string(),
-                new_code_id: liquidity_token_code_id,
-                msg: to_binary(&msg::contracts::liquidity_token::entry::MigrateMsg {})?,
-            }));
+        if let Some(liquidity_token_code_id) = liquidity_token_code_id {
+            let info = lp.info().await?;
+            if info.code_id != liquidity_token_code_id {
+                msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
+                    contract_addr: lp.get_address_string(),
+                    new_code_id: liquidity_token_code_id,
+                    msg: to_binary(&msg::contracts::liquidity_token::entry::MigrateMsg {})?,
+                }));
+            }
+            let info = xlp.info().await?;
+            if info.code_id != liquidity_token_code_id {
+                msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
+                    contract_addr: xlp.get_address_string(),
+                    new_code_id: liquidity_token_code_id,
+                    msg: to_binary(&msg::contracts::liquidity_token::entry::MigrateMsg {})?,
+                }));
+            }
         }
 
         let info = pos.info().await?;
-        if info.code_id != position_token_code_id {
-            msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
-                contract_addr: pos.get_address_string(),
-                new_code_id: position_token_code_id,
-                msg: to_binary(&msg::contracts::position_token::entry::MigrateMsg {})?,
-            }));
+        if let Some(position_token_code_id) = position_token_code_id {
+            if info.code_id != position_token_code_id {
+                msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
+                    contract_addr: pos.get_address_string(),
+                    new_code_id: position_token_code_id,
+                    msg: to_binary(&msg::contracts::position_token::entry::MigrateMsg {})?,
+                }));
+            }
         }
     }
 
