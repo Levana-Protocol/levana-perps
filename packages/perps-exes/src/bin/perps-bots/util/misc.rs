@@ -13,7 +13,10 @@ pub(crate) async fn track_tx_fees(app: &App, addr: Address, response: &CosmosTxR
                 fee.amount.into_iter().map(FundsCoin::try_from).collect();
             match funds {
                 Ok(funds) => {
-		    let funds = funds.iter().map(|item| item.amount.clone()).sum::<BigDecimal>();
+                    let funds = funds
+                        .iter()
+                        .map(|item| item.amount.clone())
+                        .sum::<BigDecimal>();
                     let mut funds_used = app.funds_used.write().await;
                     funds_used
                         .entry(addr)
