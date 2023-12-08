@@ -13,7 +13,6 @@ use perps_exes::build_version;
 use perps_exes::config::{TaskConfig, WatcherConfig};
 use rand::Rng;
 
-use serde::Serialize;
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
@@ -1094,13 +1093,7 @@ struct StatusTemplate<'a> {
     live_since: DateTime<Utc>,
     now: DateTime<Utc>,
     alert: bool,
-    node_health: Vec<NodeDescription>,
-}
-
-#[derive(Serialize)]
-struct NodeDescription {
-    node_url: String,
-    description: String,
+    node_health: Vec<String>,
 }
 
 impl TaskStatuses {
@@ -1133,10 +1126,7 @@ impl TaskStatuses {
                 .node_health_report()
                 .nodes
                 .into_iter()
-                .map(|item| NodeDescription {
-                    description: item.to_string(),
-                    node_url: item.grpc_url.to_string(),
-                })
+                .map(|item| item.to_string())
                 .collect(),
         }
     }
