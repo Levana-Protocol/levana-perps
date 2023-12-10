@@ -150,7 +150,7 @@ markets:
       target_utilization: "0.5"
       funding_rate_sensitivity: 1
       carry_leverage: 15
-      borrow_fee_rate_min_annualized: 0.015
+      borrow_fee_rate_min_annualized: 0.03
       liquidity_cooldown_seconds: 23400
 
     initial-borrow-fee-rate: 0.05
