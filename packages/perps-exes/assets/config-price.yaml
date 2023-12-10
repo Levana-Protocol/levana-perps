@@ -244,6 +244,13 @@ networks:
       feeds-usd: [
         !constant { price: "1", inverted: false }
       ]
+    INJ_USDC:
+      feeds: [
+        !pyth { key: "INJ_USD", inverted: false}
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
     EUR_USDC:
       feeds: [
         !pyth { key: "EUR_USD", inverted: false }
@@ -618,6 +625,13 @@ networks:
     COIN_USDC:
       feeds: [
         !pyth { key: "COIN_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    INJ_USDC:
+      feeds: [
+        !pyth { key: "INJ_USD", inverted: false}
       ]
       feeds-usd: [
         !constant { price: "1", inverted: false }
