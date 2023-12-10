@@ -629,3 +629,10 @@ networks:
       feeds-usd: [
         !constant { price: "1", inverted: false }
       ]
+    INJ_USDC:
+      feeds: [
+        !pyth { key: "INJ_USD", inverted: false}
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
