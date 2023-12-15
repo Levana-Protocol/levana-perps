@@ -964,13 +964,13 @@ impl ShortStatus {
 
     fn css_class(self) -> &'static str {
         match self {
-            ShortStatus::Error => "error",
-            ShortStatus::OutOfDateError => "error",
-            ShortStatus::OutOfDate => "out-of-date",
-            ShortStatus::ErrorNoAlert => "error-no-alert",
-            ShortStatus::OutOfDateNoAlert => "out-of-date-no-alert",
-            ShortStatus::Success => "success",
-            ShortStatus::NotYetRun => "not-yet-run",
+            ShortStatus::Error => "link-danger",
+            ShortStatus::OutOfDateError => "link-danger",
+            ShortStatus::OutOfDate => "text-red-400",
+            ShortStatus::ErrorNoAlert => "text-red-400",
+            ShortStatus::OutOfDateNoAlert => "text-red-300",
+            ShortStatus::Success => "link-success",
+            ShortStatus::NotYetRun => "link-primary",
         }
     }
 }
