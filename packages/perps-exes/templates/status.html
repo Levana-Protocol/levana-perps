@@ -97,11 +97,11 @@
           <p class="text-secondary">Currently running, started at {{ started }}</p>
           {% endif %}
 
-          <pre class="user-select-all">{{ status.status.last_result.value.as_ref().as_str() }}</pre>
+          <pre class="user-select-auto">{{ status.status.last_result.value.as_ref().as_str() }}</pre>
 
           {% if let Some(retrying) = status.status.last_retry_error.as_ref() %}
           <p class="text-secondary">Currently retrying, last error message <i>{{ retrying.since() }}</i></p>
-          <pre class="user-select-all">{{ retrying.value }}</pre>
+          <pre class="user-select-auto">{{ retrying.value }}</pre>
           {% endif %}
 	</div>
 	{% endfor %}
