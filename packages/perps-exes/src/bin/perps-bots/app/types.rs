@@ -288,5 +288,5 @@ impl App {
 pub(crate) enum CrankTriggerReason {
     MoreWorkFound,
     MessageWaiting,
-    NeedsOracleUpdate(PriceUpdateReason),
+    NeedsOracleUpdate(Box<PriceUpdateReason>),
 }

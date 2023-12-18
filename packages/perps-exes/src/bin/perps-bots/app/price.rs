@@ -133,7 +133,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                         markets_to_update.push((
                             market.market.get_address(),
                             market.market_id.clone(),
-                            CrankTriggerReason::NeedsOracleUpdate(reason),
+                            CrankTriggerReason::NeedsOracleUpdate(Box::new(reason)),
                         ));
                         s
                     }
