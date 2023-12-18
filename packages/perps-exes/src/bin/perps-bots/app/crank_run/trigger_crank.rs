@@ -137,9 +137,13 @@ impl From<CrankTriggerReason> for String {
         match reason {
             CrankTriggerReason::MoreWorkFound => "More work found".to_owned(),
             CrankTriggerReason::MessageWaiting => "Message waiting".to_owned(),
-            CrankTriggerReason::NeedsOracleUpdate(price_reason) => {
-                format!("Oracle update: {price_reason}")
+            CrankTriggerReason::PriceUpdateTooOld(duration) => {
+                format!("Last price update was too old (age: {duration})")
             }
+            CrankTriggerReason::PriceUpdateWillTrigger => {
+                "Price update will hit price triggers".to_owned()
+            }
+            CrankTriggerReason::NoPriceFound => "No price found in contract".to_owned(),
         }
     }
 }

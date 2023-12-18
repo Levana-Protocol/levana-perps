@@ -20,7 +20,6 @@ use shared::storage::MarketId;
 use tokio::task::JoinSet;
 
 use crate::{
-    app::CrankTriggerReason,
     util::{
         markets::Market,
         misc::track_tx_fees,
@@ -29,7 +28,9 @@ use crate::{
     watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
 };
 
-use super::{crank_run::TriggerCrank, gas_check::GasCheckWallet, App, AppBuilder};
+use super::{
+    crank_run::TriggerCrank, gas_check::GasCheckWallet, App, AppBuilder, CrankTriggerReason,
+};
 
 struct Worker {
     wallet: Arc<Wallet>,
@@ -130,11 +131,13 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                             any_needs_oracle_update = NeedsOracleUpdate::Yes;
                         }
                         let s = format!("{}: Needs price update: {reason}", market.market_id);
-                        markets_to_update.push((
-                            market.market.get_address(),
-                            market.market_id.clone(),
-                            CrankTriggerReason::NeedsOracleUpdate(Box::new(reason)),
-                        ));
+                        if let Some(reason) = reason.to_crank_reason() {
+                            markets_to_update.push((
+                                market.market.get_address(),
+                                market.market_id.clone(),
+                                reason,
+                            ));
+                        }
                         s
                     }
                 } else {
@@ -531,7 +534,7 @@ impl App {
     }
 }
 
-pub(crate) enum PriceUpdateReason {
+enum PriceUpdateReason {
     LastUpdateTooOld(Duration),
     PriceDelta {
         old: PriceBaseInQuote,
@@ -552,6 +555,17 @@ impl PriceUpdateReason {
             } => *is_too_frequent,
             PriceUpdateReason::Triggers => false,
             PriceUpdateReason::NoPriceFound => false,
+        }
+    }
+
+    pub(crate) fn to_crank_reason(&self) -> Option<CrankTriggerReason> {
+        match self {
+            PriceUpdateReason::LastUpdateTooOld(duration) => {
+                Some(CrankTriggerReason::PriceUpdateTooOld(*duration))
+            }
+            PriceUpdateReason::PriceDelta { .. } => None,
+            PriceUpdateReason::Triggers => Some(CrankTriggerReason::PriceUpdateWillTrigger),
+            PriceUpdateReason::NoPriceFound => Some(CrankTriggerReason::NoPriceFound),
         }
     }
 }
