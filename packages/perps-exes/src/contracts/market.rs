@@ -20,7 +20,7 @@ use msg::{
     },
     prelude::*,
 };
-use shared::namespace::LAST_POSITION_ID;
+use shared::namespace::{CLOSE_ALL_POSITIONS, LAST_POSITION_ID};
 
 use crate::{PositionsInfo, UpdatePositionCollateralImpact};
 
@@ -630,5 +630,12 @@ impl MarketContract {
 
     pub async fn get_oracle_price(&self) -> Result<OraclePriceResp, cosmos::Error> {
         self.0.query(MarketQueryMsg::OraclePrice {}).await
+    }
+
+    pub async fn is_wound_down(&self) -> Result<bool, cosmos::Error> {
+        self.0
+            .query_raw(CLOSE_ALL_POSITIONS)
+            .await
+            .map(|v| !v.is_empty())
     }
 }
