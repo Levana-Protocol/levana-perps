@@ -4,7 +4,10 @@ use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, HasAddress, Wallet};
 use cosmwasm_std::Fraction;
-use perps_exes::{config::LiquidityConfig, prelude::*};
+use perps_exes::{
+    config::{LiquidityBounds, LiquidityConfig},
+    prelude::*,
+};
 
 use crate::{
     config::BotConfigTestnet,
@@ -67,7 +70,11 @@ async fn single_market(
         .liquidity_config
         .markets
         .get(market_id)
-        .with_context(|| format!("No bounds available for market {market_id}"))?;
+        .copied()
+        .unwrap_or_else(|| LiquidityBounds {
+            min: "1000000".parse().unwrap(),
+            max: "100000000".parse().unwrap(),
+        });
     let min_liquidity = bounds.min;
     let max_liquidity = bounds.max;
     let util = if total.is_zero() {
