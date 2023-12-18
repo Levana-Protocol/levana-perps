@@ -200,6 +200,12 @@ impl App {
 
         // Successfully cranked, check if there's more work and, if so, schedule it to be started again
         std::mem::drop(crank_guard);
+
+        // Experiment: sleep for 2 seconds to get more accurate "more work" information. Just a theory that we're getting misleading answers by querying too fast on Injective.
+        //
+        // If this turns out to be correct, we could try something like checking the revents returned from the crank above and seeing if the actual work performed matches the requested amount of work (in the wasm-crank-batch-exec event).
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
         let more_work = match MarketContract::new(self.cosmos.make_contract(market))
             .status()
             .await
