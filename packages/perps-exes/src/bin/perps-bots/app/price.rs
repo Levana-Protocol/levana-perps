@@ -409,8 +409,8 @@ impl App {
         last_successful_price_publish_time: Option<DateTime<Utc>>,
     ) -> Result<NeedPriceUpdateInner> {
         let market_contract = &market.market;
-        let market_price: PricePoint = match market_contract.current_price().await {
-            Ok(price) => price,
+        let market_price: PricePoint = match market_contract.get_oracle_price().await {
+            Ok(price) => price.composed_price,
             Err(e) => {
                 let msg = format!("{e}");
                 return if msg.contains("price_not_found") {
