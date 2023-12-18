@@ -24,6 +24,8 @@ use cosmos::Address;
 use parking_lot::Mutex;
 use shared::storage::MarketId;
 
+use crate::app::CrankTriggerReason;
+
 /// The sending side only, for price and crank watch bots to trigger a run.
 #[derive(Clone)]
 pub(crate) struct TriggerCrank {
@@ -36,7 +38,7 @@ pub(crate) struct TriggerCrank {
 #[derive(Default)]
 struct Queue {
     /// FIFO queue of the markets to crank
-    fifo: VecDeque<(Address, MarketId)>,
+    fifo: VecDeque<(Address, MarketId, CrankTriggerReason)>,
     /// HashSet matching everything in fifo for efficient checking
     set: HashSet<Address>,
     /// The number of active crank guards, used for sanity checking only
@@ -49,6 +51,7 @@ enum PopResult {
         address: Address,
         market_id: MarketId,
         more_work_exists: bool,
+        reason: CrankTriggerReason,
     },
 }
 
@@ -73,25 +76,26 @@ impl Queue {
         assert_eq!(self.fifo.len() + self.crank_guards, self.set.len());
         match self.fifo.pop_front() {
             None => PopResult::QueueIsEmpty,
-            Some((address, market_id)) => {
+            Some((address, market_id, reason)) => {
                 assert!(self.set.contains(&address));
                 self.crank_guards += 1;
                 PopResult::ValueFound {
                     address,
                     market_id,
                     more_work_exists: !self.set.is_empty(),
+                    reason,
                 }
             }
         }
     }
 
     /// Returns true if a new value was added to the queue
-    fn push(&mut self, address: Address, market_id: MarketId) -> bool {
+    fn push(&mut self, address: Address, market_id: MarketId, reason: CrankTriggerReason) -> bool {
         assert_eq!(self.fifo.len() + self.crank_guards, self.set.len());
         if self.set.contains(&address) {
             false
         } else {
-            self.fifo.push_back((address, market_id));
+            self.fifo.push_back((address, market_id, reason));
             self.set.insert(address);
             true
         }
@@ -107,8 +111,13 @@ pub(crate) struct CrankReceiver {
 
 impl TriggerCrank {
     #[tracing::instrument(skip_all)]
-    pub(crate) async fn trigger_crank(&self, contract: Address, market_id: MarketId) {
-        let added = self.queue.lock().push(contract, market_id);
+    pub(crate) async fn trigger_crank(
+        &self,
+        contract: Address,
+        market_id: MarketId,
+        reason: CrankTriggerReason,
+    ) {
+        let added = self.queue.lock().push(contract, market_id, reason);
         if added {
             match self.send.try_send(()) {
                 Ok(()) => (),
@@ -118,6 +127,18 @@ impl TriggerCrank {
                 Err(TrySendError::Full(())) => {
                     log::warn!("Highly unlikely trigger_crank with full channel. It's not necessarily a bug, but almost certainly is.")
                 }
+            }
+        }
+    }
+}
+
+impl From<CrankTriggerReason> for String {
+    fn from(reason: CrankTriggerReason) -> Self {
+        match reason {
+            CrankTriggerReason::MoreWorkFound => "More work found".to_owned(),
+            CrankTriggerReason::MessageWaiting => "Message waiting".to_owned(),
+            CrankTriggerReason::NeedsOracleUpdate(price_reason) => {
+                format!("Oracle update: {price_reason}")
             }
         }
     }
@@ -135,7 +156,9 @@ impl CrankReceiver {
         }
     }
 
-    pub(super) async fn receive_with_timeout(&self) -> Option<(Address, MarketId, CrankGuard)> {
+    pub(super) async fn receive_with_timeout(
+        &self,
+    ) -> Option<(Address, MarketId, CrankGuard, CrankTriggerReason)> {
         // This unfortunately requires more care than it seems like it should.
         // It's possible that the timeout used on receive will end up missing an
         // update. Therefore, we always recheck the queue after a we finish,
@@ -165,6 +188,7 @@ impl CrankReceiver {
                 address,
                 more_work_exists,
                 market_id,
+                reason,
             } => {
                 // We have some work. If there's even more work available,
                 // enforce our invariant that we always have a value on the
@@ -187,6 +211,7 @@ impl CrankReceiver {
                         queue: self.trigger.queue.clone(),
                         address,
                     },
+                    reason,
                 ))
             }
         }

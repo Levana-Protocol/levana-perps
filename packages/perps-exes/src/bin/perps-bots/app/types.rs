@@ -24,6 +24,7 @@ use crate::watcher::Watcher;
 use super::factory::{FactoryInfo, FrontendInfoTestnet};
 use super::gas_check::{GasCheckBuilder, GasCheckWallet};
 use super::price::pyth_market_hours::PythMarketHours;
+use super::price::PriceUpdateReason;
 
 #[derive(serde::Serialize)]
 pub(crate) struct GasRecords {
@@ -282,4 +283,10 @@ impl App {
             .await = Arc::new(info);
         Ok(())
     }
+}
+
+pub(crate) enum CrankTriggerReason {
+    MoreWorkFound,
+    MessageWaiting,
+    NeedsOracleUpdate(PriceUpdateReason),
 }

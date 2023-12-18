@@ -20,6 +20,7 @@ use shared::storage::MarketId;
 use tokio::task::JoinSet;
 
 use crate::{
+    app::CrankTriggerReason,
     util::{
         markets::Market,
         misc::track_tx_fees,
@@ -128,9 +129,13 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                         if let NeedsOracleUpdate::Yes = needs_oracle_update {
                             any_needs_oracle_update = NeedsOracleUpdate::Yes;
                         }
-                        markets_to_update
-                            .push((market.market.get_address(), market.market_id.clone()));
-                        format!("{}: Needs price update: {reason}", market.market_id)
+                        let s = format!("{}: Needs price update: {reason}", market.market_id);
+                        markets_to_update.push((
+                            market.market.get_address(),
+                            market.market_id.clone(),
+                            CrankTriggerReason::NeedsOracleUpdate(reason),
+                        ));
+                        s
                     }
                 } else {
                     format!("{}: No price update needed", market.market_id)
@@ -170,8 +175,11 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
         } else {
             successes.push("Warning, did not find a Pyth publish timestamp".to_owned());
         }
-        for (market, market_id) in markets_to_update {
-            worker.trigger_crank.trigger_crank(market, market_id).await;
+        for (market, market_id, reason) in markets_to_update {
+            worker
+                .trigger_crank
+                .trigger_crank(market, market_id, reason)
+                .await;
         }
     }
 
@@ -523,7 +531,7 @@ impl App {
     }
 }
 
-enum PriceUpdateReason {
+pub(crate) enum PriceUpdateReason {
     LastUpdateTooOld(Duration),
     PriceDelta {
         old: PriceBaseInQuote,
