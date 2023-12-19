@@ -1,4 +1,5 @@
 mod check_price_feed_health;
+mod close_all_positions;
 mod contracts_csv;
 mod migrate;
 mod send_treasury;
@@ -38,10 +39,10 @@ use crate::{
 };
 
 use self::{
-    check_price_feed_health::CheckPriceFeedHealthOpts, contracts_csv::ContractsCsvOpts,
-    migrate::MigrateOpts, send_treasury::SendTreasuryOpts, sync_config::SyncConfigOpts,
-    transfer_dao_fees::TransferDaoFeesOpts, update_config::UpdateConfigOpts,
-    wind_down::WindDownOpts,
+    check_price_feed_health::CheckPriceFeedHealthOpts, close_all_positions::CloseAllPositionsOpts,
+    contracts_csv::ContractsCsvOpts, migrate::MigrateOpts, send_treasury::SendTreasuryOpts,
+    sync_config::SyncConfigOpts, transfer_dao_fees::TransferDaoFeesOpts,
+    update_config::UpdateConfigOpts, wind_down::WindDownOpts,
 };
 
 #[derive(clap::Parser)]
@@ -117,6 +118,11 @@ enum Sub {
         #[clap(flatten)]
         inner: CheckPriceFeedHealthOpts,
     },
+    /// Create a CW3 message to close all positions in a market
+    CloseAllPositions {
+        #[clap(flatten)]
+        inner: CloseAllPositionsOpts,
+    },
 }
 
 pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
@@ -141,6 +147,7 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
         Sub::WindDown { inner } => inner.go(opt).await?,
         Sub::ContractsCsv { inner } => inner.go(opt).await?,
         Sub::CheckPriceFeedHealth { inner } => inner.go(opt).await?,
+        Sub::CloseAllPositions { inner } => inner.go(opt).await?,
     }
     Ok(())
 }
