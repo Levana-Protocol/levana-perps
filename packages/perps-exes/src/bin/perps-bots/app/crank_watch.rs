@@ -12,8 +12,8 @@ use crate::util::markets::Market;
 use crate::watcher::{ParallelWatcher, WatchedTaskOutput, WatchedTaskPerMarketParallel};
 
 use super::factory::FactoryInfo;
-use super::App;
 use super::{crank_run::TriggerCrank, AppBuilder};
+use super::{App, CrankTriggerReason};
 
 #[derive(Clone)]
 struct Worker {
@@ -55,7 +55,11 @@ async fn check_market(
     };
 
     trigger_crank
-        .trigger_crank(market.market.get_address(), market.market_id.clone())
+        .trigger_crank(
+            market.market.get_address(),
+            market.market_id.clone(),
+            CrankTriggerReason::MessageWaiting,
+        )
         .await;
 
     Ok(WatchedTaskOutput::new(match work {

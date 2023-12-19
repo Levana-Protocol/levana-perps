@@ -1094,6 +1094,8 @@ struct StatusTemplate<'a> {
     now: DateTime<Utc>,
     alert: bool,
     node_health: Vec<String>,
+    gas_multiplier: f64,
+    gas_multiplier_gas_check: f64,
 }
 
 impl TaskStatuses {
@@ -1128,6 +1130,8 @@ impl TaskStatuses {
                 .into_iter()
                 .map(|item| item.to_string())
                 .collect(),
+            gas_multiplier: app.cosmos.get_current_gas_multiplier(),
+            gas_multiplier_gas_check: app.cosmos_gas_check.get_current_gas_multiplier(),
         }
     }
 }

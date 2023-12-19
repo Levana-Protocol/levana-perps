@@ -69,7 +69,8 @@ osmosis-testnet:
   rpc-nodes:
   - https://test-osmo-rpc.kingnodes.com
   #- https://rpc.osmotest5.osmosis.zone
-  gas-multiplier: 1.5
+  # Use dynamic gas instead
+  #gas-multiplier: 1.5
 juno-testnet:
   gas-decimals: 6
   tracker: juno1u23qyg0j4y5mzhessf0kcnjuqwg48kpufj5vujsq7kxxgxfnv5pqjmkmr4

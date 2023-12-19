@@ -27,6 +27,7 @@ use perps_exes::prelude::MarketContract;
 use perps_exes::pyth::get_oracle_update_msg;
 use shared::storage::RawAddr;
 
+use crate::app::CrankTriggerReason;
 use crate::util::misc::track_tx_fees;
 use crate::util::oracle::OffchainPriceData;
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
@@ -86,7 +87,7 @@ impl App {
         recv: &CrankReceiver,
     ) -> Result<WatchedTaskOutput> {
         // Wait for up to 20 seconds for new work to appear. If it doesn't, update our status message that no cranking was needed.
-        let (market, market_id, crank_guard) = match recv.receive_with_timeout().await {
+        let (market, market_id, crank_guard, reason) = match recv.receive_with_timeout().await {
             None => {
                 return Ok(WatchedTaskOutput::new("No crank work needed").suppress());
             }
@@ -142,6 +143,7 @@ impl App {
                 rewards: rewards.clone(),
             },
         )?;
+        builder.set_memo(reason);
 
         enum RunResult {
             NormalRun(TxResponse),
@@ -200,6 +202,7 @@ impl App {
 
         // Successfully cranked, check if there's more work and, if so, schedule it to be started again
         std::mem::drop(crank_guard);
+
         let more_work = match MarketContract::new(self.cosmos.make_contract(market))
             .status()
             .await
@@ -207,7 +210,9 @@ impl App {
             Ok(status) => match status.next_crank {
                 None => Cow::Borrowed("No additional work found waiting."),
                 Some(work) => {
-                    recv.trigger.trigger_crank(market, market_id).await;
+                    recv.trigger
+                        .trigger_crank(market, market_id, CrankTriggerReason::MoreWorkFound)
+                        .await;
                     format!("Found additional work, scheduling next crank: {work:?}").into()
                 }
             },

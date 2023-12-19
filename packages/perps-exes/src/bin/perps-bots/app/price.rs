@@ -28,7 +28,9 @@ use crate::{
     watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
 };
 
-use super::{crank_run::TriggerCrank, gas_check::GasCheckWallet, App, AppBuilder};
+use super::{
+    crank_run::TriggerCrank, gas_check::GasCheckWallet, App, AppBuilder, CrankTriggerReason,
+};
 
 struct Worker {
     wallet: Arc<Wallet>,
@@ -128,9 +130,15 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                         if let NeedsOracleUpdate::Yes = needs_oracle_update {
                             any_needs_oracle_update = NeedsOracleUpdate::Yes;
                         }
-                        markets_to_update
-                            .push((market.market.get_address(), market.market_id.clone()));
-                        format!("{}: Needs price update: {reason}", market.market_id)
+                        let s = format!("{}: Needs price update: {reason}", market.market_id);
+                        if let Some(reason) = reason.to_crank_reason() {
+                            markets_to_update.push((
+                                market.market.get_address(),
+                                market.market_id.clone(),
+                                reason,
+                            ));
+                        }
+                        s
                     }
                 } else {
                     format!("{}: No price update needed", market.market_id)
@@ -170,8 +178,11 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
         } else {
             successes.push("Warning, did not find a Pyth publish timestamp".to_owned());
         }
-        for (market, market_id) in markets_to_update {
-            worker.trigger_crank.trigger_crank(market, market_id).await;
+        for (market, market_id, reason) in markets_to_update {
+            worker
+                .trigger_crank
+                .trigger_crank(market, market_id, reason)
+                .await;
         }
     }
 
@@ -398,8 +409,8 @@ impl App {
         last_successful_price_publish_time: Option<DateTime<Utc>>,
     ) -> Result<NeedPriceUpdateInner> {
         let market_contract = &market.market;
-        let market_price: PricePoint = match market_contract.current_price().await {
-            Ok(price) => price,
+        let market_price: PricePoint = match market_contract.get_oracle_price().await {
+            Ok(price) => price.composed_price,
             Err(e) => {
                 let msg = format!("{e}");
                 return if msg.contains("price_not_found") {
@@ -544,6 +555,17 @@ impl PriceUpdateReason {
             } => *is_too_frequent,
             PriceUpdateReason::Triggers => false,
             PriceUpdateReason::NoPriceFound => false,
+        }
+    }
+
+    pub(crate) fn to_crank_reason(&self) -> Option<CrankTriggerReason> {
+        match self {
+            PriceUpdateReason::LastUpdateTooOld(duration) => {
+                Some(CrankTriggerReason::PriceUpdateTooOld(*duration))
+            }
+            PriceUpdateReason::PriceDelta { .. } => None,
+            PriceUpdateReason::Triggers => Some(CrankTriggerReason::PriceUpdateWillTrigger),
+            PriceUpdateReason::NoPriceFound => Some(CrankTriggerReason::NoPriceFound),
         }
     }
 }
