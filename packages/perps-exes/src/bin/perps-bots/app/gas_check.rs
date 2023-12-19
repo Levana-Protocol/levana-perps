@@ -211,7 +211,7 @@ impl GasCheck {
                     match e {
                         cosmos::Error::TransactionFailed { code, .. } => {
                             if code == &CosmosSdkError::OutOfGas {
-                                factor += 1;
+                                factor += 3;
                             } else {
                                 break result;
                             }
