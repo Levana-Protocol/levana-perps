@@ -64,15 +64,18 @@ pub(crate) async fn get_markets(
                 .await?;
             let market =
                 MarketContract::new(cosmos.make_contract(market_addr.into_string().parse()?));
-            res.push(Market {
-                status: market.status().await?,
-                market,
-                position_token: cosmos.make_contract(position_token.into_string().parse()?),
-                liquidity_token_lp: cosmos.make_contract(liquidity_token_lp.into_string().parse()?),
-                liquidity_token_xlp: cosmos
-                    .make_contract(liquidity_token_xlp.into_string().parse()?),
-                market_id,
-            });
+            if !market.is_wound_down().await? {
+                res.push(Market {
+                    status: market.status().await?,
+                    market,
+                    position_token: cosmos.make_contract(position_token.into_string().parse()?),
+                    liquidity_token_lp: cosmos
+                        .make_contract(liquidity_token_lp.into_string().parse()?),
+                    liquidity_token_xlp: cosmos
+                        .make_contract(liquidity_token_xlp.into_string().parse()?),
+                    market_id,
+                });
+            }
         }
     }
     Ok(res)
