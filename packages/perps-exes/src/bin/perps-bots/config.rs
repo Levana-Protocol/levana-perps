@@ -285,7 +285,10 @@ impl Opt {
                 Some(x) => GasMultiplierConfig::Static(*x),
                 None => match network {
                     CosmosNetwork::OsmosisMainnet => {
-                        GasMultiplierConfig::Dynamic(DynamicGasMultiplier::default())
+                        let mut dynamic = DynamicGasMultiplier::default();
+                        // Out of the box gas estimation is _really_ far off.
+                        dynamic.initial = 2.5;
+                        GasMultiplierConfig::Dynamic(dynamic)
                     }
                     _ => GasMultiplierConfig::Default,
                 },
