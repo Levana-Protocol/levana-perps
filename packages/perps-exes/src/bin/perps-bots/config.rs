@@ -79,6 +79,26 @@ pub(crate) enum GasMultiplierConfig {
     Static(f64),
     Dynamic(DynamicGasMultiplier),
 }
+impl GasMultiplierConfig {
+    pub(crate) fn static_or_default_for(
+        gas_multiplier: Option<f64>,
+        network: CosmosNetwork,
+    ) -> Self {
+        gas_multiplier.map_or_else(
+            || match network {
+                CosmosNetwork::OsmosisMainnet | CosmosNetwork::OsmosisTestnet => {
+                    GasMultiplierConfig::Dynamic(DynamicGasMultiplier {
+                        // Out of the box gas estimation is _really_ far off.
+                        initial: 2.5,
+                        ..Default::default()
+                    })
+                }
+                _ => GasMultiplierConfig::Default,
+            },
+            GasMultiplierConfig::Static,
+        )
+    }
+}
 
 impl BotConfig {
     /// Get the desintation wallet for crank rewards.
@@ -201,10 +221,7 @@ impl Opt {
                 None
             },
             watcher: partial.watcher.clone(),
-            gas_multiplier: match gas_multiplier {
-                Some(x) => GasMultiplierConfig::Static(x),
-                None => GasMultiplierConfig::Default,
-            },
+            gas_multiplier: GasMultiplierConfig::static_or_default_for(gas_multiplier, network),
             max_price_age_secs: partial.max_price_age_secs,
             min_price_age_secs: partial.min_price_age_secs,
             max_allowed_price_delta: partial.max_allowed_price_delta,
@@ -281,18 +298,7 @@ impl Opt {
             price_wallet: Some(price_wallet.into()),
             crank_wallets,
             watcher,
-            gas_multiplier: match gas_multiplier {
-                Some(x) => GasMultiplierConfig::Static(*x),
-                None => match network {
-                    CosmosNetwork::OsmosisMainnet => {
-                        let mut dynamic = DynamicGasMultiplier::default();
-                        // Out of the box gas estimation is _really_ far off.
-                        dynamic.initial = 2.5;
-                        GasMultiplierConfig::Dynamic(dynamic)
-                    }
-                    _ => GasMultiplierConfig::Default,
-                },
-            },
+            gas_multiplier: GasMultiplierConfig::static_or_default_for(*gas_multiplier, *network),
             max_price_age_secs: max_price_age_secs
                 .unwrap_or_else(perps_exes::config::defaults::max_price_age_secs),
             min_price_age_secs: min_price_age_secs
