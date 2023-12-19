@@ -8,7 +8,7 @@ use shared::storage::MarketId;
 use tracing::Level;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
-#[derive(clap::Parser)]
+#[derive(clap::Parser, Clone)]
 #[clap(version = build_version())]
 pub(crate) struct Opt {
     #[clap(long, short)]
@@ -57,9 +57,15 @@ pub(crate) struct Opt {
     /// List of markets that should be ignored
     #[clap(long, env = "LEVANA_BOTS_IGNORED_MARKETS", value_delimiter = ',')]
     pub(crate) ignored_markets: Vec<MarketId>,
+    /// Reqests timeout in seconds
+    #[clap(long, env = "LEVANA_BOTS_REQUEST_TIMEOUT", default_value_t = 5)]
+    pub(crate) request_timeout_seconds: u64,
+    /// Body length limit in bytes. Default is 1MB (Same as Nginx)
+    #[clap(long, env = "LEVANA_BOTS_BODY_LIMIT", default_value_t = 1024000)]
+    pub(crate) request_body_limit_bytes: usize,
 }
 
-#[derive(clap::Parser)]
+#[derive(clap::Parser, Clone)]
 pub(crate) enum Sub {
     Testnet {
         #[clap(flatten)]
@@ -71,7 +77,7 @@ pub(crate) enum Sub {
     },
 }
 
-#[derive(clap::Parser)]
+#[derive(clap::Parser, Clone)]
 pub(crate) struct TestnetOpt {
     /// hCaptcha secret key
     #[clap(long, env = "LEVANA_BOTS_HCAPTCHA_SECRET")]
@@ -101,7 +107,7 @@ pub(crate) struct TestnetOpt {
     pub(crate) http_timeout_seconds: u32,
 }
 
-#[derive(clap::Parser)]
+#[derive(clap::Parser, Clone)]
 pub(crate) struct MainnetOpt {
     #[clap(long, env = "LEVANA_BOTS_FACTORY")]
     pub(crate) factory: Address,

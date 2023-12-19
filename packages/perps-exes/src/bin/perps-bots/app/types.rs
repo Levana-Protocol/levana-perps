@@ -129,6 +129,7 @@ pub(crate) struct App {
     pub(crate) endpoint_stable: String,
     pub(crate) endpoint_edge: String,
     pub(crate) pyth_market_hours: PythMarketHours,
+    pub(crate) opt: Opt,
 }
 
 /// Helper data structure for building up an application.
@@ -193,6 +194,8 @@ impl Opt {
             ),
         };
 
+        let opt = self.clone();
+
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
             cosmos,
@@ -205,6 +208,7 @@ impl Opt {
             endpoint_stable: self.pyth_endpoint_stable,
             endpoint_edge: self.pyth_endpoint_edge,
             pyth_market_hours: Default::default(),
+            opt,
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {
