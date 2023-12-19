@@ -189,10 +189,10 @@ impl Opt {
         let cosmos_gas_check = match &config.gas_multiplier {
             GasMultiplierConfig::Default | GasMultiplierConfig::Static(_) => cosmos.clone(),
             GasMultiplierConfig::Dynamic(x) => {
-                // We do gas transfers less frequently, and we know that they require a higher multiplier. Start off immediately with the larger numbers and a bigger step size.
+                // We do gas transfers less frequently, and we know that they require a higher multiplier. Start off immediately with the larger numbers and a bigger step-up size.
                 let mut x = x.clone();
                 x.initial = 2.5;
-                x.step = 0.1;
+                x.step_up = 0.5;
                 tracing::info!("For gas check, using the following dynamic parameters: {x:?}");
                 cosmos.clone().with_dynamic_gas(x)
             }
