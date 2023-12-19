@@ -17,7 +17,7 @@ use tokio::sync::RwLock;
 
 use crate::app::factory::{get_factory_info_mainnet, get_factory_info_testnet};
 use crate::cli::Opt;
-use crate::config::{BotConfig, BotConfigByType, BotConfigTestnet};
+use crate::config::{BotConfig, BotConfigByType, BotConfigTestnet, GasMultiplierConfig};
 use crate::wallet_manager::ManagedWallet;
 use crate::watcher::Watcher;
 
@@ -121,6 +121,10 @@ pub(crate) struct App {
     factory: RwLock<Arc<FactoryInfo>>,
     frontend_info_testnet: Option<RwLock<Arc<FrontendInfoTestnet>>>,
     pub(crate) cosmos: Cosmos,
+    /// A separate Cosmos instance just for gas check due to dynamic gas weirdness.
+    ///
+    /// On Osmosis mainnet we use a dynamic gas multiplier. Since the multiplier for sending coins in gas check is significantly different than smart contract activities, we keep two different Cosmos values.
+    pub(crate) cosmos_gas_check: Cosmos,
     pub(crate) config: BotConfig,
     pub(crate) client: Client,
     pub(crate) live_since: DateTime<Utc>,
@@ -153,13 +157,23 @@ impl Opt {
             tracing::info!("Overriding chain ID to: {chain_id}");
             builder.set_chain_id(chain_id.clone());
         }
-        if let Some(gas_multiplier) = config.gas_multiplier {
-            tracing::info!("Overriding gas multiplier to: {gas_multiplier}");
-            builder.set_gas_estimate_multiplier(Some(gas_multiplier));
+        match &config.gas_multiplier {
+            GasMultiplierConfig::Default => {
+                tracing::info!("Using default gas multiplier from cosmos-rs");
+                // Just being explicit, probably isn't necessary
+                builder.set_default_gas_estimate_multiplier();
+            }
+            GasMultiplierConfig::Static(x) => {
+                tracing::info!("Setting static gas multiplier value of {x}");
+                builder.set_gas_estimate_multiplier(*x);
+            }
+            GasMultiplierConfig::Dynamic(x) => {
+                tracing::info!("Setting dynamic gas multiplier config: {x:?}");
+                builder.set_dynamic_gas_estimate_multiplier(x.clone());
+            }
         }
         builder.set_connection_count(Some(config.total_bot_count()));
         builder.set_referer_header(Some("https://bots.levana.exchange/".to_owned()));
-        builder.set_autofix_sequence_mismatch(Some(true));
         builder.build().await.map_err(|e| e.into())
     }
 
@@ -170,6 +184,18 @@ impl Opt {
             .timeout(Duration::from_secs(config.http_timeout_seconds.into()))
             .build()?;
         let cosmos = self.make_cosmos(&config).await?;
+
+        let cosmos_gas_check = match &config.gas_multiplier {
+            GasMultiplierConfig::Default | GasMultiplierConfig::Static(_) => cosmos.clone(),
+            GasMultiplierConfig::Dynamic(x) => {
+                // We do gas transfers less frequently, and we know that they require a higher multiplier. Start off immediately with the larger numbers and a bigger step size.
+                let mut x = x.clone();
+                x.initial = 2.5;
+                x.step = 0.1;
+                tracing::info!("For gas check, using the following dynamic parameters: {x:?}");
+                cosmos.clone().with_dynamic_gas(x)
+            }
+        };
 
         let (factory, frontend_info_testnet) = match &config.by_type {
             BotConfigByType::Testnet { inner } => {
@@ -196,6 +222,7 @@ impl Opt {
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
             cosmos,
+            cosmos_gas_check,
             config,
             client,
             live_since: Utc::now(),
