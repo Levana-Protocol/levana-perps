@@ -3054,6 +3054,7 @@ dependencies = [
  "tokio-tungstenite",
  "tokio-util",
  "tonic 0.10.2",
+ "tower",
  "tower-http",
  "tracing",
  "tracing-subscriber",
@@ -4935,8 +4936,10 @@ dependencies = [
  "http-body-util",
  "mime",
  "pin-project-lite",
+ "tokio",
  "tower-layer",
  "tower-service",
+ "tracing",
 ]
 
 [[package]]

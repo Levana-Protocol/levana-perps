@@ -21,7 +21,12 @@ use http::status::StatusCode;
 use serde::Deserialize;
 use serde_json::json;
 use tokio::net::TcpListener;
+use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
+use tower_http::limit::RequestBodyLimitLayer;
+use tower_http::timeout::TimeoutLayer;
+use tower_http::trace::{self, TraceLayer};
+use tracing::Level;
 
 use crate::app::App;
 use crate::types::ChainId;
@@ -94,7 +99,31 @@ pub(crate) struct ExportHistory {
 
 pub(crate) async fn launch(app: App) -> Result<()> {
     let bind = app.opt.bind;
+
     let app = Arc::new(app);
+
+    let service_builder = ServiceBuilder::new()
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
+                .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
+        )
+        .layer(RequestBodyLimitLayer::new(app.opt.request_body_limit_bytes))
+        .layer(TimeoutLayer::new(std::time::Duration::from_secs(
+            app.opt.request_timeout_seconds,
+        )))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(tower_http::cors::Any)
+                .allow_methods([
+                    http::method::Method::GET,
+                    http::method::Method::HEAD,
+                    http::method::Method::POST,
+                    http::method::Method::PUT,
+                ])
+                .allow_headers([http::header::CONTENT_TYPE]),
+        );
+
     let router = axum::Router::new()
         .typed_get(common::homepage)
         .typed_get(common::healthz)
@@ -112,17 +141,7 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .typed_get(whales::whale_css)
         .with_state(app)
         .fallback(common::not_found)
-        .layer(
-            CorsLayer::new()
-                .allow_origin(tower_http::cors::Any)
-                .allow_methods([
-                    http::method::Method::GET,
-                    http::method::Method::HEAD,
-                    http::method::Method::POST,
-                    http::method::Method::PUT,
-                ])
-                .allow_headers([http::header::CONTENT_TYPE]),
-        )
+        .layer(service_builder)
         .layer(from_fn(error_response_handler));
 
     log::info!("Launching server");

@@ -4,7 +4,8 @@ use anyhow::Result;
 use axum::routing::{get, post};
 
 use tokio::net::TcpListener;
-use tower_http::cors::CorsLayer;
+use tower::ServiceBuilder;
+use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer, timeout::TimeoutLayer};
 
 use crate::{app::App, watcher::TaskStatuses};
 
@@ -27,6 +28,22 @@ pub(crate) async fn start_rest_api(
     statuses: TaskStatuses,
     listener: TcpListener,
 ) -> Result<()> {
+    let service_builder = ServiceBuilder::new()
+        .layer(RequestBodyLimitLayer::new(app.opt.request_body_limit_bytes))
+        .layer(TimeoutLayer::new(std::time::Duration::from_secs(
+            app.opt.request_timeout_seconds,
+        )))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(tower_http::cors::Any)
+                .allow_methods([
+                    http::method::Method::GET,
+                    http::method::Method::HEAD,
+                    http::method::Method::POST,
+                ])
+                .allow_headers([http::header::CONTENT_TYPE]),
+        );
+
     let router = axum::Router::new()
         .route("/", get(common::homepage))
         .route("/factory", get(factory::factory))
@@ -41,16 +58,8 @@ pub(crate) async fn start_rest_api(
         .route("/debug/gas-refill", get(debug::gas_refill))
         .route("/debug/fund-usage", get(debug::fund_usage))
         .with_state(RestApp { app, statuses })
-        .layer(
-            CorsLayer::new()
-                .allow_origin(tower_http::cors::Any)
-                .allow_methods([
-                    http::method::Method::GET,
-                    http::method::Method::HEAD,
-                    http::method::Method::POST,
-                ])
-                .allow_headers([http::header::CONTENT_TYPE]),
-        );
+        .layer(service_builder);
+
     tracing::info!("Launching server");
 
     axum::serve(listener, router.into_make_service()).await?;
