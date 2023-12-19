@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 use anyhow::{Context, Result};
 use cosmos::{HasAddress, TxBuilder};
@@ -6,9 +9,10 @@ use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, WasmMsg};
 use msg::{
     contracts::market::{
         config::{Config, ConfigUpdate},
-        entry::ExecuteOwnerMsg,
+        entry::{ExecuteOwnerMsg, QueryMsg, StatusResp},
     },
     prelude::MarketExecuteMsg,
+    token::Token,
 };
 use perps_exes::{
     config::{ChainConfig, MainnetFactories, MarketConfigUpdates, PriceConfig},
@@ -54,19 +58,39 @@ async fn go(
 
     let mut sends = vec![];
 
-    for cosmos::Coin { denom, amount } in balances {
+    for cosmos::Coin { denom, amount } in &balances {
         // Do individual messages, have run into bugs trying to send multiple coins at once
         sends.push(CosmosMsg::Bank(cosmwasm_std::BankMsg::Send {
             to_address: dest.get_address_string(),
             amount: vec![cosmwasm_std::Coin {
-                denom,
+                denom: denom.clone(),
                 amount: amount.parse()?,
             }],
         }))
     }
 
-    println!("Treasury contract: {treasury}");
-    println!("Message: {}", serde_json::to_string(&sends)?);
+    let mut markets = factory.get_markets().await?;
+    let mut collaterals = HashMap::new();
+    for market in markets {
+        let status: StatusResp = market
+            .market
+            .query(QueryMsg::Status { price: None })
+            .await?;
+        let key = match status.collateral {
+            Token::Cw20 { addr, .. } => addr.into_string(),
+            Token::Native { denom, .. } => denom,
+        };
+
+        let mut entry = collaterals.entry(key.clone()).or_insert(0);
+        if balances.iter().any(|c| c.denom == key) {
+            *entry += 1;
+        }
+    }
+
+    println!("\nNumber of markets per collateral asset: {collaterals:#?}");
+
+    println!("\nTreasury contract: {treasury}");
+    println!("\nMessage:\n{}\n", serde_json::to_string(&sends)?);
 
     let mut builder = TxBuilder::default();
     for send in &sends {
