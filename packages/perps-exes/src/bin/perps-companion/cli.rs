@@ -57,7 +57,12 @@ pub(crate) struct Opt {
         default_value = "https://sei-grpc.lavenderfive.com"
     )]
     pub(crate) sei_mainnet_fallbacks: Vec<String>,
-
+    /// Reqests timeout in seconds
+    #[clap(long, env = "LEVANA_COMPANION_REQUEST_TIMEOUT", default_value_t = 5)]
+    pub(crate) request_timeout_seconds: u64,
+    /// Body length limit in bytes. Default is 1MB (Same as Nginx)
+    #[clap(long, env = "LEVANA_COMPANION_BODY_LIMIT", default_value_t = 1024000)]
+    pub(crate) request_body_limit_bytes: usize,
     #[clap(subcommand)]
     pub(crate) pgopt: PGOpt,
 }
