@@ -7,9 +7,9 @@ use anyhow::{Context, Result};
 use bigdecimal::BigDecimal;
 use chrono::DateTime;
 use chrono::Utc;
-use cosmos::Wallet;
 use cosmos::{Address, HasAddress};
 use cosmos::{Coin, Cosmos};
+use cosmos::{DynamicGasMultiplier, Wallet};
 use perps_exes::config::GasAmount;
 use reqwest::Client;
 use serde::Serialize;
@@ -17,7 +17,7 @@ use tokio::sync::RwLock;
 
 use crate::app::factory::{get_factory_info_mainnet, get_factory_info_testnet};
 use crate::cli::Opt;
-use crate::config::{BotConfig, BotConfigByType, BotConfigTestnet, GasMultiplierConfig};
+use crate::config::{BotConfig, BotConfigByType, BotConfigTestnet};
 use crate::wallet_manager::ManagedWallet;
 use crate::watcher::Watcher;
 
@@ -159,18 +159,14 @@ impl Opt {
             builder.set_chain_id(chain_id.clone());
         }
         match &config.gas_multiplier {
-            GasMultiplierConfig::Default => {
-                tracing::info!("Using default gas multiplier from cosmos-rs");
-                // Just being explicit, probably isn't necessary
-                builder.set_default_gas_estimate_multiplier();
-            }
-            GasMultiplierConfig::Static(x) => {
+            Some(x) => {
                 tracing::info!("Setting static gas multiplier value of {x}");
                 builder.set_gas_estimate_multiplier(*x);
             }
-            GasMultiplierConfig::Dynamic(x) => {
+            None => {
+                let x = Default::default();
                 tracing::info!("Setting dynamic gas multiplier config: {x:?}");
-                builder.set_dynamic_gas_estimate_multiplier(x.clone());
+                builder.set_dynamic_gas_estimate_multiplier(x);
             }
         }
         builder.set_connection_count(Some(config.total_bot_count()));
@@ -186,16 +182,15 @@ impl Opt {
             .build()?;
         let cosmos = self.make_cosmos(&config).await?;
 
-        let cosmos_gas_check = match &config.gas_multiplier {
-            GasMultiplierConfig::Default | GasMultiplierConfig::Static(_) => cosmos.clone(),
-            GasMultiplierConfig::Dynamic(x) => {
-                // We do gas transfers less frequently, and we know that they require a higher multiplier. Start off immediately with the larger numbers and a bigger step-up size.
-                let mut x = x.clone();
-                x.initial = 2.5;
-                x.step_up = 0.5;
-                tracing::info!("For gas check, using the following dynamic parameters: {x:?}");
-                cosmos.clone().with_dynamic_gas(x)
-            }
+        let cosmos_gas_check = {
+            // We do gas transfers less frequently, and we know that they require a higher multiplier. Start off immediately with the larger numbers and a bigger step-up size.
+            let x = DynamicGasMultiplier {
+                initial: 2.5,
+                step_up: 0.5,
+                ..Default::default()
+            };
+            tracing::info!("For gas check, using the following dynamic parameters: {x:?}");
+            cosmos.clone().with_dynamic_gas(x)
         };
 
         let (factory, frontend_info_testnet) = match &config.by_type {

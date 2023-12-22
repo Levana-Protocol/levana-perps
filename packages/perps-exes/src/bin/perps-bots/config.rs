@@ -1,6 +1,6 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
-use cosmos::{Address, CosmosNetwork, DynamicGasMultiplier, HasAddressHrp, Wallet};
+use cosmos::{Address, CosmosNetwork, HasAddressHrp, Wallet};
 use perps_exes::{
     config::{
         ChainConfig, ConfigTestnet, DeploymentInfo, GasAmount, GasDecimals, LiquidityConfig,
@@ -59,7 +59,7 @@ pub(crate) struct BotConfig {
     /// Wallets that are used to perform cranking
     pub(crate) crank_wallets: Vec<Wallet>,
     pub(crate) watcher: WatcherConfig,
-    pub(crate) gas_multiplier: GasMultiplierConfig,
+    pub(crate) gas_multiplier: Option<f64>,
     pub(crate) max_price_age_secs: u32,
     pub(crate) min_price_age_secs: u32,
     pub(crate) max_allowed_price_delta: Decimal256,
@@ -72,23 +72,6 @@ pub(crate) struct BotConfig {
     /// Wallet used to refill gas for other wallets
     pub(crate) gas_wallet: Arc<Wallet>,
     pub(crate) ignored_markets: HashSet<MarketId>,
-}
-
-pub(crate) enum GasMultiplierConfig {
-    Default,
-    Static(f64),
-    Dynamic(DynamicGasMultiplier),
-}
-impl GasMultiplierConfig {
-    pub(crate) fn static_or_default_for(
-        gas_multiplier: Option<f64>,
-        network: CosmosNetwork,
-    ) -> Self {
-        gas_multiplier.map_or_else(
-            || GasMultiplierConfig::Dynamic(DynamicGasMultiplier::default()),
-            GasMultiplierConfig::Static,
-        )
-    }
 }
 
 impl BotConfig {
@@ -212,7 +195,7 @@ impl Opt {
                 None
             },
             watcher: partial.watcher.clone(),
-            gas_multiplier: GasMultiplierConfig::static_or_default_for(gas_multiplier, network),
+            gas_multiplier,
             max_price_age_secs: partial.max_price_age_secs,
             min_price_age_secs: partial.min_price_age_secs,
             max_allowed_price_delta: partial.max_allowed_price_delta,
@@ -289,7 +272,7 @@ impl Opt {
             price_wallet: Some(price_wallet.into()),
             crank_wallets,
             watcher,
-            gas_multiplier: GasMultiplierConfig::static_or_default_for(*gas_multiplier, *network),
+            gas_multiplier: *gas_multiplier,
             max_price_age_secs: max_price_age_secs
                 .unwrap_or_else(perps_exes::config::defaults::max_price_age_secs),
             min_price_age_secs: min_price_age_secs
