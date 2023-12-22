@@ -85,16 +85,7 @@ impl GasMultiplierConfig {
         network: CosmosNetwork,
     ) -> Self {
         gas_multiplier.map_or_else(
-            || match network {
-                CosmosNetwork::OsmosisMainnet | CosmosNetwork::OsmosisTestnet => {
-                    GasMultiplierConfig::Dynamic(DynamicGasMultiplier {
-                        // Out of the box gas estimation is _really_ far off.
-                        initial: 2.5,
-                        ..Default::default()
-                    })
-                }
-                _ => GasMultiplierConfig::Default,
-            },
+            || GasMultiplierConfig::Dynamic(DynamicGasMultiplier::default()),
             GasMultiplierConfig::Static,
         )
     }
