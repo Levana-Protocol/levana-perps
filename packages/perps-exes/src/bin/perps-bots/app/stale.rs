@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use anyhow::Result;
 use axum::async_trait;
@@ -150,6 +150,33 @@ impl Msg<'_> {
 impl App {
     /// Do we think we're in the middle of an Osmosis epoch?
     pub(crate) fn is_osmosis_epoch(&self) -> bool {
-        self.cosmos.is_chain_paused()
+        let mut guard = self.epoch_last_seen.lock();
+
+        if self.cosmos.is_chain_paused() {
+            *guard = Some(Instant::now());
+            return true;
+        }
+
+        let epoch_last_seen = match *guard {
+            None => return false,
+            Some(epoch_last_seen) => epoch_last_seen,
+        };
+
+        let now = Instant::now();
+        let age = match now.checked_duration_since(epoch_last_seen) {
+            None => {
+                tracing::warn!("is_osmosis_epoch: checked_duration_since returned a None");
+                return false;
+            }
+            Some(age) => age,
+        };
+
+        if age.as_secs() > self.config.ignore_errors_after_epoch_seconds.into() {
+            // Happened too long ago, so we're not in the epoch anymore
+            *guard = None;
+            false
+        } else {
+            true
+        }
     }
 }

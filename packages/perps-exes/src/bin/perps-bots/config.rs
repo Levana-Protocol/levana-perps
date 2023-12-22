@@ -72,6 +72,8 @@ pub(crate) struct BotConfig {
     /// Wallet used to refill gas for other wallets
     pub(crate) gas_wallet: Arc<Wallet>,
     pub(crate) ignored_markets: HashSet<MarketId>,
+    /// How many seconds to ignore errors after an epoch
+    pub(crate) ignore_errors_after_epoch_seconds: u32,
 }
 
 impl BotConfig {
@@ -205,6 +207,8 @@ impl Opt {
             min_gas_in_gas_wallet: partial.min_gas_in_gas_wallet,
             gas_wallet,
             ignored_markets: self.ignored_markets.iter().cloned().collect(),
+            // Never used on testnet, just setting a reasonable default
+            ignore_errors_after_epoch_seconds: 300,
         };
 
         Ok((config, Some(faucet_bot_runner)))
@@ -232,6 +236,7 @@ impl Opt {
             crank_rewards,
             rpc_endpoint,
             crank_wallets,
+            ignore_errors_after_epoch_seconds,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let hrp = network.get_address_hrp();
@@ -285,6 +290,7 @@ impl Opt {
             min_gas_in_gas_wallet: *min_gas_refill,
             gas_wallet: Arc::new(gas_wallet),
             ignored_markets: self.ignored_markets.iter().cloned().collect(),
+            ignore_errors_after_epoch_seconds: *ignore_errors_after_epoch_seconds,
         })
     }
 }

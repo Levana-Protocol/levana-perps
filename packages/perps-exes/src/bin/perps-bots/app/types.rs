@@ -1,7 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use bigdecimal::BigDecimal;
@@ -10,6 +10,7 @@ use chrono::Utc;
 use cosmos::{Address, HasAddress};
 use cosmos::{Coin, Cosmos};
 use cosmos::{DynamicGasMultiplier, Wallet};
+use parking_lot::Mutex;
 use perps_exes::config::GasAmount;
 use reqwest::Client;
 use serde::Serialize;
@@ -134,6 +135,7 @@ pub(crate) struct App {
     pub(crate) endpoint_edge: String,
     pub(crate) pyth_market_hours: PythMarketHours,
     pub(crate) opt: Opt,
+    pub(crate) epoch_last_seen: Mutex<Option<Instant>>,
 }
 
 /// Helper data structure for building up an application.
@@ -231,6 +233,7 @@ impl Opt {
             endpoint_edge: self.pyth_endpoint_edge,
             pyth_market_hours: Default::default(),
             opt,
+            epoch_last_seen: Mutex::new(None),
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {
