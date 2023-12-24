@@ -169,7 +169,6 @@ impl Opt {
                 builder.set_dynamic_gas_estimate_multiplier(x);
             }
         }
-        builder.set_connection_count(Some(config.total_bot_count()));
         builder.set_referer_header(Some("https://bots.levana.exchange/".to_owned()));
         builder.build().await.map_err(|e| e.into())
     }
