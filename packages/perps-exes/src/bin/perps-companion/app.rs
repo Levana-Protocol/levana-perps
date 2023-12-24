@@ -50,7 +50,7 @@ impl App {
                 }
             }
 
-            let cosmos = builder.build_lazy().await;
+            let cosmos = builder.build_lazy()?;
             cosmos_map.insert(chain_id, cosmos);
         }
 
