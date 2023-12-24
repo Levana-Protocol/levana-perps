@@ -156,6 +156,13 @@ pub(crate) struct MainnetOpt {
     /// How many crank wallets to use
     #[clap(long, env = "LEVANA_BOTS_CRANK_WALLETS", default_value_t = 4)]
     pub(crate) crank_wallets: u64,
+    /// How many seconds to ignore errors after an epoch
+    #[clap(
+        long,
+        env = "LEVANA_BOTS_IGNORE_ERRORS_AFTER_EPOCH_SECONDS",
+        default_value_t = 300
+    )]
+    pub(crate) ignore_errors_after_epoch_seconds: u32,
 }
 
 impl Opt {
