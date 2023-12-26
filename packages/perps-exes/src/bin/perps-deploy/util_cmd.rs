@@ -91,13 +91,16 @@ struct UpdatePythOpt {
     network: CosmosNetwork,
     /// Market ID to do the update for
     #[clap(long)]
-    market: MarketId,
+    market: Vec<MarketId>,
     /// Override Pyth config file
     #[clap(long, env = "LEVANA_BOTS_CONFIG_PYTH")]
     pub(crate) config_pyth: Option<PathBuf>,
     /// Override chain config file
     #[clap(long, env = "LEVANA_BOTS_CONFIG_CHAIN")]
     pub(crate) config_chain: Option<PathBuf>,
+    /// Keep going infinitely
+    #[clap(long)]
+    pub(crate) keep_going: bool,
 }
 
 async fn update_pyth(
@@ -107,6 +110,7 @@ async fn update_pyth(
         network,
         config_pyth,
         config_chain,
+        keep_going,
     }: UpdatePythOpt,
 ) -> Result<()> {
     let chain = ChainConfig::load(config_chain, network)?;
@@ -125,30 +129,47 @@ async fn update_pyth(
     };
 
     let client = reqwest::Client::new();
-    let market = oracle_info
-        .markets
-        .get(&market)
-        .with_context(|| format!("No oracle feed data found for {market}"))?;
+    let mut feeds = vec![];
+    for market in market {
+        let mut market = oracle_info
+            .markets
+            .get(&market)
+            .with_context(|| format!("No oracle feed data found for {market}"))?
+            .clone();
+        feeds.append(&mut market.feeds);
+        feeds.append(&mut market.feeds_usd);
+    }
 
     let oracle = basic.cosmos.make_contract(pyth.contract);
 
-    let ids = market
-        .feeds
+    let ids = feeds
         .iter()
-        .chain(market.feeds_usd.iter())
         .filter_map(|feed| match feed.data {
             SpotPriceFeedData::Pyth { id, .. } => Some(id),
             _ => None,
         })
         .collect::<HashSet<_>>();
 
-    let msg = get_oracle_update_msg(&ids, wallet, endpoint, &client, &oracle).await?;
+    let single_update = || async {
+        let msg = get_oracle_update_msg(&ids, wallet, endpoint, &client, &oracle).await?;
 
-    let res = TxBuilder::default()
-        .add_message(msg)
-        .sign_and_broadcast(&basic.cosmos, wallet)
-        .await?;
-    log::info!("Price set in: {}", res.txhash);
+        let res = TxBuilder::default()
+            .add_message(msg)
+            .sign_and_broadcast(&basic.cosmos, wallet)
+            .await?;
+        log::info!("Price set in: {}", res.txhash);
+        anyhow::Ok(())
+    };
+    if keep_going {
+        loop {
+            if let Err(e) = single_update().await {
+                log::error!("Unable to update price: {e:?}");
+            }
+        }
+    } else {
+        single_update().await?;
+    }
+
     Ok(())
 }
 

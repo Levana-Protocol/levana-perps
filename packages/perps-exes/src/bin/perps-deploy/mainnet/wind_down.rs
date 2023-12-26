@@ -26,7 +26,7 @@ pub(super) struct WindDownOpts {
     #[clap(long)]
     factory: String,
     /// Market ID
-    #[clap(long, required = true)]
+    #[clap(long)]
     market: Vec<MarketId>,
     /// Which parts of the market to shut down
     #[clap(long, required = true)]
@@ -61,6 +61,17 @@ async fn go(
     let app = opt.load_app_mainnet(factory.network).await?;
 
     let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
+
+    let market = if market.is_empty() {
+        factory
+            .get_markets()
+            .await?
+            .into_iter()
+            .map(|x| x.market_id)
+            .collect()
+    } else {
+        market
+    };
 
     let wind_down = factory.query_wind_down().await?;
     log::info!("CW3 contract: {wind_down}");
