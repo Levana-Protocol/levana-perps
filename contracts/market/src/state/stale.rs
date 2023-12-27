@@ -58,38 +58,4 @@ impl State<'_> {
             stale_liquifunding,
         })
     }
-
-    /// Ensure that the protocol is not currently stale and, if it is, generate an error.
-    pub(crate) fn ensure_not_stale(&self, store: &dyn Storage) -> Result<()> {
-        match self.stale_check(store)? {
-            ProtocolStaleness {
-                old_price: None,
-                stale_liquifunding: None,
-            } => Ok(()),
-            ProtocolStaleness {
-                old_price: Some(old_price),
-                stale_liquifunding: None,
-            } => Err(perp_anyhow!(
-                ErrorId::Stale,
-                ErrorDomain::Market,
-                "Protocol is currently in stale state, price updates are needed (since {old_price})"
-            )),
-            ProtocolStaleness {
-                old_price: None,
-                stale_liquifunding: Some(stale_liquifunding),
-            } => Err(perp_anyhow!(
-                ErrorId::Stale,
-                ErrorDomain::Market,
-                "Protocol is currently in stale state, cranking is needed (since {stale_liquifunding})"
-            )),
-            ProtocolStaleness {
-                old_price: Some(old_price),
-                stale_liquifunding: Some(stale_liquifunding),
-            } => Err(perp_anyhow!(
-                ErrorId::Stale,
-                ErrorDomain::Market,
-                "Protocol is currently in stale state, price updates are needed (since {old_price}), cranking is needed (since {stale_liquifunding})"
-            )),
-        }
-    }
 }

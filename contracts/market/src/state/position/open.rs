@@ -303,7 +303,6 @@ impl State<'_> {
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
     ) -> Result<PositionId> {
-        self.ensure_not_stale(ctx.storage)?;
         let validated_position = self.validate_new_position(
             ctx.storage,
             OpenPositionParams {

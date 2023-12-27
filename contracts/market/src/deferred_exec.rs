@@ -132,8 +132,6 @@ fn handle_update_position_shared(
     notional_size: Option<Signed<Notional>>,
     slippage_assert: Option<SlippageAssert>,
 ) -> Result<()> {
-    state.ensure_not_stale(ctx.storage)?;
-
     // We used to assert position owner here, but that's now handled when queueing the deferred message.
 
     if let Some(slippage_assert) = slippage_assert {
