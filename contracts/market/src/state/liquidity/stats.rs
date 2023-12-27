@@ -261,6 +261,7 @@ impl State<'_> {
             ExecuteMsg::CancelLimitOrder { .. } => true,
             ExecuteMsg::ProvideCrankFunds {} => false,
             ExecuteMsg::SetManualPrice { .. } => false,
+            ExecuteMsg::PerformDeferredExec { .. } => true,
         };
         if touches_liquidity && self.should_reset_lp_balances(ctx.storage)? {
             Err(anyhow::anyhow!(

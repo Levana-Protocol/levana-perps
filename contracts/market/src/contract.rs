@@ -15,11 +15,11 @@ use crate::state::{
 use crate::prelude::*;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Response};
+use cosmwasm_std::{Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response};
 use cw2::{get_contract_version, set_contract_version};
 use msg::{
     contracts::market::{
-        deferred_execution::DeferredExecItem,
+        deferred_execution::{DeferredExecId, DeferredExecItem},
         entry::{
             DeltaNeutralityFeeResp, InitialPrice, InstantiateMsg, MigrateMsg, OraclePriceResp,
             PositionsQueryFeeApproach, PriceWouldTriggerResp, SpotPriceHistoryResp,
@@ -426,6 +426,14 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         ExecuteMsg::ProvideCrankFunds {} => {
             state.provide_crank_funds(&mut ctx, info.funds.take()?)?;
         }
+
+        ExecuteMsg::PerformDeferredExec { id } => {
+            state.assert_auth(
+                &info.sender,
+                AuthCheck::Addr(state.env.contract.address.clone()),
+            )?;
+            anyhow::bail!("PerformedDeferredExec {id}: Not implemented");
+        }
     }
 
     // Make sure either the caller sent no funds into the contract, or whatever
@@ -738,4 +746,12 @@ pub fn migrate(deps: DepsMut, env: Env, MigrateMsg {}: MigrateMsg) -> Result<Res
             "new_contract_version" => CONTRACT_VERSION,
         })
     }
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
+    let deferred_exec_id = DeferredExecId::from_u64(msg.id);
+    let (state, mut ctx) = StateContext::new(deps, env)?;
+    state.handle_deferred_exec_reply(&mut ctx, deferred_exec_id, msg.result)?;
+    ctx.into_response(&state)
 }

@@ -1,10 +1,10 @@
 use crate::state::State;
 use anyhow::Result;
-use cosmwasm_std::{Addr, Storage};
+use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, Storage, SubMsg, SubMsgResult};
 use cw_storage_plus::{Item, Map};
 use msg::contracts::market::deferred_execution::{
-    DeferredExecExecutedEvent, DeferredExecFailure, DeferredExecId, DeferredExecItem,
-    DeferredExecQueuedEvent, DeferredExecStatus, DeferredExecWithStatus, ListDeferredExecsResp,
+    DeferredExecExecutedEvent, DeferredExecId, DeferredExecItem, DeferredExecQueuedEvent,
+    DeferredExecStatus, DeferredExecWithStatus, ListDeferredExecsResp,
 };
 use msg::contracts::market::position::PositionId;
 use msg::prelude::*;
@@ -131,6 +131,7 @@ impl State<'_> {
             ctx.storage,
             new_id,
             &DeferredExecWithStatus {
+                id: new_id,
                 created: self.now(),
                 status: msg::contracts::market::deferred_execution::DeferredExecStatus::Pending,
                 item,
@@ -187,7 +188,8 @@ impl State<'_> {
     pub(crate) fn deferred_exec_deposit_balance(&self, store: &dyn Storage) -> Result<Collateral> {
         let mut deposited = Collateral::zero();
         for res in DEFERRED_EXECS.range(store, None, None, Order::Descending) {
-            let (_id, item) = res?;
+            let (id, item) = res?;
+            anyhow::ensure!(id == item.id);
             if !item.status.is_pending() {
                 break;
             }
@@ -202,21 +204,20 @@ impl State<'_> {
         id: DeferredExecId,
     ) -> Result<()> {
         // For now we always fail, this obviously needs to be fixed.
+        ctx.response_mut().add_raw_submessage(SubMsg::reply_always(
+            CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
+                contract_addr: self.env.contract.address.clone().into_string(),
+                msg: to_binary(&MarketExecuteMsg::PerformDeferredExec { id })?,
+                funds: vec![],
+            }),
+            // Let's use the deferred exec ID as the reply ID for now. In theory
+            // we could have other things in the future that need to use a reply. But we can
+            // always modify the code at that point to use a different mechanism.
+            id.u64(),
+        ));
 
-        // Question on implementation: do we want to do the execution in the same message and be very careful about error handling, _or_ should we use a submessage and then check its error value?
-
-        let mut item = DEFERRED_EXECS
-            .may_load(ctx.storage, id)?
-            .expect("process_deferred_exec: ID not found");
-        item.status = DeferredExecStatus::Failure {
-            reason: DeferredExecFailure::NotYetImplemented,
-        };
-        DEFERRED_EXECS.save(ctx.storage, id, &item)?;
-
-        if let Some(amount) = NonZero::new(item.item.deposited_amount()) {
-            self.add_token_transfer_msg(ctx, &item.owner, amount)?;
-        }
-
+        // We immediately update the data structure so that if we crank multiple
+        // items we continue with the next ID.
         let DeferredExecLatestIds { issued, processed } = DEFERRED_EXEC_LATEST_IDS
             .may_load(ctx.storage)?
             .expect("Logic error: process_deferred_exec had no DEFERRED_EXEC_LATEST_IDS");
@@ -232,12 +233,53 @@ impl State<'_> {
             },
         )?;
 
+        Ok(())
+    }
+
+    pub(crate) fn handle_deferred_exec_reply(
+        &self,
+        ctx: &mut StateContext,
+        id: DeferredExecId,
+        res: SubMsgResult,
+    ) -> Result<()> {
+        let mut item = DEFERRED_EXECS
+            .may_load(ctx.storage, id)?
+            .expect("handle_deferred_exec_reply: ID not found");
+
+        let (success, desc) = match res {
+            SubMsgResult::Ok(_) => match item.status {
+                DeferredExecStatus::Success { .. } => (true, "Execution successful".to_owned()),
+                DeferredExecStatus::Pending => {
+                    anyhow::bail!("handle_deferred_exec_reply: success reply but still Pending")
+                }
+                DeferredExecStatus::Failure { .. } => {
+                    anyhow::bail!("handle_deferred_exec_reply: success reply but see a Failure")
+                }
+            },
+            SubMsgResult::Err(e) => {
+                anyhow::ensure!(
+                    item.status == DeferredExecStatus::Pending,
+                    "Item should still be pending, but actual status is {:?}",
+                    item.status
+                );
+                item.status = DeferredExecStatus::Failure { reason: e.clone() };
+
+                // It didn't work, so give them back their money
+                if let Some(amount) = NonZero::new(item.item.deposited_amount()) {
+                    self.add_token_transfer_msg(ctx, &item.owner, amount)?;
+                }
+
+                (false, e)
+            }
+        };
+        DEFERRED_EXECS.save(ctx.storage, id, &item)?;
+
         ctx.response_mut().add_event(DeferredExecExecutedEvent {
             deferred_exec_id: id,
             position_id: item.item.position_id(),
             owner: item.owner,
-            success: false,
-            desc: "Not yet implemented".to_owned(),
+            success,
+            desc,
         });
         Ok(())
     }

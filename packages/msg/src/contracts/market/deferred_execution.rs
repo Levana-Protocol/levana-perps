@@ -29,6 +29,11 @@ impl DeferredExecId {
     pub fn u64(self) -> u64 {
         self.0.u64()
     }
+
+    /// Generate from a raw u64
+    pub fn from_u64(x: u64) -> Self {
+        DeferredExecId(x.into())
+    }
 }
 
 impl<'a> PrimaryKey<'a> for DeferredExecId {
@@ -82,6 +87,8 @@ pub struct ListDeferredExecsResp {
 /// A deferred execution work item and its current status.
 #[cw_serde]
 pub struct DeferredExecWithStatus {
+    /// ID of this item
+    pub id: DeferredExecId,
     /// Timestamp this was created, and therefore minimum price update timestamp needed
     pub created: Timestamp,
     /// Status
@@ -105,7 +112,7 @@ pub enum DeferredExecStatus {
     /// Did not successfully apply
     Failure {
         /// Reason it didn't apply successfully
-        reason: DeferredExecFailure,
+        reason: String,
     },
 }
 
@@ -118,13 +125,6 @@ impl DeferredExecStatus {
             DeferredExecStatus::Failure { .. } => false,
         }
     }
-}
-
-/// Reason deferred execution failed
-#[cw_serde]
-pub enum DeferredExecFailure {
-    /// FIXME should be removed before final version
-    NotYetImplemented,
 }
 
 /// A deferred execution work item

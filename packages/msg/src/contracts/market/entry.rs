@@ -324,6 +324,15 @@ pub enum ExecuteMsg {
         /// volume.
         price_usd: PriceCollateralInUsd,
     },
+
+    /// Perform a deferred exec
+    ///
+    /// This should only ever be called from the market contract itself, any
+    /// other call is guaranteed to fail.
+    PerformDeferredExec {
+        /// Which ID to execute
+        id: DeferredExecId,
+    },
 }
 
 /// Owner-only messages

@@ -302,11 +302,14 @@ pub(crate) fn contract_cw20() -> Box<dyn Contract<Empty>> {
 }
 
 pub(crate) fn contract_market() -> Box<dyn Contract<Empty>> {
-    Box::new(LocalContractWrapper::new(
-        market::contract::instantiate,
-        market::contract::execute,
-        market::contract::query,
-    ))
+    Box::new(
+        LocalContractWrapper::new(
+            market::contract::instantiate,
+            market::contract::execute,
+            market::contract::query,
+        )
+        .with_reply(market::contract::reply),
+    )
 }
 
 pub(crate) fn contract_factory() -> Box<dyn Contract<Empty>> {

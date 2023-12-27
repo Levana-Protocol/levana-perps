@@ -680,5 +680,6 @@ pub fn requires_spot_price_append(msg: &ExecuteMsg) -> bool {
         ExecuteMsg::SetTriggerOrder { .. } => false,
         // Does do a spot_price_append, but it's handled internally after the price is set
         ExecuteMsg::SetManualPrice { .. } => false,
+        ExecuteMsg::PerformDeferredExec { .. } => false,
     }
 }
