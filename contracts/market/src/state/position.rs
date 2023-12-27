@@ -96,11 +96,6 @@ pub(super) const NEXT_LIQUIFUNDING: Map<(Timestamp, PositionId), ()> =
 /// setting up liquidation margin initially.
 pub(super) const NEXT_STALE: Map<(Timestamp, PositionId), ()> = Map::new(namespace::NEXT_STALE);
 
-pub enum PositionOrId {
-    Id(PositionId),
-    Pos(Box<Position>),
-}
-
 /// Gets a full position by id
 pub(crate) fn get_position(store: &dyn Storage, id: PositionId) -> Result<Position> {
     #[derive(serde::Serialize)]
@@ -111,15 +106,6 @@ pub(crate) fn get_position(store: &dyn Storage, id: PositionId) -> Result<Positi
         .may_load(store, id)
         .map_err(|e| anyhow!("Could not parse position {id}: {e:?}"))?
         .ok_or_else(|| MarketError::MissingPosition { id: id.to_string() }.into_anyhow())
-}
-
-impl PositionOrId {
-    pub(crate) fn extract(self, store: &dyn Storage) -> Result<Position> {
-        match self {
-            PositionOrId::Id(id) => get_position(store, id),
-            PositionOrId::Pos(pos) => Ok(*pos),
-        }
-    }
 }
 
 fn already(
@@ -577,10 +563,10 @@ impl State<'_> {
     pub(crate) fn position_assert_owner(
         &self,
         store: &dyn Storage,
-        pos_or_id: PositionOrId,
+        pos_id: PositionId,
         addr: &Addr,
     ) -> Result<()> {
-        match pos_or_id.extract(store) {
+        match get_position(store, pos_id) {
             Err(_) => Err(perp_anyhow!(
                 ErrorId::Auth,
                 ErrorDomain::Market,

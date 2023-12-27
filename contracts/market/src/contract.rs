@@ -7,7 +7,7 @@ use crate::state::{
     fees::fees_init,
     liquidity::{liquidity_init, yield_init},
     meta::meta_init,
-    position::{get_position, positions_init, PositionOrId},
+    position::{get_position, positions_init},
     set_factory_addr,
     token::token_init,
 };
@@ -24,13 +24,13 @@ use msg::{
             DeltaNeutralityFeeResp, InitialPrice, InstantiateMsg, MigrateMsg, OraclePriceResp,
             PositionsQueryFeeApproach, PriceWouldTriggerResp, SpotPriceHistoryResp,
         },
-        position::{events::PositionSaveReason, PositionId, PositionOrPendingClose, PositionsResp},
+        position::{PositionOrPendingClose, PositionsResp},
         spot_price::{SpotPriceConfig, SpotPriceConfigInit},
     },
     shutdown::ShutdownImpact,
 };
 
-use msg::contracts::market::entry::{LimitOrderResp, SlippageAssert};
+use msg::contracts::market::entry::LimitOrderResp;
 
 use semver::Version;
 use shared::price::Price;
@@ -111,48 +111,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         // required to keep gas estimations more reliable
         state.crank_exec_batch(ctx, Some(0), rewards_addr)?;
         state.crank_current_price_complete(ctx)?;
-        Ok(())
-    }
-
-    fn handle_update_position_shared(
-        state: &State,
-        ctx: &mut StateContext,
-        sender: Addr,
-        id: PositionId,
-        notional_size: Option<Signed<Notional>>,
-        slippage_assert: Option<SlippageAssert>,
-    ) -> Result<()> {
-        state.ensure_not_stale(ctx.storage)?;
-
-        state.position_assert_owner(ctx.storage, PositionOrId::Id(id), &sender)?;
-
-        if let Some(slippage_assert) = slippage_assert {
-            let market_type = state.market_id(ctx.storage)?.get_market_type();
-            let pos = get_position(ctx.storage, id)?;
-            let delta_notional_size =
-                notional_size.unwrap_or(pos.notional_size) - pos.notional_size;
-            state.do_slippage_assert(
-                ctx.storage,
-                slippage_assert,
-                delta_notional_size,
-                market_type,
-                Some(pos.liquidation_margin.delta_neutrality),
-            )?;
-        }
-
-        let now = state.now();
-        let pos = get_position(ctx.storage, id)?;
-
-        let starts_at = pos.liquifunded_at;
-        state.position_liquifund_store(
-            ctx,
-            pos,
-            starts_at,
-            now,
-            false,
-            PositionSaveReason::Update,
-        )?;
-
         Ok(())
     }
 
@@ -305,7 +263,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             stop_loss_override,
             take_profit_override,
         } => {
-            state.position_assert_owner(ctx.storage, PositionOrId::Id(id), &info.sender)?;
+            state.position_assert_owner(ctx.storage, id, &info.sender)?;
             state.set_trigger_order(&mut ctx, id, stop_loss_override, take_profit_override)?;
         }
 
@@ -341,6 +299,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             id,
             slippage_assert,
         } => {
+            state.position_assert_owner(ctx.storage, id, &info.sender)?;
             state.defer_execution(
                 &mut ctx,
                 info.sender,
@@ -432,7 +391,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 &info.sender,
                 AuthCheck::Addr(state.env.contract.address.clone()),
             )?;
-            anyhow::bail!("PerformedDeferredExec {id}: Not implemented");
+            state.perform_deferred_exec(&mut ctx, id)?;
         }
     }
 

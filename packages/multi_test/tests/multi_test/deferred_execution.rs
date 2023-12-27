@@ -41,21 +41,20 @@ fn basic_operations() {
     market.exec_refresh_price().unwrap();
     market.exec_crank_till_finished(&cranker).unwrap();
 
-    // Since we haven't implemented anything yet, for now assert that there are no positions and an error.
     let execs = market.query_deferred_execs(&trader).unwrap();
     assert_eq!(execs.len(), 1);
     let exec = execs.into_iter().next().unwrap();
     match exec.status {
         DeferredExecStatus::Pending => panic!("Unexpected pending"),
-        DeferredExecStatus::Success { .. } => panic!("Unexpected success"),
-        DeferredExecStatus::Failure { .. } => (),
+        DeferredExecStatus::Success { .. } => (),
+        DeferredExecStatus::Failure { .. } => panic!("Unexpected failure"),
     }
     assert_eq!(&exec.owner, &trader);
 
     let positions = market.query_positions(&trader).unwrap();
-    assert_eq!(positions.len(), 0);
-
-    // FIXME update this test when we start implementing proper execution
+    assert_eq!(positions.len(), 1);
+    let position = positions.into_iter().next().unwrap();
+    assert_eq!(position.owner, trader);
 }
 
 #[test]

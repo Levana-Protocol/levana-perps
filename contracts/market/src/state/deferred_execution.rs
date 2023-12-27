@@ -100,11 +100,7 @@ impl State<'_> {
     ) -> Result<()> {
         // Owner check first
         if let Some(pos_id) = item.position_id() {
-            self.position_assert_owner(
-                ctx.storage,
-                super::position::PositionOrId::Id(pos_id),
-                &trader,
-            )?;
+            self.position_assert_owner(ctx.storage, pos_id, &trader)?;
         }
 
         let (new_id, new_latest_ids) = match DEFERRED_EXEC_LATEST_IDS.may_load(ctx.storage)? {
@@ -281,6 +277,27 @@ impl State<'_> {
             success,
             desc,
         });
+        Ok(())
+    }
+
+    pub(crate) fn load_deferred_exec_item(
+        &self,
+        store: &dyn Storage,
+        id: DeferredExecId,
+    ) -> Result<DeferredExecWithStatus> {
+        DEFERRED_EXECS
+            .may_load(store, id)?
+            .with_context(|| format!("Could not load deferred exec item {id}"))
+    }
+
+    pub(crate) fn mark_deferred_exec_success(
+        &self,
+        ctx: &mut StateContext,
+        mut item: DeferredExecWithStatus,
+        pos_id: PositionId,
+    ) -> Result<()> {
+        item.status = DeferredExecStatus::Success { id: pos_id };
+        DEFERRED_EXECS.save(ctx.storage, item.id, &item)?;
         Ok(())
     }
 }
