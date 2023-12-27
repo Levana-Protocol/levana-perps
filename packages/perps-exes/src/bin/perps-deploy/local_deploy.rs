@@ -104,7 +104,6 @@ pub(crate) async fn go(
             config: ConfigUpdate {
                 // https://phobosfinance.atlassian.net/browse/PERP-710
                 staleness_seconds: Some(60 * 60 * 24 * 7),
-                price_update_too_old_seconds: Some(60 * 60 * 24 * 5),
                 ..ConfigUpdate::default()
             },
             initial_borrow_fee_rate: "0.01".parse().unwrap(),
