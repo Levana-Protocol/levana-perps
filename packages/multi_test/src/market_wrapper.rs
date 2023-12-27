@@ -37,6 +37,7 @@ use msg::contracts::farming::entry::{
 };
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::crank::CrankWorkInfo;
+use msg::contracts::market::deferred_execution::{DeferredExecWithStatus, ListDeferredExecsResp};
 use msg::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
     InitialPrice, LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpAction,
@@ -575,6 +576,26 @@ impl PerpsMarket {
             limit,
             order,
         })
+    }
+
+    pub fn query_deferred_execs(&self, owner: &Addr) -> Result<Vec<DeferredExecWithStatus>> {
+        let mut res = vec![];
+        let mut start_after = None;
+        loop {
+            let ListDeferredExecsResp {
+                mut items,
+                next_start_after,
+            } = self.query(&QueryMsg::ListDeferredExecs {
+                addr: owner.clone().into(),
+                start_after: start_after.take(),
+                limit: None,
+            })?;
+            res.append(&mut items);
+            match next_start_after {
+                None => break Ok(res),
+                Some(next_start_after) => start_after = Some(next_start_after),
+            }
+        }
     }
 
     pub fn query_current_price(&self) -> Result<PricePoint> {

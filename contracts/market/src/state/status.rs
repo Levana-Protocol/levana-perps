@@ -68,6 +68,10 @@ impl State<'_> {
             .may_load(store)?
             .unwrap_or_default();
 
+        let next_deferred_execution = self
+            .get_next_deferred_execution(store)?
+            .map(|(_, item)| item.created);
+
         Ok(StatusResp {
             market_id: market_id.clone(),
             base: market_id.get_base().to_owned(),
@@ -94,6 +98,7 @@ impl State<'_> {
             last_crank_completed,
             unpend_queue_size,
             congested: unpend_queue_size >= self.config.unpend_limit,
+            next_deferred_execution,
         })
     }
 }

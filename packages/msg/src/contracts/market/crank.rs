@@ -1,4 +1,5 @@
 //! Data types and events for cranking.
+use super::deferred_execution::DeferredExecId;
 use super::position::PositionId;
 use crate::contracts::market::order::OrderId;
 use crate::contracts::market::position::LiquidationReason;
@@ -34,6 +35,15 @@ pub enum CrankWorkInfo {
         liquidation_reason: LiquidationReason,
         /// price point that triggered the liquidation
         price_point: PricePoint,
+    },
+    /// Deferred execution (open/update/closed) can be executed.
+    DeferredExec {
+        /// ID to be processed
+        deferred_exec_id: DeferredExecId,
+        /// Position ID, if relevant
+        position: Option<PositionId>,
+        /// Timestamp of the price point that allows execution
+        price_point_timestamp: Timestamp,
     },
     /// Limit order can be opened
     LimitOrder {
@@ -99,6 +109,9 @@ pub mod events {
                         CrankWorkInfo::Liquidation { position, .. } => {
                             format!("liquidation {position}").into()
                         }
+                        CrankWorkInfo::DeferredExec {
+                            deferred_exec_id, ..
+                        } => format!("deferred exec {deferred_exec_id}").into(),
                         CrankWorkInfo::LimitOrder { order_id } => {
                             format!("limit order {order_id}").into()
                         }
@@ -125,6 +138,7 @@ pub mod events {
                     CrankWorkInfo::Liquidation { .. } => "liquidation",
                     CrankWorkInfo::Liquifunding { .. } => "liquifunding",
                     CrankWorkInfo::UnpendLiquidationPrices { .. } => "unpend-liquidation-prices",
+                    CrankWorkInfo::DeferredExec { .. } => "deferred-exec",
                     CrankWorkInfo::LimitOrder { .. } => "limit-order",
                 },
             );
@@ -142,6 +156,11 @@ pub mod events {
                 } => (Some(position), None, Some(price_point.timestamp)),
                 CrankWorkInfo::Liquifunding { position } => (Some(position), None, None),
                 CrankWorkInfo::UnpendLiquidationPrices { position } => (Some(position), None, None),
+                CrankWorkInfo::DeferredExec {
+                    deferred_exec_id: _,
+                    position,
+                    price_point_timestamp,
+                } => (position, None, Some(price_point_timestamp)),
                 CrankWorkInfo::LimitOrder { order_id } => (None, Some(order_id), None),
             };
 

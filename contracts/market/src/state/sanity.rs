@@ -340,6 +340,7 @@ struct SubTotals {
     fees: Fees,
     net_funding_paid: Signed<Collateral>,
     delta_neutrality_fund: Collateral,
+    deferred_exec: Collateral,
 }
 
 impl SubTotals {
@@ -361,6 +362,7 @@ impl SubTotals {
 
             net_funding_paid: get_total_net_funding_paid(store)?,
             delta_neutrality_fund: DELTA_NEUTRALITY_FUND.may_load(store)?.unwrap_or_default(),
+            deferred_exec: state.deferred_exec_deposit_balance(store)?,
         };
 
         for position in OPEN_POSITIONS.range(store, None, None, Order::Ascending) {
@@ -384,6 +386,7 @@ impl SubTotals {
             fees,
             net_funding_paid: funding_fee_imbalance,
             delta_neutrality_fund,
+            deferred_exec,
         } = self;
         let positive_total = *pending_transfer
             + *position_collateral
@@ -393,7 +396,8 @@ impl SubTotals {
             + fees.protocol
             + fees.wallets
             + fees.crank
-            + *delta_neutrality_fund;
+            + *delta_neutrality_fund
+            + *deferred_exec;
 
         let total = positive_total.into_signed() + *funding_fee_imbalance;
         total

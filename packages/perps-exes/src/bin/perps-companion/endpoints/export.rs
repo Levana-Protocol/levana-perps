@@ -602,6 +602,7 @@ mod tests {
             liquidity: Default::default(),
             next_crank: None,
             last_crank_completed: None,
+            next_deferred_execution: None,
             unpend_queue_size: 0,
             borrow_fee: Default::default(),
             borrow_fee_lp: Default::default(),

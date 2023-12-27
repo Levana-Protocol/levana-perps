@@ -106,6 +106,19 @@ impl State<'_> {
                         liquidation_reason: pos.reason,
                         price_point,
                     }
+                } else if let Some((deferred_exec_id, position)) = self
+                    .next_crankable_deferred_exec_id(
+                        store,
+                        price_point.timestamp,
+                        price_point.publish_time,
+                        price_point.publish_time_usd,
+                    )?
+                {
+                    CrankWorkInfo::DeferredExec {
+                        deferred_exec_id,
+                        position,
+                        price_point_timestamp: price_point.timestamp,
+                    }
                 } else if let Some(order_id) =
                     self.limit_order_triggered_order(store, price_point.price_notional, false)?
                 {
@@ -282,6 +295,11 @@ impl State<'_> {
                     MaybeClosedPosition::Close(x) => x,
                 };
                 self.close_position(ctx, close_position_instructions)?;
+            }
+            CrankWorkInfo::DeferredExec {
+                deferred_exec_id, ..
+            } => {
+                self.process_deferred_exec(ctx, deferred_exec_id)?;
             }
             CrankWorkInfo::LimitOrder { order_id } => {
                 self.limit_order_execute_order(ctx, order_id)?;

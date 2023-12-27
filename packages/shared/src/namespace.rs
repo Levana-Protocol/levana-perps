@@ -147,3 +147,6 @@ pub const PYTH_REPLY_CONTEXT: &str = "en";
 pub const RECLAIMABLE_START: &str = "eo";
 pub const PYTH_CONFIG: &str = "ep";
 pub const MANUAL_SPOT_PRICE: &str = "eq";
+pub const DEFERRED_EXEC_LATEST_IDS: &str = "er";
+pub const DEFERRED_EXECS: &str = "es";
+pub const DEFERRED_EXECS_BY_WALLET: &str = "et";
