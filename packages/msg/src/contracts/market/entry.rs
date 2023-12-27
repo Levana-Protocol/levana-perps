@@ -667,6 +667,15 @@ pub enum QueryMsg {
         /// How many items to request per batch.
         limit: Option<u32>,
     },
+
+    /// Get a single deferred execution item, if available.
+    ///
+    /// * returns [GetDeferredExecResp]
+    #[returns(crate::contracts::market::deferred_execution::GetDeferredExecResp)]
+    GetDeferredExec {
+        /// ID
+        id: DeferredExecId,
+    },
 }
 
 /// Response for [QueryMsg::OraclePrice]

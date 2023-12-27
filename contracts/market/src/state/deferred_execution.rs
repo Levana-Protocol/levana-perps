@@ -4,7 +4,7 @@ use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, Storage, SubMsg, SubMsgRes
 use cw_storage_plus::{Item, Map};
 use msg::contracts::market::deferred_execution::{
     DeferredExecExecutedEvent, DeferredExecId, DeferredExecItem, DeferredExecQueuedEvent,
-    DeferredExecStatus, DeferredExecWithStatus, ListDeferredExecsResp,
+    DeferredExecStatus, DeferredExecWithStatus, GetDeferredExecResp, ListDeferredExecsResp,
 };
 use msg::contracts::market::position::PositionId;
 use msg::prelude::*;
@@ -93,6 +93,19 @@ impl State<'_> {
         Ok(ListDeferredExecsResp {
             items,
             next_start_after,
+        })
+    }
+
+    pub(crate) fn get_deferred_exec(
+        &self,
+        store: &dyn Storage,
+        id: DeferredExecId,
+    ) -> Result<GetDeferredExecResp> {
+        Ok(match DEFERRED_EXECS.may_load(store, id)? {
+            Some(item) => GetDeferredExecResp::Found {
+                item: Box::new(item),
+            },
+            None => GetDeferredExecResp::NotFound {},
         })
     }
 

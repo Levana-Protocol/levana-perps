@@ -665,6 +665,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 .list_deferred_execs(store, addr, start_after, limit)?
                 .query_result()
         }
+
+        QueryMsg::GetDeferredExec { id } => state.get_deferred_exec(store, id)?.query_result(),
     }
 }
 

@@ -84,6 +84,18 @@ pub struct ListDeferredExecsResp {
     pub next_start_after: Option<DeferredExecId>,
 }
 
+/// Result of trying to query a single deferred execution item.
+#[cw_serde]
+pub enum GetDeferredExecResp {
+    /// The requested ID was found
+    Found {
+        /// The current state of the item
+        item: Box<DeferredExecWithStatus>,
+    },
+    /// The requested ID was not found
+    NotFound {},
+}
+
 /// A deferred execution work item and its current status.
 #[cw_serde]
 pub struct DeferredExecWithStatus {
