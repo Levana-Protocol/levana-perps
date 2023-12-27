@@ -67,6 +67,11 @@ pub enum SpotPriceFeedData {
         /// The identifier on pyth
         id: PriceIdentifier,
         /// price age tolerance, in seconds
+        ///
+        /// We thought about removing this parameter when moving to deferred
+        /// execution. However, this would leave open a potential attack vector of opening
+        /// limit orders or positions, shutting down price updates, and then selectively
+        /// replaying old price updates for favorable triggers.
         age_tolerance_seconds: u32,
     },
     /// Stride liquid staking
