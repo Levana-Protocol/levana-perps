@@ -202,6 +202,7 @@ impl State<'_> {
     /// For sanity checks, get the total amount deposited pending deferred exec
     ///
     /// Note that this should _not_ ever be called on-chain, as it has O(n) complexity.
+    #[cfg(feature = "sanity")]
     pub(crate) fn deferred_exec_deposit_balance(&self, store: &dyn Storage) -> Result<Collateral> {
         let mut deposited = Collateral::zero();
         for res in DEFERRED_EXECS.range(store, None, None, Order::Descending) {
