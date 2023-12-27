@@ -48,7 +48,6 @@ pub(crate) fn update_config(
         funding_rate_max_annualized,
         mute_events,
         liquifunding_delay_seconds,
-        price_update_too_old_seconds,
         staleness_seconds,
         protocol_tax,
         unstake_period_seconds,
@@ -107,10 +106,6 @@ pub(crate) fn update_config(
 
     if let Some(x) = liquifunding_delay_seconds {
         config.liquifunding_delay_seconds = x;
-    }
-
-    if let Some(x) = price_update_too_old_seconds {
-        config.price_update_too_old_seconds = x;
     }
 
     if let Some(x) = staleness_seconds {

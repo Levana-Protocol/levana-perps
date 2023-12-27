@@ -40,9 +40,6 @@ impl ConfigDefaults {
     pub const fn liquifunding_delay_seconds() -> u32 {
         60 * 60 * 6
     }
-    pub const fn price_update_too_old_seconds() -> u32 {
-        60 * 30
-    }
     pub const fn staleness_seconds() -> u32 {
         60 * 60 * 2
     }

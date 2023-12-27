@@ -1243,8 +1243,6 @@ pub struct StatusResp {
 
     /// Have we reached staleness of the protocol via old liquifundings? If so, contains [Option::Some], and the timestamp when that happened.
     pub stale_liquifunding: Option<Timestamp>,
-    /// Is the last price update too old? If so, contains [Option::Some], and the timestamp when the price became too old.
-    pub stale_price: Option<Timestamp>,
     /// Are we in the congested state where new positions cannot be opened?
     pub congested: bool,
 
@@ -1253,9 +1251,9 @@ pub struct StatusResp {
 }
 
 impl StatusResp {
-    /// Is the protocol stale from either liquifunding delay or old prices?
+    /// Is the protocol stale from liquifunding delay?
     pub fn is_stale(&self) -> bool {
-        self.stale_liquifunding.is_some() || self.stale_price.is_some()
+        self.stale_liquifunding.is_some()
     }
 }
 

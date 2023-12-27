@@ -39,8 +39,6 @@ pub struct Config {
     pub mute_events: bool,
     /// Delay between liquifundings, in seconds
     pub liquifunding_delay_seconds: u32,
-    /// How old must the latest price update be to trigger the protocol to lock?
-    pub price_update_too_old_seconds: u32,
     /// How far behind must the position liquifunding process be to consider the protocol stale?
     pub staleness_seconds: u32,
     /// The percentage of fees that are taken for the protocol
@@ -152,7 +150,6 @@ impl Config {
             funding_rate_sensitivity: ConfigDefaults::funding_rate_sensitivity(),
             mute_events: ConfigDefaults::mute_events(),
             liquifunding_delay_seconds: ConfigDefaults::liquifunding_delay_seconds(),
-            price_update_too_old_seconds: ConfigDefaults::price_update_too_old_seconds(),
             staleness_seconds: ConfigDefaults::staleness_seconds(),
             protocol_tax: ConfigDefaults::protocol_tax(),
             unstake_period_seconds: ConfigDefaults::unstake_period_seconds(),
@@ -346,7 +343,6 @@ pub struct ConfigUpdate {
     pub borrow_fee_rate_max_annualized: Option<NumberGtZero>,
     pub mute_events: Option<bool>,
     pub liquifunding_delay_seconds: Option<u32>,
-    pub price_update_too_old_seconds: Option<u32>,
     pub staleness_seconds: Option<u32>,
     pub protocol_tax: Option<Decimal256>,
     pub unstake_period_seconds: Option<u32>,
@@ -383,7 +379,6 @@ impl<'a> arbitrary::Arbitrary<'a> for ConfigUpdate {
             borrow_fee_rate_max_annualized: u.arbitrary()?,
             mute_events: u.arbitrary()?,
             liquifunding_delay_seconds: u.arbitrary()?,
-            price_update_too_old_seconds: u.arbitrary()?,
             staleness_seconds: u.arbitrary()?,
             protocol_tax: arbitrary_decimal_256_option(u)?,
             unstake_period_seconds: u.arbitrary()?,
@@ -420,7 +415,6 @@ impl From<Config> for ConfigUpdate {
             funding_rate_max_annualized: Some(src.funding_rate_max_annualized),
             mute_events: Some(src.mute_events),
             liquifunding_delay_seconds: Some(src.liquifunding_delay_seconds),
-            price_update_too_old_seconds: Some(src.price_update_too_old_seconds),
             staleness_seconds: Some(src.staleness_seconds),
             protocol_tax: Some(src.protocol_tax),
             unstake_period_seconds: Some(src.unstake_period_seconds),

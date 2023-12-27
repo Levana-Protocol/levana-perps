@@ -1,136 +1,137 @@
 use levana_perpswap_multi_test::{
-    market_wrapper::PerpsMarket, position_helpers::assert_position_liquidated,
-    return_unless_market_collateral_quote, time::TimeJump, PerpsApp,
+    market_wrapper::PerpsMarket, position_helpers::assert_position_liquidated, time::TimeJump,
+    PerpsApp,
 };
-use msg::{contracts::market::entry::StatusResp, prelude::*};
+use msg::prelude::*;
 
 #[test]
 fn staleness() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    return_unless_market_collateral_quote!(market);
+    panic!("This test needs to be reviewed and updated due to removing stale price");
+    // let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    // return_unless_market_collateral_quote!(market);
 
-    let trader = market.clone_trader(0).unwrap();
-    let cranker = market.clone_trader(1).unwrap();
+    // let trader = market.clone_trader(0).unwrap();
+    // let cranker = market.clone_trader(1).unwrap();
 
-    // Make sure there's a recent active price
-    market.exec_set_price("1".try_into().unwrap()).unwrap();
+    // // Make sure there's a recent active price
+    // market.exec_set_price("1".try_into().unwrap()).unwrap();
 
-    let status = market.query_status().unwrap();
-    assert_eq!(status.stale_liquifunding, None);
-    assert_eq!(status.stale_price, None);
+    // let status = market.query_status().unwrap();
+    // assert_eq!(status.stale_liquifunding, None);
+    // assert_eq!(status.stale_price, None);
 
-    let config = market.query_config().unwrap();
-    market
-        .set_time(TimeJump::Seconds(
-            config.price_update_too_old_seconds as i64 - 60,
-        ))
-        .unwrap();
+    // let config = market.query_config().unwrap();
+    // market
+    //     .set_time(TimeJump::Seconds(
+    //         config.price_update_too_old_seconds as i64 - 60,
+    //     ))
+    //     .unwrap();
 
-    let status = market.query_status().unwrap();
-    assert_eq!(status.stale_liquifunding, None);
-    assert_eq!(status.stale_price, None);
+    // let status = market.query_status().unwrap();
+    // assert_eq!(status.stale_liquifunding, None);
+    // assert_eq!(status.stale_price, None);
 
-    market.set_time(TimeJump::Seconds(62)).unwrap();
-    let StatusResp {
-        stale_liquifunding,
-        stale_price,
-        ..
-    } = market.query_status().unwrap();
+    // market.set_time(TimeJump::Seconds(62)).unwrap();
+    // let StatusResp {
+    //     stale_liquifunding,
+    //     stale_price,
+    //     ..
+    // } = market.query_status().unwrap();
 
-    assert_eq!(stale_liquifunding, None);
-    assert_ne!(stale_price, None);
+    // assert_eq!(stale_liquifunding, None);
+    // assert_ne!(stale_price, None);
 
-    market.exec_set_price("10".try_into().unwrap()).unwrap();
+    // market.exec_set_price("10".try_into().unwrap()).unwrap();
 
-    let status = market.query_status().unwrap();
-    assert_eq!(status.stale_liquifunding, None);
-    assert_eq!(status.stale_price, None);
+    // let status = market.query_status().unwrap();
+    // assert_eq!(status.stale_liquifunding, None);
+    // assert_eq!(status.stale_price, None);
 
-    let (pos_id, _) = market
-        .exec_open_position(
-            &trader,
-            "100",
-            "10",
-            DirectionToBase::Long,
-            "10",
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+    // let (pos_id, _) = market
+    //     .exec_open_position(
+    //         &trader,
+    //         "100",
+    //         "10",
+    //         DirectionToBase::Long,
+    //         "10",
+    //         None,
+    //         None,
+    //         None,
+    //     )
+    //     .unwrap();
 
-    market.exec_crank_till_finished(&cranker).unwrap();
+    // market.exec_crank_till_finished(&cranker).unwrap();
 
-    let status = market.query_status().unwrap();
-    assert_eq!(status.stale_liquifunding, None);
-    assert_eq!(status.stale_price, None);
+    // let status = market.query_status().unwrap();
+    // assert_eq!(status.stale_liquifunding, None);
+    // assert_eq!(status.stale_price, None);
 
-    // Move ahead in time, do a price update, should be inactive
-    market
-        .set_time(TimeJump::Seconds(
-            (config.liquifunding_delay_seconds + config.staleness_seconds) as i64 * 4,
-        ))
-        .unwrap();
+    // // Move ahead in time, do a price update, should be inactive
+    // market
+    //     .set_time(TimeJump::Seconds(
+    //         (config.liquifunding_delay_seconds + config.staleness_seconds) as i64 * 4,
+    //     ))
+    //     .unwrap();
 
-    let StatusResp {
-        stale_liquifunding,
-        stale_price,
-        ..
-    } = market.query_status().unwrap();
-    assert_ne!(stale_price, None);
-    assert_ne!(stale_liquifunding, None);
+    // let StatusResp {
+    //     stale_liquifunding,
+    //     stale_price,
+    //     ..
+    // } = market.query_status().unwrap();
+    // assert_ne!(stale_price, None);
+    // assert_ne!(stale_liquifunding, None);
 
-    market.exec_set_price("1".try_into().unwrap()).unwrap();
-    let StatusResp {
-        stale_liquifunding,
-        stale_price,
-        ..
-    } = market.query_status().unwrap();
-    assert_eq!(stale_price, None);
-    assert_ne!(stale_liquifunding, None);
+    // market.exec_set_price("1".try_into().unwrap()).unwrap();
+    // let StatusResp {
+    //     stale_liquifunding,
+    //     stale_price,
+    //     ..
+    // } = market.query_status().unwrap();
+    // assert_eq!(stale_price, None);
+    // assert_ne!(stale_liquifunding, None);
 
-    market
-        .exec_open_position(
-            &trader,
-            "100",
-            "10",
-            DirectionToBase::Long,
-            "10",
-            None,
-            None,
-            None,
-        )
-        .unwrap_err();
-    market
-        .exec_update_position_leverage(&trader, pos_id, "1".try_into().unwrap(), None)
-        .unwrap_err();
+    // market
+    //     .exec_open_position(
+    //         &trader,
+    //         "100",
+    //         "10",
+    //         DirectionToBase::Long,
+    //         "10",
+    //         None,
+    //         None,
+    //         None,
+    //     )
+    //     .unwrap_err();
+    // market
+    //     .exec_update_position_leverage(&trader, pos_id, "1".try_into().unwrap(), None)
+    //     .unwrap_err();
 
-    market
-        .exec_close_position(&trader, pos_id, None)
-        .unwrap_err();
+    // market
+    //     .exec_close_position(&trader, pos_id, None)
+    //     .unwrap_err();
 
-    market.exec_crank_till_finished(&trader).unwrap();
+    // market.exec_crank_till_finished(&trader).unwrap();
 
-    let (pos_id, _) = market
-        .exec_open_position(
-            &trader,
-            "100",
-            "10",
-            DirectionToBase::Long,
-            "10",
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+    // let (pos_id, _) = market
+    //     .exec_open_position(
+    //         &trader,
+    //         "100",
+    //         "10",
+    //         DirectionToBase::Long,
+    //         "10",
+    //         None,
+    //         None,
+    //         None,
+    //     )
+    //     .unwrap();
 
-    market.query_position(pos_id).unwrap();
+    // market.query_position(pos_id).unwrap();
 
-    market
-        .exec_update_position_leverage(&trader, pos_id, "8".try_into().unwrap(), None)
-        .unwrap();
+    // market
+    //     .exec_update_position_leverage(&trader, pos_id, "8".try_into().unwrap(), None)
+    //     .unwrap();
 
-    market.exec_close_position(&trader, pos_id, None).unwrap();
+    // market.exec_close_position(&trader, pos_id, None).unwrap();
 }
 
 #[test]

@@ -56,10 +56,7 @@ impl State<'_> {
             .may_load(store)?
             .unwrap_or(Collateral::zero());
 
-        let ProtocolStaleness {
-            stale_liquifunding,
-            old_price,
-        } = self.stale_check(store)?;
+        let ProtocolStaleness { stale_liquifunding } = self.stale_check(store)?;
 
         let fees = all_fees(store)?;
 
@@ -93,7 +90,6 @@ impl State<'_> {
             instant_delta_neutrality_fee_value,
             delta_neutrality_fee_fund,
             stale_liquifunding,
-            stale_price: old_price,
             fees,
             last_crank_completed,
             unpend_queue_size,
