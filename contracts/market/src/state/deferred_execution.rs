@@ -184,11 +184,11 @@ impl State<'_> {
         // should never be newer than the block time.
         let mut publish_time = price_point_timestamp;
         if let Some(publish_time_base) = publish_time_base {
-            debug_assert!(publish_time <= price_point_timestamp);
+            debug_assert!(publish_time_base <= price_point_timestamp);
             publish_time = publish_time.min(publish_time_base);
         }
         if let Some(publish_time_collateral) = publish_time_collateral {
-            debug_assert!(publish_time <= price_point_timestamp);
+            debug_assert!(publish_time_collateral <= price_point_timestamp);
             publish_time = publish_time.min(publish_time_collateral);
         }
 
