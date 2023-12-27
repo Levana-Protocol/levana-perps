@@ -109,6 +109,9 @@ pub struct Config {
 
     /// The spot price config for this market
     pub spot_price: SpotPriceConfig,
+
+    /// Just for historical reasons/migrations
+    pub price_update_too_old_seconds: Option<u32>,
 }
 
 /// Maximum liquidity for deposit.
@@ -170,6 +173,7 @@ impl Config {
             disable_position_nft_exec: ConfigDefaults::disable_position_nft_exec(),
             liquidity_cooldown_seconds: ConfigDefaults::liquidity_cooldown_seconds(),
             spot_price,
+            price_update_too_old_seconds: None,
         }
     }
 

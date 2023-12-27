@@ -616,7 +616,6 @@ mod tests {
             instant_delta_neutrality_fee_value: Default::default(),
             delta_neutrality_fee_fund: Default::default(),
             stale_liquifunding: None,
-            stale_price: None,
             congested: false,
             fees: Fees {
                 wallets: Default::default(),
