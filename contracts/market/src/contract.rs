@@ -264,6 +264,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             take_profit_override,
         } => {
             state.position_assert_owner(ctx.storage, id, &info.sender)?;
+            state.assert_no_pending_deferred(ctx.storage, id)?;
             state.set_trigger_order(&mut ctx, id, stop_loss_override, take_profit_override)?;
         }
 
@@ -360,6 +361,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             // executions *MUST* come only from the proxy contract
             // otherwise anyone could spoof the sender
             state.assert_auth(&info.sender, AuthCheck::Addr(position_token_addr))?;
+            // Do not allow any NFT-level actions while deferred executions are pending
+            if let Some(pos_id) = msg.get_position_id()? {
+                state.assert_no_pending_deferred(ctx.storage, pos_id)?;
+            }
             state.nft_handle_exec(&mut ctx, sender.validate(state.api)?, msg)?;
         }
 

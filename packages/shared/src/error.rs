@@ -73,6 +73,7 @@ pub enum ErrorId {
     MaxLiquidity,
     InvalidTriggerPrice,
     LiquidityCooldown,
+    PendingDeferredExec,
 }
 
 /// Source within the protocol for the error

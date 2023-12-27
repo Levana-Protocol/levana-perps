@@ -29,6 +29,10 @@ const DEFERRED_EXECS: Map<DeferredExecId, DeferredExecWithStatus> =
 const DEFERRED_EXECS_BY_WALLET: Map<(Addr, DeferredExecId), ()> =
     Map::new(namespace::DEFERRED_EXECS_BY_WALLET);
 
+/// Pending deferred exec action for the given position.
+const PENDING_DEFERRED_FOR_POSITION: Map<PositionId, DeferredExecId> =
+    Map::new(namespace::PENDING_DEFERRED_FOR_POSITION);
+
 impl State<'_> {
     pub(crate) fn get_next_deferred_execution(
         &self,
@@ -99,8 +103,10 @@ impl State<'_> {
         item: DeferredExecItem,
     ) -> Result<()> {
         // Owner check first
-        if let Some(pos_id) = item.position_id() {
+        let pos_id = item.position_id();
+        if let Some(pos_id) = pos_id {
             self.position_assert_owner(ctx.storage, pos_id, &trader)?;
+            self.assert_no_pending_deferred(ctx.storage, pos_id)?;
         }
 
         let (new_id, new_latest_ids) = match DEFERRED_EXEC_LATEST_IDS.may_load(ctx.storage)? {
@@ -121,8 +127,6 @@ impl State<'_> {
         DEFERRED_EXEC_LATEST_IDS.save(ctx.storage, &new_latest_ids)?;
         DEFERRED_EXECS_BY_WALLET.save(ctx.storage, (trader.clone(), new_id), &())?;
 
-        let position_id = item.position_id();
-
         DEFERRED_EXECS.save(
             ctx.storage,
             new_id,
@@ -135,9 +139,13 @@ impl State<'_> {
             },
         )?;
 
+        if let Some(pos_id) = pos_id {
+            PENDING_DEFERRED_FOR_POSITION.save(ctx.storage, pos_id, &new_id)?;
+        }
+
         ctx.response_mut().add_event(DeferredExecQueuedEvent {
             deferred_exec_id: new_id,
-            position_id,
+            position_id: pos_id,
             owner: trader,
         });
 
@@ -270,6 +278,13 @@ impl State<'_> {
         };
         DEFERRED_EXECS.save(ctx.storage, id, &item)?;
 
+        if let Some(pos_id) = item.item.position_id() {
+            // This is just a sanity check
+            anyhow::ensure!(PENDING_DEFERRED_FOR_POSITION.load(ctx.storage, pos_id)? == id);
+
+            PENDING_DEFERRED_FOR_POSITION.remove(ctx.storage, pos_id);
+        }
+
         ctx.response_mut().add_event(DeferredExecExecutedEvent {
             deferred_exec_id: id,
             position_id: item.item.position_id(),
@@ -299,5 +314,17 @@ impl State<'_> {
         item.status = DeferredExecStatus::Success { id: pos_id };
         DEFERRED_EXECS.save(ctx.storage, item.id, &item)?;
         Ok(())
+    }
+
+    pub(crate) fn assert_no_pending_deferred(
+        &self,
+        store: &dyn Storage,
+        id: PositionId,
+    ) -> Result<()> {
+        if PENDING_DEFERRED_FOR_POSITION.has(store, id) {
+            Err(MarketError::PendingDeferredExec {}.into_anyhow())
+        } else {
+            Ok(())
+        }
     }
 }
