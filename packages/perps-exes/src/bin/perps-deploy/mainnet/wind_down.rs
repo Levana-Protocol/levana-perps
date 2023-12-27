@@ -34,6 +34,9 @@ pub(super) struct WindDownOpts {
     /// Enable instead of disable
     #[clap(long)]
     enable: bool,
+    /// Use the kill switch wallet instead
+    #[clap(long)]
+    kill_switch: bool,
 }
 
 impl WindDownOpts {
@@ -49,6 +52,7 @@ async fn go(
         market,
         impacts,
         enable,
+        kill_switch,
     }: WindDownOpts,
 ) -> Result<()> {
     let impacts = impacts
@@ -73,7 +77,11 @@ async fn go(
         market
     };
 
-    let wind_down = factory.query_wind_down().await?;
+    let wind_down = if kill_switch {
+        factory.query_kill_switch().await?
+    } else {
+        factory.query_wind_down().await?
+    };
     log::info!("CW3 contract: {wind_down}");
 
     let msg = CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {

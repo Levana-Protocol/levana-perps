@@ -130,6 +130,14 @@ impl Factory {
             })
     }
 
+    pub async fn query_kill_switch(&self) -> Result<Address> {
+        let FactoryOwnerResp { kill_switch, .. } = self.0.query(QueryMsg::FactoryOwner {}).await?;
+        kill_switch
+            .into_string()
+            .parse()
+            .with_context(|| format!("Invalid kill switch found for factory {}", self.0))
+    }
+
     pub async fn query_wind_down(&self) -> Result<Address> {
         let FactoryOwnerResp { wind_down, .. } = self.0.query(QueryMsg::FactoryOwner {}).await?;
         wind_down
