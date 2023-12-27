@@ -45,7 +45,7 @@ fn helper(
             take_profit_override,
         ),
         DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount } => {
-            handle_update_position_shared(state, ctx, item.owner, id, None, None)?;
+            handle_update_position_shared(state, ctx, id, None, None)?;
             state.update_position_collateral(ctx, id, amount.into_signed())?;
             Ok(id)
         }
@@ -56,19 +56,12 @@ fn helper(
         } => {
             let funds = amount.into_signed();
             let notional_size = state.update_size_new_notional_size(ctx, id, funds)?;
-            handle_update_position_shared(
-                state,
-                ctx,
-                item.owner,
-                id,
-                Some(notional_size),
-                slippage_assert,
-            )?;
+            handle_update_position_shared(state, ctx, id, Some(notional_size), slippage_assert)?;
             state.update_position_size(ctx, id, funds)?;
             Ok(id)
         }
         DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => {
-            handle_update_position_shared(state, ctx, item.owner, id, None, None)?;
+            handle_update_position_shared(state, ctx, id, None, None)?;
             state.update_position_collateral(ctx, id, -amount.into_signed())?;
             Ok(id)
         }
@@ -79,14 +72,7 @@ fn helper(
         } => {
             let funds = -amount.into_signed();
             let notional_size = state.update_size_new_notional_size(ctx, id, funds)?;
-            handle_update_position_shared(
-                state,
-                ctx,
-                item.owner,
-                id,
-                Some(notional_size),
-                slippage_assert,
-            )?;
+            handle_update_position_shared(state, ctx, id, Some(notional_size), slippage_assert)?;
             state.update_position_size(ctx, id, funds)?;
             Ok(id)
         }
@@ -95,7 +81,7 @@ fn helper(
             leverage,
             slippage_assert,
         } => {
-            handle_update_position_shared(state, ctx, item.owner, id, None, None)?;
+            handle_update_position_shared(state, ctx, id, None, None)?;
             let notional_size = state.update_leverage_new_notional_size(ctx, id, leverage)?;
             if let Some(slippage_assert) = slippage_assert {
                 let market_type = state.market_id(ctx.storage)?.get_market_type();
@@ -113,7 +99,7 @@ fn helper(
             Ok(id)
         }
         DeferredExecItem::UpdatePositionMaxGains { id, max_gains } => {
-            handle_update_position_shared(state, ctx, item.owner, id, None, None)?;
+            handle_update_position_shared(state, ctx, id, None, None)?;
             let counter_collateral =
                 state.update_max_gains_new_counter_collateral(ctx, id, max_gains)?;
             state.update_position_max_gains(ctx, id, counter_collateral)?;
@@ -142,14 +128,13 @@ fn helper(
 fn handle_update_position_shared(
     state: &State,
     ctx: &mut StateContext,
-    sender: Addr,
     id: PositionId,
     notional_size: Option<Signed<Notional>>,
     slippage_assert: Option<SlippageAssert>,
 ) -> Result<()> {
     state.ensure_not_stale(ctx.storage)?;
 
-    state.position_assert_owner(ctx.storage, id, &sender)?;
+    // We used to assert position owner here, but that's now handled when queueing the deferred message.
 
     if let Some(slippage_assert) = slippage_assert {
         let market_type = state.market_id(ctx.storage)?.get_market_type();

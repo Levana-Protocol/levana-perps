@@ -299,7 +299,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             id,
             slippage_assert,
         } => {
-            state.position_assert_owner(ctx.storage, id, &info.sender)?;
             state.defer_execution(
                 &mut ctx,
                 info.sender,
