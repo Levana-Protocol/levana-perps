@@ -1958,6 +1958,9 @@ impl PerpsMarket {
             responses.push(self.exec(
                 sender,
                 &MarketExecuteMsg::Crank {
+                    // This also doesn't seem necessary so far
+                    // if tests do depend on only getting more fidelity on cranking here
+                    // maybe take it as a parameter... TBD
                     //execs: Some(1),
                     execs: None,
                     rewards: None,
