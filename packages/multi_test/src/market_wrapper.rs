@@ -37,7 +37,10 @@ use msg::contracts::farming::entry::{
 };
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::crank::CrankWorkInfo;
-use msg::contracts::market::deferred_execution::{DeferredExecWithStatus, ListDeferredExecsResp, DeferredExecExecutedEvent, DeferredExecQueuedEvent};
+use msg::contracts::market::deferred_execution::{
+    DeferredExecExecutedEvent, DeferredExecQueuedEvent, DeferredExecWithStatus,
+    ListDeferredExecsResp,
+};
 use msg::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
     InitialPrice, LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpAction,
@@ -91,7 +94,7 @@ pub struct PerpsMarket {
 
     /// Temp for printf debugging / migration
     /// TODO: remove
-    pub debug_001: bool
+    pub debug_001: bool,
 }
 
 impl PerpsMarket {
@@ -236,7 +239,7 @@ impl PerpsMarket {
             addr: market_addr,
             automatic_time_jump_enabled: true,
             farming_addr,
-            debug_001: false
+            debug_001: false,
         };
 
         if bootstap_lp {
@@ -1892,11 +1895,12 @@ impl PerpsMarket {
     // this defers a message exec in the sense of Levana perps semantics of "deferred executions"
     // *not* defer in the sense of native programming jargon, like the golang keyword or until Drop kicks in etc.
     pub fn exec_defer_wasm_msg(&self, sender: &Addr, msg: WasmMsg) -> Result<DeferResponse> {
-
         let cosmos_msg = CosmosMsg::Wasm(msg);
         let res = self.app().execute(sender.clone(), cosmos_msg)?;
 
-        let queue_event = res.event_first("deferred-exec-queued").and_then(DeferredExecQueuedEvent::try_from)?;
+        let queue_event = res
+            .event_first("deferred-exec-queued")
+            .and_then(DeferredExecQueuedEvent::try_from)?;
 
         let mut responses = vec![res];
 
@@ -1911,9 +1915,19 @@ impl PerpsMarket {
                 }
             }
             // check before cranking, in case the deferred execution was queued and completed in the same block
-            if let Ok(exec_event) = responses.last().as_ref().unwrap().event_first("deferred-exec-executed").and_then(DeferredExecExecutedEvent::try_from) {
+            if let Ok(exec_event) = responses
+                .last()
+                .as_ref()
+                .unwrap()
+                .event_first("deferred-exec-executed")
+                .and_then(DeferredExecExecutedEvent::try_from)
+            {
                 if exec_event.deferred_exec_id == queue_event.deferred_exec_id {
-                    break Ok(DeferResponse { exec_event, queue_event, responses })
+                    break Ok(DeferResponse {
+                        exec_event,
+                        queue_event,
+                        responses,
+                    });
                 }
             }
 
@@ -1946,7 +1960,7 @@ pub struct DeferResponse {
 
 impl DeferResponse {
     pub fn queue_resp(&self) -> &AppResponse {
-        // Safe - we only get here if the deferred execution was queued, and by definition that's the first AppResponse we get 
+        // Safe - we only get here if the deferred execution was queued, and by definition that's the first AppResponse we get
         self.responses.first().unwrap()
     }
 

@@ -142,6 +142,11 @@ pub enum MarketError {
     },
     #[error("Cannot perform the given action while a pending action is waiting for the position")]
     PendingDeferredExec {},
+    #[error("The difference between oldest and newest publish timestamp is too large. Oldest: {oldest}. Newest: {newest}.")]
+    VolatilePriceFeedTimeDelta {
+        oldest: Timestamp,
+        newest: Timestamp,
+    },
 }
 
 /// Was the price provided by the trader too high or too low?
@@ -275,6 +280,7 @@ impl MarketError {
             MarketError::InvalidTriggerPrice { .. } => ErrorId::InvalidTriggerPrice,
             MarketError::LiquidityCooldown { .. } => ErrorId::LiquidityCooldown,
             MarketError::PendingDeferredExec {} => ErrorId::PendingDeferredExec,
+            MarketError::VolatilePriceFeedTimeDelta { .. } => ErrorId::VolatilePriceFeedTimeDelta,
         }
     }
 }

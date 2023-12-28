@@ -3,9 +3,11 @@ use anyhow::Result;
 use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, Storage, SubMsg, SubMsgResult};
 use cw_storage_plus::{Item, Map};
 use msg::contracts::market::deferred_execution::{
-    DeferredExecExecutedEvent, DeferredExecId, DeferredExecItem, DeferredExecQueuedEvent,
-    DeferredExecStatus, DeferredExecWithStatus, GetDeferredExecResp, ListDeferredExecsResp,
+    DeferredExecCompleteTarget, DeferredExecExecutedEvent, DeferredExecId, DeferredExecItem,
+    DeferredExecQueuedEvent, DeferredExecStatus, DeferredExecTarget, DeferredExecWithStatus,
+    GetDeferredExecResp, ListDeferredExecsResp,
 };
+use msg::contracts::market::order::OrderId;
 use msg::contracts::market::position::PositionId;
 use msg::prelude::*;
 
@@ -30,8 +32,12 @@ const DEFERRED_EXECS_BY_WALLET: Map<(Addr, DeferredExecId), ()> =
     Map::new(namespace::DEFERRED_EXECS_BY_WALLET);
 
 /// Pending deferred exec action for the given position.
-const PENDING_DEFERRED_FOR_POSITION: Map<PositionId, DeferredExecId> =
+const PENDING_DEFERRED_FOR_POSITION: Map<(PositionId, DeferredExecId), ()> =
     Map::new(namespace::PENDING_DEFERRED_FOR_POSITION);
+
+/// Pending deferred exec action for the given order.
+const PENDING_DEFERRED_FOR_ORDER: Map<(OrderId, DeferredExecId), ()> =
+    Map::new(namespace::PENDING_DEFERRED_FOR_ORDER);
 
 impl State<'_> {
     pub(crate) fn get_next_deferred_execution(
@@ -116,10 +122,15 @@ impl State<'_> {
         item: DeferredExecItem,
     ) -> Result<()> {
         // Owner check first
-        let pos_id = item.position_id();
-        if let Some(pos_id) = pos_id {
-            self.position_assert_owner(ctx.storage, pos_id, &trader)?;
-            self.assert_no_pending_deferred(ctx.storage, pos_id)?;
+        let target = item.target();
+        match target {
+            DeferredExecTarget::DoesNotExist => (),
+            DeferredExecTarget::Position(pos_id) => {
+                self.position_assert_owner(ctx.storage, pos_id, &trader)?;
+            }
+            DeferredExecTarget::Order(order_id) => {
+                self.limit_order_assert_owner(ctx.storage, &trader, order_id)?;
+            }
         }
 
         let (new_id, new_latest_ids) = match DEFERRED_EXEC_LATEST_IDS.may_load(ctx.storage)? {
@@ -152,13 +163,19 @@ impl State<'_> {
             },
         )?;
 
-        if let Some(pos_id) = pos_id {
-            PENDING_DEFERRED_FOR_POSITION.save(ctx.storage, pos_id, &new_id)?;
+        match target {
+            DeferredExecTarget::DoesNotExist => (),
+            DeferredExecTarget::Position(pos_id) => {
+                PENDING_DEFERRED_FOR_POSITION.save(ctx.storage, (pos_id, new_id), &())?;
+            }
+            DeferredExecTarget::Order(order_id) => {
+                PENDING_DEFERRED_FOR_ORDER.save(ctx.storage, (order_id, new_id), &())?;
+            }
         }
 
         ctx.response_mut().add_event(DeferredExecQueuedEvent {
             deferred_exec_id: new_id,
-            position_id: pos_id,
+            target,
             owner: trader,
         });
 
@@ -168,32 +185,15 @@ impl State<'_> {
     pub(crate) fn next_crankable_deferred_exec_id(
         &self,
         store: &dyn Storage,
-        price_point_timestamp: Timestamp,
-        publish_time_base: Option<Timestamp>,
-        publish_time_collateral: Option<Timestamp>,
-    ) -> Result<Option<(DeferredExecId, Option<PositionId>)>> {
+        publish_time: Timestamp,
+    ) -> Result<Option<(DeferredExecId, DeferredExecTarget)>> {
         let (id, item) = match self.get_next_deferred_execution(store)? {
             None => return Ok(None),
             Some(pair) => pair,
         };
 
-        // Get the earliest of the free price timestamps. Motivation: if someone
-        // publishes an old price from Pyth, we want to look at Pyth's time, not the block
-        // time. This isn't theoretical: every case of an off-chain oracle timestamp should
-        // be older than block time, and for on-chain oracles the timestamp of update
-        // should never be newer than the block time.
-        let mut publish_time = price_point_timestamp;
-        if let Some(publish_time_base) = publish_time_base {
-            debug_assert!(publish_time_base <= price_point_timestamp);
-            publish_time = publish_time.min(publish_time_base);
-        }
-        if let Some(publish_time_collateral) = publish_time_collateral {
-            debug_assert!(publish_time_collateral <= price_point_timestamp);
-            publish_time = publish_time.min(publish_time_collateral);
-        }
-
-        Ok(if item.created <= publish_time {
-            Some((id, item.item.position_id()))
+        Ok(if item.created < publish_time {
+            Some((id, item.item.target()))
         } else {
             None
         })
@@ -233,6 +233,8 @@ impl State<'_> {
             // always modify the code at that point to use a different mechanism.
             id.u64(),
         ));
+
+        // TODO need to deduct crank fees from either the new funds or the existing position. Can look at limit order logic.
 
         // We immediately update the data structure so that if we crank multiple
         // items we continue with the next ID.
@@ -295,16 +297,26 @@ impl State<'_> {
         };
         DEFERRED_EXECS.save(ctx.storage, id, &item)?;
 
-        if let Some(pos_id) = item.item.position_id() {
-            // This is just a sanity check
-            anyhow::ensure!(PENDING_DEFERRED_FOR_POSITION.load(ctx.storage, pos_id)? == id);
+        let target = item.item.target();
+        match target {
+            DeferredExecTarget::DoesNotExist => (),
+            DeferredExecTarget::Position(pos_id) => {
+                // This is just a sanity check
+                anyhow::ensure!(PENDING_DEFERRED_FOR_POSITION.has(ctx.storage, (pos_id, id)));
 
-            PENDING_DEFERRED_FOR_POSITION.remove(ctx.storage, pos_id);
+                PENDING_DEFERRED_FOR_POSITION.remove(ctx.storage, (pos_id, id));
+            }
+            DeferredExecTarget::Order(order_id) => {
+                // This is just a sanity check
+                anyhow::ensure!(PENDING_DEFERRED_FOR_ORDER.has(ctx.storage, (order_id, id)));
+
+                PENDING_DEFERRED_FOR_ORDER.remove(ctx.storage, (order_id, id));
+            }
         }
 
         ctx.response_mut().add_event(DeferredExecExecutedEvent {
             deferred_exec_id: id,
-            position_id: item.item.position_id(),
+            target,
             owner: item.owner,
             success,
             desc,
@@ -326,10 +338,10 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         mut item: DeferredExecWithStatus,
-        pos_id: PositionId,
+        target: DeferredExecCompleteTarget,
     ) -> Result<()> {
         item.status = DeferredExecStatus::Success {
-            id: pos_id,
+            target,
             executed: self.now(),
         };
         DEFERRED_EXECS.save(ctx.storage, item.id, &item)?;
@@ -341,7 +353,12 @@ impl State<'_> {
         store: &dyn Storage,
         id: PositionId,
     ) -> Result<()> {
-        if PENDING_DEFERRED_FOR_POSITION.has(store, id) {
+        if PENDING_DEFERRED_FOR_POSITION
+            .prefix(id)
+            .keys(store, None, None, Order::Ascending)
+            .next()
+            .is_some()
+        {
             Err(MarketError::PendingDeferredExec {}.into_anyhow())
         } else {
             Ok(())

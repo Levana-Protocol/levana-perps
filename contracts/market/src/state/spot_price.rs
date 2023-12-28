@@ -34,9 +34,17 @@ pub(crate) struct PriceStorage {
     /// Store the original incoming price in base to avoid rounding errors.
     price_base: PriceBaseInQuote,
     /// Latest price publish time for the feeds composing the price, if available
+    ///
+    /// Note that since deferred execution, these values will always be None.
     publish_time: Option<Timestamp>,
     /// Latest price publish time for the feeds composing the price_usd, if available
+    ///
+    /// Note that since deferred execution, these values will always be None.
     publish_time_usd: Option<Timestamp>,
+    /// The timestamp of the block where this price point was added.
+    ///
+    /// Note that this only started being populated after deferred execution.
+    block_time: Option<Timestamp>,
 }
 
 /// internal struct for satisfying both OraclePrice queries and spot price storage
@@ -52,15 +60,63 @@ pub(crate) struct OraclePriceInternal {
 }
 
 impl OraclePriceInternal {
+    /// Calculate the publish time for this feed, ensuring we don't violate the volitile diff rule.
+    ///
+    /// Returns `Ok(None)` if there are no volatile feeds with a publish time.
+    fn calculate_publish_time(&self, volatile_diff_seconds: u32) -> Result<Option<Timestamp>> {
+        let mut oldest_newest = None::<(Timestamp, Timestamp)>;
+
+        let mut add_new_timestamp = |timestamp| {
+            oldest_newest = Some(match oldest_newest {
+                None => (timestamp, timestamp),
+                Some((oldest, newest)) => (oldest.min(timestamp), newest.max(timestamp)),
+            });
+        };
+
+        for pyth in self.pyth.values() {
+            if pyth.volatile {
+                add_new_timestamp(pyth.publish_time);
+            }
+        }
+        // Note: ignoring Sei since we don't have publish time for it.
+        for stride in self.stride.values() {
+            if stride.volatile {
+                add_new_timestamp(stride.publish_time);
+            }
+        }
+        for simple in self.simple.values() {
+            if simple.volatile {
+                if let Some(timestamp) = simple.timestamp {
+                    add_new_timestamp(timestamp);
+                }
+            }
+        }
+
+        match oldest_newest {
+            Some((oldest, newest)) => {
+                debug_assert!(oldest <= newest);
+                let diff = newest.checked_sub(oldest, "calculate_publish_time")?;
+                let allowed = Duration::from_seconds(volatile_diff_seconds.into());
+                if diff <= allowed {
+                    Ok(Some(oldest))
+                } else {
+                    Err(MarketError::VolatilePriceFeedTimeDelta { oldest, newest }.into_anyhow())
+                }
+            }
+            None => Ok(None),
+        }
+    }
+
     pub fn compose_price(
         &self,
         market_id: &MarketId,
         feeds: &[SpotPriceFeed],
         feeds_usd: &[SpotPriceFeed],
+        block_time: Timestamp,
     ) -> Result<PriceStorage> {
-        let (price_amount, publish_time) = self.compose_price_feeds(feeds)?;
+        let price_amount = self.compose_price_feeds(feeds)?;
 
-        let (price_amount_usd, publish_time_usd) = self.compose_price_feeds(feeds_usd)?;
+        let price_amount_usd = self.compose_price_feeds(feeds_usd)?;
 
         let market_type = market_id.get_market_type();
         let price_base = PriceBaseInQuote::from_non_zero(price_amount);
@@ -71,40 +127,43 @@ impl OraclePriceInternal {
             price,
             price_usd,
             price_base,
-            publish_time,
-            publish_time_usd,
+            publish_time: None,
+            publish_time_usd: None,
+            block_time: Some(block_time),
         })
     }
 
     // given a list of feeds, compose them into a single price and publish_time (if available)
-    pub fn compose_price_feeds(
-        &self,
-        feeds: &[SpotPriceFeed],
-    ) -> Result<(NumberGtZero, Option<Timestamp>)> {
-        let mut acc_price: Option<(Number, Option<Timestamp>)> = None;
+    pub fn compose_price_feeds(&self, feeds: &[SpotPriceFeed]) -> Result<NumberGtZero> {
+        let mut acc_price: Option<Number> = None;
 
-        for SpotPriceFeed { data, inverted } in feeds {
-            let (price, publish_time) = match data {
+        for SpotPriceFeed {
+            data,
+            inverted,
+            volatile: _,
+        } in feeds
+        {
+            let price = match data {
                 SpotPriceFeedData::Pyth { id, .. } => self
                     .pyth
                     .get(id)
-                    .map(|x| (x.price, Some(x.publish_time)))
+                    .map(|x| x.price)
                     .with_context(|| format!("no pyth price for id {}", id))?,
                 SpotPriceFeedData::Sei { denom } => self
                     .sei
                     .get(denom)
-                    .map(|x| (*x, None))
+                    .copied()
                     .with_context(|| format!("no sei price for denom {}", denom))?,
                 SpotPriceFeedData::Stride { denom, .. } => self
                     .stride
                     .get(denom)
-                    .map(|x| (x.redemption_rate, Some(x.publish_time)))
+                    .map(|x| x.redemption_rate)
                     .with_context(|| format!("no stride redemption rate for denom {}", denom))?,
-                SpotPriceFeedData::Constant { price } => (*price, None),
+                SpotPriceFeedData::Constant { price } => *price,
                 SpotPriceFeedData::Simple { contract, .. } => self
                     .simple
                     .get(contract)
-                    .map(|x| (x.value, x.timestamp))
+                    .map(|x| x.value)
                     .with_context(|| format!("no simple price for contract {}", contract))?,
             };
 
@@ -115,19 +174,15 @@ impl OraclePriceInternal {
             };
 
             acc_price = match acc_price {
-                None => Some((price, publish_time)),
-                Some((prev_price, prev_publish_time)) => {
-                    let publish_time = publish_time.max(prev_publish_time);
-                    let next_price = prev_price * price;
-                    Some((next_price, publish_time))
-                }
+                None => Some(price),
+                Some(prev_price) => Some(prev_price * price),
             }
         }
 
         match acc_price {
-            Some((price, publish_time)) => {
+            Some(price) => {
                 let price = NumberGtZero::try_from(price)?;
-                Ok((price, publish_time))
+                Ok(price)
             }
             None => anyhow::bail!("No price feeds provided"),
         }
@@ -145,6 +200,7 @@ impl State<'_> {
             price_base,
             publish_time,
             publish_time_usd,
+            block_time: _,
         }: PriceStorage,
     ) -> Result<PricePoint> {
         let market_id = self.market_id(store)?;
@@ -331,34 +387,57 @@ impl State<'_> {
                     price_base,
                     publish_time: None,
                     publish_time_usd: None,
+                    block_time: Some(self.now()),
                 },
             )
             .map_err(|err| err.into())
     }
 
     pub(crate) fn spot_price_append(&self, ctx: &mut StateContext) -> Result<()> {
-        let timestamp = self.now();
-
-        if PRICES.has(ctx.storage, timestamp) {
-            // if price changes within the same block, we don't care - first come first serve
-            return Ok(());
-        }
-
         let market_id = self.market_id(ctx.storage)?;
 
-        let price_storage = match self.config.spot_price.clone() {
-            SpotPriceConfig::Manual { .. } => MANUAL_SPOT_PRICE.may_load(ctx.storage)?.context(
-                "This contract has manual price updates, and no price has been set yet.",
-            )?,
+        let (new_publish_time, price_storage) = match self.config.spot_price.clone() {
+            SpotPriceConfig::Manual { .. } => (
+                self.now(),
+                MANUAL_SPOT_PRICE.may_load(ctx.storage)?.context(
+                    "This contract has manual price updates, and no price has been set yet.",
+                )?,
+            ),
             SpotPriceConfig::Oracle {
                 pyth: _,
                 stride: _,
                 feeds,
                 feeds_usd,
-            } => self
-                .get_oracle_price(true)?
-                .compose_price(market_id, &feeds, &feeds_usd)?,
+                volatile_diff_seconds,
+            } => {
+                let internal = self.get_oracle_price(true)?;
+                const DEFAULT_VOLATILE_DIFF_SECONDS: u32 = 5;
+                let new_publish_time = internal.calculate_publish_time(
+                    volatile_diff_seconds.unwrap_or(DEFAULT_VOLATILE_DIFF_SECONDS),
+                )?;
+                let price_storage =
+                    internal.compose_price(market_id, &feeds, &feeds_usd, self.now())?;
+                (
+                    new_publish_time.unwrap_or_else(|| self.now()),
+                    price_storage,
+                )
+            }
         };
+
+        // Ensure strictly monotonically increasing publish price timestamps. Find the most recently published timestamp and make sure our new publish time is greater than it.
+        match PRICES
+            .keys(ctx.storage, None, None, Order::Descending)
+            .next()
+        {
+            // No prices published yet, so we're allowed to use this timestamp
+            None => (),
+            Some(last_published) => {
+                if last_published? >= new_publish_time {
+                    // New publish time is not newer that the last published time, do not add a new spot price
+                    return Ok(());
+                }
+            }
+        }
 
         // sanity check
         if let Some(price_usd) = price_storage.price_base.try_into_usd(market_id) {
@@ -371,7 +450,7 @@ impl State<'_> {
         }
 
         ctx.response_mut().add_event(SpotPriceEvent {
-            timestamp,
+            timestamp: new_publish_time,
             price_usd: price_storage.price_usd,
             price_notional: price_storage.price,
             price_base: price_storage.price_base,
@@ -380,7 +459,7 @@ impl State<'_> {
         });
 
         PRICES
-            .save(ctx.storage, timestamp, &price_storage)
+            .save(ctx.storage, new_publish_time, &price_storage)
             .map_err(|err| err.into())
     }
 
@@ -394,6 +473,7 @@ impl State<'_> {
                 stride: stride_config,
                 feeds,
                 feeds_usd,
+                volatile_diff_seconds: _,
             } => {
                 let mut pyth = BTreeMap::new();
                 let mut stride = BTreeMap::new();
@@ -457,6 +537,8 @@ impl State<'_> {
                                 entry.insert(OraclePriceFeedPythResp {
                                     price,
                                     publish_time,
+                                    // Pyth feeds default to being volatile unless otherwise overridden
+                                    volatile: feed.volatile.unwrap_or(true),
                                 });
                             }
                         }
@@ -555,6 +637,8 @@ impl State<'_> {
                                 entry.insert(OraclePriceFeedStrideResp {
                                     redemption_rate,
                                     publish_time,
+                                    // Stride feeds default to being non-volatile unless otherwise overridden
+                                    volatile: feed.volatile.unwrap_or_default(),
                                 });
                             }
                         }

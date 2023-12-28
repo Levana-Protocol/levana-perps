@@ -263,9 +263,15 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             stop_loss_override,
             take_profit_override,
         } => {
-            state.position_assert_owner(ctx.storage, id, &info.sender)?;
-            state.assert_no_pending_deferred(ctx.storage, id)?;
-            state.set_trigger_order(&mut ctx, id, stop_loss_override, take_profit_override)?;
+            state.defer_execution(
+                &mut ctx,
+                info.sender,
+                DeferredExecItem::SetTriggerOrder {
+                    id,
+                    stop_loss_override,
+                    take_profit_override,
+                },
+            )?;
         }
 
         ExecuteMsg::PlaceLimitOrder {
@@ -276,24 +282,27 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             stop_loss_override,
             take_profit_override,
         } => {
-            let market_type = state.market_id(ctx.storage)?.get_market_type();
-
-            state.limit_order_set_order(
+            state.defer_execution(
                 &mut ctx,
                 info.sender,
-                trigger_price,
-                info.funds.take()?,
-                leverage,
-                direction.into_notional(market_type),
-                max_gains,
-                stop_loss_override,
-                take_profit_override,
+                DeferredExecItem::PlaceLimitOrder {
+                    trigger_price,
+                    leverage,
+                    direction,
+                    max_gains,
+                    stop_loss_override,
+                    take_profit_override,
+                    amount: info.funds.take()?,
+                },
             )?;
         }
 
         ExecuteMsg::CancelLimitOrder { order_id } => {
-            state.limit_order_assert_owner(ctx.storage, &info.sender, order_id)?;
-            state.limit_order_cancel_order(&mut ctx, order_id)?;
+            state.defer_execution(
+                &mut ctx,
+                info.sender,
+                DeferredExecItem::CancelLimitOrder { order_id },
+            )?;
         }
 
         ExecuteMsg::ClosePosition {
@@ -455,7 +464,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             } => {
                 let oracle_price = state.get_oracle_price(false)?;
                 let market_id = state.market_id(store)?;
-                let price_storage = oracle_price.compose_price(market_id, &feeds, &feeds_usd)?;
+                let price_storage =
+                    oracle_price.compose_price(market_id, &feeds, &feeds_usd, state.now())?;
                 let price_point = state.make_price_point(store, state.now(), price_storage)?;
                 OraclePriceResp {
                     pyth: oracle_price.pyth,
@@ -672,13 +682,16 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, env: Env, MigrateMsg {}: MigrateMsg) -> Result<Response> {
-    let (_state, ctx) = StateContext::new(deps, env)?;
+    let (state, ctx) = StateContext::new(deps, env)?;
 
     // Note, we use _state instead of state to avoid warnings when compiling without the sanity
     // feature
 
     #[cfg(feature = "sanity")]
-    _state.sanity_check(ctx.storage);
+    state.sanity_check(ctx.storage);
+
+    // Make sure we don't have any pre-deferred-execution unpending items.
+    state.ensure_liquidation_prices_pending_empty(ctx.storage)?;
 
     let old_cw2 = get_contract_version(ctx.storage)?;
     let old_version: Version = old_cw2

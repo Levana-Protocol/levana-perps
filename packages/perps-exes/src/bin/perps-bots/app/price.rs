@@ -222,6 +222,7 @@ impl App {
                 stride: _,
                 feeds,
                 feeds_usd,
+                volatile_diff_seconds: _,
             } => feeds.iter().chain(feeds_usd.iter()).any(|x| match x.data {
                 SpotPriceFeedData::Constant { .. } => false,
                 SpotPriceFeedData::Pyth { .. } => true,
@@ -450,6 +451,7 @@ impl App {
             }
         }
 
+        // TODO review this code and make sure we're handling publish times correctly
         if let Some(publish_time) = market_price.publish_time {
             // Determine the logical "last update" by using both the
             // contract-derived price time and the most recent successful price

@@ -206,6 +206,7 @@ pub(crate) fn convert_spot_price_init(
             stride,
             feeds,
             feeds_usd,
+            volatile_diff_seconds,
         } => {
             ensure!(!feeds.is_empty(), "feeds cannot be empty");
             ensure!(!feeds_usd.is_empty(), "feeds_usd cannot be empty");
@@ -219,6 +220,7 @@ pub(crate) fn convert_spot_price_init(
                     .map(|feed| {
                         Ok(SpotPriceFeed {
                             inverted: feed.inverted,
+                            volatile: feed.volatile,
                             data: match feed.data {
                                 SpotPriceFeedDataInit::Constant { price } => {
                                     SpotPriceFeedData::Constant { price }
@@ -274,6 +276,7 @@ pub(crate) fn convert_spot_price_init(
                     .transpose()?,
                 feeds: map_feeds(api, feeds)?,
                 feeds_usd: map_feeds(api, feeds_usd)?,
+                volatile_diff_seconds,
             }
         }
     })
