@@ -1,4 +1,3 @@
-mod position;
 mod crank_fee;
 mod deferred_execution;
 mod edge;
@@ -8,9 +7,10 @@ mod logging;
 mod lp_cw20;
 mod multi_market;
 mod nft;
-mod shutdown;
+mod position;
 mod proptest;
 mod rewards;
+mod shutdown;
 mod wrong_token;
 
 /* Still failing:
