@@ -1918,18 +1918,14 @@ impl PerpsMarket {
                 .and_then(DeferredExecExecutedEvent::try_from)
             {
                 if exec_event.deferred_exec_id == queue_event.deferred_exec_id {
-                    match exec_event.success {
-                        true => {
-                            break Ok(DeferResponse {
-                                exec_event,
-                                queue_event,
-                                responses,
-                            })
-                        }
-                        false => {
-                            return Err(anyhow!("deferred execution failed: {:?}", exec_event.desc))
-                        }
-                    }
+                    break match exec_event.success {
+                        true => Ok(DeferResponse {
+                            exec_event,
+                            queue_event,
+                            responses,
+                        }),
+                        false => Err(anyhow!("deferred execution failed: {:?}", exec_event.desc)),
+                    };
                 }
             }
 
