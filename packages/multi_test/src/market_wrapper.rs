@@ -286,7 +286,6 @@ impl PerpsMarket {
             time_jump,
             self.app().block_info(),
             config.liquifunding_delay_seconds as u64,
-            config.staleness_seconds as u64,
         );
         self.app().set_block_info(block_info_change);
 

@@ -14,7 +14,6 @@ pub enum TimeJump {
     Minutes(i64),
     Hours(i64),
     Liquifundings(i64),
-    Staleness(i64),
     Blocks(i64),
     FractionalLiquifundings(f64),
     PreciseTime(Timestamp),
@@ -57,7 +56,6 @@ impl BlockInfoChange {
         time_jump: TimeJump,
         current_block_info: BlockInfo,
         liquifunding_duration: u64,
-        staleness_duration: u64,
     ) -> Self {
         let nanos = match time_jump {
             TimeJump::Nanos(n) => n,
@@ -65,7 +63,6 @@ impl BlockInfoChange {
             TimeJump::Minutes(n) => n * 60 * NANOS_PER_SECOND,
             TimeJump::Hours(n) => n * 60 * 60 * NANOS_PER_SECOND,
             TimeJump::Liquifundings(n) => n * liquifunding_duration as i64 * NANOS_PER_SECOND,
-            TimeJump::Staleness(n) => n * staleness_duration as i64 * NANOS_PER_SECOND,
             TimeJump::FractionalLiquifundings(n) => {
                 ((n * liquifunding_duration as f64) * NANOS_PER_SECOND as f64) as i64
             }
@@ -88,7 +85,7 @@ mod test {
     fn time_jump_math() {
         let app = PerpsApp::new().unwrap();
         let assert_height = |time_jump: TimeJump, expected_height: i64| {
-            let change = BlockInfoChange::from_time_jump(time_jump, app.block_info(), 3600, 3600);
+            let change = BlockInfoChange::from_time_jump(time_jump, app.block_info(), 3600);
 
             if change.height != expected_height {
                 panic!(
@@ -109,7 +106,6 @@ mod test {
             assert_height(TimeJump::Nanos(8_000_000_000 * sign), 2 * sign);
             assert_height(TimeJump::Minutes(2 * sign), 18 * sign);
             assert_height(TimeJump::Liquifundings(2 * sign), 1029 * sign);
-            assert_height(TimeJump::Staleness(2 * sign), 1029 * sign);
             assert_height(
                 TimeJump::FractionalLiquifundings(0.5 * sign as f64),
                 258 * sign,
