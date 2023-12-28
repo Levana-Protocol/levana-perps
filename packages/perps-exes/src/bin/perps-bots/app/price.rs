@@ -451,6 +451,7 @@ impl App {
             }
         }
 
+        // TODO review this code and make sure we're handling publish times correctly
         if let Some(publish_time) = market_price.publish_time {
             // Determine the logical "last update" by using both the
             // contract-derived price time and the most recent successful price

@@ -168,31 +168,14 @@ impl State<'_> {
     pub(crate) fn next_crankable_deferred_exec_id(
         &self,
         store: &dyn Storage,
-        price_point_timestamp: Timestamp,
-        publish_time_base: Option<Timestamp>,
-        publish_time_collateral: Option<Timestamp>,
+        publish_time: Timestamp,
     ) -> Result<Option<(DeferredExecId, Option<PositionId>)>> {
         let (id, item) = match self.get_next_deferred_execution(store)? {
             None => return Ok(None),
             Some(pair) => pair,
         };
 
-        // Get the earliest of the free price timestamps. Motivation: if someone
-        // publishes an old price from Pyth, we want to look at Pyth's time, not the block
-        // time. This isn't theoretical: every case of an off-chain oracle timestamp should
-        // be older than block time, and for on-chain oracles the timestamp of update
-        // should never be newer than the block time.
-        let mut publish_time = price_point_timestamp;
-        if let Some(publish_time_base) = publish_time_base {
-            debug_assert!(publish_time_base <= price_point_timestamp);
-            publish_time = publish_time.min(publish_time_base);
-        }
-        if let Some(publish_time_collateral) = publish_time_collateral {
-            debug_assert!(publish_time_collateral <= price_point_timestamp);
-            publish_time = publish_time.min(publish_time_collateral);
-        }
-
-        Ok(if item.created <= publish_time {
+        Ok(if item.created < publish_time {
             Some((id, item.item.position_id()))
         } else {
             None
