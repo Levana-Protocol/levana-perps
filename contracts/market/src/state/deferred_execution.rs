@@ -234,6 +234,8 @@ impl State<'_> {
             id.u64(),
         ));
 
+        // TODO need to deduct crank fees from either the new funds or the existing position. Can look at limit order logic.
+
         // We immediately update the data structure so that if we crank multiple
         // items we continue with the next ID.
         let DeferredExecLatestIds { issued, processed } = DEFERRED_EXEC_LATEST_IDS
