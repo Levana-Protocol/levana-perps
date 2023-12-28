@@ -55,12 +55,6 @@ async fn single_market(
     faucet: Address,
     status: &StatusResp,
 ) -> Result<WatchedTaskOutput> {
-    if status.is_stale() {
-        return Ok(WatchedTaskOutput::new(
-            "Protocol is currently stale, skipping",
-        ));
-    }
-
     let total = status.liquidity.total_collateral();
     if total.is_zero() {
         return Ok(WatchedTaskOutput::new("No deposited collateral"));

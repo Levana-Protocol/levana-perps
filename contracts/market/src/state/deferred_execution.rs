@@ -19,6 +19,12 @@ struct DeferredExecLatestIds {
     processed: Option<DeferredExecId>,
 }
 
+impl DeferredExecLatestIds {
+    fn queue_size(&self) -> u32 {
+        u32::try_from(self.issued.u64() - self.processed.map_or(0, |x| x.u64())).unwrap_or(u32::MAX)
+    }
+}
+
 /// Stores the last issued and [DeferredExecId]
 const DEFERRED_EXEC_LATEST_IDS: Item<DeferredExecLatestIds> =
     Item::new(namespace::DEFERRED_EXEC_LATEST_IDS);
@@ -40,6 +46,12 @@ const PENDING_DEFERRED_FOR_ORDER: Map<(OrderId, DeferredExecId), ()> =
     Map::new(namespace::PENDING_DEFERRED_FOR_ORDER);
 
 impl State<'_> {
+    pub(crate) fn deferred_execution_items(&self, store: &dyn Storage) -> Result<u32> {
+        Ok(DEFERRED_EXEC_LATEST_IDS
+            .may_load(store)?
+            .map_or(0, |latest| latest.queue_size()))
+    }
+
     pub(crate) fn get_next_deferred_execution(
         &self,
         store: &dyn Storage,

@@ -93,8 +93,6 @@ pub mod events {
         Borrow,
         /// Delta neutrality fee
         DeltaNeutrality,
-        /// Limit order fee
-        LimitOrder,
     }
 
     impl FeeSource {
@@ -103,7 +101,6 @@ pub mod events {
                 FeeSource::Trading => "trading",
                 FeeSource::Borrow => "borrow",
                 FeeSource::DeltaNeutrality => "delta-neutrality",
-                FeeSource::LimitOrder => "limit-order",
             }
         }
     }
@@ -116,7 +113,6 @@ pub mod events {
                 "trading" => Ok(FeeSource::Trading),
                 "borrow" => Ok(FeeSource::Borrow),
                 "delta-neutrality" => Ok(FeeSource::DeltaNeutrality),
-                "limit-order" => Ok(FeeSource::LimitOrder),
                 _ => Err(anyhow::anyhow!("Unknown FeeSource {s}")),
             }
         }

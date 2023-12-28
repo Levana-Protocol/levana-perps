@@ -15,7 +15,6 @@ pub(crate) mod position;
 pub(crate) mod sanity;
 pub(crate) mod shutdown;
 pub(crate) mod spot_price;
-pub(crate) mod stale;
 pub(crate) mod status;
 pub(crate) mod token;
 

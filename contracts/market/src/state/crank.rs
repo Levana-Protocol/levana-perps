@@ -11,7 +11,7 @@ use msg::contracts::market::{
 
 use shared::prelude::*;
 
-use super::position::{get_position, NEXT_LIQUIFUNDING, NEXT_STALE, OPEN_POSITIONS};
+use super::position::{get_position, NEXT_LIQUIFUNDING, OPEN_POSITIONS};
 
 /// The last price point timestamp for which the cranking process was completed.
 ///
@@ -166,31 +166,6 @@ impl State<'_> {
         Ok(())
     }
 
-    /// What is the ending timestamp for liquifunding and liquidation?
-    ///
-    /// Generally speaking, the crank performs its actions up until "now." That
-    /// means liquifunding does fee calculations up until the current timestamp,
-    /// and liquidations occur as of the current timestamp. The one exception to
-    /// this is when the protocol is stale. In that case, we do not have well
-    /// fundedness guarantees beyond the point where the protocol became stale,
-    /// and we therefore calculate up until the protocol entered stale.
-    ///
-    /// This function checks if the protocol is stale and, if so, returns that
-    /// timestamp. Otherwise it returns now.
-    fn stale_or_now(&self, store: &dyn Storage) -> Result<Timestamp> {
-        let now = self.now();
-        Ok(
-            match NEXT_STALE
-                .keys(store, None, None, cosmwasm_std::Order::Ascending)
-                .next()
-                .transpose()?
-            {
-                Some((stale, _)) if now > stale => stale,
-                _ => now,
-            },
-        )
-    }
-
     /// Perform a single crank execution.
     fn crank_exec(&self, ctx: &mut StateContext, work_info: CrankWorkInfo) -> Result<()> {
         // get our current playhead time and price for liquidations
@@ -225,15 +200,18 @@ impl State<'_> {
             } => {
                 let pos = get_position(ctx.storage, position)?;
 
+                // Do one more liquifunding before closing the position to
+                // pay out fees. This may end up closing the position on its own, otherwise we
+                // explicitly close it ourselves because we hit a trigger.
                 let starts_at = pos.liquifunded_at;
-                let ends_at = self.stale_or_now(ctx.storage)?;
+                let ends_at = pos.next_liquifunding;
                 let mcp = self.position_liquifund(ctx, pos, starts_at, ends_at, true)?;
 
                 let close_position_instructions = match mcp {
                     MaybeClosedPosition::Open(pos) => ClosePositionInstructions {
                         pos,
                         exposure: Signed::zero(),
-                        close_time: ends_at,
+                        close_time: self.now(),
                         settlement_time: price_point.timestamp,
                         reason: PositionCloseReason::Liquidated(liquidation_reason),
                     },

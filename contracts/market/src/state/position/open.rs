@@ -92,7 +92,6 @@ impl State<'_> {
         let liquifunded_at = self.now();
         let next_liquifunding =
             liquifunded_at.plus_seconds(config.liquifunding_delay_seconds.into());
-        let stale_at = next_liquifunding.plus_seconds(config.staleness_seconds.into());
 
         // Initial position, before taking out any trading fees
         let mut pos = Position {
@@ -110,7 +109,6 @@ impl State<'_> {
             created_at: self.now(),
             liquifunded_at,
             next_liquifunding,
-            stale_at,
             stop_loss_override,
             take_profit_override,
             liquidation_margin: LiquidationMargin::default(),

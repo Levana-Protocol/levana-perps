@@ -221,7 +221,6 @@ fn funding_payment_typical() {
             liquifunding_delay_seconds: Some(40 * 60),
             // We need precise liquifunding periods for this test so remove randomization
             liquifunding_delay_fuzz_seconds: Some(0),
-            staleness_seconds: Some(20 * 60),
             ..Default::default()
         })
         .unwrap();
@@ -363,7 +362,6 @@ fn funding_borrow_fee() {
             liquifunding_delay_seconds: Some(60 * 60),
             // We need precise liquifunding periods for this test so remove randomization
             liquifunding_delay_fuzz_seconds: Some(0),
-            staleness_seconds: Some(20 * 60),
             ..Default::default()
         })
         .unwrap();

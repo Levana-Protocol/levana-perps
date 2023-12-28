@@ -53,14 +53,7 @@ impl State<'_> {
         let order_id = OrderId::new(last_order_id.u64() + 1);
         LAST_ORDER_ID.save(ctx.storage, &order_id)?;
 
-        let order_fee = Collateral::try_from_number(
-            collateral
-                .into_number()
-                .checked_mul(self.config.limit_order_fee.into_number())?,
-        )?;
-        let collateral = collateral.checked_sub(order_fee)?;
         let price = self.spot_price(ctx.storage, None)?;
-        self.collect_limit_order_fee(ctx, order_id, order_fee, price)?;
 
         let crank_fee_usd = self.config.crank_fee_charged;
         let crank_fee = price.usd_to_collateral(crank_fee_usd);
