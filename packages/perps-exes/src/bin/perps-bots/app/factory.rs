@@ -4,7 +4,6 @@ use std::sync::Arc;
 use axum::async_trait;
 use chrono::{DateTime, Utc};
 use cosmos::{Address, Cosmos};
-use http::header::REFERER;
 use msg::contracts::faucet::entry::{GasAllowanceResp, TapAmountResponse};
 use msg::prelude::*;
 use msg::{
@@ -14,7 +13,7 @@ use msg::{
     },
     token::Token,
 };
-use reqwest::header::HeaderValue;
+use reqwest::header::{HeaderValue, REFERER};
 
 use crate::config::BotConfigByType;
 use crate::util::markets::{get_markets, Market};
