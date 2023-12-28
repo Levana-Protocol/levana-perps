@@ -1157,9 +1157,9 @@ impl PerpsMarket {
             },
         )?;
 
-        let res = self.exec_wasm_msg(sender, msg)?;
+        let defer_resp = self.exec_defer_wasm_msg(sender, msg)?;
 
-        Ok(res)
+        Ok(defer_resp.exec_resp().clone())
     }
 
     pub fn exec_update_position_collateral_impact_size(
@@ -1191,9 +1191,9 @@ impl PerpsMarket {
             },
         )?;
 
-        let res = self.exec_wasm_msg(sender, msg)?;
+        let defer_resp = self.exec_defer_wasm_msg(sender, msg)?;
 
-        Ok(res)
+        Ok(defer_resp.exec_resp().clone())
     }
 
     pub fn exec_update_position_leverage(
@@ -1203,14 +1203,16 @@ impl PerpsMarket {
         leverage: LeverageToBase,
         slippage_assert: Option<SlippageAssert>,
     ) -> Result<AppResponse> {
-        self.exec(
+        let defer_resp = self.exec_defer(
             sender,
             &MarketExecuteMsg::UpdatePositionLeverage {
                 id: position_id,
                 leverage,
                 slippage_assert,
             },
-        )
+        )?;
+
+        Ok(defer_resp.exec_resp().clone())
     }
 
     pub fn exec_update_position_max_gains(
@@ -1219,13 +1221,15 @@ impl PerpsMarket {
         position_id: PositionId,
         max_gains: MaxGainsInQuote,
     ) -> Result<AppResponse> {
-        self.exec(
+        let defer_resp = self.exec_defer(
             sender,
             &MarketExecuteMsg::UpdatePositionMaxGains {
                 id: position_id,
                 max_gains,
             },
-        )
+        )?;
+
+        Ok(defer_resp.exec_resp().clone())
     }
 
     pub fn exec_set_trigger_order(
