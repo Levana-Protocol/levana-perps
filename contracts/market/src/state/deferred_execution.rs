@@ -279,7 +279,7 @@ impl State<'_> {
             SubMsgResult::Err(e) => {
                 // Replace empty error from the submessage with validation error.
                 let e = self
-                    .deferred_validate(ctx, id)
+                    .deferred_validate(ctx.storage, id)
                     .err()
                     .map(|e| e.to_string())
                     .unwrap_or(e);

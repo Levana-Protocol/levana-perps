@@ -1225,8 +1225,6 @@ pub struct StatusResp {
     pub last_crank_completed: Option<Timestamp>,
     /// Earliest deferred execution price timestamp needed
     pub next_deferred_execution: Option<Timestamp>,
-    /// Size of the unpend queue
-    pub unpend_queue_size: u32,
     /// Overall borrow fee rate (annualized), combining LP and xLP
     pub borrow_fee: Decimal256,
     /// LP component of [Self::borrow_fee]
@@ -1258,11 +1256,24 @@ pub struct StatusResp {
 
     /// Have we reached staleness of the protocol via old liquifundings? If so, contains [Option::Some], and the timestamp when that happened.
     pub stale_liquifunding: Option<Timestamp>,
-    /// Are we in the congested state where new positions cannot be opened?
-    pub congested: bool,
 
     /// Fees held by the market contract
     pub fees: Fees,
+
+    // Backwards compat fields
+    /// Size of the unpend queue
+    ///
+    /// This field is no longer used by the protocol since implementation
+    /// of deferred execution. It will always contain 0. It is kept for backwards
+    /// compatibility.
+    pub unpend_queue_size: u32,
+
+    /// Are we in the congested state where new positions cannot be opened?
+    ///
+    /// This field is no longer used by the protocol since implementation
+    /// of deferred execution. It will always contain false. It is kept for backwards
+    /// compatibility.
+    pub congested: bool,
 }
 
 impl StatusResp {
