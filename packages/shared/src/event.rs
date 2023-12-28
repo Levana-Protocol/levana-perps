@@ -131,6 +131,12 @@ pub trait CosmwasmEventExt {
         self.map_attr_ok(key, |s| s.to_string())
     }
 
+    /// Parse a bool-as-string attribute
+    fn bool_attr(&self, key: &str) -> anyhow::Result<bool> {
+        self.string_attr(key)
+            .and_then(|s| s.parse::<bool>().map_err(|err| err.into()))
+    }
+
     /// Parse an attribute with a position direction (to base)
     fn direction_attr(&self, key: &str) -> anyhow::Result<DirectionToBase> {
         self.map_attr_result(key, |s| match s {

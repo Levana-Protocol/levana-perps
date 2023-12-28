@@ -3,6 +3,7 @@
 //! This allows the protocol to ensure only fresh prices are used for price-sensitive operations.
 use std::{fmt, num::ParseIntError};
 
+use crate::constants::event_key;
 use cosmwasm_std::StdResult;
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
 use shared::prelude::*;
@@ -359,6 +360,7 @@ impl DeferredExecItem {
 }
 
 /// Event emitted when a deferred execution is queued.
+#[derive(Debug)]
 pub struct DeferredExecQueuedEvent {
     /// ID
     pub deferred_exec_id: DeferredExecId,
@@ -377,22 +379,52 @@ impl From<DeferredExecQueuedEvent> for Event {
         }: DeferredExecQueuedEvent,
     ) -> Self {
         let mut event = Event::new("deferred-exec-queued")
-            .add_attribute("deferred_exec_id", deferred_exec_id.to_string())
-            .add_attribute("owner", owner);
+            .add_attribute(event_key::DEFERRED_EXEC_ID, deferred_exec_id.to_string())
+            .add_attribute(event_key::DEFERRED_EXEC_OWNER, owner);
         match target {
-            DeferredExecTarget::DoesNotExist => (),
+            DeferredExecTarget::DoesNotExist => {
+                event = event.add_attribute(event_key::DEFERRED_EXEC_TARGET, "does-not-exist");
+            }
             DeferredExecTarget::Position(position_id) => {
-                event = event.add_attribute("pos-id", position_id.to_string());
+                event = event
+                    .add_attribute(event_key::POS_ID, position_id.to_string())
+                    .add_attribute(event_key::DEFERRED_EXEC_TARGET, "position");
             }
             DeferredExecTarget::Order(order_id) => {
-                event = event.add_attribute("order-id", order_id.to_string());
+                event = event
+                    .add_attribute(event_key::ORDER_ID, order_id.to_string())
+                    .add_attribute(event_key::DEFERRED_EXEC_TARGET, "order");
             }
         }
         event
     }
 }
 
+impl TryFrom<Event> for DeferredExecQueuedEvent {
+    type Error = anyhow::Error;
+
+    fn try_from(evt: Event) -> anyhow::Result<Self> {
+        Ok(Self {
+            deferred_exec_id: evt
+                .u64_attr(event_key::DEFERRED_EXEC_ID)
+                .map(DeferredExecId::from_u64)?,
+            owner: evt.unchecked_addr_attr(event_key::DEFERRED_EXEC_OWNER)?,
+            target: match evt.string_attr(event_key::DEFERRED_EXEC_TARGET)?.as_str() {
+                "does-not-exist" => DeferredExecTarget::DoesNotExist,
+                "position" => DeferredExecTarget::Position(
+                    evt.u64_attr(event_key::POS_ID).map(PositionId::new)?,
+                ),
+                "order" => {
+                    DeferredExecTarget::Order(evt.u64_attr(event_key::ORDER_ID).map(OrderId::new)?)
+                }
+                _ => anyhow::bail!("invalid deferred exec target"),
+            },
+        })
+    }
+}
+
 /// Event when a deferred execution item is executed via the crank.
+#[derive(Debug)]
 pub struct DeferredExecExecutedEvent {
     /// ID
     pub deferred_exec_id: DeferredExecId,
@@ -417,19 +449,51 @@ impl From<DeferredExecExecutedEvent> for Event {
         }: DeferredExecExecutedEvent,
     ) -> Self {
         let mut event = Event::new("deferred-exec-executed")
-            .add_attribute("deferred_exec_id", deferred_exec_id.to_string())
-            .add_attribute("owner", owner)
-            .add_attribute("success", if success { "true" } else { "false" })
-            .add_attribute("desc", desc);
+            .add_attribute(event_key::DEFERRED_EXEC_ID, deferred_exec_id.to_string())
+            .add_attribute(event_key::DEFERRED_EXEC_OWNER, owner)
+            .add_attribute(event_key::SUCCESS, if success { "true" } else { "false" })
+            .add_attribute(event_key::DESC, desc);
+
         match target {
-            DeferredExecTarget::DoesNotExist => (),
+            DeferredExecTarget::DoesNotExist => {
+                event = event.add_attribute(event_key::DEFERRED_EXEC_TARGET, "does-not-exist");
+            }
             DeferredExecTarget::Position(position_id) => {
-                event = event.add_attribute("pos-id", position_id.to_string());
+                event = event
+                    .add_attribute(event_key::POS_ID, position_id.to_string())
+                    .add_attribute(event_key::DEFERRED_EXEC_TARGET, "position");
             }
             DeferredExecTarget::Order(order_id) => {
-                event = event.add_attribute("order-id", order_id.to_string());
+                event = event
+                    .add_attribute(event_key::ORDER_ID, order_id.to_string())
+                    .add_attribute(event_key::DEFERRED_EXEC_TARGET, "order");
             }
         }
         event
+    }
+}
+
+impl TryFrom<Event> for DeferredExecExecutedEvent {
+    type Error = anyhow::Error;
+
+    fn try_from(evt: Event) -> anyhow::Result<Self> {
+        Ok(Self {
+            deferred_exec_id: evt
+                .u64_attr(event_key::DEFERRED_EXEC_ID)
+                .map(DeferredExecId::from_u64)?,
+            owner: evt.unchecked_addr_attr(event_key::DEFERRED_EXEC_OWNER)?,
+            success: evt.bool_attr(event_key::SUCCESS)?,
+            desc: evt.string_attr(event_key::DESC)?,
+            target: match evt.string_attr(event_key::DEFERRED_EXEC_TARGET)?.as_str() {
+                "does-not-exist" => DeferredExecTarget::DoesNotExist,
+                "position" => DeferredExecTarget::Position(
+                    evt.u64_attr(event_key::POS_ID).map(PositionId::new)?,
+                ),
+                "order" => {
+                    DeferredExecTarget::Order(evt.u64_attr(event_key::ORDER_ID).map(OrderId::new)?)
+                }
+                _ => anyhow::bail!("invalid deferred exec target"),
+            },
+        })
     }
 }

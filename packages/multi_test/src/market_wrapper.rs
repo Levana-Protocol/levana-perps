@@ -37,7 +37,10 @@ use msg::contracts::farming::entry::{
 };
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::crank::CrankWorkInfo;
-use msg::contracts::market::deferred_execution::{DeferredExecWithStatus, ListDeferredExecsResp};
+use msg::contracts::market::deferred_execution::{
+    DeferredExecExecutedEvent, DeferredExecQueuedEvent, DeferredExecWithStatus,
+    ListDeferredExecsResp,
+};
 use msg::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
     InitialPrice, LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpAction,
@@ -88,6 +91,10 @@ pub struct PerpsMarket {
     pub automatic_time_jump_enabled: bool,
     /// Address of the farming contract
     farming_addr: Addr,
+
+    /// Temp for printf debugging / migration
+    /// TODO: remove
+    pub debug_001: bool,
 }
 
 impl PerpsMarket {
@@ -232,6 +239,7 @@ impl PerpsMarket {
             addr: market_addr,
             automatic_time_jump_enabled: true,
             farming_addr,
+            debug_001: false,
         };
 
         if bootstap_lp {
@@ -1083,7 +1091,15 @@ impl PerpsMarket {
             },
         )?;
 
-        let res = self.exec_wasm_msg(sender, msg)?;
+        // Open position always happens through a deferred exec
+        let defer_res = self.exec_defer_wasm_msg(sender, msg)?;
+
+        if self.debug_001 {
+            println!("{:#?}", defer_res);
+        }
+
+        let res = defer_res.exec_resp().clone();
+
         let pos_id = res.event_first_value("position-open", "pos-id")?.parse()?;
 
         Ok((pos_id, res))
@@ -1874,5 +1890,80 @@ impl PerpsMarket {
             .query_balance_dec(&self.app().querier(), addr)
             .map(LvnToken::from_decimal256)
             .unwrap()
+    }
+
+    // this defers a message exec in the sense of Levana perps semantics of "deferred executions"
+    // *not* defer in the sense of native programming jargon, like the golang keyword or until Drop kicks in etc.
+    pub fn exec_defer_wasm_msg(&self, sender: &Addr, msg: WasmMsg) -> Result<DeferResponse> {
+        let cosmos_msg = CosmosMsg::Wasm(msg);
+        let res = self.app().execute(sender.clone(), cosmos_msg)?;
+
+        let queue_event = res
+            .event_first("deferred-exec-queued")
+            .and_then(DeferredExecQueuedEvent::try_from)?;
+
+        let mut responses = vec![res];
+
+        // this loops forever if the deferred execution never *happens*
+        // which would be a core bug since by this point it's definitely been queued
+        // it will stop looping whether the deferred execution succeeds or fails
+        // and success/failure can be determined by looking at DeferResponse::exec_event.success
+        loop {
+            // check before cranking, in case the deferred execution was queued and completed in the same block
+            if let Ok(exec_event) = responses
+                .last()
+                .as_ref()
+                .unwrap()
+                .event_first("deferred-exec-executed")
+                .and_then(DeferredExecExecutedEvent::try_from)
+            {
+                if exec_event.deferred_exec_id == queue_event.deferred_exec_id {
+                    break match exec_event.success {
+                        true => Ok(DeferResponse {
+                            exec_event,
+                            queue_event,
+                            responses,
+                        }),
+                        false => Err(anyhow!("deferred execution failed: {:?}", exec_event.desc)),
+                    };
+                }
+            }
+
+            // this condition could removed eventually, but for now it might be helpful
+            // to catch bugs in migrating the test code that rely on the time not moving
+            if !self.automatic_time_jump_enabled {
+                bail!("automatic time jump is not enabled, cannot defer wasm msg")
+            }
+
+            self.exec_refresh_price()?;
+            self.set_time(TimeJump::Blocks(1))?;
+
+            responses.push(self.exec(
+                sender,
+                &MarketExecuteMsg::Crank {
+                    execs: Some(1),
+                    rewards: None,
+                },
+            )?);
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct DeferResponse {
+    pub queue_event: DeferredExecQueuedEvent,
+    pub exec_event: DeferredExecExecutedEvent,
+    pub responses: Vec<AppResponse>,
+}
+
+impl DeferResponse {
+    pub fn queue_resp(&self) -> &AppResponse {
+        // Safe - we only get here if the deferred execution was queued, and by definition that's the first AppResponse we get
+        self.responses.first().unwrap()
+    }
+
+    pub fn exec_resp(&self) -> &AppResponse {
+        // Safe - we only get here if the deferred execution was executed, and by definition that's the last AppResponse we get
+        self.responses.last().unwrap()
     }
 }
