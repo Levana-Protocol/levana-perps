@@ -7,6 +7,8 @@ use cosmwasm_std::StdResult;
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
 use shared::prelude::*;
 
+use crate::constants::event_key;
+
 use super::{entry::SlippageAssert, position::PositionId};
 
 /// A unique numeric ID for each deferred execution in the protocol.
@@ -282,12 +284,24 @@ impl From<DeferredExecQueuedEvent> for Event {
         }: DeferredExecQueuedEvent,
     ) -> Self {
         let mut event = Event::new("deferred-exec-queued")
-            .add_attribute("deferred_exec_id", deferred_exec_id.to_string())
-            .add_attribute("owner", owner);
+            .add_attribute(event_key::DEFERRED_EXEC_ID, deferred_exec_id.to_string())
+            .add_attribute(event_key::DEFERRED_EXEC_OWNER, owner);
         if let Some(position_id) = position_id {
-            event = event.add_attribute("pos-id", position_id.to_string());
+            event = event.add_attribute(event_key::POS_ID, position_id.to_string());
         }
         event
+    }
+}
+
+impl TryFrom<Event> for DeferredExecQueuedEvent {
+    type Error = anyhow::Error;
+
+    fn try_from(evt: Event) -> anyhow::Result<Self> {
+        Ok(Self {
+            deferred_exec_id: evt.u64_attr(event_key::DEFERRED_EXEC_ID).map(DeferredExecId::from_u64)?,
+            owner: evt.unchecked_addr_attr(event_key::DEFERRED_EXEC_OWNER)?,
+            position_id: evt.try_u64_attr(event_key::POS_ID)?.map(PositionId::new),
+        })
     }
 }
 
@@ -316,13 +330,27 @@ impl From<DeferredExecExecutedEvent> for Event {
         }: DeferredExecExecutedEvent,
     ) -> Self {
         let mut event = Event::new("deferred-exec-executed")
-            .add_attribute("deferred_exec_id", deferred_exec_id.to_string())
-            .add_attribute("owner", owner)
-            .add_attribute("success", if success { "true" } else { "false" })
-            .add_attribute("desc", desc);
+            .add_attribute(event_key::DEFERRED_EXEC_ID, deferred_exec_id.to_string())
+            .add_attribute(event_key::DEFERRED_EXEC_OWNER, owner)
+            .add_attribute(event_key::SUCCESS, if success { "true" } else { "false" })
+            .add_attribute(event_key::DESC, desc);
         if let Some(position_id) = position_id {
-            event = event.add_attribute("pos-id", position_id.to_string());
+            event = event.add_attribute(event_key::POS_ID, position_id.to_string());
         }
         event
+    }
+}
+
+impl TryFrom<Event> for DeferredExecExecutedEvent {
+    type Error = anyhow::Error;
+
+    fn try_from(evt: Event) -> anyhow::Result<Self> {
+        Ok(Self {
+            deferred_exec_id: evt.u64_attr(event_key::DEFERRED_EXEC_ID).map(DeferredExecId::from_u64)?,
+            owner: evt.unchecked_addr_attr(event_key::DEFERRED_EXEC_OWNER)?,
+            position_id: evt.try_u64_attr(event_key::POS_ID)?.map(PositionId::new),
+            success: evt.bool_attr(event_key::SUCCESS)?,
+            desc: evt.string_attr(event_key::DESC)?,
+        })
     }
 }
