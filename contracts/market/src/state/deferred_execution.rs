@@ -277,6 +277,13 @@ impl State<'_> {
                 }
             },
             SubMsgResult::Err(e) => {
+                // Replace empty error from the submessage with validation error.
+                let e = self
+                    .deferred_validate(ctx, id)
+                    .err()
+                    .map(|e| e.to_string())
+                    .unwrap_or(e);
+
                 anyhow::ensure!(
                     item.status == DeferredExecStatus::Pending,
                     "Item should still be pending, but actual status is {:?}",
