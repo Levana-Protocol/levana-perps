@@ -106,12 +106,12 @@ impl State<'_> {
                         liquidation_reason: pos.reason,
                         price_point,
                     }
-                } else if let Some((deferred_exec_id, position)) =
+                } else if let Some((deferred_exec_id, target)) =
                     self.next_crankable_deferred_exec_id(store, price_point.timestamp)?
                 {
                     CrankWorkInfo::DeferredExec {
                         deferred_exec_id,
-                        position,
+                        target,
                         price_point_timestamp: price_point.timestamp,
                     }
                 } else if let Some(order_id) =

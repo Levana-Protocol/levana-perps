@@ -46,7 +46,7 @@ impl State<'_> {
         max_gains: MaxGainsInQuote,
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
-    ) -> Result<()> {
+    ) -> Result<OrderId> {
         self.ensure_not_congested(ctx.storage, CongestionReason::PlaceLimit)?;
 
         let last_order_id = LAST_ORDER_ID
@@ -118,7 +118,7 @@ impl State<'_> {
             take_profit_override,
         });
 
-        Ok(())
+        Ok(order_id)
     }
 
     /// Returns the next long or short [LimitOrder] whose trigger price is above the specified price

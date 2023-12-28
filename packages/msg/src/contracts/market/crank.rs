@@ -1,5 +1,5 @@
 //! Data types and events for cranking.
-use super::deferred_execution::DeferredExecId;
+use super::deferred_execution::{DeferredExecId, DeferredExecTarget};
 use super::position::PositionId;
 use crate::contracts::market::order::OrderId;
 use crate::contracts::market::position::LiquidationReason;
@@ -40,8 +40,8 @@ pub enum CrankWorkInfo {
     DeferredExec {
         /// ID to be processed
         deferred_exec_id: DeferredExecId,
-        /// Position ID, if relevant
-        position: Option<PositionId>,
+        /// Target of the action
+        target: DeferredExecTarget,
         /// Timestamp of the price point that allows execution
         price_point_timestamp: Timestamp,
     },
@@ -158,9 +158,13 @@ pub mod events {
                 CrankWorkInfo::UnpendLiquidationPrices { position } => (Some(position), None, None),
                 CrankWorkInfo::DeferredExec {
                     deferred_exec_id: _,
-                    position,
+                    target,
                     price_point_timestamp,
-                } => (position, None, Some(price_point_timestamp)),
+                } => (
+                    target.position_id(),
+                    target.order_id(),
+                    Some(price_point_timestamp),
+                ),
                 CrankWorkInfo::LimitOrder { order_id } => (None, Some(order_id), None),
             };
 

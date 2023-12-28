@@ -263,9 +263,15 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             stop_loss_override,
             take_profit_override,
         } => {
-            state.position_assert_owner(ctx.storage, id, &info.sender)?;
-            state.assert_no_pending_deferred(ctx.storage, id)?;
-            state.set_trigger_order(&mut ctx, id, stop_loss_override, take_profit_override)?;
+            state.defer_execution(
+                &mut ctx,
+                info.sender,
+                DeferredExecItem::SetTriggerOrder {
+                    id,
+                    stop_loss_override,
+                    take_profit_override,
+                },
+            )?;
         }
 
         ExecuteMsg::PlaceLimitOrder {
@@ -276,24 +282,27 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             stop_loss_override,
             take_profit_override,
         } => {
-            let market_type = state.market_id(ctx.storage)?.get_market_type();
-
-            state.limit_order_set_order(
+            state.defer_execution(
                 &mut ctx,
                 info.sender,
-                trigger_price,
-                info.funds.take()?,
-                leverage,
-                direction.into_notional(market_type),
-                max_gains,
-                stop_loss_override,
-                take_profit_override,
+                DeferredExecItem::PlaceLimitOrder {
+                    trigger_price,
+                    leverage,
+                    direction,
+                    max_gains,
+                    stop_loss_override,
+                    take_profit_override,
+                    amount: info.funds.take()?,
+                },
             )?;
         }
 
         ExecuteMsg::CancelLimitOrder { order_id } => {
-            state.limit_order_assert_owner(ctx.storage, &info.sender, order_id)?;
-            state.limit_order_cancel_order(&mut ctx, order_id)?;
+            state.defer_execution(
+                &mut ctx,
+                info.sender,
+                DeferredExecItem::CancelLimitOrder { order_id },
+            )?;
         }
 
         ExecuteMsg::ClosePosition {

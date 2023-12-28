@@ -151,3 +151,4 @@ pub const DEFERRED_EXEC_LATEST_IDS: &str = "er";
 pub const DEFERRED_EXECS: &str = "es";
 pub const DEFERRED_EXECS_BY_WALLET: &str = "et";
 pub const PENDING_DEFERRED_FOR_POSITION: &str = "eu";
+pub const PENDING_DEFERRED_FOR_ORDER: &str = "ev";

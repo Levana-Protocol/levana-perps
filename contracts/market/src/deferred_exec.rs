@@ -1,5 +1,7 @@
 use msg::contracts::market::{
-    deferred_execution::{DeferredExecId, DeferredExecItem, DeferredExecWithStatus},
+    deferred_execution::{
+        DeferredExecCompleteTarget, DeferredExecId, DeferredExecItem, DeferredExecWithStatus,
+    },
     entry::SlippageAssert,
     position::events::PositionSaveReason,
 };
@@ -13,8 +15,8 @@ impl State<'_> {
         id: DeferredExecId,
     ) -> Result<()> {
         let item = self.load_deferred_exec_item(ctx.storage, id)?;
-        let pos_id = helper(self, ctx, item.clone())?;
-        self.mark_deferred_exec_success(ctx, item, pos_id)?;
+        let pos_order_id = helper(self, ctx, item.clone())?;
+        self.mark_deferred_exec_success(ctx, item, pos_order_id)?;
         Ok(())
     }
 }
@@ -23,7 +25,7 @@ fn helper(
     state: &State,
     ctx: &mut StateContext,
     item: DeferredExecWithStatus,
-) -> Result<PositionId> {
+) -> Result<DeferredExecCompleteTarget> {
     match item.item {
         DeferredExecItem::OpenPosition {
             slippage_assert,
@@ -33,21 +35,23 @@ fn helper(
             stop_loss_override,
             take_profit_override,
             amount,
-        } => state.handle_position_open(
-            ctx,
-            item.owner,
-            amount,
-            leverage,
-            direction,
-            max_gains,
-            slippage_assert,
-            stop_loss_override,
-            take_profit_override,
-        ),
+        } => state
+            .handle_position_open(
+                ctx,
+                item.owner,
+                amount,
+                leverage,
+                direction,
+                max_gains,
+                slippage_assert,
+                stop_loss_override,
+                take_profit_override,
+            )
+            .map(DeferredExecCompleteTarget::Position),
         DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount } => {
             handle_update_position_shared(state, ctx, id, None, None)?;
             state.update_position_collateral(ctx, id, amount.into_signed())?;
-            Ok(id)
+            Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionAddCollateralImpactSize {
             id,
@@ -58,12 +62,12 @@ fn helper(
             let notional_size = state.update_size_new_notional_size(ctx, id, funds)?;
             handle_update_position_shared(state, ctx, id, Some(notional_size), slippage_assert)?;
             state.update_position_size(ctx, id, funds)?;
-            Ok(id)
+            Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => {
             handle_update_position_shared(state, ctx, id, None, None)?;
             state.update_position_collateral(ctx, id, -amount.into_signed())?;
-            Ok(id)
+            Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionRemoveCollateralImpactSize {
             id,
@@ -74,7 +78,7 @@ fn helper(
             let notional_size = state.update_size_new_notional_size(ctx, id, funds)?;
             handle_update_position_shared(state, ctx, id, Some(notional_size), slippage_assert)?;
             state.update_position_size(ctx, id, funds)?;
-            Ok(id)
+            Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionLeverage {
             id,
@@ -96,14 +100,14 @@ fn helper(
                 )?;
             }
             state.update_position_leverage(ctx, id, notional_size)?;
-            Ok(id)
+            Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionMaxGains { id, max_gains } => {
             handle_update_position_shared(state, ctx, id, None, None)?;
             let counter_collateral =
                 state.update_max_gains_new_counter_collateral(ctx, id, max_gains)?;
             state.update_position_max_gains(ctx, id, counter_collateral)?;
-            Ok(id)
+            Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::ClosePosition {
             id,
@@ -121,7 +125,43 @@ fn helper(
                 )?;
             }
             state.close_position_via_msg(ctx, pos)?;
-            Ok(id)
+            Ok(DeferredExecCompleteTarget::Position(id))
+        }
+        DeferredExecItem::SetTriggerOrder {
+            id,
+            stop_loss_override,
+            take_profit_override,
+        } => {
+            state.set_trigger_order(ctx, id, stop_loss_override, take_profit_override)?;
+            Ok(DeferredExecCompleteTarget::Position(id))
+        }
+        DeferredExecItem::PlaceLimitOrder {
+            trigger_price,
+            leverage,
+            direction,
+            max_gains,
+            stop_loss_override,
+            take_profit_override,
+            amount,
+        } => {
+            let market_type = state.market_id(ctx.storage)?.get_market_type();
+
+            let order_id = state.limit_order_set_order(
+                ctx,
+                item.owner,
+                trigger_price,
+                amount,
+                leverage,
+                direction.into_notional(market_type),
+                max_gains,
+                stop_loss_override,
+                take_profit_override,
+            )?;
+            Ok(DeferredExecCompleteTarget::Order(order_id))
+        }
+        DeferredExecItem::CancelLimitOrder { order_id } => {
+            state.limit_order_cancel_order(ctx, order_id)?;
+            Ok(DeferredExecCompleteTarget::Order(order_id))
         }
     }
 }

@@ -7,7 +7,7 @@ use cosmwasm_std::StdResult;
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
 use shared::prelude::*;
 
-use super::{entry::SlippageAssert, position::PositionId};
+use super::{entry::SlippageAssert, order::OrderId, position::PositionId};
 
 /// A unique numeric ID for each deferred execution in the protocol.
 #[cw_serde]
@@ -118,8 +118,8 @@ pub enum DeferredExecStatus {
     Pending,
     /// Successfully applied
     Success {
-        /// Position ID, either created, updated, or closed
-        id: PositionId,
+        /// Entity in the system that was impacted by this execution
+        target: DeferredExecCompleteTarget,
         /// Timestamp when it was successfully executed
         executed: Timestamp,
     },
@@ -229,20 +229,114 @@ pub enum DeferredExecItem {
         /// Assertion that the price has not moved too far
         slippage_assert: Option<SlippageAssert>,
     },
+
+    /// Set a stop loss or take profit override.
+    /// This msg will override any previous values.
+    /// Passing None will remove the override.
+    SetTriggerOrder {
+        /// ID of position to modify
+        id: PositionId,
+        /// New stop loss price of the position
+        stop_loss_override: Option<PriceBaseInQuote>,
+        /// New take profit price of the position
+        take_profit_override: Option<PriceBaseInQuote>,
+    },
+
+    /// Set a limit order to open a position when the price of the asset hits
+    /// the specified trigger price.
+    PlaceLimitOrder {
+        /// Price when the order should trigger
+        trigger_price: PriceBaseInQuote,
+        /// Leverage of new position
+        leverage: LeverageToBase,
+        /// Direction of new position
+        direction: DirectionToBase,
+        /// Max gains of new position
+        max_gains: MaxGainsInQuote,
+        /// Stop loss price of new position
+        stop_loss_override: Option<PriceBaseInQuote>,
+        /// Take profit price of new position
+        take_profit_override: Option<PriceBaseInQuote>,
+        /// The amount of collateral provided
+        amount: NonZero<Collateral>,
+    },
+
+    /// Cancel an open limit order
+    CancelLimitOrder {
+        /// ID of the order
+        order_id: OrderId,
+    },
+}
+
+/// What entity within the system will be affected by this.
+#[cw_serde]
+#[derive(Copy)]
+pub enum DeferredExecTarget {
+    /// For open positions or limit orders, no ID exists yet
+    DoesNotExist,
+    /// Modifying an existing position
+    Position(PositionId),
+    /// Modifying an existing limit order
+    Order(OrderId),
+}
+
+/// After successful execution of an item, what did it impact?
+///
+/// Unlike [DeferredExecTarget] because, after execution, we always have a specific position or order impacted.
+#[cw_serde]
+#[derive(Copy)]
+pub enum DeferredExecCompleteTarget {
+    /// Modifying an existing position
+    Position(PositionId),
+    /// Modifying an existing limit order
+    Order(OrderId),
+}
+
+impl DeferredExecTarget {
+    /// The position ID, if present
+    pub fn position_id(&self) -> Option<PositionId> {
+        match self {
+            DeferredExecTarget::DoesNotExist | DeferredExecTarget::Order(_) => None,
+            DeferredExecTarget::Position(pos_id) => Some(*pos_id),
+        }
+    }
+
+    /// The order ID, if present
+    pub fn order_id(&self) -> Option<OrderId> {
+        match self {
+            DeferredExecTarget::DoesNotExist | DeferredExecTarget::Position(_) => None,
+            DeferredExecTarget::Order(order_id) => Some(*order_id),
+        }
+    }
 }
 
 impl DeferredExecItem {
-    /// The position ID for this item, if present.
-    pub fn position_id(&self) -> Option<PositionId> {
+    /// What entity in the system is targetted by this item.
+    pub fn target(&self) -> DeferredExecTarget {
         match self {
-            DeferredExecItem::OpenPosition { .. } => None,
-            DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, .. } => Some(*id),
-            DeferredExecItem::UpdatePositionAddCollateralImpactSize { id, .. } => Some(*id),
-            DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, .. } => Some(*id),
-            DeferredExecItem::UpdatePositionRemoveCollateralImpactSize { id, .. } => Some(*id),
-            DeferredExecItem::UpdatePositionLeverage { id, .. } => Some(*id),
-            DeferredExecItem::UpdatePositionMaxGains { id, .. } => Some(*id),
-            DeferredExecItem::ClosePosition { id, .. } => Some(*id),
+            DeferredExecItem::OpenPosition { .. } => DeferredExecTarget::DoesNotExist,
+            DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, .. } => {
+                DeferredExecTarget::Position(*id)
+            }
+            DeferredExecItem::UpdatePositionAddCollateralImpactSize { id, .. } => {
+                DeferredExecTarget::Position(*id)
+            }
+            DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, .. } => {
+                DeferredExecTarget::Position(*id)
+            }
+            DeferredExecItem::UpdatePositionRemoveCollateralImpactSize { id, .. } => {
+                DeferredExecTarget::Position(*id)
+            }
+            DeferredExecItem::UpdatePositionLeverage { id, .. } => {
+                DeferredExecTarget::Position(*id)
+            }
+            DeferredExecItem::UpdatePositionMaxGains { id, .. } => {
+                DeferredExecTarget::Position(*id)
+            }
+            DeferredExecItem::ClosePosition { id, .. } => DeferredExecTarget::Position(*id),
+            DeferredExecItem::SetTriggerOrder { id, .. } => DeferredExecTarget::Position(*id),
+            DeferredExecItem::PlaceLimitOrder { .. } => DeferredExecTarget::DoesNotExist,
+            DeferredExecItem::CancelLimitOrder { order_id } => DeferredExecTarget::Order(*order_id),
         }
     }
 
@@ -251,14 +345,15 @@ impl DeferredExecItem {
         match self {
             DeferredExecItem::OpenPosition { amount, .. }
             | DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { amount, .. }
-            | DeferredExecItem::UpdatePositionAddCollateralImpactSize { amount, .. } => {
-                amount.raw()
-            }
+            | DeferredExecItem::UpdatePositionAddCollateralImpactSize { amount, .. }
+            | DeferredExecItem::PlaceLimitOrder { amount, .. } => amount.raw(),
             DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { .. }
             | DeferredExecItem::UpdatePositionRemoveCollateralImpactSize { .. }
             | DeferredExecItem::UpdatePositionLeverage { .. }
             | DeferredExecItem::UpdatePositionMaxGains { .. }
-            | DeferredExecItem::ClosePosition { .. } => Collateral::zero(),
+            | DeferredExecItem::ClosePosition { .. }
+            | DeferredExecItem::SetTriggerOrder { .. }
+            | DeferredExecItem::CancelLimitOrder { .. } => Collateral::zero(),
         }
     }
 }
@@ -267,8 +362,8 @@ impl DeferredExecItem {
 pub struct DeferredExecQueuedEvent {
     /// ID
     pub deferred_exec_id: DeferredExecId,
-    /// If relevant, position ID impacted by this
-    pub position_id: Option<PositionId>,
+    /// What entity is targetted by this item
+    pub target: DeferredExecTarget,
     /// Address that queued the event
     pub owner: Addr,
 }
@@ -277,15 +372,21 @@ impl From<DeferredExecQueuedEvent> for Event {
     fn from(
         DeferredExecQueuedEvent {
             deferred_exec_id,
-            position_id,
+            target,
             owner,
         }: DeferredExecQueuedEvent,
     ) -> Self {
         let mut event = Event::new("deferred-exec-queued")
             .add_attribute("deferred_exec_id", deferred_exec_id.to_string())
             .add_attribute("owner", owner);
-        if let Some(position_id) = position_id {
-            event = event.add_attribute("pos-id", position_id.to_string());
+        match target {
+            DeferredExecTarget::DoesNotExist => (),
+            DeferredExecTarget::Position(position_id) => {
+                event = event.add_attribute("pos-id", position_id.to_string());
+            }
+            DeferredExecTarget::Order(order_id) => {
+                event = event.add_attribute("order-id", order_id.to_string());
+            }
         }
         event
     }
@@ -295,8 +396,8 @@ impl From<DeferredExecQueuedEvent> for Event {
 pub struct DeferredExecExecutedEvent {
     /// ID
     pub deferred_exec_id: DeferredExecId,
-    /// If relevant, position ID impacted by this
-    pub position_id: Option<PositionId>,
+    /// Entity targeted by this action
+    pub target: DeferredExecTarget,
     /// Address that owns this item
     pub owner: Addr,
     /// Was this item executed successfully?
@@ -309,7 +410,7 @@ impl From<DeferredExecExecutedEvent> for Event {
     fn from(
         DeferredExecExecutedEvent {
             deferred_exec_id,
-            position_id,
+            target,
             owner,
             success,
             desc,
@@ -320,8 +421,14 @@ impl From<DeferredExecExecutedEvent> for Event {
             .add_attribute("owner", owner)
             .add_attribute("success", if success { "true" } else { "false" })
             .add_attribute("desc", desc);
-        if let Some(position_id) = position_id {
-            event = event.add_attribute("pos-id", position_id.to_string());
+        match target {
+            DeferredExecTarget::DoesNotExist => (),
+            DeferredExecTarget::Position(position_id) => {
+                event = event.add_attribute("pos-id", position_id.to_string());
+            }
+            DeferredExecTarget::Order(order_id) => {
+                event = event.add_attribute("order-id", order_id.to_string());
+            }
         }
         event
     }
