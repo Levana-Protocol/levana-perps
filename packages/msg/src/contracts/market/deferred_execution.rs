@@ -120,11 +120,15 @@ pub enum DeferredExecStatus {
     Success {
         /// Position ID, either created, updated, or closed
         id: PositionId,
+        /// Timestamp when it was successfully executed
+        executed: Timestamp,
     },
     /// Did not successfully apply
     Failure {
         /// Reason it didn't apply successfully
         reason: String,
+        /// Timestamp when it failed execution
+        executed: Timestamp,
     },
 }
 

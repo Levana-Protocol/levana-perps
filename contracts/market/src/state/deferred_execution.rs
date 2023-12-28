@@ -280,7 +280,10 @@ impl State<'_> {
                     "Item should still be pending, but actual status is {:?}",
                     item.status
                 );
-                item.status = DeferredExecStatus::Failure { reason: e.clone() };
+                item.status = DeferredExecStatus::Failure {
+                    reason: e.clone(),
+                    executed: self.now(),
+                };
 
                 // It didn't work, so give them back their money
                 if let Some(amount) = NonZero::new(item.item.deposited_amount()) {
@@ -325,7 +328,10 @@ impl State<'_> {
         mut item: DeferredExecWithStatus,
         pos_id: PositionId,
     ) -> Result<()> {
-        item.status = DeferredExecStatus::Success { id: pos_id };
+        item.status = DeferredExecStatus::Success {
+            id: pos_id,
+            executed: self.now(),
+        };
         DEFERRED_EXECS.save(ctx.storage, item.id, &item)?;
         Ok(())
     }
