@@ -266,6 +266,7 @@ impl DeferredExecItem {
 }
 
 /// Event emitted when a deferred execution is queued.
+#[derive(Debug)]
 pub struct DeferredExecQueuedEvent {
     /// ID
     pub deferred_exec_id: DeferredExecId,
@@ -306,6 +307,7 @@ impl TryFrom<Event> for DeferredExecQueuedEvent {
 }
 
 /// Event when a deferred execution item is executed via the crank.
+#[derive(Debug)]
 pub struct DeferredExecExecutedEvent {
     /// ID
     pub deferred_exec_id: DeferredExecId,
