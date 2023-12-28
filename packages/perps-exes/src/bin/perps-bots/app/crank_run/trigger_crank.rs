@@ -144,6 +144,9 @@ impl From<CrankTriggerReason> for String {
                 "Price update will hit price triggers".to_owned()
             }
             CrankTriggerReason::NoPriceFound => "No price found in contract".to_owned(),
+            CrankTriggerReason::DeferredExecutionItem => {
+                "Deferred execution item waiting".to_owned()
+            }
         }
     }
 }

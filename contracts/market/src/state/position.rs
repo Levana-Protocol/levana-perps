@@ -63,15 +63,6 @@ const CLOSED_POSITIONS: Map<PositionId, ClosedPosition> = Map::new(namespace::CL
 pub(super) const NEXT_LIQUIFUNDING: Map<(Timestamp, PositionId), ()> =
     Map::new(namespace::NEXT_LIQUIFUNDING);
 
-/// Tracks when the protocol will next be stale vis-a-vis pending liquifunding.
-///
-/// It would seem like we could check that by using [NEXT_LIQUIFUNDING] and
-/// adding in the staleness duration. However, if the staleness period
-/// configuration changes after liquifunding, that calculation will no longer
-/// guarantee well-fundedness. Instead, we track "when will we go stale" when
-/// setting up liquidation margin initially.
-pub(super) const NEXT_STALE: Map<(Timestamp, PositionId), ()> = Map::new(namespace::NEXT_STALE);
-
 /// Gets a full position by id
 pub(crate) fn get_position(store: &dyn Storage, id: PositionId) -> Result<Position> {
     #[derive(serde::Serialize)]
@@ -622,11 +613,9 @@ impl State<'_> {
 
         debug_assert!(OPEN_POSITIONS.has(ctx.storage, position.id));
         debug_assert!(NEXT_LIQUIFUNDING.has(ctx.storage, (position.next_liquifunding, position.id)));
-        debug_assert!(NEXT_STALE.has(ctx.storage, (position.stale_at, position.id)));
 
         OPEN_POSITIONS.remove(ctx.storage, position.id);
         NEXT_LIQUIFUNDING.remove(ctx.storage, (position.next_liquifunding, position.id));
-        NEXT_STALE.remove(ctx.storage, (position.stale_at, position.id));
 
         self.remove_liquidation_prices(ctx, &position)?;
         self.decrease_total_funding_margin(ctx, position.liquidation_margin.funding)?;
@@ -703,11 +692,9 @@ impl State<'_> {
         pos.take_profit_price = pos.take_profit_price(price_point, market_type)?;
 
         debug_assert!(pos.liquifunded_at < pos.next_liquifunding);
-        debug_assert!(pos.next_liquifunding < pos.stale_at);
 
         OPEN_POSITIONS.save(ctx.storage, pos.id, pos)?;
         NEXT_LIQUIFUNDING.save(ctx.storage, (pos.next_liquifunding, pos.id), &())?;
-        NEXT_STALE.save(ctx.storage, (pos.stale_at, pos.id), &())?;
         self.store_liquidation_prices(ctx, pos)?;
 
         self.increase_total_funding_margin(ctx, pos.liquidation_margin.funding)?;

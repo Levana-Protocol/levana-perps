@@ -155,9 +155,6 @@ impl State<'_> {
         pos.liquifunded_at = liquifunded_at;
         pos.next_liquifunding =
             liquifunded_at.plus_seconds(self.config.liquifunding_delay_seconds.into());
-        pos.stale_at = pos
-            .next_liquifunding
-            .plus_seconds(self.config.staleness_seconds.into());
 
         if self.config.liquifunding_delay_fuzz_seconds != 0 {
             // Next we're going to add a bit of randomization to schedule the

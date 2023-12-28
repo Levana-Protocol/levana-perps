@@ -3,7 +3,7 @@ use anyhow::Result;
 use cosmwasm_std::Storage;
 use msg::contracts::market::entry::StatusResp;
 
-use super::{crank::LAST_CRANK_COMPLETED, fees::all_fees, stale::ProtocolStaleness, State};
+use super::{crank::LAST_CRANK_COMPLETED, fees::all_fees, State};
 use crate::state::delta_neutrality_fee::DELTA_NEUTRALITY_FUND;
 
 impl State<'_> {
@@ -53,8 +53,6 @@ impl State<'_> {
             .may_load(store)?
             .unwrap_or(Collateral::zero());
 
-        let ProtocolStaleness { stale_liquifunding } = self.stale_check(store)?;
-
         let fees = all_fees(store)?;
 
         let last_crank_completed = LAST_CRANK_COMPLETED.may_load(store)?;
@@ -62,6 +60,7 @@ impl State<'_> {
         let next_deferred_execution = self
             .get_next_deferred_execution(store)?
             .map(|(_, item)| item.created);
+        let deferred_execution_items = self.deferred_execution_items(store)?;
 
         Ok(StatusResp {
             market_id: market_id.clone(),
@@ -83,13 +82,10 @@ impl State<'_> {
             short_usd,
             instant_delta_neutrality_fee_value,
             delta_neutrality_fee_fund,
-            stale_liquifunding,
             fees,
             last_crank_completed,
-            // Historical reasons
-            unpend_queue_size: 0,
-            congested: false,
             next_deferred_execution,
+            deferred_execution_items,
         })
     }
 }

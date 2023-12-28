@@ -208,6 +208,8 @@ fn position_open_slippage_assert() {
     market.exec_close_position(&trader, pos.0, None).unwrap();
 
     for direction in [DirectionToBase::Short, DirectionToBase::Long] {
+        market.exec_crank_till_finished(&trader).unwrap();
+
         let price_point = market.query_current_price().unwrap();
         let leverage_to_base = LeverageToBase::try_from("20")
             .unwrap()
@@ -224,6 +226,7 @@ fn position_open_slippage_assert() {
             .unwrap()
             .amount
             .into_number();
+
         let fee_rate = fee / notional_size.abs().into_number();
         market
             .exec_open_position(

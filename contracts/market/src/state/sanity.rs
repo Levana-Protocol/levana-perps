@@ -7,9 +7,7 @@ use crate::state::{
     config::load_config,
     fees::ALL_FEES,
     funding::get_total_funding_margin,
-    position::{
-        NEXT_LIQUIFUNDING, NEXT_STALE, OPEN_POSITIONS, PRICE_TRIGGER_ASC, PRICE_TRIGGER_DESC,
-    },
+    position::{NEXT_LIQUIFUNDING, OPEN_POSITIONS, PRICE_TRIGGER_ASC, PRICE_TRIGGER_DESC},
     token::TOKEN,
 };
 use cosmwasm_std::{Env, Order, QuerierWrapper};
@@ -54,7 +52,6 @@ pub(crate) fn sanity_check_post_execute(
 fn next_last_liquifunding(store: &dyn Storage, env: &Env) -> Result<()> {
     let config = load_config(store)?;
     let delay = Duration::from_seconds(config.liquifunding_delay_seconds.into());
-    let delay_and_stale = delay + Duration::from_seconds(config.staleness_seconds.into());
     let open_position_count = OPEN_POSITIONS
         .keys(store, None, None, cosmwasm_std::Order::Ascending)
         .collect::<Result<Vec<_>, _>>()?
@@ -77,24 +74,6 @@ fn next_last_liquifunding(store: &dyn Storage, env: &Env) -> Result<()> {
     for res in OPEN_POSITIONS.range(store, None, None, cosmwasm_std::Order::Ascending) {
         let (position_id, pos) = res?;
         anyhow::ensure!(NEXT_LIQUIFUNDING.has(store, (pos.next_liquifunding, position_id)));
-    }
-
-    let mut next_stale_count = 0;
-    for pair in NEXT_STALE.keys(store, None, None, cosmwasm_std::Order::Ascending) {
-        let (timestamp, position_id) = pair?;
-        let position = OPEN_POSITIONS.load(store, position_id)?;
-        anyhow::ensure!(
-            timestamp < now
-                || (timestamp.checked_sub(now, "next_last_liquifunding (2)")?) <= delay_and_stale
-        );
-        anyhow::ensure!(position.liquifunded_at + delay_and_stale == timestamp);
-        next_stale_count += 1;
-    }
-    anyhow::ensure!(next_stale_count == open_position_count);
-
-    for res in OPEN_POSITIONS.range(store, None, None, cosmwasm_std::Order::Ascending) {
-        let (position_id, pos) = res?;
-        anyhow::ensure!(NEXT_STALE.has(store, (pos.stale_at, position_id)));
     }
 
     Ok(())

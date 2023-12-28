@@ -101,11 +101,7 @@ pub(crate) async fn go(
             collateral: crate::instantiate::CollateralSource::Cw20(
                 crate::instantiate::Cw20Source::Existing(cw20.get_address()),
             ),
-            config: ConfigUpdate {
-                // https://phobosfinance.atlassian.net/browse/PERP-710
-                staleness_seconds: Some(60 * 60 * 24 * 7),
-                ..ConfigUpdate::default()
-            },
+            config: ConfigUpdate::default(),
             initial_borrow_fee_rate: "0.01".parse().unwrap(),
             spot_price: SpotPriceConfigInit::Manual {
                 admin: wallet.get_address_string().into(),

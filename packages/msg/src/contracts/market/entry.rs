@@ -1225,6 +1225,8 @@ pub struct StatusResp {
     pub last_crank_completed: Option<Timestamp>,
     /// Earliest deferred execution price timestamp needed
     pub next_deferred_execution: Option<Timestamp>,
+    /// Number of work items sitting in the deferred execution queue
+    pub deferred_execution_items: u32,
     /// Overall borrow fee rate (annualized), combining LP and xLP
     pub borrow_fee: Decimal256,
     /// LP component of [Self::borrow_fee]
@@ -1254,33 +1256,8 @@ pub struct StatusResp {
     /// Amount of collateral in the delta neutrality fee fund.
     pub delta_neutrality_fee_fund: Collateral,
 
-    /// Have we reached staleness of the protocol via old liquifundings? If so, contains [Option::Some], and the timestamp when that happened.
-    pub stale_liquifunding: Option<Timestamp>,
-
     /// Fees held by the market contract
     pub fees: Fees,
-
-    // Backwards compat fields
-    /// Size of the unpend queue
-    ///
-    /// This field is no longer used by the protocol since implementation
-    /// of deferred execution. It will always contain 0. It is kept for backwards
-    /// compatibility.
-    pub unpend_queue_size: u32,
-
-    /// Are we in the congested state where new positions cannot be opened?
-    ///
-    /// This field is no longer used by the protocol since implementation
-    /// of deferred execution. It will always contain false. It is kept for backwards
-    /// compatibility.
-    pub congested: bool,
-}
-
-impl StatusResp {
-    /// Is the protocol stale from liquifunding delay?
-    pub fn is_stale(&self) -> bool {
-        self.stale_liquifunding.is_some()
-    }
 }
 
 /// Response for [QueryMsg::LimitOrderHistory]
