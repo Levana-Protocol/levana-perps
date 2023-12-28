@@ -201,7 +201,7 @@ impl State<'_> {
                 let pos = get_position(ctx.storage, position)?;
 
                 let starts_at = pos.liquifunded_at;
-                let ends_at = self.now(); // FIXME review if this should be different, use to be stale_or_now
+                let ends_at = starts_at.plus_seconds(self.config.liquifunding_delay_seconds.into());
                 let mcp = self.position_liquifund(ctx, pos, starts_at, ends_at, true)?;
 
                 let close_position_instructions = match mcp {
