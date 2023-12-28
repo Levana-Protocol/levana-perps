@@ -13,13 +13,13 @@ use msg::contracts::market::position::{events::PositionUpdateEvent, Position, Po
 impl State<'_> {
     pub(crate) fn update_leverage_new_notional_size(
         &self,
-        ctx: &mut StateContext,
+        store: &dyn Storage,
         id: PositionId,
         leverage: LeverageToBase,
     ) -> Result<Signed<Notional>> {
-        let market_type = self.market_id(ctx.storage)?.get_market_type();
-        let price_point = self.spot_price(ctx.storage, None)?;
-        let pos = get_position(ctx.storage, id)?;
+        let market_type = self.market_id(store)?.get_market_type();
+        let price_point = self.spot_price(store, None)?;
+        let pos = get_position(store, id)?;
 
         let leverage_to_base = leverage.into_signed(pos.direction().into_base(market_type));
 
@@ -33,11 +33,11 @@ impl State<'_> {
 
     pub(crate) fn update_size_new_notional_size(
         &self,
-        ctx: &mut StateContext,
+        store: &dyn Storage,
         id: PositionId,
         collateral_delta: Signed<Collateral>,
     ) -> Result<Signed<Notional>> {
-        let pos = get_position(ctx.storage, id)?;
+        let pos = get_position(store, id)?;
         let scale_factor = (pos.active_collateral.into_number() + collateral_delta.into_number())
             .checked_div(pos.active_collateral.into_number())?;
         Ok(Signed::<Notional>::from_number(
@@ -47,13 +47,13 @@ impl State<'_> {
 
     pub(crate) fn update_max_gains_new_counter_collateral(
         &self,
-        ctx: &mut StateContext,
+        store: &dyn Storage,
         id: PositionId,
         max_gains_in_quote: MaxGainsInQuote,
     ) -> Result<NonZero<Collateral>> {
-        let pos = get_position(ctx.storage, id)?;
-        let spot_price = self.spot_price(ctx.storage, None)?;
-        let market_type = self.market_id(ctx.storage)?.get_market_type();
+        let pos = get_position(store, id)?;
+        let spot_price = self.spot_price(store, None)?;
+        let market_type = self.market_id(store)?.get_market_type();
 
         let counter_collateral = match market_type {
             MarketType::CollateralIsQuote => {
