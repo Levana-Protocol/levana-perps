@@ -1,9 +1,8 @@
 //! All tests ultimately end up hitting deferred exeuction. The purpose of this module is to provide tests that can be used during the migration to deferred execution in the rest of the test suite.
 
-use crate::prelude::*;
 use cosmwasm_std::{to_binary, WasmMsg};
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::contracts::market::deferred_execution::DeferredExecStatus;
+use msg::{prelude::*, contracts::market::{deferred_execution::DeferredExecStatus, entry::ExecuteMsg as MarketExecuteMsg}, shared::storage::DirectionToBase};
 
 #[test]
 fn basic_operations() {
