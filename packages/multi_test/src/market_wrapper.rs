@@ -1905,6 +1905,11 @@ impl PerpsMarket {
         // it will stop looping whether the deferred execution succeeds or fails
         // and success/failure can be determined by looking at DeferResponse::exec_event.success
         loop {
+            if let Some(res) = responses.last() {
+                if let Ok(e) = res.event_first("exec-error") {
+                    println!("GOT ERROR: {:#?}", e);
+                }
+            }
             // check before cranking, in case the deferred execution was queued and completed in the same block
             if let Ok(exec_event) = responses.last().as_ref().unwrap().event_first("deferred-exec-executed").and_then(DeferredExecExecutedEvent::try_from) {
                 if exec_event.deferred_exec_id == queue_event.deferred_exec_id {

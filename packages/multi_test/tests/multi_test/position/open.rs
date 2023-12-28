@@ -241,7 +241,7 @@ fn position_open_slippage_assert() {
             )
             .unwrap_err();
 
-        market.debug_001 = true;
+        //market.debug_001 = true;
 
         let pos = market
             .exec_open_position(
