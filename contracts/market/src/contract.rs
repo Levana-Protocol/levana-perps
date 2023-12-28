@@ -682,13 +682,16 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, env: Env, MigrateMsg {}: MigrateMsg) -> Result<Response> {
-    let (_state, ctx) = StateContext::new(deps, env)?;
+    let (state, ctx) = StateContext::new(deps, env)?;
 
     // Note, we use _state instead of state to avoid warnings when compiling without the sanity
     // feature
 
     #[cfg(feature = "sanity")]
-    _state.sanity_check(ctx.storage);
+    state.sanity_check(ctx.storage);
+
+    // Make sure we don't have any pre-deferred-execution unpending items.
+    state.ensure_liquidation_prices_pending_empty(ctx.storage)?;
 
     let old_cw2 = get_contract_version(ctx.storage)?;
     let old_version: Version = old_cw2

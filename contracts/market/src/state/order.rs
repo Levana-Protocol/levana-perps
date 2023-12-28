@@ -47,8 +47,6 @@ impl State<'_> {
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
     ) -> Result<OrderId> {
-        self.ensure_not_congested(ctx.storage, CongestionReason::PlaceLimit)?;
-
         let last_order_id = LAST_ORDER_ID
             .may_load(ctx.storage)?
             .unwrap_or_else(|| OrderId::new(0));

@@ -20,11 +20,6 @@ pub enum CrankWorkInfo {
         /// Next position to be liquifunded
         position: PositionId,
     },
-    /// Adding liquidation prices to the primary data structures
-    UnpendLiquidationPrices {
-        /// Which position to process next
-        position: PositionId,
-    },
     /// Liquidate a position.
     ///
     /// Includes max gains, take profit, and stop loss.
@@ -70,27 +65,14 @@ pub mod events {
         pub requested: u64,
         /// How many cranks were actually processed
         pub actual: Vec<CrankWorkInfo>,
-        /// Size of unpend queue at start
-        pub starting_unpend: u32,
-        /// Size of unpend queue at end
-        pub ending_unpend: u32,
     }
 
     impl PerpEvent for CrankExecBatchEvent {}
     impl From<CrankExecBatchEvent> for Event {
-        fn from(
-            CrankExecBatchEvent {
-                requested,
-                actual,
-                starting_unpend,
-                ending_unpend,
-            }: CrankExecBatchEvent,
-        ) -> Self {
+        fn from(CrankExecBatchEvent { requested, actual }: CrankExecBatchEvent) -> Self {
             let mut event = Event::new("crank-batch-exec")
                 .add_attribute("requested", requested.to_string())
-                .add_attribute("actual", actual.len().to_string())
-                .add_attribute("starting-unpend", starting_unpend.to_string())
-                .add_attribute("ending-unpend", ending_unpend.to_string());
+                .add_attribute("actual", actual.len().to_string());
 
             for (idx, work) in actual.into_iter().enumerate() {
                 event = event.add_attribute(
@@ -102,9 +84,6 @@ pub mod events {
                         CrankWorkInfo::ResetLpBalances {} => "reset-lp-balances".into(),
                         CrankWorkInfo::Liquifunding { position } => {
                             format!("liquifund {position}").into()
-                        }
-                        CrankWorkInfo::UnpendLiquidationPrices { position } => {
-                            format!("unpend {position}").into()
                         }
                         CrankWorkInfo::Liquidation { position, .. } => {
                             format!("liquidation {position}").into()
@@ -137,7 +116,6 @@ pub mod events {
                     CrankWorkInfo::Completed { .. } => "completed",
                     CrankWorkInfo::Liquidation { .. } => "liquidation",
                     CrankWorkInfo::Liquifunding { .. } => "liquifunding",
-                    CrankWorkInfo::UnpendLiquidationPrices { .. } => "unpend-liquidation-prices",
                     CrankWorkInfo::DeferredExec { .. } => "deferred-exec",
                     CrankWorkInfo::LimitOrder { .. } => "limit-order",
                 },
@@ -155,7 +133,6 @@ pub mod events {
                     price_point,
                 } => (Some(position), None, Some(price_point.timestamp)),
                 CrankWorkInfo::Liquifunding { position } => (Some(position), None, None),
-                CrankWorkInfo::UnpendLiquidationPrices { position } => (Some(position), None, None),
                 CrankWorkInfo::DeferredExec {
                     deferred_exec_id: _,
                     target,
@@ -224,9 +201,6 @@ pub mod events {
                     position: get_position_id()?,
                     liquidation_reason: get_liquidation_reason()?,
                     price_point: get_price_point()?,
-                }),
-                "unpend-liquidation-prices" => Ok(CrankWorkInfo::UnpendLiquidationPrices {
-                    position: get_position_id()?,
                 }),
                 "limit-order" => Ok(CrankWorkInfo::LimitOrder {
                     order_id: OrderId::new(evt.u64_attr("order-id")?),

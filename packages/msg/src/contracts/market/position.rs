@@ -1389,10 +1389,6 @@ pub mod events {
         pub id: PositionId,
         /// Reason the position was saved
         pub reason: PositionSaveReason,
-        /// Was the position put on the pending queue?
-        ///
-        /// This occurs when the crank has fallen behind
-        pub used_pending_queue: bool,
     }
 
     /// Why was a position saved?
@@ -1439,20 +1435,10 @@ pub mod events {
     }
 
     impl From<PositionSaveEvent> for Event {
-        fn from(
-            PositionSaveEvent {
-                id,
-                reason,
-                used_pending_queue,
-            }: PositionSaveEvent,
-        ) -> Self {
+        fn from(PositionSaveEvent { id, reason }: PositionSaveEvent) -> Self {
             Event::new("position-save")
                 .add_attribute("id", id.0)
                 .add_attribute("reason", reason.as_str())
-                .add_attribute(
-                    "used-pending-queue",
-                    if used_pending_queue { "true" } else { "false" },
-                )
         }
     }
 }

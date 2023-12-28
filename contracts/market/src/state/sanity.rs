@@ -8,9 +8,7 @@ use crate::state::{
     fees::ALL_FEES,
     funding::get_total_funding_margin,
     position::{
-        LIQUIDATION_PRICES_PENDING, LIQUIDATION_PRICES_PENDING_COUNT,
-        LIQUIDATION_PRICES_PENDING_REVERSE, NEXT_LIQUIFUNDING, NEXT_STALE, OPEN_POSITIONS,
-        PRICE_TRIGGER_ASC, PRICE_TRIGGER_DESC,
+        NEXT_LIQUIFUNDING, NEXT_STALE, OPEN_POSITIONS, PRICE_TRIGGER_ASC, PRICE_TRIGGER_DESC,
     },
     token::TOKEN,
 };
@@ -106,125 +104,94 @@ fn liquidation_prices(store: &dyn Storage, _env: &Env) -> Result<()> {
     for res in OPEN_POSITIONS.range(store, None, None, cosmwasm_std::Order::Ascending) {
         let (posid, pos) = res?;
 
-        let pending_time = LIQUIDATION_PRICES_PENDING_REVERSE.may_load(store, posid)?;
-        let pending = match pending_time {
-            Some(pending_time) => {
-                Some(LIQUIDATION_PRICES_PENDING.load(store, (pending_time, posid))?)
-            }
-            None => None,
-        };
-
-        let pending_count_expected: usize = LIQUIDATION_PRICES_PENDING_COUNT
-            .may_load(store)?
-            .unwrap_or_default()
-            .try_into()?;
-        let pending_count_actual1 = LIQUIDATION_PRICES_PENDING
-            .keys(store, None, None, Order::Ascending)
-            .count();
-        let pending_count_actual2 = LIQUIDATION_PRICES_PENDING_REVERSE
-            .keys(store, None, None, Order::Ascending)
-            .count();
-        anyhow::ensure!(pending_count_expected == pending_count_actual1);
-        anyhow::ensure!(pending_count_expected == pending_count_actual2);
-
-        match pending {
-            None => {
-                anyhow::ensure!(LIQUIDATION_PRICES_PENDING_REVERSE.may_load(store, posid)? == None);
-                ensure_missing_pending(store, LIQUIDATION_PRICES_PENDING, posid)?;
-                let liquidation = pos.liquidation_price;
-                let take_profit = pos.take_profit_price;
-                let stop_loss_override = pos.stop_loss_override_notional;
-                let take_profit_override = pos.take_profit_override_notional;
-                match pos.direction() {
-                    DirectionToNotional::Long => {
-                        match liquidation {
-                            Some(price) => {
-                                PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
-                            }
-                            None => {
-                                ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
-                            }
-                        }
-                        match take_profit {
-                            Some(price) => {
-                                PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
-                            }
-                            None => {
-                                ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
-                            }
-                        }
-                        match stop_loss_override {
-                            Some(price) => {
-                                PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
-                            }
-                            None => {
-                                if liquidation.is_none() {
-                                    ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
-                                } else {
-                                    ensure_at_most_one(store, PRICE_TRIGGER_DESC, posid)?;
-                                }
-                            }
-                        }
-                        match take_profit_override {
-                            Some(price) => {
-                                PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
-                            }
-                            None => {
-                                if take_profit.is_none() {
-                                    ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
-                                } else {
-                                    ensure_at_most_one(store, PRICE_TRIGGER_ASC, posid)?;
-                                }
-                            }
+        let liquidation = pos.liquidation_price;
+        let take_profit = pos.take_profit_price;
+        let stop_loss_override = pos.stop_loss_override_notional;
+        let take_profit_override = pos.take_profit_override_notional;
+        match pos.direction() {
+            DirectionToNotional::Long => {
+                match liquidation {
+                    Some(price) => {
+                        PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
+                    }
+                    None => {
+                        ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
+                    }
+                }
+                match take_profit {
+                    Some(price) => {
+                        PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
+                    }
+                    None => {
+                        ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
+                    }
+                }
+                match stop_loss_override {
+                    Some(price) => {
+                        PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
+                    }
+                    None => {
+                        if liquidation.is_none() {
+                            ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
+                        } else {
+                            ensure_at_most_one(store, PRICE_TRIGGER_DESC, posid)?;
                         }
                     }
-                    DirectionToNotional::Short => {
-                        match liquidation {
-                            Some(price) => {
-                                PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
-                            }
-                            None => {
-                                ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
-                            }
-                        }
-                        match take_profit {
-                            Some(price) => {
-                                PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
-                            }
-                            None => {
-                                ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
-                            }
-                        }
-                        match stop_loss_override {
-                            Some(price) => {
-                                PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
-                            }
-                            None => {
-                                if liquidation.is_none() {
-                                    ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
-                                } else {
-                                    ensure_at_most_one(store, PRICE_TRIGGER_ASC, posid)?;
-                                }
-                            }
-                        }
-                        match take_profit_override {
-                            Some(price) => {
-                                PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
-                            }
-                            None => {
-                                if take_profit.is_none() {
-                                    ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
-                                } else {
-                                    ensure_at_most_one(store, PRICE_TRIGGER_DESC, posid)?;
-                                }
-                            }
+                }
+                match take_profit_override {
+                    Some(price) => {
+                        PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
+                    }
+                    None => {
+                        if take_profit.is_none() {
+                            ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
+                        } else {
+                            ensure_at_most_one(store, PRICE_TRIGGER_ASC, posid)?;
                         }
                     }
                 }
             }
-            Some(_) => {
-                ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
-                ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
+            DirectionToNotional::Short => {
+                match liquidation {
+                    Some(price) => {
+                        PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
+                    }
+                    None => {
+                        ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
+                    }
+                }
+                match take_profit {
+                    Some(price) => {
+                        PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
+                    }
+                    None => {
+                        ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
+                    }
+                }
+                match stop_loss_override {
+                    Some(price) => {
+                        PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
+                    }
+                    None => {
+                        if liquidation.is_none() {
+                            ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
+                        } else {
+                            ensure_at_most_one(store, PRICE_TRIGGER_ASC, posid)?;
+                        }
+                    }
+                }
+                match take_profit_override {
+                    Some(price) => {
+                        PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
+                    }
+                    None => {
+                        if take_profit.is_none() {
+                            ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
+                        } else {
+                            ensure_at_most_one(store, PRICE_TRIGGER_DESC, posid)?;
+                        }
+                    }
+                }
             }
         }
     }
@@ -275,18 +242,6 @@ fn ensure_at_most_one(
         }
     }
 
-    Ok(())
-}
-
-fn ensure_missing_pending(
-    store: &dyn Storage,
-    m: Map<(Timestamp, PositionId), ()>,
-    posid: PositionId,
-) -> Result<()> {
-    for res in m.keys(store, None, None, cosmwasm_std::Order::Ascending) {
-        let (_, x) = res?;
-        anyhow::ensure!(x != posid);
-    }
     Ok(())
 }
 
