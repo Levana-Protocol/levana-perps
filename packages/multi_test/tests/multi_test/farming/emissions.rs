@@ -1,7 +1,6 @@
-use levana_perpswap_multi_test::PerpsApp;
 use levana_perpswap_multi_test::market_wrapper::PerpsMarket;
 use levana_perpswap_multi_test::time::TimeJump;
-use msg::prelude::*;
+use levana_perpswap_multi_test::PerpsApp;
 use levana_perpswap_multi_test::{
     arbitrary::farming::emissions::data::FarmingEmissions, config::TEST_CONFIG,
 };
@@ -12,6 +11,7 @@ use msg::contracts::farming::entry::{
     Emissions, ExecuteMsg, FarmingPeriodResp, LockdropBucketStats, OwnerExecuteMsg,
 };
 use msg::contracts::farming::events::DepositSource;
+use msg::prelude::*;
 use msg::token::Token;
 use proptest::prelude::*;
 

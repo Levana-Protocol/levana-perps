@@ -1,4 +1,4 @@
-use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp, time::TimeJump};
+use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, time::TimeJump, PerpsApp};
 use msg::prelude::*;
 
 #[test]
