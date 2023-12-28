@@ -6,6 +6,7 @@ use msg::contracts::market::{
     position::events::PositionSaveReason,
 };
 
+use crate::state::position::OpenPositionParams;
 use crate::{prelude::*, state::position::get_position};
 
 impl State<'_> {
@@ -18,6 +19,11 @@ impl State<'_> {
         let pos_order_id = helper(self, ctx, item.clone())?;
         self.mark_deferred_exec_success(ctx, item, pos_order_id)?;
         Ok(())
+    }
+
+    pub(crate) fn deferred_validate(&self, ctx: &StateContext, id: DeferredExecId) -> Result<()> {
+        let item = self.load_deferred_exec_item(ctx.storage, id)?;
+        helper_validate(self, ctx, item)
     }
 }
 
@@ -165,6 +171,7 @@ fn helper(
         }
     }
 }
+
 fn handle_update_position_shared(
     state: &State,
     ctx: &mut StateContext,
@@ -194,4 +201,42 @@ fn handle_update_position_shared(
     state.position_liquifund_store(ctx, pos, starts_at, now, false, PositionSaveReason::Update)?;
 
     Ok(())
+}
+
+fn helper_validate(state: &State, ctx: &StateContext, item: DeferredExecWithStatus) -> Result<()> {
+    match item.item {
+        DeferredExecItem::OpenPosition {
+            slippage_assert,
+            leverage,
+            direction,
+            max_gains,
+            stop_loss_override,
+            take_profit_override,
+            amount,
+        } => state
+            .validate_new_position(
+                ctx.storage,
+                OpenPositionParams {
+                    owner: item.owner,
+                    collateral: amount,
+                    leverage,
+                    direction,
+                    max_gains_in_quote: max_gains,
+                    slippage_assert,
+                    stop_loss_override,
+                    take_profit_override,
+                },
+            )
+            .map(|_| ()),
+        DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { .. }
+        | DeferredExecItem::UpdatePositionAddCollateralImpactSize { .. }
+        | DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { .. }
+        | DeferredExecItem::UpdatePositionRemoveCollateralImpactSize { .. }
+        | DeferredExecItem::UpdatePositionLeverage { .. }
+        | DeferredExecItem::UpdatePositionMaxGains { .. }
+        | DeferredExecItem::ClosePosition { .. }
+        | DeferredExecItem::SetTriggerOrder { .. }
+        | DeferredExecItem::PlaceLimitOrder { .. }
+        | DeferredExecItem::CancelLimitOrder { .. } => Ok(()),
+    }
 }
