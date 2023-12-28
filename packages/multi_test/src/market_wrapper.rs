@@ -1919,12 +1919,16 @@ impl PerpsMarket {
             {
                 if exec_event.deferred_exec_id == queue_event.deferred_exec_id {
                     match exec_event.success {
-                        true => break Ok(DeferResponse {
-                            exec_event,
-                            queue_event,
-                            responses,
-                        }),
-                        false => return Err(anyhow!("deferred execution failed: {:?}", exec_event.desc)),
+                        true => {
+                            break Ok(DeferResponse {
+                                exec_event,
+                                queue_event,
+                                responses,
+                            })
+                        }
+                        false => {
+                            return Err(anyhow!("deferred execution failed: {:?}", exec_event.desc))
+                        }
                     }
                 }
             }
