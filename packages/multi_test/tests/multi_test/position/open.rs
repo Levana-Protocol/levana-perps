@@ -140,7 +140,7 @@ fn position_open_fail() {
 
 #[test]
 fn position_open_slippage_assert() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
     let price = market.query_current_price().unwrap().price_notional;
 
@@ -240,6 +240,8 @@ fn position_open_slippage_assert() {
                 None,
             )
             .unwrap_err();
+
+        market.debug_001 = true;
 
         let pos = market
             .exec_open_position(
