@@ -13,6 +13,7 @@ use msg::{
     },
     token::Token,
 };
+use reqwest::header::{HeaderValue, REFERER};
 
 use crate::config::BotConfigByType;
 use crate::util::markets::{get_markets, Market};
@@ -339,6 +340,10 @@ pub(crate) async fn get_height(
         };
         let value = client
             .get(url)
+            .header(
+                REFERER,
+                HeaderValue::from_static("https://bots.levana.exchange/"),
+            )
             .send()
             .await?
             .error_for_status()?
