@@ -83,8 +83,6 @@ impl State<'_> {
             take_profit_override,
         };
 
-        self.limit_order_validate(ctx.storage, &order)?;
-
         LIMIT_ORDERS.save(ctx.storage, order_id, &order)?;
 
         let market_type = self.market_type(ctx.storage)?;
@@ -356,44 +354,6 @@ impl State<'_> {
         self.add_token_transfer_msg(ctx, &order.owner, order.collateral)?;
 
         ctx.response.add_event(CancelLimitOrderEvent { order_id });
-
-        Ok(())
-    }
-
-    fn limit_order_validate(&self, storage: &dyn Storage, order: &LimitOrder) -> Result<()> {
-        let price = self.spot_price(storage, None)?;
-        let market_type = self.market_type(storage)?;
-
-        match order.direction {
-            DirectionToNotional::Long => {
-                self.validate_order_price(
-                    order.trigger_price.into_notional_price(market_type),
-                    order.trigger_price,
-                    order
-                        .stop_loss_override
-                        .map(|price| price.into_notional_price(market_type)),
-                    order.stop_loss_override,
-                    Some(price.price_notional),
-                    Some(price.price_base),
-                    market_type,
-                    TriggerType::LimitOrder,
-                )?;
-            }
-            DirectionToNotional::Short => {
-                self.validate_order_price(
-                    order.trigger_price.into_notional_price(market_type),
-                    order.trigger_price,
-                    Some(price.price_notional),
-                    Some(price.price_base),
-                    order
-                        .stop_loss_override
-                        .map(|price| price.into_notional_price(market_type)),
-                    order.stop_loss_override,
-                    market_type,
-                    TriggerType::LimitOrder,
-                )?;
-            }
-        }
 
         Ok(())
     }
