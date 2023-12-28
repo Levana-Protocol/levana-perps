@@ -21,9 +21,9 @@ impl State<'_> {
         Ok(())
     }
 
-    pub(crate) fn deferred_validate(&self, ctx: &StateContext, id: DeferredExecId) -> Result<()> {
-        let item = self.load_deferred_exec_item(ctx.storage, id)?;
-        helper_validate(self, ctx, item)
+    pub(crate) fn deferred_validate(&self, store: &dyn Storage, id: DeferredExecId) -> Result<()> {
+        let item = self.load_deferred_exec_item(store, id)?;
+        helper_validate(self, store, item)
     }
 }
 
@@ -203,7 +203,7 @@ fn handle_update_position_shared(
     Ok(())
 }
 
-fn helper_validate(state: &State, ctx: &StateContext, item: DeferredExecWithStatus) -> Result<()> {
+fn helper_validate(state: &State, store: &dyn Storage, item: DeferredExecWithStatus) -> Result<()> {
     match item.item {
         DeferredExecItem::OpenPosition {
             slippage_assert,
@@ -215,7 +215,7 @@ fn helper_validate(state: &State, ctx: &StateContext, item: DeferredExecWithStat
             amount,
         } => state
             .validate_new_position(
-                ctx.storage,
+                store,
                 OpenPositionParams {
                     owner: item.owner,
                     collateral: amount,
