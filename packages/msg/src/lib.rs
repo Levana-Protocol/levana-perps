@@ -8,7 +8,6 @@ pub mod contracts;
 pub mod prelude;
 pub mod shutdown;
 pub mod token;
-pub mod response;
 
 /// Reexport the shared crate.
 ///

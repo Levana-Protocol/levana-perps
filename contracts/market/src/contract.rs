@@ -27,7 +27,7 @@ use msg::{
         position::{PositionOrPendingClose, PositionsResp},
         spot_price::{SpotPriceConfig, SpotPriceConfigInit},
     },
-    shutdown::ShutdownImpact, response::ResponseErrorEvent,
+    shutdown::ShutdownImpact,
 };
 
 use msg::contracts::market::entry::LimitOrderResp;
@@ -93,20 +93,6 @@ pub fn instantiate(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     let (mut state, mut ctx) = StateContext::new(deps, env)?;
-
-    match inner_execute(&mut state, &mut ctx, info, msg) {
-        Err(e) => {
-            ctx.response_mut().add_event(ResponseErrorEvent{error: e.to_string()});
-            Err(e)
-        }
-        Ok(_) => {
-            ctx.into_response(&state)
-        }
-    }
-
-}
-
-fn inner_execute(mut state: &mut State, mut ctx: &mut StateContext, info: MessageInfo, msg: ExecuteMsg) -> Result<()> {
     #[cfg(feature = "sanity")]
     state.sanity_check(ctx.storage);
 
@@ -426,7 +412,7 @@ fn inner_execute(mut state: &mut State, mut ctx: &mut StateContext, info: Messag
         &ctx.fund_transfers,
     );
 
-    Ok(())
+    ctx.into_response(&state)
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
