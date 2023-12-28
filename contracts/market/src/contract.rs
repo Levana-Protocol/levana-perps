@@ -455,7 +455,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             } => {
                 let oracle_price = state.get_oracle_price(false)?;
                 let market_id = state.market_id(store)?;
-                let price_storage = oracle_price.compose_price(market_id, &feeds, &feeds_usd)?;
+                let price_storage =
+                    oracle_price.compose_price(market_id, &feeds, &feeds_usd, state.now())?;
                 let price_point = state.make_price_point(store, state.now(), price_storage)?;
                 OraclePriceResp {
                     pyth: oracle_price.pyth,

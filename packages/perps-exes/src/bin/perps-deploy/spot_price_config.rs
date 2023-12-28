@@ -35,5 +35,6 @@ pub(crate) fn get_spot_price_config(
             .iter()
             .map(|feed| feed.clone().into())
             .collect(),
+        volatile_diff_seconds: None,
     })
 }

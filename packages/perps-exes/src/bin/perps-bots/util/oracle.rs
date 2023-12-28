@@ -47,8 +47,13 @@ impl OffchainPriceData {
                     stride: _,
                     feeds,
                     feeds_usd,
+                    volatile_diff_seconds: _,
                 } => {
-                    for SpotPriceFeed { data, inverted: _ } in feeds.iter().chain(feeds_usd.iter())
+                    for SpotPriceFeed {
+                        data,
+                        inverted: _,
+                        volatile: _,
+                    } in feeds.iter().chain(feeds_usd.iter())
                     {
                         match data {
                             SpotPriceFeedData::Constant { .. } => (),

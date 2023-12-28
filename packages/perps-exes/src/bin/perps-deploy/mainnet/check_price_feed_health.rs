@@ -61,6 +61,7 @@ async fn go(
                 stride,
                 feeds,
                 feeds_usd,
+                volatile_diff_seconds: _,
             } => {
                 for feed in feeds.into_iter().chain(feeds_usd) {
                     match feed.data {

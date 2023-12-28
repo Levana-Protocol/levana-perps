@@ -222,6 +222,7 @@ impl App {
                 stride: _,
                 feeds,
                 feeds_usd,
+                volatile_diff_seconds: _,
             } => feeds.iter().chain(feeds_usd.iter()).any(|x| match x.data {
                 SpotPriceFeedData::Constant { .. } => false,
                 SpotPriceFeedData::Pyth { .. } => true,

@@ -701,6 +701,8 @@ pub struct OraclePriceFeedPythResp {
     pub price: NumberGtZero,
     /// The pyth publish time
     pub publish_time: Timestamp,
+    /// Is this considered a volatile feed?
+    pub volatile: bool,
 }
 
 /// Part of [OraclePriceResp]
@@ -710,6 +712,8 @@ pub struct OraclePriceFeedStrideResp {
     pub redemption_rate: NumberGtZero,
     /// The redemption price publish time
     pub publish_time: Timestamp,
+    /// Is this considered a volatile feed?
+    pub volatile: bool,
 }
 
 /// Part of [OraclePriceResp]
@@ -721,6 +725,8 @@ pub struct OraclePriceFeedSimpleResp {
     pub block_info: BlockInfo,
     /// Optional timestamp for the price, independent of block_info.time
     pub timestamp: Option<Timestamp>,
+    /// Is this considered a volatile feed?
+    pub volatile: bool,
 }
 
 /// When querying an open position, how do we calculate PnL vis-a-vis fees?
