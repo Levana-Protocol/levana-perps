@@ -4,6 +4,7 @@ use std::sync::Arc;
 use axum::async_trait;
 use chrono::{DateTime, Utc};
 use cosmos::{Address, Cosmos};
+use http::header::REFERER;
 use msg::contracts::faucet::entry::{GasAllowanceResp, TapAmountResponse};
 use msg::prelude::*;
 use msg::{
@@ -13,6 +14,7 @@ use msg::{
     },
     token::Token,
 };
+use reqwest::header::HeaderValue;
 
 use crate::config::BotConfigByType;
 use crate::util::markets::{get_markets, Market};
@@ -339,6 +341,10 @@ pub(crate) async fn get_height(
         };
         let value = client
             .get(url)
+            .header(
+                REFERER,
+                HeaderValue::from_static("https://bots.levana.exchange/"),
+            )
             .send()
             .await?
             .error_for_status()?
