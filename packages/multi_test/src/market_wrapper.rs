@@ -1257,7 +1257,10 @@ impl PerpsMarket {
             },
         )?;
 
-        let res = self.exec_wasm_msg(sender, msg)?;
+        let defer_res = self.exec_defer_wasm_msg(sender, msg)?;
+
+        let res = defer_res.exec_resp().clone();
+
         let order_id = res
             .event_first_value(event_key::PLACE_LIMIT_ORDER, event_key::ORDER_ID)?
             .parse()?;
