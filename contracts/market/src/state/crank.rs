@@ -200,15 +200,18 @@ impl State<'_> {
             } => {
                 let pos = get_position(ctx.storage, position)?;
 
+                // Do one more liquifunding before closing the position to
+                // pay out fees. This may end up closing the position on its own, otherwise we
+                // explicitly close it ourselves because we hit a trigger.
                 let starts_at = pos.liquifunded_at;
-                let ends_at = starts_at.plus_seconds(self.config.liquifunding_delay_seconds.into());
+                let ends_at = pos.next_liquifunding;
                 let mcp = self.position_liquifund(ctx, pos, starts_at, ends_at, true)?;
 
                 let close_position_instructions = match mcp {
                     MaybeClosedPosition::Open(pos) => ClosePositionInstructions {
                         pos,
                         exposure: Signed::zero(),
-                        close_time: ends_at,
+                        close_time: self.now(),
                         settlement_time: price_point.timestamp,
                         reason: PositionCloseReason::Liquidated(liquidation_reason),
                     },
