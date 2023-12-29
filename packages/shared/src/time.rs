@@ -84,6 +84,11 @@ impl Timestamp {
         Timestamp(seconds * 1_000_000_000)
     }
 
+    /// Construct a new value from the given number of millisecond since the epoch.
+    pub fn from_millis(millis: u64) -> Self {
+        Timestamp(millis * 1_000_000)
+    }
+
     /// Add the given number of seconds to the given timestamp
     pub fn plus_seconds(self, secs: u64) -> Self {
         self + Duration::from_seconds(secs)

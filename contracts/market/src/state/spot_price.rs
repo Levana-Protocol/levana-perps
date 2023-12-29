@@ -567,7 +567,7 @@ impl State<'_> {
                                     let price = NumberGtZero::try_from(price)
                                         .context("price must be > 0")?;
 
-                                    let publish_time = Timestamp::from_seconds(
+                                    let publish_time = Timestamp::from_millis(
                                         pair.oracle_exchange_rate.last_update_timestamp,
                                     );
 
