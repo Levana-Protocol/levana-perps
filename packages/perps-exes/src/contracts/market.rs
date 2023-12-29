@@ -414,7 +414,7 @@ impl MarketContract {
     }
 
     pub async fn crank(&self, wallet: &Wallet, rewards: Option<RawAddr>) -> Result<()> {
-	let mut status = self.status().await?;
+        let mut status = self.status().await?;
         while status.next_crank.is_some() || status.deferred_execution_items != 0 {
             log::info!("Crank started");
             let execute_msg = MarketExecuteMsg::Crank {
@@ -423,7 +423,7 @@ impl MarketContract {
             };
             let tx = self.0.execute(wallet, vec![], execute_msg).await?;
             log::info!("{}", tx.txhash);
-	    status = self.status().await?;
+            status = self.status().await?;
         }
         log::info!("Cranking finished");
         Ok(())

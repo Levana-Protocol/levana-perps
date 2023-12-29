@@ -89,7 +89,7 @@ impl PerpApp {
     }
 
     pub async fn all_open_positions(&self) -> Result<PositionsInfo> {
-	self.crank(None).await?;
+        self.crank(None).await?;
         self.market.all_open_positions(&self.wallet).await
     }
 
@@ -231,11 +231,11 @@ impl PerpApp {
         impact: UpdatePositionCollateralImpact,
         slippage_assert: Option<SlippageAssert>,
     ) -> Result<TxResponse> {
-        let _ = self.market
+        let _ = self
+            .market
             .update_collateral(&self.wallet, id, collateral, impact, slippage_assert)
             .await?;
-	self.crank_single(None).await
-
+        self.crank_single(None).await
     }
 }
 

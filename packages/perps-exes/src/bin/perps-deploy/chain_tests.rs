@@ -278,7 +278,7 @@ pub async fn test_update_leverage(perp_app: &PerpApp) -> Result<()> {
     let positions = perp_app.all_open_positions().await?;
 
     let position_detail = match &positions.info[..] {
-	[ ] => bail!("No positions found"),
+        [] => bail!("No positions found"),
         [a] => a,
         xs => bail!("More than one position found: {xs:?}"),
     };
