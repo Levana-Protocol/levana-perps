@@ -3827,9 +3827,9 @@ dependencies = [
 
 [[package]]
 name = "sei-cosmwasm"
-version = "0.4.10"
+version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49b4dd7061ee6ea8bb74f775c54876a8609c191bcd5070446ddd83f0bac3c36c"
+checksum = "cb19ce21432f9b2db390472dfa1ec884b4e0248154a07e98c3f6e569a0cd69c9"
 dependencies = [
  "cosmwasm-std",
  "protobuf",
