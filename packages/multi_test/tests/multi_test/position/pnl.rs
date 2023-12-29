@@ -36,7 +36,6 @@ fn position_pnl_close_no_change() {
         .unwrap();
 
     market.automatic_time_jump_enabled = false;
-    market.exec_crank_till_finished(&trader).unwrap();
 
     let pos = market.query_position(pos_id).unwrap();
     let start_pnl_in_collateral = pos.pnl_collateral;
