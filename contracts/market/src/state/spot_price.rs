@@ -7,8 +7,8 @@ use cosmwasm_std::QuerierWrapper;
 use cosmwasm_std::{Binary, Order};
 use msg::contracts::market::{
     entry::{
-        OraclePriceFeedPythResp, OraclePriceFeedSimpleResp, OraclePriceFeedStrideResp,
-        PriceForQuery,
+        OraclePriceFeedPythResp, OraclePriceFeedSeiResp, OraclePriceFeedSimpleResp,
+        OraclePriceFeedStrideResp, PriceForQuery,
     },
     spot_price::{events::SpotPriceEvent, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData},
 };
@@ -52,7 +52,7 @@ pub(crate) struct OraclePriceInternal {
     /// A map of each pyth id used in this market to the price and publish time
     pub pyth: BTreeMap<PriceIdentifier, OraclePriceFeedPythResp>,
     /// A map of each sei denom used in this market to the price
-    pub sei: BTreeMap<String, NumberGtZero>,
+    pub sei: BTreeMap<String, OraclePriceFeedSeiResp>,
     /// A map of each stride denom used in this market to the redemption price
     pub stride: BTreeMap<String, OraclePriceFeedStrideResp>,
     /// A map of each simple contract used in this market to the redemption price
@@ -78,7 +78,11 @@ impl OraclePriceInternal {
                 add_new_timestamp(pyth.publish_time);
             }
         }
-        // Note: ignoring Sei since we don't have publish time for it.
+        for sei in self.sei.values() {
+            if sei.volatile {
+                add_new_timestamp(sei.publish_time);
+            }
+        }
         for stride in self.stride.values() {
             if stride.volatile {
                 add_new_timestamp(stride.publish_time);
@@ -152,7 +156,7 @@ impl OraclePriceInternal {
                 SpotPriceFeedData::Sei { denom } => self
                     .sei
                     .get(denom)
-                    .copied()
+                    .map(|x| x.price)
                     .with_context(|| format!("no sei price for denom {}", denom))?,
                 SpotPriceFeedData::Stride { denom, .. } => self
                     .stride
@@ -563,7 +567,16 @@ impl State<'_> {
                                     let price = NumberGtZero::try_from(price)
                                         .context("price must be > 0")?;
 
-                                    entry.insert(price);
+                                    let publish_time = Timestamp::from_millis(
+                                        pair.oracle_exchange_rate.last_update_timestamp,
+                                    );
+
+                                    entry.insert(OraclePriceFeedSeiResp {
+                                        price,
+                                        publish_time,
+                                        // Sei feeds default to being volatile unless otherwise overridden
+                                        volatile: feed.volatile.unwrap_or(true),
+                                    });
                                 }
                             }
                             #[cfg(not(feature = "sei"))]
