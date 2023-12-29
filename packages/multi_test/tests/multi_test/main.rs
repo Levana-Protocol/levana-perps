@@ -13,13 +13,15 @@ mod proptest;
 mod rewards;
 mod shutdown;
 mod wrong_token;
-
-/* Still failing:
 mod delta_neutrality_fee;
 mod delta_neutrality_ratio;
+mod fees;
+
+/* Still failing:
 mod diagnostic;
 mod edge_update;
-mod fees;
+*/
+/* 
 mod funding;
 mod history;
 mod liquidation_price;
