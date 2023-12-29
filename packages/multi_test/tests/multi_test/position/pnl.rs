@@ -19,7 +19,6 @@ const SKIP_CHECK_LARGE_PNL_IS_TAKE_PROFIT: bool = true;
 #[test]
 fn position_pnl_close_no_change() {
     let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    market.automatic_time_jump_enabled = false;
     let trader = market.clone_trader(0).unwrap();
 
     // open/close with no price movement, pnl should be 0
@@ -36,6 +35,9 @@ fn position_pnl_close_no_change() {
         )
         .unwrap();
 
+    market.automatic_time_jump_enabled = false;
+    market.exec_crank_till_finished(&trader).unwrap();
+
     let pos = market.query_position(pos_id).unwrap();
     let start_pnl_in_collateral = pos.pnl_collateral;
 
@@ -44,7 +46,9 @@ fn position_pnl_close_no_change() {
         start_pnl_in_collateral > "-3.0".parse().unwrap() && start_pnl_in_collateral.is_negative()
     );
 
+    market.automatic_time_jump_enabled = true;
     let res = market.exec_close_position(&trader, pos_id, None).unwrap();
+    market.automatic_time_jump_enabled = false;
     let delta_neutrality_fee_close = res.first_delta_neutrality_fee_amount();
 
     let pos = market.query_closed_position(&trader, pos_id).unwrap();
