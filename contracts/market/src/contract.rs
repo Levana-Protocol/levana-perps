@@ -7,7 +7,7 @@ use crate::state::{
     fees::fees_init,
     liquidity::{liquidity_init, yield_init},
     meta::meta_init,
-    position::{get_position, positions_init, PositionOrId},
+    position::{get_position, positions_init},
     set_factory_addr,
     token::token_init,
 };
@@ -15,21 +15,22 @@ use crate::state::{
 use crate::prelude::*;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Response};
+use cosmwasm_std::{Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response};
 use cw2::{get_contract_version, set_contract_version};
 use msg::{
     contracts::market::{
+        deferred_execution::{DeferredExecId, DeferredExecItem},
         entry::{
             DeltaNeutralityFeeResp, InitialPrice, InstantiateMsg, MigrateMsg, OraclePriceResp,
             PositionsQueryFeeApproach, PriceWouldTriggerResp, SpotPriceHistoryResp,
         },
-        position::{events::PositionSaveReason, PositionId, PositionOrPendingClose, PositionsResp},
+        position::{PositionOrPendingClose, PositionsResp},
         spot_price::{SpotPriceConfig, SpotPriceConfigInit},
     },
     shutdown::ShutdownImpact,
 };
 
-use msg::contracts::market::entry::{LimitOrderResp, SlippageAssert};
+use msg::contracts::market::entry::LimitOrderResp;
 
 use semver::Version;
 use shared::price::Price;
@@ -113,48 +114,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         Ok(())
     }
 
-    fn handle_update_position_shared(
-        state: &State,
-        ctx: &mut StateContext,
-        sender: Addr,
-        id: PositionId,
-        notional_size: Option<Signed<Notional>>,
-        slippage_assert: Option<SlippageAssert>,
-    ) -> Result<()> {
-        state.ensure_not_stale(ctx.storage)?;
-
-        state.position_assert_owner(ctx.storage, PositionOrId::Id(id), &sender)?;
-
-        if let Some(slippage_assert) = slippage_assert {
-            let market_type = state.market_id(ctx.storage)?.get_market_type();
-            let pos = get_position(ctx.storage, id)?;
-            let delta_notional_size =
-                notional_size.unwrap_or(pos.notional_size) - pos.notional_size;
-            state.do_slippage_assert(
-                ctx.storage,
-                slippage_assert,
-                delta_notional_size,
-                market_type,
-                Some(pos.liquidation_margin.delta_neutrality),
-            )?;
-        }
-
-        let now = state.now();
-        let pos = get_position(ctx.storage, id)?;
-
-        let starts_at = pos.liquifunded_at;
-        state.position_liquifund_store(
-            ctx,
-            pos,
-            starts_at,
-            now,
-            false,
-            PositionSaveReason::Update,
-        )?;
-
-        Ok(())
-    }
-
     // Semi-parse the message to determine the inner message/sender (relevant
     // for CW20s) and any collateral sent into the contract
     let mut info = state.parse_perps_message_info(ctx.storage, info, msg)?;
@@ -210,44 +169,53 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             stop_loss_override,
             take_profit_override,
         } => {
-            state.handle_position_open(
+            state.defer_execution(
                 &mut ctx,
                 info.sender,
-                info.funds.take()?,
-                leverage,
-                direction,
-                max_gains,
-                slippage_assert,
-                stop_loss_override,
-                take_profit_override,
+                DeferredExecItem::OpenPosition {
+                    slippage_assert,
+                    leverage,
+                    direction,
+                    max_gains,
+                    stop_loss_override,
+                    take_profit_override,
+                    amount: info.funds.take()?,
+                },
             )?;
         }
 
         ExecuteMsg::UpdatePositionAddCollateralImpactLeverage { id } => {
-            handle_update_position_shared(&state, &mut ctx, info.sender, id, None, None)?;
-            state.update_position_collateral(&mut ctx, id, info.funds.take()?.into_signed())?;
+            state.defer_execution(
+                &mut ctx,
+                info.sender,
+                DeferredExecItem::UpdatePositionAddCollateralImpactLeverage {
+                    id,
+                    amount: info.funds.take()?,
+                },
+            )?;
         }
         ExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => {
             state.get_token(ctx.storage)?.validate_collateral(amount)?;
-            handle_update_position_shared(&state, &mut ctx, info.sender, id, None, None)?;
-            state.update_position_collateral(&mut ctx, id, -amount.into_signed())?;
+            state.defer_execution(
+                &mut ctx,
+                info.sender,
+                DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, amount },
+            )?;
         }
 
         ExecuteMsg::UpdatePositionAddCollateralImpactSize {
             id,
             slippage_assert,
         } => {
-            let funds = info.funds.take()?.into_signed();
-            let notional_size = state.update_size_new_notional_size(&mut ctx, id, funds)?;
-            handle_update_position_shared(
-                &state,
+            state.defer_execution(
                 &mut ctx,
                 info.sender,
-                id,
-                Some(notional_size),
-                slippage_assert,
+                DeferredExecItem::UpdatePositionAddCollateralImpactSize {
+                    id,
+                    slippage_assert,
+                    amount: info.funds.take()?,
+                },
             )?;
-            state.update_position_size(&mut ctx, id, funds)?;
         }
         ExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
             id,
@@ -255,18 +223,15 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             amount,
         } => {
             state.get_token(ctx.storage)?.validate_collateral(amount)?;
-
-            let notional_size =
-                state.update_size_new_notional_size(&mut ctx, id, -amount.into_signed())?;
-            handle_update_position_shared(
-                &state,
+            state.defer_execution(
                 &mut ctx,
                 info.sender,
-                id,
-                Some(notional_size),
-                slippage_assert,
+                DeferredExecItem::UpdatePositionRemoveCollateralImpactSize {
+                    id,
+                    amount: info.funds.take()?,
+                    slippage_assert,
+                },
             )?;
-            state.update_position_size(&mut ctx, id, -amount.into_signed())?;
         }
 
         ExecuteMsg::UpdatePositionLeverage {
@@ -274,30 +239,23 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             leverage,
             slippage_assert,
         } => {
-            handle_update_position_shared(&state, &mut ctx, info.sender, id, None, None)?;
-
-            let notional_size = state.update_leverage_new_notional_size(&mut ctx, id, leverage)?;
-            if let Some(slippage_assert) = slippage_assert {
-                let market_type = state.market_id(ctx.storage)?.get_market_type();
-                let pos = get_position(ctx.storage, id)?;
-                let delta_notional_size = notional_size - pos.notional_size;
-                state.do_slippage_assert(
-                    ctx.storage,
+            state.defer_execution(
+                &mut ctx,
+                info.sender,
+                DeferredExecItem::UpdatePositionLeverage {
+                    id,
+                    leverage,
                     slippage_assert,
-                    delta_notional_size,
-                    market_type,
-                    Some(pos.liquidation_margin.delta_neutrality),
-                )?;
-            }
-
-            state.update_position_leverage(&mut ctx, id, notional_size)?;
+                },
+            )?;
         }
 
         ExecuteMsg::UpdatePositionMaxGains { id, max_gains } => {
-            handle_update_position_shared(&state, &mut ctx, info.sender, id, None, None)?;
-            let counter_collateral =
-                state.update_max_gains_new_counter_collateral(&mut ctx, id, max_gains)?;
-            state.update_position_max_gains(&mut ctx, id, counter_collateral)?;
+            state.defer_execution(
+                &mut ctx,
+                info.sender,
+                DeferredExecItem::UpdatePositionMaxGains { id, max_gains },
+            )?;
         }
 
         ExecuteMsg::SetTriggerOrder {
@@ -305,8 +263,15 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             stop_loss_override,
             take_profit_override,
         } => {
-            state.position_assert_owner(ctx.storage, PositionOrId::Id(id), &info.sender)?;
-            state.set_trigger_order(&mut ctx, id, stop_loss_override, take_profit_override)?;
+            state.defer_execution(
+                &mut ctx,
+                info.sender,
+                DeferredExecItem::SetTriggerOrder {
+                    id,
+                    stop_loss_override,
+                    take_profit_override,
+                },
+            )?;
         }
 
         ExecuteMsg::PlaceLimitOrder {
@@ -317,52 +282,41 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             stop_loss_override,
             take_profit_override,
         } => {
-            let market_type = state.market_id(ctx.storage)?.get_market_type();
-
-            state.limit_order_set_order(
+            state.defer_execution(
                 &mut ctx,
                 info.sender,
-                trigger_price,
-                info.funds.take()?,
-                leverage,
-                direction.into_notional(market_type),
-                max_gains,
-                stop_loss_override,
-                take_profit_override,
+                DeferredExecItem::PlaceLimitOrder {
+                    trigger_price,
+                    leverage,
+                    direction,
+                    max_gains,
+                    stop_loss_override,
+                    take_profit_override,
+                    amount: info.funds.take()?,
+                },
             )?;
         }
 
         ExecuteMsg::CancelLimitOrder { order_id } => {
-            state.limit_order_assert_owner(ctx.storage, &info.sender, order_id)?;
-            state.limit_order_cancel_order(&mut ctx, order_id)?;
+            state.defer_execution(
+                &mut ctx,
+                info.sender,
+                DeferredExecItem::CancelLimitOrder { order_id },
+            )?;
         }
 
         ExecuteMsg::ClosePosition {
             id,
             slippage_assert,
         } => {
-            state.ensure_not_stale(ctx.storage)?;
-
-            let pos = get_position(ctx.storage, id)?;
-
-            if let Some(slippage_assert) = slippage_assert {
-                let market_type = state.market_id(ctx.storage)?.get_market_type();
-                state.do_slippage_assert(
-                    ctx.storage,
+            state.defer_execution(
+                &mut ctx,
+                info.sender,
+                DeferredExecItem::ClosePosition {
+                    id,
                     slippage_assert,
-                    -pos.notional_size,
-                    market_type,
-                    Some(pos.liquidation_margin.delta_neutrality),
-                )?;
-            }
-
-            state.position_assert_owner(
-                ctx.storage,
-                PositionOrId::Pos(Box::new(pos.clone())),
-                &info.sender,
+                },
             )?;
-
-            state.close_position_via_msg(&mut ctx, pos)?;
         }
 
         ExecuteMsg::Crank { execs, rewards } => {
@@ -416,6 +370,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             // executions *MUST* come only from the proxy contract
             // otherwise anyone could spoof the sender
             state.assert_auth(&info.sender, AuthCheck::Addr(position_token_addr))?;
+            // Do not allow any NFT-level actions while deferred executions are pending
+            if let Some(pos_id) = msg.get_position_id()? {
+                state.assert_no_pending_deferred(ctx.storage, pos_id)?;
+            }
             state.nft_handle_exec(&mut ctx, sender.validate(state.api)?, msg)?;
         }
 
@@ -439,6 +397,14 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
         ExecuteMsg::ProvideCrankFunds {} => {
             state.provide_crank_funds(&mut ctx, info.funds.take()?)?;
+        }
+
+        ExecuteMsg::PerformDeferredExec { id } => {
+            state.assert_auth(
+                &info.sender,
+                AuthCheck::Addr(state.env.contract.address.clone()),
+            )?;
+            state.perform_deferred_exec(&mut ctx, id)?;
         }
     }
 
@@ -498,7 +464,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             } => {
                 let oracle_price = state.get_oracle_price(false)?;
                 let market_id = state.market_id(store)?;
-                let price_storage = oracle_price.compose_price(market_id, &feeds, &feeds_usd)?;
+                let price_storage =
+                    oracle_price.compose_price(market_id, &feeds, &feeds_usd, state.now())?;
                 let price_point = state.make_price_point(store, state.now(), price_storage)?;
                 OraclePriceResp {
                     pyth: oracle_price.pyth,
@@ -698,18 +665,33 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             let would_trigger = state.price_would_trigger(store, price)?;
             PriceWouldTriggerResp { would_trigger }.query_result()
         }
+        QueryMsg::ListDeferredExecs {
+            addr,
+            start_after,
+            limit,
+        } => {
+            let addr = addr.validate(state.api)?;
+            state
+                .list_deferred_execs(store, addr, start_after, limit)?
+                .query_result()
+        }
+
+        QueryMsg::GetDeferredExec { id } => state.get_deferred_exec(store, id)?.query_result(),
     }
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn migrate(deps: DepsMut, env: Env, MigrateMsg {}: MigrateMsg) -> Result<Response> {
-    let (_state, ctx) = StateContext::new(deps, env)?;
+    let (state, ctx) = StateContext::new(deps, env)?;
 
     // Note, we use _state instead of state to avoid warnings when compiling without the sanity
     // feature
 
     #[cfg(feature = "sanity")]
-    _state.sanity_check(ctx.storage);
+    state.sanity_check(ctx.storage);
+
+    // Make sure we don't have any pre-deferred-execution unpending items.
+    state.ensure_liquidation_prices_pending_empty(ctx.storage)?;
 
     let old_cw2 = get_contract_version(ctx.storage)?;
     let old_version: Version = old_cw2
@@ -742,4 +724,12 @@ pub fn migrate(deps: DepsMut, env: Env, MigrateMsg {}: MigrateMsg) -> Result<Res
             "new_contract_version" => CONTRACT_VERSION,
         })
     }
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
+    let deferred_exec_id = DeferredExecId::from_u64(msg.id);
+    let (state, mut ctx) = StateContext::new(deps, env)?;
+    state.handle_deferred_exec_reply(&mut ctx, deferred_exec_id, msg.result)?;
+    ctx.into_response(&state)
 }

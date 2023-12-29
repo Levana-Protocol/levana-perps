@@ -602,7 +602,7 @@ mod tests {
             liquidity: Default::default(),
             next_crank: None,
             last_crank_completed: None,
-            unpend_queue_size: 0,
+            next_deferred_execution: None,
             borrow_fee: Default::default(),
             borrow_fee_lp: Default::default(),
             borrow_fee_xlp: Default::default(),
@@ -614,14 +614,12 @@ mod tests {
             short_usd: Default::default(),
             instant_delta_neutrality_fee_value: Default::default(),
             delta_neutrality_fee_fund: Default::default(),
-            stale_liquifunding: None,
-            stale_price: None,
-            congested: false,
             fees: Fees {
                 wallets: Default::default(),
                 protocol: Default::default(),
                 crank: Default::default(),
             },
+            deferred_execution_items: 0,
         }
     }
 

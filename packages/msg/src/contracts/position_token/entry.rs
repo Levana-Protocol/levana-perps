@@ -1,4 +1,8 @@
 //! Entrypoint messages for position token proxy
+use std::num::ParseIntError;
+
+use crate::contracts::market::position::PositionId;
+
 use super::{Approval, Metadata};
 use cosmwasm_schema::QueryResponses;
 use cosmwasm_std::{Addr, Binary};
@@ -66,6 +70,37 @@ pub enum ExecuteMsg {
         /// Address that is no longer allowed to spend all NFTs
         operator: RawAddr,
     },
+}
+
+impl ExecuteMsg {
+    /// Get the position ID from this message, if there is one.
+    pub fn get_position_id(&self) -> Result<Option<PositionId>, ParseIntError> {
+        match self {
+            ExecuteMsg::TransferNft {
+                recipient: _,
+                token_id,
+            }
+            | ExecuteMsg::SendNft {
+                contract: _,
+                token_id,
+                msg: _,
+            }
+            | ExecuteMsg::Approve {
+                spender: _,
+                token_id,
+                expires: _,
+            }
+            | ExecuteMsg::Revoke {
+                spender: _,
+                token_id,
+            } => token_id.parse().map(Some),
+            ExecuteMsg::ApproveAll {
+                operator: _,
+                expires: _,
+            }
+            | ExecuteMsg::RevokeAll { operator: _ } => Ok(None),
+        }
+    }
 }
 
 /// Query messages for a position token proxy

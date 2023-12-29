@@ -318,4 +318,5 @@ pub(crate) enum CrankTriggerReason {
     PriceUpdateTooOld(chrono::Duration),
     PriceUpdateWillTrigger,
     NoPriceFound,
+    DeferredExecutionItem,
 }

@@ -126,6 +126,9 @@ impl ShutdownImpact {
             ExecuteMsg::CancelLimitOrder { .. } => Some(Self::ClosePositions),
             ExecuteMsg::ProvideCrankFunds {} => Some(Self::Crank),
             ExecuteMsg::SetManualPrice { .. } => Some(Self::SetManualPrice),
+
+            // Since this can only be executed by the contract itself, it's safe to never block it
+            ExecuteMsg::PerformDeferredExec { .. } => None,
         }
     }
 }

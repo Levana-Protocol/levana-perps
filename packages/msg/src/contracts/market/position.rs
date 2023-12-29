@@ -76,9 +76,6 @@ pub struct Position {
     /// has passed. Additionally, liquifunding may be triggered by updating the
     /// position.
     pub next_liquifunding: Timestamp,
-    /// At what point will this position be stale? Staleness means we cannot
-    /// guarantee sufficient liquidation margin is present to cover fees.
-    pub stale_at: Timestamp,
     /// A trader specified price at which the position will be liquidated
     pub stop_loss_override: Option<PriceBaseInQuote>,
     /// Stored separately to ensure there are no rounding errors, since we need precise binary equivalence for lookups.
@@ -234,8 +231,6 @@ pub struct PositionQueryResponse {
 
     /// When the next liquifunding is scheduled
     pub next_liquifunding: Timestamp,
-    /// Point at which this position will be stale if not liquifunded
-    pub stale_at: Timestamp,
 
     /// Stop loss price set by the trader
     pub stop_loss_override: Option<PriceBaseInQuote>,
@@ -368,7 +363,8 @@ impl Position {
         // Panicking is fine here, it's a hard-coded value
         let ms_per_year = Decimal256::from_atomics(MS_PER_YEAR, 0).unwrap();
 
-        let duration = config.liquidation_margin_duration().as_ms_decimal_lossy();
+        let duration =
+            Duration::from_seconds(config.liquifunding_delay_seconds.into()).as_ms_decimal_lossy();
 
         let borrow_fee_max_rate =
             config.borrow_fee_rate_max_annualized.raw() * duration / ms_per_year;
@@ -670,7 +666,6 @@ impl Position {
             delta_neutrality_fee,
             liquifunded_at,
             next_liquifunding,
-            stale_at,
             stop_loss_override,
             take_profit_override,
             liquidation_margin,
@@ -714,7 +709,6 @@ impl Position {
             take_profit_price_base: take_profit.map(|x| x.into_base_price(market_type)),
             entry_price_base: entry_price.into_base_price(market_type),
             next_liquifunding,
-            stale_at,
             stop_loss_override,
             take_profit_override,
             crank_fee_collateral: crank_fee.collateral(),
@@ -754,7 +748,6 @@ impl Position {
             ("pos-created-at", self.created_at.to_string()),
             ("pos-liquifunded-at", self.liquifunded_at.to_string()),
             ("pos-next-liquifunding", self.next_liquifunding.to_string()),
-            ("pos-stale-at", self.stale_at.to_string()),
             (
                 "pos-borrow-fee-liquidation-margin",
                 borrow_fee_max.to_string(),
@@ -1389,10 +1382,6 @@ pub mod events {
         pub id: PositionId,
         /// Reason the position was saved
         pub reason: PositionSaveReason,
-        /// Was the position put on the pending queue?
-        ///
-        /// This occurs when the crank has fallen behind
-        pub used_pending_queue: bool,
     }
 
     /// Why was a position saved?
@@ -1439,20 +1428,10 @@ pub mod events {
     }
 
     impl From<PositionSaveEvent> for Event {
-        fn from(
-            PositionSaveEvent {
-                id,
-                reason,
-                used_pending_queue,
-            }: PositionSaveEvent,
-        ) -> Self {
+        fn from(PositionSaveEvent { id, reason }: PositionSaveEvent) -> Self {
             Event::new("position-save")
                 .add_attribute("id", id.0)
                 .add_attribute("reason", reason.as_str())
-                .add_attribute(
-                    "used-pending-queue",
-                    if used_pending_queue { "true" } else { "false" },
-                )
         }
     }
 }

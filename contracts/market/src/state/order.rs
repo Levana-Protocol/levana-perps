@@ -46,23 +46,14 @@ impl State<'_> {
         max_gains: MaxGainsInQuote,
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
-    ) -> Result<()> {
-        self.ensure_not_congested(ctx.storage, CongestionReason::PlaceLimit)?;
-
+    ) -> Result<OrderId> {
         let last_order_id = LAST_ORDER_ID
             .may_load(ctx.storage)?
             .unwrap_or_else(|| OrderId::new(0));
         let order_id = OrderId::new(last_order_id.u64() + 1);
         LAST_ORDER_ID.save(ctx.storage, &order_id)?;
 
-        let order_fee = Collateral::try_from_number(
-            collateral
-                .into_number()
-                .checked_mul(self.config.limit_order_fee.into_number())?,
-        )?;
-        let collateral = collateral.checked_sub(order_fee)?;
         let price = self.spot_price(ctx.storage, None)?;
-        self.collect_limit_order_fee(ctx, order_id, order_fee, price)?;
 
         let crank_fee_usd = self.config.crank_fee_charged;
         let crank_fee = price.usd_to_collateral(crank_fee_usd);
@@ -82,8 +73,6 @@ impl State<'_> {
             stop_loss_override,
             take_profit_override,
         };
-
-        self.limit_order_validate(ctx.storage, &order)?;
 
         LIMIT_ORDERS.save(ctx.storage, order_id, &order)?;
 
@@ -118,7 +107,7 @@ impl State<'_> {
             take_profit_override,
         });
 
-        Ok(())
+        Ok(order_id)
     }
 
     /// Returns the next long or short [LimitOrder] whose trigger price is above the specified price
@@ -356,44 +345,6 @@ impl State<'_> {
         self.add_token_transfer_msg(ctx, &order.owner, order.collateral)?;
 
         ctx.response.add_event(CancelLimitOrderEvent { order_id });
-
-        Ok(())
-    }
-
-    fn limit_order_validate(&self, storage: &dyn Storage, order: &LimitOrder) -> Result<()> {
-        let price = self.spot_price(storage, None)?;
-        let market_type = self.market_type(storage)?;
-
-        match order.direction {
-            DirectionToNotional::Long => {
-                self.validate_order_price(
-                    order.trigger_price.into_notional_price(market_type),
-                    order.trigger_price,
-                    order
-                        .stop_loss_override
-                        .map(|price| price.into_notional_price(market_type)),
-                    order.stop_loss_override,
-                    Some(price.price_notional),
-                    Some(price.price_base),
-                    market_type,
-                    TriggerType::LimitOrder,
-                )?;
-            }
-            DirectionToNotional::Short => {
-                self.validate_order_price(
-                    order.trigger_price.into_notional_price(market_type),
-                    order.trigger_price,
-                    Some(price.price_notional),
-                    Some(price.price_base),
-                    order
-                        .stop_loss_override
-                        .map(|price| price.into_notional_price(market_type)),
-                    order.stop_loss_override,
-                    market_type,
-                    TriggerType::LimitOrder,
-                )?;
-            }
-        }
 
         Ok(())
     }

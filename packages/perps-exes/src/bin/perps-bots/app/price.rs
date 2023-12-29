@@ -222,6 +222,7 @@ impl App {
                 stride: _,
                 feeds,
                 feeds_usd,
+                volatile_diff_seconds: _,
             } => feeds.iter().chain(feeds_usd.iter()).any(|x| match x.data {
                 SpotPriceFeedData::Constant { .. } => false,
                 SpotPriceFeedData::Pyth { .. } => true,
@@ -426,6 +427,20 @@ impl App {
             }
         };
 
+        // TODO With the introduction of deferred execution, the workflow here
+        // can (and should) change significantly. However, for getting a first version off
+        // the ground, the MVP is "always do a price update and crank if there's a work
+        // item in the deferred execution pool."
+        if market.status.next_deferred_execution.is_some() {
+            return Ok((
+                None,
+                Some((
+                    PriceUpdateReason::DeferredExecutionItem,
+                    NeedsOracleUpdate::Yes,
+                )),
+            ));
+        }
+
         let mut is_too_frequent = false;
 
         // Check if the price from Pyth is too old
@@ -450,6 +465,7 @@ impl App {
             }
         }
 
+        // TODO review this code and make sure we're handling publish times correctly
         if let Some(publish_time) = market_price.publish_time {
             // Determine the logical "last update" by using both the
             // contract-derived price time and the most recent successful price
@@ -545,6 +561,7 @@ enum PriceUpdateReason {
     },
     Triggers,
     NoPriceFound,
+    DeferredExecutionItem,
 }
 
 impl PriceUpdateReason {
@@ -556,6 +573,7 @@ impl PriceUpdateReason {
             } => *is_too_frequent,
             PriceUpdateReason::Triggers => false,
             PriceUpdateReason::NoPriceFound => false,
+            PriceUpdateReason::DeferredExecutionItem => false,
         }
     }
 
@@ -567,6 +585,9 @@ impl PriceUpdateReason {
             PriceUpdateReason::PriceDelta { .. } => None,
             PriceUpdateReason::Triggers => Some(CrankTriggerReason::PriceUpdateWillTrigger),
             PriceUpdateReason::NoPriceFound => Some(CrankTriggerReason::NoPriceFound),
+            PriceUpdateReason::DeferredExecutionItem => {
+                Some(CrankTriggerReason::DeferredExecutionItem)
+            }
         }
     }
 }
@@ -582,6 +603,7 @@ struct ReasonStats {
     triggers: u64,
     no_price_found: u64,
     oracle_update: u64,
+    deferred_execution: u64,
 }
 
 impl Display for ReasonStats {
@@ -596,8 +618,9 @@ impl Display for ReasonStats {
             triggers,
             no_price_found,
             oracle_update,
+            deferred_execution,
         } = self;
-        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Delta too frequent: {delta_too_frequent}. Triggers: {triggers}. No price found: {no_price_found}. Oracle update: {oracle_update}.")
+        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Delta too frequent: {delta_too_frequent}. Triggers: {triggers}. No price found: {no_price_found}. Oracle update: {oracle_update}. Deferred execution: {deferred_execution}")
     }
 }
 
@@ -612,6 +635,7 @@ impl ReasonStats {
             triggers: 0,
             no_price_found: 0,
             oracle_update: 0,
+            deferred_execution: 0,
             market,
         }
     }
@@ -636,6 +660,7 @@ impl ReasonStats {
             }
             PriceUpdateReason::Triggers => self.triggers += 1,
             PriceUpdateReason::NoPriceFound => self.no_price_found += 1,
+            PriceUpdateReason::DeferredExecutionItem => self.deferred_execution += 1,
         }
         if let NeedsOracleUpdate::Yes = needs_oracle_update {
             self.oracle_update += 1
@@ -655,6 +680,7 @@ impl Display for PriceUpdateReason {
                 write!(f, "Price would trigger positions and/or orders.")
             }
             PriceUpdateReason::NoPriceFound => write!(f, "No price point found."),
+            PriceUpdateReason::DeferredExecutionItem => write!(f, "Deferred execution item."),
         }
     }
 }

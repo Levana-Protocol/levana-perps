@@ -11,9 +11,7 @@ use msg::contracts::market::{
 
 use shared::prelude::*;
 
-use super::position::{
-    get_position, LIQUIDATION_PRICES_PENDING_COUNT, NEXT_LIQUIFUNDING, NEXT_STALE, OPEN_POSITIONS,
-};
+use super::position::{get_position, NEXT_LIQUIFUNDING, OPEN_POSITIONS};
 
 /// The last price point timestamp for which the cranking process was completed.
 ///
@@ -32,37 +30,6 @@ impl State<'_> {
     pub(crate) fn next_crank_timestamp(&self, store: &dyn Storage) -> Result<Option<PricePoint>> {
         let min = LAST_CRANK_COMPLETED.may_load(store)?.map(Bound::exclusive);
         self.spot_price_after(store, min)
-    }
-
-    /// Has the crank finished computations for all previous price points?
-    ///
-    /// If this is the case, the protocol is up-to-date and we can directly add
-    /// liquidation prices to the liquidation data structures, bypassing the
-    /// unpending queue.
-    pub(crate) fn is_crank_up_to_date(&self, store: &dyn Storage) -> Result<bool> {
-        Ok(match self.next_crank_timestamp(store)? {
-            // No price point exists after the last crank completed, therefore
-            // we're fully up to date
-            None => true,
-            Some(next_crank_timestamp) => {
-                // There is a price point that still needs to be calculated. We
-                // never crank the very latest price point, so check if there's
-                // a newer price point. If there is, we're falling behind on the
-                // crank. If the next price update available is the most recent
-                // price update: we're fully up to date.
-                let latest_price = self.spot_price_latest_opt(store)?;
-                match latest_price {
-                    // This should really never happen since we know there's at
-                    // least one price point available by the return from
-                    // next_crank_timestamp. But if it does, we'll default to
-                    // being not up to date.
-                    None => false,
-                    // Only consider the crank up to date if the two timestamps
-                    // match.
-                    Some(latest_price) => latest_price.timestamp == next_crank_timestamp.timestamp,
-                }
-            }
-        })
     }
 
     pub(crate) fn crank_work(&self, store: &dyn Storage) -> Result<Option<CrankWorkInfo>> {
@@ -94,10 +61,6 @@ impl State<'_> {
                     .transpose()?
                 {
                     CrankWorkInfo::Liquifunding { position }
-                } else if let Some(position) =
-                    self.pending_liquidation_prices(store, price_point.timestamp)?
-                {
-                    CrankWorkInfo::UnpendLiquidationPrices { position }
                 } else if let Some(pos) =
                     self.liquidatable_position(store, price_point.price_notional)?
                 {
@@ -105,6 +68,14 @@ impl State<'_> {
                         position: pos.id,
                         liquidation_reason: pos.reason,
                         price_point,
+                    }
+                } else if let Some((deferred_exec_id, target)) =
+                    self.next_crankable_deferred_exec_id(store, price_point.timestamp)?
+                {
+                    CrankWorkInfo::DeferredExec {
+                        deferred_exec_id,
+                        target,
+                        price_point_timestamp: price_point.timestamp,
                     }
                 } else if let Some(order_id) =
                     self.limit_order_triggered_order(store, price_point.price_notional, false)?
@@ -148,10 +119,6 @@ impl State<'_> {
         }
         .into();
 
-        let starting_unpend = LIQUIDATION_PRICES_PENDING_COUNT
-            .may_load(ctx.storage)?
-            .unwrap_or_default();
-
         let mut actual = vec![];
         for _ in 0..n_execs {
             match self.crank_work(ctx.storage)? {
@@ -163,16 +130,10 @@ impl State<'_> {
             };
         }
 
-        let ending_unpend = LIQUIDATION_PRICES_PENDING_COUNT
-            .may_load(ctx.storage)?
-            .unwrap_or_default();
-
         self.allocate_crank_fees(ctx, rewards, actual.len().try_into()?)?;
         ctx.response_mut().add_event(CrankExecBatchEvent {
             requested: n_execs,
             actual,
-            starting_unpend,
-            ending_unpend,
         });
 
         Ok(())
@@ -205,31 +166,6 @@ impl State<'_> {
         Ok(())
     }
 
-    /// What is the ending timestamp for liquifunding and liquidation?
-    ///
-    /// Generally speaking, the crank performs its actions up until "now." That
-    /// means liquifunding does fee calculations up until the current timestamp,
-    /// and liquidations occur as of the current timestamp. The one exception to
-    /// this is when the protocol is stale. In that case, we do not have well
-    /// fundedness guarantees beyond the point where the protocol became stale,
-    /// and we therefore calculate up until the protocol entered stale.
-    ///
-    /// This function checks if the protocol is stale and, if so, returns that
-    /// timestamp. Otherwise it returns now.
-    fn stale_or_now(&self, store: &dyn Storage) -> Result<Timestamp> {
-        let now = self.now();
-        Ok(
-            match NEXT_STALE
-                .keys(store, None, None, cosmwasm_std::Order::Ascending)
-                .next()
-                .transpose()?
-            {
-                Some((stale, _)) if now > stale => stale,
-                _ => now,
-            },
-        )
-    }
-
     /// Perform a single crank execution.
     fn crank_exec(&self, ctx: &mut StateContext, work_info: CrankWorkInfo) -> Result<()> {
         // get our current playhead time and price for liquidations
@@ -257,9 +193,6 @@ impl State<'_> {
                     PositionSaveReason::Crank,
                 )?;
             }
-            CrankWorkInfo::UnpendLiquidationPrices { position } => {
-                self.unpend_liquidation_prices(ctx, position)?;
-            }
             CrankWorkInfo::Liquidation {
                 position,
                 liquidation_reason,
@@ -267,21 +200,29 @@ impl State<'_> {
             } => {
                 let pos = get_position(ctx.storage, position)?;
 
+                // Do one more liquifunding before closing the position to
+                // pay out fees. This may end up closing the position on its own, otherwise we
+                // explicitly close it ourselves because we hit a trigger.
                 let starts_at = pos.liquifunded_at;
-                let ends_at = self.stale_or_now(ctx.storage)?;
+                let ends_at = pos.next_liquifunding;
                 let mcp = self.position_liquifund(ctx, pos, starts_at, ends_at, true)?;
 
                 let close_position_instructions = match mcp {
                     MaybeClosedPosition::Open(pos) => ClosePositionInstructions {
                         pos,
                         exposure: Signed::zero(),
-                        close_time: ends_at,
+                        close_time: self.now(),
                         settlement_time: price_point.timestamp,
                         reason: PositionCloseReason::Liquidated(liquidation_reason),
                     },
                     MaybeClosedPosition::Close(x) => x,
                 };
                 self.close_position(ctx, close_position_instructions)?;
+            }
+            CrankWorkInfo::DeferredExec {
+                deferred_exec_id, ..
+            } => {
+                self.process_deferred_exec(ctx, deferred_exec_id)?;
             }
             CrankWorkInfo::LimitOrder { order_id } => {
                 self.limit_order_execute_order(ctx, order_id)?;

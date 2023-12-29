@@ -94,6 +94,7 @@ impl App {
                             .iter()
                             .map(|feed| feed.clone().into())
                             .collect(),
+                        volatile_diff_seconds: None,
                     }
                 }
             },

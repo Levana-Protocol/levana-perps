@@ -8,7 +8,6 @@ use msg::contracts::market::entry::Fees;
 use msg::contracts::market::fees::events::{
     CrankFeeEarnedEvent, CrankFeeEvent, FeeEvent, FeeSource, TradeId,
 };
-use msg::contracts::market::order::OrderId;
 use msg::contracts::market::position::PositionId;
 use shared::prelude::*;
 
@@ -195,24 +194,6 @@ impl State<'_> {
         fee_source: FeeSource,
     ) -> Result<()> {
         self.collect_trading_fee_inner(ctx, amount, price, TradeId::Position(pos_id), fee_source)?;
-
-        Ok(())
-    }
-
-    pub(crate) fn collect_limit_order_fee(
-        &self,
-        ctx: &mut StateContext,
-        order_id: OrderId,
-        amount: Collateral,
-        price: PricePoint,
-    ) -> Result<()> {
-        self.collect_trading_fee_inner(
-            ctx,
-            amount,
-            price,
-            TradeId::LimitOrder(order_id),
-            FeeSource::LimitOrder,
-        )?;
 
         Ok(())
     }

@@ -83,6 +83,7 @@ fn get_ids_from_status(status: &StatusResp) -> IdsCache {
             stride: _,
             feeds,
             feeds_usd,
+            volatile_diff_seconds: _,
         } => {
             if is_pyth_stable(pyth.as_ref()) {
                 let ids = feeds

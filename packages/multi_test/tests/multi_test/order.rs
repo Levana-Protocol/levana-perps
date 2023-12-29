@@ -1,5 +1,4 @@
 use levana_perpswap_multi_test::market_wrapper::PerpsMarket;
-use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::PerpsApp;
 use msg::contracts::market::config::ConfigUpdate;
 use msg::contracts::market::entry::{LimitOrderHistoryResp, LimitOrderResult};
@@ -682,44 +681,6 @@ fn lagging_crank_perp_1350_short() {
         .entry_price_base
         .into_number()
         .approx_eq("15".parse().unwrap()));
-}
-
-#[test]
-fn can_place_when_stale() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    let trader = market.clone_trader(0).unwrap();
-
-    // open a position and jump a liquifinding to create some work so that the limit order won't get us out of staleness
-    market
-        .exec_open_position(
-            &trader,
-            "100",
-            "10",
-            DirectionToBase::Long,
-            "1.0",
-            None,
-            None,
-            None,
-        )
-        .unwrap();
-    market.set_time(TimeJump::Liquifundings(1)).unwrap();
-
-    // now jump a staleness (the crank of limit order won't be enough to get out of it, since it will process the previous work)
-    market.set_time(TimeJump::Staleness(1)).unwrap();
-    assert!(market.query_status().unwrap().is_stale());
-    market
-        .exec_place_limit_order(
-            &trader,
-            // So much collateral that we can't open it because of insufficient liquidity
-            "10".try_into().unwrap(),
-            "0.99".try_into().unwrap(),
-            "10".try_into().unwrap(),
-            DirectionToBase::Long,
-            "1".try_into().unwrap(),
-            None,
-            None,
-        )
-        .unwrap();
 }
 
 #[test]
