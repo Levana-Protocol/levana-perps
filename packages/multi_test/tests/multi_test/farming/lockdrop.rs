@@ -1,12 +1,15 @@
-use crate::prelude::*;
 use cosmwasm_std::Uint128;
 use levana_perpswap_multi_test::config::{DEFAULT_MARKET, TEST_CONFIG};
+use levana_perpswap_multi_test::market_wrapper::PerpsMarket;
+use levana_perpswap_multi_test::time::TimeJump;
+use levana_perpswap_multi_test::PerpsApp;
 use msg::contracts::cw20::entry::{QueryMsg as Cw20QueryMsg, TokenInfoResponse};
 use msg::contracts::farming::entry::defaults::lockdrop_month_seconds;
 use msg::contracts::farming::entry::{
     defaults::lockdrop_buckets, FarmerLockdropStats, LockdropBucketConfig,
 };
 use msg::contracts::liquidity_token::LiquidityTokenKind;
+use msg::prelude::*;
 
 fn setup_lockdrop() -> (PerpsMarket, Vec<LockdropBucketConfig>, [Addr; 3]) {
     let mut market = PerpsMarket::new_with_type(
@@ -415,7 +418,7 @@ fn test_lockdrop_locked_tokens() {
 fn test_reinvest_yield() {
     // Setup
 
-    let (market, _buckets, farmers) = setup_lockdrop();
+    let (mut market, _buckets, farmers) = setup_lockdrop();
     let trader0 = market.clone_trader(0).unwrap();
 
     // Jump to review period, transfer collateral, and launch the lockdrop
@@ -435,6 +438,7 @@ fn test_reinvest_yield() {
 
     let farming_status_before = market.query_farming_status();
 
+    market.automatic_time_jump_enabled = true;
     market
         .exec_open_position(
             &trader0,
@@ -447,6 +451,7 @@ fn test_reinvest_yield() {
             None,
         )
         .unwrap();
+    market.automatic_time_jump_enabled = false;
 
     // Reinvest and assert
 

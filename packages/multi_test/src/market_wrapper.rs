@@ -363,6 +363,17 @@ impl PerpsMarket {
         self.exec_funds(sender, msg, Number::ZERO)
     }
 
+    pub fn exec_defer(&self, sender: &Addr, msg: &MarketExecuteMsg) -> Result<DeferResponse> {
+        self.exec_defer_wasm_msg(
+            sender,
+            WasmMsg::Execute {
+                contract_addr: self.addr.to_string(),
+                msg: to_binary(&msg)?,
+                funds: Vec::new(),
+            },
+        )
+    }
+
     pub fn make_msg_with_funds(&self, msg: &MarketExecuteMsg, amount: Number) -> Result<WasmMsg> {
         let amount = Collateral::from_decimal256(
             amount
@@ -1110,13 +1121,15 @@ impl PerpsMarket {
         position_id: PositionId,
         slippage_assert: Option<SlippageAssert>,
     ) -> Result<AppResponse> {
-        self.exec(
+        let defer_resp = self.exec_defer(
             sender,
             &MarketExecuteMsg::ClosePosition {
                 id: position_id,
                 slippage_assert,
             },
-        )
+        )?;
+
+        Ok(defer_resp.exec_resp().clone())
     }
 
     pub fn exec_update_position_collateral_impact_leverage(
@@ -1143,9 +1156,9 @@ impl PerpsMarket {
             },
         )?;
 
-        let res = self.exec_wasm_msg(sender, msg)?;
+        let defer_resp = self.exec_defer_wasm_msg(sender, msg)?;
 
-        Ok(res)
+        Ok(defer_resp.exec_resp().clone())
     }
 
     pub fn exec_update_position_collateral_impact_size(
@@ -1177,9 +1190,9 @@ impl PerpsMarket {
             },
         )?;
 
-        let res = self.exec_wasm_msg(sender, msg)?;
+        let defer_resp = self.exec_defer_wasm_msg(sender, msg)?;
 
-        Ok(res)
+        Ok(defer_resp.exec_resp().clone())
     }
 
     pub fn exec_update_position_leverage(
@@ -1189,14 +1202,16 @@ impl PerpsMarket {
         leverage: LeverageToBase,
         slippage_assert: Option<SlippageAssert>,
     ) -> Result<AppResponse> {
-        self.exec(
+        let defer_resp = self.exec_defer(
             sender,
             &MarketExecuteMsg::UpdatePositionLeverage {
                 id: position_id,
                 leverage,
                 slippage_assert,
             },
-        )
+        )?;
+
+        Ok(defer_resp.exec_resp().clone())
     }
 
     pub fn exec_update_position_max_gains(
@@ -1205,13 +1220,15 @@ impl PerpsMarket {
         position_id: PositionId,
         max_gains: MaxGainsInQuote,
     ) -> Result<AppResponse> {
-        self.exec(
+        let defer_resp = self.exec_defer(
             sender,
             &MarketExecuteMsg::UpdatePositionMaxGains {
                 id: position_id,
                 max_gains,
             },
-        )
+        )?;
+
+        Ok(defer_resp.exec_resp().clone())
     }
 
     pub fn exec_set_trigger_order(
@@ -1256,7 +1273,10 @@ impl PerpsMarket {
             },
         )?;
 
-        let res = self.exec_wasm_msg(sender, msg)?;
+        let defer_res = self.exec_defer_wasm_msg(sender, msg)?;
+
+        let res = defer_res.exec_resp().clone();
+
         let order_id = res
             .event_first_value(event_key::PLACE_LIMIT_ORDER, event_key::ORDER_ID)?
             .parse()?;
@@ -1934,13 +1954,18 @@ impl PerpsMarket {
                 bail!("automatic time jump is not enabled, cannot defer wasm msg")
             }
 
-            self.exec_refresh_price()?;
-            self.set_time(TimeJump::Blocks(1))?;
+            // This doesn't seem necessary so far...
+            // if it becomes necessary, maybe check to make sure we really need a price update here
+            // self.exec_refresh_price()?;
 
             responses.push(self.exec(
                 sender,
                 &MarketExecuteMsg::Crank {
-                    execs: Some(1),
+                    // This also doesn't seem necessary so far
+                    // if tests do depend on only getting more fidelity on cranking here
+                    // maybe take it as a parameter... TBD
+                    //execs: Some(1),
+                    execs: None,
                     rewards: None,
                 },
             )?);
