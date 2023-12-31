@@ -38,12 +38,13 @@ fn pending_fees_in_query() {
         )
         .unwrap();
 
+    // Go back to the timestamp on chain when the last price update was set
+    market.set_time(TimeJump::Blocks(-1)).unwrap();
+
     let pos_orig = market
         .query_position_with_pending_fees(pos_id, PositionsQueryFeeApproach::AllFees)
         .unwrap();
 
-    // TBD - this is currently failing, but is that really unexpected with deferred execs now?
-    // i.e. some time has passed, should borrow fees not be paid while it's pending?
     assert_eq!(pos_orig.borrow_fee_collateral, Collateral::zero());
     assert_eq!(pos_orig.borrow_fee_usd, Usd::zero());
     assert_eq!(
@@ -96,8 +97,15 @@ fn pending_fees_in_query() {
 
     // Actually close and make sure it matches
     market.exec_close_position(&trader, pos_id, None).unwrap();
+
     let closed = market.query_closed_position(&trader, pos_id).unwrap();
-    assert_eq!(closed.pnl_collateral, pos.pnl_collateral);
+
+    // Since deferred execution, we always have an extra time jump between query and close. Account for that difference.
+    let fee_difference = closed.borrow_fee_collateral.into_signed() + closed.funding_fee_collateral
+        - pos.borrow_fee_collateral.into_signed()
+        - pos.funding_fee_collateral;
+
+    assert_eq!(closed.pnl_collateral, pos.pnl_collateral - fee_difference);
 
     // Ensure that the DNF before closing (taken from pos_no_fees) plus the
     // calculated DNF amount equals the final DNF value.
@@ -112,7 +120,9 @@ fn pending_fees_in_query() {
         pos_accumulated_fees.dnf_on_close_collateral
     );
     assert_eq!(
-        pos_accumulated_fees.pnl_collateral - pos_accumulated_fees.dnf_on_close_collateral,
-        closed.pnl_collateral
+        closed.pnl_collateral,
+        pos_accumulated_fees.pnl_collateral
+            - pos_accumulated_fees.dnf_on_close_collateral
+            - fee_difference,
     );
 }
