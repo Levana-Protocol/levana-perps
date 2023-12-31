@@ -24,8 +24,8 @@ mod rewards;
 mod sanity;
 mod shutdown;
 mod wrong_token;
-/*
 mod order;
+/*
 mod staleness;
 
 // Inner modules in:
