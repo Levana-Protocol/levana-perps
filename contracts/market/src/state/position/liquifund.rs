@@ -33,7 +33,7 @@ impl State<'_> {
     ) -> Result<()> {
         match mcp {
             MaybeClosedPosition::Open(mut position) => {
-                let price_point = self.spot_price(ctx.storage, Some(ends_at))?;
+                let price_point = self.spot_price(ctx.storage, ends_at)?;
                 self.position_save(ctx, &mut position, &price_point, true, false, reason)?;
                 Ok(())
             }
@@ -51,8 +51,8 @@ impl State<'_> {
         ends_at: Timestamp,
         charge_crank_fee: bool,
     ) -> Result<MaybeClosedPosition> {
-        let start_price = self.spot_price(ctx.storage, Some(starts_at))?;
-        let end_price = self.spot_price(ctx.storage, Some(ends_at))?;
+        let start_price = self.spot_price(ctx.storage, starts_at)?;
+        let end_price = self.spot_price(ctx.storage, ends_at)?;
         let config = &self.config;
 
         // PERP-996 we don't allow the liquifunding process to flip
@@ -87,7 +87,7 @@ impl State<'_> {
             slippage_liquidation_margin,
         )?;
 
-        self.liquidity_update_locked(ctx, -exposure)?;
+        self.liquidity_update_locked(ctx, -exposure, &end_price)?;
 
         let mut pos = match mcp {
             MaybeClosedPosition::Open(pos) => pos,
@@ -98,11 +98,7 @@ impl State<'_> {
 
         // After settlement, a position might need to be liquidated because the position does not
         // have enough collateral left to cover the liquidation margin for the upcoming period.
-        let liquidation_margin = pos.liquidation_margin(
-            end_price.price_notional,
-            &self.spot_price(ctx.storage, None)?,
-            config,
-        )?;
+        let liquidation_margin = pos.liquidation_margin(&end_price, config)?;
         if pos.active_collateral.raw() <= liquidation_margin.total() {
             return Ok(MaybeClosedPosition::Close(ClosePositionInstructions {
                 pos,

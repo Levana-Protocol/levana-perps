@@ -429,11 +429,11 @@ impl State<'_> {
     ) -> Result<PositionOrPendingClose> {
         let config = &self.config;
         let market_type = self.market_id(store)?.get_market_type();
-        let entry_price = match self.spot_price(store, Some(pos.created_at)) {
+        let entry_price = match self.spot_price(store, pos.created_at) {
             Ok(entry_price) => entry_price,
             Err(err) => return Err(err),
         };
-        let spot_price = self.spot_price(store, None)?;
+        let spot_price = self.current_spot_price(store)?;
 
         // PERP-996 ensure we do not flip direction, see comments in
         // liquifunding for more details
@@ -448,7 +448,7 @@ impl State<'_> {
         let dnf_on_close_collateral = self.calc_delta_neutrality_fee(
             store,
             -pos.notional_size,
-            spot_price,
+            &spot_price,
             Some(pos.liquidation_margin.delta_neutrality),
         )?;
 
@@ -514,7 +514,7 @@ impl State<'_> {
             };
         };
 
-        let start_price = self.spot_price(store, Some(pos.liquifunded_at))?;
+        let start_price = self.spot_price(store, pos.liquifunded_at)?;
         pos.into_query_response_extrapolate_exposure(
             start_price.price_notional,
             spot_price,
@@ -658,19 +658,12 @@ impl State<'_> {
         }
 
         if recalc_liquidation_margin {
-            pos.liquidation_margin = pos.liquidation_margin(
-                price_point.price_notional,
-                &self.spot_price(ctx.storage, None)?,
-                &self.config,
-            )?;
+            debug_assert_eq!(price_point.timestamp, pos.liquifunded_at);
+            pos.liquidation_margin = pos.liquidation_margin(price_point, &self.config)?;
         } else {
             debug_assert_eq!(
                 pos.liquidation_margin,
-                pos.liquidation_margin(
-                    price_point.price_notional,
-                    &self.spot_price(ctx.storage, None)?,
-                    &self.config
-                )?
+                pos.liquidation_margin(price_point, &self.config)?
             );
         }
 

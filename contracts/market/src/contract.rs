@@ -445,8 +445,11 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             state.status(store)?.query_result()
         }
 
-        QueryMsg::SpotPrice { timestamp } => state.spot_price(store, timestamp)?.query_result(),
-
+        QueryMsg::SpotPrice { timestamp } => match timestamp {
+            Some(timestamp) => state.spot_price(store, timestamp),
+            None => state.current_spot_price(store),
+        }?
+        .query_result(),
         QueryMsg::SpotPriceHistory {
             start_after,
             limit,
@@ -651,11 +654,11 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             notional_delta,
             pos_delta_neutrality_fee_margin,
         } => {
-            let price = state.spot_price(store, None)?;
+            let price = state.current_spot_price(store)?;
             let fees = state.calc_delta_neutrality_fee(
                 store,
                 notional_delta,
-                price,
+                &price,
                 pos_delta_neutrality_fee_margin,
             )?;
             let fee_rate = fees.into_number() / notional_delta.into_number();

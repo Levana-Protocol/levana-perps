@@ -49,14 +49,13 @@ impl State<'_> {
         take_profit_override: Option<PriceBaseInQuote>,
         deferred_exec_crank_fee: Collateral,
         deferred_exec_crank_fee_usd: Usd,
+        price: &PricePoint,
     ) -> Result<OrderId> {
         let last_order_id = LAST_ORDER_ID
             .may_load(ctx.storage)?
             .unwrap_or_else(|| OrderId::new(0));
         let order_id = OrderId::new(last_order_id.u64() + 1);
         LAST_ORDER_ID.save(ctx.storage, &order_id)?;
-
-        let price = self.spot_price(ctx.storage, None)?;
 
         let crank_fee_usd = self.config.crank_fee_charged;
         let crank_fee = price.usd_to_collateral(crank_fee_usd);
@@ -177,20 +176,20 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         order_id: OrderId,
+        price_point: &PricePoint,
     ) -> Result<()> {
         let order = LIMIT_ORDERS.load(ctx.storage, order_id)?;
         self.limit_order_remove(ctx.storage, &order)?;
 
         #[cfg(debug_assertions)]
         {
-            let current_price = self.spot_price(ctx.storage, None)?;
             let trigger = order
                 .trigger_price
-                .into_notional_price(current_price.market_type);
+                .into_notional_price(price_point.market_type);
             match order.direction {
-                DirectionToNotional::Long => debug_assert!(trigger >= current_price.price_notional),
+                DirectionToNotional::Long => debug_assert!(trigger >= price_point.price_notional),
                 DirectionToNotional::Short => {
-                    debug_assert!(trigger <= current_price.price_notional)
+                    debug_assert!(trigger <= price_point.price_notional)
                 }
             }
         }
@@ -208,7 +207,7 @@ impl State<'_> {
             stop_loss_override: order.stop_loss_override,
             take_profit_override: order.take_profit_override,
         };
-        let res = self.validate_new_position(ctx.storage, open_position_params);
+        let res = self.validate_new_position(ctx.storage, open_position_params, price_point);
 
         let res = match res {
             Ok(validated_position) => {

@@ -66,7 +66,7 @@ impl State<'_> {
                 ctx.storage,
                 &pos,
                 notional_size_return,
-                settlement_price,
+                &settlement_price,
                 DeltaNeutralityFeeReason::PositionClose,
             )?
             .store(self, ctx)?;
@@ -105,7 +105,7 @@ impl State<'_> {
 
         // unlock the LP collateral
         if let Some(counter_collateral) = NonZero::new(counter_collateral) {
-            self.liquidity_unlock(ctx, counter_collateral)?;
+            self.liquidity_unlock(ctx, counter_collateral, &settlement_price)?;
         }
 
         // send the trader's collateral to their wallet
@@ -123,7 +123,7 @@ impl State<'_> {
         let market_type = market_id.get_market_type();
 
         let direction_to_base = pos.direction().into_base(market_type);
-        let entry_price_base = match self.spot_price(ctx.storage, Some(pos.created_at)) {
+        let entry_price_base = match self.spot_price(ctx.storage, pos.created_at) {
             Ok(entry_price) => entry_price,
             Err(err) => return Err(err),
         }
