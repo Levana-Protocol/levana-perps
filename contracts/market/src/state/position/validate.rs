@@ -121,10 +121,9 @@ impl State<'_> {
     /// Ensure we meet the requirements for minimum deposit collateral
     pub(crate) fn validate_minimum_deposit_collateral(
         &self,
-        store: &dyn Storage,
         deposit_collateral: Collateral,
+        price_point: &PricePoint,
     ) -> Result<()> {
-        let price_point = self.spot_price(store, None)?;
         let deposit = price_point.collateral_to_usd(deposit_collateral);
 
         // We allow up to a 10% dip on the minimum deposit to allow for price fluctuations.
@@ -199,7 +198,7 @@ impl State<'_> {
         &self,
         pos: &Position,
         market_type: MarketType,
-        current_price: PricePoint,
+        current_price: &PricePoint,
     ) -> Result<()> {
         if let Some(stop_loss_override) = pos.stop_loss_override {
             match pos.direction() {
@@ -269,12 +268,12 @@ impl State<'_> {
         delta_notional_size: Signed<Notional>,
         market_type: MarketType,
         delta_neutrality_fee_margin: Option<Collateral>,
+        price_point: &PricePoint,
     ) -> Result<()> {
         if delta_notional_size.is_zero() {
             return Ok(());
         }
 
-        let price_point = self.spot_price(store, None)?;
         let delta_neutrality_fee = self.calc_delta_neutrality_fee(
             store,
             delta_notional_size,

@@ -288,7 +288,7 @@ impl State<'_> {
         ctx: &mut StateContext,
         time: Timestamp,
     ) -> Result<()> {
-        let spot_price = self.spot_price(ctx.storage, Some(time))?.price_notional;
+        let spot_price = self.spot_price(ctx.storage, time)?.price_notional;
 
         let (long_rate, short_rate) = self.derive_instant_funding_rate_annual(ctx.storage)?;
         LONG_RF_PRICE_PREFIX_SUM.append(ctx.storage, time, long_rate * spot_price.into_number())?;
@@ -481,7 +481,7 @@ impl State<'_> {
         ends_at: Timestamp,
         charge_crank_fee: bool,
     ) -> Result<MaybeClosedPosition> {
-        let price = self.spot_price(ctx.storage, Some(ends_at))?;
+        let price = self.spot_price(ctx.storage, ends_at)?;
 
         let (borrow_fee_timeslice_owed, event) =
             self.calc_capped_borrow_fee_payment(ctx.storage, &position, starts_at, ends_at)?;

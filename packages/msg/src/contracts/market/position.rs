@@ -258,7 +258,7 @@ impl Position {
     pub fn max_gains_in_quote(
         &self,
         market_type: MarketType,
-        price_point: PricePoint,
+        price_point: &PricePoint,
     ) -> Result<MaxGainsInQuote> {
         match market_type {
             MarketType::CollateralIsQuote => Ok(MaxGainsInQuote::Finite(
@@ -266,7 +266,7 @@ impl Position {
                     .checked_div_collateral(self.active_collateral)?,
             )),
             MarketType::CollateralIsBase => {
-                let take_profit_price = self.take_profit_price(&price_point, market_type)?;
+                let take_profit_price = self.take_profit_price(price_point, market_type)?;
                 let take_profit_price = match take_profit_price {
                     Some(price) => price,
                     None => return Ok(MaxGainsInQuote::PosInfinity),
@@ -355,13 +355,10 @@ impl Position {
 
     /// Computes the liquidation margin for the position
     ///
-    /// `price` is the price at the last liquifunding.
-    ///
-    /// `current_price_point` is used for converting fees from USD to collateral.
+    /// Takes the price point of the last liquifunding.
     pub fn liquidation_margin(
         &self,
-        price: Price,
-        current_price_point: &PricePoint,
+        price_point: &PricePoint,
         config: &Config,
     ) -> Result<LiquidationMargin> {
         const SEC_PER_YEAR: u64 = 31_536_000;
@@ -382,12 +379,12 @@ impl Position {
 
         let max_price = match self.direction() {
             DirectionToNotional::Long => {
-                price.into_decimal256()
+                price_point.price_notional.into_decimal256()
                     + self.counter_collateral.into_decimal256()
                         / self.notional_size.abs_unsigned().into_decimal256()
             }
             DirectionToNotional::Short => {
-                price.into_decimal256()
+                price_point.price_notional.into_decimal256()
                     + self.active_collateral.into_decimal256()
                         / self.notional_size.abs_unsigned().into_decimal256()
             }
@@ -407,7 +404,7 @@ impl Position {
             delta_neutrality: Collateral::from_decimal256(slippage_max),
             // Set aside enough margin for one normal liquifunding crank and one
             // update crank with up to 100 items in the deferred execution queue.
-            crank: current_price_point.usd_to_collateral(
+            crank: price_point.usd_to_collateral(
                 config
                     .crank_fee_charged
                     .checked_mul_dec(Decimal256::two())?
@@ -526,7 +523,7 @@ impl Position {
     #[allow(clippy::too_many_arguments)]
     pub fn into_query_response_extrapolate_exposure(
         self,
-        start_price: Price,
+        start_price: PricePoint,
         end_price: PricePoint,
         entry_price: Price,
         current_price_point: &PricePoint,
@@ -539,11 +536,13 @@ impl Position {
         // parameter to liquidation_margin. It's used exclusively to calculate
         // the crank fee, and therefore does not need to be based on the
         // liquifunding cadence.
-        let liquidation_margin =
-            self.liquidation_margin(start_price, current_price_point, config)?;
+        let liquidation_margin = self.liquidation_margin(&start_price, config)?;
 
-        let (settle_price_result, _exposure) =
-            self.settle_price_exposure(start_price, end_price, liquidation_margin.total())?;
+        let (settle_price_result, _exposure) = self.settle_price_exposure(
+            start_price.price_notional,
+            end_price,
+            liquidation_margin.total(),
+        )?;
 
         let result = match settle_price_result {
             MaybeClosedPosition::Open(pos) => {
@@ -655,7 +654,7 @@ impl Position {
             .1;
         let pnl_collateral = self.pnl_in_collateral();
         let pnl_usd = self.pnl_in_usd(&end_price);
-        let max_gains_in_quote = self.max_gains_in_quote(market_type, end_price)?;
+        let max_gains_in_quote = self.max_gains_in_quote(market_type, &end_price)?;
         let notional_size_in_collateral = self.notional_size_in_collateral(&end_price);
         let position_size_base = self.position_size_base(market_type, &end_price)?;
 

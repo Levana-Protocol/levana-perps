@@ -177,7 +177,7 @@ impl State<'_> {
         // security of the platform, but rather is a convenience for charging
         // crank fees in USD instead of collateral. Using the most recent
         // price point is our best option.
-        let price_point = self.spot_price(ctx.storage, None)?;
+        let price_point = self.current_spot_price(ctx.storage)?;
         let new_crank_fee = price_point.usd_to_collateral(new_crank_fee_usd);
 
         // Check the owner is correct and try to charge the crank fee
@@ -435,12 +435,16 @@ impl State<'_> {
                 }
             },
             SubMsgResult::Err(e) => {
+                let price_point = self.next_crank_timestamp(ctx.storage)?;
                 // Replace empty error from the submessage with validation error.
-                let e = self
-                    .deferred_validate(ctx.storage, id)
-                    .err()
-                    .map(|e| e.to_string())
-                    .unwrap_or(e);
+                let e = if let Some(price_point) = price_point {
+                    self.deferred_validate(ctx.storage, id, &price_point)
+                        .err()
+                        .map(|e| e.to_string())
+                        .unwrap_or(e)
+                } else {
+                    e
+                };
 
                 anyhow::ensure!(
                     item.status == DeferredExecStatus::Pending,

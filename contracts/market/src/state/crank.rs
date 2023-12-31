@@ -95,7 +95,10 @@ impl State<'_> {
                 } else if let Some(order_id) =
                     self.limit_order_triggered_order(store, price_point.price_notional, false)?
                 {
-                    CrankWorkInfo::LimitOrder { order_id }
+                    CrankWorkInfo::LimitOrder {
+                        order_id,
+                        price_point,
+                    }
                 } else {
                     CrankWorkInfo::Completed {
                         price_point_timestamp: price_point.timestamp,
@@ -175,7 +178,7 @@ impl State<'_> {
             _ => return Ok(()),
         };
 
-        let current = self.spot_price(ctx.storage, None)?;
+        let current = self.current_spot_price(ctx.storage)?;
 
         if price_point_timestamp == current.timestamp {
             // Finish off the price update
@@ -252,9 +255,11 @@ impl State<'_> {
             } => {
                 self.process_deferred_exec(ctx, deferred_exec_id, price_point_timestamp)?;
             }
-            CrankWorkInfo::LimitOrder { order_id } => {
-                // FIXME need to include the price point of the crank
-                self.limit_order_execute_order(ctx, order_id)?;
+            CrankWorkInfo::LimitOrder {
+                order_id,
+                price_point,
+            } => {
+                self.limit_order_execute_order(ctx, order_id, &price_point)?;
             }
             CrankWorkInfo::Completed {
                 price_point_timestamp,

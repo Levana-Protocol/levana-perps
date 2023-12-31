@@ -25,11 +25,11 @@ const TRADE_HISTORY_BY_ADDRESS: Map<(&Addr, u64), PositionAction> =
 /// user-facing leverage (in base) numbers.
 pub fn trade_volume_usd(
     pos: &Position,
-    price_point: PricePoint,
+    price_point: &PricePoint,
     market_type: MarketType,
 ) -> Result<Usd> {
     let leverage = pos
-        .active_leverage_to_notional(&price_point)
+        .active_leverage_to_notional(price_point)
         .into_base(market_type)
         .split()
         .1;
@@ -260,7 +260,7 @@ impl State<'_> {
             collateral: pos.active_collateral.raw(),
             transfer_collateral: deposit_collateral_delta,
             leverage: Some(leverage),
-            max_gains: Some(pos.max_gains_in_quote(market_type, price_point)?),
+            max_gains: Some(pos.max_gains_in_quote(market_type, &price_point)?),
             trade_fee: trade_fee_usd,
             delta_neutrality_fee: delta_neutrality_fee
                 .map(|x| x.map(|x| price_point.collateral_to_usd(x))),
