@@ -1,4 +1,4 @@
-use crate::market_wrapper::{PerpsMarket, DeferResponse};
+use crate::market_wrapper::{DeferResponse, PerpsMarket};
 use msg::contracts::market::position::PositionId;
 use msg::prelude::*;
 

@@ -1219,7 +1219,6 @@ impl PerpsMarket {
                 max_gains,
             },
         )
-
     }
 
     pub fn exec_set_trigger_order(

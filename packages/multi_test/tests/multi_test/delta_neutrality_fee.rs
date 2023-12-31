@@ -103,7 +103,10 @@ fn artificial_slippage_charge_update() {
     let defer_res = market
         .exec_update_position_collateral_impact_leverage(&trader, pos_id, "10".try_into().unwrap())
         .unwrap();
-    defer_res.exec_resp().try_first_delta_neutrality_fee_amount().unwrap_err();
+    defer_res
+        .exec_resp()
+        .try_first_delta_neutrality_fee_amount()
+        .unwrap_err();
 
     // updating with affecting size should though
     let defer_res = market

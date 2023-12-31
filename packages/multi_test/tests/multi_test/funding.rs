@@ -213,7 +213,6 @@ fn funding_payment_typical() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     return_unless_market_collateral_quote!(market);
 
-
     let trader = market.clone_trader(0).unwrap();
     let cranker = market.clone_trader(1).unwrap();
     // Ensure that the liquidation margin amount matches the old epoch rules for calculations below
