@@ -155,7 +155,7 @@ impl State<'_> {
         tokens: Option<NonZero<LpToken>>,
         collateral: NonZero<Collateral>,
     ) -> Result<u64> {
-        let price = self.spot_price(ctx.storage, None)?;
+        let price = self.current_spot_price(ctx.storage)?;
 
         let collateral = collateral.raw();
         let collateral_usd = price.collateral_to_usd(collateral);
@@ -187,7 +187,7 @@ impl State<'_> {
         deposit: NonZero<Collateral>,
     ) -> Result<()> {
         let mut summary = self.lp_history_get_summary(ctx.storage, addr)?;
-        let price = self.spot_price(ctx.storage, None)?;
+        let price = self.current_spot_price(ctx.storage)?;
 
         let deposit = deposit.raw();
         let deposit_usd = price.collateral_to_usd(deposit);
@@ -212,7 +212,7 @@ impl State<'_> {
         yield_earned: NonZero<Collateral>,
     ) -> Result<()> {
         let mut summary = self.lp_history_get_summary(ctx.storage, addr)?;
-        let price = self.spot_price(ctx.storage, None)?;
+        let price = self.current_spot_price(ctx.storage)?;
 
         let yield_earned = yield_earned.raw();
         let yield_usd = price.collateral_to_usd(yield_earned);

@@ -287,7 +287,7 @@ impl State<'_> {
             ALL_FEES.save(ctx.storage, &fees)?;
             self.add_lp_crank_rewards(ctx, addr, payment)?;
 
-            let price_point = self.spot_price(ctx.storage, None)?;
+            let price_point = self.current_spot_price(ctx.storage)?;
             ctx.response_mut().add_event(CrankFeeEarnedEvent {
                 recipient: addr.clone(),
                 amount: payment,

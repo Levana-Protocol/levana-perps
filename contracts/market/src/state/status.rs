@@ -39,7 +39,7 @@ impl State<'_> {
         let (long_usd, short_usd) = if long_notional.is_zero() && short_notional.is_zero() {
             (Usd::zero(), Usd::zero())
         } else {
-            let price_point = self.spot_price(store, None)?;
+            let price_point = self.current_spot_price(store)?;
             let long_usd = price_point.notional_to_usd(long_notional);
             let short_usd = price_point.notional_to_usd(short_notional);
             (long_usd, short_usd)

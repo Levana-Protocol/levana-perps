@@ -46,6 +46,8 @@ pub enum CrankWorkInfo {
     LimitOrder {
         /// ID of the order to be opened
         order_id: OrderId,
+        /// Price point that triggered the limit order
+        price_point: PricePoint,
     },
     /// Finished all processing for a given price update
     Completed {
@@ -115,7 +117,7 @@ pub mod events {
                         CrankWorkInfo::DeferredExec {
                             deferred_exec_id, ..
                         } => format!("deferred exec {deferred_exec_id}").into(),
-                        CrankWorkInfo::LimitOrder { order_id } => {
+                        CrankWorkInfo::LimitOrder { order_id, .. } => {
                             format!("limit order {order_id}").into()
                         }
                         CrankWorkInfo::Completed {
@@ -169,7 +171,10 @@ pub mod events {
                     target.order_id(),
                     Some(price_point_timestamp),
                 ),
-                CrankWorkInfo::LimitOrder { order_id } => (None, Some(order_id), None),
+                CrankWorkInfo::LimitOrder {
+                    order_id,
+                    price_point,
+                } => (None, Some(order_id), Some(price_point.timestamp)),
             };
 
             if let Some(position_id) = position_id {
@@ -231,6 +236,7 @@ pub mod events {
                 }),
                 "limit-order" => Ok(CrankWorkInfo::LimitOrder {
                     order_id: OrderId::new(evt.u64_attr("order-id")?),
+                    price_point: get_price_point()?,
                 }),
                 _ => Err(PerpError::unimplemented().into()),
             })
