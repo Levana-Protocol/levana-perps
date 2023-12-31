@@ -1249,7 +1249,7 @@ impl PerpsMarket {
         max_gains: MaxGainsInQuote,
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
-    ) -> Result<(OrderId, AppResponse)> {
+    ) -> Result<(OrderId, DeferResponse)> {
         let msg = self.token.into_market_execute_msg(
             &self.addr,
             collateral.raw(),
@@ -1265,17 +1265,20 @@ impl PerpsMarket {
 
         let defer_res = self.exec_defer_wasm_msg(sender, msg)?;
 
-        let res = defer_res.exec_resp().clone();
-
-        let order_id = res
+        let order_id = defer_res
+            .exec_resp()
             .event_first_value(event_key::PLACE_LIMIT_ORDER, event_key::ORDER_ID)?
             .parse()?;
 
-        Ok((order_id, res))
+        Ok((order_id, defer_res))
     }
 
-    pub fn exec_cancel_limit_order(&self, sender: &Addr, order_id: OrderId) -> Result<AppResponse> {
-        self.exec(sender, &MarketExecuteMsg::CancelLimitOrder { order_id })
+    pub fn exec_cancel_limit_order(
+        &self,
+        sender: &Addr,
+        order_id: OrderId,
+    ) -> Result<DeferResponse> {
+        self.exec_defer(sender, &MarketExecuteMsg::CancelLimitOrder { order_id })
     }
 
     // outside contract queries that require market info like addr

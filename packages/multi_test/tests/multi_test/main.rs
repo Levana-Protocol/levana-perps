@@ -17,15 +17,15 @@ mod logging;
 mod lp_cw20;
 mod multi_market;
 mod nft;
+mod override_price;
 mod position;
 mod proptest;
 mod rewards;
+mod sanity;
 mod shutdown;
 mod wrong_token;
 /*
-mod sanity;
 mod order;
-mod override_price;
 mod staleness;
 
 // Inner modules in:
