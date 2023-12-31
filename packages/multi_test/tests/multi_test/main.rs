@@ -17,9 +17,8 @@ mod rewards;
 mod shutdown;
 mod wrong_token;
 mod diagnostic;
-/* Still failing:
 mod edge_update;
-*/
+
 /*
 mod funding;
 mod history;
