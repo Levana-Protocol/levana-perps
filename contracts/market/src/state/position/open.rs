@@ -98,7 +98,7 @@ impl State<'_> {
         let last_pos_id = LAST_POSITION_ID.load(store)?;
         let pos_id = PositionId::new(last_pos_id.u64() + 1);
 
-        let liquifunded_at = self.now();
+        let liquifunded_at = price_point.timestamp;
         let next_liquifunding =
             liquifunded_at.plus_seconds(config.liquifunding_delay_seconds.into());
 
