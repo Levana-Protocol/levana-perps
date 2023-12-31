@@ -98,7 +98,11 @@ fn cannot_perform_deferred_exec() {
             &cranker,
             WasmMsg::Execute {
                 contract_addr: market.addr.clone().into_string(),
-                msg: to_binary(&MarketExecuteMsg::PerformDeferredExec { id: exec.id }).unwrap(),
+                msg: to_binary(&MarketExecuteMsg::PerformDeferredExec {
+                    id: exec.id,
+                    price_point_timestamp: Timestamp::default(),
+                })
+                .unwrap(),
                 funds: vec![],
             },
         )

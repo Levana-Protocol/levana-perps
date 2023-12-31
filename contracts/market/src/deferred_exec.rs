@@ -14,9 +14,11 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         id: DeferredExecId,
+        price_point_timestamp: Timestamp,
     ) -> Result<()> {
+        let price_point = self.spot_price(ctx.storage, Some(price_point_timestamp))?;
         let item = self.load_deferred_exec_item(ctx.storage, id)?;
-        let pos_order_id = helper(self, ctx, item.clone())?;
+        let pos_order_id = helper(self, ctx, item.clone(), price_point)?;
         self.mark_deferred_exec_success(ctx, item, pos_order_id)?;
         Ok(())
     }
@@ -31,6 +33,7 @@ fn helper(
     state: &State,
     ctx: &mut StateContext,
     item: DeferredExecWithStatus,
+    price_point: PricePoint,
 ) -> Result<DeferredExecCompleteTarget> {
     match item.item {
         DeferredExecItem::OpenPosition {
@@ -59,7 +62,7 @@ fn helper(
             )
             .map(DeferredExecCompleteTarget::Position),
         DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount } => {
-            handle_update_position_shared(state, ctx, id, None, None)?;
+            handle_update_position_shared(state, ctx, id, None, None, &price_point)?;
             state.update_position_collateral(ctx, id, amount.into_signed())?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
@@ -70,12 +73,19 @@ fn helper(
         } => {
             let funds = amount.into_signed();
             let notional_size = state.update_size_new_notional_size(ctx.storage, id, funds)?;
-            handle_update_position_shared(state, ctx, id, Some(notional_size), slippage_assert)?;
+            handle_update_position_shared(
+                state,
+                ctx,
+                id,
+                Some(notional_size),
+                slippage_assert,
+                &price_point,
+            )?;
             state.update_position_size(ctx, id, funds)?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => {
-            handle_update_position_shared(state, ctx, id, None, None)?;
+            handle_update_position_shared(state, ctx, id, None, None, &price_point)?;
             state.update_position_collateral(ctx, id, -amount.into_signed())?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
@@ -86,7 +96,14 @@ fn helper(
         } => {
             let funds = -amount.into_signed();
             let notional_size = state.update_size_new_notional_size(ctx.storage, id, funds)?;
-            handle_update_position_shared(state, ctx, id, Some(notional_size), slippage_assert)?;
+            handle_update_position_shared(
+                state,
+                ctx,
+                id,
+                Some(notional_size),
+                slippage_assert,
+                &price_point,
+            )?;
             state.update_position_size(ctx, id, funds)?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
@@ -95,7 +112,7 @@ fn helper(
             leverage,
             slippage_assert,
         } => {
-            handle_update_position_shared(state, ctx, id, None, None)?;
+            handle_update_position_shared(state, ctx, id, None, None, &price_point)?;
             let notional_size =
                 state.update_leverage_new_notional_size(ctx.storage, id, leverage)?;
             if let Some(slippage_assert) = slippage_assert {
@@ -114,7 +131,7 @@ fn helper(
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionMaxGains { id, max_gains } => {
-            handle_update_position_shared(state, ctx, id, None, None)?;
+            handle_update_position_shared(state, ctx, id, None, None, &price_point)?;
             let counter_collateral =
                 state.update_max_gains_new_counter_collateral(ctx.storage, id, max_gains)?;
             state.update_position_max_gains(ctx, id, counter_collateral)?;
@@ -135,7 +152,7 @@ fn helper(
                     Some(pos.liquidation_margin.delta_neutrality),
                 )?;
             }
-            state.close_position_via_msg(ctx, pos)?;
+            state.close_position_via_msg(ctx, pos, price_point)?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::SetTriggerOrder {
@@ -210,16 +227,25 @@ fn handle_update_position_shared(
     id: PositionId,
     notional_size: Option<Signed<Notional>>,
     slippage_assert: Option<SlippageAssert>,
+    price_point: &PricePoint,
 ) -> Result<()> {
     // We used to assert position owner here, but that's now handled when queueing the deferred message.
 
     update_position_slippage_assert(state, ctx.storage, id, notional_size, slippage_assert)?;
 
-    let now = state.now();
     let pos = get_position(ctx.storage, id)?;
 
+    debug_assert!(pos.next_liquifunding >= price_point.timestamp);
+
     let starts_at = pos.liquifunded_at;
-    state.position_liquifund_store(ctx, pos, starts_at, now, false, PositionSaveReason::Update)?;
+    state.position_liquifund_store(
+        ctx,
+        pos,
+        starts_at,
+        price_point.timestamp,
+        false,
+        PositionSaveReason::Update,
+    )?;
 
     Ok(())
 }

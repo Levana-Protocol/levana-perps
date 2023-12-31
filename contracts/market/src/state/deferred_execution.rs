@@ -374,12 +374,16 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         id: DeferredExecId,
+        price_point_timestamp: Timestamp,
     ) -> Result<()> {
         // For now we always fail, this obviously needs to be fixed.
         ctx.response_mut().add_raw_submessage(SubMsg::reply_always(
             CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
                 contract_addr: self.env.contract.address.clone().into_string(),
-                msg: to_binary(&MarketExecuteMsg::PerformDeferredExec { id })?,
+                msg: to_binary(&MarketExecuteMsg::PerformDeferredExec {
+                    id,
+                    price_point_timestamp,
+                })?,
                 funds: vec![],
             }),
             // Let's use the deferred exec ID as the reply ID for now. In theory
