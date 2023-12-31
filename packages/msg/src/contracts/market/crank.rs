@@ -12,6 +12,8 @@ pub enum CrankWorkInfo {
     CloseAllPositions {
         /// Next position to be closed
         position: PositionId,
+        /// Price point used for closing all positions
+        price_point: PricePoint,
     },
     /// Resetting all LP balances to 0 after all liquidity is drained
     ResetLpBalances {},
@@ -104,7 +106,7 @@ pub mod events {
                             Cow::Borrowed("close-all-positions")
                         }
                         CrankWorkInfo::ResetLpBalances {} => "reset-lp-balances".into(),
-                        CrankWorkInfo::Liquifunding { position } => {
+                        CrankWorkInfo::Liquifunding { position, .. } => {
                             format!("liquifund {position}").into()
                         }
                         CrankWorkInfo::Liquidation { position, .. } => {
@@ -144,7 +146,10 @@ pub mod events {
             );
 
             let (position_id, order_id, price_point_timestamp) = match src {
-                CrankWorkInfo::CloseAllPositions { position } => (Some(position), None, None),
+                CrankWorkInfo::CloseAllPositions {
+                    position,
+                    price_point,
+                } => (Some(position), None, Some(price_point.timestamp)),
                 CrankWorkInfo::ResetLpBalances {} => (None, None, None),
                 CrankWorkInfo::Completed {
                     price_point_timestamp,

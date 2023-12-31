@@ -2,9 +2,9 @@ use crate::state::position::CLOSED_POSITIONS;
 use crate::state::{position::CLOSED_POSITION_HISTORY, *};
 use anyhow::Context;
 use msg::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
-use msg::contracts::market::position::{events::PositionCloseEvent, Position, PositionCloseReason};
+use msg::contracts::market::position::{events::PositionCloseEvent, Position};
 use msg::contracts::market::position::{
-    ClosePositionInstructions, ClosedPosition, MaybeClosedPosition,
+    ClosePositionInstructions, ClosedPosition, MaybeClosedPosition, PositionCloseReason,
 };
 use shared::prelude::*;
 
@@ -13,19 +13,21 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         pos: Position,
+        settlement_price: PricePoint,
     ) -> Result<()> {
         let starts_at = pos.liquifunded_at;
-        let now = self.now();
-        let mcp = self.position_liquifund(ctx, pos, starts_at, now, false)?;
+        let ends_at = settlement_price.timestamp;
+        // Confirm that all past liquifundings have been performed before explicitly closing
+        debug_assert!(pos.next_liquifunding >= ends_at);
+        let mcp = self.position_liquifund(ctx, pos, starts_at, ends_at, false)?;
 
         // Liquifunding may have triggered a close, so check before we close again
         let instructions = match mcp {
             MaybeClosedPosition::Open(pos) => ClosePositionInstructions {
                 pos,
                 exposure: Signed::<Collateral>::zero(),
-                close_time: now,
-                settlement_time: now,
                 reason: PositionCloseReason::Direct,
+                settlement_price,
             },
             MaybeClosedPosition::Close(instructions) => instructions,
         };
@@ -43,13 +45,10 @@ impl State<'_> {
         ClosePositionInstructions {
             mut pos,
             exposure,
-            close_time,
-            settlement_time,
+            settlement_price,
             reason,
         }: ClosePositionInstructions,
     ) -> Result<()> {
-        let settlement_price = self.spot_price(ctx.storage, Some(settlement_time))?;
-
         // How much notional size are we undoing? Used for delta neutrality fee
         // and adjusting the open interest
         let notional_size_return = -pos.notional_size;
@@ -129,6 +128,7 @@ impl State<'_> {
             Err(err) => return Err(err),
         }
         .price_base;
+        let close_time = self.now();
         let closed_position = ClosedPosition {
             owner: pos.owner,
             id: pos.id,
@@ -154,7 +154,7 @@ impl State<'_> {
             notional_size: pos.notional_size,
             entry_price_base,
             close_time,
-            settlement_time,
+            settlement_time: settlement_price.timestamp,
             reason,
             active_collateral,
             delta_neutrality_fee_collateral: pos.delta_neutrality_fee.collateral(),

@@ -81,11 +81,10 @@ impl State<'_> {
         let slippage_liquidation_margin = pos.liquidation_margin.delta_neutrality;
         let (mcp, exposure) = pos.settle_price_exposure(
             start_price.price_notional,
-            end_price.price_notional,
+            end_price,
             // Make sure we have at least enough funds set aside for delta
             // neutrality fee when closing.
             slippage_liquidation_margin,
-            ends_at,
         )?;
 
         self.liquidity_update_locked(ctx, -exposure)?;
@@ -110,8 +109,7 @@ impl State<'_> {
                 // Exposure is 0 here: we've already added in the exposure
                 // value from settling above.
                 exposure: Signed::zero(),
-                close_time: ends_at,
-                settlement_time: ends_at,
+                settlement_price: end_price,
                 reason: PositionCloseReason::Liquidated(LiquidationReason::Liquidated),
             }));
         }
@@ -131,8 +129,7 @@ impl State<'_> {
             return Ok(MaybeClosedPosition::Close(ClosePositionInstructions {
                 pos,
                 exposure: Signed::zero(),
-                close_time: ends_at,
-                settlement_time: ends_at,
+                settlement_price: end_price,
                 reason: PositionCloseReason::Liquidated(LiquidationReason::MaxGains),
             }));
         };

@@ -403,12 +403,15 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             state.provide_crank_funds(&mut ctx, info.funds.take()?)?;
         }
 
-        ExecuteMsg::PerformDeferredExec { id } => {
+        ExecuteMsg::PerformDeferredExec {
+            id,
+            price_point_timestamp,
+        } => {
             state.assert_auth(
                 &info.sender,
                 AuthCheck::Addr(state.env.contract.address.clone()),
             )?;
-            state.perform_deferred_exec(&mut ctx, id)?;
+            state.perform_deferred_exec(&mut ctx, id, price_point_timestamp)?;
         }
     }
 

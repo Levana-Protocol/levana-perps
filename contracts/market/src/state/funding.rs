@@ -481,7 +481,7 @@ impl State<'_> {
         ends_at: Timestamp,
         charge_crank_fee: bool,
     ) -> Result<MaybeClosedPosition> {
-        let price = self.spot_price(ctx.storage, None)?;
+        let price = self.spot_price(ctx.storage, Some(ends_at))?;
 
         let (borrow_fee_timeslice_owed, event) =
             self.calc_capped_borrow_fee_payment(ctx.storage, &position, starts_at, ends_at)?;
@@ -585,8 +585,7 @@ impl State<'_> {
                     MaybeClosedPosition::Close(ClosePositionInstructions {
                         pos: position,
                         exposure: Signed::<Collateral>::zero(),
-                        close_time: ends_at,
-                        settlement_time: ends_at,
+                        settlement_price: price,
                         reason: PositionCloseReason::Liquidated(LiquidationReason::Liquidated),
                     })
                 }

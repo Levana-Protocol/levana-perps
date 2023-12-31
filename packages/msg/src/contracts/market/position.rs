@@ -484,11 +484,10 @@ impl Position {
     pub fn settle_price_exposure(
         mut self,
         start_price: Price,
-        end_price: Price,
+        end_price: PricePoint,
         liquidation_margin: Collateral,
-        ends_at: Timestamp,
     ) -> Result<(MaybeClosedPosition, Signed<Collateral>)> {
-        let price_delta = end_price.into_number() - start_price.into_number();
+        let price_delta = end_price.price_notional.into_number() - start_price.into_number();
         let exposure =
             Signed::<Collateral>::from_number(price_delta * self.notional_size.into_number());
         let min_exposure = liquidation_margin
@@ -501,8 +500,7 @@ impl Position {
                 MaybeClosedPosition::Close(ClosePositionInstructions {
                     pos: self,
                     exposure: min_exposure,
-                    close_time: ends_at,
-                    settlement_time: ends_at,
+                    settlement_price: end_price,
                     reason: PositionCloseReason::Liquidated(LiquidationReason::Liquidated),
                 }),
                 min_exposure,
@@ -512,8 +510,7 @@ impl Position {
                 MaybeClosedPosition::Close(ClosePositionInstructions {
                     pos: self,
                     exposure: max_exposure,
-                    close_time: ends_at,
-                    settlement_time: ends_at,
+                    settlement_price: end_price,
                     reason: PositionCloseReason::Liquidated(LiquidationReason::MaxGains),
                 }),
                 max_exposure,
@@ -545,12 +542,8 @@ impl Position {
         let liquidation_margin =
             self.liquidation_margin(start_price, current_price_point, config)?;
 
-        let (settle_price_result, _exposure) = self.settle_price_exposure(
-            start_price,
-            end_price.price_notional,
-            liquidation_margin.total(),
-            end_price.timestamp,
-        )?;
+        let (settle_price_result, _exposure) =
+            self.settle_price_exposure(start_price, end_price, liquidation_margin.total())?;
 
         let result = match settle_price_result {
             MaybeClosedPosition::Open(pos) => {
@@ -567,8 +560,7 @@ impl Position {
                     MaybeClosedPosition::Close(ClosePositionInstructions {
                         pos,
                         exposure: Signed::zero(),
-                        close_time: end_price.timestamp,
-                        settlement_time: end_price.timestamp,
+                        settlement_price: end_price,
                         reason: PositionCloseReason::Liquidated(LiquidationReason::MaxGains),
                     })
                 }
@@ -583,8 +575,7 @@ impl Position {
             MaybeClosedPosition::Close(ClosePositionInstructions {
                 pos,
                 exposure,
-                close_time,
-                settlement_time,
+                settlement_price,
                 reason,
             }) => {
                 // Best effort closed position value
@@ -633,8 +624,8 @@ impl Position {
                             .checked_sub(pos.deposit_collateral.usd())?,
                         notional_size: pos.notional_size,
                         entry_price_base,
-                        close_time,
-                        settlement_time,
+                        close_time: current_price_point.timestamp,
+                        settlement_time: settlement_price.timestamp,
                         reason,
                         active_collateral,
                         delta_neutrality_fee_collateral: pos.delta_neutrality_fee.collateral(),
