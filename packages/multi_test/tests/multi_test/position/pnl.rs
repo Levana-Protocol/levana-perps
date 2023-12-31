@@ -22,7 +22,7 @@ fn position_pnl_close_no_change() {
     let trader = market.clone_trader(0).unwrap();
 
     // open/close with no price movement, pnl should be 0
-    let (pos_id, _) = market
+    let (pos_id, defer_res) = market
         .exec_open_position(
             &trader,
             "100",
@@ -35,6 +35,7 @@ fn position_pnl_close_no_change() {
         )
         .unwrap();
 
+    defer_res.responses.filter_events_attr_value("delta-neutrality-fee", "amount").for_each(|x| println!("(after open): dnf: {}", x));
     market.automatic_time_jump_enabled = false;
 
     let pos = market.query_position(pos_id).unwrap();
@@ -46,9 +47,11 @@ fn position_pnl_close_no_change() {
     );
 
     market.automatic_time_jump_enabled = true;
-    let res = market.exec_close_position(&trader, pos_id, None).unwrap();
+    let defer_res = market.exec_close_position(&trader, pos_id, None).unwrap();
     market.automatic_time_jump_enabled = false;
-    let delta_neutrality_fee_close = res.first_delta_neutrality_fee_amount();
+    let delta_neutrality_fee_close = defer_res.exec_resp().first_delta_neutrality_fee_amount();
+
+    defer_res.responses.filter_events_attr_value("delta-neutrality-fee", "amount").for_each(|x| println!("(after close): dnf: {}", x));
 
     let pos = market.query_closed_position(&trader, pos_id).unwrap();
 
@@ -297,7 +300,7 @@ fn position_pnl_long_and_short_precise() {
         )
         .unwrap();
 
-    let (short_pos_id, res) = market
+    let (short_pos_id, defer_res) = market
         .exec_open_position(
             &trader,
             "100",
@@ -310,9 +313,9 @@ fn position_pnl_long_and_short_precise() {
         )
         .unwrap();
 
-    let short_slippage_fee = res.first_delta_neutrality_fee_amount();
+    let short_slippage_fee = defer_res.exec_resp().first_delta_neutrality_fee_amount();
 
-    let (long_pos_id, res) = market
+    let (long_pos_id, defer_res) = market
         .exec_open_position(
             &trader,
             "200",
@@ -325,7 +328,7 @@ fn position_pnl_long_and_short_precise() {
         )
         .unwrap();
 
-    let long_slippage_fee = res.first_delta_neutrality_fee_amount();
+    let long_slippage_fee = defer_res.exec_resp().first_delta_neutrality_fee_amount();
 
     // Long interest > short interest
     let rates = market.query_status().unwrap();

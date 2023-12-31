@@ -57,7 +57,7 @@ fn artificial_slippage_charge_open_close_nochange() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
 
-    let (pos_id, res) = market
+    let (pos_id, defer_res) = market
         .exec_open_position(
             &trader,
             "100",
@@ -70,11 +70,11 @@ fn artificial_slippage_charge_open_close_nochange() {
         )
         .unwrap();
 
-    let open_amount = res.first_delta_neutrality_fee_amount();
+    let open_amount = defer_res.exec_resp().first_delta_neutrality_fee_amount();
     assert_ne!(open_amount, Number::ZERO);
 
-    let res = market.exec_close_position(&trader, pos_id, None).unwrap();
-    let close_amount = res.first_delta_neutrality_fee_amount();
+    let defer_res = market.exec_close_position(&trader, pos_id, None).unwrap();
+    let close_amount = defer_res.exec_resp().first_delta_neutrality_fee_amount();
 
     // close should be exactly the inverse of open
     assert_eq!(close_amount, -open_amount);
@@ -377,7 +377,7 @@ fn artificial_slippage_charge_change_net_notional_sign() {
         })
         .unwrap();
 
-    let (pos_id, res) = market
+    let (pos_id, defer_res) = market
         .exec_open_position(
             &trader,
             "100",
@@ -390,7 +390,7 @@ fn artificial_slippage_charge_change_net_notional_sign() {
         )
         .unwrap();
 
-    let open_amount1 = res.first_delta_neutrality_fee_amount();
+    let open_amount1 = defer_res.exec_resp().first_delta_neutrality_fee_amount();
     let status1 = market.query_status().unwrap();
     let net_notional1 = status1.long_notional - status1.short_notional;
     market.exec_close_position(&trader, pos_id, None).unwrap();
@@ -408,7 +408,7 @@ fn artificial_slippage_charge_change_net_notional_sign() {
         )
         .unwrap();
 
-    let open_amount2 = res.first_delta_neutrality_fee_amount();
+    let open_amount2 = defer_res.exec_resp().first_delta_neutrality_fee_amount();
 
     let (_, res) = market
         .exec_open_position(
@@ -423,7 +423,7 @@ fn artificial_slippage_charge_change_net_notional_sign() {
         )
         .unwrap();
 
-    let open_amount3 = res.first_delta_neutrality_fee_amount();
+    let open_amount3 = defer_res.exec_resp().first_delta_neutrality_fee_amount();
     let status2 = market.query_status().unwrap();
     let net_notional2 = status2.long_notional - status2.short_notional;
     assert_eq!(net_notional1, net_notional2);
