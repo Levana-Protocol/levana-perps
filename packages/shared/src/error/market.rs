@@ -176,8 +176,6 @@ impl Display for TriggerPriceMustBe {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TriggerType {
-    /// A limit order
-    LimitOrder,
     /// A stop loss
     StopLoss,
     /// A take profit
@@ -190,7 +188,6 @@ impl Display for TriggerType {
             f,
             "{}",
             match self {
-                TriggerType::LimitOrder => "limit order",
                 TriggerType::StopLoss => "stop loss",
                 TriggerType::TakeProfit => "take profit",
             }
