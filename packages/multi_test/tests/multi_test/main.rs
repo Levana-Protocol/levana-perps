@@ -19,10 +19,10 @@ mod wrong_token;
 mod diagnostic;
 mod edge_update;
 mod funding;
-/*
 mod history;
 mod liquidation_price;
 mod liquidity;
+/*
 mod sanity;
 mod order;
 mod override_price;

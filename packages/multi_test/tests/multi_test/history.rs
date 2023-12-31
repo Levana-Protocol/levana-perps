@@ -48,6 +48,7 @@ fn trade_history_works() {
         .unwrap();
 
     let evt: PositionActionEvent = res
+        .responses
         .event_first("history-position-action")
         .unwrap()
         .try_into()
@@ -71,6 +72,7 @@ fn trade_history_works() {
         .unwrap();
 
     let evt: PositionActionEvent = res
+        .responses
         .event_first("history-position-action")
         .unwrap()
         .try_into()
@@ -98,9 +100,10 @@ fn trade_history_works() {
 
     // CLOSE
 
-    let res = market.exec_close_position(&trader, pos_id, None).unwrap();
+    let defer_res = market.exec_close_position(&trader, pos_id, None).unwrap();
 
-    let evt: PositionActionEvent = res
+    let evt: PositionActionEvent = defer_res
+        .exec_resp()
         .event_first("history-position-action")
         .unwrap()
         .try_into()
@@ -277,11 +280,12 @@ fn trade_history_update_fee_792() {
         .unwrap();
 
     // no fee when updating with "impacts leverage"
-    let res = market
+    let defer_res = market
         .exec_update_position_collateral_impact_leverage(&trader, pos_id, "20".try_into().unwrap())
         .unwrap();
 
-    let evt: PositionActionEvent = res
+    let evt: PositionActionEvent = defer_res
+        .exec_resp()
         .event_first("history-position-action")
         .unwrap()
         .try_into()
@@ -291,7 +295,7 @@ fn trade_history_update_fee_792() {
     assert_eq!(evt.action.kind, PositionActionKind::Update);
 
     // yes fee when updating with "impacts size"
-    let res = market
+    let defer_res = market
         .exec_update_position_collateral_impact_size(
             &trader,
             pos_id,
@@ -300,7 +304,8 @@ fn trade_history_update_fee_792() {
         )
         .unwrap();
 
-    let evt: PositionActionEvent = res
+    let evt: PositionActionEvent = defer_res
+        .exec_resp()
         .event_first("history-position-action")
         .unwrap()
         .try_into()

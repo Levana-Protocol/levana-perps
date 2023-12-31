@@ -1,5 +1,4 @@
-use crate::market_wrapper::PerpsMarket;
-use cw_multi_test::AppResponse;
+use crate::market_wrapper::{PerpsMarket, DeferResponse};
 use msg::contracts::market::position::PositionId;
 use msg::prelude::*;
 
@@ -18,7 +17,7 @@ impl UpdateExpect {
     pub fn validate(
         &self,
         market: &PerpsMarket,
-        res: Result<AppResponse>,
+        res: Result<DeferResponse>,
         pos_id: PositionId,
     ) -> Result<()> {
         let _pos = market.query_position(pos_id)?;

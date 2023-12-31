@@ -1135,7 +1135,7 @@ impl PerpsMarket {
         sender: &Addr,
         position_id: PositionId,
         collateral_delta: Signed<Collateral>,
-    ) -> Result<AppResponse> {
+    ) -> Result<DeferResponse> {
         let msg = self.token.into_market_execute_msg(
             &self.addr,
             collateral_delta
@@ -1154,9 +1154,7 @@ impl PerpsMarket {
             },
         )?;
 
-        let defer_resp = self.exec_defer_wasm_msg(sender, msg)?;
-
-        Ok(defer_resp.exec_resp().clone())
+        self.exec_defer_wasm_msg(sender, msg)
     }
 
     pub fn exec_update_position_collateral_impact_size(
@@ -1165,7 +1163,7 @@ impl PerpsMarket {
         position_id: PositionId,
         collateral_delta: Signed<Collateral>,
         slippage_assert: Option<SlippageAssert>,
-    ) -> Result<AppResponse> {
+    ) -> Result<DeferResponse> {
         let msg = self.token.into_market_execute_msg(
             &self.addr,
             collateral_delta
@@ -1188,9 +1186,7 @@ impl PerpsMarket {
             },
         )?;
 
-        let defer_resp = self.exec_defer_wasm_msg(sender, msg)?;
-
-        Ok(defer_resp.exec_resp().clone())
+        self.exec_defer_wasm_msg(sender, msg)
     }
 
     pub fn exec_update_position_leverage(
@@ -1199,17 +1195,15 @@ impl PerpsMarket {
         position_id: PositionId,
         leverage: LeverageToBase,
         slippage_assert: Option<SlippageAssert>,
-    ) -> Result<AppResponse> {
-        let defer_resp = self.exec_defer(
+    ) -> Result<DeferResponse> {
+        self.exec_defer(
             sender,
             &MarketExecuteMsg::UpdatePositionLeverage {
                 id: position_id,
                 leverage,
                 slippage_assert,
             },
-        )?;
-
-        Ok(defer_resp.exec_resp().clone())
+        )
     }
 
     pub fn exec_update_position_max_gains(
@@ -1217,16 +1211,15 @@ impl PerpsMarket {
         sender: &Addr,
         position_id: PositionId,
         max_gains: MaxGainsInQuote,
-    ) -> Result<AppResponse> {
-        let defer_resp = self.exec_defer(
+    ) -> Result<DeferResponse> {
+        self.exec_defer(
             sender,
             &MarketExecuteMsg::UpdatePositionMaxGains {
                 id: position_id,
                 max_gains,
             },
-        )?;
+        )
 
-        Ok(defer_resp.exec_resp().clone())
     }
 
     pub fn exec_set_trigger_order(
