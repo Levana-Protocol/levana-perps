@@ -164,6 +164,14 @@ pub enum DeferredExecItem {
         take_profit_override: Option<PriceBaseInQuote>,
         /// The amount of collateral provided
         amount: NonZero<Collateral>,
+        /// Crank fee already charged
+        ///
+        /// Note that this field only exists for variants where there isn't a
+        /// position or order to charge the fee against. In those cases, the position/order
+        /// itself is immediately updated to reflect the new charge.
+        crank_fee: Collateral,
+        /// Crank fee charged, in USD
+        crank_fee_usd: Usd,
     },
     /// Add collateral to a position, causing leverage to decrease
     ///
@@ -260,6 +268,10 @@ pub enum DeferredExecItem {
         take_profit_override: Option<PriceBaseInQuote>,
         /// The amount of collateral provided
         amount: NonZero<Collateral>,
+        /// Crank fee already charged
+        crank_fee: Collateral,
+        /// Crank fee charged, in USD
+        crank_fee_usd: Usd,
     },
 
     /// Cancel an open limit order

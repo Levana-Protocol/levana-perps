@@ -152,3 +152,5 @@ pub const DEFERRED_EXECS: &str = "es";
 pub const DEFERRED_EXECS_BY_WALLET: &str = "et";
 pub const PENDING_DEFERRED_FOR_POSITION: &str = "eu";
 pub const PENDING_DEFERRED_FOR_ORDER: &str = "ev";
+pub const IS_LIMIT_ORDER_CANCELING: &str = "ew";
+pub const IS_POSITION_CLOSING: &str = "ex";

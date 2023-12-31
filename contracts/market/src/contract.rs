@@ -180,6 +180,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     stop_loss_override,
                     take_profit_override,
                     amount: info.funds.take()?,
+                    crank_fee: Collateral::zero(),
+                    crank_fee_usd: Usd::zero(),
                 },
             )?;
         }
@@ -293,6 +295,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     stop_loss_override,
                     take_profit_override,
                     amount: info.funds.take()?,
+                    crank_fee: Collateral::zero(),
+                    crank_fee_usd: Usd::zero(),
                 },
             )?;
         }

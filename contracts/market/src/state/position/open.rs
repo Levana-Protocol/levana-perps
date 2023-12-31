@@ -33,6 +33,8 @@ pub(crate) struct ValidatedPosition {
 pub(crate) struct OpenPositionParams {
     pub(crate) owner: Addr,
     pub(crate) collateral: NonZero<Collateral>,
+    /// Crank fee already charged by the deferred execution system.
+    pub(crate) crank_fee: CollateralAndUsd,
     pub(crate) leverage: LeverageToBase,
     pub(crate) direction: DirectionToBase,
     pub(crate) max_gains_in_quote: MaxGainsInQuote,
@@ -49,6 +51,7 @@ impl State<'_> {
         OpenPositionParams {
             owner,
             collateral,
+            crank_fee,
             leverage,
             direction,
             max_gains_in_quote,
@@ -102,7 +105,8 @@ impl State<'_> {
             trading_fee: CollateralAndUsd::default(),
             funding_fee: SignedCollateralAndUsd::default(),
             borrow_fee: CollateralAndUsd::default(),
-            crank_fee: CollateralAndUsd::default(),
+            crank_fee,
+            pending_crank_fee: Usd::zero(),
             delta_neutrality_fee: SignedCollateralAndUsd::default(),
             counter_collateral,
             notional_size,
@@ -300,6 +304,8 @@ impl State<'_> {
         slippage_assert: Option<SlippageAssert>,
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
+        crank_fee: Collateral,
+        crank_fee_usd: Usd,
     ) -> Result<PositionId> {
         let validated_position = self.validate_new_position(
             ctx.storage,
@@ -312,6 +318,7 @@ impl State<'_> {
                 slippage_assert,
                 stop_loss_override,
                 take_profit_override,
+                crank_fee: CollateralAndUsd::from_pair(crank_fee, crank_fee_usd),
             },
         )?;
 
