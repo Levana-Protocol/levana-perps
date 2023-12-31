@@ -49,8 +49,9 @@ fn position_pnl_close_no_change() {
     let pos = market.query_closed_position(&trader, pos_id).unwrap();
 
     assert_eq!(
-        pos.pnl_collateral.into_number() + pos.borrow_fee_collateral.into_number(),
-        start_pnl_in_collateral.into_number() - delta_neutrality_fee_close
+        pos.pnl_collateral.into_number(),
+        start_pnl_in_collateral.into_number()
+            - (delta_neutrality_fee_close + pos.borrow_fee_collateral.into_number())
     );
 }
 
