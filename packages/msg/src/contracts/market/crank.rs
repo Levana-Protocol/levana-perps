@@ -52,6 +52,28 @@ pub enum CrankWorkInfo {
     },
 }
 
+impl CrankWorkInfo {
+    /// Should a cranker receive rewards for performing this action?
+    ///
+    /// We generally want to give out rewards for actions that are directly
+    /// user initiated and will be receiving a crank fee paid into the system. Actions
+    /// which are overall protocol maintenance without a specific user action may be
+    /// unfunded. A simple "attack" we want to avoid is a cranker flooding the system
+    /// with unnecessary price updates + cranks to continue making a profit off of
+    /// "Completed" items.
+    pub fn receives_crank_rewards(&self) -> bool {
+        match self {
+            CrankWorkInfo::CloseAllPositions { .. }
+            | CrankWorkInfo::ResetLpBalances {}
+            | CrankWorkInfo::Completed { .. } => false,
+            CrankWorkInfo::Liquifunding { .. }
+            | CrankWorkInfo::Liquidation { .. }
+            | CrankWorkInfo::DeferredExec { .. }
+            | CrankWorkInfo::LimitOrder { .. } => true,
+        }
+    }
+}
+
 /// Events related to the crank
 pub mod events {
     use std::borrow::Cow;

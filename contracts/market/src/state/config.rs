@@ -60,6 +60,7 @@ pub(crate) fn update_config(
         delta_neutrality_fee_cap,
         delta_neutrality_fee_tax,
         crank_fee_charged,
+        crank_fee_surcharge,
         crank_fee_reward,
         minimum_deposit_usd: minimum_deposit,
         liquifunding_delay_fuzz_seconds,
@@ -148,7 +149,9 @@ pub(crate) fn update_config(
     if let Some(x) = crank_fee_charged {
         config.crank_fee_charged = x;
     }
-
+    if let Some(x) = crank_fee_surcharge {
+        config.crank_fee_surcharge = x;
+    }
     if let Some(x) = crank_fee_reward {
         config.crank_fee_reward = x;
     }

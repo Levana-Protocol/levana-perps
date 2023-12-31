@@ -65,6 +65,16 @@ pub struct Config {
     pub delta_neutrality_fee_tax: Decimal256,
     /// The crank fee to be paid into the system, in collateral
     pub crank_fee_charged: Usd,
+    /// The crank surcharge charged for every 10 items in the deferred execution queue.
+    ///
+    /// This is intended to create backpressure in times of high congestion.
+    ///
+    /// For every 10 items in the deferred execution queue, this amount is added to the
+    /// crank fee charged on performing a deferred execution message.
+    ///
+    /// This is only charged while adding new items to the queue, not when performing
+    /// ongoing tasks like liquifunding or liquidations.
+    pub crank_fee_surcharge: Usd,
     /// The crank fee to be sent to crankers, in collateral
     pub crank_fee_reward: Usd,
     /// Minimum deposit collateral, given in USD
@@ -167,6 +177,7 @@ impl Config {
             delta_neutrality_fee_cap: ConfigDefaults::delta_neutrality_fee_cap(),
             delta_neutrality_fee_tax: ConfigDefaults::delta_neutrality_fee_tax(),
             crank_fee_charged: ConfigDefaults::crank_fee_charged(),
+            crank_fee_surcharge: ConfigDefaults::crank_fee_surcharge(),
             crank_fee_reward: ConfigDefaults::crank_fee_reward(),
             minimum_deposit_usd: ConfigDefaults::minimum_deposit_usd(),
             liquifunding_delay_fuzz_seconds: ConfigDefaults::liquifunding_delay_fuzz_seconds(),
@@ -347,6 +358,7 @@ pub struct ConfigUpdate {
     pub delta_neutrality_fee_cap: Option<NumberGtZero>,
     pub delta_neutrality_fee_tax: Option<Decimal256>,
     pub crank_fee_charged: Option<Usd>,
+    pub crank_fee_surcharge: Option<Usd>,
     pub crank_fee_reward: Option<Usd>,
     pub minimum_deposit_usd: Option<Usd>,
     pub liquifunding_delay_fuzz_seconds: Option<u32>,
@@ -380,6 +392,7 @@ impl<'a> arbitrary::Arbitrary<'a> for ConfigUpdate {
             delta_neutrality_fee_cap: u.arbitrary()?,
             delta_neutrality_fee_tax: arbitrary_decimal_256_option(u)?,
             crank_fee_charged: u.arbitrary()?,
+            crank_fee_surcharge: u.arbitrary()?,
             crank_fee_reward: u.arbitrary()?,
             minimum_deposit_usd: u.arbitrary()?,
             liquifunding_delay_fuzz_seconds: None,
@@ -415,6 +428,7 @@ impl From<Config> for ConfigUpdate {
             delta_neutrality_fee_cap: Some(src.delta_neutrality_fee_cap),
             delta_neutrality_fee_tax: Some(src.delta_neutrality_fee_tax),
             crank_fee_charged: Some(src.crank_fee_charged),
+            crank_fee_surcharge: Some(src.crank_fee_surcharge),
             crank_fee_reward: Some(src.crank_fee_reward),
             minimum_deposit_usd: Some(src.minimum_deposit_usd),
             liquifunding_delay_fuzz_seconds: Some(src.liquifunding_delay_fuzz_seconds),

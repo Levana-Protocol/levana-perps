@@ -133,7 +133,39 @@ impl State<'_> {
         trader: Addr,
         item: DeferredExecItem,
     ) -> Result<()> {
-        // Owner check first
+        // Calculate the next ID first so that we can figure out how many items are in the queue already.
+        let (new_id, new_latest_ids, queue_size) =
+            match DEFERRED_EXEC_LATEST_IDS.may_load(ctx.storage)? {
+                None => {
+                    let new_id = DeferredExecId::first();
+                    let latest_ids = DeferredExecLatestIds {
+                        issued: new_id,
+                        processed: None,
+                    };
+                    (new_id, latest_ids, 0)
+                }
+                Some(mut latest_ids) => {
+                    let queue_size =
+                        latest_ids.issued.u64() - latest_ids.processed.map_or(0, |x| x.u64());
+                    let new_id = latest_ids.issued.next();
+                    latest_ids.issued = new_id;
+                    (new_id, latest_ids, queue_size)
+                }
+            };
+        DEFERRED_EXEC_LATEST_IDS.save(ctx.storage, &new_latest_ids)?;
+        DEFERRED_EXECS_BY_WALLET.save(ctx.storage, (trader.clone(), new_id), &())?;
+
+        // Determine the amount of crank fee we need to charge.
+        // FIXME charge this fee as part of PERP-2815
+        let _crank_fee = self.config.crank_fee_charged
+            + self
+                .config
+                .crank_fee_surcharge
+                // Intentionally dividing at the u64 level and not Decimal so we
+                // get the expected step-wise decrease from round-down divison.
+                .checked_mul_dec(Decimal256::from_ratio(queue_size / 10, 1u32))?;
+
+        // Check the owner is correct and try to charge the crank fee
         let target = item.target();
         match target {
             DeferredExecTarget::DoesNotExist => (),
@@ -144,24 +176,6 @@ impl State<'_> {
                 self.limit_order_assert_owner(ctx.storage, &trader, order_id)?;
             }
         }
-
-        let (new_id, new_latest_ids) = match DEFERRED_EXEC_LATEST_IDS.may_load(ctx.storage)? {
-            None => {
-                let new_id = DeferredExecId::first();
-                let latest_ids = DeferredExecLatestIds {
-                    issued: new_id,
-                    processed: None,
-                };
-                (new_id, latest_ids)
-            }
-            Some(mut latest_ids) => {
-                let new_id = latest_ids.issued.next();
-                latest_ids.issued = new_id;
-                (new_id, latest_ids)
-            }
-        };
-        DEFERRED_EXEC_LATEST_IDS.save(ctx.storage, &new_latest_ids)?;
-        DEFERRED_EXECS_BY_WALLET.save(ctx.storage, (trader.clone(), new_id), &())?;
 
         DEFERRED_EXECS.save(
             ctx.storage,
