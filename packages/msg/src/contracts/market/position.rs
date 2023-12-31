@@ -523,7 +523,7 @@ impl Position {
     #[allow(clippy::too_many_arguments)]
     pub fn into_query_response_extrapolate_exposure(
         self,
-        start_price: Price,
+        start_price: PricePoint,
         end_price: PricePoint,
         entry_price: Price,
         current_price_point: &PricePoint,
@@ -536,10 +536,13 @@ impl Position {
         // parameter to liquidation_margin. It's used exclusively to calculate
         // the crank fee, and therefore does not need to be based on the
         // liquifunding cadence.
-        let liquidation_margin = self.liquidation_margin(current_price_point, config)?;
+        let liquidation_margin = self.liquidation_margin(&start_price, config)?;
 
-        let (settle_price_result, _exposure) =
-            self.settle_price_exposure(start_price, end_price, liquidation_margin.total())?;
+        let (settle_price_result, _exposure) = self.settle_price_exposure(
+            start_price.price_notional,
+            end_price,
+            liquidation_margin.total(),
+        )?;
 
         let result = match settle_price_result {
             MaybeClosedPosition::Open(pos) => {

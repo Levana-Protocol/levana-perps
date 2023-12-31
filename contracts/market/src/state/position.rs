@@ -516,7 +516,7 @@ impl State<'_> {
 
         let start_price = self.spot_price(store, pos.liquifunded_at)?;
         pos.into_query_response_extrapolate_exposure(
-            start_price.price_notional,
+            start_price,
             spot_price,
             entry_price.price_notional,
             &spot_price,
