@@ -35,8 +35,6 @@ fn position_pnl_close_no_change() {
         )
         .unwrap();
 
-
-
     let pos = market.query_position(pos_id).unwrap();
     let start_pnl_in_collateral = pos.pnl_collateral;
 
@@ -47,7 +45,6 @@ fn position_pnl_close_no_change() {
 
     let defer_res = market.exec_close_position(&trader, pos_id, None).unwrap();
     let delta_neutrality_fee_close = defer_res.exec_resp().first_delta_neutrality_fee_amount();
-
 
     let pos = market.query_closed_position(&trader, pos_id).unwrap();
 

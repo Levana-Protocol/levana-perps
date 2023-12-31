@@ -155,7 +155,7 @@ impl CosmosResponseExt for TxResponse {
 
 impl CosmosResponseExt for &[AppResponse] {
     fn events(&self) -> Box<dyn Iterator<Item = Event> + 'static> {
-        let events: Vec<Event> = self.into_iter().flat_map(|resp| resp.events.clone()).collect();
+        let events: Vec<Event> = self.iter().flat_map(|resp| resp.events.clone()).collect();
         Box::new(events.into_iter())
     }
 }

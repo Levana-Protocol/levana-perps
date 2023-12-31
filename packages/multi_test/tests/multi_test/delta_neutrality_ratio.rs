@@ -48,6 +48,11 @@ fn delta_neutrality_ratio_event() {
         .unwrap();
 
     let defer_res = market.exec_close_position(&trader, pos_id, None).unwrap();
-    DeltaNeutralityRatioEvent::try_from(defer_res.exec_resp().event_first("delta-neutrality-ratio").unwrap())
-        .unwrap();
+    DeltaNeutralityRatioEvent::try_from(
+        defer_res
+            .exec_resp()
+            .event_first("delta-neutrality-ratio")
+            .unwrap(),
+    )
+    .unwrap();
 }

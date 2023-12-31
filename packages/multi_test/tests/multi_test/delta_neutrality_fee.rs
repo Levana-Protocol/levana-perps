@@ -49,7 +49,7 @@ fn delta_neutrality_fee_cap() {
 
     if err.id != ErrorId::DeltaNeutralityFeeAlreadyLong {
         panic!("{:?}", err);
-    } 
+    }
     */
 }
 
