@@ -31,7 +31,8 @@ fn delta_neutrality_fee_cap() {
         .unwrap();
 
     // get expected error after updating
-    let err = market
+    // let err = market
+    let _ = market
         .exec_update_position_collateral_impact_size(
             &trader,
             pos_id,
@@ -395,7 +396,7 @@ fn artificial_slippage_charge_change_net_notional_sign() {
     let net_notional1 = status1.long_notional - status1.short_notional;
     market.exec_close_position(&trader, pos_id, None).unwrap();
 
-    let (_, res) = market
+    let (_, _) = market
         .exec_open_position(
             &trader,
             "100",
@@ -410,7 +411,7 @@ fn artificial_slippage_charge_change_net_notional_sign() {
 
     let open_amount2 = defer_res.exec_resp().first_delta_neutrality_fee_amount();
 
-    let (_, res) = market
+    let (_, _) = market
         .exec_open_position(
             &trader,
             "200",

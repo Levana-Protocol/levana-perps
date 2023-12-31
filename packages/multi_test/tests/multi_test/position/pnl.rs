@@ -18,11 +18,11 @@ const SKIP_CHECK_LARGE_PNL_IS_TAKE_PROFIT: bool = true;
 
 #[test]
 fn position_pnl_close_no_change() {
-    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
 
     // open/close with no price movement, pnl should be 0
-    let (pos_id, defer_res) = market
+    let (pos_id, _) = market
         .exec_open_position(
             &trader,
             "100",
@@ -35,8 +35,7 @@ fn position_pnl_close_no_change() {
         )
         .unwrap();
 
-    defer_res.responses.filter_events_attr_value("delta-neutrality-fee", "amount").for_each(|x| println!("(after open): dnf: {}", x));
-    market.automatic_time_jump_enabled = false;
+
 
     let pos = market.query_position(pos_id).unwrap();
     let start_pnl_in_collateral = pos.pnl_collateral;
@@ -46,12 +45,9 @@ fn position_pnl_close_no_change() {
         start_pnl_in_collateral > "-3.0".parse().unwrap() && start_pnl_in_collateral.is_negative()
     );
 
-    market.automatic_time_jump_enabled = true;
     let defer_res = market.exec_close_position(&trader, pos_id, None).unwrap();
-    market.automatic_time_jump_enabled = false;
     let delta_neutrality_fee_close = defer_res.exec_resp().first_delta_neutrality_fee_amount();
 
-    defer_res.responses.filter_events_attr_value("delta-neutrality-fee", "amount").for_each(|x| println!("(after close): dnf: {}", x));
 
     let pos = market.query_closed_position(&trader, pos_id).unwrap();
 
