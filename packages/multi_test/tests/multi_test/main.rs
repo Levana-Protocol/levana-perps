@@ -27,8 +27,9 @@ mod liquidity;
 mod sanity;
 mod order;
 mod override_price;
-mod staleness;
 
 // Inner modules in:
 mod position;
 */
+
+mod staleness;
