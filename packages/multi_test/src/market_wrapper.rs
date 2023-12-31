@@ -1055,7 +1055,7 @@ impl PerpsMarket {
         slippage_assert: Option<SlippageAssert>,
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
-    ) -> Result<(PositionId, AppResponse)> {
+    ) -> Result<(PositionId, DeferResponse)> {
         self.exec_open_position_raw(
             sender,
             collateral.try_into()?.into(),
@@ -1079,7 +1079,7 @@ impl PerpsMarket {
         max_gains: MaxGainsInQuote,
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
-    ) -> Result<(PositionId, AppResponse)> {
+    ) -> Result<(PositionId, DeferResponse)> {
         if self.id.get_market_type() == MarketType::CollateralIsBase {
             // let price = self.query_current_price()?;
             // let config = self.query_config()?;
@@ -1113,7 +1113,7 @@ impl PerpsMarket {
 
         let pos_id = res.event_first_value("position-open", "pos-id")?.parse()?;
 
-        Ok((pos_id, res))
+        Ok((pos_id, defer_res))
     }
 
     pub fn exec_close_position(
@@ -1121,16 +1121,14 @@ impl PerpsMarket {
         sender: &Addr,
         position_id: PositionId,
         slippage_assert: Option<SlippageAssert>,
-    ) -> Result<AppResponse> {
-        let defer_resp = self.exec_defer(
+    ) -> Result<DeferResponse> {
+        self.exec_defer(
             sender,
             &MarketExecuteMsg::ClosePosition {
                 id: position_id,
                 slippage_assert,
             },
-        )?;
-
-        Ok(defer_resp.exec_resp().clone())
+        )
     }
 
     pub fn exec_update_position_collateral_impact_leverage(
@@ -1238,8 +1236,8 @@ impl PerpsMarket {
         position_id: PositionId,
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
-    ) -> Result<AppResponse> {
-        self.exec(
+    ) -> Result<DeferResponse> {
+        self.exec_defer(
             sender,
             &MarketExecuteMsg::SetTriggerOrder {
                 id: position_id,

@@ -22,7 +22,7 @@ fn nft_position() {
 
     let trader = market.clone_trader(0).unwrap();
 
-    let (_, res) = market
+    let (_, defer_res) = market
         .exec_open_position(
             &trader,
             "100",
@@ -44,7 +44,8 @@ fn nft_position() {
 
     assert_eq!(
         Number::try_from(meta.get_attr("pos-active-collateral").unwrap()).unwrap(),
-        Number::try_from("98.9").unwrap() - res.first_delta_neutrality_fee_amount()
+        Number::try_from("98.9").unwrap()
+            - defer_res.exec_resp().first_delta_neutrality_fee_amount()
     );
 }
 

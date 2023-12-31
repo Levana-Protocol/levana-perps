@@ -163,6 +163,7 @@ impl ChargeDeltaNeutralityFeeResult {
 
 // the delta neutrality fee is done in multiple passes sometimes
 // so it's all encapsulated in this struct
+#[derive(Debug)]
 struct DeltaNeutralityFeeMultiPass {
     fees: Signed<Collateral>,
     total_in_fund_before_calc: Collateral,
