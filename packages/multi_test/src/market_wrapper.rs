@@ -1235,8 +1235,8 @@ impl PerpsMarket {
         position_id: PositionId,
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
-    ) -> Result<AppResponse> {
-        self.exec(
+    ) -> Result<DeferResponse> {
+        self.exec_defer(
             sender,
             &MarketExecuteMsg::SetTriggerOrder {
                 id: position_id,
