@@ -10,6 +10,7 @@ use msg::contracts::market::order::events::{
     CancelLimitOrderEvent, ExecuteLimitOrderEvent, PlaceLimitOrderEvent,
 };
 use msg::contracts::market::order::{LimitOrder, OrderId};
+use msg::contracts::market::position::CollateralAndUsd;
 use msg::prelude::*;
 
 use super::position::OpenPositionParams;
@@ -46,6 +47,8 @@ impl State<'_> {
         max_gains: MaxGainsInQuote,
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
+        deferred_exec_crank_fee: Collateral,
+        deferred_exec_crank_fee_usd: Usd,
     ) -> Result<OrderId> {
         let last_order_id = LAST_ORDER_ID
             .may_load(ctx.storage)?
@@ -72,6 +75,8 @@ impl State<'_> {
             max_gains,
             stop_loss_override,
             take_profit_override,
+            crank_fee_collateral: crank_fee.checked_add(deferred_exec_crank_fee)?,
+            crank_fee_usd: crank_fee_usd.checked_add(deferred_exec_crank_fee_usd)?,
         };
 
         LIMIT_ORDERS.save(ctx.storage, order_id, &order)?;
@@ -195,6 +200,7 @@ impl State<'_> {
         let open_position_params = OpenPositionParams {
             owner: order.owner.clone(),
             collateral: order.collateral,
+            crank_fee: CollateralAndUsd::from_pair(order.crank_fee_collateral, order.crank_fee_usd),
             leverage: order.leverage,
             direction: order.direction.into_base(market_type),
             max_gains_in_quote: order.max_gains,

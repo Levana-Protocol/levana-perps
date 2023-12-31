@@ -3,7 +3,7 @@ use msg::contracts::market::{
         DeferredExecCompleteTarget, DeferredExecId, DeferredExecItem, DeferredExecWithStatus,
     },
     entry::SlippageAssert,
-    position::events::PositionSaveReason,
+    position::{events::PositionSaveReason, CollateralAndUsd},
 };
 
 use crate::state::position::OpenPositionParams;
@@ -41,6 +41,8 @@ fn helper(
             stop_loss_override,
             take_profit_override,
             amount,
+            crank_fee,
+            crank_fee_usd,
         } => state
             .handle_position_open(
                 ctx,
@@ -52,6 +54,8 @@ fn helper(
                 slippage_assert,
                 stop_loss_override,
                 take_profit_override,
+                crank_fee,
+                crank_fee_usd,
             )
             .map(DeferredExecCompleteTarget::Position),
         DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount } => {
@@ -150,6 +154,8 @@ fn helper(
             stop_loss_override,
             take_profit_override,
             amount,
+            crank_fee,
+            crank_fee_usd,
         } => {
             let market_type = state.market_id(ctx.storage)?.get_market_type();
 
@@ -163,6 +169,8 @@ fn helper(
                 max_gains,
                 stop_loss_override,
                 take_profit_override,
+                crank_fee,
+                crank_fee_usd,
             )?;
             Ok(DeferredExecCompleteTarget::Order(order_id))
         }
@@ -226,12 +234,15 @@ fn helper_validate(state: &State, store: &dyn Storage, item: DeferredExecWithSta
             stop_loss_override,
             take_profit_override,
             amount,
+            crank_fee,
+            crank_fee_usd,
         } => state
             .validate_new_position(
                 store,
                 OpenPositionParams {
                     owner: item.owner,
                     collateral: amount,
+                    crank_fee: CollateralAndUsd::from_pair(crank_fee, crank_fee_usd),
                     leverage,
                     direction,
                     max_gains_in_quote: max_gains,
