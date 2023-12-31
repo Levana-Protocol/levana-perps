@@ -120,7 +120,6 @@ fn no_fee_notional_size_reduction_perp_790() {
 
     let pos1 = market.query_position(pos_id).unwrap();
 
-    println!("pos1: {:#?}", pos1);
     market
         .exec_update_position_collateral_impact_size(&trader, pos_id, "-10".parse().unwrap(), None)
         .unwrap();
