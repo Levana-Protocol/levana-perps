@@ -221,7 +221,14 @@ impl State<'_> {
             publish_time_usd,
         })
     }
-    fn spot_price_inner(&self, store: &dyn Storage, timestamp: Timestamp) -> Result<PricePoint> {
+
+    /// Returns the spot price for the provided timestamp.
+    /// If no timestamp is provided, it returns the latest spot price.
+    pub(crate) fn spot_price(
+        &self,
+        store: &dyn Storage,
+        timestamp: Timestamp,
+    ) -> Result<PricePoint> {
         self.spot_price_inner_opt(store, timestamp)?.ok_or_else(|| {
             perp_error!(
                 ErrorId::PriceNotFound,
@@ -288,20 +295,11 @@ impl State<'_> {
         Ok(())
     }
 
-    /// Returns the spot price for the provided timestamp.
-    /// If no timestamp is provided, it returns the latest spot price.
-    pub(crate) fn spot_price(
-        &self,
-        store: &dyn Storage,
-        time: Option<Timestamp>,
-    ) -> Result<PricePoint> {
-        match time {
-            None => self
-                .spot_price_cache
-                .get_or_try_init(|| self.spot_price_inner(store, self.now()))
-                .copied(),
-            Some(time) => self.spot_price_inner(store, time),
-        }
+    /// Get the current spot price
+    pub(crate) fn current_spot_price(&self, store: &dyn Storage) -> Result<PricePoint> {
+        self.spot_price_cache
+            .get_or_try_init(|| self.spot_price(store, self.now()))
+            .copied()
     }
 
     pub(crate) fn historical_spot_prices(

@@ -332,6 +332,8 @@ pub enum ExecuteMsg {
     PerformDeferredExec {
         /// Which ID to execute
         id: DeferredExecId,
+        /// Which price point to use for this execution.
+        price_point_timestamp: Timestamp,
     },
 }
 

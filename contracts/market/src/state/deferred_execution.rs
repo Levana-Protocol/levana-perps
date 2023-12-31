@@ -1,3 +1,4 @@
+use crate::state::position::get_position;
 use crate::state::State;
 use anyhow::Result;
 use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, Storage, SubMsg, SubMsgResult};
@@ -7,6 +8,7 @@ use msg::contracts::market::deferred_execution::{
     DeferredExecQueuedEvent, DeferredExecStatus, DeferredExecTarget, DeferredExecWithStatus,
     GetDeferredExecResp, ListDeferredExecsResp,
 };
+use msg::contracts::market::fees::events::TradeId;
 use msg::contracts::market::order::OrderId;
 use msg::contracts::market::position::PositionId;
 use msg::prelude::*;
@@ -44,6 +46,12 @@ const PENDING_DEFERRED_FOR_POSITION: Map<(PositionId, DeferredExecId), ()> =
 /// Pending deferred exec action for the given order.
 const PENDING_DEFERRED_FOR_ORDER: Map<(OrderId, DeferredExecId), ()> =
     Map::new(namespace::PENDING_DEFERRED_FOR_ORDER);
+
+/// Is the limit order already scheduled to be canceled?
+const IS_LIMIT_ORDER_CANCELING: Map<OrderId, ()> = Map::new(namespace::IS_LIMIT_ORDER_CANCELING);
+
+/// Is the position already scheduled to be closed?
+const IS_POSITION_CLOSING: Map<PositionId, ()> = Map::new(namespace::IS_POSITION_CLOSING);
 
 impl State<'_> {
     pub(crate) fn deferred_execution_items(&self, store: &dyn Storage) -> Result<u32> {
@@ -131,7 +139,7 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         trader: Addr,
-        item: DeferredExecItem,
+        mut item: DeferredExecItem,
     ) -> Result<()> {
         // Calculate the next ID first so that we can figure out how many items are in the queue already.
         let (new_id, new_latest_ids, queue_size) =
@@ -156,19 +164,139 @@ impl State<'_> {
         DEFERRED_EXECS_BY_WALLET.save(ctx.storage, (trader.clone(), new_id), &())?;
 
         // Determine the amount of crank fee we need to charge.
-        // FIXME charge this fee as part of PERP-2815
-        let _crank_fee = self.config.crank_fee_charged
+        let new_crank_fee_usd = self.config.crank_fee_charged
             + self
                 .config
                 .crank_fee_surcharge
                 // Intentionally dividing at the u64 level and not Decimal so we
                 // get the expected step-wise decrease from round-down divison.
                 .checked_mul_dec(Decimal256::from_ratio(queue_size / 10, 1u32))?;
+        // Even though we never want to use historical prices while executing
+        // the deferred queue, for collecting the crank fee we have to use an
+        // existing price in the system. This calculation isn't part of the
+        // security of the platform, but rather is a convenience for charging
+        // crank fees in USD instead of collateral. Using the most recent
+        // price point is our best option.
+        let price_point = self.current_spot_price(ctx.storage)?;
+        let new_crank_fee = price_point.usd_to_collateral(new_crank_fee_usd);
 
         // Check the owner is correct and try to charge the crank fee
         let target = item.target();
+        match &mut item {
+            DeferredExecItem::OpenPosition {
+                amount,
+                crank_fee,
+                crank_fee_usd,
+                ..
+            }
+            | DeferredExecItem::PlaceLimitOrder {
+                amount,
+                crank_fee,
+                crank_fee_usd,
+                ..
+            } => {
+                *crank_fee = new_crank_fee;
+                *crank_fee_usd = new_crank_fee_usd;
+                *amount = amount.checked_sub(new_crank_fee)?;
+                self.collect_crank_fee(
+                    ctx,
+                    TradeId::Deferred(new_id),
+                    new_crank_fee,
+                    new_crank_fee_usd,
+                )?;
+            }
+            DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount }
+            | DeferredExecItem::UpdatePositionAddCollateralImpactSize { id, amount, .. } => {
+                // Take the crank fee from the submitted amount
+                *amount = amount.checked_sub(new_crank_fee)?;
+
+                // Update the position to reflect the crank fee charged
+                let mut pos = get_position(ctx.storage, *id)?;
+                pos.crank_fee
+                    .checked_add_assign(new_crank_fee, &price_point)?;
+
+                // Update the protocol to track the crank fee available in general fees
+                self.collect_crank_fee(
+                    ctx,
+                    TradeId::Position(*id),
+                    new_crank_fee,
+                    new_crank_fee_usd,
+                )?;
+                self.position_save_no_recalc(ctx, &pos)?;
+            }
+            // For these five items, we have a problem of "where does the crank
+            // fee come from." We want to take it from the position itself, but this leads
+            // to complexity with liquifundings needing to be run, which can't happen until
+            // we have a new price point. For now, we've taken the simplification that (1) we
+            // can't queue one of these items while an existing update exists on the position,
+            // (2) we cap the total surcharge that can be charged to the user, and (3) we put
+            // that cap into the liquidation margin.
+            //
+            // Another approach entirely would be to force the user to provide
+            // funds for the crank fee while submitting this message. That's an API change that
+            // might cause confusion, so we didn't go that route for now, but may do so in the
+            // future. If we did that, the idea would be that extra funds would be saved in
+            // the "rewards" field for the user to claim later, instead of incurring a costly
+            // send-coins message.
+            DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, .. }
+            | DeferredExecItem::UpdatePositionRemoveCollateralImpactSize { id, .. }
+            | DeferredExecItem::UpdatePositionLeverage { id, .. }
+            | DeferredExecItem::UpdatePositionMaxGains { id, .. }
+            | DeferredExecItem::SetTriggerOrder { id, .. } => {
+                // We do not allow one of these updates to be scheduled while a
+                // pending update is already unqueued. The reason is a complication with charging
+                // of crank fees: we can't properly charge a crank fee against an open position
+                // without doing a liquifunding, which we can't do at this point because we don't
+                // have the new price point yet. Therefore, exit if there's already a pending
+                // update.
+                if PENDING_DEFERRED_FOR_POSITION
+                    .prefix(*id)
+                    .keys(ctx.storage, None, None, Order::Ascending)
+                    .next()
+                    .is_some()
+                {
+                    return Err(MarketError::PositionUpdateAlreadyPending {
+                        position_id: id.u64().into(),
+                    }
+                    .into_anyhow());
+                }
+
+                let mut pos = get_position(ctx.storage, *id)?;
+
+                // Schedule an additional crank fee to be charged at the next liquifunding to cover this work item.
+                debug_assert_eq!(pos.pending_crank_fee, Usd::zero());
+                pos.pending_crank_fee += new_crank_fee_usd;
+
+                // Save the updated position. When it's liquifunded, all protocol updates will occur.
+                self.position_save_no_recalc(ctx, &pos)?;
+            }
+            DeferredExecItem::ClosePosition { id, .. } => {
+                // We don't charge a separate crank fee for closing a position,
+                // but we ensure we only queue up such a work item once to avoid a spam
+                // attack.
+                if IS_POSITION_CLOSING.has(ctx.storage, *id) {
+                    return Err(MarketError::PositionAlreadyClosing {
+                        position_id: id.u64().into(),
+                    }
+                    .into_anyhow());
+                }
+                IS_POSITION_CLOSING.save(ctx.storage, *id, &())?;
+            }
+            DeferredExecItem::CancelLimitOrder { order_id } => {
+                // We don't charge a separate crank fee for canceling a limit
+                // order, but we ensure we only queue up such a work item once to avoid a spam
+                // attack.
+                if IS_LIMIT_ORDER_CANCELING.has(ctx.storage, *order_id) {
+                    return Err(MarketError::LimitOrderAlreadyCanceling {
+                        order_id: order_id.u64().into(),
+                    }
+                    .into_anyhow());
+                }
+                IS_LIMIT_ORDER_CANCELING.save(ctx.storage, *order_id, &())?;
+            }
+        }
         match target {
-            DeferredExecTarget::DoesNotExist => (),
+            DeferredExecTarget::DoesNotExist => {}
             DeferredExecTarget::Position(pos_id) => {
                 self.position_assert_owner(ctx.storage, pos_id, &trader)?;
             }
@@ -246,12 +374,16 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         id: DeferredExecId,
+        price_point_timestamp: Timestamp,
     ) -> Result<()> {
         // For now we always fail, this obviously needs to be fixed.
         ctx.response_mut().add_raw_submessage(SubMsg::reply_always(
             CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
                 contract_addr: self.env.contract.address.clone().into_string(),
-                msg: to_binary(&MarketExecuteMsg::PerformDeferredExec { id })?,
+                msg: to_binary(&MarketExecuteMsg::PerformDeferredExec {
+                    id,
+                    price_point_timestamp,
+                })?,
                 funds: vec![],
             }),
             // Let's use the deferred exec ID as the reply ID for now. In theory
@@ -303,12 +435,16 @@ impl State<'_> {
                 }
             },
             SubMsgResult::Err(e) => {
+                let price_point = self.next_crank_timestamp(ctx.storage)?;
                 // Replace empty error from the submessage with validation error.
-                let e = self
-                    .deferred_validate(ctx.storage, id)
-                    .err()
-                    .map(|e| e.to_string())
-                    .unwrap_or(e);
+                let e = if let Some(price_point) = price_point {
+                    self.deferred_validate(ctx.storage, id, &price_point)
+                        .err()
+                        .map(|e| e.to_string())
+                        .unwrap_or(e)
+                } else {
+                    e
+                };
 
                 anyhow::ensure!(
                     item.status == DeferredExecStatus::Pending,

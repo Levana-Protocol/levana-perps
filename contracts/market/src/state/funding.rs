@@ -288,7 +288,7 @@ impl State<'_> {
         ctx: &mut StateContext,
         time: Timestamp,
     ) -> Result<()> {
-        let spot_price = self.spot_price(ctx.storage, Some(time))?.price_notional;
+        let spot_price = self.spot_price(ctx.storage, time)?.price_notional;
 
         let (long_rate, short_rate) = self.derive_instant_funding_rate_annual(ctx.storage)?;
         LONG_RF_PRICE_PREFIX_SUM.append(ctx.storage, time, long_rate * spot_price.into_number())?;
@@ -444,8 +444,8 @@ impl State<'_> {
         ctx: &mut StateContext,
         pos: &Position,
         price_point: &PricePoint,
+        uncapped_usd: Usd,
     ) -> Result<(Collateral, Usd)> {
-        let uncapped_usd = self.config.crank_fee_charged;
         let uncapped = price_point.usd_to_collateral(uncapped_usd);
         let uncapped = match NonZero::new(uncapped) {
             Some(uncapped) => uncapped,
@@ -481,7 +481,7 @@ impl State<'_> {
         ends_at: Timestamp,
         charge_crank_fee: bool,
     ) -> Result<MaybeClosedPosition> {
-        let price = self.spot_price(ctx.storage, None)?;
+        let price = self.spot_price(ctx.storage, ends_at)?;
 
         let (borrow_fee_timeslice_owed, event) =
             self.calc_capped_borrow_fee_payment(ctx.storage, &position, starts_at, ends_at)?;
@@ -520,8 +520,20 @@ impl State<'_> {
             direction: position.direction().into_base(market_type),
         });
 
-        let crank_fee_charged = if charge_crank_fee {
-            let (crank_fee, crank_fee_usd) = self.cap_crank_fee(ctx, &position, &price)?;
+        let total_crank_fee_usd = if charge_crank_fee {
+            position
+                .pending_crank_fee
+                .checked_add(self.config.crank_fee_charged)?
+        } else {
+            position.pending_crank_fee
+        };
+        position.pending_crank_fee = Usd::zero();
+
+        let crank_fee_charged = if total_crank_fee_usd.is_zero() {
+            Collateral::zero()
+        } else {
+            let (crank_fee, crank_fee_usd) =
+                self.cap_crank_fee(ctx, &position, &price, total_crank_fee_usd)?;
             self.collect_crank_fee(
                 ctx,
                 TradeId::Position(position.id),
@@ -530,8 +542,6 @@ impl State<'_> {
             )?;
             position.crank_fee.checked_add_assign(crank_fee, &price)?;
             crank_fee
-        } else {
-            Collateral::zero()
         };
 
         // Update the active collateral
@@ -575,8 +585,7 @@ impl State<'_> {
                     MaybeClosedPosition::Close(ClosePositionInstructions {
                         pos: position,
                         exposure: Signed::<Collateral>::zero(),
-                        close_time: ends_at,
-                        settlement_time: ends_at,
+                        settlement_price: price,
                         reason: PositionCloseReason::Liquidated(LiquidationReason::Liquidated),
                     })
                 }

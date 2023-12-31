@@ -27,6 +27,12 @@ pub struct LimitOrder {
     pub stop_loss_override: Option<PriceBaseInQuote>,
     /// Take profit price
     pub take_profit_override: Option<PriceBaseInQuote>,
+    /// Crank fee charged during deferred execution and placing the limit order
+    #[serde(default)]
+    pub crank_fee_collateral: Collateral,
+    /// Same as [Self::crank_fee_collateral] but cost-basis expressed in USD.
+    #[serde(default)]
+    pub crank_fee_usd: Usd,
 }
 
 /// A unique numeric ID for each order in the protocol.

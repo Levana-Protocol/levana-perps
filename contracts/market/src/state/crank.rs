@@ -32,17 +32,24 @@ impl State<'_> {
         self.spot_price_after(store, min)
     }
 
-    pub(crate) fn crank_work(&self, store: &dyn Storage) -> Result<Option<CrankWorkInfo>> {
-        if self.get_close_all_positions(store)? {
+    fn get_close_all_positions_work(&self, store: &dyn Storage) -> Result<Option<PositionId>> {
+        Ok(if self.get_close_all_positions(store)? {
+            #[allow(clippy::manual_map)]
             if let Some(position) = OPEN_POSITIONS
                 .keys(store, None, None, Order::Ascending)
                 .next()
                 .transpose()?
             {
-                return Ok(Some(CrankWorkInfo::CloseAllPositions { position }));
+                Some(position)
+            } else {
+                None
             }
-        }
+        } else {
+            None
+        })
+    }
 
+    pub(crate) fn crank_work(&self, store: &dyn Storage) -> Result<Option<CrankWorkInfo>> {
         if self.should_reset_lp_balances(store)? {
             return Ok(Some(CrankWorkInfo::ResetLpBalances {}));
         }
@@ -61,6 +68,14 @@ impl State<'_> {
                     .transpose()?
                 {
                     CrankWorkInfo::Liquifunding { position }
+                } else if let Some(position) = self.get_close_all_positions_work(store)? {
+                    // We only try to close all positions _after_ we've done all
+                    // liquifunding. We need to ensure that all positions are liquifunded up until the
+                    // current price point before trying to close them.
+                    CrankWorkInfo::CloseAllPositions {
+                        position,
+                        price_point,
+                    }
                 } else if let Some(pos) =
                     self.liquidatable_position(store, price_point.price_notional)?
                 {
@@ -80,7 +95,10 @@ impl State<'_> {
                 } else if let Some(order_id) =
                     self.limit_order_triggered_order(store, price_point.price_notional, false)?
                 {
-                    CrankWorkInfo::LimitOrder { order_id }
+                    CrankWorkInfo::LimitOrder {
+                        order_id,
+                        price_point,
+                    }
                 } else {
                     CrankWorkInfo::Completed {
                         price_point_timestamp: price_point.timestamp,
@@ -160,7 +178,7 @@ impl State<'_> {
             _ => return Ok(()),
         };
 
-        let current = self.spot_price(ctx.storage, None)?;
+        let current = self.current_spot_price(ctx.storage)?;
 
         if price_point_timestamp == current.timestamp {
             // Finish off the price update
@@ -177,10 +195,6 @@ impl State<'_> {
 
         // do the work
         match work_info {
-            CrankWorkInfo::CloseAllPositions { position } => {
-                let pos = get_position(ctx.storage, position)?;
-                self.close_position_via_msg(ctx, pos)?;
-            }
             CrankWorkInfo::ResetLpBalances {} => {
                 self.crank_reset_lp_balances(ctx)?;
             }
@@ -197,6 +211,13 @@ impl State<'_> {
                     PositionSaveReason::Crank,
                 )?;
             }
+            CrankWorkInfo::CloseAllPositions {
+                position,
+                price_point,
+            } => {
+                let pos = get_position(ctx.storage, position)?;
+                self.close_position_via_msg(ctx, pos, price_point)?;
+            }
             CrankWorkInfo::Liquidation {
                 position,
                 liquidation_reason,
@@ -208,15 +229,19 @@ impl State<'_> {
                 // pay out fees. This may end up closing the position on its own, otherwise we
                 // explicitly close it ourselves because we hit a trigger.
                 let starts_at = pos.liquifunded_at;
-                let ends_at = pos.next_liquifunding;
+
+                // All positions that need to be liquifunded at this time _must_ have already be liquifunded.
+                debug_assert!(pos.next_liquifunding >= price_point.timestamp);
+
+                // We want to liquifund up until the price point's timestamp and make sure we shouldn't be liquidated for some other reason.
+                let ends_at = price_point.timestamp;
                 let mcp = self.position_liquifund(ctx, pos, starts_at, ends_at, true)?;
 
                 let close_position_instructions = match mcp {
                     MaybeClosedPosition::Open(pos) => ClosePositionInstructions {
                         pos,
                         exposure: Signed::zero(),
-                        close_time: self.now(),
-                        settlement_time: price_point.timestamp,
+                        settlement_price: price_point,
                         reason: PositionCloseReason::Liquidated(liquidation_reason),
                     },
                     MaybeClosedPosition::Close(x) => x,
@@ -224,12 +249,17 @@ impl State<'_> {
                 self.close_position(ctx, close_position_instructions)?;
             }
             CrankWorkInfo::DeferredExec {
-                deferred_exec_id, ..
+                deferred_exec_id,
+                price_point_timestamp,
+                target: _,
             } => {
-                self.process_deferred_exec(ctx, deferred_exec_id)?;
+                self.process_deferred_exec(ctx, deferred_exec_id, price_point_timestamp)?;
             }
-            CrankWorkInfo::LimitOrder { order_id } => {
-                self.limit_order_execute_order(ctx, order_id)?;
+            CrankWorkInfo::LimitOrder {
+                order_id,
+                price_point,
+            } => {
+                self.limit_order_execute_order(ctx, order_id, &price_point)?;
             }
             CrankWorkInfo::Completed {
                 price_point_timestamp,

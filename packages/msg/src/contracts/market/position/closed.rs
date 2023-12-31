@@ -85,8 +85,10 @@ pub struct ClosedPosition {
     pub entry_price_base: PriceBaseInQuote,
 
     /// the time at which the position is actually closed
-    /// if by user: time they sent the message
-    /// if by liquidation: liquifunding time
+    ///
+    /// This will always be the block time when the crank closed the position,
+    /// whether via liquidation, deferred execution of a ClosePosition call, or
+    /// liquifunding.
     pub close_time: Timestamp,
     /// needed for calculating final settlement amounts
     /// if by user: same as close time
@@ -154,10 +156,8 @@ pub struct ClosePositionInstructions {
     /// consume the entirety of one of those fields.
     pub exposure: Signed<Collateral>,
 
-    /// See [ClosedPosition::close_time]
-    pub close_time: Timestamp,
-    /// See [ClosedPosition::settlement_time]
-    pub settlement_time: Timestamp,
+    /// The price point used for settling this position.
+    pub settlement_price: PricePoint,
     /// See [ClosedPosition::reason]
     pub reason: PositionCloseReason,
 }

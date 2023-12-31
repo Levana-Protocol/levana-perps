@@ -147,6 +147,12 @@ pub enum MarketError {
         oldest: Timestamp,
         newest: Timestamp,
     },
+    #[error("Limit order {order_id} is already canceling")]
+    LimitOrderAlreadyCanceling { order_id: Uint64 },
+    #[error("Position {position_id} is already closing")]
+    PositionAlreadyClosing { position_id: Uint64 },
+    #[error("There is already a pending position update for {position_id}")]
+    PositionUpdateAlreadyPending { position_id: Uint64 },
 }
 
 /// Was the price provided by the trader too high or too low?
@@ -281,6 +287,11 @@ impl MarketError {
             MarketError::LiquidityCooldown { .. } => ErrorId::LiquidityCooldown,
             MarketError::PendingDeferredExec {} => ErrorId::PendingDeferredExec,
             MarketError::VolatilePriceFeedTimeDelta { .. } => ErrorId::VolatilePriceFeedTimeDelta,
+            MarketError::LimitOrderAlreadyCanceling { .. } => ErrorId::LimitOrderAlreadyCanceling,
+            MarketError::PositionAlreadyClosing { .. } => ErrorId::PositionAlreadyClosing,
+            MarketError::PositionUpdateAlreadyPending { .. } => {
+                ErrorId::PositionUpdateAlreadyPending
+            }
         }
     }
 }

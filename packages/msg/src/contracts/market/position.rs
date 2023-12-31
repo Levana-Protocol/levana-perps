@@ -61,6 +61,12 @@ pub struct Position {
     /// Total crank fees paid
     pub crank_fee: CollateralAndUsd,
 
+    /// Total crank fees pending to be paid during liquifunding.
+    ///
+    /// Tracked only in USD, we convert to Collateral at the time of charging the fee.
+    #[serde(default)]
+    pub pending_crank_fee: Usd,
+
     /// Cumulative amount of delta neutrality fees paid by (or received by) the position.
     ///
     /// Positive == outgoing, negative == incoming, like funding_fee.
@@ -252,7 +258,7 @@ impl Position {
     pub fn max_gains_in_quote(
         &self,
         market_type: MarketType,
-        price_point: PricePoint,
+        price_point: &PricePoint,
     ) -> Result<MaxGainsInQuote> {
         match market_type {
             MarketType::CollateralIsQuote => Ok(MaxGainsInQuote::Finite(
@@ -260,7 +266,7 @@ impl Position {
                     .checked_div_collateral(self.active_collateral)?,
             )),
             MarketType::CollateralIsBase => {
-                let take_profit_price = self.take_profit_price(&price_point, market_type)?;
+                let take_profit_price = self.take_profit_price(price_point, market_type)?;
                 let take_profit_price = match take_profit_price {
                     Some(price) => price,
                     None => return Ok(MaxGainsInQuote::PosInfinity),
@@ -349,13 +355,10 @@ impl Position {
 
     /// Computes the liquidation margin for the position
     ///
-    /// `price` is the price at the last liquifunding.
-    ///
-    /// `current_price_point` is used for converting fees from USD to collateral.
+    /// Takes the price point of the last liquifunding.
     pub fn liquidation_margin(
         &self,
-        price: Price,
-        current_price_point: &PricePoint,
+        price_point: &PricePoint,
         config: &Config,
     ) -> Result<LiquidationMargin> {
         const SEC_PER_YEAR: u64 = 31_536_000;
@@ -376,12 +379,12 @@ impl Position {
 
         let max_price = match self.direction() {
             DirectionToNotional::Long => {
-                price.into_decimal256()
+                price_point.price_notional.into_decimal256()
                     + self.counter_collateral.into_decimal256()
                         / self.notional_size.abs_unsigned().into_decimal256()
             }
             DirectionToNotional::Short => {
-                price.into_decimal256()
+                price_point.price_notional.into_decimal256()
                     + self.active_collateral.into_decimal256()
                         / self.notional_size.abs_unsigned().into_decimal256()
             }
@@ -399,7 +402,18 @@ impl Position {
             borrow: borrow_fee_max_payment,
             funding: Collateral::from_decimal256(funding_max_payment),
             delta_neutrality: Collateral::from_decimal256(slippage_max),
-            crank: current_price_point.usd_to_collateral(config.crank_fee_charged),
+            // Set aside enough margin for one normal liquifunding crank and one
+            // update crank with up to 100 items in the deferred execution queue.
+            crank: price_point.usd_to_collateral(
+                config
+                    .crank_fee_charged
+                    .checked_mul_dec(Decimal256::two())?
+                    .checked_add(
+                        config
+                            .crank_fee_surcharge
+                            .checked_mul_dec(Decimal256::from_ratio(10u32, 1u32))?,
+                    )?,
+            ),
         })
     }
 
@@ -467,11 +481,10 @@ impl Position {
     pub fn settle_price_exposure(
         mut self,
         start_price: Price,
-        end_price: Price,
+        end_price: PricePoint,
         liquidation_margin: Collateral,
-        ends_at: Timestamp,
     ) -> Result<(MaybeClosedPosition, Signed<Collateral>)> {
-        let price_delta = end_price.into_number() - start_price.into_number();
+        let price_delta = end_price.price_notional.into_number() - start_price.into_number();
         let exposure =
             Signed::<Collateral>::from_number(price_delta * self.notional_size.into_number());
         let min_exposure = liquidation_margin
@@ -484,8 +497,7 @@ impl Position {
                 MaybeClosedPosition::Close(ClosePositionInstructions {
                     pos: self,
                     exposure: min_exposure,
-                    close_time: ends_at,
-                    settlement_time: ends_at,
+                    settlement_price: end_price,
                     reason: PositionCloseReason::Liquidated(LiquidationReason::Liquidated),
                 }),
                 min_exposure,
@@ -495,8 +507,7 @@ impl Position {
                 MaybeClosedPosition::Close(ClosePositionInstructions {
                     pos: self,
                     exposure: max_exposure,
-                    close_time: ends_at,
-                    settlement_time: ends_at,
+                    settlement_price: end_price,
                     reason: PositionCloseReason::Liquidated(LiquidationReason::MaxGains),
                 }),
                 max_exposure,
@@ -512,7 +523,7 @@ impl Position {
     #[allow(clippy::too_many_arguments)]
     pub fn into_query_response_extrapolate_exposure(
         self,
-        start_price: Price,
+        start_price: PricePoint,
         end_price: PricePoint,
         entry_price: Price,
         current_price_point: &PricePoint,
@@ -525,14 +536,12 @@ impl Position {
         // parameter to liquidation_margin. It's used exclusively to calculate
         // the crank fee, and therefore does not need to be based on the
         // liquifunding cadence.
-        let liquidation_margin =
-            self.liquidation_margin(start_price, current_price_point, config)?;
+        let liquidation_margin = self.liquidation_margin(&start_price, config)?;
 
         let (settle_price_result, _exposure) = self.settle_price_exposure(
-            start_price,
-            end_price.price_notional,
+            start_price.price_notional,
+            end_price,
             liquidation_margin.total(),
-            end_price.timestamp,
         )?;
 
         let result = match settle_price_result {
@@ -550,8 +559,7 @@ impl Position {
                     MaybeClosedPosition::Close(ClosePositionInstructions {
                         pos,
                         exposure: Signed::zero(),
-                        close_time: end_price.timestamp,
-                        settlement_time: end_price.timestamp,
+                        settlement_price: end_price,
                         reason: PositionCloseReason::Liquidated(LiquidationReason::MaxGains),
                     })
                 }
@@ -566,8 +574,7 @@ impl Position {
             MaybeClosedPosition::Close(ClosePositionInstructions {
                 pos,
                 exposure,
-                close_time,
-                settlement_time,
+                settlement_price,
                 reason,
             }) => {
                 // Best effort closed position value
@@ -616,8 +623,8 @@ impl Position {
                             .checked_sub(pos.deposit_collateral.usd())?,
                         notional_size: pos.notional_size,
                         entry_price_base,
-                        close_time,
-                        settlement_time,
+                        close_time: current_price_point.timestamp,
+                        settlement_time: settlement_price.timestamp,
                         reason,
                         active_collateral,
                         delta_neutrality_fee_collateral: pos.delta_neutrality_fee.collateral(),
@@ -647,7 +654,7 @@ impl Position {
             .1;
         let pnl_collateral = self.pnl_in_collateral();
         let pnl_usd = self.pnl_in_usd(&end_price);
-        let max_gains_in_quote = self.max_gains_in_quote(market_type, end_price)?;
+        let max_gains_in_quote = self.max_gains_in_quote(market_type, &end_price)?;
         let notional_size_in_collateral = self.notional_size_in_collateral(&end_price);
         let position_size_base = self.position_size_base(market_type, &end_price)?;
 
@@ -663,6 +670,7 @@ impl Position {
             funding_fee,
             borrow_fee,
             crank_fee,
+            pending_crank_fee: _,
             delta_neutrality_fee,
             liquifunded_at,
             next_liquifunding,
