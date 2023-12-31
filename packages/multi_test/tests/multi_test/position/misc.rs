@@ -191,6 +191,9 @@ fn funding_payment_flips_direction() {
     market.set_time(TimeJump::Liquifundings(1)).unwrap();
     market.exec_refresh_price().unwrap();
 
+    // FIXME: why does this work?? o_O
+    market.exec_crank_n(&trader, 1).unwrap();
+
     // In collateral-is-base markets, the position should now be in the
     // ready-to-liquidate state. For collateral-is-quote, we don't have
     // off-by-one leverage so there's no issue.

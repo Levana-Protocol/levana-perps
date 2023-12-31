@@ -1,4 +1,5 @@
 use levana_perpswap_multi_test::config::DefaultMarket;
+use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, position_helpers::assert_position_liquidated,
     response::CosmosResponseExt, PerpsApp,
@@ -15,6 +16,14 @@ fn position_update_collateral_impact_leverage() {
                           collateral_delta: Signed<Collateral>,
                           expected_leverage: Number| {
         let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+        market
+            .exec_set_config(ConfigUpdate {
+                borrow_fee_rate_max_annualized: Some("0.00000000000000001".parse().unwrap()),
+                borrow_fee_rate_min_annualized: Some("0.00000000000000001".parse().unwrap()),
+                ..Default::default()
+            })
+            .unwrap();
+
         let trader = market.clone_trader(0).unwrap();
         let initial_collateral = Collateral::from_str("100").unwrap();
 
@@ -125,6 +134,11 @@ fn position_update_collateral_impact_size() {
                           collateral_delta: Signed<Collateral>,
                           expected_size: Number| {
         let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+        market
+            .exec_set_config(ConfigUpdate {
+                ..Default::default()
+            })
+            .unwrap();
         let trader = market.clone_trader(0).unwrap();
         let initial_collateral = Collateral::from_str("100").unwrap();
 
@@ -141,10 +155,13 @@ fn position_update_collateral_impact_size() {
             )
             .unwrap();
 
+        market.set_time(TimeJump::Blocks(-1)).unwrap();
+
         market
             .exec_update_position_collateral_impact_size(&trader, pos_id, collateral_delta, None)
             .unwrap();
 
+        market.set_time(TimeJump::Blocks(-1)).unwrap();
         let updated_pos = market.query_position(pos_id).unwrap();
 
         assert_eq!(
@@ -247,10 +264,13 @@ fn position_update_max_gains() {
             )
             .unwrap();
 
+        market.set_time(TimeJump::Blocks(-1)).unwrap();
+
         market
             .exec_update_position_max_gains(&trader, pos_id, max_gains)
             .unwrap();
 
+        market.set_time(TimeJump::Blocks(-1)).unwrap();
         let updated_pos = market.query_position(pos_id).unwrap();
 
         assert!(
@@ -342,6 +362,9 @@ fn position_update_open_interest_inner(
 
     market
         .exec_set_config(ConfigUpdate {
+            // very small value to minimize the borrow fee impact
+            borrow_fee_rate_max_annualized: Some("0.00000000000000001".parse().unwrap()),
+            borrow_fee_rate_min_annualized: Some("0.00000000000000001".parse().unwrap()),
             trading_fee_notional_size: Some("0.001".parse().unwrap()),
             trading_fee_counter_collateral: Some("0.001".parse().unwrap()),
             delta_neutrality_fee_sensitivity: Some("50000000".parse().unwrap()),
@@ -400,7 +423,7 @@ fn position_update_short_open_interest() {
 
     let expected_notional_size_updated = match market.id.get_market_type() {
         MarketType::CollateralIsQuote => Signed::<Notional>::from_str("-1979.83799556062912228"),
-        MarketType::CollateralIsBase => Signed::<Notional>::from_str("2076.164994173325723003"),
+        MarketType::CollateralIsBase => Signed::<Notional>::from_str("2076.165"),
     }
     .unwrap();
 
@@ -424,7 +447,7 @@ fn position_update_long_open_interest() {
 
     let expected_notional_size_updated = match market.id.get_market_type() {
         MarketType::CollateralIsQuote => Signed::<Notional>::from_str("1979.83799556062912228"),
-        MarketType::CollateralIsBase => Signed::<Notional>::from_str("-1883.158396626078132929"),
+        MarketType::CollateralIsBase => Signed::<Notional>::from_str("-1883.1584"),
     }
     .unwrap();
 
