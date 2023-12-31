@@ -711,6 +711,7 @@ fn position_update_abs_notional_size() {
                 };
 
                 let evt: PositionUpdateEvent = update_res
+                    .exec_resp()
                     .event_first("position-update")
                     .unwrap()
                     .try_into()

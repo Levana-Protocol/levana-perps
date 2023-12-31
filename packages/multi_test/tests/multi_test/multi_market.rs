@@ -2,7 +2,6 @@ use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::prelude::*;
 
 #[test]
-#[ignore]
 fn multi_market() {
     let app = PerpsApp::new_cell().unwrap();
     let market_1 = PerpsMarket::new(app.clone()).unwrap();

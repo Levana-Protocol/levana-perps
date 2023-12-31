@@ -207,8 +207,6 @@ fn funding_rates_typical() {
 }
 
 #[test]
-// FIXME - no longer works since we need to disable the time jump
-#[ignore]
 fn funding_payment_typical() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     return_unless_market_collateral_quote!(market);

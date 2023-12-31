@@ -247,8 +247,6 @@ fn position_pnl_close_loss() {
 }
 
 #[test]
-// FIXME - get this working again
-#[ignore]
 fn position_pnl_long_and_short_precise() {
     let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     return_unless_market_collateral_quote!(market);

@@ -3,8 +3,7 @@ use msg::{contracts::market::entry::PositionsQueryFeeApproach, prelude::*};
 
 #[test]
 fn pending_fees_in_query() {
-    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    market.automatic_time_jump_enabled = false;
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
 
     market
@@ -42,6 +41,9 @@ fn pending_fees_in_query() {
     let pos_orig = market
         .query_position_with_pending_fees(pos_id, PositionsQueryFeeApproach::AllFees)
         .unwrap();
+
+    // TBD - this is currently failing, but is that really unexpected with deferred execs now?
+    // i.e. some time has passed, should borrow fees not be paid while it's pending?
     assert_eq!(pos_orig.borrow_fee_collateral, Collateral::zero());
     assert_eq!(pos_orig.borrow_fee_usd, Usd::zero());
     assert_eq!(
