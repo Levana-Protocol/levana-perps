@@ -228,7 +228,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 info.sender,
                 DeferredExecItem::UpdatePositionRemoveCollateralImpactSize {
                     id,
-                    amount: info.funds.take()?,
+                    amount,
                     slippage_assert,
                 },
             )?;
