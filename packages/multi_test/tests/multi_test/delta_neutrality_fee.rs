@@ -396,7 +396,7 @@ fn artificial_slippage_charge_change_net_notional_sign() {
     let net_notional1 = status1.long_notional - status1.short_notional;
     market.exec_close_position(&trader, pos_id, None).unwrap();
 
-    let (_, _) = market
+    let (_, defer_res) = market
         .exec_open_position(
             &trader,
             "100",
@@ -411,7 +411,7 @@ fn artificial_slippage_charge_change_net_notional_sign() {
 
     let open_amount2 = defer_res.exec_resp().first_delta_neutrality_fee_amount();
 
-    let (_, _) = market
+    let (_, defer_res) = market
         .exec_open_position(
             &trader,
             "200",
