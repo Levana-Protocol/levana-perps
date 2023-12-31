@@ -137,12 +137,24 @@ impl State<'_> {
         }
         .into();
 
+        // Since deferred execution occurs in submessages, we cannot interleave
+        // deferred execution work with other work items that will occur in the current
+        // message. Therefore, once we see a deferred execution message, we do not process
+        // any other kind of message.
+        let mut saw_deferred_exec = false;
+
         let mut actual = vec![];
         let mut fees_earned = 0;
         for _ in 0..n_execs {
             match self.crank_work(ctx.storage)? {
                 None => break,
                 Some(work_info) => {
+                    let is_deferred_exec = matches!(&work_info, CrankWorkInfo::DeferredExec { .. });
+                    if !is_deferred_exec && saw_deferred_exec {
+                        break;
+                    }
+                    saw_deferred_exec = saw_deferred_exec || is_deferred_exec;
+
                     actual.push(work_info.clone());
                     if work_info.receives_crank_rewards() {
                         fees_earned += 1;
