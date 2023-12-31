@@ -16,9 +16,8 @@ mod proptest;
 mod rewards;
 mod shutdown;
 mod wrong_token;
-
-/* Still failing:
 mod diagnostic;
+/* Still failing:
 mod edge_update;
 */
 /*
