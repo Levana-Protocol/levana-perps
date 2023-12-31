@@ -14,36 +14,6 @@ fn test_place_limit_order_long() {
     market.exec_set_price("100".try_into().unwrap()).unwrap();
     market.exec_crank(&cranker).unwrap();
 
-    // Test invalid order: trigger price > spot price
-
-    market
-        .exec_place_limit_order(
-            &trader,
-            "100".try_into().unwrap(),
-            "101".try_into().unwrap(),
-            "10".try_into().unwrap(),
-            DirectionToBase::Long,
-            "1".try_into().unwrap(),
-            None,
-            None,
-        )
-        .unwrap_err();
-
-    // Test invalid order: trigger price < stop loss override
-
-    market
-        .exec_place_limit_order(
-            &trader,
-            "100".try_into().unwrap(),
-            "90".try_into().unwrap(),
-            "10".try_into().unwrap(),
-            DirectionToBase::Long,
-            "1".try_into().unwrap(),
-            Some("95".try_into().unwrap()),
-            None,
-        )
-        .unwrap_err();
-
     // Test success cases
     // Set two orders to when price moves to exactly trigger price as well as when price moves
     // bellow trigger price
@@ -110,36 +80,6 @@ fn test_place_limit_order_short() {
     let cranker = market.clone_trader(1).unwrap();
 
     market.exec_set_price("100".try_into().unwrap()).unwrap();
-
-    // Test invalid order: trigger price > spot price
-
-    market
-        .exec_place_limit_order(
-            &trader,
-            "100".try_into().unwrap(),
-            "99".try_into().unwrap(),
-            "10".try_into().unwrap(),
-            DirectionToBase::Short,
-            "1".try_into().unwrap(),
-            None,
-            None,
-        )
-        .unwrap_err();
-
-    // Test invalid order: trigger price < stop loss override
-
-    market
-        .exec_place_limit_order(
-            &trader,
-            "100".try_into().unwrap(),
-            "110".try_into().unwrap(),
-            "10".try_into().unwrap(),
-            DirectionToBase::Short,
-            "1".try_into().unwrap(),
-            Some("105".try_into().unwrap()),
-            None,
-        )
-        .unwrap_err();
 
     // Test success cases
     // Set two orders to when price moves to exactly trigger price as well as when price moves

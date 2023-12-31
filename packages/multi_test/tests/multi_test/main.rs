@@ -17,6 +17,7 @@ mod logging;
 mod lp_cw20;
 mod multi_market;
 mod nft;
+mod order;
 mod override_price;
 mod position;
 mod proptest;
@@ -24,7 +25,6 @@ mod rewards;
 mod sanity;
 mod shutdown;
 mod wrong_token;
-mod order;
 /*
 mod staleness;
 
