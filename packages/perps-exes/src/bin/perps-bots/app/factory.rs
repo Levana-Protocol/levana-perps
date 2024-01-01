@@ -308,7 +308,7 @@ async fn get_rpc_info(
     }
 
     results.sort_by_key(|x| x.1);
-    let (endpoint, rpc_height) = match results.into_iter().rev().next() {
+    let (endpoint, rpc_height) = match results.into_iter().next_back() {
         Some(pair) => pair,
         // All nodes are broken
         None => {
