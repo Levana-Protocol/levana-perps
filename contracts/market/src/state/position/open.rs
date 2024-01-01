@@ -116,6 +116,7 @@ impl State<'_> {
             counter_collateral,
             notional_size,
             created_at: self.now(),
+            price_point_created_at: Some(price_point.timestamp),
             liquifunded_at,
             next_liquifunding,
             stop_loss_override,
@@ -129,7 +130,7 @@ impl State<'_> {
                 .map(|x| x.into_notional_price(market_type)),
         };
 
-        self.set_next_liquifunding_and_stale_at(&mut pos, liquifunded_at);
+        self.set_next_liquifunding(&mut pos, liquifunded_at);
 
         let trade_volume_usd = trade_volume_usd(&pos, price_point, market_type)?;
 
@@ -181,10 +182,6 @@ impl State<'_> {
 
         let open_interest =
             self.check_adjust_net_open_interest(store, pos.notional_size, pos.direction(), true)?;
-
-        // Now that we know the liquidation and max gains, confirm that the user
-        // specified trigger orders are valid
-        self.position_validate_trigger_orders(&pos, market_type, price_point)?;
 
         Ok(ValidatedPosition {
             pos,
@@ -292,6 +289,7 @@ impl State<'_> {
                 take_profit_override: pos.take_profit_override,
             },
             created_at: pos.created_at,
+            price_point_created_at: price_point.timestamp,
         });
 
         Ok(pos.id)

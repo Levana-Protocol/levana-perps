@@ -185,6 +185,7 @@ impl State<'_> {
                 let pos = get_position(ctx.storage, position)?;
                 let starts_at = pos.liquifunded_at;
                 let ends_at = pos.next_liquifunding;
+                debug_assert!(ends_at <= price_point.timestamp);
                 self.position_liquifund_store(
                     ctx,
                     pos,
@@ -222,6 +223,7 @@ impl State<'_> {
                         exposure: Signed::zero(),
                         settlement_price: *price_point,
                         reason: PositionCloseReason::Liquidated(liquidation_reason),
+                        closed_during_liquifunding: false,
                     },
                     MaybeClosedPosition::Close(x) => x,
                 };

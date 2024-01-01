@@ -14,6 +14,7 @@ pub(crate) const NOTIONAL_SIZE_USD: &str = "notional-size-usd";
 pub(crate) const LEVERAGE_TO_BASE: &str = "leverage-to-base";
 pub(crate) const MARKET_TYPE: &str = "market-type";
 pub(crate) const CREATED_AT: &str = "created-at";
+pub(crate) const PRICE_POINT_CREATED_AT: &str = "price-point-created-at";
 pub(crate) const LIQUIFUNDED_AT: &str = "liquifunded-at";
 pub(crate) const TRADING_FEE: &str = "trading-fee";
 pub(crate) const TRADING_FEE_USD: &str = "trading-fee-usd";

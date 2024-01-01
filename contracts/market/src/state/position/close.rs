@@ -28,6 +28,7 @@ impl State<'_> {
                 exposure: Signed::<Collateral>::zero(),
                 reason: PositionCloseReason::Direct,
                 settlement_price,
+                closed_during_liquifunding: false,
             },
             MaybeClosedPosition::Close(instructions) => instructions,
         };
@@ -47,8 +48,17 @@ impl State<'_> {
             exposure,
             settlement_price,
             reason,
+            closed_during_liquifunding,
         }: ClosePositionInstructions,
     ) -> Result<()> {
+        if closed_during_liquifunding {
+            // If the position was closed during liquifunding, then liquifunded_at will still be the previous value.
+            debug_assert!(pos.liquifunded_at <= settlement_price.timestamp);
+        } else {
+            // The position was not closed during liquifunding. In this case, we need to ensure that we're
+            // fully liquifunded up until the current price point.
+            debug_assert_eq!(pos.liquifunded_at, settlement_price.timestamp);
+        }
         // How much notional size are we undoing? Used for delta neutrality fee
         // and adjusting the open interest
         let notional_size_return = -pos.notional_size;
@@ -120,7 +130,10 @@ impl State<'_> {
         let market_type = market_id.get_market_type();
 
         let direction_to_base = pos.direction().into_base(market_type);
-        let entry_price_base = match self.spot_price(ctx.storage, pos.created_at) {
+        let entry_price_base = match self.spot_price(
+            ctx.storage,
+            pos.price_point_created_at.unwrap_or(pos.created_at),
+        ) {
             Ok(entry_price) => entry_price,
             Err(err) => return Err(err),
         }
@@ -131,6 +144,7 @@ impl State<'_> {
             id: pos.id,
             direction_to_base,
             created_at: pos.created_at,
+            price_point_created_at: pos.price_point_created_at,
             liquifunded_at: pos.liquifunded_at,
             trading_fee_collateral: pos.trading_fee.collateral(),
             trading_fee_usd: pos.trading_fee.usd(),

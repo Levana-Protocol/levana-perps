@@ -126,15 +126,6 @@ pub enum MarketError {
         net_notional_before: Signed<Notional>,
         net_notional_after: Signed<Notional>,
     },
-    #[error(
-        "Specified {trigger_type} trigger price of '{specified}' must be {must_be} than '{bound}'."
-    )]
-    InvalidTriggerPrice {
-        must_be: TriggerPriceMustBe,
-        trigger_type: TriggerType,
-        specified: PriceBaseInQuote,
-        bound: PriceBaseInQuote,
-    },
     #[error("Liquidity cooldown in effect, will end in {seconds_remaining} seconds.")]
     LiquidityCooldown {
         ends_at: Timestamp,
@@ -282,7 +273,6 @@ impl MarketError {
             MarketError::DeltaNeutralityFeeShortToLong { .. } => {
                 ErrorId::DeltaNeutralityFeeShortToLong
             }
-            MarketError::InvalidTriggerPrice { .. } => ErrorId::InvalidTriggerPrice,
             MarketError::LiquidityCooldown { .. } => ErrorId::LiquidityCooldown,
             MarketError::PendingDeferredExec {} => ErrorId::PendingDeferredExec,
             MarketError::VolatilePriceFeedTimeDelta { .. } => ErrorId::VolatilePriceFeedTimeDelta,
