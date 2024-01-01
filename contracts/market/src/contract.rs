@@ -183,6 +183,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     crank_fee: Collateral::zero(),
                     crank_fee_usd: Usd::zero(),
                 },
+                Err(anyhow::anyhow!("This value should never be evaluated")),
             )?;
         }
 
@@ -194,6 +195,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     id,
                     amount: info.funds.take()?,
                 },
+                Err(anyhow::anyhow!("This value should never be evaluated")),
             )?;
         }
         ExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => {
@@ -202,6 +204,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 &mut ctx,
                 info.sender,
                 DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, amount },
+                info.funds.take(),
             )?;
         }
 
@@ -217,6 +220,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     slippage_assert,
                     amount: info.funds.take()?,
                 },
+                Err(anyhow::anyhow!("This value should never be evaluated")),
             )?;
         }
         ExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
@@ -233,6 +237,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     amount,
                     slippage_assert,
                 },
+                info.funds.take(),
             )?;
         }
 
@@ -249,6 +254,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     leverage,
                     slippage_assert,
                 },
+                info.funds.take(),
             )?;
         }
 
@@ -257,6 +263,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 &mut ctx,
                 info.sender,
                 DeferredExecItem::UpdatePositionMaxGains { id, max_gains },
+                info.funds.take(),
             )?;
         }
 
@@ -273,6 +280,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     stop_loss_override,
                     take_profit_override,
                 },
+                info.funds.take(),
             )?;
         }
 
@@ -298,6 +306,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     crank_fee: Collateral::zero(),
                     crank_fee_usd: Usd::zero(),
                 },
+                Err(anyhow::anyhow!("This value should never be evaluated")),
             )?;
         }
 
@@ -306,6 +315,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 &mut ctx,
                 info.sender,
                 DeferredExecItem::CancelLimitOrder { order_id },
+                // This should fail and be caught in defer_execution
+                info.funds.take(),
             )?;
         }
 
@@ -320,6 +331,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     id,
                     slippage_assert,
                 },
+                // This should fail and be caught in defer_execution
+                info.funds.take(),
             )?;
         }
 

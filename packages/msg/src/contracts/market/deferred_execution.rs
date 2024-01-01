@@ -509,3 +509,28 @@ impl TryFrom<Event> for DeferredExecExecutedEvent {
         })
     }
 }
+
+/// Event when fees are returned to a user
+pub struct FeesReturnedEvent {
+    /// Who overpaid the fees and received them back
+    pub recipient: Addr,
+    /// Amount received in collateral
+    pub amount: NonZero<Collateral>,
+    /// Current USD amount
+    pub amount_usd: NonZero<Usd>,
+}
+
+impl From<FeesReturnedEvent> for Event {
+    fn from(
+        FeesReturnedEvent {
+            recipient,
+            amount,
+            amount_usd,
+        }: FeesReturnedEvent,
+    ) -> Self {
+        Event::new("fees-returned")
+            .add_attribute("recipient", recipient.into_string())
+            .add_attribute("amount", amount.to_string())
+            .add_attribute("amount_usd", amount_usd.to_string())
+    }
+}
