@@ -49,63 +49,55 @@ impl State<'_> {
         })
     }
 
-    pub(crate) fn crank_work(&self, store: &dyn Storage) -> Result<Option<CrankWorkInfo>> {
+    /// Takes in a price_point from the next_crank_timestamp method
+    pub(crate) fn crank_work(
+        &self,
+        store: &dyn Storage,
+        price_point: PricePoint,
+    ) -> Result<CrankWorkInfo> {
         if self.should_reset_lp_balances(store)? {
-            return Ok(Some(CrankWorkInfo::ResetLpBalances {}));
+            return Ok(CrankWorkInfo::ResetLpBalances {});
         }
 
-        Ok(match self.next_crank_timestamp(store)? {
-            None => None,
-            Some(price_point) => Some({
-                if let Some(((_, position), _)) = NEXT_LIQUIFUNDING
-                    .prefix_range(
-                        store,
-                        None,
-                        Some(PrefixBound::inclusive(price_point.timestamp)),
-                        cosmwasm_std::Order::Ascending,
-                    )
-                    .next()
-                    .transpose()?
-                {
-                    CrankWorkInfo::Liquifunding { position }
-                } else if let Some(position) = self.get_close_all_positions_work(store)? {
-                    // We only try to close all positions _after_ we've done all
-                    // liquifunding. We need to ensure that all positions are liquifunded up until the
-                    // current price point before trying to close them.
-                    CrankWorkInfo::CloseAllPositions {
-                        position,
-                        price_point,
-                    }
-                } else if let Some(pos) =
-                    self.liquidatable_position(store, price_point.price_notional)?
-                {
-                    CrankWorkInfo::Liquidation {
-                        position: pos.id,
-                        liquidation_reason: pos.reason,
-                        price_point,
-                    }
-                } else if let Some((deferred_exec_id, target)) =
-                    self.next_crankable_deferred_exec_id(store, price_point.timestamp)?
-                {
-                    CrankWorkInfo::DeferredExec {
-                        deferred_exec_id,
-                        target,
-                        price_point_timestamp: price_point.timestamp,
-                    }
-                } else if let Some(order_id) =
-                    self.limit_order_triggered_order(store, price_point.price_notional, false)?
-                {
-                    CrankWorkInfo::LimitOrder {
-                        order_id,
-                        price_point,
-                    }
-                } else {
-                    CrankWorkInfo::Completed {
-                        price_point_timestamp: price_point.timestamp,
-                    }
+        Ok(
+            if let Some(((_, position), _)) = NEXT_LIQUIFUNDING
+                .prefix_range(
+                    store,
+                    None,
+                    Some(PrefixBound::inclusive(price_point.timestamp)),
+                    cosmwasm_std::Order::Ascending,
+                )
+                .next()
+                .transpose()?
+            {
+                CrankWorkInfo::Liquifunding { position }
+            } else if let Some(position) = self.get_close_all_positions_work(store)? {
+                // We only try to close all positions _after_ we've done all
+                // liquifunding. We need to ensure that all positions are liquifunded up until the
+                // current price point before trying to close them.
+                CrankWorkInfo::CloseAllPositions { position }
+            } else if let Some(pos) =
+                self.liquidatable_position(store, price_point.price_notional)?
+            {
+                CrankWorkInfo::Liquidation {
+                    position: pos.id,
+                    liquidation_reason: pos.reason,
                 }
-            }),
-        })
+            } else if let Some((deferred_exec_id, target)) =
+                self.next_crankable_deferred_exec_id(store, price_point.timestamp)?
+            {
+                CrankWorkInfo::DeferredExec {
+                    deferred_exec_id,
+                    target,
+                }
+            } else if let Some(order_id) =
+                self.limit_order_triggered_order(store, price_point.price_notional)?
+            {
+                CrankWorkInfo::LimitOrder { order_id }
+            } else {
+                CrankWorkInfo::Completed {}
+            },
+        )
     }
 
     /// Would the given price update trigger any liquidations?
@@ -118,7 +110,7 @@ impl State<'_> {
         if self.liquidatable_position(store, price)?.is_some() {
             return Ok(true);
         }
-        self.limit_order_triggered_order(store, price, true)
+        self.limit_order_triggered_order(store, price)
             .map(|x| x.is_some())
     }
 
@@ -146,22 +138,22 @@ impl State<'_> {
         let mut actual = vec![];
         let mut fees_earned = 0;
         for _ in 0..n_execs {
-            match self.crank_work(ctx.storage)? {
+            let price_point = match self.next_crank_timestamp(ctx.storage)? {
                 None => break,
-                Some(work_info) => {
-                    let is_deferred_exec = matches!(&work_info, CrankWorkInfo::DeferredExec { .. });
-                    if !is_deferred_exec && saw_deferred_exec {
-                        break;
-                    }
-                    saw_deferred_exec = saw_deferred_exec || is_deferred_exec;
-
-                    actual.push(work_info.clone());
-                    if work_info.receives_crank_rewards() {
-                        fees_earned += 1;
-                    }
-                    self.crank_exec(ctx, work_info)?;
-                }
+                Some(price_point) => price_point,
             };
+            let work_info = self.crank_work(ctx.storage, price_point)?;
+            let is_deferred_exec = matches!(&work_info, CrankWorkInfo::DeferredExec { .. });
+            if !is_deferred_exec && saw_deferred_exec {
+                break;
+            }
+            saw_deferred_exec = saw_deferred_exec || is_deferred_exec;
+
+            actual.push((work_info.clone(), price_point));
+            if work_info.receives_crank_rewards() {
+                fees_earned += 1;
+            }
+            self.crank_exec(ctx, work_info, &price_point)?;
         }
 
         self.allocate_crank_fees(ctx, rewards, fees_earned)?;
@@ -173,37 +165,16 @@ impl State<'_> {
         Ok(())
     }
 
-    /// If the next crank work items completes a price update, crank it.
-    ///
-    /// This is a special optimization to avoid accruing unnecessary "complete
-    /// work" items and causing the unpend queue to fill up.
-    pub(crate) fn crank_current_price_complete(&self, ctx: &mut StateContext) -> Result<()> {
-        let work_info = match self.crank_work(ctx.storage)? {
-            Some(work_info) => work_info,
-            None => return Ok(()),
-        };
-
-        let price_point_timestamp = match &work_info {
-            CrankWorkInfo::Completed {
-                price_point_timestamp,
-            } => *price_point_timestamp,
-            _ => return Ok(()),
-        };
-
-        let current = self.current_spot_price(ctx.storage)?;
-
-        if price_point_timestamp == current.timestamp {
-            // Finish off the price update
-            self.crank_exec(ctx, work_info)?;
-        }
-
-        Ok(())
-    }
-
     /// Perform a single crank execution.
-    fn crank_exec(&self, ctx: &mut StateContext, work_info: CrankWorkInfo) -> Result<()> {
+    fn crank_exec(
+        &self,
+        ctx: &mut StateContext,
+        work_info: CrankWorkInfo,
+        price_point: &PricePoint,
+    ) -> Result<()> {
         // get our current playhead time and price for liquidations
-        ctx.response_mut().add_event(work_info.clone());
+        ctx.response_mut()
+            .add_event(work_info.clone().into_event(price_point));
 
         // do the work
         match work_info {
@@ -223,17 +194,13 @@ impl State<'_> {
                     PositionSaveReason::Crank,
                 )?;
             }
-            CrankWorkInfo::CloseAllPositions {
-                position,
-                price_point,
-            } => {
+            CrankWorkInfo::CloseAllPositions { position } => {
                 let pos = get_position(ctx.storage, position)?;
-                self.close_position_via_msg(ctx, pos, price_point)?;
+                self.close_position_via_msg(ctx, pos, *price_point)?;
             }
             CrankWorkInfo::Liquidation {
                 position,
                 liquidation_reason,
-                price_point,
             } => {
                 let pos = get_position(ctx.storage, position)?;
 
@@ -253,7 +220,7 @@ impl State<'_> {
                     MaybeClosedPosition::Open(pos) => ClosePositionInstructions {
                         pos,
                         exposure: Signed::zero(),
-                        settlement_price: price_point,
+                        settlement_price: *price_point,
                         reason: PositionCloseReason::Liquidated(liquidation_reason),
                     },
                     MaybeClosedPosition::Close(x) => x,
@@ -262,22 +229,20 @@ impl State<'_> {
             }
             CrankWorkInfo::DeferredExec {
                 deferred_exec_id,
-                price_point_timestamp,
                 target: _,
             } => {
-                self.process_deferred_exec(ctx, deferred_exec_id, price_point_timestamp)?;
+                self.process_deferred_exec(ctx, deferred_exec_id, price_point)?;
             }
-            CrankWorkInfo::LimitOrder {
-                order_id,
-                price_point,
-            } => {
-                self.limit_order_execute_order(ctx, order_id, &price_point)?;
+            CrankWorkInfo::LimitOrder { order_id } => {
+                self.limit_order_execute_order(ctx, order_id, price_point)?;
             }
-            CrankWorkInfo::Completed {
-                price_point_timestamp,
-            } => {
-                self.accumulate_funding_rate(ctx, price_point_timestamp)?;
-                LAST_CRANK_COMPLETED.save(ctx.storage, &price_point_timestamp)?;
+            CrankWorkInfo::Completed {} => {
+                // Now that we've finished all updates for this price point,
+                // accumulate the updated borrow fee and funding rates.
+                self.accumulate_borrow_fee_rate(ctx, price_point)
+                    .map_err(|e| anyhow::anyhow!("accumulate_borrow_fee_rate failed: {e:?}"))?;
+                self.accumulate_funding_rate(ctx, price_point)?;
+                LAST_CRANK_COMPLETED.save(ctx.storage, &price_point.timestamp)?;
             }
         }
 

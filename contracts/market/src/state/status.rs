@@ -12,7 +12,11 @@ impl State<'_> {
         let market_type = market_id.get_market_type();
 
         let collateral = self.get_token(store)?.clone();
-        let next_crank = self.crank_work(store)?;
+        let next_crank_timestamp = self.next_crank_timestamp(store)?;
+        let next_crank = match next_crank_timestamp {
+            None => None,
+            Some(price_point) => Some(self.crank_work(store, price_point)?),
+        };
 
         let liquidity = self.load_liquidity_stats(store)?;
 

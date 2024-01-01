@@ -211,10 +211,6 @@ impl State<'_> {
         self.trade_history_add_volume(ctx, &pos.owner, trade_volume_usd)?;
         open_interest.store(ctx)?;
 
-        // derive the new funding rate
-        let funding_timestamp = self.funding_valid_until(ctx.storage)?;
-        self.accumulate_funding_rate(ctx, funding_timestamp)?;
-
         // collect trading fees
         self.collect_trading_fee(
             ctx,

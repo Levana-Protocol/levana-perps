@@ -387,7 +387,7 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         id: DeferredExecId,
-        price_point_timestamp: Timestamp,
+        price_point: &PricePoint,
     ) -> Result<()> {
         // For now we always fail, this obviously needs to be fixed.
         ctx.response_mut().add_raw_submessage(SubMsg::reply_always(
@@ -395,7 +395,7 @@ impl State<'_> {
                 contract_addr: self.env.contract.address.clone().into_string(),
                 msg: to_binary(&MarketExecuteMsg::PerformDeferredExec {
                     id,
-                    price_point_timestamp,
+                    price_point_timestamp: price_point.timestamp,
                 })?,
                 funds: vec![],
             }),

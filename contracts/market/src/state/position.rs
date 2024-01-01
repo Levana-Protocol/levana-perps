@@ -460,11 +460,20 @@ impl State<'_> {
 
         if calc_pending_fees {
             // Calculate pending fees
+
+            // Even though the usage of self.now() looks incorrect below, this is only used for
+            // querying positions, and therefore calculating till now without a liquifunding
+            // or precise price point is a best estimate of fees.
             let (borrow_fees, _) =
                 self.calc_capped_borrow_fee_payment(store, &pos, pos.liquifunded_at, self.now())?;
             let borrow_fees = borrow_fees.lp.checked_add(borrow_fees.xlp)?;
-            let (funding_payments, _) =
-                self.calc_capped_funding_payment(store, &pos, pos.liquifunded_at, self.now())?;
+            let (funding_payments, _) = self.calc_capped_funding_payment(
+                store,
+                &pos,
+                pos.liquifunded_at,
+                self.now(),
+                true,
+            )?;
             let delta_neutrality_fee = if include_dnf {
                 dnf_on_close_collateral
             } else {

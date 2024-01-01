@@ -77,6 +77,7 @@ pub enum ErrorId {
     VolatilePriceFeedTimeDelta,
     LimitOrderAlreadyCanceling,
     PositionAlreadyClosing,
+    NoPricePublishTimeFound,
 }
 
 /// Source within the protocol for the error

@@ -151,6 +151,10 @@ pub enum MarketError {
     LimitOrderAlreadyCanceling { order_id: Uint64 },
     #[error("Position {position_id} is already closing")]
     PositionAlreadyClosing { position_id: Uint64 },
+    #[error(
+        "No price publish time found, there is likely a spot price config error for this market"
+    )]
+    NoPricePublishTimeFound,
 }
 
 /// Was the price provided by the trader too high or too low?
@@ -284,6 +288,7 @@ impl MarketError {
             MarketError::VolatilePriceFeedTimeDelta { .. } => ErrorId::VolatilePriceFeedTimeDelta,
             MarketError::LimitOrderAlreadyCanceling { .. } => ErrorId::LimitOrderAlreadyCanceling,
             MarketError::PositionAlreadyClosing { .. } => ErrorId::PositionAlreadyClosing,
+            MarketError::NoPricePublishTimeFound => ErrorId::NoPricePublishTimeFound,
         }
     }
 }
