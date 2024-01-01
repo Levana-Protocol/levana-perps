@@ -1095,7 +1095,16 @@ impl PerpsMarket {
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
     ) -> Result<(PositionId, DeferResponse)> {
-        let queue_resp = self.exec_open_position_raw_queue_only(sender, collateral, slippage_assert, leverage, direction, max_gains, stop_loss_override, take_profit_override)?;
+        let queue_resp = self.exec_open_position_raw_queue_only(
+            sender,
+            collateral,
+            slippage_assert,
+            leverage,
+            direction,
+            max_gains,
+            stop_loss_override,
+            take_profit_override,
+        )?;
         self.exec_open_position_process_queue_response(sender, queue_resp)
     }
 
@@ -1971,22 +1980,29 @@ impl PerpsMarket {
 
     // this defers a message exec in the sense of Levana perps semantics of "deferred executions"
     // *not* defer in the sense of native programming jargon, like the golang keyword or until Drop kicks in etc.
-    pub fn exec_defer_queue_wasm_msg(&self, sender: &Addr, msg: WasmMsg) -> Result<DeferQueueResponse> {
+    pub fn exec_defer_queue_wasm_msg(
+        &self,
+        sender: &Addr,
+        msg: WasmMsg,
+    ) -> Result<DeferQueueResponse> {
         let cosmos_msg = CosmosMsg::Wasm(msg);
         let res = self.app().execute(sender.clone(), cosmos_msg)?;
-        
+
         let queue_event = res
             .event_first("deferred-exec-queued")
             .and_then(DeferredExecQueuedEvent::try_from)?;
 
-        
         Ok(DeferQueueResponse {
             event: queue_event,
             response: res,
         })
     }
 
-    pub fn exec_defer_queue_process(&self, cranker: &Addr, queue: DeferQueueResponse) -> Result<DeferResponse> {
+    pub fn exec_defer_queue_process(
+        &self,
+        cranker: &Addr,
+        queue: DeferQueueResponse,
+    ) -> Result<DeferResponse> {
         let mut responses = vec![queue.response];
 
         // this loops forever if the deferred execution never *happens*
@@ -2037,7 +2053,6 @@ impl PerpsMarket {
             )?);
         }
     }
-
 
     pub fn exec_defer_wasm_msg(&self, sender: &Addr, msg: WasmMsg) -> Result<DeferResponse> {
         let queue_res = self.exec_defer_queue_wasm_msg(sender, msg)?;

@@ -241,7 +241,6 @@ fn funding_payment_typical() {
         )
         .unwrap();
 
-
     market
         .exec_open_position_queue_only(
             &trader,
@@ -287,11 +286,8 @@ fn funding_payment_typical() {
     let short_pos_id = PositionId::new(3);
     let long_pos_id = PositionId::new(4);
 
-
-
     let long_before_epoch = market.query_position(long_pos_id).unwrap();
     let short_before_epoch = market.query_position(short_pos_id).unwrap();
-
 
     // Long interest > short interest
     let rates = market.query_status().unwrap();
@@ -305,9 +301,8 @@ fn funding_payment_typical() {
     // long pos; 365 days, 24 hours, but 2 epochs of time.
     let divisor = Number::from(365u64 * 24u64 / 2u64);
 
-    let funding_estimate = -long_before_epoch.notional_size.abs().into_number()
-        * rates.long_funding
-        / divisor;
+    let funding_estimate =
+        -long_before_epoch.notional_size.abs().into_number() * rates.long_funding / divisor;
     let borrow_fee = -long_before_epoch.counter_collateral.into_number()
         * rates.borrow_fee.into_number()
         / divisor;
@@ -335,12 +330,11 @@ fn funding_payment_typical() {
     assert_ne!(long_after_epoch.borrow_fee_usd, Usd::zero());
 
     // short pos; 365 days, 24 hours, but 2 epochs of time.
-    let funding_estimate = -short_before_epoch.notional_size.abs().into_number()
-        * rates.short_funding
-        / divisor;
+    let funding_estimate =
+        -short_before_epoch.notional_size.abs().into_number() * rates.short_funding / divisor;
     let borrow_fee = -short_before_epoch.counter_collateral.into_number()
         * rates.borrow_fee.into_number()
-        / divisor; 
+        / divisor;
 
     assert!((short_after_epoch.active_collateral.into_number()
         - short_before_epoch.active_collateral.into_number())
