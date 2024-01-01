@@ -7,7 +7,9 @@ use levana_perpswap_multi_test::{
     time::TimeJump,
     PerpsApp,
 };
-use msg::contracts::market::{config::ConfigUpdate, entry::PositionsQueryFeeApproach};
+use msg::contracts::market::{
+    config::ConfigUpdate, entry::PositionsQueryFeeApproach, position::PositionId,
+};
 use msg::prelude::*;
 
 // this is currently a known issue, working around it in the meantime
@@ -248,7 +250,8 @@ fn position_pnl_close_loss() {
 
 #[test]
 fn position_pnl_long_and_short_precise() {
-    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let app = PerpsApp::new_cell().unwrap();
+    let mut market = PerpsMarket::new(app.clone()).unwrap();
     return_unless_market_collateral_quote!(market);
     let trader = market.clone_trader(0).unwrap();
     let cranker = market.clone_trader(1).unwrap();
@@ -267,7 +270,7 @@ fn position_pnl_long_and_short_precise() {
         .unwrap();
 
     market
-        .exec_open_position(
+        .exec_open_position_queue_only(
             &trader,
             "100",
             "10",
@@ -280,7 +283,7 @@ fn position_pnl_long_and_short_precise() {
         .unwrap();
 
     market
-        .exec_open_position(
+        .exec_open_position_queue_only(
             &trader,
             "100",
             "10",
@@ -292,8 +295,8 @@ fn position_pnl_long_and_short_precise() {
         )
         .unwrap();
 
-    let (short_pos_id, defer_res) = market
-        .exec_open_position(
+    market
+        .exec_open_position_queue_only(
             &trader,
             "100",
             "10",
@@ -305,10 +308,8 @@ fn position_pnl_long_and_short_precise() {
         )
         .unwrap();
 
-    let short_slippage_fee = defer_res.exec_resp().first_delta_neutrality_fee_amount();
-
-    let (long_pos_id, defer_res) = market
-        .exec_open_position(
+    market
+        .exec_open_position_queue_only(
             &trader,
             "200",
             "10",
@@ -320,7 +321,22 @@ fn position_pnl_long_and_short_precise() {
         )
         .unwrap();
 
-    let long_slippage_fee = defer_res.exec_resp().first_delta_neutrality_fee_amount();
+    let short_pos_id = PositionId::new(3);
+    let long_pos_id = PositionId::new(4);
+
+    market.exec_refresh_price().unwrap();
+    market.exec_crank_n(&cranker, 100).unwrap();
+
+    let short_slippage_fee = market
+        .query_position(short_pos_id)
+        .unwrap()
+        .delta_neutrality_fee_collateral
+        .into_number();
+    let long_slippage_fee = market
+        .query_position(long_pos_id)
+        .unwrap()
+        .delta_neutrality_fee_collateral
+        .into_number();
 
     // Long interest > short interest
     let rates = market.query_status().unwrap();
@@ -366,11 +382,13 @@ fn position_pnl_long_and_short_precise() {
     assert_eq!(short_before_epoch.counter_collateral.to_string(), "100");
 
     // We want to force liquifunding to happen at exactly one hour
+    // Jump one block back to make sure that manual set price happens
+    // exactly at liquifunding time.
     market.set_time(TimeJump::Hours(1)).unwrap();
-    market.exec_crank_till_finished(&cranker).unwrap();
+    market.set_time(TimeJump::Blocks(-1)).unwrap();
 
     market.exec_set_price("0.98".try_into().unwrap()).unwrap();
-    market.exec_crank_till_finished(&cranker).unwrap();
+    market.exec_crank_n(&cranker, 100).unwrap();
 
     let long_after_epoch_1 = market.query_position(long_pos_id).unwrap();
     let short_after_epoch_1 = market.query_position(short_pos_id).unwrap();
@@ -424,9 +442,10 @@ fn position_pnl_long_and_short_precise() {
 
     market
         .set_time(TimeJump::PreciseTime(desired_crank_time.into()))
+        //.set_time(TimeJump::Hours(1))
         .unwrap();
-    market.exec_refresh_price().unwrap();
-    market.exec_crank_till_finished(&trader).unwrap();
+
+    market.exec_crank_n(&cranker, 100).unwrap();
 
     let long_after_epoch_2 = market.query_position(long_pos_id).unwrap();
     let short_after_epoch_2 = market.query_position(short_pos_id).unwrap();
