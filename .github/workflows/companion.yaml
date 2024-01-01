@@ -28,7 +28,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.70.0
+          toolchain: 1.10.0
           components: rustfmt, clippy
           targets: x86_64-unknown-linux-musl
       - uses: Swatinem/rust-cache@v2.5.1
