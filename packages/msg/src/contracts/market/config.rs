@@ -74,6 +74,7 @@ pub struct Config {
     ///
     /// This is only charged while adding new items to the queue, not when performing
     /// ongoing tasks like liquifunding or liquidations.
+    #[serde(default = "ConfigDefaults::crank_fee_surcharge")]
     pub crank_fee_surcharge: Usd,
     /// The crank fee to be sent to crankers, in collateral
     pub crank_fee_reward: Usd,

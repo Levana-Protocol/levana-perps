@@ -140,6 +140,7 @@ impl State<'_> {
         ctx: &mut StateContext,
         trader: Addr,
         mut item: DeferredExecItem,
+        funds_attached: Result<NonZero<Collateral>>,
     ) -> Result<()> {
         // Calculate the next ID first so that we can figure out how many items are in the queue already.
         let (new_id, new_latest_ids, queue_size) =
@@ -195,6 +196,7 @@ impl State<'_> {
                 crank_fee_usd,
                 ..
             } => {
+                debug_assert!(funds_attached.is_err());
                 *crank_fee = new_crank_fee;
                 *crank_fee_usd = new_crank_fee_usd;
                 *amount = amount.checked_sub(new_crank_fee)?;
@@ -208,6 +210,7 @@ impl State<'_> {
             DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount }
             | DeferredExecItem::UpdatePositionAddCollateralImpactSize { id, amount, .. } => {
                 // Take the crank fee from the submitted amount
+                debug_assert!(funds_attached.is_err());
                 *amount = amount.checked_sub(new_crank_fee)?;
 
                 // Update the position to reflect the crank fee charged
@@ -243,34 +246,40 @@ impl State<'_> {
             | DeferredExecItem::UpdatePositionLeverage { id, .. }
             | DeferredExecItem::UpdatePositionMaxGains { id, .. }
             | DeferredExecItem::SetTriggerOrder { id, .. } => {
-                // We do not allow one of these updates to be scheduled while a
-                // pending update is already unqueued. The reason is a complication with charging
-                // of crank fees: we can't properly charge a crank fee against an open position
-                // without doing a liquifunding, which we can't do at this point because we don't
-                // have the new price point yet. Therefore, exit if there's already a pending
-                // update.
-                if PENDING_DEFERRED_FOR_POSITION
-                    .prefix(*id)
-                    .keys(ctx.storage, None, None, Order::Ascending)
-                    .next()
-                    .is_some()
-                {
-                    return Err(MarketError::PositionUpdateAlreadyPending {
-                        position_id: id.u64().into(),
-                    }
-                    .into_anyhow());
+                // Take out the crank fee and put the rest of the funds into rewards to be collected.
+                let funds_attached = if new_crank_fee.is_zero() {
+                    Collateral::zero()
+                } else {
+                    funds_attached
+                        .context("No funds provided for update crank fee")?
+                        .raw()
+                };
+                let funds_after_crank = funds_attached.checked_sub(new_crank_fee)?;
+
+                // Update the protocol to track the crank fee available in general fees
+                self.collect_crank_fee(
+                    ctx,
+                    TradeId::Position(*id),
+                    new_crank_fee,
+                    new_crank_fee_usd,
+                )?;
+
+                // Give the remainder back to the user as rewards
+                if let Some(funds_after_crank) = NonZero::new(funds_after_crank) {
+                    self.return_funds_to_user(ctx, &trader, funds_after_crank, &price_point)?;
                 }
 
+                // Update the crank fee on charged on the position
                 let mut pos = get_position(ctx.storage, *id)?;
-
-                // Schedule an additional crank fee to be charged at the next liquifunding to cover this work item.
-                debug_assert_eq!(pos.pending_crank_fee, Usd::zero());
-                pos.pending_crank_fee += new_crank_fee_usd;
-
-                // Save the updated position. When it's liquifunded, all protocol updates will occur.
+                pos.crank_fee
+                    .checked_add_assign(new_crank_fee, &price_point)?;
                 self.position_save_no_recalc(ctx, &pos)?;
             }
             DeferredExecItem::ClosePosition { id, .. } => {
+                anyhow::ensure!(
+                    funds_attached.is_err(),
+                    "No funds should be attached for close position"
+                );
                 // We don't charge a separate crank fee for closing a position,
                 // but we ensure we only queue up such a work item once to avoid a spam
                 // attack.
@@ -283,6 +292,10 @@ impl State<'_> {
                 IS_POSITION_CLOSING.save(ctx.storage, *id, &())?;
             }
             DeferredExecItem::CancelLimitOrder { order_id } => {
+                anyhow::ensure!(
+                    funds_attached.is_err(),
+                    "No funds should be attached for cancel limit order"
+                );
                 // We don't charge a separate crank fee for canceling a limit
                 // order, but we ensure we only queue up such a work item once to avoid a spam
                 // attack.

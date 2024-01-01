@@ -520,20 +520,9 @@ impl State<'_> {
             direction: position.direction().into_base(market_type),
         });
 
-        let total_crank_fee_usd = if charge_crank_fee {
-            position
-                .pending_crank_fee
-                .checked_add(self.config.crank_fee_charged)?
-        } else {
-            position.pending_crank_fee
-        };
-        position.pending_crank_fee = Usd::zero();
-
-        let crank_fee_charged = if total_crank_fee_usd.is_zero() {
-            Collateral::zero()
-        } else {
+        let crank_fee_charged = if charge_crank_fee {
             let (crank_fee, crank_fee_usd) =
-                self.cap_crank_fee(ctx, &position, &price, total_crank_fee_usd)?;
+                self.cap_crank_fee(ctx, &position, &price, self.config.crank_fee_charged)?;
             self.collect_crank_fee(
                 ctx,
                 TradeId::Position(position.id),
@@ -542,6 +531,8 @@ impl State<'_> {
             )?;
             position.crank_fee.checked_add_assign(crank_fee, &price)?;
             crank_fee
+        } else {
+            Collateral::zero()
         };
 
         // Update the active collateral

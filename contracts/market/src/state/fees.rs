@@ -4,6 +4,7 @@ use crate::state::*;
 use anyhow::Context;
 use cosmwasm_std::Decimal256;
 use cw_storage_plus::Item;
+use msg::contracts::market::deferred_execution::FeesReturnedEvent;
 use msg::contracts::market::entry::Fees;
 use msg::contracts::market::fees::events::{
     CrankFeeEarnedEvent, CrankFeeEvent, FeeEvent, FeeSource, TradeId,
@@ -294,6 +295,28 @@ impl State<'_> {
                 amount_usd: price_point.collateral_to_usd_non_zero(payment),
             });
         }
+        Ok(())
+    }
+
+    /// Returns funds to a user as part of the rewards system.
+    ///
+    /// Used when over-paying crank fees
+    pub(crate) fn return_funds_to_user(
+        &self,
+        ctx: &mut StateContext,
+        addr: &Addr,
+        amount: NonZero<Collateral>,
+        price_point: &PricePoint,
+    ) -> Result<()> {
+        let mut fees = ALL_FEES.load(ctx.storage)?;
+        fees.wallets = fees.wallets.checked_add(amount.raw())?;
+        ALL_FEES.save(ctx.storage, &fees)?;
+        self.add_lp_crank_rewards(ctx, addr, amount)?;
+        ctx.response_mut().add_event(FeesReturnedEvent {
+            recipient: addr.clone(),
+            amount,
+            amount_usd: price_point.collateral_to_usd_non_zero(amount),
+        });
         Ok(())
     }
 }

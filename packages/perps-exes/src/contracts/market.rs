@@ -447,8 +447,9 @@ impl MarketContract {
         max_gains: MaxGainsInQuote,
     ) -> Result<TxResponse> {
         let execute_msg = MarketExecuteMsg::UpdatePositionMaxGains { id, max_gains };
-        let response = self.0.execute(wallet, vec![], execute_msg).await?;
-        Ok(response)
+        let status = self.status().await?;
+        self.exec_with_crank_fee(wallet, &status, &execute_msg)
+            .await
     }
 
     pub async fn update_leverage(
@@ -463,8 +464,9 @@ impl MarketContract {
             leverage,
             slippage_assert,
         };
-        let response = self.0.execute(wallet, vec![], execute_msg).await?;
-        Ok(response)
+        let status = self.status().await?;
+        self.exec_with_crank_fee(wallet, &status, &execute_msg)
+            .await
     }
 
     pub async fn update_collateral(
@@ -534,10 +536,39 @@ impl MarketContract {
                     }
                 }
             };
-            self.0
-                .execute(wallet, vec![], execute_msg)
+            self.exec_with_crank_fee(wallet, &status, &execute_msg)
                 .await
-                .map_err(|e| e.into())
+        }
+    }
+
+    async fn exec_with_crank_fee(
+        &self,
+        wallet: &Wallet,
+        status: &StatusResp,
+        msg: &MarketExecuteMsg,
+    ) -> Result<TxResponse> {
+        let price = self.current_price().await?;
+        let crank_fee_usd = status.config.crank_fee_charged
+            + status
+                .config
+                .crank_fee_surcharge
+                .checked_mul_dec(Decimal256::from_ratio(
+                    status.deferred_execution_items / 10,
+                    1u32,
+                ))?;
+        let crank_fee = price.usd_to_collateral(crank_fee_usd);
+
+        // Add a small multiplier to account for rounding errors. In real life
+        // we'd use a larger multiplier to deal with price fluctuations too.
+        let crank_fee = crank_fee.checked_mul_dec("1.01".parse().unwrap())?;
+
+        match NonZero::new(crank_fee) {
+            None => self
+                .0
+                .execute(wallet, vec![], msg)
+                .await
+                .map_err(|e| e.into()),
+            Some(crank_fee) => self.exec_with_funds(wallet, status, crank_fee, msg).await,
         }
     }
 

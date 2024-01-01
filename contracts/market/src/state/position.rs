@@ -760,7 +760,12 @@ impl State<'_> {
             .keys(store, None, None, Order::Ascending)
             .next()
             .is_none());
-        anyhow::ensure!(LIQUIDATION_PRICES_PENDING_COUNT.load(store)? == 0);
+        anyhow::ensure!(
+            LIQUIDATION_PRICES_PENDING_COUNT
+                .may_load(store)?
+                .unwrap_or_default()
+                == 0
+        );
 
         Ok(())
     }
