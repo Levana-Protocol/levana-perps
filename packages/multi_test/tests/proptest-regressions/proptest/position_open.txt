@@ -6,3 +6,4 @@
 # everyone who runs the test benefits from these saved cases.
 cc 8f9b1c43e7149b0c3a01c42e0a2fb325e9209b80560eb7f4e3d96d87e710bc2a # shrinks to open = PositionOpen { collateral: "1", slippage_assert: None, leverage: "1", direction: Long, max_gains: "1.1", stop_loss_override: None, take_profit_override: None }
 cc 1a077d0ad0ba0af6f8af6ddef43fa213275633eb0dce41cca83e3c07c4eb99e6 # shrinks to strategy = PositionOpen { collateral: "31.787128", slippage_assert: None, leverage: "28.031273", direction: Long, max_gains: "+Inf", stop_loss_override: None, take_profit_override: None, market-id: "ATOM_USD", market-type: CollateralIsBase }
+cc 2b3a661c7c13198c15f9c2dafe36750063bee1e01427ccdee625fbba56ee62c4 # shrinks to strategy = PositionOpen { collateral: "98.875508", slippage_assert: None, leverage: "29.922388", direction: Long, max_gains: "0.9974129", stop_loss_override: None, take_profit_override: None, market-id: "ATOM_USD+", market-type: CollateralIsQuote }

@@ -2,6 +2,7 @@ use levana_perpswap_multi_test::return_unless_market_collateral_quote;
 use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::contracts::market::config::{defaults::ConfigDefaults, ConfigUpdate};
+use msg::contracts::market::position::PositionId;
 use msg::prelude::*;
 
 #[test]
@@ -207,10 +208,9 @@ fn funding_rates_typical() {
 }
 
 #[test]
-// FIXME - no longer works since we need to disable the time jump
-#[ignore]
 fn funding_payment_typical() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let app = PerpsApp::new_cell().unwrap();
+    let market = PerpsMarket::new(app.clone()).unwrap();
     return_unless_market_collateral_quote!(market);
 
     let trader = market.clone_trader(0).unwrap();
@@ -226,10 +226,10 @@ fn funding_payment_typical() {
         .unwrap();
 
     market.set_time(TimeJump::Hours(2)).unwrap();
-    market.exec_refresh_price().unwrap();
+    //market.exec_refresh_price().unwrap();
 
     market
-        .exec_open_position(
+        .exec_open_position_queue_only(
             &trader,
             "100",
             "10",
@@ -242,7 +242,7 @@ fn funding_payment_typical() {
         .unwrap();
 
     market
-        .exec_open_position(
+        .exec_open_position_queue_only(
             &trader,
             "100",
             "10",
@@ -254,8 +254,8 @@ fn funding_payment_typical() {
         )
         .unwrap();
 
-    let (short_pos_id, _) = market
-        .exec_open_position(
+    market
+        .exec_open_position_queue_only(
             &trader,
             "100",
             "10",
@@ -267,8 +267,8 @@ fn funding_payment_typical() {
         )
         .unwrap();
 
-    let (long_pos_id, _) = market
-        .exec_open_position(
+    market
+        .exec_open_position_queue_only(
             &trader,
             "200",
             "10",
@@ -279,6 +279,12 @@ fn funding_payment_typical() {
             None,
         )
         .unwrap();
+
+    market.exec_refresh_price().unwrap();
+    market.exec_crank_n(&trader, 7).unwrap();
+
+    let short_pos_id = PositionId::new(3);
+    let long_pos_id = PositionId::new(4);
 
     let long_before_epoch = market.query_position(long_pos_id).unwrap();
     let short_before_epoch = market.query_position(short_pos_id).unwrap();
@@ -293,12 +299,14 @@ fn funding_payment_typical() {
     let short_after_epoch = market.query_position(short_pos_id).unwrap();
 
     // long pos; 365 days, 24 hours, but 2 epochs of time.
-    let funding_estimate = -long_before_epoch.notional_size.abs().into_number()
-        * rates.long_funding
-        / Number::from(365u64 * 24u64 / 2u64);
+    let divisor = Number::from(365u64 * 24u64 / 2u64);
+
+    let funding_estimate =
+        -long_before_epoch.notional_size.abs().into_number() * rates.long_funding / divisor;
     let borrow_fee = -long_before_epoch.counter_collateral.into_number()
         * rates.borrow_fee.into_number()
-        / Number::from(365u64 * 24u64 / 2u64);
+        / divisor;
+
     assert!(
         (long_after_epoch.active_collateral.into_number() - long_before_epoch.active_collateral.into_number())
             .approx_eq(funding_estimate + borrow_fee),
@@ -322,12 +330,12 @@ fn funding_payment_typical() {
     assert_ne!(long_after_epoch.borrow_fee_usd, Usd::zero());
 
     // short pos; 365 days, 24 hours, but 2 epochs of time.
-    let funding_estimate = -short_before_epoch.notional_size.abs().into_number()
-        * rates.short_funding
-        / Number::from(365u64 * 24u64 / 2u64);
+    let funding_estimate =
+        -short_before_epoch.notional_size.abs().into_number() * rates.short_funding / divisor;
     let borrow_fee = -short_before_epoch.counter_collateral.into_number()
         * rates.borrow_fee.into_number()
-        / Number::from(365u64 * 24u64 / 2u64);
+        / divisor;
+
     assert!((short_after_epoch.active_collateral.into_number()
         - short_before_epoch.active_collateral.into_number())
     .approx_eq(funding_estimate + borrow_fee));

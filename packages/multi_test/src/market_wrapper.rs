@@ -1095,6 +1095,74 @@ impl PerpsMarket {
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
     ) -> Result<(PositionId, DeferResponse)> {
+        let queue_resp = self.exec_open_position_raw_queue_only(
+            sender,
+            collateral,
+            slippage_assert,
+            leverage,
+            direction,
+            max_gains,
+            stop_loss_override,
+            take_profit_override,
+        )?;
+        self.exec_open_position_process_queue_response(sender, queue_resp)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn exec_open_position_queue_only(
+        &self,
+        sender: &Addr,
+        collateral: impl TryInto<NumberGtZero, Error = anyhow::Error>,
+        leverage: impl TryInto<LeverageToBase, Error = anyhow::Error>,
+        direction: DirectionToBase,
+        max_gains: impl TryInto<MaxGainsInQuote, Error = anyhow::Error>,
+        slippage_assert: Option<SlippageAssert>,
+        stop_loss_override: Option<PriceBaseInQuote>,
+        take_profit_override: Option<PriceBaseInQuote>,
+    ) -> Result<DeferQueueResponse> {
+        self.exec_open_position_raw_queue_only(
+            sender,
+            collateral.try_into()?.into(),
+            slippage_assert,
+            leverage.try_into()?,
+            direction,
+            max_gains.try_into()?,
+            stop_loss_override,
+            take_profit_override,
+        )
+    }
+
+    pub fn exec_open_position_process_queue_response(
+        &self,
+        cranker: &Addr,
+        queue_response: DeferQueueResponse,
+    ) -> Result<(PositionId, DeferResponse)> {
+        // Open position always happens through a deferred exec
+        let defer_res = self.exec_defer_queue_process(cranker, queue_response)?;
+
+        if self.debug_001 {
+            println!("{:#?}", defer_res);
+        }
+
+        let res = defer_res.exec_resp().clone();
+
+        let pos_id = res.event_first_value("position-open", "pos-id")?.parse()?;
+
+        Ok((pos_id, defer_res))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn exec_open_position_raw_queue_only(
+        &self,
+        sender: &Addr,
+        collateral: Number,
+        slippage_assert: Option<SlippageAssert>,
+        leverage: LeverageToBase,
+        direction: DirectionToBase,
+        max_gains: MaxGainsInQuote,
+        stop_loss_override: Option<PriceBaseInQuote>,
+        take_profit_override: Option<PriceBaseInQuote>,
+    ) -> Result<DeferQueueResponse> {
         if self.id.get_market_type() == MarketType::CollateralIsBase {
             // let price = self.query_current_price()?;
             // let config = self.query_config()?;
@@ -1118,17 +1186,7 @@ impl PerpsMarket {
         )?;
 
         // Open position always happens through a deferred exec
-        let defer_res = self.exec_defer_wasm_msg(sender, msg)?;
-
-        if self.debug_001 {
-            println!("{:#?}", defer_res);
-        }
-
-        let res = defer_res.exec_resp().clone();
-
-        let pos_id = res.event_first_value("position-open", "pos-id")?.parse()?;
-
-        Ok((pos_id, defer_res))
+        self.exec_defer_queue_wasm_msg(sender, msg)
     }
 
     pub fn exec_close_position(
@@ -1922,7 +1980,11 @@ impl PerpsMarket {
 
     // this defers a message exec in the sense of Levana perps semantics of "deferred executions"
     // *not* defer in the sense of native programming jargon, like the golang keyword or until Drop kicks in etc.
-    pub fn exec_defer_wasm_msg(&self, sender: &Addr, msg: WasmMsg) -> Result<DeferResponse> {
+    pub fn exec_defer_queue_wasm_msg(
+        &self,
+        sender: &Addr,
+        msg: WasmMsg,
+    ) -> Result<DeferQueueResponse> {
         let cosmos_msg = CosmosMsg::Wasm(msg);
         let res = self.app().execute(sender.clone(), cosmos_msg)?;
 
@@ -1930,7 +1992,18 @@ impl PerpsMarket {
             .event_first("deferred-exec-queued")
             .and_then(DeferredExecQueuedEvent::try_from)?;
 
-        let mut responses = vec![res];
+        Ok(DeferQueueResponse {
+            event: queue_event,
+            response: res,
+        })
+    }
+
+    pub fn exec_defer_queue_process(
+        &self,
+        cranker: &Addr,
+        queue: DeferQueueResponse,
+    ) -> Result<DeferResponse> {
+        let mut responses = vec![queue.response];
 
         // this loops forever if the deferred execution never *happens*
         // which would be a core bug since by this point it's definitely been queued
@@ -1945,11 +2018,11 @@ impl PerpsMarket {
                 .event_first("deferred-exec-executed")
                 .and_then(DeferredExecExecutedEvent::try_from)
             {
-                if exec_event.deferred_exec_id == queue_event.deferred_exec_id {
+                if exec_event.deferred_exec_id == queue.event.deferred_exec_id {
                     break match exec_event.success {
                         true => Ok(DeferResponse {
                             exec_event,
-                            queue_event,
+                            queue_event: queue.event,
                             responses,
                         }),
                         false => Err(anyhow!("deferred execution failed: {:?}", exec_event.desc)),
@@ -1968,7 +2041,7 @@ impl PerpsMarket {
             // self.exec_refresh_price()?;
 
             responses.push(self.exec(
-                sender,
+                cranker,
                 &MarketExecuteMsg::Crank {
                     // This also doesn't seem necessary so far
                     // if tests do depend on only getting more fidelity on cranking here
@@ -1979,6 +2052,11 @@ impl PerpsMarket {
                 },
             )?);
         }
+    }
+
+    pub fn exec_defer_wasm_msg(&self, sender: &Addr, msg: WasmMsg) -> Result<DeferResponse> {
+        let queue_res = self.exec_defer_queue_wasm_msg(sender, msg)?;
+        self.exec_defer_queue_process(sender, queue_res)
     }
 }
 
@@ -1999,4 +2077,10 @@ impl DeferResponse {
         // Safe - we only get here if the deferred execution was executed, and by definition that's the last AppResponse we get
         self.responses.last().unwrap()
     }
+}
+
+#[derive(Debug)]
+pub struct DeferQueueResponse {
+    pub event: DeferredExecQueuedEvent,
+    pub response: AppResponse,
 }
