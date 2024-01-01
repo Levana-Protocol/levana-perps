@@ -707,9 +707,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
 pub fn migrate(deps: DepsMut, env: Env, MigrateMsg {}: MigrateMsg) -> Result<Response> {
     let (state, ctx) = StateContext::new(deps, env)?;
 
-    // Note, we use _state instead of state to avoid warnings when compiling without the sanity
-    // feature
-
     #[cfg(feature = "sanity")]
     state.sanity_check(ctx.storage);
 
