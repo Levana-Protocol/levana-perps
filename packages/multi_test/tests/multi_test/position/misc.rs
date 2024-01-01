@@ -191,7 +191,8 @@ fn funding_payment_flips_direction() {
     market.set_time(TimeJump::Liquifundings(1)).unwrap();
     market.exec_refresh_price().unwrap();
 
-    // FIXME: why does this work?? o_O
+    // Crank just enough to do a liquifunding but not liquidation
+    // so that the position is liquidatable but not liquidated
     market.exec_crank_n(&trader, 1).unwrap();
 
     // In collateral-is-base markets, the position should now be in the
