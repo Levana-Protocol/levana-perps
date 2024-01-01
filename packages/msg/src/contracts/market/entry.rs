@@ -1240,6 +1240,8 @@ pub struct StatusResp {
     pub next_deferred_execution: Option<Timestamp>,
     /// Number of work items sitting in the deferred execution queue
     pub deferred_execution_items: u32,
+    /// Last processed deferred execution ID, if any
+    pub last_processed_deferred_exec_id: Option<DeferredExecId>,
     /// Overall borrow fee rate (annualized), combining LP and xLP
     pub borrow_fee: Decimal256,
     /// LP component of [Self::borrow_fee]

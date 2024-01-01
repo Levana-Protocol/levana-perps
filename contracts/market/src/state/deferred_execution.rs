@@ -16,13 +16,13 @@ use msg::prelude::*;
 use super::StateContext;
 
 #[derive(serde::Serialize, serde::Deserialize)]
-struct DeferredExecLatestIds {
-    issued: DeferredExecId,
-    processed: Option<DeferredExecId>,
+pub(crate) struct DeferredExecLatestIds {
+    pub(crate) issued: DeferredExecId,
+    pub(crate) processed: Option<DeferredExecId>,
 }
 
 impl DeferredExecLatestIds {
-    fn queue_size(&self) -> u32 {
+    pub(crate) fn queue_size(&self) -> u32 {
         u32::try_from(self.issued.u64() - self.processed.map_or(0, |x| x.u64())).unwrap_or(u32::MAX)
     }
 }
@@ -54,10 +54,13 @@ const IS_LIMIT_ORDER_CANCELING: Map<OrderId, ()> = Map::new(namespace::IS_LIMIT_
 const IS_POSITION_CLOSING: Map<PositionId, ()> = Map::new(namespace::IS_POSITION_CLOSING);
 
 impl State<'_> {
-    pub(crate) fn deferred_execution_items(&self, store: &dyn Storage) -> Result<u32> {
-        Ok(DEFERRED_EXEC_LATEST_IDS
-            .may_load(store)?
-            .map_or(0, |latest| latest.queue_size()))
+    pub(crate) fn deferred_execution_latest_ids(
+        &self,
+        store: &dyn Storage,
+    ) -> Result<Option<DeferredExecLatestIds>> {
+        DEFERRED_EXEC_LATEST_IDS
+            .may_load(store)
+            .map_err(|e| e.into())
     }
 
     pub(crate) fn get_next_deferred_execution(

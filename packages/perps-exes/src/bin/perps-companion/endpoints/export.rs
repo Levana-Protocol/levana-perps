@@ -620,6 +620,7 @@ mod tests {
                 crank: Default::default(),
             },
             deferred_execution_items: 0,
+            last_processed_deferred_exec_id: None,
         }
     }
 
