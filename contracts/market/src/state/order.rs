@@ -117,33 +117,18 @@ impl State<'_> {
     /// Returns the next long or short [LimitOrder] whose trigger price is above the specified price
     /// for long orders or below the specified price for short orders.
     ///
-    /// The provided price comes from the current price point we're cranking. We
-    /// also consider the most recent price within the protocol, since that
-    /// price will be used when actually opening the position. Only if the
-    /// trigger price is above both of those prices (for longs, below for
-    /// shorts) do we open the order.
-    ///
-    /// If `ignore_current_price` is `true`, we only check based on the supplied
-    /// `price` parameter. Otherwise we ensure that the order would be placed
-    /// for both the provided price and the most recent price within the
-    /// contracts.
+    /// The provided price comes from the current price point we're cranking, or
+    /// from a queried price to check if a price update would lead to a trigger or limit
+    /// order being available.
     pub(crate) fn limit_order_triggered_order(
         &self,
         storage: &dyn Storage,
         price: Price,
-        ignore_current_price: bool,
     ) -> Result<Option<OrderId>> {
-        let current = if ignore_current_price {
-            price
-        } else {
-            self.spot_price_latest_opt(storage)?
-                .map_or(price, |x| x.price_notional)
-        };
-
         let order = LIMIT_ORDERS_BY_PRICE_LONG
             .prefix_range(
                 storage,
-                Some(PrefixBound::inclusive(PriceKey::from(price.max(current)))),
+                Some(PrefixBound::inclusive(PriceKey::from(price))),
                 None,
                 Order::Ascending,
             )
@@ -155,7 +140,7 @@ impl State<'_> {
                 .prefix_range(
                     storage,
                     None,
-                    Some(PrefixBound::inclusive(PriceKey::from(price.min(current)))),
+                    Some(PrefixBound::inclusive(PriceKey::from(price))),
                     Order::Descending,
                 )
                 .next(),

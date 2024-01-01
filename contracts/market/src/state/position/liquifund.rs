@@ -51,6 +51,10 @@ impl State<'_> {
         ends_at: Timestamp,
         charge_crank_fee: bool,
     ) -> Result<MaybeClosedPosition> {
+        debug_assert!(starts_at <= ends_at);
+        debug_assert!(starts_at == pos.liquifunded_at);
+        debug_assert!(pos.next_liquifunding >= ends_at);
+
         let start_price = self.spot_price(ctx.storage, starts_at)?;
         let end_price = self.spot_price(ctx.storage, ends_at)?;
         let config = &self.config;

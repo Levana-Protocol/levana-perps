@@ -284,13 +284,3 @@ fn crank_fee_to_rewards_wallet() {
         crank_fees_pending.into_number()
     );
 }
-
-#[test]
-fn price_update_completes_price() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-
-    market.exec_set_price("5".parse().unwrap()).unwrap();
-
-    let status = market.query_status().unwrap();
-    assert_eq!(status.next_crank, None);
-}

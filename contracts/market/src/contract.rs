@@ -15,7 +15,7 @@ use crate::state::{
 use crate::prelude::*;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{Addr, Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response};
+use cosmwasm_std::{Deps, DepsMut, Env, MessageInfo, QueryResponse, Reply, Response};
 use cw2::{get_contract_version, set_contract_version};
 use msg::{
     contracts::market::{
@@ -96,24 +96,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     #[cfg(feature = "sanity")]
     state.sanity_check(ctx.storage);
 
-    // update borrow fee rate gradually
-    state
-        .accumulate_borrow_fee_rate(&mut ctx, state.now())
-        .map_err(|e| anyhow::anyhow!("accumulate_borrow_fee_rate failed: {e:?}"))?;
-
-    fn append_spot_price(
-        state: &mut State,
-        ctx: &mut StateContext,
-        rewards_addr: &Addr,
-    ) -> Result<()> {
-        state.spot_price_append(ctx)?;
-
-        // required to keep gas estimations more reliable
-        state.crank_exec_batch(ctx, Some(0), rewards_addr)?;
-        state.crank_current_price_complete(ctx)?;
-        Ok(())
-    }
-
     // Semi-parse the message to determine the inner message/sender (relevant
     // for CW20s) and any collateral sent into the contract
     let mut info = state.parse_perps_message_info(ctx.storage, info, msg)?;
@@ -125,7 +107,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     state.ensure_not_resetting_lps(&mut ctx, &info.msg)?;
 
     if info.requires_spot_price_append {
-        append_spot_price(&mut state, &mut ctx, &info.sender)?;
+        state.spot_price_append(&mut ctx)?;
     }
 
     match info.msg {
@@ -151,7 +133,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             state.save_manual_spot_price(&mut ctx, price, price_usd)?;
             // the price needed to be set first before doing this
             // so info.requires_spot_price_append is false
-            append_spot_price(&mut state, &mut ctx, &info.sender)?;
+            state.spot_price_append(&mut ctx)?;
         }
 
         // cw20

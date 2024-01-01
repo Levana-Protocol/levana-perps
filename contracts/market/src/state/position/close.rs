@@ -116,9 +116,6 @@ impl State<'_> {
         // remove position from open list
         self.position_remove(ctx, pos.id)?;
 
-        let funding_timestamp = self.funding_valid_until(ctx.storage)?;
-        self.accumulate_funding_rate(ctx, funding_timestamp)?;
-
         let market_id = self.market_id(ctx.storage)?;
         let market_type = market_id.get_market_type();
 

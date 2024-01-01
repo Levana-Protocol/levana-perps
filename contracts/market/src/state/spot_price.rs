@@ -281,6 +281,7 @@ impl State<'_> {
                 price_notional: price,
                 price_usd: collateral,
                 price_base: base,
+                // Only used for simulating new prices not in the contract, so self.now() is OK
                 timestamp: self.now(),
                 is_notional_usd: market_id.is_notional_usd(),
                 market_type,
@@ -336,22 +337,6 @@ impl State<'_> {
         Ok(prices)
     }
 
-    /// Get the latest spot price, if one is set.
-    pub(crate) fn spot_price_latest_opt(&self, store: &dyn Storage) -> Result<Option<PricePoint>> {
-        if let Some(x) = self.spot_price_cache.get() {
-            return Ok(Some(*x));
-        }
-
-        match self.spot_price_inner_opt(store, self.now()) {
-            Ok(Some(x)) => {
-                self.spot_price_cache.set(x).ok();
-                Ok(Some(x))
-            }
-            Ok(None) => Ok(None),
-            Err(e) => Err(e),
-        }
-    }
-
     /// Get the next price point after the given minimum bound.
     pub(crate) fn spot_price_after(
         &self,
@@ -389,6 +374,7 @@ impl State<'_> {
                     price_base,
                     publish_time: None,
                     publish_time_usd: None,
+                    // Acceptable to use self.now() for manual price updates, no real publish time
                     block_time: Some(self.now()),
                 },
             )
@@ -414,15 +400,15 @@ impl State<'_> {
             } => {
                 let internal = self.get_oracle_price(true)?;
                 const DEFAULT_VOLATILE_DIFF_SECONDS: u32 = 5;
-                let new_publish_time = internal.calculate_publish_time(
-                    volatile_diff_seconds.unwrap_or(DEFAULT_VOLATILE_DIFF_SECONDS),
-                )?;
+                let new_publish_time = internal
+                    .calculate_publish_time(
+                        volatile_diff_seconds.unwrap_or(DEFAULT_VOLATILE_DIFF_SECONDS),
+                    )?
+                    .ok_or(MarketError::NoPricePublishTimeFound.into_anyhow())?;
+                // self.now() usage is OK, it's explicitly for saving the block time in storage
                 let price_storage =
                     internal.compose_price(market_id, &feeds, &feeds_usd, self.now())?;
-                (
-                    new_publish_time.unwrap_or_else(|| self.now()),
-                    price_storage,
-                )
+                (new_publish_time, price_storage)
             }
         };
 

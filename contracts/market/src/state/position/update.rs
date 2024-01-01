@@ -383,8 +383,6 @@ impl State<'_> {
             price_point,
         )?;
 
-        let funding_timestamp = self.funding_valid_until(ctx.storage)?;
-        self.accumulate_funding_rate(ctx, funding_timestamp)?;
         self.adjust_counter_collateral_locked(ctx, counter_collateral_delta, price_point)?;
         self.collect_trading_fee(
             ctx,
@@ -500,8 +498,6 @@ impl State<'_> {
             price_point,
         )?;
 
-        let funding_timestamp = self.funding_valid_until(ctx.storage)?;
-        self.accumulate_funding_rate(ctx, funding_timestamp)?;
         self.adjust_counter_collateral_locked(ctx, counter_collateral_delta, price_point)?;
         self.collect_trading_fee(
             ctx,
@@ -610,7 +606,8 @@ impl State<'_> {
         // based on a liquifunding, so we perform a liquifunding right now. We
         // then validate the updated position.
         let last_liquifund = pos.liquifunded_at;
-        match self.position_liquifund(ctx, pos, last_liquifund, self.now(), false)? {
+        debug_assert!(pos.next_liquifunding >= price_point.timestamp);
+        match self.position_liquifund(ctx, pos, last_liquifund, price_point.timestamp, false)? {
             MaybeClosedPosition::Open(mut pos) => {
                 self.position_validate_trigger_orders(&pos, market_type, price_point)?;
                 self.position_save(ctx, &mut pos, price_point, true, false, PositionSaveReason::Update)?;
