@@ -289,7 +289,6 @@ pub async fn test_update_leverage(perp_app: &PerpApp) -> Result<()> {
     let diff_leverage =
         new_position_detail.leverage.into_number() - position_detail.leverage.into_number();
 
-    // Sibi: Check with Michael
     ensure!(
         diff_leverage > "0.000000006".parse()? && diff_leverage < "1".parse()?,
         "Leverage increased with delta of one. diff_leverage: {diff_leverage}"
@@ -348,7 +347,6 @@ pub async fn test_update_max_gains(perp_app: &PerpApp) -> Result<()> {
     };
 
     // 0.5 - 0.44 = 0.06
-    // Sibi: Check this with Michael
     ensure!(
         diff_max_gains > "0.0000000002".parse()? && diff_max_gains < "0.06".parse()?,
         "Max gains is updated with proper delta. diff_max_gains: {diff_max_gains}"
