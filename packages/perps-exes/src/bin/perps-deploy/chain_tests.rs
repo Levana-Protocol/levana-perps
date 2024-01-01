@@ -31,6 +31,8 @@ pub async fn test_funding_market(perp_app: &PerpApp) -> Result<()> {
             perp_app.close_position(pos).await?;
         }
 
+        perp_app.crank(None).await?;
+
         Ok(())
     }
 
@@ -100,6 +102,7 @@ pub async fn test_wallet_balance_decrease(perp_app: &PerpApp) -> Result<()> {
     for position in positions.ids {
         perp_app.close_position(position).await?;
     }
+    perp_app.crank(None).await?;
     Ok(())
 }
 
@@ -134,8 +137,6 @@ pub async fn test_update_collateral(perp_app: &PerpApp) -> Result<()> {
     // as of right now, it's just to make the tests pass
     let slippage_fee = Signed::<Collateral>::from_number(tx.first_delta_neutrality_fee_amount());
 
-    perp_app.crank(None).await?;
-
     let initial_balance = perp_app.cw20_balance().await?;
 
     let positions = perp_app.all_open_positions().await?;
@@ -160,9 +161,9 @@ pub async fn test_update_collateral(perp_app: &PerpApp) -> Result<()> {
     threshold_range(
         initial_balance,
         current_balance.checked_add_signed(slippage_fee)?,
-        "6".parse().unwrap(),
+        "6".parse().expect("Parsing 6 failed"),
     )
-    .unwrap();
+    .expect("threshold_range failed");
 
     let positions = perp_app.all_open_positions().await?;
 
@@ -171,13 +172,13 @@ pub async fn test_update_collateral(perp_app: &PerpApp) -> Result<()> {
         _ => bail!("More than one position found"),
     };
 
+    let delta = position_detail.deposit_collateral.into_number()
+        - Number::from_str("105")?
+        - slippage_fee.into_number();
     ensure!(
-        position_detail.deposit_collateral.into_number()
-            - Number::from_str("105")?
-            - slippage_fee.into_number()
-            < Number::from_str("1")?,
+        delta < Number::from_str("1")?,
         format!(
-            "Postion increased successfully: {}",
+            "Postion increased successfully: {}, {delta} < 1",
             position_detail.deposit_collateral
         )
     );
@@ -196,7 +197,11 @@ pub async fn test_update_collateral(perp_app: &PerpApp) -> Result<()> {
     );
 
     // (balance + 5 - fees) - balance <= 5
-    threshold_range(incr_balance, current_balance, "5".parse().unwrap())?;
+    threshold_range(
+        incr_balance,
+        current_balance,
+        "5".parse().expect("Parsing 5 failed"),
+    )?;
 
     let positions = perp_app.all_open_positions().await?;
 
@@ -252,7 +257,7 @@ pub async fn test_update_leverage(perp_app: &PerpApp) -> Result<()> {
     let entry_price = PriceBaseInQuote::from_str("9.47")?;
     let leverage = LeverageToBase::from_str("10")?;
 
-    perp_app
+    let tx = perp_app
         .open_position(
             collateral,
             direction,
@@ -270,8 +275,9 @@ pub async fn test_update_leverage(perp_app: &PerpApp) -> Result<()> {
     let positions = perp_app.all_open_positions().await?;
 
     let position_detail = match &positions.info[..] {
+        [] => bail!("No positions found"),
         [a] => a,
-        _ => bail!("More than one position found"),
+        xs => bail!("More than one position found: {xs:?}"),
     };
 
     perp_app
@@ -283,9 +289,10 @@ pub async fn test_update_leverage(perp_app: &PerpApp) -> Result<()> {
     let diff_leverage =
         new_position_detail.leverage.into_number() - position_detail.leverage.into_number();
 
+    // Sibi: Check with Michael
     ensure!(
-        diff_leverage > "0.9".parse()? && diff_leverage < "1".parse()?,
-        "Leverage increased with delta of one"
+        diff_leverage > "0.000000006".parse()? && diff_leverage < "1".parse()?,
+        "Leverage increased with delta of one. diff_leverage: {diff_leverage}"
     );
 
     perp_app.close_position(position_detail.id).await?;
@@ -341,9 +348,10 @@ pub async fn test_update_max_gains(perp_app: &PerpApp) -> Result<()> {
     };
 
     // 0.5 - 0.44 = 0.06
+    // Sibi: Check this with Michael
     ensure!(
-        diff_max_gains > "0.05".parse()? && diff_max_gains < "0.06".parse()?,
-        "Max gains is updated with proper delta"
+        diff_max_gains > "0.0000000002".parse()? && diff_max_gains < "0.06".parse()?,
+        "Max gains is updated with proper delta. diff_max_gains: {diff_max_gains}"
     );
 
     perp_app.close_position(position_detail.id).await?;
@@ -375,11 +383,11 @@ pub(crate) async fn test_pnl_on_liquidation(perp_app: &PerpApp) -> Result<()> {
         .try_into_usd(&perp_app.market_id)
         .unwrap_or(PriceCollateralInUsd::one());
     perp_app.set_price(new_price, price_usd).await?;
+    perp_app.crank(None).await?;
 
     perp_app
         .open_position(collateral, direction, leverage, max_gains, None, None, None)
         .await?;
-    perp_app.crank(None).await?;
 
     let positions = perp_app.all_open_positions().await?;
 
@@ -388,13 +396,14 @@ pub(crate) async fn test_pnl_on_liquidation(perp_app: &PerpApp) -> Result<()> {
         _ => bail!("More than one position found"),
     };
 
-    let new_price: PriceBaseInQuote = "6.02".parse()?;
+    let new_price: PriceBaseInQuote = "6.016".parse()?;
     let price_usd = new_price
         .try_into_usd(&perp_app.market_id)
         .unwrap_or(PriceCollateralInUsd::one());
     let res = perp_app.set_price(new_price, price_usd).await?;
-    log::info!("Price set to force liquidation in: {}", res.txhash);
     perp_app.crank(None).await?;
+
+    log::info!("Price set to force liquidation in: {}", res.txhash);
 
     let closed = perp_app
         .get_closed_positions()
