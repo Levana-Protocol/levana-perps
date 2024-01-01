@@ -34,6 +34,7 @@ fn position_misc_debug_temp() {
         .unwrap();
 
     let pos_evt: PositionUpdateEvent = update_res
+        .exec_resp()
         .event_first("position-update")
         .unwrap()
         .try_into()

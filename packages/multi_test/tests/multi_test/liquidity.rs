@@ -1209,6 +1209,8 @@ fn rewards_while_unstaking() {
     for addr in [&justxlp, &unstaking] {
         market.exec_stake_lp(addr, None).unwrap();
     }
+
+    market.automatic_time_jump_enabled = true;
     market
         .exec_open_position(
             &trader,
@@ -1221,6 +1223,7 @@ fn rewards_while_unstaking() {
             None,
         )
         .unwrap();
+    market.automatic_time_jump_enabled = false;
 
     market.set_time(TimeJump::Liquifundings(3)).unwrap();
     market.exec_refresh_price().unwrap();
@@ -1263,6 +1266,7 @@ fn rewards_while_unstaking() {
     // unstaking wallet acts like the justlp wallet for rewards.
     market.exec_unstake_xlp(&unstaking, None).unwrap();
 
+    market.automatic_time_jump_enabled = true;
     // Get more yields
     market
         .exec_open_position(
@@ -1276,6 +1280,8 @@ fn rewards_while_unstaking() {
             None,
         )
         .unwrap();
+    market.automatic_time_jump_enabled = false;
+
     market.set_time(TimeJump::Liquifundings(3)).unwrap();
     market.exec_crank_till_finished(&cranker).unwrap();
 

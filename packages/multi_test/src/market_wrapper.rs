@@ -1136,7 +1136,7 @@ impl PerpsMarket {
         sender: &Addr,
         position_id: PositionId,
         collateral_delta: Signed<Collateral>,
-    ) -> Result<AppResponse> {
+    ) -> Result<DeferResponse> {
         let msg = self.token.into_market_execute_msg(
             &self.addr,
             collateral_delta
@@ -1155,9 +1155,7 @@ impl PerpsMarket {
             },
         )?;
 
-        let defer_resp = self.exec_defer_wasm_msg(sender, msg)?;
-
-        Ok(defer_resp.exec_resp().clone())
+        self.exec_defer_wasm_msg(sender, msg)
     }
 
     pub fn exec_update_position_collateral_impact_size(
@@ -1166,7 +1164,7 @@ impl PerpsMarket {
         position_id: PositionId,
         collateral_delta: Signed<Collateral>,
         slippage_assert: Option<SlippageAssert>,
-    ) -> Result<AppResponse> {
+    ) -> Result<DeferResponse> {
         let msg = self.token.into_market_execute_msg(
             &self.addr,
             collateral_delta
@@ -1189,9 +1187,7 @@ impl PerpsMarket {
             },
         )?;
 
-        let defer_resp = self.exec_defer_wasm_msg(sender, msg)?;
-
-        Ok(defer_resp.exec_resp().clone())
+        self.exec_defer_wasm_msg(sender, msg)
     }
 
     pub fn exec_update_position_leverage(
@@ -1200,17 +1196,15 @@ impl PerpsMarket {
         position_id: PositionId,
         leverage: LeverageToBase,
         slippage_assert: Option<SlippageAssert>,
-    ) -> Result<AppResponse> {
-        let defer_resp = self.exec_defer(
+    ) -> Result<DeferResponse> {
+        self.exec_defer(
             sender,
             &MarketExecuteMsg::UpdatePositionLeverage {
                 id: position_id,
                 leverage,
                 slippage_assert,
             },
-        )?;
-
-        Ok(defer_resp.exec_resp().clone())
+        )
     }
 
     pub fn exec_update_position_max_gains(
@@ -1218,16 +1212,14 @@ impl PerpsMarket {
         sender: &Addr,
         position_id: PositionId,
         max_gains: MaxGainsInQuote,
-    ) -> Result<AppResponse> {
-        let defer_resp = self.exec_defer(
+    ) -> Result<DeferResponse> {
+        self.exec_defer(
             sender,
             &MarketExecuteMsg::UpdatePositionMaxGains {
                 id: position_id,
                 max_gains,
             },
-        )?;
-
-        Ok(defer_resp.exec_resp().clone())
+        )
     }
 
     pub fn exec_set_trigger_order(
@@ -1258,7 +1250,7 @@ impl PerpsMarket {
         max_gains: MaxGainsInQuote,
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
-    ) -> Result<(OrderId, AppResponse)> {
+    ) -> Result<(OrderId, DeferResponse)> {
         let msg = self.token.into_market_execute_msg(
             &self.addr,
             collateral.raw(),
@@ -1274,17 +1266,20 @@ impl PerpsMarket {
 
         let defer_res = self.exec_defer_wasm_msg(sender, msg)?;
 
-        let res = defer_res.exec_resp().clone();
-
-        let order_id = res
+        let order_id = defer_res
+            .exec_resp()
             .event_first_value(event_key::PLACE_LIMIT_ORDER, event_key::ORDER_ID)?
             .parse()?;
 
-        Ok((order_id, res))
+        Ok((order_id, defer_res))
     }
 
-    pub fn exec_cancel_limit_order(&self, sender: &Addr, order_id: OrderId) -> Result<AppResponse> {
-        self.exec(sender, &MarketExecuteMsg::CancelLimitOrder { order_id })
+    pub fn exec_cancel_limit_order(
+        &self,
+        sender: &Addr,
+        order_id: OrderId,
+    ) -> Result<DeferResponse> {
+        self.exec_defer(sender, &MarketExecuteMsg::CancelLimitOrder { order_id })
     }
 
     // outside contract queries that require market info like addr

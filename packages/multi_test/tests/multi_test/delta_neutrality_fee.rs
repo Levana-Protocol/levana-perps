@@ -100,13 +100,16 @@ fn artificial_slippage_charge_update() {
         .unwrap();
 
     // updating without affecting size should not charge slippage
-    let res = market
+    let defer_res = market
         .exec_update_position_collateral_impact_leverage(&trader, pos_id, "10".try_into().unwrap())
         .unwrap();
-    res.try_first_delta_neutrality_fee_amount().unwrap_err();
+    defer_res
+        .exec_resp()
+        .try_first_delta_neutrality_fee_amount()
+        .unwrap_err();
 
     // updating with affecting size should though
-    let res = market
+    let defer_res = market
         .exec_update_position_collateral_impact_size(
             &trader,
             pos_id,
@@ -114,7 +117,7 @@ fn artificial_slippage_charge_update() {
             None,
         )
         .unwrap();
-    let update_amount = res.first_delta_neutrality_fee_amount();
+    let update_amount = defer_res.exec_resp().first_delta_neutrality_fee_amount();
     assert_ne!(update_amount, Number::ZERO);
 }
 
