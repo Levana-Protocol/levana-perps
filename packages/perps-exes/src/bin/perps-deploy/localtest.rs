@@ -117,8 +117,7 @@ pub(crate) async fn go(opt: Opt, opts: TestsOpt) -> Result<()> {
     test_set_and_fetch_price(&perp_app).await?;
     test_update_leverage(&perp_app).await?;
     test_update_max_gains(&perp_app).await?;
-    // Sibi: The positions aren't getting closed
-    // test_pnl_on_liquidation(&perp_app).await?;
+    test_pnl_on_liquidation(&perp_app).await?;
 
     Ok(())
 }
