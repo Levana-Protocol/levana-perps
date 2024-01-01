@@ -116,6 +116,7 @@ impl State<'_> {
             counter_collateral,
             notional_size,
             created_at: self.now(),
+            price_point_created_at: Some(price_point.timestamp),
             liquifunded_at,
             next_liquifunding,
             stop_loss_override,
@@ -292,6 +293,7 @@ impl State<'_> {
                 take_profit_override: pos.take_profit_override,
             },
             created_at: pos.created_at,
+            price_point_created_at: price_point.timestamp,
         });
 
         Ok(pos.id)

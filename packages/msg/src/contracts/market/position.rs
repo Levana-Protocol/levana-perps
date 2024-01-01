@@ -40,8 +40,12 @@ pub struct Position {
     pub counter_collateral: NonZero<Collateral>,
     /// This is signed, where negative represents a short and positive is a long
     pub notional_size: Signed<Notional>,
-    /// When the position was created.
+    /// When the position was created, in terms of block time.
     pub created_at: Timestamp,
+    /// Price point timestamp of the crank that created this position.
+    ///
+    /// This field is only used since deferred execution, before that it is `None`.
+    pub price_point_created_at: Option<Timestamp>,
     /// The one-time fee paid when opening or updating a position
     ///
     /// this value is the current balance, including all updates
@@ -145,8 +149,10 @@ pub struct PositionQueryResponse {
     pub leverage: LeverageToBase,
     /// Leverage of the counter collateral
     pub counter_leverage: LeverageToBase,
-    /// When the position was opened
+    /// When the position was opened, block time
     pub created_at: Timestamp,
+    /// Price point used for creating this position
+    pub price_point_created_at: Option<Timestamp>,
     /// When the position was last liquifunded
     pub liquifunded_at: Timestamp,
 
@@ -587,6 +593,7 @@ impl Position {
                         id: pos.id,
                         direction_to_base,
                         created_at: pos.created_at,
+                        price_point_created_at: pos.price_point_created_at,
                         liquifunded_at: pos.liquifunded_at,
                         trading_fee_collateral: pos.trading_fee.collateral(),
                         trading_fee_usd: pos.trading_fee.usd(),
@@ -649,6 +656,7 @@ impl Position {
             counter_collateral,
             notional_size,
             created_at,
+            price_point_created_at,
             trading_fee,
             funding_fee,
             borrow_fee,
@@ -669,6 +677,7 @@ impl Position {
             owner,
             id,
             created_at,
+            price_point_created_at,
             liquifunded_at,
             direction_to_base,
             leverage,
@@ -1033,6 +1042,7 @@ pub mod events {
                         id,
                         direction_to_base,
                         created_at,
+                        price_point_created_at,
                         liquifunded_at,
                         trading_fee_collateral,
                         trading_fee_usd,
@@ -1057,7 +1067,7 @@ pub mod events {
                     },
             }: PositionCloseEvent,
         ) -> Self {
-            Event::new(event_key::POSITION_CLOSE)
+            let mut event = Event::new(event_key::POSITION_CLOSE)
                 .add_attribute(event_key::POS_OWNER, owner.to_string())
                 .add_attribute(event_key::POS_ID, id.to_string())
                 .add_attribute(event_key::DIRECTION, direction_to_base.as_str())
@@ -1111,7 +1121,11 @@ pub mod events {
                         PositionCloseReason::Direct => event_val::DIRECT,
                     },
                 )
-                .add_attribute(event_key::ACTIVE_COLLATERAL, active_collateral.to_string())
+                .add_attribute(event_key::ACTIVE_COLLATERAL, active_collateral.to_string());
+            if let Some(x) = price_point_created_at {
+                event = event.add_attribute(event_key::PRICE_POINT_CREATED_AT, x.to_string());
+            }
+            event
         }
     }
     impl TryFrom<Event> for PositionCloseEvent {
@@ -1141,6 +1155,8 @@ pub mod events {
                 id: PositionId::new(evt.u64_attr(event_key::POS_ID)?),
                 direction_to_base: evt.direction_attr(event_key::DIRECTION)?,
                 created_at: evt.timestamp_attr(event_key::CREATED_AT)?,
+                price_point_created_at: evt
+                    .try_timestamp_attr(event_key::PRICE_POINT_CREATED_AT)?,
                 liquifunded_at: evt.timestamp_attr(event_key::LIQUIFUNDED_AT)?,
                 trading_fee_collateral: evt.decimal_attr(event_key::TRADING_FEE)?,
                 trading_fee_usd: evt.decimal_attr(event_key::TRADING_FEE_USD)?,
@@ -1174,8 +1190,10 @@ pub mod events {
     pub struct PositionOpenEvent {
         /// Details of the position
         pub position_attributes: PositionAttributes,
-        /// When it was opened
+        /// When it was opened, block time
         pub created_at: Timestamp,
+        /// Price point used for creating this
+        pub price_point_created_at: Timestamp,
     }
 
     impl PerpEvent for PositionOpenEvent {}
@@ -1193,6 +1211,7 @@ pub mod events {
         fn try_from(evt: Event) -> anyhow::Result<Self> {
             Ok(Self {
                 created_at: evt.timestamp_attr(event_key::CREATED_AT)?,
+                price_point_created_at: evt.timestamp_attr(event_key::PRICE_POINT_CREATED_AT)?,
                 position_attributes: evt.try_into()?,
             })
         }

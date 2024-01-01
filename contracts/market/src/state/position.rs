@@ -429,10 +429,8 @@ impl State<'_> {
     ) -> Result<PositionOrPendingClose> {
         let config = &self.config;
         let market_type = self.market_id(store)?.get_market_type();
-        let entry_price = match self.spot_price(store, pos.created_at) {
-            Ok(entry_price) => entry_price,
-            Err(err) => return Err(err),
-        };
+        let entry_price =
+            self.spot_price(store, pos.price_point_created_at.unwrap_or(pos.created_at))?;
         let spot_price = self.current_spot_price(store)?;
 
         // PERP-996 ensure we do not flip direction, see comments in

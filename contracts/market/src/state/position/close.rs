@@ -120,7 +120,10 @@ impl State<'_> {
         let market_type = market_id.get_market_type();
 
         let direction_to_base = pos.direction().into_base(market_type);
-        let entry_price_base = match self.spot_price(ctx.storage, pos.created_at) {
+        let entry_price_base = match self.spot_price(
+            ctx.storage,
+            pos.price_point_created_at.unwrap_or(pos.created_at),
+        ) {
             Ok(entry_price) => entry_price,
             Err(err) => return Err(err),
         }
@@ -131,6 +134,7 @@ impl State<'_> {
             id: pos.id,
             direction_to_base,
             created_at: pos.created_at,
+            price_point_created_at: pos.price_point_created_at,
             liquifunded_at: pos.liquifunded_at,
             trading_fee_collateral: pos.trading_fee.collateral(),
             trading_fee_usd: pos.trading_fee.usd(),

@@ -15,8 +15,10 @@ pub struct ClosedPosition {
     pub id: PositionId,
     /// Direction (to base) of the position
     pub direction_to_base: DirectionToBase,
-    /// Timestamp the position was created
+    /// Timestamp the position was created, block time.
     pub created_at: Timestamp,
+    /// Timestamp of the price point used for creating this position.
+    pub price_point_created_at: Option<Timestamp>,
     /// Timestamp of the last liquifunding
     pub liquifunded_at: Timestamp,
 
