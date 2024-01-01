@@ -64,7 +64,11 @@ impl State<'_> {
         let next_deferred_execution = self
             .get_next_deferred_execution(store)?
             .map(|(_, item)| item.created);
-        let deferred_execution_items = self.deferred_execution_items(store)?;
+        let (deferred_execution_items, last_processed_deferred_exec_id) =
+            match self.deferred_execution_latest_ids(store)? {
+                Some(latest_ids) => (latest_ids.queue_size(), latest_ids.processed),
+                None => (0, None),
+            };
 
         Ok(StatusResp {
             market_id: market_id.clone(),
@@ -90,6 +94,7 @@ impl State<'_> {
             last_crank_completed,
             next_deferred_execution,
             deferred_execution_items,
+            last_processed_deferred_exec_id,
         })
     }
 }
