@@ -583,12 +583,13 @@ impl State<'_> {
                         );
                     }
                     // Nothing better to do here, just provide a tiny amount of active collateral.
-                    position.active_collateral = "0.0001".parse().unwrap();
+                    position.active_collateral = "0.000000001".parse().unwrap();
                     MaybeClosedPosition::Close(ClosePositionInstructions {
                         pos: position,
                         exposure: Signed::<Collateral>::zero(),
                         settlement_price: price,
                         reason: PositionCloseReason::Liquidated(LiquidationReason::Liquidated),
+                        closed_during_liquifunding: true,
                     })
                 }
             },

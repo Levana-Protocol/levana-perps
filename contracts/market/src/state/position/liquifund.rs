@@ -78,7 +78,7 @@ impl State<'_> {
         )? {
             MaybeClosedPosition::Open(pos) => pos,
             MaybeClosedPosition::Close(instructions) => {
-                return Ok(MaybeClosedPosition::Close(instructions))
+                return Ok(MaybeClosedPosition::Close(instructions));
             }
         };
 
@@ -111,6 +111,7 @@ impl State<'_> {
                 exposure: Signed::zero(),
                 settlement_price: end_price,
                 reason: PositionCloseReason::Liquidated(LiquidationReason::Liquidated),
+                closed_during_liquifunding: true,
             }));
         }
 
@@ -131,11 +132,12 @@ impl State<'_> {
                 exposure: Signed::zero(),
                 settlement_price: end_price,
                 reason: PositionCloseReason::Liquidated(LiquidationReason::MaxGains),
+                closed_during_liquifunding: true,
             }));
         };
 
         // Position does not need to be closed
-        self.set_next_liquifunding_and_stale_at(&mut pos, ends_at);
+        self.set_next_liquifunding(&mut pos, ends_at);
         pos.liquidation_margin = liquidation_margin;
         Ok(MaybeClosedPosition::Open(pos))
     }
@@ -143,11 +145,7 @@ impl State<'_> {
     /// Updates the liquifunded_at, next_liquifunding, and stale_at fields of the position.
     ///
     /// Includes logic for randomization of the next_liquifunding field
-    pub(crate) fn set_next_liquifunding_and_stale_at(
-        &self,
-        pos: &mut Position,
-        liquifunded_at: Timestamp,
-    ) {
+    pub(crate) fn set_next_liquifunding(&self, pos: &mut Position, liquifunded_at: Timestamp) {
         // First set up the values correctly
         pos.liquifunded_at = liquifunded_at;
         pos.next_liquifunding =

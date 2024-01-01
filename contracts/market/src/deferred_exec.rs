@@ -173,6 +173,7 @@ fn helper(
             stop_loss_override,
             take_profit_override,
         } => {
+            handle_update_position_shared(state, ctx, id, None, None, &price_point)?;
             state.set_trigger_order(
                 ctx,
                 id,

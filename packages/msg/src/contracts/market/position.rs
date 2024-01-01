@@ -488,6 +488,7 @@ impl Position {
                     exposure: min_exposure,
                     settlement_price: end_price,
                     reason: PositionCloseReason::Liquidated(LiquidationReason::Liquidated),
+                    closed_during_liquifunding: true,
                 }),
                 min_exposure,
             )
@@ -498,6 +499,7 @@ impl Position {
                     exposure: max_exposure,
                     settlement_price: end_price,
                     reason: PositionCloseReason::Liquidated(LiquidationReason::MaxGains),
+                    closed_during_liquifunding: true,
                 }),
                 max_exposure,
             )
@@ -550,6 +552,7 @@ impl Position {
                         exposure: Signed::zero(),
                         settlement_price: end_price,
                         reason: PositionCloseReason::Liquidated(LiquidationReason::MaxGains),
+                        closed_during_liquifunding: true,
                     })
                 }
             }
@@ -565,6 +568,7 @@ impl Position {
                 exposure,
                 settlement_price,
                 reason,
+                closed_during_liquifunding: _,
             }) => {
                 // Best effort closed position value
                 let direction_to_base = pos.direction().into_base(market_type);

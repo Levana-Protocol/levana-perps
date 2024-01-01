@@ -28,6 +28,7 @@ impl State<'_> {
                 exposure: Signed::<Collateral>::zero(),
                 reason: PositionCloseReason::Direct,
                 settlement_price,
+                closed_during_liquifunding: false,
             },
             MaybeClosedPosition::Close(instructions) => instructions,
         };
@@ -47,8 +48,17 @@ impl State<'_> {
             exposure,
             settlement_price,
             reason,
+            closed_during_liquifunding,
         }: ClosePositionInstructions,
     ) -> Result<()> {
+        if closed_during_liquifunding {
+            // If the position was closed during liquifunding, then liquifunded_at will still be the previous value.
+            debug_assert!(pos.liquifunded_at <= settlement_price.timestamp);
+        } else {
+            // The position was not closed during liquifunding. In this case, we need to ensure that we're
+            // fully liquifunded up until the current price point.
+            debug_assert_eq!(pos.liquifunded_at, settlement_price.timestamp);
+        }
         // How much notional size are we undoing? Used for delta neutrality fee
         // and adjusting the open interest
         let notional_size_return = -pos.notional_size;

@@ -130,7 +130,7 @@ impl State<'_> {
                 .map(|x| x.into_notional_price(market_type)),
         };
 
-        self.set_next_liquifunding_and_stale_at(&mut pos, liquifunded_at);
+        self.set_next_liquifunding(&mut pos, liquifunded_at);
 
         let trade_volume_usd = trade_volume_usd(&pos, price_point, market_type)?;
 

@@ -7,7 +7,6 @@ use msg::contracts::market::fees::events::FeeSource;
 use msg::contracts::market::position::events::{
     calculate_position_collaterals, PositionAttributes, PositionSaveReason, PositionTradingFee,
 };
-use msg::contracts::market::position::MaybeClosedPosition;
 use msg::contracts::market::position::{events::PositionUpdateEvent, Position, PositionId};
 
 impl State<'_> {
@@ -235,6 +234,8 @@ impl State<'_> {
     ) -> Result<()> {
         let mut pos = get_position(ctx.storage, id)?;
 
+        debug_assert!(pos.liquifunded_at == price_point.timestamp);
+
         let original_pos = pos.clone();
 
         // Update
@@ -289,6 +290,8 @@ impl State<'_> {
         price_point: &PricePoint,
     ) -> Result<()> {
         let mut pos = get_position(ctx.storage, id)?;
+
+        debug_assert!(pos.liquifunded_at == price_point.timestamp);
 
         let original_pos = pos.clone();
 
@@ -404,6 +407,8 @@ impl State<'_> {
         price_point: &PricePoint,
     ) -> Result<()> {
         let mut pos = get_position(ctx.storage, id)?;
+
+        debug_assert!(pos.liquifunded_at == price_point.timestamp);
 
         let original_pos = pos.clone();
 
@@ -529,6 +534,8 @@ impl State<'_> {
     ) -> Result<()> {
         let mut pos = get_position(ctx.storage, id)?;
 
+        debug_assert!(pos.liquifunded_at == price_point.timestamp);
+
         let original_pos = pos.clone();
 
         let old_counter_collateral = pos.counter_collateral;
@@ -584,7 +591,7 @@ impl State<'_> {
         Ok(())
     }
 
-    pub fn set_trigger_order(
+    pub(crate) fn set_trigger_order(
         &self,
         ctx: &mut StateContext,
         id: PositionId,
@@ -595,6 +602,17 @@ impl State<'_> {
         let mut pos = get_position(ctx.storage, id)?;
         let market_type = self.market_id(ctx.storage)?.get_market_type();
 
+        // We've decided _not_ to validate prices here. If the user wants to set a stop loss
+        // or take profit that conflicts with the current price, liquidation price, or max
+        // gains price, we allow it to proceed, and the override may become relevant again
+        // in the future as position characteristics change.
+        //
+        // OLD CODE:
+        //
+        // self.position_validate_trigger_orders(&pos, market_type, price_point)?;
+
+        debug_assert!(pos.liquifunded_at == price_point.timestamp);
+
         pos.stop_loss_override = stop_loss_override;
         pos.stop_loss_override_notional =
             stop_loss_override.map(|x| x.into_notional_price(market_type));
@@ -602,18 +620,14 @@ impl State<'_> {
         pos.take_profit_override_notional =
             take_profit_override.map(|x| x.into_notional_price(market_type));
 
-        // We need to validate the trigger prices against up-to-date information
-        // based on a liquifunding, so we perform a liquifunding right now. We
-        // then validate the updated position.
-        let last_liquifund = pos.liquifunded_at;
-        debug_assert!(pos.next_liquifunding >= price_point.timestamp);
-        match self.position_liquifund(ctx, pos, last_liquifund, price_point.timestamp, false)? {
-            MaybeClosedPosition::Open(mut pos) => {
-                self.position_validate_trigger_orders(&pos, market_type, price_point)?;
-                self.position_save(ctx, &mut pos, price_point, true, false, PositionSaveReason::Update)?;
-            }
-            MaybeClosedPosition::Close(_) => anyhow::bail!("Cannot update trigger orders since the position will be closed on next liquifunding"),
-        }
+        self.position_save(
+            ctx,
+            &mut pos,
+            price_point,
+            true,
+            false,
+            PositionSaveReason::Update,
+        )?;
 
         Ok(())
     }

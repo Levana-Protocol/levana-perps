@@ -162,6 +162,9 @@ pub struct ClosePositionInstructions {
     pub settlement_price: PricePoint,
     /// See [ClosedPosition::reason]
     pub reason: PositionCloseReason,
+
+    /// Did this occur because the position was closed during liquifunding?
+    pub closed_during_liquifunding: bool,
 }
 
 /// Outcome of operations which might require closing a position.
