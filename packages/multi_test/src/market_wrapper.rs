@@ -375,6 +375,21 @@ impl PerpsMarket {
         )
     }
 
+    /// Like [Self::exec_defer], but attach a crank fee.
+    pub fn exec_defer_with_crank_fee(
+        &self,
+        sender: &Addr,
+        msg: &MarketExecuteMsg,
+    ) -> Result<DeferResponse> {
+        let config = self.query_config()?;
+        let price = self.query_current_price()?;
+        let crank_fee = price.usd_to_collateral(config.crank_fee_charged);
+        let msg = self
+            .token
+            .into_market_execute_msg(&self.addr, crank_fee, msg.clone())?;
+        self.exec_defer_wasm_msg(sender, msg)
+    }
+
     pub fn make_msg_with_funds(&self, msg: &MarketExecuteMsg, amount: Number) -> Result<WasmMsg> {
         let amount = Collateral::from_decimal256(
             amount
@@ -1278,7 +1293,7 @@ impl PerpsMarket {
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
     ) -> Result<DeferResponse> {
-        self.exec_defer(
+        self.exec_defer_with_crank_fee(
             sender,
             &MarketExecuteMsg::SetTriggerOrder {
                 id: position_id,

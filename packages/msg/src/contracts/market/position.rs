@@ -61,12 +61,6 @@ pub struct Position {
     /// Total crank fees paid
     pub crank_fee: CollateralAndUsd,
 
-    /// Total crank fees pending to be paid during liquifunding.
-    ///
-    /// Tracked only in USD, we convert to Collateral at the time of charging the fee.
-    #[serde(default)]
-    pub pending_crank_fee: Usd,
-
     /// Cumulative amount of delta neutrality fees paid by (or received by) the position.
     ///
     /// Positive == outgoing, negative == incoming, like funding_fee.
@@ -402,18 +396,7 @@ impl Position {
             borrow: borrow_fee_max_payment,
             funding: Collateral::from_decimal256(funding_max_payment),
             delta_neutrality: Collateral::from_decimal256(slippage_max),
-            // Set aside enough margin for one normal liquifunding crank and one
-            // update crank with up to 100 items in the deferred execution queue.
-            crank: price_point.usd_to_collateral(
-                config
-                    .crank_fee_charged
-                    .checked_mul_dec(Decimal256::two())?
-                    .checked_add(
-                        config
-                            .crank_fee_surcharge
-                            .checked_mul_dec(Decimal256::from_ratio(10u32, 1u32))?,
-                    )?,
-            ),
+            crank: price_point.usd_to_collateral(config.crank_fee_charged),
         })
     }
 
@@ -670,7 +653,6 @@ impl Position {
             funding_fee,
             borrow_fee,
             crank_fee,
-            pending_crank_fee: _,
             delta_neutrality_fee,
             liquifunded_at,
             next_liquifunding,

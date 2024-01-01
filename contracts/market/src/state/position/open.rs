@@ -112,7 +112,6 @@ impl State<'_> {
             funding_fee: SignedCollateralAndUsd::default(),
             borrow_fee: CollateralAndUsd::default(),
             crank_fee,
-            pending_crank_fee: Usd::zero(),
             delta_neutrality_fee: SignedCollateralAndUsd::default(),
             counter_collateral,
             notional_size,
