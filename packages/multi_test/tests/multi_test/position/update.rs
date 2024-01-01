@@ -422,7 +422,7 @@ fn position_update_short_open_interest() {
     .unwrap();
 
     let expected_notional_size_updated = match market.id.get_market_type() {
-        MarketType::CollateralIsQuote => Signed::<Notional>::from_str("-1979.83799556062912228"),
+        MarketType::CollateralIsQuote => Signed::<Notional>::from_str("-1979.838"),
         MarketType::CollateralIsBase => Signed::<Notional>::from_str("2076.165"),
     }
     .unwrap();
@@ -446,7 +446,7 @@ fn position_update_long_open_interest() {
     .unwrap();
 
     let expected_notional_size_updated = match market.id.get_market_type() {
-        MarketType::CollateralIsQuote => Signed::<Notional>::from_str("1979.83799556062912228"),
+        MarketType::CollateralIsQuote => Signed::<Notional>::from_str("1979.838"),
         MarketType::CollateralIsBase => Signed::<Notional>::from_str("-1883.1584"),
     }
     .unwrap();
