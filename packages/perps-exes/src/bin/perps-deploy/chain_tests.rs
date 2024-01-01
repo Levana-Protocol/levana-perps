@@ -283,6 +283,7 @@ pub async fn test_update_leverage(perp_app: &PerpApp) -> Result<()> {
     perp_app
         .update_leverage(position_detail.id, LeverageToBase::from_str("11")?, None)
         .await?;
+    perp_app.crank_single(None).await?;
 
     let new_position_detail = perp_app.market.position_detail(position_detail.id).await?;
 
@@ -290,7 +291,7 @@ pub async fn test_update_leverage(perp_app: &PerpApp) -> Result<()> {
         new_position_detail.leverage.into_number() - position_detail.leverage.into_number();
 
     ensure!(
-        diff_leverage > "0.000000006".parse()? && diff_leverage < "1".parse()?,
+        diff_leverage > "0.9".parse()? && diff_leverage < "1".parse()?,
         "Leverage increased with delta of one. diff_leverage: {diff_leverage}"
     );
 
@@ -336,6 +337,8 @@ pub async fn test_update_max_gains(perp_app: &PerpApp) -> Result<()> {
     perp_app
         .update_max_gains(position_detail.id, max_gains)
         .await?;
+    perp_app.crank_single(None).await?;
+
     let new_position_detail = perp_app.market.position_detail(position_detail.id).await?;
 
     let diff_max_gains = match new_position_detail.max_gains_in_quote {
@@ -348,7 +351,7 @@ pub async fn test_update_max_gains(perp_app: &PerpApp) -> Result<()> {
 
     // 0.5 - 0.44 = 0.06
     ensure!(
-        diff_max_gains > "0.0000000002".parse()? && diff_max_gains < "0.06".parse()?,
+        diff_max_gains > "0.05".parse()? && diff_max_gains < "0.06".parse()?,
         "Max gains is updated with proper delta. diff_max_gains: {diff_max_gains}"
     );
 
