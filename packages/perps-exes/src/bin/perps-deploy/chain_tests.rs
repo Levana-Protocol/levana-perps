@@ -283,6 +283,7 @@ pub async fn test_update_leverage(perp_app: &PerpApp) -> Result<()> {
     perp_app
         .update_leverage(position_detail.id, LeverageToBase::from_str("11")?, None)
         .await?;
+    perp_app.crank_single(None).await?;
 
     let new_position_detail = perp_app.market.position_detail(position_detail.id).await?;
 
@@ -336,6 +337,8 @@ pub async fn test_update_max_gains(perp_app: &PerpApp) -> Result<()> {
     perp_app
         .update_max_gains(position_detail.id, max_gains)
         .await?;
+    perp_app.crank_single(None).await?;
+
     let new_position_detail = perp_app.market.position_detail(position_detail.id).await?;
 
     let diff_max_gains = match new_position_detail.max_gains_in_quote {
