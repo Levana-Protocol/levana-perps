@@ -183,10 +183,6 @@ impl State<'_> {
         let open_interest =
             self.check_adjust_net_open_interest(store, pos.notional_size, pos.direction(), true)?;
 
-        // Now that we know the liquidation and max gains, confirm that the user
-        // specified trigger orders are valid
-        self.position_validate_trigger_orders(&pos, market_type, price_point)?;
-
         Ok(ValidatedPosition {
             pos,
             trade_volume_usd,
