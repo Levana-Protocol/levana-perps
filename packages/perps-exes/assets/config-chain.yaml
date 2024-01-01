@@ -85,8 +85,8 @@ osmosis-local:
   gas-decimals: 6
 injective-testnet:
   gas-decimals: 18
-  tracker: inj1t39ssg9ywmp0tpnrgxudfdkvkttad5ntvqf6d5
-  faucet: inj1k6hkvy0h2mvlcue5dwy8jd0z9hsh5q6z22arvp
+  tracker: inj16z0ztf8uzad8tgvhrkhrmq8c7hmg8xe2ktf4nf
+  faucet: inj1lmgcv26vtdjap42a8sz6w3l95uwrt9jv24n3he
   explorer: "https://testnet.explorer.injective.network/transaction/"
   spot-price:
     pyth:
