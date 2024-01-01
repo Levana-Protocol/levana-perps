@@ -152,6 +152,7 @@ impl PerpsMarket {
                     // testing specifically for it.
                     crank_fee_charged: Some(Usd::zero()),
                     crank_fee_reward: Some(Usd::zero()),
+                    crank_fee_surcharge: Some(Usd::zero()),
                     // Easier to just go back to the original default than update tests
                     unstake_period_seconds: Some(60 * 60 * 24 * 21),
                     // Same: original default to fix tests

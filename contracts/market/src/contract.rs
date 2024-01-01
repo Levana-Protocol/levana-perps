@@ -180,6 +180,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     stop_loss_override,
                     take_profit_override,
                     amount: info.funds.take()?,
+                    crank_fee: Collateral::zero(),
+                    crank_fee_usd: Usd::zero(),
                 },
             )?;
         }
@@ -293,6 +295,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     stop_loss_override,
                     take_profit_override,
                     amount: info.funds.take()?,
+                    crank_fee: Collateral::zero(),
+                    crank_fee_usd: Usd::zero(),
                 },
             )?;
         }
@@ -399,12 +403,15 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             state.provide_crank_funds(&mut ctx, info.funds.take()?)?;
         }
 
-        ExecuteMsg::PerformDeferredExec { id } => {
+        ExecuteMsg::PerformDeferredExec {
+            id,
+            price_point_timestamp,
+        } => {
             state.assert_auth(
                 &info.sender,
                 AuthCheck::Addr(state.env.contract.address.clone()),
             )?;
-            state.perform_deferred_exec(&mut ctx, id)?;
+            state.perform_deferred_exec(&mut ctx, id, price_point_timestamp)?;
         }
     }
 
@@ -438,8 +445,11 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             state.status(store)?.query_result()
         }
 
-        QueryMsg::SpotPrice { timestamp } => state.spot_price(store, timestamp)?.query_result(),
-
+        QueryMsg::SpotPrice { timestamp } => match timestamp {
+            Some(timestamp) => state.spot_price(store, timestamp),
+            None => state.current_spot_price(store),
+        }?
+        .query_result(),
         QueryMsg::SpotPriceHistory {
             start_after,
             limit,
@@ -644,11 +654,11 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             notional_delta,
             pos_delta_neutrality_fee_margin,
         } => {
-            let price = state.spot_price(store, None)?;
+            let price = state.current_spot_price(store)?;
             let fees = state.calc_delta_neutrality_fee(
                 store,
                 notional_delta,
-                price,
+                &price,
                 pos_delta_neutrality_fee_margin,
             )?;
             let fee_rate = fees.into_number() / notional_delta.into_number();

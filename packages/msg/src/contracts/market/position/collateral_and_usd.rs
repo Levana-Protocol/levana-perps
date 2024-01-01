@@ -21,6 +21,11 @@ impl CollateralAndUsd {
         }
     }
 
+    /// Creates a new value from the raw collateral and USD values.
+    pub fn from_pair(collateral: Collateral, usd: Usd) -> Self {
+        CollateralAndUsd { collateral, usd }
+    }
+
     /// Get the collateral component
     pub fn collateral(&self) -> Collateral {
         self.collateral

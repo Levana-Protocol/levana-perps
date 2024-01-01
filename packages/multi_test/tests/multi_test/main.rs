@@ -24,10 +24,5 @@ mod proptest;
 mod rewards;
 mod sanity;
 mod shutdown;
-mod wrong_token;
-/*
 mod staleness;
-
-// Inner modules in:
-mod position;
-*/
+mod wrong_token;
