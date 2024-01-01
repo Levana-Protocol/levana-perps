@@ -396,7 +396,7 @@ pub(crate) async fn test_pnl_on_liquidation(perp_app: &PerpApp) -> Result<()> {
         _ => bail!("More than one position found"),
     };
 
-    let new_price: PriceBaseInQuote = "6.02".parse()?;
+    let new_price: PriceBaseInQuote = "6.016".parse()?;
     let price_usd = new_price
         .try_into_usd(&perp_app.market_id)
         .unwrap_or(PriceCollateralInUsd::one());
