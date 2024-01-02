@@ -19,9 +19,9 @@ use super::position::{get_position, NEXT_LIQUIFUNDING, OPEN_POSITIONS};
 /// the very first price timestamp.
 pub(super) const LAST_CRANK_COMPLETED: Item<Timestamp> = Item::new(namespace::LAST_CRANK_COMPLETED);
 
-pub(crate) fn crank_init(store: &mut dyn Storage, env: &Env) -> Result<()> {
+pub(crate) fn crank_init(store: &mut dyn Storage) -> Result<()> {
     LAST_CRANK_COMPLETED
-        .save(store, &env.block.time.into())
+        .save(store, &Timestamp::from_seconds(0))
         .map_err(|err| err.into())
 }
 

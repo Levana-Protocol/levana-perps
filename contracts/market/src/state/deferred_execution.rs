@@ -181,8 +181,8 @@ impl State<'_> {
         // security of the platform, but rather is a convenience for charging
         // crank fees in USD instead of collateral. Using the most recent
         // price point is our best option.
-        let price_point = self.current_spot_price(ctx.storage)?;
-        let new_crank_fee = price_point.usd_to_collateral(new_crank_fee_usd);
+        let current_price = self.current_spot_price(ctx.storage)?;
+        let new_crank_fee = current_price.usd_to_collateral(new_crank_fee_usd);
 
         // Check the owner is correct and try to charge the crank fee
         let target = item.target();
@@ -219,7 +219,9 @@ impl State<'_> {
                 // Update the position to reflect the crank fee charged
                 let mut pos = get_position(ctx.storage, *id)?;
                 pos.crank_fee
-                    .checked_add_assign(new_crank_fee, &price_point)?;
+                    .checked_add_assign(new_crank_fee, &current_price)?;
+                pos.deposit_collateral
+                    .checked_add_assign(new_crank_fee.into_signed(), &current_price)?;
 
                 // Update the protocol to track the crank fee available in general fees
                 self.collect_crank_fee(
@@ -230,25 +232,21 @@ impl State<'_> {
                 )?;
                 self.position_save_no_recalc(ctx, &pos)?;
             }
-            // For these five items, we have a problem of "where does the crank
-            // fee come from." We want to take it from the position itself, but this leads
-            // to complexity with liquifundings needing to be run, which can't happen until
-            // we have a new price point. For now, we've taken the simplification that (1) we
-            // can't queue one of these items while an existing update exists on the position,
-            // (2) we cap the total surcharge that can be charged to the user, and (3) we put
-            // that cap into the liquidation margin.
-            //
-            // Another approach entirely would be to force the user to provide
-            // funds for the crank fee while submitting this message. That's an API change that
-            // might cause confusion, so we didn't go that route for now, but may do so in the
-            // future. If we did that, the idea would be that extra funds would be saved in
-            // the "rewards" field for the user to claim later, instead of incurring a costly
-            // send-coins message.
+            // For these five items, we have the trader send funds to cover a
+            // crank fee. Any remaining funds are allocated to the LP rewards category for the
+            // user to collect later.
             DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, .. }
             | DeferredExecItem::UpdatePositionRemoveCollateralImpactSize { id, .. }
             | DeferredExecItem::UpdatePositionLeverage { id, .. }
             | DeferredExecItem::UpdatePositionMaxGains { id, .. }
-            | DeferredExecItem::SetTriggerOrder { id, .. } => {
+            | DeferredExecItem::SetTriggerOrder { id, .. }
+            // If the user provides a slippage assert, it's possible that the
+            // close will fail. This could lead to a spam attack on the protocol if we don't
+            // collect fees.
+            | DeferredExecItem::ClosePosition {
+                id,
+                slippage_assert: Some(_),
+            } => {
                 // Take out the crank fee and put the rest of the funds into rewards to be collected.
                 let funds_attached = if new_crank_fee.is_zero() {
                     Collateral::zero()
@@ -269,21 +267,23 @@ impl State<'_> {
 
                 // Give the remainder back to the user as rewards
                 if let Some(funds_after_crank) = NonZero::new(funds_after_crank) {
-                    self.return_funds_to_user(ctx, &trader, funds_after_crank, &price_point)?;
+                    self.return_funds_to_user(ctx, &trader, funds_after_crank, &current_price)?;
                 }
 
                 // Update the crank fee on charged on the position
                 let mut pos = get_position(ctx.storage, *id)?;
                 pos.crank_fee
-                    .checked_add_assign(new_crank_fee, &price_point)?;
+                    .checked_add_assign(new_crank_fee, &current_price)?;
+                pos.deposit_collateral
+                    .checked_add_assign(new_crank_fee.into_signed(), &current_price)?;
                 self.position_save_no_recalc(ctx, &pos)?;
             }
-            DeferredExecItem::ClosePosition { id, .. } => {
+            DeferredExecItem::ClosePosition { id, slippage_assert: None } => {
                 anyhow::ensure!(
                     funds_attached.is_err(),
                     "No funds should be attached for close position"
                 );
-                // We don't charge a separate crank fee for closing a position,
+                // We don't charge a separate crank fee for closing a position without a slippage assert,
                 // but we ensure we only queue up such a work item once to avoid a spam
                 // attack.
                 if IS_POSITION_CLOSING.has(ctx.storage, *id) {
@@ -408,8 +408,6 @@ impl State<'_> {
             id.u64(),
         ));
 
-        // TODO need to deduct crank fees from either the new funds or the existing position. Can look at limit order logic.
-
         // We immediately update the data structure so that if we crank multiple
         // items we continue with the next ID.
         let DeferredExecLatestIds { issued, processed } = DEFERRED_EXEC_LATEST_IDS
@@ -426,6 +424,16 @@ impl State<'_> {
                 processed: Some(id),
             },
         )?;
+
+        // Clear out the close position tracking so that, if closing a position
+        // fails for slippage asserts, we can retry again later.
+        if let DeferredExecItem::ClosePosition {
+            id,
+            slippage_assert: None,
+        } = DEFERRED_EXECS.load(ctx.storage, id)?.item
+        {
+            IS_POSITION_CLOSING.remove(ctx.storage, id);
+        }
 
         Ok(())
     }

@@ -9,7 +9,7 @@
 use cosmwasm_std::{from_binary, MessageInfo};
 use msg::token::Token;
 
-use crate::{prelude::*, state::spot_price::requires_spot_price_append};
+use crate::prelude::*;
 
 /// Perps-specific message info handling native coins versus CW20.
 ///
@@ -23,8 +23,6 @@ pub(crate) struct PerpsMessageInfo {
     pub(crate) msg: MarketExecuteMsg,
     /// The true sender, potentially parsed from a CW20 receive.
     pub(crate) sender: Addr,
-    /// The message requires a spot_price_append before it can be executed.
-    pub(crate) requires_spot_price_append: bool,
 }
 
 /// Collateral sent into the contract with a message.
@@ -94,7 +92,6 @@ impl State<'_> {
                     funds: CollateralSent {
                         amount: Some(funds),
                     },
-                    requires_spot_price_append: requires_spot_price_append(&msg),
                     msg,
                     sender: sender.validate(self.api)?,
                 })
@@ -112,7 +109,6 @@ impl State<'_> {
                         // converge here.
                         return Ok(PerpsMessageInfo {
                             funds: CollateralSent { amount: None },
-                            requires_spot_price_append: requires_spot_price_append(&msg),
                             msg,
                             sender: info.sender,
                         });
@@ -159,7 +155,6 @@ impl State<'_> {
                             funds: CollateralSent {
                                 amount: Some(amount),
                             },
-                            requires_spot_price_append: requires_spot_price_append(&msg),
                             msg,
                             sender: info.sender,
                         })

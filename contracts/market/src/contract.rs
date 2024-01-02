@@ -75,7 +75,7 @@ pub fn instantiate(
     token_init(deps.storage, &deps.querier, token)?;
     fees_init(deps.storage)?;
     liquidity_init(deps.storage)?;
-    crank_init(deps.storage, &env)?;
+    crank_init(deps.storage)?;
     positions_init(deps.storage)?;
     yield_init(deps.storage)?;
 
@@ -85,6 +85,7 @@ pub fn instantiate(
 
     if let Some(InitialPrice { price, price_usd }) = initial_price {
         state.save_manual_spot_price(&mut ctx, price, price_usd)?;
+        state.spot_price_append(&mut ctx)?;
     }
 
     ctx.into_response(&state)
@@ -105,10 +106,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         state.ensure_not_shut_down(impact)?;
     }
     state.ensure_not_resetting_lps(&mut ctx, &info.msg)?;
-
-    if info.requires_spot_price_append {
-        state.spot_price_append(&mut ctx)?;
-    }
 
     match info.msg {
         ExecuteMsg::Owner(owner_msg) => {
@@ -313,7 +310,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     id,
                     slippage_assert,
                 },
-                // This should fail and be caught in defer_execution
                 info.funds.take(),
             )?;
         }
@@ -323,6 +319,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 None => info.sender,
                 Some(rewards) => rewards.validate(state.api)?,
             };
+            state.spot_price_append(&mut ctx)?;
             state.crank_exec_batch(&mut ctx, execs, &rewards)?;
         }
 

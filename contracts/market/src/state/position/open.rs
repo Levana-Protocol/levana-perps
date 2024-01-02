@@ -107,7 +107,12 @@ impl State<'_> {
             owner,
             id: pos_id,
             active_collateral: collateral,
-            deposit_collateral: SignedCollateralAndUsd::new(collateral.into_signed(), price_point),
+            deposit_collateral: SignedCollateralAndUsd::new(
+                collateral
+                    .checked_add(crank_fee.collateral())?
+                    .into_signed(),
+                price_point,
+            ),
             trading_fee: CollateralAndUsd::default(),
             funding_fee: SignedCollateralAndUsd::default(),
             borrow_fee: CollateralAndUsd::default(),
