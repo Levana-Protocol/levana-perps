@@ -2,8 +2,8 @@ use std::{sync::Arc, time::Instant};
 
 use anyhow::Result;
 use axum::async_trait;
-use chrono::{DateTime, Utc};
-use msg::prelude::*;
+use chrono::Utc;
+use cosmos::HasAddress;
 use perps_exes::contracts::MarketContract;
 
 use crate::{
@@ -47,56 +47,36 @@ impl WatchedTaskPerMarketParallel for Stale {
 impl Stale {
     async fn check_stale_single(&self, market: &MarketContract, app: &App) -> Result<String> {
         let status = market.status().await?;
-        let last_crank_completed = status
-            .last_crank_completed
-            .context("No cranks completed yet")?
-            .try_into_chrono_datetime()?;
 
-        let mk_message = |msg| Msg {
-            msg,
-            last_crank_completed,
-            deferred_execution_items: status.deferred_execution_items,
+        let next_deferred = match status.next_deferred_execution {
+            Some(next_deferred) => next_deferred.try_into_chrono_datetime()?,
+            None => return Ok("No deferred execution items found, we're not stale".to_owned()),
         };
-        let age = Utc::now().signed_duration_since(last_crank_completed);
-        if age > chrono::Duration::seconds(MAX_ALLOWED_CRANK_AGE_SECS) {
-            if app.is_osmosis_epoch() {
-                Ok(mk_message(&format!("Last crank is too old (not run since {last_crank_completed}, age is {age}), but we think we're in an Osmosis epoch so ignoring")).to_string())
-            } else {
-                Err(mk_message(&format!(
-                    "Crank has not been run since {last_crank_completed}, age of {age} is too high"
-                ))
-                .to_anyhow())
-            }
-        } else {
-            Ok(mk_message("Protocol is neither stale nor congested").to_string())
+
+        let age = Utc::now().signed_duration_since(next_deferred);
+        if age.num_minutes() < 5 {
+            return Ok("Oldest deferred execution item is less than 5 minutes old".to_owned());
         }
-    }
-}
 
-// This should be at least 60 seconds more than MAX_CRANK_AGE in crank_watch to avoid spurious
-// errors
-const MAX_ALLOWED_CRANK_AGE_SECS: i64 = 300;
+        if app.is_osmosis_epoch() {
+            return Ok(
+                "Ignoring old deferred exec item since we're in the Osmosis epoch".to_owned(),
+            );
+        }
 
-struct Msg<'a> {
-    msg: &'a str,
-    last_crank_completed: DateTime<Utc>,
-    deferred_execution_items: u32,
-}
+        // TODO in the future, we'd like to give a grace period after the
+        // markets reopen for deferred exec items to catch up. Waiting until we start
+        // seeing spurious errors on mainnet to address this.
+        if app
+            .pyth_prices_closed(market.get_address(), Some(&status))
+            .await?
+        {
+            return Ok("Ignoring old deferred exec item since we're the market is in off hours for price updates".to_owned());
+        }
 
-impl Display for Msg<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let Msg {
-            msg,
-            last_crank_completed,
-            deferred_execution_items,
-        } = self;
-        write!(f, "{msg}. Last completed crank timestamp: {last_crank_completed}. Deferred execution queue size: {deferred_execution_items}.")
-    }
-}
-
-impl Msg<'_> {
-    fn to_anyhow(&self) -> anyhow::Error {
-        anyhow!("{}", self)
+        Err(anyhow::anyhow!(
+            "Oldest pending deferred exec item is too old ({age})"
+        ))
     }
 }
 
