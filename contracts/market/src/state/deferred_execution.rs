@@ -401,8 +401,6 @@ impl State<'_> {
             id.u64(),
         ));
 
-        // TODO need to deduct crank fees from either the new funds or the existing position. Can look at limit order logic.
-
         // We immediately update the data structure so that if we crank multiple
         // items we continue with the next ID.
         let DeferredExecLatestIds { issued, processed } = DEFERRED_EXEC_LATEST_IDS
@@ -419,6 +417,16 @@ impl State<'_> {
                 processed: Some(id),
             },
         )?;
+
+        // Clear out the close position tracking so that, if closing a position
+        // fails for slippage asserts, we can retry again later.
+        if let DeferredExecItem::ClosePosition {
+            id,
+            slippage_assert: _,
+        } = DEFERRED_EXECS.load(ctx.storage, id)?.item
+        {
+            IS_POSITION_CLOSING.remove(ctx.storage, id);
+        }
 
         Ok(())
     }
