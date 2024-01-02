@@ -12,7 +12,10 @@ use axum::async_trait;
 use chrono::{DateTime, Utc};
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
 use msg::{
-    contracts::market::spot_price::{PythPriceServiceNetwork, SpotPriceConfig},
+    contracts::market::{
+        crank::CrankWorkInfo,
+        spot_price::{PythPriceServiceNetwork, SpotPriceConfig},
+    },
     prelude::*,
 };
 use perps_exes::pyth::get_oracle_update_msg;
@@ -209,7 +212,7 @@ struct NeedsPriceUpdateInfo {
     /// Latest off-chain publish time
     off_chain_publish_time: DateTime<Utc>,
     /// Does the contract report that there are crank work items?
-    crank_work_available: bool,
+    crank_work_available: Option<CrankWorkInfo>,
     /// Will the newest off-chain price update execute price triggers?
     price_will_trigger: bool,
 }
@@ -279,8 +282,12 @@ impl NeedsPriceUpdateInfo {
         }
 
         // If there are crank work items available, then just crank
-        if self.crank_work_available {
-            return ActionWithReason::WorkNeeded(CrankTriggerReason::CrankWorkAvailable);
+        if let Some(crank_work) = &self.crank_work_available {
+            if let CrankWorkInfo::DeferredExec { .. } = crank_work {
+                tracing::error!("This case should never happen, found deferred exec crank work but didn't handle it with other deferred work items");
+            } else {
+                return ActionWithReason::WorkNeeded(CrankTriggerReason::CrankWorkAvailable);
+            }
         }
 
         // No other work is immediately available. Now we check if a new price
@@ -331,7 +338,7 @@ async fn check_market_needs_price_update(
                     .transpose()?,
                 off_chain_price,
                 off_chain_publish_time,
-                crank_work_available: market.status.next_crank.is_some(),
+                crank_work_available: market.status.next_crank.clone(),
                 price_will_trigger,
                 on_chain_price,
                 on_chain_publish_time,
