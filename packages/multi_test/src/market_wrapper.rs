@@ -909,23 +909,31 @@ impl PerpsMarket {
                 )
             }
             SpotPriceConfig::Oracle { .. } => {
-                let contract_addr = self.app().simple_oracle_addr.clone();
-
                 if price_usd.is_some() {
                     todo!("support setting price usd in oracle tests");
                 }
-                let now = self.now();
-                self.app().execute_contract(
-                    Addr::unchecked(&TEST_CONFIG.protocol_owner),
-                    contract_addr,
-                    &SimpleOracleExecuteMsg::SetPrice {
-                        value: price.into_non_zero().into_decimal256(),
-                        timestamp: Some(now.into()),
-                    },
-                    &[],
-                )
+
+                self.exec_set_oracle_price_base(price, self.now())
             }
         }
+    }
+
+    pub fn exec_set_oracle_price_base(
+        &self,
+        price_base: PriceBaseInQuote,
+        timestamp: Timestamp,
+    ) -> Result<AppResponse> {
+        let contract_addr = self.app().simple_oracle_addr.clone();
+
+        self.app().execute_contract(
+            Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            contract_addr,
+            &SimpleOracleExecuteMsg::SetPrice {
+                value: price_base.into_non_zero().into_decimal256(),
+                timestamp: Some(timestamp.into()),
+            },
+            &[],
+        )
     }
 
     pub fn exec_set_config(&self, config_update: ConfigUpdate) -> Result<AppResponse> {
