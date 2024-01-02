@@ -239,7 +239,14 @@ impl State<'_> {
             | DeferredExecItem::UpdatePositionRemoveCollateralImpactSize { id, .. }
             | DeferredExecItem::UpdatePositionLeverage { id, .. }
             | DeferredExecItem::UpdatePositionMaxGains { id, .. }
-            | DeferredExecItem::SetTriggerOrder { id, .. } => {
+            | DeferredExecItem::SetTriggerOrder { id, .. }
+            // If the user provides a slippage assert, it's possible that the
+            // close will fail. This could lead to a spam attack on the protocol if we don't
+            // collect fees.
+            | DeferredExecItem::ClosePosition {
+                id,
+                slippage_assert: Some(_),
+            } => {
                 // Take out the crank fee and put the rest of the funds into rewards to be collected.
                 let funds_attached = if new_crank_fee.is_zero() {
                     Collateral::zero()
@@ -271,12 +278,12 @@ impl State<'_> {
                     .checked_add_assign(new_crank_fee.into_signed(), &current_price)?;
                 self.position_save_no_recalc(ctx, &pos)?;
             }
-            DeferredExecItem::ClosePosition { id, .. } => {
+            DeferredExecItem::ClosePosition { id, slippage_assert: None } => {
                 anyhow::ensure!(
                     funds_attached.is_err(),
                     "No funds should be attached for close position"
                 );
-                // We don't charge a separate crank fee for closing a position,
+                // We don't charge a separate crank fee for closing a position without a slippage assert,
                 // but we ensure we only queue up such a work item once to avoid a spam
                 // attack.
                 if IS_POSITION_CLOSING.has(ctx.storage, *id) {
@@ -422,7 +429,7 @@ impl State<'_> {
         // fails for slippage asserts, we can retry again later.
         if let DeferredExecItem::ClosePosition {
             id,
-            slippage_assert: _,
+            slippage_assert: None,
         } = DEFERRED_EXECS.load(ctx.storage, id)?.item
         {
             IS_POSITION_CLOSING.remove(ctx.storage, id);

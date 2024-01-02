@@ -313,7 +313,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     id,
                     slippage_assert,
                 },
-                // This should fail and be caught in defer_execution
                 info.funds.take(),
             )?;
         }
