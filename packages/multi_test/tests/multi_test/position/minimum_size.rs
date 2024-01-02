@@ -36,6 +36,7 @@ fn custom_market_setup() -> anyhow::Result<PerpsMarket> {
         "1".parse()?,
         Some("1".parse()?),
         true,
+        DEFAULT_MARKET.spot_price
     )
 }
 

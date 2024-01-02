@@ -47,6 +47,7 @@ pub struct DefaultMarket {
     pub bootstrap_lp_addr: Addr,
     pub bootstrap_lp_deposit: Number,
     pub collateral_type: MarketType,
+    pub spot_price: SpotPriceKind,
 }
 
 impl DefaultMarket {
@@ -66,6 +67,11 @@ impl DefaultMarket {
 pub enum TokenKind {
     Cw20,
     Native,
+}
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum SpotPriceKind {
+    Manual,
+    Oracle,
 }
 
 pub static DEFAULT_MARKET: Lazy<DefaultMarket> = Lazy::new(|| {
@@ -103,6 +109,13 @@ pub static DEFAULT_MARKET: Lazy<DefaultMarket> = Lazy::new(|| {
             let market_type = DefaultMarket::market_type();
             println!("MARKET_COLLATERAL_TYPE: {:?}", market_type);
             market_type
+        },
+        spot_price: {
+            let kind = env::var("SPOT_PRICE_KIND").unwrap_or_else(|_| "manual".to_string());
+            match kind.as_str() {
+                "oracle" => SpotPriceKind::Oracle,
+                _ => SpotPriceKind::Manual,
+            }
         },
     }
 });

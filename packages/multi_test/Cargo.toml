@@ -28,6 +28,8 @@ cosmos-sdk-proto = { version = "0.16.0", features = ["cosmwasm"] }
 cw2 = "1.0.0"
 proptest = "1.1.0"
 dotenv = "0.15.0"
+cosmwasm-schema = "1.1.9"
+cw-storage-plus = { version = "1.0.1", default-features = false }
 
 [features]
 default = ["sanity"]

@@ -23,7 +23,7 @@ use std::ops::{Add, Div, Mul, Sub};
 /// implement [Serialize] and [Deserialize] to keep the stringy representation.
 #[derive(Debug, Clone, Default, Copy, Eq, PartialEq, Ord, PartialOrd, JsonSchema, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct Timestamp(#[schemars(with = "String")] u64);
+pub struct Timestamp(#[schemars(with = "String")] pub u64);
 
 impl Display for Timestamp {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {

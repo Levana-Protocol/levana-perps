@@ -405,6 +405,9 @@ impl State<'_> {
                         volatile_diff_seconds.unwrap_or(DEFAULT_VOLATILE_DIFF_SECONDS),
                     )?
                     .ok_or(MarketError::NoPricePublishTimeFound.into_anyhow())?;
+                let temp_debug_timestamp = cosmwasm_std::Timestamp::from(new_publish_time);
+                let temp_debug_now = cosmwasm_std::Timestamp::from(self.now());
+                println!("[in market] new_publish_time {}, now: {}, diff: {}", temp_debug_timestamp, temp_debug_now, temp_debug_now.nanos() - temp_debug_timestamp.nanos());
                 // self.now() usage is OK, it's explicitly for saving the block time in storage
                 let price_storage =
                     internal.compose_price(market_id, &feeds, &feeds_usd, self.now())?;

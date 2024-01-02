@@ -26,3 +26,4 @@ mod sanity;
 mod shutdown;
 mod staleness;
 mod wrong_token;
+mod oracle;

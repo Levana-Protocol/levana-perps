@@ -1,4 +1,4 @@
-use levana_perpswap_multi_test::config::DefaultMarket;
+use levana_perpswap_multi_test::config::{DefaultMarket, DEFAULT_MARKET};
 use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, position_helpers::assert_position_liquidated,
@@ -697,7 +697,7 @@ fn position_update_abs_notional_size() {
         for direction in directions.clone() {
             for change_kind in change_kinds.clone() {
                 let market =
-                    PerpsMarket::new_with_type(PerpsApp::new_cell().unwrap(), market_type, true)
+                    PerpsMarket::new_with_type(PerpsApp::new_cell().unwrap(), market_type, true, DEFAULT_MARKET.spot_price)
                         .unwrap();
                 let trader = market.clone_trader(0).unwrap();
 

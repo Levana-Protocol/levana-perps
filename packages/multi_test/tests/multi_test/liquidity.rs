@@ -1479,6 +1479,7 @@ fn max_liquidity() {
         "1".parse().unwrap(),
         Some("1".parse().unwrap()),
         false,
+        DEFAULT_MARKET.spot_price,
     )
     .unwrap();
     let lp = market.clone_lp(0).unwrap();
