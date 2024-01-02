@@ -739,6 +739,7 @@ pub struct OraclePriceFeedSimpleResp {
     /// Optional timestamp for the price, independent of block_info.time
     pub timestamp: Option<Timestamp>,
     /// Is this considered a volatile feed?
+    #[serde(default)]
     pub volatile: bool,
 }
 
