@@ -28,8 +28,6 @@ pub(crate) struct OffchainPriceData {
     pub(crate) values: HashMap<PriceIdentifier, (NonZero<Decimal256>, DateTime<Utc>)>,
     pub(crate) stable_ids: HashSet<PriceIdentifier>,
     pub(crate) edge_ids: HashSet<PriceIdentifier>,
-    /// The oldest publish time queried
-    pub(crate) oldest_publish_time: Option<DateTime<Utc>>,
 }
 
 impl OffchainPriceData {
@@ -98,72 +96,171 @@ impl OffchainPriceData {
             values,
             stable_ids: stable_feeds,
             edge_ids: edge_feeds,
-            oldest_publish_time,
         })
     }
 }
 
+pub(crate) enum LatestPrice {
+    NoPriceInContract,
+    PricesFound {
+        /// Price calculated from combination of on-chain and off-chain data sources
+        off_chain_price: PriceBaseInQuote,
+        /// Publish time calculated from on-chain and off-chain data sources
+        off_chain_publish_time: DateTime<Utc>,
+        /// Price calculated from latest on-chain oracle data
+        on_chain_price: PriceBaseInQuote,
+        /// Publish time calculated from on-chain oracle data
+        on_chain_publish_time: DateTime<Utc>,
+    },
+    PriceTooOld,
+    VolatileDiffTooLarge,
+}
+
+/// Get the latest off-chain price point
 pub(crate) async fn get_latest_price(
     offchain_price_data: &OffchainPriceData,
     market: &Market,
-) -> Result<(PriceBaseInQuote, DateTime<Utc>)> {
-    match &market.status.config.spot_price {
+) -> Result<LatestPrice> {
+    let (feeds, volatile_diff_seconds) = match &market.status.config.spot_price {
         SpotPriceConfig::Manual { .. } => {
             bail!("Manual markets do not use an oracle")
         }
-        SpotPriceConfig::Oracle { feeds, .. } => {
-            let oracle_price = market.market.get_oracle_price().await?;
+        SpotPriceConfig::Oracle {
+            feeds,
+            volatile_diff_seconds,
+            ..
+        } => (feeds, volatile_diff_seconds.unwrap_or(5)),
+    };
 
-            let (base, updated) =
-                compose_oracle_feeds(&oracle_price, &offchain_price_data.values, feeds)?;
-            let base = PriceBaseInQuote::from_non_zero(base);
-
-            Ok((base, updated))
+    let oracle_price = match market.market.get_oracle_price().await {
+        Ok(oracle_price) => oracle_price,
+        Err(e) => {
+            return if format!("{e:?}").contains("no_price_found") {
+                Ok(LatestPrice::NoPriceInContract)
+            } else {
+                Err(e.into())
+            }
         }
-    }
+    };
+
+    Ok(
+        match compose_oracle_feeds(
+            &oracle_price,
+            &offchain_price_data.values,
+            feeds,
+            volatile_diff_seconds,
+        )? {
+            ComposedOracleFeed::UpdateTooOld => LatestPrice::PriceTooOld,
+            ComposedOracleFeed::VolatileDiffTooLarge => LatestPrice::VolatileDiffTooLarge,
+            ComposedOracleFeed::OffChainPrice {
+                price: off_chain_price,
+                publish_time: off_chain_publish_time,
+            } => LatestPrice::PricesFound {
+                off_chain_price,
+                off_chain_publish_time,
+                on_chain_price: oracle_price.composed_price.price_base,
+                on_chain_publish_time: oracle_price
+                    .composed_price
+                    .timestamp
+                    .try_into_chrono_datetime()?,
+            },
+        },
+    )
+}
+
+enum ComposedOracleFeed {
+    UpdateTooOld,
+    OffChainPrice {
+        price: PriceBaseInQuote,
+        publish_time: DateTime<Utc>,
+    },
+    VolatileDiffTooLarge,
 }
 
 fn compose_oracle_feeds(
     oracle_price: &OraclePriceResp,
     pyth_prices: &HashMap<PriceIdentifier, (NumberGtZero, DateTime<Utc>)>,
     feeds: &[SpotPriceFeed],
-) -> Result<(NumberGtZero, DateTime<Utc>)> {
+    volatile_diff_seconds: u32,
+) -> Result<ComposedOracleFeed> {
     let mut final_price = Decimal256::one();
-    let mut updated = Utc::now();
+    let mut publish_times = None::<(DateTime<Utc>, DateTime<Utc>)>;
+    let now = Utc::now();
+
+    let mut update_publish_time =
+        |new_time: DateTime<Utc>, is_volatile_opt: Option<bool>, is_volatile_default: bool| {
+            if is_volatile_opt.unwrap_or(is_volatile_default) {
+                publish_times = Some(match publish_times {
+                    Some((oldest, newest)) => (oldest.min(new_time), newest.max(new_time)),
+                    None => (new_time, new_time),
+                });
+            }
+        };
 
     for feed in feeds {
         let component = match &feed.data {
             // pyth uses the latest-and-greatest from hermes, not the contract price
-            SpotPriceFeedData::Pyth { id, .. } => {
+            SpotPriceFeedData::Pyth {
+                id,
+                age_tolerance_seconds,
+            } => {
                 let (price, pyth_update) = pyth_prices
                     .get(id)
                     .with_context(|| format!("Missing pyth price for ID {}", id))?;
-                updated = updated.min(*pyth_update);
+                let age = now.signed_duration_since(pyth_update).num_seconds();
+                if age >= (*age_tolerance_seconds).into() {
+                    return Ok(ComposedOracleFeed::UpdateTooOld);
+                }
+
+                update_publish_time(*pyth_update, feed.volatile, true);
                 price.into_decimal256()
             }
-            SpotPriceFeedData::Constant { price } => price.into_decimal256(),
-            SpotPriceFeedData::Sei { denom } => oracle_price
-                .sei
-                .get(denom)
-                .with_context(|| format!("Missing price for Sei denom: {denom}"))?
-                .price
-                .into_decimal256(),
+            SpotPriceFeedData::Constant { price } => {
+                anyhow::ensure!(
+                    !feed.volatile.unwrap_or(false),
+                    "Constant feeds cannot be volatile"
+                );
+                price.into_decimal256()
+            }
+            SpotPriceFeedData::Sei { denom } => {
+                let sei = oracle_price
+                    .sei
+                    .get(denom)
+                    .with_context(|| format!("Missing price for Sei denom: {denom}"))?;
+                update_publish_time(
+                    sei.publish_time.try_into_chrono_datetime()?,
+                    feed.volatile,
+                    true,
+                );
+                sei.price.into_decimal256()
+            }
             SpotPriceFeedData::Stride { denom, .. } => {
                 // we _could_ query the redemption rate from stride chain, but it's not needed
                 // contract price is good enough
-                oracle_price
-                    .stride
-                    .get(denom)
-                    .with_context(|| format!("Missing redemption rate for Stride denom: {denom}"))?
-                    .redemption_rate
-                    .into_decimal256()
+                let stride = oracle_price.stride.get(denom).with_context(|| {
+                    format!("Missing redemption rate for Stride denom: {denom}")
+                })?;
+                update_publish_time(
+                    stride.publish_time.try_into_chrono_datetime()?,
+                    feed.volatile,
+                    false,
+                );
+                stride.redemption_rate.into_decimal256()
             }
-            SpotPriceFeedData::Simple { contract, .. } => oracle_price
-                .simple
-                .get(&RawAddr::from(contract))
-                .with_context(|| format!("Missing price for Simple contract: {contract}"))?
-                .value
-                .into_decimal256(),
+            SpotPriceFeedData::Simple { contract, .. } => {
+                let simple = oracle_price
+                    .simple
+                    .get(&RawAddr::from(contract))
+                    .with_context(|| format!("Missing price for Simple contract: {contract}"))?;
+                if let Some(timestamp) = simple.timestamp {
+                    update_publish_time(
+                        timestamp.try_into_chrono_datetime()?,
+                        feed.volatile,
+                        false,
+                    );
+                }
+                simple.value.into_decimal256()
+            }
         };
 
         if feed.inverted {
@@ -176,7 +273,17 @@ fn compose_oracle_feeds(
     let price = NumberGtZero::try_from_decimal(final_price)
         .with_context(|| format!("unable to convert price of {final_price} to NumberGtZero"))?;
 
-    Ok((price, updated))
+    let (oldest, newest) =
+        publish_times.context("No publish time found while composing oracle price")?;
+    let diff = newest.signed_duration_since(oldest);
+    Ok(if diff.num_seconds() > volatile_diff_seconds.into() {
+        ComposedOracleFeed::VolatileDiffTooLarge
+    } else {
+        ComposedOracleFeed::OffChainPrice {
+            price: PriceBaseInQuote::from_non_zero(price),
+            publish_time: oldest,
+        }
+    })
 }
 
 #[tracing::instrument(skip_all)]

@@ -4,15 +4,18 @@ use std::{
     collections::HashMap,
     fmt::{Display, Write},
     sync::Arc,
+    time::Instant,
 };
 
 use anyhow::Result;
 use axum::async_trait;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
-use cosmwasm_std::Decimal256;
 use msg::{
-    contracts::market::spot_price::{PythPriceServiceNetwork, SpotPriceConfig, SpotPriceFeedData},
+    contracts::market::{
+        crank::CrankWorkInfo,
+        spot_price::{PythPriceServiceNetwork, SpotPriceConfig},
+    },
     prelude::*,
 };
 use perps_exes::pyth::get_oracle_update_msg;
@@ -20,10 +23,11 @@ use shared::storage::MarketId;
 use tokio::task::JoinSet;
 
 use crate::{
+    config::NeedsPriceUpdateParams,
     util::{
         markets::Market,
         misc::track_tx_fees,
-        oracle::{get_latest_price, OffchainPriceData},
+        oracle::{get_latest_price, LatestPrice, OffchainPriceData},
     },
     watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
 };
@@ -35,18 +39,13 @@ use super::{
 struct Worker {
     wallet: Arc<Wallet>,
     stats: HashMap<MarketId, ReasonStats>,
-    /// This is the oldest feed publish time from the most recent successfully
-    /// submitted price updates
-    last_successful_price_publish_time: Option<DateTime<Utc>>,
+    /// The last time actions were taken for each market.
+    last_action_taken: HashMap<MarketId, Instant>,
     trigger_crank: TriggerCrank,
 }
 
 impl Worker {
-    fn add_reason(
-        &mut self,
-        market: &MarketId,
-        reason: &Option<(PriceUpdateReason, NeedsOracleUpdate)>,
-    ) {
+    fn add_reason(&mut self, market: &MarketId, reason: &ActionWithReason) {
         self.stats
             .entry(market.clone())
             .or_insert_with(|| ReasonStats::new(market.clone()))
@@ -64,7 +63,7 @@ impl AppBuilder {
                 Worker {
                     wallet: price_wallet,
                     stats: HashMap::new(),
-                    last_successful_price_publish_time: None,
+                    last_action_taken: HashMap::new(),
                     trigger_crank,
                 },
             )?;
@@ -98,13 +97,13 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
         let offchain_price_data = offchain_price_data.clone();
         let market = market.clone();
         let app = app.clone();
-        let last_successful_price_publish_time = worker.last_successful_price_publish_time;
+        let last_action_taken = worker.last_action_taken.get(&market.market_id).copied();
         set.spawn(async move {
             let res = check_market_needs_price_update(
                 &app,
                 offchain_price_data,
                 &market,
-                last_successful_price_publish_time,
+                last_action_taken,
             )
             .await;
             (market, res)
@@ -123,25 +122,25 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
         match res {
             Ok(reason) => {
                 worker.add_reason(&market.market_id, &reason);
-                successes.push(if let Some((reason, needs_oracle_update)) = reason {
-                    if reason.is_too_frequent() {
-                        format!("{}: Too frequent price updates, skipping", market.market_id)
-                    } else {
-                        if let NeedsOracleUpdate::Yes = needs_oracle_update {
+                successes.push(format!("{}: {reason:?}", market.market_id));
+
+                match reason {
+                    ActionWithReason::CooldownPeriod
+                    | ActionWithReason::NoWorkAvailable
+                    | ActionWithReason::PythPricesClosed
+                    | ActionWithReason::OffChainPriceTooOld
+                    | ActionWithReason::VolatileDiffTooLarge => (),
+                    ActionWithReason::WorkNeeded(crank_trigger_reason) => {
+                        if crank_trigger_reason.needs_price_update() {
                             any_needs_oracle_update = NeedsOracleUpdate::Yes;
                         }
-                        let s = format!("{}: Needs price update: {reason}", market.market_id);
                         markets_to_update.push((
                             market.market.get_address(),
                             market.market_id.clone(),
-                            reason.to_crank_reason(),
+                            crank_trigger_reason,
                         ));
-
-                        s
                     }
-                } else {
-                    format!("{}: No price update needed", market.market_id)
-                });
+                }
             }
             Err(e) => errors.push(format!(
                 "{}: error checking if price update is needed: {e:?}",
@@ -152,6 +151,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
 
     // Now perform any oracle updates needed and trigger cranking as necessary
     if markets_to_update.is_empty() {
+        anyhow::ensure!(any_needs_oracle_update == NeedsOracleUpdate::No);
         successes.push("No markets need updating".to_owned());
     } else {
         match any_needs_oracle_update {
@@ -165,25 +165,11 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
             }
         }
 
-        if let Some(oldest_publish_time) = offchain_price_data.oldest_publish_time {
-            worker.last_successful_price_publish_time = Some(oldest_publish_time);
-            successes.push(format!(
-                "Treating Pyth update timestamp as {oldest_publish_time}"
-            ));
-            let age = Utc::now().signed_duration_since(oldest_publish_time);
-            if age.num_seconds() > 10 {
-                successes.push(format!("Warning, Pyth update timestamp is older than expected, updates may fail. Age: {age}. Timestamp: {oldest_publish_time}"));
-            }
-        } else {
-            successes.push("Warning, did not find a Pyth publish timestamp".to_owned());
-        }
         for (market, market_id, reason) in markets_to_update {
-            if let Some(reason) = reason {
-                worker
-                    .trigger_crank
-                    .trigger_crank(market, market_id, reason)
-                    .await;
-            }
+            worker
+                .trigger_crank
+                .trigger_crank(market, market_id, reason)
+                .await;
         }
     }
 
@@ -206,76 +192,164 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
     }
 }
 
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 enum NeedsOracleUpdate {
     Yes,
     No,
 }
 
-impl App {
-    /// We don't bother with an oracle update if all feeds used by this contract are less than X seconds old
-    async fn needs_oracle_update(&self, market: &Market) -> Result<NeedsOracleUpdate> {
-        // Check that we actually use Pyth before making a smart contract query
-        let uses_pyth = match &market.status.config.spot_price {
-            SpotPriceConfig::Manual { .. } => false,
-            SpotPriceConfig::Oracle {
-                pyth: _,
-                stride: _,
-                feeds,
-                feeds_usd,
-                volatile_diff_seconds: _,
-            } => feeds.iter().chain(feeds_usd.iter()).any(|x| match x.data {
-                SpotPriceFeedData::Constant { .. } => false,
-                SpotPriceFeedData::Pyth { .. } => true,
-                SpotPriceFeedData::Stride { .. } => false,
-                SpotPriceFeedData::Sei { .. } => false,
-                SpotPriceFeedData::Simple { .. } => false,
-            }),
-        };
+#[derive(Debug)]
+struct NeedsPriceUpdateInfo {
+    /// Last time we took any actions for this market.
+    last_action: Option<Instant>,
+    /// The timestamp of the next pending deferred work item
+    next_pending_deferred_work_item: Option<DateTime<Utc>>,
+    /// The latest price from on-chain data only
+    on_chain_price: PriceBaseInQuote,
+    /// The latest publish time from on-chain data only
+    on_chain_publish_time: DateTime<Utc>,
+    /// Latest off-chain price
+    off_chain_price: PriceBaseInQuote,
+    /// Latest off-chain publish time
+    off_chain_publish_time: DateTime<Utc>,
+    /// Does the contract report that there are crank work items?
+    crank_work_available: Option<CrankWorkInfo>,
+    /// Will the newest off-chain price update execute price triggers?
+    price_will_trigger: bool,
+}
 
-        if !uses_pyth {
-            return Ok(NeedsOracleUpdate::No);
-        }
+#[derive(Debug)]
+enum ActionWithReason {
+    CooldownPeriod,
+    NoWorkAvailable,
+    WorkNeeded(CrankTriggerReason),
+    PythPricesClosed,
+    OffChainPriceTooOld,
+    VolatileDiffTooLarge,
+}
 
-        let oracle_price = market.market.get_oracle_price().await?;
-
-        let now = Utc::now();
-        for x in oracle_price.pyth.values() {
-            let updated = x.publish_time.try_into_chrono_datetime()?;
-            let age = now.signed_duration_since(updated);
-            if age.num_seconds() > MAX_ORACLE_AGE_SECONDS {
-                return Ok(NeedsOracleUpdate::Yes);
+impl NeedsPriceUpdateInfo {
+    fn actions(&self, params: &NeedsPriceUpdateParams) -> ActionWithReason {
+        if let Some(last_action) = self.last_action {
+            if let Some(age) = Instant::now().checked_duration_since(last_action) {
+                if age < params.action_cooldown_period {
+                    return ActionWithReason::CooldownPeriod;
+                }
             }
         }
 
-        Ok(NeedsOracleUpdate::No)
+        // Keep the protocol lively: if on-chain price is too old or too
+        // different from off-chain price, update price and crank.
+        let on_chain_age = self
+            .off_chain_publish_time
+            .signed_duration_since(self.on_chain_publish_time);
+        if on_chain_age > params.on_chain_publish_time_age_threshold {
+            return ActionWithReason::WorkNeeded(CrankTriggerReason::OnChainTooOld {
+                on_chain_age,
+                off_chain_publish_time: self.off_chain_publish_time,
+                on_chain_oracle_publish_time: self.on_chain_publish_time,
+            });
+        }
+        let on_off_chain_delta =
+            (self.on_chain_price.into_number() - self.off_chain_price.into_number()).abs_unsigned()
+                / self.off_chain_price.into_non_zero().raw();
+        if on_off_chain_delta > params.on_off_chain_price_delta {
+            return ActionWithReason::WorkNeeded(CrankTriggerReason::LargePriceDelta {
+                on_off_chain_delta,
+                on_chain_oracle_price: self.on_chain_price,
+                off_chain_price: self.off_chain_price,
+            });
+        }
+
+        // If there are deferred work items...
+        if let Some(deferred_work_item) = self.next_pending_deferred_work_item {
+            // Do we need a new publish time in the oracle to crank this?
+            if self.on_chain_publish_time < deferred_work_item {
+                // New price is needed, do we have it?
+                if self.off_chain_publish_time >= deferred_work_item {
+                    return ActionWithReason::WorkNeeded(
+                        CrankTriggerReason::DeferredNeedsNewPrice {
+                            on_chain_oracle_publish_time: self.on_chain_publish_time,
+                            deferred_work_item,
+                        },
+                    );
+                }
+            } else {
+                // No new price is needed, so we can just crank and make progress.
+                return ActionWithReason::WorkNeeded(CrankTriggerReason::DeferredWorkAvailable {
+                    on_chain_oracle_publish_time: self.on_chain_publish_time,
+                    deferred_work_item,
+                });
+            }
+        }
+
+        // If there are crank work items available, then just crank
+        if let Some(crank_work) = &self.crank_work_available {
+            if let CrankWorkInfo::DeferredExec { .. } = crank_work {
+                tracing::error!("This case should never happen, found deferred exec crank work but didn't handle it with other deferred work items");
+            } else {
+                return ActionWithReason::WorkNeeded(CrankTriggerReason::CrankWorkAvailable);
+            }
+        }
+
+        // No other work is immediately available. Now we check if a new price
+        // update would hit any triggers. We do this at the end to avoid unnecessarily
+        // spamming oracle price updates while still processing earlier items in the queue.
+        if self.price_will_trigger {
+            // Potential future optimization: only query this piece of data on-demand
+            return ActionWithReason::WorkNeeded(CrankTriggerReason::PriceWillTrigger);
+        }
+
+        // Nothing else caused a price update or crank, so no actions needed
+        ActionWithReason::NoWorkAvailable
     }
 }
-
-const MAX_ORACLE_AGE_SECONDS: i64 = 10;
 
 #[tracing::instrument(skip_all)]
 async fn check_market_needs_price_update(
     app: &App,
     offchain_price_data: Arc<OffchainPriceData>,
     market: &Market,
-    last_successful_price_publish_time: Option<DateTime<Utc>>,
-) -> Result<Option<(PriceUpdateReason, NeedsOracleUpdate)>> {
+    last_action_taken: Option<Instant>,
+) -> Result<ActionWithReason> {
     if app
         .pyth_prices_closed(market.market.get_address(), Some(&market.status))
         .await?
     {
-        return Ok(None);
+        return Ok(ActionWithReason::PythPricesClosed);
     }
-    let (oracle_price, updated) = get_latest_price(&offchain_price_data, market).await?;
-    let (_market_price, reason) = app
-        .needs_price_update(
-            market,
-            oracle_price,
-            updated,
-            last_successful_price_publish_time,
-        )
-        .await?;
-    Ok(reason)
+    match get_latest_price(&offchain_price_data, market).await? {
+        LatestPrice::NoPriceInContract => Ok(ActionWithReason::WorkNeeded(
+            CrankTriggerReason::NoPriceOnChain,
+        )),
+        LatestPrice::PriceTooOld => Ok(ActionWithReason::OffChainPriceTooOld),
+        LatestPrice::VolatileDiffTooLarge => Ok(ActionWithReason::VolatileDiffTooLarge),
+        LatestPrice::PricesFound {
+            off_chain_price,
+            off_chain_publish_time,
+            on_chain_price,
+            on_chain_publish_time,
+        } => {
+            let price_will_trigger = market.market.price_would_trigger(off_chain_price).await?;
+
+            let info = NeedsPriceUpdateInfo {
+                last_action: last_action_taken,
+                next_pending_deferred_work_item: market
+                    .status
+                    .next_deferred_execution
+                    .map(|x| x.try_into_chrono_datetime())
+                    .transpose()?,
+                off_chain_price,
+                off_chain_publish_time,
+                crank_work_available: market.status.next_crank.clone(),
+                price_will_trigger,
+                on_chain_price,
+                on_chain_publish_time,
+            };
+
+            Ok(info.actions(&app.config.needs_price_update_params))
+        }
+    }
 }
 
 async fn update_oracles(
@@ -395,232 +469,47 @@ async fn update_oracles(
     }
 }
 
-type NeedPriceUpdateInner = (
-    Option<PricePoint>,
-    Option<(PriceUpdateReason, NeedsOracleUpdate)>,
-);
-
-impl App {
-    /// Does the market need a price update?
-    #[tracing::instrument(skip_all)]
-    async fn needs_price_update(
-        &self,
-        market: &Market,
-        oracle_price: PriceBaseInQuote,
-        market_price_updated: DateTime<Utc>,
-        last_successful_price_publish_time: Option<DateTime<Utc>>,
-    ) -> Result<NeedPriceUpdateInner> {
-        let market_contract = &market.market;
-        let market_price: PricePoint = match market_contract.get_oracle_price().await {
-            Ok(price) => price.composed_price,
-            Err(e) => {
-                let msg = format!("{e}");
-                return if msg.contains("price_not_found") {
-                    // Assume this is the first price being set
-                    Ok((
-                        None,
-                        Some((PriceUpdateReason::NoPriceFound, NeedsOracleUpdate::Yes)),
-                    ))
-                } else {
-                    Err(e.into())
-                };
-            }
-        };
-
-        // TODO With the introduction of deferred execution, the workflow here
-        // can (and should) change significantly. However, for getting a first version off
-        // the ground, the MVP is "always do a price update and crank if there's a work
-        // item in the deferred execution pool."
-        if market.status.next_deferred_execution.is_some() {
-            return Ok((
-                None,
-                Some((
-                    PriceUpdateReason::DeferredExecutionItem,
-                    NeedsOracleUpdate::Yes,
-                )),
-            ));
-        }
-
-        let mut is_too_frequent = false;
-
-        // Check if the price from Pyth is too old
-        // FIXME don't use a hard-coded seconds value
-        if Utc::now()
-            .signed_duration_since(market_price_updated)
-            .num_seconds()
-            > 180
-        {
-            // Not bothering with the price update, but need to determine if
-            // Pyth prices are closed or it's an actual error
-            if self
-                .pyth_prices_closed(market.market.get_address(), Some(&market.status))
-                .await?
-            {
-                return Ok((None, None));
-            } else {
-                anyhow::bail!(
-                    "Pyth price update is too old for market {}",
-                    market.market_id
-                );
-            }
-        }
-
-        // TODO review this code and make sure we're handling publish times correctly
-        if let Some(publish_time) = market_price.publish_time {
-            // Determine the logical "last update" by using both the
-            // contract-derived price time and the most recent successful price
-            // update we pushed. The reason for this is to avoid double-sending
-            // price updates if one of the nodes reports an older price update.
-
-            let publish_time = publish_time.try_into_chrono_datetime()?;
-            let updated = (|| {
-                let last_successful_price_publish_time = last_successful_price_publish_time?;
-                if last_successful_price_publish_time < publish_time {
-                    return None;
-                }
-                if Utc::now()
-                    .signed_duration_since(last_successful_price_publish_time)
-                    .num_seconds()
-                    > self.config.max_price_age_secs.into()
-                {
-                    return None;
-                }
-                Some(last_successful_price_publish_time)
-            })()
-            .unwrap_or(publish_time);
-
-            // Check 1: is the last price update too old?
-            let age = Utc::now().signed_duration_since(updated);
-            let age_secs = age.num_seconds();
-            // Determine how old a price triggers a price update. We check
-            // the defaults for the bots, the feeds themselves, and then add
-            // a 10 second buffer to give time for transactions to land on
-            // chain.
-            let max_price_age_secs =
-                market.max_price_age_with_default(self.config.max_price_age_secs) - 10;
-            if age_secs > max_price_age_secs.into() {
-                return Ok((
-                    Some(market_price),
-                    Some((
-                        PriceUpdateReason::LastUpdateTooOld(age),
-                        self.needs_oracle_update(market).await?,
-                    )),
-                ));
-            }
-
-            // Check 1a: if it's too new, we don't update, regardless of anything
-            // else that might have happened. This is to prevent gas drainage.
-            is_too_frequent = age_secs < self.config.min_price_age_secs.into();
-        }
-
-        // Check 2: has the price moved more than the allowed delta?
-        let delta = oracle_price
-            .into_non_zero()
-            .raw()
-            .checked_div(market_price.price_base.into_non_zero().raw())?
-            .into_signed()
-            .checked_sub(Signed::ONE)?
-            .abs_unsigned();
-        if delta >= self.config.max_allowed_price_delta {
-            return Ok((
-                Some(market_price),
-                Some((
-                    PriceUpdateReason::PriceDelta {
-                        old: market_price.price_base,
-                        new: oracle_price,
-                        delta,
-                        is_too_frequent,
-                    },
-                    self.needs_oracle_update(market).await?,
-                )),
-            ));
-        }
-
-        // Check 3: would any triggers happen from this price?
-        // We save this for last since it requires a network round trip
-        if market_contract.price_would_trigger(oracle_price).await? {
-            // In this case we always do an oracle update, we want to make sure
-            // this specific price point makes it into the contract.
-            return Ok((
-                Some(market_price),
-                Some((PriceUpdateReason::Triggers, NeedsOracleUpdate::Yes)),
-            ));
-        }
-
-        Ok((Some(market_price), None))
-    }
-}
-
-enum PriceUpdateReason {
-    LastUpdateTooOld(Duration),
-    PriceDelta {
-        old: PriceBaseInQuote,
-        new: PriceBaseInQuote,
-        delta: Decimal256,
-        is_too_frequent: bool,
-    },
-    Triggers,
-    NoPriceFound,
-    DeferredExecutionItem,
-}
-
-impl PriceUpdateReason {
-    fn is_too_frequent(&self) -> bool {
-        match self {
-            PriceUpdateReason::LastUpdateTooOld(_) => false,
-            PriceUpdateReason::PriceDelta {
-                is_too_frequent, ..
-            } => *is_too_frequent,
-            PriceUpdateReason::Triggers => false,
-            PriceUpdateReason::NoPriceFound => false,
-            PriceUpdateReason::DeferredExecutionItem => false,
-        }
-    }
-
-    pub(crate) fn to_crank_reason(&self) -> Option<CrankTriggerReason> {
-        match self {
-            PriceUpdateReason::LastUpdateTooOld(duration) => {
-                Some(CrankTriggerReason::PriceUpdateTooOld(*duration))
-            }
-            PriceUpdateReason::PriceDelta { .. } => None,
-            PriceUpdateReason::Triggers => Some(CrankTriggerReason::PriceUpdateWillTrigger),
-            PriceUpdateReason::NoPriceFound => Some(CrankTriggerReason::NoPriceFound),
-            PriceUpdateReason::DeferredExecutionItem => {
-                Some(CrankTriggerReason::DeferredExecutionItem)
-            }
-        }
-    }
-}
-
 #[derive(Debug)]
 struct ReasonStats {
     market: MarketId,
     started_tracking: DateTime<Utc>,
+    oracle_update: u64,
+    cooldown: u64,
     not_needed: u64,
     too_old: u64,
     delta: u64,
-    delta_too_frequent: u64,
     triggers: u64,
+    crank_work_available: u64,
+    more_work_found: u64,
     no_price_found: u64,
-    oracle_update: u64,
-    deferred_execution: u64,
+    deferred_needs_new_price: u64,
+    deferred_work_available: u64,
+    pyth_prices_closed: u64,
+    offchain_price_too_old: u64,
+    volatile_diff_too_large: u64,
 }
 
 impl Display for ReasonStats {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let ReasonStats {
             market,
+            cooldown,
             started_tracking,
             not_needed,
             too_old,
             delta,
-            delta_too_frequent,
             triggers,
             no_price_found,
             oracle_update,
-            deferred_execution,
+            crank_work_available,
+            more_work_found,
+            deferred_needs_new_price,
+            deferred_work_available,
+            pyth_prices_closed,
+            offchain_price_too_old,
+            volatile_diff_too_large,
         } = self;
-        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Delta too frequent: {delta_too_frequent}. Triggers: {triggers}. No price found: {no_price_found}. Oracle update: {oracle_update}. Deferred execution: {deferred_execution}")
+        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Cooldown: {cooldown}. Triggers: {triggers}. No price found: {no_price_found}. Oracle update: {oracle_update}. Deferred execution w/price: {deferred_needs_new_price}. Deferred w/o price: {deferred_work_available}. Pyth prices closed: {pyth_prices_closed}. Crank work available: {crank_work_available}. More work found: {more_work_found}. Offchain price too old: {offchain_price_too_old}. Volatile diff too large: {volatile_diff_too_large}.")
     }
 }
 
@@ -628,90 +517,50 @@ impl ReasonStats {
     fn new(market: MarketId) -> Self {
         ReasonStats {
             started_tracking: Utc::now(),
+            cooldown: 0,
             not_needed: 0,
             too_old: 0,
             delta: 0,
-            delta_too_frequent: 0,
             triggers: 0,
             no_price_found: 0,
             oracle_update: 0,
-            deferred_execution: 0,
             market,
+            crank_work_available: 0,
+            more_work_found: 0,
+            deferred_needs_new_price: 0,
+            deferred_work_available: 0,
+            pyth_prices_closed: 0,
+            offchain_price_too_old: 0,
+            volatile_diff_too_large: 0,
         }
     }
-    fn add_reason(&mut self, reason: &Option<(PriceUpdateReason, NeedsOracleUpdate)>) {
-        let (reason, needs_oracle_update) = match reason {
-            Some(reason) => reason,
-            None => {
-                self.not_needed += 1;
-                return;
-            }
-        };
+
+    fn add_reason(&mut self, reason: &ActionWithReason) {
         match reason {
-            PriceUpdateReason::LastUpdateTooOld(_) => self.too_old += 1,
-            PriceUpdateReason::PriceDelta {
-                is_too_frequent, ..
-            } => {
-                if *is_too_frequent {
-                    self.delta_too_frequent += 1
-                } else {
-                    self.delta += 1
+            ActionWithReason::CooldownPeriod => self.cooldown += 1,
+            ActionWithReason::NoWorkAvailable => self.not_needed += 1,
+            ActionWithReason::PythPricesClosed => self.pyth_prices_closed += 1,
+            ActionWithReason::OffChainPriceTooOld => self.offchain_price_too_old += 1,
+            ActionWithReason::VolatileDiffTooLarge => self.volatile_diff_too_large += 1,
+            ActionWithReason::WorkNeeded(reason) => {
+                if reason.needs_price_update() {
+                    self.oracle_update += 1;
                 }
+                self.add_work_reason(reason);
             }
-            PriceUpdateReason::Triggers => self.triggers += 1,
-            PriceUpdateReason::NoPriceFound => self.no_price_found += 1,
-            PriceUpdateReason::DeferredExecutionItem => self.deferred_execution += 1,
-        }
-        if let NeedsOracleUpdate::Yes = needs_oracle_update {
-            self.oracle_update += 1
         }
     }
-}
 
-impl Display for PriceUpdateReason {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            PriceUpdateReason::LastUpdateTooOld(age) => write!(f, "Last update too old: {age}."),
-            PriceUpdateReason::PriceDelta { old, new, delta, is_too_frequent } => write!(
-                f,
-                "Large price delta. Old: {old}. New: {new}. Delta: {delta}. Too frequent: {is_too_frequent}."
-            ),
-            PriceUpdateReason::Triggers => {
-                write!(f, "Price would trigger positions and/or orders.")
-            }
-            PriceUpdateReason::NoPriceFound => write!(f, "No price point found."),
-            PriceUpdateReason::DeferredExecutionItem => write!(f, "Deferred execution item."),
+    fn add_work_reason(&mut self, reason: &CrankTriggerReason) {
+        match reason {
+            CrankTriggerReason::NoPriceOnChain => self.no_price_found += 1,
+            CrankTriggerReason::OnChainTooOld { .. } => self.too_old += 1,
+            CrankTriggerReason::LargePriceDelta { .. } => self.delta += 1,
+            CrankTriggerReason::DeferredNeedsNewPrice { .. } => self.deferred_needs_new_price += 1,
+            CrankTriggerReason::DeferredWorkAvailable { .. } => self.deferred_work_available += 1,
+            CrankTriggerReason::CrankWorkAvailable => self.crank_work_available += 1,
+            CrankTriggerReason::PriceWillTrigger => self.triggers += 1,
+            CrankTriggerReason::MoreWorkFound => self.more_work_found += 1,
         }
-    }
-}
-
-impl Market {
-    fn max_price_age_with_default(&self, default_max_age: u32) -> u32 {
-        let mut ret = default_max_age;
-        match &self.status.config.spot_price {
-            SpotPriceConfig::Manual { .. } => (),
-            SpotPriceConfig::Oracle {
-                feeds, feeds_usd, ..
-            } => feeds
-                .iter()
-                .chain(feeds_usd.iter())
-                .for_each(|feed| match &feed.data {
-                    SpotPriceFeedData::Constant { .. } => (),
-                    SpotPriceFeedData::Pyth {
-                        age_tolerance_seconds,
-                        ..
-                    } => ret = ret.min(*age_tolerance_seconds),
-                    SpotPriceFeedData::Stride {
-                        age_tolerance_seconds,
-                        ..
-                    } => ret = ret.min(*age_tolerance_seconds),
-                    SpotPriceFeedData::Sei { .. } => (),
-                    SpotPriceFeedData::Simple {
-                        age_tolerance_seconds,
-                        ..
-                    } => ret = ret.min(*age_tolerance_seconds),
-                }),
-        }
-        ret
     }
 }
