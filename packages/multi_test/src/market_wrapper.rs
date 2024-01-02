@@ -1191,7 +1191,7 @@ impl PerpsMarket {
             take_profit_override,
         )?;
 
-        self.exec_open_position_process_queue_response(sender, queue_resp)
+        self.exec_open_position_process_queue_response(sender, queue_resp, None)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1222,9 +1222,10 @@ impl PerpsMarket {
         &self,
         cranker: &Addr,
         queue_response: DeferQueueResponse,
+        crank_execs: Option<u32>,
     ) -> Result<(PositionId, DeferResponse)> {
         // Open position always happens through a deferred exec
-        let defer_res = self.exec_defer_queue_process(cranker, queue_response)?;
+        let defer_res = self.exec_defer_queue_process(cranker, queue_response, crank_execs)?;
 
         let res = defer_res.exec_resp().clone();
 
@@ -2100,6 +2101,7 @@ impl PerpsMarket {
         &self,
         cranker: &Addr,
         queue: DeferQueueResponse,
+        crank_execs: Option<u32>,
     ) -> Result<DeferResponse> {
         let mut responses = vec![queue.response];
 
@@ -2160,11 +2162,7 @@ impl PerpsMarket {
             responses.push(self.exec(
                 cranker,
                 &MarketExecuteMsg::Crank {
-                    // This also doesn't seem necessary so far
-                    // if tests do depend on only getting more fidelity on cranking here
-                    // maybe take it as a parameter... TBD
-                    //execs: Some(1),
-                    execs: None,
+                    execs: crank_execs,
                     rewards: None,
                 },
             )?);
@@ -2173,7 +2171,7 @@ impl PerpsMarket {
 
     pub fn exec_defer_wasm_msg(&self, sender: &Addr, msg: WasmMsg) -> Result<DeferResponse> {
         let queue_res = self.exec_defer_queue_wasm_msg(sender, msg)?;
-        self.exec_defer_queue_process(sender, queue_res)
+        self.exec_defer_queue_process(sender, queue_res, None)
     }
 }
 

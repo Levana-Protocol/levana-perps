@@ -35,6 +35,6 @@ fn oracle_open_position() {
     market.exec_refresh_price().unwrap();
 
     market
-        .exec_open_position_process_queue_response(&trader, queue_res)
+        .exec_open_position_process_queue_response(&trader, queue_res, None)
         .unwrap();
 }
