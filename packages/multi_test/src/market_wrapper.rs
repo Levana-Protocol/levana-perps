@@ -299,6 +299,9 @@ impl PerpsMarket {
         };
 
         if bootstap_lp {
+            // lp actions require that there is a valid price in the contract already
+            _self.exec_crank_n(&Addr::unchecked("init-cranker"), 1)?;
+
             // do not go through app get_user, since we want to _always_ bootstrap this user
             _self.exec_mint_and_deposit_liquidity(
                 &DEFAULT_MARKET.bootstrap_lp_addr,
