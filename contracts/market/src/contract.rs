@@ -75,7 +75,7 @@ pub fn instantiate(
     token_init(deps.storage, &deps.querier, token)?;
     fees_init(deps.storage)?;
     liquidity_init(deps.storage)?;
-    crank_init(deps.storage, &env)?;
+    crank_init(deps.storage)?;
     positions_init(deps.storage)?;
     yield_init(deps.storage)?;
 
