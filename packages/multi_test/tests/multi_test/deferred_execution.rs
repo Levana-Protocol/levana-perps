@@ -49,7 +49,7 @@ fn basic_operations() {
     assert_eq!(status.last_processed_deferred_exec_id, None);
     assert_eq!(status.next_crank, None);
 
-    // Now crank
+    // Now update the price...
     market.exec_refresh_price().unwrap();
 
     let status = market.query_status().unwrap();
@@ -57,6 +57,7 @@ fn basic_operations() {
     assert_eq!(status.last_processed_deferred_exec_id, None);
     assert_ne!(status.next_crank, None);
 
+    // and crank!
     market.exec_crank_till_finished(&cranker).unwrap();
     assert_eq!(market.query_status().unwrap().next_crank, None);
 
