@@ -143,7 +143,7 @@ impl App {
                 rewards: rewards.clone(),
             },
         )?;
-        builder.set_memo(reason);
+        builder.set_memo(reason.to_string());
 
         enum RunResult {
             NormalRun(TxResponse),

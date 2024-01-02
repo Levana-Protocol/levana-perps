@@ -1,6 +1,5 @@
 mod balance;
 mod crank_run;
-mod crank_watch;
 pub(crate) mod factory;
 pub(crate) mod faucet;
 mod gas_check;
@@ -44,11 +43,10 @@ impl AppBuilder {
         self.track_stats()?;
         self.track_balance()?;
 
-        // These three services are tied together closely, see docs on the
+        // These services are tied together closely, see docs on the
         // crank_run module for more explanation.
         if let Some(trigger_crank) = self.start_crank_run()? {
             self.start_price(trigger_crank.clone())?;
-            self.start_crank_watch(trigger_crank)?;
         }
 
         self.alert_on_low_gas(
