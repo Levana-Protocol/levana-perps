@@ -1,4 +1,4 @@
-use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp, config::DEFAULT_MARKET};
+use levana_perpswap_multi_test::{config::DEFAULT_MARKET, market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
     contracts::market::{
         entry::PriceForQuery,
@@ -20,7 +20,7 @@ fn status() {
         "50".parse().unwrap(),
         Some("50".parse().unwrap()),
         true,
-        DEFAULT_MARKET.spot_price
+        DEFAULT_MARKET.spot_price,
     )
     .unwrap();
 

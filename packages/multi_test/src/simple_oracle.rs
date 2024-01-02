@@ -2,14 +2,14 @@
 // but for testing
 // For the sake of reducing clutter, it's also flattened into one file here
 
+use anyhow::{bail, Result};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, BlockInfo, Decimal256, Timestamp};
 use cosmwasm_std::{
     entry_point, to_binary, Deps, DepsMut, Env, Event, MessageInfo, QueryResponse, Response,
 };
+use cosmwasm_std::{Addr, BlockInfo, Decimal256, Timestamp};
 use cw2::set_contract_version;
 use cw_storage_plus::Item;
-use anyhow::{Result, bail};
 
 pub const CONTRACT_NAME: &str = env!("CARGO_PKG_NAME");
 pub const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -69,9 +69,8 @@ pub struct Price {
     /// Optional timestamp for the price, independent of block_info.time
     pub timestamp: Option<Timestamp>,
     /// FIXME: Currently required by market contract... might be changed soon
-    pub volatile: bool
+    pub volatile: bool,
 }
-
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -89,7 +88,9 @@ pub fn instantiate(
         .transpose()?
         .unwrap_or(info.sender);
 
-    OWNER.save(deps.storage, &owner).map_err(|err| anyhow::Error::from(err))?;
+    OWNER
+        .save(deps.storage, &owner)
+        .map_err(anyhow::Error::from)?;
 
     Ok(
         Response::new().add_event(Event::new("instantiation").add_attributes([
@@ -105,7 +106,11 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     // all execution messages require the sender to be the owner
     let owner = OWNER.load(deps.storage)?;
     if info.sender != owner {
-       bail!("unauthorized, owner is {} (msg sent from {}", owner, info.sender);
+        bail!(
+            "unauthorized, owner is {} (msg sent from {}",
+            owner,
+            info.sender
+        );
     }
 
     match msg {
@@ -116,14 +121,12 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 .add_event(Event::new("set-owner").add_attribute("owner", owner.as_str())))
         }
         ExecuteMsg::SetPrice { value, timestamp } => {
-            println!("[in oracle] setting price timestamp {}, now: {}, diff: {}", timestamp.unwrap(), env.block.time, env.block.time.nanos() - timestamp.unwrap().nanos());
             let price = Price {
                 value,
                 block_info: env.block,
                 timestamp,
-                volatile: true // REQUIRED for market to see the publish_time
+                volatile: true, // REQUIRED for market to see the publish_time
             };
-
 
             PRICE.save(deps.storage, &price)?;
 

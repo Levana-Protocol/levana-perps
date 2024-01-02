@@ -10,7 +10,7 @@
 */
 
 use super::PerpsApp;
-use crate::config::{TokenKind, DEFAULT_MARKET, TEST_CONFIG, SpotPriceKind};
+use crate::config::{SpotPriceKind, TokenKind, DEFAULT_MARKET, TEST_CONFIG};
 use crate::response::CosmosResponseExt;
 use crate::time::{BlockInfoChange, TimeJump};
 use anyhow::Context;
@@ -49,7 +49,9 @@ use msg::contracts::market::entry::{
     StatusResp, TradeHistorySummary, TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
-use msg::contracts::market::spot_price::{SpotPriceConfigInit, SpotPriceFeedInit, SpotPriceFeedDataInit, SpotPriceConfig};
+use msg::contracts::market::spot_price::{
+    SpotPriceConfig, SpotPriceConfigInit, SpotPriceFeedDataInit, SpotPriceFeedInit,
+};
 use msg::contracts::market::{
     config::{Config, ConfigUpdate},
     entry::{
@@ -68,6 +70,7 @@ use msg::contracts::position_token::{
 };
 use msg::prelude::*;
 
+use crate::simple_oracle::ExecuteMsg as SimpleOracleExecuteMsg;
 use msg::constants::event_key;
 use msg::contracts::farming::entry::OwnerExecuteMsg::ReclaimEmissions;
 use msg::contracts::market::order::OrderId;
@@ -79,7 +82,6 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::cell::{RefCell, RefMut};
 use std::rc::Rc;
-use crate::simple_oracle::ExecuteMsg as SimpleOracleExecuteMsg;
 
 pub struct PerpsMarket {
     // we can have multiple markets per app instance
@@ -100,7 +102,12 @@ pub struct PerpsMarket {
 
 impl PerpsMarket {
     pub fn new(app: Rc<RefCell<PerpsApp>>) -> Result<Self> {
-        Self::new_with_type(app, DEFAULT_MARKET.collateral_type, true, DEFAULT_MARKET.spot_price)
+        Self::new_with_type(
+            app,
+            DEFAULT_MARKET.collateral_type,
+            true,
+            DEFAULT_MARKET.spot_price,
+        )
     }
 
     pub fn new_with_type(
@@ -145,22 +152,20 @@ impl PerpsMarket {
         bootstap_lp: bool,
         spot_price_kind: SpotPriceKind,
     ) -> Result<Self> {
-
         if spot_price_kind == SpotPriceKind::Oracle {
             let mut app = app.borrow_mut();
             let contract_addr = app.simple_oracle_addr.clone();
             let now = app.block_info().time;
 
-            app
-                .execute_contract(
-                    Addr::unchecked(&TEST_CONFIG.protocol_owner),
-                    contract_addr, 
-                    &SimpleOracleExecuteMsg::SetPrice { 
-                        value: initial_price.into_number().abs_unsigned(),
-                        timestamp: Some(now),
-                    }, 
-                    &[]
-                )?;
+            app.execute_contract(
+                Addr::unchecked(&TEST_CONFIG.protocol_owner),
+                contract_addr,
+                &SimpleOracleExecuteMsg::SetPrice {
+                    value: initial_price.into_number().abs_unsigned(),
+                    timestamp: Some(now),
+                },
+                &[],
+            )?;
         }
         let market_msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
             new_market: msg::contracts::market::entry::NewMarketParams {
@@ -190,33 +195,37 @@ impl PerpsMarket {
                         let contract_addr = RawAddr::from(app.borrow().simple_oracle_addr.as_ref());
                         SpotPriceConfigInit::Oracle {
                             pyth: None,
-                            stride: None, 
+                            stride: None,
                             feeds: vec![SpotPriceFeedInit {
-                                data: SpotPriceFeedDataInit::Simple { contract: contract_addr.clone(), age_tolerance_seconds: 120 },
+                                data: SpotPriceFeedDataInit::Simple {
+                                    contract: contract_addr.clone(),
+                                    age_tolerance_seconds: 120,
+                                },
                                 inverted: false,
                                 volatile: None,
-                            }], 
+                            }],
                             feeds_usd: vec![SpotPriceFeedInit {
-                                data: SpotPriceFeedDataInit::Simple { contract: contract_addr, age_tolerance_seconds: 120 },
+                                data: SpotPriceFeedDataInit::Simple {
+                                    contract: contract_addr,
+                                    age_tolerance_seconds: 120,
+                                },
                                 inverted: false,
                                 volatile: None,
-                            }], 
+                            }],
                             volatile_diff_seconds: None,
                         }
                     }
                 },
                 initial_borrow_fee_rate: "0.01".parse().unwrap(),
                 initial_price: match spot_price_kind {
-                    SpotPriceKind::Manual => {
-                        Some(InitialPrice {
-                            price: initial_price,
-                            price_usd: collateral_in_usd.unwrap_or_else(|| {
-                                PriceCollateralInUsd::from_non_zero(initial_price.into_non_zero())
-                            }),
-                        })
-                    },
-                    SpotPriceKind::Oracle => None
-                }
+                    SpotPriceKind::Manual => Some(InitialPrice {
+                        price: initial_price,
+                        price_usd: collateral_in_usd.unwrap_or_else(|| {
+                            PriceCollateralInUsd::from_non_zero(initial_price.into_non_zero())
+                        }),
+                    }),
+                    SpotPriceKind::Oracle => None,
+                },
             },
         };
 
@@ -354,7 +363,6 @@ impl PerpsMarket {
             NonZero::try_from_number(amount).context("Negative or zero token amount")?,
         )
     }
-
 
     /// Mint some native coins of the given denom
     pub fn exec_mint_native(
@@ -888,8 +896,6 @@ impl PerpsMarket {
         price: PriceBaseInQuote,
         price_usd: Option<PriceCollateralInUsd>,
     ) -> Result<AppResponse> {
-
-
         match self.query_config()?.spot_price {
             SpotPriceConfig::Manual { admin } => {
                 let price_usd = price_usd.unwrap_or(
@@ -898,13 +904,10 @@ impl PerpsMarket {
                         .unwrap_or(PriceCollateralInUsd::one()),
                 );
                 self.exec(
-                    &Addr::unchecked(&admin),
-                    &MarketExecuteMsg::SetManualPrice {
-                        price,
-                        price_usd
-                    },
+                    &admin,
+                    &MarketExecuteMsg::SetManualPrice { price, price_usd },
                 )
-            },
+            }
             SpotPriceConfig::Oracle { .. } => {
                 let contract_addr = self.app().simple_oracle_addr.clone();
 
@@ -912,22 +915,17 @@ impl PerpsMarket {
                     todo!("support setting price usd in oracle tests");
                 }
                 let now = self.now();
-                self
-                    .app()
-                    .execute_contract(
-                        Addr::unchecked(&TEST_CONFIG.protocol_owner),
-                        contract_addr, 
-                        &SimpleOracleExecuteMsg::SetPrice { 
-                            value: price.into_non_zero().into_decimal256(), 
-                            timestamp: Some(now.into()),
-                        }, 
-                        &[]
-                    )
+                self.app().execute_contract(
+                    Addr::unchecked(&TEST_CONFIG.protocol_owner),
+                    contract_addr,
+                    &SimpleOracleExecuteMsg::SetPrice {
+                        value: price.into_non_zero().into_decimal256(),
+                        timestamp: Some(now.into()),
+                    },
+                    &[],
+                )
             }
         }
-
-
-
     }
 
     pub fn exec_set_config(&self, config_update: ConfigUpdate) -> Result<AppResponse> {
@@ -2159,7 +2157,6 @@ impl PerpsMarket {
                     rewards: None,
                 },
             )?);
-
         }
     }
 

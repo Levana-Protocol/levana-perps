@@ -696,9 +696,13 @@ fn position_update_abs_notional_size() {
     for market_type in market_types {
         for direction in directions.clone() {
             for change_kind in change_kinds.clone() {
-                let market =
-                    PerpsMarket::new_with_type(PerpsApp::new_cell().unwrap(), market_type, true, DEFAULT_MARKET.spot_price)
-                        .unwrap();
+                let market = PerpsMarket::new_with_type(
+                    PerpsApp::new_cell().unwrap(),
+                    market_type,
+                    true,
+                    DEFAULT_MARKET.spot_price,
+                )
+                .unwrap();
                 let trader = market.clone_trader(0).unwrap();
 
                 // with a price of just 1 it's hard to see the changes between market types, so change it

@@ -11,8 +11,8 @@ pub mod response;
 pub mod arbitrary;
 pub mod contracts;
 pub mod rewards_helpers;
-pub mod time;
 pub mod simple_oracle;
+pub mod time;
 
 use anyhow::{anyhow, bail, Context, Result};
 use config::TEST_CONFIG;
@@ -134,7 +134,7 @@ impl PerpsApp {
         let simple_oracle_addr = app.instantiate_contract(
             simple_oracle_code_id,
             Addr::unchecked(&TEST_CONFIG.protocol_owner),
-            &simple_oracle::InstantiateMsg { 
+            &simple_oracle::InstantiateMsg {
                 owner: TEST_CONFIG.protocol_owner.clone().into(),
             },
             &[],
