@@ -554,7 +554,7 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpt
     Ok(())
 }
 
-fn strip_nulls<T: serde::Serialize>(x: T) -> Result<serde_json::Value> {
+pub(crate) fn strip_nulls<T: serde::Serialize>(x: T) -> Result<serde_json::Value> {
     use serde_json::Value;
     let value = serde_json::to_value(x)?;
     fn inner(value: Value) -> Value {

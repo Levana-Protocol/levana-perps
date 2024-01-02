@@ -380,10 +380,10 @@ networks:
   sei-testnet:
     ATOM_USD:
       feeds: [
-        !sei { denom: "uatom", inverted: false }
+        !pyth { key: "ATOM_USD", inverted: false }
       ]
       feeds-usd: [
-        !sei { denom: "uatom", inverted: false }
+        !pyth { key: "ATOM_USD", inverted: false }
       ]
     OSMO_USDC:
       feeds: [
@@ -409,10 +409,10 @@ networks:
       ]
     BTC_USD:
       feeds: [
-        !sei { denom: "ubtc", inverted: false },
+        !pyth { key: "BTC_USD", inverted: false },
       ]
       feeds-usd: [
-        !sei { denom: "ubtc", inverted: false },
+        !pyth { key: "BTC_USD", inverted: false },
       ]
     ETH_USD:
       feeds: [
