@@ -113,6 +113,7 @@ pub(crate) enum LatestPrice {
         on_chain_publish_time: DateTime<Utc>,
     },
     PriceTooOld,
+    VolatileDiffTooLarge,
 }
 
 /// Get the latest off-chain price point
@@ -120,11 +121,15 @@ pub(crate) async fn get_latest_price(
     offchain_price_data: &OffchainPriceData,
     market: &Market,
 ) -> Result<LatestPrice> {
-    let feeds = match &market.status.config.spot_price {
+    let (feeds, volatile_diff_seconds) = match &market.status.config.spot_price {
         SpotPriceConfig::Manual { .. } => {
             bail!("Manual markets do not use an oracle")
         }
-        SpotPriceConfig::Oracle { feeds, .. } => feeds,
+        SpotPriceConfig::Oracle {
+            feeds,
+            volatile_diff_seconds,
+            ..
+        } => (feeds, volatile_diff_seconds.unwrap_or(5)),
     };
 
     let oracle_price = match market.market.get_oracle_price().await {
@@ -139,8 +144,14 @@ pub(crate) async fn get_latest_price(
     };
 
     Ok(
-        match compose_oracle_feeds(&oracle_price, &offchain_price_data.values, feeds)? {
+        match compose_oracle_feeds(
+            &oracle_price,
+            &offchain_price_data.values,
+            feeds,
+            volatile_diff_seconds,
+        )? {
             ComposedOracleFeed::UpdateTooOld => LatestPrice::PriceTooOld,
+            ComposedOracleFeed::VolatileDiffTooLarge => LatestPrice::VolatileDiffTooLarge,
             ComposedOracleFeed::OffChainPrice {
                 price: off_chain_price,
                 publish_time: off_chain_publish_time,
@@ -163,24 +174,26 @@ enum ComposedOracleFeed {
         price: PriceBaseInQuote,
         publish_time: DateTime<Utc>,
     },
+    VolatileDiffTooLarge,
 }
 
 fn compose_oracle_feeds(
     oracle_price: &OraclePriceResp,
     pyth_prices: &HashMap<PriceIdentifier, (NumberGtZero, DateTime<Utc>)>,
     feeds: &[SpotPriceFeed],
+    volatile_diff_seconds: u32,
 ) -> Result<ComposedOracleFeed> {
     let mut final_price = Decimal256::one();
-    let mut publish_time = None::<DateTime<Utc>>;
+    let mut publish_times = None::<(DateTime<Utc>, DateTime<Utc>)>;
     let now = Utc::now();
 
     let mut update_publish_time =
         |new_time: DateTime<Utc>, is_volatile_opt: Option<bool>, is_volatile_default: bool| {
             if is_volatile_opt.unwrap_or(is_volatile_default) {
-                publish_time = Some(match publish_time {
-                    None => new_time,
-                    Some(publish_time) => publish_time.min(new_time),
-                })
+                publish_times = Some(match publish_times {
+                    Some((oldest, newest)) => (oldest.min(new_time), newest.max(new_time)),
+                    None => (new_time, new_time),
+                });
             }
         };
 
@@ -260,9 +273,16 @@ fn compose_oracle_feeds(
     let price = NumberGtZero::try_from_decimal(final_price)
         .with_context(|| format!("unable to convert price of {final_price} to NumberGtZero"))?;
 
-    Ok(ComposedOracleFeed::OffChainPrice {
-        price: PriceBaseInQuote::from_non_zero(price),
-        publish_time: publish_time.context("No publish time found while composing oracle price")?,
+    let (oldest, newest) =
+        publish_times.context("No publish time found while composing oracle price")?;
+    let diff = newest.signed_duration_since(oldest);
+    Ok(if diff.num_seconds() > volatile_diff_seconds.into() {
+        ComposedOracleFeed::VolatileDiffTooLarge
+    } else {
+        ComposedOracleFeed::OffChainPrice {
+            price: PriceBaseInQuote::from_non_zero(price),
+            publish_time: oldest,
+        }
     })
 }
 

@@ -128,7 +128,8 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                     ActionWithReason::CooldownPeriod
                     | ActionWithReason::NoWorkAvailable
                     | ActionWithReason::PythPricesClosed
-                    | ActionWithReason::OffChainPriceTooOld => (),
+                    | ActionWithReason::OffChainPriceTooOld
+                    | ActionWithReason::VolatileDiffTooLarge => (),
                     ActionWithReason::WorkNeeded(crank_trigger_reason) => {
                         if crank_trigger_reason.needs_price_update() {
                             any_needs_oracle_update = NeedsOracleUpdate::Yes;
@@ -224,6 +225,7 @@ enum ActionWithReason {
     WorkNeeded(CrankTriggerReason),
     PythPricesClosed,
     OffChainPriceTooOld,
+    VolatileDiffTooLarge,
 }
 
 impl NeedsPriceUpdateInfo {
@@ -321,6 +323,7 @@ async fn check_market_needs_price_update(
             CrankTriggerReason::NoPriceOnChain,
         )),
         LatestPrice::PriceTooOld => Ok(ActionWithReason::OffChainPriceTooOld),
+        LatestPrice::VolatileDiffTooLarge => Ok(ActionWithReason::VolatileDiffTooLarge),
         LatestPrice::PricesFound {
             off_chain_price,
             off_chain_publish_time,
@@ -483,6 +486,7 @@ struct ReasonStats {
     deferred_work_available: u64,
     pyth_prices_closed: u64,
     offchain_price_too_old: u64,
+    volatile_diff_too_large: u64,
 }
 
 impl Display for ReasonStats {
@@ -503,8 +507,9 @@ impl Display for ReasonStats {
             deferred_work_available,
             pyth_prices_closed,
             offchain_price_too_old,
+            volatile_diff_too_large,
         } = self;
-        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Cooldown: {cooldown}. Triggers: {triggers}. No price found: {no_price_found}. Oracle update: {oracle_update}. Deferred execution w/price: {deferred_needs_new_price}. Deferred w/o price: {deferred_work_available}. Pyth prices closed: {pyth_prices_closed}. Crank work available: {crank_work_available}. More work found: {more_work_found}. Offchain price too old: {offchain_price_too_old}.")
+        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Cooldown: {cooldown}. Triggers: {triggers}. No price found: {no_price_found}. Oracle update: {oracle_update}. Deferred execution w/price: {deferred_needs_new_price}. Deferred w/o price: {deferred_work_available}. Pyth prices closed: {pyth_prices_closed}. Crank work available: {crank_work_available}. More work found: {more_work_found}. Offchain price too old: {offchain_price_too_old}. Volatile diff too large: {volatile_diff_too_large}.")
     }
 }
 
@@ -526,6 +531,7 @@ impl ReasonStats {
             deferred_work_available: 0,
             pyth_prices_closed: 0,
             offchain_price_too_old: 0,
+            volatile_diff_too_large: 0,
         }
     }
 
@@ -535,6 +541,7 @@ impl ReasonStats {
             ActionWithReason::NoWorkAvailable => self.not_needed += 1,
             ActionWithReason::PythPricesClosed => self.pyth_prices_closed += 1,
             ActionWithReason::OffChainPriceTooOld => self.offchain_price_too_old += 1,
+            ActionWithReason::VolatileDiffTooLarge => self.volatile_diff_too_large += 1,
             ActionWithReason::WorkNeeded(reason) => {
                 if reason.needs_price_update() {
                     self.oracle_update += 1;
