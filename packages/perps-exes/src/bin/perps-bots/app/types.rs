@@ -394,7 +394,7 @@ impl CrankTriggerReason {
             | CrankTriggerReason::PriceWillTrigger => true,
             CrankTriggerReason::DeferredWorkAvailable { .. }
             | CrankTriggerReason::CrankWorkAvailable
-            | CrankTriggerReason::MoreWorkFound => true,
+            | CrankTriggerReason::MoreWorkFound => false,
         }
     }
 }
