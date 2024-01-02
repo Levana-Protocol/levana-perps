@@ -1,4 +1,5 @@
 use std::collections::{HashMap, VecDeque};
+use std::fmt::Display;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -10,8 +11,10 @@ use chrono::Utc;
 use cosmos::{Address, HasAddress};
 use cosmos::{Coin, Cosmos};
 use cosmos::{DynamicGasMultiplier, Wallet};
+use cosmwasm_std::Decimal256;
 use parking_lot::Mutex;
 use perps_exes::config::GasAmount;
+use perps_exes::prelude::PriceBaseInQuote;
 use reqwest::Client;
 use serde::Serialize;
 use tokio::sync::RwLock;
@@ -312,11 +315,86 @@ impl App {
     }
 }
 
+#[derive(Debug)]
 pub(crate) enum CrankTriggerReason {
+    NoPriceOnChain,
+    OnChainTooOld {
+        on_chain_age: chrono::Duration,
+        #[allow(dead_code)]
+        off_chain_publish_time: DateTime<Utc>,
+        #[allow(dead_code)]
+        on_chain_oracle_publish_time: DateTime<Utc>,
+    },
+    LargePriceDelta {
+        on_off_chain_delta: Decimal256,
+        #[allow(dead_code)]
+        on_chain_oracle_price: PriceBaseInQuote,
+        #[allow(dead_code)]
+        off_chain_price: PriceBaseInQuote,
+    },
+    DeferredNeedsNewPrice {
+        #[allow(dead_code)]
+        on_chain_oracle_publish_time: DateTime<Utc>,
+        deferred_work_item: DateTime<Utc>,
+    },
+    DeferredWorkAvailable {
+        #[allow(dead_code)]
+        on_chain_oracle_publish_time: DateTime<Utc>,
+        #[allow(dead_code)]
+        deferred_work_item: DateTime<Utc>,
+    },
+    CrankWorkAvailable,
+    PriceWillTrigger,
     MoreWorkFound,
-    MessageWaiting,
-    PriceUpdateTooOld(chrono::Duration),
-    PriceUpdateWillTrigger,
-    NoPriceFound,
-    DeferredExecutionItem,
+}
+
+impl Display for CrankTriggerReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            CrankTriggerReason::NoPriceOnChain => f.write_str("No price found on chain"),
+            CrankTriggerReason::OnChainTooOld {
+                on_chain_age,
+                off_chain_publish_time: _,
+                on_chain_oracle_publish_time: _,
+            } => write!(f, "On chain price too old {on_chain_age:?}"),
+            CrankTriggerReason::LargePriceDelta {
+                on_off_chain_delta,
+                on_chain_oracle_price: _,
+                off_chain_price: _,
+            } => write!(f, "Large price delta found {on_off_chain_delta}"),
+            CrankTriggerReason::DeferredNeedsNewPrice {
+                on_chain_oracle_publish_time: _,
+                deferred_work_item,
+            } => write!(
+                f,
+                "Deferred work item needs new price (later than {deferred_work_item})"
+            ),
+            CrankTriggerReason::DeferredWorkAvailable {
+                on_chain_oracle_publish_time: _,
+                deferred_work_item: _,
+            } => f.write_str("Deferred work item available"),
+            CrankTriggerReason::CrankWorkAvailable => {
+                f.write_str("Price bot discovered crank work available")
+            }
+            CrankTriggerReason::PriceWillTrigger => {
+                f.write_str("New price would trigger an action")
+            }
+            CrankTriggerReason::MoreWorkFound => f.write_str("Crank running discovered more work"),
+        }
+    }
+}
+
+impl CrankTriggerReason {
+    pub(crate) fn needs_price_update(&self) -> bool {
+        match self {
+            CrankTriggerReason::NoPriceOnChain
+            | CrankTriggerReason::OnChainTooOld { .. }
+            | CrankTriggerReason::LargePriceDelta { .. }
+            | CrankTriggerReason::DeferredNeedsNewPrice { .. }
+            | CrankTriggerReason::PriceWillTrigger => true,
+            CrankTriggerReason::DeferredWorkAvailable { .. }
+            | CrankTriggerReason::CrankWorkAvailable
+            | CrankTriggerReason::MoreWorkFound => false,
+        }
+    }
 }

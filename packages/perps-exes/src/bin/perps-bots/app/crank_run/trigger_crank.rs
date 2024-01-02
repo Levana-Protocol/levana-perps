@@ -51,7 +51,7 @@ enum PopResult {
         address: Address,
         market_id: MarketId,
         more_work_exists: bool,
-        reason: CrankTriggerReason,
+        reason: Box<CrankTriggerReason>,
     },
 }
 
@@ -83,7 +83,7 @@ impl Queue {
                     address,
                     market_id,
                     more_work_exists: !self.set.is_empty(),
-                    reason,
+                    reason: Box::new(reason),
                 }
             }
         }
@@ -127,25 +127,6 @@ impl TriggerCrank {
                 Err(TrySendError::Full(())) => {
                     log::warn!("Highly unlikely trigger_crank with full channel. It's not necessarily a bug, but almost certainly is.")
                 }
-            }
-        }
-    }
-}
-
-impl From<CrankTriggerReason> for String {
-    fn from(reason: CrankTriggerReason) -> Self {
-        match reason {
-            CrankTriggerReason::MoreWorkFound => "More work found".to_owned(),
-            CrankTriggerReason::MessageWaiting => "Message waiting".to_owned(),
-            CrankTriggerReason::PriceUpdateTooOld(duration) => {
-                format!("Last price update was too old (age: {duration})")
-            }
-            CrankTriggerReason::PriceUpdateWillTrigger => {
-                "Price update will hit price triggers".to_owned()
-            }
-            CrankTriggerReason::NoPriceFound => "No price found in contract".to_owned(),
-            CrankTriggerReason::DeferredExecutionItem => {
-                "Deferred execution item waiting".to_owned()
             }
         }
     }
@@ -218,7 +199,7 @@ impl CrankReceiver {
                         queue: self.trigger.queue.clone(),
                         address,
                     },
-                    reason,
+                    *reason,
                 ))
             }
         }
