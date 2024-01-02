@@ -28,7 +28,6 @@ use crate::util::markets::Market;
 pub(crate) enum TaskLabel {
     GetFactory,
     Stale,
-    CrankWatch,
     CrankRun { index: usize },
     Price,
     TrackBalance,
@@ -50,7 +49,6 @@ impl TaskLabel {
         match s {
             "get-factory" => Some(TaskLabel::GetFactory),
             "stale" => Some(TaskLabel::Stale),
-            "crank-watch" => Some(TaskLabel::CrankWatch),
             "price" => Some(TaskLabel::Price),
             "track-balance" => Some(TaskLabel::TrackBalance),
             "stats" => Some(TaskLabel::Stats),
@@ -75,7 +73,6 @@ impl TaskLabel {
         match self {
             TaskLabel::GetFactory => false,
             TaskLabel::Stale => false,
-            TaskLabel::CrankWatch => true,
             TaskLabel::CrankRun { index: _ } => true,
             TaskLabel::Price => true,
             TaskLabel::TrackBalance => false,
@@ -226,7 +223,6 @@ impl TaskLabel {
             TaskLabel::Trader { index: _ } => config.trader,
             TaskLabel::Utilization => config.utilization,
             TaskLabel::TrackBalance => config.track_balance,
-            TaskLabel::CrankWatch => config.crank_watch,
             TaskLabel::CrankRun { index: _ } => config.crank_run,
             TaskLabel::GetFactory => config.get_factory,
             TaskLabel::Price => config.price,
@@ -245,7 +241,6 @@ impl TaskLabel {
         }
         match self {
             TaskLabel::GetFactory => true,
-            TaskLabel::CrankWatch => true,
             TaskLabel::CrankRun { index: _ } => true,
             TaskLabel::Price => true,
             TaskLabel::TrackBalance => false,
@@ -267,7 +262,6 @@ impl TaskLabel {
     fn ident(self) -> Cow<'static, str> {
         match self {
             TaskLabel::GetFactory => "get-factory".into(),
-            TaskLabel::CrankWatch => "crank-watch".into(),
             TaskLabel::CrankRun { index } => format!("crank-run-{index}").into(),
             TaskLabel::Price => "price".into(),
             TaskLabel::TrackBalance => "track-balance".into(),

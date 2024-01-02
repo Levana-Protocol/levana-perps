@@ -38,8 +38,8 @@ use msg::contracts::farming::entry::{
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::crank::CrankWorkInfo;
 use msg::contracts::market::deferred_execution::{
-    DeferredExecExecutedEvent, DeferredExecQueuedEvent, DeferredExecWithStatus,
-    ListDeferredExecsResp,
+    DeferredExecExecutedEvent, DeferredExecId, DeferredExecQueuedEvent, DeferredExecStatus,
+    DeferredExecWithStatus, GetDeferredExecResp, ListDeferredExecsResp,
 };
 use msg::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
@@ -1992,10 +1992,26 @@ impl PerpsMarket {
             .event_first("deferred-exec-queued")
             .and_then(DeferredExecQueuedEvent::try_from)?;
 
-        Ok(DeferQueueResponse {
-            event: queue_event,
-            response: res,
-        })
+        let value = self.query_deferred_exec(queue_event.deferred_exec_id)?;
+
+        match value.status {
+            DeferredExecStatus::Failure { reason, .. } => Err(anyhow!("{}", reason)),
+            _ => Ok(DeferQueueResponse {
+                event: queue_event,
+                value,
+                response: res,
+            }),
+        }
+    }
+
+    pub fn query_deferred_exec(&self, id: DeferredExecId) -> Result<DeferredExecWithStatus> {
+        let item: GetDeferredExecResp = self.query(&QueryMsg::GetDeferredExec { id })?;
+        match item {
+            GetDeferredExecResp::Found { item } => Ok(*item),
+            GetDeferredExecResp::NotFound {} => {
+                Err(anyhow!("deferred item with id {} not found", id))
+            }
+        }
     }
 
     pub fn exec_defer_queue_process(
@@ -2019,13 +2035,29 @@ impl PerpsMarket {
                 .and_then(DeferredExecExecutedEvent::try_from)
             {
                 if exec_event.deferred_exec_id == queue.event.deferred_exec_id {
+                    let value = self.query_deferred_exec(exec_event.deferred_exec_id)?;
                     break match exec_event.success {
-                        true => Ok(DeferResponse {
-                            exec_event,
-                            queue_event: queue.event,
-                            responses,
-                        }),
-                        false => Err(anyhow!("deferred execution failed: {:?}", exec_event.desc)),
+                        true => match value.status {
+                            DeferredExecStatus::Success { .. } => Ok(DeferResponse {
+                                exec_event,
+                                queue_event: queue.event,
+                                value,
+                                responses,
+                            }),
+                            _ => Err(anyhow!(
+                                "expected deferred status of success, but it's {:?}",
+                                value.status
+                            )),
+                        },
+                        false => match value.status {
+                            DeferredExecStatus::Failure { reason, .. } => {
+                                Err(anyhow!("{}", reason))
+                            }
+                            _ => Err(anyhow!(
+                                "expected deferred status of failure, but it's {:?}",
+                                value.status
+                            )),
+                        },
                     };
                 }
             }
@@ -2064,6 +2096,7 @@ impl PerpsMarket {
 pub struct DeferResponse {
     pub queue_event: DeferredExecQueuedEvent,
     pub exec_event: DeferredExecExecutedEvent,
+    pub value: DeferredExecWithStatus,
     pub responses: Vec<AppResponse>,
 }
 
@@ -2082,5 +2115,6 @@ impl DeferResponse {
 #[derive(Debug)]
 pub struct DeferQueueResponse {
     pub event: DeferredExecQueuedEvent,
+    pub value: DeferredExecWithStatus,
     pub response: AppResponse,
 }
