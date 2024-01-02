@@ -9,7 +9,9 @@ fn randomization() {
     let trader = market.clone_trader(0).unwrap();
     let mut timestamps = HashSet::new();
 
-    // We can open up a bunch of positions without a crank...
+    market.exec_crank_till_finished(&trader).unwrap();
+
+    // Each position gets its own liquifunding cadence 
     for _ in 0..50 {
         let (pos_id, _) = market
             .exec_open_position(
@@ -24,6 +26,8 @@ fn randomization() {
             )
             .unwrap();
         let pos = market.query_position(pos_id).unwrap();
+
+        println!("{}: {}", pos_id, pos.next_liquifunding);
 
         let is_new = timestamps.insert(pos.next_liquifunding);
         assert!(
