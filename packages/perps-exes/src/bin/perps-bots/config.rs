@@ -80,11 +80,6 @@ pub(crate) struct NeedsPriceUpdateParams {
     pub(crate) on_chain_publish_time_age_threshold: chrono::Duration,
     /// How large a price delta we need before pushing a price update.
     pub(crate) on_off_chain_price_delta: Decimal256,
-    /// How long to delay between two different updates.
-    ///
-    /// Motivation: we always have to worry that the chain will respond with out
-    /// of date information and cause us to spin on updates/cranks unnecessarily.
-    pub(crate) action_cooldown_period: std::time::Duration,
 }
 
 impl BotConfig {
@@ -214,9 +209,6 @@ impl Opt {
                     partial.max_price_age_secs.into(),
                 ),
                 on_off_chain_price_delta: partial.max_allowed_price_delta,
-                action_cooldown_period: std::time::Duration::from_secs(
-                    partial.price_action_cooldown_secs.into(),
-                ),
             },
             gas_decimals,
             http_timeout_seconds,
@@ -242,7 +234,6 @@ impl Opt {
             min_gas_refill,
             watcher_config,
             max_price_age_secs,
-            price_action_cooldown_secs,
             max_allowed_price_delta,
             low_util_ratio,
             high_util_ratio,
@@ -303,11 +294,6 @@ impl Opt {
                 ),
                 on_off_chain_price_delta: max_allowed_price_delta
                     .unwrap_or_else(perps_exes::config::defaults::max_allowed_price_delta),
-                action_cooldown_period: std::time::Duration::from_secs(
-                    price_action_cooldown_secs
-                        .unwrap_or_else(perps_exes::config::defaults::price_action_cooldown_secs)
-                        .into(),
-                ),
             },
             gas_decimals,
             http_timeout_seconds: *http_timeout_seconds,

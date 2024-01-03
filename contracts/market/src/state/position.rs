@@ -600,6 +600,33 @@ impl State<'_> {
 
         Ok(None)
     }
+
+    /// Would the given new price cause a position to be liquidatable?
+    pub(crate) fn newly_liquidatable_position(
+        &self,
+        store: &dyn Storage,
+        oracle_price: Price,
+        new_price: Price,
+    ) -> bool {
+        PRICE_TRIGGER_DESC
+            .prefix_range(
+                store,
+                Some(PrefixBound::inclusive(new_price)),
+                Some(PrefixBound::exclusive(oracle_price)),
+                Order::Descending,
+            )
+            .next()
+            .is_some()
+            || PRICE_TRIGGER_ASC
+                .prefix_range(
+                    store,
+                    Some(PrefixBound::exclusive(oracle_price)),
+                    Some(PrefixBound::inclusive(new_price)),
+                    Order::Ascending,
+                )
+                .next()
+                .is_some()
+    }
 }
 
 pub(crate) fn positions_init(store: &mut dyn Storage) -> Result<()> {

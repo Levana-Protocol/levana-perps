@@ -4,7 +4,6 @@ use std::{
     collections::HashMap,
     fmt::{Display, Write},
     sync::Arc,
-    time::Instant,
 };
 
 use anyhow::Result;
@@ -39,8 +38,6 @@ use super::{
 struct Worker {
     wallet: Arc<Wallet>,
     stats: HashMap<MarketId, ReasonStats>,
-    /// The last time actions were taken for each market.
-    last_action_taken: HashMap<MarketId, Instant>,
     trigger_crank: TriggerCrank,
 }
 
@@ -63,7 +60,6 @@ impl AppBuilder {
                 Worker {
                     wallet: price_wallet,
                     stats: HashMap::new(),
-                    last_action_taken: HashMap::new(),
                     trigger_crank,
                 },
             )?;
@@ -97,15 +93,8 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
         let offchain_price_data = offchain_price_data.clone();
         let market = market.clone();
         let app = app.clone();
-        let last_action_taken = worker.last_action_taken.get(&market.market_id).copied();
         set.spawn(async move {
-            let res = check_market_needs_price_update(
-                &app,
-                offchain_price_data,
-                &market,
-                last_action_taken,
-            )
-            .await;
+            let res = check_market_needs_price_update(&app, offchain_price_data, &market).await;
             (market, res)
         });
     }
@@ -125,8 +114,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                 successes.push(format!("{}: {reason:?}", market.market_id));
 
                 match reason {
-                    ActionWithReason::CooldownPeriod
-                    | ActionWithReason::NoWorkAvailable
+                    ActionWithReason::NoWorkAvailable
                     | ActionWithReason::PythPricesClosed
                     | ActionWithReason::OffChainPriceTooOld
                     | ActionWithReason::VolatileDiffTooLarge => (),
@@ -200,10 +188,12 @@ enum NeedsOracleUpdate {
 
 #[derive(Debug)]
 struct NeedsPriceUpdateInfo {
-    /// Last time we took any actions for this market.
-    last_action: Option<Instant>,
     /// The timestamp of the next pending deferred work item
     next_pending_deferred_work_item: Option<DateTime<Utc>>,
+    /// The timestamp of the newest pending deferred work item
+    newest_pending_deferred_work_item: Option<DateTime<Utc>>,
+    /// The timestamp of the next liquifunding
+    next_liquifunding: Option<DateTime<Utc>>,
     /// The latest price from on-chain data only
     on_chain_price: PriceBaseInQuote,
     /// The latest publish time from on-chain data only
@@ -220,7 +210,6 @@ struct NeedsPriceUpdateInfo {
 
 #[derive(Debug)]
 enum ActionWithReason {
-    CooldownPeriod,
     NoWorkAvailable,
     WorkNeeded(CrankTriggerReason),
     PythPricesClosed,
@@ -230,12 +219,11 @@ enum ActionWithReason {
 
 impl NeedsPriceUpdateInfo {
     fn actions(&self, params: &NeedsPriceUpdateParams) -> ActionWithReason {
-        if let Some(last_action) = self.last_action {
-            if let Some(age) = Instant::now().checked_duration_since(last_action) {
-                if age < params.action_cooldown_period {
-                    return ActionWithReason::CooldownPeriod;
-                }
-            }
+        // If the new price would hit some new triggers, then we need to do a
+        // price update and crank.
+        if self.price_will_trigger {
+            // Potential future optimization: only query this piece of data on-demand
+            return ActionWithReason::WorkNeeded(CrankTriggerReason::PriceWillTrigger);
         }
 
         // Keep the protocol lively: if on-chain price is too old or too
@@ -261,43 +249,40 @@ impl NeedsPriceUpdateInfo {
             });
         }
 
-        // If there are deferred work items...
-        if let Some(deferred_work_item) = self.next_pending_deferred_work_item {
-            // Do we need a new publish time in the oracle to crank this?
-            if self.on_chain_publish_time < deferred_work_item {
-                // New price is needed, do we have it?
-                if self.off_chain_publish_time >= deferred_work_item {
-                    return ActionWithReason::WorkNeeded(
-                        CrankTriggerReason::DeferredNeedsNewPrice {
-                            on_chain_oracle_publish_time: self.on_chain_publish_time,
-                            deferred_work_item,
-                        },
-                    );
-                }
-            } else {
-                // No new price is needed, so we can just crank and make progress.
-                return ActionWithReason::WorkNeeded(CrankTriggerReason::DeferredWorkAvailable {
+        // See comment on needs_crank = true below.
+        let mut needs_crank = false;
+
+        // If the next liquifunding needs a price update, do it. Same for
+        // deferred work, but we look at both the oldest and newest pending item to ensure
+        // there's as little a gap between item creation and the price point that ends up
+        // cranking it as possible.
+        for timestamp in [
+            self.next_pending_deferred_work_item,
+            self.newest_pending_deferred_work_item,
+            self.next_liquifunding,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if self.on_chain_publish_time < timestamp && timestamp <= self.off_chain_publish_time {
+                return ActionWithReason::WorkNeeded(CrankTriggerReason::CrankNeedsNewPrice {
                     on_chain_oracle_publish_time: self.on_chain_publish_time,
-                    deferred_work_item,
+                    work_item: timestamp,
                 });
+            } else if self.on_chain_publish_time >= timestamp {
+                // The status response only checks if the price _in the contract_ unlocks work,
+                // it doesn't query the oracle. We probably want to change that. In the meanwhile,
+                // we check if there's work available and set a flag. Once we know that we don't
+                // need any price updates, we then do the crank after this for loop.
+                needs_crank = true;
             }
         }
 
-        // If there are crank work items available, then just crank
-        if let Some(crank_work) = &self.crank_work_available {
-            if let CrankWorkInfo::DeferredExec { .. } = crank_work {
-                tracing::error!("This case should never happen, found deferred exec crank work but didn't handle it with other deferred work items");
-            } else {
-                return ActionWithReason::WorkNeeded(CrankTriggerReason::CrankWorkAvailable);
-            }
-        }
-
-        // No other work is immediately available. Now we check if a new price
-        // update would hit any triggers. We do this at the end to avoid unnecessarily
-        // spamming oracle price updates while still processing earlier items in the queue.
-        if self.price_will_trigger {
-            // Potential future optimization: only query this piece of data on-demand
-            return ActionWithReason::WorkNeeded(CrankTriggerReason::PriceWillTrigger);
+        // No we know that pushing a price update won't trigger any new work to
+        // become available. Now just check if there's already work available to process
+        // and, if so, do a crank.
+        if needs_crank || self.crank_work_available.is_some() {
+            return ActionWithReason::WorkNeeded(CrankTriggerReason::CrankWorkAvailable);
         }
 
         // Nothing else caused a price update or crank, so no actions needed
@@ -310,7 +295,6 @@ async fn check_market_needs_price_update(
     app: &App,
     offchain_price_data: Arc<OffchainPriceData>,
     market: &Market,
-    last_action_taken: Option<Instant>,
 ) -> Result<ActionWithReason> {
     if app
         .pyth_prices_closed(market.market.get_address(), &market.config)
@@ -336,9 +320,16 @@ async fn check_market_needs_price_update(
             let status = market.market.status().await?;
 
             let info = NeedsPriceUpdateInfo {
-                last_action: last_action_taken,
                 next_pending_deferred_work_item: status
                     .next_deferred_execution
+                    .map(|x| x.try_into_chrono_datetime())
+                    .transpose()?,
+                newest_pending_deferred_work_item: status
+                    .newest_deferred_execution
+                    .map(|x| x.try_into_chrono_datetime())
+                    .transpose()?,
+                next_liquifunding: status
+                    .next_liquifunding
                     .map(|x| x.try_into_chrono_datetime())
                     .transpose()?,
                 off_chain_price,
@@ -476,7 +467,6 @@ struct ReasonStats {
     market: MarketId,
     started_tracking: DateTime<Utc>,
     oracle_update: u64,
-    cooldown: u64,
     not_needed: u64,
     too_old: u64,
     delta: u64,
@@ -485,7 +475,6 @@ struct ReasonStats {
     more_work_found: u64,
     no_price_found: u64,
     deferred_needs_new_price: u64,
-    deferred_work_available: u64,
     pyth_prices_closed: u64,
     offchain_price_too_old: u64,
     volatile_diff_too_large: u64,
@@ -495,7 +484,6 @@ impl Display for ReasonStats {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let ReasonStats {
             market,
-            cooldown,
             started_tracking,
             not_needed,
             too_old,
@@ -506,12 +494,11 @@ impl Display for ReasonStats {
             crank_work_available,
             more_work_found,
             deferred_needs_new_price,
-            deferred_work_available,
             pyth_prices_closed,
             offchain_price_too_old,
             volatile_diff_too_large,
         } = self;
-        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Cooldown: {cooldown}. Triggers: {triggers}. No price found: {no_price_found}. Oracle update: {oracle_update}. Deferred execution w/price: {deferred_needs_new_price}. Deferred w/o price: {deferred_work_available}. Pyth prices closed: {pyth_prices_closed}. Crank work available: {crank_work_available}. More work found: {more_work_found}. Offchain price too old: {offchain_price_too_old}. Volatile diff too large: {volatile_diff_too_large}.")
+        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Triggers: {triggers}. No price found: {no_price_found}. Oracle update: {oracle_update}. Deferred execution w/price: {deferred_needs_new_price}. Pyth prices closed: {pyth_prices_closed}. Crank work available: {crank_work_available}. More work found: {more_work_found}. Offchain price too old: {offchain_price_too_old}. Volatile diff too large: {volatile_diff_too_large}.")
     }
 }
 
@@ -519,7 +506,6 @@ impl ReasonStats {
     fn new(market: MarketId) -> Self {
         ReasonStats {
             started_tracking: Utc::now(),
-            cooldown: 0,
             not_needed: 0,
             too_old: 0,
             delta: 0,
@@ -530,7 +516,6 @@ impl ReasonStats {
             crank_work_available: 0,
             more_work_found: 0,
             deferred_needs_new_price: 0,
-            deferred_work_available: 0,
             pyth_prices_closed: 0,
             offchain_price_too_old: 0,
             volatile_diff_too_large: 0,
@@ -539,7 +524,6 @@ impl ReasonStats {
 
     fn add_reason(&mut self, reason: &ActionWithReason) {
         match reason {
-            ActionWithReason::CooldownPeriod => self.cooldown += 1,
             ActionWithReason::NoWorkAvailable => self.not_needed += 1,
             ActionWithReason::PythPricesClosed => self.pyth_prices_closed += 1,
             ActionWithReason::OffChainPriceTooOld => self.offchain_price_too_old += 1,
@@ -558,8 +542,7 @@ impl ReasonStats {
             CrankTriggerReason::NoPriceOnChain => self.no_price_found += 1,
             CrankTriggerReason::OnChainTooOld { .. } => self.too_old += 1,
             CrankTriggerReason::LargePriceDelta { .. } => self.delta += 1,
-            CrankTriggerReason::DeferredNeedsNewPrice { .. } => self.deferred_needs_new_price += 1,
-            CrankTriggerReason::DeferredWorkAvailable { .. } => self.deferred_work_available += 1,
+            CrankTriggerReason::CrankNeedsNewPrice { .. } => self.deferred_needs_new_price += 1,
             CrankTriggerReason::CrankWorkAvailable => self.crank_work_available += 1,
             CrankTriggerReason::PriceWillTrigger => self.triggers += 1,
             CrankTriggerReason::MoreWorkFound => self.more_work_found += 1,

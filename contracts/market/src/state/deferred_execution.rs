@@ -129,6 +129,14 @@ impl State<'_> {
         &self,
         store: &dyn Storage,
         id: DeferredExecId,
+    ) -> Result<DeferredExecWithStatus> {
+        DEFERRED_EXECS.load(store, id).map_err(|e| e.into())
+    }
+
+    pub(crate) fn get_deferred_exec_resp(
+        &self,
+        store: &dyn Storage,
+        id: DeferredExecId,
     ) -> Result<GetDeferredExecResp> {
         Ok(match DEFERRED_EXECS.may_load(store, id)? {
             Some(item) => GetDeferredExecResp::Found {

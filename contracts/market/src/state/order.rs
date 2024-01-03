@@ -155,6 +155,33 @@ impl State<'_> {
         }
     }
 
+    /// Would the given new price cause a new limit order to be triggerable?
+    pub(crate) fn limit_order_newly_triggered_order(
+        &self,
+        storage: &dyn Storage,
+        oracle_price: Price,
+        new_price: Price,
+    ) -> bool {
+        LIMIT_ORDERS_BY_PRICE_LONG
+            .prefix_range(
+                storage,
+                Some(PrefixBound::inclusive(PriceKey::from(new_price))),
+                Some(PrefixBound::exclusive(PriceKey::from(oracle_price))),
+                Order::Ascending,
+            )
+            .next()
+            .is_some()
+            || LIMIT_ORDERS_BY_PRICE_SHORT
+                .prefix_range(
+                    storage,
+                    Some(PrefixBound::exclusive(PriceKey::from(oracle_price))),
+                    Some(PrefixBound::inclusive(PriceKey::from(new_price))),
+                    Order::Descending,
+                )
+                .next()
+                .is_some()
+    }
+
     /// Attempts to execute the specified limit order by opening a position.
     /// If the position fails to open, the limit order is removed from the protocol.
     pub(crate) fn limit_order_execute_order(
