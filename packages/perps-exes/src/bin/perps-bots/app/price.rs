@@ -313,7 +313,7 @@ async fn check_market_needs_price_update(
     last_action_taken: Option<Instant>,
 ) -> Result<ActionWithReason> {
     if app
-        .pyth_prices_closed(market.market.get_address(), Some(&market.status))
+        .pyth_prices_closed(market.market.get_address(), &market.config)
         .await?
     {
         return Ok(ActionWithReason::PythPricesClosed);
@@ -367,7 +367,7 @@ async fn update_oracles(
     let mut edge_contract = None;
 
     for market in markets {
-        match &market.status.config.spot_price {
+        match &market.config.spot_price {
             SpotPriceConfig::Manual { .. } => (),
             SpotPriceConfig::Oracle { pyth: None, .. } => (),
             SpotPriceConfig::Oracle {
