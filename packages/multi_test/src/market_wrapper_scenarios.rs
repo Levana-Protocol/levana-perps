@@ -9,7 +9,12 @@ impl PerpsMarket {
     pub fn new_open_position_long_1(
         app: Rc<RefCell<PerpsApp>>,
     ) -> Result<(Self, Addr, PositionQueryResponse)> {
-        let market = Self::new_with_type(app, DEFAULT_MARKET.collateral_type, true)?;
+        let market = Self::new_with_type(
+            app,
+            DEFAULT_MARKET.collateral_type,
+            true,
+            DEFAULT_MARKET.spot_price,
+        )?;
 
         let trader = market.clone_trader(0).unwrap();
         let lp = market.clone_lp(0).unwrap();
@@ -41,7 +46,12 @@ impl PerpsMarket {
     }
 
     pub fn lp_prep(app: Rc<RefCell<PerpsApp>>) -> Result<Self> {
-        let market = Self::new_with_type(app, DEFAULT_MARKET.collateral_type, false)?;
+        let market = Self::new_with_type(
+            app,
+            DEFAULT_MARKET.collateral_type,
+            false,
+            DEFAULT_MARKET.spot_price,
+        )?;
 
         // Ensure a fixed borrow fee rate to simplify calculations here
         market

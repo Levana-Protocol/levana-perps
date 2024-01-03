@@ -16,6 +16,7 @@ fn setup_lockdrop() -> (PerpsMarket, Vec<LockdropBucketConfig>, [Addr; 3]) {
         PerpsApp::new_cell().unwrap(),
         DEFAULT_MARKET.collateral_type,
         false,
+        DEFAULT_MARKET.spot_price,
     )
     .unwrap();
     let buckets = lockdrop_buckets();
