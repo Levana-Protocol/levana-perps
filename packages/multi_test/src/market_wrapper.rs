@@ -152,21 +152,35 @@ impl PerpsMarket {
         bootstap_lp: bool,
         spot_price_kind: SpotPriceKind,
     ) -> Result<Self> {
-        if spot_price_kind == SpotPriceKind::Oracle {
-            let mut app = app.borrow_mut();
-            let contract_addr = app.simple_oracle_addr.clone();
-            let now = app.block_info().time;
+        // for oracles, set the initial price on the oracle
+        // and the market contract gets no initial price (it queries the oracle)
+        // for manual, set the initial price on the market contract
+        let initial_price = match spot_price_kind {
+            SpotPriceKind::Oracle => {
+                let mut app = app.borrow_mut();
+                let contract_addr = app.simple_oracle_addr.clone();
+                let now = app.block_info().time;
 
-            app.execute_contract(
-                Addr::unchecked(&TEST_CONFIG.protocol_owner),
-                contract_addr,
-                &SimpleOracleExecuteMsg::SetPrice {
-                    value: initial_price.into_number().abs_unsigned(),
-                    timestamp: Some(now),
-                },
-                &[],
-            )?;
-        }
+                app.execute_contract(
+                    Addr::unchecked(&TEST_CONFIG.protocol_owner),
+                    contract_addr,
+                    &SimpleOracleExecuteMsg::SetPrice {
+                        value: initial_price.into_number().abs_unsigned(),
+                        timestamp: Some(now),
+                    },
+                    &[],
+                )?;
+
+                None
+            }
+            SpotPriceKind::Manual => Some(InitialPrice {
+                price: initial_price,
+                price_usd: collateral_in_usd.unwrap_or_else(|| {
+                    PriceCollateralInUsd::from_non_zero(initial_price.into_non_zero())
+                }),
+            }),
+        };
+
         let market_msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
             new_market: msg::contracts::market::entry::NewMarketParams {
                 market_id: id.clone(),
@@ -217,15 +231,7 @@ impl PerpsMarket {
                     }
                 },
                 initial_borrow_fee_rate: "0.01".parse().unwrap(),
-                initial_price: match spot_price_kind {
-                    SpotPriceKind::Manual => Some(InitialPrice {
-                        price: initial_price,
-                        price_usd: collateral_in_usd.unwrap_or_else(|| {
-                            PriceCollateralInUsd::from_non_zero(initial_price.into_non_zero())
-                        }),
-                    }),
-                    SpotPriceKind::Oracle => None,
-                },
+                initial_price,
             },
         };
 
@@ -299,8 +305,11 @@ impl PerpsMarket {
         };
 
         if bootstap_lp {
-            // lp actions require that there is a valid price in the contract already
-            _self.exec_crank_n(&Addr::unchecked("init-cranker"), 1)?;
+            if spot_price_kind == SpotPriceKind::Oracle {
+                // not required for manual prices which append on init
+                // (technically, it's a "initial_price.is_some()" check, but this is only allowed for manual prices)
+                _self.exec_crank_n(&Addr::unchecked("init-cranker"), 1)?;
+            }
 
             // do not go through app get_user, since we want to _always_ bootstrap this user
             _self.exec_mint_and_deposit_liquidity(
