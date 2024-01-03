@@ -925,7 +925,10 @@ impl PerpsMarket {
                     todo!("support setting price usd in oracle tests");
                 }
 
-                self.exec_set_oracle_price_base(price, self.now())
+                let response = self.exec_set_oracle_price_base(price, self.now())?;
+                self.exec_crank_n(&Addr::unchecked(&TEST_CONFIG.protocol_owner), 0)?;
+
+                Ok(response)
             }
         }
     }
