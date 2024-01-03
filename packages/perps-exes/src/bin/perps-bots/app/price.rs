@@ -280,26 +280,22 @@ impl NeedsPriceUpdateInfo {
             self.next_pending_deferred_work_item,
             self.newest_pending_deferred_work_item,
             self.next_liquifunding,
-        ] {
-            if let Some(timestamp) = timestamp {
-                if self.on_chain_publish_time < timestamp
-                    && timestamp <= self.off_chain_publish_time
-                {
-                    return ActionWithReason::WorkNeeded(
-                        // FIXME rename this to generalize to liquifunding too
-                        CrankTriggerReason::DeferredNeedsNewPrice {
-                            on_chain_oracle_publish_time: self.on_chain_publish_time,
-                            deferred_work_item: timestamp,
-                        },
-                    );
-                }
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if self.on_chain_publish_time < timestamp && timestamp <= self.off_chain_publish_time {
+                return ActionWithReason::WorkNeeded(CrankTriggerReason::CrankNeedsNewPrice {
+                    on_chain_oracle_publish_time: self.on_chain_publish_time,
+                    work_item: timestamp,
+                });
             }
         }
 
         // No we know that pushing a price update won't trigger any new work to
         // become available. Now just check if there's already work available to process
         // and, if so, do a crank.
-        if let Some(crank_work) = &self.crank_work_available {
+        if self.crank_work_available.is_some() {
             return ActionWithReason::WorkNeeded(CrankTriggerReason::CrankWorkAvailable);
         }
 
@@ -496,7 +492,6 @@ struct ReasonStats {
     more_work_found: u64,
     no_price_found: u64,
     deferred_needs_new_price: u64,
-    deferred_work_available: u64,
     pyth_prices_closed: u64,
     offchain_price_too_old: u64,
     volatile_diff_too_large: u64,
@@ -517,12 +512,11 @@ impl Display for ReasonStats {
             crank_work_available,
             more_work_found,
             deferred_needs_new_price,
-            deferred_work_available,
             pyth_prices_closed,
             offchain_price_too_old,
             volatile_diff_too_large,
         } = self;
-        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Cooldown: {cooldown}. Triggers: {triggers}. No price found: {no_price_found}. Oracle update: {oracle_update}. Deferred execution w/price: {deferred_needs_new_price}. Deferred w/o price: {deferred_work_available}. Pyth prices closed: {pyth_prices_closed}. Crank work available: {crank_work_available}. More work found: {more_work_found}. Offchain price too old: {offchain_price_too_old}. Volatile diff too large: {volatile_diff_too_large}.")
+        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Cooldown: {cooldown}. Triggers: {triggers}. No price found: {no_price_found}. Oracle update: {oracle_update}. Deferred execution w/price: {deferred_needs_new_price}. Pyth prices closed: {pyth_prices_closed}. Crank work available: {crank_work_available}. More work found: {more_work_found}. Offchain price too old: {offchain_price_too_old}. Volatile diff too large: {volatile_diff_too_large}.")
     }
 }
 
@@ -541,7 +535,6 @@ impl ReasonStats {
             crank_work_available: 0,
             more_work_found: 0,
             deferred_needs_new_price: 0,
-            deferred_work_available: 0,
             pyth_prices_closed: 0,
             offchain_price_too_old: 0,
             volatile_diff_too_large: 0,
@@ -569,8 +562,7 @@ impl ReasonStats {
             CrankTriggerReason::NoPriceOnChain => self.no_price_found += 1,
             CrankTriggerReason::OnChainTooOld { .. } => self.too_old += 1,
             CrankTriggerReason::LargePriceDelta { .. } => self.delta += 1,
-            CrankTriggerReason::DeferredNeedsNewPrice { .. } => self.deferred_needs_new_price += 1,
-            CrankTriggerReason::DeferredWorkAvailable { .. } => self.deferred_work_available += 1,
+            CrankTriggerReason::CrankNeedsNewPrice { .. } => self.deferred_needs_new_price += 1,
             CrankTriggerReason::CrankWorkAvailable => self.crank_work_available += 1,
             CrankTriggerReason::PriceWillTrigger => self.triggers += 1,
             CrankTriggerReason::MoreWorkFound => self.more_work_found += 1,
