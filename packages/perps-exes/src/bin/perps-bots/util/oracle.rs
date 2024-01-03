@@ -38,7 +38,7 @@ impl OffchainPriceData {
         let mut edge_feeds = HashSet::new();
 
         for market in markets {
-            match &market.status.config.spot_price {
+            match &market.config.spot_price {
                 SpotPriceConfig::Manual { .. } => (),
                 SpotPriceConfig::Oracle {
                     pyth,
@@ -121,7 +121,7 @@ pub(crate) async fn get_latest_price(
     offchain_price_data: &OffchainPriceData,
     market: &Market,
 ) -> Result<LatestPrice> {
-    let (feeds, volatile_diff_seconds) = match &market.status.config.spot_price {
+    let (feeds, volatile_diff_seconds) = match &market.config.spot_price {
         SpotPriceConfig::Manual { .. } => {
             bail!("Manual markets do not use an oracle")
         }
