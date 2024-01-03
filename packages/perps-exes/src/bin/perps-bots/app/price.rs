@@ -249,6 +249,9 @@ impl NeedsPriceUpdateInfo {
             });
         }
 
+        // See comment on needs_crank = true below.
+        let mut needs_crank = false;
+
         // If the next liquifunding needs a price update, do it. Same for
         // deferred work, but we look at both the oldest and newest pending item to ensure
         // there's as little a gap between item creation and the price point that ends up
@@ -266,13 +269,19 @@ impl NeedsPriceUpdateInfo {
                     on_chain_oracle_publish_time: self.on_chain_publish_time,
                     work_item: timestamp,
                 });
+            } else if self.on_chain_publish_time >= timestamp {
+                // The status response only checks if the price _in the contract_ unlocks work,
+                // it doesn't query the oracle. We probably want to change that. In the meanwhile,
+                // we check if there's work available and set a flag. Once we know that we don't
+                // need any price updates, we then do the crank after this for loop.
+                needs_crank = true;
             }
         }
 
         // No we know that pushing a price update won't trigger any new work to
         // become available. Now just check if there's already work available to process
         // and, if so, do a crank.
-        if self.crank_work_available.is_some() {
+        if needs_crank || self.crank_work_available.is_some() {
             return ActionWithReason::WorkNeeded(CrankTriggerReason::CrankWorkAvailable);
         }
 
