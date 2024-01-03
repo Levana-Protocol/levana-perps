@@ -24,6 +24,9 @@ fn basic_operations() {
 
     assert_eq!(market.query_deferred_execs(&trader).unwrap(), vec![]);
 
+    market.exec_crank_till_finished(&cranker).unwrap();
+    assert_eq!(market.query_status().unwrap().next_crank, None);
+
     let msg = market
         .token
         .into_market_execute_msg(
@@ -47,10 +50,22 @@ fn basic_operations() {
     let exec = execs.into_iter().next().unwrap();
     assert_eq!(exec.status, DeferredExecStatus::Pending);
     assert_eq!(&exec.owner, &trader);
+    let status = market.query_status().unwrap();
+    assert_eq!(status.deferred_execution_items, 1);
+    assert_eq!(status.last_processed_deferred_exec_id, None);
+    assert_eq!(status.next_crank, None);
 
-    // Now crank
+    // Now update the price...
     market.exec_refresh_price().unwrap();
+
+    let status = market.query_status().unwrap();
+    assert_eq!(status.deferred_execution_items, 1);
+    assert_eq!(status.last_processed_deferred_exec_id, None);
+    assert_ne!(status.next_crank, None);
+
+    // and crank!
     market.exec_crank_till_finished(&cranker).unwrap();
+    assert_eq!(market.query_status().unwrap().next_crank, None);
 
     let execs = market.query_deferred_execs(&trader).unwrap();
     assert_eq!(execs.len(), 1);
@@ -66,6 +81,14 @@ fn basic_operations() {
     assert_eq!(positions.len(), 1);
     let position = positions.into_iter().next().unwrap();
     assert_eq!(position.owner, trader);
+
+    let status = market.query_status().unwrap();
+    assert_eq!(status.deferred_execution_items, 0);
+    assert_eq!(
+        status.last_processed_deferred_exec_id,
+        Some("1".parse().unwrap())
+    );
+    assert_eq!(status.next_crank, None);
 }
 
 #[test]
