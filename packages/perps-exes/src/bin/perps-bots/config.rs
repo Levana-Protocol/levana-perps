@@ -234,7 +234,6 @@ impl Opt {
             min_gas_refill,
             watcher_config,
             max_price_age_secs,
-            price_action_cooldown_secs,
             max_allowed_price_delta,
             low_util_ratio,
             high_util_ratio,
