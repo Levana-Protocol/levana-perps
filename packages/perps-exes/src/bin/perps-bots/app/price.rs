@@ -332,16 +332,18 @@ async fn check_market_needs_price_update(
         } => {
             let price_will_trigger = market.market.price_would_trigger(off_chain_price).await?;
 
+            // Get a fresher status, not the cached one used above for checking Pyth prices.
+            let status = market.market.status().await?;
+
             let info = NeedsPriceUpdateInfo {
                 last_action: last_action_taken,
-                next_pending_deferred_work_item: market
-                    .status
+                next_pending_deferred_work_item: status
                     .next_deferred_execution
                     .map(|x| x.try_into_chrono_datetime())
                     .transpose()?,
                 off_chain_price,
                 off_chain_publish_time,
-                crank_work_available: market.status.next_crank.clone(),
+                crank_work_available: status.next_crank.clone(),
                 price_will_trigger,
                 on_chain_price,
                 on_chain_publish_time,
