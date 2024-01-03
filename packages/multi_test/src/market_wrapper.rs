@@ -1280,6 +1280,28 @@ impl PerpsMarket {
         )
     }
 
+    pub fn exec_update_position_leverage_queue_only(
+        &self,
+        sender: &Addr,
+        position_id: PositionId,
+        leverage: LeverageToBase,
+        slippage_assert: Option<SlippageAssert>,
+    ) -> Result<DeferQueueResponse> {
+        self.exec_defer_queue_wasm_msg(sender, 
+            WasmMsg::Execute {
+                contract_addr: self.addr.to_string(),
+                msg: to_binary(&
+                    MarketExecuteMsg::UpdatePositionLeverage {
+                        id: position_id,
+                        leverage,
+                        slippage_assert,
+                    }
+                )?,
+                funds: Vec::new(),
+            },
+        )
+    }
+
     pub fn exec_update_position_max_gains(
         &self,
         sender: &Addr,
