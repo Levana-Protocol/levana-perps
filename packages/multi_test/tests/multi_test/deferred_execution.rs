@@ -215,6 +215,11 @@ fn non_deferred_after_deferred_2853() {
 
     let (pos_1, _) = open_position_oracle();
     let (pos_2, _) = open_position_oracle();
+    let (pos_liquifund_only, _) = open_position_oracle();
+    let init_liquifunded_at = market
+        .query_position(pos_liquifund_only)
+        .unwrap()
+        .liquifunded_at;
 
     market.exec_crank_till_finished(&cranker).unwrap();
 
@@ -222,16 +227,22 @@ fn non_deferred_after_deferred_2853() {
         .exec_update_position_leverage_queue_only(&trader, pos_1, "10".parse().unwrap(), None)
         .unwrap();
 
+    market.set_time(TimeJump::Blocks(1)).unwrap();
     market.exec_refresh_price().unwrap();
     market.set_time(TimeJump::Liquifundings(1)).unwrap();
 
+    let first_liquifunding_time = market.now();
 
     let update_queue_2 = market
         .exec_update_position_leverage_queue_only(&trader, pos_2, "10".parse().unwrap(), None)
         .unwrap();
+
+    market.set_time(TimeJump::Blocks(1)).unwrap();
     market.exec_refresh_price().unwrap();
     market.set_time(TimeJump::Liquifundings(1)).unwrap();
 
+    // TBD - why does commenting this out fail?
+    // I'd think that the the crank should just churn through whatever the backlog is, don't need a new price here
     market.exec_refresh_price().unwrap();
 
     assert_eq!(market.query_status().unwrap().deferred_execution_items, 2);
@@ -246,28 +257,58 @@ fn non_deferred_after_deferred_2853() {
         .status
         .is_pending());
 
-    // At 4 cranks there's still 2 items left
-    // At 5 cranks there's 1 item left
-    // At 6 cranks there's 0
-    let res = market.exec_crank_n(&cranker, 6).unwrap();
-
-    println!("{:#?}", res);
-    println!(
-        "{:#?}",
-        market
-            .query_deferred_exec(update_queue_1.value.id)
-            .unwrap()
-            .status
-    );
-    println!(
-        "{:#?}",
-        market
-            .query_deferred_exec(update_queue_2.value.id)
-            .unwrap()
-            .status
-    );
+    // This crank should process the first update queue - step 7/8 in the jira issue
+    market.exec_crank_n(&cranker, 100).unwrap();
 
     assert_eq!(market.query_status().unwrap().deferred_execution_items, 1);
-    // assert!(market.query_deferred_exec(update_queue_1.value.id).unwrap().status.is_pending());
-    // assert!(market.query_deferred_exec(update_queue_2.value.id).unwrap().status.is_pending());
+    assert!(!market
+        .query_deferred_exec(update_queue_1.value.id)
+        .unwrap()
+        .status
+        .is_pending());
+    assert!(market
+        .query_deferred_exec(update_queue_2.value.id)
+        .unwrap()
+        .status
+        .is_pending());
+
+    // confirm that no liquifundings have happened yet - step 8 in the jira issue
+    let liquifunded_at = market
+        .query_position(pos_liquifund_only)
+        .unwrap()
+        .liquifunded_at;
+    assert_eq!(liquifunded_at, init_liquifunded_at);
+
+    // This crank should process the first liquifunding and the second update - step 9/10 in the jira issue
+    market.exec_crank_n(&cranker, 100).unwrap();
+    assert_eq!(market.query_status().unwrap().deferred_execution_items, 0);
+    assert!(!market
+        .query_deferred_exec(update_queue_1.value.id)
+        .unwrap()
+        .status
+        .is_pending());
+    assert!(!market
+        .query_deferred_exec(update_queue_2.value.id)
+        .unwrap()
+        .status
+        .is_pending());
+
+    // Confirm that we've only processed the first liquifunding
+    let liquifunded_at = market
+        .query_position(pos_liquifund_only)
+        .unwrap()
+        .liquifunded_at;
+    assert!(liquifunded_at > init_liquifunded_at);
+    assert!(liquifunded_at <= first_liquifunding_time);
+
+    // final crank - i.e. step 11 in the jira issue
+    market.exec_crank_n(&cranker, 100).unwrap();
+    assert!(market.query_status().unwrap().next_crank.is_none());
+
+    let last_liquifunded_at = market
+        .query_position(pos_liquifund_only)
+        .unwrap()
+        .liquifunded_at;
+    assert!(last_liquifunded_at > liquifunded_at);
+    assert!(last_liquifunded_at > first_liquifunding_time);
 }
