@@ -1,10 +1,16 @@
 //! All tests ultimately end up hitting deferred exeuction. The purpose of this module is to provide tests that can be used during the migration to deferred execution in the rest of the test suite.
 
 use cosmwasm_std::{to_binary, WasmMsg};
-use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, time::TimeJump, PerpsApp};
+use levana_perpswap_multi_test::{
+    config::{SpotPriceKind, DEFAULT_MARKET},
+    market_wrapper::{DeferResponse, PerpsMarket},
+    time::TimeJump,
+    PerpsApp,
+};
 use msg::{
     contracts::market::{
         deferred_execution::DeferredExecStatus, entry::ExecuteMsg as MarketExecuteMsg,
+        position::PositionId,
     },
     prelude::*,
     shared::storage::DirectionToBase,
@@ -150,35 +156,42 @@ fn replies_work_for_two_in_queue() {
 
 #[test]
 fn non_deferred_after_deferred_2853() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = PerpsMarket::new_with_type(
+        PerpsApp::new_cell().unwrap(),
+        DEFAULT_MARKET.collateral_type,
+        true,
+        SpotPriceKind::Oracle,
+    )
+    .unwrap();
+    //let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
     let cranker = market.clone_trader(1).unwrap();
 
-    let (pos_1, _) = market
-        .exec_open_position(
-            &trader,
-            "100",
-            "9",
-            DirectionToBase::Long,
-            "1.0",
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+    let open_position_oracle = || -> (PositionId, DeferResponse) {
+        let queue_res = market
+            .exec_open_position_queue_only(
+                &trader,
+                "100",
+                "9",
+                DirectionToBase::Long,
+                "1.0",
+                None,
+                None,
+                None,
+            )
+            .unwrap();
 
-    let (pos_2, _) = market
-        .exec_open_position(
-            &trader,
-            "100",
-            "9",
-            DirectionToBase::Long,
-            "1.0",
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+        // These steps are necessary
+        market.set_time(TimeJump::Blocks(1)).unwrap();
+        market.exec_refresh_price().unwrap();
+
+        market
+            .exec_open_position_process_queue_response(&trader, queue_res, None)
+            .unwrap()
+    };
+
+    let (pos_1, _) = open_position_oracle();
+    let (pos_2, _) = open_position_oracle();
 
     market.exec_crank_till_finished(&cranker).unwrap();
 
@@ -203,6 +216,7 @@ fn non_deferred_after_deferred_2853() {
         .status
         .is_pending());
 
+    market.exec_refresh_price().unwrap();
     // At 4 cranks there's still 2 items left
     // At 5 cranks there's 1 item left
     // At 6 cranks there's 0
