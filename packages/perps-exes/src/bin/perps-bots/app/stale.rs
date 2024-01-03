@@ -68,7 +68,7 @@ impl Stale {
         // markets reopen for deferred exec items to catch up. Waiting until we start
         // seeing spurious errors on mainnet to address this.
         if app
-            .pyth_prices_closed(market.get_address(), Some(&status))
+            .pyth_prices_closed(market.get_address(), &status.config)
             .await?
         {
             return Ok("Ignoring old deferred exec item since we're the market is in off hours for price updates".to_owned());
