@@ -1379,16 +1379,15 @@ impl PerpsMarket {
         leverage: LeverageToBase,
         slippage_assert: Option<SlippageAssert>,
     ) -> Result<DeferQueueResponse> {
-        self.exec_defer_queue_wasm_msg(sender, 
+        self.exec_defer_queue_wasm_msg(
+            sender,
             WasmMsg::Execute {
                 contract_addr: self.addr.to_string(),
-                msg: to_binary(&
-                    MarketExecuteMsg::UpdatePositionLeverage {
-                        id: position_id,
-                        leverage,
-                        slippage_assert,
-                    }
-                )?,
+                msg: to_binary(&MarketExecuteMsg::UpdatePositionLeverage {
+                    id: position_id,
+                    leverage,
+                    slippage_assert,
+                })?,
                 funds: Vec::new(),
             },
         )
