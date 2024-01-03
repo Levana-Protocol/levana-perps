@@ -1246,6 +1246,7 @@ impl PerpsMarket {
         Ok((pos_id, defer_res))
     }
 
+    // this does *not* automatic time jump
     #[allow(clippy::too_many_arguments)]
     pub fn exec_open_position_raw_queue_only(
         &self,
@@ -1375,6 +1376,7 @@ impl PerpsMarket {
         )
     }
 
+    // this does *not* automatic time jump
     pub fn exec_update_position_leverage_queue_only(
         &self,
         sender: &Addr,
@@ -2096,6 +2098,7 @@ impl PerpsMarket {
 
     // this defers a message exec in the sense of Levana perps semantics of "deferred executions"
     // *not* defer in the sense of native programming jargon, like the golang keyword or until Drop kicks in etc.
+    // this does *not* automatic time jump
     pub fn exec_defer_queue_wasm_msg(
         &self,
         sender: &Addr,
@@ -2130,6 +2133,9 @@ impl PerpsMarket {
         }
     }
 
+    // this *does* automatic time jump
+    // at least in the sense of cranking/moving forward until it gets the deferred execution
+    // i.e. if it happens to be that the queue response is _also_ the exec response, then it won't move forward - otherwise it will
     pub fn exec_defer_queue_process(
         &self,
         cranker: &Addr,
