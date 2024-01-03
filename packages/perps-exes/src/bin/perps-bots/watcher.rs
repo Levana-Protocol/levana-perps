@@ -453,12 +453,14 @@ impl AppBuilder {
                                     tokio::time::sleep(tokio::time::Duration::from_secs(secs))
                                         .await;
                                 }
-                                perps_exes::config::Delay::Interval(secs) => {
-                                    if let Some(after) =
-                                        before.checked_add(tokio::time::Duration::from_secs(secs))
-                                    {
-                                        tokio::time::sleep_until(after).await;
-                                    }
+                                perps_exes::config::Delay::NewBlock => {
+                                    let x = ();
+                                    todo!()
+                                    // if let Some(after) =
+                                    //     before.checked_add(tokio::time::Duration::from_secs(secs))
+                                    // {
+                                    //     tokio::time::sleep_until(after).await;
+                                    // }
                                 }
                             };
                         }

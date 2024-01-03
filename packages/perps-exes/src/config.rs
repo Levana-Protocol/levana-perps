@@ -548,7 +548,7 @@ impl Default for WatcherConfig {
                 delay_between_retries: None,
             },
             price: TaskConfig {
-                delay: Delay::Interval(3),
+                delay: Delay::NewBlock,
                 out_of_date: 30,
                 // Intentionally using different defaults to make sure price
                 // updates come through quickly. We increase our retries to
@@ -617,7 +617,7 @@ pub struct TaskConfig {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum Delay {
     Constant(u64),
-    Interval(u64),
+    NewBlock,
     Random { low: u64, high: u64 },
 }
 

@@ -1239,6 +1239,10 @@ pub struct StatusResp {
     pub last_crank_completed: Option<Timestamp>,
     /// Earliest deferred execution price timestamp needed
     pub next_deferred_execution: Option<Timestamp>,
+    /// Latest deferred execution price timestamp needed
+    pub newest_deferred_execution: Option<Timestamp>,
+    /// Next liquifunding work item timestamp
+    pub next_liquifunding: Option<Timestamp>,
     /// Number of work items sitting in the deferred execution queue
     pub deferred_execution_items: u32,
     /// Last processed deferred execution ID, if any

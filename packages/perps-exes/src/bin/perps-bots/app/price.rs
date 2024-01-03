@@ -204,6 +204,10 @@ struct NeedsPriceUpdateInfo {
     last_action: Option<Instant>,
     /// The timestamp of the next pending deferred work item
     next_pending_deferred_work_item: Option<DateTime<Utc>>,
+    /// The timestamp of the newest pending deferred work item
+    newest_pending_deferred_work_item: Option<DateTime<Utc>>,
+    /// The timestamp of the next liquifunding
+    next_liquifunding: Option<DateTime<Utc>>,
     /// The latest price from on-chain data only
     on_chain_price: PriceBaseInQuote,
     /// The latest publish time from on-chain data only
@@ -238,6 +242,13 @@ impl NeedsPriceUpdateInfo {
             }
         }
 
+        // If the new price would hit some new triggers, then we need to do a
+        // price update and crank.
+        if self.price_will_trigger {
+            // Potential future optimization: only query this piece of data on-demand
+            return ActionWithReason::WorkNeeded(CrankTriggerReason::PriceWillTrigger);
+        }
+
         // Keep the protocol lively: if on-chain price is too old or too
         // different from off-chain price, update price and crank.
         let on_chain_age = self
@@ -261,43 +272,35 @@ impl NeedsPriceUpdateInfo {
             });
         }
 
-        // If there are deferred work items...
-        if let Some(deferred_work_item) = self.next_pending_deferred_work_item {
-            // Do we need a new publish time in the oracle to crank this?
-            if self.on_chain_publish_time < deferred_work_item {
-                // New price is needed, do we have it?
-                if self.off_chain_publish_time >= deferred_work_item {
+        // If the next liquifunding needs a price update, do it. Same for
+        // deferred work, but we look at both the oldest and newest pending item to ensure
+        // there's as little a gap between item creation and the price point that ends up
+        // cranking it as possible.
+        for timestamp in [
+            self.next_pending_deferred_work_item,
+            self.newest_pending_deferred_work_item,
+            self.next_liquifunding,
+        ] {
+            if let Some(timestamp) = timestamp {
+                if self.on_chain_publish_time < timestamp
+                    && timestamp <= self.off_chain_publish_time
+                {
                     return ActionWithReason::WorkNeeded(
+                        // FIXME rename this to generalize to liquifunding too
                         CrankTriggerReason::DeferredNeedsNewPrice {
                             on_chain_oracle_publish_time: self.on_chain_publish_time,
-                            deferred_work_item,
+                            deferred_work_item: timestamp,
                         },
                     );
                 }
-            } else {
-                // No new price is needed, so we can just crank and make progress.
-                return ActionWithReason::WorkNeeded(CrankTriggerReason::DeferredWorkAvailable {
-                    on_chain_oracle_publish_time: self.on_chain_publish_time,
-                    deferred_work_item,
-                });
             }
         }
 
-        // If there are crank work items available, then just crank
+        // No we know that pushing a price update won't trigger any new work to
+        // become available. Now just check if there's already work available to process
+        // and, if so, do a crank.
         if let Some(crank_work) = &self.crank_work_available {
-            if let CrankWorkInfo::DeferredExec { .. } = crank_work {
-                tracing::error!("This case should never happen, found deferred exec crank work but didn't handle it with other deferred work items");
-            } else {
-                return ActionWithReason::WorkNeeded(CrankTriggerReason::CrankWorkAvailable);
-            }
-        }
-
-        // No other work is immediately available. Now we check if a new price
-        // update would hit any triggers. We do this at the end to avoid unnecessarily
-        // spamming oracle price updates while still processing earlier items in the queue.
-        if self.price_will_trigger {
-            // Potential future optimization: only query this piece of data on-demand
-            return ActionWithReason::WorkNeeded(CrankTriggerReason::PriceWillTrigger);
+            return ActionWithReason::WorkNeeded(CrankTriggerReason::CrankWorkAvailable);
         }
 
         // Nothing else caused a price update or crank, so no actions needed
@@ -339,6 +342,14 @@ async fn check_market_needs_price_update(
                 last_action: last_action_taken,
                 next_pending_deferred_work_item: status
                     .next_deferred_execution
+                    .map(|x| x.try_into_chrono_datetime())
+                    .transpose()?,
+                newest_pending_deferred_work_item: status
+                    .newest_deferred_execution
+                    .map(|x| x.try_into_chrono_datetime())
+                    .transpose()?,
+                next_liquifunding: status
+                    .next_liquifunding
                     .map(|x| x.try_into_chrono_datetime())
                     .transpose()?,
                 off_chain_price,

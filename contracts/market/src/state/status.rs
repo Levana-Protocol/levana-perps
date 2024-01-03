@@ -1,9 +1,9 @@
 use crate::prelude::*;
 use anyhow::Result;
 use cosmwasm_std::Storage;
-use msg::contracts::market::entry::StatusResp;
+use msg::contracts::market::{deferred_execution::DeferredExecStatus, entry::StatusResp};
 
-use super::{crank::LAST_CRANK_COMPLETED, fees::all_fees, State};
+use super::{crank::LAST_CRANK_COMPLETED, fees::all_fees, position::NEXT_LIQUIFUNDING, State};
 use crate::state::delta_neutrality_fee::DELTA_NEUTRALITY_FUND;
 
 impl State<'_> {
@@ -64,11 +64,31 @@ impl State<'_> {
         let next_deferred_execution = self
             .get_next_deferred_execution(store)?
             .map(|(_, item)| item.created);
-        let (deferred_execution_items, last_processed_deferred_exec_id) =
+        let (deferred_execution_items, last_processed_deferred_exec_id, latest_deferred_id) =
             match self.deferred_execution_latest_ids(store)? {
-                Some(latest_ids) => (latest_ids.queue_size(), latest_ids.processed),
-                None => (0, None),
+                Some(latest_ids) => (
+                    latest_ids.queue_size(),
+                    latest_ids.processed,
+                    Some(latest_ids.issued),
+                ),
+                None => (0, None, None),
             };
+        let newest_deferred_execution = match latest_deferred_id {
+            Some(id) => {
+                let deferred = self.get_deferred_exec(store, id)?;
+                match deferred.status {
+                    DeferredExecStatus::Pending => Some(deferred.created),
+                    DeferredExecStatus::Success { .. } | DeferredExecStatus::Failure { .. } => None,
+                }
+            }
+            None => None,
+        };
+
+        let next_liquifunding = NEXT_LIQUIFUNDING
+            .keys(store, None, None, Order::Ascending)
+            .next()
+            .transpose()?
+            .map(|x| x.0);
 
         Ok(StatusResp {
             market_id: market_id.clone(),
@@ -95,6 +115,8 @@ impl State<'_> {
             next_deferred_execution,
             deferred_execution_items,
             last_processed_deferred_exec_id,
+            newest_deferred_execution,
+            next_liquifunding,
         })
     }
 }

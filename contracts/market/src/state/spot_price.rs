@@ -29,7 +29,7 @@ const MANUAL_SPOT_PRICE: Item<PriceStorage> = Item::new(namespace::MANUAL_SPOT_P
 /// The price components that are stored in [PRICES].
 #[derive(serde::Serialize, serde::Deserialize)]
 pub(crate) struct PriceStorage {
-    price: Price,
+    pub(crate) price: Price,
     price_usd: PriceCollateralInUsd,
     /// Store the original incoming price in base to avoid rounding errors.
     price_base: PriceBaseInQuote,
