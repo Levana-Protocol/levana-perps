@@ -4,7 +4,6 @@ use std::{
     collections::HashMap,
     fmt::{Display, Write},
     sync::Arc,
-    time::Instant,
 };
 
 use anyhow::Result;
@@ -39,8 +38,6 @@ use super::{
 struct Worker {
     wallet: Arc<Wallet>,
     stats: HashMap<MarketId, ReasonStats>,
-    /// The last time actions were taken for each market.
-    last_action_taken: HashMap<MarketId, Instant>,
     trigger_crank: TriggerCrank,
 }
 
@@ -63,7 +60,6 @@ impl AppBuilder {
                 Worker {
                     wallet: price_wallet,
                     stats: HashMap::new(),
-                    last_action_taken: HashMap::new(),
                     trigger_crank,
                 },
             )?;
@@ -97,15 +93,8 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
         let offchain_price_data = offchain_price_data.clone();
         let market = market.clone();
         let app = app.clone();
-        let last_action_taken = worker.last_action_taken.get(&market.market_id).copied();
         set.spawn(async move {
-            let res = check_market_needs_price_update(
-                &app,
-                offchain_price_data,
-                &market,
-                last_action_taken,
-            )
-            .await;
+            let res = check_market_needs_price_update(&app, offchain_price_data, &market).await;
             (market, res)
         });
     }
@@ -125,8 +114,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                 successes.push(format!("{}: {reason:?}", market.market_id));
 
                 match reason {
-                    ActionWithReason::CooldownPeriod
-                    | ActionWithReason::NoWorkAvailable
+                    ActionWithReason::NoWorkAvailable
                     | ActionWithReason::PythPricesClosed
                     | ActionWithReason::OffChainPriceTooOld
                     | ActionWithReason::VolatileDiffTooLarge => (),
@@ -200,8 +188,6 @@ enum NeedsOracleUpdate {
 
 #[derive(Debug)]
 struct NeedsPriceUpdateInfo {
-    /// Last time we took any actions for this market.
-    last_action: Option<Instant>,
     /// The timestamp of the next pending deferred work item
     next_pending_deferred_work_item: Option<DateTime<Utc>>,
     /// The timestamp of the newest pending deferred work item
@@ -224,7 +210,6 @@ struct NeedsPriceUpdateInfo {
 
 #[derive(Debug)]
 enum ActionWithReason {
-    CooldownPeriod,
     NoWorkAvailable,
     WorkNeeded(CrankTriggerReason),
     PythPricesClosed,
@@ -234,14 +219,6 @@ enum ActionWithReason {
 
 impl NeedsPriceUpdateInfo {
     fn actions(&self, params: &NeedsPriceUpdateParams) -> ActionWithReason {
-        if let Some(last_action) = self.last_action {
-            if let Some(age) = Instant::now().checked_duration_since(last_action) {
-                if age < params.action_cooldown_period {
-                    return ActionWithReason::CooldownPeriod;
-                }
-            }
-        }
-
         // If the new price would hit some new triggers, then we need to do a
         // price update and crank.
         if self.price_will_trigger {
@@ -309,7 +286,6 @@ async fn check_market_needs_price_update(
     app: &App,
     offchain_price_data: Arc<OffchainPriceData>,
     market: &Market,
-    last_action_taken: Option<Instant>,
 ) -> Result<ActionWithReason> {
     if app
         .pyth_prices_closed(market.market.get_address(), &market.config)
@@ -335,7 +311,6 @@ async fn check_market_needs_price_update(
             let status = market.market.status().await?;
 
             let info = NeedsPriceUpdateInfo {
-                last_action: last_action_taken,
                 next_pending_deferred_work_item: status
                     .next_deferred_execution
                     .map(|x| x.try_into_chrono_datetime())
@@ -483,7 +458,6 @@ struct ReasonStats {
     market: MarketId,
     started_tracking: DateTime<Utc>,
     oracle_update: u64,
-    cooldown: u64,
     not_needed: u64,
     too_old: u64,
     delta: u64,
@@ -501,7 +475,6 @@ impl Display for ReasonStats {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let ReasonStats {
             market,
-            cooldown,
             started_tracking,
             not_needed,
             too_old,
@@ -516,7 +489,7 @@ impl Display for ReasonStats {
             offchain_price_too_old,
             volatile_diff_too_large,
         } = self;
-        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Cooldown: {cooldown}. Triggers: {triggers}. No price found: {no_price_found}. Oracle update: {oracle_update}. Deferred execution w/price: {deferred_needs_new_price}. Pyth prices closed: {pyth_prices_closed}. Crank work available: {crank_work_available}. More work found: {more_work_found}. Offchain price too old: {offchain_price_too_old}. Volatile diff too large: {volatile_diff_too_large}.")
+        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Triggers: {triggers}. No price found: {no_price_found}. Oracle update: {oracle_update}. Deferred execution w/price: {deferred_needs_new_price}. Pyth prices closed: {pyth_prices_closed}. Crank work available: {crank_work_available}. More work found: {more_work_found}. Offchain price too old: {offchain_price_too_old}. Volatile diff too large: {volatile_diff_too_large}.")
     }
 }
 
@@ -524,7 +497,6 @@ impl ReasonStats {
     fn new(market: MarketId) -> Self {
         ReasonStats {
             started_tracking: Utc::now(),
-            cooldown: 0,
             not_needed: 0,
             too_old: 0,
             delta: 0,
@@ -543,7 +515,6 @@ impl ReasonStats {
 
     fn add_reason(&mut self, reason: &ActionWithReason) {
         match reason {
-            ActionWithReason::CooldownPeriod => self.cooldown += 1,
             ActionWithReason::NoWorkAvailable => self.not_needed += 1,
             ActionWithReason::PythPricesClosed => self.pyth_prices_closed += 1,
             ActionWithReason::OffChainPriceTooOld => self.offchain_price_too_old += 1,

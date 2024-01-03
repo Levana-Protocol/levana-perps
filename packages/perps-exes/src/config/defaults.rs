@@ -96,11 +96,6 @@ pub fn max_price_age_secs() -> u32 {
     60 * 60
 }
 
-pub fn price_action_cooldown_secs() -> u32 {
-    // 10 seconds
-    10
-}
-
 pub fn max_allowed_price_delta() -> Decimal256 {
     "0.01".parse().unwrap()
 }
