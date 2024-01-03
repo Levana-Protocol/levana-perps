@@ -5,6 +5,7 @@ use cosmos::Contract;
 use cosmwasm_std::Uint256;
 use msg::{
     contracts::market::{
+        config::Config,
         entry::OraclePriceResp,
         spot_price::{PythPriceServiceNetwork, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData},
     },
@@ -111,6 +112,8 @@ pub(crate) enum LatestPrice {
         on_chain_price: PriceBaseInQuote,
         /// Publish time calculated from on-chain oracle data
         on_chain_publish_time: DateTime<Utc>,
+        /// Is the on chain price stale?
+        oracle_price_stale: bool,
     },
     PriceTooOld,
     VolatileDiffTooLarge,
@@ -163,9 +166,97 @@ pub(crate) async fn get_latest_price(
                     .composed_price
                     .timestamp
                     .try_into_chrono_datetime()?,
+                oracle_price_stale: is_stale(
+                    &oracle_price,
+                    &market.config,
+                    Utc::now() + chrono::Duration::seconds(AGE_TOLERANCE_BUFFER_SECONDS),
+                )?,
             },
         },
     )
+}
+
+const AGE_TOLERANCE_BUFFER_SECONDS: i64 = 7;
+
+/// Do any of the feeds in this response fail the age tolerance check?
+fn is_stale(
+    OraclePriceResp {
+        pyth,
+        sei: _,
+        stride,
+        simple,
+        composed_price: _,
+    }: &OraclePriceResp,
+    Config { spot_price, .. }: &Config,
+    now: DateTime<Utc>,
+) -> Result<bool> {
+    let feeds = match spot_price {
+        SpotPriceConfig::Manual { .. } => anyhow::bail!("No support for manual price config"),
+        SpotPriceConfig::Oracle {
+            pyth: _,
+            stride: _,
+            feeds,
+            feeds_usd: _,
+            volatile_diff_seconds: _,
+        } => feeds,
+    };
+
+    for feed in feeds {
+        match &feed.data {
+            SpotPriceFeedData::Constant { price: _ } => (),
+            SpotPriceFeedData::Pyth {
+                id,
+                age_tolerance_seconds,
+            } => {
+                let publish_time = pyth
+                    .get(id)
+                    .context("Missing Pyth feed")?
+                    .publish_time
+                    .try_into_chrono_datetime()?;
+                if now.signed_duration_since(publish_time)
+                    > chrono::Duration::seconds((*age_tolerance_seconds).into())
+                {
+                    return Ok(true);
+                }
+            }
+            SpotPriceFeedData::Stride {
+                denom,
+                age_tolerance_seconds,
+            } => {
+                let publish_time = stride
+                    .get(denom)
+                    .context("Missing Stride feed")?
+                    .publish_time
+                    .try_into_chrono_datetime()?;
+                if now.signed_duration_since(publish_time)
+                    > chrono::Duration::seconds((*age_tolerance_seconds).into())
+                {
+                    return Ok(true);
+                }
+            }
+            SpotPriceFeedData::Sei { denom: _ } => (),
+            SpotPriceFeedData::Simple {
+                contract,
+                age_tolerance_seconds,
+            } => {
+                let contract = contract.clone().into();
+                if let Some(timestamp) = simple
+                    .get(&contract)
+                    .context("Missing Simple feed")?
+                    .timestamp
+                {
+                    let publish_time = timestamp.try_into_chrono_datetime()?;
+                    if now.signed_duration_since(publish_time)
+                        > chrono::Duration::seconds((*age_tolerance_seconds).into())
+                    {
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(false)
 }
 
 enum ComposedOracleFeed {

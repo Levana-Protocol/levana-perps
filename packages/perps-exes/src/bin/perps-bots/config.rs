@@ -73,6 +73,8 @@ pub(crate) struct BotConfig {
     pub(crate) ignored_markets: HashSet<MarketId>,
     /// How many seconds to ignore errors after an epoch
     pub(crate) ignore_errors_after_epoch_seconds: u32,
+    /// Always update the price when the price bot detects that a crank is needed
+    pub(crate) always_update_price: bool,
 }
 
 pub(crate) struct NeedsPriceUpdateParams {
@@ -218,6 +220,7 @@ impl Opt {
             ignored_markets: self.ignored_markets.iter().cloned().collect(),
             // Never used on testnet, just setting a reasonable default
             ignore_errors_after_epoch_seconds: 300,
+            always_update_price: !partial.lazily_update_price,
         };
 
         Ok((config, Some(faucet_bot_runner)))
@@ -245,6 +248,7 @@ impl Opt {
             rpc_endpoint,
             crank_wallets,
             ignore_errors_after_epoch_seconds,
+            lazily_update_price,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let hrp = network.get_address_hrp();
@@ -302,6 +306,7 @@ impl Opt {
             gas_wallet: Arc::new(gas_wallet),
             ignored_markets: self.ignored_markets.iter().cloned().collect(),
             ignore_errors_after_epoch_seconds: *ignore_errors_after_epoch_seconds,
+            always_update_price: !lazily_update_price,
         })
     }
 }

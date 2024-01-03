@@ -119,7 +119,9 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                     | ActionWithReason::OffChainPriceTooOld
                     | ActionWithReason::VolatileDiffTooLarge => (),
                     ActionWithReason::WorkNeeded(crank_trigger_reason) => {
-                        if crank_trigger_reason.needs_price_update() {
+                        if crank_trigger_reason.needs_price_update()
+                            || app.config.always_update_price
+                        {
                             any_needs_oracle_update = NeedsOracleUpdate::Yes;
                         }
                         markets_to_update.push((
@@ -206,6 +208,8 @@ struct NeedsPriceUpdateInfo {
     crank_work_available: Option<CrankWorkInfo>,
     /// Will the newest off-chain price update execute price triggers?
     price_will_trigger: bool,
+    /// Is the on-chain price in the oracle stale?
+    oracle_price_stale: bool,
 }
 
 #[derive(Debug)]
@@ -282,7 +286,11 @@ impl NeedsPriceUpdateInfo {
         // become available. Now just check if there's already work available to process
         // and, if so, do a crank.
         if needs_crank || self.crank_work_available.is_some() {
-            return ActionWithReason::WorkNeeded(CrankTriggerReason::CrankWorkAvailable);
+            return if self.oracle_price_stale {
+                ActionWithReason::WorkNeeded(CrankTriggerReason::OraclePriceStale)
+            } else {
+                ActionWithReason::WorkNeeded(CrankTriggerReason::CrankWorkAvailable)
+            };
         }
 
         // Nothing else caused a price update or crank, so no actions needed
@@ -313,6 +321,7 @@ async fn check_market_needs_price_update(
             off_chain_publish_time,
             on_chain_price,
             on_chain_publish_time,
+            oracle_price_stale,
         } => {
             let price_will_trigger = market.market.price_would_trigger(off_chain_price).await?;
 
@@ -332,12 +341,13 @@ async fn check_market_needs_price_update(
                     .next_liquifunding
                     .map(|x| x.try_into_chrono_datetime())
                     .transpose()?,
+                on_chain_price,
+                on_chain_publish_time,
                 off_chain_price,
                 off_chain_publish_time,
                 crank_work_available: status.next_crank.clone(),
                 price_will_trigger,
-                on_chain_price,
-                on_chain_publish_time,
+                oracle_price_stale,
             };
 
             Ok(info.actions(&app.config.needs_price_update_params))
@@ -478,6 +488,7 @@ struct ReasonStats {
     pyth_prices_closed: u64,
     offchain_price_too_old: u64,
     volatile_diff_too_large: u64,
+    oracle_price_stale: u64,
 }
 
 impl Display for ReasonStats {
@@ -497,8 +508,9 @@ impl Display for ReasonStats {
             pyth_prices_closed,
             offchain_price_too_old,
             volatile_diff_too_large,
+            oracle_price_stale,
         } = self;
-        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Triggers: {triggers}. No price found: {no_price_found}. Oracle update: {oracle_update}. Deferred execution w/price: {deferred_needs_new_price}. Pyth prices closed: {pyth_prices_closed}. Crank work available: {crank_work_available}. More work found: {more_work_found}. Offchain price too old: {offchain_price_too_old}. Volatile diff too large: {volatile_diff_too_large}.")
+        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Triggers: {triggers}. No price found: {no_price_found}. Oracle update: {oracle_update}. Deferred execution w/price: {deferred_needs_new_price}. Pyth prices closed: {pyth_prices_closed}. Crank work available: {crank_work_available}. More work found: {more_work_found}. Offchain price too old: {offchain_price_too_old}. Volatile diff too large: {volatile_diff_too_large}. Oracle price stale: {oracle_price_stale}.")
     }
 }
 
@@ -519,6 +531,7 @@ impl ReasonStats {
             pyth_prices_closed: 0,
             offchain_price_too_old: 0,
             volatile_diff_too_large: 0,
+            oracle_price_stale: 0,
         }
     }
 
@@ -546,6 +559,7 @@ impl ReasonStats {
             CrankTriggerReason::CrankWorkAvailable => self.crank_work_available += 1,
             CrankTriggerReason::PriceWillTrigger => self.triggers += 1,
             CrankTriggerReason::MoreWorkFound => self.more_work_found += 1,
+            CrankTriggerReason::OraclePriceStale => self.oracle_price_stale += 1,
         }
     }
 }

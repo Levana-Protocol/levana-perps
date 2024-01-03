@@ -335,6 +335,8 @@ pub struct DeploymentConfigTestnet {
     /// Disable Pyth usage and instead use the QA wallet for price update
     #[serde(default)]
     pub qa_price_updates: bool,
+    #[serde(default)]
+    pub lazily_update_price: bool,
 }
 
 fn load_yaml<T: serde::de::DeserializeOwned>(

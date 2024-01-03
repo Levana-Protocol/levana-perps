@@ -341,6 +341,7 @@ pub(crate) enum CrankTriggerReason {
     CrankWorkAvailable,
     PriceWillTrigger,
     MoreWorkFound,
+    OraclePriceStale,
 }
 
 impl Display for CrankTriggerReason {
@@ -371,6 +372,7 @@ impl Display for CrankTriggerReason {
                 f.write_str("New price would trigger an action")
             }
             CrankTriggerReason::MoreWorkFound => f.write_str("Crank running discovered more work"),
+            CrankTriggerReason::OraclePriceStale => f.write_str("Oracle price is stale"),
         }
     }
 }
@@ -382,7 +384,8 @@ impl CrankTriggerReason {
             | CrankTriggerReason::OnChainTooOld { .. }
             | CrankTriggerReason::LargePriceDelta { .. }
             | CrankTriggerReason::CrankNeedsNewPrice { .. }
-            | CrankTriggerReason::PriceWillTrigger => true,
+            | CrankTriggerReason::PriceWillTrigger
+            | CrankTriggerReason::OraclePriceStale => true,
             CrankTriggerReason::CrankWorkAvailable | CrankTriggerReason::MoreWorkFound => false,
         }
     }

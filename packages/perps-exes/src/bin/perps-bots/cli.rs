@@ -161,6 +161,9 @@ pub(crate) struct MainnetOpt {
         default_value_t = 300
     )]
     pub(crate) ignore_errors_after_epoch_seconds: u32,
+    /// Only update price in the price bots when strictly needed
+    #[clap(long, env = "LEVANA_BOTS_LAZILY_UPDATE_PRICE")]
+    pub(crate) lazily_update_price: bool,
 }
 
 impl Opt {
