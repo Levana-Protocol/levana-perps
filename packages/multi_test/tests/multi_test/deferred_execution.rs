@@ -198,11 +198,18 @@ fn non_deferred_after_deferred_2853() {
     let update_queue_1 = market
         .exec_update_position_leverage_queue_only(&trader, pos_1, "10".parse().unwrap(), None)
         .unwrap();
+
+    market.exec_refresh_price().unwrap();
     market.set_time(TimeJump::Liquifundings(1)).unwrap();
+
+
     let update_queue_2 = market
         .exec_update_position_leverage_queue_only(&trader, pos_2, "10".parse().unwrap(), None)
         .unwrap();
+    market.exec_refresh_price().unwrap();
     market.set_time(TimeJump::Liquifundings(1)).unwrap();
+
+    market.exec_refresh_price().unwrap();
 
     assert_eq!(market.query_status().unwrap().deferred_execution_items, 2);
     assert!(market
@@ -216,7 +223,6 @@ fn non_deferred_after_deferred_2853() {
         .status
         .is_pending());
 
-    market.exec_refresh_price().unwrap();
     // At 4 cranks there's still 2 items left
     // At 5 cranks there's 1 item left
     // At 6 cranks there's 0
