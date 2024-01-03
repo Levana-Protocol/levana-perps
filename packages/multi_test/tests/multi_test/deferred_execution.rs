@@ -243,6 +243,7 @@ fn non_deferred_after_deferred_2853() {
 
     // TBD - why does commenting this out fail?
     // I'd think that the the crank should just churn through whatever the backlog is, don't need a new price here
+    // at least for the first crank (I'd understand it failing later on since we don't have new prices by then)
     market.exec_refresh_price().unwrap();
 
     assert_eq!(market.query_status().unwrap().deferred_execution_items, 2);
