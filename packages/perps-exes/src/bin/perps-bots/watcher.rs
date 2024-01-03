@@ -462,7 +462,6 @@ impl AppBuilder {
                                                     last_seen_block_height = latest.height;
                                                     break;
                                                 }
-                                                tracing::warn!("NewBlock: expected to see a new block height already but didn't. Last seen: {last_seen_block_height}. Newest: {}", latest.height);
                                             }
                                             Err(e) => {
                                                 tracing::error!(
