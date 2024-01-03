@@ -10,7 +10,7 @@
 */
 
 use super::PerpsApp;
-use crate::config::{TokenKind, DEFAULT_MARKET, TEST_CONFIG};
+use crate::config::{SpotPriceKind, TokenKind, DEFAULT_MARKET, TEST_CONFIG};
 use crate::response::CosmosResponseExt;
 use crate::time::{BlockInfoChange, TimeJump};
 use anyhow::Context;
@@ -49,7 +49,9 @@ use msg::contracts::market::entry::{
     StatusResp, TradeHistorySummary, TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
-use msg::contracts::market::spot_price::SpotPriceConfigInit;
+use msg::contracts::market::spot_price::{
+    SpotPriceConfig, SpotPriceConfigInit, SpotPriceFeedDataInit, SpotPriceFeedInit,
+};
 use msg::contracts::market::{
     config::{Config, ConfigUpdate},
     entry::{
@@ -68,6 +70,7 @@ use msg::contracts::position_token::{
 };
 use msg::prelude::*;
 
+use crate::simple_oracle::ExecuteMsg as SimpleOracleExecuteMsg;
 use msg::constants::event_key;
 use msg::contracts::farming::entry::OwnerExecuteMsg::ReclaimEmissions;
 use msg::contracts::market::order::OrderId;
@@ -99,13 +102,19 @@ pub struct PerpsMarket {
 
 impl PerpsMarket {
     pub fn new(app: Rc<RefCell<PerpsApp>>) -> Result<Self> {
-        Self::new_with_type(app, DEFAULT_MARKET.collateral_type, true)
+        Self::new_with_type(
+            app,
+            DEFAULT_MARKET.collateral_type,
+            true,
+            DEFAULT_MARKET.spot_price,
+        )
     }
 
     pub fn new_with_type(
         app: Rc<RefCell<PerpsApp>>,
         market_type: MarketType,
         bootstap_lp: bool,
+        spot_price_kind: SpotPriceKind,
     ) -> Result<Self> {
         let token_init = match DEFAULT_MARKET.token_kind {
             TokenKind::Native => TokenInit::Native {
@@ -130,6 +139,7 @@ impl PerpsMarket {
             DEFAULT_MARKET.initial_price,
             None,
             bootstap_lp,
+            spot_price_kind,
         )
     }
 
@@ -140,7 +150,37 @@ impl PerpsMarket {
         initial_price: PriceBaseInQuote,
         collateral_in_usd: Option<PriceCollateralInUsd>,
         bootstap_lp: bool,
+        spot_price_kind: SpotPriceKind,
     ) -> Result<Self> {
+        // for oracles, set the initial price on the oracle
+        // and the market contract gets no initial price (it queries the oracle)
+        // for manual, set the initial price on the market contract
+        let initial_price = match spot_price_kind {
+            SpotPriceKind::Oracle => {
+                let mut app = app.borrow_mut();
+                let contract_addr = app.simple_oracle_addr.clone();
+                let now = app.block_info().time;
+
+                app.execute_contract(
+                    Addr::unchecked(&TEST_CONFIG.protocol_owner),
+                    contract_addr,
+                    &SimpleOracleExecuteMsg::SetPrice {
+                        value: initial_price.into_number().abs_unsigned(),
+                        timestamp: Some(now),
+                    },
+                    &[],
+                )?;
+
+                None
+            }
+            SpotPriceKind::Manual => Some(InitialPrice {
+                price: initial_price,
+                price_usd: collateral_in_usd.unwrap_or_else(|| {
+                    PriceCollateralInUsd::from_non_zero(initial_price.into_non_zero())
+                }),
+            }),
+        };
+
         let market_msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
             new_market: msg::contracts::market::entry::NewMarketParams {
                 market_id: id.clone(),
@@ -161,16 +201,37 @@ impl PerpsMarket {
                     liquidity_cooldown_seconds: Some(0),
                     ..Default::default()
                 }),
-                spot_price: SpotPriceConfigInit::Manual {
-                    admin: TEST_CONFIG.manual_price_owner.as_str().into(),
+                spot_price: match spot_price_kind {
+                    SpotPriceKind::Manual => SpotPriceConfigInit::Manual {
+                        admin: TEST_CONFIG.manual_price_owner.as_str().into(),
+                    },
+                    SpotPriceKind::Oracle => {
+                        let contract_addr = RawAddr::from(app.borrow().simple_oracle_addr.as_ref());
+                        SpotPriceConfigInit::Oracle {
+                            pyth: None,
+                            stride: None,
+                            feeds: vec![SpotPriceFeedInit {
+                                data: SpotPriceFeedDataInit::Simple {
+                                    contract: contract_addr.clone(),
+                                    age_tolerance_seconds: 120,
+                                },
+                                inverted: false,
+                                volatile: None,
+                            }],
+                            feeds_usd: vec![SpotPriceFeedInit {
+                                data: SpotPriceFeedDataInit::Simple {
+                                    contract: contract_addr,
+                                    age_tolerance_seconds: 120,
+                                },
+                                inverted: false,
+                                volatile: None,
+                            }],
+                            volatile_diff_seconds: None,
+                        }
+                    }
                 },
                 initial_borrow_fee_rate: "0.01".parse().unwrap(),
-                initial_price: Some(InitialPrice {
-                    price: initial_price,
-                    price_usd: collateral_in_usd.unwrap_or_else(|| {
-                        PriceCollateralInUsd::from_non_zero(initial_price.into_non_zero())
-                    }),
-                }),
+                initial_price,
             },
         };
 
@@ -244,6 +305,12 @@ impl PerpsMarket {
         };
 
         if bootstap_lp {
+            if spot_price_kind == SpotPriceKind::Oracle {
+                // not required for manual prices which append on init
+                // (technically, it's a "initial_price.is_some()" check, but this is only allowed for manual prices)
+                _self.exec_crank_n(&Addr::unchecked("init-cranker"), 1)?;
+            }
+
             // do not go through app get_user, since we want to _always_ bootstrap this user
             _self.exec_mint_and_deposit_liquidity(
                 &DEFAULT_MARKET.bootstrap_lp_addr,
@@ -841,16 +908,43 @@ impl PerpsMarket {
         price: PriceBaseInQuote,
         price_usd: Option<PriceCollateralInUsd>,
     ) -> Result<AppResponse> {
-        self.exec(
-            &Addr::unchecked(&TEST_CONFIG.manual_price_owner),
-            &MarketExecuteMsg::SetManualPrice {
-                price,
-                price_usd: price_usd.unwrap_or(
+        match self.query_config()?.spot_price {
+            SpotPriceConfig::Manual { admin } => {
+                let price_usd = price_usd.unwrap_or(
                     price
                         .try_into_usd(&self.id)
                         .unwrap_or(PriceCollateralInUsd::one()),
-                ),
+                );
+                self.exec(
+                    &admin,
+                    &MarketExecuteMsg::SetManualPrice { price, price_usd },
+                )
+            }
+            SpotPriceConfig::Oracle { .. } => {
+                if price_usd.is_some() {
+                    todo!("support setting price usd in oracle tests");
+                }
+
+                self.exec_set_oracle_price_base(price, self.now())
+            }
+        }
+    }
+
+    pub fn exec_set_oracle_price_base(
+        &self,
+        price_base: PriceBaseInQuote,
+        timestamp: Timestamp,
+    ) -> Result<AppResponse> {
+        let contract_addr = self.app().simple_oracle_addr.clone();
+
+        self.app().execute_contract(
+            Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            contract_addr,
+            &SimpleOracleExecuteMsg::SetPrice {
+                value: price_base.into_non_zero().into_decimal256(),
+                timestamp: Some(timestamp.into()),
             },
+            &[],
         )
     }
 
@@ -1105,7 +1199,8 @@ impl PerpsMarket {
             stop_loss_override,
             take_profit_override,
         )?;
-        self.exec_open_position_process_queue_response(sender, queue_resp)
+
+        self.exec_open_position_process_queue_response(sender, queue_resp, None)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1136,13 +1231,10 @@ impl PerpsMarket {
         &self,
         cranker: &Addr,
         queue_response: DeferQueueResponse,
+        crank_execs: Option<u32>,
     ) -> Result<(PositionId, DeferResponse)> {
         // Open position always happens through a deferred exec
-        let defer_res = self.exec_defer_queue_process(cranker, queue_response)?;
-
-        if self.debug_001 {
-            println!("{:#?}", defer_res);
-        }
+        let defer_res = self.exec_defer_queue_process(cranker, queue_response, crank_execs)?;
 
         let res = defer_res.exec_resp().clone();
 
@@ -2018,6 +2110,7 @@ impl PerpsMarket {
         &self,
         cranker: &Addr,
         queue: DeferQueueResponse,
+        crank_execs: Option<u32>,
     ) -> Result<DeferResponse> {
         let mut responses = vec![queue.response];
 
@@ -2026,6 +2119,10 @@ impl PerpsMarket {
         // it will stop looping whether the deferred execution succeeds or fails
         // and success/failure can be determined by looking at DeferResponse::exec_event.success
         loop {
+            if self.debug_001 {
+                //println!("{:#?}", responses.last().as_ref().unwrap());
+                println!("deferred execution items: {}, next crank: {:#?}, next deferred execution: {:#?}", self.query_status().unwrap().deferred_execution_items, self.query_status().unwrap().next_crank, self.query_status().unwrap().next_deferred_execution);
+            }
             // check before cranking, in case the deferred execution was queued and completed in the same block
             if let Ok(exec_event) = responses
                 .last()
@@ -2071,15 +2168,10 @@ impl PerpsMarket {
             // This doesn't seem necessary so far...
             // if it becomes necessary, maybe check to make sure we really need a price update here
             // self.exec_refresh_price()?;
-
             responses.push(self.exec(
                 cranker,
                 &MarketExecuteMsg::Crank {
-                    // This also doesn't seem necessary so far
-                    // if tests do depend on only getting more fidelity on cranking here
-                    // maybe take it as a parameter... TBD
-                    //execs: Some(1),
-                    execs: None,
+                    execs: crank_execs,
                     rewards: None,
                 },
             )?);
@@ -2088,7 +2180,7 @@ impl PerpsMarket {
 
     pub fn exec_defer_wasm_msg(&self, sender: &Addr, msg: WasmMsg) -> Result<DeferResponse> {
         let queue_res = self.exec_defer_queue_wasm_msg(sender, msg)?;
-        self.exec_defer_queue_process(sender, queue_res)
+        self.exec_defer_queue_process(sender, queue_res, None)
     }
 }
 
