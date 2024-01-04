@@ -6,13 +6,15 @@ use cosmwasm_std::{to_binary, WasmMsg};
 use levana_perpswap_multi_test::{
     config::{SpotPriceKind, DEFAULT_MARKET},
     market_wrapper::{DeferResponse, PerpsMarket},
+    response::CosmosResponseExt,
     time::TimeJump,
-    PerpsApp, response::CosmosResponseExt,
+    PerpsApp,
 };
 use msg::{
     contracts::market::{
-        deferred_execution::DeferredExecStatus, entry::ExecuteMsg as MarketExecuteMsg,
-        position::{PositionId, events::PositionUpdateEvent},
+        deferred_execution::DeferredExecStatus,
+        entry::ExecuteMsg as MarketExecuteMsg,
+        position::{events::PositionUpdateEvent, PositionId},
     },
     prelude::*,
     shared::storage::DirectionToBase,
@@ -334,50 +336,93 @@ fn defer_before_crank_2855() {
 
     market.exec_crank_till_finished(&cranker).unwrap();
 
-
-    let initial_active_collateral = market.query_position(pos_id).unwrap().active_collateral.into_number();
+    let initial_active_collateral = market
+        .query_position(pos_id)
+        .unwrap()
+        .active_collateral
+        .into_number();
 
     // queue an update and close with some time in between
-    market.exec_update_position_leverage_queue_only(&trader, pos_id, "12".parse().unwrap(), None).unwrap();
+    market
+        .exec_update_position_leverage_queue_only(&trader, pos_id, "12".parse().unwrap(), None)
+        .unwrap();
     market.set_time(TimeJump::Blocks(1)).unwrap();
-    let close_resp = market.exec_close_position_queue_only(&trader, pos_id, None).unwrap();
+    let close_resp = market
+        .exec_close_position_queue_only(&trader, pos_id, None)
+        .unwrap();
 
     // no pnl accumulated, update and close are both deferred
     let pos = market.query_position(pos_id).unwrap();
-    assert_eq!(pos.active_collateral.into_number(), initial_active_collateral);
+    assert_eq!(
+        pos.active_collateral.into_number(),
+        initial_active_collateral
+    );
     assert!(pos.leverage < "10".parse().unwrap());
     assert_eq!(market.query_status().unwrap().deferred_execution_items, 2);
     market.query_closed_position(&trader, pos_id).unwrap_err();
-    close_resp.response.event_first("position-update").unwrap_err();
+    close_resp
+        .response
+        .event_first("position-update")
+        .unwrap_err();
 
     // crank without a price point here works but doesn't do anything - i.e. same state as before
     market.exec_crank_n(&cranker, 100).unwrap();
     let pos = market.query_position(pos_id).unwrap();
-    assert_eq!(pos.active_collateral.into_number(), initial_active_collateral);
+    assert_eq!(
+        pos.active_collateral.into_number(),
+        initial_active_collateral
+    );
     assert!(pos.leverage < "10".parse().unwrap());
     assert_eq!(market.query_status().unwrap().deferred_execution_items, 2);
     market.query_closed_position(&trader, pos_id).unwrap_err();
-    close_resp.response.event_first("position-update").unwrap_err();
+    close_resp
+        .response
+        .event_first("position-update")
+        .unwrap_err();
 
-    // double the price 
+    // double the price
     let price_timestamp = market.now();
-    market.exec_set_price(PriceBaseInQuote::try_from_number(market.query_current_price().unwrap().price_base.into_number().checked_mul("2".parse().unwrap()).unwrap()).unwrap()).unwrap();
+    market
+        .exec_set_price(
+            PriceBaseInQuote::try_from_number(
+                market
+                    .query_current_price()
+                    .unwrap()
+                    .price_base
+                    .into_number()
+                    .checked_mul("2".parse().unwrap())
+                    .unwrap(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
 
     // One block's worth of cranking is enough to churn through the update and close - because there's only one price point
     let res = market.exec_crank_n(&cranker, 100).unwrap();
 
     // now position is updated
-    let update_event:PositionUpdateEvent = res
+    let update_event: PositionUpdateEvent = res
         .event_first("position-update")
         .unwrap()
         .try_into()
         .unwrap();
 
     // active collateral increased by a lot in the update (much more than just the updated delta, i.e. includes PnL from price)
-    let update_active_collateral = update_event.position_attributes.collaterals.active_collateral.into_number();
+    let update_active_collateral = update_event
+        .position_attributes
+        .collaterals
+        .active_collateral
+        .into_number();
 
     assert!(update_active_collateral > initial_active_collateral);
-    assert!(update_active_collateral.sub(initial_active_collateral) > (update_event.active_collateral_delta.into_number().mul(Number::from_str("10").unwrap())).abs());
+    assert!(
+        update_active_collateral.sub(initial_active_collateral)
+            > (update_event
+                .active_collateral_delta
+                .into_number()
+                .mul(Number::from_str("10").unwrap()))
+            .abs()
+    );
 
     // position was also closed
     let closed_pos = market.query_closed_position(&trader, pos_id).unwrap();
@@ -387,8 +432,11 @@ fn defer_before_crank_2855() {
 
     // last crank has the fee updates, and it's historical
     let res = market.exec_crank_till_finished(&cranker).unwrap();
-    let funding_rate_timestamp:Timestamp = res.event_first_value("funding-rate-change", "time").unwrap().parse().unwrap();
+    let funding_rate_timestamp: Timestamp = res
+        .event_first_value("funding-rate-change", "time")
+        .unwrap()
+        .parse()
+        .unwrap();
 
     assert_eq!(price_timestamp, funding_rate_timestamp);
 }
-
