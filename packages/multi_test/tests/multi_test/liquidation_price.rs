@@ -213,9 +213,9 @@ fn pnl_from_liquidation_perp_1404() {
     let pos = market.query_position(pos_id).unwrap();
 
     market.exec_crank_till_finished(&trader).unwrap();
-    market
-        .exec_set_price_and_crank("6.029".parse().unwrap())
-        .unwrap();
+    market.exec_set_price("6.029".parse().unwrap()).unwrap();
+
+    market.exec_crank(&Addr::unchecked("anybody")).unwrap();
 
     let closed = market.query_closed_position(&trader, pos_id).unwrap();
 

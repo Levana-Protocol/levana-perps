@@ -120,8 +120,13 @@ impl Context {
                             let (elapsed, resp) = self
                                 .with_timing(|| async { market.lock().await.exec_refresh_price() })
                                 .await;
-                            self.handle_app_response(client_addr, elapsed, &wrapper, resp)
-                                .await?;
+                            self.handle_app_response(
+                                client_addr,
+                                elapsed,
+                                &wrapper,
+                                resp.map(|res| res.base),
+                            )
+                            .await?;
                             Ok(())
                         }
 
