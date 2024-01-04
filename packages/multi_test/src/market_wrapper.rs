@@ -1205,17 +1205,16 @@ impl PerpsMarket {
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
     ) -> Result<(PositionId, DeferResponse)> {
-        let queue_res = self
-            .exec_open_position_queue_only(
-                &sender,
-                collateral,
-                leverage,
-                direction,
-                max_gains,
-                slippage_assert,
-                stop_loss_override,
-                take_profit_override,
-            )?;
+        let queue_res = self.exec_open_position_queue_only(
+            &sender,
+            collateral,
+            leverage,
+            direction,
+            max_gains,
+            slippage_assert,
+            stop_loss_override,
+            take_profit_override,
+        )?;
 
         // the queue above doesn't move forward a block
         // and we need to do that for the price to be valid
