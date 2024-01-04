@@ -1180,6 +1180,41 @@ impl PerpsMarket {
         )
     }
 
+    // Taking TryInto impls allows us to avoid noise in the tests
+    // and just use strings as needed, but exec_open_position_raw
+    // is available where you have the precise type
+    #[allow(clippy::too_many_arguments)]
+    pub fn exec_open_position_refresh_price(
+        &self,
+        sender: &Addr,
+        collateral: impl TryInto<NumberGtZero, Error = anyhow::Error>,
+        leverage: impl TryInto<LeverageToBase, Error = anyhow::Error>,
+        direction: DirectionToBase,
+        max_gains: impl TryInto<MaxGainsInQuote, Error = anyhow::Error>,
+        slippage_assert: Option<SlippageAssert>,
+        stop_loss_override: Option<PriceBaseInQuote>,
+        take_profit_override: Option<PriceBaseInQuote>,
+    ) -> Result<(PositionId, DeferResponse)> {
+        let queue_res = self
+            .exec_open_position_queue_only(
+                &sender,
+                collateral,
+                leverage,
+                direction,
+                max_gains,
+                slippage_assert,
+                stop_loss_override,
+                take_profit_override,
+            )?;
+
+        // the queue above doesn't move forward a block
+        // and we need to do that for the price to be valid
+        self.set_time(TimeJump::Blocks(1)).unwrap();
+        self.exec_refresh_price().unwrap();
+
+        self.exec_open_position_process_queue_response(&sender, queue_res, None)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn exec_open_position_raw(
         &self,
