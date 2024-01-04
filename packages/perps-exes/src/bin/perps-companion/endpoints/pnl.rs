@@ -298,7 +298,12 @@ impl PositionInfo {
 
 impl PnlInfo {
     fn html(self) -> Response {
-        Html(self.render().unwrap()).into_response()
+        let mut res = Html(self.render().unwrap()).into_response();
+        res.headers_mut().insert(
+            http::header::CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=300"),
+        );
+        res
     }
 
     fn image(self) -> Response {
