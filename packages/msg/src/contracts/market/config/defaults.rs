@@ -78,10 +78,10 @@ impl ConfigDefaults {
         "0.05".parse().unwrap()
     }
     pub fn crank_fee_charged() -> Usd {
-        "0.01".parse().unwrap()
+        "0.025".parse().unwrap()
     }
     pub fn crank_fee_surcharge() -> Usd {
-        "0.005".parse().unwrap()
+        "0.02".parse().unwrap()
     }
     pub fn crank_fee_reward() -> Usd {
         "0.005".parse().unwrap()
