@@ -986,7 +986,12 @@ impl PerpsMarket {
     pub fn exec_crank_till_finished(&self, sender: &Addr) -> Result<Vec<AppResponse>> {
         let mut responses = Vec::new();
 
-        while self.query_crank_stats()?.is_some() {
+        loop {
+            let status = self.query_status()?;
+            if status.deferred_execution_items == 0 && status.next_crank.is_none() {
+                break;
+            }
+
             let resp = self.exec(
                 sender,
                 &MarketExecuteMsg::Crank {
@@ -1008,7 +1013,12 @@ impl PerpsMarket {
     ) -> Result<Vec<AppResponse>> {
         let mut responses = Vec::new();
 
-        while self.query_crank_stats()?.is_some() {
+        loop {
+            let status = self.query_status()?;
+            if status.deferred_execution_items == 0 && status.next_crank.is_none() {
+                break;
+            }
+
             let resp = self.exec(
                 sender,
                 &MarketExecuteMsg::Crank {
