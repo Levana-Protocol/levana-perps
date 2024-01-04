@@ -887,22 +887,6 @@ impl PerpsMarket {
         self.exec_set_price_with_usd(price, None)
     }
 
-    pub fn exec_set_price_and_crank(&self, price: PriceBaseInQuote) -> Result<Vec<AppResponse>> {
-        let mut responses = vec![self.exec(
-            &Addr::unchecked(&TEST_CONFIG.manual_price_owner),
-            &MarketExecuteMsg::SetManualPrice {
-                price,
-                price_usd: price
-                    .try_into_usd(&self.id)
-                    .unwrap_or(PriceCollateralInUsd::one()),
-            },
-        )?];
-
-        responses.push(self.exec_crank(&Addr::unchecked("anybody"))?);
-
-        Ok(responses)
-    }
-
     pub fn exec_set_price_with_usd(
         &self,
         price: PriceBaseInQuote,
@@ -1340,6 +1324,24 @@ impl PerpsMarket {
             &MarketExecuteMsg::ClosePosition {
                 id: position_id,
                 slippage_assert,
+            },
+        )
+    }
+    pub fn exec_close_position_queue_only(
+        &self,
+        sender: &Addr,
+        position_id: PositionId,
+        slippage_assert: Option<SlippageAssert>,
+    ) -> Result<DeferQueueResponse> {
+        self.exec_defer_queue_wasm_msg(
+            sender,
+            WasmMsg::Execute {
+                contract_addr: self.addr.to_string(),
+                msg: to_binary(&MarketExecuteMsg::ClosePosition {
+                    id: position_id,
+                    slippage_assert,
+                })?,
+                funds: Vec::new(),
             },
         )
     }
