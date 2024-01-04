@@ -1206,7 +1206,7 @@ impl PerpsMarket {
         take_profit_override: Option<PriceBaseInQuote>,
     ) -> Result<(PositionId, DeferResponse)> {
         let queue_res = self.exec_open_position_queue_only(
-            &sender,
+            sender,
             collateral,
             leverage,
             direction,
@@ -1221,7 +1221,7 @@ impl PerpsMarket {
         self.set_time(TimeJump::Blocks(1)).unwrap();
         self.exec_refresh_price().unwrap();
 
-        self.exec_open_position_process_queue_response(&sender, queue_res, None)
+        self.exec_open_position_process_queue_response(sender, queue_res, None)
     }
 
     #[allow(clippy::too_many_arguments)]
