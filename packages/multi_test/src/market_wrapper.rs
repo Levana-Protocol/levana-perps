@@ -148,7 +148,7 @@ impl PerpsMarket {
         id: MarketId,
         token_init: TokenInit,
         initial_price: PriceBaseInQuote,
-        collateral_in_usd: Option<PriceCollateralInUsd>,
+        initial_price_usd: Option<PriceCollateralInUsd>,
         bootstap_lp: bool,
         spot_price_kind: SpotPriceKind,
     ) -> Result<Self> {
@@ -158,9 +158,8 @@ impl PerpsMarket {
         let initial_price = match spot_price_kind {
             SpotPriceKind::Oracle => {
                 let mut app = app.borrow_mut();
-                let contract_addr = app.simple_oracle_addr.clone();
                 let now = app.block_info().time;
-
+                let contract_addr = app.simple_oracle_addr.clone();
                 app.execute_contract(
                     Addr::unchecked(&TEST_CONFIG.protocol_owner),
                     contract_addr,
@@ -171,11 +170,27 @@ impl PerpsMarket {
                     &[],
                 )?;
 
+                let contract_addr = app.simple_oracle_usd_addr.clone();
+                app.execute_contract(
+                    Addr::unchecked(&TEST_CONFIG.protocol_owner),
+                    contract_addr,
+                    &SimpleOracleExecuteMsg::SetPrice {
+                        value: initial_price_usd
+                            .unwrap_or_else(|| {
+                                PriceCollateralInUsd::from_non_zero(initial_price.into_non_zero())
+                            })
+                            .into_number()
+                            .abs_unsigned(),
+                        timestamp: Some(now),
+                    },
+                    &[],
+                )?;
+
                 None
             }
             SpotPriceKind::Manual => Some(InitialPrice {
                 price: initial_price,
-                price_usd: collateral_in_usd.unwrap_or_else(|| {
+                price_usd: initial_price_usd.unwrap_or_else(|| {
                     PriceCollateralInUsd::from_non_zero(initial_price.into_non_zero())
                 }),
             }),
@@ -207,6 +222,8 @@ impl PerpsMarket {
                     },
                     SpotPriceKind::Oracle => {
                         let contract_addr = RawAddr::from(app.borrow().simple_oracle_addr.as_ref());
+                        let contract_addr_usd =
+                            RawAddr::from(app.borrow().simple_oracle_usd_addr.as_ref());
                         SpotPriceConfigInit::Oracle {
                             pyth: None,
                             stride: None,
@@ -220,7 +237,7 @@ impl PerpsMarket {
                             }],
                             feeds_usd: vec![SpotPriceFeedInit {
                                 data: SpotPriceFeedDataInit::Simple {
-                                    contract: contract_addr,
+                                    contract: contract_addr_usd,
                                     age_tolerance_seconds: 120,
                                 },
                                 inverted: false,
@@ -878,12 +895,12 @@ impl PerpsMarket {
     }
 
     // market executions
-    pub fn exec_refresh_price(&self) -> Result<AppResponse> {
+    pub fn exec_refresh_price(&self) -> Result<PriceResponse> {
         let price_resp = self.query_current_price()?;
         self.exec_set_price(price_resp.price_base)
     }
 
-    pub fn exec_set_price(&self, price: PriceBaseInQuote) -> Result<AppResponse> {
+    pub fn exec_set_price(&self, price: PriceBaseInQuote) -> Result<PriceResponse> {
         self.exec_set_price_with_usd(price, None)
     }
 
@@ -891,28 +908,34 @@ impl PerpsMarket {
         &self,
         price: PriceBaseInQuote,
         price_usd: Option<PriceCollateralInUsd>,
-    ) -> Result<AppResponse> {
+    ) -> Result<PriceResponse> {
+        let price_usd = price_usd.unwrap_or(
+            price
+                .try_into_usd(&self.id)
+                .unwrap_or(PriceCollateralInUsd::one()),
+        );
+
         match self.query_config()?.spot_price {
             SpotPriceConfig::Manual { admin } => {
-                let price_usd = price_usd.unwrap_or(
-                    price
-                        .try_into_usd(&self.id)
-                        .unwrap_or(PriceCollateralInUsd::one()),
-                );
-                self.exec(
+                let resp = self.exec(
                     &admin,
                     &MarketExecuteMsg::SetManualPrice { price, price_usd },
-                )
+                )?;
+
+                Ok(PriceResponse {
+                    base: resp.clone(),
+                    usd: resp,
+                })
             }
             SpotPriceConfig::Oracle { .. } => {
-                if price_usd.is_some() {
-                    todo!("support setting price usd in oracle tests");
-                }
-
-                let response = self.exec_set_oracle_price_base(price, self.now())?;
+                let base_resp = self.exec_set_oracle_price_base(price, self.now())?;
+                let usd_resp = self.exec_set_oracle_price_usd(price_usd, self.now())?;
                 self.exec_crank_n(&Addr::unchecked(&TEST_CONFIG.protocol_owner), 0)?;
 
-                Ok(response)
+                Ok(PriceResponse {
+                    base: base_resp,
+                    usd: usd_resp,
+                })
             }
         }
     }
@@ -929,6 +952,23 @@ impl PerpsMarket {
             contract_addr,
             &SimpleOracleExecuteMsg::SetPrice {
                 value: price_base.into_non_zero().into_decimal256(),
+                timestamp: Some(timestamp.into()),
+            },
+            &[],
+        )
+    }
+    pub fn exec_set_oracle_price_usd(
+        &self,
+        price_usd: PriceCollateralInUsd,
+        timestamp: Timestamp,
+    ) -> Result<AppResponse> {
+        let contract_addr = self.app().simple_oracle_usd_addr.clone();
+
+        self.app().execute_contract(
+            Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            contract_addr,
+            &SimpleOracleExecuteMsg::SetPrice {
+                value: price_usd.into_number().abs_unsigned(),
                 timestamp: Some(timestamp.into()),
             },
             &[],
@@ -1855,7 +1895,7 @@ impl PerpsMarket {
             }
 
             ClientToBridgeMsg::RefreshPrice => {
-                on_exec(self.exec_refresh_price());
+                on_exec(self.exec_refresh_price().map(|res| res.base));
             }
 
             ClientToBridgeMsg::Crank => {
@@ -2285,4 +2325,11 @@ pub struct DeferQueueResponse {
     pub event: DeferredExecQueuedEvent,
     pub value: DeferredExecWithStatus,
     pub response: AppResponse,
+}
+
+#[derive(Debug)]
+pub struct PriceResponse {
+    pub base: AppResponse,
+    // will be identical to the response for `base` for manual prices
+    pub usd: AppResponse,
 }

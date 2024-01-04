@@ -48,6 +48,7 @@ pub struct PerpsApp {
     pub log_block_time_changes: bool,
     pub rewards_addr: Addr,
     pub simple_oracle_addr: Addr,
+    pub simple_oracle_usd_addr: Addr,
 }
 
 impl Deref for PerpsApp {
@@ -141,6 +142,16 @@ impl PerpsApp {
             "rewards",
             Some(TEST_CONFIG.migration_admin.clone()),
         )?;
+        let simple_oracle_usd_addr = app.instantiate_contract(
+            simple_oracle_code_id,
+            Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &simple_oracle::InstantiateMsg {
+                owner: TEST_CONFIG.protocol_owner.clone().into(),
+            },
+            &[],
+            "rewards",
+            Some(TEST_CONFIG.migration_admin.clone()),
+        )?;
 
         let mut _self = PerpsApp {
             code_ids: [
@@ -163,6 +174,7 @@ impl PerpsApp {
             log_block_time_changes: false,
             rewards_addr,
             simple_oracle_addr,
+            simple_oracle_usd_addr,
         };
 
         Ok(_self)

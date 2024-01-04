@@ -327,7 +327,7 @@ fn defer_before_crank_2855() {
             "100",
             "9",
             DirectionToBase::Long,
-            "10.0",
+            "8",
             None,
             None,
             None,
@@ -390,7 +390,7 @@ fn defer_before_crank_2855() {
                     .unwrap()
                     .price_base
                     .into_number()
-                    .checked_mul("2".parse().unwrap())
+                    .checked_mul("1.5".parse().unwrap())
                     .unwrap(),
             )
             .unwrap(),
