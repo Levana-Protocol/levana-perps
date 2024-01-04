@@ -171,6 +171,10 @@ impl Opt {
                 builder.set_dynamic_gas_estimate_multiplier(x);
             }
         }
+
+        // Only has an impact on Osmosis mainnet.
+        builder.set_osmosis_gas_params(1.2, 10.0, 0.0054);
+
         builder.set_referer_header(Some("https://bots.levana.exchange/".to_owned()));
         builder.build().await.map_err(|e| e.into())
     }
