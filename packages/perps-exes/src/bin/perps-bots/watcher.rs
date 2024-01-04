@@ -43,6 +43,7 @@ pub(crate) enum TaskLabel {
     LiqudityTransactionAlert,
     TotalDepositAlert,
     RpcHealth,
+    Congestion,
 }
 
 impl TaskLabel {
@@ -62,6 +63,7 @@ impl TaskLabel {
             "liquidity-transaction-alert" => Some(TaskLabel::LiqudityTransactionAlert),
             "total-deposit-alert" => Some(TaskLabel::TotalDepositAlert),
             "rpc-health" => Some(TaskLabel::RpcHealth),
+            "congestion" => Some(TaskLabel::Congestion),
             _ => {
                 // Being lazy, skipping UltraCrank and Trader, they aren't needed
                 let index = s.strip_prefix("crank-run-")?;
@@ -90,6 +92,7 @@ impl TaskLabel {
             TaskLabel::LiqudityTransactionAlert => false,
             TaskLabel::TotalDepositAlert => false,
             TaskLabel::RpcHealth => false,
+            TaskLabel::Congestion => false,
         }
     }
 }
@@ -235,6 +238,7 @@ impl TaskLabel {
             TaskLabel::LiqudityTransactionAlert => config.liquidity_transaction,
             TaskLabel::TotalDepositAlert => config.liquidity_transaction,
             TaskLabel::RpcHealth => config.rpc_health,
+            TaskLabel::Congestion => config.congestion,
         }
     }
 
@@ -261,6 +265,7 @@ impl TaskLabel {
             TaskLabel::LiqudityTransactionAlert => false,
             TaskLabel::TotalDepositAlert => false,
             TaskLabel::RpcHealth => false,
+            TaskLabel::Congestion => false,
         }
     }
 
@@ -283,6 +288,7 @@ impl TaskLabel {
             TaskLabel::LiqudityTransactionAlert => "liquidity-transaction-alert".into(),
             TaskLabel::TotalDepositAlert => "total-deposit-alert".into(),
             TaskLabel::RpcHealth => "rpc-health".into(),
+            TaskLabel::Congestion => "congestion".into(),
         }
     }
 }

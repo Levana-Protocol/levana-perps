@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Instant};
 use anyhow::Result;
 use axum::async_trait;
 use chrono::{DateTime, Utc};
-use cosmos::{Address, HasAddress};
+use cosmos::{Address, HasAddress, HasAddressHrp};
 use dashmap::DashMap;
 use msg::prelude::*;
 use perps_exes::contracts::MarketContract;
@@ -14,7 +14,7 @@ use crate::{
     watcher::{ParallelWatcher, TaskLabel, WatchedTaskOutput, WatchedTaskPerMarketParallel},
 };
 
-use super::{factory::FactoryInfo, App, AppBuilder};
+use super::{factory::FactoryInfo, App, AppBuilder, OSMOSIS_MAX_GAS_PRICE};
 
 impl AppBuilder {
     pub(super) fn track_stale(&mut self) -> Result<()> {
@@ -88,6 +88,11 @@ impl Stale {
                 .await?
             {
                 Ok(mk_message("Ignoring stale state since Pyth prices are closed").to_string())
+            } else if app.is_osmosis_congested() {
+                Ok(
+                    mk_message("Ignoring stale state since Osmosis appears to be congested")
+                        .to_string(),
+                )
             } else {
                 Err(mk_message("Protocol is in stale state").to_anyhow())
             }
@@ -98,6 +103,8 @@ impl Stale {
             if age > chrono::Duration::seconds(MAX_ALLOWED_CRANK_AGE_SECS) {
                 if app.is_osmosis_epoch() {
                     Ok(mk_message(&format!("Last crank is too old (not run since {last_crank_completed}, age is {age}), but we think we're in an Osmosis epoch so ignoring")).to_string())
+                } else if app.is_osmosis_congested() {
+                    Ok(mk_message(&format!("Last crank is too old (not run since {last_crank_completed}, age is {age}), but we think we're in an Osmosis congested period so ignoring")).to_string())
                 } else {
                     Err(mk_message(&format!(
                     "Crank has not been run since {last_crank_completed}, age of {age} is too high"
@@ -178,5 +185,17 @@ impl App {
         } else {
             true
         }
+    }
+
+    fn is_osmosis_mainnet(&self) -> bool {
+        match self.config.by_type {
+            BotConfigByType::Testnet { .. } => false,
+            BotConfigByType::Mainnet { .. } => self.cosmos.get_address_hrp().as_str() == "osmo",
+        }
+    }
+
+    /// Do we think the Osmosis chain is overly congested?
+    pub(crate) fn is_osmosis_congested(&self) -> bool {
+        self.is_osmosis_mainnet() && self.cosmos.get_base_gas_price() > OSMOSIS_MAX_GAS_PRICE
     }
 }
