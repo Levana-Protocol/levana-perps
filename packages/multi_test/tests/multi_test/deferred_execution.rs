@@ -227,6 +227,7 @@ fn non_deferred_after_deferred_2853() {
         .exec_update_position_leverage_queue_only(&trader, pos_1, "10".parse().unwrap(), None)
         .unwrap();
 
+    // the queue above did not move forward - gotta set the price at the _next_ block
     market.set_time(TimeJump::Blocks(1)).unwrap();
     market.exec_refresh_price().unwrap();
     market.set_time(TimeJump::Liquifundings(1)).unwrap();
@@ -237,14 +238,10 @@ fn non_deferred_after_deferred_2853() {
         .exec_update_position_leverage_queue_only(&trader, pos_2, "10".parse().unwrap(), None)
         .unwrap();
 
+    // the queue above did not move forward - gotta set the price at the _next_ block
     market.set_time(TimeJump::Blocks(1)).unwrap();
     market.exec_refresh_price().unwrap();
     market.set_time(TimeJump::Liquifundings(1)).unwrap();
-
-    // TBD - why does commenting this out fail?
-    // I'd think that the the crank should just churn through whatever the backlog is, don't need a new price here
-    // at least for the first crank (I'd understand it failing later on since we don't have new prices by then)
-    market.exec_refresh_price().unwrap();
 
     assert_eq!(market.query_status().unwrap().deferred_execution_items, 2);
     assert!(market
@@ -259,6 +256,7 @@ fn non_deferred_after_deferred_2853() {
         .is_pending());
 
     // This crank should process the first update queue - step 7/8 in the jira issue
+    market.exec_refresh_price().unwrap(); // we have to refresh the price first though, otherwise it's too old and the cranking will fail
     market.exec_crank_n(&cranker, 100).unwrap();
 
     assert_eq!(market.query_status().unwrap().deferred_execution_items, 1);
