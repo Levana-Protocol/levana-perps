@@ -190,8 +190,8 @@ fn non_deferred_after_deferred_2853() {
     let cranker = market.clone_trader(1).unwrap();
 
     let open_position_oracle = || -> (PositionId, DeferResponse) {
-        let queue_res = market
-            .exec_open_position_queue_only(
+        market
+            .exec_open_position_refresh_price(
                 &trader,
                 "100",
                 "9",
@@ -201,14 +201,6 @@ fn non_deferred_after_deferred_2853() {
                 None,
                 None,
             )
-            .unwrap();
-
-        // These steps are necessary
-        market.set_time(TimeJump::Blocks(1)).unwrap();
-        market.exec_refresh_price().unwrap();
-
-        market
-            .exec_open_position_process_queue_response(&trader, queue_res, None)
             .unwrap()
     };
 
