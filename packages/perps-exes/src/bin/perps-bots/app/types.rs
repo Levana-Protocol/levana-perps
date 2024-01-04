@@ -332,16 +332,11 @@ pub(crate) enum CrankTriggerReason {
         #[allow(dead_code)]
         off_chain_price: PriceBaseInQuote,
     },
-    DeferredNeedsNewPrice {
+    /// Something in the crank queue, either deferred exec or liquifunding, needs a new price.
+    CrankNeedsNewPrice {
         #[allow(dead_code)]
         on_chain_oracle_publish_time: DateTime<Utc>,
-        deferred_work_item: DateTime<Utc>,
-    },
-    DeferredWorkAvailable {
-        #[allow(dead_code)]
-        on_chain_oracle_publish_time: DateTime<Utc>,
-        #[allow(dead_code)]
-        deferred_work_item: DateTime<Utc>,
+        work_item: DateTime<Utc>,
     },
     CrankWorkAvailable,
     PriceWillTrigger,
@@ -362,17 +357,13 @@ impl Display for CrankTriggerReason {
                 on_chain_oracle_price: _,
                 off_chain_price: _,
             } => write!(f, "Large price delta found {on_off_chain_delta}"),
-            CrankTriggerReason::DeferredNeedsNewPrice {
+            CrankTriggerReason::CrankNeedsNewPrice {
                 on_chain_oracle_publish_time: _,
-                deferred_work_item,
+                work_item: deferred_work_item,
             } => write!(
                 f,
                 "Deferred work item needs new price (later than {deferred_work_item})"
             ),
-            CrankTriggerReason::DeferredWorkAvailable {
-                on_chain_oracle_publish_time: _,
-                deferred_work_item: _,
-            } => f.write_str("Deferred work item available"),
             CrankTriggerReason::CrankWorkAvailable => {
                 f.write_str("Price bot discovered crank work available")
             }
@@ -390,11 +381,9 @@ impl CrankTriggerReason {
             CrankTriggerReason::NoPriceOnChain
             | CrankTriggerReason::OnChainTooOld { .. }
             | CrankTriggerReason::LargePriceDelta { .. }
-            | CrankTriggerReason::DeferredNeedsNewPrice { .. }
+            | CrankTriggerReason::CrankNeedsNewPrice { .. }
             | CrankTriggerReason::PriceWillTrigger => true,
-            CrankTriggerReason::DeferredWorkAvailable { .. }
-            | CrankTriggerReason::CrankWorkAvailable
-            | CrankTriggerReason::MoreWorkFound => false,
+            CrankTriggerReason::CrankWorkAvailable | CrankTriggerReason::MoreWorkFound => false,
         }
     }
 }

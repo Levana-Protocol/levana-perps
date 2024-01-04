@@ -621,6 +621,8 @@ mod tests {
             },
             deferred_execution_items: 0,
             last_processed_deferred_exec_id: None,
+            newest_deferred_execution: None,
+            next_liquifunding: None,
         }
     }
 

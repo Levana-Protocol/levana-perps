@@ -342,6 +342,7 @@ impl AppBuilder {
         }
         let app = self.app.clone();
         let future = Box::pin(async move {
+            let mut last_seen_block_height = 0;
             let mut retries = 0;
             loop {
                 let old_counts = {
@@ -356,7 +357,6 @@ impl AppBuilder {
                     };
                     guard.counts
                 };
-                let before = tokio::time::Instant::now();
                 let res = task
                     .run_single_with_timeout(
                         app.clone(),
@@ -453,11 +453,24 @@ impl AppBuilder {
                                     tokio::time::sleep(tokio::time::Duration::from_secs(secs))
                                         .await;
                                 }
-                                perps_exes::config::Delay::Interval(secs) => {
-                                    if let Some(after) =
-                                        before.checked_add(tokio::time::Duration::from_secs(secs))
-                                    {
-                                        tokio::time::sleep_until(after).await;
+                                perps_exes::config::Delay::NewBlock => {
+                                    // Wait for a new block to appear
+                                    loop {
+                                        match app.cosmos.get_latest_block_info().await {
+                                            Ok(latest) => {
+                                                if last_seen_block_height < latest.height {
+                                                    last_seen_block_height = latest.height;
+                                                    break;
+                                                }
+                                            }
+                                            Err(e) => {
+                                                tracing::error!(
+                                                    "Unable to query latest block info: {e:?}"
+                                                );
+                                            }
+                                        }
+                                        tokio::time::sleep(tokio::time::Duration::from_millis(200))
+                                            .await;
                                     }
                                 }
                             };

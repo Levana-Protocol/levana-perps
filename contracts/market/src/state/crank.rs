@@ -7,6 +7,7 @@ use msg::contracts::market::{
         events::PositionSaveReason, ClosePositionInstructions, MaybeClosedPosition,
         PositionCloseReason,
     },
+    spot_price::SpotPriceConfig,
 };
 
 use shared::prelude::*;
@@ -104,14 +105,27 @@ impl State<'_> {
     pub(crate) fn price_would_trigger(
         &self,
         store: &dyn Storage,
-        price: PriceBaseInQuote,
+        new_price: PriceBaseInQuote,
     ) -> Result<bool> {
-        let price = price.into_notional_price(self.market_type(store)?);
-        if self.liquidatable_position(store, price)?.is_some() {
-            return Ok(true);
-        }
-        self.limit_order_triggered_order(store, price)
-            .map(|x| x.is_some())
+        // Get the latest price available in the oracle
+        let oracle_price = match &self.config.spot_price {
+            SpotPriceConfig::Manual { .. } => self.current_spot_price(store)?.price_notional,
+            SpotPriceConfig::Oracle {
+                feeds, feeds_usd, ..
+            } => {
+                let oracle_price = self.get_oracle_price(false)?;
+                let market_id = self.market_id(store)?;
+                let price_storage =
+                    oracle_price.compose_price(market_id, feeds, feeds_usd, self.now())?;
+                price_storage.price
+            }
+        };
+
+        let new_price = new_price.into_notional_price(self.market_type(store)?);
+        Ok(
+            self.newly_liquidatable_position(store, oracle_price, new_price)
+                || self.limit_order_newly_triggered_order(store, oracle_price, new_price),
+        )
     }
 
     // this always executes the requested cranks
