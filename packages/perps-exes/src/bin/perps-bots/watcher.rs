@@ -302,6 +302,13 @@ impl Watcher {
             },
             listener,
         ));
+        self.set.spawn(async move {
+            loop {
+                let now = Utc::now();
+                println!("Heartbeat check: {now}");
+                tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+            }
+        });
         for ToSpawn { future, label } in self.to_spawn {
             self.set.spawn(async move {
                 future

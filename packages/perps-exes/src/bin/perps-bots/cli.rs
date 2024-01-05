@@ -185,6 +185,7 @@ impl Opt {
 
         let subscriber = tracing_subscriber::registry().with(
             fmt::Layer::default()
+                .log_internal_errors(true)
                 .and_then(EnvFilter::from_default_env().add_directive(env_directive)),
         );
 
