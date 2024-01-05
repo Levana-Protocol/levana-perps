@@ -145,8 +145,6 @@ pub(crate) struct AppBuilder {
     pub(crate) gas_check: GasCheckBuilder,
 }
 
-pub(crate) const OSMOSIS_MAX_GAS_PRICE: f64 = 0.0054;
-
 impl Opt {
     async fn make_cosmos(&self, config: &BotConfig) -> Result<Cosmos> {
         let mut builder = config.network.builder().await?;
@@ -174,8 +172,10 @@ impl Opt {
             }
         }
 
-        // Only has an impact on Osmosis mainnet.
-        builder.set_osmosis_gas_params(1.2, 10.0, OSMOSIS_MAX_GAS_PRICE);
+        if let BotConfigByType::Mainnet { inner } = &config.by_type {
+            // Only has an impact on Osmosis mainnet.
+            builder.set_osmosis_gas_params(1.2, 10.0, inner.max_gas_price);
+        }
 
         builder.set_referer_header(Some("https://bots.levana.exchange/".to_owned()));
         builder.build().await.map_err(|e| e.into())

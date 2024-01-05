@@ -49,6 +49,10 @@ pub(crate) struct BotConfigMainnet {
     pub(crate) crank_rewards: Address,
     /// Used for checking RPC health, not for making queries
     pub(crate) rpc_endpoint: Arc<String>,
+    /// What gas price on Osmosis to consider the chain congested
+    pub(crate) gas_price_congested: f64,
+    /// Maximum gas price to allow for transactions
+    pub(crate) max_gas_price: f64,
 }
 
 pub(crate) struct BotConfig {
@@ -237,6 +241,8 @@ impl Opt {
             rpc_endpoint,
             crank_wallets,
             ignore_errors_after_epoch_seconds,
+            gas_price_congested,
+            max_gas_price,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let hrp = network.get_address_hrp();
@@ -270,6 +276,8 @@ impl Opt {
                     },
                     crank_rewards: *crank_rewards,
                     rpc_endpoint: Arc::new(rpc_endpoint.clone()),
+                    gas_price_congested: *gas_price_congested,
+                    max_gas_price: *max_gas_price,
                 }
                 .into(),
             },

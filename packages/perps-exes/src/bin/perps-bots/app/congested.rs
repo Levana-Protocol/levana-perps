@@ -5,7 +5,7 @@ use axum::async_trait;
 
 use crate::watcher::{Heartbeat, TaskLabel, WatchedTask, WatchedTaskOutput};
 
-use super::{App, AppBuilder, OSMOSIS_MAX_GAS_PRICE};
+use super::{App, AppBuilder};
 
 impl AppBuilder {
     pub(super) fn start_congestion_alert(&mut self) -> Result<()> {
@@ -24,14 +24,14 @@ impl WatchedTask for Congestion {
 }
 
 async fn check(app: &App) -> Result<WatchedTaskOutput> {
-    let base = app.cosmos.get_base_gas_price();
-    if app.is_osmosis_congested() {
+    let info = app.get_congested_info();
+    if info.is_congested() {
         Err(anyhow::anyhow!(
-            "It appears that the Osmosis chain is congested. Current base gas price: {base}. Max allowed: {OSMOSIS_MAX_GAS_PRICE}",
+            "It appears that the Osmosis chain is congested. {info:?}",
         ))
     } else {
         Ok(WatchedTaskOutput::new(format!(
-            "Chain does not appear to be congested. Current base gas price: {base}. Max allowed: {OSMOSIS_MAX_GAS_PRICE}"
+            "Chain does not appear to be congested. {info:?}"
         )))
     }
 }
