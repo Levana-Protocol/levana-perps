@@ -148,7 +148,7 @@ impl SignedLeverageToBase {
 
     /// Split up this value into the direction and absolute leverage.
     pub fn split(self) -> (DirectionToBase, LeverageToBase) {
-        let (direction, leverage) = match self.0.try_into_positive_value() {
+        let (direction, leverage) = match self.0.try_into_non_negative_value() {
             Some(x) => (DirectionToBase::Long, x),
             None => (DirectionToBase::Short, self.0.abs_unsigned()),
         };
@@ -190,7 +190,7 @@ pub struct SignedLeverageToNotional(Signed<Decimal256>);
 impl SignedLeverageToNotional {
     /// Extract the direction value
     pub fn direction(self) -> DirectionToNotional {
-        match self.0.try_into_positive_value() {
+        match self.0.try_into_non_negative_value() {
             Some(_) => DirectionToNotional::Long,
             None => DirectionToNotional::Short,
         }

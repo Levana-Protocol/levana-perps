@@ -335,7 +335,7 @@ impl SubTotals {
 
         let total = positive_total.into_signed() + *funding_fee_imbalance;
         total
-            .try_into_positive_value()
+            .try_into_non_negative_value()
             .with_context(|| format!("Calculated total is negative: {self:?}"))
     }
 }

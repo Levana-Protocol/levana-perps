@@ -622,7 +622,7 @@ impl State<'_> {
             .locked
             .into_signed()
             .checked_add(amount)?
-            .try_into_positive_value()
+            .try_into_non_negative_value()
         {
             None => anyhow::bail!(
                 "liquidity_update_locked: locked is {}, amount is {}",
