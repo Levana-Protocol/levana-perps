@@ -131,7 +131,7 @@ impl State<'_> {
                 Some(PrefixBound::inclusive(PriceKey::from(price))),
                 None,
                 // If we had a continuous price stream with no holes whatsoever, the higher price here would have already been triggered
-                // But since we have holes, we want to walk in descending order to find the "most urgent" price to execute first 
+                // But since we have holes, we want to walk in descending order to find the "most urgent" price to execute first
                 // i.e. we start with the ones which are furthest away from our target price, and work our way inwards
                 Order::Descending,
             )

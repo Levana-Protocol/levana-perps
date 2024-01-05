@@ -120,13 +120,26 @@ pub mod events {
         }
     }
 
-    impl CrankWorkInfo {
-        /// Convert a crank work info into an event with the given price point.
-        pub fn into_event(self, price_point: &PricePoint) -> Event {
+    /// CrankWorkInfo with a given price point
+    pub struct CrankWorkInfoEvent {
+        /// The work info itself
+        pub work_info: CrankWorkInfo,
+        /// A price point, i.e. the price point that triggered the work
+        pub price_point: PricePoint,
+    }
+
+    impl PerpEvent for CrankWorkInfoEvent {}
+    impl From<CrankWorkInfoEvent> for Event {
+        fn from(
+            CrankWorkInfoEvent {
+                work_info,
+                price_point,
+            }: CrankWorkInfoEvent,
+        ) -> Self {
             let mut event = Event::new("crank-work")
                 .add_attribute(
                     "kind",
-                    match self {
+                    match work_info {
                         CrankWorkInfo::CloseAllPositions { .. } => "close-all-positions",
                         CrankWorkInfo::ResetLpBalances { .. } => "reset-lp-balances",
                         CrankWorkInfo::Completed { .. } => "completed",
@@ -136,9 +149,12 @@ pub mod events {
                         CrankWorkInfo::LimitOrder { .. } => "limit-order",
                     },
                 )
-                .add_attribute("price-point-timestamp", price_point.timestamp.to_string());
+                // Keeping this for backwards-compat with indexer, though it should be deprecated
+                // and deserialized from price-point itself
+                .add_attribute("price-point-timestamp", price_point.timestamp.to_string())
+                .add_attribute("price-point", serde_json::to_string(&price_point).unwrap());
 
-            let (position_id, order_id) = match self {
+            let (position_id, order_id) = match work_info {
                 CrankWorkInfo::CloseAllPositions { position } => (Some(position), None),
                 CrankWorkInfo::ResetLpBalances {} => (None, None),
                 CrankWorkInfo::Completed {} => (None, None),
@@ -160,11 +176,9 @@ pub mod events {
 
             if let CrankWorkInfo::Liquidation {
                 liquidation_reason, ..
-            } = self
+            } = work_info
             {
-                event = event
-                    .add_attribute("price-point", serde_json::to_string(&price_point).unwrap())
-                    .add_attribute("liquidation-reason", liquidation_reason.to_string());
+                event = event.add_attribute("liquidation-reason", liquidation_reason.to_string());
             }
 
             if let Some(order_id) = order_id {
@@ -175,7 +189,7 @@ pub mod events {
         }
     }
 
-    impl TryFrom<Event> for CrankWorkInfo {
+    impl TryFrom<Event> for CrankWorkInfoEvent {
         type Error = anyhow::Error;
 
         fn try_from(evt: Event) -> anyhow::Result<Self> {
@@ -190,7 +204,7 @@ pub mod events {
                 }
             };
 
-            evt.map_attr_result("kind", |s| match s {
+            let work_info = evt.map_attr_result("kind", |s| match s {
                 "completed" => Ok(CrankWorkInfo::Completed {}),
                 "liquifunding" => Ok(CrankWorkInfo::Liquifunding {
                     position: get_position_id()?,
@@ -203,7 +217,21 @@ pub mod events {
                     order_id: OrderId::new(evt.u64_attr("order-id")?),
                 }),
                 _ => Err(PerpError::unimplemented().into()),
+            })?;
+
+            Ok(Self {
+                work_info,
+                price_point: evt.json_attr("price-point")?,
             })
+        }
+    }
+
+    // Not sure if this is needed anymore, but keeping it in for backwards compat at least
+    impl TryFrom<Event> for CrankWorkInfo {
+        type Error = anyhow::Error;
+
+        fn try_from(evt: Event) -> anyhow::Result<Self> {
+            CrankWorkInfoEvent::try_from(evt).map(|x| x.work_info)
         }
     }
 }

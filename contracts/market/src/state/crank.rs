@@ -2,7 +2,10 @@ use crate::state::*;
 use cosmwasm_std::Order;
 use cw_storage_plus::{Bound, PrefixBound};
 use msg::contracts::market::{
-    crank::{events::CrankExecBatchEvent, CrankWorkInfo},
+    crank::{
+        events::{CrankExecBatchEvent, CrankWorkInfoEvent},
+        CrankWorkInfo,
+    },
     position::{
         events::PositionSaveReason, ClosePositionInstructions, MaybeClosedPosition,
         PositionCloseReason,
@@ -186,8 +189,10 @@ impl State<'_> {
         work_info: CrankWorkInfo,
         price_point: &PricePoint,
     ) -> Result<()> {
-        ctx.response_mut()
-            .add_event(work_info.clone().into_event(price_point));
+        ctx.response_mut().add_event(CrankWorkInfoEvent {
+            work_info: work_info.clone(),
+            price_point: *price_point,
+        });
 
         // do the work
         match work_info {
