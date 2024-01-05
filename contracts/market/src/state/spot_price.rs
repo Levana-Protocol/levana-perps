@@ -384,7 +384,8 @@ impl State<'_> {
             .map_err(|err| err.into())
     }
 
-    // TODO - make volatile time non-optional in config instead of hardcoding a fallback here?
+    // the config `volatile_diff_seconds` value is optional for the sake of backwards-compatability
+    // if we ever migrate the storage such that it's always present, we can remove this function
     pub(crate) fn config_volatile_time(&self) -> u32 {
         const DEFAULT_VOLATILE_DIFF_SECONDS: u32 = 5;
 
