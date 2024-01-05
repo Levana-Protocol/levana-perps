@@ -661,8 +661,13 @@ impl MarketContract {
         }
     }
 
-    pub async fn get_oracle_price(&self) -> Result<OraclePriceResp, cosmos::Error> {
-        self.0.query(MarketQueryMsg::OraclePrice {}).await
+    pub async fn get_oracle_price(
+        &self,
+        validate_age: bool,
+    ) -> Result<OraclePriceResp, cosmos::Error> {
+        self.0
+            .query(MarketQueryMsg::OraclePrice { validate_age })
+            .await
     }
 
     pub async fn is_wound_down(&self) -> Result<bool, cosmos::Error> {
