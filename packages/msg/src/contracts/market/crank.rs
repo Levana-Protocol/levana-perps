@@ -181,6 +181,23 @@ pub mod events {
                 event = event.add_attribute("liquidation-reason", liquidation_reason.to_string());
             }
 
+            if let CrankWorkInfo::DeferredExec {
+                deferred_exec_id,
+                target,
+            } = work_info
+            {
+                event = event
+                    .add_attribute("deferred-exec-id", deferred_exec_id.to_string())
+                    .add_attribute(
+                        "deferred-exec-target",
+                        match target {
+                            DeferredExecTarget::DoesNotExist => "not-exist",
+                            DeferredExecTarget::Position { .. } => "position",
+                            DeferredExecTarget::Order { .. } => "order",
+                        },
+                    );
+            }
+
             if let Some(order_id) = order_id {
                 event = event.add_attribute("order-id", order_id.to_string());
             }
@@ -195,6 +212,8 @@ pub mod events {
         fn try_from(evt: Event) -> anyhow::Result<Self> {
             let get_position_id =
                 || -> anyhow::Result<PositionId> { Ok(PositionId::new(evt.u64_attr("pos-id")?)) };
+            let get_order_id =
+                || -> anyhow::Result<OrderId> { Ok(OrderId::new(evt.u64_attr("order-id")?)) };
 
             let get_liquidation_reason = || -> anyhow::Result<LiquidationReason> {
                 match evt.string_attr("liquidation-reason")?.as_str() {
@@ -214,8 +233,27 @@ pub mod events {
                     liquidation_reason: get_liquidation_reason()?,
                 }),
                 "limit-order" => Ok(CrankWorkInfo::LimitOrder {
-                    order_id: OrderId::new(evt.u64_attr("order-id")?),
+                    order_id: get_order_id()?,
                 }),
+                "close-all-positions" => Ok(CrankWorkInfo::CloseAllPositions {
+                    position: get_position_id()?,
+                }),
+                "reset-lp-balances" => Ok(CrankWorkInfo::ResetLpBalances {}),
+                "deferred-exec" => Ok(CrankWorkInfo::DeferredExec {
+                    deferred_exec_id: DeferredExecId::from_u64(evt.u64_attr("deferred-exec-id")?),
+                    target: evt.map_attr_result(
+                        "deferred-exec-target",
+                        |x| -> Result<DeferredExecTarget> {
+                            match x {
+                                "not-exist" => Ok(DeferredExecTarget::DoesNotExist),
+                                "position" => get_position_id().map(DeferredExecTarget::Position),
+                                "order" => get_order_id().map(DeferredExecTarget::Order),
+                                _ => Err(PerpError::unimplemented().into()),
+                            }
+                        },
+                    )?,
+                }),
+
                 _ => Err(PerpError::unimplemented().into()),
             })?;
 
