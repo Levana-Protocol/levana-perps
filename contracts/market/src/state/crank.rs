@@ -186,7 +186,6 @@ impl State<'_> {
         work_info: CrankWorkInfo,
         price_point: &PricePoint,
     ) -> Result<()> {
-        // get our current playhead time and price for liquidations
         ctx.response_mut()
             .add_event(work_info.clone().into_event(price_point));
 
