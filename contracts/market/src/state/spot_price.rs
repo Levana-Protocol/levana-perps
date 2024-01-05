@@ -384,6 +384,20 @@ impl State<'_> {
             .map_err(|err| err.into())
     }
 
+    // TODO - make volatile time non-optional in config instead of hardcoding a fallback here?
+    pub(crate) fn config_volatile_time(&self) -> u32 {
+        const DEFAULT_VOLATILE_DIFF_SECONDS: u32 = 5;
+
+        match self.config.spot_price {
+            SpotPriceConfig::Manual { .. } => None,
+            SpotPriceConfig::Oracle {
+                volatile_diff_seconds,
+                ..
+            } => volatile_diff_seconds,
+        }
+        .unwrap_or(DEFAULT_VOLATILE_DIFF_SECONDS)
+    }
+
     pub(crate) fn spot_price_append(&self, ctx: &mut StateContext) -> Result<()> {
         let market_id = self.market_id(ctx.storage)?;
 
@@ -399,14 +413,11 @@ impl State<'_> {
                 stride: _,
                 feeds,
                 feeds_usd,
-                volatile_diff_seconds,
+                volatile_diff_seconds: _,
             } => {
                 let internal = self.get_oracle_price(true)?;
-                const DEFAULT_VOLATILE_DIFF_SECONDS: u32 = 5;
                 let new_publish_time = internal
-                    .calculate_publish_time(
-                        volatile_diff_seconds.unwrap_or(DEFAULT_VOLATILE_DIFF_SECONDS),
-                    )?
+                    .calculate_publish_time(self.config_volatile_time())?
                     .ok_or(MarketError::NoPricePublishTimeFound.into_anyhow())?;
                 // self.now() usage is OK, it's explicitly for saving the block time in storage
                 let price_storage =

@@ -132,7 +132,7 @@ pub(crate) async fn get_latest_price(
         } => (feeds, volatile_diff_seconds.unwrap_or(5)),
     };
 
-    let oracle_price = match market.market.get_oracle_price().await {
+    let oracle_price = match market.market.get_oracle_price(false).await {
         Ok(oracle_price) => oracle_price,
         Err(e) => {
             return if format!("{e:?}").contains("no_price_found") {

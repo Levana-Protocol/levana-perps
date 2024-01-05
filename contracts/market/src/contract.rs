@@ -457,20 +457,24 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             SpotPriceHistoryResp { price_points }.query_result()
         }
 
-        QueryMsg::OraclePrice {} => match state.config.spot_price.clone() {
+        QueryMsg::OraclePrice { validate_age } => match state.config.spot_price.clone() {
             SpotPriceConfig::Manual { .. } => {
                 bail!("there is no oracle for this market, it uses a manual price instead");
             }
             SpotPriceConfig::Oracle {
                 feeds, feeds_usd, ..
             } => {
-                let oracle_price = state.get_oracle_price(false)?;
+                let oracle_price = state.get_oracle_price(validate_age)?;
                 let market_id = state.market_id(store)?;
                 let price_storage =
                     oracle_price.compose_price(market_id, &feeds, &feeds_usd, state.now())?;
 
                 let oracle_publish_time = oracle_price
-                    .calculate_publish_time(u32::MAX)?
+                    .calculate_publish_time(if validate_age {
+                        state.config_volatile_time()
+                    } else {
+                        u32::MAX
+                    })?
                     .context("couldn't get an oracle price (no-volatile)")?;
 
                 let price_point =
