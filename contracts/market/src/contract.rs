@@ -468,7 +468,13 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 let market_id = state.market_id(store)?;
                 let price_storage =
                     oracle_price.compose_price(market_id, &feeds, &feeds_usd, state.now())?;
-                let price_point = state.make_price_point(store, state.now(), price_storage)?;
+
+                let oracle_publish_time = oracle_price
+                    .calculate_publish_time(u32::MAX)?
+                    .context("couldn't get an oracle price (no-volatile)")?;
+
+                let price_point =
+                    state.make_price_point(store, oracle_publish_time, price_storage)?;
                 OraclePriceResp {
                     pyth: oracle_price.pyth,
                     sei: oracle_price.sei,

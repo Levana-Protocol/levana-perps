@@ -63,7 +63,10 @@ impl OraclePriceInternal {
     /// Calculate the publish time for this feed, ensuring we don't violate the volitile diff rule.
     ///
     /// Returns `Ok(None)` if there are no volatile feeds with a publish time.
-    fn calculate_publish_time(&self, volatile_diff_seconds: u32) -> Result<Option<Timestamp>> {
+    pub(crate) fn calculate_publish_time(
+        &self,
+        volatile_diff_seconds: u32,
+    ) -> Result<Option<Timestamp>> {
         let mut oldest_newest = None::<(Timestamp, Timestamp)>;
 
         let mut add_new_timestamp = |timestamp| {
