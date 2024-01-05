@@ -93,7 +93,7 @@ impl State<'_> {
             .into_signed()
             .checked_add(exposure)?
             .checked_sub(delta_neutrality_fee)?
-            .try_into_positive_value()
+            .try_into_non_negative_value()
             .with_context(|| {
                 format!(
                     "close_position: negative active collateral: {} with exposure {}",
@@ -105,7 +105,7 @@ impl State<'_> {
             .counter_collateral
             .into_signed()
             .checked_sub(exposure)?
-            .try_into_positive_value()
+            .try_into_non_negative_value()
             .with_context(|| {
                 format!(
                     "close_position: negative counter collateral: {} with exposure {}",

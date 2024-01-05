@@ -123,11 +123,11 @@ impl State<'_> {
             BorrowFees {
                 lp: lp_rate
                     .value
-                    .try_into_positive_value()
+                    .try_into_non_negative_value()
                     .context("lp_rate is negative")?,
                 xlp: xlp_rate
                     .value
-                    .try_into_positive_value()
+                    .try_into_non_negative_value()
                     .context("xlp_rate is negative")?,
             },
         ))
@@ -175,7 +175,7 @@ impl State<'_> {
             .into_number()
             .checked_add(rate_delta)?;
         let total_rate = calculated_rate
-            .try_into_positive_value()
+            .try_into_non_negative_value()
             .and_then(NonZero::new)
             .map_or(
                 self.config.borrow_fee_rate_min_annualized,

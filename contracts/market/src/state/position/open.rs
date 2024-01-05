@@ -99,8 +99,6 @@ impl State<'_> {
         let pos_id = PositionId::new(last_pos_id.u64() + 1);
 
         let liquifunded_at = price_point.timestamp;
-        let next_liquifunding =
-            liquifunded_at.plus_seconds(config.liquifunding_delay_seconds.into());
 
         // Initial position, before taking out any trading fees
         let mut pos = Position {
@@ -123,7 +121,8 @@ impl State<'_> {
             created_at: self.now(),
             price_point_created_at: Some(price_point.timestamp),
             liquifunded_at,
-            next_liquifunding,
+            // just temporarily setting _something_ here, it will be overwritten right away in `set_next_liquifunding`
+            next_liquifunding: liquifunded_at,
             stop_loss_override,
             take_profit_override,
             liquidation_margin: LiquidationMargin::default(),

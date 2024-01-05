@@ -63,7 +63,7 @@ pub trait UnsignedDecimal:
     fn checked_add_signed(self, rhs: Signed<Self>) -> Result<Self> {
         self.into_signed()
             .checked_add(rhs)?
-            .try_into_positive_value()
+            .try_into_non_negative_value()
             .with_context(|| format!("{self} + {rhs}"))
     }
 
@@ -370,7 +370,7 @@ impl<T: UnsignedDecimal> Signed<T> {
     }
 
     /// If the value is positive or zero, return the inner `T`. Otherwise return `None`.
-    pub fn try_into_positive_value(self) -> Option<T> {
+    pub fn try_into_non_negative_value(self) -> Option<T> {
         if self.is_negative() {
             None
         } else {
@@ -380,7 +380,7 @@ impl<T: UnsignedDecimal> Signed<T> {
 
     /// Try to convert into a non-zero value
     pub fn try_into_non_zero(self) -> Option<NonZero<T>> {
-        self.try_into_positive_value().and_then(NonZero::new)
+        self.try_into_non_negative_value().and_then(NonZero::new)
     }
 }
 
@@ -594,7 +594,7 @@ impl<T: UnsignedDecimal> NonZero<T> {
 
     /// Try to convert a signed value into a non-zero.
     pub fn try_from_signed(src: Signed<T>) -> Result<Self> {
-        src.try_into_positive_value()
+        src.try_into_non_negative_value()
             .and_then(NonZero::new)
             .with_context(|| format!("Could not converted signed value {src} into NonZero"))
     }

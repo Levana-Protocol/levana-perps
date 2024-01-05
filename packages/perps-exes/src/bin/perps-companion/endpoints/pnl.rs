@@ -276,7 +276,7 @@ impl PositionInfo {
             },
             pnl_percentage: match pnl_type {
                 PnlType::Usd => None,
-                _ => match deposit_collateral_usd.try_into_positive_value() {
+                _ => match deposit_collateral_usd.try_into_non_negative_value() {
                     None => None,
                     Some(deposit) => {
                         let percent = pos.pnl_usd.into_number() / deposit.into_number()
