@@ -2320,14 +2320,14 @@ impl DeferResponse {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DeferQueueResponse {
     pub event: DeferredExecQueuedEvent,
     pub value: DeferredExecWithStatus,
     pub response: AppResponse,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PriceResponse {
     pub base: AppResponse,
     // will be identical to the response for `base` for manual prices
