@@ -11,7 +11,7 @@ impl State<'_> {
         let max_allowed_leverage = self
             .config
             .max_leverage
-            .try_into_positive_value()
+            .try_into_non_negative_value()
             .context("Max allowed leverage is negative")?;
         let current_leverage =
             current_leverage.map(|x| x.into_base(market_type).split().1.into_decimal256());

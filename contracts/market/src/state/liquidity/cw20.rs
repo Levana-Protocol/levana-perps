@@ -608,7 +608,7 @@ impl State<'_> {
             LiquidityTokenKind::Xlp => &mut addr_stats.xlp,
         };
         let new_balance = Signed::from(*m).checked_add(delta)?;
-        *m = match new_balance.try_into_positive_value() {
+        *m = match new_balance.try_into_non_negative_value() {
             None => {
                 return Err(perp_anyhow!(
                     ErrorId::Cw20Funds,

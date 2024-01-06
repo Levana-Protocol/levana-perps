@@ -101,12 +101,12 @@ impl State<'_> {
         let lp = LP_BORROW_FEE_DATA_SERIES
             .try_load_last(ctx.storage)?
             .map_or(Number::ZERO, |x| x.1.value)
-            .try_into_positive_value()
+            .try_into_non_negative_value()
             .context("LP_BORROW_FEE_DATA_SERIES gave a negative value")?;
         let xlp = XLP_BORROW_FEE_DATA_SERIES
             .try_load_last(ctx.storage)?
             .map_or(Number::ZERO, |x| x.1.value)
-            .try_into_positive_value()
+            .try_into_non_negative_value()
             .context("XLP_BORROW_FEE_DATA_SERIES gave a negative value")?;
         anyhow::ensure!(
             !lp.is_zero() || !xlp.is_zero(),

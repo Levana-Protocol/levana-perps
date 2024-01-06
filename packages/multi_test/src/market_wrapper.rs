@@ -477,7 +477,7 @@ impl PerpsMarket {
     pub fn make_msg_with_funds(&self, msg: &MarketExecuteMsg, amount: Number) -> Result<WasmMsg> {
         let amount = Collateral::from_decimal256(
             amount
-                .try_into_positive_value()
+                .try_into_non_negative_value()
                 .context("funds must be positive!")?,
         );
 
@@ -1395,7 +1395,7 @@ impl PerpsMarket {
         let msg = self.token.into_market_execute_msg(
             &self.addr,
             collateral_delta
-                .try_into_positive_value()
+                .try_into_non_negative_value()
                 .unwrap_or_default(),
             if collateral_delta.is_negative() {
                 MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage {
@@ -1423,7 +1423,7 @@ impl PerpsMarket {
         let msg = self.token.into_market_execute_msg(
             &self.addr,
             collateral_delta
-                .try_into_positive_value()
+                .try_into_non_negative_value()
                 .unwrap_or_default(),
             if collateral_delta.is_negative() {
                 MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize {

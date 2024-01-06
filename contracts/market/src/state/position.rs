@@ -526,7 +526,6 @@ impl State<'_> {
             start_price,
             spot_price,
             entry_price.price_notional,
-            &spot_price,
             config,
             market_type,
             original_direction_to_base,

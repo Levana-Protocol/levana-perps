@@ -218,6 +218,7 @@ impl State<'_> {
         stats.last_accrue_key = self.latest_yield_per_token(ctx.storage)?.0;
 
         stats.unstaking = None;
+        stats.cooldown_ends = None;
         self.save_liquidity_stats_addr(ctx.storage, &addr, &stats)?;
 
         // And we're done! Move on.

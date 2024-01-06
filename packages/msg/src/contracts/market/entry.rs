@@ -462,7 +462,13 @@ pub enum QueryMsg {
     /// This may be more up-to-date than the spot price which was
     /// validated and pushed into the contract storage via execution messages
     #[returns(OraclePriceResp)]
-    OraclePrice {},
+    OraclePrice {
+        /// If true then it will validate the publish_time age as though it were
+        /// used to push a new spot_price update
+        /// Otherwise, it just returns the oracle price as-is, even if it's old
+        #[serde(default)]
+        validate_age: bool,
+    },
 
     /// * returns [super::position::PositionsResp]
     ///
