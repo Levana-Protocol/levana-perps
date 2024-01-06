@@ -11,7 +11,7 @@ impl State<'_> {
         let max_allowed_leverage = self
             .config
             .max_leverage
-            .try_into_positive_value()
+            .try_into_non_negative_value()
             .context("Max allowed leverage is negative")?;
         let current_leverage =
             current_leverage.map(|x| x.into_base(market_type).split().1.into_decimal256());
@@ -121,10 +121,9 @@ impl State<'_> {
     /// Ensure we meet the requirements for minimum deposit collateral
     pub(crate) fn validate_minimum_deposit_collateral(
         &self,
-        store: &dyn Storage,
         deposit_collateral: Collateral,
+        price_point: &PricePoint,
     ) -> Result<()> {
-        let price_point = self.spot_price(store, None)?;
         let deposit = price_point.collateral_to_usd(deposit_collateral);
 
         // We allow up to a 10% dip on the minimum deposit to allow for price fluctuations.
@@ -147,134 +146,19 @@ impl State<'_> {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn validate_order_price(
-        &self,
-        order_price: Price,
-        order_price_base: PriceBaseInQuote,
-        lower_bound: Option<Price>,
-        lower_bound_base: Option<PriceBaseInQuote>,
-        upper_bound: Option<Price>,
-        upper_bound_base: Option<PriceBaseInQuote>,
-        market_type: MarketType,
-        trigger_type: TriggerType,
-    ) -> Result<()> {
-        let (lower_bound_comparison, upper_bound_comparison) = match market_type {
-            MarketType::CollateralIsQuote => {
-                (TriggerPriceMustBe::Greater, TriggerPriceMustBe::Less)
-            }
-            MarketType::CollateralIsBase => (TriggerPriceMustBe::Less, TriggerPriceMustBe::Greater),
-        };
-
-        if let Some(lower_bound) = lower_bound {
-            if order_price <= lower_bound {
-                return Err(MarketError::InvalidTriggerPrice {
-                    specified: order_price_base,
-                    bound: lower_bound_base
-                        .ok_or_else(|| anyhow!("no external lower bound provided"))?,
-                    must_be: lower_bound_comparison,
-                    trigger_type,
-                }
-                .into_anyhow());
-            }
-        }
-
-        if let Some(upper_bound) = upper_bound {
-            if order_price >= upper_bound {
-                return Err(MarketError::InvalidTriggerPrice {
-                    specified: order_price_base,
-                    bound: upper_bound_base
-                        .ok_or_else(|| anyhow!("no external upper bound provided"))?,
-                    must_be: upper_bound_comparison,
-                    trigger_type,
-                }
-                .into_anyhow());
-            }
-        }
-
-        Ok(())
-    }
-
-    pub(crate) fn position_validate_trigger_orders(
-        &self,
-        pos: &Position,
-        market_type: MarketType,
-        current_price: PricePoint,
-    ) -> Result<()> {
-        if let Some(stop_loss_override) = pos.stop_loss_override {
-            match pos.direction() {
-                DirectionToNotional::Long => {
-                    self.validate_order_price(
-                        stop_loss_override.into_notional_price(market_type),
-                        stop_loss_override,
-                        pos.liquidation_price,
-                        pos.liquidation_price
-                            .map(|price| price.into_base_price(market_type)),
-                        Some(current_price.price_notional),
-                        Some(current_price.price_base),
-                        market_type,
-                        TriggerType::StopLoss,
-                    )?;
-                }
-                DirectionToNotional::Short => {
-                    self.validate_order_price(
-                        stop_loss_override.into_notional_price(market_type),
-                        stop_loss_override,
-                        Some(current_price.price_notional),
-                        Some(current_price.price_base),
-                        pos.liquidation_price,
-                        pos.liquidation_price
-                            .map(|price| price.into_base_price(market_type)),
-                        market_type,
-                        TriggerType::StopLoss,
-                    )?;
-                }
-            }
-        }
-
-        if let Some(take_profit_override) = pos.take_profit_override {
-            match pos.direction() {
-                DirectionToNotional::Long => self.validate_order_price(
-                    take_profit_override.into_notional_price(market_type),
-                    take_profit_override,
-                    Some(current_price.price_notional),
-                    Some(current_price.price_base),
-                    pos.take_profit_price,
-                    pos.take_profit_price
-                        .map(|price| price.into_base_price(market_type)),
-                    market_type,
-                    TriggerType::TakeProfit,
-                )?,
-                DirectionToNotional::Short => self.validate_order_price(
-                    take_profit_override.into_notional_price(market_type),
-                    take_profit_override,
-                    pos.take_profit_price,
-                    pos.take_profit_price
-                        .map(|price| price.into_base_price(market_type)),
-                    Some(current_price.price_notional),
-                    Some(current_price.price_base),
-                    market_type,
-                    TriggerType::TakeProfit,
-                )?,
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn do_slippage_assert(
+    pub(crate) fn do_slippage_assert(
         &self,
         store: &dyn Storage,
         slippage_assert: SlippageAssert,
         delta_notional_size: Signed<Notional>,
         market_type: MarketType,
         delta_neutrality_fee_margin: Option<Collateral>,
+        price_point: &PricePoint,
     ) -> Result<()> {
         if delta_notional_size.is_zero() {
             return Ok(());
         }
 
-        let price_point = self.spot_price(store, None)?;
         let delta_neutrality_fee = self.calc_delta_neutrality_fee(
             store,
             delta_notional_size,

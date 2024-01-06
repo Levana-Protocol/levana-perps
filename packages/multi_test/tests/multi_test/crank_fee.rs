@@ -1,4 +1,6 @@
-use crate::prelude::*;
+use cosmwasm_std::Addr;
+use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, time::TimeJump, PerpsApp};
+use msg::{contracts::market::config::ConfigUpdate, prelude::*};
 
 fn enable_crank_fee(market: &PerpsMarket) -> anyhow::Result<()> {
     market.exec_set_config(ConfigUpdate {
@@ -27,7 +29,7 @@ fn crank_fee_is_charged_and_paid() {
         Collateral::zero()
     );
 
-    // Open a position. We still don't have any crank fees, that will happen after we liquifund.
+    // Open a position. We need to pay an initial deferred execution crank fee.
     let (pos_id, _) = market
         .exec_open_position(
             &trader,
@@ -40,10 +42,17 @@ fn crank_fee_is_charged_and_paid() {
             None,
         )
         .unwrap();
-    assert_eq!(market.query_fees().unwrap().crank, Collateral::zero());
+    let price = market.query_current_price().unwrap();
+    let config = market.query_config().unwrap();
+    let crank_fee_charged = price.usd_to_collateral(config.crank_fee_charged);
+    let crank_fee_reward = price.usd_to_collateral(config.crank_fee_reward);
+    assert_eq!(
+        market.query_fees().unwrap().crank,
+        crank_fee_charged - crank_fee_reward
+    );
     assert_eq!(
         market.query_position(pos_id).unwrap().crank_fee_collateral,
-        Collateral::zero()
+        crank_fee_charged
     );
 
     // Cranking with liquifunding should charge a crank fee and allocate to the cranker
@@ -60,11 +69,10 @@ fn crank_fee_is_charged_and_paid() {
     market.exec_crank_till_finished(&cranker).unwrap();
     let fees_after_crank = market.query_fees().unwrap().crank;
     let crank_fees_pending = market.query_lp_info(&cranker).unwrap().available_yield;
-    let config = market.query_config().unwrap();
     assert_eq!(
         // our current collateral-to-usd price is 1, so just compare directly
         (fees_after_crank + crank_fees_pending).into_decimal256(),
-        config.crank_fee_charged.into_decimal256(),
+        config.crank_fee_charged.into_decimal256() + crank_fee_charged.into_decimal256() - crank_fee_reward.into_decimal256(),
         "fees_after_crank: {fees_after_crank}. crank_fees_pending: {crank_fees_pending}. charged: {}", config.crank_fee_charged
     );
     // The cranking above did multiple operations, not just our liquifunding. Therefore we check that we have _at least_ the reward amount.
@@ -102,6 +110,7 @@ fn crank_fee_is_charged_and_paid() {
             .unwrap()
             .crank_fee_charged
             .into_decimal256()
+            * Decimal256::two()
     );
 }
 
@@ -219,10 +228,17 @@ fn crank_fee_to_rewards_wallet() {
             None,
         )
         .unwrap();
-    assert_eq!(market.query_fees().unwrap().crank, Collateral::zero());
+
+    let config = market.query_config().unwrap();
+    let price = market.query_current_price().unwrap();
+
+    assert_eq!(
+        market.query_fees().unwrap().crank,
+        price.usd_to_collateral(config.crank_fee_charged - config.crank_fee_reward)
+    );
     assert_eq!(
         market.query_position(pos_id).unwrap().crank_fee_collateral,
-        Collateral::zero()
+        price.usd_to_collateral(config.crank_fee_charged)
     );
 
     // Cranking with liquifunding should charge a crank fee and allocate to the cranker
@@ -251,7 +267,7 @@ fn crank_fee_to_rewards_wallet() {
     assert_eq!(
         // our current collateral-to-usd price is 1, so just compare directly
         (fees_after_crank + crank_fees_pending).into_decimal256(),
-        config.crank_fee_charged.into_decimal256(),
+        config.crank_fee_charged.into_decimal256() + config.crank_fee_charged.into_decimal256() - config.crank_fee_reward.into_decimal256(),
         "fees_after_crank: {fees_after_crank}. crank_fees_pending: {crank_fees_pending}. charged: {}", config.crank_fee_charged
     );
     // The cranking above did multiple operations, not just our liquifunding. Therefore we check that we have _at least_ the reward amount.
@@ -267,14 +283,4 @@ fn crank_fee_to_rewards_wallet() {
         cranker_balance_after_crank,
         crank_fees_pending.into_number()
     );
-}
-
-#[test]
-fn price_update_completes_price() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-
-    market.exec_set_price("5".parse().unwrap()).unwrap();
-
-    let status = market.query_status().unwrap();
-    assert_eq!(status.next_crank, None);
 }

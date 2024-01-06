@@ -78,6 +78,11 @@ pub(crate) enum TestnetSub {
         #[clap(flatten)]
         inner: crate::testnet::update_market_configs::UpdateMarketConfigsOpt,
     },
+    /// Sync config against the local config
+    SyncConfig {
+        #[clap(flatten)]
+        inner: crate::testnet::sync_config::SyncConfigOpts,
+    },
 }
 
 #[derive(clap::Parser)]

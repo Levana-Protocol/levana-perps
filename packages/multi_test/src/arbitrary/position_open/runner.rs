@@ -1,6 +1,5 @@
-use crate::market_wrapper::PerpsMarket;
+use crate::market_wrapper::{DeferResponse, PerpsMarket};
 use anyhow::Result;
-use cw_multi_test::AppResponse;
 use msg::contracts::market::position::PositionId;
 
 use super::data::PositionOpen;
@@ -13,7 +12,7 @@ impl OpenExpect {
     pub fn validate(
         &self,
         market: &PerpsMarket,
-        res: Result<(PositionId, AppResponse)>,
+        res: Result<(PositionId, DeferResponse)>,
     ) -> Result<()> {
         match self {
             Self::Success => {

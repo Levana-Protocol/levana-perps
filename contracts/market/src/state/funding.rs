@@ -123,11 +123,11 @@ impl State<'_> {
             BorrowFees {
                 lp: lp_rate
                     .value
-                    .try_into_positive_value()
+                    .try_into_non_negative_value()
                     .context("lp_rate is negative")?,
                 xlp: xlp_rate
                     .value
-                    .try_into_positive_value()
+                    .try_into_non_negative_value()
                     .context("xlp_rate is negative")?,
             },
         ))
@@ -136,14 +136,16 @@ impl State<'_> {
     pub(crate) fn derive_instant_borrow_fee_rate_annual(
         &self,
         store: &dyn Storage,
+        price_point: &PricePoint,
     ) -> Result<BorrowFees> {
         // See section 5.5 of the whitepaper
 
         let (previous_rate_time, previous_rate) = self.get_current_borrow_fee_rate_annual(store)?;
-        let now = self.now();
-        let nanos_since_last_rate = if previous_rate_time < now {
-            (now.checked_sub(previous_rate_time, "derive_instant_borrow_fee_rate_annual")?)
-                .as_nanos()
+        let nanos_since_last_rate = if previous_rate_time < price_point.timestamp {
+            (price_point
+                .timestamp
+                .checked_sub(previous_rate_time, "derive_instant_borrow_fee_rate_annual")?)
+            .as_nanos()
         } else {
             0
         };
@@ -173,7 +175,7 @@ impl State<'_> {
             .into_number()
             .checked_add(rate_delta)?;
         let total_rate = calculated_rate
-            .try_into_positive_value()
+            .try_into_non_negative_value()
             .and_then(NonZero::new)
             .map_or(
                 self.config.borrow_fee_rate_min_annualized,
@@ -286,9 +288,10 @@ impl State<'_> {
     pub(crate) fn accumulate_funding_rate(
         &self,
         ctx: &mut StateContext,
-        time: Timestamp,
+        price_point: &PricePoint,
     ) -> Result<()> {
-        let spot_price = self.spot_price(ctx.storage, Some(time))?.price_notional;
+        let time = price_point.timestamp;
+        let spot_price = price_point.price_notional;
 
         let (long_rate, short_rate) = self.derive_instant_funding_rate_annual(ctx.storage)?;
         LONG_RF_PRICE_PREFIX_SUM.append(ctx.storage, time, long_rate * spot_price.into_number())?;
@@ -330,6 +333,8 @@ impl State<'_> {
             "Initial borrow rate must be at most maximum rate"
         );
 
+        // Usage of self.now() is acceptable here, it's only used for
+        // initializing data structures during contract instantiation.
         LP_BORROW_FEE_DATA_SERIES.append(ctx.storage, self.now(), initial_rate.into())?;
         XLP_BORROW_FEE_DATA_SERIES.append(ctx.storage, self.now(), Number::ZERO)
     }
@@ -337,29 +342,31 @@ impl State<'_> {
     pub(crate) fn accumulate_borrow_fee_rate(
         &self,
         ctx: &mut StateContext,
-        time: Timestamp,
+        price_point: &PricePoint,
     ) -> Result<()> {
         let rate = self
-            .derive_instant_borrow_fee_rate_annual(ctx.storage)
+            .derive_instant_borrow_fee_rate_annual(ctx.storage, price_point)
             .context("derive_instant_borrow_fee_rate_annual")?;
 
-        LP_BORROW_FEE_DATA_SERIES.append(ctx.storage, time, rate.lp.into_number())?;
-        XLP_BORROW_FEE_DATA_SERIES.append(ctx.storage, time, rate.xlp.into_number())?;
+        LP_BORROW_FEE_DATA_SERIES.append(
+            ctx.storage,
+            price_point.timestamp,
+            rate.lp.into_number(),
+        )?;
+        XLP_BORROW_FEE_DATA_SERIES.append(
+            ctx.storage,
+            price_point.timestamp,
+            rate.xlp.into_number(),
+        )?;
 
         ctx.response.add_event(BorrowFeeChangeEvent {
-            time,
+            time: price_point.timestamp,
             total_rate: rate.lp.checked_add(rate.xlp)?,
             lp_rate: rate.lp,
             xlp_rate: rate.xlp,
         });
 
         Ok(())
-    }
-
-    pub(crate) fn funding_valid_until(&self, store: &dyn Storage) -> Result<Timestamp> {
-        Ok(self
-            .next_crank_timestamp(store)?
-            .map_or(self.now(), |price_point| price_point.timestamp))
     }
 
     /// Calculate the capped borrow fee amount to be paid.
@@ -412,10 +419,14 @@ impl State<'_> {
         pos: &Position,
         starts_at: Timestamp,
         ends_at: Timestamp,
+        is_query: bool,
     ) -> Result<(Signed<Collateral>, Option<InsufficientMarginEvent>)> {
-        let funding_ends_at = self.funding_valid_until(store)?.min(ends_at);
-        let uncapped_signed =
-            self.calculate_funding_payment(store, pos, starts_at, funding_ends_at)?;
+        debug_assert!(
+            ends_at <= pos.next_liquifunding || is_query,
+            "calc_capped_funding_payment: ends_at {ends_at} greater than next_liquifunding {}",
+            pos.next_liquifunding
+        );
+        let uncapped_signed = self.calculate_funding_payment(store, pos, starts_at, ends_at)?;
 
         // If negative or zero, position doesn't have to pay, so we can't have hit our cap.
         let uncapped = match NonZero::try_from_signed(uncapped_signed).ok() {
@@ -444,8 +455,8 @@ impl State<'_> {
         ctx: &mut StateContext,
         pos: &Position,
         price_point: &PricePoint,
+        uncapped_usd: Usd,
     ) -> Result<(Collateral, Usd)> {
-        let uncapped_usd = self.config.crank_fee_charged;
         let uncapped = price_point.usd_to_collateral(uncapped_usd);
         let uncapped = match NonZero::new(uncapped) {
             Some(uncapped) => uncapped,
@@ -481,7 +492,7 @@ impl State<'_> {
         ends_at: Timestamp,
         charge_crank_fee: bool,
     ) -> Result<MaybeClosedPosition> {
-        let price = self.spot_price(ctx.storage, None)?;
+        let price = self.spot_price(ctx.storage, ends_at)?;
 
         let (borrow_fee_timeslice_owed, event) =
             self.calc_capped_borrow_fee_payment(ctx.storage, &position, starts_at, ends_at)?;
@@ -490,7 +501,7 @@ impl State<'_> {
         }
 
         let (funding_timeslice_owed, event) =
-            self.calc_capped_funding_payment(ctx.storage, &position, starts_at, ends_at)?;
+            self.calc_capped_funding_payment(ctx.storage, &position, starts_at, ends_at, false)?;
         if let Some(event) = event {
             ctx.response_mut().add_event(event);
         }
@@ -521,7 +532,8 @@ impl State<'_> {
         });
 
         let crank_fee_charged = if charge_crank_fee {
-            let (crank_fee, crank_fee_usd) = self.cap_crank_fee(ctx, &position, &price)?;
+            let (crank_fee, crank_fee_usd) =
+                self.cap_crank_fee(ctx, &position, &price, self.config.crank_fee_charged)?;
             self.collect_crank_fee(
                 ctx,
                 TradeId::Position(position.id),
@@ -571,13 +583,13 @@ impl State<'_> {
                         );
                     }
                     // Nothing better to do here, just provide a tiny amount of active collateral.
-                    position.active_collateral = "0.0001".parse().unwrap();
+                    position.active_collateral = "0.000000001".parse().unwrap();
                     MaybeClosedPosition::Close(ClosePositionInstructions {
                         pos: position,
                         exposure: Signed::<Collateral>::zero(),
-                        close_time: ends_at,
-                        settlement_time: ends_at,
+                        settlement_price: price,
                         reason: PositionCloseReason::Liquidated(LiquidationReason::Liquidated),
+                        closed_during_liquifunding: true,
                     })
                 }
             },

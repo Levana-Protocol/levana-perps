@@ -11,6 +11,7 @@ pub mod response;
 pub mod arbitrary;
 pub mod contracts;
 pub mod rewards_helpers;
+pub mod simple_oracle;
 pub mod time;
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -46,6 +47,8 @@ pub struct PerpsApp {
     pub factory_addr: Addr,
     pub log_block_time_changes: bool,
     pub rewards_addr: Addr,
+    pub simple_oracle_addr: Addr,
+    pub simple_oracle_usd_addr: Addr,
 }
 
 impl Deref for PerpsApp {
@@ -73,6 +76,7 @@ pub(crate) enum PerpsContract {
     Cw20,
     Rewards,
     Farming,
+    SimpleOracle,
 }
 
 impl PerpsApp {
@@ -91,6 +95,7 @@ impl PerpsApp {
         let liquidity_token_code_id = app.store_code(contract_liquidity_token());
         let rewards_code_id = app.store_code(contract_rewards());
         let farming_code_id = app.store_code(contract_farming());
+        let simple_oracle_code_id = app.store_code(contract_simple_oracle());
 
         let factory_addr = app.instantiate_contract(
             factory_code_id,
@@ -127,6 +132,27 @@ impl PerpsApp {
             Some(TEST_CONFIG.migration_admin.clone()),
         )?;
 
+        let simple_oracle_addr = app.instantiate_contract(
+            simple_oracle_code_id,
+            Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &simple_oracle::InstantiateMsg {
+                owner: TEST_CONFIG.protocol_owner.clone().into(),
+            },
+            &[],
+            "rewards",
+            Some(TEST_CONFIG.migration_admin.clone()),
+        )?;
+        let simple_oracle_usd_addr = app.instantiate_contract(
+            simple_oracle_code_id,
+            Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &simple_oracle::InstantiateMsg {
+                owner: TEST_CONFIG.protocol_owner.clone().into(),
+            },
+            &[],
+            "rewards",
+            Some(TEST_CONFIG.migration_admin.clone()),
+        )?;
+
         let mut _self = PerpsApp {
             code_ids: [
                 (PerpsContract::Factory, factory_code_id),
@@ -136,6 +162,8 @@ impl PerpsApp {
                 (PerpsContract::LiquidityToken, liquidity_token_code_id),
                 (PerpsContract::Rewards, rewards_code_id),
                 (PerpsContract::Farming, farming_code_id),
+                (PerpsContract::Farming, farming_code_id),
+                (PerpsContract::SimpleOracle, simple_oracle_code_id),
             ]
             .into(),
             app,
@@ -145,6 +173,8 @@ impl PerpsApp {
             users: HashSet::new(),
             log_block_time_changes: false,
             rewards_addr,
+            simple_oracle_addr,
+            simple_oracle_usd_addr,
         };
 
         Ok(_self)
@@ -302,11 +332,14 @@ pub(crate) fn contract_cw20() -> Box<dyn Contract<Empty>> {
 }
 
 pub(crate) fn contract_market() -> Box<dyn Contract<Empty>> {
-    Box::new(LocalContractWrapper::new(
-        market::contract::instantiate,
-        market::contract::execute,
-        market::contract::query,
-    ))
+    Box::new(
+        LocalContractWrapper::new(
+            market::contract::instantiate,
+            market::contract::execute,
+            market::contract::query,
+        )
+        .with_reply(market::contract::reply),
+    )
 }
 
 pub(crate) fn contract_factory() -> Box<dyn Contract<Empty>> {
@@ -337,6 +370,14 @@ pub(crate) fn contract_farming() -> Box<dyn Contract<Empty>> {
         )
         .with_reply(farming::execute::reply),
     )
+}
+
+pub(crate) fn contract_simple_oracle() -> Box<dyn Contract<Empty>> {
+    Box::new(LocalContractWrapper::new(
+        simple_oracle::instantiate,
+        simple_oracle::execute,
+        simple_oracle::query,
+    ))
 }
 
 // struct to satisfy the `Contract` trait

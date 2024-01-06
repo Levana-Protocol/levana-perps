@@ -96,15 +96,10 @@ pub(super) fn seconds_till_ultra() -> u32 {
 }
 
 pub fn max_price_age_secs() -> u32 {
-    // 2 minutes
-    60 * 2
-}
-
-pub fn min_price_age_secs() -> u32 {
-    // 10 seconds
-    10
+    // 1 hour
+    60 * 60
 }
 
 pub fn max_allowed_price_delta() -> Decimal256 {
-    "0.0005".parse().unwrap()
+    "0.01".parse().unwrap()
 }

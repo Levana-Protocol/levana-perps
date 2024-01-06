@@ -7,11 +7,7 @@ use crate::state::{
     config::load_config,
     fees::ALL_FEES,
     funding::get_total_funding_margin,
-    position::{
-        LIQUIDATION_PRICES_PENDING, LIQUIDATION_PRICES_PENDING_COUNT,
-        LIQUIDATION_PRICES_PENDING_REVERSE, NEXT_LIQUIFUNDING, NEXT_STALE, OPEN_POSITIONS,
-        PRICE_TRIGGER_ASC, PRICE_TRIGGER_DESC,
-    },
+    position::{NEXT_LIQUIFUNDING, OPEN_POSITIONS, PRICE_TRIGGER_ASC, PRICE_TRIGGER_DESC},
     token::TOKEN,
 };
 use cosmwasm_std::{Env, Order, QuerierWrapper};
@@ -56,7 +52,6 @@ pub(crate) fn sanity_check_post_execute(
 fn next_last_liquifunding(store: &dyn Storage, env: &Env) -> Result<()> {
     let config = load_config(store)?;
     let delay = Duration::from_seconds(config.liquifunding_delay_seconds.into());
-    let delay_and_stale = delay + Duration::from_seconds(config.staleness_seconds.into());
     let open_position_count = OPEN_POSITIONS
         .keys(store, None, None, cosmwasm_std::Order::Ascending)
         .collect::<Result<Vec<_>, _>>()?
@@ -81,24 +76,6 @@ fn next_last_liquifunding(store: &dyn Storage, env: &Env) -> Result<()> {
         anyhow::ensure!(NEXT_LIQUIFUNDING.has(store, (pos.next_liquifunding, position_id)));
     }
 
-    let mut next_stale_count = 0;
-    for pair in NEXT_STALE.keys(store, None, None, cosmwasm_std::Order::Ascending) {
-        let (timestamp, position_id) = pair?;
-        let position = OPEN_POSITIONS.load(store, position_id)?;
-        anyhow::ensure!(
-            timestamp < now
-                || (timestamp.checked_sub(now, "next_last_liquifunding (2)")?) <= delay_and_stale
-        );
-        anyhow::ensure!(position.liquifunded_at + delay_and_stale == timestamp);
-        next_stale_count += 1;
-    }
-    anyhow::ensure!(next_stale_count == open_position_count);
-
-    for res in OPEN_POSITIONS.range(store, None, None, cosmwasm_std::Order::Ascending) {
-        let (position_id, pos) = res?;
-        anyhow::ensure!(NEXT_STALE.has(store, (pos.stale_at, position_id)));
-    }
-
     Ok(())
 }
 
@@ -106,125 +83,94 @@ fn liquidation_prices(store: &dyn Storage, _env: &Env) -> Result<()> {
     for res in OPEN_POSITIONS.range(store, None, None, cosmwasm_std::Order::Ascending) {
         let (posid, pos) = res?;
 
-        let pending_time = LIQUIDATION_PRICES_PENDING_REVERSE.may_load(store, posid)?;
-        let pending = match pending_time {
-            Some(pending_time) => {
-                Some(LIQUIDATION_PRICES_PENDING.load(store, (pending_time, posid))?)
-            }
-            None => None,
-        };
-
-        let pending_count_expected: usize = LIQUIDATION_PRICES_PENDING_COUNT
-            .may_load(store)?
-            .unwrap_or_default()
-            .try_into()?;
-        let pending_count_actual1 = LIQUIDATION_PRICES_PENDING
-            .keys(store, None, None, Order::Ascending)
-            .count();
-        let pending_count_actual2 = LIQUIDATION_PRICES_PENDING_REVERSE
-            .keys(store, None, None, Order::Ascending)
-            .count();
-        anyhow::ensure!(pending_count_expected == pending_count_actual1);
-        anyhow::ensure!(pending_count_expected == pending_count_actual2);
-
-        match pending {
-            None => {
-                anyhow::ensure!(LIQUIDATION_PRICES_PENDING_REVERSE.may_load(store, posid)? == None);
-                ensure_missing_pending(store, LIQUIDATION_PRICES_PENDING, posid)?;
-                let liquidation = pos.liquidation_price;
-                let take_profit = pos.take_profit_price;
-                let stop_loss_override = pos.stop_loss_override_notional;
-                let take_profit_override = pos.take_profit_override_notional;
-                match pos.direction() {
-                    DirectionToNotional::Long => {
-                        match liquidation {
-                            Some(price) => {
-                                PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
-                            }
-                            None => {
-                                ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
-                            }
-                        }
-                        match take_profit {
-                            Some(price) => {
-                                PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
-                            }
-                            None => {
-                                ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
-                            }
-                        }
-                        match stop_loss_override {
-                            Some(price) => {
-                                PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
-                            }
-                            None => {
-                                if liquidation.is_none() {
-                                    ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
-                                } else {
-                                    ensure_at_most_one(store, PRICE_TRIGGER_DESC, posid)?;
-                                }
-                            }
-                        }
-                        match take_profit_override {
-                            Some(price) => {
-                                PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
-                            }
-                            None => {
-                                if take_profit.is_none() {
-                                    ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
-                                } else {
-                                    ensure_at_most_one(store, PRICE_TRIGGER_ASC, posid)?;
-                                }
-                            }
+        let liquidation = pos.liquidation_price;
+        let take_profit = pos.take_profit_price;
+        let stop_loss_override = pos.stop_loss_override_notional;
+        let take_profit_override = pos.take_profit_override_notional;
+        match pos.direction() {
+            DirectionToNotional::Long => {
+                match liquidation {
+                    Some(price) => {
+                        PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
+                    }
+                    None => {
+                        ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
+                    }
+                }
+                match take_profit {
+                    Some(price) => {
+                        PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
+                    }
+                    None => {
+                        ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
+                    }
+                }
+                match stop_loss_override {
+                    Some(price) => {
+                        PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
+                    }
+                    None => {
+                        if liquidation.is_none() {
+                            ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
+                        } else {
+                            ensure_at_most_one(store, PRICE_TRIGGER_DESC, posid)?;
                         }
                     }
-                    DirectionToNotional::Short => {
-                        match liquidation {
-                            Some(price) => {
-                                PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
-                            }
-                            None => {
-                                ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
-                            }
-                        }
-                        match take_profit {
-                            Some(price) => {
-                                PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
-                            }
-                            None => {
-                                ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
-                            }
-                        }
-                        match stop_loss_override {
-                            Some(price) => {
-                                PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
-                            }
-                            None => {
-                                if liquidation.is_none() {
-                                    ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
-                                } else {
-                                    ensure_at_most_one(store, PRICE_TRIGGER_ASC, posid)?;
-                                }
-                            }
-                        }
-                        match take_profit_override {
-                            Some(price) => {
-                                PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
-                            }
-                            None => {
-                                if take_profit.is_none() {
-                                    ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
-                                } else {
-                                    ensure_at_most_one(store, PRICE_TRIGGER_DESC, posid)?;
-                                }
-                            }
+                }
+                match take_profit_override {
+                    Some(price) => {
+                        PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
+                    }
+                    None => {
+                        if take_profit.is_none() {
+                            ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
+                        } else {
+                            ensure_at_most_one(store, PRICE_TRIGGER_ASC, posid)?;
                         }
                     }
                 }
             }
-            Some(_) => {
-                ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
-                ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
+            DirectionToNotional::Short => {
+                match liquidation {
+                    Some(price) => {
+                        PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
+                    }
+                    None => {
+                        ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
+                    }
+                }
+                match take_profit {
+                    Some(price) => {
+                        PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
+                    }
+                    None => {
+                        ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
+                    }
+                }
+                match stop_loss_override {
+                    Some(price) => {
+                        PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
+                    }
+                    None => {
+                        if liquidation.is_none() {
+                            ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
+                        } else {
+                            ensure_at_most_one(store, PRICE_TRIGGER_ASC, posid)?;
+                        }
+                    }
+                }
+                match take_profit_override {
+                    Some(price) => {
+                        PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
+                    }
+                    None => {
+                        if take_profit.is_none() {
+                            ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
+                        } else {
+                            ensure_at_most_one(store, PRICE_TRIGGER_DESC, posid)?;
+                        }
+                    }
+                }
             }
         }
     }
@@ -278,18 +224,6 @@ fn ensure_at_most_one(
     Ok(())
 }
 
-fn ensure_missing_pending(
-    store: &dyn Storage,
-    m: Map<(Timestamp, PositionId), ()>,
-    posid: PositionId,
-) -> Result<()> {
-    for res in m.keys(store, None, None, cosmwasm_std::Order::Ascending) {
-        let (_, x) = res?;
-        anyhow::ensure!(x != posid);
-    }
-    Ok(())
-}
-
 fn liquidity_balances(
     state: &State,
     store: &dyn Storage,
@@ -340,6 +274,7 @@ struct SubTotals {
     fees: Fees,
     net_funding_paid: Signed<Collateral>,
     delta_neutrality_fund: Collateral,
+    deferred_exec: Collateral,
 }
 
 impl SubTotals {
@@ -361,6 +296,7 @@ impl SubTotals {
 
             net_funding_paid: get_total_net_funding_paid(store)?,
             delta_neutrality_fund: DELTA_NEUTRALITY_FUND.may_load(store)?.unwrap_or_default(),
+            deferred_exec: state.deferred_exec_deposit_balance(store)?,
         };
 
         for position in OPEN_POSITIONS.range(store, None, None, Order::Ascending) {
@@ -384,6 +320,7 @@ impl SubTotals {
             fees,
             net_funding_paid: funding_fee_imbalance,
             delta_neutrality_fund,
+            deferred_exec,
         } = self;
         let positive_total = *pending_transfer
             + *position_collateral
@@ -393,11 +330,12 @@ impl SubTotals {
             + fees.protocol
             + fees.wallets
             + fees.crank
-            + *delta_neutrality_fund;
+            + *delta_neutrality_fund
+            + *deferred_exec;
 
         let total = positive_total.into_signed() + *funding_fee_imbalance;
         total
-            .try_into_positive_value()
+            .try_into_non_negative_value()
             .with_context(|| format!("Calculated total is negative: {self:?}"))
     }
 }

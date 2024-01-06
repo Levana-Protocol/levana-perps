@@ -4,7 +4,7 @@ pyth:
     # for the sake of simplicity, it's only defined top-level in deploy config
     # and then at runtime it's duplicated for each feed as-needed
     # note that stride does _not_ have this approach, but is instead defined in each feed directly
-    update-age-tolerance: 120
+    update-age-tolerance: 21
     # Pyth price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-stable
     feed-ids:
       ATOM_USD: "b00b60f88b03a6a625a8d1c048c3f66653edf217439983d037e7222c4e612819"
@@ -34,7 +34,7 @@ pyth:
       PYTH_USD: 0bbf28e9a841a1cc788f6a361b17ca072d0ea3098a1e5df1c3922d06719579ff
       NTRN_USD: a8e6517966a52cb1df864b2764f3629fde3f21d2b640b5c572fcd654cbccd65e
   edge: 
-    update-age-tolerance: 120
+    update-age-tolerance: 21
     # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-edge
     feed-ids:
       ATOM_USD: "61226d39beea19d334f17c2febce27e12646d84675924ebb02b9cdaea68727e3"
@@ -380,10 +380,10 @@ networks:
   sei-testnet:
     ATOM_USD:
       feeds: [
-        !sei { denom: "uatom", inverted: false }
+        !pyth { key: "ATOM_USD", inverted: false }
       ]
       feeds-usd: [
-        !sei { denom: "uatom", inverted: false }
+        !pyth { key: "ATOM_USD", inverted: false }
       ]
     OSMO_USDC:
       feeds: [
@@ -409,10 +409,10 @@ networks:
       ]
     BTC_USD:
       feeds: [
-        !sei { denom: "ubtc", inverted: false },
+        !pyth { key: "BTC_USD", inverted: false },
       ]
       feeds-usd: [
-        !sei { denom: "ubtc", inverted: false },
+        !pyth { key: "BTC_USD", inverted: false },
       ]
     ETH_USD:
       feeds: [

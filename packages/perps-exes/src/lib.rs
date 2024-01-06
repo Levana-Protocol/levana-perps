@@ -9,6 +9,7 @@ use cosmos::{
     HasAddress, Wallet,
 };
 use cosmos::{HasAddressHrp, SeedPhrase};
+use msg::contracts::market::entry::StatusResp;
 use msg::contracts::market::position::ClosedPosition;
 use msg::prelude::*;
 use msg::{
@@ -88,6 +89,7 @@ impl PerpApp {
     }
 
     pub async fn all_open_positions(&self) -> Result<PositionsInfo> {
+        self.crank(None).await?;
         self.market.all_open_positions(&self.wallet).await
     }
 
@@ -102,7 +104,8 @@ impl PerpApp {
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
     ) -> Result<TxResponse> {
-        self.market
+        let _ = self
+            .market
             .open_position(
                 &self.wallet,
                 &self.market.status().await?,
@@ -114,7 +117,8 @@ impl PerpApp {
                 stop_loss_override,
                 take_profit_override,
             )
-            .await
+            .await?;
+        self.crank_single(None).await
     }
 
     pub async fn deposit_liquidity(&self, collateral: NonZero<Collateral>) -> Result<TxResponse> {
@@ -142,8 +146,21 @@ impl PerpApp {
         self.market.close_position(&self.wallet, position_id).await
     }
 
+    pub async fn status(&self) -> Result<StatusResp> {
+        let status = self.market.status().await?;
+        Ok(status)
+    }
+
     pub async fn crank(&self, rewards: Option<RawAddr>) -> Result<()> {
         self.market.crank(&self.wallet, rewards).await
+    }
+
+    pub async fn crank_single(&self, rewards: Option<RawAddr>) -> Result<TxResponse> {
+        let response = self
+            .market
+            .crank_single(&self.wallet, None, rewards)
+            .await?;
+        Ok(response)
     }
 
     pub async fn tap_faucet(&self) -> Result<TxResponse> {
@@ -214,9 +231,11 @@ impl PerpApp {
         impact: UpdatePositionCollateralImpact,
         slippage_assert: Option<SlippageAssert>,
     ) -> Result<TxResponse> {
-        self.market
+        let _ = self
+            .market
             .update_collateral(&self.wallet, id, collateral, impact, slippage_assert)
-            .await
+            .await?;
+        self.crank_single(None).await
     }
 }
 

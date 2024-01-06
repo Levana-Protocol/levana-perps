@@ -1,5 +1,4 @@
 use levana_perpswap_multi_test::market_wrapper::PerpsMarket;
-use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::PerpsApp;
 use msg::contracts::market::config::ConfigUpdate;
 use msg::contracts::market::entry::{LimitOrderHistoryResp, LimitOrderResult};
@@ -14,36 +13,6 @@ fn test_place_limit_order_long() {
 
     market.exec_set_price("100".try_into().unwrap()).unwrap();
     market.exec_crank(&cranker).unwrap();
-
-    // Test invalid order: trigger price > spot price
-
-    market
-        .exec_place_limit_order(
-            &trader,
-            "100".try_into().unwrap(),
-            "101".try_into().unwrap(),
-            "10".try_into().unwrap(),
-            DirectionToBase::Long,
-            "1".try_into().unwrap(),
-            None,
-            None,
-        )
-        .unwrap_err();
-
-    // Test invalid order: trigger price < stop loss override
-
-    market
-        .exec_place_limit_order(
-            &trader,
-            "100".try_into().unwrap(),
-            "90".try_into().unwrap(),
-            "10".try_into().unwrap(),
-            DirectionToBase::Long,
-            "1".try_into().unwrap(),
-            Some("95".try_into().unwrap()),
-            None,
-        )
-        .unwrap_err();
 
     // Test success cases
     // Set two orders to when price moves to exactly trigger price as well as when price moves
@@ -111,36 +80,6 @@ fn test_place_limit_order_short() {
     let cranker = market.clone_trader(1).unwrap();
 
     market.exec_set_price("100".try_into().unwrap()).unwrap();
-
-    // Test invalid order: trigger price > spot price
-
-    market
-        .exec_place_limit_order(
-            &trader,
-            "100".try_into().unwrap(),
-            "99".try_into().unwrap(),
-            "10".try_into().unwrap(),
-            DirectionToBase::Short,
-            "1".try_into().unwrap(),
-            None,
-            None,
-        )
-        .unwrap_err();
-
-    // Test invalid order: trigger price < stop loss override
-
-    market
-        .exec_place_limit_order(
-            &trader,
-            "100".try_into().unwrap(),
-            "110".try_into().unwrap(),
-            "10".try_into().unwrap(),
-            DirectionToBase::Short,
-            "1".try_into().unwrap(),
-            Some("105".try_into().unwrap()),
-            None,
-        )
-        .unwrap_err();
 
     // Test success cases
     // Set two orders to when price moves to exactly trigger price as well as when price moves
@@ -577,9 +516,13 @@ fn lagging_crank_perp_1350_long() {
     let cranker = market.clone_trader(1).unwrap();
 
     // Start off with a price of 10. Place a limit order with a trigger of 7.
-    // Then price drops to 6, and climbs to 8, before any cranking happens. We
-    // need to guarantee that the position doesn't get opened under those
+    // Then price drops to 6.9, and climbs to 7.1, before any cranking happens.
+    //
+    // Before deferred execution: We need to guarantee that the position doesn't get opened under those
     // circumstances. Later, when it drops back down to 5, we should enter at 5.
+    //
+    // Since deferred execution: we want to retroactively use the first price point the triggered,
+    // even with a lagging crank.
     market.exec_set_price("10".parse().unwrap()).unwrap();
     market.exec_crank_till_finished(&cranker).unwrap();
 
@@ -601,30 +544,42 @@ fn lagging_crank_perp_1350_long() {
         .unwrap();
     assert_eq!(resp.orders.len(), 1);
 
-    market.exec_set_price("6".parse().unwrap()).unwrap();
-    market.exec_set_price("8".parse().unwrap()).unwrap();
-    market.exec_crank_till_finished(&cranker).unwrap();
+    market.exec_set_price("6.9".parse().unwrap()).unwrap();
+    market.exec_set_price("7.1".parse().unwrap()).unwrap();
 
     let resp = market
         .query_limit_orders(&trader, None, Some(5u32), None)
         .unwrap();
     assert_eq!(resp.orders.len(), 1);
+    let positions = market.query_positions(&trader).unwrap();
+    assert_eq!(positions.len(), 0);
 
-    market.exec_set_price("5".parse().unwrap()).unwrap();
     market.exec_crank_till_finished(&cranker).unwrap();
 
     let resp = market
         .query_limit_orders(&trader, None, Some(5u32), None)
         .unwrap();
     assert_eq!(resp.orders.len(), 0);
-
-    let mut positions = market.query_positions(&trader).unwrap();
+    let positions = market.query_positions(&trader).unwrap();
     assert_eq!(positions.len(), 1);
-    let position = positions.pop().unwrap();
-    assert!(position
-        .entry_price_base
-        .into_number()
-        .approx_eq("5".parse().unwrap()));
+
+    // Code below only applied before deferred execution.
+
+    // market.exec_set_price("5".parse().unwrap()).unwrap();
+    // market.exec_crank_till_finished(&cranker).unwrap();
+
+    // let resp = market
+    //     .query_limit_orders(&trader, None, Some(5u32), None)
+    //     .unwrap();
+    // assert_eq!(resp.orders.len(), 0);
+
+    // let mut positions = market.query_positions(&trader).unwrap();
+    // assert_eq!(positions.len(), 1);
+    // let position = positions.pop().unwrap();
+    // assert!(position
+    //     .entry_price_base
+    //     .into_number()
+    //     .approx_eq("5".parse().unwrap()));
 }
 
 #[test]
@@ -632,6 +587,9 @@ fn lagging_crank_perp_1350_short() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
     let cranker = market.clone_trader(1).unwrap();
+
+    // Description below is pre-deferred execution. See test above for explanation
+    // of the changes since deferred execution.
 
     // Start off with a price of 10. Place a limit order with a trigger of 13.
     // Then price climbs to 14, and drops to 12, before any cranking happens. We
@@ -658,174 +616,38 @@ fn lagging_crank_perp_1350_short() {
         .unwrap();
     assert_eq!(resp.orders.len(), 1);
 
-    market.exec_set_price("14".parse().unwrap()).unwrap();
-    market.exec_set_price("12".parse().unwrap()).unwrap();
-    market.exec_crank_till_finished(&cranker).unwrap();
+    market.exec_set_price("13.1".parse().unwrap()).unwrap();
+    market.exec_set_price("12.9".parse().unwrap()).unwrap();
 
     let resp = market
         .query_limit_orders(&trader, None, Some(5u32), None)
         .unwrap();
     assert_eq!(resp.orders.len(), 1);
+    let positions = market.query_positions(&trader).unwrap();
+    assert_eq!(positions.len(), 0);
 
-    market.exec_set_price("15".parse().unwrap()).unwrap();
     market.exec_crank_till_finished(&cranker).unwrap();
 
     let resp = market
         .query_limit_orders(&trader, None, Some(5u32), None)
         .unwrap();
     assert_eq!(resp.orders.len(), 0);
-
-    let mut positions = market.query_positions(&trader).unwrap();
+    let positions = market.query_positions(&trader).unwrap();
     assert_eq!(positions.len(), 1);
-    let position = positions.pop().unwrap();
-    assert!(position
-        .entry_price_base
-        .into_number()
-        .approx_eq("15".parse().unwrap()));
-}
 
-#[test]
-fn can_place_when_stale() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    let trader = market.clone_trader(0).unwrap();
+    // market.exec_set_price("15".parse().unwrap()).unwrap();
+    // market.exec_crank_till_finished(&cranker).unwrap();
 
-    // open a position and jump a liquifinding to create some work so that the limit order won't get us out of staleness
-    market
-        .exec_open_position(
-            &trader,
-            "100",
-            "10",
-            DirectionToBase::Long,
-            "1.0",
-            None,
-            None,
-            None,
-        )
-        .unwrap();
-    market.set_time(TimeJump::Liquifundings(1)).unwrap();
+    // let resp = market
+    //     .query_limit_orders(&trader, None, Some(5u32), None)
+    //     .unwrap();
+    // assert_eq!(resp.orders.len(), 0);
 
-    // now jump a staleness (the crank of limit order won't be enough to get out of it, since it will process the previous work)
-    market.set_time(TimeJump::Staleness(1)).unwrap();
-    assert!(market.query_status().unwrap().is_stale());
-    market
-        .exec_place_limit_order(
-            &trader,
-            // So much collateral that we can't open it because of insufficient liquidity
-            "10".try_into().unwrap(),
-            "0.99".try_into().unwrap(),
-            "10".try_into().unwrap(),
-            DirectionToBase::Long,
-            "1".try_into().unwrap(),
-            None,
-            None,
-        )
-        .unwrap();
-}
-
-#[test]
-fn invalid_trigger_price() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    let trader = market.clone_trader(0).unwrap();
-
-    market.exec_set_price("20".parse().unwrap()).unwrap();
-
-    let err = market
-        .exec_place_limit_order(
-            &trader,
-            // So much collateral that we can't open it because of insufficient liquidity
-            "10".try_into().unwrap(),
-            "20.1".parse().unwrap(),
-            "10".try_into().unwrap(),
-            DirectionToBase::Long,
-            "1".try_into().unwrap(),
-            None,
-            None,
-        )
-        .unwrap_err()
-        .downcast::<PerpError<MarketError>>()
-        .unwrap();
-    assert_eq!(
-        err.data.unwrap(),
-        MarketError::InvalidTriggerPrice {
-            must_be: TriggerPriceMustBe::Less,
-            trigger_type: TriggerType::LimitOrder,
-            specified: "20.1".parse().unwrap(),
-            bound: "20".parse().unwrap(),
-        }
-    );
-
-    let err = market
-        .exec_place_limit_order(
-            &trader,
-            // So much collateral that we can't open it because of insufficient liquidity
-            "10".try_into().unwrap(),
-            "19.9".parse().unwrap(),
-            "10".try_into().unwrap(),
-            DirectionToBase::Short,
-            "1".try_into().unwrap(),
-            None,
-            None,
-        )
-        .unwrap_err()
-        .downcast::<PerpError<MarketError>>()
-        .unwrap();
-    assert_eq!(
-        err.data.unwrap(),
-        MarketError::InvalidTriggerPrice {
-            must_be: TriggerPriceMustBe::Greater,
-            trigger_type: TriggerType::LimitOrder,
-            specified: "19.9".parse().unwrap(),
-            bound: "20".parse().unwrap(),
-        }
-    );
-
-    let err = market
-        .exec_place_limit_order(
-            &trader,
-            // So much collateral that we can't open it because of insufficient liquidity
-            "10".try_into().unwrap(),
-            "20".parse().unwrap(),
-            "10".try_into().unwrap(),
-            DirectionToBase::Long,
-            "1".try_into().unwrap(),
-            None,
-            None,
-        )
-        .unwrap_err()
-        .downcast::<PerpError<MarketError>>()
-        .unwrap();
-    assert_eq!(
-        err.data.unwrap(),
-        MarketError::InvalidTriggerPrice {
-            must_be: TriggerPriceMustBe::Less,
-            trigger_type: TriggerType::LimitOrder,
-            specified: "20".parse().unwrap(),
-            bound: "20".parse().unwrap(),
-        }
-    );
-
-    let err = market
-        .exec_place_limit_order(
-            &trader,
-            // So much collateral that we can't open it because of insufficient liquidity
-            "10".try_into().unwrap(),
-            "20".parse().unwrap(),
-            "10".try_into().unwrap(),
-            DirectionToBase::Short,
-            "1".try_into().unwrap(),
-            None,
-            None,
-        )
-        .unwrap_err()
-        .downcast::<PerpError<MarketError>>()
-        .unwrap();
-    assert_eq!(
-        err.data.unwrap(),
-        MarketError::InvalidTriggerPrice {
-            must_be: TriggerPriceMustBe::Greater,
-            trigger_type: TriggerType::LimitOrder,
-            specified: "20".parse().unwrap(),
-            bound: "20".parse().unwrap(),
-        }
-    );
+    // let mut positions = market.query_positions(&trader).unwrap();
+    // assert_eq!(positions.len(), 1);
+    // let position = positions.pop().unwrap();
+    // assert!(position
+    //     .entry_price_base
+    //     .into_number()
+    //     .approx_eq("15".parse().unwrap()));
 }

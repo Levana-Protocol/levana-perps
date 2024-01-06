@@ -10,7 +10,7 @@
 */
 
 use super::PerpsApp;
-use crate::config::{TokenKind, DEFAULT_MARKET, TEST_CONFIG};
+use crate::config::{SpotPriceKind, TokenKind, DEFAULT_MARKET, TEST_CONFIG};
 use crate::response::CosmosResponseExt;
 use crate::time::{BlockInfoChange, TimeJump};
 use anyhow::Context;
@@ -37,6 +37,10 @@ use msg::contracts::farming::entry::{
 };
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::crank::CrankWorkInfo;
+use msg::contracts::market::deferred_execution::{
+    DeferredExecExecutedEvent, DeferredExecId, DeferredExecQueuedEvent, DeferredExecStatus,
+    DeferredExecWithStatus, GetDeferredExecResp, ListDeferredExecsResp,
+};
 use msg::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
     InitialPrice, LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpAction,
@@ -45,7 +49,9 @@ use msg::contracts::market::entry::{
     StatusResp, TradeHistorySummary, TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
-use msg::contracts::market::spot_price::SpotPriceConfigInit;
+use msg::contracts::market::spot_price::{
+    SpotPriceConfig, SpotPriceConfigInit, SpotPriceFeedDataInit, SpotPriceFeedInit,
+};
 use msg::contracts::market::{
     config::{Config, ConfigUpdate},
     entry::{
@@ -64,6 +70,7 @@ use msg::contracts::position_token::{
 };
 use msg::prelude::*;
 
+use crate::simple_oracle::ExecuteMsg as SimpleOracleExecuteMsg;
 use msg::constants::event_key;
 use msg::contracts::farming::entry::OwnerExecuteMsg::ReclaimEmissions;
 use msg::contracts::market::order::OrderId;
@@ -87,17 +94,27 @@ pub struct PerpsMarket {
     pub automatic_time_jump_enabled: bool,
     /// Address of the farming contract
     farming_addr: Addr,
+
+    /// Temp for printf debugging / migration
+    /// TODO: remove
+    pub debug_001: bool,
 }
 
 impl PerpsMarket {
     pub fn new(app: Rc<RefCell<PerpsApp>>) -> Result<Self> {
-        Self::new_with_type(app, DEFAULT_MARKET.collateral_type, true)
+        Self::new_with_type(
+            app,
+            DEFAULT_MARKET.collateral_type,
+            true,
+            DEFAULT_MARKET.spot_price,
+        )
     }
 
     pub fn new_with_type(
         app: Rc<RefCell<PerpsApp>>,
         market_type: MarketType,
         bootstap_lp: bool,
+        spot_price_kind: SpotPriceKind,
     ) -> Result<Self> {
         let token_init = match DEFAULT_MARKET.token_kind {
             TokenKind::Native => TokenInit::Native {
@@ -122,6 +139,7 @@ impl PerpsMarket {
             DEFAULT_MARKET.initial_price,
             None,
             bootstap_lp,
+            spot_price_kind,
         )
     }
 
@@ -130,9 +148,54 @@ impl PerpsMarket {
         id: MarketId,
         token_init: TokenInit,
         initial_price: PriceBaseInQuote,
-        collateral_in_usd: Option<PriceCollateralInUsd>,
+        initial_price_usd: Option<PriceCollateralInUsd>,
         bootstap_lp: bool,
+        spot_price_kind: SpotPriceKind,
     ) -> Result<Self> {
+        // for oracles, set the initial price on the oracle
+        // and the market contract gets no initial price (it queries the oracle)
+        // for manual, set the initial price on the market contract
+        let initial_price = match spot_price_kind {
+            SpotPriceKind::Oracle => {
+                let mut app = app.borrow_mut();
+                let now = app.block_info().time;
+                let contract_addr = app.simple_oracle_addr.clone();
+                app.execute_contract(
+                    Addr::unchecked(&TEST_CONFIG.protocol_owner),
+                    contract_addr,
+                    &SimpleOracleExecuteMsg::SetPrice {
+                        value: initial_price.into_number().abs_unsigned(),
+                        timestamp: Some(now),
+                    },
+                    &[],
+                )?;
+
+                let contract_addr = app.simple_oracle_usd_addr.clone();
+                app.execute_contract(
+                    Addr::unchecked(&TEST_CONFIG.protocol_owner),
+                    contract_addr,
+                    &SimpleOracleExecuteMsg::SetPrice {
+                        value: initial_price_usd
+                            .unwrap_or_else(|| {
+                                PriceCollateralInUsd::from_non_zero(initial_price.into_non_zero())
+                            })
+                            .into_number()
+                            .abs_unsigned(),
+                        timestamp: Some(now),
+                    },
+                    &[],
+                )?;
+
+                None
+            }
+            SpotPriceKind::Manual => Some(InitialPrice {
+                price: initial_price,
+                price_usd: initial_price_usd.unwrap_or_else(|| {
+                    PriceCollateralInUsd::from_non_zero(initial_price.into_non_zero())
+                }),
+            }),
+        };
+
         let market_msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
             new_market: msg::contracts::market::entry::NewMarketParams {
                 market_id: id.clone(),
@@ -144,6 +207,7 @@ impl PerpsMarket {
                     // testing specifically for it.
                     crank_fee_charged: Some(Usd::zero()),
                     crank_fee_reward: Some(Usd::zero()),
+                    crank_fee_surcharge: Some(Usd::zero()),
                     // Easier to just go back to the original default than update tests
                     unstake_period_seconds: Some(60 * 60 * 24 * 21),
                     // Same: original default to fix tests
@@ -152,16 +216,39 @@ impl PerpsMarket {
                     liquidity_cooldown_seconds: Some(0),
                     ..Default::default()
                 }),
-                spot_price: SpotPriceConfigInit::Manual {
-                    admin: TEST_CONFIG.manual_price_owner.as_str().into(),
+                spot_price: match spot_price_kind {
+                    SpotPriceKind::Manual => SpotPriceConfigInit::Manual {
+                        admin: TEST_CONFIG.manual_price_owner.as_str().into(),
+                    },
+                    SpotPriceKind::Oracle => {
+                        let contract_addr = RawAddr::from(app.borrow().simple_oracle_addr.as_ref());
+                        let contract_addr_usd =
+                            RawAddr::from(app.borrow().simple_oracle_usd_addr.as_ref());
+                        SpotPriceConfigInit::Oracle {
+                            pyth: None,
+                            stride: None,
+                            feeds: vec![SpotPriceFeedInit {
+                                data: SpotPriceFeedDataInit::Simple {
+                                    contract: contract_addr.clone(),
+                                    age_tolerance_seconds: 120,
+                                },
+                                inverted: false,
+                                volatile: None,
+                            }],
+                            feeds_usd: vec![SpotPriceFeedInit {
+                                data: SpotPriceFeedDataInit::Simple {
+                                    contract: contract_addr_usd,
+                                    age_tolerance_seconds: 120,
+                                },
+                                inverted: false,
+                                volatile: None,
+                            }],
+                            volatile_diff_seconds: None,
+                        }
+                    }
                 },
                 initial_borrow_fee_rate: "0.01".parse().unwrap(),
-                initial_price: Some(InitialPrice {
-                    price: initial_price,
-                    price_usd: collateral_in_usd.unwrap_or_else(|| {
-                        PriceCollateralInUsd::from_non_zero(initial_price.into_non_zero())
-                    }),
-                }),
+                initial_price,
             },
         };
 
@@ -231,9 +318,16 @@ impl PerpsMarket {
             addr: market_addr,
             automatic_time_jump_enabled: true,
             farming_addr,
+            debug_001: false,
         };
 
         if bootstap_lp {
+            if spot_price_kind == SpotPriceKind::Oracle {
+                // not required for manual prices which append on init
+                // (technically, it's a "initial_price.is_some()" check, but this is only allowed for manual prices)
+                _self.exec_crank_n(&Addr::unchecked("init-cranker"), 1)?;
+            }
+
             // do not go through app get_user, since we want to _always_ bootstrap this user
             _self.exec_mint_and_deposit_liquidity(
                 &DEFAULT_MARKET.bootstrap_lp_addr,
@@ -285,7 +379,6 @@ impl PerpsMarket {
             time_jump,
             self.app().block_info(),
             config.liquifunding_delay_seconds as u64,
-            config.staleness_seconds as u64,
         );
         self.app().set_block_info(block_info_change);
 
@@ -355,10 +448,36 @@ impl PerpsMarket {
         self.exec_funds(sender, msg, Number::ZERO)
     }
 
+    pub fn exec_defer(&self, sender: &Addr, msg: &MarketExecuteMsg) -> Result<DeferResponse> {
+        self.exec_defer_wasm_msg(
+            sender,
+            WasmMsg::Execute {
+                contract_addr: self.addr.to_string(),
+                msg: to_binary(&msg)?,
+                funds: Vec::new(),
+            },
+        )
+    }
+
+    /// Like [Self::exec_defer], but attach a crank fee.
+    pub fn exec_defer_with_crank_fee(
+        &self,
+        sender: &Addr,
+        msg: &MarketExecuteMsg,
+    ) -> Result<DeferResponse> {
+        let config = self.query_config()?;
+        let price = self.query_current_price()?;
+        let crank_fee = price.usd_to_collateral(config.crank_fee_charged);
+        let msg = self
+            .token
+            .into_market_execute_msg(&self.addr, crank_fee, msg.clone())?;
+        self.exec_defer_wasm_msg(sender, msg)
+    }
+
     pub fn make_msg_with_funds(&self, msg: &MarketExecuteMsg, amount: Number) -> Result<WasmMsg> {
         let amount = Collateral::from_decimal256(
             amount
-                .try_into_positive_value()
+                .try_into_non_negative_value()
                 .context("funds must be positive!")?,
         );
 
@@ -577,6 +696,26 @@ impl PerpsMarket {
         })
     }
 
+    pub fn query_deferred_execs(&self, owner: &Addr) -> Result<Vec<DeferredExecWithStatus>> {
+        let mut res = vec![];
+        let mut start_after = None;
+        loop {
+            let ListDeferredExecsResp {
+                mut items,
+                next_start_after,
+            } = self.query(&QueryMsg::ListDeferredExecs {
+                addr: owner.clone().into(),
+                start_after: start_after.take(),
+                limit: None,
+            })?;
+            res.append(&mut items);
+            match next_start_after {
+                None => break Ok(res),
+                Some(next_start_after) => start_after = Some(next_start_after),
+            }
+        }
+    }
+
     pub fn query_current_price(&self) -> Result<PricePoint> {
         self.query(&MarketQueryMsg::SpotPrice { timestamp: None })
     }
@@ -756,46 +895,83 @@ impl PerpsMarket {
     }
 
     // market executions
-    pub fn exec_refresh_price(&self) -> Result<AppResponse> {
+    pub fn exec_refresh_price(&self) -> Result<PriceResponse> {
         let price_resp = self.query_current_price()?;
         self.exec_set_price(price_resp.price_base)
     }
 
-    pub fn exec_set_price(&self, price: PriceBaseInQuote) -> Result<AppResponse> {
+    pub fn exec_set_price(&self, price: PriceBaseInQuote) -> Result<PriceResponse> {
         self.exec_set_price_with_usd(price, None)
-    }
-
-    pub fn exec_set_price_and_crank(&self, price: PriceBaseInQuote) -> Result<Vec<AppResponse>> {
-        let mut responses = vec![self.exec(
-            &Addr::unchecked(&TEST_CONFIG.manual_price_owner),
-            &MarketExecuteMsg::SetManualPrice {
-                price,
-                price_usd: price
-                    .try_into_usd(&self.id)
-                    .unwrap_or(PriceCollateralInUsd::one()),
-            },
-        )?];
-
-        responses.push(self.exec_crank(&Addr::unchecked("anybody"))?);
-
-        Ok(responses)
     }
 
     pub fn exec_set_price_with_usd(
         &self,
         price: PriceBaseInQuote,
         price_usd: Option<PriceCollateralInUsd>,
+    ) -> Result<PriceResponse> {
+        let price_usd = price_usd.unwrap_or(
+            price
+                .try_into_usd(&self.id)
+                .unwrap_or(PriceCollateralInUsd::one()),
+        );
+
+        match self.query_config()?.spot_price {
+            SpotPriceConfig::Manual { admin } => {
+                let resp = self.exec(
+                    &admin,
+                    &MarketExecuteMsg::SetManualPrice { price, price_usd },
+                )?;
+
+                Ok(PriceResponse {
+                    base: resp.clone(),
+                    usd: resp,
+                })
+            }
+            SpotPriceConfig::Oracle { .. } => {
+                let base_resp = self.exec_set_oracle_price_base(price, self.now())?;
+                let usd_resp = self.exec_set_oracle_price_usd(price_usd, self.now())?;
+                self.exec_crank_n(&Addr::unchecked(&TEST_CONFIG.protocol_owner), 0)?;
+
+                Ok(PriceResponse {
+                    base: base_resp,
+                    usd: usd_resp,
+                })
+            }
+        }
+    }
+
+    pub fn exec_set_oracle_price_base(
+        &self,
+        price_base: PriceBaseInQuote,
+        timestamp: Timestamp,
     ) -> Result<AppResponse> {
-        self.exec(
-            &Addr::unchecked(&TEST_CONFIG.manual_price_owner),
-            &MarketExecuteMsg::SetManualPrice {
-                price,
-                price_usd: price_usd.unwrap_or(
-                    price
-                        .try_into_usd(&self.id)
-                        .unwrap_or(PriceCollateralInUsd::one()),
-                ),
+        let contract_addr = self.app().simple_oracle_addr.clone();
+
+        self.app().execute_contract(
+            Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            contract_addr,
+            &SimpleOracleExecuteMsg::SetPrice {
+                value: price_base.into_non_zero().into_decimal256(),
+                timestamp: Some(timestamp.into()),
             },
+            &[],
+        )
+    }
+    pub fn exec_set_oracle_price_usd(
+        &self,
+        price_usd: PriceCollateralInUsd,
+        timestamp: Timestamp,
+    ) -> Result<AppResponse> {
+        let contract_addr = self.app().simple_oracle_usd_addr.clone();
+
+        self.app().execute_contract(
+            Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            contract_addr,
+            &SimpleOracleExecuteMsg::SetPrice {
+                value: price_usd.into_number().abs_unsigned(),
+                timestamp: Some(timestamp.into()),
+            },
+            &[],
         )
     }
 
@@ -834,7 +1010,12 @@ impl PerpsMarket {
     pub fn exec_crank_till_finished(&self, sender: &Addr) -> Result<Vec<AppResponse>> {
         let mut responses = Vec::new();
 
-        while self.query_crank_stats()?.is_some() {
+        loop {
+            let status = self.query_status()?;
+            if status.deferred_execution_items == 0 && status.next_crank.is_none() {
+                break;
+            }
+
             let resp = self.exec(
                 sender,
                 &MarketExecuteMsg::Crank {
@@ -856,7 +1037,12 @@ impl PerpsMarket {
     ) -> Result<Vec<AppResponse>> {
         let mut responses = Vec::new();
 
-        while self.query_crank_stats()?.is_some() {
+        loop {
+            let status = self.query_status()?;
+            if status.deferred_execution_items == 0 && status.next_crank.is_none() {
+                break;
+            }
+
             let resp = self.exec(
                 sender,
                 &MarketExecuteMsg::Crank {
@@ -1015,7 +1201,7 @@ impl PerpsMarket {
         slippage_assert: Option<SlippageAssert>,
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
-    ) -> Result<(PositionId, AppResponse)> {
+    ) -> Result<(PositionId, DeferResponse)> {
         self.exec_open_position_raw(
             sender,
             collateral.try_into()?.into(),
@@ -1026,6 +1212,40 @@ impl PerpsMarket {
             stop_loss_override,
             take_profit_override,
         )
+    }
+
+    // Taking TryInto impls allows us to avoid noise in the tests
+    // and just use strings as needed, but exec_open_position_raw
+    // is available where you have the precise type
+    #[allow(clippy::too_many_arguments)]
+    pub fn exec_open_position_refresh_price(
+        &self,
+        sender: &Addr,
+        collateral: impl TryInto<NumberGtZero, Error = anyhow::Error>,
+        leverage: impl TryInto<LeverageToBase, Error = anyhow::Error>,
+        direction: DirectionToBase,
+        max_gains: impl TryInto<MaxGainsInQuote, Error = anyhow::Error>,
+        slippage_assert: Option<SlippageAssert>,
+        stop_loss_override: Option<PriceBaseInQuote>,
+        take_profit_override: Option<PriceBaseInQuote>,
+    ) -> Result<(PositionId, DeferResponse)> {
+        let queue_res = self.exec_open_position_queue_only(
+            sender,
+            collateral,
+            leverage,
+            direction,
+            max_gains,
+            slippage_assert,
+            stop_loss_override,
+            take_profit_override,
+        )?;
+
+        // the queue above doesn't move forward a block
+        // and we need to do that for the price to be valid
+        self.set_time(TimeJump::Blocks(1)).unwrap();
+        self.exec_refresh_price().unwrap();
+
+        self.exec_open_position_process_queue_response(sender, queue_res, None)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1039,7 +1259,74 @@ impl PerpsMarket {
         max_gains: MaxGainsInQuote,
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
-    ) -> Result<(PositionId, AppResponse)> {
+    ) -> Result<(PositionId, DeferResponse)> {
+        let queue_resp = self.exec_open_position_raw_queue_only(
+            sender,
+            collateral,
+            slippage_assert,
+            leverage,
+            direction,
+            max_gains,
+            stop_loss_override,
+            take_profit_override,
+        )?;
+
+        self.exec_open_position_process_queue_response(sender, queue_resp, None)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn exec_open_position_queue_only(
+        &self,
+        sender: &Addr,
+        collateral: impl TryInto<NumberGtZero, Error = anyhow::Error>,
+        leverage: impl TryInto<LeverageToBase, Error = anyhow::Error>,
+        direction: DirectionToBase,
+        max_gains: impl TryInto<MaxGainsInQuote, Error = anyhow::Error>,
+        slippage_assert: Option<SlippageAssert>,
+        stop_loss_override: Option<PriceBaseInQuote>,
+        take_profit_override: Option<PriceBaseInQuote>,
+    ) -> Result<DeferQueueResponse> {
+        self.exec_open_position_raw_queue_only(
+            sender,
+            collateral.try_into()?.into(),
+            slippage_assert,
+            leverage.try_into()?,
+            direction,
+            max_gains.try_into()?,
+            stop_loss_override,
+            take_profit_override,
+        )
+    }
+
+    pub fn exec_open_position_process_queue_response(
+        &self,
+        cranker: &Addr,
+        queue_response: DeferQueueResponse,
+        crank_execs: Option<u32>,
+    ) -> Result<(PositionId, DeferResponse)> {
+        // Open position always happens through a deferred exec
+        let defer_res = self.exec_defer_queue_process(cranker, queue_response, crank_execs)?;
+
+        let res = defer_res.exec_resp().clone();
+
+        let pos_id = res.event_first_value("position-open", "pos-id")?.parse()?;
+
+        Ok((pos_id, defer_res))
+    }
+
+    // this does *not* automatic time jump
+    #[allow(clippy::too_many_arguments)]
+    pub fn exec_open_position_raw_queue_only(
+        &self,
+        sender: &Addr,
+        collateral: Number,
+        slippage_assert: Option<SlippageAssert>,
+        leverage: LeverageToBase,
+        direction: DirectionToBase,
+        max_gains: MaxGainsInQuote,
+        stop_loss_override: Option<PriceBaseInQuote>,
+        take_profit_override: Option<PriceBaseInQuote>,
+    ) -> Result<DeferQueueResponse> {
         if self.id.get_market_type() == MarketType::CollateralIsBase {
             // let price = self.query_current_price()?;
             // let config = self.query_config()?;
@@ -1062,10 +1349,8 @@ impl PerpsMarket {
             },
         )?;
 
-        let res = self.exec_wasm_msg(sender, msg)?;
-        let pos_id = res.event_first_value("position-open", "pos-id")?.parse()?;
-
-        Ok((pos_id, res))
+        // Open position always happens through a deferred exec
+        self.exec_defer_queue_wasm_msg(sender, msg)
     }
 
     pub fn exec_close_position(
@@ -1073,12 +1358,30 @@ impl PerpsMarket {
         sender: &Addr,
         position_id: PositionId,
         slippage_assert: Option<SlippageAssert>,
-    ) -> Result<AppResponse> {
-        self.exec(
+    ) -> Result<DeferResponse> {
+        self.exec_defer(
             sender,
             &MarketExecuteMsg::ClosePosition {
                 id: position_id,
                 slippage_assert,
+            },
+        )
+    }
+    pub fn exec_close_position_queue_only(
+        &self,
+        sender: &Addr,
+        position_id: PositionId,
+        slippage_assert: Option<SlippageAssert>,
+    ) -> Result<DeferQueueResponse> {
+        self.exec_defer_queue_wasm_msg(
+            sender,
+            WasmMsg::Execute {
+                contract_addr: self.addr.to_string(),
+                msg: to_binary(&MarketExecuteMsg::ClosePosition {
+                    id: position_id,
+                    slippage_assert,
+                })?,
+                funds: Vec::new(),
             },
         )
     }
@@ -1088,11 +1391,11 @@ impl PerpsMarket {
         sender: &Addr,
         position_id: PositionId,
         collateral_delta: Signed<Collateral>,
-    ) -> Result<AppResponse> {
+    ) -> Result<DeferResponse> {
         let msg = self.token.into_market_execute_msg(
             &self.addr,
             collateral_delta
-                .try_into_positive_value()
+                .try_into_non_negative_value()
                 .unwrap_or_default(),
             if collateral_delta.is_negative() {
                 MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage {
@@ -1107,9 +1410,7 @@ impl PerpsMarket {
             },
         )?;
 
-        let res = self.exec_wasm_msg(sender, msg)?;
-
-        Ok(res)
+        self.exec_defer_wasm_msg(sender, msg)
     }
 
     pub fn exec_update_position_collateral_impact_size(
@@ -1118,11 +1419,11 @@ impl PerpsMarket {
         position_id: PositionId,
         collateral_delta: Signed<Collateral>,
         slippage_assert: Option<SlippageAssert>,
-    ) -> Result<AppResponse> {
+    ) -> Result<DeferResponse> {
         let msg = self.token.into_market_execute_msg(
             &self.addr,
             collateral_delta
-                .try_into_positive_value()
+                .try_into_non_negative_value()
                 .unwrap_or_default(),
             if collateral_delta.is_negative() {
                 MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
@@ -1141,9 +1442,7 @@ impl PerpsMarket {
             },
         )?;
 
-        let res = self.exec_wasm_msg(sender, msg)?;
-
-        Ok(res)
+        self.exec_defer_wasm_msg(sender, msg)
     }
 
     pub fn exec_update_position_leverage(
@@ -1152,8 +1451,8 @@ impl PerpsMarket {
         position_id: PositionId,
         leverage: LeverageToBase,
         slippage_assert: Option<SlippageAssert>,
-    ) -> Result<AppResponse> {
-        self.exec(
+    ) -> Result<DeferResponse> {
+        self.exec_defer(
             sender,
             &MarketExecuteMsg::UpdatePositionLeverage {
                 id: position_id,
@@ -1163,13 +1462,35 @@ impl PerpsMarket {
         )
     }
 
+    // this does *not* automatic time jump
+    pub fn exec_update_position_leverage_queue_only(
+        &self,
+        sender: &Addr,
+        position_id: PositionId,
+        leverage: LeverageToBase,
+        slippage_assert: Option<SlippageAssert>,
+    ) -> Result<DeferQueueResponse> {
+        self.exec_defer_queue_wasm_msg(
+            sender,
+            WasmMsg::Execute {
+                contract_addr: self.addr.to_string(),
+                msg: to_binary(&MarketExecuteMsg::UpdatePositionLeverage {
+                    id: position_id,
+                    leverage,
+                    slippage_assert,
+                })?,
+                funds: Vec::new(),
+            },
+        )
+    }
+
     pub fn exec_update_position_max_gains(
         &self,
         sender: &Addr,
         position_id: PositionId,
         max_gains: MaxGainsInQuote,
-    ) -> Result<AppResponse> {
-        self.exec(
+    ) -> Result<DeferResponse> {
+        self.exec_defer(
             sender,
             &MarketExecuteMsg::UpdatePositionMaxGains {
                 id: position_id,
@@ -1184,8 +1505,8 @@ impl PerpsMarket {
         position_id: PositionId,
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
-    ) -> Result<AppResponse> {
-        self.exec(
+    ) -> Result<DeferResponse> {
+        self.exec_defer_with_crank_fee(
             sender,
             &MarketExecuteMsg::SetTriggerOrder {
                 id: position_id,
@@ -1206,7 +1527,7 @@ impl PerpsMarket {
         max_gains: MaxGainsInQuote,
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
-    ) -> Result<(OrderId, AppResponse)> {
+    ) -> Result<(OrderId, DeferResponse)> {
         let msg = self.token.into_market_execute_msg(
             &self.addr,
             collateral.raw(),
@@ -1220,16 +1541,22 @@ impl PerpsMarket {
             },
         )?;
 
-        let res = self.exec_wasm_msg(sender, msg)?;
-        let order_id = res
+        let defer_res = self.exec_defer_wasm_msg(sender, msg)?;
+
+        let order_id = defer_res
+            .exec_resp()
             .event_first_value(event_key::PLACE_LIMIT_ORDER, event_key::ORDER_ID)?
             .parse()?;
 
-        Ok((order_id, res))
+        Ok((order_id, defer_res))
     }
 
-    pub fn exec_cancel_limit_order(&self, sender: &Addr, order_id: OrderId) -> Result<AppResponse> {
-        self.exec(sender, &MarketExecuteMsg::CancelLimitOrder { order_id })
+    pub fn exec_cancel_limit_order(
+        &self,
+        sender: &Addr,
+        order_id: OrderId,
+    ) -> Result<DeferResponse> {
+        self.exec_defer(sender, &MarketExecuteMsg::CancelLimitOrder { order_id })
     }
 
     // outside contract queries that require market info like addr
@@ -1568,7 +1895,7 @@ impl PerpsMarket {
             }
 
             ClientToBridgeMsg::RefreshPrice => {
-                on_exec(self.exec_refresh_price());
+                on_exec(self.exec_refresh_price().map(|res| res.base));
             }
 
             ClientToBridgeMsg::Crank => {
@@ -1854,4 +2181,155 @@ impl PerpsMarket {
             .map(LvnToken::from_decimal256)
             .unwrap()
     }
+
+    // this defers a message exec in the sense of Levana perps semantics of "deferred executions"
+    // *not* defer in the sense of native programming jargon, like the golang keyword or until Drop kicks in etc.
+    // this does *not* automatic time jump
+    pub fn exec_defer_queue_wasm_msg(
+        &self,
+        sender: &Addr,
+        msg: WasmMsg,
+    ) -> Result<DeferQueueResponse> {
+        let cosmos_msg = CosmosMsg::Wasm(msg);
+        let res = self.app().execute(sender.clone(), cosmos_msg)?;
+
+        let queue_event = res
+            .event_first("deferred-exec-queued")
+            .and_then(DeferredExecQueuedEvent::try_from)?;
+
+        let value = self.query_deferred_exec(queue_event.deferred_exec_id)?;
+
+        match value.status {
+            DeferredExecStatus::Failure { reason, .. } => Err(anyhow!("{}", reason)),
+            _ => Ok(DeferQueueResponse {
+                event: queue_event,
+                value,
+                response: res,
+            }),
+        }
+    }
+
+    pub fn query_deferred_exec(&self, id: DeferredExecId) -> Result<DeferredExecWithStatus> {
+        let item: GetDeferredExecResp = self.query(&QueryMsg::GetDeferredExec { id })?;
+        match item {
+            GetDeferredExecResp::Found { item } => Ok(*item),
+            GetDeferredExecResp::NotFound {} => {
+                Err(anyhow!("deferred item with id {} not found", id))
+            }
+        }
+    }
+
+    // this *does* automatic time jump
+    // at least in the sense of cranking/moving forward until it gets the deferred execution
+    // i.e. if it happens to be that the queue response is _also_ the exec response, then it won't move forward - otherwise it will
+    pub fn exec_defer_queue_process(
+        &self,
+        cranker: &Addr,
+        queue: DeferQueueResponse,
+        crank_execs: Option<u32>,
+    ) -> Result<DeferResponse> {
+        let mut responses = vec![queue.response];
+
+        // this loops forever if the deferred execution never *happens*
+        // which would be a core bug since by this point it's definitely been queued
+        // it will stop looping whether the deferred execution succeeds or fails
+        // and success/failure can be determined by looking at DeferResponse::exec_event.success
+        loop {
+            if self.debug_001 {
+                //println!("{:#?}", responses.last().as_ref().unwrap());
+                println!("deferred execution items: {}, next crank: {:#?}, next deferred execution: {:#?}", self.query_status().unwrap().deferred_execution_items, self.query_status().unwrap().next_crank, self.query_status().unwrap().next_deferred_execution);
+            }
+            // check before cranking, in case the deferred execution was queued and completed in the same block
+            if let Ok(exec_event) = responses
+                .last()
+                .as_ref()
+                .unwrap()
+                .event_first("deferred-exec-executed")
+                .and_then(DeferredExecExecutedEvent::try_from)
+            {
+                if exec_event.deferred_exec_id == queue.event.deferred_exec_id {
+                    let value = self.query_deferred_exec(exec_event.deferred_exec_id)?;
+                    break match exec_event.success {
+                        true => match value.status {
+                            DeferredExecStatus::Success { .. } => Ok(DeferResponse {
+                                exec_event,
+                                queue_event: queue.event,
+                                value,
+                                responses,
+                            }),
+                            _ => Err(anyhow!(
+                                "expected deferred status of success, but it's {:?}",
+                                value.status
+                            )),
+                        },
+                        false => match value.status {
+                            DeferredExecStatus::Failure { reason, .. } => {
+                                Err(anyhow!("{}", reason))
+                            }
+                            _ => Err(anyhow!(
+                                "expected deferred status of failure, but it's {:?}",
+                                value.status
+                            )),
+                        },
+                    };
+                }
+            }
+
+            // this condition could removed eventually, but for now it might be helpful
+            // to catch bugs in migrating the test code that rely on the time not moving
+            if !self.automatic_time_jump_enabled {
+                bail!("automatic time jump is not enabled, cannot defer wasm msg")
+            }
+
+            // This doesn't seem necessary so far...
+            // if it becomes necessary, maybe check to make sure we really need a price update here
+            // self.exec_refresh_price()?;
+            responses.push(self.exec(
+                cranker,
+                &MarketExecuteMsg::Crank {
+                    execs: crank_execs,
+                    rewards: None,
+                },
+            )?);
+        }
+    }
+
+    pub fn exec_defer_wasm_msg(&self, sender: &Addr, msg: WasmMsg) -> Result<DeferResponse> {
+        let queue_res = self.exec_defer_queue_wasm_msg(sender, msg)?;
+        self.exec_defer_queue_process(sender, queue_res, None)
+    }
+}
+
+#[derive(Debug)]
+pub struct DeferResponse {
+    pub queue_event: DeferredExecQueuedEvent,
+    pub exec_event: DeferredExecExecutedEvent,
+    pub value: DeferredExecWithStatus,
+    pub responses: Vec<AppResponse>,
+}
+
+impl DeferResponse {
+    pub fn queue_resp(&self) -> &AppResponse {
+        // Safe - we only get here if the deferred execution was queued, and by definition that's the first AppResponse we get
+        self.responses.first().unwrap()
+    }
+
+    pub fn exec_resp(&self) -> &AppResponse {
+        // Safe - we only get here if the deferred execution was executed, and by definition that's the last AppResponse we get
+        self.responses.last().unwrap()
+    }
+}
+
+#[derive(Debug)]
+pub struct DeferQueueResponse {
+    pub event: DeferredExecQueuedEvent,
+    pub value: DeferredExecWithStatus,
+    pub response: AppResponse,
+}
+
+#[derive(Debug)]
+pub struct PriceResponse {
+    pub base: AppResponse,
+    // will be identical to the response for `base` for manual prices
+    pub usd: AppResponse,
 }

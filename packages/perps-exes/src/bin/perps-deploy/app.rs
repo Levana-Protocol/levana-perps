@@ -188,12 +188,14 @@ impl Opt {
                         feeds.push(SpotPriceFeed {
                             data: SpotPriceFeedData::Constant { price },
                             inverted,
+                            volatile: None,
                         });
                     }
                     MarketPriceFeedConfig::Sei { denom, inverted } => {
                         feeds.push(SpotPriceFeed {
                             data: SpotPriceFeedData::Sei { denom },
                             inverted,
+                            volatile: None,
                         });
                     }
                     MarketPriceFeedConfig::Stride {
@@ -207,6 +209,7 @@ impl Opt {
                                 age_tolerance_seconds: age_tolerance,
                             },
                             inverted,
+                            volatile: None,
                         });
                     }
                     MarketPriceFeedConfig::Pyth { key, inverted } => {
@@ -234,6 +237,7 @@ impl Opt {
                                 age_tolerance_seconds: pyth_config.update_age_tolerance,
                             },
                             inverted,
+                            volatile: None,
                         });
                     }
                     MarketPriceFeedConfig::Simple {
@@ -252,6 +256,7 @@ impl Opt {
                                 age_tolerance_seconds: age_tolerance,
                             },
                             inverted,
+                            volatile: None,
                         });
                     }
                 }

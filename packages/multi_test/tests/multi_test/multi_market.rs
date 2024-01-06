@@ -1,8 +1,7 @@
-use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
+use levana_perpswap_multi_test::{config::DEFAULT_MARKET, market_wrapper::PerpsMarket, PerpsApp};
 use msg::prelude::*;
 
 #[test]
-#[ignore]
 fn multi_market() {
     let app = PerpsApp::new_cell().unwrap();
     let market_1 = PerpsMarket::new(app.clone()).unwrap();
@@ -13,6 +12,7 @@ fn multi_market() {
         PriceBaseInQuote::try_from_number(Number::ONE).unwrap(),
         Some("1".parse().unwrap()),
         true,
+        DEFAULT_MARKET.spot_price,
     )
     .unwrap();
 

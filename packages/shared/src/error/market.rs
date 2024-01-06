@@ -126,20 +126,26 @@ pub enum MarketError {
         net_notional_before: Signed<Notional>,
         net_notional_after: Signed<Notional>,
     },
-    #[error(
-        "Specified {trigger_type} trigger price of '{specified}' must be {must_be} than '{bound}'."
-    )]
-    InvalidTriggerPrice {
-        must_be: TriggerPriceMustBe,
-        trigger_type: TriggerType,
-        specified: PriceBaseInQuote,
-        bound: PriceBaseInQuote,
-    },
     #[error("Liquidity cooldown in effect, will end in {seconds_remaining} seconds.")]
     LiquidityCooldown {
         ends_at: Timestamp,
         seconds_remaining: u64,
     },
+    #[error("Cannot perform the given action while a pending action is waiting for the position")]
+    PendingDeferredExec {},
+    #[error("The difference between oldest and newest publish timestamp is too large. Oldest: {oldest}. Newest: {newest}.")]
+    VolatilePriceFeedTimeDelta {
+        oldest: Timestamp,
+        newest: Timestamp,
+    },
+    #[error("Limit order {order_id} is already canceling")]
+    LimitOrderAlreadyCanceling { order_id: Uint64 },
+    #[error("Position {position_id} is already closing")]
+    PositionAlreadyClosing { position_id: Uint64 },
+    #[error(
+        "No price publish time found, there is likely a spot price config error for this market"
+    )]
+    NoPricePublishTimeFound,
 }
 
 /// Was the price provided by the trader too high or too low?
@@ -169,8 +175,6 @@ impl Display for TriggerPriceMustBe {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TriggerType {
-    /// A limit order
-    LimitOrder,
     /// A stop loss
     StopLoss,
     /// A take profit
@@ -183,7 +187,6 @@ impl Display for TriggerType {
             f,
             "{}",
             match self {
-                TriggerType::LimitOrder => "limit order",
                 TriggerType::StopLoss => "stop loss",
                 TriggerType::TakeProfit => "take profit",
             }
@@ -270,8 +273,12 @@ impl MarketError {
             MarketError::DeltaNeutralityFeeShortToLong { .. } => {
                 ErrorId::DeltaNeutralityFeeShortToLong
             }
-            MarketError::InvalidTriggerPrice { .. } => ErrorId::InvalidTriggerPrice,
             MarketError::LiquidityCooldown { .. } => ErrorId::LiquidityCooldown,
+            MarketError::PendingDeferredExec {} => ErrorId::PendingDeferredExec,
+            MarketError::VolatilePriceFeedTimeDelta { .. } => ErrorId::VolatilePriceFeedTimeDelta,
+            MarketError::LimitOrderAlreadyCanceling { .. } => ErrorId::LimitOrderAlreadyCanceling,
+            MarketError::PositionAlreadyClosing { .. } => ErrorId::PositionAlreadyClosing,
+            MarketError::NoPricePublishTimeFound => ErrorId::NoPricePublishTimeFound,
         }
     }
 }

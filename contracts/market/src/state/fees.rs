@@ -4,11 +4,11 @@ use crate::state::*;
 use anyhow::Context;
 use cosmwasm_std::Decimal256;
 use cw_storage_plus::Item;
+use msg::contracts::market::deferred_execution::FeesReturnedEvent;
 use msg::contracts::market::entry::Fees;
 use msg::contracts::market::fees::events::{
     CrankFeeEarnedEvent, CrankFeeEvent, FeeEvent, FeeSource, TradeId,
 };
-use msg::contracts::market::order::OrderId;
 use msg::contracts::market::position::PositionId;
 use shared::prelude::*;
 
@@ -101,12 +101,12 @@ impl State<'_> {
         let lp = LP_BORROW_FEE_DATA_SERIES
             .try_load_last(ctx.storage)?
             .map_or(Number::ZERO, |x| x.1.value)
-            .try_into_positive_value()
+            .try_into_non_negative_value()
             .context("LP_BORROW_FEE_DATA_SERIES gave a negative value")?;
         let xlp = XLP_BORROW_FEE_DATA_SERIES
             .try_load_last(ctx.storage)?
             .map_or(Number::ZERO, |x| x.1.value)
-            .try_into_positive_value()
+            .try_into_non_negative_value()
             .context("XLP_BORROW_FEE_DATA_SERIES gave a negative value")?;
         anyhow::ensure!(
             !lp.is_zero() || !xlp.is_zero(),
@@ -195,24 +195,6 @@ impl State<'_> {
         fee_source: FeeSource,
     ) -> Result<()> {
         self.collect_trading_fee_inner(ctx, amount, price, TradeId::Position(pos_id), fee_source)?;
-
-        Ok(())
-    }
-
-    pub(crate) fn collect_limit_order_fee(
-        &self,
-        ctx: &mut StateContext,
-        order_id: OrderId,
-        amount: Collateral,
-        price: PricePoint,
-    ) -> Result<()> {
-        self.collect_trading_fee_inner(
-            ctx,
-            amount,
-            price,
-            TradeId::LimitOrder(order_id),
-            FeeSource::LimitOrder,
-        )?;
 
         Ok(())
     }
@@ -306,13 +288,35 @@ impl State<'_> {
             ALL_FEES.save(ctx.storage, &fees)?;
             self.add_lp_crank_rewards(ctx, addr, payment)?;
 
-            let price_point = self.spot_price(ctx.storage, None)?;
+            let price_point = self.current_spot_price(ctx.storage)?;
             ctx.response_mut().add_event(CrankFeeEarnedEvent {
                 recipient: addr.clone(),
                 amount: payment,
                 amount_usd: price_point.collateral_to_usd_non_zero(payment),
             });
         }
+        Ok(())
+    }
+
+    /// Returns funds to a user as part of the rewards system.
+    ///
+    /// Used when over-paying crank fees
+    pub(crate) fn return_funds_to_user(
+        &self,
+        ctx: &mut StateContext,
+        addr: &Addr,
+        amount: NonZero<Collateral>,
+        price_point: &PricePoint,
+    ) -> Result<()> {
+        let mut fees = ALL_FEES.load(ctx.storage)?;
+        fees.wallets = fees.wallets.checked_add(amount.raw())?;
+        ALL_FEES.save(ctx.storage, &fees)?;
+        self.add_lp_crank_rewards(ctx, addr, amount)?;
+        ctx.response_mut().add_event(FeesReturnedEvent {
+            recipient: addr.clone(),
+            amount,
+            amount_usd: price_point.collateral_to_usd_non_zero(amount),
+        });
         Ok(())
     }
 }

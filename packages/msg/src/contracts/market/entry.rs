@@ -1,4 +1,5 @@
 //! Entrypoint messages for the market
+use super::deferred_execution::DeferredExecId;
 use super::order::LimitOrder;
 use super::position::{ClosedPosition, PositionId};
 use super::spot_price::SpotPriceConfigInit;
@@ -323,6 +324,17 @@ pub enum ExecuteMsg {
         /// volume.
         price_usd: PriceCollateralInUsd,
     },
+
+    /// Perform a deferred exec
+    ///
+    /// This should only ever be called from the market contract itself, any
+    /// other call is guaranteed to fail.
+    PerformDeferredExec {
+        /// Which ID to execute
+        id: DeferredExecId,
+        /// Which price point to use for this execution.
+        price_point_timestamp: Timestamp,
+    },
 }
 
 /// Owner-only messages
@@ -450,7 +462,13 @@ pub enum QueryMsg {
     /// This may be more up-to-date than the spot price which was
     /// validated and pushed into the contract storage via execution messages
     #[returns(OraclePriceResp)]
-    OraclePrice {},
+    OraclePrice {
+        /// If true then it will validate the publish_time age as though it were
+        /// used to push a new spot_price update
+        /// Otherwise, it just returns the oracle price as-is, even if it's old
+        #[serde(default)]
+        validate_age: bool,
+    },
 
     /// * returns [super::position::PositionsResp]
     ///
@@ -642,6 +660,30 @@ pub enum QueryMsg {
         /// The new price of the base asset in terms of quote
         price: PriceBaseInQuote,
     },
+
+    /// Enumerate deferred execution work items for the given trader.
+    ///
+    /// Always begins enumeration from the most recent.
+    ///
+    /// * returns [ListDeferredExecsResp]
+    #[returns(crate::contracts::market::deferred_execution::ListDeferredExecsResp)]
+    ListDeferredExecs {
+        /// Trader wallet address
+        addr: RawAddr,
+        /// Previously seen final ID.
+        start_after: Option<DeferredExecId>,
+        /// How many items to request per batch.
+        limit: Option<u32>,
+    },
+
+    /// Get a single deferred execution item, if available.
+    ///
+    /// * returns [GetDeferredExecResp]
+    #[returns(crate::contracts::market::deferred_execution::GetDeferredExecResp)]
+    GetDeferredExec {
+        /// ID
+        id: DeferredExecId,
+    },
 }
 
 /// Response for [QueryMsg::OraclePrice]
@@ -650,7 +692,7 @@ pub struct OraclePriceResp {
     /// A map of each pyth id used in this market to the price and publish time
     pub pyth: BTreeMap<PriceIdentifier, OraclePriceFeedPythResp>,
     /// A map of each sei denom used in this market to the price
-    pub sei: BTreeMap<String, NumberGtZero>,
+    pub sei: BTreeMap<String, OraclePriceFeedSeiResp>,
     /// A map of each stride denom used in this market to the redemption price
     pub stride: BTreeMap<String, OraclePriceFeedStrideResp>,
     /// A map of each simple contract used in this market to the contract price
@@ -667,6 +709,19 @@ pub struct OraclePriceFeedPythResp {
     pub price: NumberGtZero,
     /// The pyth publish time
     pub publish_time: Timestamp,
+    /// Is this considered a volatile feed?
+    pub volatile: bool,
+}
+
+/// Part of [OraclePriceResp]
+#[cw_serde]
+pub struct OraclePriceFeedSeiResp {
+    /// The Sei price
+    pub price: NumberGtZero,
+    /// The Sei publish time
+    pub publish_time: Timestamp,
+    /// Is this considered a volatile feed?
+    pub volatile: bool,
 }
 
 /// Part of [OraclePriceResp]
@@ -676,6 +731,8 @@ pub struct OraclePriceFeedStrideResp {
     pub redemption_rate: NumberGtZero,
     /// The redemption price publish time
     pub publish_time: Timestamp,
+    /// Is this considered a volatile feed?
+    pub volatile: bool,
 }
 
 /// Part of [OraclePriceResp]
@@ -687,6 +744,9 @@ pub struct OraclePriceFeedSimpleResp {
     pub block_info: BlockInfo,
     /// Optional timestamp for the price, independent of block_info.time
     pub timestamp: Option<Timestamp>,
+    /// Is this considered a volatile feed?
+    #[serde(default)]
+    pub volatile: bool,
 }
 
 /// When querying an open position, how do we calculate PnL vis-a-vis fees?
@@ -1183,8 +1243,16 @@ pub struct StatusResp {
     pub next_crank: Option<CrankWorkInfo>,
     /// Timestamp of the last completed crank
     pub last_crank_completed: Option<Timestamp>,
-    /// Size of the unpend queue
-    pub unpend_queue_size: u32,
+    /// Earliest deferred execution price timestamp needed
+    pub next_deferred_execution: Option<Timestamp>,
+    /// Latest deferred execution price timestamp needed
+    pub newest_deferred_execution: Option<Timestamp>,
+    /// Next liquifunding work item timestamp
+    pub next_liquifunding: Option<Timestamp>,
+    /// Number of work items sitting in the deferred execution queue
+    pub deferred_execution_items: u32,
+    /// Last processed deferred execution ID, if any
+    pub last_processed_deferred_exec_id: Option<DeferredExecId>,
     /// Overall borrow fee rate (annualized), combining LP and xLP
     pub borrow_fee: Decimal256,
     /// LP component of [Self::borrow_fee]
@@ -1214,22 +1282,8 @@ pub struct StatusResp {
     /// Amount of collateral in the delta neutrality fee fund.
     pub delta_neutrality_fee_fund: Collateral,
 
-    /// Have we reached staleness of the protocol via old liquifundings? If so, contains [Option::Some], and the timestamp when that happened.
-    pub stale_liquifunding: Option<Timestamp>,
-    /// Is the last price update too old? If so, contains [Option::Some], and the timestamp when the price became too old.
-    pub stale_price: Option<Timestamp>,
-    /// Are we in the congested state where new positions cannot be opened?
-    pub congested: bool,
-
     /// Fees held by the market contract
     pub fees: Fees,
-}
-
-impl StatusResp {
-    /// Is the protocol stale from either liquifunding delay or old prices?
-    pub fn is_stale(&self) -> bool {
-        self.stale_liquifunding.is_some() || self.stale_price.is_some()
-    }
 }
 
 /// Response for [QueryMsg::LimitOrderHistory]

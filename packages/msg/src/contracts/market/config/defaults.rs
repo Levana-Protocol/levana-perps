@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 use super::MaxLiquidity;
 use cosmwasm_std::Decimal256;
-use shared::storage::{Collateral, NonZero, Number, NumberGtZero, Usd};
+use shared::storage::{NonZero, Number, NumberGtZero, Usd};
 
 pub struct ConfigDefaults {}
 
@@ -40,12 +40,6 @@ impl ConfigDefaults {
     pub const fn liquifunding_delay_seconds() -> u32 {
         60 * 60 * 6
     }
-    pub const fn price_update_too_old_seconds() -> u32 {
-        60 * 30
-    }
-    pub const fn staleness_seconds() -> u32 {
-        60 * 60 * 2
-    }
     pub fn protocol_tax() -> Decimal256 {
         "0.3".parse().unwrap()
     }
@@ -83,20 +77,17 @@ impl ConfigDefaults {
     pub fn delta_neutrality_fee_tax() -> Decimal256 {
         "0.05".parse().unwrap()
     }
-    pub fn limit_order_fee() -> Collateral {
-        Collateral::from(0u64)
-    }
     pub fn crank_fee_charged() -> Usd {
-        "0.01".parse().unwrap()
+        "0.025".parse().unwrap()
+    }
+    pub fn crank_fee_surcharge() -> Usd {
+        "0.02".parse().unwrap()
     }
     pub fn crank_fee_reward() -> Usd {
-        "0.001".parse().unwrap()
+        "0.005".parse().unwrap()
     }
     pub fn minimum_deposit_usd() -> Usd {
         "5".parse().unwrap()
-    }
-    pub const fn unpend_limit() -> u32 {
-        500
     }
 
     pub const fn liquifunding_delay_fuzz_seconds() -> u32 {

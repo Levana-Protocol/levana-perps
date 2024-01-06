@@ -27,7 +27,11 @@ pub struct PricePoint {
     pub price_usd: PriceCollateralInUsd,
     /// Price of the base asset in terms of the quote.
     pub price_base: PriceBaseInQuote,
-    /// Timestamp of when this price was entered into the system.
+    /// Publish time of this price point.
+    ///
+    /// Before deferred execution, this was the block time when the field was
+    /// added. Since deferred execution, this is a calculated value based on the publish
+    /// times of individual feeds.
     pub timestamp: Timestamp,
     /// Is the notional asset USD?
     ///
@@ -41,8 +45,12 @@ pub struct PricePoint {
     /// price conversions.
     pub market_type: MarketType,
     /// Latest price publish time for the feeds composing the price, if available
+    ///
+    /// This field will always be empty since implementation of deferred execution.
     pub publish_time: Option<Timestamp>,
     /// Latest price publish time for the feeds composing the price_usd, if available
+    ///
+    /// This field will always be empty since implementation of deferred execution.
     pub publish_time_usd: Option<Timestamp>,
 }
 

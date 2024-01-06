@@ -197,7 +197,7 @@ pub mod events {
 
     impl LiquidityPoolSizeEvent {
         /// Generate a value from protocol stats and the current price.
-        pub fn from_stats(stats: &LiquidityStats, price: PricePoint) -> Self {
+        pub fn from_stats(stats: &LiquidityStats, price: &PricePoint) -> Self {
             let total_collateral = stats.total_collateral();
             let total_tokens = stats.total_tokens();
             let (lp_collateral, xlp_collateral) = if total_tokens.is_zero() {

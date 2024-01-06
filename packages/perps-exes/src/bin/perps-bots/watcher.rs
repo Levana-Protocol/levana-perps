@@ -28,7 +28,6 @@ use crate::util::markets::Market;
 pub(crate) enum TaskLabel {
     GetFactory,
     Stale,
-    CrankWatch,
     CrankRun { index: usize },
     Price,
     TrackBalance,
@@ -51,7 +50,6 @@ impl TaskLabel {
         match s {
             "get-factory" => Some(TaskLabel::GetFactory),
             "stale" => Some(TaskLabel::Stale),
-            "crank-watch" => Some(TaskLabel::CrankWatch),
             "price" => Some(TaskLabel::Price),
             "track-balance" => Some(TaskLabel::TrackBalance),
             "stats" => Some(TaskLabel::Stats),
@@ -77,7 +75,6 @@ impl TaskLabel {
         match self {
             TaskLabel::GetFactory => false,
             TaskLabel::Stale => false,
-            TaskLabel::CrankWatch => true,
             TaskLabel::CrankRun { index: _ } => true,
             TaskLabel::Price => true,
             TaskLabel::TrackBalance => false,
@@ -229,7 +226,6 @@ impl TaskLabel {
             TaskLabel::Trader { index: _ } => config.trader,
             TaskLabel::Utilization => config.utilization,
             TaskLabel::TrackBalance => config.track_balance,
-            TaskLabel::CrankWatch => config.crank_watch,
             TaskLabel::CrankRun { index: _ } => config.crank_run,
             TaskLabel::GetFactory => config.get_factory,
             TaskLabel::Price => config.price,
@@ -249,7 +245,6 @@ impl TaskLabel {
         }
         match self {
             TaskLabel::GetFactory => true,
-            TaskLabel::CrankWatch => true,
             TaskLabel::CrankRun { index: _ } => true,
             TaskLabel::Price => true,
             TaskLabel::TrackBalance => false,
@@ -272,7 +267,6 @@ impl TaskLabel {
     fn ident(self) -> Cow<'static, str> {
         match self {
             TaskLabel::GetFactory => "get-factory".into(),
-            TaskLabel::CrankWatch => "crank-watch".into(),
             TaskLabel::CrankRun { index } => format!("crank-run-{index}").into(),
             TaskLabel::Price => "price".into(),
             TaskLabel::TrackBalance => "track-balance".into(),
@@ -361,6 +355,7 @@ impl AppBuilder {
         }
         let app = self.app.clone();
         let future = Box::pin(async move {
+            let mut last_seen_block_height = 0;
             let mut retries = 0;
             loop {
                 let old_counts = {
@@ -375,7 +370,6 @@ impl AppBuilder {
                     };
                     guard.counts
                 };
-                let before = tokio::time::Instant::now();
                 let res = task
                     .run_single_with_timeout(
                         app.clone(),
@@ -472,11 +466,24 @@ impl AppBuilder {
                                     tokio::time::sleep(tokio::time::Duration::from_secs(secs))
                                         .await;
                                 }
-                                perps_exes::config::Delay::Interval(secs) => {
-                                    if let Some(after) =
-                                        before.checked_add(tokio::time::Duration::from_secs(secs))
-                                    {
-                                        tokio::time::sleep_until(after).await;
+                                perps_exes::config::Delay::NewBlock => {
+                                    // Wait for a new block to appear
+                                    loop {
+                                        match app.cosmos.get_latest_block_info().await {
+                                            Ok(latest) => {
+                                                if last_seen_block_height < latest.height {
+                                                    last_seen_block_height = latest.height;
+                                                    break;
+                                                }
+                                            }
+                                            Err(e) => {
+                                                tracing::error!(
+                                                    "Unable to query latest block info: {e:?}"
+                                                );
+                                            }
+                                        }
+                                        tokio::time::sleep(tokio::time::Duration::from_millis(200))
+                                            .await;
                                     }
                                 }
                             };

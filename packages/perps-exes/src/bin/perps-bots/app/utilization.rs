@@ -3,7 +3,6 @@ use std::sync::Arc;
 use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, HasAddress, Wallet};
-use msg::contracts::market::entry::StatusResp;
 use perps_exes::{config::UtilizationConfig, prelude::*};
 
 use crate::{
@@ -45,7 +44,7 @@ impl WatchedTaskPerMarket for Utilization {
         _factory: &FactoryInfo,
         market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, &market.market, self.testnet.faucet, &market.status).await
+        single_market(self, &market.market, self.testnet.faucet).await
     }
 }
 
@@ -53,14 +52,8 @@ async fn single_market(
     worker: &Utilization,
     market: &MarketContract,
     faucet: Address,
-    status: &StatusResp,
 ) -> Result<WatchedTaskOutput> {
-    if status.is_stale() {
-        return Ok(WatchedTaskOutput::new(
-            "Protocol is currently stale, skipping",
-        ));
-    }
-
+    let status = market.status().await?;
     let total = status.liquidity.total_collateral();
     if total.is_zero() {
         return Ok(WatchedTaskOutput::new("No deposited collateral"));
@@ -100,7 +93,7 @@ async fn single_market(
         tracing::info!("Low utilization ratio, opening positions.");
 
         let balance = market
-            .get_collateral_balance(status, worker.wallet.get_address())
+            .get_collateral_balance(&status, worker.wallet.get_address())
             .await?;
         let cw20 = match &status.collateral {
             msg::token::Token::Cw20 {
@@ -124,7 +117,7 @@ async fn single_market(
                     worker.app.cosmos.clone(),
                     worker.wallet.get_address(),
                     "200000".parse().unwrap(),
-                    status,
+                    &status,
                     cw20,
                     faucet,
                 )
@@ -202,7 +195,7 @@ async fn single_market(
         let res = market
             .open_position(
                 &worker.wallet,
-                status,
+                &status,
                 deposit_collateral,
                 direction,
                 leverage,

@@ -33,7 +33,7 @@ impl State<'_> {
     ) -> Result<()> {
         match mcp {
             MaybeClosedPosition::Open(mut position) => {
-                let price_point = self.spot_price(ctx.storage, Some(ends_at))?;
+                let price_point = self.spot_price(ctx.storage, ends_at)?;
                 self.position_save(ctx, &mut position, &price_point, true, false, reason)?;
                 Ok(())
             }
@@ -51,8 +51,12 @@ impl State<'_> {
         ends_at: Timestamp,
         charge_crank_fee: bool,
     ) -> Result<MaybeClosedPosition> {
-        let start_price = self.spot_price(ctx.storage, Some(starts_at))?;
-        let end_price = self.spot_price(ctx.storage, Some(ends_at))?;
+        debug_assert!(starts_at <= ends_at);
+        debug_assert!(starts_at == pos.liquifunded_at);
+        debug_assert!(pos.next_liquifunding >= ends_at);
+
+        let start_price = self.spot_price(ctx.storage, starts_at)?;
+        let end_price = self.spot_price(ctx.storage, ends_at)?;
         let config = &self.config;
 
         // PERP-996 we don't allow the liquifunding process to flip
@@ -74,21 +78,20 @@ impl State<'_> {
         )? {
             MaybeClosedPosition::Open(pos) => pos,
             MaybeClosedPosition::Close(instructions) => {
-                return Ok(MaybeClosedPosition::Close(instructions))
+                return Ok(MaybeClosedPosition::Close(instructions));
             }
         };
 
         let slippage_liquidation_margin = pos.liquidation_margin.delta_neutrality;
         let (mcp, exposure) = pos.settle_price_exposure(
             start_price.price_notional,
-            end_price.price_notional,
+            end_price,
             // Make sure we have at least enough funds set aside for delta
             // neutrality fee when closing.
             slippage_liquidation_margin,
-            ends_at,
         )?;
 
-        self.liquidity_update_locked(ctx, -exposure)?;
+        self.liquidity_update_locked(ctx, -exposure, &end_price)?;
 
         let mut pos = match mcp {
             MaybeClosedPosition::Open(pos) => pos,
@@ -99,20 +102,16 @@ impl State<'_> {
 
         // After settlement, a position might need to be liquidated because the position does not
         // have enough collateral left to cover the liquidation margin for the upcoming period.
-        let liquidation_margin = pos.liquidation_margin(
-            end_price.price_notional,
-            &self.spot_price(ctx.storage, None)?,
-            config,
-        )?;
+        let liquidation_margin = pos.liquidation_margin(&end_price, config)?;
         if pos.active_collateral.raw() <= liquidation_margin.total() {
             return Ok(MaybeClosedPosition::Close(ClosePositionInstructions {
                 pos,
                 // Exposure is 0 here: we've already added in the exposure
                 // value from settling above.
                 exposure: Signed::zero(),
-                close_time: ends_at,
-                settlement_time: ends_at,
+                settlement_price: end_price,
                 reason: PositionCloseReason::Liquidated(LiquidationReason::Liquidated),
+                closed_during_liquifunding: true,
             }));
         }
 
@@ -131,14 +130,14 @@ impl State<'_> {
             return Ok(MaybeClosedPosition::Close(ClosePositionInstructions {
                 pos,
                 exposure: Signed::zero(),
-                close_time: ends_at,
-                settlement_time: ends_at,
+                settlement_price: end_price,
                 reason: PositionCloseReason::Liquidated(LiquidationReason::MaxGains),
+                closed_during_liquifunding: true,
             }));
         };
 
         // Position does not need to be closed
-        self.set_next_liquifunding_and_stale_at(&mut pos, ends_at);
+        self.set_next_liquifunding(&mut pos, ends_at);
         pos.liquidation_margin = liquidation_margin;
         Ok(MaybeClosedPosition::Open(pos))
     }
@@ -146,18 +145,11 @@ impl State<'_> {
     /// Updates the liquifunded_at, next_liquifunding, and stale_at fields of the position.
     ///
     /// Includes logic for randomization of the next_liquifunding field
-    pub(crate) fn set_next_liquifunding_and_stale_at(
-        &self,
-        pos: &mut Position,
-        liquifunded_at: Timestamp,
-    ) {
+    pub(crate) fn set_next_liquifunding(&self, pos: &mut Position, liquifunded_at: Timestamp) {
         // First set up the values correctly
         pos.liquifunded_at = liquifunded_at;
         pos.next_liquifunding =
             liquifunded_at.plus_seconds(self.config.liquifunding_delay_seconds.into());
-        pos.stale_at = pos
-            .next_liquifunding
-            .plus_seconds(self.config.staleness_seconds.into());
 
         if self.config.liquifunding_delay_fuzz_seconds != 0 {
             // Next we're going to add a bit of randomization to schedule the

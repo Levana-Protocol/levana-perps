@@ -46,10 +46,10 @@ trader:
 initial-prices:
   ATOM_USD:
     price: 7
-    price_usd: 1
+    price_usd: 7
   stATOM_USD:
     price: 8
-    price_usd: 1
+    price_usd: 8
   ETH_BTC:
     price: 0.5
     price_usd: 28000

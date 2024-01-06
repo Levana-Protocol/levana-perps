@@ -64,9 +64,8 @@ pub(crate) struct BotConfig {
     pub(crate) crank_wallets: Vec<Wallet>,
     pub(crate) watcher: WatcherConfig,
     pub(crate) gas_multiplier: Option<f64>,
-    pub(crate) max_price_age_secs: u32,
-    pub(crate) min_price_age_secs: u32,
-    pub(crate) max_allowed_price_delta: Decimal256,
+    /// Parameters for checking if we need to do a price update or crank
+    pub(crate) needs_price_update_params: NeedsPriceUpdateParams,
     pub(crate) gas_decimals: GasDecimals,
     pub(crate) http_timeout_seconds: u32,
     /// Default minimum gas amount
@@ -78,6 +77,13 @@ pub(crate) struct BotConfig {
     pub(crate) ignored_markets: HashSet<MarketId>,
     /// How many seconds to ignore errors after an epoch
     pub(crate) ignore_errors_after_epoch_seconds: u32,
+}
+
+pub(crate) struct NeedsPriceUpdateParams {
+    /// How old an on-chain price update can be before we do an update.
+    pub(crate) on_chain_publish_time_age_threshold: chrono::Duration,
+    /// How large a price delta we need before pushing a price update.
+    pub(crate) on_off_chain_price_delta: Decimal256,
 }
 
 impl BotConfig {
@@ -202,9 +208,12 @@ impl Opt {
             },
             watcher: partial.watcher.clone(),
             gas_multiplier,
-            max_price_age_secs: partial.max_price_age_secs,
-            min_price_age_secs: partial.min_price_age_secs,
-            max_allowed_price_delta: partial.max_allowed_price_delta,
+            needs_price_update_params: NeedsPriceUpdateParams {
+                on_chain_publish_time_age_threshold: chrono::Duration::seconds(
+                    partial.max_price_age_secs.into(),
+                ),
+                on_off_chain_price_delta: partial.max_allowed_price_delta,
+            },
             gas_decimals,
             http_timeout_seconds,
             min_gas: partial.min_gas,
@@ -229,7 +238,6 @@ impl Opt {
             min_gas_refill,
             watcher_config,
             max_price_age_secs,
-            min_price_age_secs,
             max_allowed_price_delta,
             low_util_ratio,
             high_util_ratio,
@@ -286,12 +294,15 @@ impl Opt {
             crank_wallets,
             watcher,
             gas_multiplier: *gas_multiplier,
-            max_price_age_secs: max_price_age_secs
-                .unwrap_or_else(perps_exes::config::defaults::max_price_age_secs),
-            min_price_age_secs: min_price_age_secs
-                .unwrap_or_else(perps_exes::config::defaults::min_price_age_secs),
-            max_allowed_price_delta: max_allowed_price_delta
-                .unwrap_or_else(perps_exes::config::defaults::max_allowed_price_delta),
+            needs_price_update_params: NeedsPriceUpdateParams {
+                on_chain_publish_time_age_threshold: chrono::Duration::seconds(
+                    max_price_age_secs
+                        .unwrap_or_else(perps_exes::config::defaults::max_price_age_secs)
+                        .into(),
+                ),
+                on_off_chain_price_delta: max_allowed_price_delta
+                    .unwrap_or_else(perps_exes::config::defaults::max_allowed_price_delta),
+            },
             gas_decimals,
             http_timeout_seconds: *http_timeout_seconds,
             min_gas: *min_gas,

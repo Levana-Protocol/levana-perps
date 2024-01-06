@@ -48,8 +48,6 @@ pub(crate) fn update_config(
         funding_rate_max_annualized,
         mute_events,
         liquifunding_delay_seconds,
-        price_update_too_old_seconds,
-        staleness_seconds,
         protocol_tax,
         unstake_period_seconds,
         target_utilization,
@@ -61,11 +59,10 @@ pub(crate) fn update_config(
         delta_neutrality_fee_sensitivity,
         delta_neutrality_fee_cap,
         delta_neutrality_fee_tax,
-        limit_order_fee,
         crank_fee_charged,
+        crank_fee_surcharge,
         crank_fee_reward,
         minimum_deposit_usd: minimum_deposit,
-        unpend_limit,
         liquifunding_delay_fuzz_seconds,
         max_liquidity,
         disable_position_nft_exec,
@@ -109,14 +106,6 @@ pub(crate) fn update_config(
         config.liquifunding_delay_seconds = x;
     }
 
-    if let Some(x) = price_update_too_old_seconds {
-        config.price_update_too_old_seconds = x;
-    }
-
-    if let Some(x) = staleness_seconds {
-        config.staleness_seconds = x;
-    }
-
     if let Some(protocol_tax) = protocol_tax {
         config.protocol_tax = protocol_tax;
     }
@@ -157,22 +146,17 @@ pub(crate) fn update_config(
         config.delta_neutrality_fee_tax = x;
     }
 
-    if let Some(x) = limit_order_fee {
-        config.limit_order_fee = x;
-    }
-
     if let Some(x) = crank_fee_charged {
         config.crank_fee_charged = x;
     }
-
+    if let Some(x) = crank_fee_surcharge {
+        config.crank_fee_surcharge = x;
+    }
     if let Some(x) = crank_fee_reward {
         config.crank_fee_reward = x;
     }
     if let Some(x) = minimum_deposit {
         config.minimum_deposit_usd = x;
-    }
-    if let Some(x) = unpend_limit {
-        config.unpend_limit = x;
     }
     if let Some(x) = liquifunding_delay_fuzz_seconds {
         config.liquifunding_delay_fuzz_seconds = x;
@@ -211,6 +195,7 @@ pub(crate) fn convert_spot_price_init(
             stride,
             feeds,
             feeds_usd,
+            volatile_diff_seconds,
         } => {
             ensure!(!feeds.is_empty(), "feeds cannot be empty");
             ensure!(!feeds_usd.is_empty(), "feeds_usd cannot be empty");
@@ -224,6 +209,7 @@ pub(crate) fn convert_spot_price_init(
                     .map(|feed| {
                         Ok(SpotPriceFeed {
                             inverted: feed.inverted,
+                            volatile: feed.volatile,
                             data: match feed.data {
                                 SpotPriceFeedDataInit::Constant { price } => {
                                     SpotPriceFeedData::Constant { price }
@@ -279,6 +265,7 @@ pub(crate) fn convert_spot_price_init(
                     .transpose()?,
                 feeds: map_feeds(api, feeds)?,
                 feeds_usd: map_feeds(api, feeds_usd)?,
+                volatile_diff_seconds,
             }
         }
     })

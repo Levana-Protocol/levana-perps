@@ -17,7 +17,7 @@ impl State<'_> {
         &self,
         store: &dyn Storage,
         notional_delta: Signed<Notional>,
-        price: PricePoint,
+        price: &PricePoint,
         liquidation_margin_factor: Option<Collateral>,
     ) -> Result<Signed<Collateral>> {
         let mut calc = DeltaNeutralityFeeMultiPass::new(
@@ -38,13 +38,13 @@ impl State<'_> {
         store: &dyn Storage,
         pos: &mut Position,
         notional_delta: Signed<Notional>,
-        price: PricePoint,
+        price: &PricePoint,
         reason: DeltaNeutralityFeeReason,
     ) -> Result<ChargeDeltaNeutralityFeeResult> {
         let res =
             self.charge_delta_neutrality_fee_no_update(store, pos, notional_delta, price, reason)?;
         pos.active_collateral = pos.active_collateral.checked_sub_signed(res.fee)?;
-        pos.add_delta_neutrality_fee(res.fee, &price)?;
+        pos.add_delta_neutrality_fee(res.fee, price)?;
         Ok(res)
     }
 
@@ -55,7 +55,7 @@ impl State<'_> {
         store: &dyn Storage,
         pos: &Position,
         notional_delta: Signed<Notional>,
-        price: PricePoint,
+        price: &PricePoint,
         reason: DeltaNeutralityFeeReason,
     ) -> Result<ChargeDeltaNeutralityFeeResult> {
         let mut calc = DeltaNeutralityFeeMultiPass::new(
@@ -104,7 +104,7 @@ impl State<'_> {
             cap_triggered_info: calc.cap_triggered_info,
             total_funds_after,
             protocol_fees,
-            price,
+            price: *price,
         })
     }
 }
@@ -163,6 +163,7 @@ impl ChargeDeltaNeutralityFeeResult {
 
 // the delta neutrality fee is done in multiple passes sometimes
 // so it's all encapsulated in this struct
+#[derive(Debug)]
 struct DeltaNeutralityFeeMultiPass {
     fees: Signed<Collateral>,
     total_in_fund_before_calc: Collateral,
@@ -186,7 +187,7 @@ impl DeltaNeutralityFeeMultiPass {
         config: Config,
         net_notional: Signed<Notional>,
         delta_notional: Signed<Notional>,
-        price: PricePoint,
+        price: &PricePoint,
         liquidation_margin_factor: Option<Collateral>,
     ) -> Result<Self> {
         Ok(Self {
@@ -195,7 +196,7 @@ impl DeltaNeutralityFeeMultiPass {
             delta_notional,
             fees: Signed::<Collateral>::zero(),
             total_in_fund_before_calc: DELTA_NEUTRALITY_FUND.may_load(store)?.unwrap_or_default(),
-            price,
+            price: *price,
             liquidation_margin_factor,
             cap_triggered_info: None,
         })

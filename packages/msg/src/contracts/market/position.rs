@@ -40,8 +40,12 @@ pub struct Position {
     pub counter_collateral: NonZero<Collateral>,
     /// This is signed, where negative represents a short and positive is a long
     pub notional_size: Signed<Notional>,
-    /// When the position was created.
+    /// When the position was created, in terms of block time.
     pub created_at: Timestamp,
+    /// Price point timestamp of the crank that created this position.
+    ///
+    /// This field is only used since deferred execution, before that it is `None`.
+    pub price_point_created_at: Option<Timestamp>,
     /// The one-time fee paid when opening or updating a position
     ///
     /// this value is the current balance, including all updates
@@ -76,9 +80,6 @@ pub struct Position {
     /// has passed. Additionally, liquifunding may be triggered by updating the
     /// position.
     pub next_liquifunding: Timestamp,
-    /// At what point will this position be stale? Staleness means we cannot
-    /// guarantee sufficient liquidation margin is present to cover fees.
-    pub stale_at: Timestamp,
     /// A trader specified price at which the position will be liquidated
     pub stop_loss_override: Option<PriceBaseInQuote>,
     /// Stored separately to ensure there are no rounding errors, since we need precise binary equivalence for lookups.
@@ -148,8 +149,10 @@ pub struct PositionQueryResponse {
     pub leverage: LeverageToBase,
     /// Leverage of the counter collateral
     pub counter_leverage: LeverageToBase,
-    /// When the position was opened
+    /// When the position was opened, block time
     pub created_at: Timestamp,
+    /// Price point used for creating this position
+    pub price_point_created_at: Option<Timestamp>,
     /// When the position was last liquifunded
     pub liquifunded_at: Timestamp,
 
@@ -234,8 +237,6 @@ pub struct PositionQueryResponse {
 
     /// When the next liquifunding is scheduled
     pub next_liquifunding: Timestamp,
-    /// Point at which this position will be stale if not liquifunded
-    pub stale_at: Timestamp,
 
     /// Stop loss price set by the trader
     pub stop_loss_override: Option<PriceBaseInQuote>,
@@ -257,7 +258,7 @@ impl Position {
     pub fn max_gains_in_quote(
         &self,
         market_type: MarketType,
-        price_point: PricePoint,
+        price_point: &PricePoint,
     ) -> Result<MaxGainsInQuote> {
         match market_type {
             MarketType::CollateralIsQuote => Ok(MaxGainsInQuote::Finite(
@@ -265,7 +266,7 @@ impl Position {
                     .checked_div_collateral(self.active_collateral)?,
             )),
             MarketType::CollateralIsBase => {
-                let take_profit_price = self.take_profit_price(&price_point, market_type)?;
+                let take_profit_price = self.take_profit_price(price_point, market_type)?;
                 let take_profit_price = match take_profit_price {
                     Some(price) => price,
                     None => return Ok(MaxGainsInQuote::PosInfinity),
@@ -354,13 +355,10 @@ impl Position {
 
     /// Computes the liquidation margin for the position
     ///
-    /// `price` is the price at the last liquifunding.
-    ///
-    /// `current_price_point` is used for converting fees from USD to collateral.
+    /// Takes the price point of the last liquifunding.
     pub fn liquidation_margin(
         &self,
-        price: Price,
-        current_price_point: &PricePoint,
+        price_point: &PricePoint,
         config: &Config,
     ) -> Result<LiquidationMargin> {
         const SEC_PER_YEAR: u64 = 31_536_000;
@@ -368,7 +366,8 @@ impl Position {
         // Panicking is fine here, it's a hard-coded value
         let ms_per_year = Decimal256::from_atomics(MS_PER_YEAR, 0).unwrap();
 
-        let duration = config.liquidation_margin_duration().as_ms_decimal_lossy();
+        let duration =
+            Duration::from_seconds(config.liquifunding_delay_seconds.into()).as_ms_decimal_lossy();
 
         let borrow_fee_max_rate =
             config.borrow_fee_rate_max_annualized.raw() * duration / ms_per_year;
@@ -380,12 +379,12 @@ impl Position {
 
         let max_price = match self.direction() {
             DirectionToNotional::Long => {
-                price.into_decimal256()
+                price_point.price_notional.into_decimal256()
                     + self.counter_collateral.into_decimal256()
                         / self.notional_size.abs_unsigned().into_decimal256()
             }
             DirectionToNotional::Short => {
-                price.into_decimal256()
+                price_point.price_notional.into_decimal256()
                     + self.active_collateral.into_decimal256()
                         / self.notional_size.abs_unsigned().into_decimal256()
             }
@@ -403,7 +402,7 @@ impl Position {
             borrow: borrow_fee_max_payment,
             funding: Collateral::from_decimal256(funding_max_payment),
             delta_neutrality: Collateral::from_decimal256(slippage_max),
-            crank: current_price_point.usd_to_collateral(config.crank_fee_charged),
+            crank: price_point.usd_to_collateral(config.crank_fee_charged),
         })
     }
 
@@ -471,11 +470,10 @@ impl Position {
     pub fn settle_price_exposure(
         mut self,
         start_price: Price,
-        end_price: Price,
+        end_price: PricePoint,
         liquidation_margin: Collateral,
-        ends_at: Timestamp,
     ) -> Result<(MaybeClosedPosition, Signed<Collateral>)> {
-        let price_delta = end_price.into_number() - start_price.into_number();
+        let price_delta = end_price.price_notional.into_number() - start_price.into_number();
         let exposure =
             Signed::<Collateral>::from_number(price_delta * self.notional_size.into_number());
         let min_exposure = liquidation_margin
@@ -488,9 +486,9 @@ impl Position {
                 MaybeClosedPosition::Close(ClosePositionInstructions {
                     pos: self,
                     exposure: min_exposure,
-                    close_time: ends_at,
-                    settlement_time: ends_at,
+                    settlement_price: end_price,
                     reason: PositionCloseReason::Liquidated(LiquidationReason::Liquidated),
+                    closed_during_liquifunding: true,
                 }),
                 min_exposure,
             )
@@ -499,9 +497,9 @@ impl Position {
                 MaybeClosedPosition::Close(ClosePositionInstructions {
                     pos: self,
                     exposure: max_exposure,
-                    close_time: ends_at,
-                    settlement_time: ends_at,
+                    settlement_price: end_price,
                     reason: PositionCloseReason::Liquidated(LiquidationReason::MaxGains),
+                    closed_during_liquifunding: true,
                 }),
                 max_exposure,
             )
@@ -516,10 +514,9 @@ impl Position {
     #[allow(clippy::too_many_arguments)]
     pub fn into_query_response_extrapolate_exposure(
         self,
-        start_price: Price,
+        start_price: PricePoint,
         end_price: PricePoint,
         entry_price: Price,
-        current_price_point: &PricePoint,
         config: &Config,
         market_type: MarketType,
         original_direction_to_base: DirectionToBase,
@@ -529,14 +526,12 @@ impl Position {
         // parameter to liquidation_margin. It's used exclusively to calculate
         // the crank fee, and therefore does not need to be based on the
         // liquifunding cadence.
-        let liquidation_margin =
-            self.liquidation_margin(start_price, current_price_point, config)?;
+        let liquidation_margin = self.liquidation_margin(&start_price, config)?;
 
         let (settle_price_result, _exposure) = self.settle_price_exposure(
-            start_price,
-            end_price.price_notional,
+            start_price.price_notional,
+            end_price,
             liquidation_margin.total(),
-            end_price.timestamp,
         )?;
 
         let result = match settle_price_result {
@@ -554,9 +549,9 @@ impl Position {
                     MaybeClosedPosition::Close(ClosePositionInstructions {
                         pos,
                         exposure: Signed::zero(),
-                        close_time: end_price.timestamp,
-                        settlement_time: end_price.timestamp,
+                        settlement_price: end_price,
                         reason: PositionCloseReason::Liquidated(LiquidationReason::MaxGains),
+                        closed_during_liquifunding: true,
                     })
                 }
             }
@@ -570,9 +565,9 @@ impl Position {
             MaybeClosedPosition::Close(ClosePositionInstructions {
                 pos,
                 exposure,
-                close_time,
-                settlement_time,
+                settlement_price,
                 reason,
+                closed_during_liquifunding: _,
             }) => {
                 // Best effort closed position value
                 let direction_to_base = pos.direction().into_base(market_type);
@@ -601,6 +596,7 @@ impl Position {
                         id: pos.id,
                         direction_to_base,
                         created_at: pos.created_at,
+                        price_point_created_at: pos.price_point_created_at,
                         liquifunded_at: pos.liquifunded_at,
                         trading_fee_collateral: pos.trading_fee.collateral(),
                         trading_fee_usd: pos.trading_fee.usd(),
@@ -620,8 +616,8 @@ impl Position {
                             .checked_sub(pos.deposit_collateral.usd())?,
                         notional_size: pos.notional_size,
                         entry_price_base,
-                        close_time,
-                        settlement_time,
+                        close_time: end_price.timestamp,
+                        settlement_time: settlement_price.timestamp,
                         reason,
                         active_collateral,
                         delta_neutrality_fee_collateral: pos.delta_neutrality_fee.collateral(),
@@ -651,7 +647,7 @@ impl Position {
             .1;
         let pnl_collateral = self.pnl_in_collateral();
         let pnl_usd = self.pnl_in_usd(&end_price);
-        let max_gains_in_quote = self.max_gains_in_quote(market_type, end_price)?;
+        let max_gains_in_quote = self.max_gains_in_quote(market_type, &end_price)?;
         let notional_size_in_collateral = self.notional_size_in_collateral(&end_price);
         let position_size_base = self.position_size_base(market_type, &end_price)?;
 
@@ -663,6 +659,7 @@ impl Position {
             counter_collateral,
             notional_size,
             created_at,
+            price_point_created_at,
             trading_fee,
             funding_fee,
             borrow_fee,
@@ -670,7 +667,6 @@ impl Position {
             delta_neutrality_fee,
             liquifunded_at,
             next_liquifunding,
-            stale_at,
             stop_loss_override,
             take_profit_override,
             liquidation_margin,
@@ -684,6 +680,7 @@ impl Position {
             owner,
             id,
             created_at,
+            price_point_created_at,
             liquifunded_at,
             direction_to_base,
             leverage,
@@ -714,7 +711,6 @@ impl Position {
             take_profit_price_base: take_profit.map(|x| x.into_base_price(market_type)),
             entry_price_base: entry_price.into_base_price(market_type),
             next_liquifunding,
-            stale_at,
             stop_loss_override,
             take_profit_override,
             crank_fee_collateral: crank_fee.collateral(),
@@ -754,7 +750,6 @@ impl Position {
             ("pos-created-at", self.created_at.to_string()),
             ("pos-liquifunded-at", self.liquifunded_at.to_string()),
             ("pos-next-liquifunding", self.next_liquifunding.to_string()),
-            ("pos-stale-at", self.stale_at.to_string()),
             (
                 "pos-borrow-fee-liquidation-margin",
                 borrow_fee_max.to_string(),
@@ -1050,6 +1045,7 @@ pub mod events {
                         id,
                         direction_to_base,
                         created_at,
+                        price_point_created_at,
                         liquifunded_at,
                         trading_fee_collateral,
                         trading_fee_usd,
@@ -1074,7 +1070,7 @@ pub mod events {
                     },
             }: PositionCloseEvent,
         ) -> Self {
-            Event::new(event_key::POSITION_CLOSE)
+            let mut event = Event::new(event_key::POSITION_CLOSE)
                 .add_attribute(event_key::POS_OWNER, owner.to_string())
                 .add_attribute(event_key::POS_ID, id.to_string())
                 .add_attribute(event_key::DIRECTION, direction_to_base.as_str())
@@ -1128,7 +1124,11 @@ pub mod events {
                         PositionCloseReason::Direct => event_val::DIRECT,
                     },
                 )
-                .add_attribute(event_key::ACTIVE_COLLATERAL, active_collateral.to_string())
+                .add_attribute(event_key::ACTIVE_COLLATERAL, active_collateral.to_string());
+            if let Some(x) = price_point_created_at {
+                event = event.add_attribute(event_key::PRICE_POINT_CREATED_AT, x.to_string());
+            }
+            event
         }
     }
     impl TryFrom<Event> for PositionCloseEvent {
@@ -1158,6 +1158,8 @@ pub mod events {
                 id: PositionId::new(evt.u64_attr(event_key::POS_ID)?),
                 direction_to_base: evt.direction_attr(event_key::DIRECTION)?,
                 created_at: evt.timestamp_attr(event_key::CREATED_AT)?,
+                price_point_created_at: evt
+                    .try_timestamp_attr(event_key::PRICE_POINT_CREATED_AT)?,
                 liquifunded_at: evt.timestamp_attr(event_key::LIQUIFUNDED_AT)?,
                 trading_fee_collateral: evt.decimal_attr(event_key::TRADING_FEE)?,
                 trading_fee_usd: evt.decimal_attr(event_key::TRADING_FEE_USD)?,
@@ -1191,8 +1193,10 @@ pub mod events {
     pub struct PositionOpenEvent {
         /// Details of the position
         pub position_attributes: PositionAttributes,
-        /// When it was opened
+        /// When it was opened, block time
         pub created_at: Timestamp,
+        /// Price point used for creating this
+        pub price_point_created_at: Timestamp,
     }
 
     impl PerpEvent for PositionOpenEvent {}
@@ -1210,6 +1214,7 @@ pub mod events {
         fn try_from(evt: Event) -> anyhow::Result<Self> {
             Ok(Self {
                 created_at: evt.timestamp_attr(event_key::CREATED_AT)?,
+                price_point_created_at: evt.timestamp_attr(event_key::PRICE_POINT_CREATED_AT)?,
                 position_attributes: evt.try_into()?,
             })
         }
@@ -1389,10 +1394,6 @@ pub mod events {
         pub id: PositionId,
         /// Reason the position was saved
         pub reason: PositionSaveReason,
-        /// Was the position put on the pending queue?
-        ///
-        /// This occurs when the crank has fallen behind
-        pub used_pending_queue: bool,
     }
 
     /// Why was a position saved?
@@ -1439,20 +1440,10 @@ pub mod events {
     }
 
     impl From<PositionSaveEvent> for Event {
-        fn from(
-            PositionSaveEvent {
-                id,
-                reason,
-                used_pending_queue,
-            }: PositionSaveEvent,
-        ) -> Self {
+        fn from(PositionSaveEvent { id, reason }: PositionSaveEvent) -> Self {
             Event::new("position-save")
                 .add_attribute("id", id.0)
                 .add_attribute("reason", reason.as_str())
-                .add_attribute(
-                    "used-pending-queue",
-                    if used_pending_queue { "true" } else { "false" },
-                )
         }
     }
 }

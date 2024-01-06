@@ -33,7 +33,7 @@ jobs:
           just-version: 1.8.0
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.70.0
+          toolchain: 1.71.0
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
@@ -50,10 +50,10 @@ jobs:
             wasm
       - name: Compile
         run: just cargo-compile
-      # - name: Run tests (with prop tests) 
+      # - name: Run tests (with prop tests)
       #   if: github.ref == 'refs/heads/develop'
       #   run: just cargo-test-with-prop
-      - name: Run tests (without prop tests) 
+      - name: Run tests (without prop tests)
         # if: github.ref != 'refs/heads/develop'
         run: just cargo-test-check
       - name: Clippy
@@ -106,7 +106,7 @@ jobs:
           just-version: 1.8.0
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.70.0
+          toolchain: 1.71.0
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:

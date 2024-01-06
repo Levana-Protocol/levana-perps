@@ -335,12 +335,12 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         liquidity_stats: &LiquidityStats,
-        price: PricePoint,
+        price: &PricePoint,
     ) -> Result<()> {
         ctx.response_mut()
             .add_event(LiquidityPoolSizeEvent::from_stats(liquidity_stats, price));
 
-        self.add_delta_neutrality_ratio_event(ctx, liquidity_stats, &price)
+        self.add_delta_neutrality_ratio_event(ctx, liquidity_stats, price)
     }
 
     /// Returns the number of LP shares minted.
@@ -365,8 +365,8 @@ impl State<'_> {
         liquidity_stats.unlocked += amount.raw();
 
         self.save_liquidity_stats(ctx.storage, &liquidity_stats)?;
-        let price = self.spot_price(ctx.storage, None)?;
-        self.add_pool_size_change_events(ctx, &liquidity_stats, price)?;
+        let price = self.current_spot_price(ctx.storage)?;
+        self.add_pool_size_change_events(ctx, &liquidity_stats, &price)?;
 
         // Update shares
 
@@ -446,8 +446,8 @@ impl State<'_> {
         let short_interest_protocol = self.open_short_interest(ctx.storage)?;
         let net_notional =
             long_interest_protocol.into_signed() - short_interest_protocol.into_signed();
-        let price = self.spot_price(ctx.storage, None)?;
-        let min_unlocked_liquidity = self.min_unlocked_liquidity(net_notional, price)?;
+        let price = self.current_spot_price(ctx.storage)?;
+        let min_unlocked_liquidity = self.min_unlocked_liquidity(net_notional, &price)?;
         if liquidity_to_return.raw() + min_unlocked_liquidity > liquidity_stats.unlocked {
             return Err(MarketError::InsufficientLiquidityForWithdrawal {
                 requested_lp: shares_to_withdraw,
@@ -469,8 +469,7 @@ impl State<'_> {
             .checked_sub(liquidity_to_return.raw())?;
 
         self.save_liquidity_stats(ctx.storage, &liquidity_stats)?;
-        let price = self.spot_price(ctx.storage, None)?;
-        self.add_pool_size_change_events(ctx, &liquidity_stats, price)?;
+        self.add_pool_size_change_events(ctx, &liquidity_stats, &price)?;
 
         // Transfer funds to LP
 
@@ -616,13 +615,14 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         amount: Signed<Collateral>,
+        price: &PricePoint,
     ) -> Result<()> {
         let mut stats = self.load_liquidity_stats(ctx.storage)?;
         stats.locked = match stats
             .locked
             .into_signed()
             .checked_add(amount)?
-            .try_into_positive_value()
+            .try_into_non_negative_value()
         {
             None => anyhow::bail!(
                 "liquidity_update_locked: locked is {}, amount is {}",
@@ -636,7 +636,6 @@ impl State<'_> {
 
         // The total pool size *has* changed here, due to LPs winning or losing
         // at the time of liquifunding
-        let price = self.spot_price(ctx.storage, None)?;
         self.add_pool_size_change_events(ctx, &stats, price)?;
 
         ctx.response_mut().add_event(LockUpdateEvent { amount });
@@ -648,7 +647,7 @@ impl State<'_> {
     pub(crate) fn min_unlocked_liquidity(
         &self,
         net_notional: Signed<Notional>,
-        price: PricePoint,
+        price: &PricePoint,
     ) -> Result<Collateral> {
         let net_notional_in_collateral = price.notional_to_collateral(net_notional.abs_unsigned());
         let counter_collateral = net_notional_in_collateral.div_non_zero_dec(
@@ -664,6 +663,7 @@ impl State<'_> {
         store: &dyn Storage,
         amount: NonZero<Collateral>,
         delta_notional: Option<Signed<Notional>>,
+        price: &PricePoint,
     ) -> Result<()> {
         let stats = self.load_liquidity_stats(store)?;
         let long_interest_protocol = self.open_long_interest(store)?;
@@ -671,7 +671,6 @@ impl State<'_> {
         let net_notional = long_interest_protocol.into_signed()
             - short_interest_protocol.into_signed()
             + delta_notional.unwrap_or_else(|| Notional::zero().into_signed());
-        let price = self.spot_price(store, None)?;
         let min_unlocked_liquidity = self.min_unlocked_liquidity(net_notional, price)?;
         if min_unlocked_liquidity + amount.raw() > stats.unlocked {
             Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed lock! not enough unlocked liquidity in the protocol! (asked for {}, only {} available with {} minimum)", amount, stats.unlocked, min_unlocked_liquidity))
@@ -684,9 +683,10 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         amount: NonZero<Collateral>,
+        price: &PricePoint,
     ) -> Result<()> {
         let mut stats = self.load_liquidity_stats(ctx.storage)?;
-        self.check_unlocked_liquidity(ctx.storage, amount, None)?;
+        self.check_unlocked_liquidity(ctx.storage, amount, None, price)?;
 
         stats.locked = stats.locked.checked_add(amount.raw())?;
         stats.unlocked = stats.unlocked.checked_sub(amount.raw())?;
@@ -695,7 +695,6 @@ impl State<'_> {
         // Technically the total pool size has not changed
         // but the event consists of both locked and unlocked parts
         // so emit the event for now
-        let price = self.spot_price(ctx.storage, None)?;
         self.add_pool_size_change_events(ctx, &stats, price)?;
 
         ctx.response_mut().add_event(LockEvent { amount });
@@ -707,6 +706,7 @@ impl State<'_> {
         &self,
         ctx: &mut StateContext,
         amount: NonZero<Collateral>,
+        price: &PricePoint,
     ) -> Result<()> {
         let mut liquidity_stats = self.load_liquidity_stats(ctx.storage)?;
         if amount.raw() > liquidity_stats.locked {
@@ -720,7 +720,6 @@ impl State<'_> {
         // Technically the total pool size has not changed
         // but the event consists of both locked and unlocked parts
         // so emit the event for now
-        let price = self.spot_price(ctx.storage, None)?;
         self.add_pool_size_change_events(ctx, &liquidity_stats, price)?;
 
         ctx.response_mut().add_event(UnlockEvent { amount });
@@ -1033,7 +1032,7 @@ impl State<'_> {
             MaxLiquidity::Unlimited {} => return Ok(()),
             MaxLiquidity::Usd { amount } => amount.raw(),
         };
-        let price = self.spot_price(ctx.storage, None)?;
+        let price = self.current_spot_price(ctx.storage)?;
         let deposit = price.collateral_to_usd(deposit.raw());
         let current = stats.total_collateral();
         let current = price.collateral_to_usd(current);

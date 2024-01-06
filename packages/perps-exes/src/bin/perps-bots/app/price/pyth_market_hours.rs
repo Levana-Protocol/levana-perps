@@ -6,7 +6,7 @@ use cosmos::Address;
 use dashmap::DashMap;
 use itertools::Itertools;
 use msg::contracts::market::{
-    entry::StatusResp,
+    config::Config,
     spot_price::{PythConfig, PythPriceServiceNetwork, SpotPriceConfig, SpotPriceFeedData},
 };
 use pyth_sdk_cw::PriceIdentifier;
@@ -17,7 +17,7 @@ impl App {
     pub(crate) async fn pyth_prices_closed(
         &self,
         address: Address,
-        status: Option<&StatusResp>,
+        config: &Config,
     ) -> Result<bool> {
         let lock = self
             .pyth_market_hours
@@ -31,7 +31,7 @@ impl App {
             return Ok(!is_open.is_open);
         }
 
-        let ids = self.pyth_market_hours.get_ids(address, status);
+        let ids = self.pyth_market_hours.get_ids(address, config);
 
         let mut is_open = IsOpen {
             is_open: true,
@@ -62,27 +62,26 @@ pub(crate) struct PythMarketHours {
 }
 
 impl PythMarketHours {
-    fn get_ids(&self, address: Address, status: Option<&StatusResp>) -> IdsCache {
+    fn get_ids(&self, address: Address, config: &Config) -> IdsCache {
         let cached = self.ids.entry(address).or_default().clone();
-        if let Some(status) = status {
-            let ids = get_ids_from_status(status);
-            if ids != cached {
-                self.ids.insert(address, ids.clone());
-                return ids;
-            }
+        let ids = get_ids_from_config(config);
+        if ids != cached {
+            self.ids.insert(address, ids.clone());
+            return ids;
         }
         cached
     }
 }
 
-fn get_ids_from_status(status: &StatusResp) -> IdsCache {
-    match &status.config.spot_price {
+fn get_ids_from_config(config: &Config) -> IdsCache {
+    match &config.spot_price {
         SpotPriceConfig::Manual { .. } => IdsCache::default(),
         SpotPriceConfig::Oracle {
             pyth,
             stride: _,
             feeds,
             feeds_usd,
+            volatile_diff_seconds: _,
         } => {
             if is_pyth_stable(pyth.as_ref()) {
                 let ids = feeds

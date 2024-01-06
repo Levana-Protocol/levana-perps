@@ -34,6 +34,7 @@ fn position_misc_debug_temp() {
         .unwrap();
 
     let pos_evt: PositionUpdateEvent = update_res
+        .exec_resp()
         .event_first("position-update")
         .unwrap()
         .try_into()
@@ -189,6 +190,10 @@ fn funding_payment_flips_direction() {
     // Let some liquifunding occur so we collection the funding payments
     market.set_time(TimeJump::Liquifundings(1)).unwrap();
     market.exec_refresh_price().unwrap();
+
+    // Crank just enough to do a liquifunding but not liquidation
+    // so that the position is liquidatable but not liquidated
+    market.exec_crank_n(&trader, 1).unwrap();
 
     // In collateral-is-base markets, the position should now be in the
     // ready-to-liquidate state. For collateral-is-quote, we don't have
