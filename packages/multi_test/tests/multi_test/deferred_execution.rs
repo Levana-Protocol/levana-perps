@@ -6,6 +6,7 @@ use cosmwasm_std::{to_binary, WasmMsg};
 use levana_perpswap_multi_test::{
     config::{SpotPriceKind, DEFAULT_MARKET},
     market_wrapper::{DeferResponse, PerpsMarket},
+    position_helpers::assert_position_liquidated,
     response::CosmosResponseExt,
     time::TimeJump,
     PerpsApp,
@@ -13,7 +14,7 @@ use levana_perpswap_multi_test::{
 use msg::{
     contracts::market::{
         deferred_execution::DeferredExecStatus,
-        entry::ExecuteMsg as MarketExecuteMsg,
+        entry::{ExecuteMsg as MarketExecuteMsg, PositionsQueryFeeApproach},
         position::{events::PositionUpdateEvent, PositionId},
     },
     prelude::*,
@@ -541,4 +542,81 @@ fn defer_same_block_2859() {
         .exec_defer_queue_process(&cranker, queue_res, None)
         .unwrap();
     market.query_closed_position(&trader, pos_id).unwrap();
+}
+
+#[test]
+fn defer_liquidation_2856() {
+    let market = PerpsMarket::new_with_type(
+        PerpsApp::new_cell().unwrap(),
+        DEFAULT_MARKET.collateral_type,
+        true,
+        SpotPriceKind::Oracle,
+    )
+    .unwrap();
+
+    let trader = market.clone_trader(0).unwrap();
+    let cranker = market.clone_trader(1).unwrap();
+
+    market.exec_set_price("10".try_into().unwrap()).unwrap();
+
+    let (pos_id, _) = market
+        .exec_open_position_refresh_price(
+            &trader,
+            "100",
+            "10",
+            DirectionToBase::Short,
+            "0.5",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    market.exec_crank_till_finished(&cranker).unwrap();
+
+    // check that we go from "open" to "pending close" but NOT "closed" when we push the new price
+    market.query_position(pos_id).unwrap();
+    market.exec_set_price("100".parse().unwrap()).unwrap();
+    market.query_position(pos_id).unwrap_err();
+    market
+        .query_position_pending_close(pos_id, PositionsQueryFeeApproach::Accumulated)
+        .unwrap();
+    market.query_closed_position(&trader, pos_id).unwrap_err();
+
+    // now queue an update
+    let queue_resp = market
+        .exec_update_position_leverage_queue_only(&trader, pos_id, "8".parse().unwrap(), None)
+        .unwrap();
+    assert!(queue_resp.value.status.is_pending());
+    // make sure there's a valid price point for the update to be processed
+    market.set_time(TimeJump::Blocks(1)).unwrap();
+    market.exec_refresh_price().unwrap();
+
+    // even though the update will not be allowed to go through, as of now it's still pending
+    assert!(market
+        .query_deferred_exec(queue_resp.value.id)
+        .unwrap()
+        .status
+        .is_pending());
+
+    // crank it all out
+    market.exec_crank_till_finished(&trader).unwrap();
+
+    // the update failed
+    match market
+        .query_deferred_exec(queue_resp.value.id)
+        .unwrap()
+        .status
+    {
+        DeferredExecStatus::Failure { .. } => {}
+        _ => panic!("Unexpected status, should have failed"),
+    }
+
+    // and position is fully closed due to liquidation
+    let pos = market.query_closed_position(&trader, pos_id).unwrap();
+    assert_position_liquidated(&pos).unwrap();
+    market.query_position(pos_id).unwrap_err();
+    market
+        .query_position_pending_close(pos_id, PositionsQueryFeeApproach::Accumulated)
+        .unwrap_err();
 }
