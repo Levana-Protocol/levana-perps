@@ -324,6 +324,7 @@ markets:
       delta_neutrality_fee_sensitivity: 50000000000
       delta_neutrality_fee_cap: 0.0001
       liquidity_cooldown_seconds: 23400
+      exposure_margin_ratio: 0.002
 
     initial-borrow-fee-rate: 0.05
   GBP_USDC:
@@ -339,6 +340,7 @@ markets:
       delta_neutrality_fee_sensitivity: 50000000000
       delta_neutrality_fee_cap: 0.0001
       liquidity_cooldown_seconds: 23400
+      exposure_margin_ratio: 0.002
 
     initial-borrow-fee-rate: 0.05
   CNH_USDC:
@@ -359,6 +361,7 @@ markets:
       liquifunding_delay_seconds: 21600
       liquifunding_delay_fuzz_seconds: 3600
       liquidity_cooldown_seconds: 23400
+      exposure_margin_ratio: 0.002
 
     initial-borrow-fee-rate: 0.05
   GOLD_USDC:
@@ -379,6 +382,7 @@ markets:
       liquifunding_delay_seconds: 21600
       liquifunding_delay_fuzz_seconds: 3600
       liquidity_cooldown_seconds: 23400
+      exposure_margin_ratio: 0.002
 
     initial-borrow-fee-rate: 0.05
 

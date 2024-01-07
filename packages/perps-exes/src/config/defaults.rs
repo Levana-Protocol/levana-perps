@@ -101,5 +101,5 @@ pub fn max_price_age_secs() -> u32 {
 }
 
 pub fn max_allowed_price_delta() -> Decimal256 {
-    "0.01".parse().unwrap()
+    "0.001".parse().unwrap()
 }

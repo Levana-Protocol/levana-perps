@@ -38,7 +38,7 @@ impl ConfigDefaults {
         false
     }
     pub const fn liquifunding_delay_seconds() -> u32 {
-        60 * 60 * 6
+        60 * 60 * 24
     }
     pub fn protocol_tax() -> Decimal256 {
         "0.3".parse().unwrap()
@@ -78,13 +78,13 @@ impl ConfigDefaults {
         "0.05".parse().unwrap()
     }
     pub fn crank_fee_charged() -> Usd {
-        "0.025".parse().unwrap()
+        "0.1".parse().unwrap()
     }
     pub fn crank_fee_surcharge() -> Usd {
-        "0.02".parse().unwrap()
+        "0.08".parse().unwrap()
     }
     pub fn crank_fee_reward() -> Usd {
-        "0.005".parse().unwrap()
+        "0.09".parse().unwrap()
     }
     pub fn minimum_deposit_usd() -> Usd {
         "5".parse().unwrap()
@@ -106,5 +106,8 @@ impl ConfigDefaults {
 
         // Default to 1 hour
         60 * 60
+    }
+    pub fn exposure_margin_ratio() -> Decimal256 {
+        "0.005".parse().unwrap()
     }
 }

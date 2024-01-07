@@ -88,6 +88,12 @@ impl App {
             Some(crank_needed) => crank_needed,
         };
 
+        let cosmos = if reason.needs_high_gas() {
+            &self.cosmos_high_gas
+        } else {
+            &self.cosmos
+        };
+
         let rewards = self
             .config
             .get_crank_rewards_wallet()
@@ -107,7 +113,7 @@ impl App {
                         rewards: rewards.clone(),
                     },
                 )?
-                .simulate(&self.cosmos, &[crank_wallet.get_address()])
+                .simulate(cosmos, &[crank_wallet.get_address()])
                 .await
             {
                 Ok(_) => {
@@ -145,7 +151,7 @@ impl App {
         }
 
         let run_result = match builder
-            .sign_and_broadcast_cosmos_tx(&self.cosmos, crank_wallet)
+            .sign_and_broadcast_cosmos_tx(cosmos, crank_wallet)
             .await
             .with_context(|| format!("Unable to turn crank for market {market}"))
         {

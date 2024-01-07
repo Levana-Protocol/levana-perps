@@ -1,6 +1,9 @@
 use cosmwasm_std::Addr;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, time::TimeJump, PerpsApp};
-use msg::prelude::{DirectionToBase, PriceBaseInQuote};
+use msg::{
+    contracts::market::config::ConfigUpdate,
+    prelude::{DirectionToBase, PriceBaseInQuote},
+};
 
 #[test]
 fn liquidation_edge() {
@@ -113,6 +116,16 @@ fn take_profit_edge() {
 #[test]
 fn insufficient_liquidation_margin() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    market
+        .exec_set_config(ConfigUpdate {
+            // The exposure amount changes in response to changes in price.
+            // Therefore, if we keep the default higher value for this parameter,
+            // we don't end up closing the position after one liquifunding.
+            // To account for that, we set a much lower exposure ratio.
+            exposure_margin_ratio: Some("0.0001".parse().unwrap()),
+            ..ConfigUpdate::default()
+        })
+        .unwrap();
 
     let trader = market.clone_trader(0).unwrap();
     // Open a position

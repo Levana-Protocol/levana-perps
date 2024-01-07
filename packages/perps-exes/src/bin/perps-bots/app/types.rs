@@ -125,6 +125,8 @@ pub(crate) struct App {
     factory: RwLock<Arc<FactoryInfo>>,
     frontend_info_testnet: Option<RwLock<Arc<FrontendInfoTestnet>>>,
     pub(crate) cosmos: Cosmos,
+    /// Configured with much higher max gas price for urgent messages that need to get through congestion.
+    pub(crate) cosmos_high_gas: Cosmos,
     /// A separate Cosmos instance just for gas check due to dynamic gas weirdness.
     ///
     /// On Osmosis mainnet we use a dynamic gas multiplier. Since the multiplier for sending coins in gas check is significantly different than smart contract activities, we keep two different Cosmos values.
@@ -177,7 +179,7 @@ impl Opt {
 
         if let BotConfigByType::Mainnet { inner } = &config.by_type {
             // Only has an impact on Osmosis mainnet.
-            builder.set_osmosis_gas_params(1.2, 10.0, inner.max_gas_price);
+            builder.set_max_gas_price(inner.max_gas_price);
         }
 
         builder.set_referer_header(Some("https://bots.levana.exchange/".to_owned()));
@@ -227,9 +229,17 @@ impl Opt {
 
         let opt = self.clone();
 
+        let cosmos_high_gas = match &config.by_type {
+            BotConfigByType::Testnet { .. } => cosmos.clone(),
+            BotConfigByType::Mainnet { inner } => cosmos
+                .clone()
+                .with_max_gas_price(inner.higher_max_gas_price),
+        };
+
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
             cosmos,
+            cosmos_high_gas,
             cosmos_gas_check,
             config,
             client,
@@ -390,6 +400,19 @@ impl CrankTriggerReason {
             | CrankTriggerReason::CrankNeedsNewPrice { .. }
             | CrankTriggerReason::PriceWillTrigger => true,
             CrankTriggerReason::CrankWorkAvailable | CrankTriggerReason::MoreWorkFound => false,
+        }
+    }
+
+    /// Does this action warrant paying very high gas costs?
+    pub(crate) fn needs_high_gas(&self) -> bool {
+        match self {
+            CrankTriggerReason::LargePriceDelta { .. } => true,
+            CrankTriggerReason::NoPriceOnChain
+            | CrankTriggerReason::OnChainTooOld { .. }
+            | CrankTriggerReason::CrankNeedsNewPrice { .. }
+            | CrankTriggerReason::CrankWorkAvailable
+            | CrankTriggerReason::PriceWillTrigger
+            | CrankTriggerReason::MoreWorkFound => false,
         }
     }
 }

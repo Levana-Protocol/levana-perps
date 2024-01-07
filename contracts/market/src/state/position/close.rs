@@ -25,7 +25,8 @@ impl State<'_> {
         let instructions = match mcp {
             MaybeClosedPosition::Open(pos) => ClosePositionInstructions {
                 pos,
-                exposure: Signed::<Collateral>::zero(),
+                capped_exposure: Signed::<Collateral>::zero(),
+                additional_losses: Collateral::zero(),
                 reason: PositionCloseReason::Direct,
                 settlement_price,
                 closed_during_liquifunding: false,
@@ -45,7 +46,8 @@ impl State<'_> {
         ctx: &mut StateContext,
         ClosePositionInstructions {
             mut pos,
-            exposure,
+            capped_exposure,
+            additional_losses,
             settlement_price,
             reason,
             closed_during_liquifunding,
@@ -68,7 +70,7 @@ impl State<'_> {
         // local value, not the active_collateral on the position.
         debug_assert!(pos.active_collateral.raw() >= pos.liquidation_margin.delta_neutrality);
         debug_assert!(
-            pos.active_collateral.into_signed() + exposure
+            pos.active_collateral.into_signed() + capped_exposure
                 >= pos.liquidation_margin.delta_neutrality.into_signed()
         );
         let delta_neutrality_fee = self
@@ -88,28 +90,64 @@ impl State<'_> {
 
         // Calculate the final active and counter collateral based on price
         // settlement exposure change and final delta neutrality fee payment.
+        anyhow::ensure!(
+            -capped_exposure <= pos.active_collateral.into_signed(),
+            "Calculated exposure is {capped_exposure}, which outweighs active collateral of {}",
+            pos.active_collateral
+        );
+        anyhow::ensure!(
+            capped_exposure <= pos.counter_collateral.into_signed(),
+            "Calculated exposure is {capped_exposure}, which outweighs counter collateral of {}",
+            pos.counter_collateral
+        );
+
+        // Take the DNF out of the active collateral
         let active_collateral = pos
             .active_collateral
             .into_signed()
-            .checked_add(exposure)?
-            .checked_sub(delta_neutrality_fee)?
+            .checked_sub(delta_neutrality_fee)?;
+        anyhow::ensure!(active_collateral.is_positive_or_zero());
+
+        // The final exposure needs to include all the additional losses that we
+        // can provide funds for. So we calculate the total exposure (capped - additional
+        // losses), and then make sure it doesn't exceed the active collateral after paying
+        // all fees.
+        let final_exposure = capped_exposure
+            .checked_sub(additional_losses.into_signed())?
+            .max(-active_collateral);
+
+        // And now that we have the final exposure amount, we need to calculate
+        // how much additional losses we just realized and update the locked liquidity in
+        // the system to represent the additional funds sent to the liquidity pool.
+        //
+        // Take the exposure we already capped and subtract out the final exposure. Since both numbers in a loss scenario will be negative, this will give back the positive value representing the funds to be sent to the liquidity pool.
+        let additional_lp_funds = capped_exposure.checked_sub(final_exposure)?;
+        debug_assert!(additional_lp_funds >= Signed::zero());
+        self.liquidity_update_locked(ctx, additional_lp_funds, &settlement_price)?;
+
+        // Final active collateral is the active collateral post fees plus final
+        // exposure numbers. The final exposure will be negative for losses and positive
+        // for gains, thus the reason we add.
+        let active_collateral = active_collateral
+            .checked_add(final_exposure)?
             .try_into_non_negative_value()
             .with_context(|| {
                 format!(
                     "close_position: negative active collateral: {} with exposure {}",
-                    pos.active_collateral, exposure
+                    pos.active_collateral, final_exposure
                 )
             })?;
+
         let active_collateral_usd = settlement_price.collateral_to_usd(active_collateral);
         let counter_collateral = pos
             .counter_collateral
             .into_signed()
-            .checked_sub(exposure)?
+            .checked_sub(final_exposure)?
             .try_into_non_negative_value()
             .with_context(|| {
                 format!(
                     "close_position: negative counter collateral: {} with exposure {}",
-                    pos.counter_collateral, exposure
+                    pos.counter_collateral, final_exposure
                 )
             })?;
 
