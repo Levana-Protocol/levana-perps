@@ -5,7 +5,7 @@ use std::ops::{Mul, Sub};
 use cosmwasm_std::{to_binary, WasmMsg};
 use levana_perpswap_multi_test::{
     config::{SpotPriceKind, DEFAULT_MARKET},
-    market_wrapper::{DeferResponse, PerpsMarket},
+    market_wrapper::{DeferQueueResponse, DeferResponse, PerpsMarket},
     position_helpers::assert_position_liquidated,
     response::CosmosResponseExt,
     time::TimeJump,
@@ -14,7 +14,7 @@ use levana_perpswap_multi_test::{
 use msg::{
     contracts::market::{
         deferred_execution::DeferredExecStatus,
-        entry::{ExecuteMsg as MarketExecuteMsg, PositionsQueryFeeApproach},
+        entry::{ExecuteMsg as MarketExecuteMsg, PositionsQueryFeeApproach, SlippageAssert},
         position::{events::PositionUpdateEvent, PositionId},
     },
     prelude::*,
@@ -381,7 +381,7 @@ fn defer_before_crank_2855() {
         .event_first("position-update")
         .unwrap_err();
 
-    // double the price
+    // increase the price
     let price_timestamp = market.now();
     market
         .exec_set_price(
@@ -619,4 +619,172 @@ fn defer_liquidation_2856() {
     market
         .query_position_pending_close(pos_id, PositionsQueryFeeApproach::Accumulated)
         .unwrap_err();
+}
+
+#[test]
+fn defer_slippage_2857() {
+    let market = PerpsMarket::new_with_type(
+        PerpsApp::new_cell().unwrap(),
+        DEFAULT_MARKET.collateral_type,
+        true,
+        SpotPriceKind::Oracle,
+    )
+    .unwrap();
+
+    let trader = market.clone_trader(0).unwrap();
+    let cranker = market.clone_trader(1).unwrap();
+    let market_type = market.id.get_market_type();
+
+    // helper functions to make the test more readable
+    let open_with_slippage_queue_only = |tolerance: f32| -> DeferQueueResponse {
+        let price = market.query_current_price().unwrap();
+
+        market
+            .exec_open_position_queue_only(
+                &trader,
+                "100",
+                "10",
+                DirectionToBase::Long,
+                "8",
+                Some(SlippageAssert {
+                    price: price.price_base,
+                    tolerance: tolerance.to_string().parse().unwrap(),
+                }),
+                None,
+                None,
+            )
+            .unwrap()
+    };
+    let update_with_slippage_queue_only =
+        |tolerance: f32, pos_id: PositionId| -> DeferQueueResponse {
+            let price = market.query_current_price().unwrap();
+
+            market
+                .exec_update_position_leverage_queue_only(
+                    &trader,
+                    pos_id,
+                    "20".parse().unwrap(),
+                    Some(SlippageAssert {
+                        price: price.price_base,
+                        tolerance: tolerance.to_string().parse().unwrap(),
+                    }),
+                )
+                .unwrap()
+        };
+
+    let close_with_slippage_queue_only =
+        |tolerance: f32, pos_id: PositionId| -> DeferQueueResponse {
+            let price = market.query_current_price().unwrap();
+
+            market
+                .exec_close_position_queue_only(
+                    &trader,
+                    pos_id,
+                    Some(SlippageAssert {
+                        price: price.price_base,
+                        tolerance: tolerance.to_string().parse().unwrap(),
+                    }),
+                )
+                .unwrap()
+        };
+
+    let jump_and_set_price = |price: f32| {
+        market.set_time(TimeJump::Blocks(1)).unwrap();
+        market
+            .exec_set_price(price.to_string().parse().unwrap())
+            .unwrap()
+    };
+
+    // sanity check that we're starting from the expected baseline
+    assert_eq!(
+        market.query_current_price().unwrap().price_base,
+        "1".parse().unwrap()
+    );
+
+    // queue an open that will not have enough slippage tolerance
+    let open_queue_resp = open_with_slippage_queue_only(0.001);
+
+    jump_and_set_price(1.1);
+
+    // the queue itself is still pending
+    assert!(market
+        .query_deferred_exec(open_queue_resp.value.id)
+        .unwrap()
+        .status
+        .is_pending());
+
+    // executing it fails, not enough slippage
+    let err = market
+        .exec_open_position_process_queue_response(&cranker, open_queue_resp, None)
+        .unwrap_err();
+    assert!(err.to_string().to_lowercase().contains("slippage"));
+
+    // try again - this time with higher slippage tolerance
+    let open_queue_resp = open_with_slippage_queue_only(0.5);
+    jump_and_set_price(1.1);
+
+    // works!
+    let (pos_id, _) = market
+        .exec_open_position_process_queue_response(&cranker, open_queue_resp, None)
+        .unwrap();
+    market.query_position(pos_id).unwrap();
+
+    // now queue an update that will not have enough slippage tolerance
+    let update_queue_resp = update_with_slippage_queue_only(0.001, pos_id);
+    jump_and_set_price(1.2);
+
+    // the queue itself is still pending
+    assert!(market
+        .query_deferred_exec(update_queue_resp.value.id)
+        .unwrap()
+        .status
+        .is_pending());
+
+    // executing it fails, not enough slippage
+    let err = market
+        .exec_defer_queue_process(&cranker, update_queue_resp, None)
+        .unwrap_err();
+    assert!(err.to_string().to_lowercase().contains("slippage"));
+
+    // try again - this time with higher slippage tolerance - success!
+    let update_queue_resp = update_with_slippage_queue_only(0.5, pos_id);
+    jump_and_set_price(1.2);
+    market
+        .exec_defer_queue_process(&cranker, update_queue_resp, None)
+        .unwrap();
+    assert!(market.query_position(pos_id).unwrap().leverage > "18".parse().unwrap()); // just some leverage higher than 10, close to 20ish
+
+    // now queue a close that will not have enough slippage tolerance
+    let close_queue_resp = close_with_slippage_queue_only(0.001, pos_id);
+    if market_type == MarketType::CollateralIsBase {
+        jump_and_set_price(1.15);
+    } else {
+        jump_and_set_price(1.18);
+    }
+
+    // the queue itself is still pending
+    assert!(market
+        .query_deferred_exec(close_queue_resp.value.id)
+        .unwrap()
+        .status
+        .is_pending());
+
+    // executing it fails, not enough slippage
+    let err = market
+        .exec_defer_queue_process(&cranker, close_queue_resp, None)
+        .unwrap_err();
+    assert!(err.to_string().to_lowercase().contains("slippage"));
+
+    // try again - this time with higher slippage tolerance - success!
+    let close_queue_resp = close_with_slippage_queue_only(0.5, pos_id);
+    if market_type == MarketType::CollateralIsBase {
+        jump_and_set_price(1.15);
+    } else {
+        jump_and_set_price(1.18);
+    }
+    market
+        .exec_defer_queue_process(&cranker, close_queue_resp, None)
+        .unwrap();
+    market.query_position(pos_id).unwrap_err();
+    market.query_closed_position(&trader, pos_id).unwrap();
 }
