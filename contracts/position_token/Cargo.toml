@@ -1,6 +1,6 @@
 [package]
 name = "levana_perpswap_cosmos_position_token"
-version = "0.1.0-beta.15"
+version = "0.1.1"
 authors = ["Levana Team"]
 edition = "2021"
 
