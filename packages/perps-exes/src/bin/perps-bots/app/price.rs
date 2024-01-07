@@ -455,6 +455,8 @@ async fn update_oracles(
         Err(e) => {
             if app.is_osmosis_epoch() {
                 Ok(format!("Unable to update Pyth oracle, but assuming it's because we're in the epoch: {e:?}"))
+            } else if app.get_congested_info().is_congested() {
+                Ok(format!("Unable to update Pyth oracle, but assuming it's because Osmosis is congested: {e:?}"))
             } else {
                 Err(e.into())
             }

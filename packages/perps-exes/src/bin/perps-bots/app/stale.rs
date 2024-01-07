@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Instant};
 use anyhow::Result;
 use axum::async_trait;
 use chrono::Utc;
-use cosmos::HasAddress;
+use cosmos::{HasAddress, HasAddressHrp};
 use perps_exes::contracts::MarketContract;
 
 use crate::{
@@ -63,6 +63,9 @@ impl Stale {
                 "Ignoring old deferred exec item since we're in the Osmosis epoch".to_owned(),
             );
         }
+        if app.get_congested_info().is_congested() {
+            return Ok("Ignoring stale state since Osmosis appears to be congested".to_owned());
+        }
 
         // TODO in the future, we'd like to give a grace period after the
         // markets reopen for deferred exec items to catch up. Waiting until we start
@@ -110,6 +113,47 @@ impl App {
             false
         } else {
             true
+        }
+    }
+
+    /// Gas price congestion info for Osmosis mainnet
+    pub(crate) fn get_congested_info(&self) -> CongestedInfo {
+        match &self.config.by_type {
+            BotConfigByType::Mainnet { inner }
+                if self.cosmos.get_address_hrp().as_str() == "osmo" =>
+            {
+                CongestedInfo::OsmosisMainnet {
+                    base: self.cosmos.get_base_gas_price(),
+                    congested: inner.gas_price_congested,
+                    max: inner.max_gas_price,
+                }
+            }
+            _ => CongestedInfo::NotOsmosisMainnet,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum CongestedInfo {
+    NotOsmosisMainnet,
+    OsmosisMainnet {
+        base: f64,
+        congested: f64,
+        // Just present for the Debug output
+        #[allow(dead_code)]
+        max: f64,
+    },
+}
+
+impl CongestedInfo {
+    pub(crate) fn is_congested(&self) -> bool {
+        match self {
+            CongestedInfo::NotOsmosisMainnet => false,
+            CongestedInfo::OsmosisMainnet {
+                base,
+                congested,
+                max: _,
+            } => base >= congested,
         }
     }
 }

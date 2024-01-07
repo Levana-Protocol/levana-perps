@@ -156,6 +156,8 @@ impl App {
             Err(e) => {
                 if self.is_osmosis_epoch() {
                     return Ok(WatchedTaskOutput::new(format!("Ignoring crank run error since we think we're in the Osmosis epoch, error: {e:?}")));
+                } else if self.get_congested_info().is_congested() {
+                    return Ok(WatchedTaskOutput::new(format!("Ignoring crank run error since we think the Osmosis chain is overly congested, error: {e:?}")));
                 }
 
                 let error_as_str = format!("{e:?}");

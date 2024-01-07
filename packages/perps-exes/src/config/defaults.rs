@@ -86,6 +86,10 @@ pub(super) fn rpc_health() -> TaskConfig {
     super::WatcherConfig::default().rpc_health
 }
 
+pub(super) fn congestion() -> TaskConfig {
+    super::WatcherConfig::default().congestion
+}
+
 pub(super) fn seconds_till_ultra() -> u32 {
     // 8 minutes
     60 * 8

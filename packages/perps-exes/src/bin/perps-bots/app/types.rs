@@ -175,8 +175,10 @@ impl Opt {
             }
         }
 
-        // Only has an impact on Osmosis mainnet.
-        builder.set_osmosis_gas_params(1.2, 10.0, 0.0054);
+        if let BotConfigByType::Mainnet { inner } = &config.by_type {
+            // Only has an impact on Osmosis mainnet.
+            builder.set_osmosis_gas_params(1.2, 10.0, inner.max_gas_price);
+        }
 
         builder.set_referer_header(Some("https://bots.levana.exchange/".to_owned()));
         builder.build().await.map_err(|e| e.into())

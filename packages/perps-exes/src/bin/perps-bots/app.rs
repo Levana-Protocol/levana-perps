@@ -1,4 +1,5 @@
 mod balance;
+mod congested;
 mod crank_run;
 pub(crate) mod factory;
 pub(crate) mod faucet;
@@ -88,9 +89,9 @@ impl AppBuilder {
                 self.start_stats_alert(mainnet.clone())?;
                 self.start_rpc_health(mainnet.clone())?;
 
-                // Bug in Osmosis, don't run there
                 match self.app.cosmos.get_address_hrp().as_str() {
-                    "osmo" => (),
+                    "osmo" => self.start_congestion_alert()?,
+                    // Bug in Osmosis, don't run there
                     _ => {
                         self.start_liquidity_transaction_alert(mainnet.clone())?;
                         self.start_total_deposits_alert(mainnet)?;

@@ -479,6 +479,8 @@ pub struct WatcherConfig {
     pub liquidity_transaction: TaskConfig,
     #[serde(default = "defaults::rpc_health")]
     pub rpc_health: TaskConfig,
+    #[serde(default = "defaults::congestion")]
+    pub congestion: TaskConfig,
 }
 
 impl Default for WatcherConfig {
@@ -586,6 +588,13 @@ impl Default for WatcherConfig {
             rpc_health: TaskConfig {
                 delay: Delay::Constant(300),
                 out_of_date: 500,
+                retries: None,
+                delay_between_retries: None,
+            },
+            congestion: TaskConfig {
+                // OK to be fast on this, we use cached data
+                delay: Delay::Constant(2),
+                out_of_date: 2,
                 retries: None,
                 delay_between_retries: None,
             },
