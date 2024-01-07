@@ -160,4 +160,11 @@ hashes:
   gitrev: d2f81083b19c1cad899b4072daea25b5e989d733
   code-ids:
     osmosis-mainnet: 399
+    sei-mainnet: 890
+    injective-mainnet: 327
   hash: 358425993997964c646774516908fb543540f066b7a4e6b5e79e15ca5a1b845e
+- contract-type: market
+  gitrev: d2f81083b19c1cad899b4072daea25b5e989d733
+  code-ids:
+    injective-mainnet: 326
+  hash: 0d53f72d9c0ebba8be6c416e5bfbb4770da919bc91fa482a5d5bb461fb632848
