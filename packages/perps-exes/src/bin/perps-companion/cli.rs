@@ -30,7 +30,7 @@ pub(crate) struct Opt {
     #[clap(
         long,
         env = "LEVANA_COMPANION_INJECTIVE_MAINNET_PRIMARY_GRPC",
-        default_value = "primary: https://inj-priv-grpc.kingnodes"
+        default_value = "https://inj-priv-grpc.kingnodes.com"
     )]
     pub(crate) injective_mainnet_primary: String,
     /// Fallback GRPC endpoints for Osmosis mainnet.

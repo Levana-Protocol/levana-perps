@@ -235,12 +235,12 @@ async fn load_whale_market_data(
 
     let (lp_apr_1d, xlp_apr_1d) = get_aprs(
         client,
-        &format!("https://indexer.levana.finance/apr_daily_avg?market={market}"),
+        &format!("https://indexer-mainnet.levana.finance/apr_daily_avg?market={market}"),
     )
     .await?;
     let (lp_apr_7d, xlp_apr_7d) = get_aprs(
         client,
-        &format!("https://indexer.levana.finance/apr?market={market}"),
+        &format!("https://indexer-mainnet.levana.finance/apr?market={market}"),
     )
     .await?;
 
@@ -300,6 +300,10 @@ impl WhaleData {
         res.headers_mut().insert(
             http::header::CONTENT_TYPE,
             HeaderValue::from_static("text/html; charset=utf-8"),
+        );
+        res.headers_mut().insert(
+            http::header::CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=300"),
         );
         Ok(res)
     }
