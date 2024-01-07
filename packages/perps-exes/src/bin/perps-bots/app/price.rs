@@ -81,7 +81,8 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
     let mut successes = vec![];
     let mut errors = vec![];
     let mut markets_to_update = vec![];
-    let mut any_needs_oracle_update = NeedsOracleUpdate::No;
+    let mut any_needs_oracle_update = false;
+    let mut any_needs_high_gas_oracle_update = false;
 
     // Load any offchain data, in batch, needed by the individual spot price configs
     let offchain_price_data = Arc::new(OffchainPriceData::load(&app, &factory.markets).await?);
@@ -120,7 +121,10 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                     | ActionWithReason::VolatileDiffTooLarge => (),
                     ActionWithReason::WorkNeeded(crank_trigger_reason) => {
                         if crank_trigger_reason.needs_price_update() {
-                            any_needs_oracle_update = NeedsOracleUpdate::Yes;
+                            any_needs_oracle_update = true;
+                            if crank_trigger_reason.needs_high_gas() {
+                                any_needs_high_gas_oracle_update = true;
+                            }
                         }
                         markets_to_update.push((
                             market.market.get_address(),
@@ -139,18 +143,22 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
 
     // Now perform any oracle updates needed and trigger cranking as necessary
     if markets_to_update.is_empty() {
-        anyhow::ensure!(any_needs_oracle_update == NeedsOracleUpdate::No);
+        anyhow::ensure!(!any_needs_oracle_update);
         successes.push("No markets need updating".to_owned());
     } else {
-        match any_needs_oracle_update {
-            NeedsOracleUpdate::Yes => {
-                successes.push(
-                    update_oracles(worker, &app, &factory.markets, &offchain_price_data).await?,
-                );
-            }
-            NeedsOracleUpdate::No => {
-                successes.push("No markets needed an oracle update".to_owned());
-            }
+        if any_needs_oracle_update {
+            successes.push(
+                update_oracles(
+                    worker,
+                    &app,
+                    &factory.markets,
+                    &offchain_price_data,
+                    any_needs_high_gas_oracle_update,
+                )
+                .await?,
+            );
+        } else {
+            successes.push("No markets needed an oracle update".to_owned());
         }
 
         for (market, market_id, reason) in markets_to_update {
@@ -178,12 +186,6 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
     } else {
         Ok(WatchedTaskOutput::new(msg))
     }
-}
-
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
-enum NeedsOracleUpdate {
-    Yes,
-    No,
 }
 
 #[derive(Debug)]
@@ -219,15 +221,18 @@ enum ActionWithReason {
 
 impl NeedsPriceUpdateInfo {
     fn actions(&self, params: &NeedsPriceUpdateParams) -> ActionWithReason {
-        // If the new price would hit some new triggers, then we need to do a
-        // price update and crank.
-        if self.price_will_trigger {
-            // Potential future optimization: only query this piece of data on-demand
-            return ActionWithReason::WorkNeeded(CrankTriggerReason::PriceWillTrigger);
-        }
-
         // Keep the protocol lively: if on-chain price is too old or too
         // different from off-chain price, update price and crank.
+        let on_off_chain_delta =
+            (self.on_chain_price.into_number() - self.off_chain_price.into_number()).abs_unsigned()
+                / self.off_chain_price.into_non_zero().raw();
+        if on_off_chain_delta > params.on_off_chain_price_delta {
+            return ActionWithReason::WorkNeeded(CrankTriggerReason::LargePriceDelta {
+                on_off_chain_delta,
+                on_chain_oracle_price: self.on_chain_price,
+                off_chain_price: self.off_chain_price,
+            });
+        }
         let on_chain_age = self
             .off_chain_publish_time
             .signed_duration_since(self.on_chain_publish_time);
@@ -238,15 +243,12 @@ impl NeedsPriceUpdateInfo {
                 on_chain_oracle_publish_time: self.on_chain_publish_time,
             });
         }
-        let on_off_chain_delta =
-            (self.on_chain_price.into_number() - self.off_chain_price.into_number()).abs_unsigned()
-                / self.off_chain_price.into_non_zero().raw();
-        if on_off_chain_delta > params.on_off_chain_price_delta {
-            return ActionWithReason::WorkNeeded(CrankTriggerReason::LargePriceDelta {
-                on_off_chain_delta,
-                on_chain_oracle_price: self.on_chain_price,
-                off_chain_price: self.off_chain_price,
-            });
+
+        // If the new price would hit some new triggers, then we need to do a
+        // price update and crank.
+        if self.price_will_trigger {
+            // Potential future optimization: only query this piece of data on-demand
+            return ActionWithReason::WorkNeeded(CrankTriggerReason::PriceWillTrigger);
         }
 
         // See comment on needs_crank = true below.
@@ -350,6 +352,7 @@ async fn update_oracles(
     app: &App,
     markets: &[Market],
     offchain_price_data: &OffchainPriceData,
+    use_high_gas: bool,
 ) -> Result<String> {
     if offchain_price_data.stable_ids.is_empty() && offchain_price_data.edge_ids.is_empty() {
         return Ok("No Pyth IDs found, no Pyth oracle update needed".to_owned());
@@ -440,9 +443,14 @@ async fn update_oracles(
     // reports that prices for this market are currently closed, we ignore such
     // an error.
 
+    let cosmos = if use_high_gas {
+        &app.cosmos_high_gas
+    } else {
+        &app.cosmos
+    };
     match TxBuilder::default()
         .add_message(msg.clone())
-        .sign_and_broadcast_cosmos_tx(&app.cosmos, &worker.wallet)
+        .sign_and_broadcast_cosmos_tx(cosmos, &worker.wallet)
         .await
     {
         Ok(res) => {

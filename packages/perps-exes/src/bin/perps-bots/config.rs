@@ -53,6 +53,8 @@ pub(crate) struct BotConfigMainnet {
     pub(crate) gas_price_congested: f64,
     /// Maximum gas price to allow for transactions
     pub(crate) max_gas_price: f64,
+    /// Higher maximum gas price for urgent messages
+    pub(crate) higher_max_gas_price: f64,
 }
 
 pub(crate) struct BotConfig {
@@ -251,6 +253,7 @@ impl Opt {
             ignore_errors_after_epoch_seconds,
             gas_price_congested,
             max_gas_price,
+            higher_max_gas_price,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let hrp = network.get_address_hrp();
@@ -286,6 +289,7 @@ impl Opt {
                     rpc_endpoint: Arc::new(rpc_endpoint.clone()),
                     gas_price_congested: *gas_price_congested,
                     max_gas_price: *max_gas_price,
+                    higher_max_gas_price: *higher_max_gas_price,
                 }
                 .into(),
             },
