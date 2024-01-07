@@ -139,17 +139,17 @@ networks:
   sei-mainnet:
     ETH_USD:
       feeds: [
-        !sei { denom: "ueth", inverted: false },
+        !pyth { key: "ETH_USD", inverted: false },
       ]
       feeds-usd: [
-        !sei { denom: "ueth", inverted: false },
+        !pyth { key: "ETH_USD", inverted: false },
       ]
     SEI_USD:
       feeds: [
-        !sei { denom: "usei", inverted: false }
+        !pyth { key: "SEI_USD", inverted: false }
       ]
       feeds-usd: [
-        !sei { denom: "usei", inverted: false }
+        !pyth { key: "SEI_USD", inverted: false }
       ]
   osmosis-mainnet:
     ATOM_USD:
@@ -401,11 +401,11 @@ networks:
       ]
     ETH_BTC:
       feeds: [
-        !sei { denom: "ueth", inverted: false },
-        !sei { denom: "ubtc", inverted: true },
+        !pyth { key: "ETH_USD", inverted: false },
+        !pyth { key: "BTC_USD", inverted: true },
       ]
       feeds-usd: [
-        !sei { denom: "ubtc", inverted: false },
+        !pyth { key: "BTC_USD", inverted: false },
       ]
     BTC_USD:
       feeds: [
