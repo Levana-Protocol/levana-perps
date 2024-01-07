@@ -149,14 +149,22 @@ impl Display for LiquidationReason {
 pub struct ClosePositionInstructions {
     /// The position in its current state
     pub pos: Position,
-    /// Any additional fund transfers that need to be reflected.
+    /// The capped exposure amount after taking liquidation margin into account.
     ///
     /// Positive value means a transfer from counter collateral to active
     /// collateral. Negative means active to counter collateral. This is not
     /// reflected in the position itself, since Position requires non-zero
     /// active and counter collateral, and it's entirely possible we will
     /// consume the entirety of one of those fields.
-    pub exposure: Signed<Collateral>,
+    pub capped_exposure: Signed<Collateral>,
+    /// Additional losses that the trader experienced that cut into liquidation margin.
+    ///
+    /// If the trader
+    /// experienced max gains, then this value is 0. In the case where the trader
+    /// experienced a liquidation event and capped_exposure did not fully represent
+    /// losses due to liquidation margin, this value contains additional losses we would
+    /// like to take away from the trader after paying all pending fees.
+    pub additional_losses: Collateral,
 
     /// The price point used for settling this position.
     pub settlement_price: PricePoint,
@@ -172,6 +180,7 @@ pub struct ClosePositionInstructions {
 /// This can apply to liquifunding, settling price exposure, etc.
 #[must_use]
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum MaybeClosedPosition {
     /// The position stayed open, here's the current status
     Open(Position),

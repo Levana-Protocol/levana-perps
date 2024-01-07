@@ -228,3 +228,63 @@ fn pnl_from_liquidation_perp_1404() {
         additional_pnl
     );
 }
+
+#[test]
+fn extreme_price_trader_gets_nothing() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    market.exec_set_price("10".parse().unwrap()).unwrap();
+    market.exec_crank_till_finished(&trader).unwrap();
+    let (pos_id, _) = market
+        .exec_open_position(
+            &trader,
+            "100",
+            "10",
+            DirectionToBase::Short,
+            "2",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    // Have the price go against the position to such an extent that they would lose everything, including the liquidation margin.
+
+    market.exec_set_price("11".parse().unwrap()).unwrap();
+    market.exec_crank(&Addr::unchecked("anybody")).unwrap();
+
+    let closed = market.query_closed_position(&trader, pos_id).unwrap();
+    assert_eq!(closed.active_collateral, Collateral::zero());
+    assert_eq!(closed.pnl_collateral, "-100".parse().unwrap());
+}
+
+#[test]
+fn normal_price_trader_gets_something() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    market.exec_set_price("10".parse().unwrap()).unwrap();
+    market.exec_crank_till_finished(&trader).unwrap();
+    let (pos_id, _) = market
+        .exec_open_position(
+            &trader,
+            "100",
+            "10",
+            DirectionToBase::Short,
+            "2",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    let pos_after_open = market.query_position(pos_id).unwrap();
+
+    market.exec_set_price("10.95".parse().unwrap()).unwrap();
+    market.exec_crank(&Addr::unchecked("anybody")).unwrap();
+
+    let closed = market.query_closed_position(&trader, pos_id).unwrap();
+    assert!(closed.active_collateral < pos_after_open.liquidation_margin.total());
+    assert!(closed.active_collateral > Collateral::zero());
+    assert!(closed.pnl_collateral > "-100".parse().unwrap());
+}

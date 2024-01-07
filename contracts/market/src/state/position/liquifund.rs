@@ -108,7 +108,8 @@ impl State<'_> {
                 pos,
                 // Exposure is 0 here: we've already added in the exposure
                 // value from settling above.
-                exposure: Signed::zero(),
+                capped_exposure: Signed::zero(),
+                additional_losses: Collateral::zero(),
                 settlement_price: end_price,
                 reason: PositionCloseReason::Liquidated(LiquidationReason::Liquidated),
                 closed_during_liquifunding: true,
@@ -129,7 +130,8 @@ impl State<'_> {
         if original_direction_to_base != new_direction_to_base {
             return Ok(MaybeClosedPosition::Close(ClosePositionInstructions {
                 pos,
-                exposure: Signed::zero(),
+                capped_exposure: Signed::zero(),
+                additional_losses: Collateral::zero(),
                 settlement_price: end_price,
                 reason: PositionCloseReason::Liquidated(LiquidationReason::MaxGains),
                 closed_during_liquifunding: true,

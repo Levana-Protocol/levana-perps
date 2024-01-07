@@ -238,7 +238,8 @@ impl State<'_> {
                 let close_position_instructions = match mcp {
                     MaybeClosedPosition::Open(pos) => ClosePositionInstructions {
                         pos,
-                        exposure: Signed::zero(),
+                        capped_exposure: Signed::zero(),
+                        additional_losses: Collateral::zero(),
                         settlement_price: *price_point,
                         reason: PositionCloseReason::Liquidated(liquidation_reason),
                         closed_during_liquifunding: false,

@@ -491,7 +491,11 @@ impl Position {
             (
                 MaybeClosedPosition::Close(ClosePositionInstructions {
                     pos: self,
-                    exposure: min_exposure,
+                    capped_exposure: min_exposure,
+                    additional_losses: min_exposure
+                        .checked_sub(exposure)?
+                        .try_into_non_negative_value()
+                        .context("Calculated additional_losses is negative")?,
                     settlement_price: end_price,
                     reason: PositionCloseReason::Liquidated(LiquidationReason::Liquidated),
                     closed_during_liquifunding: true,
@@ -502,7 +506,8 @@ impl Position {
             (
                 MaybeClosedPosition::Close(ClosePositionInstructions {
                     pos: self,
-                    exposure: max_exposure,
+                    capped_exposure: max_exposure,
+                    additional_losses: Collateral::zero(),
                     settlement_price: end_price,
                     reason: PositionCloseReason::Liquidated(LiquidationReason::MaxGains),
                     closed_during_liquifunding: true,
@@ -554,7 +559,8 @@ impl Position {
                 } else {
                     MaybeClosedPosition::Close(ClosePositionInstructions {
                         pos,
-                        exposure: Signed::zero(),
+                        capped_exposure: Signed::zero(),
+                        additional_losses: Collateral::zero(),
                         settlement_price: end_price,
                         reason: PositionCloseReason::Liquidated(LiquidationReason::MaxGains),
                         closed_during_liquifunding: true,
@@ -570,7 +576,8 @@ impl Position {
                 .map(|pos| PositionOrPendingClose::Open(Box::new(pos))),
             MaybeClosedPosition::Close(ClosePositionInstructions {
                 pos,
-                exposure,
+                capped_exposure: exposure,
+                additional_losses: _,
                 settlement_price,
                 reason,
                 closed_during_liquifunding: _,
