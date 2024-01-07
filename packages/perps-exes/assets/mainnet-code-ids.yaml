@@ -166,5 +166,16 @@ hashes:
 - contract-type: market
   gitrev: d2f81083b19c1cad899b4072daea25b5e989d733
   code-ids:
+    sei-mainnet: 891
     injective-mainnet: 326
   hash: 0d53f72d9c0ebba8be6c416e5bfbb4770da919bc91fa482a5d5bb461fb632848
+- contract-type: liquidity-token
+  gitrev: d2f81083b19c1cad899b4072daea25b5e989d733
+  code-ids:
+    sei-mainnet: 892
+  hash: 5aedf5e7ad58ebdfbd826d0c8dddf73cd3629542888ef6c41b04ee994bf52b4e
+- contract-type: position-token
+  gitrev: d2f81083b19c1cad899b4072daea25b5e989d733
+  code-ids:
+    sei-mainnet: 893
+  hash: 8fb10aa5e47135d8558b79908687a67a4d2ee1c723583f6b22b54f4fdd8a872d
