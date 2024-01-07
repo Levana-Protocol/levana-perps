@@ -67,6 +67,7 @@ pub(crate) fn update_config(
         max_liquidity,
         disable_position_nft_exec,
         liquidity_cooldown_seconds,
+        exposure_margin_ratio,
         spot_price,
     }: ConfigUpdate,
 ) -> Result<()> {
@@ -173,6 +174,10 @@ pub(crate) fn update_config(
 
     if let Some(x) = spot_price {
         config.spot_price = convert_spot_price_init(api, x)?;
+    }
+
+    if let Some(x) = exposure_margin_ratio {
+        config.exposure_margin_ratio = x;
     }
 
     config.validate()?;

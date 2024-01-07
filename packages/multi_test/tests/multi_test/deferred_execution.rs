@@ -757,7 +757,7 @@ fn defer_slippage_2857() {
     // now queue a close that will not have enough slippage tolerance
     let close_queue_resp = close_with_slippage_queue_only(0.001, pos_id);
     if market_type == MarketType::CollateralIsBase {
-        jump_and_set_price(1.15);
+        jump_and_set_price(1.156);
     } else {
         jump_and_set_price(1.18);
     }
@@ -773,12 +773,16 @@ fn defer_slippage_2857() {
     let err = market
         .exec_defer_queue_process(&cranker, close_queue_resp, None)
         .unwrap_err();
-    assert!(err.to_string().to_lowercase().contains("slippage"));
+    let err = err.to_string().to_lowercase();
+    assert!(
+        err.contains("slippage"),
+        "err does not contain the word 'slippage': {err}"
+    );
 
     // try again - this time with higher slippage tolerance - success!
     let close_queue_resp = close_with_slippage_queue_only(0.5, pos_id);
     if market_type == MarketType::CollateralIsBase {
-        jump_and_set_price(1.15);
+        jump_and_set_price(1.156);
     } else {
         jump_and_set_price(1.18);
     }

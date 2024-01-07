@@ -107,4 +107,7 @@ impl ConfigDefaults {
         // Default to 1 hour
         60 * 60
     }
+    pub fn exposure_margin_ratio() -> Decimal256 {
+        "0.005".parse().unwrap()
+    }
 }

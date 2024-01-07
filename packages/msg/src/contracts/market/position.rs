@@ -111,12 +111,15 @@ pub struct LiquidationMargin {
     pub delta_neutrality: Collateral,
     /// Funds set aside for a single crank fee.
     pub crank: Collateral,
+    /// Funds set aside to cover additional price exposure losses from sparse price updates.
+    #[serde(default)]
+    pub exposure: Collateral,
 }
 
 impl LiquidationMargin {
     /// Total value of the liquidation margin fields
     pub fn total(&self) -> Collateral {
-        self.borrow + self.funding + self.delta_neutrality + self.crank
+        self.borrow + self.funding + self.delta_neutrality + self.crank + self.exposure
     }
 }
 
@@ -403,6 +406,9 @@ impl Position {
             funding: Collateral::from_decimal256(funding_max_payment),
             delta_neutrality: Collateral::from_decimal256(slippage_max),
             crank: price_point.usd_to_collateral(config.crank_fee_charged),
+            exposure: price_point
+                .notional_to_collateral(self.notional_size.abs_unsigned())
+                .checked_mul_dec(config.exposure_margin_ratio)?,
         })
     }
 
@@ -725,6 +731,7 @@ impl Position {
             funding: funding_max,
             delta_neutrality: slippage_max,
             crank,
+            exposure,
         } = &self.liquidation_margin;
         vec![
             ("pos-owner", self.owner.to_string()),
@@ -757,6 +764,7 @@ impl Position {
             ("pos-funding-liquidation-margin", funding_max.to_string()),
             ("pos-slippage-liquidation-margin", slippage_max.to_string()),
             ("pos-crank-liquidation-margin", crank.to_string()),
+            ("pos-exposure-liquidation-margin", exposure.to_string()),
         ]
     }
 }
