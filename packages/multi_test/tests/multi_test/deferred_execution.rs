@@ -443,6 +443,108 @@ fn defer_before_crank_2855() {
 }
 
 #[test]
+fn defer_same_block_2859() {
+    let market = PerpsMarket::new_with_type(
+        PerpsApp::new_cell().unwrap(),
+        DEFAULT_MARKET.collateral_type,
+        true,
+        SpotPriceKind::Oracle,
+    )
+    .unwrap();
+
+    let trader = market.clone_trader(0).unwrap();
+    let cranker = market.clone_trader(1).unwrap();
+
+    market.exec_refresh_price().unwrap();
+
+    // this test does the same overall process for open, update, and close
+
+    /////////// OPEN //////////////
+    // try to open in the same block as the price
+    let queue_res = market
+        .exec_open_position_queue_only(
+            &trader,
+            "100",
+            "9",
+            DirectionToBase::Long,
+            "8",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    // fails
+    market
+        .exec_open_position_process_queue_response(&trader, queue_res.clone(), None)
+        .unwrap_err();
+
+    // now push a new price (inherently goes to the next block)
+    market.exec_refresh_price().unwrap();
+
+    // success!
+    let (pos_id, _) = market
+        .exec_open_position_process_queue_response(&trader, queue_res, None)
+        .unwrap();
+
+    /////////// UPDATE //////////////
+    // Now for update... same story
+    // new price in a new block
+    market.exec_refresh_price().unwrap();
+
+    // update in that same block
+    let queue_res = market
+        .exec_update_position_leverage_queue_only(&trader, pos_id, "10".parse().unwrap(), None)
+        .unwrap();
+
+    // fail
+    market
+        .exec_defer_queue_process(&cranker, queue_res.clone(), None)
+        .unwrap_err();
+    // multiple updates are allowed btw
+    market
+        .exec_update_position_leverage_queue_only(&trader, pos_id, "10".parse().unwrap(), None)
+        .unwrap();
+
+    // new price in a new block to process the queue
+    market.exec_refresh_price().unwrap();
+
+    // success!
+    market
+        .exec_defer_queue_process(&cranker, queue_res, None)
+        .unwrap();
+
+    /////////// CLOSE //////////////
+    // Now for close... same story
+    // new price in a new block
+    market.exec_refresh_price().unwrap();
+
+    // close in that same block
+    let queue_res = market
+        .exec_close_position_queue_only(&trader, pos_id, None)
+        .unwrap();
+
+    // fail
+    market
+        .exec_defer_queue_process(&cranker, queue_res.clone(), None)
+        .unwrap_err();
+
+    // multiple closes are not allowed (unless the previous one failed with a slippage assert, not tested here)
+    market
+        .exec_close_position_queue_only(&trader, pos_id, None)
+        .unwrap_err();
+
+    // new price in new block for the queue exec
+    market.exec_refresh_price().unwrap();
+
+    //success
+    market
+        .exec_defer_queue_process(&cranker, queue_res, None)
+        .unwrap();
+    market.query_closed_position(&trader, pos_id).unwrap();
+}
+
+#[test]
 fn defer_liquidation_2856() {
     let market = PerpsMarket::new_with_type(
         PerpsApp::new_cell().unwrap(),

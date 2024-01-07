@@ -142,6 +142,23 @@ impl DeferredExecStatus {
             DeferredExecStatus::Failure { .. } => false,
         }
     }
+    /// Is this item a failure?
+    pub fn is_failure(&self) -> bool {
+        match self {
+            DeferredExecStatus::Pending => false,
+            DeferredExecStatus::Success { .. } => false,
+            DeferredExecStatus::Failure { .. } => true,
+        }
+    }
+
+    /// Is this item a success?
+    pub fn is_success(&self) -> bool {
+        match self {
+            DeferredExecStatus::Pending => false,
+            DeferredExecStatus::Success { .. } => true,
+            DeferredExecStatus::Failure { .. } => false,
+        }
+    }
 }
 
 /// A deferred execution work item
@@ -372,7 +389,7 @@ impl DeferredExecItem {
 }
 
 /// Event emitted when a deferred execution is queued.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DeferredExecQueuedEvent {
     /// ID
     pub deferred_exec_id: DeferredExecId,
