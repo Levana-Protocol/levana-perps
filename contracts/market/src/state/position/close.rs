@@ -122,6 +122,7 @@ impl State<'_> {
         //
         // Take the exposure we already capped and subtract out the final exposure. Since both numbers in a loss scenario will be negative, this will give back the positive value representing the funds to be sent to the liquidity pool.
         let additional_lp_funds = capped_exposure.checked_sub(final_exposure)?;
+        debug_assert!(additional_lp_funds >= Signed::zero());
         self.liquidity_update_locked(ctx, additional_lp_funds, &settlement_price)?;
 
         // Final active collateral is the active collateral post fees plus final
