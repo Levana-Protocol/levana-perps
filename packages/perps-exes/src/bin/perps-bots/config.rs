@@ -55,6 +55,8 @@ pub(crate) struct BotConfigMainnet {
     pub(crate) max_gas_price: f64,
     /// Higher maximum gas price for urgent messages
     pub(crate) higher_max_gas_price: f64,
+    /// Higher maximum gas price for *very* urgent messages
+    pub(crate) higher_very_high_max_gas_price: f64,
 }
 
 pub(crate) struct BotConfig {
@@ -265,6 +267,7 @@ impl Opt {
             gas_price_congested,
             max_gas_price,
             higher_max_gas_price,
+            very_higher_max_gas_price
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let hrp = network.get_address_hrp();
@@ -303,6 +306,7 @@ impl Opt {
                     gas_price_congested: *gas_price_congested,
                     max_gas_price: *max_gas_price,
                     higher_max_gas_price: *higher_max_gas_price,
+                    higher_very_high_max_gas_price: *very_higher_max_gas_price,
                 }
                 .into(),
             },

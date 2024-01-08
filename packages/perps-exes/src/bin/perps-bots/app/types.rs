@@ -127,6 +127,8 @@ pub(crate) struct App {
     pub(crate) cosmos: Cosmos,
     /// Configured with much higher max gas price for urgent messages that need to get through congestion.
     pub(crate) cosmos_high_gas: Cosmos,
+    /// Configured with much *much* higher max gas price for urgent messages that need to get through congestion.
+    pub(crate) cosmos_very_high_gas: Cosmos,
     /// A separate Cosmos instance just for gas check due to dynamic gas weirdness.
     ///
     /// On Osmosis mainnet we use a dynamic gas multiplier. Since the multiplier for sending coins in gas check is significantly different than smart contract activities, we keep two different Cosmos values.
@@ -236,10 +238,18 @@ impl Opt {
                 .with_max_gas_price(inner.higher_max_gas_price),
         };
 
+        let cosmos_very_high_gas = match &config.by_type {
+            BotConfigByType::Testnet { .. } => cosmos.clone(),
+            BotConfigByType::Mainnet { inner } => cosmos
+                .clone()
+                .with_max_gas_price(inner.higher_very_high_max_gas_price),
+        };
+
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
             cosmos,
             cosmos_high_gas,
+            cosmos_very_high_gas,
             cosmos_gas_check,
             config,
             client,

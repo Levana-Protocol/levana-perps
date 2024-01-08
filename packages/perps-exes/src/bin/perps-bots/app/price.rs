@@ -182,7 +182,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                     &app,
                     &factory.markets,
                     &offchain_price_data,
-                    any_needs_high_gas_oracle_update.is_some(),
+                    any_needs_high_gas_oracle_update,
                 )
                 .await?,
             );
@@ -382,7 +382,7 @@ pub(crate) async fn update_oracles(
     app: &App,
     markets: &[Market],
     offchain_price_data: &OffchainPriceData,
-    is_high_gas: bool,
+    high_gas: Option<HighGas>,
 ) -> Result<String> {
     if offchain_price_data.stable_ids.is_empty() && offchain_price_data.edge_ids.is_empty() {
         return Ok("No Pyth IDs found, no Pyth oracle update needed".to_owned());
@@ -473,10 +473,10 @@ pub(crate) async fn update_oracles(
     // reports that prices for this market are currently closed, we ignore such
     // an error.
 
-    let cosmos = if is_high_gas {
-        &app.cosmos_high_gas
-    } else {
-        &app.cosmos
+    let cosmos = match high_gas {
+        None => &app.cosmos,
+        Some(HighGas::High) => &app.cosmos_high_gas,
+        Some(HighGas::VeryHigh) => &app.cosmos_very_high_gas,
     };
 
     match TxBuilder::default()

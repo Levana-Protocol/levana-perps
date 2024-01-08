@@ -7,7 +7,7 @@ use crate::{
 
 use super::{
     gas_check::GasCheckWallet, price::update_oracles, App, AppBuilder,
-    CrankTriggerReason, crank_run::RunResult,
+    CrankTriggerReason, crank_run::RunResult, HighGas,
 };
 use anyhow::Result;
 use axum::async_trait;
@@ -77,7 +77,7 @@ impl WatchedTask for Worker {
                             &app,
                             &factory.markets,
                             &offchain_price_data,
-                            true,
+                            Some(HighGas::VeryHigh),
                         )
                         .await?,
                     );
