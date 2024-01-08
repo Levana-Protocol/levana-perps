@@ -65,8 +65,8 @@ pub(crate) struct BotConfig {
     pub(crate) price_wallet: Option<Arc<Wallet>>,
     /// Wallets that are used to perform cranking
     pub(crate) crank_wallets: Vec<Wallet>,
-    /// Wallet used in very high gas situations
-    pub(crate) very_high_gas_wallet: Arc<Wallet>,
+    /// Wallet used for very high gas situations, derived from price wallet seed
+    pub(crate) high_gas_wallet: Wallet,
     pub(crate) watcher: WatcherConfig,
     pub(crate) gas_multiplier: Option<f64>,
     /// Parameters for checking if we need to do a price update or crank
@@ -205,19 +205,19 @@ impl Opt {
                 })
                 .collect::<Result<_>>()?,
             price_wallet: if partial.price {
-                Some(Arc::new(self.get_wallet(
+                Some(Arc::new(self.get_price_wallet(
                     network.get_address_hrp(),
                     &wallet_phrase_name,
-                    "PRICE",
+                    0
                 )?))
             } else {
                 None
             },
-            very_high_gas_wallet: Arc::new(self.get_wallet(
+            high_gas_wallet: self.get_price_wallet(
                 network.get_address_hrp(),
                 &wallet_phrase_name,
-                "VERY_HIGH_GAS",
-            )?),
+                1
+            )?,
             watcher: partial.watcher.clone(),
             gas_multiplier,
             needs_price_update_params: NeedsPriceUpdateParams {
@@ -245,7 +245,6 @@ impl Opt {
         MainnetOpt {
             factory,
             seed,
-            seed_very_high_gas,
             network,
             gas_multiplier,
             min_gas,
@@ -279,11 +278,10 @@ impl Opt {
 
         let gas_wallet = get_wallet(1)?;
         let price_wallet = get_wallet(2)?;
+        let high_gas_wallet = get_wallet(3)?;
         let crank_wallets = (0..*crank_wallets)
-            .map(|idx| get_wallet(idx + 3))
+            .map(|idx| get_wallet(idx + 4))
             .collect::<Result<_, _>>()?;
-
-        let very_high_gas_wallet = Arc::new(seed_very_high_gas.with_hrp(hrp)?);
 
         let watcher = match watcher_config {
             Some(yaml) => serde_yaml::from_str(yaml).context("Invalid watcher config on CLI")?,
@@ -312,7 +310,7 @@ impl Opt {
             network: *network,
             price_wallet: Some(price_wallet.into()),
             crank_wallets,
-            very_high_gas_wallet,
+            high_gas_wallet,
             watcher,
             gas_multiplier: *gas_multiplier,
             needs_price_update_params: NeedsPriceUpdateParams {

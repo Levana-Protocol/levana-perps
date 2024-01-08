@@ -38,7 +38,6 @@ use super::{
 
 struct Worker {
     wallet: Arc<Wallet>,
-    very_high_gas_wallet: Arc<Wallet>,
     stats: HashMap<MarketId, ReasonStats>,
     trigger_crank: TriggerCrank,
 }
@@ -61,7 +60,6 @@ impl AppBuilder {
                 crate::watcher::TaskLabel::Price,
                 Worker {
                     wallet: price_wallet,
-                    very_high_gas_wallet: self.app.config.very_high_gas_wallet.clone(),
                     stats: HashMap::new(),
                     trigger_crank,
                 },
@@ -461,19 +459,19 @@ async fn update_oracles(
     // reports that prices for this market are currently closed, we ignore such
     // an error.
 
-    let (cosmos, price_wallet) = match high_gas {
-        None => (&app.cosmos, &worker.wallet),
-        Some(HighGas::High) => (&app.cosmos_high_gas, &worker.wallet),
-        Some(HighGas::VeryHigh) => (&app.cosmos_high_gas, &worker.very_high_gas_wallet),
+    let cosmos = if high_gas.is_some() {
+        &app.cosmos_high_gas 
+    } else {
+        &app.cosmos
     };
 
     match TxBuilder::default()
         .add_message(msg.clone())
-        .sign_and_broadcast_cosmos_tx(cosmos, price_wallet)
+        .sign_and_broadcast_cosmos_tx(cosmos, &worker.wallet)
         .await
     {
         Ok(res) => {
-            track_tx_fees(app, price_wallet.get_address(), &res).await;
+            track_tx_fees(app, worker.wallet.get_address(), &res).await;
             Ok(format!(
                 "Prices updated in Pyth oracle contract with txhash {}",
                 res.response.txhash

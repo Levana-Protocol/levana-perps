@@ -22,7 +22,7 @@ use cosmos::{HasAddress, TxBuilder, Wallet};
 use msg::prelude::MarketExecuteMsg;
 use perps_exes::prelude::MarketContract;
 
-use crate::app::{CrankTriggerReason, HighGas};
+use crate::app::CrankTriggerReason;
 use crate::util::misc::track_tx_fees;
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
@@ -34,7 +34,6 @@ pub(crate) use trigger_crank::TriggerCrank;
 
 struct Worker {
     crank_wallet: Wallet,
-    very_high_gas_wallet: Arc<Wallet>,
     recv: CrankReceiver,
 }
 
@@ -54,7 +53,6 @@ impl AppBuilder {
 
             let worker = Worker {
                 crank_wallet,
-                very_high_gas_wallet: self.app.config.very_high_gas_wallet.clone(),
                 recv: recv.clone(),
             };
             self.watch_periodic(
@@ -70,7 +68,7 @@ impl AppBuilder {
 #[async_trait]
 impl WatchedTask for Worker {
     async fn run_single(&mut self, app: Arc<App>, _: Heartbeat) -> Result<WatchedTaskOutput> {
-        app.crank(&self.crank_wallet, &self.very_high_gas_wallet, &self.recv)
+        app.crank(&self.crank_wallet, &self.recv)
             .await
     }
 }
@@ -81,7 +79,6 @@ impl App {
     async fn crank(
         &self,
         crank_wallet: &Wallet,
-        very_high_gas_wallet: &Wallet,
         recv: &CrankReceiver,
     ) -> Result<WatchedTaskOutput> {
         // Wait for up to 20 seconds for new work to appear. If it doesn't, update our status message that no cranking was needed.
@@ -92,10 +89,10 @@ impl App {
             Some(crank_needed) => crank_needed,
         };
 
-        let (cosmos, crank_wallet) = match reason.needs_high_gas() {
-            None => (&self.cosmos, crank_wallet),
-            Some(HighGas::High) => (&self.cosmos_high_gas, crank_wallet),
-            Some(HighGas::VeryHigh) => (&self.cosmos_high_gas, very_high_gas_wallet),
+        let cosmos = if reason.needs_high_gas().is_some() {
+            &self.cosmos_high_gas
+        } else {
+            &self.cosmos
         };
 
         let rewards = self

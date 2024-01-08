@@ -113,8 +113,6 @@ pub(crate) struct MainnetOpt {
     pub(crate) factory: Address,
     #[clap(long, env = "LEVANA_BOTS_SEED_PHRASE")]
     pub(crate) seed: SeedPhrase,
-    #[clap(long, env = "LEVANA_BOTS_VERY_HIGH_GAS_SEED_PHRASE")]
-    pub(crate) seed_very_high_gas: SeedPhrase,
     #[clap(long, env = "COSMOS_NETWORK")]
     pub(crate) network: CosmosNetwork,
     #[clap(long, env = "COSMOS_GAS_MULTIPLIER")]
@@ -208,20 +206,6 @@ impl Opt {
         Ok(())
     }
 
-    pub(crate) fn get_wallet(
-        &self,
-        address_type: AddressHrp,
-        wallet_phrase_name: &str,
-        wallet_type: &str,
-    ) -> Result<Wallet> {
-        let env_var = format!("LEVANA_BOTS_PHRASE_{wallet_phrase_name}_{wallet_type}");
-        let phrase = get_env(&env_var)?;
-        let phrase = SeedPhrase::from_str(&phrase)?;
-        let wallet = phrase.with_hrp(address_type)?;
-        tracing::info!("Wallet address for {wallet_type}: {wallet}");
-        Ok(wallet)
-    }
-
     pub(crate) fn get_wallet_seed(
         &self,
         wallet_phrase_name: &str,
@@ -264,6 +248,21 @@ impl Opt {
             .with_cosmos_numbered(index.into())
             .with_hrp(address_type)?;
         tracing::info!("Crank bot wallet: {wallet}");
+        Ok(wallet)
+    }
+    pub(crate) fn get_price_wallet(
+        &self,
+        address_type: AddressHrp,
+        wallet_phrase_name: &str,
+        index: u32,
+    ) -> Result<Wallet> {
+        let env_var = format!("LEVANA_BOTS_PHRASE_{}_PRICE", wallet_phrase_name);
+        let phrase = get_env(&env_var)?;
+        let seed = SeedPhrase::from_str(&phrase)?;
+        let wallet = seed
+            .with_cosmos_numbered(index.into())
+            .with_hrp(address_type)?;
+        tracing::info!("Price bot wallet: {wallet}");
         Ok(wallet)
     }
 }
