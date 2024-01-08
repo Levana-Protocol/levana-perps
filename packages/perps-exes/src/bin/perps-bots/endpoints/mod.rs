@@ -5,7 +5,13 @@ use axum::routing::{get, post};
 
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
-use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer, timeout::TimeoutLayer};
+use tower_http::{
+    cors::CorsLayer,
+    limit::RequestBodyLimitLayer,
+    timeout::TimeoutLayer,
+    trace::{self, TraceLayer},
+};
+use tracing::Level;
 
 use crate::{app::App, watcher::TaskStatuses};
 
@@ -29,6 +35,12 @@ pub(crate) async fn start_rest_api(
     listener: TcpListener,
 ) -> Result<()> {
     let service_builder = ServiceBuilder::new()
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
+                .on_request(trace::DefaultOnRequest::new().level(Level::INFO))
+                .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
+        )
         .layer(RequestBodyLimitLayer::new(app.opt.request_body_limit_bytes))
         .layer(TimeoutLayer::new(std::time::Duration::from_secs(
             app.opt.request_timeout_seconds,
