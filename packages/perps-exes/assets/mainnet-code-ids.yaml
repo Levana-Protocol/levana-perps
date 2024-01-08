@@ -166,6 +166,7 @@ hashes:
 - contract-type: market
   gitrev: d2f81083b19c1cad899b4072daea25b5e989d733
   code-ids:
+    osmosis-mainnet: 400
     sei-mainnet: 891
     injective-mainnet: 326
   hash: 0d53f72d9c0ebba8be6c416e5bfbb4770da919bc91fa482a5d5bb461fb632848
