@@ -92,7 +92,7 @@ impl TaskLabel {
             TaskLabel::TotalDepositAlert => false,
             TaskLabel::RpcHealth => false,
             TaskLabel::Congestion => false,
-            TaskLabel::HighGas => false,
+            TaskLabel::HighGas => true,
         }
     }
 }
