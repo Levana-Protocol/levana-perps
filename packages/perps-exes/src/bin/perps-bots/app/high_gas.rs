@@ -6,8 +6,8 @@ use crate::{
 };
 
 use super::{
-    crank_run::TriggerCrank, gas_check::GasCheckWallet, price::update_oracles, App, AppBuilder,
-    CrankTriggerReason,
+    gas_check::GasCheckWallet, price::update_oracles, App, AppBuilder,
+    CrankTriggerReason, crank_run::RunResult,
 };
 use anyhow::Result;
 use axum::async_trait;
@@ -35,7 +35,7 @@ pub(crate) enum HighGasWork {
 
 /// Start the background thread to run "high gas" tasks.
 impl AppBuilder {
-    pub(super) fn start_high_gas(&mut self, trigger_crank: TriggerCrank) -> Result<HighGasTrigger> {
+    pub(super) fn start_high_gas(&mut self) -> Result<HighGasTrigger> {
         let wallet = self.app.config.high_gas_wallet.clone();
 
         self.refill_gas(wallet.get_address(), GasCheckWallet::HighGas)?;
@@ -44,7 +44,6 @@ impl AppBuilder {
 
         let worker = Worker {
             wallet,
-            trigger_crank,
             current_work: current_work.clone(),
         };
 
@@ -57,7 +56,6 @@ impl AppBuilder {
 struct Worker {
     wallet: Wallet,
     current_work: Arc<Mutex<Option<HighGasWork>>>,
-    trigger_crank: TriggerCrank,
 }
 
 #[async_trait]
@@ -84,17 +82,32 @@ impl WatchedTask for Worker {
                         .await?,
                     );
 
-                    for (market, market_id, reason) in markets_to_update {
-                        self.trigger_crank
-                            .trigger_crank(market, market_id, reason)
-                            .await;
+                    for (market, _, reason) in markets_to_update {
+                        // always "succeeds"
+                        successes.push(match app.crank(&self.wallet, market, reason, Some(&[0])).await? {
+                            RunResult::NormalRun(txres) => {
+                                format!(
+                                    "[VERY HIGH GAS] - Successfully turned the crank for market {market} in transaction {}.",
+                                    txres.txhash
+                                )
+                            }
+                            RunResult::OutOfGas => {
+                                format!("[VERY HIGH GAS] - Got an 'out of gas' code 11 when trying to crank.")
+                            }
+                            RunResult::OsmosisEpoch(e) => {
+                                format!("[VERY HIGH GAS] - Ignoring crank run error since we think we're in the Osmosis epoch, error: {e:?}")
+                            }
+                            RunResult::OsmosisCongested(e) => {
+                                format!("[VERY HIGH GAS] - Ignoring crank run error since we think the Osmosis chain is overly congested, error: {e:?}")
+                            }
+                        });
                     }
 
-                    successes.push("high gas - update price success".to_string());
+                    successes.push("[VERY HIGH GAS] - update price success".to_string());
                 }
             },
             None => {
-                successes.push("high gas - no work to do".to_string());
+                successes.push("[VERY HIGH GAS] - no work to do".to_string());
             }
         }
 
