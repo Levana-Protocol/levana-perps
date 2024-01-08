@@ -35,6 +35,7 @@ pub(crate) enum GasCheckWallet {
     Price,
     Managed(ManagedWallet),
     UltraCrank(usize),
+    HighGas,
 }
 
 impl Display for GasCheckWallet {
@@ -48,6 +49,7 @@ impl Display for GasCheckWallet {
             GasCheckWallet::Price => write!(f, "Price"),
             GasCheckWallet::Managed(x) => write!(f, "{x}"),
             GasCheckWallet::UltraCrank(x) => write!(f, "Ultra crank #{x}"),
+            GasCheckWallet::HighGas => write!(f, "Price"),
         }
     }
 }

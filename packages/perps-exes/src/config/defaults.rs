@@ -90,6 +90,10 @@ pub(super) fn congestion() -> TaskConfig {
     super::WatcherConfig::default().congestion
 }
 
+pub(super) fn high_gas() -> TaskConfig {
+    super::WatcherConfig::default().high_gas
+}
+
 pub(super) fn seconds_till_ultra() -> u32 {
     // 8 minutes
     60 * 8

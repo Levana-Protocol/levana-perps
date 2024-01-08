@@ -484,6 +484,8 @@ pub struct WatcherConfig {
     pub rpc_health: TaskConfig,
     #[serde(default = "defaults::congestion")]
     pub congestion: TaskConfig,
+    #[serde(default = "defaults::high_gas")]
+    pub high_gas: TaskConfig,
 }
 
 impl Default for WatcherConfig {
@@ -598,6 +600,13 @@ impl Default for WatcherConfig {
                 // OK to be fast on this, we use cached data
                 delay: Delay::Constant(2),
                 out_of_date: 2,
+                retries: None,
+                delay_between_retries: None,
+            },
+            high_gas: TaskConfig {
+                // We block internally within the high gas service
+                delay: Delay::Constant(0),
+                out_of_date: 60,
                 retries: None,
                 delay_between_retries: None,
             },

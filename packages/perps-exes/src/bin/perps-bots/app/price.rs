@@ -32,14 +32,17 @@ use crate::{
 };
 
 use super::{
-    crank_run::TriggerCrank, gas_check::GasCheckWallet, App, AppBuilder, CrankTriggerReason,
-    HighGas,
+    crank_run::TriggerCrank,
+    gas_check::GasCheckWallet,
+    high_gas::{HighGasTrigger, HighGasWork},
+    App, AppBuilder, CrankTriggerReason, HighGas,
 };
 
 struct Worker {
     wallet: Arc<Wallet>,
     stats: HashMap<MarketId, ReasonStats>,
     trigger_crank: TriggerCrank,
+    high_gas_trigger: HighGasTrigger,
 }
 
 impl Worker {
@@ -53,7 +56,11 @@ impl Worker {
 
 /// Start the background thread to keep options pools up to date.
 impl AppBuilder {
-    pub(super) fn start_price(&mut self, trigger_crank: TriggerCrank) -> Result<()> {
+    pub(super) fn start_price(
+        &mut self,
+        trigger_crank: TriggerCrank,
+        high_gas_trigger: HighGasTrigger,
+    ) -> Result<()> {
         if let Some(price_wallet) = self.app.config.price_wallet.clone() {
             self.refill_gas(price_wallet.get_address(), GasCheckWallet::Price)?;
             self.watch_periodic(
@@ -62,6 +69,7 @@ impl AppBuilder {
                     wallet: price_wallet,
                     stats: HashMap::new(),
                     trigger_crank,
+                    high_gas_trigger,
                 },
             )?;
         }
@@ -160,15 +168,21 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
     if markets_to_update.is_empty() {
         anyhow::ensure!(!any_needs_oracle_update);
         successes.push("No markets need updating".to_owned());
+    } else if any_needs_high_gas_oracle_update == Some(HighGas::VeryHigh) {
+        successes.push("Passing the work to HighGas runner".to_owned());
+        worker.high_gas_trigger.set(HighGasWork::Price {
+            offchain_price_data,
+            markets_to_update,
+        });
     } else {
         if any_needs_oracle_update {
             successes.push(
                 update_oracles(
-                    worker,
+                    &worker.wallet,
                     &app,
                     &factory.markets,
                     &offchain_price_data,
-                    any_needs_high_gas_oracle_update,
+                    any_needs_high_gas_oracle_update.is_some(),
                 )
                 .await?,
             );
@@ -363,12 +377,12 @@ async fn check_market_needs_price_update(
     }
 }
 
-async fn update_oracles(
-    worker: &mut Worker,
+pub(crate) async fn update_oracles(
+    wallet: &Wallet,
     app: &App,
     markets: &[Market],
     offchain_price_data: &OffchainPriceData,
-    high_gas: Option<HighGas>,
+    is_high_gas: bool,
 ) -> Result<String> {
     if offchain_price_data.stable_ids.is_empty() && offchain_price_data.edge_ids.is_empty() {
         return Ok("No Pyth IDs found, no Pyth oracle update needed".to_owned());
@@ -429,7 +443,7 @@ async fn update_oracles(
 
             get_oracle_update_msg(
                 &offchain_price_data.stable_ids,
-                &*worker.wallet,
+                &wallet,
                 &app.endpoint_stable,
                 &app.client,
                 &app.cosmos.make_contract(contract),
@@ -442,7 +456,7 @@ async fn update_oracles(
 
             get_oracle_update_msg(
                 &offchain_price_data.edge_ids,
-                &*worker.wallet,
+                &wallet,
                 &app.endpoint_edge,
                 &app.client,
                 &app.cosmos.make_contract(contract),
@@ -459,19 +473,19 @@ async fn update_oracles(
     // reports that prices for this market are currently closed, we ignore such
     // an error.
 
-    let cosmos = if high_gas.is_some() {
-        &app.cosmos_high_gas 
+    let cosmos = if is_high_gas {
+        &app.cosmos_high_gas
     } else {
         &app.cosmos
     };
 
     match TxBuilder::default()
         .add_message(msg.clone())
-        .sign_and_broadcast_cosmos_tx(cosmos, &worker.wallet)
+        .sign_and_broadcast_cosmos_tx(cosmos, wallet)
         .await
     {
         Ok(res) => {
-            track_tx_fees(app, worker.wallet.get_address(), &res).await;
+            track_tx_fees(app, wallet.get_address(), &res).await;
             Ok(format!(
                 "Prices updated in Pyth oracle contract with txhash {}",
                 res.response.txhash

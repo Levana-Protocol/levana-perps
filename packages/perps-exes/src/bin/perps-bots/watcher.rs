@@ -43,6 +43,7 @@ pub(crate) enum TaskLabel {
     TotalDepositAlert,
     RpcHealth,
     Congestion,
+    HighGas,
 }
 
 impl TaskLabel {
@@ -62,6 +63,7 @@ impl TaskLabel {
             "total-deposit-alert" => Some(TaskLabel::TotalDepositAlert),
             "rpc-health" => Some(TaskLabel::RpcHealth),
             "congestion" => Some(TaskLabel::Congestion),
+            "high-gas" => Some(TaskLabel::HighGas),
             _ => {
                 // Being lazy, skipping UltraCrank and Trader, they aren't needed
                 let index = s.strip_prefix("crank-run-")?;
@@ -90,6 +92,7 @@ impl TaskLabel {
             TaskLabel::TotalDepositAlert => false,
             TaskLabel::RpcHealth => false,
             TaskLabel::Congestion => false,
+            TaskLabel::HighGas => false,
         }
     }
 }
@@ -235,6 +238,7 @@ impl TaskLabel {
             TaskLabel::TotalDepositAlert => config.liquidity_transaction,
             TaskLabel::RpcHealth => config.rpc_health,
             TaskLabel::Congestion => config.congestion,
+            TaskLabel::HighGas => config.high_gas,
         }
     }
 
@@ -261,6 +265,7 @@ impl TaskLabel {
             TaskLabel::TotalDepositAlert => false,
             TaskLabel::RpcHealth => false,
             TaskLabel::Congestion => false,
+            TaskLabel::HighGas => false,
         }
     }
 
@@ -283,6 +288,7 @@ impl TaskLabel {
             TaskLabel::TotalDepositAlert => "total-deposit-alert".into(),
             TaskLabel::RpcHealth => "rpc-health".into(),
             TaskLabel::Congestion => "congestion".into(),
+            TaskLabel::HighGas => "high-gas".into(),
         }
     }
 }

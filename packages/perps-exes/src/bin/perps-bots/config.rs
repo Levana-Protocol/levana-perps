@@ -61,7 +61,6 @@ pub(crate) struct BotConfig {
     pub(crate) by_type: BotConfigByType,
     pub(crate) network: CosmosNetwork,
     /// Wallet used to update Pyth oracle contract
-    //pub(crate) price_wallet: Option<Arc<Wallet>>,
     pub(crate) price_wallet: Option<Arc<Wallet>>,
     /// Wallets that are used to perform cranking
     pub(crate) crank_wallets: Vec<Wallet>,
@@ -208,7 +207,7 @@ impl Opt {
                 Some(Arc::new(self.get_price_wallet(
                     network.get_address_hrp(),
                     &wallet_phrase_name,
-                    0
+                    0,
                 )?))
             } else {
                 None
@@ -216,7 +215,7 @@ impl Opt {
             high_gas_wallet: self.get_price_wallet(
                 network.get_address_hrp(),
                 &wallet_phrase_name,
-                1
+                1,
             )?,
             watcher: partial.watcher.clone(),
             gas_multiplier,
