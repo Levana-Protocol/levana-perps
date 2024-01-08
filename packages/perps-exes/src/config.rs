@@ -631,6 +631,15 @@ pub enum Delay {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MarketConfigUpdates {
     pub markets: HashMap<MarketId, ConfigUpdateAndBorrowFee>,
+    pub crank_fees: HashMap<CosmosNetwork, CrankFeeConfig>,
+}
+
+#[derive(serde::Deserialize, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct CrankFeeConfig {
+    pub charged: Usd,
+    pub surcharge: Usd,
+    pub reward: Usd,
 }
 
 #[derive(serde::Deserialize, Debug, Clone)]
