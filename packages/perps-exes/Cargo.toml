@@ -72,7 +72,7 @@ pid1 = "0.1.1"
 dashmap = "5.5.3"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-parking_lot = "0.12.1"
+parking_lot = { version = "0.12.1", features = ["deadlock_detection"] }
 bigdecimal = { version = "0.4.2", features = ["serde"]}
 http = "1.0.0"
 headers = "0.4.0"

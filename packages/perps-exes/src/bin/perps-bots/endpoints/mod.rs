@@ -55,11 +55,10 @@ pub(crate) async fn start_rest_api(
         .route("/markets", get(markets::markets))
         .route("/debug/gas-refill", get(debug::gas_refill))
         .route("/debug/fund-usage", get(debug::fund_usage))
-        .with_state(RestApp { app, statuses })
         .layer(service_builder)
         .route("/healthz", get(common::healthz))
-        .route("/status", get(status::all));
-
+        .route("/status", get(status::all))
+        .with_state(RestApp { app, statuses });
 
     tracing::info!("Launching server");
 
