@@ -188,6 +188,7 @@ overrides:
   seici:
     wallet-manager-address: osmo1ghgpnmxgt6xz463423hhnx8zp99dwt563wnllv
     dev-settings: true
+    price: true
     crank: 4
     liquidity: true
     utilization: true
