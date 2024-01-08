@@ -9,7 +9,9 @@ use std::{
 use anyhow::Result;
 use axum::async_trait;
 use chrono::{DateTime, Utc};
-use cosmos::{Address, HasAddress, TxBuilder, Wallet};
+use cosmos::{
+    proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, HasAddress, TxBuilder, Wallet,
+};
 use msg::{
     contracts::market::{
         crank::CrankWorkInfo,
@@ -170,10 +172,13 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
         successes.push("No markets need updating".to_owned());
     } else if any_needs_high_gas_oracle_update == Some(HighGas::VeryHigh) {
         successes.push("Passing the work to HighGas runner".to_owned());
-        worker.high_gas_trigger.set(HighGasWork::Price {
-            offchain_price_data,
-            markets_to_update,
-        });
+        worker
+            .high_gas_trigger
+            .set(HighGasWork::Price {
+                offchain_price_data,
+                markets_to_update,
+            })
+            .await;
     } else {
         if any_needs_oracle_update {
             successes.push(
@@ -377,16 +382,16 @@ async fn check_market_needs_price_update(
     }
 }
 
-pub(crate) async fn update_oracles(
+pub(crate) async fn price_get_update_oracles_msg(
     wallet: &Wallet,
     app: &App,
     markets: &[Market],
     offchain_price_data: &OffchainPriceData,
-    high_gas: Option<HighGas>,
-) -> Result<String> {
+) -> Result<Option<MsgExecuteContract>> {
     if offchain_price_data.stable_ids.is_empty() && offchain_price_data.edge_ids.is_empty() {
-        return Ok("No Pyth IDs found, no Pyth oracle update needed".to_owned());
+        return Ok(None);
     }
+
     let mut stable_contract = None;
     let mut edge_contract = None;
 
@@ -430,39 +435,58 @@ pub(crate) async fn update_oracles(
         }
     }
 
-    let msg = match (stable_contract, edge_contract) {
+    match (stable_contract, edge_contract) {
         (None, None) => {
             anyhow::ensure!(offchain_price_data.stable_ids.is_empty());
             anyhow::ensure!(offchain_price_data.edge_ids.is_empty());
-            return Ok("No Pyth price feeds found to update".to_owned());
+            return Ok(None);
         }
         (Some(_), Some(_)) => anyhow::bail!("Cannot support both stable and edge Pyth contracts"),
         (Some(contract), None) => {
             anyhow::ensure!(edge_contract.is_none());
             anyhow::ensure!(offchain_price_data.edge_ids.is_empty());
 
-            get_oracle_update_msg(
-                &offchain_price_data.stable_ids,
-                &wallet,
-                &app.endpoint_stable,
-                &app.client,
-                &app.cosmos.make_contract(contract),
-            )
-            .await?
+            Ok(Some(
+                get_oracle_update_msg(
+                    &offchain_price_data.stable_ids,
+                    &wallet,
+                    &app.endpoint_stable,
+                    &app.client,
+                    &app.cosmos.make_contract(contract),
+                )
+                .await?,
+            ))
         }
         (None, Some(contract)) => {
             anyhow::ensure!(stable_contract.is_none());
             anyhow::ensure!(offchain_price_data.stable_ids.is_empty());
 
-            get_oracle_update_msg(
-                &offchain_price_data.edge_ids,
-                &wallet,
-                &app.endpoint_edge,
-                &app.client,
-                &app.cosmos.make_contract(contract),
-            )
-            .await?
+            Ok(Some(
+                get_oracle_update_msg(
+                    &offchain_price_data.edge_ids,
+                    &wallet,
+                    &app.endpoint_edge,
+                    &app.client,
+                    &app.cosmos.make_contract(contract),
+                )
+                .await?,
+            ))
         }
+    }
+}
+
+pub(crate) async fn update_oracles(
+    wallet: &Wallet,
+    app: &App,
+    markets: &[Market],
+    offchain_price_data: &OffchainPriceData,
+    high_gas: Option<HighGas>,
+) -> Result<String> {
+    let msg = match price_get_update_oracles_msg(wallet, app, markets, offchain_price_data).await? {
+        None => {
+            return Ok("No Pyth IDs found, no Pyth oracle update needed".to_owned());
+        }
+        Some(msg) => msg,
     };
 
     // Previously, with PERP-1702, we had some logic to ignore some errors from

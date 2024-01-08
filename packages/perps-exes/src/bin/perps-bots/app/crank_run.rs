@@ -18,7 +18,7 @@ use anyhow::{Context, Result};
 use axum::async_trait;
 
 use cosmos::proto::cosmos::base::abci::v1beta1::TxResponse;
-use cosmos::{HasAddress, TxBuilder, Wallet, Address};
+use cosmos::{Address, HasAddress, TxBuilder, Wallet};
 use msg::prelude::MarketExecuteMsg;
 use perps_exes::prelude::MarketContract;
 
@@ -40,7 +40,7 @@ pub(crate) enum RunResult {
     NormalRun(TxResponse),
     OutOfGas,
     OsmosisEpoch(anyhow::Error),
-    OsmosisCongested(anyhow::Error)
+    OsmosisCongested(anyhow::Error),
 }
 
 /// Start the background thread to turn the crank on the crank bots.
@@ -99,7 +99,6 @@ impl App {
         // Successfully cranked, check if there's more work and, if so, schedule it to be started again
         std::mem::drop(crank_guard);
 
-
         let more_work = match MarketContract::new(self.cosmos.make_contract(market))
             .status()
             .await
@@ -139,12 +138,11 @@ impl App {
     pub(crate) async fn crank(
         &self,
         crank_wallet: &Wallet,
-        market: Address, 
+        market: Address,
         reason: CrankTriggerReason,
-        // an array of N execs to try with fallbacks 
+        // an array of N execs to try with fallbacks
         execs: Option<&[u32]>,
     ) -> Result<RunResult> {
-
         let cosmos = if reason.needs_high_gas().is_some() {
             &self.cosmos_high_gas
         } else {
@@ -202,7 +200,6 @@ impl App {
         )?;
         builder.set_memo(reason.to_string());
 
-
         match builder
             .sign_and_broadcast_cosmos_tx(cosmos, crank_wallet)
             .await
@@ -236,7 +233,5 @@ impl App {
                 }
             }
         }
-
-
     }
 }

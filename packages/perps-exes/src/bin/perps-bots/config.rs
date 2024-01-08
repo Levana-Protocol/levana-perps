@@ -267,7 +267,7 @@ impl Opt {
             gas_price_congested,
             max_gas_price,
             higher_max_gas_price,
-            very_higher_max_gas_price
+            very_higher_max_gas_price,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let hrp = network.get_address_hrp();

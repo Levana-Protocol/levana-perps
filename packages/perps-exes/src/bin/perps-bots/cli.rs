@@ -170,11 +170,7 @@ pub(crate) struct MainnetOpt {
     #[clap(long, env = "LEVANA_BOTS_MAX_GAS_PRICE", default_value_t = 0.0486)]
     pub(crate) max_gas_price: f64,
     /// Maximum gas price we'll pay on Osmosis for urgent messages
-    #[clap(
-        long,
-        env = "LEVANA_BOTS_HIGHER_MAX_GAS_PRICE",
-        default_value_t = 0.2
-    )]
+    #[clap(long, env = "LEVANA_BOTS_HIGHER_MAX_GAS_PRICE", default_value_t = 0.2)]
     pub(crate) higher_max_gas_price: f64,
     /// Maximum gas price we'll pay on Osmosis for urgent messages
     #[clap(

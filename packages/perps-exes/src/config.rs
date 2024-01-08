@@ -604,9 +604,9 @@ impl Default for WatcherConfig {
                 delay_between_retries: None,
             },
             high_gas: TaskConfig {
-                // OK to be fast on this, we're polling to see if there's
-                // work to do and then we block internally within the high gas service
-                delay: Delay::Constant(2),
+                // We block internally within this service
+                // and use a channel to signal when it should be woken up
+                delay: Delay::Constant(0),
                 out_of_date: 60,
                 retries: None,
                 delay_between_retries: None,
