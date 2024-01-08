@@ -8,7 +8,7 @@ use msg::{
     contracts::{
         cw20::entry::BalanceResponse,
         market::{
-            config::ConfigUpdate,
+            config::{Config, ConfigUpdate},
             entry::{
                 ClosedPositionsResp, ExecuteOwnerMsg, LpAction, LpActionHistoryResp, LpInfoResp,
                 OraclePriceResp, PositionAction, PositionActionHistoryResp, PriceWouldTriggerResp,
@@ -68,6 +68,16 @@ impl MarketContract {
     /// Useful for working around the overly aggressive cw_serde deny_unknown_fields.
     pub async fn status_relaxed<T: serde::de::DeserializeOwned>(&self) -> Result<T, cosmos::Error> {
         self.0.query(MarketQueryMsg::Status { price: None }).await
+    }
+
+    /// Get just the config out of the status
+    pub async fn config(&self) -> Result<Config> {
+        #[derive(serde::Deserialize)]
+        struct SimpleStatus {
+            config: Config,
+        }
+        let SimpleStatus { config } = self.status_relaxed().await?;
+        Ok(config)
     }
 
     pub async fn status_at_height(&self, height: u64) -> Result<StatusResp, cosmos::Error> {

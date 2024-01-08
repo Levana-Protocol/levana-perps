@@ -12,13 +12,17 @@ use msg::{
 };
 use perps_exes::{
     config::{
-        ChainConfig, ConfigUpdateAndBorrowFee, MainnetFactories, MarketConfigUpdates, PriceConfig,
+        ChainConfig, ConfigUpdateAndBorrowFee, CrankFeeConfig, MainnetFactories,
+        MarketConfigUpdates, PriceConfig,
     },
     contracts::{Factory, MarketInfo},
     prelude::MarketContract,
 };
 
-use crate::{mainnet::strip_nulls, spot_price_config::get_spot_price_config, util::add_cosmos_msg};
+use crate::{
+    mainnet::strip_nulls, spot_price_config::get_spot_price_config,
+    testnet::sync_config::is_unused_key, util::add_cosmos_msg,
+};
 
 #[derive(clap::Parser)]
 pub(super) struct SyncConfigOpts {
@@ -35,10 +39,11 @@ impl SyncConfigOpts {
 async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) -> Result<()> {
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
+    let network = factory.network;
 
     let chain_config = ChainConfig::load(None::<PathBuf>, factory.network)?;
     let price_config = PriceConfig::load(None::<PathBuf>)?;
-    let oracle = opt.get_oracle_info(&chain_config, &price_config, factory.network)?;
+    let oracle = opt.get_oracle_info(&chain_config, &price_config, network)?;
 
     let app = opt.load_app_mainnet(factory.network).await?;
     let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
@@ -53,7 +58,7 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
     } in markets
     {
         let market = MarketContract::new(market);
-        let actual_config = market.status().await?.config;
+        let actual_config = market.config().await?;
         let ConfigUpdateAndBorrowFee {
             config: expected_config,
             initial_borrow_fee_rate: _,
@@ -61,6 +66,14 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
             .markets
             .get(&market_id)
             .with_context(|| format!("No market config update found for {market_id}"))?;
+        let CrankFeeConfig {
+            charged,
+            surcharge,
+            reward,
+        } = market_config_updates
+            .crank_fees
+            .get(&network)
+            .with_context(|| format!("No crank fee config found for network {network}"))?;
         let default_config = Config::new(
             msg::contracts::market::spot_price::SpotPriceConfig::Manual {
                 admin: Addr::unchecked("ignored"),
@@ -91,12 +104,22 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
             let expected = if key == "spot_price" {
                 let spot_price_config = get_spot_price_config(&oracle, &price_config, &market_id)?;
                 serde_json::to_value(spot_price_config)?
+            } else if is_unused_key(&key) {
+                continue;
             } else {
                 let expected_value = expected_config
                     .remove(&key)
                     .with_context(|| format!("Missing key in expected_config: {key}"))?;
                 if expected_value.is_null() {
-                    default_value
+                    if key == "crank_fee_charged" {
+                        serde_json::to_value(charged)?
+                    } else if key == "crank_fee_surcharge" {
+                        serde_json::to_value(surcharge)?
+                    } else if key == "crank_fee_reward" {
+                        serde_json::to_value(reward)?
+                    } else {
+                        default_value
+                    }
                 } else {
                     if default_value == expected_value {
                         println!("Unnecessary config update {key} for market {market_id}");

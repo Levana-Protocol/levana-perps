@@ -602,3 +602,17 @@ markets:
   COIN_USDC:
     config: {}
     initial-borrow-fee-rate: 0.05
+
+crank-fees:
+  osmosis-mainnet:
+    charged: 0.2
+    surcharge: 0.1
+    reward: 0.18
+  sei-mainnet:
+    charged: 0.2
+    surcharge: 0.1
+    reward: 0.18
+  injective-mainnet:
+    charged: 0.05
+    surcharge: 0.025
+    reward: 0.045

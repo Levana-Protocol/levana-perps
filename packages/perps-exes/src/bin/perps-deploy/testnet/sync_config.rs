@@ -158,7 +158,7 @@ async fn go(
 }
 
 /// Keys which are still in the Config struct for backwards compat but no longer in ConfigUpdate
-fn is_unused_key(key: &str) -> bool {
+pub(crate) fn is_unused_key(key: &str) -> bool {
     key == "limit_order_fee"
         || key == "price_update_too_old_seconds"
         || key == "staleness_seconds"
