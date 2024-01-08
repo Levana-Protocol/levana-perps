@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use parking_lot::deadlock;
 use pid1::Pid1Settings;
 use tokio::net::TcpListener;
 
@@ -22,6 +23,24 @@ fn main_inner() -> Result<()> {
     let opt = cli::Opt::parse();
 
     opt.init_logger()?;
+
+    // Create a background thread which checks for deadlocks every 10s
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_secs(10));
+        let deadlocks = deadlock::check_deadlock();
+        if deadlocks.is_empty() {
+            continue;
+        }
+        tracing::error!("{} deadlocks detected", deadlocks.len());
+        for (i, threads) in deadlocks.iter().enumerate() {
+            tracing::error!("Deadlock #{}", i);
+            for t in threads {
+                tracing::error!("Thread Id {:#?}", t.thread_id());
+                tracing::error!("{:#?}", t.backtrace());
+            }
+        }
+    });
+
     let _guard = opt.sentry_dsn.clone().map(|sentry_dsn| {
         sentry::init((
             sentry_dsn,

@@ -5,7 +5,13 @@ use axum::routing::{get, post};
 
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
-use tower_http::{cors::CorsLayer, limit::RequestBodyLimitLayer, timeout::TimeoutLayer};
+use tower_http::{
+    cors::CorsLayer,
+    limit::RequestBodyLimitLayer,
+    timeout::TimeoutLayer,
+    trace::{self, TraceLayer},
+};
+use tracing::Level;
 
 use crate::{app::App, watcher::TaskStatuses};
 
@@ -29,6 +35,12 @@ pub(crate) async fn start_rest_api(
     listener: TcpListener,
 ) -> Result<()> {
     let service_builder = ServiceBuilder::new()
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
+                .on_request(trace::DefaultOnRequest::new().level(Level::INFO))
+                .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
+        )
         .layer(RequestBodyLimitLayer::new(app.opt.request_body_limit_bytes))
         .layer(TimeoutLayer::new(std::time::Duration::from_secs(
             app.opt.request_timeout_seconds,
@@ -48,17 +60,17 @@ pub(crate) async fn start_rest_api(
         .route("/", get(common::homepage))
         .route("/factory", get(factory::factory))
         .route("/frontend-config", get(factory::factory))
-        .route("/healthz", get(common::healthz))
         .route("/build-version", get(common::build_version))
         .route("/api/faucet", post(faucet::bot))
-        .route("/status", get(status::all))
         .route("/carry", get(carry::carry))
         .route("/status/:label", get(status::single))
         .route("/markets", get(markets::markets))
         .route("/debug/gas-refill", get(debug::gas_refill))
         .route("/debug/fund-usage", get(debug::fund_usage))
-        .with_state(RestApp { app, statuses })
-        .layer(service_builder);
+        .layer(service_builder)
+        .route("/healthz", get(common::healthz))
+        .route("/status", get(status::all))
+        .with_state(RestApp { app, statuses });
 
     tracing::info!("Launching server");
 
