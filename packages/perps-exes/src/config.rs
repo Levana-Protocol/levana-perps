@@ -332,6 +332,9 @@ pub struct DeploymentConfigTestnet {
     /// Maximum the price can move before we push a price update, e.g. 0.01 means 1%.
     #[serde(default = "defaults::max_allowed_price_delta")]
     pub max_allowed_price_delta: Decimal256,
+    /// How large a price delta is considered "very high", i.e. to use a different gas wallet
+    #[serde(default = "defaults::very_high_price_delta")]
+    pub very_high_price_delta: Decimal256,
     /// Disable Pyth usage and instead use the QA wallet for price update
     #[serde(default)]
     pub qa_price_updates: bool,

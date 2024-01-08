@@ -113,6 +113,8 @@ pub(crate) struct MainnetOpt {
     pub(crate) factory: Address,
     #[clap(long, env = "LEVANA_BOTS_SEED_PHRASE")]
     pub(crate) seed: SeedPhrase,
+    #[clap(long, env = "LEVANA_BOTS_VERY_HIGH_GAS_SEED_PHRASE")]
+    pub(crate) seed_very_high_gas: SeedPhrase,
     #[clap(long, env = "COSMOS_NETWORK")]
     pub(crate) network: CosmosNetwork,
     #[clap(long, env = "COSMOS_GAS_MULTIPLIER")]
@@ -129,6 +131,8 @@ pub(crate) struct MainnetOpt {
     pub(crate) max_price_age_secs: Option<u32>,
     #[clap(long, env = "LEVANA_BOTS_MAX_ALLOWED_PRICE_DELTA")]
     pub(crate) max_allowed_price_delta: Option<Decimal256>,
+    #[clap(long, env = "LEVANA_BOTS_VERY_HIGH_PRICE_DELTA")]
+    pub(crate) very_high_price_delta: Option<Decimal256>,
     #[clap(long, env = "LEVANA_BOTS_LOW_UTIL_RATIO", default_value = "0.5")]
     pub(crate) low_util_ratio: Decimal256,
     #[clap(long, env = "LEVANA_BOTS_HIGH_UTIL_RATIO", default_value = "0.9")]

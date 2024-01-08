@@ -189,10 +189,10 @@ overrides:
     wallet-manager-address: osmo1ghgpnmxgt6xz463423hhnx8zp99dwt563wnllv
     dev-settings: true
     price: true
-    crank: 4
-    liquidity: true
-    utilization: true
-    balance: true
+    crank: 0
+    liquidity: false
+    utilization: false
+    balance: false
     traders: 0
     default-market-ids:
       - ATOM_USD
