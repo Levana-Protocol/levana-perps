@@ -49,7 +49,7 @@ impl Display for GasCheckWallet {
             GasCheckWallet::Price => write!(f, "Price"),
             GasCheckWallet::Managed(x) => write!(f, "{x}"),
             GasCheckWallet::UltraCrank(x) => write!(f, "Ultra crank #{x}"),
-            GasCheckWallet::HighGas => write!(f, "Price"),
+            GasCheckWallet::HighGas => write!(f, "High gas"),
         }
     }
 }
