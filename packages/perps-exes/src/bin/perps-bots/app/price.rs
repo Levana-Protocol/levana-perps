@@ -439,7 +439,7 @@ pub(crate) async fn price_get_update_oracles_msg(
         (None, None) => {
             anyhow::ensure!(offchain_price_data.stable_ids.is_empty());
             anyhow::ensure!(offchain_price_data.edge_ids.is_empty());
-            return Ok(None);
+            Ok(None)
         }
         (Some(_), Some(_)) => anyhow::bail!("Cannot support both stable and edge Pyth contracts"),
         (Some(contract), None) => {

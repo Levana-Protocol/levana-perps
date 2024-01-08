@@ -150,7 +150,7 @@ impl WatchedTask for Worker {
                                 if error_as_str.contains("out of gas")
                                     || error_as_str.contains("code 11")
                                 {
-                                    successes.push(format!("[VERY HIGH GAS] - Got an 'out of gas' code 11 when trying to crank."));
+                                    successes.push("[VERY HIGH GAS] - Got an 'out of gas' code 11 when trying to crank.".to_string());
                                 }
                                 // We previously checked here for a price_too_old error message.
                                 // However, with the new price logic from deferred execution, that should never
