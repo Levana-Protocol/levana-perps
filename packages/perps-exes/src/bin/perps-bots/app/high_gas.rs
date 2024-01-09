@@ -9,7 +9,7 @@ use super::{
     gas_check::GasCheckWallet, price::price_get_update_oracles_msg, App, AppBuilder,
     CrankTriggerReason,
 };
-use anyhow::Result;
+use anyhow::{Result, bail};
 use axum::async_trait;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
 use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
@@ -139,24 +139,16 @@ impl WatchedTask for Worker {
                             if app.is_osmosis_epoch() {
                                 successes.push(format!("[VERY HIGH GAS] - Ignoring crank run error since we think we're in the Osmosis epoch, error: {e:?}"));
                             } else if app.get_congested_info().is_congested() {
-                                successes.push(format!("[VERY HIGH GAS] - Ignoring crank run error since we think the Osmosis chain is overly congested, error: {e:?}"));
+                                bail!("[VERY HIGH GAS] - Ignoring crank run error since we think the Osmosis chain is overly congested, error: {e:?}");
                             } else {
                                 let error_as_str = format!("{e:?}");
-
-                                // If we got an "out of gas" code 11 error, we want to ignore
-                                // it. This usually happens when new work comes in. The logic
-                                // below to check if new work is available will cause a new
-                                // crank run to be scheduled, if one is needed.
                                 if error_as_str.contains("out of gas")
                                     || error_as_str.contains("code 11")
                                 {
-                                    successes.push("[VERY HIGH GAS] - Got an 'out of gas' code 11 when trying to crank.".to_string());
+                                    bail!("[VERY HIGH GAS] - Got an 'out of gas' code 11 when trying to crank.".to_string());
                                 }
-                                // We previously checked here for a price_too_old error message.
-                                // However, with the new price logic from deferred execution, that should never
-                                // happen. So now we'll simply allow such an error message to bubble up.
                                 else {
-                                    return Err(anyhow::anyhow!("[VERY HIGH GAS] - {:?}", e));
+                                    bail!("[VERY HIGH GAS] - {:?}", e);
                                 }
                             }
                         }
