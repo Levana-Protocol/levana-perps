@@ -25,7 +25,6 @@ pub struct HighGasTrigger {
 }
 
 impl HighGasTrigger {
-    // returns true if the work was combined with previous work
     pub(crate) async fn set(&self, work: HighGasWork) {
         // explicit scope to drop the lock
         {
@@ -199,15 +198,15 @@ impl WatchedTask for Worker {
                         }
                         Err(e) => {
                             if app.is_osmosis_epoch() {
-                                successes.push(format!("[VERY HIGH GAS] - Ignoring crank run error since we think we're in the Osmosis epoch, error: {e:?}"));
+                                successes.push(format!("[VERY HIGH GAS] - we think we're in the Osmosis epoch, error: {e:?}"));
                             } else if app.get_congested_info().is_congested() {
-                                bail!("[VERY HIGH GAS] - Ignoring crank run error since we think the Osmosis chain is overly congested, error: {e:?}");
+                                bail!("[VERY HIGH GAS] - we think the Osmosis chain is overly congested, error: {e:?}");
                             } else {
                                 let error_as_str = format!("{e:?}");
                                 if error_as_str.contains("out of gas")
                                     || error_as_str.contains("code 11")
                                 {
-                                    bail!("[VERY HIGH GAS] - Got an 'out of gas' code 11 when trying to crank.".to_string());
+                                    bail!("[VERY HIGH GAS] - Got an 'out of gas' code 11 when trying to crank. error: {e:?}");
                                 } else {
                                     bail!("[VERY HIGH GAS] - {:?}", e);
                                 }
