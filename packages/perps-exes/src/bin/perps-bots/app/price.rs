@@ -248,10 +248,11 @@ struct NeedsPriceUpdateInfo {
     crank_work_available: Option<CrankWorkInfo>,
     /// Will the newest off-chain price update execute price triggers?
     price_will_trigger: bool,
-    /// exposure_margin_ratio of the market, used to detect very high price delta
-    /// the distance to the security hole from where we start to try to
-    /// land the oracle update with very high gas price limit is the trading fees and
-    /// the other leftover liquidation margin components of the position.
+    /// exposure_margin_ratio of the market; used to compare with the price delta to detect
+    /// the moment the bots need to use very high gas wallet to try to
+    /// land the oracle update for the LPs to be safe from late liquidations. The security
+    /// concern of the price delta actually has an additional buffer of trading fees and
+    /// liquidation margin for fees after settling pending fees.
     exposure_margin_ratio: Decimal256,
 }
 
