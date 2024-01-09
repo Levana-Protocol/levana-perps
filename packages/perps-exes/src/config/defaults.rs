@@ -108,6 +108,6 @@ pub fn max_allowed_price_delta() -> Decimal256 {
     "0.001".parse().unwrap()
 }
 
-pub fn very_high_price_delta() -> Decimal256 {
-    "0.005".parse().unwrap()
+pub fn min_gas_high_gas_wallet() -> GasAmount {
+    "500".parse().unwrap()
 }

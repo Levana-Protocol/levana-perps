@@ -14,7 +14,6 @@ use cosmos::{DynamicGasMultiplier, Wallet};
 use cosmwasm_std::Decimal256;
 use parking_lot::Mutex;
 use perps_exes::config::GasAmount;
-use perps_exes::prelude::PriceBaseInQuote;
 use reqwest::Client;
 use serde::Serialize;
 use tokio::sync::RwLock;
@@ -283,8 +282,12 @@ impl AppBuilder {
         address: Address,
         wallet_name: GasCheckWallet,
     ) -> Result<()> {
-        self.gas_check
-            .add(address, wallet_name, self.app.config.min_gas, true)
+        match wallet_name {
+            GasCheckWallet::HighGas => self.gas_check
+                .add(address, wallet_name, self.app.config.min_gas_high_gas_wallet, true),
+            _ => self.gas_check
+                .add(address, wallet_name, self.app.config.min_gas, true),
+        }
     }
 
     pub(crate) fn alert_on_low_gas(
@@ -352,11 +355,8 @@ pub(crate) enum CrankTriggerReason {
         on_chain_oracle_publish_time: DateTime<Utc>,
     },
     LargePriceDelta {
-        on_off_chain_delta: Decimal256,
-        #[allow(dead_code)]
-        on_chain_oracle_price: PriceBaseInQuote,
-        #[allow(dead_code)]
-        off_chain_price: PriceBaseInQuote,
+        oracle_to_off_chain_delta: Decimal256,
+        market_to_off_chain_delta: Decimal256,
         // if the price delta is large, we may want to use a different wallet
         very_high_price_delta: bool,
     },
@@ -381,11 +381,10 @@ impl Display for CrankTriggerReason {
                 on_chain_oracle_publish_time: _,
             } => write!(f, "On chain price too old {on_chain_age:?}"),
             CrankTriggerReason::LargePriceDelta {
-                on_off_chain_delta,
-                on_chain_oracle_price: _,
-                off_chain_price: _,
+                oracle_to_off_chain_delta,
+                market_to_off_chain_delta,
                 very_high_price_delta: _,
-            } => write!(f, "Large price delta found {on_off_chain_delta}"),
+            } => write!(f, "Large price delta found, delta to oracle: {oracle_to_off_chain_delta}, delta to market: {market_to_off_chain_delta}"),
             CrankTriggerReason::CrankNeedsNewPrice {
                 on_chain_oracle_publish_time: _,
                 work_item: deferred_work_item,
