@@ -9,7 +9,7 @@ use super::{
     gas_check::GasCheckWallet, price::price_get_update_oracles_msg, App, AppBuilder,
     CrankTriggerReason,
 };
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use axum::async_trait;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
 use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
@@ -24,8 +24,17 @@ pub struct HighGasTrigger {
 }
 
 impl HighGasTrigger {
+    // returns true if the work was combined with previous work
     pub(crate) async fn set(&self, work: HighGasWork) {
-        *self.current_work.lock() = Some(work);
+        // explicit scope to drop the lock
+        {
+            let lock = &mut *self.current_work.lock();
+            if let Some(prev) = lock.take() {
+                *lock = Some(prev.append(work));
+            } else {
+                *lock = Some(work);
+            }
+        };
         let _ = self.sender.send(()).await;
     }
 }
@@ -34,6 +43,58 @@ pub(crate) enum HighGasWork {
         offchain_price_data: Arc<OffchainPriceData>,
         markets_to_update: Vec<(Address, MarketId, CrankTriggerReason)>,
     },
+}
+
+impl HighGasWork {
+    pub fn append(self, other: Self) -> Self {
+        match (self, other) {
+            (
+                HighGasWork::Price {
+                    offchain_price_data,
+                    mut markets_to_update,
+                },
+                HighGasWork::Price {
+                    offchain_price_data: other_offchain_price_data,
+                    markets_to_update: other_markets_to_update,
+                },
+            ) => {
+                for (market, market_id, reason) in other_markets_to_update.into_iter() {
+                    if !markets_to_update.iter().any(|(_, id, _)| *id == market_id) {
+                        markets_to_update.push((market, market_id, reason));
+                    }
+                }
+
+                // would be nice to get rid of this clone, but this path shouldn't be hit very often
+                let mut offchain_price_data = (*offchain_price_data).clone();
+                let OffchainPriceData {
+                    values,
+                    stable_ids,
+                    edge_ids,
+                } = &*other_offchain_price_data;
+
+                offchain_price_data.stable_ids.extend(stable_ids.iter());
+                offchain_price_data.edge_ids.extend(edge_ids.iter());
+
+                for (key, value) in values {
+                    // insert if it's a brand new key or if the timestamp is newer than the previous one
+                    let should_insert = match offchain_price_data.values.get(key) {
+                        None => true,
+                        Some(prev) if value.1 >= prev.1 => true,
+                        _ => false,
+                    };
+
+                    if should_insert {
+                        offchain_price_data.values.insert(*key, *value);
+                    }
+                }
+
+                HighGasWork::Price {
+                    offchain_price_data: Arc::new(offchain_price_data),
+                    markets_to_update,
+                }
+            }
+        }
+    }
 }
 
 /// Start the background thread to run "high gas" tasks.
@@ -146,8 +207,7 @@ impl WatchedTask for Worker {
                                     || error_as_str.contains("code 11")
                                 {
                                     bail!("[VERY HIGH GAS] - Got an 'out of gas' code 11 when trying to crank.".to_string());
-                                }
-                                else {
+                                } else {
                                     bail!("[VERY HIGH GAS] - {:?}", e);
                                 }
                             }
