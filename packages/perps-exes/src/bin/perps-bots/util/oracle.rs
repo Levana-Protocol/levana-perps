@@ -23,6 +23,7 @@ pub struct PythOracle {
     pub endpoint: String,
 }
 
+#[derive(Clone)]
 pub(crate) struct OffchainPriceData {
     /// Store the stable and edge values together since the IDs cannot overlap
     pub(crate) values: HashMap<PriceIdentifier, (NonZero<Decimal256>, DateTime<Utc>)>,

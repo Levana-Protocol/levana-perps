@@ -55,6 +55,8 @@ pub(crate) struct BotConfigMainnet {
     pub(crate) max_gas_price: f64,
     /// Higher maximum gas price for urgent messages
     pub(crate) higher_max_gas_price: f64,
+    /// Higher maximum gas price for *very* urgent messages
+    pub(crate) higher_very_high_max_gas_price: f64,
 }
 
 pub(crate) struct BotConfig {
@@ -64,6 +66,8 @@ pub(crate) struct BotConfig {
     pub(crate) price_wallet: Option<Arc<Wallet>>,
     /// Wallets that are used to perform cranking
     pub(crate) crank_wallets: Vec<Wallet>,
+    /// Wallet used for very high gas situations, derived from price wallet seed
+    pub(crate) high_gas_wallet: Wallet,
     pub(crate) watcher: WatcherConfig,
     pub(crate) gas_multiplier: Option<f64>,
     /// Parameters for checking if we need to do a price update or crank
@@ -86,6 +90,8 @@ pub(crate) struct NeedsPriceUpdateParams {
     pub(crate) on_chain_publish_time_age_threshold: chrono::Duration,
     /// How large a price delta we need before pushing a price update.
     pub(crate) on_off_chain_price_delta: Decimal256,
+    /// How large a price delta is considered "very high" (e.g. to use a different wallet)
+    pub(crate) very_high_price_delta: Decimal256,
 }
 
 impl BotConfig {
@@ -200,14 +206,19 @@ impl Opt {
                 })
                 .collect::<Result<_>>()?,
             price_wallet: if partial.price {
-                Some(Arc::new(self.get_wallet(
+                Some(Arc::new(self.get_price_wallet(
                     network.get_address_hrp(),
                     &wallet_phrase_name,
-                    "PRICE",
+                    0,
                 )?))
             } else {
                 None
             },
+            high_gas_wallet: self.get_price_wallet(
+                network.get_address_hrp(),
+                &wallet_phrase_name,
+                1,
+            )?,
             watcher: partial.watcher.clone(),
             gas_multiplier,
             needs_price_update_params: NeedsPriceUpdateParams {
@@ -215,6 +226,7 @@ impl Opt {
                     partial.max_price_age_secs.into(),
                 ),
                 on_off_chain_price_delta: partial.max_allowed_price_delta,
+                very_high_price_delta: partial.very_high_price_delta,
             },
             gas_decimals,
             http_timeout_seconds,
@@ -241,6 +253,7 @@ impl Opt {
             watcher_config,
             max_price_age_secs,
             max_allowed_price_delta,
+            very_high_price_delta,
             low_util_ratio,
             high_util_ratio,
             ltc_num_blocks,
@@ -254,6 +267,7 @@ impl Opt {
             gas_price_congested,
             max_gas_price,
             higher_max_gas_price,
+            very_higher_max_gas_price,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let hrp = network.get_address_hrp();
@@ -266,9 +280,11 @@ impl Opt {
 
         let gas_wallet = get_wallet(1)?;
         let price_wallet = get_wallet(2)?;
+        let high_gas_wallet = get_wallet(3)?;
         let crank_wallets = (0..*crank_wallets)
-            .map(|idx| get_wallet(idx + 3))
+            .map(|idx| get_wallet(idx + 4))
             .collect::<Result<_, _>>()?;
+
         let watcher = match watcher_config {
             Some(yaml) => serde_yaml::from_str(yaml).context("Invalid watcher config on CLI")?,
             None => WatcherConfig::default(),
@@ -290,12 +306,14 @@ impl Opt {
                     gas_price_congested: *gas_price_congested,
                     max_gas_price: *max_gas_price,
                     higher_max_gas_price: *higher_max_gas_price,
+                    higher_very_high_max_gas_price: *very_higher_max_gas_price,
                 }
                 .into(),
             },
             network: *network,
             price_wallet: Some(price_wallet.into()),
             crank_wallets,
+            high_gas_wallet,
             watcher,
             gas_multiplier: *gas_multiplier,
             needs_price_update_params: NeedsPriceUpdateParams {
@@ -306,6 +324,8 @@ impl Opt {
                 ),
                 on_off_chain_price_delta: max_allowed_price_delta
                     .unwrap_or_else(perps_exes::config::defaults::max_allowed_price_delta),
+                very_high_price_delta: very_high_price_delta
+                    .unwrap_or_else(perps_exes::config::defaults::very_high_price_delta),
             },
             gas_decimals,
             http_timeout_seconds: *http_timeout_seconds,

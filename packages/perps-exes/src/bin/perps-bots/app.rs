@@ -4,6 +4,7 @@ mod crank_run;
 pub(crate) mod factory;
 pub(crate) mod faucet;
 mod gas_check;
+mod high_gas;
 mod liquidity;
 mod liquidity_transaction;
 mod price;
@@ -47,7 +48,8 @@ impl AppBuilder {
         // These services are tied together closely, see docs on the
         // crank_run module for more explanation.
         if let Some(trigger_crank) = self.start_crank_run()? {
-            self.start_price(trigger_crank.clone())?;
+            let high_gas_trigger = self.start_high_gas()?;
+            self.start_price(trigger_crank.clone(), high_gas_trigger)?;
         }
 
         self.alert_on_low_gas(

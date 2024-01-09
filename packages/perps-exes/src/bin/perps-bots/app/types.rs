@@ -127,6 +127,8 @@ pub(crate) struct App {
     pub(crate) cosmos: Cosmos,
     /// Configured with much higher max gas price for urgent messages that need to get through congestion.
     pub(crate) cosmos_high_gas: Cosmos,
+    /// Configured with much *much* higher max gas price for urgent messages that need to get through congestion.
+    pub(crate) cosmos_very_high_gas: Cosmos,
     /// A separate Cosmos instance just for gas check due to dynamic gas weirdness.
     ///
     /// On Osmosis mainnet we use a dynamic gas multiplier. Since the multiplier for sending coins in gas check is significantly different than smart contract activities, we keep two different Cosmos values.
@@ -236,10 +238,18 @@ impl Opt {
                 .with_max_gas_price(inner.higher_max_gas_price),
         };
 
+        let cosmos_very_high_gas = match &config.by_type {
+            BotConfigByType::Testnet { .. } => cosmos.clone(),
+            BotConfigByType::Mainnet { inner } => cosmos
+                .clone()
+                .with_max_gas_price(inner.higher_very_high_max_gas_price),
+        };
+
         let app = App {
             factory: RwLock::new(Arc::new(factory)),
             cosmos,
             cosmos_high_gas,
+            cosmos_very_high_gas,
             cosmos_gas_check,
             config,
             client,
@@ -331,7 +341,7 @@ impl App {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) enum CrankTriggerReason {
     NoPriceOnChain,
     OnChainTooOld {
@@ -347,6 +357,8 @@ pub(crate) enum CrankTriggerReason {
         on_chain_oracle_price: PriceBaseInQuote,
         #[allow(dead_code)]
         off_chain_price: PriceBaseInQuote,
+        // if the price delta is large, we may want to use a different wallet
+        very_high_price_delta: bool,
     },
     /// Something in the crank queue, either deferred exec or liquifunding, needs a new price.
     CrankNeedsNewPrice {
@@ -372,6 +384,7 @@ impl Display for CrankTriggerReason {
                 on_off_chain_delta,
                 on_chain_oracle_price: _,
                 off_chain_price: _,
+                very_high_price_delta: _,
             } => write!(f, "Large price delta found {on_off_chain_delta}"),
             CrankTriggerReason::CrankNeedsNewPrice {
                 on_chain_oracle_publish_time: _,
@@ -404,15 +417,29 @@ impl CrankTriggerReason {
     }
 
     /// Does this action warrant paying very high gas costs?
-    pub(crate) fn needs_high_gas(&self) -> bool {
+    pub(crate) fn needs_high_gas(&self) -> Option<HighGas> {
         match self {
-            CrankTriggerReason::LargePriceDelta { .. } => true,
+            CrankTriggerReason::LargePriceDelta {
+                very_high_price_delta,
+                ..
+            } => Some(if *very_high_price_delta {
+                HighGas::VeryHigh
+            } else {
+                HighGas::High
+            }),
             CrankTriggerReason::NoPriceOnChain
             | CrankTriggerReason::OnChainTooOld { .. }
             | CrankTriggerReason::CrankNeedsNewPrice { .. }
             | CrankTriggerReason::CrankWorkAvailable
             | CrankTriggerReason::PriceWillTrigger
-            | CrankTriggerReason::MoreWorkFound => false,
+            | CrankTriggerReason::MoreWorkFound => None,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum HighGas {
+    High,
+    // So high we treat it differently with its own wallet
+    VeryHigh,
 }
