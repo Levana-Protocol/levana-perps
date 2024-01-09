@@ -1,6 +1,6 @@
 pub mod defaults;
 
-use std::{collections::HashMap, iter::Sum, path::Path};
+use std::{collections::HashMap, iter::Sum, ops::AddAssign, path::Path};
 
 use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, RawAddress};
@@ -196,6 +196,12 @@ impl Sum<GasAmount> for GasAmount {
     fn sum<I: Iterator<Item = GasAmount>>(iter: I) -> Self {
         let total = iter.fold(Decimal256::zero(), |acc, x| acc + x.0);
         GasAmount(total)
+    }
+}
+
+impl AddAssign for GasAmount {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
     }
 }
 
