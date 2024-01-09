@@ -269,19 +269,30 @@ impl NeedsPriceUpdateInfo {
     fn actions(&self, params: &NeedsPriceUpdateParams) -> ActionWithReason {
         // Keep the protocol lively: if on-chain price is too old or too
         // different from off-chain price, update price and crank.
-        let oracle_to_off_chain_delta =
-            (self.on_chain_oracle_price.into_number() - self.off_chain_price.into_number()).abs_unsigned()
-                / self.off_chain_price.into_non_zero().raw();
-        let market_to_off_chain_delta =
-            (self.on_chain_market_price.into_number() - self.off_chain_price.into_number()).abs_unsigned()
-                / self.off_chain_price.into_non_zero().raw();
-        if oracle_to_off_chain_delta > params.on_off_chain_price_delta.min(self.exposure_margin_ratio)
-            || market_to_off_chain_delta > params.on_off_chain_price_delta.min(self.exposure_margin_ratio)
+        let oracle_to_off_chain_delta = (self.on_chain_oracle_price.into_number()
+            - self.off_chain_price.into_number())
+        .abs_unsigned()
+            / self.off_chain_price.into_non_zero().raw();
+        let market_to_off_chain_delta = (self.on_chain_market_price.into_number()
+            - self.off_chain_price.into_number())
+        .abs_unsigned()
+            / self.off_chain_price.into_non_zero().raw();
+        if oracle_to_off_chain_delta
+            > params
+                .on_off_chain_price_delta
+                .min(self.exposure_margin_ratio)
+            || market_to_off_chain_delta
+                > params
+                    .on_off_chain_price_delta
+                    .min(self.exposure_margin_ratio)
         {
             let very_high_price_delta = market_to_off_chain_delta > self.exposure_margin_ratio
                 || oracle_to_off_chain_delta > self.exposure_margin_ratio;
 
-            if very_high_price_delta || self.next_pending_deferred_work_item.is_some() || self.price_will_trigger {
+            if very_high_price_delta
+                || self.next_pending_deferred_work_item.is_some()
+                || self.price_will_trigger
+            {
                 return ActionWithReason::WorkNeeded(CrankTriggerReason::LargePriceDelta {
                     oracle_to_off_chain_delta,
                     market_to_off_chain_delta,
@@ -400,8 +411,7 @@ async fn check_market_needs_price_update(
                 on_chain_oracle_price,
                 on_chain_oracle_publish_time,
                 on_chain_market_price: market_price.price_base,
-                on_chain_market_publish_time: market_price.timestamp
-                    .try_into_chrono_datetime()?,
+                on_chain_market_publish_time: market_price.timestamp.try_into_chrono_datetime()?,
                 exposure_margin_ratio: status.config.exposure_margin_ratio,
             };
 

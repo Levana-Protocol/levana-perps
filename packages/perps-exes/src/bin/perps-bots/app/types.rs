@@ -283,9 +283,14 @@ impl AppBuilder {
         wallet_name: GasCheckWallet,
     ) -> Result<()> {
         match wallet_name {
-            GasCheckWallet::HighGas => self.gas_check
-                .add(address, wallet_name, self.app.config.min_gas_high_gas_wallet, true),
-            _ => self.gas_check
+            GasCheckWallet::HighGas => self.gas_check.add(
+                address,
+                wallet_name,
+                self.app.config.min_gas_high_gas_wallet,
+                true,
+            ),
+            _ => self
+                .gas_check
                 .add(address, wallet_name, self.app.config.min_gas, true),
         }
     }
