@@ -18,6 +18,7 @@ use shared::storage::MarketId;
 
 // For high gas, we only care about whether there is a current work item.
 // We don't need a queue of historical work items to process
+// But they do get appended into a single work item
 pub struct HighGasTrigger {
     current_work: Arc<Mutex<Option<HighGasWork>>>,
     sender: async_channel::Sender<()>,
