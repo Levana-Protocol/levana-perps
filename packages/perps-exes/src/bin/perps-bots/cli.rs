@@ -121,7 +121,7 @@ pub(crate) struct MainnetOpt {
     #[clap(long, env = "LEVANA_BOTS_MIN_GAS")]
     pub(crate) min_gas: GasAmount,
     /// Used for the very high gas wallet on Osmosis
-    #[clap(long, env = "LEVANA_BOTS_MIN_GAS")]
+    #[clap(long, env = "LEVANA_BOTS_MIN_GAS_HIGH_GAS_WALLET")]
     pub(crate) min_gas_high_gas_wallet: GasAmount,
     /// Minimum required in the refill wallet used to top off price and crank wallets
     #[clap(long, env = "LEVANA_BOTS_MIN_GAS_REFILL")]
