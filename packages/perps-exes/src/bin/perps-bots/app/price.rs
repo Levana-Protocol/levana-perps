@@ -170,24 +170,26 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
     if markets_to_update.is_empty() {
         anyhow::ensure!(!any_needs_oracle_update);
         successes.push("No markets need updating".to_owned());
-    } else if any_needs_high_gas_oracle_update == Some(HighGas::VeryHigh) {
-        successes.push("Passing the work to HighGas runner".to_owned());
-        worker
-            .high_gas_trigger
-            .set(HighGasWork::Price {
-                offchain_price_data,
-                markets_to_update,
-            })
-            .await;
     } else {
         if any_needs_oracle_update {
+            if any_needs_high_gas_oracle_update == Some(HighGas::VeryHigh) {
+                successes.push("Passing the work to HighGas runner".to_owned());
+                worker
+                    .high_gas_trigger
+                    .set(HighGasWork::Price {
+                        offchain_price_data: offchain_price_data.clone(),
+                        markets_to_update: markets_to_update.clone(),
+                    })
+                    .await;
+            }
             successes.push(
                 update_oracles(
                     &worker.wallet,
                     &app,
                     &factory.markets,
                     &offchain_price_data,
-                    any_needs_high_gas_oracle_update,
+                    // We already did "very high" above, so if we have any HighGas, it's just "high" now
+                    any_needs_high_gas_oracle_update.map(|_| HighGas::High),
                 )
                 .await?,
             );

@@ -341,7 +341,7 @@ impl App {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) enum CrankTriggerReason {
     NoPriceOnChain,
     OnChainTooOld {
