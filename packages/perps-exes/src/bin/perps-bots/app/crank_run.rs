@@ -130,7 +130,7 @@ impl App {
             }
             RunResult::OsmosisCongested(e) => {
                 format!("Ignoring crank run error since we think the Osmosis chain is overly congested, error: {e:?}")
-            } 
+            }
         })
         .skip_delay())
     }
