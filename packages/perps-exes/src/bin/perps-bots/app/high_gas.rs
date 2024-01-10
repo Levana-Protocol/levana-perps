@@ -9,7 +9,7 @@ use super::{
     gas_check::GasCheckWallet, price::price_get_update_oracles_msg, App, AppBuilder,
     CrankTriggerReason,
 };
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use axum::async_trait;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
 use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
@@ -104,8 +104,12 @@ impl HighGasWork {
 /// Start the background thread to run "high gas" tasks.
 impl AppBuilder {
     pub(super) fn start_high_gas(&mut self) -> Result<HighGasTrigger> {
-        let wallet = self.app.config.high_gas_wallet.clone();
-
+        let wallet = self
+            .app
+            .config
+            .high_gas_wallet
+            .clone()
+            .context("high gas wallet is required")?;
         self.refill_gas(wallet.get_address(), GasCheckWallet::HighGas)?;
 
         let current_work = Arc::new(Mutex::new(None));
@@ -127,7 +131,7 @@ impl AppBuilder {
 }
 
 struct Worker {
-    wallet: Wallet,
+    wallet: Arc<Wallet>,
     current_work: Arc<Mutex<Option<HighGasWork>>>,
     receiver: async_channel::Receiver<()>,
 }
@@ -186,7 +190,7 @@ impl WatchedTask for Worker {
 
                         builder.add_execute_message(
                             market,
-                            &self.wallet,
+                            &*self.wallet,
                             vec![],
                             MarketExecuteMsg::Crank {
                                 execs: Some(0),
