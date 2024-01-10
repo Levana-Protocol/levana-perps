@@ -614,7 +614,7 @@ impl Default for WatcherConfig {
                 // and use a channel to signal when it should be woken up
                 delay: Delay::Constant(0),
                 out_of_date: 60,
-                retries: None,
+                retries: Some(0),
                 delay_between_retries: None,
             },
         }
