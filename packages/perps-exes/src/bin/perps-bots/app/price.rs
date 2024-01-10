@@ -232,10 +232,14 @@ struct NeedsPriceUpdateInfo {
     newest_pending_deferred_work_item: Option<DateTime<Utc>>,
     /// The timestamp of the next liquifunding
     next_liquifunding: Option<DateTime<Utc>>,
-    /// The latest price from on-chain data only
-    on_chain_price: PriceBaseInQuote,
-    /// The latest publish time from on-chain data only
-    on_chain_publish_time: DateTime<Utc>,
+    /// The latest price from on-chain oracle contract
+    on_chain_oracle_price: PriceBaseInQuote,
+    /// The latest publish time from on-chain oracle contract
+    on_chain_oracle_publish_time: DateTime<Utc>,
+    /// The latest price from on-chain market contract
+    on_chain_market_price: PriceBaseInQuote,
+    /// The latest publish time from on-chain market contract
+    on_chain_market_publish_time: DateTime<Utc>,
     /// Latest off-chain price
     off_chain_price: PriceBaseInQuote,
     /// Latest off-chain publish time
@@ -244,6 +248,12 @@ struct NeedsPriceUpdateInfo {
     crank_work_available: Option<CrankWorkInfo>,
     /// Will the newest off-chain price update execute price triggers?
     price_will_trigger: bool,
+    /// exposure_margin_ratio of the market; used to compare with the price delta to detect
+    /// the moment the bots need to use very high gas wallet to try to
+    /// land the oracle update for the LPs to be safe from late liquidations. The security
+    /// concern of the price delta actually has an additional buffer of trading fees and
+    /// liquidation margin for fees after settling pending fees.
+    exposure_margin_ratio: Decimal256,
 }
 
 #[derive(Debug)]
@@ -259,25 +269,46 @@ impl NeedsPriceUpdateInfo {
     fn actions(&self, params: &NeedsPriceUpdateParams) -> ActionWithReason {
         // Keep the protocol lively: if on-chain price is too old or too
         // different from off-chain price, update price and crank.
-        let on_off_chain_delta =
-            (self.on_chain_price.into_number() - self.off_chain_price.into_number()).abs_unsigned()
-                / self.off_chain_price.into_non_zero().raw();
-        if on_off_chain_delta > params.on_off_chain_price_delta {
-            return ActionWithReason::WorkNeeded(CrankTriggerReason::LargePriceDelta {
-                on_off_chain_delta,
-                on_chain_oracle_price: self.on_chain_price,
-                off_chain_price: self.off_chain_price,
-                very_high_price_delta: on_off_chain_delta > params.very_high_price_delta,
-            });
+        let oracle_to_off_chain_delta = (self.on_chain_oracle_price.into_number()
+            - self.off_chain_price.into_number())
+        .abs_unsigned()
+            / self.off_chain_price.into_non_zero().raw();
+        let market_to_off_chain_delta = (self.on_chain_market_price.into_number()
+            - self.off_chain_price.into_number())
+        .abs_unsigned()
+            / self.off_chain_price.into_non_zero().raw();
+        if oracle_to_off_chain_delta
+            > params
+                .on_off_chain_price_delta
+                .min(self.exposure_margin_ratio)
+            || market_to_off_chain_delta
+                > params
+                    .on_off_chain_price_delta
+                    .min(self.exposure_margin_ratio)
+        {
+            let very_high_price_delta = market_to_off_chain_delta > self.exposure_margin_ratio
+                || oracle_to_off_chain_delta > self.exposure_margin_ratio;
+
+            if very_high_price_delta
+                || self.next_pending_deferred_work_item.is_some()
+                || self.price_will_trigger
+            {
+                return ActionWithReason::WorkNeeded(CrankTriggerReason::LargePriceDelta {
+                    oracle_to_off_chain_delta,
+                    market_to_off_chain_delta,
+                    very_high_price_delta,
+                });
+            }
         }
         let on_chain_age = self
             .off_chain_publish_time
-            .signed_duration_since(self.on_chain_publish_time);
+            .signed_duration_since(self.on_chain_market_publish_time);
         if on_chain_age > params.on_chain_publish_time_age_threshold {
             return ActionWithReason::WorkNeeded(CrankTriggerReason::OnChainTooOld {
                 on_chain_age,
                 off_chain_publish_time: self.off_chain_publish_time,
-                on_chain_oracle_publish_time: self.on_chain_publish_time,
+                // here we provide the publish time from the market because it is the older of the two.
+                on_chain_oracle_publish_time: self.on_chain_market_publish_time,
             });
         }
 
@@ -303,17 +334,18 @@ impl NeedsPriceUpdateInfo {
         .into_iter()
         .flatten()
         {
-            if self.on_chain_publish_time < timestamp && timestamp <= self.off_chain_publish_time {
+            if self.on_chain_oracle_publish_time >= timestamp {
+                // If the oracle price update timestamp is enough to make work available, do crank
+                // even if there is no other reason to update the price.
+                needs_crank = true;
+            }
+            if timestamp <= self.off_chain_publish_time
+                && timestamp > self.on_chain_oracle_publish_time
+            {
                 return ActionWithReason::WorkNeeded(CrankTriggerReason::CrankNeedsNewPrice {
-                    on_chain_oracle_publish_time: self.on_chain_publish_time,
+                    on_chain_oracle_publish_time: self.on_chain_oracle_publish_time,
                     work_item: timestamp,
                 });
-            } else if self.on_chain_publish_time >= timestamp {
-                // The status response only checks if the price _in the contract_ unlocks work,
-                // it doesn't query the oracle. We probably want to change that. In the meanwhile,
-                // we check if there's work available and set a flag. Once we know that we don't
-                // need any price updates, we then do the crank after this for loop.
-                needs_crank = true;
             }
         }
 
@@ -350,13 +382,14 @@ async fn check_market_needs_price_update(
         LatestPrice::PricesFound {
             off_chain_price,
             off_chain_publish_time,
-            on_chain_price,
-            on_chain_publish_time,
+            on_chain_oracle_price,
+            on_chain_oracle_publish_time,
         } => {
             let price_will_trigger = market.market.price_would_trigger(off_chain_price).await?;
 
             // Get a fresher status, not the cached one used above for checking Pyth prices.
             let status = market.market.status().await?;
+            let market_price = market.market.current_price().await?;
 
             let info = NeedsPriceUpdateInfo {
                 next_pending_deferred_work_item: status
@@ -375,8 +408,11 @@ async fn check_market_needs_price_update(
                 off_chain_publish_time,
                 crank_work_available: status.next_crank.clone(),
                 price_will_trigger,
-                on_chain_price,
-                on_chain_publish_time,
+                on_chain_oracle_price,
+                on_chain_oracle_publish_time,
+                on_chain_market_price: market_price.price_base,
+                on_chain_market_publish_time: market_price.timestamp.try_into_chrono_datetime()?,
+                exposure_margin_ratio: status.config.exposure_margin_ratio,
             };
 
             Ok(info.actions(&app.config.needs_price_update_params))

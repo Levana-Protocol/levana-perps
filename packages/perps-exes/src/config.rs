@@ -326,6 +326,9 @@ pub struct DeploymentConfigTestnet {
     /// Minimum gas required in wallet managed by perps bots
     #[serde(default = "defaults::min_gas")]
     pub min_gas: GasAmount,
+    /// Minimum gas required in very high gas wallet managed by perps bots
+    #[serde(default = "defaults::min_gas_high_gas_wallet")]
+    pub min_gas_high_gas_wallet: GasAmount,
     /// Minimum gas required in the faucet contract
     #[serde(default = "defaults::min_gas_in_faucet")]
     pub min_gas_in_faucet: GasAmount,
@@ -338,9 +341,6 @@ pub struct DeploymentConfigTestnet {
     /// Maximum the price can move before we push a price update, e.g. 0.01 means 1%.
     #[serde(default = "defaults::max_allowed_price_delta")]
     pub max_allowed_price_delta: Decimal256,
-    /// How large a price delta is considered "very high", i.e. to use a different gas wallet
-    #[serde(default = "defaults::very_high_price_delta")]
-    pub very_high_price_delta: Decimal256,
     /// Disable Pyth usage and instead use the QA wallet for price update
     #[serde(default)]
     pub qa_price_updates: bool,

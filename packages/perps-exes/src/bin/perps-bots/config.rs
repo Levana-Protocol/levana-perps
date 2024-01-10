@@ -76,6 +76,7 @@ pub(crate) struct BotConfig {
     pub(crate) http_timeout_seconds: u32,
     /// Default minimum gas amount
     pub(crate) min_gas: GasAmount,
+    pub(crate) min_gas_high_gas_wallet: GasAmount,
     /// The amount of gas in the gas wallet used to top off other wallets
     pub(crate) min_gas_in_gas_wallet: GasAmount,
     /// Wallet used to refill gas for other wallets
@@ -90,8 +91,6 @@ pub(crate) struct NeedsPriceUpdateParams {
     pub(crate) on_chain_publish_time_age_threshold: chrono::Duration,
     /// How large a price delta we need before pushing a price update.
     pub(crate) on_off_chain_price_delta: Decimal256,
-    /// How large a price delta is considered "very high" (e.g. to use a different wallet)
-    pub(crate) very_high_price_delta: Decimal256,
 }
 
 impl BotConfig {
@@ -226,11 +225,11 @@ impl Opt {
                     partial.max_price_age_secs.into(),
                 ),
                 on_off_chain_price_delta: partial.max_allowed_price_delta,
-                very_high_price_delta: partial.very_high_price_delta,
             },
             gas_decimals,
             http_timeout_seconds,
             min_gas: partial.min_gas,
+            min_gas_high_gas_wallet: partial.min_gas_high_gas_wallet,
             min_gas_in_gas_wallet: partial.min_gas_in_gas_wallet,
             gas_wallet,
             ignored_markets: self.ignored_markets.iter().cloned().collect(),
@@ -249,11 +248,11 @@ impl Opt {
             network,
             gas_multiplier,
             min_gas,
+            min_gas_high_gas_wallet,
             min_gas_refill,
             watcher_config,
             max_price_age_secs,
             max_allowed_price_delta,
-            very_high_price_delta,
             low_util_ratio,
             high_util_ratio,
             ltc_num_blocks,
@@ -324,12 +323,11 @@ impl Opt {
                 ),
                 on_off_chain_price_delta: max_allowed_price_delta
                     .unwrap_or_else(perps_exes::config::defaults::max_allowed_price_delta),
-                very_high_price_delta: very_high_price_delta
-                    .unwrap_or_else(perps_exes::config::defaults::very_high_price_delta),
             },
             gas_decimals,
             http_timeout_seconds: *http_timeout_seconds,
             min_gas: *min_gas,
+            min_gas_high_gas_wallet: *min_gas_high_gas_wallet,
             min_gas_in_gas_wallet: *min_gas_refill,
             gas_wallet: Arc::new(gas_wallet),
             ignored_markets: self.ignored_markets.iter().cloned().collect(),

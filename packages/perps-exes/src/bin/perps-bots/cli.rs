@@ -120,6 +120,9 @@ pub(crate) struct MainnetOpt {
     /// Used for both price and crank wallets
     #[clap(long, env = "LEVANA_BOTS_MIN_GAS")]
     pub(crate) min_gas: GasAmount,
+    /// Used for the very high gas wallet on Osmosis
+    #[clap(long, env = "LEVANA_BOTS_MIN_GAS_HIGH_GAS_WALLET")]
+    pub(crate) min_gas_high_gas_wallet: GasAmount,
     /// Minimum required in the refill wallet used to top off price and crank wallets
     #[clap(long, env = "LEVANA_BOTS_MIN_GAS_REFILL")]
     pub(crate) min_gas_refill: GasAmount,
@@ -129,8 +132,6 @@ pub(crate) struct MainnetOpt {
     pub(crate) max_price_age_secs: Option<u32>,
     #[clap(long, env = "LEVANA_BOTS_MAX_ALLOWED_PRICE_DELTA")]
     pub(crate) max_allowed_price_delta: Option<Decimal256>,
-    #[clap(long, env = "LEVANA_BOTS_VERY_HIGH_PRICE_DELTA")]
-    pub(crate) very_high_price_delta: Option<Decimal256>,
     #[clap(long, env = "LEVANA_BOTS_LOW_UTIL_RATIO", default_value = "0.5")]
     pub(crate) low_util_ratio: Decimal256,
     #[clap(long, env = "LEVANA_BOTS_HIGH_UTIL_RATIO", default_value = "0.9")]
