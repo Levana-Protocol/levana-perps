@@ -26,7 +26,7 @@ use crate::app::CrankTriggerReason;
 use crate::util::misc::track_tx_fees;
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
-use self::trigger_crank::CrankReceiver;
+use self::trigger_crank::{CrankReceiver, CrankWorkItem};
 
 use super::gas_check::GasCheckWallet;
 use super::{App, AppBuilder};
@@ -87,7 +87,14 @@ impl App {
         recv: &CrankReceiver,
     ) -> Result<WatchedTaskOutput> {
         // Wait for up to 20 seconds for new work to appear. If it doesn't, update our status message that no cranking was needed.
-        let (market, market_id, crank_guard, reason) = match recv.receive_with_timeout().await {
+        let CrankWorkItem {
+            address: market,
+            id: market_id,
+            guard: crank_guard,
+            reason,
+            queued,
+            received,
+        } = match recv.receive_with_timeout().await {
             None => {
                 return Ok(WatchedTaskOutput::new("No crank work needed").suppress());
             }
@@ -118,8 +125,8 @@ impl App {
         Ok(WatchedTaskOutput::new(match run_result {
             RunResult::NormalRun(txres) => {
                 format!(
-                    "Successfully turned the crank for market {market} in transaction {}. {}",
-                    txres.txhash, more_work
+                    "Successfully turned the crank for market {market} in transaction {}. {}. Queued delay: {:?}",
+                    txres.txhash, more_work, received.saturating_duration_since(queued)
                 )
             }
             RunResult::OutOfGas => {

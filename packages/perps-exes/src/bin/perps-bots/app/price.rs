@@ -4,6 +4,7 @@ use std::{
     collections::HashMap,
     fmt::{Display, Write},
     sync::Arc,
+    time::Instant,
 };
 
 use anyhow::Result;
@@ -95,8 +96,20 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
     let mut any_needs_oracle_update = false;
     let mut any_needs_high_gas_oracle_update: Option<HighGas> = None;
 
+    let begin_price_update = Instant::now();
+    successes.push(format!(
+        "Beginning run_price_update at {begin_price_update:?} ({})",
+        Utc::now()
+    ));
+
     // Load any offchain data, in batch, needed by the individual spot price configs
     let offchain_price_data = Arc::new(OffchainPriceData::load(&app, &factory.markets).await?);
+
+    let got_price_data = Instant::now();
+    successes.push(format!(
+        "Time to get off chain price data: {:?}",
+        got_price_data.saturating_duration_since(begin_price_update)
+    ));
 
     // Now that we have the offchain data, parallelize the checking of
     // individual markets to see if we need to do a price update
@@ -111,6 +124,14 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
         });
     }
 
+    let spawned = Instant::now();
+    successes.push(format!(
+        "Time to spawn market tasks: {:?}",
+        spawned.saturating_duration_since(got_price_data)
+    ));
+
+    let mut last_iter = Instant::now();
+
     // Wait for all the subtasks to complete
     while let Some(res_outer) = set.join_next().await {
         let (market, res) = match res_outer {
@@ -122,8 +143,14 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
         };
         match res {
             Ok(reason) => {
+                let now = Instant::now();
                 worker.add_reason(&market.market_id, &reason);
-                successes.push(format!("{}: {reason:?}", market.market_id));
+                successes.push(format!(
+                    "{}: {reason:?} (time: {:?})",
+                    market.market_id,
+                    now.saturating_duration_since(last_iter)
+                ));
+                last_iter = now;
 
                 match reason {
                     ActionWithReason::NoWorkAvailable
@@ -159,12 +186,23 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                     }
                 }
             }
-            Err(e) => errors.push(format!(
-                "{}: error checking if price update is needed: {e:?}",
-                market.market_id
-            )),
+            Err(e) => {
+                let now = Instant::now();
+
+                errors.push(format!(
+                    "{}: error checking if price update is needed: {e:?} (time: {:?})",
+                    market.market_id,
+                    now.saturating_duration_since(last_iter)
+                ));
+                last_iter = now;
+            }
         }
     }
+
+    successes.push(format!(
+        "Total time to process all markets: {:?}",
+        begin_price_update.elapsed()
+    ));
 
     // Now perform any oracle updates needed and trigger cranking as necessary
     if markets_to_update.is_empty() {
@@ -173,12 +211,16 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
     } else {
         if any_needs_oracle_update {
             if any_needs_high_gas_oracle_update == Some(HighGas::VeryHigh) {
-                successes.push("Passing the work to HighGas runner".to_owned());
+                successes.push(format!(
+                    "Passing the work to HighGas runner after {:?}",
+                    begin_price_update.elapsed()
+                ));
                 worker
                     .high_gas_trigger
                     .set(HighGasWork::Price {
                         offchain_price_data: offchain_price_data.clone(),
                         markets_to_update: markets_to_update.clone(),
+                        queued: Instant::now(),
                     })
                     .await;
             }
