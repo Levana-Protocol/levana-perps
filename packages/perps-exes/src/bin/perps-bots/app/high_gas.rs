@@ -1,4 +1,4 @@
-use std::{fmt::Write, sync::Arc};
+use std::{fmt::Write, sync::Arc, time::Instant};
 
 use crate::{
     util::oracle::OffchainPriceData,
@@ -42,6 +42,7 @@ pub(crate) enum HighGasWork {
     Price {
         offchain_price_data: Arc<OffchainPriceData>,
         markets_to_update: Vec<(Address, MarketId, CrankTriggerReason)>,
+        queued: Instant,
     },
 }
 
@@ -52,10 +53,12 @@ impl HighGasWork {
                 HighGasWork::Price {
                     offchain_price_data,
                     mut markets_to_update,
+                    queued: queued1,
                 },
                 HighGasWork::Price {
                     offchain_price_data: other_offchain_price_data,
                     markets_to_update: other_markets_to_update,
+                    queued: queued2,
                 },
             ) => {
                 for (market, market_id, reason) in other_markets_to_update.into_iter() {
@@ -91,6 +94,7 @@ impl HighGasWork {
                 HighGasWork::Price {
                     offchain_price_data: Arc::new(offchain_price_data),
                     markets_to_update,
+                    queued: queued1.min(queued2),
                 }
             }
         }
@@ -153,7 +157,12 @@ impl WatchedTask for Worker {
                 HighGasWork::Price {
                     offchain_price_data,
                     markets_to_update,
+                    queued,
                 } => {
+                    successes.push(format!(
+                        "Received new work, delta between queued and now: {:?}",
+                        queued.elapsed(),
+                    ));
                     let factory = app.get_factory_info().await;
 
                     let mut builder = TxBuilder::default();
