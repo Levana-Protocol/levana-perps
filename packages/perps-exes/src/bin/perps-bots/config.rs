@@ -134,6 +134,7 @@ impl Opt {
             gas_multiplier,
             gas_decimals,
             assets: _,
+            age_tolerance_seconds: _,
         } = ChainConfig::load(testnet.config_chain.as_ref(), network)?;
         let partial = match &testnet.deployment_config {
             Some(s) => serde_yaml::from_str(s)?,

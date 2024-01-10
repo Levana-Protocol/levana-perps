@@ -25,6 +25,7 @@ sei-mainnet:
   rpc-nodes:
     - https://rpc.sei-apis.com
 osmosis-mainnet:
+  age-tolerance-seconds: 45
   gas-decimals: 6
   spot-price: 
     pyth:
@@ -54,6 +55,7 @@ osmosis-mainnet:
       denom: ibc/FBB3FEF80ED2344D821D4F95C31DBFD33E4E31D5324CAD94EF756E67B749F668
       decimal-places: 18
 osmosis-testnet:
+  age-tolerance-seconds: 45
   gas-decimals: 6
   spot-price: 
     pyth:
