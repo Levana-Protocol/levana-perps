@@ -9,7 +9,7 @@ use super::{
     gas_check::GasCheckWallet, price::price_get_update_oracles_msg, App, AppBuilder,
     CrankTriggerReason,
 };
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use axum::async_trait;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
 use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
@@ -103,28 +103,30 @@ impl HighGasWork {
 
 /// Start the background thread to run "high gas" tasks.
 impl AppBuilder {
-    pub(super) fn start_high_gas(&mut self) -> Result<Option<HighGasTrigger>> {
-        if let Some(wallet) = self.app.config.high_gas_wallet.clone() {
-            self.refill_gas(wallet.get_address(), GasCheckWallet::HighGas)?;
+    pub(super) fn start_high_gas(&mut self) -> Result<HighGasTrigger> {
+        let wallet = self
+            .app
+            .config
+            .high_gas_wallet
+            .clone()
+            .context("high gas wallet is required")?;
+        self.refill_gas(wallet.get_address(), GasCheckWallet::HighGas)?;
 
-            let current_work = Arc::new(Mutex::new(None));
-            let (sender, receiver) = async_channel::bounded(100);
+        let current_work = Arc::new(Mutex::new(None));
+        let (sender, receiver) = async_channel::bounded(100);
 
-            let worker = Worker {
-                wallet,
-                current_work: current_work.clone(),
-                receiver,
-            };
+        let worker = Worker {
+            wallet,
+            current_work: current_work.clone(),
+            receiver,
+        };
 
-            self.watch_periodic(crate::watcher::TaskLabel::HighGas, worker)?;
+        self.watch_periodic(crate::watcher::TaskLabel::HighGas, worker)?;
 
-            Ok(Some(HighGasTrigger {
-                current_work,
-                sender,
-            }))
-        } else {
-            Ok(None)
-        }
+        Ok(HighGasTrigger {
+            current_work,
+            sender,
+        })
     }
 }
 
