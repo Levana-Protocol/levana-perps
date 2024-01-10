@@ -38,7 +38,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
-            packages/perps-exes -> target
+            .
       - name: Cache contract builds
         uses: actions/cache@v3.2.3
         with:
