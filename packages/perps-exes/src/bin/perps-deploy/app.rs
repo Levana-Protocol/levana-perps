@@ -234,7 +234,9 @@ impl Opt {
                         feeds.push(SpotPriceFeed {
                             data: SpotPriceFeedData::Pyth {
                                 id,
-                                age_tolerance_seconds: pyth_config.update_age_tolerance,
+                                age_tolerance_seconds: chain_config
+                                    .age_tolerance_seconds
+                                    .unwrap_or(pyth_config.update_age_tolerance),
                             },
                             inverted,
                             volatile: None,

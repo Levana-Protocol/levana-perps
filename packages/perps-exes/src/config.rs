@@ -34,6 +34,7 @@ pub struct ChainConfig {
     pub gas_decimals: GasDecimals,
     #[serde(default)]
     pub assets: HashMap<String, NativeAsset>,
+    pub age_tolerance_seconds: Option<u32>,
 }
 
 #[derive(serde::Deserialize, Clone, Debug)]
