@@ -60,6 +60,21 @@
           <div class="p-1"><i class="bi bi-check-circle text-success"></i> <span class="fw-bold">Live since </span><span class="text-secondary">{{live_since}}</span></div>
           <div class="p-1"><i class="bi bi-check-circle text-success"></i> <span class="fw-bold">Current time </span><span class="text-secondary">{{now}}</span></div>
           <div class="p-1"><i class="bi bi-check-circle text-success"></i> <span class="fw-bold">Gas multiplier </span><span class="text-secondary">{{gas_multiplier}} (gas refill: {{gas_multiplier_gas_check}})</span></div>
+          {% match max_gas_prices %}
+            {% when Some with (prices) %}
+              <div class="p-1">
+                <i class="bi bi-check-circle text-success"></i>
+                <span class="fw-bold">Congestion alert level:</span>
+                <span class="text-secondary">{{prices.alert_congested}}</span>
+                <span class="fw-bold">Regular max price:</span>
+                <span class="text-secondary">{{prices.max_price}}</span>
+                <span class="fw-bold">High max price:</span>
+                <span class="text-secondary">{{prices.high_max_price}}</span>
+                <span class="fw-bold">Very high max price:</span>
+                <span class="text-secondary">{{prices.very_high_max_price}}</span>
+              </div>
+            {% when None %}
+          {% endmatch %}
 	</div>
       </div>
       <div class="row m-5">
