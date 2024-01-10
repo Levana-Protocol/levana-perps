@@ -48,8 +48,7 @@ impl AppBuilder {
         // These services are tied together closely, see docs on the
         // crank_run module for more explanation.
         if let Some(trigger_crank) = self.start_crank_run()? {
-            let high_gas_trigger = self.start_high_gas()?;
-            self.start_price(trigger_crank.clone(), high_gas_trigger)?;
+            self.start_price(trigger_crank.clone())?;
         }
 
         self.alert_on_low_gas(

@@ -59,12 +59,9 @@ impl Worker {
 
 /// Start the background thread to keep options pools up to date.
 impl AppBuilder {
-    pub(super) fn start_price(
-        &mut self,
-        trigger_crank: TriggerCrank,
-        high_gas_trigger: HighGasTrigger,
-    ) -> Result<()> {
+    pub(super) fn start_price(&mut self, trigger_crank: TriggerCrank) -> Result<()> {
         if let Some(price_wallet) = self.app.config.price_wallet.clone() {
+            let high_gas_trigger = self.start_high_gas()?;
             self.refill_gas(price_wallet.get_address(), GasCheckWallet::Price)?;
             self.watch_periodic(
                 crate::watcher::TaskLabel::Price,
