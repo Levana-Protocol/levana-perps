@@ -1122,6 +1122,16 @@ struct StatusTemplate<'a> {
     node_health: Vec<String>,
     gas_multiplier: f64,
     gas_multiplier_gas_check: f64,
+    max_gas_prices: Option<MaxGasPrices>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+struct MaxGasPrices {
+    alert_congested: f64,
+    max_price: f64,
+    high_max_price: f64,
+    very_high_max_price: f64,
 }
 
 impl TaskStatuses {
@@ -1133,6 +1143,15 @@ impl TaskStatuses {
         let statuses = self.statuses(label).await;
         let alert = statuses.iter().any(|x| x.short.alert());
         let frontend_info_testnet = app.get_frontend_info_testnet().await;
+        let max_gas_prices = match &app.config.by_type {
+            crate::config::BotConfigByType::Testnet { .. } => None,
+            crate::config::BotConfigByType::Mainnet { inner } => Some(MaxGasPrices {
+                alert_congested: inner.gas_price_congested,
+                max_price: inner.max_gas_price,
+                high_max_price: inner.higher_max_gas_price,
+                very_high_max_price: inner.higher_very_high_max_gas_price,
+            }),
+        };
         StatusTemplate {
             statuses,
             family: match &app.config.by_type {
@@ -1158,6 +1177,7 @@ impl TaskStatuses {
                 .collect(),
             gas_multiplier: app.cosmos.get_current_gas_multiplier(),
             gas_multiplier_gas_check: app.cosmos_gas_check.get_current_gas_multiplier(),
+            max_gas_prices,
         }
     }
 }
