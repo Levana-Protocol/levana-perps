@@ -163,6 +163,7 @@ impl WatchedTask for Worker {
                     markets_to_update,
                     queued,
                 } => {
+                    let received = Instant::now();
                     successes.push(format!(
                         "Received new work, delta between queued and now: {:?}",
                         queued.elapsed(),
@@ -213,19 +214,35 @@ impl WatchedTask for Worker {
                             if app.is_osmosis_epoch() {
                                 successes.push(format!("[VERY HIGH GAS] - we think we're in the Osmosis epoch, error: {e:?}"));
                             } else if app.get_congested_info().is_congested() {
-                                bail!("[VERY HIGH GAS] - we think the Osmosis chain is overly congested, error: {e:?}");
+                                bail!("[VERY HIGH GAS] - we think the Osmosis chain is overly congested, error: {e:?}, delta between queued and now: {:?}, delta between received and now: {:?}",
+                                    queued.elapsed(),
+                                    received.elapsed(),
+                                );
                             } else {
                                 let error_as_str = format!("{e:?}");
                                 if error_as_str.contains("out of gas")
                                     || error_as_str.contains("code 11")
                                 {
-                                    bail!("[VERY HIGH GAS] - Got an 'out of gas' code 11 when trying to crank. error: {e:?}");
+                                    bail!("[VERY HIGH GAS] - Got an 'out of gas' code 11 when trying to crank. error: {e:?}, delta between queued and now: {:?}, delta between received and now: {:?}",
+                                        queued.elapsed(),
+                                        received.elapsed(),
+                                    );
                                 } else {
-                                    bail!("[VERY HIGH GAS] - {:?}", e);
+                                    bail!("[VERY HIGH GAS] - {:?}, delta between queued and now: {:?}, delta between received and now: {:?}",
+                                        queued.elapsed(),
+                                        received.elapsed(),
+                                        e,
+                                    );
                                 }
                             }
                         }
                     }
+
+                    successes.push(format!(
+                        "Finished the work, delta between queued and now: {:?}, delta between received and now: {:?}",
+                        queued.elapsed(),
+                        received.elapsed(),
+                    ));
                 }
             },
             None => {
