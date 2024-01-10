@@ -2,6 +2,7 @@ set dotenv-load
 export PERPS_WASM_DIR := "./wasm/artifacts"
 GIT_SHA := `git rev-parse HEAD`
 
+
 # List all recipies
 default:
 	just --list --unsorted
