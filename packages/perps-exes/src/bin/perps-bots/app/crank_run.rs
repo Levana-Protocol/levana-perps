@@ -13,6 +13,7 @@ mod trigger_crank;
 
 use std::borrow::Cow;
 use std::sync::Arc;
+use std::time::Instant;
 
 use anyhow::{Context, Result};
 use axum::async_trait;
@@ -101,6 +102,7 @@ impl App {
             Some(crank_needed) => crank_needed,
         };
 
+        let start_crank = Instant::now();
         let run_result = self.crank(crank_wallet, market, reason, None).await?;
 
         // Successfully cranked, check if there's more work and, if so, schedule it to be started again
@@ -125,8 +127,8 @@ impl App {
         Ok(WatchedTaskOutput::new(match run_result {
             RunResult::NormalRun(txres) => {
                 format!(
-                    "Successfully turned the crank for market {market} in transaction {}. {}. Queued delay: {:?}",
-                    txres.txhash, more_work, received.saturating_duration_since(queued)
+                    "Successfully turned the crank for market {market} in transaction {}. {}. Queued delay: {:?}, Elapsed since starting to crank: {:?}",
+                    txres.txhash, more_work, received.saturating_duration_since(queued), start_crank.elapsed(),
                 )
             }
             RunResult::OutOfGas => {

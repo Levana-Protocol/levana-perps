@@ -562,6 +562,8 @@ pub(crate) async fn update_oracles(
     offchain_price_data: &OffchainPriceData,
     high_gas: Option<HighGas>,
 ) -> Result<String> {
+    let received = Instant::now();
+
     let msg = match price_get_update_oracles_msg(wallet, app, markets, offchain_price_data).await? {
         None => {
             return Ok("No Pyth IDs found, no Pyth oracle update needed".to_owned());
@@ -591,15 +593,16 @@ pub(crate) async fn update_oracles(
         Ok(res) => {
             track_tx_fees(app, wallet.get_address(), &res).await;
             Ok(format!(
-                "Prices updated in Pyth oracle contract with txhash {}",
-                res.response.txhash
+                "Prices updated in Pyth oracle contract with txhash {}, delay: {:?}",
+                res.response.txhash,
+                received.elapsed(),
             ))
         }
         Err(e) => {
             if app.is_osmosis_epoch() {
-                Ok(format!("Unable to update Pyth oracle, but assuming it's because we're in the epoch: {e:?}"))
+                Ok(format!("Unable to update Pyth oracle, but assuming it's because we're in the epoch: {e:?}, delay: {:?}", received.elapsed()))
             } else if app.get_congested_info().is_congested() {
-                Ok(format!("Unable to update Pyth oracle, but assuming it's because Osmosis is congested: {e:?}"))
+                Ok(format!("Unable to update Pyth oracle, but assuming it's because Osmosis is congested: {e:?}, delay: {:?}", received.elapsed()))
             } else {
                 Err(e.into())
             }
