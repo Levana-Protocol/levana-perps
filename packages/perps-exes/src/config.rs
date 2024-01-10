@@ -549,7 +549,7 @@ impl Default for WatcherConfig {
                 // We block internally within the crank run service
                 delay: Delay::Constant(0),
                 out_of_date: 60,
-                retries: Some(0),
+                retries: None,
                 delay_between_retries: None,
             },
             get_factory: TaskConfig {
@@ -615,7 +615,7 @@ impl Default for WatcherConfig {
                 // and use a channel to signal when it should be woken up
                 delay: Delay::Constant(0),
                 out_of_date: 60,
-                retries: Some(0),
+                retries: None,
                 delay_between_retries: None,
             },
         }
