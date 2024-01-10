@@ -67,7 +67,7 @@ pub(crate) struct BotConfig {
     /// Wallets that are used to perform cranking
     pub(crate) crank_wallets: Vec<Wallet>,
     /// Wallet used for very high gas situations, derived from price wallet seed
-    pub(crate) high_gas_wallet: Wallet,
+    pub(crate) high_gas_wallet: Option<Arc<Wallet>>,
     pub(crate) watcher: WatcherConfig,
     pub(crate) gas_multiplier: Option<f64>,
     /// Parameters for checking if we need to do a price update or crank
@@ -213,11 +213,15 @@ impl Opt {
             } else {
                 None
             },
-            high_gas_wallet: self.get_price_wallet(
-                network.get_address_hrp(),
-                &wallet_phrase_name,
-                1,
-            )?,
+            high_gas_wallet: if partial.price {
+                Some(Arc::new(self.get_price_wallet(
+                    network.get_address_hrp(),
+                    &wallet_phrase_name,
+                    1,
+                )?))
+            } else {
+                None
+            },
             watcher: partial.watcher.clone(),
             gas_multiplier,
             needs_price_update_params: NeedsPriceUpdateParams {
@@ -312,7 +316,7 @@ impl Opt {
             network: *network,
             price_wallet: Some(price_wallet.into()),
             crank_wallets,
-            high_gas_wallet,
+            high_gas_wallet: Some(Arc::new(high_gas_wallet)),
             watcher,
             gas_multiplier: *gas_multiplier,
             needs_price_update_params: NeedsPriceUpdateParams {

@@ -99,31 +99,33 @@ impl HighGasWork {
 
 /// Start the background thread to run "high gas" tasks.
 impl AppBuilder {
-    pub(super) fn start_high_gas(&mut self) -> Result<HighGasTrigger> {
-        let wallet = self.app.config.high_gas_wallet.clone();
+    pub(super) fn start_high_gas(&mut self) -> Result<Option<HighGasTrigger>> {
+        if let Some(wallet) = self.app.config.high_gas_wallet.clone() {
+            self.refill_gas(wallet.get_address(), GasCheckWallet::HighGas)?;
 
-        self.refill_gas(wallet.get_address(), GasCheckWallet::HighGas)?;
+            let current_work = Arc::new(Mutex::new(None));
+            let (sender, receiver) = async_channel::bounded(100);
 
-        let current_work = Arc::new(Mutex::new(None));
-        let (sender, receiver) = async_channel::bounded(100);
+            let worker = Worker {
+                wallet,
+                current_work: current_work.clone(),
+                receiver,
+            };
 
-        let worker = Worker {
-            wallet,
-            current_work: current_work.clone(),
-            receiver,
-        };
+            self.watch_periodic(crate::watcher::TaskLabel::HighGas, worker)?;
 
-        self.watch_periodic(crate::watcher::TaskLabel::HighGas, worker)?;
-
-        Ok(HighGasTrigger {
-            current_work,
-            sender,
-        })
+            Ok(Some(HighGasTrigger {
+                current_work,
+                sender,
+            }))
+        } else {
+            Ok(None)
+        }
     }
 }
 
 struct Worker {
-    wallet: Wallet,
+    wallet: Arc<Wallet>,
     current_work: Arc<Mutex<Option<HighGasWork>>>,
     receiver: async_channel::Receiver<()>,
 }
@@ -177,7 +179,7 @@ impl WatchedTask for Worker {
 
                         builder.add_execute_message(
                             market,
-                            &self.wallet,
+                            &*self.wallet,
                             vec![],
                             MarketExecuteMsg::Crank {
                                 execs: Some(0),

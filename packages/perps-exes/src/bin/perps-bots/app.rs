@@ -18,7 +18,7 @@ mod types;
 mod ultra_crank;
 mod utilization;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use cosmos::HasAddressHrp;
 
 use tokio::net::TcpListener;
@@ -48,7 +48,9 @@ impl AppBuilder {
         // These services are tied together closely, see docs on the
         // crank_run module for more explanation.
         if let Some(trigger_crank) = self.start_crank_run()? {
-            let high_gas_trigger = self.start_high_gas()?;
+            let high_gas_trigger = self
+                .start_high_gas()?
+                .context("high gas wallet is required when doing price updates")?;
             self.start_price(trigger_crank.clone(), high_gas_trigger)?;
         }
 
