@@ -86,7 +86,13 @@ pub mod events {
 
     impl PerpEvent for CrankExecBatchEvent {}
     impl From<CrankExecBatchEvent> for Event {
-        fn from(CrankExecBatchEvent { requested, paying, actual }: CrankExecBatchEvent) -> Self {
+        fn from(
+            CrankExecBatchEvent {
+                requested,
+                paying,
+                actual,
+            }: CrankExecBatchEvent,
+        ) -> Self {
             let mut event = Event::new("crank-batch-exec")
                 .add_attribute("requested", requested.to_string())
                 .add_attribute("actual", actual.len().to_string())
