@@ -2,6 +2,9 @@ name: Perps Companion Docker Image
 
 on:
   workflow_dispatch:
+  schedule:
+    # For cache, run at 9 AM UTC every 5th day of month
+    - cron: "0 9 */5 * *"
 
 env:
   CARGO_TERM_COLOR: always
@@ -19,7 +22,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          just-version: 1.8.0
+          just-version: 1.16.0
       - name: Log in to the Container registry
         uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
@@ -31,7 +34,7 @@ jobs:
           toolchain: 1.71.0
           components: rustfmt, clippy
           targets: x86_64-unknown-linux-musl
-      - uses: Swatinem/rust-cache@v2.5.1
+      - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
             .
@@ -43,3 +46,4 @@ jobs:
         run: just build-companion-image
       - name: Push image
         run: just push-companion-image
+        if: ${{ github.event_name != 'schedule' }}
