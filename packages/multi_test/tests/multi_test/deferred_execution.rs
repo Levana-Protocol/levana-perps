@@ -252,30 +252,11 @@ fn non_deferred_after_deferred_2853() {
         .is_pending());
 
     // This crank should process the first update queue - step 7/8 in the jira issue
+    // And also the first liquifunding and the second update - step 9/10 in the jira issue
+    // And also step 11 of liquifunding until completion in one big crank.
     market.exec_refresh_price().unwrap(); // we have to refresh the price first though, otherwise it's too old and the cranking will fail
     market.exec_crank_n(&cranker, 100).unwrap();
 
-    assert_eq!(market.query_status().unwrap().deferred_execution_items, 1);
-    assert!(!market
-        .query_deferred_exec(update_queue_1.value.id)
-        .unwrap()
-        .status
-        .is_pending());
-    assert!(market
-        .query_deferred_exec(update_queue_2.value.id)
-        .unwrap()
-        .status
-        .is_pending());
-
-    // confirm that no liquifundings have happened yet - step 8 in the jira issue
-    let liquifunded_at = market
-        .query_position(pos_liquifund_only)
-        .unwrap()
-        .liquifunded_at;
-    assert_eq!(liquifunded_at, init_liquifunded_at);
-
-    // This crank should process the first liquifunding and the second update - step 9/10 in the jira issue
-    market.exec_crank_n(&cranker, 100).unwrap();
     assert_eq!(market.query_status().unwrap().deferred_execution_items, 0);
     assert!(!market
         .query_deferred_exec(update_queue_1.value.id)
@@ -287,25 +268,13 @@ fn non_deferred_after_deferred_2853() {
         .unwrap()
         .status
         .is_pending());
-
-    // Confirm that we've only processed the first liquifunding
     let liquifunded_at = market
         .query_position(pos_liquifund_only)
         .unwrap()
         .liquifunded_at;
     assert!(liquifunded_at > init_liquifunded_at);
-    assert!(liquifunded_at <= first_liquifunding_time);
-
-    // final crank - i.e. step 11 in the jira issue
-    market.exec_crank_n(&cranker, 100).unwrap();
+    assert!(liquifunded_at > first_liquifunding_time);
     assert!(market.query_status().unwrap().next_crank.is_none());
-
-    let last_liquifunded_at = market
-        .query_position(pos_liquifund_only)
-        .unwrap()
-        .liquifunded_at;
-    assert!(last_liquifunded_at > liquifunded_at);
-    assert!(last_liquifunded_at > first_liquifunding_time);
 }
 
 #[test]
@@ -398,8 +367,8 @@ fn defer_before_crank_2855() {
         )
         .unwrap();
 
-    // One block's worth of cranking is enough to churn through the update and close - because there's only one price point
-    let res = market.exec_crank_n(&cranker, 100).unwrap();
+    // Crank update and close work items, but not the "Completed".
+    let res = market.exec_crank_n(&cranker, 2).unwrap();
 
     // now position is updated
     let update_event: PositionUpdateEvent = res
@@ -431,7 +400,7 @@ fn defer_before_crank_2855() {
     // and it was closed with more collateral than what it had at the update
     assert!(closed_pos.active_collateral.into_number() > update_active_collateral);
 
-    // last crank has the fee updates, and it's historical
+    // last crank is for one Completed item and it has the fee updates, and it's historical
     let res = market.exec_crank_till_finished(&cranker).unwrap();
     let funding_rate_timestamp: Timestamp = res
         .event_first_value("funding-rate-change", "time")

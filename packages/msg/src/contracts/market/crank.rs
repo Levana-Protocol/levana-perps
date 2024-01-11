@@ -78,16 +78,19 @@ pub mod events {
     pub struct CrankExecBatchEvent {
         /// How many cranks were requested
         pub requested: u64,
+        /// How many paying cranks were processed
+        pub paying: u64,
         /// How many cranks were actually processed
         pub actual: Vec<(CrankWorkInfo, PricePoint)>,
     }
 
     impl PerpEvent for CrankExecBatchEvent {}
     impl From<CrankExecBatchEvent> for Event {
-        fn from(CrankExecBatchEvent { requested, actual }: CrankExecBatchEvent) -> Self {
+        fn from(CrankExecBatchEvent { requested, paying, actual }: CrankExecBatchEvent) -> Self {
             let mut event = Event::new("crank-batch-exec")
                 .add_attribute("requested", requested.to_string())
-                .add_attribute("actual", actual.len().to_string());
+                .add_attribute("actual", actual.len().to_string())
+                .add_attribute("paying", paying.to_string());
 
             for (idx, (work, price_point)) in actual.into_iter().enumerate() {
                 event = event.add_attribute(

@@ -320,7 +320,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 Some(rewards) => rewards.validate(state.api)?,
             };
             state.spot_price_append(&mut ctx)?;
-            state.crank_exec_batch(&mut ctx, execs, &rewards)?;
+            state.crank_exec_batch(
+                &mut ctx,
+                Some((execs.unwrap_or(state.config.crank_execs), rewards)),
+            )?;
         }
 
         ExecuteMsg::DepositLiquidity { stake_to_xlp } => {
@@ -740,5 +743,6 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
     let deferred_exec_id = DeferredExecId::from_u64(msg.id);
     let (state, mut ctx) = StateContext::new(deps, env)?;
     state.handle_deferred_exec_reply(&mut ctx, deferred_exec_id, msg.result)?;
+    state.crank_exec_batch(&mut ctx, None)?;
     ctx.into_response(&state)
 }

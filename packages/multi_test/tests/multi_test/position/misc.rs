@@ -191,9 +191,10 @@ fn funding_payment_flips_direction() {
     market.set_time(TimeJump::Liquifundings(1)).unwrap();
     market.exec_refresh_price().unwrap();
 
-    // Crank just enough to do a liquifunding but not liquidation
-    // so that the position is liquidatable but not liquidated
-    market.exec_crank_n(&trader, 1).unwrap();
+    // Update the price point in the market contract forcing the position
+    // into a "pending close" state, but not actually doing liquifunding
+    // which will liquidate the position.
+    market.exec_crank_n(&trader, 0).unwrap();
 
     // In collateral-is-base markets, the position should now be in the
     // ready-to-liquidate state. For collateral-is-quote, we don't have
