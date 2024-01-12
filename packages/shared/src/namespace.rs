@@ -154,3 +154,4 @@ pub const PENDING_DEFERRED_FOR_POSITION: &str = "eu";
 pub const PENDING_DEFERRED_FOR_ORDER: &str = "ev";
 pub const IS_LIMIT_ORDER_CANCELING: &str = "ew";
 pub const IS_POSITION_CLOSING: &str = "ex";
+pub const CRANK_BATCH_WEIGHT_LEFT: &str = "ey";
