@@ -1284,6 +1284,12 @@ pub struct StatusResp {
 
     /// Fees held by the market contract
     pub fees: Fees,
+
+    /// Current spot price that has landed in the market and is used
+    /// for calculating long_usd and short_usd at the time of this query
+    /// In very niche edge cases, where the market is queried before a price has landed
+    /// this may be None
+    pub spot_price: Option<PricePoint>,
 }
 
 /// Response for [QueryMsg::LimitOrderHistory]

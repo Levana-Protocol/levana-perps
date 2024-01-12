@@ -623,6 +623,7 @@ mod tests {
             last_processed_deferred_exec_id: None,
             newest_deferred_execution: None,
             next_liquifunding: None,
+            spot_price: None,
         }
     }
 

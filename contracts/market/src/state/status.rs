@@ -52,15 +52,18 @@ impl State<'_> {
             MarketType::CollateralIsBase => (short_notional_protocol, long_notional_protocol),
         };
 
+        let price_point = self.current_spot_price(store);
+
         // Avoid spot price lookup for corner case of status queries before spot price update
-        let (long_usd, short_usd) = if long_notional.is_zero() && short_notional.is_zero() {
-            (Usd::zero(), Usd::zero())
-        } else {
-            let price_point = self.current_spot_price(store)?;
-            let long_usd = price_point.notional_to_usd(long_notional);
-            let short_usd = price_point.notional_to_usd(short_notional);
-            (long_usd, short_usd)
-        };
+        let (long_usd, short_usd, price_point) =
+            if long_notional.is_zero() && short_notional.is_zero() {
+                (Usd::zero(), Usd::zero(), price_point.ok())
+            } else {
+                let price_point = price_point?;
+                let long_usd = price_point.notional_to_usd(long_notional);
+                let short_usd = price_point.notional_to_usd(short_notional);
+                (long_usd, short_usd, Some(price_point))
+            };
         let instant_delta_neutrality_fee_value = long_notional
             .into_signed()
             .checked_sub(short_notional.into_signed())?
@@ -130,6 +133,7 @@ impl State<'_> {
             last_processed_deferred_exec_id,
             newest_deferred_execution,
             next_liquifunding,
+            spot_price: price_point,
         })
     }
 }
