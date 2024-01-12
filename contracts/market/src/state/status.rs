@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
 use cosmwasm_std::Storage;
+use msg::contracts::market::crank::CrankWorkInfo;
 use msg::contracts::market::{deferred_execution::DeferredExecStatus, entry::StatusResp};
 
 use super::{crank::LAST_CRANK_COMPLETED, fees::all_fees, position::NEXT_LIQUIFUNDING, State};
@@ -15,7 +16,19 @@ impl State<'_> {
         let next_crank_timestamp = self.next_crank_timestamp(store)?;
         let next_crank = match next_crank_timestamp {
             None => None,
-            Some(price_point) => Some(self.crank_work(store, price_point)?),
+            Some(crank_price_point) => {
+                let price_point = self.current_spot_price(store)?;
+                let work_item = self.crank_work(store, crank_price_point)?;
+                if let CrankWorkInfo::Completed {} = work_item {
+                    if price_point.timestamp == crank_price_point.timestamp {
+                        None
+                    } else {
+                        Some(work_item)
+                    }
+                } else {
+                    Some(work_item)
+                }
+            }
         };
 
         let liquidity = self.load_liquidity_stats(store)?;
