@@ -97,7 +97,14 @@ impl App {
             received,
         } = match recv.receive_with_timeout().await {
             None => {
-                return Ok(WatchedTaskOutput::new("No crank work needed").suppress());
+                // PERP-2904: we used to have a .suppress() call here, but that
+                // leads to issues where a crank failure message can stick around for too long.
+                // When implementing PERP-2904, we need to think through the correct handling of
+                // this case, and the high gas bot too. We need _something_ where we generate an
+                // alert when something fails, but also somehow the alert disappears over time. For
+                // now, I'm putting in place a short-term workaround of removing the suppress and
+                // considering both crank run and high gas bots as non-alert cases.
+                return Ok(WatchedTaskOutput::new("No crank work needed"));
             }
             Some(crank_needed) => crank_needed,
         };

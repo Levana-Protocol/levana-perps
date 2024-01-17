@@ -249,7 +249,8 @@ impl TaskLabel {
         }
         match self {
             TaskLabel::GetFactory => true,
-            TaskLabel::CrankRun { index: _ } => true,
+            // FIXME change as part of PERP-2904
+            TaskLabel::CrankRun { index: _ } => false,
             TaskLabel::Price => true,
             TaskLabel::TrackBalance => false,
             TaskLabel::GasCheck => false,
@@ -265,7 +266,8 @@ impl TaskLabel {
             TaskLabel::TotalDepositAlert => false,
             TaskLabel::RpcHealth => false,
             TaskLabel::Congestion => false,
-            TaskLabel::HighGas => true,
+            // FIXME change as part of PERP-2904
+            TaskLabel::HighGas => false,
         }
     }
 
