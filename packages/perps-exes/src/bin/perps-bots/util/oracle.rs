@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
-use cosmos::Contract;
+use cosmos::{Address, Contract};
 use cosmwasm_std::Uint256;
 use msg::{
     contracts::market::{
@@ -113,7 +113,9 @@ pub(crate) enum LatestPrice {
         /// Publish time calculated from on-chain oracle data
         on_chain_oracle_publish_time: DateTime<Utc>,
     },
-    PriceTooOld,
+    PriceTooOld {
+        feed: FeedType,
+    },
     VolatileDiffTooLarge,
 }
 
@@ -151,7 +153,7 @@ pub(crate) async fn get_latest_price(
             feeds,
             volatile_diff_seconds,
         )? {
-            ComposedOracleFeed::UpdateTooOld => LatestPrice::PriceTooOld,
+            ComposedOracleFeed::UpdateTooOld { feed } => LatestPrice::PriceTooOld { feed },
             ComposedOracleFeed::VolatileDiffTooLarge => LatestPrice::VolatileDiffTooLarge,
             ComposedOracleFeed::OffChainPrice {
                 price: off_chain_price,
@@ -170,12 +172,31 @@ pub(crate) async fn get_latest_price(
 }
 
 enum ComposedOracleFeed {
-    UpdateTooOld,
+    UpdateTooOld {
+        feed: FeedType,
+    },
     OffChainPrice {
         price: PriceBaseInQuote,
         publish_time: DateTime<Utc>,
     },
     VolatileDiffTooLarge,
+}
+
+#[derive(Debug)]
+pub(crate) enum FeedType {
+    Pyth { id: PriceIdentifier },
+    Stride { denom: String },
+    Simple { contract: Address },
+}
+
+impl Display for FeedType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            FeedType::Pyth { id } => write!(f, "Pyth feed {id}"),
+            FeedType::Stride { denom } => write!(f, "Stride denom {denom}"),
+            FeedType::Simple { contract } => write!(f, "Simple contract {contract}"),
+        }
+    }
 }
 
 fn compose_oracle_feeds(
@@ -210,7 +231,9 @@ fn compose_oracle_feeds(
                     .with_context(|| format!("Missing pyth price for ID {}", id))?;
                 let age = now.signed_duration_since(pyth_update).num_seconds();
                 if age >= (*age_tolerance_seconds).into() {
-                    return Ok(ComposedOracleFeed::UpdateTooOld);
+                    return Ok(ComposedOracleFeed::UpdateTooOld {
+                        feed: FeedType::Pyth { id: *id },
+                    });
                 }
 
                 update_publish_time(*pyth_update, feed.volatile, true);
@@ -235,30 +258,46 @@ fn compose_oracle_feeds(
                 );
                 sei.price.into_decimal256()
             }
-            SpotPriceFeedData::Stride { denom, .. } => {
+            SpotPriceFeedData::Stride {
+                denom,
+                age_tolerance_seconds,
+            } => {
                 // we _could_ query the redemption rate from stride chain, but it's not needed
                 // contract price is good enough
                 let stride = oracle_price.stride.get(denom).with_context(|| {
                     format!("Missing redemption rate for Stride denom: {denom}")
                 })?;
-                update_publish_time(
-                    stride.publish_time.try_into_chrono_datetime()?,
-                    feed.volatile,
-                    false,
-                );
+                let publish_time = stride.publish_time.try_into_chrono_datetime()?;
+                let age = now.signed_duration_since(publish_time).num_seconds();
+                if age >= (*age_tolerance_seconds).into() {
+                    return Ok(ComposedOracleFeed::UpdateTooOld {
+                        feed: FeedType::Stride {
+                            denom: denom.clone(),
+                        },
+                    });
+                }
+                update_publish_time(publish_time, feed.volatile, false);
                 stride.redemption_rate.into_decimal256()
             }
-            SpotPriceFeedData::Simple { contract, .. } => {
+            SpotPriceFeedData::Simple {
+                contract,
+                age_tolerance_seconds,
+            } => {
                 let simple = oracle_price
                     .simple
                     .get(&RawAddr::from(contract))
                     .with_context(|| format!("Missing price for Simple contract: {contract}"))?;
                 if let Some(timestamp) = simple.timestamp {
-                    update_publish_time(
-                        timestamp.try_into_chrono_datetime()?,
-                        feed.volatile,
-                        false,
-                    );
+                    let timestamp = timestamp.try_into_chrono_datetime()?;
+                    let age = now.signed_duration_since(timestamp).num_seconds();
+                    if age >= (*age_tolerance_seconds).into() {
+                        return Ok(ComposedOracleFeed::UpdateTooOld {
+                            feed: FeedType::Simple {
+                                contract: contract.as_str().parse()?,
+                            },
+                        });
+                    }
+                    update_publish_time(timestamp, feed.volatile, false);
                 }
                 simple.value.into_decimal256()
             }

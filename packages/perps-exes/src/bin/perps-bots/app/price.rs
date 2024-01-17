@@ -29,7 +29,7 @@ use crate::{
     util::{
         markets::Market,
         misc::track_tx_fees,
-        oracle::{get_latest_price, LatestPrice, OffchainPriceData},
+        oracle::{get_latest_price, FeedType, LatestPrice, OffchainPriceData},
     },
     watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
 };
@@ -151,8 +151,8 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
 
                 match reason {
                     ActionWithReason::NoWorkAvailable | ActionWithReason::PythPricesClosed => (),
-                    ActionWithReason::OffChainPriceTooOld => {
-                        errors.push(format!("{}: off chain price is too old. Check the price feed and try manual cranking in the frontend.", market.market_id));
+                    ActionWithReason::PriceTooOld { feed } => {
+                        errors.push(format!("{}: price is too old. Check the price feed and try manual cranking in the frontend. Feed info: {feed}.", market.market_id));
                     }
                     ActionWithReason::VolatileDiffTooLarge => {
                         errors.push(format!("{}: different in volatile price publish times is too high. Check the price feed and try manual cranking in the frontend.", market.market_id));
@@ -303,7 +303,7 @@ enum ActionWithReason {
     NoWorkAvailable,
     WorkNeeded(CrankTriggerReason),
     PythPricesClosed,
-    OffChainPriceTooOld,
+    PriceTooOld { feed: FeedType },
     VolatileDiffTooLarge,
 }
 
@@ -419,7 +419,7 @@ async fn check_market_needs_price_update(
         LatestPrice::NoPriceInContract => Ok(ActionWithReason::WorkNeeded(
             CrankTriggerReason::NoPriceOnChain,
         )),
-        LatestPrice::PriceTooOld => Ok(ActionWithReason::OffChainPriceTooOld),
+        LatestPrice::PriceTooOld { feed } => Ok(ActionWithReason::PriceTooOld { feed }),
         LatestPrice::VolatileDiffTooLarge => Ok(ActionWithReason::VolatileDiffTooLarge),
         LatestPrice::PricesFound {
             off_chain_price,
@@ -624,7 +624,7 @@ struct ReasonStats {
     no_price_found: u64,
     deferred_needs_new_price: u64,
     pyth_prices_closed: u64,
-    offchain_price_too_old: u64,
+    price_too_old: u64,
     volatile_diff_too_large: u64,
 }
 
@@ -643,10 +643,10 @@ impl Display for ReasonStats {
             more_work_found,
             deferred_needs_new_price,
             pyth_prices_closed,
-            offchain_price_too_old,
+            price_too_old,
             volatile_diff_too_large,
         } = self;
-        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Triggers: {triggers}. No price found: {no_price_found}. Oracle update: {oracle_update}. Deferred execution w/price: {deferred_needs_new_price}. Pyth prices closed: {pyth_prices_closed}. Crank work available: {crank_work_available}. More work found: {more_work_found}. Offchain price too old: {offchain_price_too_old}. Volatile diff too large: {volatile_diff_too_large}.")
+        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Triggers: {triggers}. No price found: {no_price_found}. Oracle update: {oracle_update}. Deferred execution w/price: {deferred_needs_new_price}. Pyth prices closed: {pyth_prices_closed}. Crank work available: {crank_work_available}. More work found: {more_work_found}. Price too old: {price_too_old}. Volatile diff too large: {volatile_diff_too_large}.")
     }
 }
 
@@ -665,7 +665,7 @@ impl ReasonStats {
             more_work_found: 0,
             deferred_needs_new_price: 0,
             pyth_prices_closed: 0,
-            offchain_price_too_old: 0,
+            price_too_old: 0,
             volatile_diff_too_large: 0,
         }
     }
@@ -674,7 +674,7 @@ impl ReasonStats {
         match reason {
             ActionWithReason::NoWorkAvailable => self.not_needed += 1,
             ActionWithReason::PythPricesClosed => self.pyth_prices_closed += 1,
-            ActionWithReason::OffChainPriceTooOld => self.offchain_price_too_old += 1,
+            ActionWithReason::PriceTooOld { .. } => self.price_too_old += 1,
             ActionWithReason::VolatileDiffTooLarge => self.volatile_diff_too_large += 1,
             ActionWithReason::WorkNeeded(reason) => {
                 if reason.needs_price_update() {
