@@ -150,10 +150,13 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                 last_iter = now;
 
                 match reason {
-                    ActionWithReason::NoWorkAvailable
-                    | ActionWithReason::PythPricesClosed
-                    | ActionWithReason::OffChainPriceTooOld
-                    | ActionWithReason::VolatileDiffTooLarge => (),
+                    ActionWithReason::NoWorkAvailable | ActionWithReason::PythPricesClosed => (),
+                    ActionWithReason::OffChainPriceTooOld => {
+                        errors.push(format!("{}: off chain price is too old. Check the price feed and try manual cranking in the frontend.", market.market_id));
+                    }
+                    ActionWithReason::VolatileDiffTooLarge => {
+                        errors.push(format!("{}: different in volatile price publish times is too high. Check the price feed and try manual cranking in the frontend.", market.market_id));
+                    }
                     ActionWithReason::WorkNeeded(crank_trigger_reason) => {
                         if crank_trigger_reason.needs_price_update() {
                             any_needs_oracle_update = true;
