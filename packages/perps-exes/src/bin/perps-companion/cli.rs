@@ -16,7 +16,7 @@ pub(crate) struct Opt {
     #[clap(
         long,
         env = "LEVANA_COMPANION_OSMOSIS_MAINNET_PRIMARY_GRPC",
-        default_value = "https://grpc.dev-osmosis.zone:443"
+        default_value = "https://grpc.osmosis.zone"
     )]
     pub(crate) osmosis_mainnet_primary: String,
     /// Primary mainnet GRPC Override for Sei.
