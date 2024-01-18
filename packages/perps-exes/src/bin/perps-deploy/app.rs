@@ -63,7 +63,8 @@ pub(crate) enum PriceSourceConfig {
 #[derive(Clone, Debug)]
 pub(crate) struct OracleInfo {
     pub pyth: Option<ChainPythConfig>,
-    pub stride: Option<ChainStrideConfig>,
+    /// Fallback config if not overridden by a market
+    pub stride_fallback: Option<ChainStrideConfig>,
     pub markets: HashMap<MarketId, OracleMarketPriceFeeds>,
 }
 
@@ -71,6 +72,7 @@ pub(crate) struct OracleInfo {
 pub(crate) struct OracleMarketPriceFeeds {
     pub feeds: Vec<SpotPriceFeed>,
     pub feeds_usd: Vec<SpotPriceFeed>,
+    pub stride_contract_override: Option<Address>,
 }
 
 /// Complete app for mainnet
@@ -278,12 +280,13 @@ impl Opt {
                 OracleMarketPriceFeeds {
                     feeds: map_feeds(&price_feed_configs.feeds)?,
                     feeds_usd: map_feeds(&price_feed_configs.feeds_usd)?,
+                    stride_contract_override: price_feed_configs.stride_contract,
                 },
             );
         }
         Ok(OracleInfo {
             pyth: chain_spot_price_config.pyth.clone(),
-            stride: chain_spot_price_config.stride.clone(),
+            stride_fallback: chain_spot_price_config.stride.clone(),
             markets,
         })
     }

@@ -73,6 +73,10 @@ impl App {
                         .markets
                         .get(&market_id)
                         .with_context(|| format!("No oracle market found for {market_id}"))?;
+                    let stride = match market.stride_contract_override {
+                        Some(stride) => Some(stride),
+                        None => oracle.stride_fallback.clone().map(|x| x.contract),
+                    };
 
                     let global_price_config = &self.basic.price_config;
 
@@ -81,8 +85,8 @@ impl App {
                             contract_address: pyth.contract.get_address_string().into(),
                             network: pyth.r#type,
                         }),
-                        stride: oracle.stride.as_ref().map(|stride| StrideConfigInit {
-                            contract_address: stride.contract.get_address_string().into(),
+                        stride: stride.map(|addr| StrideConfigInit {
+                            contract_address: addr.get_address_string().into(),
                         }),
                         feeds: market
                             .feeds
