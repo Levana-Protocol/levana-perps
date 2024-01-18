@@ -123,6 +123,8 @@ pub struct MarketPriceFeedConfigs {
     pub feeds: Vec<MarketPriceFeedConfig>,
     /// feed of the collateral asset in terms of USD
     pub feeds_usd: Vec<MarketPriceFeedConfig>,
+    /// Override the Stride contract address for this market
+    pub stride_contract: Option<Address>,
 }
 
 #[derive(serde::Deserialize, Debug, Clone)]
