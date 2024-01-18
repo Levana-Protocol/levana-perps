@@ -3,7 +3,7 @@ use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket,
     position_helpers::{assert_position_liquidated, assert_position_max_gains},
     response::CosmosResponseExt,
-    return_unless_market_collateral_quote,
+    return_unless_market_collateral_base, return_unless_market_collateral_quote,
     time::TimeJump,
     PerpsApp,
 };
@@ -553,5 +553,86 @@ fn position_pnl_usd() {
     assert_ne!(pos.pnl_usd, start_pos.pnl_usd);
     if market.id.get_market_type() == MarketType::CollateralIsQuote {
         assert_eq!(pos.pnl_collateral.into_number(), pos.pnl_usd.into_number());
+    }
+}
+
+// This isn't so much of a test since the values were copy/pasted from the result
+// the intent is to have a stable baseline in the test suite which we can compare
+// against a comparable test in the frontend
+#[test]
+fn pnl_take_profit_override_min_2949() {
+    let mut positions = Vec::new();
+    let mut closed_positions = Vec::new();
+    let market_price: PriceBaseInQuote = "10.127".parse().unwrap();
+    // each test case has a unique take_profit_price and max_gains, but all other params are the same (starting market price, etc.)
+    struct TestCase<'a> {
+        take_profit_price: PriceBaseInQuote,
+        max_gains: &'a str,
+    }
+    impl<'a> From<(&str, &'a str)> for TestCase<'a> {
+        fn from((take_profit_price, max_gains): (&str, &'a str)) -> Self {
+            Self {
+                take_profit_price: take_profit_price.parse().unwrap(),
+                max_gains,
+            }
+        }
+    }
+
+    let test_cases = [
+        TestCase::from(("11.3", "115.829")),
+        TestCase::from(("11.2", "105.9544")),
+        TestCase::from(("10.3", "17.083")),
+        TestCase::from(("10.2", "7.2085")),
+    ];
+    let expected_pnl = [
+        "0.925604545929346828",
+        "0.853619422330059713",
+        "0.143826184710790827",
+        "0.058026332973898605",
+    ];
+
+    // just to prevent any possible confusion, each market is created fresh
+    for TestCase {
+        take_profit_price,
+        max_gains,
+    } in test_cases
+    {
+        // Setup
+        let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+        return_unless_market_collateral_base!(market);
+
+        let trader = market.clone_trader(0).unwrap();
+        let cranker = market.clone_trader(1).unwrap();
+
+        market.exec_set_price(market_price).unwrap();
+        let (pos_id, _) = market
+            .exec_open_position(
+                &trader,
+                "1",
+                "10",
+                DirectionToBase::Long,
+                max_gains,
+                None,
+                None,
+                Some(take_profit_price),
+            )
+            .unwrap();
+
+        let pos = market.query_position(pos_id).unwrap();
+        positions.push(pos);
+
+        market.exec_set_price(take_profit_price).unwrap();
+        market.exec_crank(&cranker).unwrap();
+
+        let closed_pos = market.query_closed_position(&trader, pos_id).unwrap();
+        closed_positions.push(closed_pos);
+    }
+
+    for (idx, closed_position) in closed_positions.iter().enumerate() {
+        let expected_pnl = expected_pnl[idx];
+        assert_eq!(
+            expected_pnl.parse::<Signed<Collateral>>().unwrap(),
+            closed_position.pnl_collateral
+        );
     }
 }
