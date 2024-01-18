@@ -21,7 +21,7 @@ use axum::async_trait;
 use cosmos::proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
 use msg::prelude::MarketExecuteMsg;
-use perps_exes::prelude::MarketContract;
+use perps_exes::prelude::{MarketContract, MarketId};
 
 use crate::app::CrankTriggerReason;
 use crate::util::misc::track_tx_fees;
@@ -97,13 +97,22 @@ impl App {
             received,
         } = match recv.receive_with_timeout().await {
             None => {
-                return Ok(WatchedTaskOutput::new("No crank work needed").suppress());
+                // PERP-2904: we used to have a .suppress() call here, but that
+                // leads to issues where a crank failure message can stick around for too long.
+                // When implementing PERP-2904, we need to think through the correct handling of
+                // this case, and the high gas bot too. We need _something_ where we generate an
+                // alert when something fails, but also somehow the alert disappears over time. For
+                // now, I'm putting in place a short-term workaround of removing the suppress and
+                // considering both crank run and high gas bots as non-alert cases.
+                return Ok(WatchedTaskOutput::new("No crank work needed"));
             }
             Some(crank_needed) => crank_needed,
         };
 
         let start_crank = Instant::now();
-        let run_result = self.crank(crank_wallet, market, reason, None).await?;
+        let run_result = self
+            .crank(crank_wallet, market, &market_id, reason, None)
+            .await?;
 
         // Successfully cranked, check if there's more work and, if so, schedule it to be started again
         std::mem::drop(crank_guard);
@@ -148,6 +157,7 @@ impl App {
         &self,
         crank_wallet: &Wallet,
         market: Address,
+        market_id: &MarketId,
         reason: CrankTriggerReason,
         // an array of N execs to try with fallbacks
         execs: Option<&[u32]>,
@@ -212,7 +222,7 @@ impl App {
         match builder
             .sign_and_broadcast_cosmos_tx(cosmos, crank_wallet)
             .await
-            .with_context(|| format!("Unable to turn crank for market {market}"))
+            .with_context(|| format!("Unable to turn crank for market {market_id} ({market})"))
         {
             Ok(txres) => {
                 track_tx_fees(self, crank_wallet.get_address(), &txres).await;

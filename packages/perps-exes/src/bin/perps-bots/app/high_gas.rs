@@ -228,10 +228,10 @@ impl WatchedTask for Worker {
                                         received.elapsed(),
                                     );
                                 } else {
-                                    bail!("[VERY HIGH GAS] - {:?}, delta between queued and now: {:?}, delta between received and now: {:?}",
+                                    bail!("[VERY HIGH GAS]\n{:?}\nDelta between queued and now: {:?}\nDelta between received and now: {:?}",
+                                        e,
                                         queued.elapsed(),
                                         received.elapsed(),
-                                        e,
                                     );
                                 }
                             }
