@@ -680,11 +680,9 @@ impl WatchedTaskOutput {
         }
     }
 
-    pub(crate) fn set_expiry(
-	mut self, expire_duration: Duration
-    ) -> Self {
-	self.expire_alert = Some(expire_duration);
-	self
+    pub(crate) fn set_expiry(mut self, expire_duration: Duration) -> Self {
+        self.expire_alert = Some(expire_duration);
+        self
     }
 
     pub(crate) fn skip_delay(mut self) -> Self {

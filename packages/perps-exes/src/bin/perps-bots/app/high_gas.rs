@@ -153,7 +153,11 @@ impl WatchedTask for Worker {
             ),
         }
 
-        let work = self.current_work.try_lock().map(|mut item| item.take()).flatten();
+        let work = self
+            .current_work
+            .try_lock()
+            .map(|mut item| item.take())
+            .flatten();
         let mut successes = vec![];
 
         match work {
