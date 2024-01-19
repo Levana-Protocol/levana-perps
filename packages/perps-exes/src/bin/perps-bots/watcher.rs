@@ -142,8 +142,12 @@ pub(crate) struct TaskStatus {
     last_result: TaskResult,
     last_retry_error: Option<TaskError>,
     current_run_started: Option<DateTime<Utc>>,
+    // Is the last_result out of date ?
     #[serde(skip)]
     out_of_date: Duration,
+    // Should we expire the status of last result ?
+    #[serde(skip)]
+    expire_last_result: Option<Duration>,
     counts: TaskCounts,
 }
 
@@ -201,6 +205,16 @@ enum OutOfDateType {
 }
 
 impl TaskStatus {
+    fn is_expired(&self) -> bool {
+        if let Some(expiry_duration) = self.expire_last_result {
+            let last_run = self.last_result.updated;
+            let now = Utc::now();
+            last_run + expiry_duration >= now
+        } else {
+            false
+        }
+    }
+
     fn is_out_of_date(&self) -> OutOfDateType {
         match self.current_run_started {
             Some(started) => {
@@ -249,8 +263,7 @@ impl TaskLabel {
         }
         match self {
             TaskLabel::GetFactory => true,
-            // FIXME change as part of PERP-2904
-            TaskLabel::CrankRun { index: _ } => false,
+            TaskLabel::CrankRun { index: _ } => true,
             TaskLabel::Price => true,
             TaskLabel::TrackBalance => false,
             TaskLabel::GasCheck => false,
@@ -266,8 +279,7 @@ impl TaskLabel {
             TaskLabel::TotalDepositAlert => false,
             TaskLabel::RpcHealth => false,
             TaskLabel::Congestion => false,
-            // FIXME change as part of PERP-2904
-            TaskLabel::HighGas => false,
+            TaskLabel::HighGas => true,
         }
     }
 
@@ -354,6 +366,7 @@ impl AppBuilder {
             current_run_started: None,
             out_of_date,
             counts: Default::default(),
+            expire_last_result: None,
         }));
         {
             let old = self.watcher.statuses.insert(label, task_status.clone());
@@ -375,6 +388,7 @@ impl AppBuilder {
                         current_run_started: Some(Utc::now()),
                         out_of_date,
                         counts: old.counts,
+                        expire_last_result: old.expire_last_result,
                     };
                     guard.counts
                 };
@@ -393,7 +407,8 @@ impl AppBuilder {
                             Ok(WatchedTaskOutput {
                             skip_delay: false,
                             suppress: false,
-                            message: format!("Ignoring an error because the chain appears to be paused (Osmosis epoch). Error was:\n{err:?}").into()
+                            message: format!("Ignoring an error because the chain appears to be paused (Osmosis epoch). Error was:\n{err:?}").into(),
+                                expire_alert: None,
                         })
                         } else {
                             Err(err)
@@ -405,6 +420,7 @@ impl AppBuilder {
                         skip_delay,
                         message,
                         suppress,
+                        expire_alert,
                     }) => {
                         if label.show_output() {
                             tracing::info!("{label}: Success! {message}");
@@ -460,11 +476,13 @@ impl AppBuilder {
                                     successes: old_counts.successes + 1,
                                     ..old_counts
                                 },
+                                expire_last_result: expire_alert,
                             };
                         }
                         retries = 0;
                         if !skip_delay {
                             match config.delay {
+                                perps_exes::config::Delay::NoDelay => (),
                                 perps_exes::config::Delay::Constant(secs) => {
                                     tokio::time::sleep(tokio::time::Duration::from_secs(secs))
                                         .await;
@@ -569,6 +587,7 @@ impl AppBuilder {
                                     errors: old_counts.errors + 1,
                                     ..old_counts
                                 },
+                                expire_last_result: None,
                             };
                         } else {
                             {
@@ -586,6 +605,7 @@ impl AppBuilder {
                                         retries: old_counts.retries + 1,
                                         ..old_counts
                                     },
+                                    expire_last_result: None,
                                 };
                             }
                         }
@@ -608,9 +628,16 @@ impl AppBuilder {
 
 #[derive(Debug)]
 pub(crate) struct WatchedTaskOutput {
+    // Should we skip delay between tasks ? If yes, then we dont sleep
+    // once the task gets completed.
     skip_delay: bool,
+    // Should we supress the output ? If we supress, the new output
+    // won't be reflected. The last_result value will be used instead.
     suppress: bool,
     message: Cow<'static, str>,
+    // Controls the stickiness of this message. After how long should
+    // we treat this as a non alert ?
+    expire_alert: Option<Duration>,
 }
 
 impl WatchedTaskOutput {
@@ -619,6 +646,19 @@ impl WatchedTaskOutput {
             skip_delay: false,
             suppress: false,
             message: message.into(),
+            expire_alert: None,
+        }
+    }
+
+    pub(crate) fn new_with_expiry(
+        message: impl Into<Cow<'static, str>>,
+        expire_alert: Duration,
+    ) -> Self {
+        WatchedTaskOutput {
+            skip_delay: false,
+            suppress: false,
+            message: message.into(),
+            expire_alert: Some(expire_alert),
         }
     }
 
@@ -677,6 +717,7 @@ impl Heartbeat {
             current_run_started: Some(Utc::now()),
             out_of_date: old.out_of_date,
             counts: old.counts,
+            expire_last_result: old.expire_last_result,
         };
     }
 }
@@ -712,6 +753,7 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
                     skip_delay,
                     message,
                     suppress,
+                    expire_alert: _,
                 }) => {
                     if suppress {
                         errors.push(format!("Found a 'suppress' which is not supported for per-market updates: {message}"));
@@ -736,6 +778,7 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
                 skip_delay: total_skip_delay,
                 message: successes.join("\n").into(),
                 suppress: false,
+                expire_alert: None,
             })
         } else {
             let mut msg = String::new();
@@ -796,6 +839,7 @@ impl<T: WatchedTaskPerMarketParallel> WatchedTask for ParallelWatcher<T> {
                         skip_delay,
                         message,
                         suppress,
+                        expire_alert: _,
                     }) => {
                         if suppress {
                             errors.push(format!("Found a 'suppress' which is not supported for per-market updates: {message}"));
@@ -823,6 +867,7 @@ impl<T: WatchedTaskPerMarketParallel> WatchedTask for ParallelWatcher<T> {
                 skip_delay: total_skip_delay,
                 message: successes.join("\n").into(),
                 suppress: false,
+                expire_alert: None,
             })
         } else {
             let mut msg = String::new();
@@ -957,7 +1002,11 @@ impl TaskStatus {
             }
             TaskResultValue::Err(_) => {
                 if label.triggers_alert(selected_label) {
-                    ShortStatus::Error
+                    if self.is_expired() {
+                        ShortStatus::ErrorNoAlert
+                    } else {
+                        ShortStatus::Error
+                    }
                 } else {
                     ShortStatus::ErrorNoAlert
                 }
@@ -1017,6 +1066,7 @@ impl ResponseBuilder {
                     current_run_started,
                     out_of_date: _,
                     counts: _,
+                    expire_last_result: _,
                 },
             short,
         }: RenderedStatus,
