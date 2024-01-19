@@ -209,7 +209,7 @@ impl TaskStatus {
         if let Some(expiry_duration) = self.expire_last_result {
             let last_run = self.last_result.updated;
             let now = Utc::now();
-            last_run + expiry_duration >= now
+            last_run + expiry_duration <= now
         } else {
             false
         }
@@ -266,7 +266,7 @@ impl TaskLabel {
             TaskLabel::CrankRun { index: _ } => true,
             TaskLabel::Price => true,
             TaskLabel::TrackBalance => false,
-            TaskLabel::GasCheck => false,
+            TaskLabel::GasCheck => true,
             TaskLabel::UltraCrank { index: _ } => false,
             TaskLabel::Liquidity => false,
             TaskLabel::Utilization => false,
@@ -409,6 +409,7 @@ impl AppBuilder {
                             suppress: false,
                             message: format!("Ignoring an error because the chain appears to be paused (Osmosis epoch). Error was:\n{err:?}").into(),
                                 expire_alert: None,
+				error: false
                         })
                         } else {
                             Err(err)
@@ -421,6 +422,7 @@ impl AppBuilder {
                         message,
                         suppress,
                         expire_alert,
+                        error,
                     }) => {
                         if label.show_output() {
                             tracing::info!("{label}: Success! {message}");
@@ -433,8 +435,20 @@ impl AppBuilder {
                             let title = label.to_string();
                             if label.triggers_alert(None) {
                                 match &*old.last_result.value {
-                                    // Was a success, still a success, do nothing
-                                    TaskResultValue::Ok(_) => (),
+                                    TaskResultValue::Ok(_) => {
+                                        if error {
+                                            // Was a success, but not a success now
+                                            sentry::with_scope(
+                                                |scope| scope.set_tag("part-name", title.clone()),
+                                                || {
+                                                    sentry::capture_message(
+                                                        &format!("{title}: {message}"),
+                                                        sentry::Level::Error,
+                                                    )
+                                                },
+                                            );
+                                        }
+                                    }
                                     TaskResultValue::Err(err) => {
                                         sentry::with_scope(
                                             |scope| scope.set_tag("part-name", title.clone()),
@@ -465,7 +479,11 @@ impl AppBuilder {
                                     value: if suppress {
                                         guard.last_result.value.clone()
                                     } else {
-                                        TaskResultValue::Ok(message).into()
+                                        if error {
+                                            TaskResultValue::Err(message.into()).into()
+                                        } else {
+                                            TaskResultValue::Ok(message).into()
+                                        }
                                     },
                                     updated: Utc::now(),
                                 },
@@ -473,7 +491,16 @@ impl AppBuilder {
                                 current_run_started: None,
                                 out_of_date,
                                 counts: TaskCounts {
-                                    successes: old_counts.successes + 1,
+                                    successes: if error {
+                                        old_counts.successes
+                                    } else {
+                                        old_counts.successes + 1
+                                    },
+                                    errors: if error {
+                                        old_counts.errors + 1
+                                    } else {
+                                        old_counts.errors
+                                    },
                                     ..old_counts
                                 },
                                 expire_last_result: expire_alert,
@@ -638,6 +665,8 @@ pub(crate) struct WatchedTaskOutput {
     // Controls the stickiness of this message. After how long should
     // we treat this as a non alert ?
     expire_alert: Option<Duration>,
+    // Is the message an error ?
+    error: bool,
 }
 
 impl WatchedTaskOutput {
@@ -647,23 +676,24 @@ impl WatchedTaskOutput {
             suppress: false,
             message: message.into(),
             expire_alert: None,
+            error: false,
         }
     }
 
-    pub(crate) fn new_with_expiry(
-        message: impl Into<Cow<'static, str>>,
-        expire_alert: Duration,
+    pub(crate) fn set_expiry(
+	mut self, expire_duration: Duration
     ) -> Self {
-        WatchedTaskOutput {
-            skip_delay: false,
-            suppress: false,
-            message: message.into(),
-            expire_alert: Some(expire_alert),
-        }
+	self.expire_alert = Some(expire_duration);
+	self
     }
 
     pub(crate) fn skip_delay(mut self) -> Self {
         self.skip_delay = true;
+        self
+    }
+
+    pub(crate) fn set_error(mut self) -> Self {
+        self.error = true;
         self
     }
 
@@ -754,15 +784,20 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
                     message,
                     suppress,
                     expire_alert: _,
+                    error,
                 }) => {
                     if suppress {
                         errors.push(format!("Found a 'suppress' which is not supported for per-market updates: {message}"));
                     }
-                    successes.push(format!(
-                        "{market} {addr}: {message}",
-                        market = market.market_id,
-                        addr = market.market
-                    ));
+                    if error {
+                        errors.push(message.into_owned());
+                    } else {
+                        successes.push(format!(
+                            "{market} {addr}: {message}",
+                            market = market.market_id,
+                            addr = market.market
+                        ));
+                    }
                     total_skip_delay = skip_delay || total_skip_delay;
                 }
                 Err(e) => errors.push(format!(
@@ -779,6 +814,7 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
                 message: successes.join("\n").into(),
                 suppress: false,
                 expire_alert: None,
+                error: false,
             })
         } else {
             let mut msg = String::new();
@@ -840,15 +876,20 @@ impl<T: WatchedTaskPerMarketParallel> WatchedTask for ParallelWatcher<T> {
                         message,
                         suppress,
                         expire_alert: _,
+                        error,
                     }) => {
                         if suppress {
                             errors.push(format!("Found a 'suppress' which is not supported for per-market updates: {message}"));
                         }
-                        successes.push(format!(
-                            "{market} {addr}: {message}",
-                            market = market.market_id,
-                            addr = market.market
-                        ));
+                        if error {
+                            errors.push(message.into_owned());
+                        } else {
+                            successes.push(format!(
+                                "{market} {addr}: {message}",
+                                market = market.market_id,
+                                addr = market.market
+                            ));
+                        }
                         total_skip_delay = skip_delay || total_skip_delay;
                     }
                     Err(e) => errors.push(format!(
@@ -868,6 +909,7 @@ impl<T: WatchedTaskPerMarketParallel> WatchedTask for ParallelWatcher<T> {
                 message: successes.join("\n").into(),
                 suppress: false,
                 expire_alert: None,
+                error: false,
             })
         } else {
             let mut msg = String::new();
