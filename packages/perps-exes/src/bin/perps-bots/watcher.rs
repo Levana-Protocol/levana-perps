@@ -697,8 +697,6 @@ impl WatchedTaskOutput {
         self
     }
 
-    // FIXME decide if we still need this when working on PERP-2904.
-    #[allow(dead_code)]
     pub(crate) fn suppress(mut self) -> Self {
         self.suppress = true;
         self
