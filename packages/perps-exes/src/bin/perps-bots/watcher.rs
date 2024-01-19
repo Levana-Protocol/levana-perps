@@ -478,12 +478,10 @@ impl AppBuilder {
                                 last_result: TaskResult {
                                     value: if suppress {
                                         guard.last_result.value.clone()
+                                    } else if error {
+                                        TaskResultValue::Err(message.into()).into()
                                     } else {
-                                        if error {
-                                            TaskResultValue::Err(message.into()).into()
-                                        } else {
-                                            TaskResultValue::Ok(message).into()
-                                        }
+                                        TaskResultValue::Ok(message).into()
                                     },
                                     updated: Utc::now(),
                                 },
