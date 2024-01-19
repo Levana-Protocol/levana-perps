@@ -399,6 +399,8 @@ pub struct DeferredExecQueuedEvent {
     pub owner: Addr,
 }
 
+impl PerpEvent for DeferredExecQueuedEvent {}
+
 impl From<DeferredExecQueuedEvent> for Event {
     fn from(
         DeferredExecQueuedEvent {
@@ -466,6 +468,7 @@ pub struct DeferredExecExecutedEvent {
     /// Text description of what happened
     pub desc: String,
 }
+impl PerpEvent for DeferredExecExecutedEvent {}
 
 impl From<DeferredExecExecutedEvent> for Event {
     fn from(
@@ -536,6 +539,7 @@ pub struct FeesReturnedEvent {
     /// Current USD amount
     pub amount_usd: NonZero<Usd>,
 }
+impl PerpEvent for FeesReturnedEvent {}
 
 impl From<FeesReturnedEvent> for Event {
     fn from(

@@ -16,10 +16,14 @@ use cosmwasm_std::{
 use cw2::{get_contract_version, set_contract_version};
 use msg::contracts::{
     cw20::{entry::InstantiateMinter, Cw20Coin},
-    faucet::entry::{
-        ConfigResponse, ExecuteMsg, FaucetAsset, FundsSentResponse, GasAllowance, GasAllowanceResp,
-        GetTokenResponse, IneligibleReason, InstantiateMsg, IsAdminResponse, MigrateMsg,
-        NextTradingIndexResponse, OwnerMsg, QueryMsg, TapAmountResponse, TapEligibleResponse,
+    faucet::{
+        entry::{
+            ConfigResponse, ExecuteMsg, FaucetAsset, FundsSentResponse, GasAllowance,
+            GasAllowanceResp, GetTokenResponse, IneligibleReason, InstantiateMsg, IsAdminResponse,
+            MigrateMsg, NextTradingIndexResponse, OwnerMsg, QueryMsg, TapAmountResponse,
+            TapEligibleResponse,
+        },
+        error::FaucetError,
     },
 };
 use semver::Version;

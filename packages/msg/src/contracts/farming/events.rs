@@ -6,6 +6,7 @@ use crate::prelude::*;
 
 /// Event emitted when a new farming contract is instantiated.
 pub struct NewFarmingEvent {}
+impl PerpEvent for NewFarmingEvent {}
 
 impl From<NewFarmingEvent> for Event {
     fn from(NewFarmingEvent {}: NewFarmingEvent) -> Self {
@@ -24,6 +25,7 @@ pub struct DepositEvent {
     /// The asset originally deposited by the farmer
     pub source: DepositSource,
 }
+impl PerpEvent for DepositEvent {}
 
 /// Where did the funds for a farming deposit come from?
 #[cw_serde]
@@ -69,6 +71,7 @@ pub struct WithdrawEvent {
     /// Amount of xLP
     pub xlp: LpToken,
 }
+impl PerpEvent for WithdrawEvent {}
 
 impl From<WithdrawEvent> for Event {
     fn from(
@@ -96,6 +99,7 @@ pub struct LockdropDepositEvent {
     /// The bucket into which `amount` is being deposited
     pub bucket_id: LockdropBucketId,
 }
+impl PerpEvent for LockdropDepositEvent {}
 
 impl From<LockdropDepositEvent> for Event {
     fn from(src: LockdropDepositEvent) -> Self {
@@ -115,6 +119,7 @@ pub struct LockdropWithdrawEvent {
     /// The bucket into which `amount` is being deposited
     pub bucket_id: LockdropBucketId,
 }
+impl PerpEvent for LockdropWithdrawEvent {}
 
 impl From<LockdropWithdrawEvent> for Event {
     fn from(src: LockdropWithdrawEvent) -> Self {
@@ -134,6 +139,7 @@ pub struct LockdropLaunchEvent {
     /// The amount of xlp tokens minted during launch
     pub xlp: LpToken,
 }
+impl PerpEvent for LockdropLaunchEvent {}
 
 impl From<LockdropLaunchEvent> for Event {
     fn from(src: LockdropLaunchEvent) -> Self {
@@ -153,6 +159,7 @@ pub struct ReinvestEvent {
     /// The amount of yield allocated to the bonus fund
     pub bonus_yield: Collateral,
 }
+impl PerpEvent for ReinvestEvent {}
 
 impl From<ReinvestEvent> for Event {
     fn from(src: ReinvestEvent) -> Self {
@@ -205,6 +212,7 @@ pub struct FarmingPoolSizeEvent {
     /// Total amount of xLP held by the farming contract
     pub xlp: LpToken,
 }
+impl PerpEvent for FarmingPoolSizeEvent {}
 
 impl From<FarmingPoolSizeEvent> for Event {
     fn from(src: FarmingPoolSizeEvent) -> Self {

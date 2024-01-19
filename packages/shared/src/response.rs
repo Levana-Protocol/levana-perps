@@ -128,7 +128,7 @@ impl ResponseBuilder {
     }
 
     /// Add an event to the response.
-    pub fn add_event(&mut self, event: impl Into<Event>) {
+    pub fn add_event(&mut self, event: impl PerpEvent) {
         let event: Event = event.into();
 
         #[cfg(debug_assertions)]

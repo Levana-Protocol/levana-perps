@@ -27,12 +27,16 @@ pub fn ack_fail(err: anyhow::Error) -> Binary {
 pub mod event {
     use cosmwasm_std::{Event, IbcChannel};
 
+    use crate::event::PerpEvent;
+
     /// IBC Channel Connect Event
     #[derive(Debug)]
     pub struct IbcChannelConnectEvent<'a> {
         /// The IBC channel
         pub channel: &'a IbcChannel,
     }
+
+    impl PerpEvent for IbcChannelConnectEvent<'_> {}
 
     impl<'a> From<IbcChannelConnectEvent<'a>> for Event {
         fn from(src: IbcChannelConnectEvent) -> Self {
@@ -46,6 +50,7 @@ pub mod event {
         /// The IBC channel
         pub channel: &'a IbcChannel,
     }
+    impl PerpEvent for IbcChannelCloseEvent<'_> {}
 
     impl<'a> From<IbcChannelCloseEvent<'a>> for Event {
         fn from(src: IbcChannelCloseEvent) -> Self {

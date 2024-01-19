@@ -1,4 +1,4 @@
-use super::entry::FaucetAsset;
+use super::{entry::FaucetAsset, error::FaucetError};
 use cosmwasm_std::Addr;
 use shared::prelude::*;
 
@@ -24,5 +24,39 @@ impl From<TapEvent> for cosmwasm_std::Event {
                 evt.add_attributes(vec![("asset-kind", "native"), ("asset-denom", &denom)])
             }
         }
+    }
+}
+
+/// The event name for this will be the address itself
+/// due to backwards compatibility requirements
+pub struct FaucetErrorEvent {
+    pub addr: Addr,
+    pub error: FaucetError,
+}
+impl PerpEvent for FaucetErrorEvent {}
+
+impl From<FaucetErrorEvent> for cosmwasm_std::Event {
+    fn from(src: FaucetErrorEvent) -> Self {
+        match src.error {
+            FaucetError::TooSoon { wait_secs } => {
+                Event::new(src.addr).add_attribute("wait_secs", wait_secs.to_string())
+            }
+            FaucetError::AlreadyTapped { cw20 } => {
+                Event::new(src.addr).add_attribute("already_tapped", cw20.into_string())
+            }
+        }
+    }
+}
+
+/// The event name for this will be the address itself
+/// due to backwards compatibility requirements
+pub struct FaucetSuccessEvent {
+    pub addr: Addr,
+}
+impl PerpEvent for FaucetSuccessEvent {}
+
+impl From<FaucetSuccessEvent> for cosmwasm_std::Event {
+    fn from(src: FaucetSuccessEvent) -> Self {
+        Event::new(src.addr).add_attribute("success", "success")
     }
 }

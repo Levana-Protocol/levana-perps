@@ -6,6 +6,7 @@ use msg::contracts::{
     cw20::entry::{ExecuteMsg as Cw20ExecuteMsg, QueryMsg as Cw20QueryMsg, TokenInfoResponse},
     faucet::{
         entry::{FaucetAsset, TappersResp},
+        error::FaucetError,
         events::TapEvent,
     },
 };
@@ -21,12 +22,6 @@ const NATIVE_TAP_AMOUNT: Map<String, Number> = Map::new(namespace::NATIVE_TAP_AM
 const DEFAULT_CW20_TAP_AMOUNT: &str = "1000";
 const DEFAULT_NATIVE_TAP_AMOUNT: &str = "10";
 const NATIVE_DECIMAL_PLACES: u32 = 6; // differs per denom?
-
-#[derive(serde::Serialize)]
-pub(crate) enum FaucetError {
-    TooSoon { wait_secs: Decimal256 },
-    AlreadyTapped { cw20: Addr },
-}
 
 impl State<'_> {
     pub(crate) fn tap_limit(&self, store: &dyn Storage) -> Result<Option<u32>> {

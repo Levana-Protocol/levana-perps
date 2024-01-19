@@ -1410,6 +1410,7 @@ pub mod events {
         /// Reason the position was saved
         pub reason: PositionSaveReason,
     }
+    impl PerpEvent for PositionSaveEvent {}
 
     /// Why was a position saved?
     #[derive(Clone, Copy, PartialEq, Eq, Debug)]

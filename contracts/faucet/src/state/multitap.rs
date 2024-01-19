@@ -5,6 +5,7 @@
 
 use cosmwasm_std::Coin;
 use msg::contracts::faucet::entry::{FaucetAsset, GasAllowance, MultitapRecipient};
+use msg::contracts::faucet::events::{FaucetErrorEvent, FaucetSuccessEvent};
 use msg::prelude::*;
 
 use super::gas_coin::get_gas_allowance;
@@ -38,14 +39,10 @@ impl State<'_> {
         // skip. This allows multitapping from the faucet bot to be resilient in the
         // face of getting invalid addresses in its queue.
         if let Err(e) = self.validate_tap_faucet_error(ctx.storage, &addr, &assets)? {
-            match e {
-                super::FaucetError::TooSoon { wait_secs } => ctx
-                    .response
-                    .add_event(Event::new(&addr).add_attribute("wait_secs", wait_secs.to_string())),
-                super::FaucetError::AlreadyTapped { cw20 } => ctx.response.add_event(
-                    Event::new(&addr).add_attribute("already_tapped", cw20.into_string()),
-                ),
-            }
+            ctx.response.add_event(FaucetErrorEvent {
+                addr: addr.clone(),
+                error: e,
+            });
             return Ok(());
         }
         self.save_last_tap(ctx, &addr)?;
@@ -54,7 +51,7 @@ impl State<'_> {
             self.set_tapped_trading_competition(ctx, &addr, asset)?;
         }
         ctx.response
-            .add_event(Event::new(&addr).add_attribute("success", "success"));
+            .add_event(FaucetSuccessEvent { addr: addr.clone() });
 
         // Top off the gas
         if let Some(GasAllowance { denom, amount }) = gas_allowance {
