@@ -302,6 +302,16 @@ networks:
       feeds-usd: [
         !pyth { key: "TIA_USD", inverted: false}
       ]
+    milkTIA_USD:
+      stride-contract: osmo1jt34seu48rqe6acy9ew4fgzvg502mjmrggt00d8thn5fe2g32hjsmyy7p6
+      feeds: [
+        !pyth { key: "TIA_USD", inverted: false },
+        !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 43200 }
+      ]
+      feeds-usd: [
+        !pyth { key: "TIA_USD", inverted: false },
+        !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 43200 }
+      ]
     LINK_USDC:
       feeds: [
         !pyth { key: "LINK_USD", inverted: false }
