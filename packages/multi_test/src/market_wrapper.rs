@@ -2278,7 +2278,7 @@ impl PerpsMarket {
                                 }
                                 Some(_) if reason.contains("error executing WasmMsg") => {
                                     panic!(
-                                            "validation is failing without an error message - this is a core unexpected error: {:?}",
+                                            "validation is passing but it should be failing- this is a core unexpected error: {:?}",
                                             value.status
                                         );
                                 }
