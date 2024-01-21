@@ -9,6 +9,7 @@ use msg::{
         cw20::entry::BalanceResponse,
         market::{
             config::{Config, ConfigUpdate},
+            deferred_execution::{DeferredExecId, GetDeferredExecResp},
             entry::{
                 ClosedPositionsResp, ExecuteOwnerMsg, LpAction, LpActionHistoryResp, LpInfoResp,
                 OraclePriceResp, PositionAction, PositionActionHistoryResp, PriceWouldTriggerResp,
@@ -685,5 +686,12 @@ impl MarketContract {
             .query_raw(CLOSE_ALL_POSITIONS)
             .await
             .map(|v| !v.is_empty())
+    }
+
+    pub async fn get_deferred_exec(&self, id: DeferredExecId) -> Result<GetDeferredExecResp> {
+        self.0
+            .query(MarketQueryMsg::GetDeferredExec { id })
+            .await
+            .map_err(|e| e.into())
     }
 }

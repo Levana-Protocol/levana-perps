@@ -15,6 +15,12 @@ use super::{entry::SlippageAssert, order::OrderId, position::PositionId};
 #[derive(Copy, PartialOrd, Ord, Eq)]
 pub struct DeferredExecId(Uint64);
 
+impl std::hash::Hash for DeferredExecId {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.u64().hash(state);
+    }
+}
+
 impl DeferredExecId {
     /// First ID issued. We start with 1 instead of 0 for user friendliness.
     pub fn first() -> Self {

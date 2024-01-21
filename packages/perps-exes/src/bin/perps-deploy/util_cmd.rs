@@ -1,3 +1,4 @@
+mod deferred_exec;
 mod list_contracts;
 mod lp_history;
 mod token_balances;
@@ -53,6 +54,11 @@ enum Sub {
         #[clap(flatten)]
         inner: OpenPositionCsvOpt,
     },
+    /// Export deferred execution IDs and status
+    DeferredExecCsv {
+        #[clap(flatten)]
+        inner: deferred_exec::DeferredExecCsvOpt,
+    },
     /// Export a CSV with stats on LP actions
     LpActionCsv {
         #[clap(flatten)]
@@ -77,6 +83,7 @@ impl UtilOpt {
             Sub::DeployPyth { inner } => deploy_pyth_opt(opt, inner).await,
             Sub::TradeVolume { inner } => trade_volume(opt, inner).await,
             Sub::OpenPositionCsv { inner } => open_position_csv(opt, inner).await,
+            Sub::DeferredExecCsv { inner } => inner.go(opt).await,
             Sub::LpActionCsv { inner } => inner.go(opt).await,
             Sub::TokenBalances { inner } => inner.go(opt).await,
             Sub::ListContracts { inner } => inner.go().await,
