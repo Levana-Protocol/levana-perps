@@ -485,6 +485,7 @@ impl State<'_> {
                 item.status = DeferredExecStatus::Failure {
                     reason: e.clone(),
                     executed: self.now(),
+                    crank_price: price_point,
                 };
 
                 // It didn't work, so give them back their money

@@ -130,6 +130,8 @@ pub enum DeferredExecStatus {
         reason: String,
         /// Timestamp when it failed execution
         executed: Timestamp,
+        /// Price point when it was cranked, if applicable
+        crank_price: Option<PricePoint>,
     },
 }
 
