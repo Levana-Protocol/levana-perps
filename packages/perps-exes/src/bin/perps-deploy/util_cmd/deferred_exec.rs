@@ -42,10 +42,10 @@ struct Record {
     owner: Address,
     exec_id: DeferredExecId,
     status: Status,
-    rendered: String,
     executed_time: Option<DateTime<Utc>>,
     executed_block: Option<i64>,
     reason: Option<String>,
+    rendered: String,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -111,17 +111,29 @@ impl AllExecs {
         self.inner.lock().add_record(record)
     }
 
-    async fn get_block(&self, cosmos: &Cosmos, executed_time: DateTime<Utc>) -> Result<i64> {
+    async fn get_block(
+        &self,
+        cosmos: &Cosmos,
+        executed_time: DateTime<Utc>,
+    ) -> Result<Option<i64>> {
         {
             let guard = self.inner.lock();
             if let Some(block) = guard.blocks.get(&executed_time) {
-                return Ok(*block);
+                return Ok(Some(*block));
             }
         }
-        cosmos
-            .first_block_after(executed_time, None)
-            .await
-            .map_err(|e| e.into())
+
+        const DO_EXPENSIVE_BLOCK_SEARCH: bool = false;
+
+        if DO_EXPENSIVE_BLOCK_SEARCH {
+            cosmos
+                .first_block_after(executed_time, None)
+                .await
+                .map(Some)
+                .map_err(|e| e.into())
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -187,6 +199,7 @@ async fn go(
 async fn go_market(all_execs: AllExecs, market_info: MarketInfo) -> Result<()> {
     let market = MarketContract::new(market_info.market);
     let cosmos = market.get_cosmos();
+    let status = market.status().await?;
 
     let mut exec_id = DeferredExecId::first();
 
@@ -217,9 +230,7 @@ async fn go_market(all_execs: AllExecs, market_info: MarketInfo) -> Result<()> {
                     };
                     let executed_block = match executed_time {
                         None => None,
-                        Some(executed_time) => {
-                            Some(all_execs.get_block(&cosmos, executed_time).await?)
-                        }
+                        Some(executed_time) => all_execs.get_block(&cosmos, executed_time).await?,
                     };
 
                     let record = Record {
