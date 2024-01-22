@@ -546,7 +546,7 @@ markets:
       borrow_fee_rate_min_annualized: 0.08
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.3
-      delta_neutrality_fee_sensitivity: 40000000
+      delta_neutrality_fee_sensitivity: 1000
       delta_neutrality_fee_tax: 0.25
       carry_leverage: 15
       liquidity_cooldown_seconds: 86400
