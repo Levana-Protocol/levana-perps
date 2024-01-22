@@ -1,3 +1,4 @@
+use crate::state::liquidity::LiquidityUnlock;
 use crate::state::position::CLOSED_POSITIONS;
 use crate::state::{position::CLOSED_POSITION_HISTORY, *};
 use anyhow::Context;
@@ -153,7 +154,11 @@ impl State<'_> {
 
         // unlock the LP collateral
         if let Some(counter_collateral) = NonZero::new(counter_collateral) {
-            self.liquidity_unlock(ctx, counter_collateral, &settlement_price)?;
+            LiquidityUnlock {
+                amount: counter_collateral,
+                price: settlement_price,
+            }
+            .apply(self, ctx)?;
         }
 
         // send the trader's collateral to their wallet

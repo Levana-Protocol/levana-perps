@@ -657,76 +657,6 @@ impl State<'_> {
         Ok(counter_collateral)
     }
 
-    /// Check that there is sufficient unlocked liquidity
-    pub(crate) fn check_unlocked_liquidity(
-        &self,
-        store: &dyn Storage,
-        amount: NonZero<Collateral>,
-        delta_notional: Option<Signed<Notional>>,
-        price: &PricePoint,
-    ) -> Result<()> {
-        let stats = self.load_liquidity_stats(store)?;
-        let long_interest_protocol = self.open_long_interest(store)?;
-        let short_interest_protocol = self.open_short_interest(store)?;
-        let net_notional = long_interest_protocol.into_signed()
-            - short_interest_protocol.into_signed()
-            + delta_notional.unwrap_or_else(|| Notional::zero().into_signed());
-        let min_unlocked_liquidity = self.min_unlocked_liquidity(net_notional, price)?;
-        if min_unlocked_liquidity + amount.raw() > stats.unlocked {
-            Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed lock! not enough unlocked liquidity in the protocol! (asked for {}, only {} available with {} minimum)", amount, stats.unlocked, min_unlocked_liquidity))
-        } else {
-            Ok(())
-        }
-    }
-
-    pub(crate) fn liquidity_lock(
-        &self,
-        ctx: &mut StateContext,
-        amount: NonZero<Collateral>,
-        price: &PricePoint,
-    ) -> Result<()> {
-        let mut stats = self.load_liquidity_stats(ctx.storage)?;
-        self.check_unlocked_liquidity(ctx.storage, amount, None, price)?;
-
-        stats.locked = stats.locked.checked_add(amount.raw())?;
-        stats.unlocked = stats.unlocked.checked_sub(amount.raw())?;
-        self.save_liquidity_stats(ctx.storage, &stats)?;
-
-        // Technically the total pool size has not changed
-        // but the event consists of both locked and unlocked parts
-        // so emit the event for now
-        self.add_pool_size_change_events(ctx, &stats, price)?;
-
-        ctx.response_mut().add_event(LockEvent { amount });
-
-        Ok(())
-    }
-
-    pub(crate) fn liquidity_unlock(
-        &self,
-        ctx: &mut StateContext,
-        amount: NonZero<Collateral>,
-        price: &PricePoint,
-    ) -> Result<()> {
-        let mut liquidity_stats = self.load_liquidity_stats(ctx.storage)?;
-        if amount.raw() > liquidity_stats.locked {
-            return Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed unlock! not enough locked liquidity in the protocol! (asked for {}, only {} available)", amount, liquidity_stats.locked));
-        } else {
-            liquidity_stats.locked = liquidity_stats.locked.checked_sub(amount.raw())?;
-            liquidity_stats.unlocked = liquidity_stats.unlocked.checked_add(amount.raw())?;
-        }
-        self.save_liquidity_stats(ctx.storage, &liquidity_stats)?;
-
-        // Technically the total pool size has not changed
-        // but the event consists of both locked and unlocked parts
-        // so emit the event for now
-        self.add_pool_size_change_events(ctx, &liquidity_stats, price)?;
-
-        ctx.response_mut().add_event(UnlockEvent { amount });
-
-        Ok(())
-    }
-
     /// Sends all accrued yield to specified LP
     ///
     /// `send_to_wallet` indicates whether the resulting collateral should be
@@ -1084,5 +1014,91 @@ impl State<'_> {
                 .as_nanos()
                 / 1_000_000_000,
         }))
+    }
+}
+
+// Helper struct for liquidity unlock
+#[must_use]
+pub(crate) struct LiquidityUnlock {
+    pub amount: NonZero<Collateral>,
+    pub price: PricePoint,
+}
+
+impl LiquidityUnlock {
+    // Validate is automatically called by apply (so that it also loads the latest stats)
+    // but can also be called for error recovery in the submessage handler
+    pub(crate) fn validate(&self, state: &State, store: &dyn Storage) -> Result<LiquidityStats> {
+        let mut liquidity_stats = state.load_liquidity_stats(store)?;
+        if self.amount.raw() > liquidity_stats.locked {
+            Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed unlock! not enough locked liquidity in the protocol! (asked for {}, only {} available)", self.amount, liquidity_stats.locked))
+        } else {
+            liquidity_stats.locked = liquidity_stats.locked.checked_sub(self.amount.raw())?;
+            liquidity_stats.unlocked = liquidity_stats.unlocked.checked_add(self.amount.raw())?;
+            Ok(liquidity_stats)
+        }
+    }
+    pub(crate) fn apply(&self, state: &State, ctx: &mut StateContext) -> Result<()> {
+        let liquidity_stats = self.validate(state, ctx.storage)?;
+
+        state.save_liquidity_stats(ctx.storage, &liquidity_stats)?;
+
+        // Technically the total pool size has not changed
+        // but the event consists of both locked and unlocked parts
+        // so emit the event for now
+        state.add_pool_size_change_events(ctx, &liquidity_stats, &self.price)?;
+
+        ctx.response_mut().add_event(UnlockEvent {
+            amount: self.amount,
+        });
+
+        Ok(())
+    }
+}
+
+// Helper struct for liquidity lock
+#[must_use]
+pub(crate) struct LiquidityLock {
+    pub amount: NonZero<Collateral>,
+    pub price: PricePoint,
+    pub delta_notional: Option<Signed<Notional>>,
+}
+
+impl LiquidityLock {
+    // Validate is automatically called by apply (so that it also loads the latest stats)
+    // but can also be called for error recovery in the submessage handler
+    pub(crate) fn validate(&self, state: &State, store: &dyn Storage) -> Result<LiquidityStats> {
+        let mut stats = state.load_liquidity_stats(store)?;
+        let long_interest_protocol = state.open_long_interest(store)?;
+        let short_interest_protocol = state.open_short_interest(store)?;
+        let net_notional = long_interest_protocol.into_signed()
+            - short_interest_protocol.into_signed()
+            + self
+                .delta_notional
+                .unwrap_or_else(|| Notional::zero().into_signed());
+        let min_unlocked_liquidity = state.min_unlocked_liquidity(net_notional, &self.price)?;
+        if min_unlocked_liquidity + self.amount.raw() > stats.unlocked {
+            Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed lock! not enough unlocked liquidity in the protocol! (asked for {}, only {} available with {} minimum)", self.amount, stats.unlocked, min_unlocked_liquidity))
+        } else {
+            stats.locked = stats.locked.checked_add(self.amount.raw())?;
+            stats.unlocked = stats.unlocked.checked_sub(self.amount.raw())?;
+            Ok(stats)
+        }
+    }
+
+    pub(crate) fn apply(&self, state: &State, ctx: &mut StateContext) -> Result<()> {
+        let stats = self.validate(state, ctx.storage)?;
+
+        state.save_liquidity_stats(ctx.storage, &stats)?;
+
+        // Technically the total pool size has not changed
+        // but the event consists of both locked and unlocked parts
+        // so emit the event for now
+        state.add_pool_size_change_events(ctx, &stats, &self.price)?;
+
+        ctx.response_mut().add_event(LockEvent {
+            amount: self.amount,
+        });
+
+        Ok(())
     }
 }

@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use crate::state::delta_neutrality_fee::ChargeDeltaNeutralityFeeResult;
 use crate::state::history::trade::trade_volume_usd;
+use crate::state::liquidity::LiquidityLock;
 use msg::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
 use msg::contracts::market::entry::{PositionActionKind, SlippageAssert};
 use msg::contracts::market::fees::events::FeeSource;
@@ -165,12 +166,12 @@ impl State<'_> {
             DeltaNeutralityFeeReason::PositionOpen,
         )?;
 
-        self.check_unlocked_liquidity(
-            store,
-            pos.counter_collateral,
-            Some(pos.notional_size),
-            price_point,
-        )?;
+        LiquidityLock {
+            amount: pos.counter_collateral,
+            price: *price_point,
+            delta_notional: Some(pos.notional_size),
+        }
+        .validate(self, store)?;
 
         pos.liquidation_margin = pos.liquidation_margin(price_point, &self.config)?;
 
@@ -224,7 +225,12 @@ impl State<'_> {
         delta_neutrality_fee.store(self, ctx)?;
 
         // Note that in the validity check we've already confirmed there is sufficient liquidity
-        self.liquidity_lock(ctx, pos.counter_collateral, &price_point)?;
+        LiquidityLock {
+            amount: pos.counter_collateral,
+            delta_notional: None,
+            price: price_point,
+        }
+        .apply(self, ctx)?;
 
         // Save the position, setting liquidation margin and prices
         self.position_save(
