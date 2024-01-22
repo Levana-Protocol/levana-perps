@@ -146,6 +146,12 @@ pub enum MarketError {
         "No price publish time found, there is likely a spot price config error for this market"
     )]
     NoPricePublishTimeFound,
+    #[error("Cannot close position {id}, it was already closed at {close_time}. Close reason: {reason}.")]
+    PositionAlreadyClosed {
+        id: Uint64,
+        close_time: Timestamp,
+        reason: String,
+    },
 }
 
 /// Was the price provided by the trader too high or too low?
@@ -279,6 +285,7 @@ impl MarketError {
             MarketError::LimitOrderAlreadyCanceling { .. } => ErrorId::LimitOrderAlreadyCanceling,
             MarketError::PositionAlreadyClosing { .. } => ErrorId::PositionAlreadyClosing,
             MarketError::NoPricePublishTimeFound => ErrorId::NoPricePublishTimeFound,
+            MarketError::PositionAlreadyClosed { .. } => ErrorId::PositionAlreadyClosed,
         }
     }
 }
