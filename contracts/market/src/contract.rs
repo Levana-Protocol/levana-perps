@@ -99,7 +99,12 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     }
     res
 }
-pub fn execute_inner(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
+pub fn execute_inner(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: ExecuteMsg,
+) -> Result<Response> {
     let (mut state, mut ctx) = StateContext::new(deps, env)?;
     #[cfg(feature = "sanity")]
     state.sanity_check(ctx.storage);

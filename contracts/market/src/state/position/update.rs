@@ -227,12 +227,7 @@ impl State<'_> {
         let market_type = self.market_id(store)?.get_market_type();
 
         let trade_volume = trade_volume_usd(&original_pos, price_point, market_type)?
-            .diff(trade_volume_usd(
-                &pos,
-                price_point,
-                market_type,
-            )?);
-
+            .diff(trade_volume_usd(&pos, price_point, market_type)?);
 
         // Validate
         self.position_validate_leverage_data(market_type, &pos, price_point, Some(&original_pos))?;
@@ -245,12 +240,12 @@ impl State<'_> {
 
         let event = self.position_update_event(store, &original_pos, pos.clone(), price_point)?;
 
-        Ok(UpdatePositionCollateral{
+        Ok(UpdatePositionCollateral {
             pos,
             price_point: *price_point,
             trade_volume,
             user_refund,
-            event
+            event,
         })
     }
 
@@ -300,11 +295,8 @@ impl State<'_> {
 
         let market_type = self.market_id(store)?.get_market_type();
 
-        let trade_volume = trade_volume_usd(&original_pos, price_point, market_type)?.diff(trade_volume_usd(
-            &pos,
-            price_point,
-            market_type,
-        )?);
+        let trade_volume = trade_volume_usd(&original_pos, price_point, market_type)?
+            .diff(trade_volume_usd(&pos, price_point, market_type)?);
 
         // Validate leverage _before_ we reduce trading fees from active collateral
         self.position_validate_leverage_data(market_type, &pos, price_point, Some(&original_pos))?;
@@ -326,7 +318,6 @@ impl State<'_> {
 
         let notional_size_diff = pos.notional_size - original_pos.notional_size;
 
-
         let dnf = self.charge_delta_neutrality_fee(
             store,
             &mut pos,
@@ -335,16 +326,12 @@ impl State<'_> {
             DeltaNeutralityFeeReason::PositionUpdate,
         )?;
 
-        let open_interest = self.check_adjust_net_open_interest(
-            store,
-            notional_size_diff,
-            pos.direction(),
-            true,
-        )?;
+        let open_interest =
+            self.check_adjust_net_open_interest(store, notional_size_diff, pos.direction(), true)?;
 
         let event = self.position_update_event(store, &original_pos, pos.clone(), price_point)?;
 
-        Ok(UpdatePositionLeverage{
+        Ok(UpdatePositionLeverage {
             pos,
             price_point: *price_point,
             trade_volume,
@@ -352,7 +339,7 @@ impl State<'_> {
             open_interest,
             counter_collateral_delta,
             trading_fee_delta,
-            event
+            event,
         })
     }
 
@@ -402,11 +389,8 @@ impl State<'_> {
 
         let market_type = self.market_type(store)?;
 
-        let trade_volume = trade_volume_usd(&original_pos, price_point, market_type)?.diff(trade_volume_usd(
-            &pos,
-            price_point,
-            market_type,
-        )?);
+        let trade_volume = trade_volume_usd(&original_pos, price_point, market_type)?
+            .diff(trade_volume_usd(&pos, price_point, market_type)?);
 
         // Validate leverage _before_ we reduce trading fees from active collateral
         self.position_validate_leverage_data(market_type, &pos, price_point, Some(&original_pos))?;
@@ -428,7 +412,6 @@ impl State<'_> {
 
         let notional_size_diff = pos.notional_size - original_pos.notional_size;
 
-
         let dnf = self.charge_delta_neutrality_fee(
             store,
             &mut pos,
@@ -437,14 +420,8 @@ impl State<'_> {
             DeltaNeutralityFeeReason::PositionUpdate,
         )?;
 
-
-        let open_interest = self.check_adjust_net_open_interest(
-            store,
-            notional_size_diff,
-            pos.direction(),
-            true,
-        )?;
-
+        let open_interest =
+            self.check_adjust_net_open_interest(store, notional_size_diff, pos.direction(), true)?;
 
         // Send the removed collateral back to the user. We convert a negative
         // delta (indicating the user requested collateral be returned) into a
@@ -464,7 +441,7 @@ impl State<'_> {
             open_interest,
             counter_collateral_delta,
             trading_fee_delta,
-            event
+            event,
         })
     }
 
@@ -478,12 +455,8 @@ impl State<'_> {
         let original_pos = get_position(store, id)?;
         let mut pos = original_pos.clone();
 
-        let counter_collateral = self.update_max_gains_new_counter_collateral(
-            store,
-            id,
-            max_gains,
-            &price_point,
-        )?;
+        let counter_collateral =
+            self.update_max_gains_new_counter_collateral(store, id, max_gains, &price_point)?;
 
         let old_counter_collateral = pos.counter_collateral;
         let new_counter_collateral = counter_collateral;
@@ -511,18 +484,17 @@ impl State<'_> {
         pos.trading_fee
             .checked_add_assign(trading_fee_delta, price_point)?;
 
-
         let notional_size_diff = pos.notional_size - original_pos.notional_size;
         debug_assert!(notional_size_diff.is_zero());
 
         let event = self.position_update_event(store, &original_pos, pos.clone(), price_point)?;
 
-        Ok(UpdatePositionMaxGains{
+        Ok(UpdatePositionMaxGains {
             pos,
             price_point: *price_point,
             counter_collateral_delta,
             trading_fee_delta,
-            event
+            event,
         })
     }
 
@@ -568,6 +540,11 @@ impl State<'_> {
     }
 }
 
+// This is a helper struct, created from read-only storage.
+// Most of the validation is done while creating the struct, which allows for
+// error recovery in the submessage handler.
+// State is then mutably updated by calling .apply()
+#[must_use]
 pub(crate) struct UpdatePositionCollateral {
     pos: Position,
     price_point: PricePoint,
@@ -579,11 +556,7 @@ impl UpdatePositionCollateral {
     pub fn apply(&mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
-        state.trade_history_add_volume(
-            ctx,
-            &self.pos.owner,
-            self.trade_volume,
-        )?;
+        state.trade_history_add_volume(ctx, &self.pos.owner, self.trade_volume)?;
 
         self.event.emit(state, ctx, &self.pos, &self.price_point)?;
 
@@ -605,6 +578,11 @@ impl UpdatePositionCollateral {
     }
 }
 
+// This is a helper struct, created from read-only storage.
+// Most of the validation is done while creating the struct, which allows for
+// error recovery in the submessage handler.
+// State is then mutably updated by calling .apply()
+#[must_use]
 pub(crate) struct UpdatePositionSize {
     pos: Position,
     price_point: PricePoint,
@@ -617,15 +595,11 @@ pub(crate) struct UpdatePositionSize {
     event: PositionUpdateEvent,
 }
 
-impl UpdatePositionSize{
+impl UpdatePositionSize {
     pub fn apply(&mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
-        state.trade_history_add_volume(
-            ctx,
-            &self.pos.owner,
-            self.trade_volume,
-        )?;
+        state.trade_history_add_volume(ctx, &self.pos.owner, self.trade_volume)?;
 
         self.dnf.store(state, ctx)?;
         self.open_interest.store(ctx)?;
@@ -639,15 +613,17 @@ impl UpdatePositionSize{
             PositionSaveReason::Update,
         )?;
 
-
         state.add_delta_neutrality_ratio_event(
             ctx,
             &state.load_liquidity_stats(ctx.storage)?,
             &self.price_point,
         )?;
 
-
-        state.adjust_counter_collateral_locked(ctx, self.counter_collateral_delta, &self.price_point)?;
+        state.adjust_counter_collateral_locked(
+            ctx,
+            self.counter_collateral_delta,
+            &self.price_point,
+        )?;
         state.collect_trading_fee(
             ctx,
             self.pos.id,
@@ -665,6 +641,11 @@ impl UpdatePositionSize{
     }
 }
 
+// This is a helper struct, created from read-only storage.
+// Most of the validation is done while creating the struct, which allows for
+// error recovery in the submessage handler.
+// State is then mutably updated by calling .apply()
+#[must_use]
 pub(crate) struct UpdatePositionLeverage {
     pos: Position,
     price_point: PricePoint,
@@ -680,11 +661,7 @@ impl UpdatePositionLeverage {
     pub fn apply(&mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
-        state.trade_history_add_volume(
-            ctx,
-            &self.pos.owner,
-            self.trade_volume,
-        )?;
+        state.trade_history_add_volume(ctx, &self.pos.owner, self.trade_volume)?;
 
         self.dnf.store(state, ctx)?;
         self.open_interest.store(ctx)?;
@@ -698,15 +675,17 @@ impl UpdatePositionLeverage {
             PositionSaveReason::Update,
         )?;
 
-
         state.add_delta_neutrality_ratio_event(
             ctx,
             &state.load_liquidity_stats(ctx.storage)?,
             &self.price_point,
         )?;
 
-
-        state.adjust_counter_collateral_locked(ctx, self.counter_collateral_delta, &self.price_point)?;
+        state.adjust_counter_collateral_locked(
+            ctx,
+            self.counter_collateral_delta,
+            &self.price_point,
+        )?;
         state.collect_trading_fee(
             ctx,
             self.pos.id,
@@ -719,6 +698,11 @@ impl UpdatePositionLeverage {
     }
 }
 
+// This is a helper struct, created from read-only storage.
+// Most of the validation is done while creating the struct, which allows for
+// error recovery in the submessage handler.
+// State is then mutably updated by calling .apply()
+#[must_use]
 pub(crate) struct UpdatePositionMaxGains {
     pos: Position,
     price_point: PricePoint,
@@ -731,7 +715,6 @@ impl UpdatePositionMaxGains {
     pub fn apply(&mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
-
         state.position_save(
             ctx,
             &mut self.pos,
@@ -741,8 +724,11 @@ impl UpdatePositionMaxGains {
             PositionSaveReason::Update,
         )?;
 
-
-        state.adjust_counter_collateral_locked(ctx, self.counter_collateral_delta, &self.price_point)?;
+        state.adjust_counter_collateral_locked(
+            ctx,
+            self.counter_collateral_delta,
+            &self.price_point,
+        )?;
         state.collect_trading_fee(
             ctx,
             self.pos.id,
@@ -755,6 +741,10 @@ impl UpdatePositionMaxGains {
     }
 }
 
+// This trait allows for separating the creation of the event vs. emitting it
+// Most of the validation is done while creating the event itself, which allows for
+// error recovery in the submessage handler.
+// The event is then emitted by calling .emit()
 trait PositionUpdateEventExt {
     fn emit(
         &self,
@@ -767,13 +757,12 @@ trait PositionUpdateEventExt {
 
 impl PositionUpdateEventExt for PositionUpdateEvent {
     fn emit(
-            &self,
-            state: &State,
-            ctx: &mut StateContext,
-            pos: &Position,
-            spot_price: &PricePoint,
-        ) -> Result<()> {
-        
+        &self,
+        state: &State,
+        ctx: &mut StateContext,
+        pos: &Position,
+        spot_price: &PricePoint,
+    ) -> Result<()> {
         ctx.response_mut().add_event(self.clone());
 
         state.position_history_add_action(
@@ -795,6 +784,5 @@ impl PositionUpdateEventExt for PositionUpdateEvent {
         )?;
 
         Ok(())
-
     }
 }

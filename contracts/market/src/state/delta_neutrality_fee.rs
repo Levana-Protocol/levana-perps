@@ -128,7 +128,11 @@ pub(crate) struct ChargeDeltaNeutralityFeeResult {
 
 impl ChargeDeltaNeutralityFeeResult {
     /// write its data to storage.
-    pub(crate) fn store(&self, state: &State, ctx: &mut StateContext) -> Result<Signed<Collateral>> {
+    pub(crate) fn store(
+        &self,
+        state: &State,
+        ctx: &mut StateContext,
+    ) -> Result<Signed<Collateral>> {
         let ChargeDeltaNeutralityFeeResult {
             pos_id,
             fee,
