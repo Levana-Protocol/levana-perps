@@ -18,6 +18,7 @@ use std::time::Instant;
 use anyhow::{Context, Result};
 use axum::async_trait;
 
+use chrono::Duration;
 use cosmos::proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
 use msg::prelude::MarketExecuteMsg;
@@ -97,14 +98,7 @@ impl App {
             received,
         } = match recv.receive_with_timeout().await {
             None => {
-                // PERP-2904: we used to have a .suppress() call here, but that
-                // leads to issues where a crank failure message can stick around for too long.
-                // When implementing PERP-2904, we need to think through the correct handling of
-                // this case, and the high gas bot too. We need _something_ where we generate an
-                // alert when something fails, but also somehow the alert disappears over time. For
-                // now, I'm putting in place a short-term workaround of removing the suppress and
-                // considering both crank run and high gas bots as non-alert cases.
-                return Ok(WatchedTaskOutput::new("No crank work needed"));
+                return Ok(WatchedTaskOutput::new("No crank work needed").suppress());
             }
             Some(crank_needed) => crank_needed,
         };
@@ -133,24 +127,33 @@ impl App {
             Err(e) => format!("Failed getting status to check for new crank work: {e:?}.").into(),
         };
 
-        Ok(WatchedTaskOutput::new(match run_result {
+        let output = match run_result {
             RunResult::NormalRun(txres) => {
+                let message =
                 format!(
                     "Successfully turned the crank for market {market} in transaction {}. {}. Queued delay: {:?}, Elapsed since starting to crank: {:?}",
                     txres.txhash, more_work, received.saturating_duration_since(queued), start_crank.elapsed(),
-                )
+                );
+                WatchedTaskOutput::new(message)
             }
             RunResult::OutOfGas => {
-                format!("Got an 'out of gas' code 11 when trying to crank. {more_work}")
+                let message =
+                    format!("Got an 'out of gas' code 11 when trying to crank. {more_work}");
+                WatchedTaskOutput::new(message)
+                    .set_expiry(Duration::seconds(10))
+                    .set_error()
             }
             RunResult::OsmosisEpoch(e) => {
-                format!("Ignoring crank run error since we think we're in the Osmosis epoch, error: {e:?}")
+                let message = format!("Ignoring crank run error since we think we're in the Osmosis epoch, error: {e:?}");
+                WatchedTaskOutput::new(message)
             }
             RunResult::OsmosisCongested(e) => {
-                format!("Ignoring crank run error since we think the Osmosis chain is overly congested, error: {e:?}")
+                let message = format!("Ignoring crank run error since we think the Osmosis chain is overly congested, error: {e:?}");
+                WatchedTaskOutput::new(message)
             }
-        })
-        .skip_delay())
+        };
+
+        Ok(output.skip_delay())
     }
 
     pub(crate) async fn crank(

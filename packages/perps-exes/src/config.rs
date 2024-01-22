@@ -549,7 +549,7 @@ impl Default for WatcherConfig {
             },
             crank_run: TaskConfig {
                 // We block internally within the crank run service
-                delay: Delay::Constant(0),
+                delay: Delay::NoDelay,
                 out_of_date: 60,
                 retries: None,
                 delay_between_retries: None,
@@ -615,7 +615,7 @@ impl Default for WatcherConfig {
             high_gas: TaskConfig {
                 // We block internally within this service
                 // and use a channel to signal when it should be woken up
-                delay: Delay::Constant(0),
+                delay: Delay::NoDelay,
                 out_of_date: 60,
                 retries: None,
                 delay_between_retries: None,
@@ -644,6 +644,7 @@ pub struct TaskConfig {
 #[derive(serde::Deserialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum Delay {
+    NoDelay,
     Constant(u64),
     NewBlock,
     Random { low: u64, high: u64 },
