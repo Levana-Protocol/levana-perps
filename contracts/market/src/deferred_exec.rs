@@ -1,9 +1,7 @@
 use msg::contracts::market::{
     deferred_execution::{
         DeferredExecCompleteTarget, DeferredExecId, DeferredExecItem, DeferredExecWithStatus,
-    },
-    entry::SlippageAssert,
-    position::{events::PositionSaveReason, CollateralAndUsd},
+    }, entry::SlippageAssert, position::{events::PositionSaveReason, CollateralAndUsd}
 };
 
 use crate::state::position::OpenPositionParams;
@@ -70,7 +68,8 @@ fn helper(
             .map(DeferredExecCompleteTarget::Position),
         DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount } => {
             handle_update_position_shared(state, ctx, id, None, None, &price_point)?;
-            state.update_position_collateral(ctx, id, amount.into_signed(), &price_point)?;
+            state.update_position_collateral(ctx.storage, id, amount.into_signed(), &price_point)?
+                .apply(state, ctx)?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionAddCollateralImpactSize {
@@ -88,12 +87,14 @@ fn helper(
                 slippage_assert,
                 &price_point,
             )?;
-            state.update_position_size(ctx, id, funds, &price_point)?;
+            state.update_position_size(ctx.storage, id, funds, &price_point)?
+                .apply(state, ctx)?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => {
             handle_update_position_shared(state, ctx, id, None, None, &price_point)?;
-            state.update_position_collateral(ctx, id, -amount.into_signed(), &price_point)?;
+            state.update_position_collateral(ctx.storage, id, -amount.into_signed(), &price_point)?
+                .apply(state, ctx)?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionRemoveCollateralImpactSize {
@@ -111,7 +112,8 @@ fn helper(
                 slippage_assert,
                 &price_point,
             )?;
-            state.update_position_size(ctx, id, funds, &price_point)?;
+            state.update_position_size(ctx.storage, id, funds, &price_point)?
+                .apply(state, ctx)?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionLeverage {
@@ -135,18 +137,14 @@ fn helper(
                     &price_point,
                 )?;
             }
-            state.update_position_leverage(ctx, id, notional_size, &price_point)?;
+            state.update_position_leverage(ctx.storage, id, notional_size, &price_point)?
+                .apply(state, ctx)?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionMaxGains { id, max_gains } => {
             handle_update_position_shared(state, ctx, id, None, None, &price_point)?;
-            let counter_collateral = state.update_max_gains_new_counter_collateral(
-                ctx.storage,
-                id,
-                max_gains,
-                &price_point,
-            )?;
-            state.update_position_max_gains(ctx, id, counter_collateral, &price_point)?;
+            state.update_position_max_gains(ctx.storage, id, max_gains, &price_point)?
+                .apply(state, ctx)?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::ClosePosition {
@@ -314,6 +312,62 @@ fn helper_validate(
                 price_point,
             )
             .map(|_| ()),
+        DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount} => {
+            validate_update_position_shared(state, store, id, None, None, price_point)?;
+            state.update_position_collateral(store, id, amount.into_signed(), &price_point)?;
+            Ok(())
+        },
+        DeferredExecItem::UpdatePositionAddCollateralImpactSize {
+            id,
+            slippage_assert,
+            amount,
+        } => {
+            let funds = amount.into_signed();
+            
+            let notional_size = state.update_size_new_notional_size(store, id, funds)?;
+            validate_update_position_shared(state, store, id, Some(notional_size), slippage_assert, price_point)?;
+            state.update_position_size(store, id, funds, &price_point)?;
+
+            Ok(())
+        },
+        DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, amount} => {
+            validate_update_position_shared(state, store, id, None, None, price_point)?;
+            state.update_position_collateral(store, id, -amount.into_signed(), &price_point)?;
+            Ok(())
+        },
+        DeferredExecItem::UpdatePositionRemoveCollateralImpactSize {
+            id,
+            amount,
+            slippage_assert,
+        } => {
+            let funds = -amount.into_signed();
+            let notional_size = state.update_size_new_notional_size(store, id, funds)?;
+            validate_update_position_shared(state, store, id, Some(notional_size), slippage_assert, price_point)?;
+            state.update_position_size(store, id, funds, &price_point)?;
+            Ok(())
+        },
+        DeferredExecItem::UpdatePositionLeverage {
+            id,
+            leverage,
+            slippage_assert,
+        } => {
+            // first the common validation without slippage assert
+            // doesn't really do anything right now, but it's here for consistency
+            validate_update_position_shared(state, store, id, None, slippage_assert.clone(), price_point)?;
+            let notional_size =
+                state.update_leverage_new_notional_size(store, id, leverage, price_point)?;
+            // This slippage assert is not 100% the same as in the execute code path, because
+            // it is done before liquifund while the real slippage assert test is done after.
+            validate_update_position_shared(state, store, id, Some(notional_size), slippage_assert, price_point)?;
+
+            state.update_position_leverage(store, id, notional_size, &price_point)?;
+            Ok(())
+        },
+        DeferredExecItem::UpdatePositionMaxGains { id, max_gains} => {
+            validate_update_position_shared(state, store, id, None, None, price_point)?;
+            state.update_position_max_gains(store, id, max_gains, price_point)?;
+            Ok(())
+        },
         DeferredExecItem::ClosePosition {
             id,
             slippage_assert,
@@ -332,64 +386,34 @@ fn helper_validate(
             }
             Ok(())
         }
-        DeferredExecItem::UpdatePositionAddCollateralImpactSize {
-            id,
-            slippage_assert,
-            amount,
-        } => {
-            let funds = amount.into_signed();
-            let notional_size = state.update_size_new_notional_size(store, id, funds)?;
-            update_position_slippage_assert(
-                state,
-                store,
-                id,
-                Some(notional_size),
-                slippage_assert,
-                price_point,
-            )?;
-            Ok(())
-        }
-        DeferredExecItem::UpdatePositionRemoveCollateralImpactSize {
-            id,
-            amount,
-            slippage_assert,
-        } => {
-            let funds = -amount.into_signed();
-            let notional_size = state.update_size_new_notional_size(store, id, funds)?;
-            update_position_slippage_assert(
-                state,
-                store,
-                id,
-                Some(notional_size),
-                slippage_assert,
-                price_point,
-            )?;
-            Ok(())
-        }
-        DeferredExecItem::UpdatePositionLeverage {
-            id,
-            leverage,
-            slippage_assert,
-        } => {
-            let notional_size =
-                state.update_leverage_new_notional_size(store, id, leverage, price_point)?;
-            // This slippage assert is not 100% the same as in the execute code path, because
-            // it is done before liquifund while the real slippage assert test is done after.
-            update_position_slippage_assert(
-                state,
-                store,
-                id,
-                Some(notional_size),
-                slippage_assert,
-                price_point,
-            )?;
-            Ok(())
-        }
-        DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { .. }
-        | DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { .. }
-        | DeferredExecItem::UpdatePositionMaxGains { .. }
         | DeferredExecItem::SetTriggerOrder { .. }
         | DeferredExecItem::PlaceLimitOrder { .. }
         | DeferredExecItem::CancelLimitOrder { .. } => Ok(()),
     }
+}
+
+fn validate_update_position_shared(state: &State,
+    store: &dyn Storage,
+    id: PositionId,
+    notional_size: Option<Signed<Notional>>,
+    slippage_assert: Option<SlippageAssert>,
+    price_point: &PricePoint) -> Result<()> {
+
+    update_position_slippage_assert(
+        state,
+        store,
+        id,
+        notional_size,
+        slippage_assert,
+        price_point,
+    )?;
+
+
+    // can't do this without significant refactoring
+    // let pos = get_position(store, id)?;
+    // let starts_at = pos.liquifunded_at;
+    // let ends_at = price_point.timestamp;
+    // state.position_liquifund(ctx, pos, starts_at, ends_at, false)?;
+
+    Ok(())
 }

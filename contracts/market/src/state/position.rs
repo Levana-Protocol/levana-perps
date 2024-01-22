@@ -11,7 +11,6 @@ pub(crate) use open::*;
 mod close;
 pub use close::*;
 mod update;
-pub use update::*;
 mod validate;
 pub use validate::*;
 mod cw721;
@@ -892,7 +891,7 @@ pub(crate) enum AdjustOpenInterestResult {
 }
 
 impl AdjustOpenInterestResult {
-    pub(crate) fn store(self, ctx: &mut StateContext) -> Result<()> {
+    pub(crate) fn store(&self, ctx: &mut StateContext) -> Result<()> {
         match self {
             AdjustOpenInterestResult::Long(long) => {
                 OPEN_NOTIONAL_LONG_INTEREST.save(ctx.storage, &long)?
