@@ -158,7 +158,7 @@ impl ChargeDeltaNeutralityFeeResult {
             });
         }
 
-        DELTA_NEUTRALITY_FUND.save(ctx.storage, &total_funds_after)?;
+        DELTA_NEUTRALITY_FUND.save(ctx.storage, total_funds_after)?;
 
         state.collect_delta_neutrality_fee_for_protocol(ctx, *pos_id, *protocol_fees, *price)?;
         Ok(*fee)

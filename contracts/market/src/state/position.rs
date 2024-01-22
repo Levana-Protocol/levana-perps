@@ -894,10 +894,10 @@ impl AdjustOpenInterestResult {
     pub(crate) fn store(&self, ctx: &mut StateContext) -> Result<()> {
         match self {
             AdjustOpenInterestResult::Long(long) => {
-                OPEN_NOTIONAL_LONG_INTEREST.save(ctx.storage, &long)?
+                OPEN_NOTIONAL_LONG_INTEREST.save(ctx.storage, long)?
             }
             AdjustOpenInterestResult::Short(short) => {
-                OPEN_NOTIONAL_SHORT_INTEREST.save(ctx.storage, &short)?
+                OPEN_NOTIONAL_SHORT_INTEREST.save(ctx.storage, short)?
             }
         }
         Ok(())

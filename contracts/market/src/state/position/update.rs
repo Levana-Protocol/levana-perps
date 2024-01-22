@@ -456,7 +456,7 @@ impl State<'_> {
         let mut pos = original_pos.clone();
 
         let counter_collateral =
-            self.update_max_gains_new_counter_collateral(store, id, max_gains, &price_point)?;
+            self.update_max_gains_new_counter_collateral(store, id, max_gains, price_point)?;
 
         let old_counter_collateral = pos.counter_collateral;
         let new_counter_collateral = counter_collateral;
@@ -767,7 +767,7 @@ impl PositionUpdateEventExt for PositionUpdateEvent {
 
         state.position_history_add_action(
             ctx,
-            &pos,
+            pos,
             PositionActionKind::Update,
             if self.trading_fee_delta.is_zero() {
                 None

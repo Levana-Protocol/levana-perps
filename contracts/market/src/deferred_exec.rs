@@ -323,7 +323,7 @@ fn helper_validate(
         DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount } => {
             validate_update_position_shared(state, store, id, None, None, price_point)?;
             let _ =
-                state.update_position_collateral(store, id, amount.into_signed(), &price_point)?;
+                state.update_position_collateral(store, id, amount.into_signed(), price_point)?;
             Ok(())
         }
         DeferredExecItem::UpdatePositionAddCollateralImpactSize {
@@ -342,14 +342,14 @@ fn helper_validate(
                 slippage_assert,
                 price_point,
             )?;
-            let _ = state.update_position_size(store, id, funds, &price_point)?;
+            let _ = state.update_position_size(store, id, funds, price_point)?;
 
             Ok(())
         }
         DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => {
             validate_update_position_shared(state, store, id, None, None, price_point)?;
             let _ =
-                state.update_position_collateral(store, id, -amount.into_signed(), &price_point)?;
+                state.update_position_collateral(store, id, -amount.into_signed(), price_point)?;
             Ok(())
         }
         DeferredExecItem::UpdatePositionRemoveCollateralImpactSize {
@@ -367,7 +367,7 @@ fn helper_validate(
                 slippage_assert,
                 price_point,
             )?;
-            let _ = state.update_position_size(store, id, funds, &price_point)?;
+            let _ = state.update_position_size(store, id, funds, price_point)?;
             Ok(())
         }
         DeferredExecItem::UpdatePositionLeverage {
@@ -398,7 +398,7 @@ fn helper_validate(
                 price_point,
             )?;
 
-            let _ = state.update_position_leverage(store, id, notional_size, &price_point)?;
+            let _ = state.update_position_leverage(store, id, notional_size, price_point)?;
             Ok(())
         }
         DeferredExecItem::UpdatePositionMaxGains { id, max_gains } => {
