@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use axum::async_trait;
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use cosmos::{
     proto::cosmos::bank::v1beta1::MsgSend, Address, Coin, Cosmos, HasAddress, TxBuilder, Wallet,
 };
@@ -209,8 +209,7 @@ impl GasCheck {
         }
 
         if errors.is_empty() {
-            let output =
-                WatchedTaskOutput::new(balances.join("\n")).set_expiry(Duration::seconds(10));
+            let output = WatchedTaskOutput::new(balances.join("\n"));
             Ok(if skip_delay {
                 output.skip_delay()
             } else {
@@ -218,10 +217,8 @@ impl GasCheck {
             })
         } else {
             errors.append(&mut balances);
-            let output = WatchedTaskOutput::new(errors.join("\n"))
-                .set_expiry(Duration::seconds(10))
-                .set_error();
-            Ok(output.set_error())
+            let errors = errors.join("\n");
+            Err(anyhow::anyhow!("{errors}"))
         }
     }
 }

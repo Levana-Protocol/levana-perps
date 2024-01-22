@@ -153,10 +153,7 @@ impl WatchedTask for Worker {
             ),
         }
 
-        let work = self
-            .current_work
-            .try_lock()
-            .and_then(|mut item| item.take());
+        let work = self.current_work.lock().take();
         let mut successes = vec![];
 
         match work {
