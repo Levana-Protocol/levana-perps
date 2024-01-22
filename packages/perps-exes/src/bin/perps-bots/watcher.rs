@@ -142,10 +142,10 @@ pub(crate) struct TaskStatus {
     last_result: TaskResult,
     last_retry_error: Option<TaskError>,
     current_run_started: Option<DateTime<Utc>>,
-    // Is the last_result out of date ?
+    /// Is the last_result out of date ?
     #[serde(skip)]
     out_of_date: Duration,
-    // Should we expire the status of last result ?
+    /// Should we expire the status of last result ?
     #[serde(skip)]
     expire_last_result: Option<Duration>,
     counts: TaskCounts,
@@ -266,7 +266,7 @@ impl TaskLabel {
             TaskLabel::CrankRun { index: _ } => true,
             TaskLabel::Price => true,
             TaskLabel::TrackBalance => false,
-            TaskLabel::GasCheck => true,
+            TaskLabel::GasCheck => false,
             TaskLabel::UltraCrank { index: _ } => false,
             TaskLabel::Liquidity => false,
             TaskLabel::Utilization => false,
@@ -653,17 +653,17 @@ impl AppBuilder {
 
 #[derive(Debug)]
 pub(crate) struct WatchedTaskOutput {
-    // Should we skip delay between tasks ? If yes, then we dont sleep
-    // once the task gets completed.
+    /// Should we skip delay between tasks ? If yes, then we dont
+    /// sleep once the task gets completed.
     skip_delay: bool,
-    // Should we supress the output ? If we supress, the new output
-    // won't be reflected. The last_result value will be used instead.
+    /// Should we supress the output ? If we supress, the new output
+    /// won't be reflected. The last_result value will be used instead.
     suppress: bool,
     message: Cow<'static, str>,
-    // Controls the stickiness of this message. After how long should
-    // we treat this as a non alert ?
+    /// Controls the stickiness of this message. After how long should
+    /// we treat this as a non alert ?
     expire_alert: Option<Duration>,
-    // Is the message an error ?
+    /// Is the message an error ?
     error: bool,
 }
 
