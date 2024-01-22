@@ -54,6 +54,9 @@ osmosis-mainnet:
     ryETH:
       denom: ibc/FBB3FEF80ED2344D821D4F95C31DBFD33E4E31D5324CAD94EF756E67B749F668
       decimal-places: 18
+    milkTIA:
+      denom: factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA
+      decimal-places: 6
 osmosis-testnet:
   age-tolerance-seconds: 42
   gas-decimals: 6

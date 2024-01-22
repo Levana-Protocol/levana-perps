@@ -216,7 +216,7 @@ markets:
       borrow_fee_rate_min_annualized: 0.05
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.3
-      delta_neutrality_fee_sensitivity: 250000000
+      delta_neutrality_fee_sensitivity: 25000000
       carry_leverage: 15
       delta_neutrality_fee_tax: 0.1
       liquidity_cooldown_seconds: 86400
@@ -268,7 +268,7 @@ markets:
       borrow_fee_rate_min_annualized: 0.05
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.3
-      delta_neutrality_fee_sensitivity: 150000000
+      delta_neutrality_fee_sensitivity: 4300000
       carry_leverage: 15
       delta_neutrality_fee_tax: 0.1
       liquidity_cooldown_seconds: 86400
@@ -294,7 +294,7 @@ markets:
       borrow_fee_rate_min_annualized: 0.08
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.3
-      delta_neutrality_fee_sensitivity: 40000000
+      delta_neutrality_fee_sensitivity: 1000000
       delta_neutrality_fee_tax: 0.25
       carry_leverage: 15
       liquidity_cooldown_seconds: 86400
@@ -412,7 +412,7 @@ markets:
       borrow_fee_rate_min_annualized: 0.03
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.3
-      delta_neutrality_fee_sensitivity: 300000000
+      delta_neutrality_fee_sensitivity: 1000000
       carry_leverage: 15
       delta_neutrality_fee_tax: 0.1
       liquidity_cooldown_seconds: 86400
@@ -433,7 +433,7 @@ markets:
 
   SOL_USDC:
     config:
-      delta_neutrality_fee_sensitivity: 500000000
+      delta_neutrality_fee_sensitivity: 5000000
       funding_rate_sensitivity: 1.5
       carry_leverage: 15
       borrow_fee_sensitivity: 0.3
@@ -486,7 +486,7 @@ markets:
 
   LINK_USDC:
     config:
-      delta_neutrality_fee_sensitivity: 400000000
+      delta_neutrality_fee_sensitivity: 26666666
       funding_rate_sensitivity: 1.5
       carry_leverage: 15
       borrow_fee_sensitivity: 0.3
@@ -546,7 +546,7 @@ markets:
       borrow_fee_rate_min_annualized: 0.08
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.3
-      delta_neutrality_fee_sensitivity: 40000000
+      delta_neutrality_fee_sensitivity: 1000
       delta_neutrality_fee_tax: 0.25
       carry_leverage: 15
       liquidity_cooldown_seconds: 86400
@@ -572,7 +572,6 @@ markets:
 
     initial-borrow-fee-rate: 0.16
 
-  # FIXME temporary values copied from TIA_USD, do not use on mainnet
   milkTIA_USD:
     config:
       trading_fee_notional_size: 0.002
@@ -596,7 +595,7 @@ markets:
       carry_leverage: 15
       funding_rate_sensitivity: 2
       target_utilization: 0.5
-      delta_neutrality_fee_sensitivity: 75000000
+      delta_neutrality_fee_sensitivity: 25000000
       borrow_fee_sensitivity: 0.3
       delta_neutrality_fee_tax: 0.25
       borrow_fee_rate_min_annualized: 0.03
@@ -609,7 +608,7 @@ markets:
       carry_leverage: 15
       funding_rate_sensitivity: 2
       target_utilization: 0.5
-      delta_neutrality_fee_sensitivity: 90000000
+      delta_neutrality_fee_sensitivity: 20000000
       borrow_fee_sensitivity: 0.3
       delta_neutrality_fee_tax: 0.25
       borrow_fee_rate_min_annualized: 0.12
