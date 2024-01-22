@@ -111,6 +111,15 @@ pub enum PositionCloseReason {
     Direct,
 }
 
+impl Display for PositionCloseReason {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            PositionCloseReason::Liquidated(reason) => write!(f, "{reason}"),
+            PositionCloseReason::Direct => f.write_str("Manual close"),
+        }
+    }
+}
+
 /// Reason why a position was liquidated
 #[cw_serde]
 #[derive(Eq, Copy)]

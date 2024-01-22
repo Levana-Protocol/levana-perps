@@ -78,6 +78,7 @@ pub enum ErrorId {
     LimitOrderAlreadyCanceling,
     PositionAlreadyClosing,
     NoPricePublishTimeFound,
+    PositionAlreadyClosed,
 }
 
 /// Source within the protocol for the error
