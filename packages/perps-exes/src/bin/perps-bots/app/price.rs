@@ -247,11 +247,11 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
             // UpdatePriceFeeds again.
             match worker.mode {
                 WorkerMode::MultiMessage => {
-                    let markets_to_crank: Vec<_> =
-                        markets_to_update.clone().into_iter().take(5).collect();
+                    let (markets_to_crank, remaining_markets_to_crank) =
+                        markets_to_update.split_at(5);
                     let multi_message = MultiMessageEntity {
                         markets: factory.markets.clone(),
-                        trigger: markets_to_crank,
+                        trigger: markets_to_crank.to_vec(),
                     };
 
                     let now = Instant::now();
@@ -269,7 +269,15 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                         .await;
                     let result = process_tx_result(&app, &worker.wallet, &now, response).await;
                     match result {
-                        Ok(res) => successes.push(res),
+                        Ok(res) => {
+                            successes.push(res);
+                            for (market, market_id, reason) in remaining_markets_to_crank.to_vec() {
+                                worker
+                                    .trigger_crank
+                                    .trigger_crank(market, market_id, reason)
+                                    .await;
+                            }
+                        }
                         Err(e) => errors.push(format!("{e:?}")),
                     }
                 }
