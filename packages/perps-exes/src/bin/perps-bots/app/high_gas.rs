@@ -10,6 +10,7 @@ use super::{
     CrankTriggerReason,
 };
 use anyhow::{bail, Context, Result};
+use async_channel::RecvError;
 use axum::async_trait;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
 use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
@@ -38,24 +39,22 @@ impl HighGasTrigger {
         let _ = self.sender.send(()).await;
     }
 }
-pub(crate) enum HighGasWork {
-    Price {
-        offchain_price_data: Arc<OffchainPriceData>,
-        markets_to_update: Vec<(Address, MarketId, CrankTriggerReason)>,
-        queued: Instant,
-    },
+pub(crate) struct HighGasWork {
+    pub(crate) offchain_price_data: Arc<OffchainPriceData>,
+    pub(crate) markets_to_update: Vec<(Address, MarketId, CrankTriggerReason)>,
+    pub(crate) queued: Instant,
 }
 
 impl HighGasWork {
     pub fn append(self, other: Self) -> Self {
         match (self, other) {
             (
-                HighGasWork::Price {
+                HighGasWork {
                     offchain_price_data,
                     mut markets_to_update,
                     queued: queued1,
                 },
-                HighGasWork::Price {
+                HighGasWork {
                     offchain_price_data: other_offchain_price_data,
                     markets_to_update: other_markets_to_update,
                     queued: queued2,
@@ -91,7 +90,7 @@ impl HighGasWork {
                     }
                 }
 
-                HighGasWork::Price {
+                HighGasWork {
                     offchain_price_data: Arc::new(offchain_price_data),
                     markets_to_update,
                     queued: queued1.min(queued2),
@@ -139,116 +138,105 @@ struct Worker {
 #[async_trait]
 impl WatchedTask for Worker {
     async fn run_single(&mut self, app: Arc<App>, _: Heartbeat) -> Result<WatchedTaskOutput> {
-        // instead of busy-looping to check the mutex, await a future that will be woken up at the earliest of:
-        // * 20 seconds
-        // * the channel receiving a value (i.e. new work added)
-        match tokio::time::timeout(tokio::time::Duration::from_secs(20), self.receiver.recv()).await
-        {
-            // Timeout occurred, not an error, just keep going with our logic
-            Err(_) => (),
-            // Popped a value from the queue, all good
-            Ok(Ok(())) => (),
-            Ok(Err(_)) => unreachable!(
-                "receive_with_timeout: impossible RecvError, all sending sides have been closed"
+        // We wait till we are instructed that a new work item is arrived
+        let more_work = self.receiver.recv().await;
+        let HighGasWork {
+            offchain_price_data,
+            markets_to_update,
+            queued,
+        } = match more_work {
+            Ok(()) => {
+                let work = self.current_work.lock().take();
+                match work {
+                    Some(work) => work,
+                    None => {
+                        bail!("[VERY HIGH GAS] Signaled about work item, but didn't receive any.")
+                    }
+                }
+            }
+            Err(RecvError) => unreachable!(
+                "[VERY HIGH GAS] impossible RecvError, all sending sides have been closed"
             ),
-        }
+        };
 
-        let work = self.current_work.lock().take();
         let mut successes = vec![];
 
-        match work {
-            Some(work) => match work {
-                HighGasWork::Price {
-                    offchain_price_data,
-                    markets_to_update,
-                    queued,
-                } => {
-                    let received = Instant::now();
+        let received = Instant::now();
+        successes.push(format!(
+            "Received new work, delta between queued and now: {:?}",
+            queued.elapsed(),
+        ));
+        let factory = app.get_factory_info().await;
+
+        let mut builder = TxBuilder::default();
+
+        if let Some(oracle_msg) =
+            price_get_update_oracles_msg(&self.wallet, &app, &factory.markets, &offchain_price_data)
+                .await?
+        {
+            builder.add_message(oracle_msg);
+        }
+
+        for (market, _, _) in markets_to_update.into_iter().take(5) {
+            let rewards = app
+                .config
+                .get_crank_rewards_wallet()
+                .map(|a| a.get_address_string().into());
+
+            builder.add_execute_message(
+                market,
+                &*self.wallet,
+                vec![],
+                MarketExecuteMsg::Crank {
+                    execs: Some(0),
+                    rewards: rewards.clone(),
+                },
+            )?;
+        }
+
+        match builder
+            .sign_and_broadcast_cosmos_tx(&app.cosmos_very_high_gas, &self.wallet)
+            .await
+        {
+            Ok(txres) => {
+                successes.push(format!(
+                    "[VERY HIGH GAS] - Successfully executed in transaction {}.",
+                    txres.response.txhash
+                ));
+            }
+            Err(e) => {
+                if app.is_osmosis_epoch() {
                     successes.push(format!(
-                        "Received new work, delta between queued and now: {:?}",
-                        queued.elapsed(),
+                        "[VERY HIGH GAS] - we think we're in the Osmosis epoch, error: {e:?}"
                     ));
-                    let factory = app.get_factory_info().await;
-
-                    let mut builder = TxBuilder::default();
-
-                    if let Some(oracle_msg) = price_get_update_oracles_msg(
-                        &self.wallet,
-                        &app,
-                        &factory.markets,
-                        &offchain_price_data,
-                    )
-                    .await?
-                    {
-                        builder.add_message(oracle_msg);
-                    }
-
-                    for (market, _, _) in markets_to_update.into_iter().take(5) {
-                        let rewards = app
-                            .config
-                            .get_crank_rewards_wallet()
-                            .map(|a| a.get_address_string().into());
-
-                        builder.add_execute_message(
-                            market,
-                            &*self.wallet,
-                            vec![],
-                            MarketExecuteMsg::Crank {
-                                execs: Some(0),
-                                rewards: rewards.clone(),
-                            },
-                        )?;
-                    }
-
-                    match builder
-                        .sign_and_broadcast_cosmos_tx(&app.cosmos_very_high_gas, &self.wallet)
-                        .await
-                    {
-                        Ok(txres) => {
-                            successes.push(format!(
-                                "[VERY HIGH GAS] - Successfully executed in transaction {}.",
-                                txres.response.txhash
-                            ));
-                        }
-                        Err(e) => {
-                            if app.is_osmosis_epoch() {
-                                successes.push(format!("[VERY HIGH GAS] - we think we're in the Osmosis epoch, error: {e:?}"));
-                            } else if app.get_congested_info().is_congested() {
-                                bail!("[VERY HIGH GAS] - we think the Osmosis chain is overly congested, error: {e:?}, delta between queued and now: {:?}, delta between received and now: {:?}",
+                } else if app.get_congested_info().is_congested() {
+                    bail!("[VERY HIGH GAS] - we think the Osmosis chain is overly congested, error: {e:?}, delta between queued and now: {:?}, delta between received and now: {:?}",
                                     queued.elapsed(),
                                     received.elapsed(),
                                 );
-                            } else {
-                                let error_as_str = format!("{e:?}");
-                                if error_as_str.contains("out of gas")
-                                    || error_as_str.contains("code 11")
-                                {
-                                    bail!("[VERY HIGH GAS] - Got an 'out of gas' code 11 when trying to crank. error: {e:?}, delta between queued and now: {:?}, delta between received and now: {:?}",
+                } else {
+                    let error_as_str = format!("{e:?}");
+                    if error_as_str.contains("out of gas") || error_as_str.contains("code 11") {
+                        bail!("[VERY HIGH GAS] - Got an 'out of gas' code 11 when trying to crank. error: {e:?}, delta between queued and now: {:?}, delta between received and now: {:?}",
                                         queued.elapsed(),
                                         received.elapsed(),
                                     );
-                                } else {
-                                    bail!("[VERY HIGH GAS]\n{:?}\nDelta between queued and now: {:?}\nDelta between received and now: {:?}",
+                    } else {
+                        bail!("[VERY HIGH GAS]\n{:?}\nDelta between queued and now: {:?}\nDelta between received and now: {:?}",
                                         e,
                                         queued.elapsed(),
                                         received.elapsed(),
                                     );
-                                }
-                            }
-                        }
                     }
+                }
+            }
+        }
 
-                    successes.push(format!(
+        successes.push(format!(
                         "Finished the work, delta between queued and now: {:?}, delta between received and now: {:?}",
                         queued.elapsed(),
                         received.elapsed(),
                     ));
-                }
-            },
-            None => {
-                successes.push("[VERY HIGH GAS] - no work to do".to_string());
-            }
-        }
 
         let mut msg = String::new();
         for line in successes.into_iter() {
