@@ -271,7 +271,9 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                     match result {
                         Ok(res) => {
                             successes.push(res);
-                            for (market, market_id, reason) in remaining_markets_to_crank.to_vec() {
+                            for (market, market_id, reason) in
+                                remaining_markets_to_crank.iter().cloned()
+                            {
                                 worker
                                     .trigger_crank
                                     .trigger_crank(market, market_id, reason)
