@@ -497,133 +497,6 @@ impl State<'_> {
         })
     }
 
-    /// Settle pending fees
-    pub(crate) fn position_settle_pending_fees(
-        &self,
-        store: &dyn Storage,
-        mut position: Position,
-        starts_at: Timestamp,
-        ends_at: Timestamp,
-        charge_crank_fee: bool,
-    ) -> Result<PositionFeeSettlement> {
-        let price = self.spot_price(store, ends_at)?;
-
-        let mut insufficient_margin_events = Vec::new();
-        let (borrow_fee_timeslice_owed, event) =
-            self.calc_capped_borrow_fee_payment(store, &position, starts_at, ends_at)?;
-
-        if let Some(event) = event {
-            insufficient_margin_events.push(event);
-        }
-
-        let (funding_timeslice_owed, event) =
-            self.calc_capped_funding_payment(store, &position, starts_at, ends_at, false)?;
-        if let Some(event) = event {
-            insufficient_margin_events.push(event);
-        }
-
-        let funding_timeslice_owed =
-            self.track_funding_fee_payment_with_capping(store, funding_timeslice_owed, &position)?;
-
-        position
-            .funding_fee
-            .checked_add_assign(funding_timeslice_owed.amount, &price)?;
-
-        position.borrow_fee.checked_add_assign(
-            borrow_fee_timeslice_owed.lp + borrow_fee_timeslice_owed.xlp,
-            &price,
-        )?;
-
-        // collect the borrow fee portion, which is ultimately paid out to liquidity providers
-        // funding portion is paid between positions and dealt with through
-        // the inherent position bookkeeping, not a global fee collection
-        let borrow_fee_collection =
-            self.collect_borrow_fee(store, position.id, borrow_fee_timeslice_owed, price)?;
-
-        let market_type = self.market_id(store)?.get_market_type();
-
-        let funding_payment_event = FundingPaymentEvent {
-            pos_id: position.id,
-            amount: funding_timeslice_owed.amount,
-            amount_usd: funding_timeslice_owed
-                .amount
-                .map(|x| price.collateral_to_usd(x)),
-            direction: position.direction().into_base(market_type),
-        };
-
-        let cap_crank_fee = if charge_crank_fee {
-            //let (crank_fee, crank_fee_usd) =
-            let cap_crank_fee =
-                self.cap_crank_fee(&position, &price, self.config.crank_fee_charged)?;
-            position
-                .crank_fee
-                .checked_add_assign(cap_crank_fee.amount, &price)?;
-            Some(cap_crank_fee)
-        } else {
-            None
-        };
-
-        // Update the active collateral
-        debug_assert!(position.active_collateral.raw() >= position.liquidation_margin.total());
-        let to_subtract = borrow_fee_timeslice_owed.lp.into_signed()
-            + borrow_fee_timeslice_owed.xlp.into_signed()
-            + funding_timeslice_owed.amount
-            + cap_crank_fee
-                .as_ref()
-                .map(|crank_fee| crank_fee.amount.into_signed())
-                .unwrap_or(Collateral::zero().into_signed());
-        debug_assert!(to_subtract <= position.liquidation_margin.total().into_signed());
-
-        let position = match position
-            .active_collateral
-            .checked_sub_signed(to_subtract)
-            .ok()
-        {
-            Some(active_collateral) => {
-                position.active_collateral = active_collateral;
-                MaybeClosedPosition::Open(position)
-            }
-            // This is a deeply degenerate case that should never happen,
-            // but we check for it explicitly and handle as gracefully as
-            // possible.
-            None => {
-                if let Some(to_subtract) = to_subtract.try_into_non_zero() {
-                    insufficient_margin_events.push(InsufficientMarginEvent {
-                        pos: position.id,
-                        fee_type: FeeType::Overall,
-                        available: position.active_collateral.into_signed(),
-                        requested: to_subtract.into_signed(),
-                        desc: None,
-                    });
-                } else {
-                    debug_assert!(
-                        false,
-                        "Impossible! to_subtract is not a strictly positive value"
-                    );
-                }
-                // Nothing better to do here, just provide a tiny amount of active collateral.
-                position.active_collateral = "0.000000001".parse().unwrap();
-                MaybeClosedPosition::Close(ClosePositionInstructions {
-                    pos: position,
-                    capped_exposure: Signed::<Collateral>::zero(),
-                    additional_losses: Collateral::zero(),
-                    settlement_price: price,
-                    reason: PositionCloseReason::Liquidated(LiquidationReason::Liquidated),
-                    closed_during_liquifunding: true,
-                })
-            }
-        };
-
-        Ok(PositionFeeSettlement {
-            position,
-            insufficient_margin_events,
-            funding_fee_payment: funding_timeslice_owed,
-            borrow_fee_collection,
-            funding_payment_event,
-            cap_crank_fee,
-        })
-    }
-
     /// Initialize the funding totals data structures
     pub(crate) fn initialize_funding_totals(&self, ctx: &mut StateContext) -> Result<()> {
         TOTAL_NET_FUNDING_PAID.save(ctx.storage, &Signed::<Collateral>::zero())?;
@@ -803,6 +676,135 @@ pub(crate) struct PositionFeeSettlement {
 }
 
 impl PositionFeeSettlement {
+    /// Settle pending fees
+    pub fn new(
+        state: &State,
+        store: &dyn Storage,
+        mut position: Position,
+        starts_at: Timestamp,
+        ends_at: Timestamp,
+        charge_crank_fee: bool,
+    ) -> Result<Self> {
+        let price = state.spot_price(store, ends_at)?;
+
+        let mut insufficient_margin_events = Vec::new();
+        let (borrow_fee_timeslice_owed, event) =
+            state.calc_capped_borrow_fee_payment(store, &position, starts_at, ends_at)?;
+
+        if let Some(event) = event {
+            insufficient_margin_events.push(event);
+        }
+
+        let (funding_timeslice_owed, event) =
+            state.calc_capped_funding_payment(store, &position, starts_at, ends_at, false)?;
+        if let Some(event) = event {
+            insufficient_margin_events.push(event);
+        }
+
+        let funding_timeslice_owed = state.track_funding_fee_payment_with_capping(
+            store,
+            funding_timeslice_owed,
+            &position,
+        )?;
+
+        position
+            .funding_fee
+            .checked_add_assign(funding_timeslice_owed.amount, &price)?;
+
+        position.borrow_fee.checked_add_assign(
+            borrow_fee_timeslice_owed.lp + borrow_fee_timeslice_owed.xlp,
+            &price,
+        )?;
+
+        // collect the borrow fee portion, which is ultimately paid out to liquidity providers
+        // funding portion is paid between positions and dealt with through
+        // the inherent position bookkeeping, not a global fee collection
+        let borrow_fee_collection =
+            state.collect_borrow_fee(store, position.id, borrow_fee_timeslice_owed, price)?;
+
+        let market_type = state.market_id(store)?.get_market_type();
+
+        let funding_payment_event = FundingPaymentEvent {
+            pos_id: position.id,
+            amount: funding_timeslice_owed.amount,
+            amount_usd: funding_timeslice_owed
+                .amount
+                .map(|x| price.collateral_to_usd(x)),
+            direction: position.direction().into_base(market_type),
+        };
+
+        let cap_crank_fee = if charge_crank_fee {
+            //let (crank_fee, crank_fee_usd) =
+            let cap_crank_fee =
+                state.cap_crank_fee(&position, &price, state.config.crank_fee_charged)?;
+            position
+                .crank_fee
+                .checked_add_assign(cap_crank_fee.amount, &price)?;
+            Some(cap_crank_fee)
+        } else {
+            None
+        };
+
+        // Update the active collateral
+        debug_assert!(position.active_collateral.raw() >= position.liquidation_margin.total());
+        let to_subtract = borrow_fee_timeslice_owed.lp.into_signed()
+            + borrow_fee_timeslice_owed.xlp.into_signed()
+            + funding_timeslice_owed.amount
+            + cap_crank_fee
+                .as_ref()
+                .map(|crank_fee| crank_fee.amount.into_signed())
+                .unwrap_or(Collateral::zero().into_signed());
+        debug_assert!(to_subtract <= position.liquidation_margin.total().into_signed());
+
+        let position = match position
+            .active_collateral
+            .checked_sub_signed(to_subtract)
+            .ok()
+        {
+            Some(active_collateral) => {
+                position.active_collateral = active_collateral;
+                MaybeClosedPosition::Open(position)
+            }
+            // This is a deeply degenerate case that should never happen,
+            // but we check for it explicitly and handle as gracefully as
+            // possible.
+            None => {
+                if let Some(to_subtract) = to_subtract.try_into_non_zero() {
+                    insufficient_margin_events.push(InsufficientMarginEvent {
+                        pos: position.id,
+                        fee_type: FeeType::Overall,
+                        available: position.active_collateral.into_signed(),
+                        requested: to_subtract.into_signed(),
+                        desc: None,
+                    });
+                } else {
+                    debug_assert!(
+                        false,
+                        "Impossible! to_subtract is not a strictly positive value"
+                    );
+                }
+                // Nothing better to do here, just provide a tiny amount of active collateral.
+                position.active_collateral = "0.000000001".parse().unwrap();
+                MaybeClosedPosition::Close(ClosePositionInstructions {
+                    pos: position,
+                    capped_exposure: Signed::<Collateral>::zero(),
+                    additional_losses: Collateral::zero(),
+                    settlement_price: price,
+                    reason: PositionCloseReason::Liquidated(LiquidationReason::Liquidated),
+                    closed_during_liquifunding: true,
+                })
+            }
+        };
+
+        Ok(Self {
+            position,
+            insufficient_margin_events,
+            funding_fee_payment: funding_timeslice_owed,
+            borrow_fee_collection,
+            funding_payment_event,
+            cap_crank_fee,
+        })
+    }
     pub fn apply(&self, state: &State, ctx: &mut StateContext) -> Result<()> {
         for event in &self.insufficient_margin_events {
             ctx.response_mut().add_event(event);

@@ -1,4 +1,5 @@
 use crate::state::liquidity::{LiquidityUnlock, LiquidityUpdateLocked};
+use crate::state::position::liquifund::PositionLiquifund;
 use crate::state::position::CLOSED_POSITIONS;
 use crate::state::{position::CLOSED_POSITION_HISTORY, *};
 use anyhow::Context;
@@ -20,7 +21,7 @@ impl State<'_> {
         let ends_at = settlement_price.timestamp;
         // Confirm that all past liquifundings have been performed before explicitly closing
         debug_assert!(pos.next_liquifunding >= ends_at);
-        let liquifund = self.position_liquifund(ctx.storage, pos, starts_at, ends_at, false)?;
+        let liquifund = PositionLiquifund::new(self, ctx.storage, pos, starts_at, ends_at, false)?;
         liquifund.apply(self, ctx)?;
         let mcp = liquifund.position;
 

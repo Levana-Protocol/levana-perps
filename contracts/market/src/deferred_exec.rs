@@ -522,7 +522,7 @@ fn validate_slippage_assert_and_liquifund(
     debug_assert!(pos.next_liquifunding >= price_point.timestamp);
 
     let starts_at = pos.liquifunded_at;
-    state.position_liquifund(store, pos, starts_at, price_point.timestamp, false)
+    PositionLiquifund::new(state, store, pos, starts_at, price_point.timestamp, false)
 }
 
 fn update_position_slippage_assert(
