@@ -171,6 +171,7 @@ fn helper(
                     &price_point,
                 )?
                 .apply(state, ctx)?;
+
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionMaxGains { id, max_gains } => {
@@ -436,8 +437,6 @@ fn helper_validate(
             leverage,
             slippage_assert,
         } => {
-            // first the common validation without slippage assert
-            // not sure if this is really necessary, but it's here for migration compatibility
             let liquifund = validate_update_position_shared(
                 state,
                 store,

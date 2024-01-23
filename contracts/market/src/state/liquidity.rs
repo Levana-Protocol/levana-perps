@@ -1035,18 +1035,28 @@ pub(crate) struct LiquidityLock {
 impl LiquidityLock {
     // Validate is automatically called by apply (so that it also loads the latest stats)
     // but can also be called for error recovery in the submessage handler
-    pub(crate) fn validate(&self, state: &State, store: &dyn Storage) -> Result<LiquidityStats> {
+    pub(crate) fn validate(
+        &self,
+        state: &State,
+        store: &dyn Storage,
+        net_notional_override: Option<Signed<Notional>>,
+    ) -> Result<LiquidityStats> {
         let mut stats = state.load_liquidity_stats(store)?;
-        let long_interest_protocol = state.open_long_interest(store)?;
-        let short_interest_protocol = state.open_short_interest(store)?;
-        let net_notional = long_interest_protocol.into_signed()
-            - short_interest_protocol.into_signed()
-            + self
-                .delta_notional
-                .unwrap_or_else(|| Notional::zero().into_signed());
+        let mut net_notional = match net_notional_override {
+            Some(net_notional_override) => net_notional_override,
+            None => {
+                let long_interest_protocol = state.open_long_interest(store)?;
+                let short_interest_protocol = state.open_short_interest(store)?;
+                long_interest_protocol.into_signed() - short_interest_protocol.into_signed()
+            }
+        };
+        net_notional += self
+            .delta_notional
+            .unwrap_or_else(|| Notional::zero().into_signed());
         let min_unlocked_liquidity = state.min_unlocked_liquidity(net_notional, &self.price)?;
+
         if min_unlocked_liquidity + self.amount.raw() > stats.unlocked {
-            Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed lock! not enough unlocked liquidity in the protocol! (asked for {}, only {} available with {} minimum)", self.amount, stats.unlocked, min_unlocked_liquidity))
+            Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed lock! not enough unlocked liquidity in the protocol! (asked for {}, only {} available with {} minimum. net notional is {})", self.amount, stats.unlocked, min_unlocked_liquidity, net_notional))
         } else {
             stats.locked = stats.locked.checked_add(self.amount.raw())?;
             stats.unlocked = stats.unlocked.checked_sub(self.amount.raw())?;
@@ -1055,7 +1065,7 @@ impl LiquidityLock {
     }
 
     pub(crate) fn apply(&self, state: &State, ctx: &mut StateContext) -> Result<()> {
-        let stats = self.validate(state, ctx.storage)?;
+        let stats = self.validate(state, ctx.storage, None)?;
 
         state.save_liquidity_stats(ctx.storage, &stats)?;
 

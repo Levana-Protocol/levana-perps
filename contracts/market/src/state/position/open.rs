@@ -166,12 +166,11 @@ impl State<'_> {
             DeltaNeutralityFeeReason::PositionOpen,
         )?;
 
-        LiquidityLock {
+        let liquidity_lock = LiquidityLock {
             amount: pos.counter_collateral,
             price: *price_point,
             delta_notional: Some(pos.notional_size),
-        }
-        .validate(self, store)?;
+        };
 
         pos.liquidation_margin = pos.liquidation_margin(price_point, &self.config)?;
 
@@ -187,6 +186,8 @@ impl State<'_> {
 
         let open_interest =
             self.check_adjust_net_open_interest(store, pos.notional_size, pos.direction(), true)?;
+
+        liquidity_lock.validate(self, store, None)?;
 
         Ok(ValidatedPosition {
             pos,

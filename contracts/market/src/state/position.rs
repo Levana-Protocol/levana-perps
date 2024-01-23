@@ -890,6 +890,20 @@ pub(crate) enum AdjustOpenInterestResult {
 }
 
 impl AdjustOpenInterestResult {
+    pub(crate) fn net_notional(
+        &self,
+        state: &State,
+        store: &dyn Storage,
+    ) -> Result<Signed<Notional>> {
+        Ok(match self {
+            AdjustOpenInterestResult::Long(long) => {
+                long.into_signed() - state.open_short_interest(store)?.into_signed()
+            }
+            AdjustOpenInterestResult::Short(short) => {
+                state.open_long_interest(store)?.into_signed() - short.into_signed()
+            }
+        })
+    }
     pub(crate) fn store(&self, ctx: &mut StateContext) -> Result<()> {
         match self {
             AdjustOpenInterestResult::Long(long) => {
