@@ -11,7 +11,8 @@ use anyhow::Result;
 use axum::async_trait;
 use chrono::{DateTime, Utc};
 use cosmos::{
-    proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, HasAddress, TxBuilder, Wallet,
+    proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, CosmosTxResponse, HasAddress,
+    TxBuilder, Wallet,
 };
 use msg::{
     contracts::market::{
@@ -41,11 +42,20 @@ use super::{
     App, AppBuilder, CrankTriggerReason, HighGas,
 };
 
+#[derive(Debug, PartialEq)]
+enum WorkerMode {
+    Normal,
+    // Experimental mode which performs multi-message price update
+    // including cranks
+    MultiMessage,
+}
+
 struct Worker {
     wallet: Arc<Wallet>,
     stats: HashMap<MarketId, ReasonStats>,
     trigger_crank: TriggerCrank,
     high_gas_trigger: HighGasTrigger,
+    mode: WorkerMode,
 }
 
 impl Worker {
@@ -60,6 +70,11 @@ impl Worker {
 /// Start the background thread to keep options pools up to date.
 impl AppBuilder {
     pub(super) fn start_price(&mut self, trigger_crank: TriggerCrank) -> Result<()> {
+        let mode = if self.app.opt.multi_message_update {
+            WorkerMode::MultiMessage
+        } else {
+            WorkerMode::Normal
+        };
         if let Some(price_wallet) = self.app.config.price_wallet.clone() {
             let high_gas_trigger = self.start_high_gas()?;
             self.refill_gas(price_wallet.get_address(), GasCheckWallet::Price)?;
@@ -70,6 +85,7 @@ impl AppBuilder {
                     stats: HashMap::new(),
                     trigger_crank,
                     high_gas_trigger,
+                    mode,
                 },
             )?;
         }
@@ -224,26 +240,78 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                     })
                     .await;
             }
-            successes.push(
-                update_oracles(
-                    &worker.wallet,
-                    &app,
-                    &factory.markets,
-                    &offchain_price_data,
-                    // We already did "very high" above, so if we have any HighGas, it's just "high" now
-                    any_needs_high_gas_oracle_update.map(|_| HighGas::High),
-                )
-                .await?,
-            );
+
+            if worker.mode == WorkerMode::MultiMessage {
+                let MultiMessageResult {
+                    messages,
+                    remaining_cranks,
+                } = get_multi_messages(factory.markets.clone(), markets_to_update.clone());
+
+                let now = Instant::now();
+                for message in messages {
+                    let tx = construct_multi_message(
+                        message,
+                        &worker.wallet,
+                        &app,
+                        &offchain_price_data,
+                    )
+                    .await?;
+                    let response = tx
+                        .sign_and_broadcast_cosmos_tx(&app.cosmos, &worker.wallet)
+                        .await;
+                    let result = process_tx_result(&app, &worker.wallet, &now, response).await?;
+                    successes.push(result);
+                }
+
+                for cranks in remaining_cranks.chunks(5) {
+                    let mut builder = TxBuilder::default();
+                    for (market, _, _) in cranks {
+                        let rewards = app
+                            .config
+                            .get_crank_rewards_wallet()
+                            .map(|a| a.get_address_string().into());
+                        let wallet = &*worker.wallet.clone();
+                        builder.add_execute_message(
+                            market,
+                            wallet,
+                            vec![],
+                            MarketExecuteMsg::Crank {
+                                execs: Some(0),
+                                rewards: rewards.clone(),
+                            },
+                        )?;
+                    }
+                    let response = builder
+                        .sign_and_broadcast_cosmos_tx(&app.cosmos, &worker.wallet)
+                        .await;
+                    // todo: change message
+                    let result = process_tx_result(&app, &worker.wallet, &now, response).await?;
+                    successes.push(result);
+                }
+            } else {
+                successes.push(
+                    update_oracles(
+                        &worker.wallet,
+                        &app,
+                        &factory.markets,
+                        &offchain_price_data,
+                        // We already did "very high" above, so if we have any HighGas, it's just "high" now
+                        any_needs_high_gas_oracle_update.map(|_| HighGas::High),
+                    )
+                    .await?,
+                );
+            }
         } else {
             successes.push("No markets needed an oracle update".to_owned());
         }
 
-        for (market, market_id, reason) in markets_to_update {
-            worker
-                .trigger_crank
-                .trigger_crank(market, market_id, reason)
-                .await;
+        if worker.mode == WorkerMode::Normal {
+            for (market, market_id, reason) in markets_to_update {
+                worker
+                    .trigger_crank
+                    .trigger_crank(market, market_id, reason)
+                    .await;
+            }
         }
     }
 
@@ -263,6 +331,106 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
         Err(anyhow::anyhow!({ msg }))
     } else {
         Ok(WatchedTaskOutput::new(msg))
+    }
+}
+
+pub(crate) struct MultiMessageEntity {
+    pub(crate) markets: Vec<Market>,
+    pub(crate) trigger: Vec<(Address, MarketId, CrankTriggerReason)>,
+}
+
+pub(crate) struct MultiMessageResult {
+    pub(crate) messages: Vec<MultiMessageEntity>,
+    pub(crate) remaining_cranks: Vec<(Address, MarketId, CrankTriggerReason)>,
+}
+
+async fn process_tx_result(
+    app: &App,
+    wallet: &Wallet,
+    instant: &Instant,
+    response: Result<CosmosTxResponse, cosmos::Error>,
+) -> Result<String> {
+    match response {
+        Ok(res) => {
+            track_tx_fees(app, wallet.get_address(), &res).await;
+            Ok(format!(
+                "Multi tx executed (Pyth update and cranking) with txhash {}, delay: {:?}",
+                res.response.txhash,
+                instant.elapsed(),
+            ))
+        }
+        Err(e) => {
+            if app.is_osmosis_epoch() {
+                Ok(format!("Multi tx failed, but assuming it's because we're in the epoch: {e:?}, delay: {:?}", instant.elapsed()))
+            } else if app.get_congested_info().is_congested() {
+                Ok(format!("Multi tx failed, but assuming it's because Osmosis is congested: {e:?}, delay: {:?}", instant.elapsed()))
+            } else {
+                Err(e.into())
+            }
+        }
+    }
+}
+
+async fn construct_multi_message(
+    message: MultiMessageEntity,
+    wallet: &Wallet,
+    app: &App,
+    offchain_price_data: &OffchainPriceData,
+) -> Result<TxBuilder> {
+    let mut builder = TxBuilder::default();
+    if let Some(oracle_msg) =
+        price_get_update_oracles_msg(wallet, app, &message.markets[..], offchain_price_data).await?
+    {
+        builder.add_message(oracle_msg);
+    }
+    for (market, _, _) in message.trigger {
+        let rewards = app
+            .config
+            .get_crank_rewards_wallet()
+            .map(|a| a.get_address_string().into());
+
+        builder.add_execute_message(
+            market,
+            wallet,
+            vec![],
+            MarketExecuteMsg::Crank {
+                execs: Some(2),
+                rewards: rewards.clone(),
+            },
+        )?;
+    }
+    Ok(builder)
+}
+
+fn get_multi_messages(
+    markets: Vec<Market>,
+    markets_to_trigger: Vec<(Address, MarketId, CrankTriggerReason)>,
+) -> MultiMessageResult {
+    // todo: check difference to find out at places where only cranking is required
+    let original_markets = markets.clone();
+    let markets = markets.chunks(5);
+    let mut result = vec![];
+    let markets_to_trigger = markets_to_trigger.into_iter();
+    for market in markets {
+        let markets_to_trigger: Vec<_> = markets_to_trigger
+            .clone()
+            .filter(|(_, market_id, _)| market.iter().any(|item| item.market_id == *market_id))
+            .collect();
+        result.push(MultiMessageEntity {
+            markets: market.to_vec(),
+            trigger: markets_to_trigger.clone(),
+        })
+    }
+    let remaining_cranks = markets_to_trigger
+        .filter(|(_, market_id, _)| {
+            !original_markets
+                .iter()
+                .any(|item| item.market_id == *market_id)
+        })
+        .collect();
+    MultiMessageResult {
+        messages: result,
+        remaining_cranks,
     }
 }
 
@@ -591,6 +759,7 @@ pub(crate) async fn update_oracles(
         .await
     {
         Ok(res) => {
+            // todo: this
             track_tx_fees(app, wallet.get_address(), &res).await;
             Ok(format!(
                 "Prices updated in Pyth oracle contract with txhash {}, delay: {:?}",
