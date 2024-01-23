@@ -13,7 +13,7 @@ use msg::contracts::market::position::{
 };
 
 impl State<'_> {
-    /// Same as [State::position_liquifund], but update the stored data with the resulting [MaybeClosedPosition].
+    /// creates a (validated) [PositionLiquifund], stores it, and processes the resulting [MaybeClosedPosition].
     pub(crate) fn position_liquifund_store(
         &self,
         ctx: &mut StateContext,
