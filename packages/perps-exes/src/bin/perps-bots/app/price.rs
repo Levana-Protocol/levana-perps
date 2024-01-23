@@ -247,55 +247,30 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
             // UpdatePriceFeeds again.
             match worker.mode {
                 WorkerMode::MultiMessage => {
-                    let MultiMessageResult {
-                        messages,
-                        remaining_cranks,
-                    } = get_multi_messages(factory.markets.clone(), markets_to_update.clone());
+                    let markets_to_crank: Vec<_> =
+                        markets_to_update.clone().into_iter().take(5).collect();
+                    let multi_message = MultiMessageEntity {
+                        markets: factory.markets.clone(),
+                        trigger: markets_to_crank,
+                    };
 
                     let now = Instant::now();
-                    for message in messages {
-                        let tx = construct_multi_message(
-                            message,
-                            &worker.wallet,
-                            &app,
-                            &offchain_price_data,
-                        )
-                        .await?;
-                        let response = tx
-                            .sign_and_broadcast_cosmos_tx(&app.cosmos, &worker.wallet)
-                            .await;
-                        let result = process_tx_result(&app, &worker.wallet, &now, response).await;
-                        match result {
-                            Ok(res) => successes.push(res),
-                            Err(e) => errors.push(format!("{e:?}")),
-                        }
-                    }
-                    for cranks in remaining_cranks.chunks(5) {
-                        let mut builder = TxBuilder::default();
-                        for (market, _, _) in cranks {
-                            let rewards = app
-                                .config
-                                .get_crank_rewards_wallet()
-                                .map(|a| a.get_address_string().into());
-                            let wallet = &*worker.wallet.clone();
-                            builder.add_execute_message(
-                                market,
-                                wallet,
-                                vec![],
-                                MarketExecuteMsg::Crank {
-                                    execs: Some(2),
-                                    rewards: rewards.clone(),
-                                },
-                            )?;
-                        }
-                        let response = builder
-                            .sign_and_broadcast_cosmos_tx(&app.cosmos, &worker.wallet)
-                            .await;
-                        let result = process_tx_result(&app, &worker.wallet, &now, response).await;
-                        match result {
-                            Ok(res) => successes.push(res),
-                            Err(e) => errors.push(format!("{e:?}")),
-                        }
+
+                    let tx = construct_multi_message(
+                        multi_message,
+                        &worker.wallet,
+                        &app,
+                        &offchain_price_data,
+                    )
+                    .await?;
+
+                    let response = tx
+                        .sign_and_broadcast_cosmos_tx(&app.cosmos, &worker.wallet)
+                        .await;
+                    let result = process_tx_result(&app, &worker.wallet, &now, response).await;
+                    match result {
+                        Ok(res) => successes.push(res),
+                        Err(e) => errors.push(format!("{e:?}")),
                     }
                 }
                 WorkerMode::Normal => {
@@ -356,16 +331,6 @@ pub(crate) struct MultiMessageEntity {
     pub(crate) trigger: Vec<(Address, MarketId, CrankTriggerReason)>,
 }
 
-/// This structure represents the various transactions that are
-/// required to land both the oracle price update as well as the
-/// cranking. The number of transactions that would be required to
-/// complete is the sum of messages.len() and (message_cranks.len() /
-/// 5)
-pub(crate) struct MultiMessageResult {
-    pub(crate) messages: Vec<MultiMessageEntity>,
-    pub(crate) remaining_cranks: Vec<(Address, MarketId, CrankTriggerReason)>,
-}
-
 async fn process_tx_result(
     app: &App,
     wallet: &Wallet,
@@ -424,53 +389,6 @@ async fn construct_multi_message(
         )?;
     }
     Ok(builder)
-}
-
-/// Construct [`MultiMessageResult`] for efficiently landing
-/// transaction.
-///
-/// * `markets`: The vector representing collection of markets for
-/// which we will be doing the oracle UpdatePriceFeeds.
-/// * `markets_to_trigger`: * `markets_to_trigger`: The vector of markets for
-/// which will be triggering the crank with exec as 2.
-///
-/// The objective of this function is to construct
-/// [`MultiMessageResult`] which itself is comprised of vector of
-/// [`MultiMessageEntity`] and the remaning cranks that needs to be done.
-/// We ensure the following things here:
-/// - Ensure that we do the oracle UpdatePriceFeeds and cranking for
-/// the same market together if cranking needs to be done for the same market.
-/// - For the markets which requires cranking to be performed, but no
-/// oracle update is required - we send it as part of `remaining_cranks`
-fn get_multi_messages(
-    markets: Vec<Market>,
-    markets_to_trigger: Vec<(Address, MarketId, CrankTriggerReason)>,
-) -> MultiMessageResult {
-    let original_markets = markets.clone();
-    let markets = markets.chunks(5);
-    let mut result = vec![];
-    let markets_to_trigger = markets_to_trigger.into_iter();
-    for market in markets {
-        let markets_to_trigger: Vec<_> = markets_to_trigger
-            .clone()
-            .filter(|(_, market_id, _)| market.iter().any(|item| item.market_id == *market_id))
-            .collect();
-        result.push(MultiMessageEntity {
-            markets: market.to_vec(),
-            trigger: markets_to_trigger.clone(),
-        })
-    }
-    let remaining_cranks = markets_to_trigger
-        .filter(|(_, market_id, _)| {
-            !original_markets
-                .iter()
-                .any(|item| item.market_id == *market_id)
-        })
-        .collect();
-    MultiMessageResult {
-        messages: result,
-        remaining_cranks,
-    }
 }
 
 #[derive(Debug)]
