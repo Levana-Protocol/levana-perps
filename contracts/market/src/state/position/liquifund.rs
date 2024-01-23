@@ -69,13 +69,17 @@ impl State<'_> {
             .split()
             .0;
 
-        let pos = match self.position_settle_pending_fees(
-            ctx,
+        let pos_fee_settlement = self.position_settle_pending_fees(
+            ctx.storage,
             pos,
             starts_at,
             ends_at,
             charge_crank_fee,
-        )? {
+        )?;
+
+        pos_fee_settlement.apply(self, ctx)?;
+
+        let pos = match pos_fee_settlement.position {
             MaybeClosedPosition::Open(pos) => pos,
             MaybeClosedPosition::Close(instructions) => {
                 return Ok(MaybeClosedPosition::Close(instructions));

@@ -13,6 +13,7 @@ use msg::contracts::market::order::{LimitOrder, OrderId};
 use msg::contracts::market::position::CollateralAndUsd;
 use msg::prelude::*;
 
+use super::fees::CapCrankFee;
 use super::position::OpenPositionParams;
 
 /// Stores the last used [OrderId]
@@ -59,7 +60,8 @@ impl State<'_> {
 
         let crank_fee_usd = self.config.crank_fee_charged;
         let crank_fee = price.usd_to_collateral(crank_fee_usd);
-        self.collect_crank_fee(ctx, TradeId::LimitOrder(order_id), crank_fee, crank_fee_usd)?;
+        CapCrankFee::new(crank_fee, crank_fee_usd, TradeId::LimitOrder(order_id))
+            .apply(self, ctx)?;
         let collateral = collateral
             .checked_sub(crank_fee)
             .context("Insufficient funds to cover fees, failed on crank fee")?;

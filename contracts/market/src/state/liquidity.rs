@@ -42,7 +42,7 @@ pub(crate) fn yield_init(store: &mut dyn Storage) -> Result<()> {
 
 /// Stores how much yield is allocated per LP and xLP token as prefix sums.
 #[derive(Serialize, Deserialize, Debug)]
-pub(super) struct YieldPerToken {
+pub(crate) struct YieldPerToken {
     /// Prefix sum for LP tokens
     lp: Collateral,
     /// Prefix sum for xLP tokens
@@ -173,10 +173,10 @@ impl State<'_> {
     /// Stores new yield to be used during future calculations
     pub(crate) fn liquidity_process_new_yield(
         &self,
-        ctx: &mut StateContext,
+        store: &dyn Storage,
         new_yield: LpAndXlp,
-    ) -> Result<()> {
-        let stats = self.load_liquidity_stats(ctx.storage)?;
+    ) -> Result<LiquidityNewYieldToProcess> {
+        let stats = self.load_liquidity_stats(store)?;
         let lp_yield_per_token = match NonZero::new(stats.total_lp.into_decimal256()) {
             None => {
                 debug_assert_eq!(new_yield.lp, Collateral::zero());
@@ -192,7 +192,7 @@ impl State<'_> {
             Some(total_xlp) => new_yield.xlp.div_non_zero_dec(total_xlp),
         };
 
-        let (last_index, last_yield) = self.latest_yield_per_token(ctx.storage)?;
+        let (last_index, last_yield) = self.latest_yield_per_token(store)?;
 
         let new_yield = YieldPerToken {
             lp: last_yield.lp.checked_add(lp_yield_per_token)?,
@@ -200,9 +200,11 @@ impl State<'_> {
         };
 
         let next_index = last_index + 1;
-        YIELD_PER_TIME_PER_TOKEN.save(ctx.storage, next_index, &new_yield)?;
 
-        Ok(())
+        Ok(LiquidityNewYieldToProcess {
+            next_index,
+            new_yield,
+        })
     }
 
     /// Get the latest key and value from [YIELD_PER_TIME_PER_TOKEN].
@@ -1099,6 +1101,19 @@ impl LiquidityLock {
             amount: self.amount,
         });
 
+        Ok(())
+    }
+}
+
+#[must_use]
+pub(crate) struct LiquidityNewYieldToProcess {
+    pub next_index: u64,
+    pub new_yield: YieldPerToken,
+}
+
+impl LiquidityNewYieldToProcess {
+    pub(crate) fn apply(&self, _state: &State, ctx: &mut StateContext) -> Result<()> {
+        YIELD_PER_TIME_PER_TOKEN.save(ctx.storage, self.next_index, &self.new_yield)?;
         Ok(())
     }
 }

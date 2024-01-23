@@ -7,10 +7,12 @@ use cw_storage_plus::Item;
 use msg::contracts::market::deferred_execution::FeesReturnedEvent;
 use msg::contracts::market::entry::Fees;
 use msg::contracts::market::fees::events::{
-    CrankFeeEarnedEvent, CrankFeeEvent, FeeEvent, FeeSource, TradeId,
+    CrankFeeEarnedEvent, CrankFeeEvent, FeeEvent, FeeSource, InsufficientMarginEvent, TradeId,
 };
 use msg::contracts::market::position::PositionId;
 use shared::prelude::*;
+
+use self::liquidity::LiquidityNewYieldToProcess;
 
 use super::funding::LpAndXlp;
 
@@ -40,11 +42,11 @@ impl State<'_> {
     // only earmarks the fee, doesn't transfer anything
     pub(crate) fn collect_borrow_fee(
         &self,
-        ctx: &mut StateContext,
+        store: &dyn Storage,
         pos_id: PositionId,
         amount: LpAndXlp,
         price: PricePoint,
-    ) -> Result<()> {
+    ) -> Result<BorrowFeeCollection> {
         let protocol_tax = self.config.protocol_tax;
         let protocol_fee_lp = amount.lp.checked_mul_dec(protocol_tax)?;
         let protocol_fee_xlp = amount.xlp.checked_mul_dec(protocol_tax)?;
@@ -53,32 +55,27 @@ impl State<'_> {
         let protocol_fee = protocol_fee_lp.checked_add(protocol_fee_xlp)?;
         debug_assert_eq!(protocol_fee + lp_fee + xlp_fee, amount.lp + amount.xlp);
 
-        ALL_FEES.update::<_, anyhow::Error>(ctx.storage, |mut fee| {
-            fee.wallets += lp_fee + xlp_fee;
-            fee.protocol += protocol_fee;
-            Ok(fee)
-        })?;
-
-        self.liquidity_process_new_yield(
-            ctx,
+        let liquidity_yield_to_process = self.liquidity_process_new_yield(
+            store,
             LpAndXlp {
                 lp: lp_fee,
                 xlp: xlp_fee,
             },
         )?;
 
-        ctx.response_mut().add_event(FeeEvent {
-            trade_id: TradeId::Position(pos_id),
-            fee_source: FeeSource::Borrow,
-            lp_amount: lp_fee,
-            lp_amount_usd: price.collateral_to_usd(lp_fee),
-            xlp_amount: xlp_fee,
-            xlp_amount_usd: price.collateral_to_usd(xlp_fee),
-            protocol_amount: protocol_fee,
-            protocol_amount_usd: price.collateral_to_usd(protocol_fee),
-        });
-
-        Ok(())
+        Ok(BorrowFeeCollection {
+            liquidity_yield_to_process,
+            event: FeeEvent {
+                trade_id: TradeId::Position(pos_id),
+                fee_source: FeeSource::Borrow,
+                lp_amount: lp_fee,
+                lp_amount_usd: price.collateral_to_usd(lp_fee),
+                xlp_amount: xlp_fee,
+                xlp_amount_usd: price.collateral_to_usd(xlp_fee),
+                protocol_amount: protocol_fee,
+                protocol_amount_usd: price.collateral_to_usd(protocol_fee),
+            },
+        })
     }
 
     // only earmarks the fee, doesn't transfer anything
@@ -137,12 +134,13 @@ impl State<'_> {
         })?;
 
         self.liquidity_process_new_yield(
-            ctx,
+            ctx.storage,
             LpAndXlp {
                 lp: lp_fee,
                 xlp: xlp_fee,
             },
-        )?;
+        )?
+        .apply(self, ctx)?;
 
         ctx.response_mut().add_event(FeeEvent {
             trade_id,
@@ -153,34 +151,6 @@ impl State<'_> {
             xlp_amount_usd: price.collateral_to_usd(xlp_fee),
             protocol_amount: protocol_fee,
             protocol_amount_usd: price.collateral_to_usd(protocol_fee),
-        });
-
-        Ok(())
-    }
-
-    /// Emits events and increases the fee amount within the protocol for one crank fee.
-    ///
-    /// Returns the amount of the crank fee. It is the _caller's responsibility_
-    /// to make sure the fee is taken off of active collateral or a similar
-    /// field.
-    pub(crate) fn collect_crank_fee(
-        &self,
-        ctx: &mut StateContext,
-        trade_id: TradeId,
-        amount: Collateral,
-        amount_usd: Usd,
-    ) -> Result<()> {
-        let mut fees = ALL_FEES.load(ctx.storage)?;
-        let old_balance = fees.crank;
-        fees.crank = fees.crank.checked_add(amount)?;
-        ALL_FEES.save(ctx.storage, &fees)?;
-
-        ctx.response_mut().add_event(CrankFeeEvent {
-            trade_id,
-            amount,
-            amount_usd,
-            old_balance,
-            new_balance: fees.crank,
         });
 
         Ok(())
@@ -317,6 +287,78 @@ impl State<'_> {
             amount,
             amount_usd: price_point.collateral_to_usd_non_zero(amount),
         });
+        Ok(())
+    }
+}
+
+#[must_use]
+pub(crate) struct BorrowFeeCollection {
+    pub event: FeeEvent,
+    pub liquidity_yield_to_process: LiquidityNewYieldToProcess,
+}
+
+impl BorrowFeeCollection {
+    pub fn apply(&self, state: &State, ctx: &mut StateContext) -> Result<()> {
+        let Self {
+            event,
+            liquidity_yield_to_process,
+        } = self;
+
+        liquidity_yield_to_process.apply(state, ctx)?;
+
+        ALL_FEES.update::<_, anyhow::Error>(ctx.storage, |mut fee| {
+            fee.wallets += event.lp_amount + event.xlp_amount;
+            fee.protocol += event.protocol_amount;
+            Ok(fee)
+        })?;
+
+        ctx.response_mut().add_event(event.clone());
+        Ok(())
+    }
+}
+
+#[must_use]
+pub(crate) struct CapCrankFee {
+    pub amount: Collateral,
+    pub amount_usd: Usd,
+    pub insufficient_margin_event: Option<InsufficientMarginEvent>,
+    pub trade_id: TradeId,
+}
+
+impl CapCrankFee {
+    pub fn new(amount: Collateral, amount_usd: Usd, trade_id: TradeId) -> Self {
+        Self {
+            amount,
+            amount_usd,
+            insufficient_margin_event: None,
+            trade_id,
+        }
+    }
+
+    pub fn apply(&self, _state: &State, ctx: &mut StateContext) -> Result<()> {
+        let Self {
+            trade_id,
+            amount,
+            amount_usd,
+            insufficient_margin_event,
+        } = self;
+        if let Some(event) = insufficient_margin_event {
+            ctx.response_mut().add_event(event);
+        }
+
+        let mut fees = ALL_FEES.load(ctx.storage)?;
+        let old_balance = fees.crank;
+        fees.crank = fees.crank.checked_add(*amount)?;
+        ALL_FEES.save(ctx.storage, &fees)?;
+
+        ctx.response_mut().add_event(CrankFeeEvent {
+            trade_id: trade_id.clone(),
+            amount: *amount,
+            amount_usd: *amount_usd,
+            old_balance,
+            new_balance: fees.crank,
+        });
+
         Ok(())
     }
 }
