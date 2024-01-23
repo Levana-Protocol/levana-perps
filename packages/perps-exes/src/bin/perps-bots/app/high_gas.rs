@@ -47,54 +47,53 @@ pub(crate) struct HighGasWork {
 
 impl HighGasWork {
     pub fn append(self, other: Self) -> Self {
-        match (self, other) {
-            (
-                HighGasWork {
-                    offchain_price_data,
-                    mut markets_to_update,
-                    queued: queued1,
-                },
-                HighGasWork {
-                    offchain_price_data: other_offchain_price_data,
-                    markets_to_update: other_markets_to_update,
-                    queued: queued2,
-                },
-            ) => {
-                for (market, market_id, reason) in other_markets_to_update.into_iter() {
-                    if !markets_to_update.iter().any(|(_, id, _)| *id == market_id) {
-                        markets_to_update.push((market, market_id, reason));
-                    }
+        let (
+            HighGasWork {
+                offchain_price_data,
+                mut markets_to_update,
+                queued: queued1,
+            },
+            HighGasWork {
+                offchain_price_data: other_offchain_price_data,
+                markets_to_update: other_markets_to_update,
+                queued: queued2,
+            },
+        ) = (self, other);
+        {
+            for (market, market_id, reason) in other_markets_to_update.into_iter() {
+                if !markets_to_update.iter().any(|(_, id, _)| *id == market_id) {
+                    markets_to_update.push((market, market_id, reason));
                 }
+            }
 
-                // would be nice to get rid of this clone, but this path shouldn't be hit very often
-                let mut offchain_price_data = (*offchain_price_data).clone();
-                let OffchainPriceData {
-                    values,
-                    stable_ids,
-                    edge_ids,
-                } = &*other_offchain_price_data;
+            // would be nice to get rid of this clone, but this path shouldn't be hit very often
+            let mut offchain_price_data = (*offchain_price_data).clone();
+            let OffchainPriceData {
+                values,
+                stable_ids,
+                edge_ids,
+            } = &*other_offchain_price_data;
 
-                offchain_price_data.stable_ids.extend(stable_ids.iter());
-                offchain_price_data.edge_ids.extend(edge_ids.iter());
+            offchain_price_data.stable_ids.extend(stable_ids.iter());
+            offchain_price_data.edge_ids.extend(edge_ids.iter());
 
-                for (key, value) in values {
-                    // insert if it's a brand new key or if the timestamp is newer than the previous one
-                    let should_insert = match offchain_price_data.values.get(key) {
-                        None => true,
-                        Some(prev) if value.1 >= prev.1 => true,
-                        _ => false,
-                    };
+            for (key, value) in values {
+                // insert if it's a brand new key or if the timestamp is newer than the previous one
+                let should_insert = match offchain_price_data.values.get(key) {
+                    None => true,
+                    Some(prev) if value.1 >= prev.1 => true,
+                    _ => false,
+                };
 
-                    if should_insert {
-                        offchain_price_data.values.insert(*key, *value);
-                    }
+                if should_insert {
+                    offchain_price_data.values.insert(*key, *value);
                 }
+            }
 
-                HighGasWork {
-                    offchain_price_data: Arc::new(offchain_price_data),
-                    markets_to_update,
-                    queued: queued1.min(queued2),
-                }
+            HighGasWork {
+                offchain_price_data: Arc::new(offchain_price_data),
+                markets_to_update,
+                queued: queued1.min(queued2),
             }
         }
     }
