@@ -247,8 +247,9 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
             // UpdatePriceFeeds again.
             match worker.mode {
                 WorkerMode::MultiMessage => {
+                    let split_index = std::cmp::min(5, markets_to_update.len());
                     let (markets_to_crank, remaining_markets_to_crank) =
-                        markets_to_update.split_at(5);
+                        markets_to_update.split_at(split_index);
                     let multi_message = MultiMessageEntity {
                         markets: factory.markets.clone(),
                         trigger: markets_to_crank.to_vec(),
