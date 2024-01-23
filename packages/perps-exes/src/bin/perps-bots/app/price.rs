@@ -416,7 +416,6 @@ fn get_multi_messages(
     markets: Vec<Market>,
     markets_to_trigger: Vec<(Address, MarketId, CrankTriggerReason)>,
 ) -> MultiMessageResult {
-    // todo: check difference to find out at places where only cranking is required
     let original_markets = markets.clone();
     let markets = markets.chunks(5);
     let mut result = vec![];
@@ -769,7 +768,6 @@ pub(crate) async fn update_oracles(
         .await
     {
         Ok(res) => {
-            // todo: this
             track_tx_fees(app, wallet.get_address(), &res).await;
             Ok(format!(
                 "Prices updated in Pyth oracle contract with txhash {}, delay: {:?}",
