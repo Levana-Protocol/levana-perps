@@ -359,7 +359,7 @@ async fn process_tx_result(
 }
 
 /// Construct TxBuilder for both Oracle Update price feed as well as
-/// do the cranking.
+/// to do the minimal cranking.
 async fn construct_multi_message(
     message: MultiMessageEntity,
     wallet: &Wallet,
