@@ -612,39 +612,6 @@ impl State<'_> {
         Ok(addr_stats)
     }
 
-    /// Update the amount of locked liquidity. Note, this does not update unlocked.
-    pub(crate) fn liquidity_update_locked(
-        &self,
-        ctx: &mut StateContext,
-        amount: Signed<Collateral>,
-        price: &PricePoint,
-    ) -> Result<()> {
-        let mut stats = self.load_liquidity_stats(ctx.storage)?;
-        stats.locked = match stats
-            .locked
-            .into_signed()
-            .checked_add(amount)?
-            .try_into_non_negative_value()
-        {
-            None => anyhow::bail!(
-                "liquidity_update_locked: locked is {}, amount is {}",
-                stats.locked,
-                amount
-            ),
-            Some(locked) => locked,
-        };
-
-        self.save_liquidity_stats(ctx.storage, &stats)?;
-
-        // The total pool size *has* changed here, due to LPs winning or losing
-        // at the time of liquifunding
-        self.add_pool_size_change_events(ctx, &stats, price)?;
-
-        ctx.response_mut().add_event(LockUpdateEvent { amount });
-
-        Ok(())
-    }
-
     /// Minimum amount of liquidity needed to allow a carry leverage trade that balances the net notional.
     pub(crate) fn min_unlocked_liquidity(
         &self,
@@ -1114,6 +1081,56 @@ pub(crate) struct LiquidityNewYieldToProcess {
 impl LiquidityNewYieldToProcess {
     pub(crate) fn apply(&self, _state: &State, ctx: &mut StateContext) -> Result<()> {
         YIELD_PER_TIME_PER_TOKEN.save(ctx.storage, self.next_index, &self.new_yield)?;
+        Ok(())
+    }
+}
+
+// Helper struct for liquidity "update lock"
+// Update the amount of locked liquidity. Note, this does not update unlocked.
+// TBD: can this be consolidated into LiquidityLock with a flag?
+#[must_use]
+pub(crate) struct LiquidityUpdateLocked {
+    pub amount: Signed<Collateral>,
+    pub price: PricePoint,
+}
+
+impl LiquidityUpdateLocked {
+    // Validate is automatically called by apply (so that it also loads the latest stats)
+    // but can also be called for error recovery in the submessage handler
+    pub(crate) fn validate(&self, state: &State, store: &dyn Storage) -> Result<LiquidityStats> {
+        let Self { amount, .. } = self;
+        let mut stats = state.load_liquidity_stats(store)?;
+        stats.locked = match stats
+            .locked
+            .into_signed()
+            .checked_add(*amount)?
+            .try_into_non_negative_value()
+        {
+            None => anyhow::bail!(
+                "liquidity_update_locked: locked is {}, amount is {}",
+                stats.locked,
+                amount
+            ),
+            Some(locked) => locked,
+        };
+
+        Ok(stats)
+    }
+
+    pub(crate) fn apply(&self, state: &State, ctx: &mut StateContext) -> Result<()> {
+        let Self { amount, price } = self;
+
+        let stats = self.validate(state, ctx.storage)?;
+
+        state.save_liquidity_stats(ctx.storage, &stats)?;
+
+        // The total pool size *has* changed here, due to LPs winning or losing
+        // at the time of liquifunding
+        state.add_pool_size_change_events(ctx, &stats, price)?;
+
+        ctx.response_mut()
+            .add_event(LockUpdateEvent { amount: *amount });
+
         Ok(())
     }
 }

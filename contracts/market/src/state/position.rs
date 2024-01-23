@@ -1,7 +1,6 @@
-mod liquifund;
+pub(crate) mod liquifund;
 
 use cosmwasm_std::Order;
-pub use liquifund::*;
 mod open;
 use msg::contracts::market::{
     entry::{ClosedPositionCursor, ClosedPositionsResp, PositionsQueryFeeApproach},

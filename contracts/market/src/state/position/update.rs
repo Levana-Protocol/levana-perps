@@ -192,11 +192,11 @@ impl State<'_> {
     pub fn update_position_collateral(
         &self,
         store: &dyn Storage,
-        id: PositionId,
+        pos: Position,
         collateral_delta: Signed<Collateral>,
         price_point: &PricePoint,
     ) -> Result<UpdatePositionCollateral> {
-        let mut pos = get_position(store, id)?;
+        let mut pos = pos;
         let original_pos = pos.clone();
 
         // Update
@@ -232,12 +232,12 @@ impl State<'_> {
     pub fn update_position_leverage(
         &self,
         store: &dyn Storage,
-        id: PositionId,
+        pos: Position,
         notional_size: Signed<Notional>,
         price_point: &PricePoint,
     ) -> Result<UpdatePositionLeverage> {
-        let original_pos = get_position(store, id)?;
-        let mut pos = original_pos.clone();
+        let mut pos = pos;
+        let original_pos = pos.clone();
 
         if notional_size.into_number().approx_eq(Number::ZERO) {
             perp_bail!(
@@ -328,11 +328,11 @@ impl State<'_> {
     pub fn update_position_size(
         &self,
         store: &dyn Storage,
-        id: PositionId,
+        pos: Position,
         collateral_delta: Signed<Collateral>,
         price_point: &PricePoint,
     ) -> Result<UpdatePositionSize> {
-        let mut pos = get_position(store, id)?;
+        let mut pos = pos;
         let original_pos = pos.clone();
 
         // Update
@@ -432,15 +432,15 @@ impl State<'_> {
     pub fn update_position_max_gains(
         &self,
         store: &dyn Storage,
-        id: PositionId,
+        pos: Position,
         max_gains: MaxGainsInQuote,
         price_point: &PricePoint,
     ) -> Result<UpdatePositionMaxGains> {
-        let original_pos = get_position(store, id)?;
-        let mut pos = original_pos.clone();
+        let mut pos = pos;
+        let original_pos = pos.clone();
 
         let counter_collateral =
-            self.update_max_gains_new_counter_collateral(store, id, max_gains, price_point)?;
+            self.update_max_gains_new_counter_collateral(store, pos.id, max_gains, price_point)?;
 
         let old_counter_collateral = pos.counter_collateral;
         let new_counter_collateral = counter_collateral;

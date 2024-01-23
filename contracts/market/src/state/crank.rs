@@ -261,7 +261,10 @@ impl State<'_> {
 
                 // We want to liquifund up until the price point's timestamp and make sure we shouldn't be liquidated for some other reason.
                 let ends_at = price_point.timestamp;
-                let mcp = self.position_liquifund(ctx, pos, starts_at, ends_at, true)?;
+                let liquifund =
+                    self.position_liquifund(ctx.storage, pos, starts_at, ends_at, true)?;
+                liquifund.apply(self, ctx)?;
+                let mcp = liquifund.position;
 
                 let close_position_instructions = match mcp {
                     MaybeClosedPosition::Open(pos) => ClosePositionInstructions {

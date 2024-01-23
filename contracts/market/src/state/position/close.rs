@@ -1,4 +1,4 @@
-use crate::state::liquidity::LiquidityUnlock;
+use crate::state::liquidity::{LiquidityUnlock, LiquidityUpdateLocked};
 use crate::state::position::CLOSED_POSITIONS;
 use crate::state::{position::CLOSED_POSITION_HISTORY, *};
 use anyhow::Context;
@@ -20,7 +20,9 @@ impl State<'_> {
         let ends_at = settlement_price.timestamp;
         // Confirm that all past liquifundings have been performed before explicitly closing
         debug_assert!(pos.next_liquifunding >= ends_at);
-        let mcp = self.position_liquifund(ctx, pos, starts_at, ends_at, false)?;
+        let liquifund = self.position_liquifund(ctx.storage, pos, starts_at, ends_at, false)?;
+        liquifund.apply(self, ctx)?;
+        let mcp = liquifund.position;
 
         // Liquifunding may have triggered a close, so check before we close again
         let instructions = match mcp {
@@ -124,7 +126,11 @@ impl State<'_> {
         // Take the exposure we already capped and subtract out the final exposure. Since both numbers in a loss scenario will be negative, this will give back the positive value representing the funds to be sent to the liquidity pool.
         let additional_lp_funds = capped_exposure.checked_sub(final_exposure)?;
         debug_assert!(additional_lp_funds >= Signed::zero());
-        self.liquidity_update_locked(ctx, additional_lp_funds, &settlement_price)?;
+        LiquidityUpdateLocked {
+            amount: additional_lp_funds,
+            price: settlement_price,
+        }
+        .apply(self, ctx)?;
 
         // Final active collateral is the active collateral post fees plus final
         // exposure numbers. The final exposure will be negative for losses and positive
