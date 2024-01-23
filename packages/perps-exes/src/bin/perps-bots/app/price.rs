@@ -253,6 +253,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                     } = get_multi_messages(factory.markets.clone(), markets_to_update.clone());
 
                     let now = Instant::now();
+                    let mut should_continue = true;
                     for message in messages {
                         let tx = construct_multi_message(
                             message,
@@ -264,35 +265,44 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                         let response = tx
                             .sign_and_broadcast_cosmos_tx(&app.cosmos, &worker.wallet)
                             .await;
-                        let result =
-                            process_tx_result(&app, &worker.wallet, &now, response).await?;
-                        successes.push(result);
-                    }
-
-                    for cranks in remaining_cranks.chunks(5) {
-                        let mut builder = TxBuilder::default();
-                        for (market, _, _) in cranks {
-                            let rewards = app
-                                .config
-                                .get_crank_rewards_wallet()
-                                .map(|a| a.get_address_string().into());
-                            let wallet = &*worker.wallet.clone();
-                            builder.add_execute_message(
-                                market,
-                                wallet,
-                                vec![],
-                                MarketExecuteMsg::Crank {
-                                    execs: Some(0),
-                                    rewards: rewards.clone(),
-                                },
-                            )?;
+                        let result = process_tx_result(&app, &worker.wallet, &now, response).await;
+                        match result {
+                            Ok(res) => successes.push(res),
+                            Err(e) => {
+                                errors.push(format!("{e:?}"));
+                                should_continue = false;
+                            }
                         }
-                        let response = builder
-                            .sign_and_broadcast_cosmos_tx(&app.cosmos, &worker.wallet)
-                            .await;
-                        let result =
-                            process_tx_result(&app, &worker.wallet, &now, response).await?;
-                        successes.push(result);
+                    }
+                    if should_continue {
+                        for cranks in remaining_cranks.chunks(5) {
+                            let mut builder = TxBuilder::default();
+                            for (market, _, _) in cranks {
+                                let rewards = app
+                                    .config
+                                    .get_crank_rewards_wallet()
+                                    .map(|a| a.get_address_string().into());
+                                let wallet = &*worker.wallet.clone();
+                                builder.add_execute_message(
+                                    market,
+                                    wallet,
+                                    vec![],
+                                    MarketExecuteMsg::Crank {
+                                        execs: Some(0),
+                                        rewards: rewards.clone(),
+                                    },
+                                )?;
+                            }
+                            let response = builder
+                                .sign_and_broadcast_cosmos_tx(&app.cosmos, &worker.wallet)
+                                .await;
+                            let result =
+                                process_tx_result(&app, &worker.wallet, &now, response).await;
+                            match result {
+                                Ok(res) => successes.push(res),
+                                Err(e) => errors.push(format!("{e:?}")),
+                            }
+                        }
                     }
                 }
                 WorkerMode::Normal => {
