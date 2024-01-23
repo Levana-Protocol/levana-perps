@@ -159,7 +159,18 @@ fn helper(
             id,
             slippage_assert,
         } => {
-            let pos = get_position(ctx.storage, id)?;
+            let pos = match get_position(ctx.storage, id) {
+                Ok(pos) => Ok(pos),
+                Err(e) => match state.load_closed_position(ctx.storage, id) {
+                    Ok(Some(closed)) => Err(MarketError::PositionAlreadyClosed {
+                        id: id.u64().into(),
+                        close_time: closed.close_time,
+                        reason: closed.reason.to_string(),
+                    }
+                    .into_anyhow()),
+                    _ => Err(e),
+                },
+            }?;
             if let Some(slippage_assert) = slippage_assert {
                 let market_type = state.market_id(ctx.storage)?.get_market_type();
                 state.do_slippage_assert(
