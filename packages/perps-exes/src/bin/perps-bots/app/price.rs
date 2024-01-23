@@ -241,65 +241,73 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                     .await;
             }
 
-            if worker.mode == WorkerMode::MultiMessage {
-                let MultiMessageResult {
-                    messages,
-                    remaining_cranks,
-                } = get_multi_messages(factory.markets.clone(), markets_to_update.clone());
+            // Even if we do the Oracle UpdatePriceFeeds in the above
+            // step, we don't want to wait for it to finish. So in the
+            // below execution flow, we perform the Oracle
+            // UpdatePriceFeeds again.
+            match worker.mode {
+                WorkerMode::MultiMessage => {
+                    let MultiMessageResult {
+                        messages,
+                        remaining_cranks,
+                    } = get_multi_messages(factory.markets.clone(), markets_to_update.clone());
 
-                let now = Instant::now();
-                for message in messages {
-                    let tx = construct_multi_message(
-                        message,
-                        &worker.wallet,
-                        &app,
-                        &offchain_price_data,
-                    )
-                    .await?;
-                    let response = tx
-                        .sign_and_broadcast_cosmos_tx(&app.cosmos, &worker.wallet)
-                        .await;
-                    let result = process_tx_result(&app, &worker.wallet, &now, response).await?;
-                    successes.push(result);
-                }
-
-                for cranks in remaining_cranks.chunks(5) {
-                    let mut builder = TxBuilder::default();
-                    for (market, _, _) in cranks {
-                        let rewards = app
-                            .config
-                            .get_crank_rewards_wallet()
-                            .map(|a| a.get_address_string().into());
-                        let wallet = &*worker.wallet.clone();
-                        builder.add_execute_message(
-                            market,
-                            wallet,
-                            vec![],
-                            MarketExecuteMsg::Crank {
-                                execs: Some(0),
-                                rewards: rewards.clone(),
-                            },
-                        )?;
+                    let now = Instant::now();
+                    for message in messages {
+                        let tx = construct_multi_message(
+                            message,
+                            &worker.wallet,
+                            &app,
+                            &offchain_price_data,
+                        )
+                        .await?;
+                        let response = tx
+                            .sign_and_broadcast_cosmos_tx(&app.cosmos, &worker.wallet)
+                            .await;
+                        let result =
+                            process_tx_result(&app, &worker.wallet, &now, response).await?;
+                        successes.push(result);
                     }
-                    let response = builder
-                        .sign_and_broadcast_cosmos_tx(&app.cosmos, &worker.wallet)
-                        .await;
-                    // todo: change message
-                    let result = process_tx_result(&app, &worker.wallet, &now, response).await?;
-                    successes.push(result);
+
+                    for cranks in remaining_cranks.chunks(5) {
+                        let mut builder = TxBuilder::default();
+                        for (market, _, _) in cranks {
+                            let rewards = app
+                                .config
+                                .get_crank_rewards_wallet()
+                                .map(|a| a.get_address_string().into());
+                            let wallet = &*worker.wallet.clone();
+                            builder.add_execute_message(
+                                market,
+                                wallet,
+                                vec![],
+                                MarketExecuteMsg::Crank {
+                                    execs: Some(0),
+                                    rewards: rewards.clone(),
+                                },
+                            )?;
+                        }
+                        let response = builder
+                            .sign_and_broadcast_cosmos_tx(&app.cosmos, &worker.wallet)
+                            .await;
+                        let result =
+                            process_tx_result(&app, &worker.wallet, &now, response).await?;
+                        successes.push(result);
+                    }
                 }
-            } else {
-                successes.push(
-                    update_oracles(
-                        &worker.wallet,
-                        &app,
-                        &factory.markets,
-                        &offchain_price_data,
-                        // We already did "very high" above, so if we have any HighGas, it's just "high" now
-                        any_needs_high_gas_oracle_update.map(|_| HighGas::High),
-                    )
-                    .await?,
-                );
+                WorkerMode::Normal => {
+                    successes.push(
+                        update_oracles(
+                            &worker.wallet,
+                            &app,
+                            &factory.markets,
+                            &offchain_price_data,
+                            // We already did "very high" above, so if we have any HighGas, it's just "high" now
+                            any_needs_high_gas_oracle_update.map(|_| HighGas::High),
+                        )
+                        .await?,
+                    );
+                }
             }
         } else {
             successes.push("No markets needed an oracle update".to_owned());
@@ -371,6 +379,8 @@ async fn process_tx_result(
     }
 }
 
+/// Construct TxBuilder for both Oracle Update price feed as well as
+/// do the cranking.
 async fn construct_multi_message(
     message: MultiMessageEntity,
     wallet: &Wallet,
