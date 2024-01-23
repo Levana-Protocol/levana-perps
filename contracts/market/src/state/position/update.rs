@@ -190,315 +190,6 @@ impl State<'_> {
         Ok(evt)
     }
 
-    pub fn update_position_collateral(
-        &self,
-        store: &dyn Storage,
-        pos: Position,
-        collateral_delta: Signed<Collateral>,
-        price_point: &PricePoint,
-    ) -> Result<UpdatePositionCollateral> {
-        let mut pos = pos;
-        let original_pos = pos.clone();
-
-        // Update
-        pos.active_collateral = pos.active_collateral.checked_add_signed(collateral_delta)?;
-        pos.deposit_collateral
-            .checked_add_assign(collateral_delta, price_point)?;
-
-        let market_type = self.market_id(store)?.get_market_type();
-
-        let trade_volume = trade_volume_usd(&original_pos, price_point, market_type)?
-            .diff(trade_volume_usd(&pos, price_point, market_type)?);
-
-        // Validate
-        self.position_validate_leverage_data(market_type, &pos, price_point, Some(&original_pos))?;
-        if collateral_delta.is_negative() {
-            self.validate_minimum_deposit_collateral(pos.active_collateral.raw(), price_point)?;
-        }
-
-        // calculate possible user refund
-        let user_refund = (-collateral_delta).try_into_non_zero();
-
-        let event = self.position_update_event(store, &original_pos, pos.clone(), price_point)?;
-
-        Ok(UpdatePositionCollateral {
-            pos,
-            price_point: *price_point,
-            trade_volume,
-            user_refund,
-            event,
-        })
-    }
-
-    pub fn update_position_leverage(
-        &self,
-        store: &dyn Storage,
-        pos: Position,
-        notional_size: Signed<Notional>,
-        price_point: &PricePoint,
-    ) -> Result<UpdatePositionLeverage> {
-        let mut pos = pos;
-        let original_pos = pos.clone();
-
-        if notional_size.into_number().approx_eq(Number::ZERO) {
-            perp_bail!(
-                ErrorId::PositionUpdate,
-                ErrorDomain::Market,
-                "Notional size cannot be zero!"
-            );
-        }
-
-        // Update
-
-        let old_counter_ratio_of_notional_size_in_collateral =
-            pos.counter_collateral.checked_div_collateral(
-                NonZero::new(price_point.notional_to_collateral(pos.notional_size.abs_unsigned()))
-                    .context("notional_size is zero")?,
-            )?;
-
-        let old_notional_size_in_collateral = pos
-            .notional_size
-            .map(|x| price_point.notional_to_collateral(x));
-        let new_notional_size_in_collateral =
-            notional_size.map(|x| price_point.notional_to_collateral(x));
-        pos.notional_size = notional_size;
-
-        let old_counter_collateral = pos.counter_collateral;
-        let new_counter_collateral = NonZero::new(
-            new_notional_size_in_collateral
-                .abs_unsigned()
-                .checked_mul_dec(old_counter_ratio_of_notional_size_in_collateral.raw())?,
-        )
-        .context("new_counter_collateral is zero")?;
-        let counter_collateral_delta =
-            new_counter_collateral.into_signed() - old_counter_collateral.into_signed();
-        let liquidity_update = LiquidityUpdate::new(counter_collateral_delta, price_point)?;
-        pos.counter_collateral = new_counter_collateral;
-
-        let market_type = self.market_id(store)?.get_market_type();
-
-        let trade_volume = trade_volume_usd(&original_pos, price_point, market_type)?
-            .diff(trade_volume_usd(&pos, price_point, market_type)?);
-
-        // Validate leverage _before_ we reduce trading fees from active collateral
-        self.position_validate_leverage_data(market_type, &pos, price_point, Some(&original_pos))?;
-
-        // Update fees
-
-        let trading_fee_delta = self.config.calculate_trade_fee(
-            old_notional_size_in_collateral,
-            new_notional_size_in_collateral,
-            old_counter_collateral.raw(),
-            new_counter_collateral.raw(),
-        )?;
-
-        pos.active_collateral = pos.active_collateral.checked_sub(trading_fee_delta)?;
-        pos.trading_fee
-            .checked_add_assign(trading_fee_delta, price_point)?;
-
-        // Validation
-
-        let notional_size_diff = pos.notional_size - original_pos.notional_size;
-
-        let dnf = self.charge_delta_neutrality_fee(
-            store,
-            &mut pos,
-            notional_size_diff,
-            price_point,
-            DeltaNeutralityFeeReason::PositionUpdate,
-        )?;
-
-        let open_interest =
-            self.check_adjust_net_open_interest(store, notional_size_diff, pos.direction(), true)?;
-
-        let event = self.position_update_event(store, &original_pos, pos.clone(), price_point)?;
-
-        if let Some(liquidity_update) = &liquidity_update {
-            liquidity_update.validate(
-                self,
-                store,
-                Some(open_interest.net_notional(self, store)?),
-            )?;
-        }
-        Ok(UpdatePositionLeverage {
-            pos,
-            price_point: *price_point,
-            trade_volume,
-            dnf,
-            open_interest,
-            liquidity_update,
-            trading_fee_delta,
-            event,
-        })
-    }
-
-    pub fn update_position_size(
-        &self,
-        store: &dyn Storage,
-        pos: Position,
-        collateral_delta: Signed<Collateral>,
-        price_point: &PricePoint,
-    ) -> Result<UpdatePositionSize> {
-        let mut pos = pos;
-        let original_pos = pos.clone();
-
-        // Update
-        if !pos
-            .active_collateral
-            .into_signed()
-            .checked_add(collateral_delta)?
-            .into_number()
-            .approx_gt_strict(Number::ZERO)
-        {
-            perp_bail!(
-                ErrorId::PositionUpdate,
-                ErrorDomain::Market,
-                "Active collateral cannot be negative!"
-            );
-        }
-
-        let scale_factor = ((pos.active_collateral.into_number() + collateral_delta.into_number())
-            / pos.active_collateral.into_number())
-        .try_into_non_zero()
-        .context("scale_factor is negative or zero")?;
-        pos.active_collateral = pos.active_collateral.checked_add_signed(collateral_delta)?;
-        pos.deposit_collateral
-            .checked_add_assign(collateral_delta, price_point)?;
-        let old_notional_size_in_collateral = pos.notional_size_in_collateral(price_point);
-        let new_notional_size_in_collateral =
-            old_notional_size_in_collateral.try_map(|x| x.checked_mul_dec(scale_factor.raw()))?;
-        pos.notional_size =
-            new_notional_size_in_collateral.map(|x| price_point.collateral_to_notional(x));
-
-        let old_counter_collateral = pos.counter_collateral.raw();
-        let new_counter_collateral = pos.counter_collateral.checked_mul_non_zero(scale_factor)?;
-        let counter_collateral_delta =
-            new_counter_collateral.into_signed() - old_counter_collateral.into_signed();
-        let liquidity_update = LiquidityUpdate::new(counter_collateral_delta, price_point)?;
-        pos.counter_collateral = new_counter_collateral;
-
-        let market_type = self.market_type(store)?;
-
-        let trade_volume = trade_volume_usd(&original_pos, price_point, market_type)?
-            .diff(trade_volume_usd(&pos, price_point, market_type)?);
-
-        // Validate leverage _before_ we reduce trading fees from active collateral
-        self.position_validate_leverage_data(market_type, &pos, price_point, Some(&original_pos))?;
-
-        if collateral_delta.is_negative() {
-            self.validate_minimum_deposit_collateral(pos.active_collateral.raw(), price_point)?;
-        }
-
-        // Update fees
-        let trading_fee_delta = self.config.calculate_trade_fee(
-            old_notional_size_in_collateral,
-            new_notional_size_in_collateral,
-            old_counter_collateral,
-            new_counter_collateral.raw(),
-        )?;
-        pos.active_collateral = pos.active_collateral.checked_sub(trading_fee_delta)?;
-        pos.trading_fee
-            .checked_add_assign(trading_fee_delta, price_point)?;
-
-        let notional_size_diff = pos.notional_size - original_pos.notional_size;
-
-        let dnf = self.charge_delta_neutrality_fee(
-            store,
-            &mut pos,
-            notional_size_diff,
-            price_point,
-            DeltaNeutralityFeeReason::PositionUpdate,
-        )?;
-
-        let open_interest =
-            self.check_adjust_net_open_interest(store, notional_size_diff, pos.direction(), true)?;
-
-        // Send the removed collateral back to the user. We convert a negative
-        // delta (indicating the user requested collateral be returned) into a
-        // positive (giving the amount to be returned) and then attempt to
-        // convert to a NonZero to ensure this is a positive value greater than
-        // 0. If it's 0 or negative, there's no transfer to be made.
-        let user_refund = (-collateral_delta).try_into_non_zero();
-
-        let event = self.position_update_event(store, &original_pos, pos.clone(), price_point)?;
-
-        if let Some(liquidity_update) = &liquidity_update {
-            liquidity_update.validate(
-                self,
-                store,
-                Some(open_interest.net_notional(self, store)?),
-            )?;
-        }
-        Ok(UpdatePositionSize {
-            pos,
-            price_point: *price_point,
-            trade_volume,
-            user_refund,
-            dnf,
-            open_interest,
-            liquidity_update,
-            trading_fee_delta,
-            event,
-        })
-    }
-
-    pub fn update_position_max_gains(
-        &self,
-        store: &dyn Storage,
-        pos: Position,
-        max_gains: MaxGainsInQuote,
-        price_point: &PricePoint,
-    ) -> Result<UpdatePositionMaxGains> {
-        let mut pos = pos;
-        let original_pos = pos.clone();
-
-        let counter_collateral =
-            self.update_max_gains_new_counter_collateral(store, pos.id, max_gains, price_point)?;
-
-        let old_counter_collateral = pos.counter_collateral;
-        let new_counter_collateral = counter_collateral;
-        let counter_collateral_delta =
-            new_counter_collateral.into_signed() - old_counter_collateral.into_signed();
-        let liquidity_update = LiquidityUpdate::new(counter_collateral_delta, price_point)?;
-        pos.counter_collateral = new_counter_collateral;
-
-        // Validate leverage _before_ we reduce trading fees from active collateral
-        self.position_validate_leverage_data(
-            self.market_type(store)?,
-            &pos,
-            price_point,
-            Some(&original_pos),
-        )?;
-
-        // Update fees.
-        let trading_fee_delta = self.config.calculate_trade_fee(
-            Signed::zero(),
-            Signed::zero(),
-            old_counter_collateral.raw(),
-            new_counter_collateral.raw(),
-        )?;
-
-        pos.active_collateral = pos.active_collateral.checked_sub(trading_fee_delta)?;
-        pos.trading_fee
-            .checked_add_assign(trading_fee_delta, price_point)?;
-
-        let notional_size_diff = pos.notional_size - original_pos.notional_size;
-        debug_assert!(notional_size_diff.is_zero());
-
-        let event = self.position_update_event(store, &original_pos, pos.clone(), price_point)?;
-
-        if let Some(liquidity_update) = &liquidity_update {
-            liquidity_update.validate(self, store, None)?;
-        }
-        Ok(UpdatePositionMaxGains {
-            pos,
-            price_point: *price_point,
-            liquidity_update,
-            trading_fee_delta,
-            event,
-        })
-    }
-
     pub(crate) fn set_trigger_order(
         &self,
         ctx: &mut StateContext,
@@ -554,6 +245,51 @@ pub(crate) struct UpdatePositionCollateral {
     event: PositionUpdateEvent,
 }
 impl UpdatePositionCollateral {
+    pub fn new(
+        state: &State,
+        store: &dyn Storage,
+        pos: Position,
+        collateral_delta: Signed<Collateral>,
+        price_point: &PricePoint,
+    ) -> Result<Self> {
+        let mut pos = pos;
+        let original_pos = pos.clone();
+
+        // Update
+        pos.active_collateral = pos.active_collateral.checked_add_signed(collateral_delta)?;
+        pos.deposit_collateral
+            .checked_add_assign(collateral_delta, price_point)?;
+
+        let market_type = state.market_id(store)?.get_market_type();
+
+        let trade_volume = trade_volume_usd(&original_pos, price_point, market_type)?
+            .diff(trade_volume_usd(&pos, price_point, market_type)?);
+
+        // Validate
+        state.position_validate_leverage_data(
+            market_type,
+            &pos,
+            price_point,
+            Some(&original_pos),
+        )?;
+        if collateral_delta.is_negative() {
+            state.validate_minimum_deposit_collateral(pos.active_collateral.raw(), price_point)?;
+        }
+
+        // calculate possible user refund
+        let user_refund = (-collateral_delta).try_into_non_zero();
+
+        let event = state.position_update_event(store, &original_pos, pos.clone(), price_point)?;
+
+        Ok(UpdatePositionCollateral {
+            pos,
+            price_point: *price_point,
+            trade_volume,
+            user_refund,
+            event,
+        })
+    }
+
     pub fn apply(&mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
@@ -597,6 +333,124 @@ pub(crate) struct UpdatePositionSize {
 }
 
 impl UpdatePositionSize {
+    pub fn new(
+        state: &State,
+        store: &dyn Storage,
+        pos: Position,
+        collateral_delta: Signed<Collateral>,
+        price_point: &PricePoint,
+    ) -> Result<Self> {
+        let mut pos = pos;
+        let original_pos = pos.clone();
+
+        // Update
+        if !pos
+            .active_collateral
+            .into_signed()
+            .checked_add(collateral_delta)?
+            .into_number()
+            .approx_gt_strict(Number::ZERO)
+        {
+            perp_bail!(
+                ErrorId::PositionUpdate,
+                ErrorDomain::Market,
+                "Active collateral cannot be negative!"
+            );
+        }
+
+        let scale_factor = ((pos.active_collateral.into_number() + collateral_delta.into_number())
+            / pos.active_collateral.into_number())
+        .try_into_non_zero()
+        .context("scale_factor is negative or zero")?;
+        pos.active_collateral = pos.active_collateral.checked_add_signed(collateral_delta)?;
+        pos.deposit_collateral
+            .checked_add_assign(collateral_delta, price_point)?;
+        let old_notional_size_in_collateral = pos.notional_size_in_collateral(price_point);
+        let new_notional_size_in_collateral =
+            old_notional_size_in_collateral.try_map(|x| x.checked_mul_dec(scale_factor.raw()))?;
+        pos.notional_size =
+            new_notional_size_in_collateral.map(|x| price_point.collateral_to_notional(x));
+
+        let old_counter_collateral = pos.counter_collateral.raw();
+        let new_counter_collateral = pos.counter_collateral.checked_mul_non_zero(scale_factor)?;
+        let counter_collateral_delta =
+            new_counter_collateral.into_signed() - old_counter_collateral.into_signed();
+        let liquidity_update = LiquidityUpdate::new(counter_collateral_delta, price_point)?;
+        pos.counter_collateral = new_counter_collateral;
+
+        let market_type = state.market_type(store)?;
+
+        let trade_volume = trade_volume_usd(&original_pos, price_point, market_type)?
+            .diff(trade_volume_usd(&pos, price_point, market_type)?);
+
+        // Validate leverage _before_ we reduce trading fees from active collateral
+        state.position_validate_leverage_data(
+            market_type,
+            &pos,
+            price_point,
+            Some(&original_pos),
+        )?;
+
+        if collateral_delta.is_negative() {
+            state.validate_minimum_deposit_collateral(pos.active_collateral.raw(), price_point)?;
+        }
+
+        // Update fees
+        let trading_fee_delta = state.config.calculate_trade_fee(
+            old_notional_size_in_collateral,
+            new_notional_size_in_collateral,
+            old_counter_collateral,
+            new_counter_collateral.raw(),
+        )?;
+        pos.active_collateral = pos.active_collateral.checked_sub(trading_fee_delta)?;
+        pos.trading_fee
+            .checked_add_assign(trading_fee_delta, price_point)?;
+
+        let notional_size_diff = pos.notional_size - original_pos.notional_size;
+
+        let dnf = state.charge_delta_neutrality_fee(
+            store,
+            &mut pos,
+            notional_size_diff,
+            price_point,
+            DeltaNeutralityFeeReason::PositionUpdate,
+        )?;
+
+        let open_interest = state.check_adjust_net_open_interest(
+            store,
+            notional_size_diff,
+            pos.direction(),
+            true,
+        )?;
+
+        // Send the removed collateral back to the user. We convert a negative
+        // delta (indicating the user requested collateral be returned) into a
+        // positive (giving the amount to be returned) and then attempt to
+        // convert to a NonZero to ensure this is a positive value greater than
+        // 0. If it's 0 or negative, there's no transfer to be made.
+        let user_refund = (-collateral_delta).try_into_non_zero();
+
+        let event = state.position_update_event(store, &original_pos, pos.clone(), price_point)?;
+
+        if let Some(liquidity_update) = &liquidity_update {
+            liquidity_update.validate(
+                state,
+                store,
+                Some(open_interest.net_notional(state, store)?),
+            )?;
+        }
+        Ok(UpdatePositionSize {
+            pos,
+            price_point: *price_point,
+            trade_volume,
+            user_refund,
+            dnf,
+            open_interest,
+            liquidity_update,
+            trading_fee_delta,
+            event,
+        })
+    }
     pub fn apply(&mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
@@ -657,6 +511,116 @@ pub(crate) struct UpdatePositionLeverage {
 }
 
 impl UpdatePositionLeverage {
+    pub fn new(
+        state: &State,
+        store: &dyn Storage,
+        pos: Position,
+        notional_size: Signed<Notional>,
+        price_point: &PricePoint,
+    ) -> Result<Self> {
+        let mut pos = pos;
+        let original_pos = pos.clone();
+
+        if notional_size.into_number().approx_eq(Number::ZERO) {
+            perp_bail!(
+                ErrorId::PositionUpdate,
+                ErrorDomain::Market,
+                "Notional size cannot be zero!"
+            );
+        }
+
+        // Update
+
+        let old_counter_ratio_of_notional_size_in_collateral =
+            pos.counter_collateral.checked_div_collateral(
+                NonZero::new(price_point.notional_to_collateral(pos.notional_size.abs_unsigned()))
+                    .context("notional_size is zero")?,
+            )?;
+
+        let old_notional_size_in_collateral = pos
+            .notional_size
+            .map(|x| price_point.notional_to_collateral(x));
+        let new_notional_size_in_collateral =
+            notional_size.map(|x| price_point.notional_to_collateral(x));
+        pos.notional_size = notional_size;
+
+        let old_counter_collateral = pos.counter_collateral;
+        let new_counter_collateral = NonZero::new(
+            new_notional_size_in_collateral
+                .abs_unsigned()
+                .checked_mul_dec(old_counter_ratio_of_notional_size_in_collateral.raw())?,
+        )
+        .context("new_counter_collateral is zero")?;
+        let counter_collateral_delta =
+            new_counter_collateral.into_signed() - old_counter_collateral.into_signed();
+        let liquidity_update = LiquidityUpdate::new(counter_collateral_delta, price_point)?;
+        pos.counter_collateral = new_counter_collateral;
+
+        let market_type = state.market_id(store)?.get_market_type();
+
+        let trade_volume = trade_volume_usd(&original_pos, price_point, market_type)?
+            .diff(trade_volume_usd(&pos, price_point, market_type)?);
+
+        // Validate leverage _before_ we reduce trading fees from active collateral
+        state.position_validate_leverage_data(
+            market_type,
+            &pos,
+            price_point,
+            Some(&original_pos),
+        )?;
+
+        // Update fees
+
+        let trading_fee_delta = state.config.calculate_trade_fee(
+            old_notional_size_in_collateral,
+            new_notional_size_in_collateral,
+            old_counter_collateral.raw(),
+            new_counter_collateral.raw(),
+        )?;
+
+        pos.active_collateral = pos.active_collateral.checked_sub(trading_fee_delta)?;
+        pos.trading_fee
+            .checked_add_assign(trading_fee_delta, price_point)?;
+
+        // Validation
+
+        let notional_size_diff = pos.notional_size - original_pos.notional_size;
+
+        let dnf = state.charge_delta_neutrality_fee(
+            store,
+            &mut pos,
+            notional_size_diff,
+            price_point,
+            DeltaNeutralityFeeReason::PositionUpdate,
+        )?;
+
+        let open_interest = state.check_adjust_net_open_interest(
+            store,
+            notional_size_diff,
+            pos.direction(),
+            true,
+        )?;
+
+        let event = state.position_update_event(store, &original_pos, pos.clone(), price_point)?;
+
+        if let Some(liquidity_update) = &liquidity_update {
+            liquidity_update.validate(
+                state,
+                store,
+                Some(open_interest.net_notional(state, store)?),
+            )?;
+        }
+        Ok(UpdatePositionLeverage {
+            pos,
+            price_point: *price_point,
+            trade_volume,
+            dnf,
+            open_interest,
+            liquidity_update,
+            trading_fee_delta,
+            event,
+        })
+    }
     pub fn apply(&mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
@@ -710,6 +674,63 @@ pub(crate) struct UpdatePositionMaxGains {
 }
 
 impl UpdatePositionMaxGains {
+    pub fn new(
+        state: &State,
+        store: &dyn Storage,
+        pos: Position,
+        max_gains: MaxGainsInQuote,
+        price_point: &PricePoint,
+    ) -> Result<Self> {
+        let mut pos = pos;
+        let original_pos = pos.clone();
+
+        let counter_collateral =
+            state.update_max_gains_new_counter_collateral(store, pos.id, max_gains, price_point)?;
+
+        let old_counter_collateral = pos.counter_collateral;
+        let new_counter_collateral = counter_collateral;
+        let counter_collateral_delta =
+            new_counter_collateral.into_signed() - old_counter_collateral.into_signed();
+        let liquidity_update = LiquidityUpdate::new(counter_collateral_delta, price_point)?;
+        pos.counter_collateral = new_counter_collateral;
+
+        // Validate leverage _before_ we reduce trading fees from active collateral
+        state.position_validate_leverage_data(
+            state.market_type(store)?,
+            &pos,
+            price_point,
+            Some(&original_pos),
+        )?;
+
+        // Update fees.
+        let trading_fee_delta = state.config.calculate_trade_fee(
+            Signed::zero(),
+            Signed::zero(),
+            old_counter_collateral.raw(),
+            new_counter_collateral.raw(),
+        )?;
+
+        pos.active_collateral = pos.active_collateral.checked_sub(trading_fee_delta)?;
+        pos.trading_fee
+            .checked_add_assign(trading_fee_delta, price_point)?;
+
+        let notional_size_diff = pos.notional_size - original_pos.notional_size;
+        debug_assert!(notional_size_diff.is_zero());
+
+        let event = state.position_update_event(store, &original_pos, pos.clone(), price_point)?;
+
+        if let Some(liquidity_update) = &liquidity_update {
+            liquidity_update.validate(state, store, None)?;
+        }
+        Ok(UpdatePositionMaxGains {
+            pos,
+            price_point: *price_point,
+            liquidity_update,
+            trading_fee_delta,
+            event,
+        })
+    }
+
     pub fn apply(&mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 

@@ -9,7 +9,7 @@ use msg::contracts::market::{
 pub(crate) use open::*;
 mod close;
 pub use close::*;
-mod update;
+pub(crate) mod update;
 mod validate;
 pub use validate::*;
 mod cw721;

@@ -93,18 +93,6 @@ pub fn instantiate(
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
-    let res = execute_inner(deps, env, info, msg);
-    if let Err(err) = &res {
-        println!("execute error: {}", err);
-    }
-    res
-}
-pub fn execute_inner(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    msg: ExecuteMsg,
-) -> Result<Response> {
     let (mut state, mut ctx) = StateContext::new(deps, env)?;
     #[cfg(feature = "sanity")]
     state.sanity_check(ctx.storage);
