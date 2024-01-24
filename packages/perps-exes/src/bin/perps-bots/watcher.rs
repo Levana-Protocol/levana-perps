@@ -403,6 +403,7 @@ impl AppBuilder {
                         Heartbeat {
                             task_status: task_status.clone(),
                         },
+                        out_of_date.is_some(),
                     )
                     .await;
                 let res = match res {
@@ -710,17 +711,22 @@ pub(crate) trait WatchedTask: Send + Sync + 'static {
         &mut self,
         app: Arc<App>,
         heartbeat: Heartbeat,
+        should_timeout: bool,
     ) -> Result<WatchedTaskOutput> {
-        match tokio::time::timeout(
-            tokio::time::Duration::from_secs(MAX_TASK_SECONDS),
-            self.run_single(app, heartbeat),
-        )
-        .await
-        {
-            Ok(x) => x,
-            Err(e) => Err(anyhow::anyhow!(
-                "Running a single task took too long, killing. Elapsed time: {e}"
-            )),
+        if should_timeout {
+            match tokio::time::timeout(
+                tokio::time::Duration::from_secs(MAX_TASK_SECONDS),
+                self.run_single(app, heartbeat),
+            )
+            .await
+            {
+                Ok(x) => x,
+                Err(e) => Err(anyhow::anyhow!(
+                    "Running a single task took too long, killing. Elapsed time: {e}"
+                )),
+            }
+        } else {
+            self.run_single(app, heartbeat).await
         }
     }
 }
