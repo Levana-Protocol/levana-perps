@@ -30,7 +30,7 @@ use crate::{
     util::{
         markets::Market,
         misc::track_tx_fees,
-        oracle::{get_latest_price, FeedType, LatestPrice, OffchainPriceData},
+        oracle::{get_latest_price, LatestPrice, OffchainPriceData, PriceTooOld},
     },
     watcher::{Heartbeat, WatchedTask, WatchedTaskOutput},
 };
@@ -167,8 +167,17 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
 
                 match reason {
                     ActionWithReason::NoWorkAvailable | ActionWithReason::PythPricesClosed => (),
-                    ActionWithReason::PriceTooOld { feed } => {
-                        errors.push(format!("{}: price is too old. Check the price feed and try manual cranking in the frontend. Feed info: {feed}.", market.market_id));
+                    ActionWithReason::PriceTooOld {
+                        too_old:
+                            PriceTooOld {
+                                feed,
+                                check_time,
+                                publish_time,
+                                age,
+                                age_tolerance_seconds,
+                            },
+                    } => {
+                        errors.push(format!("{}: price is too old. Check the price feed and try manual cranking in the frontend. Feed info: {feed}. Publish time: {publish_time}. Checked at: {check_time}. Age: {age}s. Tolerance: {age_tolerance_seconds}s.", market.market_id));
                     }
                     ActionWithReason::VolatileDiffTooLarge => {
                         errors.push(format!("{}: different in volatile price publish times is too high. Check the price feed and try manual cranking in the frontend.", market.market_id));
@@ -439,7 +448,7 @@ enum ActionWithReason {
     NoWorkAvailable,
     WorkNeeded(CrankTriggerReason),
     PythPricesClosed,
-    PriceTooOld { feed: FeedType },
+    PriceTooOld { too_old: PriceTooOld },
     VolatileDiffTooLarge,
 }
 
@@ -555,7 +564,7 @@ async fn check_market_needs_price_update(
         LatestPrice::NoPriceInContract => Ok(ActionWithReason::WorkNeeded(
             CrankTriggerReason::NoPriceOnChain,
         )),
-        LatestPrice::PriceTooOld { feed } => Ok(ActionWithReason::PriceTooOld { feed }),
+        LatestPrice::PriceTooOld { too_old } => Ok(ActionWithReason::PriceTooOld { too_old }),
         LatestPrice::VolatileDiffTooLarge => Ok(ActionWithReason::VolatileDiffTooLarge),
         LatestPrice::PricesFound {
             off_chain_price,
