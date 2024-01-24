@@ -362,13 +362,14 @@ fn helper_validate(
             let liquifund =
                 validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?;
 
-            let _ = UpdatePositionCollateral::new(
+            UpdatePositionCollateral::new(
                 state,
                 store,
                 liquifund.position.into(),
                 amount.into_signed(),
                 price_point,
-            )?;
+            )?
+            .discard();
             Ok(())
         }
         DeferredExecItem::UpdatePositionAddCollateralImpactSize {
@@ -387,26 +388,22 @@ fn helper_validate(
                 slippage_assert,
                 price_point,
             )?;
-            let _ = UpdatePositionSize::new(
-                state,
-                store,
-                liquifund.position.into(),
-                funds,
-                price_point,
-            )?;
+            UpdatePositionSize::new(state, store, liquifund.position.into(), funds, price_point)?
+                .discard();
 
             Ok(())
         }
         DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => {
             let liquifund =
                 validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?;
-            let _ = UpdatePositionCollateral::new(
+            UpdatePositionCollateral::new(
                 state,
                 store,
                 liquifund.position.into(),
                 -amount.into_signed(),
                 price_point,
-            )?;
+            )?
+            .discard();
             Ok(())
         }
         DeferredExecItem::UpdatePositionRemoveCollateralImpactSize {
@@ -424,13 +421,8 @@ fn helper_validate(
                 slippage_assert,
                 price_point,
             )?;
-            let _ = UpdatePositionSize::new(
-                state,
-                store,
-                liquifund.position.into(),
-                funds,
-                price_point,
-            )?;
+            UpdatePositionSize::new(state, store, liquifund.position.into(), funds, price_point)?
+                .discard();
             Ok(())
         }
         DeferredExecItem::UpdatePositionLeverage {
@@ -465,19 +457,20 @@ fn helper_validate(
                 )?;
             }
 
-            let _ = UpdatePositionLeverage::new(state, store, pos, notional_size, price_point)?;
+            UpdatePositionLeverage::new(state, store, pos, notional_size, price_point)?.discard();
             Ok(())
         }
         DeferredExecItem::UpdatePositionMaxGains { id, max_gains } => {
             let liquifund =
                 validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?;
-            let _ = UpdatePositionMaxGains::new(
+            UpdatePositionMaxGains::new(
                 state,
                 store,
                 liquifund.position.into(),
                 max_gains,
                 price_point,
-            )?;
+            )?
+            .discard();
             Ok(())
         }
         DeferredExecItem::ClosePosition {

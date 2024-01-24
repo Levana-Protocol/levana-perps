@@ -290,6 +290,9 @@ impl UpdatePositionCollateral {
         })
     }
 
+    // This is a no-op, but it's more expressive to call discard() or apply()
+    // rather than to just assign it to a throwaway variable.
+    pub fn discard(self) {}
     pub fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
@@ -451,6 +454,10 @@ impl UpdatePositionSize {
             event,
         })
     }
+    // This is a no-op, but it's more expressive to call discard() or apply()
+    // rather than to just assign it to a throwaway variable.
+    pub fn discard(self) {}
+
     pub fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
@@ -621,6 +628,11 @@ impl UpdatePositionLeverage {
             event,
         })
     }
+
+    // This is a no-op, but it's more expressive to call discard() or apply()
+    // rather than to just assign it to a throwaway variable.
+    pub fn discard(self) {}
+
     pub fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
@@ -731,6 +743,9 @@ impl UpdatePositionMaxGains {
         })
     }
 
+    // This is a no-op, but it's more expressive to call discard() or apply()
+    // rather than to just assign it to a throwaway variable.
+    pub fn discard(self) {}
     pub fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
