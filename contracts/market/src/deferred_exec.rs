@@ -365,7 +365,7 @@ fn helper_validate(
             let _ = UpdatePositionCollateral::new(
                 state,
                 store,
-                liquifund.position.inner_position().clone(),
+                liquifund.position.into(),
                 amount.into_signed(),
                 price_point,
             )?;
@@ -390,7 +390,7 @@ fn helper_validate(
             let _ = UpdatePositionSize::new(
                 state,
                 store,
-                liquifund.position.inner_position().clone(),
+                liquifund.position.into(),
                 funds,
                 price_point,
             )?;
@@ -403,7 +403,7 @@ fn helper_validate(
             let _ = UpdatePositionCollateral::new(
                 state,
                 store,
-                liquifund.position.inner_position().clone(),
+                liquifund.position.into(),
                 -amount.into_signed(),
                 price_point,
             )?;
@@ -427,7 +427,7 @@ fn helper_validate(
             let _ = UpdatePositionSize::new(
                 state,
                 store,
-                liquifund.position.inner_position().clone(),
+                liquifund.position.into(),
                 funds,
                 price_point,
             )?;
@@ -449,7 +449,7 @@ fn helper_validate(
             let notional_size =
                 state.update_leverage_new_notional_size(store, id, leverage, price_point)?;
 
-            let pos = liquifund.position.inner_position().clone();
+            let pos:Position = liquifund.position.into();
 
             if let Some(slippage_assert) = slippage_assert {
                 let market_type = state.market_id(store)?.get_market_type();
@@ -474,7 +474,7 @@ fn helper_validate(
             let _ = UpdatePositionMaxGains::new(
                 state,
                 store,
-                liquifund.position.inner_position().clone(),
+                liquifund.position.into(),
                 max_gains,
                 price_point,
             )?;

@@ -197,12 +197,11 @@ pub enum MaybeClosedPosition {
     Close(ClosePositionInstructions),
 }
 
-impl MaybeClosedPosition {
-    /// Gets the inner Position, whether opened or closed
-    pub fn inner_position(&self) -> &Position {
-        match self {
+impl From<MaybeClosedPosition> for Position {
+    fn from(maybe_closed: MaybeClosedPosition) -> Self {
+        match maybe_closed {
             MaybeClosedPosition::Open(pos) => pos,
-            MaybeClosedPosition::Close(instructions) => &instructions.pos,
+            MaybeClosedPosition::Close(instructions) => instructions.pos,
         }
     }
 }
