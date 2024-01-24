@@ -88,7 +88,6 @@ impl App {
         crank_wallet: &Wallet,
         recv: &CrankReceiver,
     ) -> Result<WatchedTaskOutput> {
-        // Wait for up to 20 seconds for new work to appear. If it doesn't, update our status message that no cranking was needed.
         let CrankWorkItem {
             address: market,
             id: market_id,
@@ -96,13 +95,7 @@ impl App {
             reason,
             queued,
             received,
-        } = match recv.receive_with_timeout().await {
-            None => {
-                return Ok(WatchedTaskOutput::new("No crank work needed").suppress());
-            }
-            Some(crank_needed) => crank_needed,
-        };
-
+        } = recv.receive_work().await?;
         let start_crank = Instant::now();
         let run_result = self
             .crank(crank_wallet, market, &market_id, reason, None)

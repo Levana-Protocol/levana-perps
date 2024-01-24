@@ -697,11 +697,6 @@ impl WatchedTaskOutput {
         self.error = true;
         self
     }
-
-    pub(crate) fn suppress(mut self) -> Self {
-        self.suppress = true;
-        self
-    }
 }
 
 #[async_trait]

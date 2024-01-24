@@ -20,7 +20,8 @@ use std::{
     time::Instant,
 };
 
-use async_channel::{RecvError, TrySendError};
+use anyhow::{bail, Result};
+use async_channel::TrySendError;
 use cosmos::Address;
 use parking_lot::Mutex;
 use shared::storage::MarketId;
@@ -157,68 +158,54 @@ impl CrankReceiver {
         }
     }
 
-    pub(super) async fn receive_with_timeout(&self) -> Option<CrankWorkItem> {
-        // This unfortunately requires more care than it seems like it should.
-        // It's possible that the timeout used on receive will end up missing an
-        // update. Therefore, we always recheck the queue after a we finish,
-        // even if the timeout triggered.
-        match tokio::time::timeout(
-            tokio::time::Duration::from_secs(MAX_WAIT_SECONDS),
-            self.recv.recv(),
-        )
-        .await
-        {
-            // Timeout occurred, not an error, just keep going with our logic
-            Err(_) => (),
-            // Popped a value from the queue, all good
-            Ok(Ok(())) => (),
-            Ok(Err(RecvError)) => unreachable!(
-                "receive_with_timeout: impossible RecvError, all sending sides have been closed"
-            ),
-        }
-
-        // OK, we're done waiting. Try to pop a value from the queue.
-        match self.trigger.queue.lock().pop() {
-            PopResult::QueueIsEmpty => {
-                // No work item found, so return None and don't do anything to the channel.
-                None
-            }
-            PopResult::ValueFound {
-                address,
-                more_work_exists,
-                market_id,
-                reason,
-                queued,
-            } => {
-                // We have some work. If there's even more work available,
-                // enforce our invariant that we always have a value on the
-                // channel in such a case.
-                if more_work_exists && self.recv.is_empty() {
-                    match self.trigger.send.try_send(()) {
-                        Ok(()) => (),
-                        Err(TrySendError::Closed(())) => {
-                            unreachable!("Resending on empty channel encountered closed")
+    pub(super) async fn receive_work(&self) -> Result<CrankWorkItem> {
+        let work = self.recv.recv().await;
+        match work {
+            Ok(()) => {
+                let work = self.trigger.queue.lock().pop();
+                match work {
+                    PopResult::QueueIsEmpty => {
+                        bail!("Possible bug: Signaled about work item, but didn't receive any.")
+                    }
+                    PopResult::ValueFound {
+                        address,
+                        market_id,
+                        more_work_exists,
+                        reason,
+                        queued,
+                    } => {
+                        // We have some work. If there's even more work available,
+                        // enforce our invariant that we always have a value on the
+                        // channel in such a case.
+                        if more_work_exists && self.recv.is_empty() {
+                            match self.trigger.send.try_send(()) {
+                                Ok(()) => (),
+                                Err(TrySendError::Closed(())) => {
+                                    unreachable!("Resending on empty channel encountered closed")
+                                }
+                                Err(TrySendError::Full(())) => {
+                                    log::warn!("Highly suspect, resending on empty channel encountered full")
+                                }
+                            }
                         }
-                        Err(TrySendError::Full(())) => log::warn!(
-                            "Highly suspect, resending on empty channel encountered full"
-                        ),
+                        Ok(CrankWorkItem {
+                            address,
+                            id: market_id,
+                            guard: CrankGuard {
+                                queue: self.trigger.queue.clone(),
+                                address,
+                            },
+
+                            reason: *reason,
+                            queued,
+                            received: Instant::now(),
+                        })
                     }
                 }
-                Some(CrankWorkItem {
-                    address,
-                    id: market_id,
-                    guard: CrankGuard {
-                        queue: self.trigger.queue.clone(),
-                        address,
-                    },
-
-                    reason: *reason,
-                    queued,
-                    received: Instant::now(),
-                })
             }
+            Err(err) => unreachable!(
+                "receive: impossible RecvError, all sending sides have been closed {err:?}"
+            ),
         }
     }
 }
-
-const MAX_WAIT_SECONDS: u64 = 20;
