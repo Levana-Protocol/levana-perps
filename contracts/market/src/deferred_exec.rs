@@ -6,8 +6,12 @@
 //
 // The execution branch then goes one step further - applying the changes to the state, using that same struct
 //
-// In some cases there are validation steps which are run again at apply() time,
-// which re-validate certain conditions (like open-interest) with the true state having changed
+// In some cases there are validation steps which are run again at apply() time, as an extra precaution
+// For example: locking up liquidity requires knowing the net notional.
+// in the validation-only branch, we calculate what the net notional should eventually be changed to, and use that in-memory value
+// but in the execution branch, it uses the real net notional directly from storage, which at least feels a little bit safer.
+// This is, of course, merely a safety net - if these values are different, it means that something has gone horribly wrong...
+// but we'd rather "something has gone wrong" in the error recovery only, and the normal execution path should do the clearest thing
 use msg::contracts::market::{
     deferred_execution::{
         DeferredExecCompleteTarget, DeferredExecId, DeferredExecItem, DeferredExecWithStatus,
