@@ -41,7 +41,10 @@ pub(crate) struct TriggerCrank {
 struct Queue {
     /// FIFO queue of the markets to crank
     fifo: VecDeque<(Address, MarketId, CrankTriggerReason, Instant)>,
-    /// HashSet matching everything in fifo for efficient checking
+    /// HashSet matching everything currently waiting to be worked on or in flight.
+    ///
+    /// This HashSet should contain everything currently in fifo, plus works
+    /// items that have been popped off of fifo but not yet executed.
     set: HashSet<Address>,
     /// The number of active crank guards, used for sanity checking only
     crank_guards: usize,
