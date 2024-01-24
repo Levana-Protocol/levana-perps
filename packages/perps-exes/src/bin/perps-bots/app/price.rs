@@ -302,7 +302,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
             successes.push("No markets needed an oracle update".to_owned());
         }
 
-        if worker.mode == WorkerMode::Normal {
+        if worker.mode == WorkerMode::Normal || !any_needs_oracle_update {
             for (market, market_id, reason) in markets_to_update {
                 worker
                     .trigger_crank
