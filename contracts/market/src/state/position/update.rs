@@ -12,7 +12,7 @@ use msg::contracts::market::position::events::{
 };
 use msg::contracts::market::position::{events::PositionUpdateEvent, Position, PositionId};
 
-use super::AdjustOpenInterestResult;
+use super::AdjustOpenInterest;
 
 impl State<'_> {
     pub(crate) fn update_leverage_new_notional_size(
@@ -329,7 +329,7 @@ pub(crate) struct UpdatePositionSize {
     trade_volume: Usd,
     user_refund: Option<NonZero<Collateral>>,
     dnf: ChargeDeltaNeutralityFeeResult,
-    open_interest: AdjustOpenInterestResult,
+    open_interest: AdjustOpenInterest,
     liquidity_update: Option<LiquidityUpdate>,
     trading_fee_delta: Collateral,
     event: PositionUpdateEvent,
@@ -419,12 +419,8 @@ impl UpdatePositionSize {
             DeltaNeutralityFeeReason::PositionUpdate,
         )?;
 
-        let open_interest = state.check_adjust_net_open_interest(
-            store,
-            notional_size_diff,
-            pos.direction(),
-            true,
-        )?;
+        let open_interest =
+            AdjustOpenInterest::new(state, store, notional_size_diff, pos.direction(), true)?;
 
         // Send the removed collateral back to the user. We convert a negative
         // delta (indicating the user requested collateral be returned) into a
@@ -464,7 +460,7 @@ impl UpdatePositionSize {
         state.trade_history_add_volume(ctx, &self.pos.owner, self.trade_volume)?;
 
         self.dnf.store(state, ctx)?;
-        self.open_interest.store(ctx)?;
+        self.open_interest.apply(ctx)?;
 
         state.position_save(
             ctx,
@@ -511,7 +507,7 @@ pub(crate) struct UpdatePositionLeverage {
     price_point: PricePoint,
     trade_volume: Usd,
     dnf: ChargeDeltaNeutralityFeeResult,
-    open_interest: AdjustOpenInterestResult,
+    open_interest: AdjustOpenInterest,
     liquidity_update: Option<LiquidityUpdate>,
     trading_fee_delta: Collateral,
     event: PositionUpdateEvent,
@@ -601,12 +597,8 @@ impl UpdatePositionLeverage {
             DeltaNeutralityFeeReason::PositionUpdate,
         )?;
 
-        let open_interest = state.check_adjust_net_open_interest(
-            store,
-            notional_size_diff,
-            pos.direction(),
-            true,
-        )?;
+        let open_interest =
+            AdjustOpenInterest::new(state, store, notional_size_diff, pos.direction(), true)?;
 
         let event = state.position_update_event(store, &original_pos, pos.clone(), price_point)?;
 
@@ -639,7 +631,7 @@ impl UpdatePositionLeverage {
         state.trade_history_add_volume(ctx, &self.pos.owner, self.trade_volume)?;
 
         self.dnf.store(state, ctx)?;
-        self.open_interest.store(ctx)?;
+        self.open_interest.apply(ctx)?;
 
         state.position_save(
             ctx,

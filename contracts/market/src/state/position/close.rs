@@ -1,6 +1,6 @@
 use crate::state::liquidity::{LiquidityUnlock, LiquidityUpdateLocked};
 use crate::state::position::liquifund::PositionLiquifund;
-use crate::state::position::CLOSED_POSITIONS;
+use crate::state::position::{AdjustOpenInterest, CLOSED_POSITIONS};
 use crate::state::{position::CLOSED_POSITION_HISTORY, *};
 use anyhow::Context;
 use msg::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
@@ -89,7 +89,14 @@ impl State<'_> {
 
         // Reduce net open interest. This needs to happen _after_ delta
         // neutrality fee payments so the slippage calculations are correct.
-        self.adjust_net_open_interest(ctx, notional_size_return, pos.direction(), false)?;
+        AdjustOpenInterest::new(
+            self,
+            ctx.storage,
+            notional_size_return,
+            pos.direction(),
+            false,
+        )?
+        .apply(ctx)?;
 
         // Calculate the final active and counter collateral based on price
         // settlement exposure change and final delta neutrality fee payment.

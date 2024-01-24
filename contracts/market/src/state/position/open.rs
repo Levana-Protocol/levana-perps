@@ -13,7 +13,7 @@ use msg::contracts::market::position::{
     CollateralAndUsd, LiquidationMargin, SignedCollateralAndUsd,
 };
 
-use super::{AdjustOpenInterestResult, LAST_POSITION_ID};
+use super::{AdjustOpenInterest, LAST_POSITION_ID};
 
 /// Information on a validated position we would like to open.
 ///
@@ -27,7 +27,7 @@ pub(crate) struct ValidatedPosition {
     trade_volume_usd: Usd,
     price_point: PricePoint,
     delta_neutrality_fee: ChargeDeltaNeutralityFeeResult,
-    open_interest: AdjustOpenInterestResult,
+    open_interest: AdjustOpenInterest,
 }
 
 /// Parameters for opening a new position
@@ -185,7 +185,7 @@ impl State<'_> {
         );
 
         let open_interest =
-            self.check_adjust_net_open_interest(store, pos.notional_size, pos.direction(), true)?;
+            AdjustOpenInterest::new(self, store, pos.notional_size, pos.direction(), true)?;
 
         liquidity_lock.validate(self, store, None)?;
 
@@ -212,7 +212,7 @@ impl State<'_> {
         is_market: bool,
     ) -> Result<PositionId> {
         self.trade_history_add_volume(ctx, &pos.owner, trade_volume_usd)?;
-        open_interest.store(ctx)?;
+        open_interest.apply(ctx)?;
 
         // collect trading fees
         self.collect_trading_fee(
