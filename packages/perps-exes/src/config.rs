@@ -550,7 +550,7 @@ impl Default for WatcherConfig {
             crank_run: TaskConfig {
                 // We block internally within the crank run service
                 delay: Delay::NoDelay,
-                out_of_date: Some(60),
+                out_of_date: None,
                 retries: None,
                 delay_between_retries: None,
             },
