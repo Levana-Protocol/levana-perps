@@ -80,12 +80,12 @@ impl Queue {
         match self.fifo.pop_front() {
             None => PopResult::QueueIsEmpty,
             Some((address, market_id, reason, queued)) => {
-                assert!(self.set.remove(&address));
+		assert!(self.set.contains(&address));
                 self.crank_guards += 1;
                 PopResult::ValueFound {
                     address,
                     market_id,
-                    more_work_exists: !self.set.is_empty(),
+                    more_work_exists: !self.fifo.is_empty(),
                     reason: Box::new(reason),
                     queued,
                 }
