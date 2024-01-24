@@ -144,7 +144,7 @@ pub(crate) struct TaskStatus {
     current_run_started: Option<DateTime<Utc>>,
     /// Is the last_result out of date ?
     #[serde(skip)]
-    out_of_date: Duration,
+    out_of_date: Option<Duration>,
     /// Should we expire the status of last result ?
     #[serde(skip)]
     expire_last_result: Option<Duration>,
@@ -217,16 +217,19 @@ impl TaskStatus {
 
     fn is_out_of_date(&self) -> OutOfDateType {
         match self.current_run_started {
-            Some(started) => {
-                let now = Utc::now();
-                if started + Duration::seconds(300) <= now {
-                    OutOfDateType::Very
-                } else if started + self.out_of_date <= now {
-                    OutOfDateType::Slightly
-                } else {
-                    OutOfDateType::Not
+            Some(started) => match self.out_of_date {
+                Some(out_of_date) => {
+                    let now = Utc::now();
+                    if started + Duration::seconds(300) <= now {
+                        OutOfDateType::Very
+                    } else if started + out_of_date <= now {
+                        OutOfDateType::Slightly
+                    } else {
+                        OutOfDateType::Not
+                    }
                 }
-            }
+                None => OutOfDateType::Not,
+            },
             None => OutOfDateType::Not,
         }
     }
@@ -356,7 +359,9 @@ impl AppBuilder {
         T: WatchedTask,
     {
         let config = label.task_config_for(&self.app.config.watcher);
-        let out_of_date = chrono::Duration::seconds(config.out_of_date.into());
+        let out_of_date = config
+            .out_of_date
+            .map(|item| chrono::Duration::seconds(item.into()));
         let task_status = Arc::new(RwLock::new(TaskStatus {
             last_result: TaskResult {
                 value: TaskResultValue::NotYetRun.into(),

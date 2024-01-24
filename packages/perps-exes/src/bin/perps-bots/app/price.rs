@@ -233,7 +233,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                 ));
                 worker
                     .high_gas_trigger
-                    .set(HighGasWork::Price {
+                    .set(HighGasWork {
                         offchain_price_data: offchain_price_data.clone(),
                         markets_to_update: markets_to_update.clone(),
                         queued: Instant::now(),
