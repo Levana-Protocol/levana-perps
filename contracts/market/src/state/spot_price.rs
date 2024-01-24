@@ -332,10 +332,9 @@ impl State<'_> {
                 self.make_price_point(store, timestamp, price_storage)
             });
 
-        let prices = match limit {
-            None => iter.collect::<Result<Vec<_>>>()?,
-            Some(limit) => iter.take(limit).collect::<Result<Vec<_>>>()?,
-        };
+        let prices = iter
+            .take(limit.unwrap_or(usize::try_from(QUERY_MAX_LIMIT)?))
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(prices)
     }

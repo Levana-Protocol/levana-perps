@@ -4,6 +4,11 @@ use cosmwasm_std::{
     SystemResult, WasmQuery,
 };
 
+/// useful for placing an upper cap on query iterators
+/// as a safety measure to prevent exhausting resources on nodes that allow
+/// unbounded query gas
+pub const QUERY_MAX_LIMIT: u32 = 1000;
+
 /// Like [cosmwasm_std::Order] but serialized as a string
 /// and with a schema export
 #[cw_serde]

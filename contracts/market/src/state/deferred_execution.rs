@@ -106,9 +106,9 @@ impl State<'_> {
             start_after.map(Bound::exclusive),
             Order::Descending,
         );
-        let limit = usize::try_from(limit.unwrap_or(10))
-            .expect("list_deferred_execs: could not convert limit to usize")
-            .min(30);
+        const DEFERRED_DEFAULT_LIMIT: u32 = 10;
+        let limit = usize::try_from(limit.unwrap_or(DEFERRED_DEFAULT_LIMIT).min(QUERY_MAX_LIMIT))
+            .expect("list_deferred_execs: could not convert limit to usize");
         let mut items = vec![];
         let mut last_id = None;
         for res in iter.by_ref().take(limit) {

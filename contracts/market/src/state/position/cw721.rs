@@ -36,7 +36,6 @@ const TOKEN_COUNT: Item<u64> = Item::new(namespace::NFT_COUNT);
 const OWNER_TO_TOKEN_IDS: Map<(&Addr, String), u8> = Map::new(namespace::NFT_OWNERS);
 const TOKEN_IDS: Map<String, u8> = Map::new(namespace::NFT_POSITION_IDS);
 const DEFAULT_LIMIT: u32 = 10;
-const MAX_LIMIT: u32 = 100;
 
 impl State<'_> {
     pub(crate) fn nft_handle_query(
@@ -154,7 +153,7 @@ impl State<'_> {
     where
         F: Fn(String) -> A + Clone,
     {
-        let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+        let limit = usize::try_from(limit.unwrap_or(DEFAULT_LIMIT).min(QUERY_MAX_LIMIT))?;
 
         let min = start_after.map(Bound::exclusive);
 
@@ -244,7 +243,7 @@ impl State<'_> {
         start_addr: Option<Addr>,
         limit: Option<u32>,
     ) -> Result<OperatorsResponse> {
-        let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+        let limit = usize::try_from(limit.unwrap_or(DEFAULT_LIMIT).min(QUERY_MAX_LIMIT))?;
         let start = start_addr.as_ref().map(Bound::exclusive);
 
         let res: Result<Vec<_>> = OPERATORS
