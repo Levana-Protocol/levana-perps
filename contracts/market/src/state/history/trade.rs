@@ -166,8 +166,11 @@ impl State<'_> {
             Order::Descending => (None, start_after.map(Bound::exclusive)),
         };
         let mut iter = map.prefix(id).range(store, min, max, order);
-        const MAX_LIMIT: u32 = 20;
-        let limit = limit.unwrap_or(MAX_LIMIT).min(MAX_LIMIT).try_into()?;
+        const HISTORY_DEFAULT_LIMIT: u32 = 20;
+        let limit = limit
+            .unwrap_or(HISTORY_DEFAULT_LIMIT)
+            .min(QUERY_MAX_LIMIT)
+            .try_into()?;
         let mut actions = Vec::with_capacity(limit);
         let mut next_start_after = None;
         for _ in 0..limit {
