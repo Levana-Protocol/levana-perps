@@ -245,7 +245,7 @@ pub(crate) struct UpdatePositionCollateral {
     event: PositionUpdateEvent,
 }
 impl UpdatePositionCollateral {
-    pub fn new(
+    pub(crate) fn new(
         state: &State,
         store: &dyn Storage,
         pos: Position,
@@ -292,8 +292,8 @@ impl UpdatePositionCollateral {
 
     // This is a no-op, but it's more expressive to call discard() or apply()
     // rather than to just assign it to a throwaway variable.
-    pub fn discard(self) {}
-    pub fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub(crate) fn discard(self) {}
+    pub(crate) fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
         state.trade_history_add_volume(ctx, &self.pos.owner, self.trade_volume)?;
@@ -336,7 +336,7 @@ pub(crate) struct UpdatePositionSize {
 }
 
 impl UpdatePositionSize {
-    pub fn new(
+    pub(crate) fn new(
         state: &State,
         store: &dyn Storage,
         pos: Position,
@@ -452,9 +452,9 @@ impl UpdatePositionSize {
     }
     // This is a no-op, but it's more expressive to call discard() or apply()
     // rather than to just assign it to a throwaway variable.
-    pub fn discard(self) {}
+    pub(crate) fn discard(self) {}
 
-    pub fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub(crate) fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
         state.trade_history_add_volume(ctx, &self.pos.owner, self.trade_volume)?;
@@ -514,7 +514,7 @@ pub(crate) struct UpdatePositionLeverage {
 }
 
 impl UpdatePositionLeverage {
-    pub fn new(
+    pub(crate) fn new(
         state: &State,
         store: &dyn Storage,
         pos: Position,
@@ -623,9 +623,9 @@ impl UpdatePositionLeverage {
 
     // This is a no-op, but it's more expressive to call discard() or apply()
     // rather than to just assign it to a throwaway variable.
-    pub fn discard(self) {}
+    pub(crate) fn discard(self) {}
 
-    pub fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub(crate) fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
         state.trade_history_add_volume(ctx, &self.pos.owner, self.trade_volume)?;
@@ -678,7 +678,7 @@ pub(crate) struct UpdatePositionMaxGains {
 }
 
 impl UpdatePositionMaxGains {
-    pub fn new(
+    pub(crate) fn new(
         state: &State,
         store: &dyn Storage,
         pos: Position,
@@ -737,8 +737,8 @@ impl UpdatePositionMaxGains {
 
     // This is a no-op, but it's more expressive to call discard() or apply()
     // rather than to just assign it to a throwaway variable.
-    pub fn discard(self) {}
-    pub fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub(crate) fn discard(self) {}
+    pub(crate) fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
         state.position_save(
@@ -845,7 +845,7 @@ impl LiquidityUpdate {
         }
     }
 
-    pub fn validate(
+    pub(crate) fn validate(
         &self,
         state: &State,
         store: &dyn Storage,
@@ -857,7 +857,7 @@ impl LiquidityUpdate {
         }
     }
 
-    pub fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
         match self {
             Self::Lock(liquidity) => liquidity.apply(state, ctx),
             Self::Unlock(liquidity) => liquidity.apply(state, ctx),

@@ -677,7 +677,7 @@ pub(crate) struct PositionFeeSettlement {
 
 impl PositionFeeSettlement {
     /// Settle pending fees
-    pub fn new(
+    pub(crate) fn new(
         state: &State,
         store: &dyn Storage,
         mut position: Position,
@@ -805,7 +805,7 @@ impl PositionFeeSettlement {
             cap_crank_fee,
         })
     }
-    pub fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
         for event in &self.insufficient_margin_events {
             ctx.response_mut().add_event(event);
         }
@@ -829,7 +829,7 @@ pub(crate) struct FundingFeePaymentWithCapping {
 }
 
 impl FundingFeePaymentWithCapping {
-    pub fn apply(self, _state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub(crate) fn apply(self, _state: &State, ctx: &mut StateContext) -> Result<()> {
         if let Some(event) = &self.insufficient_margin_event {
             ctx.response_mut().add_event(event);
         }

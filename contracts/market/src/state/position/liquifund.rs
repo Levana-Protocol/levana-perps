@@ -92,7 +92,7 @@ pub(crate) struct PositionLiquifund {
 }
 
 impl PositionLiquifund {
-    pub fn new(
+    pub(crate) fn new(
         state: &State,
         store: &dyn Storage,
         pos: Position,
@@ -222,7 +222,7 @@ impl PositionLiquifund {
     }
 
     // this apply returns a MaybeClosedPosition, for convenience
-    pub fn apply(self, state: &State, ctx: &mut StateContext) -> Result<MaybeClosedPosition> {
+    pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<MaybeClosedPosition> {
         self.fee_settlement.apply(state, ctx)?;
         if let Some(liquidity_update_locked) = self.liquidity_update_locked {
             liquidity_update_locked.apply(state, ctx)?;

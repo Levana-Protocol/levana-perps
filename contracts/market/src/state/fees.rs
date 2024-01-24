@@ -298,7 +298,7 @@ pub(crate) struct BorrowFeeCollection {
 }
 
 impl BorrowFeeCollection {
-    pub fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
         let Self {
             event,
             liquidity_yield_to_process,
@@ -326,7 +326,7 @@ pub(crate) struct CapCrankFee {
 }
 
 impl CapCrankFee {
-    pub fn new(amount: Collateral, amount_usd: Usd, trade_id: TradeId) -> Self {
+    pub(crate) fn new(amount: Collateral, amount_usd: Usd, trade_id: TradeId) -> Self {
         Self {
             amount,
             amount_usd,
@@ -335,7 +335,7 @@ impl CapCrankFee {
         }
     }
 
-    pub fn apply(self, _state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub(crate) fn apply(self, _state: &State, ctx: &mut StateContext) -> Result<()> {
         let Self {
             trade_id,
             amount,
