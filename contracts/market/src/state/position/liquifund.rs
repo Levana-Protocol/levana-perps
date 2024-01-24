@@ -23,10 +23,10 @@ impl State<'_> {
         charge_crank_fee: bool,
         reason: PositionSaveReason,
     ) -> Result<()> {
-        let liquifund =
-            PositionLiquifund::new(self, ctx.storage, pos, starts_at, ends_at, charge_crank_fee)?;
-        liquifund.apply(self, ctx)?;
-        self.process_maybe_closed_position(ctx, liquifund.position, ends_at, reason)
+        let mcp =
+            PositionLiquifund::new(self, ctx.storage, pos, starts_at, ends_at, charge_crank_fee)?
+                .apply(self, ctx)?;
+        self.process_maybe_closed_position(ctx, mcp, ends_at, reason)
     }
 
     fn process_maybe_closed_position(
@@ -220,11 +220,13 @@ impl PositionLiquifund {
             liquidity_update_locked,
         })
     }
-    pub fn apply(&self, state: &State, ctx: &mut StateContext) -> Result<()> {
+
+    // this apply returns a MaybeClosedPosition, for convenience
+    pub fn apply(self, state: &State, ctx: &mut StateContext) -> Result<MaybeClosedPosition> {
         self.fee_settlement.apply(state, ctx)?;
-        if let Some(liquidity_update_locked) = &self.liquidity_update_locked {
+        if let Some(liquidity_update_locked) = self.liquidity_update_locked {
             liquidity_update_locked.apply(state, ctx)?;
         }
-        Ok(())
+        Ok(self.position)
     }
 }

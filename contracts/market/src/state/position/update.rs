@@ -290,7 +290,7 @@ impl UpdatePositionCollateral {
         })
     }
 
-    pub fn apply(&mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
         state.trade_history_add_volume(ctx, &self.pos.owner, self.trade_volume)?;
@@ -451,7 +451,7 @@ impl UpdatePositionSize {
             event,
         })
     }
-    pub fn apply(&mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
         state.trade_history_add_volume(ctx, &self.pos.owner, self.trade_volume)?;
@@ -621,7 +621,7 @@ impl UpdatePositionLeverage {
             event,
         })
     }
-    pub fn apply(&mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
         state.trade_history_add_volume(ctx, &self.pos.owner, self.trade_volume)?;
@@ -731,7 +731,7 @@ impl UpdatePositionMaxGains {
         })
     }
 
-    pub fn apply(&mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
 
         state.position_save(
@@ -850,7 +850,7 @@ impl LiquidityUpdate {
         }
     }
 
-    pub fn apply(&self, state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
         match self {
             Self::Lock(liquidity) => liquidity.apply(state, ctx),
             Self::Unlock(liquidity) => liquidity.apply(state, ctx),

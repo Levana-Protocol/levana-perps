@@ -449,7 +449,7 @@ fn helper_validate(
             let notional_size =
                 state.update_leverage_new_notional_size(store, id, leverage, price_point)?;
 
-            let pos:Position = liquifund.position.into();
+            let pos: Position = liquifund.position.into();
 
             if let Some(slippage_assert) = slippage_assert {
                 let market_type = state.market_id(store)?.get_market_type();

@@ -1006,7 +1006,7 @@ impl LiquidityUnlock {
             Ok(liquidity_stats)
         }
     }
-    pub(crate) fn apply(&self, state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
         let liquidity_stats = self.validate(state, ctx.storage)?;
 
         state.save_liquidity_stats(ctx.storage, &liquidity_stats)?;
@@ -1064,7 +1064,7 @@ impl LiquidityLock {
         }
     }
 
-    pub(crate) fn apply(&self, state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
         let stats = self.validate(state, ctx.storage, None)?;
 
         state.save_liquidity_stats(ctx.storage, &stats)?;
@@ -1089,7 +1089,7 @@ pub(crate) struct LiquidityNewYieldToProcess {
 }
 
 impl LiquidityNewYieldToProcess {
-    pub(crate) fn apply(&self, _state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub(crate) fn apply(self, _state: &State, ctx: &mut StateContext) -> Result<()> {
         YIELD_PER_TIME_PER_TOKEN.save(ctx.storage, self.next_index, &self.new_yield)?;
         Ok(())
     }
@@ -1127,7 +1127,7 @@ impl LiquidityUpdateLocked {
         Ok(stats)
     }
 
-    pub(crate) fn apply(&self, state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
         let Self { amount, price } = self;
 
         let stats = self.validate(state, ctx.storage)?;
@@ -1136,10 +1136,9 @@ impl LiquidityUpdateLocked {
 
         // The total pool size *has* changed here, due to LPs winning or losing
         // at the time of liquifunding
-        state.add_pool_size_change_events(ctx, &stats, price)?;
+        state.add_pool_size_change_events(ctx, &stats, &price)?;
 
-        ctx.response_mut()
-            .add_event(LockUpdateEvent { amount: *amount });
+        ctx.response_mut().add_event(LockUpdateEvent { amount });
 
         Ok(())
     }

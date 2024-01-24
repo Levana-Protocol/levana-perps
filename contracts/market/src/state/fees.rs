@@ -298,7 +298,7 @@ pub(crate) struct BorrowFeeCollection {
 }
 
 impl BorrowFeeCollection {
-    pub fn apply(&self, state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
         let Self {
             event,
             liquidity_yield_to_process,
@@ -335,7 +335,7 @@ impl CapCrankFee {
         }
     }
 
-    pub fn apply(&self, _state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub fn apply(self, _state: &State, ctx: &mut StateContext) -> Result<()> {
         let Self {
             trade_id,
             amount,
@@ -348,13 +348,13 @@ impl CapCrankFee {
 
         let mut fees = ALL_FEES.load(ctx.storage)?;
         let old_balance = fees.crank;
-        fees.crank = fees.crank.checked_add(*amount)?;
+        fees.crank = fees.crank.checked_add(amount)?;
         ALL_FEES.save(ctx.storage, &fees)?;
 
         ctx.response_mut().add_event(CrankFeeEvent {
             trade_id: trade_id.clone(),
-            amount: *amount,
-            amount_usd: *amount_usd,
+            amount,
+            amount_usd,
             old_balance,
             new_balance: fees.crank,
         });

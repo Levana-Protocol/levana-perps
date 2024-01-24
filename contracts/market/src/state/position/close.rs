@@ -21,9 +21,8 @@ impl State<'_> {
         let ends_at = settlement_price.timestamp;
         // Confirm that all past liquifundings have been performed before explicitly closing
         debug_assert!(pos.next_liquifunding >= ends_at);
-        let liquifund = PositionLiquifund::new(self, ctx.storage, pos, starts_at, ends_at, false)?;
-        liquifund.apply(self, ctx)?;
-        let mcp = liquifund.position;
+        let mcp = PositionLiquifund::new(self, ctx.storage, pos, starts_at, ends_at, false)?
+            .apply(self, ctx)?;
 
         // Liquifunding may have triggered a close, so check before we close again
         let instructions = match mcp {

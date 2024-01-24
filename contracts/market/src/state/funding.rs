@@ -805,7 +805,7 @@ impl PositionFeeSettlement {
             cap_crank_fee,
         })
     }
-    pub fn apply(&self, state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
         for event in &self.insufficient_margin_events {
             ctx.response_mut().add_event(event);
         }
@@ -813,7 +813,7 @@ impl PositionFeeSettlement {
         self.funding_fee_payment.apply(state, ctx)?;
         self.borrow_fee_collection.apply(state, ctx)?;
         ctx.response_mut().add_event(&self.funding_payment_event);
-        if let Some(cap_crank_fee) = &self.cap_crank_fee {
+        if let Some(cap_crank_fee) = self.cap_crank_fee {
             cap_crank_fee.apply(state, ctx)?;
         }
         Ok(())
@@ -829,7 +829,7 @@ pub(crate) struct FundingFeePaymentWithCapping {
 }
 
 impl FundingFeePaymentWithCapping {
-    pub fn apply(&self, _state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub fn apply(self, _state: &State, ctx: &mut StateContext) -> Result<()> {
         if let Some(event) = &self.insufficient_margin_event {
             ctx.response_mut().add_event(event);
         }
