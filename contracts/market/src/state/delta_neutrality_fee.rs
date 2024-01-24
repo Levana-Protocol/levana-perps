@@ -128,11 +128,7 @@ pub(crate) struct ChargeDeltaNeutralityFeeResult {
 
 impl ChargeDeltaNeutralityFeeResult {
     /// write its data to storage.
-    pub(crate) fn store(
-        &self,
-        state: &State,
-        ctx: &mut StateContext,
-    ) -> Result<Signed<Collateral>> {
+    pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<Signed<Collateral>> {
         let ChargeDeltaNeutralityFeeResult {
             pos_id,
             fee,
@@ -150,7 +146,7 @@ impl ChargeDeltaNeutralityFeeResult {
         }) = cap_triggered_info
         {
             ctx.response_mut().add_event(InsufficientMarginEvent {
-                pos: *pos_id,
+                pos: pos_id,
                 fee_type: FeeType::DeltaNeutrality,
                 available: available.into_signed(),
                 requested: requested.into_signed(),
@@ -158,10 +154,10 @@ impl ChargeDeltaNeutralityFeeResult {
             });
         }
 
-        DELTA_NEUTRALITY_FUND.save(ctx.storage, total_funds_after)?;
+        DELTA_NEUTRALITY_FUND.save(ctx.storage, &total_funds_after)?;
 
-        state.collect_delta_neutrality_fee_for_protocol(ctx, *pos_id, *protocol_fees, *price)?;
-        Ok(*fee)
+        state.collect_delta_neutrality_fee_for_protocol(ctx, pos_id, protocol_fees, price)?;
+        Ok(fee)
     }
 }
 

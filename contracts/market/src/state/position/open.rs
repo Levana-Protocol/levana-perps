@@ -223,7 +223,7 @@ impl State<'_> {
             FeeSource::Trading,
         )?;
 
-        delta_neutrality_fee.store(self, ctx)?;
+        delta_neutrality_fee.apply(self, ctx)?;
 
         // Note that in the validity check we've already confirmed there is sufficient liquidity
         LiquidityLock {

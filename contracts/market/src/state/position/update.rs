@@ -459,7 +459,7 @@ impl UpdatePositionSize {
 
         state.trade_history_add_volume(ctx, &self.pos.owner, self.trade_volume)?;
 
-        self.dnf.store(state, ctx)?;
+        self.dnf.apply(state, ctx)?;
         self.open_interest.apply(ctx)?;
 
         state.position_save(
@@ -630,7 +630,7 @@ impl UpdatePositionLeverage {
 
         state.trade_history_add_volume(ctx, &self.pos.owner, self.trade_volume)?;
 
-        self.dnf.store(state, ctx)?;
+        self.dnf.apply(state, ctx)?;
         self.open_interest.apply(ctx)?;
 
         state.position_save(

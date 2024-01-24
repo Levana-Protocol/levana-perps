@@ -84,7 +84,7 @@ impl State<'_> {
                 &settlement_price,
                 DeltaNeutralityFeeReason::PositionClose,
             )?
-            .store(self, ctx)?;
+            .apply(self, ctx)?;
         pos.add_delta_neutrality_fee(delta_neutrality_fee, &settlement_price)?;
 
         // Reduce net open interest. This needs to happen _after_ delta
