@@ -817,7 +817,7 @@ checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 [[package]]
 name = "cosmos"
 version = "0.1.0"
-source = "git+https://github.com/Levana-Protocol/levana-cosmos-rs.git?rev=c2e5eaa93cbb80447bb17b45b0973fd2a93790d9#c2e5eaa93cbb80447bb17b45b0973fd2a93790d9"
+source = "git+https://github.com/Levana-Protocol/levana-cosmos-rs.git?rev=8978316651b46c25fd9a560f0f03edd540d2c9fa#8978316651b46c25fd9a560f0f03edd540d2c9fa"
 dependencies = [
  "base64 0.21.3",
  "bech32",
@@ -825,7 +825,6 @@ dependencies = [
  "bitcoin",
  "chrono",
  "cosmos-sdk-proto",
- "cosmwasm-std",
  "fs-err",
  "hex",
  "hkd32",
