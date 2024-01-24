@@ -114,7 +114,7 @@ pub(crate) enum LatestPrice {
         on_chain_oracle_publish_time: DateTime<Utc>,
     },
     PriceTooOld {
-        feed: FeedType,
+        too_old: PriceTooOld,
     },
     VolatileDiffTooLarge,
 }
@@ -153,7 +153,7 @@ pub(crate) async fn get_latest_price(
             feeds,
             volatile_diff_seconds,
         )? {
-            ComposedOracleFeed::UpdateTooOld { feed } => LatestPrice::PriceTooOld { feed },
+            ComposedOracleFeed::UpdateTooOld { too_old } => LatestPrice::PriceTooOld { too_old },
             ComposedOracleFeed::VolatileDiffTooLarge => LatestPrice::VolatileDiffTooLarge,
             ComposedOracleFeed::OffChainPrice {
                 price: off_chain_price,
@@ -171,9 +171,18 @@ pub(crate) async fn get_latest_price(
     )
 }
 
+#[derive(Debug)]
+pub(crate) struct PriceTooOld {
+    pub(crate) feed: FeedType,
+    pub(crate) check_time: DateTime<Utc>,
+    pub(crate) publish_time: DateTime<Utc>,
+    pub(crate) age: i64,
+    pub(crate) age_tolerance_seconds: u32,
+}
+
 enum ComposedOracleFeed {
     UpdateTooOld {
-        feed: FeedType,
+        too_old: PriceTooOld,
     },
     OffChainPrice {
         price: PriceBaseInQuote,
@@ -232,7 +241,13 @@ fn compose_oracle_feeds(
                 let age = now.signed_duration_since(pyth_update).num_seconds();
                 if age >= (*age_tolerance_seconds).into() {
                     return Ok(ComposedOracleFeed::UpdateTooOld {
-                        feed: FeedType::Pyth { id: *id },
+                        too_old: PriceTooOld {
+                            feed: FeedType::Pyth { id: *id },
+                            check_time: now,
+                            publish_time: *pyth_update,
+                            age,
+                            age_tolerance_seconds: *age_tolerance_seconds,
+                        },
                     });
                 }
 
@@ -271,8 +286,14 @@ fn compose_oracle_feeds(
                 let age = now.signed_duration_since(publish_time).num_seconds();
                 if age >= (*age_tolerance_seconds).into() {
                     return Ok(ComposedOracleFeed::UpdateTooOld {
-                        feed: FeedType::Stride {
-                            denom: denom.clone(),
+                        too_old: PriceTooOld {
+                            feed: FeedType::Stride {
+                                denom: denom.clone(),
+                            },
+                            check_time: now,
+                            publish_time,
+                            age,
+                            age_tolerance_seconds: *age_tolerance_seconds,
                         },
                     });
                 }
@@ -292,8 +313,14 @@ fn compose_oracle_feeds(
                     let age = now.signed_duration_since(timestamp).num_seconds();
                     if age >= (*age_tolerance_seconds).into() {
                         return Ok(ComposedOracleFeed::UpdateTooOld {
-                            feed: FeedType::Simple {
-                                contract: contract.as_str().parse()?,
+                            too_old: PriceTooOld {
+                                feed: FeedType::Simple {
+                                    contract: contract.as_str().parse()?,
+                                },
+                                check_time: now,
+                                publish_time: timestamp,
+                                age,
+                                age_tolerance_seconds: *age_tolerance_seconds,
                             },
                         });
                     }
