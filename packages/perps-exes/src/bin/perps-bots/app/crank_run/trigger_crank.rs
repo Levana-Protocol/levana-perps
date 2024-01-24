@@ -88,7 +88,7 @@ impl Queue {
                 PopResult::ValueFound {
                     address,
                     market_id,
-                    more_work_exists: !self.set.is_empty(),
+                    more_work_exists: !self.fifo.is_empty(),
                     reason: Box::new(reason),
                     queued,
                 }
