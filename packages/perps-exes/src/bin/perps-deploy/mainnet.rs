@@ -2,6 +2,7 @@ mod check_price_feed_health;
 mod close_all_positions;
 mod contracts_csv;
 mod migrate;
+mod rewards;
 mod send_treasury;
 mod sync_config;
 mod transfer_dao_fees;
@@ -123,6 +124,11 @@ enum Sub {
         #[clap(flatten)]
         inner: CloseAllPositionsOpts,
     },
+    /// Collect rewards in all markets in a mainnet factory
+    Rewards {
+        #[clap(flatten)]
+        inner: rewards::RewardsOpts,
+    },
 }
 
 pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
@@ -148,6 +154,7 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
         Sub::ContractsCsv { inner } => inner.go(opt).await?,
         Sub::CheckPriceFeedHealth { inner } => inner.go(opt).await?,
         Sub::CloseAllPositions { inner } => inner.go(opt).await?,
+        Sub::Rewards { inner } => inner.go(opt).await?,
     }
     Ok(())
 }
