@@ -369,7 +369,7 @@ async fn process_tx_result(
         Err(e) => {
             if app.is_osmosis_epoch() {
                 Ok(format!("Multi tx failed, but assuming it's because we're in the epoch: {e:?}, delay: {:?}", instant.elapsed()))
-            } else if app.get_congested_info().is_congested() {
+            } else if app.get_congested_info().await.is_congested() {
                 Ok(format!("Multi tx failed, but assuming it's because Osmosis is congested: {e:?}, delay: {:?}", instant.elapsed()))
             } else {
                 Err(e.into())
@@ -746,7 +746,7 @@ pub(crate) async fn update_oracles(
         Err(e) => {
             if app.is_osmosis_epoch() {
                 Ok(format!("Unable to update Pyth oracle, but assuming it's because we're in the epoch: {e:?}, delay: {:?}", received.elapsed()))
-            } else if app.get_congested_info().is_congested() {
+            } else if app.get_congested_info().await.is_congested() {
                 Ok(format!("Unable to update Pyth oracle, but assuming it's because Osmosis is congested: {e:?}, delay: {:?}", received.elapsed()))
             } else {
                 Err(e.into())
