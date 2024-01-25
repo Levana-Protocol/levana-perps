@@ -29,6 +29,7 @@ pub(crate) struct OpenPositionExec {
     price_point: PricePoint,
     delta_neutrality_fee: ChargeDeltaNeutralityFeeResult,
     open_interest: AdjustOpenInterest,
+    liquidity: LiquidityLock,
 }
 
 impl OpenPositionExec {
@@ -152,14 +153,16 @@ impl OpenPositionExec {
             DeltaNeutralityFeeReason::PositionOpen,
         )?;
 
-        state.check_unlocked_liquidity(
+        let liquidity = LiquidityLock::new(
+            state,
             store,
             pos.counter_collateral,
+            *price_point,
             Some(pos.notional_size),
-            price_point,
+            None,
         )?;
 
-        pos.liquidation_margin = pos.liquidation_margin(price_point, &config)?;
+        pos.liquidation_margin = pos.liquidation_margin(price_point, config)?;
 
         // Check for sufficient margin
         perp_ensure!(
@@ -171,20 +174,37 @@ impl OpenPositionExec {
             pos.liquidation_margin,
         );
 
-        let open_interest = 
+        let open_interest =
             AdjustOpenInterest::new(state, store, pos.notional_size, pos.direction(), true)?;
 
-        Ok(Self{
+        Ok(Self {
             pos,
             trade_volume_usd,
             price_point: *price_point,
             delta_neutrality_fee,
             open_interest,
+            liquidity,
         })
     }
 
-    pub fn apply(self, state: &State, ctx: &mut StateContext, save_reason: PositionSaveReason) -> Result<PositionId> {
-        let Self { pos, trade_volume_usd, price_point, delta_neutrality_fee, open_interest } = self;
+    // This is a no-op, but it's more expressive to call discard() or apply()
+    // rather than to just assign it to a throwaway variable.
+    pub(crate) fn discard(self) {}
+
+    pub fn apply(
+        self,
+        state: &State,
+        ctx: &mut StateContext,
+        save_reason: PositionSaveReason,
+    ) -> Result<PositionId> {
+        let Self {
+            mut pos,
+            trade_volume_usd,
+            price_point,
+            delta_neutrality_fee,
+            open_interest,
+            liquidity,
+        } = self;
         state.trade_history_add_volume(ctx, &pos.owner, trade_volume_usd)?;
 
         open_interest.apply(ctx)?;
@@ -201,17 +221,10 @@ impl OpenPositionExec {
         delta_neutrality_fee.apply(state, ctx)?;
 
         // Note that in the validity check we've already confirmed there is sufficient liquidity
-        state.liquidity_lock(ctx, pos.counter_collateral, &price_point)?;
+        liquidity.apply(state, ctx)?;
 
         // Save the position, setting liquidation margin and prices
-        state.position_save(
-            ctx,
-            &mut pos,
-            &price_point,
-            false,
-            true,
-            save_reason,
-        )?;
+        state.position_save(ctx, &mut pos, &price_point, false, true, save_reason)?;
 
         // mint the nft
         state.nft_mint(ctx, pos.owner.clone(), pos.id.to_string())?;

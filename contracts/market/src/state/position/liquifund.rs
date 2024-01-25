@@ -143,12 +143,9 @@ impl PositionLiquifund {
             slippage_liquidation_margin,
         )?;
 
-        let liquidity_update_locked = LiquidityUpdateLocked {
-            amount: -exposure,
-            price: end_price,
-        };
-        liquidity_update_locked.validate(state, store)?;
-        let liquidity_update_locked = Some(liquidity_update_locked);
+        let liquidity_update_locked = Some(LiquidityUpdateLocked::new(
+            state, store, -exposure, end_price,
+        )?);
 
         let mut pos = match mcp {
             MaybeClosedPosition::Open(pos) => pos,
@@ -222,7 +219,11 @@ impl PositionLiquifund {
     }
 
     // this apply returns a MaybeClosedPosition, for convenience
-    pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<MaybeClosedPosition> {
+    pub(crate) fn apply(
+        self,
+        state: &State,
+        ctx: &mut StateContext,
+    ) -> Result<MaybeClosedPosition> {
         self.fee_settlement.apply(state, ctx)?;
         if let Some(liquidity_update_locked) = self.liquidity_update_locked {
             liquidity_update_locked.apply(state, ctx)?;

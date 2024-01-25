@@ -226,9 +226,11 @@ impl State<'_> {
             take_profit_override: order.take_profit_override,
         };
 
-        let res = match OpenPositionExec::new(self, ctx.storage, open_position_params, price_point) {
+        let res = match OpenPositionExec::new(self, ctx.storage, open_position_params, price_point)
+        {
             Ok(validated_position) => {
-                let pos_id = validated_position.apply(self, ctx, PositionSaveReason::ExecuteLimitOrder)?;
+                let pos_id =
+                    validated_position.apply(self, ctx, PositionSaveReason::ExecuteLimitOrder)?;
                 Ok(pos_id)
             }
             Err(e) => {

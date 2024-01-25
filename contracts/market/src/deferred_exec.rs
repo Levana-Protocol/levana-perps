@@ -5,13 +5,7 @@
 // by way of shared functions and structs that contain as much of the validation as possible in their construction
 //
 // The execution branch then goes one step further - applying the changes to the state, using that same struct
-//
-// In some cases there are validation steps which are run again at apply() time, as an extra precaution
-// For example: locking up liquidity requires knowing the net notional.
-// in the validation-only branch, we calculate what the net notional should eventually be changed to, and use that in-memory value
-// but in the execution branch, it uses the real net notional directly from storage, which at least feels a little bit safer.
-// This is, of course, merely a safety net - if these values are different, it means that something has gone horribly wrong...
-// but we'd rather "something has gone wrong" in the error recovery only, and the normal execution path should do the clearest thing
+// In order to ensure that the struct is used, we annotate with `#[must_use]` and either `apply()` or `discard()` are called
 use msg::contracts::market::{
     deferred_execution::{
         DeferredExecCompleteTarget, DeferredExecId, DeferredExecItem, DeferredExecWithStatus,
@@ -21,10 +15,12 @@ use msg::contracts::market::{
 };
 
 use crate::state::position::{
-    liquifund::PositionLiquifund, update::{
+    liquifund::PositionLiquifund,
+    update::{
         UpdatePositionCollateral, UpdatePositionLeverage, UpdatePositionMaxGains,
         UpdatePositionSize,
-    }, OpenPositionExec, OpenPositionParams, ValidatedPosition
+    },
+    OpenPositionExec, OpenPositionParams,
 };
 use crate::{prelude::*, state::position::get_position};
 
@@ -71,24 +67,24 @@ fn helper_execute(
             amount,
             crank_fee,
             crank_fee_usd,
-        } => {
-            OpenPositionExec::new(state, ctx.storage, 
-                OpenPositionParams { 
-                    owner: item.owner,
-                    collateral: amount,
-                    leverage,
-                    direction,
-                    max_gains_in_quote: max_gains,
-                    slippage_assert,
-                    stop_loss_override,
-                    take_profit_override,
-                    crank_fee: CollateralAndUsd::from_pair(crank_fee, crank_fee_usd),
-                }, 
-                &price_point
-            )?
-            .apply(state, ctx, PositionSaveReason::OpenMarket)
-            .map(DeferredExecCompleteTarget::Position)
-        },
+        } => OpenPositionExec::new(
+            state,
+            ctx.storage,
+            OpenPositionParams {
+                owner: item.owner,
+                collateral: amount,
+                leverage,
+                direction,
+                max_gains_in_quote: max_gains,
+                slippage_assert,
+                stop_loss_override,
+                take_profit_override,
+                crank_fee: CollateralAndUsd::from_pair(crank_fee, crank_fee_usd),
+            },
+            &price_point,
+        )?
+        .apply(state, ctx, PositionSaveReason::OpenMarket)
+        .map(DeferredExecCompleteTarget::Position),
         DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount } => {
             execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
             UpdatePositionCollateral::new(
@@ -341,23 +337,27 @@ fn helper_validate(
             amount,
             crank_fee,
             crank_fee_usd,
-        } => state
-            .validate_new_position(
+        } => {
+            OpenPositionExec::new(
+                state,
                 store,
                 OpenPositionParams {
                     owner: item.owner,
                     collateral: amount,
-                    crank_fee: CollateralAndUsd::from_pair(crank_fee, crank_fee_usd),
                     leverage,
                     direction,
                     max_gains_in_quote: max_gains,
                     slippage_assert,
                     stop_loss_override,
                     take_profit_override,
+                    crank_fee: CollateralAndUsd::from_pair(crank_fee, crank_fee_usd),
                 },
                 price_point,
-            )
-            .map(|_| ()),
+            )?
+            .discard();
+
+            Ok(())
+        }
         DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount } => {
             let liquifund =
                 validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?;

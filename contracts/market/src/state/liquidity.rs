@@ -991,34 +991,46 @@ impl State<'_> {
 pub(crate) struct LiquidityUnlock {
     pub amount: NonZero<Collateral>,
     pub price: PricePoint,
+    pub stats: LiquidityStats,
 }
 
 impl LiquidityUnlock {
     // Validate is automatically called by apply (so that it also loads the latest stats)
     // but can also be called for error recovery in the submessage handler
-    pub(crate) fn validate(&self, state: &State, store: &dyn Storage) -> Result<LiquidityStats> {
-        let mut liquidity_stats = state.load_liquidity_stats(store)?;
-        if self.amount.raw() > liquidity_stats.locked {
-            Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed unlock! not enough locked liquidity in the protocol! (asked for {}, only {} available)", self.amount, liquidity_stats.locked))
+    pub(crate) fn new(
+        state: &State,
+        store: &dyn Storage,
+        amount: NonZero<Collateral>,
+        price: PricePoint,
+    ) -> Result<Self> {
+        let mut stats = state.load_liquidity_stats(store)?;
+        if amount.raw() > stats.locked {
+            Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed unlock! not enough locked liquidity in the protocol! (asked for {}, only {} available)", amount, stats.locked))
         } else {
-            liquidity_stats.locked = liquidity_stats.locked.checked_sub(self.amount.raw())?;
-            liquidity_stats.unlocked = liquidity_stats.unlocked.checked_add(self.amount.raw())?;
-            Ok(liquidity_stats)
+            stats.locked = stats.locked.checked_sub(amount.raw())?;
+            stats.unlocked = stats.unlocked.checked_add(amount.raw())?;
+            Ok(Self {
+                stats,
+                amount,
+                price,
+            })
         }
     }
     pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
-        let liquidity_stats = self.validate(state, ctx.storage)?;
+        let Self {
+            amount,
+            stats,
+            price,
+        } = self;
 
-        state.save_liquidity_stats(ctx.storage, &liquidity_stats)?;
+        state.save_liquidity_stats(ctx.storage, &stats)?;
 
         // Technically the total pool size has not changed
         // but the event consists of both locked and unlocked parts
         // so emit the event for now
-        state.add_pool_size_change_events(ctx, &liquidity_stats, &self.price)?;
+        state.add_pool_size_change_events(ctx, &stats, &price)?;
 
-        ctx.response_mut().add_event(UnlockEvent {
-            amount: self.amount,
-        });
+        ctx.response_mut().add_event(UnlockEvent { amount });
 
         Ok(())
     }
@@ -1028,19 +1040,19 @@ impl LiquidityUnlock {
 #[must_use]
 pub(crate) struct LiquidityLock {
     pub amount: NonZero<Collateral>,
+    pub stats: LiquidityStats,
     pub price: PricePoint,
-    pub delta_notional: Option<Signed<Notional>>,
 }
 
 impl LiquidityLock {
-    // Validate is automatically called by apply (so that it also loads the latest stats)
-    // but can also be called for error recovery in the submessage handler
-    pub(crate) fn validate(
-        &self,
+    pub(crate) fn new(
         state: &State,
         store: &dyn Storage,
+        amount: NonZero<Collateral>,
+        price: PricePoint,
+        delta_notional: Option<Signed<Notional>>,
         net_notional_override: Option<Signed<Notional>>,
-    ) -> Result<LiquidityStats> {
+    ) -> Result<Self> {
         let mut stats = state.load_liquidity_stats(store)?;
         let mut net_notional = match net_notional_override {
             Some(net_notional_override) => net_notional_override,
@@ -1050,33 +1062,37 @@ impl LiquidityLock {
                 long_interest_protocol.into_signed() - short_interest_protocol.into_signed()
             }
         };
-        net_notional += self
-            .delta_notional
-            .unwrap_or_else(|| Notional::zero().into_signed());
-        let min_unlocked_liquidity = state.min_unlocked_liquidity(net_notional, &self.price)?;
+        net_notional += delta_notional.unwrap_or_else(|| Notional::zero().into_signed());
+        let min_unlocked_liquidity = state.min_unlocked_liquidity(net_notional, &price)?;
 
-        if min_unlocked_liquidity + self.amount.raw() > stats.unlocked {
-            Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed lock! not enough unlocked liquidity in the protocol! (asked for {}, only {} available with {} minimum. net notional is {})", self.amount, stats.unlocked, min_unlocked_liquidity, net_notional))
+        if min_unlocked_liquidity + amount.raw() > stats.unlocked {
+            Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed lock! not enough unlocked liquidity in the protocol! (asked for {}, only {} available with {} minimum. net notional is {})", amount, stats.unlocked, min_unlocked_liquidity, net_notional))
         } else {
-            stats.locked = stats.locked.checked_add(self.amount.raw())?;
-            stats.unlocked = stats.unlocked.checked_sub(self.amount.raw())?;
-            Ok(stats)
+            stats.locked = stats.locked.checked_add(amount.raw())?;
+            stats.unlocked = stats.unlocked.checked_sub(amount.raw())?;
+            Ok(Self {
+                stats,
+                amount,
+                price,
+            })
         }
     }
 
     pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
-        let stats = self.validate(state, ctx.storage, None)?;
+        let Self {
+            amount,
+            stats,
+            price,
+        } = self;
 
         state.save_liquidity_stats(ctx.storage, &stats)?;
 
         // Technically the total pool size has not changed
         // but the event consists of both locked and unlocked parts
         // so emit the event for now
-        state.add_pool_size_change_events(ctx, &stats, &self.price)?;
+        state.add_pool_size_change_events(ctx, &stats, &price)?;
 
-        ctx.response_mut().add_event(LockEvent {
-            amount: self.amount,
-        });
+        ctx.response_mut().add_event(LockEvent { amount });
 
         Ok(())
     }
@@ -1102,18 +1118,21 @@ impl LiquidityNewYieldToProcess {
 pub(crate) struct LiquidityUpdateLocked {
     pub amount: Signed<Collateral>,
     pub price: PricePoint,
+    pub stats: LiquidityStats,
 }
 
 impl LiquidityUpdateLocked {
-    // Validate is automatically called by apply (so that it also loads the latest stats)
-    // but can also be called for error recovery in the submessage handler
-    pub(crate) fn validate(&self, state: &State, store: &dyn Storage) -> Result<LiquidityStats> {
-        let Self { amount, .. } = self;
+    pub(crate) fn new(
+        state: &State,
+        store: &dyn Storage,
+        amount: Signed<Collateral>,
+        price: PricePoint,
+    ) -> Result<Self> {
         let mut stats = state.load_liquidity_stats(store)?;
         stats.locked = match stats
             .locked
             .into_signed()
-            .checked_add(*amount)?
+            .checked_add(amount)?
             .try_into_non_negative_value()
         {
             None => anyhow::bail!(
@@ -1124,13 +1143,19 @@ impl LiquidityUpdateLocked {
             Some(locked) => locked,
         };
 
-        Ok(stats)
+        Ok(Self {
+            amount,
+            price,
+            stats,
+        })
     }
 
     pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
-        let Self { amount, price } = self;
-
-        let stats = self.validate(state, ctx.storage)?;
+        let Self {
+            amount,
+            price,
+            stats,
+        } = self;
 
         state.save_liquidity_stats(ctx.storage, &stats)?;
 

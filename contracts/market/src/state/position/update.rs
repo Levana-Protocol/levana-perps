@@ -6,7 +6,6 @@ use crate::state::position::get_position;
 use msg::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
 use msg::contracts::market::entry::PositionActionKind;
 use msg::contracts::market::fees::events::FeeSource;
-use msg::contracts::market::liquidity::LiquidityStats;
 use msg::contracts::market::position::events::{
     calculate_position_collaterals, PositionAttributes, PositionSaveReason, PositionTradingFee,
 };
@@ -378,7 +377,6 @@ impl UpdatePositionSize {
         let new_counter_collateral = pos.counter_collateral.checked_mul_non_zero(scale_factor)?;
         let counter_collateral_delta =
             new_counter_collateral.into_signed() - old_counter_collateral.into_signed();
-        let liquidity_update = LiquidityUpdate::new(counter_collateral_delta, price_point)?;
         pos.counter_collateral = new_counter_collateral;
 
         let market_type = state.market_type(store)?;
@@ -422,6 +420,13 @@ impl UpdatePositionSize {
         let open_interest =
             AdjustOpenInterest::new(state, store, notional_size_diff, pos.direction(), true)?;
 
+        let liquidity_update = LiquidityUpdate::new(
+            state,
+            store,
+            counter_collateral_delta,
+            price_point,
+            Some(&open_interest),
+        )?;
         // Send the removed collateral back to the user. We convert a negative
         // delta (indicating the user requested collateral be returned) into a
         // positive (giving the amount to be returned) and then attempt to
@@ -431,13 +436,6 @@ impl UpdatePositionSize {
 
         let event = state.position_update_event(store, &original_pos, pos.clone(), price_point)?;
 
-        if let Some(liquidity_update) = &liquidity_update {
-            liquidity_update.validate(
-                state,
-                store,
-                Some(open_interest.net_notional(state, store)?),
-            )?;
-        }
         Ok(UpdatePositionSize {
             pos,
             price_point: *price_point,
@@ -556,7 +554,6 @@ impl UpdatePositionLeverage {
         .context("new_counter_collateral is zero")?;
         let counter_collateral_delta =
             new_counter_collateral.into_signed() - old_counter_collateral.into_signed();
-        let liquidity_update = LiquidityUpdate::new(counter_collateral_delta, price_point)?;
         pos.counter_collateral = new_counter_collateral;
 
         let market_type = state.market_id(store)?.get_market_type();
@@ -600,15 +597,15 @@ impl UpdatePositionLeverage {
         let open_interest =
             AdjustOpenInterest::new(state, store, notional_size_diff, pos.direction(), true)?;
 
+        let liquidity_update = LiquidityUpdate::new(
+            state,
+            store,
+            counter_collateral_delta,
+            price_point,
+            Some(&open_interest),
+        )?;
         let event = state.position_update_event(store, &original_pos, pos.clone(), price_point)?;
 
-        if let Some(liquidity_update) = &liquidity_update {
-            liquidity_update.validate(
-                state,
-                store,
-                Some(open_interest.net_notional(state, store)?),
-            )?;
-        }
         Ok(UpdatePositionLeverage {
             pos,
             price_point: *price_point,
@@ -695,7 +692,6 @@ impl UpdatePositionMaxGains {
         let new_counter_collateral = counter_collateral;
         let counter_collateral_delta =
             new_counter_collateral.into_signed() - old_counter_collateral.into_signed();
-        let liquidity_update = LiquidityUpdate::new(counter_collateral_delta, price_point)?;
         pos.counter_collateral = new_counter_collateral;
 
         // Validate leverage _before_ we reduce trading fees from active collateral
@@ -721,11 +717,11 @@ impl UpdatePositionMaxGains {
         let notional_size_diff = pos.notional_size - original_pos.notional_size;
         debug_assert!(notional_size_diff.is_zero());
 
+        let liquidity_update =
+            LiquidityUpdate::new(state, store, counter_collateral_delta, price_point, None)?;
+
         let event = state.position_update_event(store, &original_pos, pos.clone(), price_point)?;
 
-        if let Some(liquidity_update) = &liquidity_update {
-            liquidity_update.validate(state, store, None)?;
-        }
         Ok(UpdatePositionMaxGains {
             pos,
             price_point: *price_point,
@@ -811,6 +807,7 @@ impl PositionUpdateEventExt for PositionUpdateEvent {
     }
 }
 
+#[must_use]
 enum LiquidityUpdate {
     Lock(LiquidityLock),
     Unlock(LiquidityUnlock),
@@ -818,23 +815,28 @@ enum LiquidityUpdate {
 
 impl LiquidityUpdate {
     fn new(
+        state: &State,
+        store: &dyn Storage,
         counter_collateral_delta: Signed<Collateral>,
         price_point: &PricePoint,
+        open_interest: Option<&AdjustOpenInterest>,
     ) -> Result<Option<Self>> {
         match NonZero::new(counter_collateral_delta.abs_unsigned()) {
             Some(delta_abs) => {
                 if counter_collateral_delta.is_strictly_positive() {
-                    let liquidity = LiquidityLock {
-                        amount: delta_abs,
-                        price: *price_point,
-                        delta_notional: None,
-                    };
+                    let liquidity = LiquidityLock::new(
+                        state,
+                        store,
+                        delta_abs,
+                        *price_point,
+                        None,
+                        open_interest
+                            .map(|x| x.net_notional(state, store))
+                            .transpose()?,
+                    )?;
                     Ok(Some(Self::Lock(liquidity)))
                 } else {
-                    let liquidity = LiquidityUnlock {
-                        amount: delta_abs,
-                        price: *price_point,
-                    };
+                    let liquidity = LiquidityUnlock::new(state, store, delta_abs, *price_point)?;
                     Ok(Some(Self::Unlock(liquidity)))
                 }
             }
@@ -842,18 +844,6 @@ impl LiquidityUpdate {
                 debug_assert_eq!(counter_collateral_delta, Signed::zero());
                 Ok(None)
             }
-        }
-    }
-
-    pub(crate) fn validate(
-        &self,
-        state: &State,
-        store: &dyn Storage,
-        net_notional_override: Option<Signed<Notional>>,
-    ) -> Result<LiquidityStats> {
-        match self {
-            Self::Lock(liquidity) => liquidity.validate(state, store, net_notional_override),
-            Self::Unlock(liquidity) => liquidity.validate(state, store),
         }
     }
 

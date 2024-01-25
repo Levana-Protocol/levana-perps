@@ -133,11 +133,8 @@ impl State<'_> {
         // Take the exposure we already capped and subtract out the final exposure. Since both numbers in a loss scenario will be negative, this will give back the positive value representing the funds to be sent to the liquidity pool.
         let additional_lp_funds = capped_exposure.checked_sub(final_exposure)?;
         debug_assert!(additional_lp_funds >= Signed::zero());
-        LiquidityUpdateLocked {
-            amount: additional_lp_funds,
-            price: settlement_price,
-        }
-        .apply(self, ctx)?;
+        LiquidityUpdateLocked::new(self, ctx.storage, additional_lp_funds, settlement_price)?
+            .apply(self, ctx)?;
 
         // Final active collateral is the active collateral post fees plus final
         // exposure numbers. The final exposure will be negative for losses and positive
@@ -167,11 +164,8 @@ impl State<'_> {
 
         // unlock the LP collateral
         if let Some(counter_collateral) = NonZero::new(counter_collateral) {
-            LiquidityUnlock {
-                amount: counter_collateral,
-                price: settlement_price,
-            }
-            .apply(self, ctx)?;
+            LiquidityUnlock::new(self, ctx.storage, counter_collateral, settlement_price)?
+                .apply(self, ctx)?;
         }
 
         // send the trader's collateral to their wallet
