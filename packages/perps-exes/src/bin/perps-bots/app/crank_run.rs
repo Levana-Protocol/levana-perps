@@ -227,7 +227,7 @@ impl App {
             Err(e) => {
                 if self.is_osmosis_epoch() {
                     Ok(RunResult::OsmosisEpoch(e))
-                } else if self.get_congested_info().is_congested() {
+                } else if self.get_congested_info().await.is_congested() {
                     Ok(RunResult::OsmosisCongested(e))
                 } else {
                     let error_as_str = format!("{e:?}");
