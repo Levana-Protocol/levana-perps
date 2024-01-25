@@ -63,6 +63,9 @@ pub(crate) struct Opt {
     /// Body length limit in bytes. Default is 1MB (Same as Nginx)
     #[clap(long, env = "LEVANA_BOTS_BODY_LIMIT", default_value_t = 1024000)]
     pub(crate) request_body_limit_bytes: usize,
+    /// Use experimental multi message price update including cranks
+    #[clap(long, env = "LEVANA_BOTS_MULTI_MESSAGE_UPDATES")]
+    pub(crate) multi_message_update: bool,
 }
 
 #[derive(clap::Parser, Clone)]

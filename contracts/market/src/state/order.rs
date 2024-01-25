@@ -297,8 +297,12 @@ impl State<'_> {
             order.unwrap_or(Order::Ascending),
         );
 
-        const MAX_LIMIT: u32 = 20;
-        let limit = limit.unwrap_or(MAX_LIMIT).min(MAX_LIMIT).try_into()?;
+        const ORDER_DEFAULT_LIMIT: u32 = 20;
+
+        let limit = limit
+            .unwrap_or(ORDER_DEFAULT_LIMIT)
+            .min(QUERY_MAX_LIMIT)
+            .try_into()?;
         let mut orders = Vec::with_capacity(limit);
         let mut next_start_after = None;
         for _ in 0..limit {

@@ -169,6 +169,7 @@ impl State<'_> {
         let order = order.unwrap_or(OrderInMessage::Descending);
         let limit: usize = limit
             .unwrap_or(DEFAULT_CLOSED_POSITION_HISTORY_LIMIT)
+            .min(QUERY_MAX_LIMIT)
             .try_into()?;
 
         let (min, max) = match (cursor, order) {
