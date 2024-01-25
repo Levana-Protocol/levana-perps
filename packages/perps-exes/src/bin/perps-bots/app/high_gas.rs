@@ -212,7 +212,7 @@ impl WatchedTask for Worker {
                     successes.push(format!(
                         "[VERY HIGH GAS] - we think we're in the Osmosis epoch, error: {e:?}"
                     ));
-                } else if app.get_congested_info().is_congested() {
+                } else if app.get_congested_info().await.is_congested() {
                     let msg = format!("[VERY HIGH GAS] - we think the Osmosis chain is overly congested, error: {e:?}, delta between queued and now: {:?}, delta between received and now: {:?}",
                                     queued.elapsed(),
                                     received.elapsed());

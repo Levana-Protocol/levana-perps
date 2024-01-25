@@ -63,7 +63,7 @@ impl Stale {
                 "Ignoring old deferred exec item since we're in the Osmosis epoch".to_owned(),
             );
         }
-        if app.get_congested_info().is_congested() {
+        if app.get_congested_info().await.is_congested() {
             return Ok("Ignoring stale state since Osmosis appears to be congested".to_owned());
         }
 
@@ -117,13 +117,13 @@ impl App {
     }
 
     /// Gas price congestion info for Osmosis mainnet
-    pub(crate) fn get_congested_info(&self) -> CongestedInfo {
+    pub(crate) async fn get_congested_info(&self) -> CongestedInfo {
         match &self.config.by_type {
             BotConfigByType::Mainnet { inner }
                 if self.cosmos.get_address_hrp().as_str() == "osmo" =>
             {
                 CongestedInfo::OsmosisMainnet {
-                    base: self.cosmos.get_base_gas_price(),
+                    base: self.cosmos.get_base_gas_price().await,
                     congested: inner.gas_price_congested,
                     max: inner.max_gas_price,
                 }
