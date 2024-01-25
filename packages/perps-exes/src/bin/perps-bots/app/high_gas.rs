@@ -9,9 +9,10 @@ use super::{
     gas_check::GasCheckWallet, price::price_get_update_oracles_msg, App, AppBuilder,
     CrankTriggerReason,
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use async_channel::RecvError;
 use axum::async_trait;
+use chrono::Duration;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
 use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
 use parking_lot::Mutex;
@@ -149,7 +150,10 @@ impl WatchedTask for Worker {
                 match work {
                     Some(work) => work,
                     None => {
-                        bail!("[VERY HIGH GAS] Signaled about work item, but didn't receive any.")
+                        tracing::warn!(
+                            "[VERY HIGH GAS] Signaled about work item, but didn't receive any."
+                        );
+                        return Ok(WatchedTaskOutput::new("No work item received"));
                     }
                 }
             }
@@ -209,23 +213,29 @@ impl WatchedTask for Worker {
                         "[VERY HIGH GAS] - we think we're in the Osmosis epoch, error: {e:?}"
                     ));
                 } else if app.get_congested_info().is_congested() {
-                    bail!("[VERY HIGH GAS] - we think the Osmosis chain is overly congested, error: {e:?}, delta between queued and now: {:?}, delta between received and now: {:?}",
+                    let msg = format!("[VERY HIGH GAS] - we think the Osmosis chain is overly congested, error: {e:?}, delta between queued and now: {:?}, delta between received and now: {:?}",
                                     queued.elapsed(),
-                                    received.elapsed(),
-                                );
+                                    received.elapsed());
+                    return Ok(WatchedTaskOutput::new(msg)
+                        .set_error()
+                        .set_expiry(Duration::seconds(10)));
                 } else {
                     let error_as_str = format!("{e:?}");
                     if error_as_str.contains("out of gas") || error_as_str.contains("code 11") {
-                        bail!("[VERY HIGH GAS] - Got an 'out of gas' code 11 when trying to crank. error: {e:?}, delta between queued and now: {:?}, delta between received and now: {:?}",
+                        let msg = format!("[VERY HIGH GAS] - Got an 'out of gas' code 11 when trying to crank. error: {e:?}, delta between queued and now: {:?}, delta between received and now: {:?}",
                                         queued.elapsed(),
-                                        received.elapsed(),
-                                    );
+                                        received.elapsed());
+                        return Ok(WatchedTaskOutput::new(msg)
+                            .set_error()
+                            .set_expiry(Duration::seconds(10)));
                     } else {
-                        bail!("[VERY HIGH GAS]\n{:?}\nDelta between queued and now: {:?}\nDelta between received and now: {:?}",
+                        let msg = format!("[VERY HIGH GAS]\n{:?}\nDelta between queued and now: {:?}\nDelta between received and now: {:?}",
                                         e,
                                         queued.elapsed(),
-                                        received.elapsed(),
-                                    );
+                                        received.elapsed());
+                        return Ok(WatchedTaskOutput::new(msg)
+                            .set_error()
+                            .set_expiry(Duration::seconds(10)));
                     }
                 }
             }
