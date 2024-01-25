@@ -3,6 +3,7 @@ use cosmwasm_std::Event;
 use shared::prelude::*;
 
 /// Event when a delta neutrality payment is made.
+#[derive(Clone)]
 pub struct DeltaNeutralityFeeEvent {
     /// Amount of the fee. Negative means paid to trader.
     pub amount: Signed<Collateral>,

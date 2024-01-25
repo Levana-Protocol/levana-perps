@@ -127,8 +127,8 @@ pub(crate) struct ChargeDeltaNeutralityFeeResult {
 }
 
 impl ChargeDeltaNeutralityFeeResult {
-    /// Consume this value and write its data to storage.
-    pub(crate) fn store(self, state: &State, ctx: &mut StateContext) -> Result<Signed<Collateral>> {
+    /// write its data to storage.
+    pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<Signed<Collateral>> {
         let ChargeDeltaNeutralityFeeResult {
             pos_id,
             fee,
@@ -138,7 +138,7 @@ impl ChargeDeltaNeutralityFeeResult {
             protocol_fees,
             price,
         } = self;
-        ctx.response_mut().add_event(fee_event);
+        ctx.response_mut().add_event(fee_event.clone());
 
         if let Some(CapTriggeredInfo {
             available,

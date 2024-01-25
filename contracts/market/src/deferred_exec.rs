@@ -1,3 +1,11 @@
+// CosmWasm 1.0 redacts submessage errors, turning them all into "error code 5"
+// This will be changed in Cosmwasm 2.0, but for now, we need to recover errors manually
+//
+// The validation branch tries to follow the execution branch as closely as possible
+// by way of shared functions and structs that contain as much of the validation as possible in their construction
+//
+// The execution branch then goes one step further - applying the changes to the state, using that same struct
+// In order to ensure that the struct is used, we annotate with `#[must_use]` and either `apply()` or `discard()` are called
 use msg::contracts::market::{
     deferred_execution::{
         DeferredExecCompleteTarget, DeferredExecId, DeferredExecItem, DeferredExecWithStatus,
@@ -6,7 +14,14 @@ use msg::contracts::market::{
     position::{events::PositionSaveReason, CollateralAndUsd},
 };
 
-use crate::state::position::OpenPositionParams;
+use crate::state::position::{
+    liquifund::PositionLiquifund,
+    update::{
+        UpdatePositionCollateral, UpdatePositionLeverage, UpdatePositionMaxGains,
+        UpdatePositionSize,
+    },
+    OpenPositionExec, OpenPositionParams,
+};
 use crate::{prelude::*, state::position::get_position};
 
 impl State<'_> {
@@ -19,7 +34,7 @@ impl State<'_> {
         let price_point = self.spot_price(ctx.storage, price_point_timestamp)?;
         debug_assert!(price_point.timestamp == price_point_timestamp);
         let item = self.load_deferred_exec_item(ctx.storage, id)?;
-        let pos_order_id = helper(self, ctx, item.clone(), price_point)?;
+        let pos_order_id = helper_execute(self, ctx, item.clone(), price_point)?;
         self.mark_deferred_exec_success(ctx, item, pos_order_id)?;
         Ok(())
     }
@@ -35,7 +50,7 @@ impl State<'_> {
     }
 }
 
-fn helper(
+fn helper_execute(
     state: &State,
     ctx: &mut StateContext,
     item: DeferredExecWithStatus,
@@ -52,25 +67,34 @@ fn helper(
             amount,
             crank_fee,
             crank_fee_usd,
-        } => state
-            .handle_position_open(
-                ctx,
-                item.owner,
-                amount,
+        } => OpenPositionExec::new(
+            state,
+            ctx.storage,
+            OpenPositionParams {
+                owner: item.owner,
+                collateral: amount,
                 leverage,
                 direction,
-                max_gains,
+                max_gains_in_quote: max_gains,
                 slippage_assert,
                 stop_loss_override,
                 take_profit_override,
-                crank_fee,
-                crank_fee_usd,
-                &price_point,
-            )
-            .map(DeferredExecCompleteTarget::Position),
+                crank_fee: CollateralAndUsd::from_pair(crank_fee, crank_fee_usd),
+            },
+            &price_point,
+        )?
+        .apply(state, ctx, PositionSaveReason::OpenMarket)
+        .map(DeferredExecCompleteTarget::Position),
         DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount } => {
-            handle_update_position_shared(state, ctx, id, None, None, &price_point)?;
-            state.update_position_collateral(ctx, id, amount.into_signed(), &price_point)?;
+            execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
+            UpdatePositionCollateral::new(
+                state,
+                ctx.storage,
+                get_position(ctx.storage, id)?,
+                amount.into_signed(),
+                &price_point,
+            )?
+            .apply(state, ctx)?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionAddCollateralImpactSize {
@@ -80,7 +104,7 @@ fn helper(
         } => {
             let funds = amount.into_signed();
             let notional_size = state.update_size_new_notional_size(ctx.storage, id, funds)?;
-            handle_update_position_shared(
+            execute_slippage_assert_and_liquifund(
                 state,
                 ctx,
                 id,
@@ -88,12 +112,26 @@ fn helper(
                 slippage_assert,
                 &price_point,
             )?;
-            state.update_position_size(ctx, id, funds, &price_point)?;
+            UpdatePositionSize::new(
+                state,
+                ctx.storage,
+                get_position(ctx.storage, id)?,
+                funds,
+                &price_point,
+            )?
+            .apply(state, ctx)?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => {
-            handle_update_position_shared(state, ctx, id, None, None, &price_point)?;
-            state.update_position_collateral(ctx, id, -amount.into_signed(), &price_point)?;
+            execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
+            UpdatePositionCollateral::new(
+                state,
+                ctx.storage,
+                get_position(ctx.storage, id)?,
+                -amount.into_signed(),
+                &price_point,
+            )?
+            .apply(state, ctx)?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionRemoveCollateralImpactSize {
@@ -103,7 +141,7 @@ fn helper(
         } => {
             let funds = -amount.into_signed();
             let notional_size = state.update_size_new_notional_size(ctx.storage, id, funds)?;
-            handle_update_position_shared(
+            execute_slippage_assert_and_liquifund(
                 state,
                 ctx,
                 id,
@@ -111,7 +149,14 @@ fn helper(
                 slippage_assert,
                 &price_point,
             )?;
-            state.update_position_size(ctx, id, funds, &price_point)?;
+            UpdatePositionSize::new(
+                state,
+                ctx.storage,
+                get_position(ctx.storage, id)?,
+                funds,
+                &price_point,
+            )?
+            .apply(state, ctx)?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionLeverage {
@@ -119,7 +164,7 @@ fn helper(
             leverage,
             slippage_assert,
         } => {
-            handle_update_position_shared(state, ctx, id, None, None, &price_point)?;
+            execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
             let notional_size =
                 state.update_leverage_new_notional_size(ctx.storage, id, leverage, &price_point)?;
             if let Some(slippage_assert) = slippage_assert {
@@ -135,18 +180,27 @@ fn helper(
                     &price_point,
                 )?;
             }
-            state.update_position_leverage(ctx, id, notional_size, &price_point)?;
+            UpdatePositionLeverage::new(
+                state,
+                ctx.storage,
+                get_position(ctx.storage, id)?,
+                notional_size,
+                &price_point,
+            )?
+            .apply(state, ctx)?;
+
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::UpdatePositionMaxGains { id, max_gains } => {
-            handle_update_position_shared(state, ctx, id, None, None, &price_point)?;
-            let counter_collateral = state.update_max_gains_new_counter_collateral(
+            execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
+            UpdatePositionMaxGains::new(
+                state,
                 ctx.storage,
-                id,
+                get_position(ctx.storage, id)?,
                 max_gains,
                 &price_point,
-            )?;
-            state.update_position_max_gains(ctx, id, counter_collateral, &price_point)?;
+            )?
+            .apply(state, ctx)?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::ClosePosition {
@@ -184,7 +238,7 @@ fn helper(
             stop_loss_override,
             take_profit_override,
         } => {
-            handle_update_position_shared(state, ctx, id, None, None, &price_point)?;
+            execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
             state.set_trigger_order(
                 ctx,
                 id,
@@ -230,32 +284,7 @@ fn helper(
     }
 }
 
-fn update_position_slippage_assert(
-    state: &State,
-    store: &dyn Storage,
-    id: PositionId,
-    notional_size: Option<Signed<Notional>>,
-    slippage_assert: Option<SlippageAssert>,
-    price_point: &PricePoint,
-) -> Result<()> {
-    if let Some(slippage_assert) = slippage_assert {
-        let market_type = state.market_id(store)?.get_market_type();
-        let pos = get_position(store, id)?;
-        let delta_notional_size = notional_size.unwrap_or(pos.notional_size) - pos.notional_size;
-        state.do_slippage_assert(
-            store,
-            slippage_assert,
-            delta_notional_size,
-            market_type,
-            Some(pos.liquidation_margin.delta_neutrality),
-            price_point,
-        )?;
-    }
-
-    Ok(())
-}
-
-fn handle_update_position_shared(
+fn execute_slippage_assert_and_liquifund(
     state: &State,
     ctx: &mut StateContext,
     id: PositionId,
@@ -308,23 +337,142 @@ fn helper_validate(
             amount,
             crank_fee,
             crank_fee_usd,
-        } => state
-            .validate_new_position(
+        } => {
+            OpenPositionExec::new(
+                state,
                 store,
                 OpenPositionParams {
                     owner: item.owner,
                     collateral: amount,
-                    crank_fee: CollateralAndUsd::from_pair(crank_fee, crank_fee_usd),
                     leverage,
                     direction,
                     max_gains_in_quote: max_gains,
                     slippage_assert,
                     stop_loss_override,
                     take_profit_override,
+                    crank_fee: CollateralAndUsd::from_pair(crank_fee, crank_fee_usd),
                 },
                 price_point,
-            )
-            .map(|_| ()),
+            )?
+            .discard();
+
+            Ok(())
+        }
+        DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount } => {
+            let liquifund =
+                validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?;
+
+            UpdatePositionCollateral::new(
+                state,
+                store,
+                liquifund.position.into(),
+                amount.into_signed(),
+                price_point,
+            )?
+            .discard();
+            Ok(())
+        }
+        DeferredExecItem::UpdatePositionAddCollateralImpactSize {
+            id,
+            slippage_assert,
+            amount,
+        } => {
+            let funds = amount.into_signed();
+
+            let notional_size = state.update_size_new_notional_size(store, id, funds)?;
+            let liquifund = validate_slippage_assert_and_liquifund(
+                state,
+                store,
+                id,
+                Some(notional_size),
+                slippage_assert,
+                price_point,
+            )?;
+            UpdatePositionSize::new(state, store, liquifund.position.into(), funds, price_point)?
+                .discard();
+
+            Ok(())
+        }
+        DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => {
+            let liquifund =
+                validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?;
+            UpdatePositionCollateral::new(
+                state,
+                store,
+                liquifund.position.into(),
+                -amount.into_signed(),
+                price_point,
+            )?
+            .discard();
+            Ok(())
+        }
+        DeferredExecItem::UpdatePositionRemoveCollateralImpactSize {
+            id,
+            amount,
+            slippage_assert,
+        } => {
+            let funds = -amount.into_signed();
+            let notional_size = state.update_size_new_notional_size(store, id, funds)?;
+            let liquifund = validate_slippage_assert_and_liquifund(
+                state,
+                store,
+                id,
+                Some(notional_size),
+                slippage_assert,
+                price_point,
+            )?;
+            UpdatePositionSize::new(state, store, liquifund.position.into(), funds, price_point)?
+                .discard();
+            Ok(())
+        }
+        DeferredExecItem::UpdatePositionLeverage {
+            id,
+            leverage,
+            slippage_assert,
+        } => {
+            let liquifund = validate_slippage_assert_and_liquifund(
+                state,
+                store,
+                id,
+                None,
+                slippage_assert.clone(),
+                price_point,
+            )?;
+            let notional_size =
+                state.update_leverage_new_notional_size(store, id, leverage, price_point)?;
+
+            let pos: Position = liquifund.position.into();
+
+            if let Some(slippage_assert) = slippage_assert {
+                let market_type = state.market_id(store)?.get_market_type();
+
+                let delta_notional_size = notional_size - pos.notional_size;
+                state.do_slippage_assert(
+                    store,
+                    slippage_assert,
+                    delta_notional_size,
+                    market_type,
+                    Some(pos.liquidation_margin.delta_neutrality),
+                    price_point,
+                )?;
+            }
+
+            UpdatePositionLeverage::new(state, store, pos, notional_size, price_point)?.discard();
+            Ok(())
+        }
+        DeferredExecItem::UpdatePositionMaxGains { id, max_gains } => {
+            let liquifund =
+                validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?;
+            UpdatePositionMaxGains::new(
+                state,
+                store,
+                liquifund.position.into(),
+                max_gains,
+                price_point,
+            )?
+            .discard();
+            Ok(())
+        }
         DeferredExecItem::ClosePosition {
             id,
             slippage_assert,
@@ -343,64 +491,58 @@ fn helper_validate(
             }
             Ok(())
         }
-        DeferredExecItem::UpdatePositionAddCollateralImpactSize {
-            id,
-            slippage_assert,
-            amount,
-        } => {
-            let funds = amount.into_signed();
-            let notional_size = state.update_size_new_notional_size(store, id, funds)?;
-            update_position_slippage_assert(
-                state,
-                store,
-                id,
-                Some(notional_size),
-                slippage_assert,
-                price_point,
-            )?;
-            Ok(())
-        }
-        DeferredExecItem::UpdatePositionRemoveCollateralImpactSize {
-            id,
-            amount,
-            slippage_assert,
-        } => {
-            let funds = -amount.into_signed();
-            let notional_size = state.update_size_new_notional_size(store, id, funds)?;
-            update_position_slippage_assert(
-                state,
-                store,
-                id,
-                Some(notional_size),
-                slippage_assert,
-                price_point,
-            )?;
-            Ok(())
-        }
-        DeferredExecItem::UpdatePositionLeverage {
-            id,
-            leverage,
-            slippage_assert,
-        } => {
-            let notional_size =
-                state.update_leverage_new_notional_size(store, id, leverage, price_point)?;
-            // This slippage assert is not 100% the same as in the execute code path, because
-            // it is done before liquifund while the real slippage assert test is done after.
-            update_position_slippage_assert(
-                state,
-                store,
-                id,
-                Some(notional_size),
-                slippage_assert,
-                price_point,
-            )?;
-            Ok(())
-        }
-        DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { .. }
-        | DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { .. }
-        | DeferredExecItem::UpdatePositionMaxGains { .. }
-        | DeferredExecItem::SetTriggerOrder { .. }
+        DeferredExecItem::SetTriggerOrder { .. }
         | DeferredExecItem::PlaceLimitOrder { .. }
         | DeferredExecItem::CancelLimitOrder { .. } => Ok(()),
     }
+}
+
+fn validate_slippage_assert_and_liquifund(
+    state: &State,
+    store: &dyn Storage,
+    id: PositionId,
+    notional_size: Option<Signed<Notional>>,
+    slippage_assert: Option<SlippageAssert>,
+    price_point: &PricePoint,
+) -> Result<PositionLiquifund> {
+    update_position_slippage_assert(
+        state,
+        store,
+        id,
+        notional_size,
+        slippage_assert,
+        price_point,
+    )?;
+
+    let pos = get_position(store, id)?;
+
+    debug_assert!(pos.next_liquifunding >= price_point.timestamp);
+
+    let starts_at = pos.liquifunded_at;
+    PositionLiquifund::new(state, store, pos, starts_at, price_point.timestamp, false)
+}
+
+fn update_position_slippage_assert(
+    state: &State,
+    store: &dyn Storage,
+    id: PositionId,
+    notional_size: Option<Signed<Notional>>,
+    slippage_assert: Option<SlippageAssert>,
+    price_point: &PricePoint,
+) -> Result<()> {
+    if let Some(slippage_assert) = slippage_assert {
+        let market_type = state.market_id(store)?.get_market_type();
+        let pos = get_position(store, id)?;
+        let delta_notional_size = notional_size.unwrap_or(pos.notional_size) - pos.notional_size;
+        state.do_slippage_assert(
+            store,
+            slippage_assert,
+            delta_notional_size,
+            market_type,
+            Some(pos.liquidation_margin.delta_neutrality),
+            price_point,
+        )?;
+    }
+
+    Ok(())
 }

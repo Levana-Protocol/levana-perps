@@ -1,3 +1,4 @@
+use crate::state::fees::CapCrankFee;
 use crate::state::position::get_position;
 use crate::state::State;
 use anyhow::Result;
@@ -212,12 +213,8 @@ impl State<'_> {
                 *crank_fee = new_crank_fee;
                 *crank_fee_usd = new_crank_fee_usd;
                 *amount = amount.checked_sub(new_crank_fee)?;
-                self.collect_crank_fee(
-                    ctx,
-                    TradeId::Deferred(new_id),
-                    new_crank_fee,
-                    new_crank_fee_usd,
-                )?;
+
+                CapCrankFee::new(new_crank_fee, new_crank_fee_usd, TradeId::Deferred(new_id)).apply(self, ctx)?;
             }
             DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount }
             | DeferredExecItem::UpdatePositionAddCollateralImpactSize { id, amount, .. } => {
@@ -233,12 +230,7 @@ impl State<'_> {
                     .checked_add_assign(new_crank_fee.into_signed(), &current_price)?;
 
                 // Update the protocol to track the crank fee available in general fees
-                self.collect_crank_fee(
-                    ctx,
-                    TradeId::Position(*id),
-                    new_crank_fee,
-                    new_crank_fee_usd,
-                )?;
+                CapCrankFee::new(new_crank_fee, new_crank_fee_usd, TradeId::Position(*id)).apply(self, ctx)?;
                 self.position_save_no_recalc(ctx, &pos)?;
             }
             // For these five items, we have the trader send funds to cover a
@@ -267,12 +259,7 @@ impl State<'_> {
                 let funds_after_crank = funds_attached.checked_sub(new_crank_fee)?;
 
                 // Update the protocol to track the crank fee available in general fees
-                self.collect_crank_fee(
-                    ctx,
-                    TradeId::Position(*id),
-                    new_crank_fee,
-                    new_crank_fee_usd,
-                )?;
+                CapCrankFee::new(new_crank_fee, new_crank_fee_usd, TradeId::Position(*id)).apply(self, ctx)?;
 
                 // Give the remainder back to the user as rewards
                 if let Some(funds_after_crank) = NonZero::new(funds_after_crank) {

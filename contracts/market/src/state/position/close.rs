@@ -1,4 +1,6 @@
-use crate::state::position::CLOSED_POSITIONS;
+use crate::state::liquidity::{LiquidityUnlock, LiquidityUpdateLocked};
+use crate::state::position::liquifund::PositionLiquifund;
+use crate::state::position::{AdjustOpenInterest, CLOSED_POSITIONS};
 use crate::state::{position::CLOSED_POSITION_HISTORY, *};
 use anyhow::Context;
 use msg::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
@@ -19,7 +21,8 @@ impl State<'_> {
         let ends_at = settlement_price.timestamp;
         // Confirm that all past liquifundings have been performed before explicitly closing
         debug_assert!(pos.next_liquifunding >= ends_at);
-        let mcp = self.position_liquifund(ctx, pos, starts_at, ends_at, false)?;
+        let mcp = PositionLiquifund::new(self, ctx.storage, pos, starts_at, ends_at, false)?
+            .apply(self, ctx)?;
 
         // Liquifunding may have triggered a close, so check before we close again
         let instructions = match mcp {
@@ -81,12 +84,19 @@ impl State<'_> {
                 &settlement_price,
                 DeltaNeutralityFeeReason::PositionClose,
             )?
-            .store(self, ctx)?;
+            .apply(self, ctx)?;
         pos.add_delta_neutrality_fee(delta_neutrality_fee, &settlement_price)?;
 
         // Reduce net open interest. This needs to happen _after_ delta
         // neutrality fee payments so the slippage calculations are correct.
-        self.adjust_net_open_interest(ctx, notional_size_return, pos.direction(), false)?;
+        AdjustOpenInterest::new(
+            self,
+            ctx.storage,
+            notional_size_return,
+            pos.direction(),
+            false,
+        )?
+        .apply(ctx)?;
 
         // Calculate the final active and counter collateral based on price
         // settlement exposure change and final delta neutrality fee payment.
@@ -123,7 +133,8 @@ impl State<'_> {
         // Take the exposure we already capped and subtract out the final exposure. Since both numbers in a loss scenario will be negative, this will give back the positive value representing the funds to be sent to the liquidity pool.
         let additional_lp_funds = capped_exposure.checked_sub(final_exposure)?;
         debug_assert!(additional_lp_funds >= Signed::zero());
-        self.liquidity_update_locked(ctx, additional_lp_funds, &settlement_price)?;
+        LiquidityUpdateLocked::new(self, ctx.storage, additional_lp_funds, settlement_price)?
+            .apply(self, ctx)?;
 
         // Final active collateral is the active collateral post fees plus final
         // exposure numbers. The final exposure will be negative for losses and positive
@@ -153,7 +164,8 @@ impl State<'_> {
 
         // unlock the LP collateral
         if let Some(counter_collateral) = NonZero::new(counter_collateral) {
-            self.liquidity_unlock(ctx, counter_collateral, &settlement_price)?;
+            LiquidityUnlock::new(self, ctx.storage, counter_collateral, settlement_price)?
+                .apply(self, ctx)?;
         }
 
         // send the trader's collateral to their wallet

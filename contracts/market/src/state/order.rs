@@ -10,10 +10,12 @@ use msg::contracts::market::order::events::{
     CancelLimitOrderEvent, ExecuteLimitOrderEvent, PlaceLimitOrderEvent,
 };
 use msg::contracts::market::order::{LimitOrder, OrderId};
+use msg::contracts::market::position::events::PositionSaveReason;
 use msg::contracts::market::position::CollateralAndUsd;
 use msg::prelude::*;
 
-use super::position::OpenPositionParams;
+use super::fees::CapCrankFee;
+use super::position::{OpenPositionExec, OpenPositionParams};
 
 /// Stores the last used [OrderId]
 const LAST_ORDER_ID: Item<OrderId> = Item::new(namespace::LAST_ORDER_ID);
@@ -59,7 +61,8 @@ impl State<'_> {
 
         let crank_fee_usd = self.config.crank_fee_charged;
         let crank_fee = price.usd_to_collateral(crank_fee_usd);
-        self.collect_crank_fee(ctx, TradeId::LimitOrder(order_id), crank_fee, crank_fee_usd)?;
+        CapCrankFee::new(crank_fee, crank_fee_usd, TradeId::LimitOrder(order_id))
+            .apply(self, ctx)?;
         let collateral = collateral
             .checked_sub(crank_fee)
             .context("Insufficient funds to cover fees, failed on crank fee")?;
@@ -222,11 +225,12 @@ impl State<'_> {
             stop_loss_override: order.stop_loss_override,
             take_profit_override: order.take_profit_override,
         };
-        let res = self.validate_new_position(ctx.storage, open_position_params, price_point);
 
-        let res = match res {
+        let res = match OpenPositionExec::new(self, ctx.storage, open_position_params, price_point)
+        {
             Ok(validated_position) => {
-                let pos_id = self.open_validated_position(ctx, validated_position, false)?;
+                let pos_id =
+                    validated_position.apply(self, ctx, PositionSaveReason::ExecuteLimitOrder)?;
                 Ok(pos_id)
             }
             Err(e) => {

@@ -1854,6 +1854,7 @@ fn carry_leverage_min_liquidity_update_leverage() {
     market
         .exec_update_position_leverage(&trader, pos_id, "3.02".parse().unwrap(), None)
         .unwrap();
+
     let response =
         market.exec_update_position_leverage(&trader, pos_id, "3.5".parse().unwrap(), None);
     assert!(response.is_err());

@@ -1,5 +1,6 @@
 use crate::state::*;
 use cosmwasm_std::Order;
+use crank::position::liquifund::PositionLiquifund;
 use cw_storage_plus::{Bound, PrefixBound};
 use msg::contracts::market::{
     crank::{
@@ -261,7 +262,8 @@ impl State<'_> {
 
                 // We want to liquifund up until the price point's timestamp and make sure we shouldn't be liquidated for some other reason.
                 let ends_at = price_point.timestamp;
-                let mcp = self.position_liquifund(ctx, pos, starts_at, ends_at, true)?;
+                let mcp = PositionLiquifund::new(self, ctx.storage, pos, starts_at, ends_at, true)?
+                    .apply(self, ctx)?;
 
                 let close_position_instructions = match mcp {
                     MaybeClosedPosition::Open(pos) => ClosePositionInstructions {

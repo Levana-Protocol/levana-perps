@@ -2264,10 +2264,26 @@ impl PerpsMarket {
                                 value.status
                             )),
                         },
-                        false => match value.status {
-                            DeferredExecStatus::Failure { reason, .. } => {
-                                Err(anyhow!("{}", reason))
-                            }
+                        false => match &value.status {
+                            DeferredExecStatus::Failure {
+                                reason,
+                                crank_price,
+                                ..
+                            } => match &crank_price {
+                                None => {
+                                    panic!(
+                                            "crank price is none in deferred exec - this is a core unexpected error: {:?}",
+                                            value.status
+                                        );
+                                }
+                                Some(_) if reason.contains("error executing WasmMsg") => {
+                                    panic!(
+                                            "validation is passing but it should be failing- this is a core unexpected error: {:?}",
+                                            value.status
+                                        );
+                                }
+                                _ => Err(anyhow!("{}", reason)),
+                            },
                             _ => Err(anyhow!(
                                 "expected deferred status of failure, but it's {:?}",
                                 value.status

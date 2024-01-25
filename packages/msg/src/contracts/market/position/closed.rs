@@ -154,7 +154,7 @@ impl Display for LiquidationReason {
 /// profit), insufficient margin... the point of this data structure is to
 /// capture all the information needed by the close position actions to do final
 /// settlement on a position and move it to the closed position data structures.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ClosePositionInstructions {
     /// The position in its current state
     pub pos: Position,
@@ -195,6 +195,15 @@ pub enum MaybeClosedPosition {
     Open(Position),
     /// We need to close the position
     Close(ClosePositionInstructions),
+}
+
+impl From<MaybeClosedPosition> for Position {
+    fn from(maybe_closed: MaybeClosedPosition) -> Self {
+        match maybe_closed {
+            MaybeClosedPosition::Open(pos) => pos,
+            MaybeClosedPosition::Close(instructions) => instructions.pos,
+        }
+    }
 }
 
 /// Query response intermediate value on a position.

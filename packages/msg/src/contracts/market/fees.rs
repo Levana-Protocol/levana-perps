@@ -212,9 +212,9 @@ pub mod events {
         pub direction: DirectionToBase,
     }
 
-    impl PerpEvent for FundingPaymentEvent {}
-    impl From<FundingPaymentEvent> for Event {
-        fn from(src: FundingPaymentEvent) -> Self {
+    impl PerpEvent for &FundingPaymentEvent {}
+    impl From<&FundingPaymentEvent> for Event {
+        fn from(src: &FundingPaymentEvent) -> Self {
             Event::new("funding-payment")
                 .add_attribute("pos-id", src.pos_id.to_string())
                 .add_attribute("amount", src.amount.to_string())
@@ -222,6 +222,12 @@ pub mod events {
                 .add_attribute(event_key::DIRECTION, src.direction.as_str())
         }
     }
+    impl From<FundingPaymentEvent> for Event {
+        fn from(src: FundingPaymentEvent) -> Self {
+            (&src).into()
+        }
+    }
+    impl PerpEvent for FundingPaymentEvent {}
 
     impl TryFrom<Event> for FundingPaymentEvent {
         type Error = anyhow::Error;
@@ -432,7 +438,7 @@ pub mod events {
         /// Description of what happened
         pub desc: Option<String>,
     }
-    impl From<InsufficientMarginEvent> for Event {
+    impl From<&InsufficientMarginEvent> for Event {
         fn from(
             InsufficientMarginEvent {
                 pos,
@@ -440,7 +446,7 @@ pub mod events {
                 available,
                 requested,
                 desc,
-            }: InsufficientMarginEvent,
+            }: &InsufficientMarginEvent,
         ) -> Self {
             let evt = Event::new(event_key::INSUFFICIENT_MARGIN)
                 .add_attribute(event_key::POS_ID, pos.to_string())
@@ -451,6 +457,12 @@ pub mod events {
                 Some(desc) => evt.add_attribute(event_key::DESC, desc),
                 None => evt,
             }
+        }
+    }
+    impl PerpEvent for &InsufficientMarginEvent {}
+    impl From<InsufficientMarginEvent> for Event {
+        fn from(event: InsufficientMarginEvent) -> Self {
+            (&event).into()
         }
     }
     impl PerpEvent for InsufficientMarginEvent {}
