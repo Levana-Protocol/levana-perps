@@ -21,12 +21,10 @@ use msg::contracts::market::{
 };
 
 use crate::state::position::{
-    liquifund::PositionLiquifund,
-    update::{
+    liquifund::PositionLiquifund, update::{
         UpdatePositionCollateral, UpdatePositionLeverage, UpdatePositionMaxGains,
         UpdatePositionSize,
-    },
-    OpenPositionParams,
+    }, OpenPositionExec, OpenPositionParams, ValidatedPosition
 };
 use crate::{prelude::*, state::position::get_position};
 
@@ -73,22 +71,24 @@ fn helper_execute(
             amount,
             crank_fee,
             crank_fee_usd,
-        } => state
-            .handle_position_open(
-                ctx,
-                item.owner,
-                amount,
-                leverage,
-                direction,
-                max_gains,
-                slippage_assert,
-                stop_loss_override,
-                take_profit_override,
-                crank_fee,
-                crank_fee_usd,
-                &price_point,
-            )
-            .map(DeferredExecCompleteTarget::Position),
+        } => {
+            OpenPositionExec::new(state, ctx.storage, 
+                OpenPositionParams { 
+                    owner: item.owner,
+                    collateral: amount,
+                    leverage,
+                    direction,
+                    max_gains_in_quote: max_gains,
+                    slippage_assert,
+                    stop_loss_override,
+                    take_profit_override,
+                    crank_fee: CollateralAndUsd::from_pair(crank_fee, crank_fee_usd),
+                }, 
+                &price_point
+            )?
+            .apply(state, ctx, PositionSaveReason::OpenMarket)
+            .map(DeferredExecCompleteTarget::Position)
+        },
         DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount } => {
             execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
             UpdatePositionCollateral::new(

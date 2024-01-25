@@ -10,11 +10,12 @@ use msg::contracts::market::order::events::{
     CancelLimitOrderEvent, ExecuteLimitOrderEvent, PlaceLimitOrderEvent,
 };
 use msg::contracts::market::order::{LimitOrder, OrderId};
+use msg::contracts::market::position::events::PositionSaveReason;
 use msg::contracts::market::position::CollateralAndUsd;
 use msg::prelude::*;
 
 use super::fees::CapCrankFee;
-use super::position::OpenPositionParams;
+use super::position::{OpenPositionExec, OpenPositionParams};
 
 /// Stores the last used [OrderId]
 const LAST_ORDER_ID: Item<OrderId> = Item::new(namespace::LAST_ORDER_ID);
@@ -224,11 +225,10 @@ impl State<'_> {
             stop_loss_override: order.stop_loss_override,
             take_profit_override: order.take_profit_override,
         };
-        let res = self.validate_new_position(ctx.storage, open_position_params, price_point);
 
-        let res = match res {
+        let res = match OpenPositionExec::new(self, ctx.storage, open_position_params, price_point) {
             Ok(validated_position) => {
-                let pos_id = self.open_validated_position(ctx, validated_position, false)?;
+                let pos_id = validated_position.apply(self, ctx, PositionSaveReason::ExecuteLimitOrder)?;
                 Ok(pos_id)
             }
             Err(e) => {
