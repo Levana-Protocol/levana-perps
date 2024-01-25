@@ -1,6 +1,6 @@
 use crate::state::*;
 use cosmwasm_std::Order;
-use crank::position::liquifund::PositionLiquifund;
+use crank::position::{close::ClosePositionExecInit, liquifund::PositionLiquifund};
 use cw_storage_plus::{Bound, PrefixBound};
 use msg::contracts::market::{
     crank::{
@@ -16,6 +16,8 @@ use msg::contracts::market::{
 use serde::{Deserialize, Serialize};
 
 use shared::prelude::*;
+
+use self::position::close::ClosePositionExec;
 
 use super::position::{get_position, NEXT_LIQUIFUNDING, OPEN_POSITIONS};
 
@@ -244,7 +246,8 @@ impl State<'_> {
             }
             CrankWorkInfo::CloseAllPositions { position } => {
                 let pos = get_position(ctx.storage, position)?;
-                self.close_position_via_msg(ctx, pos, *price_point)?;
+                ClosePositionExec::new_via_msg(self, ctx.storage, pos, *price_point)?
+                    .apply(self, ctx)?;
             }
             CrankWorkInfo::Liquidation {
                 position,
@@ -276,7 +279,13 @@ impl State<'_> {
                     },
                     MaybeClosedPosition::Close(x) => x,
                 };
-                self.close_position(ctx, close_position_instructions)?;
+                ClosePositionExec::new(
+                    self,
+                    ctx.storage,
+                    close_position_instructions,
+                    ClosePositionExecInit::Liquidation,
+                )?
+                .apply(self, ctx)?;
             }
             CrankWorkInfo::DeferredExec {
                 deferred_exec_id,

@@ -833,10 +833,12 @@ impl LiquidityUpdate {
                         open_interest
                             .map(|x| x.net_notional(state, store))
                             .transpose()?,
+                        None,
                     )?;
                     Ok(Some(Self::Lock(liquidity)))
                 } else {
-                    let liquidity = LiquidityUnlock::new(state, store, delta_abs, *price_point)?;
+                    let liquidity =
+                        LiquidityUnlock::new(state, store, delta_abs, *price_point, None)?;
                     Ok(Some(Self::Unlock(liquidity)))
                 }
             }

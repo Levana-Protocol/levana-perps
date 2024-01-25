@@ -10,33 +10,77 @@ use msg::contracts::market::position::{
 };
 use shared::prelude::*;
 
+use self::delta_neutrality_fee::ChargeDeltaNeutralityFeeResult;
+
 impl State<'_> {
-    pub(crate) fn close_position_via_msg(
+    /// Load a closed position by ID, if available
+    pub(crate) fn load_closed_position(
         &self,
-        ctx: &mut StateContext,
+        store: &dyn Storage,
+        pos_id: PositionId,
+    ) -> Result<Option<ClosedPosition>> {
+        CLOSED_POSITIONS
+            .may_load(store, pos_id)
+            .map_err(|e| e.into())
+    }
+}
+
+#[must_use]
+pub(crate) struct ClosePositionExec {
+    init: ClosePositionExecInit,
+    dnf: ChargeDeltaNeutralityFeeResult,
+    open_interest: AdjustOpenInterest,
+    liquidity_update: LiquidityUpdateLocked,
+    liquidity_unlock: Option<LiquidityUnlock>,
+    trader_collateral_to_send: Option<NonZero<Collateral>>,
+    closed_position: ClosedPosition,
+    settlement_price: PricePoint,
+}
+
+// close position picks off from different places
+// which require some sort of continuation
+pub(crate) enum ClosePositionExecInit {
+    ViaMsg { liquifund: Box<PositionLiquifund> },
+
+    // nothing to continue - this happens via crank where everything is applied beforehand
+    Liquidation,
+
+    // nothing to continue - this happens via an *applied* liquifund
+    LiquifundProcessing,
+}
+impl ClosePositionExec {
+    pub(crate) fn new_via_msg(
+        state: &State,
+        store: &dyn Storage,
         pos: Position,
         settlement_price: PricePoint,
-    ) -> Result<()> {
+    ) -> Result<Self> {
         let starts_at = pos.liquifunded_at;
         let ends_at = settlement_price.timestamp;
         // Confirm that all past liquifundings have been performed before explicitly closing
         debug_assert!(pos.next_liquifunding >= ends_at);
-        let mcp = PositionLiquifund::new(self, ctx.storage, pos, starts_at, ends_at, false)?
-            .apply(self, ctx)?;
+        let liquifund = PositionLiquifund::new(state, store, pos, starts_at, ends_at, false)?;
 
-        // Liquifunding may have triggered a close, so check before we close again
-        let instructions = match mcp {
+        let instructions = match &liquifund.position {
             MaybeClosedPosition::Open(pos) => ClosePositionInstructions {
-                pos,
+                pos: pos.clone(),
                 capped_exposure: Signed::<Collateral>::zero(),
                 additional_losses: Collateral::zero(),
                 reason: PositionCloseReason::Direct,
                 settlement_price,
                 closed_during_liquifunding: false,
             },
-            MaybeClosedPosition::Close(instructions) => instructions,
+            MaybeClosedPosition::Close(instructions) => instructions.clone(),
         };
-        self.close_position(ctx, instructions)
+
+        Self::new(
+            state,
+            store,
+            instructions,
+            ClosePositionExecInit::ViaMsg {
+                liquifund: Box::new(liquifund),
+            },
+        )
     }
 
     /// called directly or from liquifund
@@ -44,9 +88,9 @@ impl State<'_> {
     /// This function takes in override values for active_collateral and
     /// counter_collateral. The values within Position are required to be
     /// non-zero, but when closing a position both values can end up as 0.
-    pub(crate) fn close_position(
-        &self,
-        ctx: &mut StateContext,
+    pub(crate) fn new(
+        state: &State,
+        store: &dyn Storage,
         ClosePositionInstructions {
             mut pos,
             capped_exposure,
@@ -55,7 +99,8 @@ impl State<'_> {
             reason,
             closed_during_liquifunding,
         }: ClosePositionInstructions,
-    ) -> Result<()> {
+        init: ClosePositionExecInit,
+    ) -> Result<Self> {
         if closed_during_liquifunding {
             // If the position was closed during liquifunding, then liquifunded_at will still be the previous value.
             debug_assert!(pos.liquifunded_at <= settlement_price.timestamp);
@@ -76,27 +121,21 @@ impl State<'_> {
             pos.active_collateral.into_signed() + capped_exposure
                 >= pos.liquidation_margin.delta_neutrality.into_signed()
         );
-        let delta_neutrality_fee = self
-            .charge_delta_neutrality_fee_no_update(
-                ctx.storage,
-                &pos,
-                notional_size_return,
-                &settlement_price,
-                DeltaNeutralityFeeReason::PositionClose,
-            )?
-            .apply(self, ctx)?;
-        pos.add_delta_neutrality_fee(delta_neutrality_fee, &settlement_price)?;
+        let dnf = state.charge_delta_neutrality_fee_no_update(
+            store,
+            &pos,
+            notional_size_return,
+            &settlement_price,
+            DeltaNeutralityFeeReason::PositionClose,
+        )?;
 
+        pos.add_delta_neutrality_fee(dnf.fee, &settlement_price)?;
+
+        // TBD: retaining previous comment, but it appears to be stale:
         // Reduce net open interest. This needs to happen _after_ delta
         // neutrality fee payments so the slippage calculations are correct.
-        AdjustOpenInterest::new(
-            self,
-            ctx.storage,
-            notional_size_return,
-            pos.direction(),
-            false,
-        )?
-        .apply(ctx)?;
+        let open_interest =
+            AdjustOpenInterest::new(state, store, notional_size_return, pos.direction(), false)?;
 
         // Calculate the final active and counter collateral based on price
         // settlement exposure change and final delta neutrality fee payment.
@@ -112,10 +151,7 @@ impl State<'_> {
         );
 
         // Take the DNF out of the active collateral
-        let active_collateral = pos
-            .active_collateral
-            .into_signed()
-            .checked_sub(delta_neutrality_fee)?;
+        let active_collateral = pos.active_collateral.into_signed().checked_sub(dnf.fee)?;
         anyhow::ensure!(active_collateral.is_positive_or_zero());
 
         // The final exposure needs to include all the additional losses that we
@@ -133,8 +169,22 @@ impl State<'_> {
         // Take the exposure we already capped and subtract out the final exposure. Since both numbers in a loss scenario will be negative, this will give back the positive value representing the funds to be sent to the liquidity pool.
         let additional_lp_funds = capped_exposure.checked_sub(final_exposure)?;
         debug_assert!(additional_lp_funds >= Signed::zero());
-        LiquidityUpdateLocked::new(self, ctx.storage, additional_lp_funds, settlement_price)?
-            .apply(self, ctx)?;
+
+        let init_liquidity_stats = match &init {
+            ClosePositionExecInit::ViaMsg { liquifund } => liquifund
+                .liquidity_update_locked
+                .as_ref()
+                .map(|l| l.stats.clone()),
+            ClosePositionExecInit::Liquidation => None,
+            ClosePositionExecInit::LiquifundProcessing => None,
+        };
+        let liquidity_update = LiquidityUpdateLocked::new(
+            state,
+            store,
+            additional_lp_funds,
+            settlement_price,
+            init_liquidity_stats,
+        )?;
 
         // Final active collateral is the active collateral post fees plus final
         // exposure numbers. The final exposure will be negative for losses and positive
@@ -163,32 +213,36 @@ impl State<'_> {
             })?;
 
         // unlock the LP collateral
-        if let Some(counter_collateral) = NonZero::new(counter_collateral) {
-            LiquidityUnlock::new(self, ctx.storage, counter_collateral, settlement_price)?
-                .apply(self, ctx)?;
-        }
+        let liquidity_unlock = match NonZero::new(counter_collateral) {
+            None => None,
+            Some(counter_collateral) => {
+                // the storage that LiquidityUnlock reads from isn't actually updated from liquidity_update yet
+                // so we need to pick up from LiquidityUpdateLocked.stats
+                Some(LiquidityUnlock::new(
+                    state,
+                    store,
+                    counter_collateral,
+                    settlement_price,
+                    Some(liquidity_update.stats.clone()),
+                )?)
+            }
+        };
 
-        // send the trader's collateral to their wallet
-        if let Some(active_collateral) = NonZero::new(active_collateral) {
-            self.add_token_transfer_msg(ctx, &pos.owner, active_collateral)?;
-        }
+        let trader_collateral_to_send = NonZero::new(active_collateral);
 
-        // remove position from open list
-        self.position_remove(ctx, pos.id)?;
-
-        let market_id = self.market_id(ctx.storage)?;
+        let market_id = state.market_id(store)?;
         let market_type = market_id.get_market_type();
 
         let direction_to_base = pos.direction().into_base(market_type);
-        let entry_price_base = match self.spot_price(
-            ctx.storage,
-            pos.price_point_created_at.unwrap_or(pos.created_at),
-        ) {
-            Ok(entry_price) => entry_price,
-            Err(err) => return Err(err),
-        }
-        .price_base;
-        let close_time = self.now();
+        let entry_price_base =
+            match state.spot_price(store, pos.price_point_created_at.unwrap_or(pos.created_at)) {
+                Ok(entry_price) => entry_price,
+                Err(err) => return Err(err),
+            }
+            .price_base;
+
+        let close_time = state.now();
+
         let closed_position = ClosedPosition {
             owner: pos.owner,
             id: pos.id,
@@ -222,37 +276,73 @@ impl State<'_> {
             delta_neutrality_fee_usd: pos.delta_neutrality_fee.usd(),
         };
 
-        self.position_history_add_close(
+        Ok(Self {
+            init,
+            dnf,
+            open_interest,
+            liquidity_update,
+            liquidity_unlock,
+            trader_collateral_to_send,
+            closed_position,
+            settlement_price,
+        })
+    }
+
+    // This is a no-op, but it's more expressive to call discard() or apply()
+    // rather than to just assign it to a throwaway variable.
+    pub(crate) fn discard(self) {}
+
+    pub fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
+        match self.init {
+            ClosePositionExecInit::ViaMsg { liquifund } => {
+                let _ = liquifund.apply(state, ctx)?;
+            }
+            ClosePositionExecInit::Liquidation => {}
+            ClosePositionExecInit::LiquifundProcessing => {}
+        }
+        let dnf_fee = self.dnf.fee;
+        self.dnf.apply(state, ctx)?;
+        self.open_interest.apply(ctx)?;
+        self.liquidity_update.apply(state, ctx)?;
+        if let Some(liquidity_unlock) = self.liquidity_unlock {
+            liquidity_unlock.apply(state, ctx)?;
+        }
+
+        // send the trader's collateral to their wallet
+        if let Some(collateral) = self.trader_collateral_to_send {
+            state.add_token_transfer_msg(ctx, &self.closed_position.owner, collateral)?;
+        }
+
+        // remove position from open list
+        state.position_remove(ctx, self.closed_position.id)?;
+
+        state.position_history_add_close(
             ctx,
-            &closed_position,
-            delta_neutrality_fee,
-            &settlement_price,
+            &self.closed_position,
+            dnf_fee,
+            &self.settlement_price,
         )?;
 
-        self.nft_burn(ctx, &closed_position.owner, pos.id.to_string())?;
+        state.nft_burn(
+            ctx,
+            &self.closed_position.owner,
+            self.closed_position.id.to_string(),
+        )?;
 
         CLOSED_POSITION_HISTORY.save(
             ctx.storage,
-            (&closed_position.owner, (close_time, pos.id)),
-            &closed_position,
+            (
+                &self.closed_position.owner,
+                (self.closed_position.close_time, self.closed_position.id),
+            ),
+            &self.closed_position,
         )?;
 
-        CLOSED_POSITIONS.save(ctx.storage, pos.id, &closed_position)?;
+        CLOSED_POSITIONS.save(ctx.storage, self.closed_position.id, &self.closed_position)?;
 
-        ctx.response_mut()
-            .add_event(PositionCloseEvent { closed_position });
-
+        ctx.response_mut().add_event(PositionCloseEvent {
+            closed_position: self.closed_position,
+        });
         Ok(())
-    }
-
-    /// Load a closed position by ID, if available
-    pub(crate) fn load_closed_position(
-        &self,
-        store: &dyn Storage,
-        pos_id: PositionId,
-    ) -> Result<Option<ClosedPosition>> {
-        CLOSED_POSITIONS
-            .may_load(store, pos_id)
-            .map_err(|e| e.into())
     }
 }

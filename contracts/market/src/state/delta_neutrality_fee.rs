@@ -118,7 +118,7 @@ impl State<'_> {
 #[must_use]
 pub(crate) struct ChargeDeltaNeutralityFeeResult {
     pos_id: PositionId,
-    fee: Signed<Collateral>,
+    pub(crate) fee: Signed<Collateral>,
     fee_event: DeltaNeutralityFeeEvent,
     cap_triggered_info: Option<CapTriggeredInfo>,
     total_funds_after: Collateral,

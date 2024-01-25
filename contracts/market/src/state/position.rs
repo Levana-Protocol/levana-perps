@@ -7,8 +7,7 @@ use msg::contracts::market::{
     position::events::{PositionSaveEvent, PositionSaveReason},
 };
 pub(crate) use open::*;
-mod close;
-pub use close::*;
+pub(crate) mod close;
 pub(crate) mod update;
 mod validate;
 pub use validate::*;
