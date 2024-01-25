@@ -9,7 +9,7 @@ use super::{
     gas_check::GasCheckWallet, price::price_get_update_oracles_msg, App, AppBuilder,
     CrankTriggerReason,
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use async_channel::RecvError;
 use axum::async_trait;
 use chrono::Duration;
