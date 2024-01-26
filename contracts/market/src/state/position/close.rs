@@ -27,7 +27,6 @@ impl State<'_> {
 
 #[must_use]
 pub(crate) struct ClosePositionExec {
-    init: ClosePositionExecInit,
     dnf: ChargeDeltaNeutralityFeeResult,
     open_interest: AdjustOpenInterest,
     liquidity_update: LiquidityUpdateLocked,
@@ -35,19 +34,11 @@ pub(crate) struct ClosePositionExec {
     trader_collateral_to_send: Option<NonZero<Collateral>>,
     closed_position: ClosedPosition,
     settlement_price: PricePoint,
+    // this is optional, will only be set when the position is closed directly via a message
+    // when a position is closed via liquifunding (e.g. liquidations), it is not set
+    liquifund_via_msg: Option<PositionLiquifund>,
 }
 
-// close position picks off from different places
-// which require some sort of continuation
-pub(crate) enum ClosePositionExecInit {
-    ViaMsg { liquifund: Box<PositionLiquifund> },
-
-    // nothing to continue - this happens via crank where everything is applied beforehand
-    Liquidation,
-
-    // nothing to continue - this happens via an *applied* liquifund
-    LiquifundProcessing,
-}
 impl ClosePositionExec {
     pub(crate) fn new_via_msg(
         state: &State,
@@ -73,14 +64,7 @@ impl ClosePositionExec {
             MaybeClosedPosition::Close(instructions) => instructions.clone(),
         };
 
-        Self::new(
-            state,
-            store,
-            instructions,
-            ClosePositionExecInit::ViaMsg {
-                liquifund: Box::new(liquifund),
-            },
-        )
+        Self::new(state, store, instructions, Some(liquifund))
     }
 
     /// called directly or from liquifund
@@ -99,7 +83,7 @@ impl ClosePositionExec {
             reason,
             closed_during_liquifunding,
         }: ClosePositionInstructions,
-        init: ClosePositionExecInit,
+        liquifund_via_msg: Option<PositionLiquifund>,
     ) -> Result<Self> {
         if closed_during_liquifunding {
             // If the position was closed during liquifunding, then liquifunded_at will still be the previous value.
@@ -170,20 +154,15 @@ impl ClosePositionExec {
         let additional_lp_funds = capped_exposure.checked_sub(final_exposure)?;
         debug_assert!(additional_lp_funds >= Signed::zero());
 
-        let init_liquidity_stats = match &init {
-            ClosePositionExecInit::ViaMsg { liquifund } => liquifund
-                .liquidity_update_locked
-                .as_ref()
-                .map(|l| l.stats.clone()),
-            ClosePositionExecInit::Liquidation => None,
-            ClosePositionExecInit::LiquifundProcessing => None,
-        };
         let liquidity_update = LiquidityUpdateLocked::new(
             state,
             store,
             additional_lp_funds,
             settlement_price,
-            init_liquidity_stats,
+            liquifund_via_msg
+                .as_ref()
+                .and_then(|l| l.liquidity_update_locked.as_ref())
+                .map(|l| l.stats.clone()),
         )?;
 
         // Final active collateral is the active collateral post fees plus final
@@ -277,7 +256,7 @@ impl ClosePositionExec {
         };
 
         Ok(Self {
-            init,
+            liquifund_via_msg,
             dnf,
             open_interest,
             liquidity_update,
@@ -293,12 +272,8 @@ impl ClosePositionExec {
     pub(crate) fn discard(self) {}
 
     pub fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
-        match self.init {
-            ClosePositionExecInit::ViaMsg { liquifund } => {
-                let _ = liquifund.apply(state, ctx)?;
-            }
-            ClosePositionExecInit::Liquidation => {}
-            ClosePositionExecInit::LiquifundProcessing => {}
+        if let Some(liquifund) = self.liquifund_via_msg {
+            let _ = liquifund.apply(state, ctx)?;
         }
         let dnf_fee = self.dnf.fee;
         self.dnf.apply(state, ctx)?;

@@ -12,7 +12,7 @@ use msg::contracts::market::position::{
     PositionCloseReason,
 };
 
-use super::close::{ClosePositionExec, ClosePositionExecInit};
+use super::close::ClosePositionExec;
 
 impl State<'_> {
     /// creates a (validated) [PositionLiquifund], stores it, and processes the resulting [MaybeClosedPosition].
@@ -38,13 +38,8 @@ impl State<'_> {
                 Ok(())
             }
             MaybeClosedPosition::Close(close_position_instructions) => {
-                ClosePositionExec::new(
-                    self,
-                    ctx.storage,
-                    close_position_instructions,
-                    ClosePositionExecInit::LiquifundProcessing,
-                )?
-                .apply(self, ctx)?;
+                ClosePositionExec::new(self, ctx.storage, close_position_instructions, None)?
+                    .apply(self, ctx)?;
                 Ok(())
             }
         }
