@@ -334,14 +334,14 @@ impl State<'_> {
 }
 
 #[must_use]
-pub(crate) struct LimitOrderExec {
+pub(crate) struct PlaceLimitOrderExec {
     order_id: OrderId,
     crank_fee: CapCrankFee,
     order: LimitOrder,
     price: PricePoint,
 }
 
-impl LimitOrderExec {
+impl PlaceLimitOrderExec {
     /// Sets a [LimitOrder]
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
@@ -450,12 +450,12 @@ impl LimitOrderExec {
 }
 
 #[must_use]
-pub(crate) struct LimitOrderCancelExec {
+pub(crate) struct CancelLimitOrderExec {
     order_id: OrderId,
     order: LimitOrder,
 }
 
-impl LimitOrderCancelExec {
+impl CancelLimitOrderExec {
     /// Cancels a [LimitOrder]
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(store: &dyn Storage, order_id: OrderId) -> Result<Self> {

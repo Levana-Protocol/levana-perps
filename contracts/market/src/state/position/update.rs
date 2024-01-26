@@ -195,14 +195,14 @@ impl State<'_> {
 // error recovery in the submessage handler.
 // State is then mutably updated by calling .apply()
 #[must_use]
-pub(crate) struct UpdatePositionCollateral {
+pub(crate) struct UpdatePositionCollateralExec {
     pos: Position,
     price_point: PricePoint,
     trade_volume: Usd,
     user_refund: Option<NonZero<Collateral>>,
     event: PositionUpdateEvent,
 }
-impl UpdatePositionCollateral {
+impl UpdatePositionCollateralExec {
     pub(crate) fn new(
         state: &State,
         store: &dyn Storage,
@@ -239,7 +239,7 @@ impl UpdatePositionCollateral {
 
         let event = state.position_update_event(store, &original_pos, pos.clone(), price_point)?;
 
-        Ok(UpdatePositionCollateral {
+        Ok(UpdatePositionCollateralExec {
             pos,
             price_point: *price_point,
             trade_volume,
@@ -281,7 +281,7 @@ impl UpdatePositionCollateral {
 // error recovery in the submessage handler.
 // State is then mutably updated by calling .apply()
 #[must_use]
-pub(crate) struct UpdatePositionSize {
+pub(crate) struct UpdatePositionSizeExec {
     pos: Position,
     price_point: PricePoint,
     trade_volume: Usd,
@@ -293,7 +293,7 @@ pub(crate) struct UpdatePositionSize {
     event: PositionUpdateEvent,
 }
 
-impl UpdatePositionSize {
+impl UpdatePositionSizeExec {
     pub(crate) fn new(
         state: &State,
         store: &dyn Storage,
@@ -395,7 +395,7 @@ impl UpdatePositionSize {
 
         let event = state.position_update_event(store, &original_pos, pos.clone(), price_point)?;
 
-        Ok(UpdatePositionSize {
+        Ok(UpdatePositionSizeExec {
             pos,
             price_point: *price_point,
             trade_volume,
@@ -459,7 +459,7 @@ impl UpdatePositionSize {
 // error recovery in the submessage handler.
 // State is then mutably updated by calling .apply()
 #[must_use]
-pub(crate) struct UpdatePositionLeverage {
+pub(crate) struct UpdatePositionLeverageExec {
     pos: Position,
     price_point: PricePoint,
     trade_volume: Usd,
@@ -470,7 +470,7 @@ pub(crate) struct UpdatePositionLeverage {
     event: PositionUpdateEvent,
 }
 
-impl UpdatePositionLeverage {
+impl UpdatePositionLeverageExec {
     pub(crate) fn new(
         state: &State,
         store: &dyn Storage,
@@ -565,7 +565,7 @@ impl UpdatePositionLeverage {
         )?;
         let event = state.position_update_event(store, &original_pos, pos.clone(), price_point)?;
 
-        Ok(UpdatePositionLeverage {
+        Ok(UpdatePositionLeverageExec {
             pos,
             price_point: *price_point,
             trade_volume,
@@ -625,7 +625,7 @@ impl UpdatePositionLeverage {
 // error recovery in the submessage handler.
 // State is then mutably updated by calling .apply()
 #[must_use]
-pub(crate) struct UpdatePositionMaxGains {
+pub(crate) struct UpdatePositionMaxGainsExec {
     pos: Position,
     price_point: PricePoint,
     liquidity_update: Option<LiquidityUpdate>,
@@ -633,7 +633,7 @@ pub(crate) struct UpdatePositionMaxGains {
     event: PositionUpdateEvent,
 }
 
-impl UpdatePositionMaxGains {
+impl UpdatePositionMaxGainsExec {
     pub(crate) fn new(
         state: &State,
         store: &dyn Storage,
@@ -681,7 +681,7 @@ impl UpdatePositionMaxGains {
 
         let event = state.position_update_event(store, &original_pos, pos.clone(), price_point)?;
 
-        Ok(UpdatePositionMaxGains {
+        Ok(UpdatePositionMaxGainsExec {
             pos,
             price_point: *price_point,
             liquidity_update,
@@ -817,12 +817,12 @@ impl LiquidityUpdate {
 }
 
 #[must_use]
-pub(crate) struct TriggerOrder {
+pub(crate) struct TriggerOrderExec {
     pos: Position,
     price_point: PricePoint,
 }
 
-impl TriggerOrder {
+impl TriggerOrderExec {
     pub(crate) fn new(
         state: &State,
         store: &dyn Storage,
