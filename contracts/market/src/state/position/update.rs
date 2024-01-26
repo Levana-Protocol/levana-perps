@@ -188,47 +188,6 @@ impl State<'_> {
 
         Ok(evt)
     }
-
-    pub(crate) fn set_trigger_order(
-        &self,
-        ctx: &mut StateContext,
-        id: PositionId,
-        stop_loss_override: Option<PriceBaseInQuote>,
-        take_profit_override: Option<PriceBaseInQuote>,
-        price_point: &PricePoint,
-    ) -> Result<()> {
-        let mut pos = get_position(ctx.storage, id)?;
-        let market_type = self.market_id(ctx.storage)?.get_market_type();
-
-        // We've decided _not_ to validate prices here. If the user wants to set a stop loss
-        // or take profit that conflicts with the current price, liquidation price, or max
-        // gains price, we allow it to proceed, and the override may become relevant again
-        // in the future as position characteristics change.
-        //
-        // OLD CODE:
-        //
-        // self.position_validate_trigger_orders(&pos, market_type, price_point)?;
-
-        debug_assert!(pos.liquifunded_at == price_point.timestamp);
-
-        pos.stop_loss_override = stop_loss_override;
-        pos.stop_loss_override_notional =
-            stop_loss_override.map(|x| x.into_notional_price(market_type));
-        pos.take_profit_override = take_profit_override;
-        pos.take_profit_override_notional =
-            take_profit_override.map(|x| x.into_notional_price(market_type));
-
-        self.position_save(
-            ctx,
-            &mut pos,
-            price_point,
-            true,
-            false,
-            PositionSaveReason::Update,
-        )?;
-
-        Ok(())
-    }
 }
 
 // This is a helper struct, created from read-only storage.
@@ -854,5 +813,62 @@ impl LiquidityUpdate {
             Self::Lock(liquidity) => liquidity.apply(state, ctx),
             Self::Unlock(liquidity) => liquidity.apply(state, ctx),
         }
+    }
+}
+
+#[must_use]
+pub(crate) struct TriggerOrder {
+    pos: Position,
+    price_point: PricePoint,
+}
+
+impl TriggerOrder {
+    pub(crate) fn new(
+        state: &State,
+        store: &dyn Storage,
+        id: PositionId,
+        stop_loss_override: Option<PriceBaseInQuote>,
+        take_profit_override: Option<PriceBaseInQuote>,
+        price_point: PricePoint,
+    ) -> Result<Self> {
+        let mut pos = get_position(store, id)?;
+        let market_type = state.market_id(store)?.get_market_type();
+
+        // We've decided _not_ to validate prices here. If the user wants to set a stop loss
+        // or take profit that conflicts with the current price, liquidation price, or max
+        // gains price, we allow it to proceed, and the override may become relevant again
+        // in the future as position characteristics change.
+        //
+        // OLD CODE:
+        //
+        // self.position_validate_trigger_orders(&pos, market_type, price_point)?;
+
+        debug_assert!(pos.liquifunded_at == price_point.timestamp);
+
+        pos.stop_loss_override = stop_loss_override;
+        pos.stop_loss_override_notional =
+            stop_loss_override.map(|x| x.into_notional_price(market_type));
+        pos.take_profit_override = take_profit_override;
+        pos.take_profit_override_notional =
+            take_profit_override.map(|x| x.into_notional_price(market_type));
+
+        Ok(Self { pos, price_point })
+    }
+
+    // This is a no-op, but it's more expressive to call discard() or apply()
+    // rather than to just assign it to a throwaway variable.
+    pub(crate) fn discard(self) {}
+
+    pub(crate) fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
+        state.position_save(
+            ctx,
+            &mut self.pos,
+            &self.price_point,
+            true,
+            false,
+            PositionSaveReason::Update,
+        )?;
+
+        Ok(())
     }
 }
