@@ -12,6 +12,8 @@ use msg::contracts::market::position::{
     PositionCloseReason,
 };
 
+use super::close::ClosePositionExec;
+
 impl State<'_> {
     /// creates a (validated) [PositionLiquifund], stores it, and processes the resulting [MaybeClosedPosition].
     pub(crate) fn position_liquifund_store(
@@ -26,16 +28,9 @@ impl State<'_> {
         let mcp =
             PositionLiquifund::new(self, ctx.storage, pos, starts_at, ends_at, charge_crank_fee)?
                 .apply(self, ctx)?;
-        self.process_maybe_closed_position(ctx, mcp, ends_at, reason)
-    }
 
-    fn process_maybe_closed_position(
-        &self,
-        ctx: &mut StateContext,
-        mcp: MaybeClosedPosition,
-        ends_at: Timestamp,
-        reason: PositionSaveReason,
-    ) -> Result<()> {
+        //self.process_maybe_closed_position(ctx, mcp, ends_at, reason)
+
         match mcp {
             MaybeClosedPosition::Open(mut position) => {
                 let price_point = self.spot_price(ctx.storage, ends_at)?;
@@ -43,7 +38,9 @@ impl State<'_> {
                 Ok(())
             }
             MaybeClosedPosition::Close(close_position_instructions) => {
-                self.close_position(ctx, close_position_instructions)
+                ClosePositionExec::new(self, ctx.storage, close_position_instructions, None)?
+                    .apply(self, ctx)?;
+                Ok(())
             }
         }
     }
@@ -144,7 +141,7 @@ impl PositionLiquifund {
         )?;
 
         let liquidity_update_locked = Some(LiquidityUpdateLocked::new(
-            state, store, -exposure, end_price,
+            state, store, -exposure, end_price, None,
         )?);
 
         let mut pos = match mcp {

@@ -17,6 +17,8 @@ use serde::{Deserialize, Serialize};
 
 use shared::prelude::*;
 
+use self::position::close::ClosePositionExec;
+
 use super::position::{get_position, NEXT_LIQUIFUNDING, OPEN_POSITIONS};
 
 /// The last price point timestamp for which the cranking process was completed.
@@ -244,7 +246,8 @@ impl State<'_> {
             }
             CrankWorkInfo::CloseAllPositions { position } => {
                 let pos = get_position(ctx.storage, position)?;
-                self.close_position_via_msg(ctx, pos, *price_point)?;
+                ClosePositionExec::new_via_msg(self, ctx.storage, pos, *price_point)?
+                    .apply(self, ctx)?;
             }
             CrankWorkInfo::Liquidation {
                 position,
@@ -276,7 +279,8 @@ impl State<'_> {
                     },
                     MaybeClosedPosition::Close(x) => x,
                 };
-                self.close_position(ctx, close_position_instructions)?;
+                ClosePositionExec::new(self, ctx.storage, close_position_instructions, None)?
+                    .apply(self, ctx)?;
             }
             CrankWorkInfo::DeferredExec {
                 deferred_exec_id,

@@ -160,6 +160,7 @@ impl OpenPositionExec {
             *price_point,
             Some(pos.notional_size),
             None,
+            None,
         )?;
 
         pos.liquidation_margin = pos.liquidation_margin(price_point, config)?;

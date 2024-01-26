@@ -15,6 +15,7 @@ use msg::contracts::market::{
 };
 
 use crate::state::position::{
+    close::ClosePositionExec,
     liquifund::PositionLiquifund,
     update::{
         UpdatePositionCollateral, UpdatePositionLeverage, UpdatePositionMaxGains,
@@ -207,30 +208,8 @@ fn helper_execute(
             id,
             slippage_assert,
         } => {
-            let pos = match get_position(ctx.storage, id) {
-                Ok(pos) => Ok(pos),
-                Err(e) => match state.load_closed_position(ctx.storage, id) {
-                    Ok(Some(closed)) => Err(MarketError::PositionAlreadyClosed {
-                        id: id.u64().into(),
-                        close_time: closed.close_time,
-                        reason: closed.reason.to_string(),
-                    }
-                    .into_anyhow()),
-                    _ => Err(e),
-                },
-            }?;
-            if let Some(slippage_assert) = slippage_assert {
-                let market_type = state.market_id(ctx.storage)?.get_market_type();
-                state.do_slippage_assert(
-                    ctx.storage,
-                    slippage_assert,
-                    -pos.notional_size,
-                    market_type,
-                    Some(pos.liquidation_margin.delta_neutrality),
-                    &price_point,
-                )?;
-            }
-            state.close_position_via_msg(ctx, pos, price_point)?;
+            helper_close_position(state, ctx.storage, id, slippage_assert, price_point)?
+                .apply(state, ctx)?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::SetTriggerOrder {
@@ -477,18 +456,7 @@ fn helper_validate(
             id,
             slippage_assert,
         } => {
-            let pos = get_position(store, id)?;
-            if let Some(slippage_assert) = slippage_assert {
-                let market_type = state.market_id(store)?.get_market_type();
-                state.do_slippage_assert(
-                    store,
-                    slippage_assert,
-                    -pos.notional_size,
-                    market_type,
-                    Some(pos.liquidation_margin.delta_neutrality),
-                    price_point,
-                )?;
-            }
+            helper_close_position(state, store, id, slippage_assert, *price_point)?.discard();
             Ok(())
         }
         DeferredExecItem::SetTriggerOrder { .. }
@@ -545,4 +513,37 @@ fn update_position_slippage_assert(
     }
 
     Ok(())
+}
+
+fn helper_close_position(
+    state: &State,
+    store: &dyn Storage,
+    id: PositionId,
+    slippage_assert: Option<SlippageAssert>,
+    price_point: PricePoint,
+) -> Result<ClosePositionExec> {
+    let pos = match get_position(store, id) {
+        Ok(pos) => Ok(pos),
+        Err(e) => match state.load_closed_position(store, id) {
+            Ok(Some(closed)) => Err(MarketError::PositionAlreadyClosed {
+                id: id.u64().into(),
+                close_time: closed.close_time,
+                reason: closed.reason.to_string(),
+            }
+            .into_anyhow()),
+            _ => Err(e),
+        },
+    }?;
+    if let Some(slippage_assert) = slippage_assert {
+        let market_type = state.market_id(store)?.get_market_type();
+        state.do_slippage_assert(
+            store,
+            slippage_assert,
+            -pos.notional_size,
+            market_type,
+            Some(pos.liquidation_margin.delta_neutrality),
+            &price_point,
+        )?;
+    }
+    ClosePositionExec::new_via_msg(state, store, pos, price_point)
 }

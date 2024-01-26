@@ -995,15 +995,15 @@ pub(crate) struct LiquidityUnlock {
 }
 
 impl LiquidityUnlock {
-    // Validate is automatically called by apply (so that it also loads the latest stats)
-    // but can also be called for error recovery in the submessage handler
     pub(crate) fn new(
         state: &State,
         store: &dyn Storage,
         amount: NonZero<Collateral>,
         price: PricePoint,
+        // optional to allow chaining liquidity updates in validation, before applying
+        stats: Option<LiquidityStats>,
     ) -> Result<Self> {
-        let mut stats = state.load_liquidity_stats(store)?;
+        let mut stats = stats.unwrap_or(state.load_liquidity_stats(store)?);
         if amount.raw() > stats.locked {
             Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed unlock! not enough locked liquidity in the protocol! (asked for {}, only {} available)", amount, stats.locked))
         } else {
@@ -1016,6 +1016,7 @@ impl LiquidityUnlock {
             })
         }
     }
+
     pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
         let Self {
             amount,
@@ -1052,8 +1053,10 @@ impl LiquidityLock {
         price: PricePoint,
         delta_notional: Option<Signed<Notional>>,
         net_notional_override: Option<Signed<Notional>>,
+        // optional to allow chaining liquidity updates in validation, before applying
+        stats: Option<LiquidityStats>,
     ) -> Result<Self> {
-        let mut stats = state.load_liquidity_stats(store)?;
+        let mut stats = stats.unwrap_or(state.load_liquidity_stats(store)?);
         let mut net_notional = match net_notional_override {
             Some(net_notional_override) => net_notional_override,
             None => {
@@ -1098,19 +1101,6 @@ impl LiquidityLock {
     }
 }
 
-#[must_use]
-pub(crate) struct LiquidityNewYieldToProcess {
-    pub next_index: u64,
-    pub new_yield: YieldPerToken,
-}
-
-impl LiquidityNewYieldToProcess {
-    pub(crate) fn apply(self, _state: &State, ctx: &mut StateContext) -> Result<()> {
-        YIELD_PER_TIME_PER_TOKEN.save(ctx.storage, self.next_index, &self.new_yield)?;
-        Ok(())
-    }
-}
-
 // Helper struct for liquidity "update lock"
 // Update the amount of locked liquidity. Note, this does not update unlocked.
 // TBD: can this be consolidated into LiquidityLock with a flag?
@@ -1127,8 +1117,10 @@ impl LiquidityUpdateLocked {
         store: &dyn Storage,
         amount: Signed<Collateral>,
         price: PricePoint,
+        // optional to allow chaining liquidity updates in validation, before applying
+        stats: Option<LiquidityStats>,
     ) -> Result<Self> {
-        let mut stats = state.load_liquidity_stats(store)?;
+        let mut stats = stats.unwrap_or(state.load_liquidity_stats(store)?);
         stats.locked = match stats
             .locked
             .into_signed()
@@ -1165,6 +1157,19 @@ impl LiquidityUpdateLocked {
 
         ctx.response_mut().add_event(LockUpdateEvent { amount });
 
+        Ok(())
+    }
+}
+
+#[must_use]
+pub(crate) struct LiquidityNewYieldToProcess {
+    pub next_index: u64,
+    pub new_yield: YieldPerToken,
+}
+
+impl LiquidityNewYieldToProcess {
+    pub(crate) fn apply(self, _state: &State, ctx: &mut StateContext) -> Result<()> {
+        YIELD_PER_TIME_PER_TOKEN.save(ctx.storage, self.next_index, &self.new_yield)?;
         Ok(())
     }
 }
