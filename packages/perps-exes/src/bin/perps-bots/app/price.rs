@@ -571,12 +571,12 @@ async fn check_market_needs_price_update(
             off_chain_publish_time,
             on_chain_oracle_price,
             on_chain_oracle_publish_time,
+            on_chain_price_point: market_price,
         } => {
             let price_will_trigger = market.market.price_would_trigger(off_chain_price).await?;
 
             // Get a fresher status, not the cached one used above for checking Pyth prices.
             let status = market.market.status().await?;
-            let market_price = market.market.current_price().await?;
 
             let info = NeedsPriceUpdateInfo {
                 next_pending_deferred_work_item: status
