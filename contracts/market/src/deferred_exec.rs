@@ -14,14 +14,17 @@ use msg::contracts::market::{
     position::{events::PositionSaveReason, CollateralAndUsd},
 };
 
-use crate::state::position::{
-    close::ClosePositionExec,
-    liquifund::PositionLiquifund,
-    update::{
-        UpdatePositionCollateral, UpdatePositionLeverage, UpdatePositionMaxGains,
-        UpdatePositionSize,
+use crate::state::{
+    order::{CancelLimitOrderExec, PlaceLimitOrderExec},
+    position::{
+        close::ClosePositionExec,
+        liquifund::PositionLiquifund,
+        update::{
+            TriggerOrderExec, UpdatePositionCollateralExec, UpdatePositionLeverageExec,
+            UpdatePositionMaxGainsExec, UpdatePositionSizeExec,
+        },
+        OpenPositionExec, OpenPositionParams,
     },
-    OpenPositionExec, OpenPositionParams,
 };
 use crate::{prelude::*, state::position::get_position};
 
@@ -88,7 +91,7 @@ fn helper_execute(
         .map(DeferredExecCompleteTarget::Position),
         DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount } => {
             execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
-            UpdatePositionCollateral::new(
+            UpdatePositionCollateralExec::new(
                 state,
                 ctx.storage,
                 get_position(ctx.storage, id)?,
@@ -113,7 +116,7 @@ fn helper_execute(
                 slippage_assert,
                 &price_point,
             )?;
-            UpdatePositionSize::new(
+            UpdatePositionSizeExec::new(
                 state,
                 ctx.storage,
                 get_position(ctx.storage, id)?,
@@ -125,7 +128,7 @@ fn helper_execute(
         }
         DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => {
             execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
-            UpdatePositionCollateral::new(
+            UpdatePositionCollateralExec::new(
                 state,
                 ctx.storage,
                 get_position(ctx.storage, id)?,
@@ -150,7 +153,7 @@ fn helper_execute(
                 slippage_assert,
                 &price_point,
             )?;
-            UpdatePositionSize::new(
+            UpdatePositionSizeExec::new(
                 state,
                 ctx.storage,
                 get_position(ctx.storage, id)?,
@@ -181,7 +184,7 @@ fn helper_execute(
                     &price_point,
                 )?;
             }
-            UpdatePositionLeverage::new(
+            UpdatePositionLeverageExec::new(
                 state,
                 ctx.storage,
                 get_position(ctx.storage, id)?,
@@ -194,7 +197,7 @@ fn helper_execute(
         }
         DeferredExecItem::UpdatePositionMaxGains { id, max_gains } => {
             execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
-            UpdatePositionMaxGains::new(
+            UpdatePositionMaxGainsExec::new(
                 state,
                 ctx.storage,
                 get_position(ctx.storage, id)?,
@@ -218,13 +221,15 @@ fn helper_execute(
             take_profit_override,
         } => {
             execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
-            state.set_trigger_order(
-                ctx,
+            TriggerOrderExec::new(
+                state,
+                ctx.storage,
                 id,
                 stop_loss_override,
                 take_profit_override,
-                &price_point,
-            )?;
+                price_point,
+            )?
+            .apply(state, ctx)?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
         DeferredExecItem::PlaceLimitOrder {
@@ -238,26 +243,26 @@ fn helper_execute(
             crank_fee,
             crank_fee_usd,
         } => {
-            let market_type = state.market_id(ctx.storage)?.get_market_type();
-
-            let order_id = state.limit_order_set_order(
-                ctx,
+            let order_id = PlaceLimitOrderExec::new(
+                state,
+                ctx.storage,
                 item.owner,
                 trigger_price,
                 amount,
                 leverage,
-                direction.into_notional(market_type),
+                direction.into_notional(state.market_type(ctx.storage)?),
                 max_gains,
                 stop_loss_override,
                 take_profit_override,
                 crank_fee,
                 crank_fee_usd,
-                &price_point,
-            )?;
+                price_point,
+            )?
+            .apply(state, ctx)?;
             Ok(DeferredExecCompleteTarget::Order(order_id))
         }
         DeferredExecItem::CancelLimitOrder { order_id } => {
-            state.limit_order_cancel_order(ctx, order_id)?;
+            CancelLimitOrderExec::new(ctx.storage, order_id)?.apply(state, ctx)?;
             Ok(DeferredExecCompleteTarget::Order(order_id))
         }
     }
@@ -341,7 +346,7 @@ fn helper_validate(
             let liquifund =
                 validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?;
 
-            UpdatePositionCollateral::new(
+            UpdatePositionCollateralExec::new(
                 state,
                 store,
                 liquifund.position.into(),
@@ -367,15 +372,21 @@ fn helper_validate(
                 slippage_assert,
                 price_point,
             )?;
-            UpdatePositionSize::new(state, store, liquifund.position.into(), funds, price_point)?
-                .discard();
+            UpdatePositionSizeExec::new(
+                state,
+                store,
+                liquifund.position.into(),
+                funds,
+                price_point,
+            )?
+            .discard();
 
             Ok(())
         }
         DeferredExecItem::UpdatePositionRemoveCollateralImpactLeverage { id, amount } => {
             let liquifund =
                 validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?;
-            UpdatePositionCollateral::new(
+            UpdatePositionCollateralExec::new(
                 state,
                 store,
                 liquifund.position.into(),
@@ -400,8 +411,14 @@ fn helper_validate(
                 slippage_assert,
                 price_point,
             )?;
-            UpdatePositionSize::new(state, store, liquifund.position.into(), funds, price_point)?
-                .discard();
+            UpdatePositionSizeExec::new(
+                state,
+                store,
+                liquifund.position.into(),
+                funds,
+                price_point,
+            )?
+            .discard();
             Ok(())
         }
         DeferredExecItem::UpdatePositionLeverage {
@@ -436,13 +453,14 @@ fn helper_validate(
                 )?;
             }
 
-            UpdatePositionLeverage::new(state, store, pos, notional_size, price_point)?.discard();
+            UpdatePositionLeverageExec::new(state, store, pos, notional_size, price_point)?
+                .discard();
             Ok(())
         }
         DeferredExecItem::UpdatePositionMaxGains { id, max_gains } => {
             let liquifund =
                 validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?;
-            UpdatePositionMaxGains::new(
+            UpdatePositionMaxGainsExec::new(
                 state,
                 store,
                 liquifund.position.into(),
@@ -459,9 +477,57 @@ fn helper_validate(
             helper_close_position(state, store, id, slippage_assert, *price_point)?.discard();
             Ok(())
         }
-        DeferredExecItem::SetTriggerOrder { .. }
-        | DeferredExecItem::PlaceLimitOrder { .. }
-        | DeferredExecItem::CancelLimitOrder { .. } => Ok(()),
+        DeferredExecItem::SetTriggerOrder {
+            id,
+            stop_loss_override,
+            take_profit_override,
+        } => {
+            validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?
+                .discard();
+            TriggerOrderExec::new(
+                state,
+                store,
+                id,
+                stop_loss_override,
+                take_profit_override,
+                *price_point,
+            )?
+            .discard();
+            Ok(())
+        }
+        DeferredExecItem::PlaceLimitOrder {
+            trigger_price,
+            leverage,
+            direction,
+            max_gains,
+            stop_loss_override,
+            take_profit_override,
+            amount,
+            crank_fee,
+            crank_fee_usd,
+        } => {
+            PlaceLimitOrderExec::new(
+                state,
+                store,
+                item.owner,
+                trigger_price,
+                amount,
+                leverage,
+                direction.into_notional(state.market_type(store)?),
+                max_gains,
+                stop_loss_override,
+                take_profit_override,
+                crank_fee,
+                crank_fee_usd,
+                *price_point,
+            )?
+            .discard();
+            Ok(())
+        }
+        DeferredExecItem::CancelLimitOrder { order_id } => {
+            CancelLimitOrderExec::new(store, order_id)?.discard();
+            Ok(())
+        }
     }
 }
 
