@@ -112,6 +112,8 @@ pub(crate) enum LatestPrice {
         on_chain_oracle_price: PriceBaseInQuote,
         /// Publish time calculated from on-chain oracle data
         on_chain_oracle_publish_time: DateTime<Utc>,
+        /// Current on-chain price point
+        on_chain_price_point: PricePoint,
     },
     PriceTooOld {
         too_old: PriceTooOld,
@@ -124,6 +126,16 @@ pub(crate) async fn get_latest_price(
     offchain_price_data: &OffchainPriceData,
     market: &Market,
 ) -> Result<LatestPrice> {
+    let on_chain_price_point = match market.market.current_price().await {
+        Ok(price_point) => price_point,
+        Err(e) => {
+            return if e.to_string().contains("price_not_found") {
+                Ok(LatestPrice::NoPriceInContract)
+            } else {
+                Err(e.into())
+            };
+        }
+    };
     let (feeds, volatile_diff_seconds) = match &market.config.spot_price {
         SpotPriceConfig::Manual { .. } => {
             bail!("Manual markets do not use an oracle")
@@ -166,6 +178,7 @@ pub(crate) async fn get_latest_price(
                     .composed_price
                     .timestamp
                     .try_into_chrono_datetime()?,
+                on_chain_price_point,
             },
         },
     )
