@@ -535,7 +535,7 @@ impl AppBuilder {
                                             }
                                             Err(e) => {
                                                 tracing::error!(
-                                                    "Unable to query latest block info: {e:?}"
+                                                    "Unable to query latest block info: {e}"
                                                 );
                                             }
                                         }
