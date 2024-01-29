@@ -34,9 +34,18 @@ pub(crate) struct ClosePositionExec {
     trader_collateral_to_send: Option<NonZero<Collateral>>,
     closed_position: ClosedPosition,
     settlement_price: PricePoint,
-    // this is optional, will only be set when the position is closed directly via a message
-    // when a position is closed via liquifunding (e.g. liquidations), it is not set
-    liquifund_via_msg: Option<PositionLiquifund>,
+    // Prior to the "deferred error recovery" requirements, we simply did liquifunding
+    // in the message handler and then closing continued on from there.
+    // There was no need for the close position process itself to know about liquifunding.
+    //
+    // Since we now merely build up the liquifunding struct and defer applying it, we need to
+    // pass it down for two reasons:
+    // 1. Have it available for the ClosePositionExec to apply it
+    // 2. We need to extract the LiquidityStats, so that we can pick up from there
+    //    in other words, what the liquidity stats will be after the liquifunding is applied
+    //    and before LiquidityUnlock is applied (LiquidityUnlock happens to be the first part
+    //    of the close position process that uses the liquidity stats)
+    liquifund_via_close_msg: Option<PositionLiquifund>,
 }
 
 impl ClosePositionExec {
@@ -83,7 +92,7 @@ impl ClosePositionExec {
             reason,
             closed_during_liquifunding,
         }: ClosePositionInstructions,
-        liquifund_via_msg: Option<PositionLiquifund>,
+        liquifund_via_close_msg: Option<PositionLiquifund>,
     ) -> Result<Self> {
         if closed_during_liquifunding {
             // If the position was closed during liquifunding, then liquifunded_at will still be the previous value.
@@ -159,7 +168,7 @@ impl ClosePositionExec {
             store,
             additional_lp_funds,
             settlement_price,
-            liquifund_via_msg
+            liquifund_via_close_msg
                 .as_ref()
                 .and_then(|l| l.liquidity_update_locked.as_ref())
                 .map(|l| l.stats.clone()),
@@ -256,7 +265,7 @@ impl ClosePositionExec {
         };
 
         Ok(Self {
-            liquifund_via_msg,
+            liquifund_via_close_msg,
             dnf,
             open_interest,
             liquidity_update,
@@ -272,7 +281,7 @@ impl ClosePositionExec {
     pub(crate) fn discard(self) {}
 
     pub fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
-        if let Some(liquifund) = self.liquifund_via_msg {
+        if let Some(liquifund) = self.liquifund_via_close_msg {
             let _ = liquifund.apply(state, ctx)?;
         }
         let dnf_fee = self.dnf.fee;
