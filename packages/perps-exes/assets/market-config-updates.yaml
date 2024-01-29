@@ -107,19 +107,53 @@ markets:
 
   SEI_USD:
     config:
-      trading_fee_notional_size: 0.0022
-      trading_fee_counter_collateral: 0.0022
-      max_leverage: 10
-      carry_leverage: 5
+      carry_leverage: 15
       funding_rate_sensitivity: 2
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.3
-      delta_neutrality_fee_sensitivity: 7500000
+      delta_neutrality_fee_sensitivity: 20000000
       borrow_fee_rate_min_annualized: 0.04
-      delta_neutrality_fee_cap: 0.014
-      delta_neutrality_fee_tax: 0.5
+      delta_neutrality_fee_tax: 0.25
       liquidity_cooldown_seconds: 86400
-      exposure_margin_ratio: 0.01
+
+    initial-borrow-fee-rate: 0.08
+
+  BTC_SEI:
+    config:
+      carry_leverage: 15
+      funding_rate_sensitivity: 2
+      target_utilization: 0.5
+      borrow_fee_sensitivity: 0.3
+      delta_neutrality_fee_sensitivity: 20000000
+      borrow_fee_rate_min_annualized: 0.04
+      delta_neutrality_fee_tax: 0.25
+      liquidity_cooldown_seconds: 86400
+
+    initial-borrow-fee-rate: 0.08
+
+  ETH_SEI:
+    config:
+      carry_leverage: 15
+      funding_rate_sensitivity: 2
+      target_utilization: 0.5
+      borrow_fee_sensitivity: 0.3
+      delta_neutrality_fee_sensitivity: 20000000
+      borrow_fee_rate_min_annualized: 0.04
+      delta_neutrality_fee_tax: 0.25
+      liquidity_cooldown_seconds: 86400
+
+    initial-borrow-fee-rate: 0.08
+
+  SOL_SEI:
+    config:
+      carry_leverage: 15
+      funding_rate_sensitivity: 2
+      target_utilization: 0.5
+      borrow_fee_sensitivity: 0.3
+      delta_neutrality_fee_sensitivity: 20000000
+      borrow_fee_rate_min_annualized: 0.04
+      delta_neutrality_fee_tax: 0.25
+      liquidity_cooldown_seconds: 86400
 
     initial-borrow-fee-rate: 0.08
 
@@ -619,46 +653,6 @@ markets:
   # Coinbase stock, intended only for testing of off-hours markets
   COIN_USDC:
     config: {}
-    initial-borrow-fee-rate: 0.05
-
-  # Used on testnet only for now, needs a proper review before we can use on mainnet
-  BTC_SEI:
-    config:
-      # effectively infinity
-      delta_neutrality_fee_sensitivity: 50000000000
-      borrow_fee_sensitivity: 0.3
-      funding_rate_max_annualized: "0.45"
-      borrow_fee_rate_max_annualized: "0.30"
-      target_utilization: "0.5"
-      funding_rate_sensitivity: 1
-      carry_leverage: 15
-      borrow_fee_rate_min_annualized: 0.03
-      liquidity_cooldown_seconds: 86400
-
-    initial-borrow-fee-rate: 0.05
-  ETH_SEI:
-    config:
-      # effectively infinity
-      delta_neutrality_fee_sensitivity: 50000000000
-      funding_rate_sensitivity: 1.5
-      borrow_fee_rate_min_annualized: 0.03
-      target_utilization: 0.5
-      carry_leverage: 15
-      liquidity_cooldown_seconds: 86400
-      borrow_fee_sensitivity: 0.2
-
-    initial-borrow-fee-rate: 0.05
-  SOL_SEI:
-    config:
-      delta_neutrality_fee_sensitivity: 5000000
-      funding_rate_sensitivity: 1.5
-      carry_leverage: 15
-      borrow_fee_sensitivity: 0.3
-      borrow_fee_rate_min_annualized: 0.03
-      target_utilization: 0.5
-      delta_neutrality_fee_tax: 0.1
-      liquidity_cooldown_seconds: 86400
-
     initial-borrow-fee-rate: 0.05
 
 crank-fees:
