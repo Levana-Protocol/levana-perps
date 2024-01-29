@@ -215,6 +215,10 @@ impl PositionLiquifund {
         })
     }
 
+    // This is a no-op, but it's more expressive to call discard() or apply()
+    // rather than to just assign it to a throwaway variable.
+    pub(crate) fn discard(self) {}
+
     // this apply returns a MaybeClosedPosition, for convenience
     pub(crate) fn apply(
         self,

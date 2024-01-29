@@ -482,8 +482,8 @@ fn helper_validate(
             stop_loss_override,
             take_profit_override,
         } => {
-            let _ =
-                validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?;
+            validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?
+                .discard();
             TriggerOrderExec::new(
                 state,
                 store,
