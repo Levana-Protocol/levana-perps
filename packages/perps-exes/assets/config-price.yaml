@@ -289,6 +289,13 @@ networks:
       feeds-usd: [
         !constant { price: "1", inverted: false }
       ]
+    GOLD_USDC:
+      feeds: [
+        !pyth { key: "XAU_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
     BNB_USDC:
       feeds: [
         !pyth { key: "BNB_USD", inverted: false }
@@ -712,4 +719,15 @@ networks:
       ]
       feeds-usd: [
         !constant { price: "1", inverted: false }
+      ]
+    stDYDX_USD:
+      # Intentionally using the wrong Stride info here, for testnet we just want some contract that will respond with any redemption rate.
+      stride-contract: osmo1jlm7dglrwfk073r2mgta66sf27htceaklx0qprlm0pupfv632p6s3mzckj
+      feeds: [
+        !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 31536000 },
+        !pyth { key: "DYDX_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 31536000 },
+        !pyth { key: "DYDX_USD", inverted: false }
       ]
