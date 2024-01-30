@@ -139,7 +139,6 @@ pub mod events {
         pub take_profit_override: Option<PriceBaseInQuote>,
     }
 
-    impl PerpEvent for PlaceLimitOrderEvent {}
     impl From<PlaceLimitOrderEvent> for Event {
         fn from(src: PlaceLimitOrderEvent) -> Self {
             let mut event = Event::new(event_key::PLACE_LIMIT_ORDER)
@@ -229,7 +228,6 @@ pub mod events {
         pub order_id: OrderId,
     }
 
-    impl PerpEvent for CancelLimitOrderEvent {}
     impl From<CancelLimitOrderEvent> for Event {
         fn from(src: CancelLimitOrderEvent) -> Self {
             Event::new(event_key::PLACE_LIMIT_ORDER)
@@ -256,7 +254,6 @@ pub mod events {
         pub error: Option<String>,
     }
 
-    impl PerpEvent for ExecuteLimitOrderEvent {}
     impl From<ExecuteLimitOrderEvent> for Event {
         fn from(src: ExecuteLimitOrderEvent) -> Self {
             let mut event = Event::new(event_key::EXECUTE_LIMIT_ORDER)

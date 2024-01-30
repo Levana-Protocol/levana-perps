@@ -327,7 +327,6 @@ pub mod events {
         pub publish_time_usd: Option<Timestamp>,
     }
 
-    impl PerpEvent for SpotPriceEvent {}
     impl From<SpotPriceEvent> for Event {
         fn from(src: SpotPriceEvent) -> Self {
             let mut evt = Event::new("spot-price").add_attributes(vec![

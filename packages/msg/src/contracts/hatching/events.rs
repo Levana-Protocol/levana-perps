@@ -1,11 +1,9 @@
 use super::HatchDetails;
-use shared::prelude::*;
 
 pub struct HatchStartEvent {
     pub id: u64,
     pub details: HatchDetails,
 }
-impl PerpEvent for HatchStartEvent {}
 impl From<HatchStartEvent> for cosmwasm_std::Event {
     fn from(src: HatchStartEvent) -> Self {
         mixin_hatch_event(cosmwasm_std::Event::new("hatch-start"), src.id, src.details)
@@ -16,7 +14,6 @@ pub struct HatchRetryEvent {
     pub id: u64,
     pub details: HatchDetails,
 }
-impl PerpEvent for HatchRetryEvent {}
 impl From<HatchRetryEvent> for cosmwasm_std::Event {
     fn from(src: HatchRetryEvent) -> Self {
         mixin_hatch_event(cosmwasm_std::Event::new("hatch-retry"), src.id, src.details)
@@ -27,7 +24,6 @@ pub struct HatchCompleteEvent {
     pub id: u64,
     pub details: HatchDetails,
 }
-impl PerpEvent for HatchCompleteEvent {}
 impl From<HatchCompleteEvent> for cosmwasm_std::Event {
     fn from(src: HatchCompleteEvent) -> Self {
         mixin_hatch_event(

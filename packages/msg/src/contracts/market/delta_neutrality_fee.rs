@@ -17,7 +17,6 @@ pub struct DeltaNeutralityFeeEvent {
     pub protocol_amount: Collateral,
 }
 
-impl PerpEvent for DeltaNeutralityFeeEvent {}
 impl From<DeltaNeutralityFeeEvent> for Event {
     fn from(src: DeltaNeutralityFeeEvent) -> Self {
         Event::new("delta-neutrality-fee").add_attributes(vec![
