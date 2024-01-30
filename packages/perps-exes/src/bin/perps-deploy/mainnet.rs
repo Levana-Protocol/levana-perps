@@ -489,20 +489,11 @@ struct AddMarketOpts {
     factory: String,
     /// New market ID to add
     #[clap(long)]
-    market_id: MarketId,
+    market_id: Vec<MarketId>,
 }
 
 async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpts) -> Result<()> {
-    let ConfigUpdateAndBorrowFee {
-        config: market_config_update,
-        initial_borrow_fee_rate,
-    } = {
-        let mut market_config_updates = MarketConfigUpdates::load(&opt.market_config)?;
-        market_config_updates
-            .markets
-            .remove(&market_id)
-            .with_context(|| format!("No config update found for market ID: {market_id}"))?
-    };
+    let market_config_updates = MarketConfigUpdates::load(&opt.market_config)?;
 
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
@@ -511,47 +502,61 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpt
     let price_config = PriceConfig::load(None::<PathBuf>)?;
     let oracle = opt.get_oracle_info(&chain_config, &price_config, factory.network)?;
 
-    let collateral_name = market_id.get_collateral();
-    let token = chain_config
-        .assets
-        .get(collateral_name)
-        .with_context(|| {
-            format!(
-                "No definition for asset {collateral_name} for network {}",
-                factory.network
-            )
-        })?
-        .into();
+    let mut simtx = TxBuilder::default();
+    let mut msgs = vec![];
 
-    let msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
-        new_market: NewMarketParams {
-            spot_price: get_spot_price_config(&oracle, &price_config, &market_id)?,
-            market_id,
-            token,
-            config: Some(market_config_update),
-            initial_borrow_fee_rate,
-            initial_price: None,
-        },
-    };
-    let msg = strip_nulls(msg)?;
+    let network = factory.network;
     let factory = app.cosmos.make_contract(factory.address);
-
     let factory = Factory::from_contract(factory);
-    log::info!("Need to make a proposal");
-
     let owner = factory.query_owner().await?;
-    log::info!("CW3 contract: {owner}");
-    log::info!(
-        "Message: {}",
-        serde_json::to_string(&CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
+
+    for market_id in market_id {
+        let ConfigUpdateAndBorrowFee {
+            config: market_config_update,
+            initial_borrow_fee_rate,
+        } = {
+            market_config_updates
+                .markets
+                .get(&market_id)
+                .cloned()
+                .with_context(|| format!("No config update found for market ID: {market_id}"))?
+        };
+
+        let collateral_name = market_id.get_collateral();
+        let token = chain_config
+            .assets
+            .get(collateral_name)
+            .with_context(|| {
+                format!("No definition for asset {collateral_name} for network {network}",)
+            })?
+            .into();
+
+        let msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
+            new_market: NewMarketParams {
+                spot_price: get_spot_price_config(&oracle, &price_config, &market_id)?,
+                market_id,
+                token,
+                config: Some(market_config_update),
+                initial_borrow_fee_rate,
+                initial_price: None,
+            },
+        };
+        let msg = strip_nulls(msg)?;
+
+        simtx.add_execute_message(&factory, owner, vec![], &msg);
+        msgs.push(CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
             contract_addr: factory.to_string(),
             msg: to_binary(&msg)?,
-            funds: vec![]
-        }))?
-    );
+            funds: vec![],
+        }));
+    }
 
-    let simres = TxBuilder::default()
-        .add_execute_message(factory, owner, vec![], &msg)?
+    log::info!("Need to make a proposal");
+
+    log::info!("CW3 contract: {owner}");
+    log::info!("Message: {}", serde_json::to_string(&msgs)?);
+
+    let simres = simtx
         .simulate(&app.cosmos, &[owner])
         .await
         .context("Could not simulate message")?;
