@@ -61,6 +61,9 @@ osmosis-mainnet:
     milkTIA:
       denom: factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA
       decimal-places: 6
+    stDYDX:
+      denom: ibc/980E82A9F8E7CA8CD480F4577E73682A6D3855A267D1831485D7EBEF0E7A6C2C
+      decimal-places: 18
 osmosis-testnet:
   age-tolerance-seconds: 42
   gas-decimals: 6
