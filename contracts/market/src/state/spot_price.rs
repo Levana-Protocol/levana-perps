@@ -332,8 +332,13 @@ impl State<'_> {
                 self.make_price_point(store, timestamp, price_storage)
             });
 
+        const DEFAULT_LIMIT: usize = 20;
         let prices = iter
-            .take(limit.unwrap_or(usize::try_from(QUERY_MAX_LIMIT)?))
+            .take(
+                limit
+                    .unwrap_or(DEFAULT_LIMIT)
+                    .min(usize::try_from(QUERY_MAX_LIMIT)?),
+            )
             .collect::<Result<Vec<_>>>()?;
 
         Ok(prices)
