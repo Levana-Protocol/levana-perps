@@ -24,6 +24,10 @@ sei-mainnet:
       type: stable
   rpc-nodes:
     - https://rpc.sei-apis.com
+  assets:
+    SEI:
+      denom: usei
+      decimal-places: 6
 osmosis-mainnet:
   age-tolerance-seconds: 42
   gas-decimals: 6
