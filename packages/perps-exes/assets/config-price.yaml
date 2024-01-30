@@ -289,6 +289,13 @@ networks:
       feeds-usd: [
         !constant { price: "1", inverted: false }
       ]
+    GOLD_USDC:
+      feeds: [
+        !pyth { key: "XAU_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
     BNB_USDC:
       feeds: [
         !pyth { key: "BNB_USD", inverted: false }
