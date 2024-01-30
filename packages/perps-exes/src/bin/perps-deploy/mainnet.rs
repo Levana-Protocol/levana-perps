@@ -28,7 +28,7 @@ use msg::{
 };
 use perps_exes::{
     config::{
-        ChainConfig, ConfigUpdateAndBorrowFee, MainnetFactories, MainnetFactory,
+        ChainConfig, ConfigUpdateAndBorrowFee, CrankFeeConfig, MainnetFactories, MainnetFactory,
         MarketConfigUpdates, NativeAsset, PriceConfig,
     },
     contracts::Factory,
@@ -512,7 +512,7 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpt
 
     for market_id in market_id {
         let ConfigUpdateAndBorrowFee {
-            config: market_config_update,
+            config: mut market_config_update,
             initial_borrow_fee_rate,
         } = {
             market_config_updates
@@ -521,6 +521,17 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpt
                 .cloned()
                 .with_context(|| format!("No config update found for market ID: {market_id}"))?
         };
+        let CrankFeeConfig {
+            charged,
+            surcharge,
+            reward,
+        } = market_config_updates
+            .crank_fees
+            .get(&network)
+            .with_context(|| format!("No crank fee config found for network {network}"))?;
+        market_config_update.crank_fee_charged = Some(*charged);
+        market_config_update.crank_fee_surcharge = Some(*surcharge);
+        market_config_update.crank_fee_reward = Some(*reward);
 
         let collateral_name = market_id.get_collateral();
         let token = chain_config
