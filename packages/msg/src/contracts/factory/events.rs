@@ -51,7 +51,6 @@ impl FromStr for NewContractKind {
     }
 }
 
-impl PerpEvent for InstantiateEvent {}
 impl From<InstantiateEvent> for Event {
     fn from(
         InstantiateEvent {

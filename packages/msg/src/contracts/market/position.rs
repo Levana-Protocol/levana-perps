@@ -1050,7 +1050,6 @@ pub mod events {
         pub closed_position: ClosedPosition,
     }
 
-    impl PerpEvent for PositionCloseEvent {}
     impl From<PositionCloseEvent> for Event {
         fn from(
             PositionCloseEvent {
@@ -1214,7 +1213,6 @@ pub mod events {
         pub price_point_created_at: Timestamp,
     }
 
-    impl PerpEvent for PositionOpenEvent {}
     impl From<PositionOpenEvent> for Event {
         fn from(src: PositionOpenEvent) -> Self {
             let event = Event::new(event_key::POSITION_OPEN)
@@ -1280,7 +1278,6 @@ pub mod events {
         pub updated_at: Timestamp,
     }
 
-    impl PerpEvent for PositionUpdateEvent {}
     impl From<PositionUpdateEvent> for Event {
         fn from(
             PositionUpdateEvent {

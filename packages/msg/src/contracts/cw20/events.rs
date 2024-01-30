@@ -1,6 +1,5 @@
 use cosmwasm_std::{Addr, Event, Uint128};
 use cw_utils::Expiration;
-use shared::prelude::*;
 
 use super::entry::{EmbeddedLogo, Logo};
 
@@ -12,7 +11,6 @@ pub struct TransferEvent {
     pub by: Option<Addr>,
 }
 
-impl PerpEvent for TransferEvent {}
 impl From<TransferEvent> for Event {
     fn from(src: TransferEvent) -> Self {
         let event = Event::new("transfer").add_attributes(vec![
@@ -36,7 +34,6 @@ pub struct BurnEvent {
     pub by: Option<Addr>,
 }
 
-impl PerpEvent for BurnEvent {}
 impl From<BurnEvent> for Event {
     fn from(src: BurnEvent) -> Self {
         let event = Event::new("burn").add_attributes(vec![
@@ -60,7 +57,6 @@ pub struct SendEvent {
     pub by: Option<Addr>,
 }
 
-impl PerpEvent for SendEvent {}
 impl From<SendEvent> for Event {
     fn from(src: SendEvent) -> Self {
         let event = Event::new("send").add_attributes(vec![
@@ -84,7 +80,6 @@ pub struct MintEvent {
     pub amount: Uint128,
 }
 
-impl PerpEvent for MintEvent {}
 impl From<MintEvent> for Event {
     fn from(src: MintEvent) -> Self {
         Event::new("mint").add_attributes(vec![
@@ -119,7 +114,6 @@ impl AllowanceChangeKind {
     }
 }
 
-impl PerpEvent for AllowanceChangeEvent {}
 impl From<AllowanceChangeEvent> for Event {
     fn from(src: AllowanceChangeEvent) -> Self {
         let event = Event::new("allowance-change").add_attributes(vec![
@@ -141,7 +135,6 @@ pub struct MinterChangeEvent {
     pub minter: Addr,
 }
 
-impl PerpEvent for MinterChangeEvent {}
 impl From<MinterChangeEvent> for Event {
     fn from(src: MinterChangeEvent) -> Self {
         Event::new("minter-change").add_attribute("minter", src.minter.into_string())
@@ -155,7 +148,6 @@ pub struct MarketingChangeEvent {
     pub marketing: Option<String>,
 }
 
-impl PerpEvent for MarketingChangeEvent {}
 impl From<MarketingChangeEvent> for Event {
     fn from(src: MarketingChangeEvent) -> Self {
         let event = Event::new("marketing-change");
@@ -182,7 +174,6 @@ pub struct LogoChangeEvent<'a> {
     pub logo: &'a Logo,
 }
 
-impl<'a> PerpEvent for LogoChangeEvent<'a> {}
 impl<'a> From<LogoChangeEvent<'a>> for Event {
     fn from(src: LogoChangeEvent) -> Self {
         let event = Event::new("logo-change");

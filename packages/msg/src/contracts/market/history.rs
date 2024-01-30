@@ -16,7 +16,6 @@ pub mod events {
         pub volume_usd: Usd,
     }
 
-    impl PerpEvent for TradeVolumeEvent {}
     impl From<TradeVolumeEvent> for Event {
         fn from(src: TradeVolumeEvent) -> Self {
             Event::new("history-trade-volume")
@@ -41,7 +40,6 @@ pub mod events {
         pub pnl_usd: Signed<Usd>,
     }
 
-    impl PerpEvent for PnlEvent {}
     impl From<PnlEvent> for Event {
         fn from(src: PnlEvent) -> Self {
             Event::new("history-pnl")
@@ -68,7 +66,6 @@ pub mod events {
         pub action: PositionAction,
     }
 
-    impl PerpEvent for PositionActionEvent {}
     impl From<PositionActionEvent> for Event {
         fn from(src: PositionActionEvent) -> Self {
             let evt = Event::new("history-position-action")
@@ -206,7 +203,6 @@ pub mod events {
         pub action_id: u64,
     }
 
-    impl PerpEvent for LpActionEvent {}
     impl From<LpActionEvent> for Event {
         fn from(src: LpActionEvent) -> Self {
             let event = Event::new("history-lp-action")
@@ -282,7 +278,6 @@ pub mod events {
         pub deposit_usd: Usd,
     }
 
-    impl PerpEvent for LpDepositEvent {}
     impl From<LpDepositEvent> for Event {
         fn from(src: LpDepositEvent) -> Self {
             Event::new("history-lp-deposit")
@@ -311,7 +306,6 @@ pub mod events {
         pub yield_usd: Usd,
     }
 
-    impl PerpEvent for LpYieldEvent {}
     impl From<LpYieldEvent> for Event {
         fn from(
             LpYieldEvent {

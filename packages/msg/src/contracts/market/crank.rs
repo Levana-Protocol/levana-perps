@@ -84,7 +84,6 @@ pub mod events {
         pub actual: Vec<(CrankWorkInfo, PricePoint)>,
     }
 
-    impl PerpEvent for CrankExecBatchEvent {}
     impl From<CrankExecBatchEvent> for Event {
         fn from(
             CrankExecBatchEvent {
@@ -137,7 +136,6 @@ pub mod events {
         pub price_point: PricePoint,
     }
 
-    impl PerpEvent for CrankWorkInfoEvent {}
     impl From<CrankWorkInfoEvent> for Event {
         fn from(
             CrankWorkInfoEvent {

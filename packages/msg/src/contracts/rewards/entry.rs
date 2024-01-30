@@ -113,7 +113,6 @@ pub mod events {
         pub amount: Decimal256,
     }
 
-    impl PerpEvent for GrantRewardsEvent {}
     impl From<GrantRewardsEvent> for Event {
         fn from(src: GrantRewardsEvent) -> Self {
             Event::new(event_key::GRANT_REWARDS).add_attributes([
@@ -141,7 +140,6 @@ pub mod events {
         pub amount: Decimal256,
     }
 
-    impl PerpEvent for ClaimRewardsEvent {}
     impl From<ClaimRewardsEvent> for Event {
         fn from(src: ClaimRewardsEvent) -> Self {
             Event::new(event_key::CLAIM_REWARDS).add_attributes([
