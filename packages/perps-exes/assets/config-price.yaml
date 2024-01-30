@@ -151,6 +151,30 @@ networks:
       feeds-usd: [
         !pyth { key: "SEI_USD", inverted: false }
       ]
+    BTC_SEI:
+      feeds: [
+        !pyth { key: "BTC_USD", inverted: false },
+        !pyth { key: "SEI_USD", inverted: true },
+      ]
+      feeds-usd: [
+        !pyth { key: "SEI_USD", inverted: false },
+      ]
+    ETH_SEI:
+      feeds: [
+        !pyth { key: "ETH_USD", inverted: false },
+        !pyth { key: "SEI_USD", inverted: true },
+      ]
+      feeds-usd: [
+        !pyth { key: "SEI_USD", inverted: false },
+      ]
+    SOL_SEI:
+      feeds: [
+        !pyth { key: "SOL_USD", inverted: false },
+        !pyth { key: "SEI_USD", inverted: true },
+      ]
+      feeds-usd: [
+        !pyth { key: "SEI_USD", inverted: false },
+      ]
   osmosis-mainnet:
     ATOM_USD:
       feeds: [
