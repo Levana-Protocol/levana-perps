@@ -394,6 +394,15 @@ networks:
         !stride { denom: "ibc/D176154B0C63D1F9C6DCFB4F70349EBF2E2B5A87A05902F57A6AE92B863E9AEC", inverted: false, age_tolerance: 43200 },
         !pyth { key: "OSMO_USD", inverted: false }
       ]
+    stDYDX_USD:
+      feeds: [
+        !stride { denom: "ibc/980E82A9F8E7CA8CD480F4577E73682A6D3855A267D1831485D7EBEF0E7A6C2C", inverted: false, age_tolerance: 43200 },
+        !pyth { key: "DYDX_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !stride { denom: "ibc/980E82A9F8E7CA8CD480F4577E73682A6D3855A267D1831485D7EBEF0E7A6C2C", inverted: false, age_tolerance: 43200 },
+        !pyth { key: "DYDX_USD", inverted: false }
+      ]
     ryETH_USD:
       feeds: [
         !simple { contract: "osmo1556egspjm44k54mdqrwkatfrk6e4mzdeum3q32fp3d2lr95rh5cq0g2hcg", inverted: false, age_tolerance: 43200 },
