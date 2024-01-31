@@ -42,20 +42,11 @@ use super::{
     App, AppBuilder, CrankTriggerReason, HighGas,
 };
 
-#[derive(Debug, PartialEq)]
-enum WorkerMode {
-    Normal,
-    // Experimental mode which performs multi-message price update
-    // including cranks
-    MultiMessage,
-}
-
 struct Worker {
     wallet: Arc<Wallet>,
     stats: HashMap<MarketId, ReasonStats>,
     trigger_crank: TriggerCrank,
     high_gas_trigger: HighGasTrigger,
-    mode: WorkerMode,
 }
 
 impl Worker {
@@ -70,11 +61,6 @@ impl Worker {
 /// Start the background thread to keep options pools up to date.
 impl AppBuilder {
     pub(super) fn start_price(&mut self, trigger_crank: TriggerCrank) -> Result<()> {
-        let mode = if self.app.opt.multi_message_update {
-            WorkerMode::MultiMessage
-        } else {
-            WorkerMode::Normal
-        };
         if let Some(price_wallet) = self.app.config.price_wallet.clone() {
             let high_gas_trigger = self.start_high_gas()?;
             self.refill_gas(price_wallet.get_address(), GasCheckWallet::Price)?;
@@ -85,7 +71,6 @@ impl AppBuilder {
                     stats: HashMap::new(),
                     trigger_crank,
                     high_gas_trigger,
-                    mode,
                 },
             )?;
         }
@@ -254,64 +239,41 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
             // step, we don't want to wait for it to finish. So in the
             // below execution flow, we perform the Oracle
             // UpdatePriceFeeds again.
-            match worker.mode {
-                WorkerMode::MultiMessage => {
-                    let split_index = std::cmp::min(5, markets_to_update.len());
-                    let (markets_to_crank, remaining_markets_to_crank) =
-                        markets_to_update.split_at(split_index);
-                    let multi_message = MultiMessageEntity {
-                        markets: factory.markets.clone(),
-                        trigger: markets_to_crank.to_vec(),
-                    };
+            let split_index = std::cmp::min(5, markets_to_update.len());
+            let (markets_to_crank, remaining_markets_to_crank) =
+                markets_to_update.split_at(split_index);
+            let multi_message = MultiMessageEntity {
+                markets: factory.markets.clone(),
+                trigger: markets_to_crank.to_vec(),
+            };
 
-                    let now = Instant::now();
+            let now = Instant::now();
 
-                    let tx = construct_multi_message(
-                        multi_message,
-                        &worker.wallet,
-                        &app,
-                        &offchain_price_data,
-                    )
+            let tx =
+                construct_multi_message(multi_message, &worker.wallet, &app, &offchain_price_data)
                     .await?;
 
-                    let response = tx
-                        .sign_and_broadcast_cosmos_tx(&app.cosmos, &worker.wallet)
-                        .await;
-                    let result = process_tx_result(&app, &worker.wallet, &now, response).await;
-                    match result {
-                        Ok(res) => {
-                            successes.push(res);
-                            for (market, market_id, reason) in
-                                remaining_markets_to_crank.iter().cloned()
-                            {
-                                worker
-                                    .trigger_crank
-                                    .trigger_crank(market, market_id, reason)
-                                    .await;
-                            }
-                        }
-                        Err(e) => errors.push(format!("{e:?}")),
+            let response = tx
+                .sign_and_broadcast_cosmos_tx(&app.cosmos, &worker.wallet)
+                .await;
+            let result = process_tx_result(&app, &worker.wallet, &now, response).await;
+            match result {
+                Ok(res) => {
+                    successes.push(res);
+                    for (market, market_id, reason) in remaining_markets_to_crank.iter().cloned() {
+                        worker
+                            .trigger_crank
+                            .trigger_crank(market, market_id, reason)
+                            .await;
                     }
                 }
-                WorkerMode::Normal => {
-                    successes.push(
-                        update_oracles(
-                            &worker.wallet,
-                            &app,
-                            &factory.markets,
-                            &offchain_price_data,
-                            // We already did "very high" above, so if we have any HighGas, it's just "high" now
-                            any_needs_high_gas_oracle_update.map(|_| HighGas::High),
-                        )
-                        .await?,
-                    );
-                }
+                Err(e) => errors.push(format!("{e:?}")),
             }
         } else {
             successes.push("No markets needed an oracle update".to_owned());
         }
 
-        if worker.mode == WorkerMode::Normal || !any_needs_oracle_update {
+        if !any_needs_oracle_update {
             for (market, market_id, reason) in markets_to_update {
                 worker
                     .trigger_crank
@@ -696,61 +658,6 @@ pub(crate) async fn price_get_update_oracles_msg(
                 )
                 .await?,
             ))
-        }
-    }
-}
-
-pub(crate) async fn update_oracles(
-    wallet: &Wallet,
-    app: &App,
-    markets: &[Market],
-    offchain_price_data: &OffchainPriceData,
-    high_gas: Option<HighGas>,
-) -> Result<String> {
-    let received = Instant::now();
-
-    let msg = match price_get_update_oracles_msg(wallet, app, markets, offchain_price_data).await? {
-        None => {
-            return Ok("No Pyth IDs found, no Pyth oracle update needed".to_owned());
-        }
-        Some(msg) => msg,
-    };
-
-    // Previously, with PERP-1702, we had some logic to ignore some errors from
-    // out-of-date prices. However, since we're no longer updating the market
-    // contract here, that's not relevant, so that logic has been removed.
-    // Overall: we want to treat _any_ failure to update prices in the Pyth
-    // contract as an immediate error. The one exception for now: if Pyth
-    // reports that prices for this market are currently closed, we ignore such
-    // an error.
-
-    let cosmos = match high_gas {
-        None => &app.cosmos,
-        Some(HighGas::High) => &app.cosmos_high_gas,
-        Some(HighGas::VeryHigh) => &app.cosmos_very_high_gas,
-    };
-
-    match TxBuilder::default()
-        .add_message(msg.clone())
-        .sign_and_broadcast_cosmos_tx(cosmos, wallet)
-        .await
-    {
-        Ok(res) => {
-            track_tx_fees(app, wallet.get_address(), &res).await;
-            Ok(format!(
-                "Prices updated in Pyth oracle contract with txhash {}, delay: {:?}",
-                res.response.txhash,
-                received.elapsed(),
-            ))
-        }
-        Err(e) => {
-            if app.is_osmosis_epoch() {
-                Ok(format!("Unable to update Pyth oracle, but assuming it's because we're in the epoch: {e:?}, delay: {:?}", received.elapsed()))
-            } else if app.get_congested_info().await.is_congested() {
-                Ok(format!("Unable to update Pyth oracle, but assuming it's because Osmosis is congested: {e:?}, delay: {:?}", received.elapsed()))
-            } else {
-                Err(e.into())
-            }
         }
     }
 }
