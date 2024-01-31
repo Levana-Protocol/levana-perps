@@ -210,10 +210,10 @@ impl WatchedTask for Worker {
             Err(e) => {
                 if app.is_osmosis_epoch() {
                     successes.push(format!(
-                        "[VERY HIGH GAS] - we think we're in the Osmosis epoch, error: {e:?}"
+                        "[VERY HIGH GAS] - we think we're in the Osmosis epoch, error: {e}"
                     ));
                 } else if app.get_congested_info().await.is_congested() {
-                    let msg = format!("[VERY HIGH GAS] - we think the Osmosis chain is overly congested, error: {e:?}, delta between queued and now: {:?}, delta between received and now: {:?}",
+                    let msg = format!("[VERY HIGH GAS] - we think the Osmosis chain is overly congested, error: {e}, delta between queued and now: {:?}, delta between received and now: {:?}",
                                     queued.elapsed(),
                                     received.elapsed());
                     return Ok(WatchedTaskOutput::new(msg)
@@ -222,14 +222,14 @@ impl WatchedTask for Worker {
                 } else {
                     let error_as_str = format!("{e:?}");
                     if error_as_str.contains("out of gas") || error_as_str.contains("code 11") {
-                        let msg = format!("[VERY HIGH GAS] - Got an 'out of gas' code 11 when trying to crank. error: {e:?}, delta between queued and now: {:?}, delta between received and now: {:?}",
+                        let msg = format!("[VERY HIGH GAS] - Got an 'out of gas' code 11 when trying to crank. error: {e}, delta between queued and now: {:?}, delta between received and now: {:?}",
                                         queued.elapsed(),
                                         received.elapsed());
                         return Ok(WatchedTaskOutput::new(msg)
                             .set_error()
                             .set_expiry(Duration::seconds(10)));
                     } else {
-                        let msg = format!("[VERY HIGH GAS]\n{:?}\nDelta between queued and now: {:?}\nDelta between received and now: {:?}",
+                        let msg = format!("[VERY HIGH GAS]\n{}\nDelta between queued and now: {:?}\nDelta between received and now: {:?}",
                                         e,
                                         queued.elapsed(),
                                         received.elapsed());
