@@ -532,7 +532,9 @@ async fn csv_helper(
         anyhow::ensure!(id == Some(pos_id));
 
         let timestamp = timestamp.try_into_chrono_datetime()?;
-        let price_timestamp = price_timestamp.map(|x| x.try_into_chrono_datetime()).transpose()?;
+        let price_timestamp = price_timestamp
+            .map(|x| x.try_into_chrono_datetime())
+            .transpose()?;
         let leverage = leverage
             .with_context(|| format!("Missing leverage on position open action for {pos_id}"))?;
 

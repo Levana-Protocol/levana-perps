@@ -640,7 +640,7 @@ mod tests {
             id: Some(PositionId::new(id)),
             kind,
             timestamp: Timestamp::from_seconds(timestamp),
-            price_timestamp: None, 
+            price_timestamp: None,
             collateral: Default::default(),
             transfer_collateral: Signed::<Collateral>::from_str(transfer_collateral).unwrap(),
             leverage: None,
