@@ -478,7 +478,7 @@ impl State<'_> {
                 liquidity_stats
                     .total_collateral()
                     .approx_eq(Collateral::zero()),
-                "LiquidityStats::lp_to_collateral: no liquidity is in the pool"
+                "liquidity_withdraw: no lp tokens left, but collateral is not zero"
             );
             liquidity_stats = LiquidityStats::default();
         }
