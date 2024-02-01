@@ -1,10 +1,12 @@
+use proptest::prelude::*;
 use std::cell::RefCell;
+use std::ops::Mul;
 use std::rc::Rc;
 use std::str::FromStr;
 
 use cosmwasm_std::{Addr, Decimal256, Uint128, Uint256};
 use levana_perpswap_multi_test::arbitrary::lp::data::LpYield;
-use levana_perpswap_multi_test::config::{TokenKind, DEFAULT_MARKET, TEST_CONFIG};
+use levana_perpswap_multi_test::config::{SpotPriceKind, TokenKind, DEFAULT_MARKET, TEST_CONFIG};
 use levana_perpswap_multi_test::return_unless_market_collateral_quote;
 use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
@@ -2100,4 +2102,131 @@ fn liquidity_cooldown_no_cooldown_xlp() {
     market
         .exec_liquidity_token_transfer(LiquidityTokenKind::Xlp, &lp0, &lp1, "1".parse().unwrap())
         .unwrap();
+}
+
+#[test]
+fn liquidity_zero_dust_2487() {
+    liquidity_zero_dust_2487_inner("1.030489".parse().unwrap(), "1004.9995".parse().unwrap());
+    liquidity_zero_dust_2487_inner("0.9".parse().unwrap(), "1004.9995".parse().unwrap());
+}
+
+fn liquidity_zero_dust_2487_inner(price_change_multiplier: Decimal256, lp_amount: Decimal256) {
+    let market = PerpsMarket::new_with_type(
+        PerpsApp::new_cell().unwrap(),
+        DEFAULT_MARKET.collateral_type,
+        // make sure LP starts with 0
+        false,
+        SpotPriceKind::Oracle,
+    )
+    .unwrap();
+
+    // just get an initial price in there
+    market
+        .exec_crank_n(&Addr::unchecked("init-cranker"), 1)
+        .unwrap();
+    market.exec_refresh_price().unwrap();
+
+    let lp = market.clone_lp(0).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    // sanity check that we're starting from a baseline
+    let liquidity = market.query_liquidity_stats().unwrap();
+    assert_eq!(liquidity.total_collateral(), Collateral::zero());
+    assert_eq!(liquidity.total_tokens(), LpToken::zero());
+
+    // LP Mint & Deposit
+    let lp_deposit = Number::try_from(lp_amount.to_string()).unwrap();
+    market.exec_mint_tokens(&lp, lp_deposit).unwrap();
+    market.exec_deposit_liquidity(&lp, lp_deposit).unwrap();
+
+    let liquidity_before_open = market.query_liquidity_stats().unwrap();
+
+    // open a position
+    let (pos_id, _) = market
+        .exec_open_position_refresh_price(
+            &trader,
+            "100",
+            "9",
+            DirectionToBase::Long,
+            "1.0",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    let counter_collateral = market.query_position(pos_id).unwrap().counter_collateral;
+
+    // update price
+    let price = market
+        .query_current_price()
+        .unwrap()
+        .price_base
+        .into_number()
+        .abs_unsigned()
+        .mul(price_change_multiplier);
+
+    market
+        .exec_set_price(price.to_string().parse().unwrap())
+        .unwrap();
+    market.set_time(TimeJump::Blocks(1)).unwrap();
+    market.exec_refresh_price().unwrap();
+    market.exec_crank_till_finished(&trader).unwrap();
+
+    // close the position if it hasn't already
+    if market.query_position(pos_id).is_ok() {
+        market
+            .exec_close_position_refresh_price(&trader, pos_id, None)
+            .unwrap();
+    }
+
+    // sanity check, liquidity has gained some interesting amount
+    let liquidity = market.query_liquidity_stats().unwrap();
+    assert_ne!(
+        liquidity.total_collateral(),
+        liquidity_before_open.total_collateral() - counter_collateral.raw()
+    );
+
+    // withdraw all liquidity
+    market.exec_withdraw_liquidity(&lp, None).unwrap();
+
+    let liquidity = market.query_liquidity_stats().unwrap();
+
+    // lp tokens are 0
+    assert_eq!(liquidity.total_tokens(), LpToken::zero());
+    // hmmmm - ideally this would be the bug (which we want to fix TDD style) :/
+    assert_eq!(liquidity.total_collateral(), Collateral::zero());
+
+    // demonstrate that the protocol is still working fine
+    let lp_deposit = Number::from(1000u64);
+    market.exec_mint_tokens(&lp, lp_deposit).unwrap();
+    market.exec_deposit_liquidity(&lp, lp_deposit).unwrap();
+
+    // open a position
+    market
+        .exec_open_position_refresh_price(
+            &trader,
+            "100",
+            "9",
+            DirectionToBase::Long,
+            "1.0",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+}
+proptest! {
+    #[test]
+    #[cfg_attr(not(feature = "proptest"), ignore)]
+    fn proptest_liquidity_zero_dust_2487(
+        price_change_multiplier in 0.9f32..1.1f32,
+        lp_amount in 1000.0f32..1010.0f32
+    )
+    {
+        liquidity_zero_dust_2487_inner(
+            price_change_multiplier.to_string().parse().unwrap(),
+            lp_amount.to_string().parse().unwrap()
+        );
+    }
 }

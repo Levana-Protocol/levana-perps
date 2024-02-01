@@ -1369,6 +1369,22 @@ impl PerpsMarket {
             },
         )
     }
+
+    pub fn exec_close_position_refresh_price(
+        &self,
+        sender: &Addr,
+        position_id: PositionId,
+        slippage_assert: Option<SlippageAssert>,
+    ) -> Result<DeferResponse> {
+        let queue_res =
+            self.exec_close_position_queue_only(sender, position_id, slippage_assert)?;
+
+        self.set_time(TimeJump::Blocks(1)).unwrap();
+        self.exec_refresh_price().unwrap();
+
+        self.exec_defer_queue_process(&sender, queue_res, None)
+    }
+
     pub fn exec_close_position_queue_only(
         &self,
         sender: &Addr,
