@@ -238,7 +238,7 @@ impl State<'_> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn position_history_add_action(
+    pub(crate) fn position_history_add_open_update_action(
         &self,
         ctx: &mut StateContext,
         pos: &Position,
