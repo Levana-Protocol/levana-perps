@@ -2192,9 +2192,8 @@ fn liquidity_zero_dust_2487_inner(price_change_multiplier: Decimal256, lp_amount
 
     let liquidity = market.query_liquidity_stats().unwrap();
 
-    // lp tokens are 0
+    // liquidity is truly zero
     assert_eq!(liquidity.total_tokens(), LpToken::zero());
-    // hmmmm - ideally this would be the bug (which we want to fix TDD style) :/
     assert_eq!(liquidity.total_collateral(), Collateral::zero());
 
     // demonstrate that the protocol is still working fine
@@ -2216,7 +2215,9 @@ fn liquidity_zero_dust_2487_inner(price_change_multiplier: Decimal256, lp_amount
         )
         .unwrap();
 }
+
 proptest! {
+    // run this to get some error conditions for the explicit test above
     #[test]
     #[cfg_attr(not(feature = "proptest"), ignore)]
     fn proptest_liquidity_zero_dust_2487(
