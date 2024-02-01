@@ -513,6 +513,7 @@ async fn csv_helper(
             id,
             kind,
             timestamp,
+            price_timestamp,
             collateral: _,
             transfer_collateral: _,
             leverage,
@@ -531,6 +532,7 @@ async fn csv_helper(
         anyhow::ensure!(id == Some(pos_id));
 
         let timestamp = timestamp.try_into_chrono_datetime()?;
+        let price_timestamp = price_timestamp.map(|x| x.try_into_chrono_datetime()).transpose()?;
         let leverage = leverage
             .with_context(|| format!("Missing leverage on position open action for {pos_id}"))?;
 
@@ -544,6 +546,7 @@ async fn csv_helper(
             market: MarketId::clone(&market_id),
             id: pos_id,
             timestamp,
+            price_timestamp,
             leverage,
         };
 
@@ -576,6 +579,7 @@ struct PositionRecordCommon {
     market: MarketId,
     id: PositionId,
     timestamp: DateTime<Utc>,
+    price_timestamp: Option<DateTime<Utc>>,
     leverage: LeverageToBase,
 }
 
@@ -615,6 +619,7 @@ impl PositionRecord {
             market,
             id,
             timestamp,
+            price_timestamp,
             leverage,
         }: PositionRecordCommon,
         position: &PositionQueryResponse,
@@ -632,7 +637,7 @@ impl PositionRecord {
         Ok(Self {
             market: market.clone(),
             id,
-            opened_at: timestamp,
+            opened_at: price_timestamp.unwrap_or(timestamp),
             closed_at: None,
             leverage,
             owner: position.owner.as_str().parse()?,
@@ -654,6 +659,7 @@ impl PositionRecord {
             market,
             id,
             timestamp,
+            price_timestamp,
             leverage,
         }: PositionRecordCommon,
         position: &ClosedPosition,
@@ -671,7 +677,7 @@ impl PositionRecord {
         Ok(Self {
             market,
             id,
-            opened_at: timestamp,
+            opened_at: price_timestamp.unwrap_or(timestamp),
             closed_at: Some(position.close_time.try_into_chrono_datetime()?),
             leverage,
             owner: position.owner.as_str().parse()?,
