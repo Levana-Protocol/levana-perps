@@ -815,7 +815,6 @@ pub struct PositionAction {
     /// Timestamp when the action occurred
     pub timestamp: Timestamp,
     /// Timestamp of the PricePoint used for this action, if relevant
-    #[serde(default)]
     pub price_timestamp: Option<Timestamp>,
     /// the amount of collateral at the time of the action
     #[serde(alias = "active_collateral")]
