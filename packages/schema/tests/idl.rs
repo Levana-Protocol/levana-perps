@@ -307,7 +307,6 @@ fn test_allow_unknown_fields() {
         foo: String
     }
 
-
     let expanded_str = serde_json::to_string(&Expanded::default()).unwrap();
     let expanded:Expanded = serde_json::from_str(&expanded_str).unwrap();
     let minimal:Minimal = serde_json::from_str(&expanded_str).unwrap();
