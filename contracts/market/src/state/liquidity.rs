@@ -470,6 +470,19 @@ impl State<'_> {
             .unlocked
             .checked_sub(liquidity_to_return.raw())?;
 
+        // PERP-2487: rounding errors can leave a little bit of "dust" in collateral
+        // we need to zero it out here if there's no liquidity tokens left
+        if liquidity_stats.total_tokens().is_zero() {
+            // sanity check, it really should just be dust, at most
+            anyhow::ensure!(
+                liquidity_stats
+                    .total_collateral()
+                    .approx_eq(Collateral::zero()),
+                "liquidity_withdraw: no lp tokens left, but collateral is not zero"
+            );
+            liquidity_stats = LiquidityStats::default();
+        }
+
         self.save_liquidity_stats(ctx.storage, &liquidity_stats)?;
         self.add_pool_size_change_events(ctx, &liquidity_stats, &price)?;
 
