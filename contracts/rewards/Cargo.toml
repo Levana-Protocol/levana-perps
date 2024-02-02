@@ -31,4 +31,4 @@ schemars = "0.8.12"
 serde = { version = "1.0.159", default-features = false, features = ["derive"] }
 semver = "1.0.17"
 anyhow = "1.0.70"
-cosmwasm-schema = "1.2.3"
+cosmwasm-schema = {path = "../../packages/schema" }

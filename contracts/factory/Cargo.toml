@@ -35,4 +35,4 @@ anyhow = "1.0.67"
 enum-iterator = "1.2"
 
 [dev-dependencies]
-cosmwasm-schema = "1.1.9"
+cosmwasm-schema = {path = "../../packages/schema" }

@@ -34,4 +34,4 @@ semver = "1.0.15"
 anyhow = "1.0.67"
 
 [dev-dependencies]
-cosmwasm-schema = "1.1.9"
+cosmwasm-schema = {path = "../../packages/schema" }

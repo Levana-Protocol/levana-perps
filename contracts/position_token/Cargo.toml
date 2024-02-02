@@ -36,4 +36,4 @@ cw-utils = "1.0.1"
 serde-json-wasm = "0.5"
 
 [dev-dependencies]
-cosmwasm-schema = "1.1.9"
+cosmwasm-schema = {path = "../../packages/schema" }
