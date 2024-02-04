@@ -156,6 +156,9 @@ async fn worker(
             yield_pending: Collateral,
             first_action: Option<chrono::DateTime<chrono::Utc>>,
             last_action: Option<chrono::DateTime<chrono::Utc>>,
+            lp_collateral: Collateral,
+            xlp_collateral: Collateral,
+            xlp_unstaking: Collateral,
         }
 
         let lp_info = market.lp_info(lp).await?;
@@ -171,6 +174,17 @@ async fn worker(
             collateral_withdrawn: Collateral::zero(),
             first_action: None,
             last_action: None,
+            lp_collateral: lp_info.lp_collateral,
+            xlp_collateral: lp_info.xlp_collateral,
+            xlp_unstaking: lp_info
+                .unstaking
+                .map_or_else(Collateral::zero, |unstaking| {
+                    Collateral::from_decimal256(
+                        (unstaking.xlp_unstaking.raw() - unstaking.collected).into_decimal256()
+                            / unstaking.xlp_unstaking.into_decimal256()
+                            * unstaking.xlp_unstaking_collateral.into_decimal256(),
+                    )
+                }),
         };
 
         let actions = market.get_lp_actions(lp).await?;
