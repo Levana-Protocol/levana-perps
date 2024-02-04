@@ -249,7 +249,7 @@ impl OpenPositionExec {
             .into_base(market_type)
             .split();
 
-        state.position_history_add_action(
+        state.position_history_add_open_update_action(
             ctx,
             &pos,
             PositionActionKind::Open,

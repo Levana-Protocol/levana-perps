@@ -744,7 +744,7 @@ impl PositionUpdateEventExt for PositionUpdateEvent {
     ) -> Result<()> {
         ctx.response_mut().add_event(self.clone());
 
-        state.position_history_add_action(
+        state.position_history_add_open_update_action(
             ctx,
             pos,
             PositionActionKind::Update,
