@@ -92,6 +92,7 @@ impl State<'_> {
             id: Some(pos.id),
             kind: PositionActionKind::Transfer,
             timestamp: self.now(),
+            price_timestamp: None,
             collateral: pos.active_collateral.raw(),
             transfer_collateral: pos.active_collateral.into_signed(),
             leverage: None,
@@ -238,7 +239,7 @@ impl State<'_> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn position_history_add_action(
+    pub(crate) fn position_history_add_open_update_action(
         &self,
         ctx: &mut StateContext,
         pos: &Position,
@@ -260,6 +261,7 @@ impl State<'_> {
             id: Some(pos.id),
             kind,
             timestamp: self.now(),
+            price_timestamp: Some(price_point.timestamp),
             collateral: pos.active_collateral.raw(),
             transfer_collateral: deposit_collateral_delta,
             leverage: Some(leverage),
@@ -301,6 +303,7 @@ impl State<'_> {
             id: Some(pos.id),
             kind: PositionActionKind::Close,
             timestamp: self.now(),
+            price_timestamp: Some(price_point.timestamp),
             collateral: active_collateral,
             transfer_collateral: active_collateral.into_signed(),
             leverage: None,

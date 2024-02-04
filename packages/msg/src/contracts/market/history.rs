@@ -92,6 +92,14 @@ pub mod events {
                     src.action.transfer_collateral.to_string(),
                 );
 
+            let evt = match src.action.price_timestamp {
+                Some(price_timestamp) => evt.add_attribute(
+                    event_key::POSITION_ACTION_PRICE_TIMESTAMP,
+                    price_timestamp.to_string(),
+                ),
+                None => evt,
+            };
+
             let evt = match src.action.leverage {
                 Some(leverage) => {
                     evt.add_attribute(event_key::POSITION_ACTION_LEVERAGE, leverage.to_string())
@@ -171,6 +179,8 @@ pub mod events {
                         _ => Err(PerpError::unimplemented().into()),
                     })?,
                     timestamp: evt.timestamp_attr(event_key::POSITION_ACTION_TIMESTAMP)?,
+                    price_timestamp: evt
+                        .try_timestamp_attr(event_key::POSITION_ACTION_PRICE_TIMESTAMP)?,
                     collateral: evt.decimal_attr(event_key::POSITION_ACTION_COLLATERAL)?,
                     transfer_collateral: evt.signed_attr(event_key::POSITION_ACTION_TRANSFER)?,
                     leverage: evt.try_leverage_to_base_attr(event_key::POSITION_ACTION_LEVERAGE)?,
