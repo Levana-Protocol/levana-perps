@@ -886,7 +886,19 @@ version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce34a08020433989af5cc470104f6bd22134320fe0221bd8aeb919fd5ec92d5"
 dependencies = [
- "cosmwasm-schema-derive",
+ "cosmwasm-schema-derive 1.4.0",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "cosmwasm-schema"
+version = "2.0.0-beta.1"
+source = "git+https://github.com/Levana-Protocol/cosmwasm.git?rev=6e36567b8359214f6690c8de081bb1e237803fb1#6e36567b8359214f6690c8de081bb1e237803fb1"
+dependencies = [
+ "cosmwasm-schema-derive 2.0.0-beta.1",
  "schemars",
  "serde",
  "serde_json",
@@ -898,6 +910,16 @@ name = "cosmwasm-schema-derive"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96694ec781a7dd6dea1f968a2529ade009c21ad999c88b5f53d6cc495b3b96f7"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "cosmwasm-schema-derive"
+version = "2.0.0-beta.1"
+source = "git+https://github.com/Levana-Protocol/cosmwasm.git?rev=6e36567b8359214f6690c8de081bb1e237803fb1#6e36567b8359214f6690c8de081bb1e237803fb1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1086,7 +1108,7 @@ version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c80e93d1deccb8588db03945016a292c3c631e6325d349ebb35d2db6f4f946f7"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 1.4.0",
  "cosmwasm-std",
  "cw2",
  "schemars",
@@ -1101,7 +1123,7 @@ version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29ac2dc7a55ad64173ca1e0a46697c31b7a5c51342f55a1e84a724da4eb99908"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 1.4.0",
  "cosmwasm-std",
  "cw-storage-plus",
  "schemars",
@@ -2412,7 +2434,7 @@ name = "levana_perpswap_cosmos_cw20"
 version = "0.1.0-beta.15"
 dependencies = [
  "anyhow",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.0.0-beta.1",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -2430,7 +2452,7 @@ name = "levana_perpswap_cosmos_factory"
 version = "0.1.1"
 dependencies = [
  "anyhow",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.0.0-beta.1",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw2",
@@ -2463,7 +2485,7 @@ name = "levana_perpswap_cosmos_faucet"
 version = "0.1.0-beta.15"
 dependencies = [
  "anyhow",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.0.0-beta.1",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw2",
@@ -2480,7 +2502,7 @@ name = "levana_perpswap_cosmos_hatching"
 version = "0.1.0-beta.16"
 dependencies = [
  "anyhow",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.0.0-beta.1",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -2500,7 +2522,7 @@ name = "levana_perpswap_cosmos_ibc_execute_proxy"
 version = "0.1.0-beta.15"
 dependencies = [
  "anyhow",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.0.0-beta.1",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -2520,7 +2542,7 @@ name = "levana_perpswap_cosmos_liquidity_token"
 version = "0.1.1"
 dependencies = [
  "anyhow",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.0.0-beta.1",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -2538,7 +2560,7 @@ name = "levana_perpswap_cosmos_market"
 version = "0.1.1"
 dependencies = [
  "anyhow",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.0.0-beta.1",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -2560,7 +2582,7 @@ version = "0.1.0-beta.15"
 dependencies = [
  "anyhow",
  "arbitrary",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.0.0-beta.1",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -2581,7 +2603,7 @@ name = "levana_perpswap_cosmos_position_token"
 version = "0.1.1"
 dependencies = [
  "anyhow",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.0.0-beta.1",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -2600,7 +2622,7 @@ name = "levana_perpswap_cosmos_rewards"
 version = "0.1.0-beta.15"
 dependencies = [
  "anyhow",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.0.0-beta.1",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw2",
@@ -2618,7 +2640,7 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "chrono",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.0.0-beta.1",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw2",
@@ -2651,7 +2673,7 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "cosmos-sdk-proto",
- "cosmwasm-schema",
+ "cosmwasm-schema 2.0.0-beta.1",
  "cosmwasm-std",
  "cw-multi-test",
  "cw-storage-plus",
@@ -3330,7 +3352,7 @@ version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c04e9f2961bce1ef13b09afcdb5aee7d4ddde83669e5f9d2824ba422cb00de48"
 dependencies = [
- "cosmwasm-schema",
+ "cosmwasm-schema 1.4.0",
  "cosmwasm-std",
  "pyth-sdk",
  "thiserror",
