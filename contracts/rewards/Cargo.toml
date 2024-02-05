@@ -31,4 +31,4 @@ schemars = "0.8.12"
 serde = { version = "1.0.159", default-features = false, features = ["derive"] }
 semver = "1.0.17"
 anyhow = "1.0.70"
-cosmwasm-schema = {path = "../../packages/schema" }
+cosmwasm-schema = {git = "https://github.com/Levana-Protocol/cosmwasm.git", rev = "6e36567b8359214f6690c8de081bb1e237803fb1", features=["allow-unknown-fields"] }

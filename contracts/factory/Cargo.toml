@@ -35,4 +35,4 @@ anyhow = "1.0.67"
 enum-iterator = "1.2"
 
 [dev-dependencies]
-cosmwasm-schema = {path = "../../packages/schema" }
+cosmwasm-schema = {git = "https://github.com/Levana-Protocol/cosmwasm.git", rev = "6e36567b8359214f6690c8de081bb1e237803fb1", features=["allow-unknown-fields"] }
