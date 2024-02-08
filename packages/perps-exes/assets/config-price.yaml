@@ -33,6 +33,7 @@ pyth:
       COIN_USD: fee33f2a978bf32dd6b662b65ba8083c6773b494f8401194ec1870c640860245
       PYTH_USD: 0bbf28e9a841a1cc788f6a361b17ca072d0ea3098a1e5df1c3922d06719579ff
       NTRN_USD: a8e6517966a52cb1df864b2764f3629fde3f21d2b640b5c572fcd654cbccd65e
+      DYM_USD: a9f3b2a89c6f85a6c20a9518abde39b944e839ca49a0c92307c65974d3f14a57
   edge: 
     update-age-tolerance: 21
     # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-edge
@@ -342,6 +343,22 @@ networks:
       feeds-usd: [
         !pyth { key: "TIA_USD", inverted: false },
         !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 43200 }
+      ]
+    stTIA_USD:
+      feeds: [
+        !stride { denom: "ibc/698350B8A61D575025F3ED13E9AC9C0F45C89DEFE92F76D5838F1D3C1A7FF7C9", inverted: false, age_tolerance: 43200 },
+        !pyth { key: "TIA_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !stride { denom: "ibc/698350B8A61D575025F3ED13E9AC9C0F45C89DEFE92F76D5838F1D3C1A7FF7C9", inverted: false, age_tolerance: 43200 },
+        !pyth { key: "TIA_USD", inverted: false }
+      ]
+    DYN_USD:
+      feeds: [
+        !pyth { key: "DYM_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !pyth { key: "DYM_USD", inverted: false }
       ]
     LINK_USDC:
       feeds: [

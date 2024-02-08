@@ -309,6 +309,19 @@ markets:
 
     initial-borrow-fee-rate: 0.1
 
+  DYM_USD:
+    config:
+      funding_rate_sensitivity: 2
+      borrow_fee_rate_min_annualized: 0.04
+      target_utilization: 0.5
+      borrow_fee_sensitivity: 0.3
+      delta_neutrality_fee_sensitivity: 40000000
+      delta_neutrality_fee_tax: 0.25
+      carry_leverage: 15
+      liquidity_cooldown_seconds: 86400
+
+    initial-borrow-fee-rate: 0.08
+
   INJ_USD:
     config:
       funding_rate_sensitivity: 2
@@ -587,7 +600,6 @@ markets:
 
     initial-borrow-fee-rate: 0.16
 
-
   TIA_USD:
     config:
       trading_fee_notional_size: 0.002
@@ -607,6 +619,24 @@ markets:
     initial-borrow-fee-rate: 0.16
 
   milkTIA_USD:
+    config:
+      trading_fee_notional_size: 0.002
+      trading_fee_counter_collateral: 0.002
+      max_leverage: 10
+      carry_leverage: 5
+      funding_rate_sensitivity: 2
+      target_utilization: 0.5
+      delta_neutrality_fee_sensitivity: 20000000
+      borrow_fee_sensitivity: 0.3
+      delta_neutrality_fee_cap: 0.015
+      delta_neutrality_fee_tax: 0.25
+      borrow_fee_rate_min_annualized: 0.08
+      liquidity_cooldown_seconds: 86400
+      exposure_margin_ratio: 0.01
+
+    initial-borrow-fee-rate: 0.16
+
+  stTIA_USD:
     config:
       trading_fee_notional_size: 0.002
       trading_fee_counter_collateral: 0.002
