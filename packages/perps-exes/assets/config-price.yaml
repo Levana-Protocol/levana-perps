@@ -353,7 +353,7 @@ networks:
         !stride { denom: "ibc/698350B8A61D575025F3ED13E9AC9C0F45C89DEFE92F76D5838F1D3C1A7FF7C9", inverted: false, age_tolerance: 43200 },
         !pyth { key: "TIA_USD", inverted: false }
       ]
-    DYN_USD:
+    DYM_USD:
       feeds: [
         !pyth { key: "DYM_USD", inverted: false }
       ]
