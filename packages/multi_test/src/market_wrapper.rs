@@ -138,17 +138,20 @@ impl PerpsMarket {
             token_init,
             DEFAULT_MARKET.initial_price,
             None,
+            None,
             bootstap_lp,
             spot_price_kind,
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn new_custom(
         app: Rc<RefCell<PerpsApp>>,
         id: MarketId,
         token_init: TokenInit,
         initial_price: PriceBaseInQuote,
         initial_price_usd: Option<PriceCollateralInUsd>,
+        initial_price_publish_time: Option<Timestamp>,
         bootstap_lp: bool,
         spot_price_kind: SpotPriceKind,
     ) -> Result<Self> {
@@ -158,14 +161,16 @@ impl PerpsMarket {
         let initial_price = match spot_price_kind {
             SpotPriceKind::Oracle => {
                 let mut app = app.borrow_mut();
-                let now = app.block_info().time;
+                let price_publish_time = initial_price_publish_time
+                    .map(|x| x.into())
+                    .unwrap_or(app.block_info().time);
                 let contract_addr = app.simple_oracle_addr.clone();
                 app.execute_contract(
                     Addr::unchecked(&TEST_CONFIG.protocol_owner),
                     contract_addr,
                     &SimpleOracleExecuteMsg::SetPrice {
                         value: initial_price.into_number().abs_unsigned(),
-                        timestamp: Some(now),
+                        timestamp: Some(price_publish_time),
                     },
                     &[],
                 )?;
@@ -181,7 +186,7 @@ impl PerpsMarket {
                             })
                             .into_number()
                             .abs_unsigned(),
-                        timestamp: Some(now),
+                        timestamp: Some(price_publish_time),
                     },
                     &[],
                 )?;
