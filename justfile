@@ -159,8 +159,9 @@ push-companion-image:
 
 # Download health-check binary
 download-health-check:
-	env GH_TOKEN="$LEVANA_DEVOPS_REPO_PAT" gh release download v0.9 --repo https://github.com/Levana-Protocol/devops/
+	env GH_TOKEN="$LEVANA_DEVOPS_REPO_PAT" gh release download v0.10 --repo https://github.com/Levana-Protocol/devops/
 	cp health-check ./.ci/bots
+	cp health-check ./.ci/companion
 
 # Run companion
 run-companion:
