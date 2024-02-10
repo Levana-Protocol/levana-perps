@@ -10,7 +10,8 @@ use axum_extra::response::Css;
 use crate::app::App;
 
 use super::{
-    BuildVersionRoute, ErrorCssRoute, ErrorPage, Favicon, HealthRoute, HomeRoute, RobotRoute,
+    BuildVersionRoute, ErrorCssRoute, ErrorPage, Favicon, GrpcHealthRoute, HealthRoute, HomeRoute,
+    RobotRoute,
 };
 
 pub(crate) async fn homepage(_: HomeRoute) -> &'static str {
@@ -21,7 +22,11 @@ Not sure what you thought you'd find, but you didn't find it.
 Better luck next time."#
 }
 
-pub(crate) async fn healthz(_: HealthRoute, app: State<Arc<App>>) -> String {
+pub(crate) async fn healthz(_: HealthRoute) -> &'static str {
+    "healthy"
+}
+
+pub(crate) async fn grpc_health(_: GrpcHealthRoute, app: State<Arc<App>>) -> String {
     let mut res = "Yup, I'm alive. gRPC node health check\n\n".to_owned();
     for (chain_id, cosmos) in &app.cosmos {
         writeln!(&mut res, "{chain_id}:").unwrap();

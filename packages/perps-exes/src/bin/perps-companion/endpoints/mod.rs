@@ -42,6 +42,10 @@ pub(crate) struct HomeRoute;
 pub(crate) struct HealthRoute;
 
 #[derive(TypedPath)]
+#[typed_path("/grpc-health")]
+pub(crate) struct GrpcHealthRoute;
+
+#[derive(TypedPath)]
 #[typed_path("/build-version")]
 pub(crate) struct BuildVersionRoute;
 
@@ -127,6 +131,7 @@ pub(crate) async fn launch(app: App) -> Result<()> {
     let router = axum::Router::new()
         .typed_get(common::homepage)
         .typed_get(common::healthz)
+        .typed_get(common::grpc_health)
         .typed_get(common::build_version)
         .typed_get(pnl::pnl_css)
         .typed_get(common::error_css)
