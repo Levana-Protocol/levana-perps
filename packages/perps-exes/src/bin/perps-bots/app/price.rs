@@ -12,7 +12,7 @@ use axum::async_trait;
 use chrono::{DateTime, Utc};
 use cosmos::{
     proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, CosmosTxResponse, HasAddress,
-    TxBuilder, Wallet,
+    TxBuilder, TxMessage, Wallet,
 };
 use msg::{
     contracts::market::{
@@ -570,6 +570,23 @@ async fn check_market_needs_price_update(
 }
 
 pub(crate) async fn price_get_update_oracles_msg(
+    wallet: &Wallet,
+    app: &App,
+    markets: &[Market],
+    offchain_price_data: &OffchainPriceData,
+) -> Result<Option<TxMessage>> {
+    price_get_update_oracles_msg_raw(wallet, app, markets, offchain_price_data)
+        .await
+        .map(|msg| {
+            msg.map(|msg| {
+                let mut msg = TxMessage::from(msg);
+                msg.set_description("Pyth price oracle update message");
+                msg
+            })
+        })
+}
+
+async fn price_get_update_oracles_msg_raw(
     wallet: &Wallet,
     app: &App,
     markets: &[Market],
