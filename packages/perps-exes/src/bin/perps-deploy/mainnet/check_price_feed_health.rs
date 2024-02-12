@@ -1,27 +1,14 @@
-use std::{path::PathBuf, str::FromStr};
+use std::str::FromStr;
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
-use cosmos::{Address, HasAddress, HasCosmos, TxBuilder};
-use cosmwasm_std::{to_binary, Addr, CosmosMsg, Decimal256, Empty, WasmMsg};
-use msg::{
-    contracts::market::{
-        config::{Config, ConfigUpdate},
-        entry::ExecuteOwnerMsg,
-        spot_price::{SpotPriceConfig, SpotPriceFeedData},
-    },
-    prelude::MarketExecuteMsg,
-};
+use cosmos::{Address, HasCosmos};
+use msg::contracts::market::spot_price::{SpotPriceConfig, SpotPriceFeedData};
 use perps_exes::{
-    config::{
-        ChainConfig, ConfigUpdateAndBorrowFee, MainnetFactories, MarketConfigUpdates, PriceConfig,
-    },
+    config::MainnetFactories,
     contracts::{Factory, MarketInfo},
     prelude::{MarketContract, Timestamp},
 };
-use shared::storage::MarketId;
-
-use crate::{mainnet::strip_nulls, spot_price_config::get_spot_price_config, util::add_cosmos_msg};
 
 #[derive(clap::Parser)]
 pub(super) struct CheckPriceFeedHealthOpts {
@@ -57,7 +44,7 @@ async fn go(
                 anyhow::bail!("Unexpected manual spot price config for {market_id}")
             }
             SpotPriceConfig::Oracle {
-                pyth,
+                pyth: _,
                 stride,
                 feeds,
                 feeds_usd,

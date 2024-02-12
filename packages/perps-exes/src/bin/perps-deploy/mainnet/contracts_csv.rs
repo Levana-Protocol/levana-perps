@@ -1,25 +1,12 @@
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
-use cosmos::{Address, HasAddress, TxBuilder};
-use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, WasmMsg};
-use msg::{
-    contracts::market::{
-        config::{Config, ConfigUpdate},
-        entry::ExecuteOwnerMsg,
-    },
-    prelude::MarketExecuteMsg,
-};
+use anyhow::Result;
+use cosmos::{Address, HasAddress};
 use perps_exes::{
-    config::{
-        ChainConfig, ConfigUpdateAndBorrowFee, MainnetFactories, MarketConfigUpdates, PriceConfig,
-    },
+    config::MainnetFactories,
     contracts::{Factory, MarketInfo},
-    prelude::MarketContract,
 };
 use shared::storage::MarketId;
-
-use crate::{mainnet::strip_nulls, spot_price_config::get_spot_price_config, util::add_cosmos_msg};
 
 #[derive(clap::Parser)]
 pub(super) struct ContractsCsvOpts {

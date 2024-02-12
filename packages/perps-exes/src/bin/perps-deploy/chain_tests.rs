@@ -257,7 +257,7 @@ pub async fn test_update_leverage(perp_app: &PerpApp) -> Result<()> {
     let entry_price = PriceBaseInQuote::from_str("9.47")?;
     let leverage = LeverageToBase::from_str("10")?;
 
-    let tx = perp_app
+    perp_app
         .open_position(
             collateral,
             direction,

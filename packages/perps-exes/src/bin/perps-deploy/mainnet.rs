@@ -9,36 +9,25 @@ mod transfer_dao_fees;
 mod update_config;
 mod wind_down;
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    path::PathBuf,
-};
+use std::{collections::BTreeMap, path::PathBuf};
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use cosmos::{Address, ContractAdmin, Cosmos, CosmosNetwork, HasAddress, TxBuilder};
 use cosmwasm_std::{to_binary, CosmosMsg, Empty};
-use msg::{
-    contracts::market::{
-        entry::NewMarketParams,
-        spot_price::{
-            PythConfigInit, PythPriceServiceNetwork, SpotPriceConfigInit, SpotPriceFeedDataInit,
-            StrideConfigInit,
-        },
-    },
-    token::TokenInit,
+use msg::contracts::market::{
+    entry::NewMarketParams,
+    spot_price::{SpotPriceConfigInit, SpotPriceFeedDataInit},
 };
 use perps_exes::{
     config::{
         ChainConfig, ConfigUpdateAndBorrowFee, CrankFeeConfig, MainnetFactories, MainnetFactory,
-        MarketConfigUpdates, NativeAsset, PriceConfig,
+        MarketConfigUpdates, PriceConfig,
     },
     contracts::Factory,
     prelude::*,
 };
 
-use crate::{
-    app::OracleInfo, cli::Opt, spot_price_config::get_spot_price_config, util::get_hash_for_path,
-};
+use crate::{cli::Opt, spot_price_config::get_spot_price_config, util::get_hash_for_path};
 
 use self::{
     check_price_feed_health::CheckPriceFeedHealthOpts, close_all_positions::CloseAllPositionsOpts,
@@ -54,6 +43,7 @@ pub(crate) struct MainnetOpt {
 }
 
 #[derive(clap::Parser)]
+#[allow(clippy::large_enum_variant)]
 enum Sub {
     /// Store all perps contracts on chain
     StorePerpsContracts {
@@ -218,27 +208,6 @@ impl CodeIds {
         network: CosmosNetwork,
     ) -> Result<u64> {
         self.get(contract_type, opt, network).map(|x| x.code_id)
-    }
-
-    fn get_by_gitrev(
-        &self,
-        contract_type: ContractType,
-        network: CosmosNetwork,
-        gitrev: &str,
-    ) -> Result<u64> {
-        let mut iter = self
-            .hashes
-            .iter()
-            .filter(|x| x.gitrev == gitrev && x.contract_type == contract_type)
-            .flat_map(|x| x.code_ids.get(&network).copied());
-        let first = iter
-            .next()
-            .with_context(|| format!("No {contract_type:?} contract found for gitrev {gitrev}"))?;
-        anyhow::ensure!(
-            iter.next().is_none(),
-            "Found multiple {contract_type:?} contracts for gitrev {gitrev}"
-        );
-        Ok(first)
     }
 }
 
@@ -543,7 +512,7 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpt
             })?
             .into();
 
-        let spot_price = get_spot_price_config(&oracle, &price_config, &market_id)?;
+        let spot_price = get_spot_price_config(&oracle, &market_id)?;
         validate_spot_price_config(&app.cosmos, &spot_price, &market_id).await?;
 
         let msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
@@ -558,7 +527,7 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpt
         };
         let msg = strip_nulls(msg)?;
 
-        simtx.add_execute_message(&factory, owner, vec![], &msg);
+        simtx.add_execute_message(&factory, owner, vec![], &msg)?;
         msgs.push(CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
             contract_addr: factory.to_string(),
             msg: to_binary(&msg)?,
@@ -593,11 +562,11 @@ async fn validate_spot_price_config(
             anyhow::bail!("Unsupported manual price config for {market_id}")
         }
         SpotPriceConfigInit::Oracle {
-            pyth,
+            pyth: _,
             stride,
             feeds,
             feeds_usd,
-            volatile_diff_seconds,
+            volatile_diff_seconds: _,
         } => {
             for feed in feeds.iter().chain(feeds_usd.iter()) {
                 match &feed.data {
@@ -613,7 +582,7 @@ async fn validate_spot_price_config(
                     }
                     SpotPriceFeedDataInit::Stride {
                         denom,
-                        age_tolerance_seconds,
+                        age_tolerance_seconds: _,
                     } => {
                         #[derive(serde::Serialize)]
                         #[serde(rename_all = "snake_case")]

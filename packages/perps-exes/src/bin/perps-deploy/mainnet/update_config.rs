@@ -58,7 +58,7 @@ async fn go(
             let chain_config = ChainConfig::load(None::<PathBuf>, factory.network)?;
             let price_config = PriceConfig::load(None::<PathBuf>)?;
             let oracle = opt.get_oracle_info(&chain_config, &price_config, factory.network)?;
-            move |market_id| get_spot_price_config(&oracle, &price_config, &market_id)
+            move |market_id| get_spot_price_config(&oracle, &market_id)
         })
     } else {
         None

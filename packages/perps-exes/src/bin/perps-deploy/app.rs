@@ -9,7 +9,6 @@ use msg::{
     contracts::market::spot_price::{PythPriceServiceNetwork, SpotPriceFeed, SpotPriceFeedData},
     prelude::*,
 };
-use once_cell::sync::OnceCell;
 use perps_exes::config::{
     ChainConfig, ChainPythConfig, ChainStrideConfig, ConfigTestnet, DeploymentConfigTestnet,
     MarketPriceFeedConfig, PriceConfig,
@@ -129,7 +128,6 @@ impl Opt {
 
     pub(crate) async fn load_app(&self, family: &str) -> Result<App> {
         let config = ConfigTestnet::load(self.config_testnet.as_ref())?;
-        let price_config = PriceConfig::load(self.config_price.as_ref())?;
         let partial = config.get_deployment_info(family)?;
         let basic = self.load_basic_app(partial.network).await?;
 
@@ -225,17 +223,13 @@ impl Opt {
                             PythPriceServiceNetwork::Stable => &global_price_config.pyth.stable,
                         };
 
-                        let id = pyth_config
-                            .feed_ids
-                            .get(&key)
-                            .with_context(|| {
-                                format!("No pyth config found for {} on {:?}", key, network)
-                            })?
-                            .clone();
+                        let id = pyth_config.feed_ids.get(&key).with_context(|| {
+                            format!("No pyth config found for {} on {:?}", key, network)
+                        })?;
 
                         feeds.push(SpotPriceFeed {
                             data: SpotPriceFeedData::Pyth {
-                                id,
+                                id: *id,
                                 age_tolerance_seconds: chain_config
                                     .age_tolerance_seconds
                                     .unwrap_or(pyth_config.update_age_tolerance),
@@ -292,8 +286,6 @@ impl Opt {
     }
 
     pub(crate) async fn load_app_mainnet(&self, network: CosmosNetwork) -> Result<AppMainnet> {
-        let price_config = PriceConfig::load(self.config_price.as_ref())?;
-        let chain_config = ChainConfig::load(self.config_chain.as_ref(), network)?;
         let cosmos = self.connect(network).await?;
         let wallet = self.get_lazy_wallet(network)?;
 

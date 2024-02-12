@@ -4,12 +4,7 @@ use anyhow::{Context, Result};
 use cosmos::{ContractAdmin, CosmosNetwork, HasAddress};
 use msg::contracts::{
     cw20::{entry::InstantiateMinter, Cw20Coin},
-    farming::entry::OwnerExecuteMsg,
-    market::{
-        config::ConfigUpdate,
-        entry::ExecuteOwnerMsg,
-        spot_price::{SpotPriceConfig, SpotPriceConfigInit},
-    },
+    market::{config::ConfigUpdate, spot_price::SpotPriceConfigInit},
 };
 use msg::prelude::*;
 use perps_exes::config::ConfigTestnet;
@@ -139,7 +134,6 @@ pub(crate) async fn go(
         markets,
         trading_competition: false,
         faucet_admin: None,
-        price_source: crate::app::PriceSourceConfig::Wallet(wallet.get_address()),
     })
     .await?;
 
@@ -159,7 +153,7 @@ pub(crate) async fn go(
                 msg::contracts::market::entry::ExecuteMsg::SetManualPrice {
                     price: initial_price,
                     price_usd: initial_price
-                        .try_into_usd(&market_id)
+                        .try_into_usd(market_id)
                         .unwrap_or(collateral_price),
                 },
             )

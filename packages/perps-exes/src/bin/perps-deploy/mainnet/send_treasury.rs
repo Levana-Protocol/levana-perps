@@ -1,26 +1,15 @@
-use std::{
-    collections::{HashMap, HashSet},
-    path::PathBuf,
-};
+use std::collections::HashMap;
 
 use anyhow::{Context, Result};
 use cosmos::{HasAddress, TxBuilder};
-use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, WasmMsg};
+use cosmwasm_std::CosmosMsg;
 use msg::{
-    contracts::market::{
-        config::{Config, ConfigUpdate},
-        entry::{ExecuteOwnerMsg, QueryMsg, StatusResp},
-    },
-    prelude::MarketExecuteMsg,
+    contracts::market::entry::{QueryMsg, StatusResp},
     token::Token,
 };
-use perps_exes::{
-    config::{ChainConfig, MainnetFactories, MarketConfigUpdates, PriceConfig},
-    contracts::{Factory, MarketInfo},
-    prelude::MarketContract,
-};
+use perps_exes::{config::MainnetFactories, contracts::Factory};
 
-use crate::{mainnet::strip_nulls, spot_price_config::get_spot_price_config, util::add_cosmos_msg};
+use crate::util::add_cosmos_msg;
 use cosmos::Address;
 
 #[derive(clap::Parser)]
@@ -69,7 +58,7 @@ async fn go(
         }))
     }
 
-    let mut markets = factory.get_markets().await?;
+    let markets = factory.get_markets().await?;
     let mut collaterals = HashMap::new();
     for market in markets {
         let status: StatusResp = market
@@ -81,7 +70,7 @@ async fn go(
             Token::Native { denom, .. } => denom,
         };
 
-        let mut entry = collaterals.entry(key.clone()).or_insert(0);
+        let entry = collaterals.entry(key.clone()).or_insert(0);
         if balances.iter().any(|c| c.denom == key) {
             *entry += 1;
         }

@@ -1,17 +1,8 @@
-use std::path::PathBuf;
-
-use cosmos::HasAddress;
-use cosmwasm_std::Decimal256;
 use msg::prelude::*;
-use perps_exes::{
-    config::{ChainConfig, PriceConfig},
-    contracts::Factory,
-};
+use perps_exes::contracts::Factory;
 use shared::storage::MarketId;
 
-use crate::{
-    app::PriceSourceConfig, instantiate::AddMarketParams, spot_price_config::get_spot_price_config,
-};
+use crate::instantiate::AddMarketParams;
 
 #[derive(clap::Parser)]
 pub(crate) struct AddMarketOpt {
@@ -29,10 +20,6 @@ impl AddMarketOpt {
         let wallet = app.basic.get_wallet()?;
         let factory = app.tracker.get_factory(&self.family).await?.into_contract();
 
-        let chain_config = ChainConfig::load(None::<PathBuf>, app.basic.network)?;
-        let price_config = PriceConfig::load(None::<PathBuf>)?;
-        let oracle = opt.get_oracle_info(&chain_config, &price_config, app.basic.network)?;
-
         let factory = Factory::from_contract(factory);
         let instantiate_market = app.make_instantiate_market(self.market.clone())?;
 
@@ -40,7 +27,6 @@ impl AddMarketOpt {
             trading_competition: app.trading_competition,
             faucet_admin: Some(app.wallet_manager),
             factory,
-            spot_price: get_spot_price_config(&oracle, &price_config, &self.market)?,
         };
         instantiate_market
             .add(

@@ -99,9 +99,6 @@ struct UpdatePythOpt {
     /// Market ID to do the update for
     #[clap(long)]
     market: Vec<MarketId>,
-    /// Override Pyth config file
-    #[clap(long, env = "LEVANA_BOTS_CONFIG_PYTH")]
-    pub(crate) config_pyth: Option<PathBuf>,
     /// Override chain config file
     #[clap(long, env = "LEVANA_BOTS_CONFIG_CHAIN")]
     pub(crate) config_chain: Option<PathBuf>,
@@ -115,7 +112,6 @@ async fn update_pyth(
     UpdatePythOpt {
         market,
         network,
-        config_pyth,
         config_chain,
         keep_going,
     }: UpdatePythOpt,
@@ -504,7 +500,7 @@ async fn csv_helper(
 
         if let Some(record) = old_data.get(&(MarketId::clone(&market_id), pos_id)) {
             let mut csv = csv.lock().await;
-            csv.serialize(&record)?;
+            csv.serialize(record)?;
             csv.flush()?;
             continue;
         }
