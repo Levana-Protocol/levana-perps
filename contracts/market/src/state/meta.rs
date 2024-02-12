@@ -23,6 +23,8 @@ impl State<'_> {
     }
 
     pub(crate) fn instantiation_time(&self, store: &dyn Storage) -> Result<Timestamp> {
-        INSTANTIATION_TIMESTAMP.load(store).map_err(|err| err.into())
+        INSTANTIATION_TIMESTAMP
+            .load(store)
+            .map_err(|err| err.into())
     }
 }
