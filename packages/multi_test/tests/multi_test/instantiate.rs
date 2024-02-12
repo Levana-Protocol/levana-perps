@@ -15,7 +15,7 @@ fn instantiate_price_early_3025() {
     let app = PerpsApp::new_cell().unwrap();
 
     let now = app.borrow().block_info().time;
-    let before_instantiation_time = now.minus_hours(1);
+    let before_instantiation_time = now.minus_seconds(20);
 
     let token_init = match DEFAULT_MARKET.token_kind {
         TokenKind::Native => TokenInit::Native {
@@ -48,12 +48,15 @@ fn instantiate_price_early_3025() {
     )
     .unwrap();
 
-    // cranking will fail due to not having a valid price
+    // this will fail, due to the fix in this issue (cannot use a spot price publish time earlier than instantiation time)
+    // note that prior to this fix, it would have succeeded - and thereby bricked the protocol
+    // since it would push an invalid price into the crank queue that could then never be moved forward
     market
-        .exec_crank_n(&Addr::unchecked("init-cranker"), 1)
+        .exec_crank_n(&Addr::unchecked("init-cranker"), 0)
         .unwrap_err();
 
-    // as will initializing lps
+
+    // also fails to initialize lps
     market
         .exec_mint_and_deposit_liquidity(
             &DEFAULT_MARKET.bootstrap_lp_addr,
@@ -61,17 +64,14 @@ fn instantiate_price_early_3025() {
         )
         .unwrap_err();
 
-    // in fact we can't even query the price
+    // in fact we can't even query the price - because there is none
     market.query_current_price().unwrap_err();
 
-    // but, we *can* push a new price now
+    // but, if we push a new price
     market.exec_set_price(DEFAULT_MARKET.initial_price).unwrap();
 
-    // which opens up everything...
+    //  everything works
 
-    market
-        .exec_crank_n(&Addr::unchecked("init-cranker"), 1)
-        .unwrap();
     market
         .exec_mint_and_deposit_liquidity(
             &DEFAULT_MARKET.bootstrap_lp_addr,
@@ -102,4 +102,5 @@ fn instantiate_price_early_3025() {
     market
         .exec_open_position_process_queue_response(&trader, queue_res, None)
         .unwrap();
+
 }

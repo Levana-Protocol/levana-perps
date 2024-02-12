@@ -70,7 +70,7 @@ pub fn instantiate(
 
     set_factory_addr(deps.storage, &factory.validate(deps.api)?)?;
     config_init(deps.api, deps.storage, config, spot_price)?;
-    meta_init(deps.storage, &market_id)?;
+    meta_init(deps.storage, &env, &market_id)?;
 
     token_init(deps.storage, &deps.querier, token)?;
     fees_init(deps.storage)?;
