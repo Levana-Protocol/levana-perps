@@ -909,7 +909,11 @@ impl PerpsMarket {
         self.exec_set_price_with_usd(price, None)
     }
 
-    pub fn exec_set_price_time(&self, price: PriceBaseInQuote, timestamp: Option<Timestamp>) -> Result<PriceResponse> {
+    pub fn exec_set_price_time(
+        &self,
+        price: PriceBaseInQuote,
+        timestamp: Option<Timestamp>,
+    ) -> Result<PriceResponse> {
         self.exec_set_price_with_usd_time(price, None, timestamp)
     }
 
@@ -925,7 +929,7 @@ impl PerpsMarket {
         &self,
         price: PriceBaseInQuote,
         price_usd: Option<PriceCollateralInUsd>,
-        timestamp: Option<Timestamp>
+        timestamp: Option<Timestamp>,
     ) -> Result<PriceResponse> {
         let price_usd = price_usd.unwrap_or(
             price

@@ -55,7 +55,6 @@ fn instantiate_price_early_3025() {
         .exec_crank_n(&Addr::unchecked("init-cranker"), 0)
         .unwrap_err();
 
-
     // also fails to initialize lps
     market
         .exec_mint_and_deposit_liquidity(
@@ -102,5 +101,4 @@ fn instantiate_price_early_3025() {
     market
         .exec_open_position_process_queue_response(&trader, queue_res, None)
         .unwrap();
-
 }
