@@ -3,11 +3,7 @@ use std::{collections::HashSet, path::PathBuf, sync::Arc};
 use crate::cli::Opt;
 use cosmos::{Address, CosmosNetwork};
 use msg::{
-    contracts::{
-        cw20::entry::AllAccountsResponse,
-        liquidity_token::LiquidityTokenKind,
-        market::entry::{LpAction, LpActionKind},
-    },
+    contracts::{cw20::entry::AllAccountsResponse, liquidity_token::LiquidityTokenKind},
     prelude::*,
 };
 use perps_exes::{contracts::Factory, prelude::MarketContract};
@@ -157,7 +153,7 @@ async fn worker(
 
         let lp_info = market.lp_info(lp).await?;
 
-        let mut record = Record {
+        let record = Record {
             market_id: &market_id,
             addr: lp,
             yield_withdrawn: lp_info.history.r#yield,

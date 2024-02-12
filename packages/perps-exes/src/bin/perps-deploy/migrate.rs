@@ -1,16 +1,9 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use cosmos::HasAddress;
-use msg::contracts::{
-    factory::entry::CodeIds,
-    market::spot_price::{
-        PythConfigInit, PythPriceServiceNetwork, SpotPriceConfigInit, StrideConfigInit,
-    },
-    tracker::entry::ContractResp,
-};
+use msg::contracts::{factory::entry::CodeIds, tracker::entry::ContractResp};
 use perps_exes::contracts::{Factory, MarketInfo};
 
 use crate::{
-    app::PriceSourceConfig,
     cli::Opt,
     store_code::{FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN},
 };

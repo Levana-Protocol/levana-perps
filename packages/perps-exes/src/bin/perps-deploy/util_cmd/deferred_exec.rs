@@ -6,8 +6,7 @@ use std::{
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use cosmos::{Address, Cosmos, CosmosNetwork, HasCosmos};
-use dashmap::DashMap;
+use cosmos::{Address, Cosmos, HasCosmos};
 use msg::contracts::market::deferred_execution::{
     DeferredExecId, DeferredExecStatus, GetDeferredExecResp,
 };
@@ -17,7 +16,6 @@ use perps_exes::{
     contracts::{Factory, MarketInfo},
     prelude::{MarketContract, MarketId},
 };
-use sha2::digest::HashMarker;
 use tokio::task::JoinSet;
 
 #[derive(clap::Parser)]
@@ -87,7 +85,7 @@ impl AllExecs {
         };
 
         for record in records {
-            res.add_record(record);
+            res.add_record(record)?;
         }
         Ok(AllExecs {
             inner: Arc::new(Mutex::new(res)),
@@ -170,7 +168,6 @@ async fn go(
 ) -> Result<()> {
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
-    let network = factory.network;
     let app = opt.load_app_mainnet(factory.network).await?;
     let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
 
@@ -199,7 +196,6 @@ async fn go(
 async fn go_market(all_execs: AllExecs, market_info: MarketInfo) -> Result<()> {
     let market = MarketContract::new(market_info.market);
     let cosmos = market.get_cosmos();
-    let status = market.status().await?;
 
     let mut exec_id = DeferredExecId::first();
 
@@ -230,7 +226,7 @@ async fn go_market(all_execs: AllExecs, market_info: MarketInfo) -> Result<()> {
                     };
                     let executed_block = match executed_time {
                         None => None,
-                        Some(executed_time) => all_execs.get_block(&cosmos, executed_time).await?,
+                        Some(executed_time) => all_execs.get_block(cosmos, executed_time).await?,
                     };
 
                     let record = Record {

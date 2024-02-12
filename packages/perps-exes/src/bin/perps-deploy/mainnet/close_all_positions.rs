@@ -1,22 +1,11 @@
-use std::path::PathBuf;
-
 use anyhow::{Context, Result};
 use cosmos::{HasAddress, TxBuilder};
 use cosmwasm_std::{to_binary, CosmosMsg, Empty, WasmMsg};
-use msg::{
-    contracts::market::{config::ConfigUpdate, entry::ExecuteOwnerMsg},
-    prelude::{FactoryExecuteMsg, MarketExecuteMsg},
-    shutdown::{ShutdownEffect, ShutdownImpact},
-};
-use perps_exes::{
-    config::{ChainConfig, PriceConfig},
-    contracts::Factory,
-};
+use msg::prelude::MarketExecuteMsg;
+use perps_exes::contracts::Factory;
 use shared::storage::MarketId;
 
-use crate::{
-    cli::Opt, mainnet::strip_nulls, spot_price_config::get_spot_price_config, util::add_cosmos_msg,
-};
+use crate::{cli::Opt, util::add_cosmos_msg};
 
 use super::MainnetFactories;
 

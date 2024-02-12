@@ -1,24 +1,15 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use cosmos::{HasAddress, TxBuilder};
-use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, WasmMsg};
-use msg::{
-    contracts::market::{
-        config::{Config, ConfigUpdate},
-        entry::ExecuteOwnerMsg,
-    },
-    prelude::MarketExecuteMsg,
-};
+use cosmwasm_std::Addr;
+use msg::contracts::market::config::{Config, ConfigUpdate};
 use perps_exes::{
-    config::{
-        ChainConfig, ConfigUpdateAndBorrowFee, MainnetFactories, MarketConfigUpdates, PriceConfig,
-    },
+    config::{ChainConfig, ConfigUpdateAndBorrowFee, MarketConfigUpdates, PriceConfig},
     contracts::{Factory, MarketInfo},
     prelude::{MarketContract, MarketId},
 };
 
-use crate::{mainnet::strip_nulls, spot_price_config::get_spot_price_config, util::add_cosmos_msg};
+use crate::spot_price_config::get_spot_price_config;
 
 #[derive(clap::Parser)]
 pub(crate) struct SyncConfigOpts {
@@ -107,7 +98,7 @@ async fn go(
 
         for (key, default_value) in default_config {
             let expected = if key == "spot_price" {
-                let spot_price_config = get_spot_price_config(&oracle, &price_config, &market_id)?;
+                let spot_price_config = get_spot_price_config(&oracle, &market_id)?;
                 serde_json::to_value(spot_price_config)?
                 // Keys that no longer exist in ConfigUpdate
             } else if is_unused_key(&key) {
@@ -148,7 +139,7 @@ async fn go(
             if do_it {
                 let update = serde_json::Value::Object(needed_update);
                 let update: ConfigUpdate = serde_json::from_value(update)?;
-                let res = market.config_update(&wallet, update).await?;
+                let res = market.config_update(wallet, update).await?;
                 log::info!("Updated {market_id} in {}", res.txhash);
             }
         }

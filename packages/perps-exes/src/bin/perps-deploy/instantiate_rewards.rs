@@ -6,7 +6,7 @@ use crate::{
     store_code::{Contracts, HATCHING, IBC_EXECUTE_PROXY, LVN_REWARDS},
 };
 use anyhow::{bail, Context, Result};
-use cosmos::{Coin, ContractAdmin, CosmosBuilder, TokenFactory};
+use cosmos::{Coin, ContractAdmin, CosmosBuilder};
 use cosmos::{Contract, CosmosNetwork, HasAddress};
 use cosmwasm_std::IbcOrder;
 use msg::contracts::hatching::{
@@ -295,15 +295,13 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                 // gas is wildly underestimated on osmosis testnet at least
                 // create a new cosmos instance with increased estimation multiplier
                 // to make sure we have enough
-                let mut builder = CosmosBuilder::clone(&*basic.cosmos.get_cosmos_builder());
+                let mut builder = CosmosBuilder::clone(basic.cosmos.get_cosmos_builder());
                 builder.set_gas_estimate_multiplier(1.5);
                 let cosmos = builder.build_lazy()?;
 
                 let tokenfactory = basic.cosmos.clone().token_factory()?;
 
-                tokenfactory
-                    .mint(&wallet, lvn_denom.clone(), AMOUNT)
-                    .await?;
+                tokenfactory.mint(wallet, lvn_denom.clone(), AMOUNT).await?;
 
                 let coin = Coin {
                     denom: lvn_denom,

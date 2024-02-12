@@ -1,24 +1,11 @@
-use std::path::PathBuf;
-
-use anyhow::{Context, Result};
+use anyhow::Result;
 use cosmos::{HasAddress, TxBuilder};
-use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, WasmMsg};
-use msg::{
-    contracts::market::{
-        config::{Config, ConfigUpdate},
-        entry::ExecuteOwnerMsg,
-    },
-    prelude::MarketExecuteMsg,
-};
+use msg::prelude::MarketExecuteMsg;
 use perps_exes::{
-    config::{ChainConfig, MainnetFactories, MarketConfigUpdates, PriceConfig},
-    contracts::{Factory, MarketInfo},
+    config::MainnetFactories,
+    contracts::Factory,
     prelude::{Collateral, MarketContract},
 };
-use shared::storage::{ErrorId, PerpError};
-
-use crate::{mainnet::strip_nulls, spot_price_config::get_spot_price_config, util::add_cosmos_msg};
-use cosmos::Address;
 
 #[derive(clap::Parser)]
 pub(super) struct RewardsOpts {
@@ -46,10 +33,7 @@ async fn go(opt: crate::cli::Opt, RewardsOpts { factory, market_id }: RewardsOpt
 
     let mut markets = factory.get_markets().await?;
     if let Some(market_id) = market_id {
-        markets = markets
-            .into_iter()
-            .filter(|m| m.market_id.as_str() == market_id)
-            .collect();
+        markets.retain(|m| m.market_id.as_str() == market_id);
     }
 
     let wallet = app.get_wallet()?;

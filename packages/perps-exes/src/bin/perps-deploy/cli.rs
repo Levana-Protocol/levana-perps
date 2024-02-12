@@ -86,6 +86,7 @@ pub(crate) enum TestnetSub {
 }
 
 #[derive(clap::Parser)]
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum Subcommand {
     /// Do a complete local deployment
     LocalDeploy {

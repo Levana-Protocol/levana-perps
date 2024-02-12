@@ -1,24 +1,5 @@
-use std::path::PathBuf;
-
-use anyhow::{Context, Result};
-use cosmos::{HasAddress, TxBuilder};
-use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, WasmMsg};
-use msg::{
-    contracts::market::{
-        config::{Config, ConfigUpdate},
-        entry::ExecuteOwnerMsg,
-    },
-    prelude::MarketExecuteMsg,
-};
-use perps_exes::{
-    config::{ChainConfig, MainnetFactories, MarketConfigUpdates, PriceConfig},
-    contracts::{Factory, MarketInfo},
-    prelude::MarketContract,
-};
-use shared::storage::{ErrorId, PerpError};
-
-use crate::{mainnet::strip_nulls, spot_price_config::get_spot_price_config, util::add_cosmos_msg};
-use cosmos::Address;
+use anyhow::Result;
+use perps_exes::{config::MainnetFactories, contracts::Factory};
 
 #[derive(clap::Parser)]
 pub(super) struct TransferDaoFeesOpts {
@@ -49,10 +30,7 @@ async fn go(
 
     let mut markets = factory.get_markets().await?;
     if let Some(market_id) = market_id {
-        markets = markets
-            .into_iter()
-            .filter(|m| m.market_id.as_str() == market_id)
-            .collect();
+        markets.retain(|m| m.market_id.as_str() == market_id);
     }
 
     for market in markets {
