@@ -15,13 +15,14 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use cosmos::{Address, ContractAdmin, CosmosNetwork, HasAddress, TxBuilder};
+use cosmos::{Address, ContractAdmin, Cosmos, CosmosNetwork, HasAddress, TxBuilder};
 use cosmwasm_std::{to_binary, CosmosMsg, Empty};
 use msg::{
     contracts::market::{
         entry::NewMarketParams,
         spot_price::{
-            PythConfigInit, PythPriceServiceNetwork, SpotPriceConfigInit, StrideConfigInit,
+            PythConfigInit, PythPriceServiceNetwork, SpotPriceConfigInit, SpotPriceFeedDataInit,
+            StrideConfigInit,
         },
     },
     token::TokenInit,
@@ -542,9 +543,12 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpt
             })?
             .into();
 
+        let spot_price = get_spot_price_config(&oracle, &price_config, &market_id)?;
+        validate_spot_price_config(&app.cosmos, &spot_price, &market_id).await?;
+
         let msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
             new_market: NewMarketParams {
-                spot_price: get_spot_price_config(&oracle, &price_config, &market_id)?,
+                spot_price,
                 market_id,
                 token,
                 config: Some(market_config_update),
@@ -575,6 +579,82 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpt
     log::debug!("Simulation response: {simres:?}");
 
     Ok(())
+}
+
+async fn validate_spot_price_config(
+    cosmos: &Cosmos,
+    spot_price: &SpotPriceConfigInit,
+    market_id: &MarketId,
+) -> Result<()> {
+    log::info!("Validating spot price config for {market_id}");
+
+    match spot_price {
+        SpotPriceConfigInit::Manual { .. } => {
+            anyhow::bail!("Unsupported manual price config for {market_id}")
+        }
+        SpotPriceConfigInit::Oracle {
+            pyth,
+            stride,
+            feeds,
+            feeds_usd,
+            volatile_diff_seconds,
+        } => {
+            for feed in feeds.iter().chain(feeds_usd.iter()) {
+                match &feed.data {
+                    // No need to check the constant feed
+                    SpotPriceFeedDataInit::Constant { price: _ } => (),
+                    SpotPriceFeedDataInit::Pyth {
+                        id: _,
+                        age_tolerance_seconds: _,
+                    } => {
+                        // In theory could do some sanity checking of the Pyth
+                        // feeds here, but that's usually well handled via testnet testing. Skipping for
+                        // now.
+                    }
+                    SpotPriceFeedDataInit::Stride {
+                        denom,
+                        age_tolerance_seconds,
+                    } => {
+                        #[derive(serde::Serialize)]
+                        #[serde(rename_all = "snake_case")]
+                        enum StrideQuery<'a> {
+                            RedemptionRate { denom: &'a str },
+                        }
+
+                        let stride = stride.as_ref().with_context(|| format!("Using a Stride feed with denom {denom}, but no Stride contract configured"))?;
+                        let stride =
+                            cosmos.make_contract(stride.contract_address.as_str().parse()?);
+                        let res: serde_json::Value =
+                            stride.query(StrideQuery::RedemptionRate { denom }).await?;
+                        log::info!(
+                            "Queried Stride contract {stride} with denom {denom}, got result {}",
+                            serde_json::to_string(&res)?
+                        );
+                    }
+                    SpotPriceFeedDataInit::Sei { denom } => anyhow::bail!(
+                        "No longer supporting Sei native oracle, provided denom is: {denom}"
+                    ),
+                    SpotPriceFeedDataInit::Simple {
+                        contract,
+                        age_tolerance_seconds: _,
+                    } => {
+                        #[derive(serde::Serialize)]
+                        #[serde(rename_all = "snake_case")]
+                        enum SimpleQuery {
+                            Price {},
+                        }
+                        let contract = cosmos.make_contract(contract.as_str().parse()?);
+                        let res: serde_json::Value = contract.query(SimpleQuery::Price {}).await?;
+                        log::info!(
+                            "Queried simple contract {contract}, got result {}",
+                            serde_json::to_string(&res)?
+                        );
+                    }
+                }
+            }
+            Ok(())
+        }
+    }
 }
 
 pub(crate) fn strip_nulls<T: serde::Serialize>(x: T) -> Result<serde_json::Value> {
