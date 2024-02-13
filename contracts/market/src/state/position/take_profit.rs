@@ -13,7 +13,40 @@ pub(crate) struct TakeProfitToCounterCollateral<'a>{
     pub price_point: &'a PricePoint,
 } 
 impl <'a> TakeProfitToCounterCollateral <'a> {
+
+    // this version is a stab at trying to invert the old take profit calculation
     pub fn calc(&self) -> Result<NonZero<Collateral>> {
+        let Self {
+            take_profit_price_base,
+            market_type,
+            collateral,
+            leverage_to_base,
+            direction,
+            config,
+            price_point,
+        } = *self;
+        let take_profit_price = self.min_take_profit_price();
+
+        let price_notional = price_point.price_notional.into_number();
+
+        let notional_size = calculate_notional_size(
+            price_point,
+            market_type,
+            collateral,
+            leverage_to_base,
+            direction,
+        )?;
+
+        let counter_collateral = take_profit_price
+            .checked_sub(price_notional)?
+            .checked_mul(notional_size.into_number())?;
+
+        println!("TAKE PROFIT PRICE: {}, PRICE NOTIONAL: {} NOTIONAL SIZE: {} COLLATERAL: {} COUNTER COLLATERAL: {}", take_profit_price, price_notional, notional_size, collateral, counter_collateral);
+        Ok(NonZero::try_from_number(counter_collateral).context("Calculated an invalid counter_collateral")?)
+    }
+
+    // this version was from trying to mirror the frontend
+    pub fn calc_v2(&self) -> Result<NonZero<Collateral>> {
         let Self {
             take_profit_price_base,
             market_type,
