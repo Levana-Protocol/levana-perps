@@ -29,3 +29,4 @@ pub mod price;
 pub(crate) mod response;
 pub mod storage;
 pub mod time;
+pub mod compat;

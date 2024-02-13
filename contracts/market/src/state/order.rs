@@ -13,6 +13,7 @@ use msg::contracts::market::order::{LimitOrder, OrderId};
 use msg::contracts::market::position::events::PositionSaveReason;
 use msg::contracts::market::position::CollateralAndUsd;
 use msg::prelude::*;
+use shared::compat::BackwardsCompatTakeProfit;
 
 use super::fees::CapCrankFee;
 use super::position::{OpenPositionExec, OpenPositionParams};
@@ -139,10 +140,18 @@ impl State<'_> {
             crank_fee: CollateralAndUsd::from_pair(order.crank_fee_collateral, order.crank_fee_usd),
             leverage: order.leverage,
             direction: order.direction.into_base(market_type),
-            max_gains_in_quote: order.max_gains,
             slippage_assert: None,
             stop_loss_override: order.stop_loss_override,
-            take_profit_override: order.take_profit_override,
+            take_profit_price: BackwardsCompatTakeProfit{
+                direction: order.direction.into_base(market_type),
+                leverage: order.leverage,
+                market_type,
+                max_gains: Some(order.max_gains), 
+                take_profit_override: order.take_profit_override, 
+                price_point,
+                // TODO
+                take_profit: None,
+            }.calc()?
         };
 
         let res = match OpenPositionExec::new(self, ctx.storage, open_position_params, price_point)

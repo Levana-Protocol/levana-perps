@@ -9,6 +9,7 @@ use msg::contracts::market::{
 pub(crate) use open::*;
 pub(crate) mod close;
 pub(crate) mod update;
+pub(crate) mod take_profit;
 mod validate;
 pub use validate::*;
 mod cw721;
@@ -661,6 +662,7 @@ impl State<'_> {
                     )?;
                 }
 
+                // eventually this shouldn't be needed, but for now, save it - just in case
                 if let Some(take_profit_override) = pos.take_profit_override_notional {
                     PRICE_TRIGGER_ASC.save(
                         ctx.storage,
@@ -694,6 +696,7 @@ impl State<'_> {
                     )?;
                 }
 
+                // eventually this shouldn't be needed, but for now, save it - just in case
                 if let Some(take_profit_override) = pos.take_profit_override_notional {
                     PRICE_TRIGGER_DESC.save(
                         ctx.storage,

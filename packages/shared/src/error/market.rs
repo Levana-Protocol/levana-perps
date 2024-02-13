@@ -152,6 +152,10 @@ pub enum MarketError {
         close_time: Timestamp,
         reason: String,
     },
+    #[error(
+        "Could not calculate take profit from any of the supplied parameters"
+    )]
+    MissingTakeProfit,
 }
 
 /// Was the price provided by the trader too high or too low?
@@ -286,6 +290,7 @@ impl MarketError {
             MarketError::PositionAlreadyClosing { .. } => ErrorId::PositionAlreadyClosing,
             MarketError::NoPricePublishTimeFound => ErrorId::NoPricePublishTimeFound,
             MarketError::PositionAlreadyClosed { .. } => ErrorId::PositionAlreadyClosed,
+            MarketError::MissingTakeProfit { .. } => ErrorId::MissingTakeProfit,
         }
     }
 }

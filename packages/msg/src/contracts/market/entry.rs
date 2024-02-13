@@ -110,11 +110,13 @@ pub enum ExecuteMsg {
         /// Direction of new position
         direction: DirectionToBase,
         /// Maximum gains of new position
-        max_gains: MaxGainsInQuote,
+        #[deprecated(note = "Use take_profit instead")]
+        max_gains: Option<MaxGainsInQuote>,
         /// Stop loss price of new position
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
-        take_profit_override: Option<PriceBaseInQuote>,
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<PriceBaseInQuote>,
     },
 
     /// Add collateral to a position, causing leverage to decrease
@@ -1141,9 +1143,9 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
                 slippage_assert: u.arbitrary()?,
                 leverage: u.arbitrary()?,
                 direction: u.arbitrary()?,
-                max_gains: u.arbitrary()?,
+                max_gains: None, 
                 stop_loss_override: u.arbitrary()?,
-                take_profit_override: u.arbitrary()?,
+                take_profit: Some(u.arbitrary()?),
             }),
             2 => Ok(ExecuteMsg::UpdatePositionAddCollateralImpactLeverage { id: u.arbitrary()? }),
             3 => Ok(ExecuteMsg::UpdatePositionAddCollateralImpactSize {

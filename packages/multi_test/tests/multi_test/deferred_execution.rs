@@ -41,9 +41,9 @@ fn basic_operations() {
                 slippage_assert: None,
                 leverage: "10".parse().unwrap(),
                 direction: DirectionToBase::Long,
-                max_gains: MaxGainsInQuote::Finite("1.2".parse().unwrap()),
+                max_gains: Some(MaxGainsInQuote::Finite("1.2".parse().unwrap())),
                 stop_loss_override: None,
-                take_profit_override: None,
+                take_profit: None,
             },
         )
         .unwrap();
@@ -113,9 +113,9 @@ fn cannot_perform_deferred_exec() {
                 slippage_assert: None,
                 leverage: "10".parse().unwrap(),
                 direction: DirectionToBase::Long,
-                max_gains: MaxGainsInQuote::Finite("1.2".parse().unwrap()),
+                max_gains: Some(MaxGainsInQuote::Finite("1.2".parse().unwrap())),
                 stop_loss_override: None,
-                take_profit_override: None,
+                take_profit: None,
             },
         )
         .unwrap();
@@ -160,9 +160,9 @@ fn replies_work_for_two_in_queue() {
                 slippage_assert: None,
                 leverage: "10".parse().unwrap(),
                 direction: DirectionToBase::Long,
-                max_gains: MaxGainsInQuote::Finite("1.2".parse().unwrap()),
+                max_gains: Some(MaxGainsInQuote::Finite("1.2".parse().unwrap())),
                 stop_loss_override: None,
-                take_profit_override: None,
+                take_profit: None,
             },
         )
         .unwrap();

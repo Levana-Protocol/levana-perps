@@ -154,9 +154,9 @@ where
             slippage_assert: None,
             leverage,
             direction,
-            max_gains,
+            max_gains: Some(max_gains),
             stop_loss_override: None,
-            take_profit_override: None,
+            take_profit: None,
         };
 
         self.bridge

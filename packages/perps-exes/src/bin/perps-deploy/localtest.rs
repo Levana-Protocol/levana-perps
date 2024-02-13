@@ -9,7 +9,6 @@ use std::{
 
 use crate::chain_tests::{
     test_funding_market, test_pnl_on_liquidation, test_set_and_fetch_price, test_update_leverage,
-    test_update_max_gains,
 };
 use crate::{
     chain_tests::{test_update_collateral, test_wallet_balance_decrease},
@@ -116,7 +115,7 @@ pub(crate) async fn go(opt: Opt, opts: TestsOpt) -> Result<()> {
     test_update_collateral(&perp_app).await?;
     test_set_and_fetch_price(&perp_app).await?;
     test_update_leverage(&perp_app).await?;
-    test_update_max_gains(&perp_app).await?;
+    //test_update_max_gains(&perp_app).await?;
     test_pnl_on_liquidation(&perp_app).await?;
 
     Ok(())

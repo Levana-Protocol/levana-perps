@@ -69,6 +69,7 @@ use msg::contracts::position_token::{
     Metadata as Cw721Metadata,
 };
 use msg::prelude::*;
+use msg::shared::compat::BackwardsCompatTakeProfit;
 
 use crate::simple_oracle::ExecuteMsg as SimpleOracleExecuteMsg;
 use msg::constants::event_key;
@@ -1338,6 +1339,18 @@ impl PerpsMarket {
             //direction = direction.invert();
         }
 
+        let price = self.query_current_price()?;
+
+        let take_profit = BackwardsCompatTakeProfit{
+            leverage,
+            direction,
+            market_type: self.id.get_market_type(),
+            max_gains: Some(max_gains), 
+            take_profit_override, 
+            price_point: &price,
+            take_profit: None,
+        }.calc()?;
+
         let msg = self.token.into_market_execute_msg(
             &self.addr,
             Collateral::try_from_number(collateral)?,
@@ -1345,9 +1358,9 @@ impl PerpsMarket {
                 slippage_assert,
                 leverage,
                 direction,
-                max_gains,
+                max_gains: None,
                 stop_loss_override,
-                take_profit_override,
+                take_profit: Some(take_profit),
             },
         )?;
 

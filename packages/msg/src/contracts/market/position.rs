@@ -85,12 +85,16 @@ pub struct Position {
     /// Stored separately to ensure there are no rounding errors, since we need precise binary equivalence for lookups.
     pub stop_loss_override_notional: Option<Price>,
     /// A trader specified price at which the position will be closed in profit
+    #[deprecated(note = "Use take_profit_price_trader instead")]
     pub take_profit_override: Option<PriceBaseInQuote>,
     /// Stored separately to ensure there are no rounding errors, since we need precise binary equivalence for lookups.
     pub take_profit_override_notional: Option<Price>,
     /// The most recently calculated liquidation price
     pub liquidation_price: Option<Price>,
-    /// The most recently calculated take profit (max gains) price
+    /// A trader specified price at which the position will be closed in profit
+    pub take_profit_price_trader: Option<PriceBaseInQuote>,
+    /// The actual price at which the trader will achieve maximum gains and take all counter collateral. 
+    /// This is the notional price, not the base price, to avoid rounding errors
     pub take_profit_price: Option<Price>,
     /// The amount of liquidation margin set aside
     pub liquidation_margin: LiquidationMargin,
@@ -231,8 +235,11 @@ pub struct PositionQueryResponse {
     pub liquidation_margin: LiquidationMargin,
 
     /// Maximum gains, in terms of quote, the trader can achieve
-    pub max_gains_in_quote: MaxGainsInQuote,
-    /// Price at which trader will achieve maximum gains and take all counter collateral.
+    #[deprecated(note = "Use take_profit_price_trader instead")]
+    pub max_gains_in_quote: Option<MaxGainsInQuote>,
+    /// Trader-specified take profit price 
+    pub take_profit_price_trader: Option<PriceBaseInQuote>,
+    /// The actual price at which trader will achieve maximum gains and take all counter collateral.
     pub take_profit_price_base: Option<PriceBaseInQuote>,
 
     /// Entry price
@@ -244,6 +251,7 @@ pub struct PositionQueryResponse {
     /// Stop loss price set by the trader
     pub stop_loss_override: Option<PriceBaseInQuote>,
     /// Take profit price set by the trader
+    #[deprecated(note = "Use take_profit_price_trader instead")]
     pub take_profit_override: Option<PriceBaseInQuote>,
 }
 
@@ -660,7 +668,6 @@ impl Position {
             .1;
         let pnl_collateral = self.pnl_in_collateral();
         let pnl_usd = self.pnl_in_usd(&end_price);
-        let max_gains_in_quote = self.max_gains_in_quote(market_type, &end_price)?;
         let notional_size_in_collateral = self.notional_size_in_collateral(&end_price);
         let position_size_base = self.position_size_base(market_type, &end_price)?;
 
@@ -681,10 +688,11 @@ impl Position {
             liquifunded_at,
             next_liquifunding,
             stop_loss_override,
-            take_profit_override,
+            take_profit_override: _,
             liquidation_margin,
             liquidation_price,
-            take_profit_price: take_profit,
+            take_profit_price_trader,
+            take_profit_price,
             stop_loss_override_notional: _,
             take_profit_override_notional: _,
         } = self;
@@ -718,14 +726,15 @@ impl Position {
             position_size_base,
             position_size_usd: position_size_base.map(|x| end_price.base_to_usd(x)),
             counter_collateral,
-            max_gains_in_quote,
+            max_gains_in_quote: None,
             liquidation_price_base: liquidation_price.map(|x| x.into_base_price(market_type)),
             liquidation_margin,
-            take_profit_price_base: take_profit.map(|x| x.into_base_price(market_type)),
+            take_profit_price_base: take_profit_price.map(|x| x.into_base_price(market_type)),
+            take_profit_price_trader,
             entry_price_base: entry_price.into_base_price(market_type),
             next_liquifunding,
             stop_loss_override,
-            take_profit_override,
+            take_profit_override: None,
             crank_fee_collateral: crank_fee.collateral(),
             crank_fee_usd: crank_fee.usd(),
         })

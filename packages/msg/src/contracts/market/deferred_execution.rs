@@ -6,6 +6,7 @@ use std::{fmt, num::ParseIntError};
 use crate::constants::event_key;
 use cosmwasm_std::StdResult;
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
+use serde::de;
 use shared::prelude::*;
 
 use super::{entry::SlippageAssert, order::OrderId, position::PositionId};
@@ -182,11 +183,15 @@ pub enum DeferredExecItem {
         /// Direction of new position
         direction: DirectionToBase,
         /// Maximum gains of new position
-        max_gains: MaxGainsInQuote,
+        #[deprecated(note = "use take_profit instead")]
+        max_gains: Option<MaxGainsInQuote>,
         /// Stop loss price of new position
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
+        #[deprecated(note = "use take_profit instead")]
         take_profit_override: Option<PriceBaseInQuote>,
+        /// Take profit price of new position
+        take_profit: Option<PriceBaseInQuote>,
         /// The amount of collateral provided
         amount: NonZero<Collateral>,
         /// Crank fee already charged

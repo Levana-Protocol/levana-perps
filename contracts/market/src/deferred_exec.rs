@@ -13,17 +13,15 @@ use msg::contracts::market::{
     entry::SlippageAssert,
     position::{events::PositionSaveReason, CollateralAndUsd},
 };
+use shared::compat::BackwardsCompatTakeProfit;
 
 use crate::state::{
     order::{CancelLimitOrderExec, PlaceLimitOrderExec},
     position::{
-        close::ClosePositionExec,
-        liquifund::PositionLiquifund,
-        update::{
+        close::ClosePositionExec, liquifund::PositionLiquifund, update::{
             TriggerOrderExec, UpdatePositionCollateralExec, UpdatePositionLeverageExec,
             UpdatePositionMaxGainsExec, UpdatePositionSizeExec,
-        },
-        OpenPositionExec, OpenPositionParams,
+        }, OpenPositionExec, OpenPositionParams
     },
 };
 use crate::{prelude::*, state::position::get_position};
@@ -67,28 +65,41 @@ fn helper_execute(
             direction,
             max_gains,
             stop_loss_override,
+            take_profit,
             take_profit_override,
             amount,
             crank_fee,
             crank_fee_usd,
-        } => OpenPositionExec::new(
-            state,
-            ctx.storage,
-            OpenPositionParams {
-                owner: item.owner,
-                collateral: amount,
-                leverage,
+        } => {
+
+            let take_profit_price = BackwardsCompatTakeProfit{
+                market_type: state.market_id(ctx.storage)?.get_market_type(),
                 direction,
-                max_gains_in_quote: max_gains,
-                slippage_assert,
-                stop_loss_override,
-                take_profit_override,
-                crank_fee: CollateralAndUsd::from_pair(crank_fee, crank_fee_usd),
-            },
-            &price_point,
-        )?
-        .apply(state, ctx, PositionSaveReason::OpenMarket)
-        .map(DeferredExecCompleteTarget::Position),
+                leverage,
+                max_gains, 
+                take_profit_override, 
+                take_profit, 
+                price_point: &price_point,
+            }.calc()?;
+
+            OpenPositionExec::new(
+                state,
+                ctx.storage,
+                OpenPositionParams {
+                    owner: item.owner,
+                    collateral: amount,
+                    leverage,
+                    direction,
+                    slippage_assert,
+                    stop_loss_override,
+                    take_profit_price,
+                    crank_fee: CollateralAndUsd::from_pair(crank_fee, crank_fee_usd),
+                },
+                &price_point,
+            )?
+            .apply(state, ctx, PositionSaveReason::OpenMarket)
+            .map(DeferredExecCompleteTarget::Position)
+        },
         DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount } => {
             execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
             UpdatePositionCollateralExec::new(
@@ -318,10 +329,21 @@ fn helper_validate(
             max_gains,
             stop_loss_override,
             take_profit_override,
+            take_profit,
             amount,
             crank_fee,
             crank_fee_usd,
         } => {
+
+            let take_profit_price = BackwardsCompatTakeProfit{
+                direction,
+                leverage,
+                max_gains, 
+                market_type: state.market_id(store)?.get_market_type(),
+                take_profit_override, 
+                take_profit, price_point
+            }.calc()?;
+
             OpenPositionExec::new(
                 state,
                 store,
@@ -330,10 +352,9 @@ fn helper_validate(
                     collateral: amount,
                     leverage,
                     direction,
-                    max_gains_in_quote: max_gains,
                     slippage_assert,
                     stop_loss_override,
-                    take_profit_override,
+                    take_profit_price,
                     crank_fee: CollateralAndUsd::from_pair(crank_fee, crank_fee_usd),
                 },
                 price_point,
