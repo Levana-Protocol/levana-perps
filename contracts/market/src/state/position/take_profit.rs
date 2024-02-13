@@ -23,8 +23,7 @@ impl <'a> TakeProfitToCounterCollateral <'a> {
             config,
             price_point,
         } = *self;
-        // TODO - switch take profit price if lower than min max-gains price?
-        let take_profit_price = take_profit_price_base.into_number();
+        let take_profit_price = self.min_take_profit_price();
 
         let notional_size = calculate_notional_size(
             price_point,
@@ -57,8 +56,46 @@ impl <'a> TakeProfitToCounterCollateral <'a> {
             }
         };
 
+        println!("TAKE PROFIT PRICE: {}, PRICE NOTIONAL: {} NOTIONAL SIZE: {} COLLATERAL: {} COUNTER COLLATERAL: {}", take_profit_price, price_notional_in_collateral, notional_size, collateral, counter_collateral);
+
         Ok(NonZero::try_from_number(counter_collateral).context("Calculated an invalid counter_collateral")?)
 
+    }
+
+    fn min_take_profit_price(&self) -> Number {
+        self.take_profit_price_base.into_number()
+        // TODO - need to implement this sorta thing? copied from frontend:
+        // const minMaxGains = calculateMaxGainsRange({
+        //     direction: position.directionToBase,
+        //     maxLeverage: marketConfig.maxLeverage,
+        //     leverage: position.leverage,
+        //     marketType: marketConfig.type,
+        //   }).min.divide(100)
+        
+        //   const newTakeProfit = inferredInputValue(props.takeProfitAmount)
+        
+        //   const newMaxGainsAmount = calculateMaxGainsFromDependencies({
+        //     collateral: position.activeCollateral,
+        //     marketPrice: marketPrice,
+        //     direction: position.directionToBase,
+        //     leverage: position.leverage,
+        //     takeProfitPrice: newTakeProfit,
+        //     maxLeverage: marketConfig.maxLeverage,
+        //     allowNegative: false,
+        //   }).maxGains.divide(100)
+        
+        //   const maxGainsPrice = (() => {
+        //     if (newMaxGainsAmount.isGreaterThan(minMaxGains)) {
+        //       return newTakeProfit
+        //     } else {
+        //       return calculateTakeProfitPrice({
+        //         direction: position.directionToBase,
+        //         leverage: position.leverage.toString(),
+        //         maxGains: minMaxGains.times(100),
+        //         marketPrice: marketPrice,
+        //       }).takeProfitPrice
+        //     }
+        //   })()
     }
 }
 
