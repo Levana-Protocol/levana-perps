@@ -34,9 +34,10 @@ struct Record<'a> {
 
 async fn go(opt: crate::cli::Opt, TvlReportOpt { csv }: TvlReportOpt) -> Result<()> {
     let mut csv = ::csv::Writer::from_path(&csv)?;
+    let factories = MainnetFactories::load()?;
 
     for factory in ["osmomainnet1", "seimainnet1", "injmainnet1"] {
-        go_factory(&mut csv, &opt, factory).await?;
+        go_factory(&mut csv, &opt, &factories, factory).await?;
     }
 
     Ok(())
@@ -45,9 +46,9 @@ async fn go(opt: crate::cli::Opt, TvlReportOpt { csv }: TvlReportOpt) -> Result<
 async fn go_factory(
     csv: &mut csv::Writer<std::fs::File>,
     opt: &crate::cli::Opt,
+    factories: &MainnetFactories,
     factory_name: &str,
 ) -> Result<()> {
-    let factories = MainnetFactories::load()?;
     let factory = factories.get(factory_name)?;
     let app = opt.load_app_mainnet(factory.network).await?;
     let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
