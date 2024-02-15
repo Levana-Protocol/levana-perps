@@ -1351,6 +1351,8 @@ impl PerpsMarket {
             take_profit: None,
         }.calc()?;
 
+        println!("CALCULATED TAKE PROFIT: {}", take_profit);
+
         let msg = self.token.into_market_execute_msg(
             &self.addr,
             Collateral::try_from_number(collateral)?,

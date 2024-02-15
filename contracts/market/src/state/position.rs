@@ -544,6 +544,8 @@ impl State<'_> {
         let market_type = self.market_type(ctx.storage)?;
         pos.take_profit_price = pos.take_profit_price(price_point, market_type)?;
 
+        println!("take_profit_price: {:?}", pos.take_profit_price);
+
         debug_assert!(pos.liquifunded_at < pos.next_liquifunding);
 
         OPEN_POSITIONS.save(ctx.storage, pos.id, pos)?;
