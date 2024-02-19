@@ -2,6 +2,7 @@ mod deferred_exec;
 mod list_contracts;
 mod lp_history;
 mod token_balances;
+mod tvl_report;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -74,6 +75,11 @@ enum Sub {
         #[clap(flatten)]
         inner: list_contracts::ListContractsOpt,
     },
+    /// Capture TVL (trader and LP deposits) for all markets
+    TvlReport {
+        #[clap(flatten)]
+        inner: tvl_report::TvlReportOpt,
+    },
 }
 
 impl UtilOpt {
@@ -87,6 +93,7 @@ impl UtilOpt {
             Sub::LpActionCsv { inner } => inner.go(opt).await,
             Sub::TokenBalances { inner } => inner.go(opt).await,
             Sub::ListContracts { inner } => inner.go().await,
+            Sub::TvlReport { inner } => inner.go(opt).await,
         }
     }
 }
