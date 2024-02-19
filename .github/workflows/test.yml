@@ -50,7 +50,7 @@ jobs:
           workspaces: |
             .
       - name: Cache contract builds
-        if: (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/develop')
+        if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/develop') }}
         uses: actions/cache@v4
         with:
           key: contracts-${{ hashFiles('Cargo.toml') }}-${{hashFiles('Cargo.lock')}}-new${{ hashFiles('./.ci/osmolocal.Dockerfile')}}-${{ hashFiles('./.ci/contracts.sh')}} }
@@ -83,7 +83,7 @@ jobs:
         run: just build-localosmosis
       - name: On Chain tests (Rust)
         run: just contracts-test
-        if: (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/develop')
+        if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/develop') }}
       - name: Deploy to Osmosis testnet
         if: github.ref == 'refs/heads/develop'
         run: COSMOS_WALLET="${{ secrets.DEPLOYER_PHRASE }}" just deploy-osmosis-testnet || echo "Ignoring failed deployment"
