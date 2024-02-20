@@ -1480,6 +1480,7 @@ fn max_liquidity() {
         token_init,
         "1".parse().unwrap(),
         Some("1".parse().unwrap()),
+        None,
         false,
         DEFAULT_MARKET.spot_price,
     )

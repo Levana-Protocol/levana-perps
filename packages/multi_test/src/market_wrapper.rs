@@ -138,17 +138,20 @@ impl PerpsMarket {
             token_init,
             DEFAULT_MARKET.initial_price,
             None,
+            None,
             bootstap_lp,
             spot_price_kind,
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn new_custom(
         app: Rc<RefCell<PerpsApp>>,
         id: MarketId,
         token_init: TokenInit,
         initial_price: PriceBaseInQuote,
         initial_price_usd: Option<PriceCollateralInUsd>,
+        initial_price_publish_time: Option<Timestamp>,
         bootstap_lp: bool,
         spot_price_kind: SpotPriceKind,
     ) -> Result<Self> {
@@ -158,14 +161,16 @@ impl PerpsMarket {
         let initial_price = match spot_price_kind {
             SpotPriceKind::Oracle => {
                 let mut app = app.borrow_mut();
-                let now = app.block_info().time;
+                let price_publish_time = initial_price_publish_time
+                    .map(|x| x.into())
+                    .unwrap_or(app.block_info().time);
                 let contract_addr = app.simple_oracle_addr.clone();
                 app.execute_contract(
                     Addr::unchecked(&TEST_CONFIG.protocol_owner),
                     contract_addr,
                     &SimpleOracleExecuteMsg::SetPrice {
                         value: initial_price.into_number().abs_unsigned(),
-                        timestamp: Some(now),
+                        timestamp: Some(price_publish_time),
                     },
                     &[],
                 )?;
@@ -181,7 +186,7 @@ impl PerpsMarket {
                             })
                             .into_number()
                             .abs_unsigned(),
-                        timestamp: Some(now),
+                        timestamp: Some(price_publish_time),
                     },
                     &[],
                 )?;
@@ -904,10 +909,27 @@ impl PerpsMarket {
         self.exec_set_price_with_usd(price, None)
     }
 
+    pub fn exec_set_price_time(
+        &self,
+        price: PriceBaseInQuote,
+        timestamp: Option<Timestamp>,
+    ) -> Result<PriceResponse> {
+        self.exec_set_price_with_usd_time(price, None, timestamp)
+    }
+
     pub fn exec_set_price_with_usd(
         &self,
         price: PriceBaseInQuote,
         price_usd: Option<PriceCollateralInUsd>,
+    ) -> Result<PriceResponse> {
+        self.exec_set_price_with_usd_time(price, price_usd, None)
+    }
+
+    pub fn exec_set_price_with_usd_time(
+        &self,
+        price: PriceBaseInQuote,
+        price_usd: Option<PriceCollateralInUsd>,
+        timestamp: Option<Timestamp>,
     ) -> Result<PriceResponse> {
         let price_usd = price_usd.unwrap_or(
             price
@@ -917,6 +939,10 @@ impl PerpsMarket {
 
         match self.query_config()?.spot_price {
             SpotPriceConfig::Manual { admin } => {
+                if timestamp.is_some() {
+                    anyhow::bail!("Manual price does not support setting timestamp");
+                }
+
                 let resp = self.exec(
                     &admin,
                     &MarketExecuteMsg::SetManualPrice { price, price_usd },
@@ -928,8 +954,9 @@ impl PerpsMarket {
                 })
             }
             SpotPriceConfig::Oracle { .. } => {
-                let base_resp = self.exec_set_oracle_price_base(price, self.now())?;
-                let usd_resp = self.exec_set_oracle_price_usd(price_usd, self.now())?;
+                let timestamp = timestamp.unwrap_or(self.now());
+                let base_resp = self.exec_set_oracle_price_base(price, timestamp)?;
+                let usd_resp = self.exec_set_oracle_price_usd(price_usd, timestamp)?;
                 self.exec_crank_n(&Addr::unchecked(&TEST_CONFIG.protocol_owner), 0)?;
 
                 Ok(PriceResponse {

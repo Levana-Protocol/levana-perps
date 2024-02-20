@@ -12,6 +12,7 @@ mod farming;
 mod fees;
 mod funding;
 mod history;
+mod instantiate;
 mod liquidation_price;
 mod liquidity;
 mod logging;
