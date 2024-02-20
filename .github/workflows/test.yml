@@ -76,15 +76,17 @@ jobs:
       - name: Typescript check
         run: just typescript-check
       - name: Build contracts
+        if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/develop') }}
         run: just build-contracts
       - name: Print contract sizes
+        if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/develop') }}
         run: ls -l wasm/artifacts/*.wasm
       - name: Build local osmosis
+        if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/develop') }}
         run: just build-localosmosis
-        if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/develop') }}
       - name: On Chain tests (Rust)
-        run: just contracts-test
         if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/develop') }}
+        run: just contracts-test
       - name: Deploy to Osmosis testnet
         if: github.ref == 'refs/heads/develop'
         run: COSMOS_WALLET="${{ secrets.DEPLOYER_PHRASE }}" just deploy-osmosis-testnet || echo "Ignoring failed deployment"
