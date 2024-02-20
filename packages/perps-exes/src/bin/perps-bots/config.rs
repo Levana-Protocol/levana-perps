@@ -214,15 +214,7 @@ impl Opt {
             } else {
                 None
             },
-            high_gas_wallet: if partial.price {
-                Some(Arc::new(self.get_price_wallet(
-                    network.get_address_hrp(),
-                    &wallet_phrase_name,
-                    1,
-                )?))
-            } else {
-                None
-            },
+            high_gas_wallet: None,
             watcher: partial.watcher.clone(),
             gas_multiplier,
             needs_price_update_params: NeedsPriceUpdateParams {
@@ -284,9 +276,14 @@ impl Opt {
 
         let gas_wallet = get_wallet(1)?;
         let price_wallet = get_wallet(2)?;
-        let high_gas_wallet = get_wallet(3)?;
+
+        let (high_gas_wallet, crank_wallet_start) = match network.get_address_hrp().as_str() {
+            "osmo" => (Some(Arc::new(get_wallet(3)?)), 4),
+            _ => (None, 3),
+        };
+
         let crank_wallets = (0..*crank_wallets)
-            .map(|idx| get_wallet(idx + 4))
+            .map(|idx| get_wallet(idx + crank_wallet_start))
             .collect::<Result<_, _>>()?;
 
         let watcher = match watcher_config {
@@ -317,7 +314,7 @@ impl Opt {
             network: *network,
             price_wallet: Some(price_wallet.into()),
             crank_wallets,
-            high_gas_wallet: Some(Arc::new(high_gas_wallet)),
+            high_gas_wallet,
             watcher,
             gas_multiplier: *gas_multiplier,
             needs_price_update_params: NeedsPriceUpdateParams {

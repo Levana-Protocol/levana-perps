@@ -46,7 +46,7 @@ struct Worker {
     wallet: Arc<Wallet>,
     stats: HashMap<MarketId, ReasonStats>,
     trigger_crank: TriggerCrank,
-    high_gas_trigger: HighGasTrigger,
+    high_gas_trigger: Option<HighGasTrigger>,
 }
 
 impl Worker {
@@ -221,18 +221,22 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
     } else {
         if any_needs_oracle_update {
             if any_needs_high_gas_oracle_update == Some(HighGas::VeryHigh) {
-                successes.push(format!(
-                    "Passing the work to HighGas runner after {:?}",
-                    begin_price_update.elapsed()
-                ));
-                worker
-                    .high_gas_trigger
-                    .set(HighGasWork {
-                        offchain_price_data: offchain_price_data.clone(),
-                        markets_to_update: markets_to_update.clone(),
-                        queued: Instant::now(),
-                    })
-                    .await;
+                match &worker.high_gas_trigger {
+                    Some(high_gas_trigger) => {
+                        successes.push(format!(
+                            "Passing the work to HighGas runner after {:?}",
+                            begin_price_update.elapsed()
+                        ));
+                        high_gas_trigger
+                            .set(HighGasWork {
+                                offchain_price_data: offchain_price_data.clone(),
+                                markets_to_update: markets_to_update.clone(),
+                                queued: Instant::now(),
+                            })
+                            .await;
+                    }
+                    None => successes.push("Found high gas work, but we're on a chain that doesn't use a high gas wallet".to_owned())
+                }
             }
 
             // Even if we do the Oracle UpdatePriceFeeds in the above

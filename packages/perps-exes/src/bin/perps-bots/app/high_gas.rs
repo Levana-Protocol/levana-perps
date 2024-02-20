@@ -9,7 +9,7 @@ use super::{
     gas_check::GasCheckWallet, price::price_get_update_oracles_msg, App, AppBuilder,
     CrankTriggerReason,
 };
-use anyhow::{Context, Result};
+use anyhow::Result;
 use async_channel::RecvError;
 use axum::async_trait;
 use chrono::Duration;
@@ -102,13 +102,11 @@ impl HighGasWork {
 
 /// Start the background thread to run "high gas" tasks.
 impl AppBuilder {
-    pub(super) fn start_high_gas(&mut self) -> Result<HighGasTrigger> {
-        let wallet = self
-            .app
-            .config
-            .high_gas_wallet
-            .clone()
-            .context("high gas wallet is required")?;
+    pub(super) fn start_high_gas(&mut self) -> Result<Option<HighGasTrigger>> {
+        let wallet = match self.app.config.high_gas_wallet.clone() {
+            None => return Ok(None),
+            Some(wallet) => wallet,
+        };
         self.refill_gas(wallet.get_address(), GasCheckWallet::HighGas)?;
 
         let current_work = Arc::new(Mutex::new(None));
@@ -122,10 +120,10 @@ impl AppBuilder {
 
         self.watch_periodic(crate::watcher::TaskLabel::HighGas, worker)?;
 
-        Ok(HighGasTrigger {
+        Ok(Some(HighGasTrigger {
             current_work,
             sender,
-        })
+        }))
     }
 }
 
