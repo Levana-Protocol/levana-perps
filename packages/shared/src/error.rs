@@ -79,7 +79,7 @@ pub enum ErrorId {
     PositionAlreadyClosing,
     NoPricePublishTimeFound,
     PositionAlreadyClosed,
-    MissingTakeProfit
+    MissingTakeProfit,
 }
 
 /// Source within the protocol for the error

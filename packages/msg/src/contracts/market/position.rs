@@ -93,7 +93,7 @@ pub struct Position {
     pub liquidation_price: Option<Price>,
     /// A trader specified price at which the position will be closed in profit
     pub take_profit_price_trader: Option<PriceBaseInQuote>,
-    /// The actual price at which the trader will achieve maximum gains and take all counter collateral. 
+    /// The actual price at which the trader will achieve maximum gains and take all counter collateral.
     /// This is the notional price, not the base price, to avoid rounding errors
     pub take_profit_price: Option<Price>,
     /// The amount of liquidation margin set aside
@@ -237,7 +237,7 @@ pub struct PositionQueryResponse {
     /// Maximum gains, in terms of quote, the trader can achieve
     #[deprecated(note = "Use take_profit_price_trader instead")]
     pub max_gains_in_quote: Option<MaxGainsInQuote>,
-    /// Trader-specified take profit price 
+    /// Trader-specified take profit price
     pub take_profit_price_trader: Option<PriceBaseInQuote>,
     /// The actual price at which trader will achieve maximum gains and take all counter collateral.
     pub take_profit_price_base: Option<PriceBaseInQuote>,

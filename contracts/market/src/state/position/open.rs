@@ -71,9 +71,10 @@ impl OpenPositionExec {
         }
 
         let take_profit_price_trader = take_profit_price;
-        let take_profit_price_notional = take_profit_price_trader.map(|x| x.into_notional_price(market_type));
+        let take_profit_price_notional =
+            take_profit_price_trader.map(|x| x.into_notional_price(market_type));
 
-        let counter_collateral = TakeProfitToCounterCollateral{
+        let counter_collateral = TakeProfitToCounterCollateral {
             take_profit_price_base: take_profit_price_trader,
             market_type,
             collateral,
@@ -81,7 +82,8 @@ impl OpenPositionExec {
             direction,
             config: &state.config,
             price_point,
-        }.calc()?;
+        }
+        .calc()?;
 
         // FEES
         // https://www.notion.so/levana-protocol/Levana-Well-funded-Perpetuals-Whitepaper-9805a6eba56d429b839f5551dbb65c40#75bb26a1439c4a81894c2aa399471263
@@ -125,7 +127,7 @@ impl OpenPositionExec {
             take_profit_price: take_profit_price_notional,
             stop_loss_override_notional: stop_loss_override
                 .map(|x| x.into_notional_price(market_type)),
-            take_profit_override_notional: None
+            take_profit_override_notional: None,
         };
 
         state.set_next_liquifunding(&mut pos, liquifunded_at);

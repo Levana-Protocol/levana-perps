@@ -13,6 +13,7 @@ pub mod result;
 
 pub(crate) mod addr;
 pub(crate) mod auth;
+pub mod compat;
 pub mod direction;
 pub mod ibc;
 pub mod leverage;
@@ -29,4 +30,3 @@ pub mod price;
 pub(crate) mod response;
 pub mod storage;
 pub mod time;
-pub mod compat;

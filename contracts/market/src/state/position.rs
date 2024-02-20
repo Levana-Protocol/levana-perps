@@ -8,8 +8,8 @@ use msg::contracts::market::{
 };
 pub(crate) use open::*;
 pub(crate) mod close;
-pub(crate) mod update;
 pub(crate) mod take_profit;
+pub(crate) mod update;
 mod validate;
 pub use validate::*;
 mod cw721;

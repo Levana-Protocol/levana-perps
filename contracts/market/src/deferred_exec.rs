@@ -18,10 +18,13 @@ use shared::compat::BackwardsCompatTakeProfit;
 use crate::state::{
     order::{CancelLimitOrderExec, PlaceLimitOrderExec},
     position::{
-        close::ClosePositionExec, liquifund::PositionLiquifund, update::{
+        close::ClosePositionExec,
+        liquifund::PositionLiquifund,
+        update::{
             TriggerOrderExec, UpdatePositionCollateralExec, UpdatePositionLeverageExec,
             UpdatePositionMaxGainsExec, UpdatePositionSizeExec,
-        }, OpenPositionExec, OpenPositionParams
+        },
+        OpenPositionExec, OpenPositionParams,
     },
 };
 use crate::{prelude::*, state::position::get_position};
@@ -71,17 +74,17 @@ fn helper_execute(
             crank_fee,
             crank_fee_usd,
         } => {
-
-            let take_profit_price = BackwardsCompatTakeProfit{
+            let take_profit_price = BackwardsCompatTakeProfit {
                 collateral: amount,
                 market_type: state.market_id(ctx.storage)?.get_market_type(),
                 direction,
                 leverage,
-                max_gains, 
-                take_profit_override, 
-                take_profit, 
+                max_gains,
+                take_profit_override,
+                take_profit,
                 price_point: &price_point,
-            }.calc()?;
+            }
+            .calc()?;
 
             OpenPositionExec::new(
                 state,
@@ -100,7 +103,7 @@ fn helper_execute(
             )?
             .apply(state, ctx, PositionSaveReason::OpenMarket)
             .map(DeferredExecCompleteTarget::Position)
-        },
+        }
         DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount } => {
             execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
             UpdatePositionCollateralExec::new(
@@ -335,16 +338,17 @@ fn helper_validate(
             crank_fee,
             crank_fee_usd,
         } => {
-
-            let take_profit_price = BackwardsCompatTakeProfit{
+            let take_profit_price = BackwardsCompatTakeProfit {
                 collateral: amount,
                 direction,
                 leverage,
-                max_gains, 
+                max_gains,
                 market_type: state.market_id(store)?.get_market_type(),
-                take_profit_override, 
-                take_profit, price_point
-            }.calc()?;
+                take_profit_override,
+                take_profit,
+                price_point,
+            }
+            .calc()?;
 
             OpenPositionExec::new(
                 state,

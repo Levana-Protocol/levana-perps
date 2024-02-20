@@ -77,7 +77,6 @@ impl State<'_> {
             }
         };
 
-
         if is_out_of_range {
             Err(MarketError::CounterLeverageOutOfRange {
                 low_allowed: Decimal256::one(),

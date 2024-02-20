@@ -152,9 +152,7 @@ pub enum MarketError {
         close_time: Timestamp,
         reason: String,
     },
-    #[error(
-        "Could not calculate take profit from any of the supplied parameters"
-    )]
+    #[error("Could not calculate take profit from any of the supplied parameters")]
     MissingTakeProfit,
 }
 

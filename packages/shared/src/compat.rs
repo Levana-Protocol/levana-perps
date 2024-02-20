@@ -1,8 +1,8 @@
 //! Backwards compatibility helpers
 #![allow(missing_docs)]
 
-use crate::storage::{MaxGainsInQuote, PriceBaseInQuote, PricePoint};
 use crate::prelude::*;
+use crate::storage::{MaxGainsInQuote, PriceBaseInQuote, PricePoint};
 
 /// Backwards compatible take profit calculation
 pub struct BackwardsCompatTakeProfit<'a> {
@@ -16,7 +16,7 @@ pub struct BackwardsCompatTakeProfit<'a> {
     pub take_profit: Option<PriceBaseInQuote>,
 }
 
-impl <'a> BackwardsCompatTakeProfit<'a> {
+impl<'a> BackwardsCompatTakeProfit<'a> {
     pub fn calc(self) -> Result<Option<PriceBaseInQuote>> {
         let BackwardsCompatTakeProfit {
             collateral,
@@ -34,14 +34,18 @@ impl <'a> BackwardsCompatTakeProfit<'a> {
                 Some(take_profit_override) => Ok(Some(take_profit_override)),
                 None => match max_gains {
                     Some(max_gains) => {
-                        let leverage_to_notional = leverage.into_signed(direction).into_notional(market_type);
+                        let leverage_to_notional =
+                            leverage.into_signed(direction).into_notional(market_type);
 
                         let notional_size_in_collateral =
                             leverage_to_notional.checked_mul_collateral(collateral)?;
 
-                        let counter_collateral = max_gains.calculate_counter_collateral(market_type, collateral, notional_size_in_collateral, leverage_to_notional)?;
-
-
+                        let counter_collateral = max_gains.calculate_counter_collateral(
+                            market_type,
+                            collateral,
+                            notional_size_in_collateral,
+                            leverage_to_notional,
+                        )?;
 
                         TakeProfitFromCounterCollateral {
                             counter_collateral,
@@ -50,24 +54,25 @@ impl <'a> BackwardsCompatTakeProfit<'a> {
                             leverage_to_base: self.leverage,
                             price_point,
                             direction,
-                        }.calc()
-                    },
-                    None => Ok(None)
-                }
-            } 
+                        }
+                        .calc()
+                    }
+                    None => Ok(None),
+                },
+            },
         }
     }
 }
 
-struct TakeProfitFromCounterCollateral<'a>{
+struct TakeProfitFromCounterCollateral<'a> {
     pub market_type: MarketType,
     pub collateral: NonZero<Collateral>,
     pub counter_collateral: NonZero<Collateral>,
     pub leverage_to_base: LeverageToBase,
     pub price_point: &'a PricePoint,
     pub direction: DirectionToBase,
-} 
-impl <'a> TakeProfitFromCounterCollateral <'a> {
+}
+impl<'a> TakeProfitFromCounterCollateral<'a> {
     pub fn calc(&self) -> Result<Option<PriceBaseInQuote>> {
         let Self {
             market_type,
@@ -78,8 +83,13 @@ impl <'a> TakeProfitFromCounterCollateral <'a> {
             direction,
         } = self;
 
-        let notional_size = calc_notional_size(*leverage_to_base, *direction, *market_type, price_point, *collateral)?;
-
+        let notional_size = calc_notional_size(
+            *leverage_to_base,
+            *direction,
+            *market_type,
+            price_point,
+            *collateral,
+        )?;
 
         let take_profit_price_raw = price_point.price_notional.into_number().checked_add(
             counter_collateral
@@ -109,13 +119,18 @@ impl <'a> TakeProfitFromCounterCollateral <'a> {
     }
 }
 
-pub fn calc_notional_size(leverage: LeverageToBase, direction: DirectionToBase, market_type: MarketType, price_point: &PricePoint, collateral: NonZero<Collateral>) -> Result<Signed<Notional>> {
+pub fn calc_notional_size(
+    leverage: LeverageToBase,
+    direction: DirectionToBase,
+    market_type: MarketType,
+    price_point: &PricePoint,
+    collateral: NonZero<Collateral>,
+) -> Result<Signed<Notional>> {
     let leverage_to_base = leverage.into_signed(direction);
 
     let leverage_to_notional = leverage_to_base.into_notional(market_type);
 
-    let notional_size_in_collateral =
-        leverage_to_notional.checked_mul_collateral(collateral)?;
+    let notional_size_in_collateral = leverage_to_notional.checked_mul_collateral(collateral)?;
 
     Ok(notional_size_in_collateral.map(|x| price_point.collateral_to_notional(x)))
 }

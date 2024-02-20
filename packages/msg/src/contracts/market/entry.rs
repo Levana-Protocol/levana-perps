@@ -1146,7 +1146,7 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
                 slippage_assert: u.arbitrary()?,
                 leverage: u.arbitrary()?,
                 direction: u.arbitrary()?,
-                max_gains: None, 
+                max_gains: None,
                 stop_loss_override: u.arbitrary()?,
                 take_profit: Some(u.arbitrary()?),
             }),

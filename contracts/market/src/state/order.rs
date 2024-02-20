@@ -142,17 +142,18 @@ impl State<'_> {
             direction: order.direction.into_base(market_type),
             slippage_assert: None,
             stop_loss_override: order.stop_loss_override,
-            take_profit_price: BackwardsCompatTakeProfit{
+            take_profit_price: BackwardsCompatTakeProfit {
                 collateral: order.collateral,
                 direction: order.direction.into_base(market_type),
                 leverage: order.leverage,
                 market_type,
-                max_gains: Some(order.max_gains), 
-                take_profit_override: order.take_profit_override, 
+                max_gains: Some(order.max_gains),
+                take_profit_override: order.take_profit_override,
                 price_point,
                 // TODO
                 take_profit: None,
-            }.calc()?
+            }
+            .calc()?,
         };
 
         let res = match OpenPositionExec::new(self, ctx.storage, open_position_params, price_point)
