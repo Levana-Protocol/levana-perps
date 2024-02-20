@@ -6,7 +6,6 @@ use std::{fmt, num::ParseIntError};
 use crate::constants::event_key;
 use cosmwasm_std::StdResult;
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
-use serde::de;
 use shared::prelude::*;
 
 use super::{entry::SlippageAssert, order::OrderId, position::PositionId};

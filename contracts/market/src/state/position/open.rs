@@ -71,7 +71,7 @@ impl OpenPositionExec {
         }
 
         let take_profit_price_trader = take_profit_price;
-        let take_profit_price_notional = take_profit_price_trader.into_notional_price(market_type);
+        let take_profit_price_notional = take_profit_price_trader.map(|x| x.into_notional_price(market_type));
 
         let counter_collateral = TakeProfitToCounterCollateral{
             take_profit_price_base: take_profit_price_trader,
@@ -121,8 +121,8 @@ impl OpenPositionExec {
             take_profit_override: None,
             liquidation_margin: LiquidationMargin::default(),
             liquidation_price: None,
-            take_profit_price_trader: Some(take_profit_price_trader),
-            take_profit_price: Some(take_profit_price_notional),
+            take_profit_price_trader,
+            take_profit_price: take_profit_price_notional,
             stop_loss_override_notional: stop_loss_override
                 .map(|x| x.into_notional_price(market_type)),
             take_profit_override_notional: None
@@ -303,5 +303,5 @@ pub(crate) struct OpenPositionParams {
     pub(crate) direction: DirectionToBase,
     pub(crate) slippage_assert: Option<SlippageAssert>,
     pub(crate) stop_loss_override: Option<PriceBaseInQuote>,
-    pub(crate) take_profit_price: PriceBaseInQuote,
+    pub(crate) take_profit_price: Option<PriceBaseInQuote>,
 }

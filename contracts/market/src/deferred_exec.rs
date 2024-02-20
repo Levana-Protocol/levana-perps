@@ -73,6 +73,7 @@ fn helper_execute(
         } => {
 
             let take_profit_price = BackwardsCompatTakeProfit{
+                collateral: amount,
                 market_type: state.market_id(ctx.storage)?.get_market_type(),
                 direction,
                 leverage,
@@ -336,6 +337,7 @@ fn helper_validate(
         } => {
 
             let take_profit_price = BackwardsCompatTakeProfit{
+                collateral: amount,
                 direction,
                 leverage,
                 max_gains, 

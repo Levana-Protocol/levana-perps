@@ -115,6 +115,9 @@ pub enum ExecuteMsg {
         /// Stop loss price of new position
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
+        /// if None *and* max_gains is None, then take profit price is "infinite"
+        /// this allows for backwards-compatibility with old clients who always set max-gains
+        /// and eventually, when max_gains is removed, None will simply always mean "infinite"
         #[serde(alias = "take_profit_override")]
         take_profit: Option<PriceBaseInQuote>,
     },

@@ -1,10 +1,10 @@
 use std::ops::{Add, Div, Mul, Sub};
 
-use shared::{storage::{MarketError, MaxGainsInQuote, PriceBaseInQuote, PricePoint}};
+use shared::{storage::{MaxGainsInQuote, PriceBaseInQuote, PricePoint}, compat::calc_notional_size};
 use crate::prelude::*;
 
 pub(crate) struct TakeProfitToCounterCollateral<'a>{
-    pub take_profit_price_base: PriceBaseInQuote, 
+    pub take_profit_price_base: Option<PriceBaseInQuote>, 
     pub market_type: MarketType, 
     pub collateral: NonZero<Collateral>,
     pub leverage_to_base: LeverageToBase,
@@ -13,12 +13,6 @@ pub(crate) struct TakeProfitToCounterCollateral<'a>{
     pub price_point: &'a PricePoint,
 } 
 
-enum DebugKind {
-    V1,
-    V2
-}
-
-const DEBUG_KIND: DebugKind = DebugKind::V2;
 
 impl <'a> TakeProfitToCounterCollateral <'a> {
 
@@ -26,7 +20,7 @@ impl <'a> TakeProfitToCounterCollateral <'a> {
         let take_profit_price = self.min_take_profit_price()?;
         let counter_collateral = self.counter_collateral(take_profit_price)?;
 
-        Ok(NonZero::try_from_number(counter_collateral).context("Calculated an invalid counter_collateral")?)
+        NonZero::try_from_number(counter_collateral).context("Calculated an invalid counter_collateral from take_profit")
     }
 
     fn notional_size(&self) -> Result<Number> {
@@ -39,68 +33,62 @@ impl <'a> TakeProfitToCounterCollateral <'a> {
             ..
         } = *self;
 
-        let leverage_to_base = leverage_to_base.into_signed(direction);
-
-        let leverage_to_notional = leverage_to_base.into_notional(market_type);
-
-        let notional_size_in_collateral =
-            leverage_to_notional.checked_mul_collateral(collateral)?;
-        let notional_size =
-            notional_size_in_collateral.map(|x| price_point.collateral_to_notional(x));
-
-        Ok(notional_size.into_number())
+        Ok(calc_notional_size(leverage_to_base, direction, market_type, price_point, collateral)?.into_number())
     }
 
-    fn counter_collateral(&self, take_profit_price: Number) -> Result<Number> {
+    // the take_profit_price here is passed in since it may be the "min max gains" price
+    // or any take profit price, even below that min
+    fn counter_collateral(&self, take_profit_price: Option<Number>) -> Result<Number> {
         let Self {
             market_type,
             collateral,
-            config,
             price_point,
+            leverage_to_base,
+            direction,
             ..
         } = *self;
 
         let notional_size = self.notional_size()?;
 
-        let counter_collateral = match DEBUG_KIND {
-            // this version is a stab at trying to invert the old take profit calculation
-            DebugKind::V1 => {
-                let price_notional = price_point.price_notional.into_number();
+        match take_profit_price {
+            None => {
+                let leverage_to_notional = leverage_to_base.into_signed(direction).into_notional(market_type);
 
-                take_profit_price
-                    .checked_sub(price_notional)?
-                    .checked_mul(notional_size)?
+                let notional_size_in_collateral =
+                    leverage_to_notional.checked_mul_collateral(collateral)?;
+
+                MaxGainsInQuote::PosInfinity.calculate_counter_collateral(market_type, collateral, notional_size_in_collateral, leverage_to_notional)
+                    .map(|x| x.into_number())
             },
-            DebugKind::V2 => {
+            Some(take_profit_price) => {
                 // this version was from trying to mirror the frontend
-                match market_type {
+                // TODO - clean this up, is probably a method on price_point or similar
+                // should not need the epsilon at all which was taken from the frontend
+                let take_profit_price_notional = match market_type {
                     MarketType::CollateralIsQuote => {
                         take_profit_price
-                            .sub(self.price_notional_in_collateral())
-                            .mul(notional_size)
                     },
                     MarketType::CollateralIsBase => {
                         let epsilon = Decimal256::from_ratio(1u32, 1000000u32).into_signed();
-                        let take_profit_price_notional = if take_profit_price.approx_lt_relaxed(epsilon) {
+                        if take_profit_price.approx_lt_relaxed(epsilon) {
                             Number::MAX
                         } else {
                             Number::ONE.div(take_profit_price)
-                        };
-
-                        take_profit_price_notional
-                            .sub(self.price_notional_in_collateral())
-                            .mul(notional_size)
+                        }
                     }
-                }
+                };
+
+                let counter_collateral = take_profit_price_notional
+                    .sub(price_point.price_notional.into_number())
+                    .mul(notional_size);
+
+                Ok(counter_collateral)
             }
-        };
+        }
 
-        println!("TAKE PROFIT PRICE: {}, NOTIONAL SIZE: {} COLLATERAL: {} COUNTER COLLATERAL: {}", take_profit_price, notional_size, collateral, counter_collateral);
-
-        Ok(counter_collateral)
     }
 
-    fn min_take_profit_price(&self) -> Result<Number> {
+    fn min_take_profit_price(&self) -> Result<Option<Number>> {
         let min_max_gains = self.min_max_gains();
         let max_gains_amount = self.max_gains_amount()?;
 
@@ -119,13 +107,12 @@ impl <'a> TakeProfitToCounterCollateral <'a> {
             }
         };
 
-        println!("MIN MAX GAINS: {}, MAX GAINS: {:?}, USING TAKE-PROFIT AS-IS: {:?}", min_max_gains, max_gains_amount, new_take_profit.is_none());
         match new_take_profit {
             Some(new_take_profit) => {
-                Ok(new_take_profit)
+                Ok(Some(new_take_profit))
             },
             None => {
-                Ok(self.take_profit_price_base.into_number())
+                Ok(self.take_profit_price_base.map(|x| x.into_number()))
             }
         }
     }
@@ -160,7 +147,7 @@ impl <'a> TakeProfitToCounterCollateral <'a> {
 
     fn max_gains_amount(&self) -> Result<Option<Number>> {
         let notional_size = self.notional_size()?;
-        let counter_collateral = self.counter_collateral(self.take_profit_price_base.into_number())?;
+        let counter_collateral = self.counter_collateral(self.take_profit_price_base.map(|x| x.into_number()))?;
         let active_collateral = self.collateral.into_number();
 
 
@@ -202,3 +189,4 @@ impl <'a> TakeProfitToCounterCollateral <'a> {
     }
 
 }
+

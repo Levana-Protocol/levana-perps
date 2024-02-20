@@ -1343,18 +1343,17 @@ impl PerpsMarket {
 
         let collateral = Collateral::try_from_number(collateral)?;
 
-        let take_profit = BackwardsCompatTakeProfit{
+        let take_profit = BackwardsCompatTakeProfit {
             leverage,
             direction,
             collateral: NonZero::new(collateral).unwrap(),
             market_type: self.id.get_market_type(),
-            max_gains: Some(max_gains), 
-            take_profit_override, 
+            max_gains: Some(max_gains),
+            take_profit_override,
             price_point: &price,
             take_profit: None,
-        }.calc()?.context("failed to calculate take profit")?;
-
-        println!("CALCULATED TAKE PROFIT: {}", take_profit);
+        }
+        .calc()?;
 
         let msg = self.token.into_market_execute_msg(
             &self.addr,
@@ -1365,7 +1364,7 @@ impl PerpsMarket {
                 direction,
                 max_gains: None,
                 stop_loss_override,
-                take_profit: Some(take_profit),
+                take_profit,
             },
         )?;
 

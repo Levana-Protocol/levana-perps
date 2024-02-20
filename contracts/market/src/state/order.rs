@@ -143,6 +143,7 @@ impl State<'_> {
             slippage_assert: None,
             stop_loss_override: order.stop_loss_override,
             take_profit_price: BackwardsCompatTakeProfit{
+                collateral: order.collateral,
                 direction: order.direction.into_base(market_type),
                 leverage: order.leverage,
                 market_type,

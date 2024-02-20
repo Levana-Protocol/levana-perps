@@ -1,3 +1,6 @@
+// TODO: remove this once the deprecated fields are fully removed
+#![allow(deprecated)]
+
 mod crank_fee;
 mod crank_price;
 mod deferred_execution;
