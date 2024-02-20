@@ -17,12 +17,10 @@ jobs:
   bots-image:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: extractions/setup-just@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
         with:
-          just-version: 1.8.0
+          tool: just@1.16.0
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
