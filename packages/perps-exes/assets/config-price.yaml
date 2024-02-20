@@ -443,6 +443,13 @@ networks:
       feeds-usd: [
         !constant { price: "1", inverted: false }
       ]
+    CNH_USDC:
+      feeds: [
+        !pyth { key: "USD_CNH", inverted: true }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
 
   sei-testnet:
     ATOM_USD:
