@@ -142,15 +142,17 @@ impl State<'_> {
             direction: order.direction.into_base(market_type),
             slippage_assert: None,
             stop_loss_override: order.stop_loss_override,
+            // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
             take_profit_price: BackwardsCompatTakeProfit {
                 collateral: order.collateral,
                 direction: order.direction.into_base(market_type),
                 leverage: order.leverage,
                 market_type,
+                // However, this needs to be migrated too
                 max_gains: Some(order.max_gains),
                 take_profit_override: order.take_profit_override,
                 price_point,
-                // TODO
+                // i.e. should just use this here
                 take_profit: None,
             }
             .calc()?,

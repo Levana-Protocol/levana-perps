@@ -1343,6 +1343,8 @@ impl PerpsMarket {
 
         let collateral = Collateral::try_from_number(collateral)?;
 
+        // eh, this is a nice convenience to not have to rewrite all the tests
+        // when BackwardsCompatTakeProfit is deprecated from main code, it could be moved entirely into test code
         let take_profit = BackwardsCompatTakeProfit {
             leverage,
             direction,

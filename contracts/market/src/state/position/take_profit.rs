@@ -46,7 +46,7 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
     }
 
     // the take_profit_price here is passed in since it may be the "min max gains" price
-    // or any take profit price, even below that min
+    // or the user-supplied take profit price (i.e. self.take_profit_price_base)
     fn counter_collateral(&self, take_profit_price: Option<Number>) -> Result<Number> {
         let Self {
             market_type,

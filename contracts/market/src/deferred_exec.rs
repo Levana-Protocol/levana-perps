@@ -74,6 +74,7 @@ fn helper_execute(
             crank_fee,
             crank_fee_usd,
         } => {
+            // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
             let take_profit_price = BackwardsCompatTakeProfit {
                 collateral: amount,
                 market_type: state.market_id(ctx.storage)?.get_market_type(),
@@ -338,6 +339,7 @@ fn helper_validate(
             crank_fee,
             crank_fee_usd,
         } => {
+            // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
             let take_profit_price = BackwardsCompatTakeProfit {
                 collateral: amount,
                 direction,
