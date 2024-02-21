@@ -299,67 +299,71 @@ pub async fn test_update_leverage(perp_app: &PerpApp) -> Result<()> {
     Ok(())
 }
 
-// TODO - bring back?
-// pub async fn test_update_max_gains(perp_app: &PerpApp) -> Result<()> {
-//     log::info!("Test updating Max Gains");
+pub async fn test_update_max_gains(perp_app: &PerpApp) -> Result<()> {
+    log::info!("Test updating Max Gains");
 
-//     // Open position
-//     let collateral = "100".parse()?;
-//     let direction = DirectionToBase::Long;
-//     let max_gains = MaxGainsInQuote::from_str("0.44")?;
-//     let max_slippage = Number::from_str("1")?;
-//     let tolerance = max_slippage / 100;
-//     let entry_price = PriceBaseInQuote::from_str("9.47")?;
-//     let leverage = LeverageToBase::from_str("10")?;
+    // Open position
+    let collateral = "100".parse()?;
+    let direction = DirectionToBase::Long;
+    let max_gains = MaxGainsInQuote::from_str("0.44")?;
+    let max_slippage = Number::from_str("1")?;
+    let tolerance = max_slippage / 100;
+    let entry_price = PriceBaseInQuote::from_str("9.47")?;
+    let leverage = LeverageToBase::from_str("10")?;
 
-//     perp_app
-//         .open_position(
-//             collateral,
-//             direction,
-//             leverage,
-//             max_gains,
-//             Some(SlippageAssert {
-//                 price: entry_price,
-//                 tolerance,
-//             }),
-//             None,
-//             None,
-//         )
-//         .await?;
+    perp_app
+        .open_position(
+            collateral,
+            direction,
+            leverage,
+            max_gains,
+            Some(SlippageAssert {
+                price: entry_price,
+                tolerance,
+            }),
+            None,
+            None,
+        )
+        .await?;
 
-//     let positions = perp_app.all_open_positions().await?;
+    let positions = perp_app.all_open_positions().await?;
 
-//     let position_detail = match &positions.info[..] {
-//         [a] => a,
-//         _ => bail!("More than one position found"),
-//     };
+    let position_detail = match &positions.info[..] {
+        [a] => a,
+        _ => bail!("More than one position found"),
+    };
 
-//     let max_gains = MaxGainsInQuote::from_str("0.50")?;
-//     perp_app
-//         .update_max_gains(position_detail.id, max_gains)
-//         .await?;
-//     perp_app.crank_single(None).await?;
+    let max_gains = MaxGainsInQuote::from_str("0.50")?;
+    perp_app
+        .update_max_gains(position_detail.id, max_gains)
+        .await?;
+    perp_app.crank_single(None).await?;
 
-//     let new_position_detail = perp_app.market.position_detail(position_detail.id).await?;
+    let new_position_detail = perp_app.market.position_detail(position_detail.id).await?;
 
-//     let diff_max_gains = match new_position_detail.max_gains_in_quote {
-//         MaxGainsInQuote::Finite(x) => x.into_number(),
-//         MaxGainsInQuote::PosInfinity => anyhow::bail!("Infinite max gains for new position"),
-//     } - match position_detail.max_gains_in_quote {
-//         MaxGainsInQuote::Finite(x) => x.into_number(),
-//         MaxGainsInQuote::PosInfinity => anyhow::bail!("Infinite max gains for position_detail"),
-//     };
+    // TODO: remove this once the deprecated fields are fully removed
+    #[allow(deprecated)]
+    if let Some(max_gains) = new_position_detail.max_gains_in_quote {
+        let diff_max_gains = match max_gains {
+            MaxGainsInQuote::Finite(x) => x.into_number(),
+            MaxGainsInQuote::PosInfinity => anyhow::bail!("Infinite max gains for new position"),
+        } - match max_gains {
+            MaxGainsInQuote::Finite(x) => x.into_number(),
+            MaxGainsInQuote::PosInfinity => anyhow::bail!("Infinite max gains for position_detail"),
+        };
 
-//     // 0.5 - 0.44 = 0.06
-//     ensure!(
-//         diff_max_gains > "0.05".parse()? && diff_max_gains < "0.06".parse()?,
-//         "Max gains is updated with proper delta. diff_max_gains: {diff_max_gains}"
-//     );
+        // 0.5 - 0.44 = 0.06
+        ensure!(
+            diff_max_gains > "0.05".parse()? && diff_max_gains < "0.06".parse()?,
+            "Max gains is updated with proper delta. diff_max_gains: {diff_max_gains}"
+        );
+    } else {
+        // TODO - improve test to check take_profit_price instead
+    }
+    perp_app.close_position(position_detail.id).await?;
 
-//     perp_app.close_position(position_detail.id).await?;
-
-//     Ok(())
-// }
+    Ok(())
+}
 
 // Similar in spirit with decEqual (typescript code)
 fn threshold_range(n1: Collateral, n2: Collateral, threshold: Collateral) -> Result<()> {
