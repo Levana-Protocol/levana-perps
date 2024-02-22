@@ -380,7 +380,7 @@ fn helper_validate(
                         leverage,
                         max_gains,
                         take_profit,
-                        price_point: &price_point,
+                        price_point,
                     }
                     .calc()?
                 }
