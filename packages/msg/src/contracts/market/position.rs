@@ -690,6 +690,8 @@ impl Position {
             take_profit_override_notional: _,
         } = self;
 
+        // TODO: remove this once the deprecated fields are fully removed
+        #[allow(deprecated)]
         Ok(PositionQueryResponse {
             owner,
             id,

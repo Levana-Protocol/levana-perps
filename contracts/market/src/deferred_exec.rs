@@ -62,6 +62,8 @@ fn helper_execute(
     price_point: PricePoint,
 ) -> Result<DeferredExecCompleteTarget> {
     match item.item {
+        // TODO: remove this once the deprecated fields are fully removed
+        #[allow(deprecated)]
         DeferredExecItem::OpenPosition {
             slippage_assert,
             leverage,
@@ -327,6 +329,8 @@ fn helper_validate(
     price_point: &PricePoint,
 ) -> Result<()> {
     match item.item {
+        // TODO: remove this once the deprecated fields are fully removed
+        #[allow(deprecated)]
         DeferredExecItem::OpenPosition {
             slippage_assert,
             leverage,

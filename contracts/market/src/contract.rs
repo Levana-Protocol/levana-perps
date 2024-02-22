@@ -140,6 +140,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             sender: _,
         } => anyhow::bail!("Cannot nest a Receive inside another Receive"),
 
+        // TODO: remove this once the deprecated fields are fully removed
+        #[allow(deprecated)]
         ExecuteMsg::OpenPosition {
             slippage_assert,
             leverage,

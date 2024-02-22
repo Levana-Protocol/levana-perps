@@ -1,7 +1,5 @@
 //! Messages and helper data types for the perps protocol.
 #![deny(missing_docs)]
-// TODO: remove this once the deprecated fields are fully removed
-#![allow(deprecated)]
 
 #[cfg(feature = "bridge")]
 pub mod bridge;
