@@ -120,10 +120,9 @@ impl OpenPositionExec {
             // just temporarily setting _something_ here, it will be overwritten right away in `set_next_liquifunding`
             next_liquifunding: liquifunded_at,
             stop_loss_override,
-            take_profit_override: None,
+            take_profit_override: take_profit_price_trader,
             liquidation_margin: LiquidationMargin::default(),
             liquidation_price: None,
-            take_profit_price_trader,
             take_profit_price: take_profit_price_notional,
             stop_loss_override_notional: stop_loss_override
                 .map(|x| x.into_notional_price(market_type)),

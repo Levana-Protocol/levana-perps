@@ -85,14 +85,11 @@ pub struct Position {
     /// Stored separately to ensure there are no rounding errors, since we need precise binary equivalence for lookups.
     pub stop_loss_override_notional: Option<Price>,
     /// A trader specified price at which the position will be closed in profit
-    #[deprecated(note = "Use take_profit_price_trader instead")]
     pub take_profit_override: Option<PriceBaseInQuote>,
     /// Stored separately to ensure there are no rounding errors, since we need precise binary equivalence for lookups.
     pub take_profit_override_notional: Option<Price>,
     /// The most recently calculated liquidation price
     pub liquidation_price: Option<Price>,
-    /// A trader specified price at which the position will be closed in profit
-    pub take_profit_price_trader: Option<PriceBaseInQuote>,
     /// The actual price at which the trader will achieve maximum gains and take all counter collateral.
     /// This is the notional price, not the base price, to avoid rounding errors
     pub take_profit_price: Option<Price>,
@@ -685,10 +682,9 @@ impl Position {
             liquifunded_at,
             next_liquifunding,
             stop_loss_override,
-            take_profit_override: _,
+            take_profit_override,
             liquidation_margin,
             liquidation_price,
-            take_profit_price_trader,
             take_profit_price,
             stop_loss_override_notional: _,
             take_profit_override_notional: _,
@@ -730,7 +726,7 @@ impl Position {
             entry_price_base: entry_price.into_base_price(market_type),
             next_liquifunding,
             stop_loss_override,
-            take_profit_override: take_profit_price_trader,
+            take_profit_override,
             crank_fee_collateral: crank_fee.collateral(),
             crank_fee_usd: crank_fee.usd(),
         })
