@@ -237,8 +237,6 @@ pub struct PositionQueryResponse {
     /// Maximum gains, in terms of quote, the trader can achieve
     #[deprecated(note = "Use take_profit_price_trader instead")]
     pub max_gains_in_quote: Option<MaxGainsInQuote>,
-    /// Trader-specified take profit price
-    pub take_profit_price_trader: Option<PriceBaseInQuote>,
     /// The actual price at which trader will achieve maximum gains and take all counter collateral.
     pub take_profit_price_base: Option<PriceBaseInQuote>,
 
@@ -251,7 +249,6 @@ pub struct PositionQueryResponse {
     /// Stop loss price set by the trader
     pub stop_loss_override: Option<PriceBaseInQuote>,
     /// Take profit price set by the trader
-    #[deprecated(note = "Use take_profit_price_trader instead")]
     pub take_profit_override: Option<PriceBaseInQuote>,
 }
 
@@ -730,11 +727,10 @@ impl Position {
             liquidation_price_base: liquidation_price.map(|x| x.into_base_price(market_type)),
             liquidation_margin,
             take_profit_price_base: take_profit_price.map(|x| x.into_base_price(market_type)),
-            take_profit_price_trader,
             entry_price_base: entry_price.into_base_price(market_type),
             next_liquifunding,
             stop_loss_override,
-            take_profit_override: None,
+            take_profit_override: take_profit_price_trader,
             crank_fee_collateral: crank_fee.collateral(),
             crank_fee_usd: crank_fee.usd(),
         })

@@ -106,10 +106,10 @@ fn infinite_max_gains_perp_481() {
         //     res.max_gains_in_quote
         // );
         assert_eq!(
-            res.take_profit_price_trader,
+            res.take_profit_override,
             None,
             "Take profit price is not None on iteration {i}, actual: {}",
-            res.take_profit_price_trader.unwrap()
+            res.take_profit_override.unwrap()
         );
     }
 }

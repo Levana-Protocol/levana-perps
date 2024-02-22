@@ -185,7 +185,7 @@ async fn main_inner() -> Result<()> {
                 .liquidation_price_base
                 .map_or("No price found".to_owned(), |item| item.to_string());
             let take_profit_price = position
-                .take_profit_price_trader
+                .take_profit_override
                 .map_or("No price found".to_owned(), |item| item.to_string());
             println!("Collateral: {}", position.deposit_collateral);
             println!("Active Collateral: {}", position.active_collateral);
