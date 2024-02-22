@@ -115,11 +115,9 @@ pub enum ExecuteMsg {
         /// Stop loss price of new position
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
-        /// if None *and* max_gains is None, then take profit price is "infinite"
-        /// this allows for backwards-compatibility with old clients who always set max-gains
-        /// and eventually, when max_gains is removed, None will simply always mean "infinite"
+        /// if max_gains is `None`, this *must* be `Some`
         #[serde(alias = "take_profit_override")]
-        take_profit: Option<PriceBaseInQuote>,
+        take_profit: Option<TakeProfitPrice>,
     },
 
     /// Add collateral to a position, causing leverage to decrease
@@ -840,7 +838,7 @@ pub struct PositionAction {
     /// If this is a position transfer, the new owner.
     pub new_owner: Option<Addr>,
     /// The take profit override, if set.
-    pub take_profit_override: Option<PriceBaseInQuote>,
+    pub take_profit_override: Option<TakeProfitPrice>,
     /// The stop loss override, if set.
     pub stop_loss_override: Option<PriceBaseInQuote>,
 }

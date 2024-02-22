@@ -1,8 +1,9 @@
 //! Backwards compatibility helpers
+// this file should be completely deleted when max_gains is
 #![allow(missing_docs)]
 
 use crate::prelude::*;
-use crate::storage::{MaxGainsInQuote, PriceBaseInQuote, PricePoint};
+use crate::storage::{MaxGainsInQuote, PricePoint};
 
 /// Backwards compatible take profit calculation
 ///
@@ -16,13 +17,12 @@ pub struct BackwardsCompatTakeProfit<'a> {
     pub leverage: LeverageToBase,
     pub market_type: MarketType,
     pub price_point: &'a PricePoint,
-    pub max_gains: Option<MaxGainsInQuote>,
-    pub take_profit_override: Option<PriceBaseInQuote>,
+    pub max_gains: MaxGainsInQuote,
     pub take_profit: Option<PriceBaseInQuote>,
 }
 
 impl<'a> BackwardsCompatTakeProfit<'a> {
-    pub fn calc(self) -> Result<Option<PriceBaseInQuote>> {
+    pub fn calc(self) -> Result<TakeProfitPrice> {
         let BackwardsCompatTakeProfit {
             collateral,
             direction,
@@ -30,40 +30,36 @@ impl<'a> BackwardsCompatTakeProfit<'a> {
             market_type,
             price_point,
             max_gains,
-            take_profit_override,
             take_profit,
         } = self;
         match take_profit {
-            Some(take_profit) => Ok(Some(take_profit)),
-            None => match take_profit_override {
-                Some(take_profit_override) => Ok(Some(take_profit_override)),
-                None => match max_gains {
-                    Some(max_gains) => {
-                        let leverage_to_notional =
-                            leverage.into_signed(direction).into_notional(market_type);
+            Some(take_profit) => Ok(TakeProfitPrice::Finite(take_profit.into_non_zero())),
+            None => match max_gains {
+                MaxGainsInQuote::PosInfinity => Ok(TakeProfitPrice::PosInfinity),
+                MaxGainsInQuote::Finite(_) => {
+                    let leverage_to_notional =
+                        leverage.into_signed(direction).into_notional(market_type);
 
-                        let notional_size_in_collateral =
-                            leverage_to_notional.checked_mul_collateral(collateral)?;
+                    let notional_size_in_collateral =
+                        leverage_to_notional.checked_mul_collateral(collateral)?;
 
-                        let counter_collateral = max_gains.calculate_counter_collateral(
-                            market_type,
-                            collateral,
-                            notional_size_in_collateral,
-                            leverage_to_notional,
-                        )?;
+                    let counter_collateral = max_gains.calculate_counter_collateral(
+                        market_type,
+                        collateral,
+                        notional_size_in_collateral,
+                        leverage_to_notional,
+                    )?;
 
-                        TakeProfitFromCounterCollateral {
-                            counter_collateral,
-                            market_type,
-                            collateral,
-                            leverage_to_base: self.leverage,
-                            price_point,
-                            direction,
-                        }
-                        .calc()
+                    TakeProfitFromCounterCollateral {
+                        counter_collateral,
+                        market_type,
+                        collateral,
+                        leverage_to_base: self.leverage,
+                        price_point,
+                        direction,
                     }
-                    None => Ok(None),
-                },
+                    .calc()
+                }
             },
         }
     }
@@ -79,7 +75,7 @@ struct TakeProfitFromCounterCollateral<'a> {
     pub direction: DirectionToBase,
 }
 impl<'a> TakeProfitFromCounterCollateral<'a> {
-    pub fn calc(&self) -> Result<Option<PriceBaseInQuote>> {
+    pub fn calc(&self) -> Result<TakeProfitPrice> {
         let Self {
             market_type,
             collateral,
@@ -114,11 +110,11 @@ impl<'a> TakeProfitFromCounterCollateral<'a> {
         };
 
         match take_profit_price {
-            Some(price) => Ok(Some(price.into_base_price(*market_type))),
+            Some(price) => Ok(TakeProfitPrice::Finite(price.into_base_price(*market_type).into_non_zero())),
             None =>
             match market_type {
                 // Infinite max gains results in a notional take profit price of 0
-                MarketType::CollateralIsBase => Ok(None),
+                MarketType::CollateralIsBase => Ok(TakeProfitPrice::PosInfinity),
                 MarketType::CollateralIsQuote => Err(anyhow!("Calculated a take profit price of {take_profit_price_raw} in a collateral-is-quote market. Spot notional price: {}. Counter collateral: {}. Notional size: {}.", price_point.price_notional, self.counter_collateral,notional_size)),
             }
         }

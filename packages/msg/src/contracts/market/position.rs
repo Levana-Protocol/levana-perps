@@ -85,7 +85,8 @@ pub struct Position {
     /// Stored separately to ensure there are no rounding errors, since we need precise binary equivalence for lookups.
     pub stop_loss_override_notional: Option<Price>,
     /// A trader specified price at which the position will be closed in profit
-    pub take_profit_override: Option<PriceBaseInQuote>,
+    // TODO - this should eventually become non-optional, but that would require a migration
+    pub take_profit_override: Option<TakeProfitPrice>,
     /// Stored separately to ensure there are no rounding errors, since we need precise binary equivalence for lookups.
     pub take_profit_override_notional: Option<Price>,
     /// The most recently calculated liquidation price
@@ -246,7 +247,8 @@ pub struct PositionQueryResponse {
     /// Stop loss price set by the trader
     pub stop_loss_override: Option<PriceBaseInQuote>,
     /// Take profit price set by the trader
-    pub take_profit_override: Option<PriceBaseInQuote>,
+    // TODO- this should eventually become non-optional
+    pub take_profit_override: Option<TakeProfitPrice>,
 }
 
 impl Position {
@@ -926,8 +928,9 @@ pub mod events {
         pub counter_leverage: LeverageToBase,
         /// Stop loss price
         pub stop_loss_override: Option<PriceBaseInQuote>,
-        /// Take profit price
-        pub take_profit_override: Option<PriceBaseInQuote>,
+        /// Take profit price set by the trader
+        // TODO - this should eventually become non-optional, but that would require a migration
+        pub take_profit_override: Option<TakeProfitPrice>,
     }
 
     impl PositionAttributes {
@@ -1036,12 +1039,11 @@ pub mod events {
                         Some(PriceBaseInQuote::try_from_number(stop_loss_override)?)
                     }
                 },
-                take_profit_override: match evt.try_number_attr(event_key::TAKE_PROFIT_OVERRIDE)? {
-                    None => None,
-                    Some(take_profit_override) => {
-                        Some(PriceBaseInQuote::try_from_number(take_profit_override)?)
-                    }
-                },
+                take_profit_override: evt
+                    .try_map_attr(event_key::TAKE_PROFIT_OVERRIDE, |s| {
+                        TakeProfitPrice::try_from(s)
+                    })
+                    .transpose()?,
             })
         }
     }

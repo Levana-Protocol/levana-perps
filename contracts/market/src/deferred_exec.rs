@@ -71,23 +71,38 @@ fn helper_execute(
             max_gains,
             stop_loss_override,
             take_profit,
-            take_profit_override,
             amount,
             crank_fee,
             crank_fee_usd,
         } => {
             // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
-            let take_profit_price = BackwardsCompatTakeProfit {
-                collateral: amount,
-                market_type: state.market_id(ctx.storage)?.get_market_type(),
-                direction,
-                leverage,
-                max_gains,
-                take_profit_override,
-                take_profit,
-                price_point: &price_point,
-            }
-            .calc()?;
+            let take_profit_price = match (take_profit, max_gains) {
+                (None, None) => {
+                    bail!("must supply at least one of take_profit or max_gains");
+                }
+                (Some(take_profit_price), None) => take_profit_price,
+                (take_profit, Some(max_gains)) => {
+                    let take_profit = match take_profit {
+                        None => None,
+                        Some(take_profit) => match take_profit {
+                            TakeProfitPrice::PosInfinity => {
+                                bail!("cannot set infinite take profit price and max_gains")
+                            }
+                            TakeProfitPrice::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
+                        },
+                    };
+                    BackwardsCompatTakeProfit {
+                        collateral: amount,
+                        market_type: state.market_id(ctx.storage)?.get_market_type(),
+                        direction,
+                        leverage,
+                        max_gains,
+                        take_profit,
+                        price_point: &price_point,
+                    }
+                    .calc()?
+                }
+            };
 
             OpenPositionExec::new(
                 state,
@@ -337,24 +352,39 @@ fn helper_validate(
             direction,
             max_gains,
             stop_loss_override,
-            take_profit_override,
             take_profit,
             amount,
             crank_fee,
             crank_fee_usd,
         } => {
             // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
-            let take_profit_price = BackwardsCompatTakeProfit {
-                collateral: amount,
-                direction,
-                leverage,
-                max_gains,
-                market_type: state.market_id(store)?.get_market_type(),
-                take_profit_override,
-                take_profit,
-                price_point,
-            }
-            .calc()?;
+            let take_profit_price = match (take_profit, max_gains) {
+                (None, None) => {
+                    bail!("must supply at least one of take_profit or max_gains");
+                }
+                (Some(take_profit_price), None) => take_profit_price,
+                (take_profit, Some(max_gains)) => {
+                    let take_profit = match take_profit {
+                        None => None,
+                        Some(take_profit) => match take_profit {
+                            TakeProfitPrice::PosInfinity => {
+                                bail!("cannot set infinite take profit price and max_gains")
+                            }
+                            TakeProfitPrice::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
+                        },
+                    };
+                    BackwardsCompatTakeProfit {
+                        collateral: amount,
+                        market_type: state.market_id(store)?.get_market_type(),
+                        direction,
+                        leverage,
+                        max_gains,
+                        take_profit,
+                        price_point: &price_point,
+                    }
+                    .calc()?
+                }
+            };
 
             OpenPositionExec::new(
                 state,

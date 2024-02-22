@@ -159,7 +159,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     direction,
                     max_gains,
                     stop_loss_override,
-                    take_profit_override: None,
                     take_profit,
                     amount: info.funds.take()?,
                     crank_fee: Collateral::zero(),

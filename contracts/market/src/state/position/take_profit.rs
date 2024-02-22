@@ -3,11 +3,11 @@ use std::ops::{Add, Div, Mul, Sub};
 use crate::prelude::*;
 use shared::{
     compat::calc_notional_size,
-    storage::{MaxGainsInQuote, PriceBaseInQuote, PricePoint},
+    storage::{MaxGainsInQuote, PricePoint},
 };
 
 pub(crate) struct TakeProfitToCounterCollateral<'a> {
-    pub take_profit_price_base: Option<PriceBaseInQuote>,
+    pub take_profit_price_base: TakeProfitPrice,
     pub market_type: MarketType,
     pub collateral: NonZero<Collateral>,
     pub leverage_to_base: LeverageToBase,
@@ -126,7 +126,10 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
 
         match new_take_profit {
             Some(new_take_profit) => Ok(Some(new_take_profit)),
-            None => Ok(self.take_profit_price_base.map(|x| x.into_number())),
+            None => Ok(match self.take_profit_price_base {
+                TakeProfitPrice::PosInfinity => None,
+                TakeProfitPrice::Finite(x) => Some(x.into_number()),
+            }),
         }
     }
 
@@ -154,8 +157,10 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
 
     fn max_gains_amount(&self) -> Result<Option<Number>> {
         let notional_size = self.notional_size()?;
-        let counter_collateral =
-            self.counter_collateral(self.take_profit_price_base.map(|x| x.into_number()))?;
+        let counter_collateral = self.counter_collateral(match self.take_profit_price_base {
+            TakeProfitPrice::PosInfinity => None,
+            TakeProfitPrice::Finite(x) => Some(x.into_number()),
+        })?;
         let active_collateral = self.collateral.into_number();
 
         let max_gains = match self.market_type {

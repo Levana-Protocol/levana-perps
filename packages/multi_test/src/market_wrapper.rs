@@ -1350,10 +1350,9 @@ impl PerpsMarket {
             direction,
             collateral: NonZero::new(collateral).unwrap(),
             market_type: self.id.get_market_type(),
-            max_gains: Some(max_gains),
-            take_profit_override,
+            max_gains,
+            take_profit: take_profit_override,
             price_point: &price,
-            take_profit: None,
         }
         .calc()?;
 
@@ -1366,7 +1365,7 @@ impl PerpsMarket {
                 direction,
                 max_gains: None,
                 stop_loss_override,
-                take_profit,
+                take_profit: Some(take_profit),
             },
         )?;
 

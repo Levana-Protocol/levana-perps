@@ -107,8 +107,8 @@ fn infinite_max_gains_perp_481() {
         // );
         assert_eq!(
             res.take_profit_override,
-            None,
-            "Take profit price is not None on iteration {i}, actual: {}",
+            Some(TakeProfitPrice::PosInfinity),
+            "Take profit price is not infinite on iteration {i}, actual: {}",
             res.take_profit_override.unwrap()
         );
     }

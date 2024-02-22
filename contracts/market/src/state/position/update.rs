@@ -828,6 +828,7 @@ impl TriggerOrderExec {
         store: &dyn Storage,
         id: PositionId,
         stop_loss_override: Option<PriceBaseInQuote>,
+        // TODO - make this TakeProfitPrice
         take_profit_override: Option<PriceBaseInQuote>,
         price_point: PricePoint,
     ) -> Result<Self> {
@@ -848,7 +849,8 @@ impl TriggerOrderExec {
         pos.stop_loss_override = stop_loss_override;
         pos.stop_loss_override_notional =
             stop_loss_override.map(|x| x.into_notional_price(market_type));
-        pos.take_profit_override = take_profit_override;
+        pos.take_profit_override =
+            take_profit_override.map(|x| TakeProfitPrice::Finite(x.into_non_zero()));
         pos.take_profit_override_notional =
             take_profit_override.map(|x| x.into_notional_price(market_type));
 

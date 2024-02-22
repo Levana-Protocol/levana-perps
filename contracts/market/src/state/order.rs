@@ -149,11 +149,9 @@ impl State<'_> {
                 leverage: order.leverage,
                 market_type,
                 // However, this needs to be migrated too
-                max_gains: Some(order.max_gains),
-                take_profit_override: order.take_profit_override,
+                max_gains: order.max_gains,
+                take_profit: order.take_profit_override,
                 price_point,
-                // i.e. should just use this here
-                take_profit: None,
             }
             .calc()?,
         };
