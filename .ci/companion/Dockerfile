@@ -1,4 +1,4 @@
-FROM alpine:3.14.2
+FROM alpine:3.19.1
 
 RUN apk update && apk add fontconfig
 
@@ -11,7 +11,6 @@ COPY health-check /usr/bin
 COPY perps-companion /usr/bin/perps-companion
 
 RUN chmod 755 /usr/bin/health-check
-RUN apk add --no-cache curl bash aws-cli
 
 ENTRYPOINT [ "health-check", "--task-output-timeout", "400", "--app-description", "companion" ]
 
