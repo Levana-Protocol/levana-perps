@@ -1,4 +1,4 @@
-FROM alpine:3.14.2
+FROM alpine:3.19.1
 
 COPY perps-bots /usr/bin
 COPY health-check /usr/bin
