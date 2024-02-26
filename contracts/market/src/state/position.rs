@@ -662,7 +662,6 @@ impl State<'_> {
                     )?;
                 }
 
-                // eventually this shouldn't be needed, but for now, save it - just in case
                 if let Some(take_profit_override) = pos.take_profit_override_notional {
                     PRICE_TRIGGER_ASC.save(
                         ctx.storage,
