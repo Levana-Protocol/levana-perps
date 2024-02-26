@@ -6,11 +6,6 @@ use crate::prelude::*;
 use crate::storage::{MaxGainsInQuote, PricePoint};
 
 /// Backwards compatible take profit calculation
-///
-/// To set "infinite max gains", with new API style
-/// both max_gains should be None and take_profit is None
-/// (which will result in the calculated take_profit itself to be None
-/// and then this whole struct can be removed along with max_gains)
 pub struct BackwardsCompatTakeProfit<'a> {
     pub collateral: NonZero<Collateral>,
     pub direction: DirectionToBase,
