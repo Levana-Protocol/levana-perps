@@ -17,7 +17,7 @@ pub(crate) struct TakeProfitToCounterCollateral<'a> {
 }
 
 impl<'a> TakeProfitToCounterCollateral<'a> {
-    pub fn calc(&self) -> Result<NonZero<Collateral>> {
+    pub(crate) fn calc(&self) -> Result<NonZero<Collateral>> {
         let take_profit_price = self.min_take_profit_price()?;
         let counter_collateral = self.counter_collateral(take_profit_price)?;
 
