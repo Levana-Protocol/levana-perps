@@ -78,23 +78,11 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
                     .map(|x| x.into_number())
             }
             TakeProfitPrice::Finite(take_profit_price) => {
-                let take_profit_price = take_profit_price.into_number();
-                // this version was from trying to mirror the frontend
-                // TODO - clean this up, is probably a method on price_point or similar
-                // should not need the epsilon at all which was taken from the frontend
-                let take_profit_price_notional = match market_type {
-                    MarketType::CollateralIsQuote => take_profit_price,
-                    MarketType::CollateralIsBase => {
-                        let epsilon = Decimal256::from_ratio(1u32, 1000000u32).into_signed();
-                        if take_profit_price.approx_lt_relaxed(epsilon) {
-                            Number::MAX
-                        } else {
-                            Number::ONE.div(take_profit_price)
-                        }
-                    }
-                };
+                let take_profit_price = PriceBaseInQuote::from_non_zero(take_profit_price);
+                let take_profit_price_notional = take_profit_price.into_notional_price(market_type);
 
                 let counter_collateral = take_profit_price_notional
+                    .into_number()
                     .sub(price_point.price_notional.into_number())
                     .mul(notional_size.into_number());
 
