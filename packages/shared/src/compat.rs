@@ -1,5 +1,5 @@
 //! Backwards compatibility helpers
-// this file should be completely deleted when max_gains is
+// this file should be completely deleted when max_gains is deleted
 #![allow(missing_docs)]
 
 use crate::prelude::*;
