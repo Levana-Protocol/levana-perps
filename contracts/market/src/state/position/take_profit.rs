@@ -44,9 +44,10 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
         )
     }
 
-    // the take_profit_price here is passed in since it may be the "min max gains" price
-    // or the user-supplied take profit price (i.e. self.take_profit_price_base)
-    fn counter_collateral(&self, take_profit_price: Option<Number>) -> Result<Number> {
+    // the take_profit_price here may be:
+    // 1. the actual take_profit price the trader is requesting (may be very close to spot price)
+    // 2. the calculated minimum take_profit price corresponding to minimum allowed counter-collateral (will be some buffer away from spot price) 
+    fn counter_collateral(&self, take_profit_price: TakeProfitPrice) -> Result<Number> {
         let Self {
             market_type,
             collateral,
@@ -59,7 +60,7 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
         let notional_size = self.notional_size()?;
 
         match take_profit_price {
-            None => {
+            TakeProfitPrice::PosInfinity => {
                 let leverage_to_notional = leverage_to_base
                     .into_signed(direction)
                     .into_notional(market_type);
@@ -76,7 +77,8 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
                     )
                     .map(|x| x.into_number())
             }
-            Some(take_profit_price) => {
+            TakeProfitPrice::Finite(take_profit_price) => {
+                let take_profit_price = take_profit_price.into_number();
                 // this version was from trying to mirror the frontend
                 // TODO - clean this up, is probably a method on price_point or similar
                 // should not need the epsilon at all which was taken from the frontend
@@ -101,7 +103,7 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
         }
     }
 
-    fn min_take_profit_price(&self) -> Result<Option<Number>> {
+    fn min_take_profit_price(&self) -> Result<TakeProfitPrice> {
         let min_max_gains = self.min_max_gains();
         let max_gains_amount = self.max_gains_amount()?;
 
@@ -124,11 +126,8 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
         };
 
         match new_take_profit {
-            Some(new_take_profit) => Ok(Some(new_take_profit)),
-            None => Ok(match self.take_profit_price_base {
-                TakeProfitPrice::PosInfinity => None,
-                TakeProfitPrice::Finite(x) => Some(x.into_number()),
-            }),
+            Some(new_take_profit) => Ok(TakeProfitPrice::Finite(new_take_profit.try_into_non_zero().context("could not make non-zero take-profit price")?)),
+            None => Ok(self.take_profit_price_base)
         }
     }
 
@@ -156,10 +155,7 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
 
     fn max_gains_amount(&self) -> Result<Option<Number>> {
         let notional_size = self.notional_size()?;
-        let counter_collateral = self.counter_collateral(match self.take_profit_price_base {
-            TakeProfitPrice::PosInfinity => None,
-            TakeProfitPrice::Finite(x) => Some(x.into_number()),
-        })?;
+        let counter_collateral = self.counter_collateral(self.take_profit_price_base)?;
         let active_collateral = self.collateral.into_number();
 
         let max_gains = match self.market_type {
