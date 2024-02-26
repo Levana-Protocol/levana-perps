@@ -25,7 +25,7 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
             .context("Calculated an invalid counter_collateral from take_profit")
     }
 
-    fn notional_size(&self) -> Result<Number> {
+    fn notional_size(&self) -> Result<Signed<Notional>> {
         let Self {
             market_type,
             collateral,
@@ -35,14 +35,13 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
             ..
         } = *self;
 
-        Ok(calc_notional_size(
+        calc_notional_size(
             leverage_to_base,
             direction,
             market_type,
             price_point,
             collateral,
-        )?
-        .into_number())
+        )
     }
 
     // the take_profit_price here is passed in since it may be the "min max gains" price
@@ -95,7 +94,7 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
 
                 let counter_collateral = take_profit_price_notional
                     .sub(price_point.price_notional.into_number())
-                    .mul(notional_size);
+                    .mul(notional_size.into_number());
 
                 Ok(counter_collateral)
             }
@@ -170,7 +169,7 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
 
                 let take_profit_price = self
                     .price_notional_in_collateral()
-                    .add(counter_collateral.div(notional_size));
+                    .add(counter_collateral.div(notional_size.into_number()));
 
                 let epsilon = Decimal256::from_ratio(1u32, 1000000u32).into_signed();
 
