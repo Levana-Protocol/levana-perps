@@ -46,7 +46,7 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
 
     // the take_profit_price here may be:
     // 1. the actual take_profit price the trader is requesting (may be very close to spot price)
-    // 2. the calculated minimum take_profit price corresponding to minimum allowed counter-collateral (will be some buffer away from spot price) 
+    // 2. the calculated minimum take_profit price corresponding to minimum allowed counter-collateral (will be some buffer away from spot price)
     fn counter_collateral(&self, take_profit_price: TakeProfitPrice) -> Result<Number> {
         let Self {
             market_type,
@@ -126,8 +126,12 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
         };
 
         match new_take_profit {
-            Some(new_take_profit) => Ok(TakeProfitPrice::Finite(new_take_profit.try_into_non_zero().context("could not make non-zero take-profit price")?)),
-            None => Ok(self.take_profit_price_base)
+            Some(new_take_profit) => Ok(TakeProfitPrice::Finite(
+                new_take_profit
+                    .try_into_non_zero()
+                    .context("could not make non-zero take-profit price")?,
+            )),
+            None => Ok(self.take_profit_price_base),
         }
     }
 
