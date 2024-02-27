@@ -68,6 +68,9 @@ pub(crate) struct Opt {
     /// Require that the fonts needed by the SVG are present
     #[clap(long, env = "LEVANA_COMPANION_FONT_CHECK")]
     pub(crate) font_check: bool,
+    /// Cache-bust query string parameter to force Twitter to reindex metadata
+    #[clap(long, env = "LEVANA_COMPANION_CACHE_BUST", default_value_t = 1)]
+    pub(crate) cache_bust: u32,
 }
 
 impl Opt {

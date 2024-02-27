@@ -97,6 +97,7 @@ impl PnlInfo {
             chain: chain.to_string(),
             wallet,
             quote_currency,
+            cache_bust_param: app.opt.cache_bust,
         })
     }
 }
@@ -462,6 +463,7 @@ struct PnlInfo {
     wallet: Option<String>,
     pnl: PnlDetails,
     quote_currency: String,
+    cache_bust_param: u32,
 }
 
 enum PnlDetails {
