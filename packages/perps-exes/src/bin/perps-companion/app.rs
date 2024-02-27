@@ -82,6 +82,11 @@ impl App {
         let mut fontdb = resvg::usvg::fontdb::Database::new();
         fontdb.load_system_fonts();
 
+        for (face_id, face) in fontdb.faces().enumerate() {
+            tracing::info!("Font #{}: {:?}", face_id + 1, face)
+        }
+        tracing::info!("Total fonts available: {}.", fontdb.len());
+
         Ok(App {
             cosmos: cosmos_map,
             opt,
