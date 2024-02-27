@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use anyhow::{Context, Result};
 use cosmos::{Cosmos, CosmosNetwork};
 use perps_exes::{config::MainnetFactories, contracts::Factory};
+use resvg::usvg::fontdb::Database;
 
 use crate::{cli::Opt, db::handle::Db, types::ChainId};
 
@@ -13,6 +14,7 @@ pub(crate) struct App {
     pub(crate) db: Db,
     pub(crate) factories: Vec<(Factory, CosmosNetwork)>,
     pub(crate) client: reqwest::Client,
+    pub(crate) fontdb: Database,
 }
 
 impl App {
@@ -76,12 +78,17 @@ impl App {
             .user_agent("Companion server")
             .build()?;
 
+        // Load up the fonts and convert text values
+        let mut fontdb = resvg::usvg::fontdb::Database::new();
+        fontdb.load_system_fonts();
+
         Ok(App {
             cosmos: cosmos_map,
             opt,
             db,
             factories,
             client,
+            fontdb,
         })
     }
 
