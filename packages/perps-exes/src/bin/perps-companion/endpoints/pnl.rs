@@ -33,7 +33,7 @@ use crate::{
     types::{ChainId, ContractEnvironment, DirectionForDb, PnlType, TwoDecimalPoints},
 };
 
-use super::{ErrorPage, PnlCssRoute, PnlHtml, PnlImage, PnlUrl};
+use super::{ErrorPage, PnlCssRoute, PnlHtml, PnlImage, PnlImageSvg, PnlUrl};
 
 pub(super) async fn pnl_url(
     _: PnlUrl,
@@ -119,6 +119,16 @@ pub(super) async fn pnl_image(
     PnlInfo::load_from_database(&app, pnl_id, &host)
         .await
         .map(PnlInfo::image)
+}
+
+pub(super) async fn pnl_image_svg(
+    PnlImageSvg { pnl_id }: PnlImageSvg,
+    TypedHeader(host): TypedHeader<Host>,
+    State(app): State<Arc<App>>,
+) -> Result<Response, Error> {
+    PnlInfo::load_from_database(&app, pnl_id, &host)
+        .await
+        .map(PnlInfo::image_svg)
 }
 
 pub(super) async fn pnl_css(_: PnlCssRoute) -> Css<&'static str> {
@@ -315,6 +325,22 @@ impl PnlInfo {
                 res
             }
         }
+    }
+
+    fn image_svg(self) -> Response {
+        // Generate the raw SVG text by rendering the template
+        let svg = PnlSvg { info: &self }.render().unwrap();
+
+        let mut res = svg.into_response();
+        res.headers_mut().insert(
+            http::header::CONTENT_TYPE,
+            HeaderValue::from_static("image/svg+xml"),
+        );
+        res.headers_mut().insert(
+            http::header::CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=86400"),
+        );
+        res
     }
 
     fn image_inner(&self) -> Result<Response> {
