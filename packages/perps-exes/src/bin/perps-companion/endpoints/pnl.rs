@@ -22,7 +22,7 @@ use msg::{
     prelude::{NonZero, PricePoint, Signed, SignedLeverageToNotional, UnsignedDecimal, Usd},
 };
 
-use resvg::usvg::{TreeParsing, TreeTextToPath};
+use resvg::usvg::{fontdb::Database, TreeParsing, TreeTextToPath};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use shared::storage::{MarketId, MarketType};
@@ -118,7 +118,7 @@ pub(super) async fn pnl_image(
 ) -> Result<Response, Error> {
     PnlInfo::load_from_database(&app, pnl_id, &host)
         .await
-        .map(PnlInfo::image)
+        .map(|info| info.image(&app.fontdb))
 }
 
 pub(super) async fn pnl_image_svg(
@@ -316,8 +316,8 @@ impl PnlInfo {
         res
     }
 
-    fn image(self) -> Response {
-        match self.image_inner() {
+    fn image(self, fontsdb: &Database) -> Response {
+        match self.image_inner(fontsdb) {
             Ok(res) => res,
             Err(e) => {
                 let mut res = format!("Error while rendering SVG: {e:?}").into_response();
@@ -343,17 +343,14 @@ impl PnlInfo {
         res
     }
 
-    fn image_inner(&self) -> Result<Response> {
+    fn image_inner(&self, fontsdb: &Database) -> Result<Response> {
         // Generate the raw SVG text by rendering the template
         let svg = PnlSvg { info: self }.render().unwrap();
 
         // Convert the SVG into a usvg tree using default settings
         let mut tree = resvg::usvg::Tree::from_str(&svg, &resvg::usvg::Options::default())?;
 
-        // Load up the fonts and convert text values
-        let mut fontdb = resvg::usvg::fontdb::Database::new();
-        fontdb.load_system_fonts();
-        tree.convert_text(&fontdb);
+        tree.convert_text(fontsdb);
 
         // Now that our usvg tree has text converted, convert into an resvg tree
         let rtree = resvg::Tree::from_usvg(&tree);
