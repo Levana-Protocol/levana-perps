@@ -559,7 +559,7 @@ networks:
       # Real contract from Milky Way
       # stride-contract: osmo1jlm7dglrwfk073r2mgta66sf27htceaklx0qprlm0pupfv632p6s3mzckj
       # RR fix contract to correct inverted redemption rate
-      stride-contract: osmo1aku3dajhjtl9flm68lpjp6l9mj37wt8lmsv3r53rcp2r2u850k9syugwu0
+      stride-contract: osmo1qemh23s4qwymxyzqs0puhle60djhtytjhvv4ghdfdf0x9tgkapss6q6sj8
       feeds: [
         !pyth { key: "TIA_USD", inverted: false },
         !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 31536000 }
