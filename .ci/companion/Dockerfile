@@ -1,6 +1,6 @@
 FROM alpine:3.19.1
 
-RUN apk update && apk add fontconfig
+RUN apk update && apk add bash fontconfig
 
 ADD https://static.levana.finance/PublicSans-Regular.ttf /usr/share/fonts/PublicSans-Regular.ttf
 
