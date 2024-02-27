@@ -548,6 +548,7 @@ impl State<'_> {
             amount,
             insufficient_margin_event,
             total_net_funding_paid,
+            #[cfg(debug_assertions)]
             margin_to_check: pos.liquidation_margin.funding,
         })
     }
@@ -822,10 +823,11 @@ impl PositionFeeSettlement {
 
 #[must_use]
 pub(crate) struct FundingFeePaymentWithCapping {
-    pub amount: Signed<Collateral>,
-    pub insufficient_margin_event: Option<InsufficientMarginEvent>,
-    pub total_net_funding_paid: Signed<Collateral>,
-    pub margin_to_check: Collateral,
+    pub(crate) amount: Signed<Collateral>,
+    pub(crate) insufficient_margin_event: Option<InsufficientMarginEvent>,
+    pub(crate) total_net_funding_paid: Signed<Collateral>,
+    #[cfg(debug_assertions)]
+    pub(crate) margin_to_check: Collateral,
 }
 
 impl FundingFeePaymentWithCapping {
