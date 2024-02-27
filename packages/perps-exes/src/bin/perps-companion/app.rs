@@ -82,10 +82,24 @@ impl App {
         let mut fontdb = resvg::usvg::fontdb::Database::new();
         fontdb.load_system_fonts();
 
-        for (face_id, face) in fontdb.faces().enumerate() {
-            tracing::info!("Font #{}: {:?}", face_id + 1, face)
+        if opt.font_check {
+            anyhow::ensure!(!fontdb.is_empty(), "No fonts found");
+
+            let mut has_public_sans = false;
+
+            for (face_id, face) in fontdb.faces().enumerate() {
+                tracing::info!("Font #{}: {:?}", face_id + 1, face);
+
+                has_public_sans = has_public_sans
+                    || face
+                        .families
+                        .iter()
+                        .any(|(family, _)| family == "Public Sans");
+            }
+            tracing::info!("Total fonts available: {}.", fontdb.len());
+
+            anyhow::ensure!(has_public_sans, "Did not find the Public Sans font");
         }
-        tracing::info!("Total fonts available: {}.", fontdb.len());
 
         Ok(App {
             cosmos: cosmos_map,
