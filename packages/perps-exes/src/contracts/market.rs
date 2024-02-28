@@ -353,6 +353,33 @@ impl MarketContract {
         Ok(position_response)
     }
 
+    pub async fn all_closed_positions(
+        &self,
+        owner: impl HasAddress,
+    ) -> Result<Vec<ClosedPosition>> {
+        let mut cursor = None;
+        let mut res = vec![];
+        loop {
+            let ClosedPositionsResp {
+                mut positions,
+                cursor: new_cursor,
+            } = self
+                .0
+                .query(MarketQueryMsg::ClosedPositionHistory {
+                    owner: owner.get_address_string().into(),
+                    cursor: cursor.take(),
+                    limit: None,
+                    order: None,
+                })
+                .await?;
+            res.append(&mut positions);
+            match new_cursor {
+                Some(new_cursor) => cursor = Some(new_cursor),
+                None => break Ok(res),
+            }
+        }
+    }
+
     pub async fn raw_query_positions(
         &self,
         position_ids: Vec<PositionId>,

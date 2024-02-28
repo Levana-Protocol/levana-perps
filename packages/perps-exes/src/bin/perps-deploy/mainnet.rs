@@ -1,6 +1,7 @@
 mod check_price_feed_health;
 mod close_all_positions;
 mod contracts_csv;
+mod fees_paid;
 mod migrate;
 mod rewards;
 mod send_treasury;
@@ -120,6 +121,11 @@ enum Sub {
         #[clap(flatten)]
         inner: rewards::RewardsOpts,
     },
+    /// Produce a report on fees paid by a wallet across a factory
+    FeesPaid {
+        #[clap(flatten)]
+        inner: fees_paid::FeesPaidOpts,
+    },
 }
 
 pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
@@ -146,6 +152,7 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
         Sub::CheckPriceFeedHealth { inner } => inner.go(opt).await?,
         Sub::CloseAllPositions { inner } => inner.go(opt).await?,
         Sub::Rewards { inner } => inner.go(opt).await?,
+        Sub::FeesPaid { inner } => inner.go(opt).await?,
     }
     Ok(())
 }
