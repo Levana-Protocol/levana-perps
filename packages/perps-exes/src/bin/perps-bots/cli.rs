@@ -46,14 +46,14 @@ pub(crate) struct Opt {
         env = "LEVANA_BOTS_PYTH_ENDPOINT_STABLE",
         default_value = "https://hermes.pyth.network/"
     )]
-    pub(crate) pyth_endpoint_stable: String,
+    pub(crate) pyth_endpoint_stable: reqwest::Url,
     /// The edge Pyth endpoint
     #[clap(
         long,
         env = "LEVANA_BOTS_PYTH_ENDPOINT_EDGE",
         default_value = "https://hermes-beta.pyth.network/"
     )]
-    pub(crate) pyth_endpoint_edge: String,
+    pub(crate) pyth_endpoint_edge: reqwest::Url,
     /// List of markets that should be ignored
     #[clap(long, env = "LEVANA_BOTS_IGNORED_MARKETS", value_delimiter = ',')]
     pub(crate) ignored_markets: Vec<MarketId>,
