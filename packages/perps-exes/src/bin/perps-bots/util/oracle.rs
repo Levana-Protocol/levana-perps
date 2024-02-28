@@ -391,7 +391,7 @@ async fn fetch_pyth_prices(
     }
 
     let base = endpoint.join("api/latest_price_feeds")?;
-    let ids_iter = ids.into_iter().map(|feed| ("ids[]", feed.to_hex()));
+    let ids_iter = ids.iter().map(|feed| ("ids[]", feed.to_hex()));
     let url = reqwest::Url::parse_with_params(base.as_str(), ids_iter)?;
 
     let records: Vec<PythRecord> = fetch_json_with_retry(|| client.get(url.clone())).await?;
