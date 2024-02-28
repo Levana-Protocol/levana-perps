@@ -13,6 +13,7 @@ impl State<'_> {
             .max_leverage
             .try_into_non_negative_value()
             .context("Max allowed leverage is negative")?;
+
         let current_leverage =
             current_leverage.map(|x| x.into_base(market_type).split().1.into_decimal256());
         let new_leverage = new_leverage_notional

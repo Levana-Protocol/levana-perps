@@ -60,8 +60,7 @@ impl<'a> BackwardsCompatTakeProfit<'a> {
     }
 }
 
-// just a local helper
-struct TakeProfitFromCounterCollateral<'a> {
+pub struct TakeProfitFromCounterCollateral<'a> {
     pub market_type: MarketType,
     pub collateral: NonZero<Collateral>,
     pub counter_collateral: NonZero<Collateral>,

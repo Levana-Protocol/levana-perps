@@ -62,6 +62,7 @@ pub enum ErrorId {
 
     // Errors that come from MarketError
     InvalidInfiniteMaxGains,
+    InvalidInfiniteTakeProfitPrice,
     MaxGainsTooLarge,
     WithdrawTooMuch,
     InsufficientLiquidityForWithdrawal,
