@@ -475,7 +475,6 @@ impl NeedsPriceUpdateInfo {
                 && timestamp > self.on_chain_oracle_publish_time
             {
                 return ActionWithReason::WorkNeeded(CrankTriggerReason::CrankNeedsNewPrice {
-                    on_chain_oracle_publish_time: self.on_chain_oracle_publish_time,
                     work_item: timestamp,
                 });
             }
@@ -666,7 +665,6 @@ async fn price_get_update_oracles_msg_raw(
 struct ReasonStats {
     market: MarketId,
     started_tracking: DateTime<Utc>,
-    oracle_update: u64,
     not_needed: u64,
     too_old: u64,
     normal_trigger: u64,
@@ -689,7 +687,6 @@ impl Display for ReasonStats {
             not_needed,
             too_old,
             no_price_found,
-            oracle_update,
             crank_work_available,
             more_work_found,
             deferred_needs_new_price,
@@ -700,7 +697,7 @@ impl Display for ReasonStats {
             high_trigger,
             very_high_trigger,
         } = self;
-        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Normal triggers: {normal_trigger}. High gas triggers: {high_trigger}. Very high gas triggers: {very_high_trigger}. No price found: {no_price_found}. Oracle update: {oracle_update}. Deferred execution w/price: {deferred_needs_new_price}. Pyth prices closed: {pyth_prices_closed}. Crank work available: {crank_work_available}. More work found: {more_work_found}. Price too old: {price_too_old}. Volatile diff too large: {volatile_diff_too_large}.")
+        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Normal triggers: {normal_trigger}. High gas triggers: {high_trigger}. Very high gas triggers: {very_high_trigger}. No price found: {no_price_found}. Deferred execution w/price: {deferred_needs_new_price}. Pyth prices closed: {pyth_prices_closed}. Crank work available: {crank_work_available}. More work found: {more_work_found}. Price too old: {price_too_old}. Volatile diff too large: {volatile_diff_too_large}.")
     }
 }
 
@@ -711,7 +708,6 @@ impl ReasonStats {
             not_needed: 0,
             too_old: 0,
             no_price_found: 0,
-            oracle_update: 0,
             market,
             crank_work_available: 0,
             more_work_found: 0,
@@ -731,12 +727,7 @@ impl ReasonStats {
             ActionWithReason::PythPricesClosed => self.pyth_prices_closed += 1,
             ActionWithReason::PriceTooOld { .. } => self.price_too_old += 1,
             ActionWithReason::VolatileDiffTooLarge => self.volatile_diff_too_large += 1,
-            ActionWithReason::WorkNeeded(reason) => {
-                if reason.needs_price_update() {
-                    self.oracle_update += 1;
-                }
-                self.add_work_reason(reason);
-            }
+            ActionWithReason::WorkNeeded(reason) => self.add_work_reason(reason),
         }
     }
 

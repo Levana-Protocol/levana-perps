@@ -360,8 +360,6 @@ pub(crate) enum CrankTriggerReason {
     },
     /// Something in the crank queue, either deferred exec or liquifunding, needs a new price.
     CrankNeedsNewPrice {
-        #[allow(dead_code)]
-        on_chain_oracle_publish_time: DateTime<Utc>,
         work_item: DateTime<Utc>,
     },
     CrankWorkAvailable,
@@ -381,7 +379,6 @@ impl Display for CrankTriggerReason {
                 on_chain_oracle_publish_time: _,
             } => write!(f, "On chain price too old {on_chain_age:?}"),
             CrankTriggerReason::CrankNeedsNewPrice {
-                on_chain_oracle_publish_time: _,
                 work_item: deferred_work_item,
             } => write!(
                 f,
