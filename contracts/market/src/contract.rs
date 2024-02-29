@@ -248,6 +248,16 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             )?;
         }
 
+        ExecuteMsg::UpdatePositionTakeProfitPrice { id, price } => {
+            state.defer_execution(
+                &mut ctx,
+                info.sender,
+                DeferredExecItem::UpdatePositionTakeProfitPrice { id, price },
+                info.funds.take(),
+            )?;
+        }
+
+
         ExecuteMsg::SetTriggerOrder {
             id,
             stop_loss_override,

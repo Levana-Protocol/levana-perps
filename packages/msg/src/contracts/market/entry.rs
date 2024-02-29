@@ -175,6 +175,14 @@ pub enum ExecuteMsg {
         max_gains: MaxGainsInQuote,
     },
 
+    /// Modify the take profit price of a position
+    UpdatePositionTakeProfitPrice {
+        /// ID of position to update
+        id: PositionId,
+        /// New take profit price of the position
+        price: TakeProfitPrice,
+    },
+
     /// Set a stop loss or take profit override.
     /// This msg will override any previous values.
     /// Passing None will remove the override.

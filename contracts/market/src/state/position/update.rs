@@ -3,6 +3,7 @@ use crate::state::delta_neutrality_fee::ChargeDeltaNeutralityFeeResult;
 use crate::state::history::trade::trade_volume_usd;
 use crate::state::liquidity::{LiquidityLock, LiquidityUnlock};
 use crate::state::position::get_position;
+use crate::state::position::take_profit::TakeProfitToCounterCollateral;
 use msg::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
 use msg::contracts::market::entry::PositionActionKind;
 use msg::contracts::market::fees::events::FeeSource;
@@ -719,6 +720,123 @@ impl UpdatePositionMaxGainsExec {
         Ok(())
     }
 }
+
+// This is a helper struct, created from read-only storage.
+// Most of the validation is done while creating the struct, which allows for
+// error recovery in the submessage handler.
+// State is then mutably updated by calling .apply()
+#[must_use]
+pub(crate) struct UpdatePositionTakeProfitPriceExec {
+    pos: Position,
+    price_point: PricePoint,
+    liquidity_update: Option<LiquidityUpdate>,
+    trading_fee_delta: Collateral,
+    event: PositionUpdateEvent,
+}
+
+impl UpdatePositionTakeProfitPriceExec {
+    pub(crate) fn new(
+        state: &State,
+        store: &dyn Storage,
+        pos: Position,
+        take_profit_price: TakeProfitPrice,
+        price_point: &PricePoint,
+    ) -> Result<Self> {
+        let mut pos = pos;
+        let original_pos = pos.clone();
+
+        let market_type = state.market_type(store)?;
+
+        let leverage_to_base = pos
+            .active_leverage_to_notional(&price_point)
+            .into_base(market_type)
+            .split()
+            .1;
+
+        let counter_collateral = TakeProfitToCounterCollateral {
+            take_profit_price_base: take_profit_price,
+            market_type,
+            collateral: pos.active_collateral,
+            leverage_to_base,
+            direction: pos.direction().into_base(market_type),
+            config: &state.config,
+            price_point,
+        }.calc()?;
+
+        let old_counter_collateral = pos.counter_collateral;
+        let new_counter_collateral = counter_collateral;
+        let counter_collateral_delta =
+            new_counter_collateral.into_signed() - old_counter_collateral.into_signed();
+        pos.counter_collateral = new_counter_collateral;
+
+        // Validate leverage _before_ we reduce trading fees from active collateral
+        state.position_validate_leverage_data(
+            state.market_type(store)?,
+            &pos,
+            price_point,
+            Some(&original_pos),
+        )?;
+
+        // Update fees.
+        let trading_fee_delta = state.config.calculate_trade_fee(
+            Signed::zero(),
+            Signed::zero(),
+            old_counter_collateral.raw(),
+            new_counter_collateral.raw(),
+        )?;
+
+        pos.active_collateral = pos.active_collateral.checked_sub(trading_fee_delta)?;
+        pos.trading_fee
+            .checked_add_assign(trading_fee_delta, price_point)?;
+
+        let notional_size_diff = pos.notional_size - original_pos.notional_size;
+        debug_assert!(notional_size_diff.is_zero());
+
+        let liquidity_update =
+            LiquidityUpdate::new(state, store, counter_collateral_delta, price_point, None)?;
+
+        let event = state.position_update_event(store, &original_pos, pos.clone(), price_point)?;
+
+        Ok(Self {
+            pos,
+            price_point: *price_point,
+            liquidity_update,
+            trading_fee_delta,
+            event,
+        })
+    }
+
+    // This is a no-op, but it's more expressive to call discard() or apply()
+    // rather than to just assign it to a throwaway variable.
+    pub(crate) fn discard(self) {}
+    pub(crate) fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
+        debug_assert!(self.pos.liquifunded_at == self.price_point.timestamp);
+
+        state.position_save(
+            ctx,
+            &mut self.pos,
+            &self.price_point,
+            true,
+            true,
+            PositionSaveReason::Update,
+        )?;
+
+        if let Some(liquidity_update) = self.liquidity_update.take() {
+            liquidity_update.apply(state, ctx)?;
+        }
+        state.collect_trading_fee(
+            ctx,
+            self.pos.id,
+            self.trading_fee_delta,
+            self.price_point,
+            FeeSource::Trading,
+        )?;
+        self.event.emit(state, ctx, &self.pos, &self.price_point)?;
+        Ok(())
+    }
+}
+
+
 
 // This trait allows for separating the creation of the event vs. emitting it
 // Most of the validation is done while creating the event itself, which allows for
