@@ -197,7 +197,6 @@ async fn main_inner() -> Result<()> {
                 }
             );
             println!("Leverage: {}", position.leverage);
-            println!("Max gains: {}", position.max_gains_in_quote);
             println!("Liquidation Price: {}", liquidation_price);
             println!("Profit price: {}", take_profit_price);
         }

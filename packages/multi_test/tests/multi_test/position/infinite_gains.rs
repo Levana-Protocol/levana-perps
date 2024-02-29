@@ -99,17 +99,17 @@ fn infinite_max_gains_perp_481() {
         // Position is still open, confirm that it's still considered infinite.
 
         let res = market.query_position(pos_id).unwrap();
+        // assert_eq!(
+        //     res.max_gains_in_quote,
+        //     MaxGainsInQuote::PosInfinity,
+        //     "Max gains is not infinite on iteration {i}, actual: {}",
+        //     res.max_gains_in_quote
+        // );
         assert_eq!(
-            res.max_gains_in_quote,
-            MaxGainsInQuote::PosInfinity,
-            "Max gains is not infinite on iteration {i}, actual: {}",
-            res.max_gains_in_quote
-        );
-        assert_eq!(
-            res.take_profit_price_base,
-            None,
-            "Take profit price is not None on iteration {i}, actual: {}",
-            res.take_profit_price_base.unwrap()
+            res.take_profit_override,
+            Some(TakeProfitPrice::PosInfinity),
+            "Take profit price is not infinite on iteration {i}, actual: {}",
+            res.take_profit_override.unwrap()
         );
     }
 }

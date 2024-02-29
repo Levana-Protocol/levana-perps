@@ -2,6 +2,7 @@ use crate::prelude::*;
 use crate::state::delta_neutrality_fee::ChargeDeltaNeutralityFeeResult;
 use crate::state::history::trade::trade_volume_usd;
 use crate::state::liquidity::LiquidityLock;
+use crate::state::position::take_profit::TakeProfitToCounterCollateral;
 use msg::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
 use msg::contracts::market::entry::{PositionActionKind, SlippageAssert};
 use msg::contracts::market::fees::events::FeeSource;
@@ -42,10 +43,9 @@ impl OpenPositionExec {
             crank_fee,
             leverage,
             direction,
-            max_gains_in_quote,
             slippage_assert,
             stop_loss_override,
-            take_profit_override,
+            take_profit_price,
         }: OpenPositionParams,
         price_point: &PricePoint,
     ) -> Result<Self> {
@@ -70,12 +70,24 @@ impl OpenPositionExec {
             )?;
         }
 
-        let counter_collateral = max_gains_in_quote.calculate_counter_collateral(
+        let take_profit_price_trader = take_profit_price;
+        let take_profit_price_notional = match take_profit_price {
+            TakeProfitPrice::PosInfinity => None,
+            TakeProfitPrice::Finite(x) => {
+                Some(PriceBaseInQuote::from_non_zero(x).into_notional_price(market_type))
+            }
+        };
+
+        let counter_collateral = TakeProfitToCounterCollateral {
+            take_profit_price_base: take_profit_price_trader,
             market_type,
             collateral,
-            notional_size_in_collateral,
-            leverage_to_notional,
-        )?;
+            leverage_to_base: leverage,
+            direction,
+            config: &state.config,
+            price_point,
+        }
+        .calc()?;
 
         // FEES
         // https://www.notion.so/levana-protocol/Levana-Well-funded-Perpetuals-Whitepaper-9805a6eba56d429b839f5551dbb65c40#75bb26a1439c4a81894c2aa399471263
@@ -112,14 +124,13 @@ impl OpenPositionExec {
             // just temporarily setting _something_ here, it will be overwritten right away in `set_next_liquifunding`
             next_liquifunding: liquifunded_at,
             stop_loss_override,
-            take_profit_override,
+            take_profit_override: Some(take_profit_price_trader),
             liquidation_margin: LiquidationMargin::default(),
             liquidation_price: None,
-            take_profit_price: None,
+            take_profit_price: take_profit_price_notional,
             stop_loss_override_notional: stop_loss_override
                 .map(|x| x.into_notional_price(market_type)),
-            take_profit_override_notional: take_profit_override
-                .map(|x| x.into_notional_price(market_type)),
+            take_profit_override_notional: None,
         };
 
         state.set_next_liquifunding(&mut pos, liquifunded_at);
@@ -295,8 +306,7 @@ pub(crate) struct OpenPositionParams {
     pub(crate) crank_fee: CollateralAndUsd,
     pub(crate) leverage: LeverageToBase,
     pub(crate) direction: DirectionToBase,
-    pub(crate) max_gains_in_quote: MaxGainsInQuote,
     pub(crate) slippage_assert: Option<SlippageAssert>,
     pub(crate) stop_loss_override: Option<PriceBaseInQuote>,
-    pub(crate) take_profit_override: Option<PriceBaseInQuote>,
+    pub(crate) take_profit_price: TakeProfitPrice,
 }

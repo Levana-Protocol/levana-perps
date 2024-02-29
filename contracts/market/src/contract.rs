@@ -140,13 +140,15 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             sender: _,
         } => anyhow::bail!("Cannot nest a Receive inside another Receive"),
 
+        // TODO: remove this once the deprecated fields are fully removed
+        #[allow(deprecated)]
         ExecuteMsg::OpenPosition {
             slippage_assert,
             leverage,
             direction,
             max_gains,
             stop_loss_override,
-            take_profit_override,
+            take_profit,
         } => {
             state.defer_execution(
                 &mut ctx,
@@ -157,7 +159,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     direction,
                     max_gains,
                     stop_loss_override,
-                    take_profit_override,
+                    take_profit,
                     amount: info.funds.take()?,
                     crank_fee: Collateral::zero(),
                     crank_fee_usd: Usd::zero(),

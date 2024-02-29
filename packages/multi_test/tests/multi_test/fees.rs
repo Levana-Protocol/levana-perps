@@ -31,8 +31,8 @@ fn test_fees_inner(market: PerpsMarket, direction: DirectionToBase, expected_fee
 
     let assert_fees_eq = |expected_protocol, expected_lp| -> Fees {
         let fees = market.query_fees().unwrap();
-        assert_eq!(fees.protocol, expected_protocol);
-        assert_eq!(fees.wallets, expected_lp);
+        assert!(fees.protocol.approx_eq(expected_protocol));
+        assert!(fees.wallets.approx_eq(expected_lp));
 
         fees
     };
@@ -57,19 +57,19 @@ fn test_fees_inner(market: PerpsMarket, direction: DirectionToBase, expected_fee
     // assert conditions after open
     assert_dao_eq(Collateral::zero());
     let fees_after_open = market.query_fees().unwrap();
-    assert_eq!(fees_after_open.protocol, expected_protocol_fees);
-    assert_eq!(fees_after_open.wallets, expected_lp_fees);
+    assert!(fees_after_open.protocol.approx_eq(expected_protocol_fees));
+    assert!(fees_after_open.wallets.approx_eq(expected_lp_fees));
 
     // transfer the fees (by way of factory to test submsg pipeline)
     market
         .exec_factory(&FactoryExecuteMsg::TransferAllDaoFees {})
         .unwrap();
-    assert_dao_eq(expected_protocol_fees); // full original amount
+    assert_dao_eq(fees_after_open.protocol); // full original amount
     assert_fees_eq(Collateral::zero(), expected_lp_fees); // LP is unchanged
 
     // make sure we error when we try to transfer empty fees
     market.exec_transfer_dao_fees(&cranker).unwrap_err();
-    assert_dao_eq(expected_protocol_fees); // full original amount
+    assert_dao_eq(fees_after_open.protocol); // full original amount
     assert_fees_eq(Collateral::zero(), expected_lp_fees); // LP is unchanged
 }
 

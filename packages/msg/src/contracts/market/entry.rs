@@ -110,11 +110,14 @@ pub enum ExecuteMsg {
         /// Direction of new position
         direction: DirectionToBase,
         /// Maximum gains of new position
-        max_gains: MaxGainsInQuote,
+        #[deprecated(note = "Use take_profit instead")]
+        max_gains: Option<MaxGainsInQuote>,
         /// Stop loss price of new position
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
-        take_profit_override: Option<PriceBaseInQuote>,
+        /// if max_gains is `None`, this *must* be `Some`
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<TakeProfitPrice>,
     },
 
     /// Add collateral to a position, causing leverage to decrease
@@ -835,7 +838,7 @@ pub struct PositionAction {
     /// If this is a position transfer, the new owner.
     pub new_owner: Option<Addr>,
     /// The take profit override, if set.
-    pub take_profit_override: Option<PriceBaseInQuote>,
+    pub take_profit_override: Option<TakeProfitPrice>,
     /// The stop loss override, if set.
     pub stop_loss_override: Option<PriceBaseInQuote>,
 }
@@ -1141,9 +1144,9 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
                 slippage_assert: u.arbitrary()?,
                 leverage: u.arbitrary()?,
                 direction: u.arbitrary()?,
-                max_gains: u.arbitrary()?,
+                max_gains: None,
                 stop_loss_override: u.arbitrary()?,
-                take_profit_override: u.arbitrary()?,
+                take_profit: Some(u.arbitrary()?),
             }),
             2 => Ok(ExecuteMsg::UpdatePositionAddCollateralImpactLeverage { id: u.arbitrary()? }),
             3 => Ok(ExecuteMsg::UpdatePositionAddCollateralImpactSize {

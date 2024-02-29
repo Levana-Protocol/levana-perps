@@ -83,6 +83,14 @@ impl LiquidityStats {
         }))
         .context("liquidity_deposit_inner: new shares is (impossibly) 0")
     }
+
+    /// approximate equality comparison, helpful for tests
+    pub fn approx_eq(&self, other: &Self) -> bool {
+        self.locked.approx_eq(other.locked)
+            && self.unlocked.approx_eq(other.unlocked)
+            && self.total_lp.approx_eq(other.total_lp)
+            && self.total_xlp.approx_eq(other.total_xlp)
+    }
 }
 
 /// Liquidity events

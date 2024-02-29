@@ -13,6 +13,7 @@ use msg::contracts::market::{
     entry::SlippageAssert,
     position::{events::PositionSaveReason, CollateralAndUsd},
 };
+use shared::compat::BackwardsCompatTakeProfit;
 
 use crate::state::{
     order::{CancelLimitOrderExec, PlaceLimitOrderExec},
@@ -61,34 +62,66 @@ fn helper_execute(
     price_point: PricePoint,
 ) -> Result<DeferredExecCompleteTarget> {
     match item.item {
+        // TODO: remove this once the deprecated fields are fully removed
+        #[allow(deprecated)]
         DeferredExecItem::OpenPosition {
             slippage_assert,
             leverage,
             direction,
             max_gains,
             stop_loss_override,
-            take_profit_override,
+            take_profit,
             amount,
             crank_fee,
             crank_fee_usd,
-        } => OpenPositionExec::new(
-            state,
-            ctx.storage,
-            OpenPositionParams {
-                owner: item.owner,
-                collateral: amount,
-                leverage,
-                direction,
-                max_gains_in_quote: max_gains,
-                slippage_assert,
-                stop_loss_override,
-                take_profit_override,
-                crank_fee: CollateralAndUsd::from_pair(crank_fee, crank_fee_usd),
-            },
-            &price_point,
-        )?
-        .apply(state, ctx, PositionSaveReason::OpenMarket)
-        .map(DeferredExecCompleteTarget::Position),
+        } => {
+            // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
+            let take_profit_price = match (take_profit, max_gains) {
+                (None, None) => {
+                    bail!("must supply at least one of take_profit or max_gains");
+                }
+                (Some(take_profit_price), None) => take_profit_price,
+                (take_profit, Some(max_gains)) => {
+                    let take_profit = match take_profit {
+                        None => None,
+                        Some(take_profit) => match take_profit {
+                            TakeProfitPrice::PosInfinity => {
+                                bail!("cannot set infinite take profit price and max_gains")
+                            }
+                            TakeProfitPrice::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
+                        },
+                    };
+                    BackwardsCompatTakeProfit {
+                        collateral: amount,
+                        market_type: state.market_id(ctx.storage)?.get_market_type(),
+                        direction,
+                        leverage,
+                        max_gains,
+                        take_profit,
+                        price_point: &price_point,
+                    }
+                    .calc()?
+                }
+            };
+
+            OpenPositionExec::new(
+                state,
+                ctx.storage,
+                OpenPositionParams {
+                    owner: item.owner,
+                    collateral: amount,
+                    leverage,
+                    direction,
+                    slippage_assert,
+                    stop_loss_override,
+                    take_profit_price,
+                    crank_fee: CollateralAndUsd::from_pair(crank_fee, crank_fee_usd),
+                },
+                &price_point,
+            )?
+            .apply(state, ctx, PositionSaveReason::OpenMarket)
+            .map(DeferredExecCompleteTarget::Position)
+        }
         DeferredExecItem::UpdatePositionAddCollateralImpactLeverage { id, amount } => {
             execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
             UpdatePositionCollateralExec::new(
@@ -311,17 +344,48 @@ fn helper_validate(
     price_point: &PricePoint,
 ) -> Result<()> {
     match item.item {
+        // TODO: remove this once the deprecated fields are fully removed
+        #[allow(deprecated)]
         DeferredExecItem::OpenPosition {
             slippage_assert,
             leverage,
             direction,
             max_gains,
             stop_loss_override,
-            take_profit_override,
+            take_profit,
             amount,
             crank_fee,
             crank_fee_usd,
         } => {
+            // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
+            let take_profit_price = match (take_profit, max_gains) {
+                (None, None) => {
+                    bail!("must supply at least one of take_profit or max_gains");
+                }
+                (Some(take_profit_price), None) => take_profit_price,
+                (take_profit, Some(max_gains)) => {
+                    let take_profit = match take_profit {
+                        None => None,
+                        Some(take_profit) => match take_profit {
+                            TakeProfitPrice::PosInfinity => {
+                                bail!("cannot set infinite take profit price and max_gains")
+                            }
+                            TakeProfitPrice::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
+                        },
+                    };
+                    BackwardsCompatTakeProfit {
+                        collateral: amount,
+                        market_type: state.market_id(store)?.get_market_type(),
+                        direction,
+                        leverage,
+                        max_gains,
+                        take_profit,
+                        price_point,
+                    }
+                    .calc()?
+                }
+            };
+
             OpenPositionExec::new(
                 state,
                 store,
@@ -330,10 +394,9 @@ fn helper_validate(
                     collateral: amount,
                     leverage,
                     direction,
-                    max_gains_in_quote: max_gains,
                     slippage_assert,
                     stop_loss_override,
-                    take_profit_override,
+                    take_profit_price,
                     crank_fee: CollateralAndUsd::from_pair(crank_fee, crank_fee_usd),
                 },
                 price_point,

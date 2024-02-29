@@ -1,10 +1,13 @@
 //! Data types and conversion functions for different price representations.
+use schemars::{
+    schema::{InstanceType, SchemaObject},
+    JsonSchema,
+};
 use std::{fmt::Display, str::FromStr};
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Decimal256, StdError, StdResult};
 use cw_storage_plus::{Key, KeyDeserialize, Prefixer, PrimaryKey};
-use schemars::JsonSchema;
 
 use crate::prelude::*;
 
@@ -483,6 +486,112 @@ impl TryFrom<pyth_sdk_cw::Price> for PriceCollateralInUsd {
     }
 }
 
+/// String representation of positive infinity.
+const POS_INF_STR: &str = "+Inf";
+
+/// The take profit price for a position, as supplied by client messsages.
+///
+/// Infinite take profit price is possible. However, this is an error in the case of
+/// short positions or collateral-is-quote markets.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub enum TakeProfitPrice {
+    /// Finite take profit price
+    Finite(NonZero<Decimal256>),
+    /// Infinite take profit price
+    PosInfinity,
+}
+
+impl Display for TakeProfitPrice {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            TakeProfitPrice::Finite(val) => val.fmt(f),
+            TakeProfitPrice::PosInfinity => write!(f, "{}", POS_INF_STR),
+        }
+    }
+}
+
+impl FromStr for TakeProfitPrice {
+    type Err = PerpError;
+    fn from_str(src: &str) -> Result<Self, PerpError> {
+        match src {
+            POS_INF_STR => Ok(TakeProfitPrice::PosInfinity),
+            _ => match src.parse() {
+                Ok(number) => Ok(TakeProfitPrice::Finite(number)),
+                Err(err) => Err(perp_error!(
+                    ErrorId::Conversion,
+                    ErrorDomain::Default,
+                    "error converting {} to TakeProfitPrice , {}",
+                    src,
+                    err
+                )),
+            },
+        }
+    }
+}
+
+impl TryFrom<&str> for TakeProfitPrice {
+    type Error = anyhow::Error;
+
+    fn try_from(val: &str) -> Result<Self, Self::Error> {
+        Self::from_str(val).map_err(|err| err.into())
+    }
+}
+
+impl serde::Serialize for TakeProfitPrice {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            TakeProfitPrice::Finite(number) => number.serialize(serializer),
+            TakeProfitPrice::PosInfinity => serializer.serialize_str(POS_INF_STR),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for TakeProfitPrice {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_str(TakeProfitPriceVisitor)
+    }
+}
+
+impl JsonSchema for TakeProfitPrice {
+    fn schema_name() -> String {
+        "TakeProfitPrice".to_owned()
+    }
+
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        SchemaObject {
+            instance_type: Some(InstanceType::String.into()),
+            format: Some("take-profit".to_owned()),
+            ..Default::default()
+        }
+        .into()
+    }
+}
+
+struct TakeProfitPriceVisitor;
+
+impl<'de> serde::de::Visitor<'de> for TakeProfitPriceVisitor {
+    type Value = TakeProfitPrice;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("TakeProfitPrice")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        v.parse()
+            .map_err(|_| E::custom(format!("Invalid TakeProfitPrice: {v}")))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -558,5 +667,18 @@ mod tests {
         go(-123456789, 3, "-123456789000.0");
         go(12345600789, -5, "123456.00789");
         go(1234560078900, -7, "123456.00789");
+    }
+
+    #[test]
+    fn take_profit_price() {
+        fn go(s: &str, expected: TakeProfitPrice) {
+            let deserialized = serde_json::from_str::<TakeProfitPrice>(s).unwrap();
+            assert_eq!(deserialized, expected);
+            let serialized = serde_json::to_string(&expected).unwrap();
+            assert_eq!(serialized, s);
+        }
+
+        go("\"1.2\"", TakeProfitPrice::Finite("1.2".parse().unwrap()));
+        go("\"+Inf\"", TakeProfitPrice::PosInfinity);
     }
 }

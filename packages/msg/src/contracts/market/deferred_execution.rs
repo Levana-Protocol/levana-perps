@@ -182,11 +182,13 @@ pub enum DeferredExecItem {
         /// Direction of new position
         direction: DirectionToBase,
         /// Maximum gains of new position
-        max_gains: MaxGainsInQuote,
+        #[deprecated(note = "use take_profit instead")]
+        max_gains: Option<MaxGainsInQuote>,
         /// Stop loss price of new position
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
-        take_profit_override: Option<PriceBaseInQuote>,
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<TakeProfitPrice>,
         /// The amount of collateral provided
         amount: NonZero<Collateral>,
         /// Crank fee already charged

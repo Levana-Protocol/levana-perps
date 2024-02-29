@@ -203,9 +203,9 @@ impl MarketContract {
             slippage_assert,
             leverage,
             direction,
-            max_gains,
+            max_gains: Some(max_gains),
             stop_loss_override,
-            take_profit_override,
+            take_profit: take_profit_override.map(|x| TakeProfitPrice::Finite(x.into_non_zero())),
         };
         self.exec_with_funds(wallet, status, deposit, &msg)
             .await

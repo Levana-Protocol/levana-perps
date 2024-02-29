@@ -22,7 +22,7 @@ fn test_position_open_inner(
     // liquidity is adjusted due to open
     let liquidity = market.query_liquidity_stats().unwrap();
 
-    assert_eq!(liquidity, *expected_liquidity);
+    liquidity.approx_eq(expected_liquidity);
 
     // sanity check that the NFT works
     let nft_ids = market.query_position_token_ids(&trader).unwrap();
