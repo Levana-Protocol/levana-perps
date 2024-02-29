@@ -391,7 +391,10 @@ impl Display for CrankTriggerReason {
                 f.write_str("Price bot discovered crank work available")
             }
             CrankTriggerReason::PriceWillTrigger { gas_level } => {
-                f.write_str("New price would trigger an action with {gas_level} gas level")
+                write!(
+                    f,
+                    "New price would trigger an action with {gas_level} gas level"
+                )
             }
             CrankTriggerReason::MoreWorkFound => f.write_str("Crank running discovered more work"),
         }
@@ -431,4 +434,14 @@ pub(crate) enum GasLevel {
     High,
     /// The delta is high enough to risk a delayed-trigger attack, use a separate task and much higher gas
     VeryHigh,
+}
+
+impl Display for GasLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(match self {
+            GasLevel::Normal => "normal",
+            GasLevel::High => "high",
+            GasLevel::VeryHigh => "very high",
+        })
+    }
 }
