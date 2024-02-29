@@ -11,7 +11,6 @@ use chrono::Utc;
 use cosmos::{Address, HasAddress};
 use cosmos::{Coin, Cosmos};
 use cosmos::{DynamicGasMultiplier, Wallet};
-use cosmwasm_std::Decimal256;
 use parking_lot::Mutex;
 use perps_exes::config::GasAmount;
 use reqwest::Client;
@@ -359,12 +358,6 @@ pub(crate) enum CrankTriggerReason {
         #[allow(dead_code)]
         on_chain_oracle_publish_time: DateTime<Utc>,
     },
-    LargePriceDelta {
-        oracle_to_off_chain_delta: Decimal256,
-        market_to_off_chain_delta: Decimal256,
-        // if the price delta is large, we may want to use a different wallet
-        very_high_price_delta: bool,
-    },
     /// Something in the crank queue, either deferred exec or liquifunding, needs a new price.
     CrankNeedsNewPrice {
         #[allow(dead_code)]
@@ -372,7 +365,10 @@ pub(crate) enum CrankTriggerReason {
         work_item: DateTime<Utc>,
     },
     CrankWorkAvailable,
-    PriceWillTrigger,
+    PriceWillTrigger {
+        /// What level of high gas wallet is necessitated by this?
+        high_gas: Option<HighGas>,
+    },
     MoreWorkFound,
 }
 
@@ -385,11 +381,6 @@ impl Display for CrankTriggerReason {
                 off_chain_publish_time: _,
                 on_chain_oracle_publish_time: _,
             } => write!(f, "On chain price too old {on_chain_age:?}"),
-            CrankTriggerReason::LargePriceDelta {
-                oracle_to_off_chain_delta,
-                market_to_off_chain_delta,
-                very_high_price_delta: _,
-            } => write!(f, "Large price delta found, delta to oracle: {oracle_to_off_chain_delta}, delta to market: {market_to_off_chain_delta}"),
             CrankTriggerReason::CrankNeedsNewPrice {
                 on_chain_oracle_publish_time: _,
                 work_item: deferred_work_item,
@@ -400,7 +391,7 @@ impl Display for CrankTriggerReason {
             CrankTriggerReason::CrankWorkAvailable => {
                 f.write_str("Price bot discovered crank work available")
             }
-            CrankTriggerReason::PriceWillTrigger => {
+            CrankTriggerReason::PriceWillTrigger { high_gas: _ } => {
                 f.write_str("New price would trigger an action")
             }
             CrankTriggerReason::MoreWorkFound => f.write_str("Crank running discovered more work"),
@@ -413,9 +404,8 @@ impl CrankTriggerReason {
         match self {
             CrankTriggerReason::NoPriceOnChain
             | CrankTriggerReason::OnChainTooOld { .. }
-            | CrankTriggerReason::LargePriceDelta { .. }
             | CrankTriggerReason::CrankNeedsNewPrice { .. }
-            | CrankTriggerReason::PriceWillTrigger => true,
+            | CrankTriggerReason::PriceWillTrigger { .. } => true,
             CrankTriggerReason::CrankWorkAvailable | CrankTriggerReason::MoreWorkFound => false,
         }
     }
@@ -423,19 +413,11 @@ impl CrankTriggerReason {
     /// Does this action warrant paying very high gas costs?
     pub(crate) fn needs_high_gas(&self) -> Option<HighGas> {
         match self {
-            CrankTriggerReason::LargePriceDelta {
-                very_high_price_delta,
-                ..
-            } => Some(if *very_high_price_delta {
-                HighGas::VeryHigh
-            } else {
-                HighGas::High
-            }),
+            CrankTriggerReason::PriceWillTrigger { high_gas } => *high_gas,
             CrankTriggerReason::NoPriceOnChain
             | CrankTriggerReason::OnChainTooOld { .. }
             | CrankTriggerReason::CrankNeedsNewPrice { .. }
             | CrankTriggerReason::CrankWorkAvailable
-            | CrankTriggerReason::PriceWillTrigger
             | CrankTriggerReason::MoreWorkFound => None,
         }
     }

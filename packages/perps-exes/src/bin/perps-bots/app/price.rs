@@ -430,29 +430,29 @@ impl NeedsPriceUpdateInfo {
             - self.off_chain_price.into_number())
         .abs_unsigned()
             / self.off_chain_price.into_non_zero().raw();
-        if oracle_to_off_chain_delta
-            > params
-                .on_off_chain_price_delta
-                .min(self.exposure_margin_ratio)
-            || market_to_off_chain_delta
-                > params
-                    .on_off_chain_price_delta
-                    .min(self.exposure_margin_ratio)
-        {
-            let very_high_price_delta = market_to_off_chain_delta > self.exposure_margin_ratio
-                || oracle_to_off_chain_delta > self.exposure_margin_ratio;
 
-            if very_high_price_delta
-                || self.next_pending_deferred_work_item.is_some()
-                || self.price_will_trigger
+        // If the new price would hit some new triggers, then we need to do a
+        // price update and crank.
+        if self.price_will_trigger {
+            // Potential future optimization: only query this piece of data on-demand
+            let very_high_threshold = self.exposure_margin_ratio;
+            let high_threshold = params.on_off_chain_price_delta;
+
+            // We know that we need to trigger a price update. Now we determine if the price delta is high enough that it warrants spending extra gas on Osmosis mainnet.
+            let high_gas = if market_to_off_chain_delta > very_high_threshold
+                || oracle_to_off_chain_delta > very_high_threshold
             {
-                return ActionWithReason::WorkNeeded(CrankTriggerReason::LargePriceDelta {
-                    oracle_to_off_chain_delta,
-                    market_to_off_chain_delta,
-                    very_high_price_delta,
-                });
-            }
+                Some(HighGas::VeryHigh)
+            } else if market_to_off_chain_delta > high_threshold
+                || oracle_to_off_chain_delta > high_threshold
+            {
+                Some(HighGas::High)
+            } else {
+                None
+            };
+            return ActionWithReason::WorkNeeded(CrankTriggerReason::PriceWillTrigger { high_gas });
         }
+
         let on_chain_age = self
             .off_chain_publish_time
             .signed_duration_since(self.on_chain_market_publish_time);
@@ -463,13 +463,6 @@ impl NeedsPriceUpdateInfo {
                 // here we provide the publish time from the market because it is the older of the two.
                 on_chain_oracle_publish_time: self.on_chain_market_publish_time,
             });
-        }
-
-        // If the new price would hit some new triggers, then we need to do a
-        // price update and crank.
-        if self.price_will_trigger {
-            // Potential future optimization: only query this piece of data on-demand
-            return ActionWithReason::WorkNeeded(CrankTriggerReason::PriceWillTrigger);
         }
 
         // See comment on needs_crank = true below.
@@ -690,8 +683,9 @@ struct ReasonStats {
     oracle_update: u64,
     not_needed: u64,
     too_old: u64,
-    delta: u64,
-    triggers: u64,
+    normal_trigger: u64,
+    high_trigger: u64,
+    very_high_trigger: u64,
     crank_work_available: u64,
     more_work_found: u64,
     no_price_found: u64,
@@ -708,8 +702,6 @@ impl Display for ReasonStats {
             started_tracking,
             not_needed,
             too_old,
-            delta,
-            triggers,
             no_price_found,
             oracle_update,
             crank_work_available,
@@ -718,8 +710,11 @@ impl Display for ReasonStats {
             pyth_prices_closed,
             price_too_old,
             volatile_diff_too_large,
+            normal_trigger,
+            high_trigger,
+            very_high_trigger,
         } = self;
-        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Delta: {delta}. Triggers: {triggers}. No price found: {no_price_found}. Oracle update: {oracle_update}. Deferred execution w/price: {deferred_needs_new_price}. Pyth prices closed: {pyth_prices_closed}. Crank work available: {crank_work_available}. More work found: {more_work_found}. Price too old: {price_too_old}. Volatile diff too large: {volatile_diff_too_large}.")
+        write!(f, "{market} {started_tracking}: not needed {not_needed}. too old {too_old}. Normal triggers: {normal_trigger}. High gas triggers: {high_trigger}. Very high gas triggers: {very_high_trigger}. No price found: {no_price_found}. Oracle update: {oracle_update}. Deferred execution w/price: {deferred_needs_new_price}. Pyth prices closed: {pyth_prices_closed}. Crank work available: {crank_work_available}. More work found: {more_work_found}. Price too old: {price_too_old}. Volatile diff too large: {volatile_diff_too_large}.")
     }
 }
 
@@ -729,8 +724,6 @@ impl ReasonStats {
             started_tracking: Utc::now(),
             not_needed: 0,
             too_old: 0,
-            delta: 0,
-            triggers: 0,
             no_price_found: 0,
             oracle_update: 0,
             market,
@@ -740,6 +733,9 @@ impl ReasonStats {
             pyth_prices_closed: 0,
             price_too_old: 0,
             volatile_diff_too_large: 0,
+            normal_trigger: 0,
+            high_trigger: 0,
+            very_high_trigger: 0,
         }
     }
 
@@ -762,10 +758,13 @@ impl ReasonStats {
         match reason {
             CrankTriggerReason::NoPriceOnChain => self.no_price_found += 1,
             CrankTriggerReason::OnChainTooOld { .. } => self.too_old += 1,
-            CrankTriggerReason::LargePriceDelta { .. } => self.delta += 1,
             CrankTriggerReason::CrankNeedsNewPrice { .. } => self.deferred_needs_new_price += 1,
             CrankTriggerReason::CrankWorkAvailable => self.crank_work_available += 1,
-            CrankTriggerReason::PriceWillTrigger => self.triggers += 1,
+            CrankTriggerReason::PriceWillTrigger { high_gas } => match high_gas {
+                Some(HighGas::High) => self.high_trigger += 1,
+                Some(HighGas::VeryHigh) => self.very_high_trigger += 1,
+                None => todo!(),
+            },
             CrankTriggerReason::MoreWorkFound => self.more_work_found += 1,
         }
     }
