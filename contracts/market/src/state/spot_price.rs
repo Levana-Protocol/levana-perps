@@ -437,7 +437,14 @@ impl State<'_> {
             .next()
         {
             // No prices published yet, so we're allowed to use this timestamp
-            None => (),
+            None => {
+                // niche case of the first oracle price point being earlier than our instantiation time
+                // we need to wait for the oracle price to move further into the future
+                // because that time is used in initialize_borrow_fee_rate() (as now())
+                if new_publish_time < self.instantiation_time(ctx.storage)? {
+                    bail!("Cannot use a spot price publish time earlier than the contract instantiation time");
+                }
+            }
             Some(last_published) => {
                 if last_published? >= new_publish_time {
                     // New publish time is not newer that the last published time, do not add a new spot price

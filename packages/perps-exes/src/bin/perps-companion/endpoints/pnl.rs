@@ -22,7 +22,7 @@ use msg::{
     prelude::{NonZero, PricePoint, Signed, SignedLeverageToNotional, UnsignedDecimal, Usd},
 };
 
-use resvg::usvg::{TreeParsing, TreeTextToPath};
+use resvg::usvg::{fontdb::Database, TreeParsing, TreeTextToPath};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use shared::storage::{MarketId, MarketType};
@@ -33,7 +33,7 @@ use crate::{
     types::{ChainId, ContractEnvironment, DirectionForDb, PnlType, TwoDecimalPoints},
 };
 
-use super::{ErrorPage, PnlCssRoute, PnlHtml, PnlImage, PnlUrl};
+use super::{ErrorPage, PnlCssRoute, PnlHtml, PnlImage, PnlImageSvg, PnlUrl};
 
 pub(super) async fn pnl_url(
     _: PnlUrl,
@@ -97,6 +97,7 @@ impl PnlInfo {
             chain: chain.to_string(),
             wallet,
             quote_currency,
+            cache_bust_param: app.opt.cache_bust,
         })
     }
 }
@@ -118,7 +119,17 @@ pub(super) async fn pnl_image(
 ) -> Result<Response, Error> {
     PnlInfo::load_from_database(&app, pnl_id, &host)
         .await
-        .map(PnlInfo::image)
+        .map(|info| info.image(&app.fontdb))
+}
+
+pub(super) async fn pnl_image_svg(
+    PnlImageSvg { pnl_id }: PnlImageSvg,
+    TypedHeader(host): TypedHeader<Host>,
+    State(app): State<Arc<App>>,
+) -> Result<Response, Error> {
+    PnlInfo::load_from_database(&app, pnl_id, &host)
+        .await
+        .map(PnlInfo::image_svg)
 }
 
 pub(super) async fn pnl_css(_: PnlCssRoute) -> Css<&'static str> {
@@ -306,8 +317,8 @@ impl PnlInfo {
         res
     }
 
-    fn image(self) -> Response {
-        match self.image_inner() {
+    fn image(self, fontsdb: &Database) -> Response {
+        match self.image_inner(fontsdb) {
             Ok(res) => res,
             Err(e) => {
                 let mut res = format!("Error while rendering SVG: {e:?}").into_response();
@@ -317,17 +328,30 @@ impl PnlInfo {
         }
     }
 
-    fn image_inner(&self) -> Result<Response> {
+    fn image_svg(self) -> Response {
+        // Generate the raw SVG text by rendering the template
+        let svg = PnlSvg { info: &self }.render().unwrap();
+
+        let mut res = svg.into_response();
+        res.headers_mut().insert(
+            http::header::CONTENT_TYPE,
+            HeaderValue::from_static("image/svg+xml"),
+        );
+        res.headers_mut().insert(
+            http::header::CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=86400"),
+        );
+        res
+    }
+
+    fn image_inner(&self, fontsdb: &Database) -> Result<Response> {
         // Generate the raw SVG text by rendering the template
         let svg = PnlSvg { info: self }.render().unwrap();
 
         // Convert the SVG into a usvg tree using default settings
         let mut tree = resvg::usvg::Tree::from_str(&svg, &resvg::usvg::Options::default())?;
 
-        // Load up the fonts and convert text values
-        let mut fontdb = resvg::usvg::fontdb::Database::new();
-        fontdb.load_system_fonts();
-        tree.convert_text(&fontdb);
+        tree.convert_text(fontsdb);
 
         // Now that our usvg tree has text converted, convert into an resvg tree
         let rtree = resvg::Tree::from_usvg(&tree);
@@ -439,6 +463,7 @@ struct PnlInfo {
     wallet: Option<String>,
     pnl: PnlDetails,
     quote_currency: String,
+    cache_bust_param: u32,
 }
 
 enum PnlDetails {

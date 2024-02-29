@@ -28,6 +28,13 @@ pub enum MarketError {
         market_type: MarketType,
         direction: DirectionToBase,
     },
+    #[error(
+        "Infinite take profit price can only be used on long positions for collateral-is-base markets"
+    )]
+    InvalidInfiniteTakeProfitPrice {
+        market_type: MarketType,
+        direction: DirectionToBase,
+    },
     #[error("Max gains are too large")]
     MaxGainsTooLarge {},
     #[error("Unable to withdraw {requested}. Only {available} LP tokens held.")]
@@ -152,8 +159,6 @@ pub enum MarketError {
         close_time: Timestamp,
         reason: String,
     },
-    #[error("Could not calculate take profit from any of the supplied parameters")]
-    MissingTakeProfit,
 }
 
 /// Was the price provided by the trader too high or too low?
@@ -254,6 +259,9 @@ impl MarketError {
     fn get_error_id(&self) -> ErrorId {
         match self {
             MarketError::InvalidInfiniteMaxGains { .. } => ErrorId::InvalidInfiniteMaxGains,
+            MarketError::InvalidInfiniteTakeProfitPrice { .. } => {
+                ErrorId::InvalidInfiniteTakeProfitPrice
+            }
             MarketError::MaxGainsTooLarge {} => ErrorId::MaxGainsTooLarge,
             MarketError::WithdrawTooMuch { .. } => ErrorId::WithdrawTooMuch,
             MarketError::InsufficientLiquidityForWithdrawal { .. } => {
@@ -288,7 +296,6 @@ impl MarketError {
             MarketError::PositionAlreadyClosing { .. } => ErrorId::PositionAlreadyClosing,
             MarketError::NoPricePublishTimeFound => ErrorId::NoPricePublishTimeFound,
             MarketError::PositionAlreadyClosed { .. } => ErrorId::PositionAlreadyClosed,
-            MarketError::MissingTakeProfit { .. } => ErrorId::MissingTakeProfit,
         }
     }
 }

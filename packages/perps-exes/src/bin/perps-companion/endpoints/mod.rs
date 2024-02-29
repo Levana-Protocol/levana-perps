@@ -85,6 +85,12 @@ pub(crate) struct PnlImage {
     pub(crate) pnl_id: i64,
 }
 
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/pnl/:pnl_id/image.svg", rejection(pnl::Error))]
+pub(crate) struct PnlImageSvg {
+    pub(crate) pnl_id: i64,
+}
+
 impl From<PathRejection> for pnl::Error {
     fn from(rejection: PathRejection) -> Self {
         Self::Path {
@@ -141,6 +147,7 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .typed_put(pnl::pnl_url)
         .typed_get(pnl::pnl_html)
         .typed_get(pnl::pnl_image)
+        .typed_get(pnl::pnl_image_svg)
         .typed_get(export::history)
         .typed_get(whales::whales)
         .typed_get(whales::whale_css)

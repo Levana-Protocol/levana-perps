@@ -11,6 +11,7 @@ fn multi_market() {
         market_1.token.clone().into(),
         PriceBaseInQuote::try_from_number(Number::ONE).unwrap(),
         Some("1".parse().unwrap()),
+        None,
         true,
         DEFAULT_MARKET.spot_price,
     )

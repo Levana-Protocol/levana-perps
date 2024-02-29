@@ -19,6 +19,7 @@ fn status() {
         },
         "50".parse().unwrap(),
         Some("50".parse().unwrap()),
+        None,
         true,
         DEFAULT_MARKET.spot_price,
     )

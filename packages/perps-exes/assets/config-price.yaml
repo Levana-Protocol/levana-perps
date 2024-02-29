@@ -20,6 +20,7 @@ pyth:
       GBP_USD: 84c2dde9633d93d1bcad84e7dc41c9d56578b7ec52fabedc1f335d673df0a7c1
       USD_CNH: eef52e09c878ad41f6a81803e3640fe04dceea727de894edd4ea117e2e332e66
       XAU_USD: 765d2ba906dbc32ca17cc11f5310a89e9ee1f6420508c63861f2f8ba4ee34bb2
+      XAG_USD: f2fb02c32b055c805e7238d628e5e9dadef274376114eb1f012337cabe93871e
       BNB_USD: 2f95862b045670cd22bee3114c39763a4a08beeb663b145d283c31d7d1101c4f
       SOL_USD: ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d
       LINK_USD: 8ac0c70fff57e9aefdf5edf44b51d62c2d433653cbb2cf5cc06bb115af04d221
@@ -297,6 +298,13 @@ networks:
       feeds-usd: [
         !constant { price: "1", inverted: false }
       ]
+    SILVER_USDC:
+      feeds: [
+        !pyth { key: "XAG_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
     BNB_USDC:
       feeds: [
         !pyth { key: "BNB_USD", inverted: false }
@@ -335,7 +343,10 @@ networks:
         !pyth { key: "TIA_USD", inverted: false}
       ]
     milkTIA_USD:
-      stride-contract: osmo1jt34seu48rqe6acy9ew4fgzvg502mjmrggt00d8thn5fe2g32hjsmyy7p6
+      # Original contract from Milky Way team with inverted redemption rate
+      # stride-contract: osmo1jt34seu48rqe6acy9ew4fgzvg502mjmrggt00d8thn5fe2g32hjsmyy7p6
+      # Correction contract
+      stride-contract: osmo1j0qqgzu2520usq5580rcf8whcckuc7nlcy7k4hxwqkwg43n2zy9q4xnf2u
       feeds: [
         !pyth { key: "TIA_USD", inverted: false },
         !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 43200 }
@@ -439,6 +450,13 @@ networks:
     NTRN_USDC:
       feeds: [
         !pyth { key: "NTRN_USD", inverted: false },
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    CNH_USDC:
+      feeds: [
+        !pyth { key: "USD_CNH", inverted: true }
       ]
       feeds-usd: [
         !constant { price: "1", inverted: false }
@@ -549,7 +567,10 @@ networks:
         !pyth { key: "OSMO_USD", inverted: false }
       ]
     milkTIA_USD:
-      stride-contract: osmo1jlm7dglrwfk073r2mgta66sf27htceaklx0qprlm0pupfv632p6s3mzckj
+      # Real contract from Milky Way
+      # stride-contract: osmo1jlm7dglrwfk073r2mgta66sf27htceaklx0qprlm0pupfv632p6s3mzckj
+      # RR fix contract to correct inverted redemption rate
+      stride-contract: osmo1qemh23s4qwymxyzqs0puhle60djhtytjhvv4ghdfdf0x9tgkapss6q6sj8
       feeds: [
         !pyth { key: "TIA_USD", inverted: false },
         !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 31536000 }
@@ -653,6 +674,13 @@ networks:
     GOLD_USDC:
       feeds: [
         !pyth { key: "XAU_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    SILVER_USDC:
+      feeds: [
+        !pyth { key: "XAG_USD", inverted: false }
       ]
       feeds-usd: [
         !constant { price: "1", inverted: false }

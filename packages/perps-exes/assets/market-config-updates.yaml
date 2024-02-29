@@ -439,6 +439,27 @@ markets:
       exposure_margin_ratio: 0.002
 
     initial-borrow-fee-rate: 0.05
+  SILVER_USDC:
+    config:
+      trading_fee_notional_size: 0.001
+      trading_fee_counter_collateral: 0.001
+      max_leverage: 100
+      carry_leverage: 25
+      funding_rate_sensitivity: 1
+      funding_rate_max_annualized: 0.45
+      borrow_fee_rate_min_annualized: 0.03
+      borrow_fee_rate_max_annualized: 0.3
+      target_utilization: 0.5
+      borrow_fee_sensitivity: 0.15
+      delta_neutrality_fee_sensitivity: 5000000000
+      delta_neutrality_fee_cap: 0.0001
+      delta_neutrality_fee_tax: 0.05
+      liquifunding_delay_seconds: 21600
+      liquifunding_delay_fuzz_seconds: 3600
+      liquidity_cooldown_seconds: 86400
+      exposure_margin_ratio: 0.002
+
+    initial-borrow-fee-rate: 0.05
 
   XRP_USDC:
     config:

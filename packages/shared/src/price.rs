@@ -567,7 +567,7 @@ impl JsonSchema for TakeProfitPrice {
     fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         SchemaObject {
             instance_type: Some(InstanceType::String.into()),
-            format: Some("leverage".to_owned()),
+            format: Some("take-profit".to_owned()),
             ..Default::default()
         }
         .into()

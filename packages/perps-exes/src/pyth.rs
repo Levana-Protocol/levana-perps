@@ -9,7 +9,7 @@ use pyth_sdk_cw::PriceIdentifier;
 pub async fn get_oracle_update_msg(
     ids: &HashSet<PriceIdentifier>,
     sender: impl HasAddress,
-    endpoint: &str,
+    endpoint: &reqwest::Url,
     client: &reqwest::Client,
     oracle: &Contract,
 ) -> Result<MsgExecuteContract> {
@@ -38,7 +38,7 @@ pub async fn get_oracle_update_msg(
 
 async fn get_wormhole_proofs(
     ids: &HashSet<PriceIdentifier>,
-    endpoint: &str,
+    endpoint: &reqwest::Url,
     client: &reqwest::Client,
 ) -> Result<Vec<String>> {
     anyhow::ensure!(
@@ -46,15 +46,11 @@ async fn get_wormhole_proofs(
         "Cannot get wormhole proofs with no price IDs"
     );
     // pyth uses this format for array params: https://github.com/axios/axios/blob/9588fcdec8aca45c3ba2f7968988a5d03f23168c/test/specs/helpers/buildURL.spec.js#L31
-    let url_params = ids
-        .iter()
-        .map(|id| format!("ids[]={id}"))
-        .collect::<Vec<String>>()
-        .join("&");
-    let url_params = &url_params;
-    let url = format!("{endpoint}api/latest_vaas?{url_params}");
+    let url_params = ids.iter().map(|id| ("ids[]", id.to_hex()));
+    let url = endpoint.join("api/latest_vaas")?;
+    let url = reqwest::Url::parse_with_params(url.as_str(), url_params)?;
 
-    let vaas: Vec<String> = fetch_json_with_retry(|| client.get(&url)).await?;
+    let vaas: Vec<String> = fetch_json_with_retry(|| client.get(url.clone())).await?;
 
     Ok(vaas)
 }

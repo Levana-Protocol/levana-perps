@@ -369,7 +369,7 @@ fn compose_oracle_feeds(
 #[tracing::instrument(skip_all)]
 async fn fetch_pyth_prices(
     client: &reqwest::Client,
-    endpoint: &str,
+    endpoint: &reqwest::Url,
     ids: &HashSet<PriceIdentifier>,
     values: &mut HashMap<PriceIdentifier, (NonZero<Decimal256>, DateTime<Utc>)>,
     oldest_publish_time: &mut Option<DateTime<Utc>>,
@@ -390,15 +390,11 @@ async fn fetch_pyth_prices(
         return Ok(());
     }
 
-    let base = format!("{}api/latest_price_feeds", endpoint);
-    let records: Vec<PythRecord> = fetch_json_with_retry(|| {
-        let mut req = client.get(&base);
-        for id in ids {
-            req = req.query(&[("ids[]", id)])
-        }
-        req
-    })
-    .await?;
+    let base = endpoint.join("api/latest_price_feeds")?;
+    let ids_iter = ids.iter().map(|feed| ("ids[]", feed.to_hex()));
+    let url = reqwest::Url::parse_with_params(base.as_str(), ids_iter)?;
+
+    let records: Vec<PythRecord> = fetch_json_with_retry(|| client.get(url.clone())).await?;
 
     for PythRecord {
         id,
