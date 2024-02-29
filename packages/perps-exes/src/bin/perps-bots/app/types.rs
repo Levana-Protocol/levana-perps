@@ -366,8 +366,7 @@ pub(crate) enum CrankTriggerReason {
     },
     CrankWorkAvailable,
     PriceWillTrigger {
-        /// What level of high gas wallet is necessitated by this?
-        high_gas: Option<HighGas>,
+        gas_level: GasLevel,
     },
     MoreWorkFound,
 }
@@ -391,8 +390,8 @@ impl Display for CrankTriggerReason {
             CrankTriggerReason::CrankWorkAvailable => {
                 f.write_str("Price bot discovered crank work available")
             }
-            CrankTriggerReason::PriceWillTrigger { high_gas: _ } => {
-                f.write_str("New price would trigger an action")
+            CrankTriggerReason::PriceWillTrigger { gas_level } => {
+                f.write_str("New price would trigger an action with {gas_level} gas level")
             }
             CrankTriggerReason::MoreWorkFound => f.write_str("Crank running discovered more work"),
         }
@@ -410,22 +409,26 @@ impl CrankTriggerReason {
         }
     }
 
-    /// Does this action warrant paying very high gas costs?
-    pub(crate) fn needs_high_gas(&self) -> Option<HighGas> {
+    /// What gas level is warranted for this action?
+    pub(crate) fn gas_level(&self) -> GasLevel {
         match self {
-            CrankTriggerReason::PriceWillTrigger { high_gas } => *high_gas,
+            CrankTriggerReason::PriceWillTrigger { gas_level } => *gas_level,
             CrankTriggerReason::NoPriceOnChain
             | CrankTriggerReason::OnChainTooOld { .. }
             | CrankTriggerReason::CrankNeedsNewPrice { .. }
             | CrankTriggerReason::CrankWorkAvailable
-            | CrankTriggerReason::MoreWorkFound => None,
+            | CrankTriggerReason::MoreWorkFound => GasLevel::Normal,
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum HighGas {
+/// What level of gas is necessary when doing a price update for a price trigger?
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+pub(crate) enum GasLevel {
+    /// Normal, not a particularly high price delta
+    Normal,
+    /// We've passed the high gas delta from config, so use more gas
     High,
-    // So high we treat it differently with its own wallet
+    /// The delta is high enough to risk a delayed-trigger attack, use a separate task and much higher gas
     VeryHigh,
 }

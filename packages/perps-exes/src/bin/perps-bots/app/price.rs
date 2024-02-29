@@ -39,7 +39,7 @@ use super::{
     crank_run::TriggerCrank,
     gas_check::GasCheckWallet,
     high_gas::{HighGasTrigger, HighGasWork},
-    App, AppBuilder, CrankTriggerReason, HighGas,
+    App, AppBuilder, CrankTriggerReason, GasLevel,
 };
 
 struct Worker {
@@ -92,7 +92,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
     let mut errors = vec![];
     let mut markets_to_update = vec![];
     let mut any_needs_oracle_update = false;
-    let mut any_needs_high_gas_oracle_update: Option<HighGas> = None;
+    let mut max_gas_level = GasLevel::Normal;
 
     let begin_price_update = Instant::now();
     successes.push(format!(
@@ -170,23 +170,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                     ActionWithReason::WorkNeeded(crank_trigger_reason) => {
                         if crank_trigger_reason.needs_price_update() {
                             any_needs_oracle_update = true;
-                            if let Some(high_gas) = crank_trigger_reason.needs_high_gas() {
-                                match any_needs_high_gas_oracle_update {
-                                    None => {
-                                        any_needs_high_gas_oracle_update = Some(high_gas);
-                                    }
-                                    Some(prev) => {
-                                        if prev == HighGas::VeryHigh
-                                            || high_gas == HighGas::VeryHigh
-                                        {
-                                            any_needs_high_gas_oracle_update =
-                                                Some(HighGas::VeryHigh);
-                                        } else {
-                                            any_needs_high_gas_oracle_update = Some(HighGas::High);
-                                        }
-                                    }
-                                }
-                            }
+                            max_gas_level = max_gas_level.max(crank_trigger_reason.gas_level());
                         }
                         markets_to_update.push((
                             market.market.get_address(),
@@ -220,7 +204,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
         successes.push("No markets need updating".to_owned());
     } else {
         if any_needs_oracle_update {
-            if any_needs_high_gas_oracle_update == Some(HighGas::VeryHigh) {
+            if let GasLevel::VeryHigh = max_gas_level {
                 match &worker.high_gas_trigger {
                     Some(high_gas_trigger) => {
                         successes.push(format!(
@@ -439,18 +423,20 @@ impl NeedsPriceUpdateInfo {
             let high_threshold = params.on_off_chain_price_delta;
 
             // We know that we need to trigger a price update. Now we determine if the price delta is high enough that it warrants spending extra gas on Osmosis mainnet.
-            let high_gas = if market_to_off_chain_delta > very_high_threshold
+            let gas_level = if market_to_off_chain_delta > very_high_threshold
                 || oracle_to_off_chain_delta > very_high_threshold
             {
-                Some(HighGas::VeryHigh)
+                GasLevel::VeryHigh
             } else if market_to_off_chain_delta > high_threshold
                 || oracle_to_off_chain_delta > high_threshold
             {
-                Some(HighGas::High)
+                GasLevel::High
             } else {
-                None
+                GasLevel::Normal
             };
-            return ActionWithReason::WorkNeeded(CrankTriggerReason::PriceWillTrigger { high_gas });
+            return ActionWithReason::WorkNeeded(CrankTriggerReason::PriceWillTrigger {
+                gas_level,
+            });
         }
 
         let on_chain_age = self
@@ -760,10 +746,10 @@ impl ReasonStats {
             CrankTriggerReason::OnChainTooOld { .. } => self.too_old += 1,
             CrankTriggerReason::CrankNeedsNewPrice { .. } => self.deferred_needs_new_price += 1,
             CrankTriggerReason::CrankWorkAvailable => self.crank_work_available += 1,
-            CrankTriggerReason::PriceWillTrigger { high_gas } => match high_gas {
-                Some(HighGas::High) => self.high_trigger += 1,
-                Some(HighGas::VeryHigh) => self.very_high_trigger += 1,
-                None => todo!(),
+            CrankTriggerReason::PriceWillTrigger { gas_level } => match gas_level {
+                GasLevel::Normal => self.normal_trigger += 1,
+                GasLevel::High => self.high_trigger += 1,
+                GasLevel::VeryHigh => self.very_high_trigger += 1,
             },
             CrankTriggerReason::MoreWorkFound => self.more_work_found += 1,
         }

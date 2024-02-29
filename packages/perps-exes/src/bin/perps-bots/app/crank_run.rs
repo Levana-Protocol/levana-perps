@@ -31,7 +31,7 @@ use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 use self::trigger_crank::{CrankReceiver, CrankWorkItem};
 
 use super::gas_check::GasCheckWallet;
-use super::{App, AppBuilder};
+use super::{App, AppBuilder, GasLevel};
 pub(crate) use trigger_crank::TriggerCrank;
 
 struct Worker {
@@ -158,10 +158,10 @@ impl App {
         // an array of N execs to try with fallbacks
         execs: Option<&[u32]>,
     ) -> Result<RunResult> {
-        let cosmos = if reason.needs_high_gas().is_some() {
-            &self.cosmos_high_gas
-        } else {
-            &self.cosmos
+        let cosmos = match reason.gas_level() {
+            GasLevel::Normal => &self.cosmos,
+            // we won't use the very high gas wallet in cranking, that's reserved for the high gas task
+            GasLevel::High | GasLevel::VeryHigh => &self.cosmos_high_gas,
         };
 
         let rewards = self
