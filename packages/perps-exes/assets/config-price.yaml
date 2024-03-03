@@ -221,6 +221,13 @@ networks:
       feeds-usd: [
         !pyth { key: "BTC_USD", inverted: false }
       ]
+    wBTC_USD:
+      feeds: [
+        !pyth { key: "BTC_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !pyth { key: "BTC_USD", inverted: false }
+      ]
     nBTC_USD:
       feeds: [
         !pyth { key: "BTC_USD", inverted: false }
@@ -609,6 +616,13 @@ networks:
         !pyth { key: "ETH_USD", inverted: false },
       ]
     BTC_USD:
+      feeds: [
+        !pyth { key: "BTC_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !pyth { key: "BTC_USD", inverted: false }
+      ]
+    wBTC_USD:
       feeds: [
         !pyth { key: "BTC_USD", inverted: false }
       ]
