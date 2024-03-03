@@ -265,17 +265,49 @@ fn helper_execute(
             .apply(state, ctx)?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
+
+        // TODO: remove this once the deprecated fields are fully removed
+        #[allow(deprecated)]
         DeferredExecItem::PlaceLimitOrder {
             trigger_price,
             leverage,
             direction,
             max_gains,
             stop_loss_override,
-            take_profit_override,
+            take_profit,
             amount,
             crank_fee,
             crank_fee_usd,
         } => {
+            // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
+            let take_profit_price = match (take_profit, max_gains) {
+                (None, None) => {
+                    bail!("must supply at least one of take_profit or max_gains");
+                }
+                (Some(take_profit_price), None) => take_profit_price,
+                (take_profit, Some(max_gains)) => {
+                    let take_profit = match take_profit {
+                        None => None,
+                        Some(take_profit) => match take_profit {
+                            TakeProfitPrice::PosInfinity => {
+                                bail!("cannot set infinite take profit price and max_gains")
+                            }
+                            TakeProfitPrice::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
+                        },
+                    };
+                    BackwardsCompatTakeProfit {
+                        collateral: amount,
+                        market_type: state.market_id(ctx.storage)?.get_market_type(),
+                        direction,
+                        leverage,
+                        max_gains,
+                        take_profit,
+                        price_point: &price_point,
+                    }
+                    .calc()?
+                }
+            };
+
             let order_id = PlaceLimitOrderExec::new(
                 state,
                 ctx.storage,
@@ -284,9 +316,8 @@ fn helper_execute(
                 amount,
                 leverage,
                 direction.into_notional(state.market_type(ctx.storage)?),
-                max_gains,
                 stop_loss_override,
-                take_profit_override,
+                take_profit_price,
                 crank_fee,
                 crank_fee_usd,
                 price_point,
@@ -558,17 +589,48 @@ fn helper_validate(
             .discard();
             Ok(())
         }
+
+        // TODO: remove this once the deprecated fields are fully removed
+        #[allow(deprecated)]
         DeferredExecItem::PlaceLimitOrder {
             trigger_price,
             leverage,
             direction,
             max_gains,
             stop_loss_override,
-            take_profit_override,
+            take_profit,
             amount,
             crank_fee,
             crank_fee_usd,
         } => {
+            // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
+            let take_profit_price = match (take_profit, max_gains) {
+                (None, None) => {
+                    bail!("must supply at least one of take_profit or max_gains");
+                }
+                (Some(take_profit_price), None) => take_profit_price,
+                (take_profit, Some(max_gains)) => {
+                    let take_profit = match take_profit {
+                        None => None,
+                        Some(take_profit) => match take_profit {
+                            TakeProfitPrice::PosInfinity => {
+                                bail!("cannot set infinite take profit price and max_gains")
+                            }
+                            TakeProfitPrice::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
+                        },
+                    };
+                    BackwardsCompatTakeProfit {
+                        collateral: amount,
+                        market_type: state.market_id(store)?.get_market_type(),
+                        direction,
+                        leverage,
+                        max_gains,
+                        take_profit,
+                        price_point,
+                    }
+                    .calc()?
+                }
+            };
             PlaceLimitOrderExec::new(
                 state,
                 store,
@@ -577,9 +639,8 @@ fn helper_validate(
                 amount,
                 leverage,
                 direction.into_notional(state.market_type(store)?),
-                max_gains,
                 stop_loss_override,
-                take_profit_override,
+                take_profit_price,
                 crank_fee,
                 crank_fee_usd,
                 *price_point,

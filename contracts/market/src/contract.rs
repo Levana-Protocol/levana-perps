@@ -265,13 +265,15 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             )?;
         }
 
+        // TODO: remove this once the deprecated fields are fully removed
+        #[allow(deprecated)]
         ExecuteMsg::PlaceLimitOrder {
             trigger_price,
             leverage,
             direction,
             max_gains,
             stop_loss_override,
-            take_profit_override,
+            take_profit,
         } => {
             state.defer_execution(
                 &mut ctx,
@@ -282,7 +284,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     direction,
                     max_gains,
                     stop_loss_override,
-                    take_profit_override,
+                    take_profit,
                     amount: info.funds.take()?,
                     crank_fee: Collateral::zero(),
                     crank_fee_usd: Usd::zero(),
@@ -545,6 +547,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             let order = state.limit_order_load(store, order_id)?;
             let market_type = state.market_type(store)?;
 
+            #[allow(deprecated)]
             LimitOrderResp {
                 order_id,
                 trigger_price: order.trigger_price,
@@ -553,7 +556,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 direction: order.direction.into_base(market_type),
                 max_gains: order.max_gains,
                 stop_loss_override: order.stop_loss_override,
-                take_profit_override: order.take_profit_override,
+                take_profit: order.take_profit,
             }
             .query_result()
         }

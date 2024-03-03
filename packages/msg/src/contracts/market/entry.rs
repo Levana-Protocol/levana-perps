@@ -196,12 +196,16 @@ pub enum ExecuteMsg {
         leverage: LeverageToBase,
         /// Direction of new position
         direction: DirectionToBase,
-        /// Max gains of new position
-        max_gains: MaxGainsInQuote,
+
+        /// Maximum gains of new position
+        #[deprecated(note = "Use take_profit instead")]
+        max_gains: Option<MaxGainsInQuote>,
         /// Stop loss price of new position
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
-        take_profit_override: Option<PriceBaseInQuote>,
+        /// if max_gains is `None`, this *must* be `Some`
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<TakeProfitPrice>,
     },
 
     /// Cancel an open limit order
@@ -1014,11 +1018,13 @@ pub struct LimitOrderResp {
     /// Direction of the new position
     pub direction: DirectionToBase,
     /// Max gains of the new position
-    pub max_gains: MaxGainsInQuote,
+    #[deprecated(note = "Use take_profit instead")]
+    pub max_gains: Option<MaxGainsInQuote>,
     /// Stop loss of the new position
     pub stop_loss_override: Option<PriceBaseInQuote>,
+    #[serde(alias = "take_profit_override")]
     /// Take profit of the new position
-    pub take_profit_override: Option<PriceBaseInQuote>,
+    pub take_profit: Option<TakeProfitPrice>,
 }
 
 /// Response for [QueryMsg::LimitOrders]
@@ -1180,9 +1186,9 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
                 trigger_price: u.arbitrary()?,
                 leverage: u.arbitrary()?,
                 direction: u.arbitrary()?,
-                max_gains: u.arbitrary()?,
+                max_gains: None,
                 stop_loss_override: u.arbitrary()?,
-                take_profit_override: u.arbitrary()?,
+                take_profit: Some(u.arbitrary()?),
             }),
             10 => Ok(ExecuteMsg::CancelLimitOrder {
                 order_id: u.arbitrary()?,

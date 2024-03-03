@@ -1591,6 +1591,19 @@ impl PerpsMarket {
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
     ) -> Result<(OrderId, DeferResponse)> {
+        // eh, this is a nice convenience to not have to rewrite all the tests
+        // when BackwardsCompatTakeProfit is deprecated from main code, it could be moved entirely into test code
+        let take_profit = BackwardsCompatTakeProfit {
+            leverage,
+            direction,
+            collateral,
+            market_type: self.id.get_market_type(),
+            max_gains,
+            take_profit: take_profit_override,
+            price_point: &self.query_current_price()?,
+        }
+        .calc()?;
+
         let msg = self.token.into_market_execute_msg(
             &self.addr,
             collateral.raw(),
@@ -1598,9 +1611,9 @@ impl PerpsMarket {
                 trigger_price,
                 leverage,
                 direction,
-                max_gains,
+                max_gains: None,
                 stop_loss_override,
-                take_profit_override,
+                take_profit: Some(take_profit),
             },
         )?;
 

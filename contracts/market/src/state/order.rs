@@ -134,6 +134,38 @@ impl State<'_> {
 
         let market_type = self.market_type(ctx.storage)?;
 
+        // this is kept in case we're executing an order that was already placed in the old system
+        // it shouldn't be needed for any new orders, which do this song and dance in deferred_exec creation
+        // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
+        #[allow(deprecated)]
+        let take_profit_price = match (order.take_profit, order.max_gains) {
+            (None, None) => {
+                bail!("must supply at least one of take_profit or max_gains");
+            }
+            (Some(take_profit_price), None) => take_profit_price,
+            (take_profit, Some(max_gains)) => {
+                let take_profit = match take_profit {
+                    None => None,
+                    Some(take_profit) => match take_profit {
+                        TakeProfitPrice::PosInfinity => {
+                            bail!("cannot set infinite take profit price and max_gains")
+                        }
+                        TakeProfitPrice::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
+                    },
+                };
+                BackwardsCompatTakeProfit {
+                    collateral: order.collateral,
+                    market_type,
+                    direction: order.direction.into_base(market_type),
+                    leverage: order.leverage,
+                    max_gains,
+                    take_profit,
+                    price_point,
+                }
+                .calc()?
+            }
+        };
+
         let open_position_params = OpenPositionParams {
             owner: order.owner.clone(),
             collateral: order.collateral,
@@ -142,18 +174,7 @@ impl State<'_> {
             direction: order.direction.into_base(market_type),
             slippage_assert: None,
             stop_loss_override: order.stop_loss_override,
-            // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
-            take_profit_price: BackwardsCompatTakeProfit {
-                collateral: order.collateral,
-                direction: order.direction.into_base(market_type),
-                leverage: order.leverage,
-                market_type,
-                // However, this needs to be migrated too
-                max_gains: order.max_gains,
-                take_profit: order.take_profit_override,
-                price_point,
-            }
-            .calc()?,
+            take_profit_price,
         };
 
         let res = match OpenPositionExec::new(self, ctx.storage, open_position_params, price_point)
@@ -242,6 +263,8 @@ impl State<'_> {
                 Some((order_id, _)) => {
                     let order = LIMIT_ORDERS.load(storage, order_id)?;
                     let market_type = self.market_type(storage)?;
+
+                    #[allow(deprecated)]
                     let order_resp = LimitOrderResp {
                         order_id,
                         trigger_price: order.trigger_price,
@@ -250,7 +273,7 @@ impl State<'_> {
                         direction: order.direction.into_base(market_type),
                         max_gains: order.max_gains,
                         stop_loss_override: order.stop_loss_override,
-                        take_profit_override: order.take_profit_override,
+                        take_profit: order.take_profit,
                     };
 
                     orders.push(order_resp);
@@ -363,9 +386,8 @@ impl PlaceLimitOrderExec {
         collateral: NonZero<Collateral>,
         leverage: LeverageToBase,
         direction: DirectionToNotional,
-        max_gains: MaxGainsInQuote,
         stop_loss_override: Option<PriceBaseInQuote>,
-        take_profit_override: Option<PriceBaseInQuote>,
+        take_profit: TakeProfitPrice,
         deferred_exec_crank_fee: Collateral,
         deferred_exec_crank_fee_usd: Usd,
         price: PricePoint,
@@ -384,6 +406,7 @@ impl PlaceLimitOrderExec {
             .checked_sub(crank_fee.amount)
             .context("Insufficient funds to cover fees, failed on crank fee")?;
 
+        #[allow(deprecated)]
         let order = LimitOrder {
             order_id,
             owner: owner.clone(),
@@ -391,9 +414,9 @@ impl PlaceLimitOrderExec {
             collateral,
             leverage,
             direction,
-            max_gains,
             stop_loss_override,
-            take_profit_override,
+            max_gains: None,
+            take_profit: Some(take_profit),
             crank_fee_collateral: crank_fee.amount.checked_add(deferred_exec_crank_fee)?,
             crank_fee_usd: crank_fee
                 .amount_usd
@@ -443,6 +466,8 @@ impl PlaceLimitOrderExec {
         LIMIT_ORDERS_BY_ADDR.save(ctx.storage, (&order.owner, order_id), &())?;
 
         let direction_to_base = order.direction.into_base(market_type);
+
+        #[allow(deprecated)]
         ctx.response.add_event(PlaceLimitOrderEvent {
             market_type,
             collateral: order.collateral,
@@ -454,7 +479,7 @@ impl PlaceLimitOrderExec {
             order_id,
             owner: order.owner,
             trigger_price: order.trigger_price,
-            take_profit_override: order.take_profit_override,
+            take_profit_override: order.take_profit,
         });
         Ok(self.order_id)
     }
