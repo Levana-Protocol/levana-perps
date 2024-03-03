@@ -70,6 +70,9 @@ osmosis-mainnet:
     DYM:
       denom: ibc/9A76CDF0CBCEF37923F32518FA15E5DC92B9F56128292BC4D63C4AEA76CBB110
       decimal-places: 18
+    wBTC:
+      denom: factory/osmo1z0qrq605sjgcqpylfl4aa6s90x738j7m58wyatt0tdzflg2ha26q67k743/wbtc
+      decimal-places: 8
 osmosis-testnet:
   age-tolerance-seconds: 42
   gas-decimals: 6
