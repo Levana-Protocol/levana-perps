@@ -748,7 +748,7 @@ impl UpdatePositionTakeProfitPriceExec {
         let market_type = state.market_type(store)?;
 
         let leverage_to_base = pos
-            .active_leverage_to_notional(&price_point)
+            .active_leverage_to_notional(price_point)
             .into_base(market_type)
             .split()
             .1;

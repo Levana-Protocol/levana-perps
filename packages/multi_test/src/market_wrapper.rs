@@ -1554,21 +1554,38 @@ impl PerpsMarket {
         max_gains: MaxGainsInQuote,
     ) -> Result<DeferResponse> {
         // converting to take profit price here, instead of rewriting all the tests, for convenience
+
         let pos = self.query_position(position_id)?;
         let price_point = self.query_current_price()?;
-        let take_profit_price = BackwardsCompatTakeProfit{
+        let take_profit_price = BackwardsCompatTakeProfit {
             collateral: pos.active_collateral,
-            direction: pos.direction_to_base, 
+            direction: pos.direction_to_base,
             leverage: pos.leverage,
             market_type: self.id.get_market_type(),
             price_point: &price_point,
             max_gains,
             take_profit: None,
-        }.calc()?;
+        }
+        .calc()?;
 
         self.exec_defer(
             sender,
-            &MarketExecuteMsg::UpdatePositionTakeProfitPrice { 
+            &MarketExecuteMsg::UpdatePositionTakeProfitPrice {
+                id: position_id,
+                price: take_profit_price,
+            },
+        )
+    }
+
+    pub fn exec_update_position_take_profit(
+        &self,
+        sender: &Addr,
+        position_id: PositionId,
+        take_profit_price: TakeProfitPrice,
+    ) -> Result<DeferResponse> {
+        self.exec_defer(
+            sender,
+            &MarketExecuteMsg::UpdatePositionTakeProfitPrice {
                 id: position_id,
                 price: take_profit_price,
             },

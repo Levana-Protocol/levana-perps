@@ -1,7 +1,5 @@
-use std::panic::catch_unwind;
-
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::prelude::*;
+use msg::{contracts::market::position::PositionId, prelude::*};
 
 #[derive(Debug)]
 struct OpenParam {
@@ -11,13 +9,151 @@ struct OpenParam {
 }
 
 #[test]
-fn max_gain_edge() {
+fn take_profit_edge() {
+    // The overall idea of this test is to open a position and then test that we can update the take_profit price
+    // as expected around the edges of maximum and minimum values
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
     let market_type = market.id.get_market_type();
     let trader = market.clone_trader(0).unwrap();
 
-    let open_param = match market_type {
+    #[derive(Debug)]
+    struct Edges {
+        min: Edge,
+        max: Edge,
+    }
+
+    #[derive(Debug)]
+    struct Edge {
+        // helps debugging
+        #[allow(dead_code)]
+        value: Option<Decimal256>,
+        // helps debugging
+        #[allow(dead_code)]
+        side: Side,
+        valid: Option<TakeProfitPrice>,
+        invalid: Option<TakeProfitPrice>,
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    enum Side {
+        Min,
+        Max,
+    }
+
+    impl Edge {
+        fn new(edge_value: Option<Decimal256>, side: Side) -> Self {
+            match edge_value {
+                None => Self {
+                    value: edge_value,
+                    side,
+                    valid: Some(TakeProfitPrice::PosInfinity),
+                    invalid: None,
+                },
+                Some(value) => {
+                    match NonZero::new(value) {
+                        None => {
+                            Self {
+                                value: edge_value,
+                                side,
+                                valid: match side {
+                                    // min is zero, but that's not even valid on the type level... test explicit very low price right above that min
+                                    Side::Min => Some("0.0000001".parse().unwrap()),
+                                    Side::Max => {
+                                        panic!("max of zero leaves no room to set any price")
+                                    }
+                                },
+                                invalid: None,
+                            }
+                        }
+                        Some(value) => {
+                            // test the prices just a bit above and below the edge
+                            let partial_value = NonZero::new(
+                                Decimal256::from_ratio(1u32, 3u32) * value.into_decimal256(),
+                            )
+                            .unwrap();
+                            match side {
+                                Side::Min => Self {
+                                    side,
+                                    value: edge_value,
+                                    valid: Some(TakeProfitPrice::Finite(
+                                        value.checked_add(partial_value.into_decimal256()).unwrap(),
+                                    )),
+                                    invalid: Some(TakeProfitPrice::Finite(
+                                        value.checked_sub(partial_value.into_decimal256()).unwrap(),
+                                    )),
+                                },
+                                Side::Max => Self {
+                                    side,
+                                    value: edge_value,
+                                    valid: Some(TakeProfitPrice::Finite(
+                                        value.checked_sub(partial_value.into_decimal256()).unwrap(),
+                                    )),
+                                    invalid: Some(TakeProfitPrice::Finite(
+                                        value.checked_add(partial_value.into_decimal256()).unwrap(),
+                                    )),
+                                },
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        fn assert(&self, position_id: PositionId, trader: &Addr, market: &PerpsMarket) {
+            if let Some(valid) = self.valid {
+                let response = market.exec_update_position_take_profit(trader, position_id, valid);
+                assert!(response.is_ok());
+            }
+            if let Some(invalid) = self.invalid {
+                let response =
+                    market.exec_update_position_take_profit(trader, position_id, invalid);
+                assert!(response.is_err());
+            }
+        }
+    }
+
+    impl Edges {
+        fn new(direction: DirectionToBase, market: &PerpsMarket) -> Self {
+            let direction_to_notional = direction.into_notional(market.id.get_market_type());
+            let price = market.query_current_price().unwrap();
+            let price_notional = price.price_notional.into_number();
+            let (min, max) = match direction_to_notional {
+                DirectionToNotional::Short => {
+                    let min = Decimal256::zero();
+                    let max = price_notional.abs_unsigned();
+
+                    match market.id.get_market_type() {
+                        MarketType::CollateralIsQuote => (Some(min), Some(max)),
+                        MarketType::CollateralIsBase => (Some(Decimal256::one() / max), None),
+                    }
+                }
+                DirectionToNotional::Long => {
+                    let min = price_notional.abs_unsigned();
+                    let max = min * Decimal256::from_ratio(2u32, 1u32);
+
+                    match market.id.get_market_type() {
+                        MarketType::CollateralIsQuote => (Some(min), Some(max)),
+                        MarketType::CollateralIsBase => {
+                            (Some(Decimal256::one() / max), Some(Decimal256::one() / min))
+                        }
+                    }
+                }
+            };
+
+            Edges {
+                min: Edge::new(min, Side::Min),
+                max: Edge::new(max, Side::Max),
+            }
+        }
+
+        fn assert(&self, position_id: PositionId, trader: &Addr, market: &PerpsMarket) {
+            self.min.assert(position_id, trader, market);
+            self.max.assert(position_id, trader, market);
+        }
+    }
+
+    let open_long = match market_type {
         MarketType::CollateralIsQuote => OpenParam {
             collateral: "10".parse().unwrap(),
             leverage: "5".parse().unwrap(),
@@ -33,76 +169,44 @@ fn max_gain_edge() {
     let (position_id, _) = market
         .exec_open_position_raw(
             &trader,
-            open_param.collateral,
+            open_long.collateral,
             None,
-            open_param.leverage,
+            open_long.leverage,
             DirectionToBase::Long,
-            open_param.max_gains,
+            open_long.max_gains,
             None,
             None,
         )
         .unwrap();
 
-    // Max value of max gains where update is possible
-    let high_max_gains = match market_type {
-        MarketType::CollateralIsQuote => "5",
-        MarketType::CollateralIsBase => {
-            "9999999999999999999999999999999999999999999999999999999999"
-        }
-    };
+    Edges::new(DirectionToBase::Long, &market).assert(position_id, &trader, &market);
 
-    market
-        .exec_update_position_max_gains(&trader, position_id, high_max_gains.parse().unwrap())
+    let open_short = match market_type {
+        MarketType::CollateralIsQuote => OpenParam {
+            collateral: "10".parse().unwrap(),
+            leverage: "5".parse().unwrap(),
+            max_gains: "1.0".parse().unwrap(),
+        },
+        MarketType::CollateralIsBase => OpenParam {
+            collateral: "10".parse().unwrap(),
+            leverage: "5".parse().unwrap(),
+            max_gains: "0.2".parse().unwrap(),
+        },
+    };
+    let (position_id, _) = market
+        .exec_open_position_raw(
+            &trader,
+            open_short.collateral,
+            None,
+            open_short.leverage,
+            DirectionToBase::Short,
+            open_short.max_gains,
+            None,
+            None,
+        )
         .unwrap();
 
-    // Updating to this value will result in failure
-    let fail_max_gains = match market_type {
-        MarketType::CollateralIsQuote => "6",
-        MarketType::CollateralIsBase => {
-            "99999999999999999999999999999999999999999999999999999999990000"
-        }
-    };
-
-    match market_type {
-        MarketType::CollateralIsQuote => {
-            let response = market.exec_update_position_max_gains(
-                &trader,
-                position_id,
-                fail_max_gains.parse().unwrap(),
-            );
-            assert!(response.is_err())
-        }
-        MarketType::CollateralIsBase => {
-            // Going beyond the max value results in panic because of unwrap in ops.rs
-            let response = catch_unwind(|| {
-                let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-                market.exec_update_position_max_gains(
-                    &trader,
-                    position_id,
-                    fail_max_gains.parse().unwrap(),
-                )
-            });
-            assert!(response.is_err());
-        }
-    }
-
-    // Lowest value of max gains where it can be updated
-    let low_max_gains = "0.2";
-
-    market
-        .exec_update_position_max_gains(&trader, position_id, low_max_gains.parse().unwrap())
-        .unwrap();
-
-    // Going below lowest value will result in failure
-    let fail_max_gains = "0.1";
-
-    let response = market.exec_update_position_max_gains(
-        &trader,
-        position_id,
-        fail_max_gains.parse().unwrap(),
-    );
-
-    assert!(response.is_err())
+    Edges::new(DirectionToBase::Short, &market).assert(position_id, &trader, &market);
 }
 
 #[test]
