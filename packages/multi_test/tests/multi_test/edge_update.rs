@@ -42,59 +42,57 @@ fn take_profit_edge() {
     }
 
     impl Edge {
-        fn new(edge_value: Option<Decimal256>, side: Side) -> Self {
-            match edge_value {
-                None => Self {
-                    value: edge_value,
-                    side,
-                    valid: Some(TakeProfitPrice::PosInfinity),
-                    invalid: None,
-                },
+        fn infinity(side: Side) -> Self {
+            Self {
+                value: None,
+                side,
+                valid: Some(TakeProfitPrice::PosInfinity),
+                invalid: None,
+            }
+        }
+        fn new(edge_value: Decimal256, side: Side) -> Self {
+            match NonZero::new(edge_value) {
+                None => {
+                    Self {
+                        value: Some(edge_value),
+                        side,
+                        valid: match side {
+                            // min is zero, but that's not even valid on the type level... test explicit very low price right above that min
+                            Side::Min => Some("0.0000001".parse().unwrap()),
+                            Side::Max => {
+                                panic!("max of zero leaves no room to set any price")
+                            }
+                        },
+                        // can't express a 0 price to test
+                        invalid: None,
+                    }
+                }
                 Some(value) => {
-                    match NonZero::new(value) {
-                        None => {
-                            Self {
-                                value: edge_value,
-                                side,
-                                valid: match side {
-                                    // min is zero, but that's not even valid on the type level... test explicit very low price right above that min
-                                    Side::Min => Some("0.0000001".parse().unwrap()),
-                                    Side::Max => {
-                                        panic!("max of zero leaves no room to set any price")
-                                    }
-                                },
-                                invalid: None,
-                            }
-                        }
-                        Some(value) => {
-                            // test the prices just a bit above and below the edge
-                            let partial_value = NonZero::new(
-                                Decimal256::from_ratio(1u32, 3u32) * value.into_decimal256(),
-                            )
+                    // test the prices just a bit above and below the edge
+                    let partial_value =
+                        NonZero::new(Decimal256::from_ratio(1u32, 3u32) * value.into_decimal256())
                             .unwrap();
-                            match side {
-                                Side::Min => Self {
-                                    side,
-                                    value: edge_value,
-                                    valid: Some(TakeProfitPrice::Finite(
-                                        value.checked_add(partial_value.into_decimal256()).unwrap(),
-                                    )),
-                                    invalid: Some(TakeProfitPrice::Finite(
-                                        value.checked_sub(partial_value.into_decimal256()).unwrap(),
-                                    )),
-                                },
-                                Side::Max => Self {
-                                    side,
-                                    value: edge_value,
-                                    valid: Some(TakeProfitPrice::Finite(
-                                        value.checked_sub(partial_value.into_decimal256()).unwrap(),
-                                    )),
-                                    invalid: Some(TakeProfitPrice::Finite(
-                                        value.checked_add(partial_value.into_decimal256()).unwrap(),
-                                    )),
-                                },
-                            }
-                        }
+                    match side {
+                        Side::Min => Self {
+                            side,
+                            value: Some(edge_value),
+                            valid: Some(TakeProfitPrice::Finite(
+                                value.checked_add(partial_value.into_decimal256()).unwrap(),
+                            )),
+                            invalid: Some(TakeProfitPrice::Finite(
+                                value.checked_sub(partial_value.into_decimal256()).unwrap(),
+                            )),
+                        },
+                        Side::Max => Self {
+                            side,
+                            value: Some(edge_value),
+                            valid: Some(TakeProfitPrice::Finite(
+                                value.checked_sub(partial_value.into_decimal256()).unwrap(),
+                            )),
+                            invalid: Some(TakeProfitPrice::Finite(
+                                value.checked_add(partial_value.into_decimal256()).unwrap(),
+                            )),
+                        },
                     }
                 }
             }
@@ -118,14 +116,20 @@ fn take_profit_edge() {
             let direction_to_notional = direction.into_notional(market.id.get_market_type());
             let price = market.query_current_price().unwrap();
             let price_notional = price.price_notional.into_number();
-            let (min, max) = match direction_to_notional {
+            match direction_to_notional {
                 DirectionToNotional::Short => {
                     let min = Decimal256::zero();
                     let max = price_notional.abs_unsigned();
 
                     match market.id.get_market_type() {
-                        MarketType::CollateralIsQuote => (Some(min), Some(max)),
-                        MarketType::CollateralIsBase => (Some(Decimal256::one() / max), None),
+                        MarketType::CollateralIsQuote => Edges {
+                            min: Edge::new(min, Side::Min),
+                            max: Edge::new(max, Side::Max),
+                        },
+                        MarketType::CollateralIsBase => Edges {
+                            min: Edge::new(Decimal256::one() / max, Side::Min),
+                            max: Edge::infinity(Side::Max),
+                        },
                     }
                 }
                 DirectionToNotional::Long => {
@@ -133,17 +137,16 @@ fn take_profit_edge() {
                     let max = min * Decimal256::from_ratio(2u32, 1u32);
 
                     match market.id.get_market_type() {
-                        MarketType::CollateralIsQuote => (Some(min), Some(max)),
-                        MarketType::CollateralIsBase => {
-                            (Some(Decimal256::one() / max), Some(Decimal256::one() / min))
-                        }
+                        MarketType::CollateralIsQuote => Edges {
+                            min: Edge::new(min, Side::Min),
+                            max: Edge::new(max, Side::Max),
+                        },
+                        MarketType::CollateralIsBase => Edges {
+                            min: Edge::new(Decimal256::one() / max, Side::Min),
+                            max: Edge::new(Decimal256::one() / min, Side::Max),
+                        },
                     }
                 }
-            };
-
-            Edges {
-                min: Edge::new(min, Side::Min),
-                max: Edge::new(max, Side::Max),
             }
         }
 
