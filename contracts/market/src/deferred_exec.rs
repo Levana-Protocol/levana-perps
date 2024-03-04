@@ -240,7 +240,10 @@ fn helper_execute(
             .apply(state, ctx)?;
             Ok(DeferredExecCompleteTarget::Position(id))
         }
-        DeferredExecItem::UpdatePositionTakeProfitPrice { id, price: take_profit_price } => {
+        DeferredExecItem::UpdatePositionTakeProfitPrice {
+            id,
+            price: take_profit_price,
+        } => {
             execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
             UpdatePositionTakeProfitPriceExec::new(
                 state,
@@ -576,7 +579,10 @@ fn helper_validate(
             .discard();
             Ok(())
         }
-        DeferredExecItem::UpdatePositionTakeProfitPrice { id, price: take_profit_price} => {
+        DeferredExecItem::UpdatePositionTakeProfitPrice {
+            id,
+            price: take_profit_price,
+        } => {
             let liquifund =
                 validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?;
             UpdatePositionTakeProfitPriceExec::new(

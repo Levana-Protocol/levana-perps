@@ -761,7 +761,8 @@ impl UpdatePositionTakeProfitPriceExec {
             direction: pos.direction().into_base(market_type),
             config: &state.config,
             price_point,
-        }.calc()?;
+        }
+        .calc()?;
 
         let old_counter_collateral = pos.counter_collateral;
         let new_counter_collateral = counter_collateral;
@@ -835,8 +836,6 @@ impl UpdatePositionTakeProfitPriceExec {
         Ok(())
     }
 }
-
-
 
 // This trait allows for separating the creation of the event vs. emitting it
 // Most of the validation is done while creating the event itself, which allows for

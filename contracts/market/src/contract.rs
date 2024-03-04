@@ -257,7 +257,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             )?;
         }
 
-
         ExecuteMsg::SetTriggerOrder {
             id,
             stop_loss_override,
