@@ -191,7 +191,10 @@ pub enum ExecuteMsg {
         id: PositionId,
         /// New stop loss price of the position
         stop_loss_override: Option<PriceBaseInQuote>,
-        /// New take profit price of the position
+        /// New take profit price of the position, merely as a trigger.
+        /// This does not affect the locked up counter collateral (or borrow fees etc.).
+        /// if this override is further away than the position's take profit price, the position's will be triggered first
+        /// if you want to update the position itself, use [ExecuteMsg::UpdatePositionTakeProfitPrice]
         take_profit_override: Option<PriceBaseInQuote>,
     },
 
