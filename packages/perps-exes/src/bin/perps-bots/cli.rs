@@ -66,6 +66,9 @@ pub(crate) struct Opt {
     /// How many blocks we're allowed to lag before we raise an error
     #[clap(long, env = "LEVANA_BOTS_BLOCK_LAG_ALLOWED")]
     pub(crate) block_lag_allowed: Option<u32>,
+    /// How many blocks we're allowed to lag before we raise an error
+    #[clap(long, env = "LEVANA_BOTS_BLOCK_AGE_ALLOWED")]
+    pub(crate) block_age_allowed: Option<u64>,
 }
 
 #[derive(clap::Parser, Clone)]
