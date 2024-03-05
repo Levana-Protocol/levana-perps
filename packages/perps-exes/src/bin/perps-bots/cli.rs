@@ -63,6 +63,9 @@ pub(crate) struct Opt {
     /// Body length limit in bytes. Default is 1MB (Same as Nginx)
     #[clap(long, env = "LEVANA_BOTS_BODY_LIMIT", default_value_t = 1024000)]
     pub(crate) request_body_limit_bytes: usize,
+    /// How many blocks we're allowed to lag before we raise an error
+    #[clap(long, env = "LEVANA_BOTS_BLOCK_LAG_ALLOWED")]
+    pub(crate) block_lag_allowed: Option<u32>,
 }
 
 #[derive(clap::Parser, Clone)]

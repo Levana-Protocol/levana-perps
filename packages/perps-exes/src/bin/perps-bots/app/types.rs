@@ -165,6 +165,10 @@ impl Opt {
             tracing::info!("Overriding chain ID to: {chain_id}");
             builder.set_chain_id(chain_id.clone());
         }
+        if let Some(block_lag_allowed) = self.block_lag_allowed {
+            tracing::info!("Overriding block lag allowed to: {block_lag_allowed}");
+            builder.set_block_lag_allowed(Some(block_lag_allowed));
+        }
         match &config.gas_multiplier {
             Some(x) => {
                 tracing::info!("Setting static gas multiplier value of {x}");
