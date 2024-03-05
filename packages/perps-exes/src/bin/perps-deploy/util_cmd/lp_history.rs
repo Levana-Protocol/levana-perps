@@ -35,6 +35,7 @@ struct ToProcess {
     lp: Address,
     market: MarketContract,
     market_id: Arc<MarketId>,
+    price: Arc<PricePoint>,
 }
 
 async fn go(
@@ -94,6 +95,19 @@ async fn handle_market(
     let mut seen = HashSet::new();
     let market_id = Arc::new(market.market_id);
 
+    let market_contract = MarketContract::new(market.market.clone());
+    let price = match market_contract.current_price().await {
+        Ok(price) => Arc::new(price),
+        Err(e) => {
+            if e.to_string().contains("price_not_found") {
+                tracing::warn!("No price found for market {market_id}");
+                return Ok(());
+            } else {
+                return Err(e.into());
+            }
+        }
+    };
+
     for kind in [LiquidityTokenKind::Lp, LiquidityTokenKind::Xlp] {
         let mut start_after = None;
 
@@ -120,6 +134,7 @@ async fn handle_market(
                         lp: addr,
                         market: MarketContract::new(market.market.clone()),
                         market_id: market_id.clone(),
+                        price: price.clone(),
                     })
                     .await?;
                 }
@@ -138,6 +153,7 @@ async fn worker(
         lp,
         market,
         market_id,
+        price,
     }) = rx.recv().await
     {
         #[derive(serde::Serialize)]
@@ -149,6 +165,7 @@ async fn worker(
             lp_collateral: Collateral,
             xlp_collateral: Collateral,
             xlp_unstaking: Collateral,
+            holdings_usd: Usd,
         }
 
         let lp_info = market.lp_info(lp).await?;
@@ -169,6 +186,9 @@ async fn worker(
                             * unstaking.xlp_unstaking_collateral.into_decimal256(),
                     )
                 }),
+            holdings_usd: price.collateral_to_usd(
+                lp_info.available_yield + lp_info.lp_collateral + lp_info.xlp_collateral,
+            ),
         };
 
         let mut csv = csv.lock().await;
