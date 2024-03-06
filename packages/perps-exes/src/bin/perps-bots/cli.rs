@@ -186,6 +186,9 @@ pub(crate) struct MainnetOpt {
         default_value_t = 2.0
     )]
     pub(crate) very_higher_max_gas_price: f64,
+    /// Disable optional services
+    #[clap(long, env = "LEVANA_BOTS_DISABLE_OPTIONAL_SERVICES")]
+    pub(crate) disable_optional_services: bool,
 }
 
 impl Opt {

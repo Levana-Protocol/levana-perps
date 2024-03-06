@@ -42,8 +42,11 @@ impl AppBuilder {
         // Start the tasks that run on all deployments
         self.start_factory_task()?;
         self.track_stale()?;
-        self.track_stats()?;
-        self.track_balance()?;
+
+        if self.app.config.run_optional_services {
+            self.track_stats()?;
+            self.track_balance()?;
+        }
 
         // These services are tied together closely, see docs on the
         // crank_run module for more explanation.
@@ -87,15 +90,20 @@ impl AppBuilder {
             BotConfigByType::Mainnet { inner } => {
                 // Launch mainnet tasks
                 let mainnet = inner.clone();
-                self.start_stats_alert(mainnet.clone())?;
-                self.start_rpc_health(mainnet.clone())?;
+
+                if self.app.config.run_optional_services {
+                    self.start_stats_alert(mainnet.clone())?;
+                    self.start_rpc_health(mainnet.clone())?;
+                }
 
                 match self.app.cosmos.get_address_hrp().as_str() {
                     "osmo" => self.start_congestion_alert()?,
                     // Bug in Osmosis, don't run there
                     _ => {
-                        self.start_liquidity_transaction_alert(mainnet.clone())?;
-                        self.start_total_deposits_alert(mainnet)?;
+                        if self.app.config.run_optional_services {
+                            self.start_liquidity_transaction_alert(mainnet.clone())?;
+                            self.start_total_deposits_alert(mainnet)?;
+                        }
                     }
                 }
             }
