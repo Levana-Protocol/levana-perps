@@ -86,6 +86,9 @@ pub(crate) struct BotConfig {
     pub(crate) ignore_errors_after_epoch_seconds: u32,
     /// Run optional services?
     pub(crate) run_optional_services: bool,
+    /// How long to delay after price bot completes before running again
+    pub(crate) price_bot_delay: Option<tokio::time::Duration>,
+    pub(crate) log_requests: bool,
 }
 
 pub(crate) struct NeedsPriceUpdateParams {
@@ -235,6 +238,8 @@ impl Opt {
             // Never used on testnet, just setting a reasonable default
             ignore_errors_after_epoch_seconds: 300,
             run_optional_services: true,
+            price_bot_delay: None,
+            log_requests: false,
         };
 
         Ok((config, Some(faucet_bot_runner)))
@@ -268,6 +273,8 @@ impl Opt {
             higher_max_gas_price,
             very_higher_max_gas_price,
             disable_optional_services,
+            price_bot_delay,
+            log_requests,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let hrp = network.get_address_hrp();
@@ -339,6 +346,8 @@ impl Opt {
             ignored_markets: self.ignored_markets.iter().cloned().collect(),
             ignore_errors_after_epoch_seconds: *ignore_errors_after_epoch_seconds,
             run_optional_services: !*disable_optional_services,
+            price_bot_delay: price_bot_delay.map(tokio::time::Duration::from_millis),
+            log_requests: *log_requests,
         })
     }
 }

@@ -173,6 +173,9 @@ impl Opt {
             tracing::info!("Overriding block age allowed to: {block_age_allowed}");
             builder.set_latest_block_age_allowed(Some(Duration::from_secs(block_age_allowed)));
         }
+        if config.log_requests {
+            builder.set_log_requests(true);
+        }
         match &config.gas_multiplier {
             Some(x) => {
                 tracing::info!("Setting static gas multiplier value of {x}");
