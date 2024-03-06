@@ -293,12 +293,12 @@ fn position_update_max_gains() {
             perform_update(
                 DirectionToBase::Long,
                 max_gains,
-                "496.699996670471841705".parse().unwrap(),
+                "496.699999999999999989".parse().unwrap(),
             );
             perform_update(
                 DirectionToBase::Short,
                 max_gains,
-                "496.699996670471841705".parse().unwrap(),
+                "496.699999999999999989".parse().unwrap(),
             );
         }
         MarketType::CollateralIsBase => {
@@ -310,7 +310,7 @@ fn position_update_max_gains() {
             perform_update(
                 DirectionToBase::Short,
                 max_gains,
-                "1080.875958405433354248".parse().unwrap(),
+                "1080.875983250866657727".parse().unwrap(),
             );
         }
     }
@@ -323,12 +323,12 @@ fn position_update_max_gains() {
             perform_update(
                 DirectionToBase::Long,
                 max_gains,
-                "198.679998668188736682".parse().unwrap(),
+                "198.679999999999999995".parse().unwrap(),
             );
             perform_update(
                 DirectionToBase::Short,
                 max_gains,
-                "198.679998668188736682".parse().unwrap(),
+                "198.679999999999999995".parse().unwrap(),
             );
         }
         MarketType::CollateralIsBase => {
@@ -340,7 +340,7 @@ fn position_update_max_gains() {
             perform_update(
                 DirectionToBase::Short,
                 max_gains,
-                "271.992259356357591301".parse().unwrap(),
+                "271.992263289575023781".parse().unwrap(),
             );
         }
     }

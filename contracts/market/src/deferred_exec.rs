@@ -22,7 +22,7 @@ use crate::state::{
         liquifund::PositionLiquifund,
         update::{
             TriggerOrderExec, UpdatePositionCollateralExec, UpdatePositionLeverageExec,
-            UpdatePositionMaxGainsExec, UpdatePositionSizeExec,
+            UpdatePositionMaxGainsExec, UpdatePositionSizeExec, UpdatePositionTakeProfitPriceExec,
         },
         OpenPositionExec, OpenPositionParams,
     },
@@ -235,6 +235,21 @@ fn helper_execute(
                 ctx.storage,
                 get_position(ctx.storage, id)?,
                 max_gains,
+                &price_point,
+            )?
+            .apply(state, ctx)?;
+            Ok(DeferredExecCompleteTarget::Position(id))
+        }
+        DeferredExecItem::UpdatePositionTakeProfitPrice {
+            id,
+            price: take_profit_price,
+        } => {
+            execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
+            UpdatePositionTakeProfitPriceExec::new(
+                state,
+                ctx.storage,
+                get_position(ctx.storage, id)?,
+                take_profit_price,
                 &price_point,
             )?
             .apply(state, ctx)?;
@@ -559,6 +574,22 @@ fn helper_validate(
                 store,
                 liquifund.position.into(),
                 max_gains,
+                price_point,
+            )?
+            .discard();
+            Ok(())
+        }
+        DeferredExecItem::UpdatePositionTakeProfitPrice {
+            id,
+            price: take_profit_price,
+        } => {
+            let liquifund =
+                validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?;
+            UpdatePositionTakeProfitPriceExec::new(
+                state,
+                store,
+                liquifund.position.into(),
+                take_profit_price,
                 price_point,
             )?
             .discard();

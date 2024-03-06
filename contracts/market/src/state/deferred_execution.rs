@@ -240,6 +240,7 @@ impl State<'_> {
             | DeferredExecItem::UpdatePositionRemoveCollateralImpactSize { id, .. }
             | DeferredExecItem::UpdatePositionLeverage { id, .. }
             | DeferredExecItem::UpdatePositionMaxGains { id, .. }
+            | DeferredExecItem::UpdatePositionTakeProfitPrice { id, .. }
             | DeferredExecItem::SetTriggerOrder { id, .. }
             // If the user provides a slippage assert, it's possible that the
             // close will fail. This could lead to a spam attack on the protocol if we don't

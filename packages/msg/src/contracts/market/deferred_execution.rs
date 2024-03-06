@@ -258,6 +258,14 @@ pub enum DeferredExecItem {
         max_gains: MaxGainsInQuote,
     },
 
+    /// Modify the take profit price of a position
+    UpdatePositionTakeProfitPrice {
+        /// ID of position to update
+        id: PositionId,
+        /// New take profit price of the position
+        price: TakeProfitPrice,
+    },
+
     /// Close a position
     ClosePosition {
         /// ID of position to close
@@ -375,6 +383,9 @@ impl DeferredExecItem {
             DeferredExecItem::UpdatePositionMaxGains { id, .. } => {
                 DeferredExecTarget::Position(*id)
             }
+            DeferredExecItem::UpdatePositionTakeProfitPrice { id, .. } => {
+                DeferredExecTarget::Position(*id)
+            }
             DeferredExecItem::ClosePosition { id, .. } => DeferredExecTarget::Position(*id),
             DeferredExecItem::SetTriggerOrder { id, .. } => DeferredExecTarget::Position(*id),
             DeferredExecItem::PlaceLimitOrder { .. } => DeferredExecTarget::DoesNotExist,
@@ -393,6 +404,7 @@ impl DeferredExecItem {
             | DeferredExecItem::UpdatePositionRemoveCollateralImpactSize { .. }
             | DeferredExecItem::UpdatePositionLeverage { .. }
             | DeferredExecItem::UpdatePositionMaxGains { .. }
+            | DeferredExecItem::UpdatePositionTakeProfitPrice { .. }
             | DeferredExecItem::ClosePosition { .. }
             | DeferredExecItem::SetTriggerOrder { .. }
             | DeferredExecItem::CancelLimitOrder { .. } => Collateral::zero(),

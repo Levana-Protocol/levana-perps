@@ -243,6 +243,7 @@ impl State<'_> {
             ExecuteMsg::UpdatePositionRemoveCollateralImpactSize { .. } => true,
             ExecuteMsg::UpdatePositionLeverage { .. } => true,
             ExecuteMsg::UpdatePositionMaxGains { .. } => true,
+            ExecuteMsg::UpdatePositionTakeProfitPrice { .. } => true,
             ExecuteMsg::SetTriggerOrder { .. } => true,
             ExecuteMsg::ClosePosition { .. } => true,
             ExecuteMsg::DepositLiquidity { .. } => true,
