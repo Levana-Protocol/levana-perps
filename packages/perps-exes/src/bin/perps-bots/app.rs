@@ -85,7 +85,7 @@ impl AppBuilder {
                     self.start_utilization(inner.clone())?;
                     self.start_ultra_crank_bot(&inner)?;
                     self.start_traders(inner.clone())?;
-		    self.start_liquidity(inner.clone())?;
+                    self.start_liquidity(inner.clone())?;
                     self.start_balance(inner.clone())?;
                 }
             }
