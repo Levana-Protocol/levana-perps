@@ -120,6 +120,7 @@ pub(crate) async fn get_factory_info_mainnet(
     Ok((message, factory_info))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn get_factory_info_testnet(
     cosmos: &Cosmos,
     client: &reqwest::Client,
