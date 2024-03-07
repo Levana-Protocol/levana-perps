@@ -524,6 +524,10 @@ impl AppBuilder {
                                         .await;
                                 }
                                 perps_exes::config::Delay::NewBlock => {
+                                    if let Some(duration) = app.config.price_bot_delay {
+                                        tokio::time::sleep(duration).await;
+                                    }
+
                                     // Wait for a new block to appear
                                     loop {
                                         match app.cosmos.get_latest_block_info().await {
