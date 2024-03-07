@@ -73,7 +73,7 @@ pub(crate) struct Opt {
     #[clap(
         long,
         env = "LEVANA_BOTS_REFERER_HEADER",
-        default_value = "https://bots.levana.exchange/"
+        default_value = "https://bots.levana.finance/"
     )]
     pub(crate) referer_header: reqwest::Url,
 }
