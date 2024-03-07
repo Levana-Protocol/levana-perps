@@ -193,7 +193,7 @@ impl Opt {
             builder.set_max_gas_price(inner.max_gas_price);
         }
 
-        builder.set_referer_header(Some("https://bots.levana.exchange/".to_owned()));
+        builder.set_referer_header(Some(self.referer_header.to_string()));
         builder.build().await.map_err(|e| e.into())
     }
 
@@ -221,6 +221,7 @@ impl Opt {
                 let (_, factory, frontend) = get_factory_info_testnet(
                     &cosmos,
                     &client,
+                    self.referer_header.clone(),
                     inner.tracker,
                     inner.faucet,
                     &inner.contract_family,
