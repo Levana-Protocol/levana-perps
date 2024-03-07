@@ -557,8 +557,8 @@ impl Default for WatcherConfig {
             get_factory: TaskConfig {
                 delay: Delay::Constant(60),
                 out_of_date: Some(180),
-                retries: None,
-                delay_between_retries: None,
+                retries: Some(5),
+                delay_between_retries: Some(30),
             },
             price: TaskConfig {
                 delay: Delay::NewBlock,
