@@ -36,7 +36,8 @@ impl WatchedTask for RpcHealth {
 }
 
 async fn check(app: &App, endpoint: Arc<String>) -> Result<WatchedTaskOutput> {
-    let (endpoint, rpc_height) = get_height(endpoint, app.client.clone()).await?;
+    let (endpoint, rpc_height) =
+        get_height(endpoint, app.client.clone(), app.opt.referer_header.clone()).await?;
     let rpc_height: i64 = rpc_height.try_into()?;
     let grpc_latest = app.cosmos.get_latest_block_info().await?;
     let grpc_height = grpc_latest.height;

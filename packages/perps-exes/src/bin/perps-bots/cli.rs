@@ -69,6 +69,13 @@ pub(crate) struct Opt {
     /// How many blocks we're allowed to lag before we raise an error
     #[clap(long, env = "LEVANA_BOTS_BLOCK_AGE_ALLOWED")]
     pub(crate) block_age_allowed: Option<u64>,
+    /// Referer header to denote resource requesting it
+    #[clap(
+        long,
+        env = "LEVANA_BOTS_REFERER_HEADER",
+        default_value = "https://bots.levana.exchange/"
+    )]
+    pub(crate) referer_header: reqwest::Url,
 }
 
 #[derive(clap::Parser, Clone)]
