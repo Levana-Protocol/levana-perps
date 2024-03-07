@@ -572,8 +572,8 @@ impl Default for WatcherConfig {
             stale: TaskConfig {
                 delay: Delay::Constant(30),
                 out_of_date: Some(180),
-                retries: None,
-                delay_between_retries: None,
+                retries: Some(5),
+                delay_between_retries: Some(20),
             },
             stats: TaskConfig {
                 delay: Delay::Constant(30),
