@@ -80,12 +80,14 @@ impl AppBuilder {
                     GasCheckWallet::WalletManager,
                 )?;
 
-                // Launch testnet tasks
-                self.start_balance(inner.clone())?;
-                self.start_liquidity(inner.clone())?;
-                self.start_utilization(inner.clone())?;
-                self.start_traders(inner.clone())?;
-                self.start_ultra_crank_bot(&inner)?;
+                if self.app.config.run_optional_services {
+                    // Launch testnet tasks
+                    self.start_utilization(inner.clone())?;
+                    self.start_ultra_crank_bot(&inner)?;
+                    self.start_traders(inner.clone())?;
+                    self.start_liquidity(inner.clone())?;
+                    self.start_balance(inner.clone())?;
+                }
             }
             BotConfigByType::Mainnet { inner } => {
                 // Launch mainnet tasks
