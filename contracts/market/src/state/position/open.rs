@@ -203,7 +203,7 @@ impl OpenPositionExec {
     // rather than to just assign it to a throwaway variable.
     pub(crate) fn discard(self) {}
 
-    pub fn apply(
+    pub(crate) fn apply(
         self,
         state: &State,
         ctx: &mut StateContext,

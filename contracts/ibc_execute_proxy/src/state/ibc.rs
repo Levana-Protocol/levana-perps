@@ -15,12 +15,12 @@ const EXPECTED_CHANNEL_INFO: Item<ExpectedChannelInfo> = Item::new("expected_cha
 
 #[derive(Serialize, Deserialize, Debug)]
 struct ExpectedChannelInfo {
-    pub version: String,
-    pub order: IbcOrder,
+    pub(crate) version: String,
+    pub(crate) order: IbcOrder,
 }
 
 impl State<'_> {
-    pub fn validate_channel(
+    pub(crate) fn validate_channel(
         &self,
         storage: &dyn Storage,
         channel: &IbcChannel,

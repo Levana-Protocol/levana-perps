@@ -37,10 +37,10 @@ const DEFAULT_LIMIT: u32 = 10;
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub(crate) struct TokenInfo {
-    pub name: String,
-    pub symbol: String,
-    pub decimals: u8,
-    pub total_supply: Uint128,
+    pub(crate) name: String,
+    pub(crate) symbol: String,
+    pub(crate) decimals: u8,
+    pub(crate) total_supply: Uint128,
 }
 
 impl State<'_> {

@@ -36,7 +36,7 @@ pub(crate) struct VestingRewards {
 }
 
 impl VestingRewards {
-    pub fn calculate_unlocked_rewards(&self, from: Timestamp) -> Result<Decimal256> {
+    pub(crate) fn calculate_unlocked_rewards(&self, from: Timestamp) -> Result<Decimal256> {
         let unlocked = if from >= self.start + self.duration {
             self.amount.checked_sub(self.claimed)?
         } else {
@@ -72,7 +72,7 @@ impl State<'_> {
             .with_context(|| "failed to create rewards transfer msg")
     }
 
-    pub fn load_rewards(
+    pub(crate) fn load_rewards(
         &self,
         storage: &dyn Storage,
         address: &Addr,

@@ -1,2 +1,2 @@
-pub mod contract;
-pub mod state;
+pub(crate) mod contract;
+pub(crate) mod state;

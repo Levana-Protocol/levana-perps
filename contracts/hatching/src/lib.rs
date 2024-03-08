@@ -1,5 +1,4 @@
-pub mod contract;
-pub mod state;
+pub(crate) mod state;
 
 #[cfg(test)]
 mod tests;

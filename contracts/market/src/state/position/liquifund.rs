@@ -83,9 +83,9 @@ impl State<'_> {
 
 #[must_use]
 pub(crate) struct PositionLiquifund {
-    pub fee_settlement: PositionFeeSettlement,
-    pub position: MaybeClosedPosition,
-    pub liquidity_update_locked: Option<LiquidityUpdateLocked>,
+    pub(crate) fee_settlement: PositionFeeSettlement,
+    pub(crate) position: MaybeClosedPosition,
+    pub(crate) liquidity_update_locked: Option<LiquidityUpdateLocked>,
 }
 
 impl PositionLiquifund {

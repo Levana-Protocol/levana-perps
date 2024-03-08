@@ -23,7 +23,7 @@ const TRADE_HISTORY_BY_ADDRESS: Map<(&Addr, u64), PositionAction> =
 /// have different leverage numbers due to the 1-leverage conversion between
 /// base and notional. This calculation is intended to convert back to the
 /// user-facing leverage (in base) numbers.
-pub fn trade_volume_usd(
+pub(crate) fn trade_volume_usd(
     pos: &Position,
     price_point: &PricePoint,
     market_type: MarketType,

@@ -43,14 +43,14 @@ pub(crate) fn load_config(store: &dyn Storage) -> Result<Config> {
     CONFIG.load(store).map_err(|err| err.into())
 }
 
-pub fn lvn_from_profile_spirit_level(spirit_level: NumberGtZero) -> Result<NumberGtZero> {
+pub(crate) fn lvn_from_profile_spirit_level(spirit_level: NumberGtZero) -> Result<NumberGtZero> {
     Decimal256::from_str("2.41")
         .map_err(|err| err.into())
         .map(|multiplier| spirit_level.into_decimal256() * multiplier)
         .and_then(|lvn| NumberGtZero::try_from_decimal(lvn).context("lvn cannot be zero"))
 }
 
-pub fn lvn_from_nft_spirit_level(
+pub(crate) fn lvn_from_nft_spirit_level(
     spirit_level: NumberGtZero,
     kind: NftBurnKind,
     rarity: NftRarity,
