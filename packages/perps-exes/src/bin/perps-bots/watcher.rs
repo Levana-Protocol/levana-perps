@@ -136,7 +136,7 @@ pub(crate) struct TaskStatuses {
     statuses: Arc<StatusMap>,
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct TaskStatus {
     last_result: TaskResult,
@@ -151,7 +151,7 @@ pub(crate) struct TaskStatus {
     counts: TaskCounts,
 }
 
-#[derive(Clone, Copy, Default, serde::Serialize)]
+#[derive(Clone, Copy, Default, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct TaskCounts {
     pub(crate) successes: usize,
@@ -164,14 +164,14 @@ impl TaskCounts {
     }
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct TaskResult {
     pub(crate) value: Arc<TaskResultValue>,
     pub(crate) updated: DateTime<Utc>,
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum TaskResultValue {
     Ok(Cow<'static, str>),
@@ -191,7 +191,7 @@ impl TaskResultValue {
     }
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct TaskError {
     pub(crate) value: Arc<String>,
@@ -926,7 +926,7 @@ impl<T: WatchedTaskPerMarketParallel> WatchedTask for ParallelWatcher<T> {
     }
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 struct RenderedStatus {
     label: TaskLabel,
@@ -972,6 +972,12 @@ impl TaskStatuses {
         );
 
         if template.alert {
+            let failure_status = template
+                .statuses
+                .iter()
+                .filter(|x| x.short.alert())
+                .collect::<Vec<_>>();
+            tracing::error!("Status failure: {:#?}", failure_status);
             *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
         }
 
@@ -988,6 +994,12 @@ impl TaskStatuses {
         let mut res = Json(&template).into_response();
 
         if template.alert {
+            let failure_status = template
+                .statuses
+                .iter()
+                .filter(|x| x.short.alert())
+                .collect::<Vec<_>>();
+            tracing::error!("Status failure: {:#?}", failure_status);
             *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
         }
 
@@ -1005,12 +1017,18 @@ impl TaskStatuses {
         };
         let statuses = self.statuses(label).await;
         let alert = statuses.iter().any(|x| x.short.alert());
+
         statuses
-            .into_iter()
-            .for_each(|rendered| response_builder.add(rendered).unwrap());
+            .iter()
+            .for_each(|rendered| response_builder.add(rendered.clone()).unwrap());
         let mut res = response_builder.into_response();
 
         if alert {
+            let failure_status = statuses
+                .iter()
+                .filter(|x| x.short.alert())
+                .collect::<Vec<_>>();
+            tracing::error!("Status failure: {:#?}", failure_status);
             *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
         }
 
@@ -1023,7 +1041,7 @@ struct ResponseBuilder {
     any_errors: bool,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 enum ShortStatus {
     Error,
