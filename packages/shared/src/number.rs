@@ -75,7 +75,7 @@
 //! However, if we want to do math with a different underlying type - we do need
 //! to drop down to that common type. There's two approaches (both of which
 //! return an Option, in case the resulting value is zero):
-//!     
+//!
 //!   1. If the inner NonZero type stays the same (i.e. it's all `Collateral`)
 //!     then call `.raw()` to get the inner type, do your math, and then convert
 //!     back to the NonZero wrapper via `NonZero::new()`
@@ -91,7 +91,7 @@
 //! use levana_perpswap_cosmos_shared::number::*;
 //! use cosmwasm_std::Decimal256;
 //! use std::str::FromStr;
-//!  
+//!
 //! let lhs:NonZero<Collateral> = "1.23".parse().unwrap();
 //! let rhs:Collateral = "4.56".parse().unwrap();
 //! let collateral_result = lhs.raw().checked_add(rhs).unwrap();
@@ -105,7 +105,7 @@
 //! use levana_perpswap_cosmos_shared::number::*;
 //! use cosmwasm_std::Decimal256;
 //! use std::str::FromStr;
-//!  
+//!
 //! let lhs:NonZero<Collateral> = "1.23".parse().unwrap();
 //! let rhs:Decimal256 = "4.56".parse().unwrap();
 //! let decimal_result = lhs.into_decimal256().checked_add(rhs).unwrap();
@@ -157,11 +157,8 @@
 //! ```
 
 mod convert;
-pub use convert::*;
 mod ops;
-pub use ops::*;
 mod serialize;
-pub use ops::*;
 use schemars::schema::{InstanceType, Metadata, SchemaObject};
 use schemars::JsonSchema;
 mod nonzero;
