@@ -114,7 +114,7 @@ impl OraclePriceInternal {
         }
     }
 
-    pub fn compose_price(
+    pub(crate) fn compose_price(
         &self,
         market_id: &MarketId,
         feeds: &[SpotPriceFeed],
@@ -141,7 +141,7 @@ impl OraclePriceInternal {
     }
 
     // given a list of feeds, compose them into a single price and publish_time (if available)
-    pub fn compose_price_feeds(&self, feeds: &[SpotPriceFeed]) -> Result<NumberGtZero> {
+    pub(crate) fn compose_price_feeds(&self, feeds: &[SpotPriceFeed]) -> Result<NumberGtZero> {
         let mut acc_price: Option<Number> = None;
 
         for SpotPriceFeed {
