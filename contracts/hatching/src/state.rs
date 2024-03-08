@@ -3,8 +3,8 @@ mod lvn;
 pub(crate) mod nft_burn;
 pub(crate) mod nft_mint;
 pub(crate) use lvn::*;
-mod hatch;
 pub(crate) mod config;
+mod hatch;
 mod profile;
 
 use msg::contracts::hatching::config::Config;

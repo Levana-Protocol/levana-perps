@@ -8,10 +8,10 @@ use msg::contracts::market::{
 };
 pub(crate) use open::*;
 pub(crate) mod close;
+mod cw721;
 pub(crate) mod take_profit;
 pub(crate) mod update;
 mod validate;
-mod cw721;
 
 use crate::constants::DEFAULT_CLOSED_POSITION_HISTORY_LIMIT;
 use crate::prelude::*;
