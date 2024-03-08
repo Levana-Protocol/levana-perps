@@ -50,13 +50,13 @@ pub(crate) struct PriceStorage {
 /// internal struct for satisfying both OraclePrice queries and spot price storage
 pub(crate) struct OraclePriceInternal {
     /// A map of each pyth id used in this market to the price and publish time
-    pub pyth: BTreeMap<PriceIdentifier, OraclePriceFeedPythResp>,
+    pub(crate) pyth: BTreeMap<PriceIdentifier, OraclePriceFeedPythResp>,
     /// A map of each sei denom used in this market to the price
-    pub sei: BTreeMap<String, OraclePriceFeedSeiResp>,
+    pub(crate) sei: BTreeMap<String, OraclePriceFeedSeiResp>,
     /// A map of each stride denom used in this market to the redemption price
-    pub stride: BTreeMap<String, OraclePriceFeedStrideResp>,
+    pub(crate) stride: BTreeMap<String, OraclePriceFeedStrideResp>,
     /// A map of each simple contract used in this market to the redemption price
-    pub simple: BTreeMap<Addr, OraclePriceFeedSimpleResp>,
+    pub(crate) simple: BTreeMap<Addr, OraclePriceFeedSimpleResp>,
 }
 
 impl OraclePriceInternal {

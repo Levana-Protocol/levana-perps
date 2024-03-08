@@ -2,7 +2,7 @@
 pub(crate) const POSITION_OPEN: &str = "position-open";
 pub(crate) const POSITION_UPDATE: &str = "position-update";
 pub(crate) const POSITION_CLOSE: &str = "position-close";
-pub const POS_ID: &str = "pos-id";
+pub(crate) const POS_ID: &str = "pos-id";
 pub(crate) const POS_OWNER: &str = "pos-owner";
 pub(crate) const DEPOSIT_COLLATERAL: &str = "deposit-collateral";
 pub(crate) const DEPOSIT_COLLATERAL_USD: &str = "deposit-collateral-usd";
@@ -32,9 +32,11 @@ pub(crate) const SETTLED_AT: &str = "settled-at";
 pub(crate) const CLOSE_REASON: &str = "close-reason";
 pub(crate) const STOP_LOSS_OVERRIDE: &str = "stop-loss-override";
 pub(crate) const TAKE_PROFIT_OVERRIDE: &str = "take-profit-override";
+// Being used in multi_test
 pub const PLACE_LIMIT_ORDER: &str = "place-limit-order";
 pub(crate) const EXECUTE_LIMIT_ORDER: &str = "execute-limit-order";
 pub(crate) const EXECUTE_LIMIT_ORDER_ERROR: &str = "error";
+// Being used in multi_test
 pub const ORDER_ID: &str = "order-id";
 pub(crate) const TRIGGER_PRICE: &str = "trigger-price";
 pub(crate) const MAX_GAINS: &str = "max-gains";

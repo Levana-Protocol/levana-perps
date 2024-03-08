@@ -1,5 +1,6 @@
-pub mod constants;
+pub(crate) mod constants;
+// Being used by multi_test
 pub mod contract;
 mod deferred_exec;
 pub(crate) mod prelude;
-pub mod state;
+pub(crate) mod state;
