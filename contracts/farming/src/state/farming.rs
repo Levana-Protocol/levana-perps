@@ -32,8 +32,8 @@ pub(crate) struct FarmingTotals {
     /// We could in theory query the xLP balance instead of storing it. However,
     /// that gets hairy quickly when users deposit xLP, since querying the xLP
     /// token balance will not give the correct response for calculations.
-    pub xlp: LpToken,
-    pub farming: FarmingToken,
+    pub(crate) xlp: LpToken,
+    pub(crate) farming: FarmingToken,
 }
 
 impl FarmingTotals {

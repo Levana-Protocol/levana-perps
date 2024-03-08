@@ -5,7 +5,7 @@ use std::convert::TryFrom;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u64)]
-pub enum ReplyId {
+pub(crate) enum ReplyId {
     TransferCollateral = 0,
     ReinvestYield = 1,
     FarmingDeposit = 2,

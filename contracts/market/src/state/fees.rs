@@ -293,8 +293,8 @@ impl State<'_> {
 
 #[must_use]
 pub(crate) struct BorrowFeeCollection {
-    pub event: FeeEvent,
-    pub liquidity_yield_to_process: LiquidityNewYieldToProcess,
+    pub(crate) event: FeeEvent,
+    pub(crate) liquidity_yield_to_process: LiquidityNewYieldToProcess,
 }
 
 impl BorrowFeeCollection {
@@ -319,10 +319,10 @@ impl BorrowFeeCollection {
 
 #[must_use]
 pub(crate) struct CapCrankFee {
-    pub amount: Collateral,
-    pub amount_usd: Usd,
-    pub insufficient_margin_event: Option<InsufficientMarginEvent>,
-    pub trade_id: TradeId,
+    pub(crate) amount: Collateral,
+    pub(crate) amount_usd: Usd,
+    pub(crate) insufficient_margin_event: Option<InsufficientMarginEvent>,
+    pub(crate) trade_id: TradeId,
 }
 
 impl CapCrankFee {

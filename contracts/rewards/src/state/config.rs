@@ -8,13 +8,13 @@ use shared::prelude::*;
 const CONFIG: Item<Config> = Item::new("config");
 
 impl State<'_> {
-    pub fn save_config(&self, store: &mut dyn Storage) -> Result<()> {
+    pub(crate) fn save_config(&self, store: &mut dyn Storage) -> Result<()> {
         CONFIG.save(store, &self.config)?;
         Ok(())
     }
 }
 
-pub fn load_config(store: &dyn Storage) -> Result<Config> {
+pub(crate) fn load_config(store: &dyn Storage) -> Result<Config> {
     let config = CONFIG.load(store)?;
 
     Ok(config)

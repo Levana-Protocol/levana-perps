@@ -4,7 +4,6 @@ mod stats;
 use crate::state::*;
 use anyhow::Context;
 use cosmwasm_std::Order;
-pub use cw20::*;
 use cw_storage_plus::Map;
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::config::MaxLiquidity;
@@ -1002,9 +1001,9 @@ impl State<'_> {
 // Helper struct for liquidity unlock
 #[must_use]
 pub(crate) struct LiquidityUnlock {
-    pub amount: NonZero<Collateral>,
-    pub price: PricePoint,
-    pub stats: LiquidityStats,
+    pub(crate) amount: NonZero<Collateral>,
+    pub(crate) price: PricePoint,
+    pub(crate) stats: LiquidityStats,
 }
 
 impl LiquidityUnlock {

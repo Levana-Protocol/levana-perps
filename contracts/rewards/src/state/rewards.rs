@@ -12,27 +12,27 @@ const REWARDS: Map<&Addr, RewardsInfo> = Map::new("rewards-info");
 #[derive(Serialize, Deserialize, Debug)]
 pub(crate) struct RewardsInfo {
     /// The total amount of tokens rewarded to the user across all their hatchings
-    pub total_rewards: Decimal256,
+    pub(crate) total_rewards: Decimal256,
     /// The total amount of tokens claimed by the user across all their hatchings
-    pub total_claimed: Decimal256,
+    pub(crate) total_claimed: Decimal256,
     /// Information related to the tokens currently vesting
-    pub vesting_rewards: Option<VestingRewards>,
+    pub(crate) vesting_rewards: Option<VestingRewards>,
 }
 
 /// A struct containing information pertaining to rewards from the current vesting period
 #[derive(Serialize, Deserialize, Debug)]
 pub(crate) struct VestingRewards {
     /// The total amount of tokens rewarded to the user for the current vesting period
-    pub amount: Decimal256,
+    pub(crate) amount: Decimal256,
     /// The start time of the current vesting period
-    pub start: Timestamp,
+    pub(crate) start: Timestamp,
     /// The duration of the current vesting period
-    pub duration: Duration,
+    pub(crate) duration: Duration,
     /// The amount of tokens from the current vesting period that have already been claimed
     /// (and transferred) to the user
-    pub claimed: Decimal256,
+    pub(crate) claimed: Decimal256,
     /// The timestamp of the last time the user claimed rewards
-    pub last_claimed: Timestamp,
+    pub(crate) last_claimed: Timestamp,
 }
 
 impl VestingRewards {
