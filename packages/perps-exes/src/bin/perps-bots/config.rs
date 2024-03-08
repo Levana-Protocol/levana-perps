@@ -237,9 +237,9 @@ impl Opt {
             ignored_markets: self.ignored_markets.iter().cloned().collect(),
             // Never used on testnet, just setting a reasonable default
             ignore_errors_after_epoch_seconds: 300,
-            run_optional_services: true,
-            price_bot_delay: None,
-            log_requests: false,
+            run_optional_services: !self.disable_optional_services,
+            price_bot_delay: self.price_bot_delay.map(tokio::time::Duration::from_millis),
+            log_requests: self.log_requests,
         };
 
         Ok((config, Some(faucet_bot_runner)))
@@ -272,9 +272,6 @@ impl Opt {
             max_gas_price,
             higher_max_gas_price,
             very_higher_max_gas_price,
-            disable_optional_services,
-            price_bot_delay,
-            log_requests,
         }: &MainnetOpt,
     ) -> Result<BotConfig> {
         let hrp = network.get_address_hrp();
@@ -345,9 +342,9 @@ impl Opt {
             gas_wallet: Arc::new(gas_wallet),
             ignored_markets: self.ignored_markets.iter().cloned().collect(),
             ignore_errors_after_epoch_seconds: *ignore_errors_after_epoch_seconds,
-            run_optional_services: !*disable_optional_services,
-            price_bot_delay: price_bot_delay.map(tokio::time::Duration::from_millis),
-            log_requests: *log_requests,
+            run_optional_services: !self.disable_optional_services,
+            price_bot_delay: self.price_bot_delay.map(tokio::time::Duration::from_millis),
+            log_requests: self.log_requests,
         })
     }
 }

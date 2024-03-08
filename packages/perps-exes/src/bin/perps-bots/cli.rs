@@ -76,6 +76,15 @@ pub(crate) struct Opt {
         default_value = "https://bots.levana.exchange/"
     )]
     pub(crate) referer_header: reqwest::Url,
+    /// Disable optional services
+    #[clap(long, env = "LEVANA_BOTS_DISABLE_OPTIONAL_SERVICES")]
+    pub(crate) disable_optional_services: bool,
+    /// Price bot delay in milliseconds
+    #[clap(long, env = "LEVANA_BOTS_PRICE_BOT_DELAY_MILLIS")]
+    pub(crate) price_bot_delay: Option<u64>,
+    /// Log every query made by the system?
+    #[clap(long, env = "LEVANA_BOTS_LOG_REQUESTS")]
+    pub(crate) log_requests: bool,
 }
 
 #[derive(clap::Parser, Clone)]
@@ -193,15 +202,6 @@ pub(crate) struct MainnetOpt {
         default_value_t = 2.0
     )]
     pub(crate) very_higher_max_gas_price: f64,
-    /// Disable optional services
-    #[clap(long, env = "LEVANA_BOTS_DISABLE_OPTIONAL_SERVICES")]
-    pub(crate) disable_optional_services: bool,
-    /// Price bot delay in milliseconds
-    #[clap(long, env = "LEVANA_BOTS_PRICE_BOT_DELAY_MILLIS")]
-    pub(crate) price_bot_delay: Option<u64>,
-    /// Log every query made by the system?
-    #[clap(long, env = "LEVANA_BOTS_LOG_REQUESTS")]
-    pub(crate) log_requests: bool,
 }
 
 impl Opt {
