@@ -619,9 +619,9 @@ impl State<'_> {
 
                                 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
                                 #[serde(rename_all = "snake_case")]
-                                pub struct RedemptionRateResponse {
-                                    pub redemption_rate: Decimal256,
-                                    pub update_time: u64,
+                                struct RedemptionRateResponse {
+                                    redemption_rate: Decimal256,
+                                    update_time: u64,
                                 }
 
                                 let resp: RedemptionRateResponse = self.querier.query_wasm_smart(
