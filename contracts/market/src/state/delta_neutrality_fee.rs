@@ -182,7 +182,7 @@ struct CapTriggeredInfo {
 }
 
 impl DeltaNeutralityFeeMultiPass {
-    pub fn new(
+    pub(crate) fn new(
         store: &dyn Storage,
         config: Config,
         net_notional: Signed<Notional>,
@@ -202,7 +202,7 @@ impl DeltaNeutralityFeeMultiPass {
         })
     }
 
-    pub fn run(&mut self) -> Result<()> {
+    pub(crate) fn run(&mut self) -> Result<()> {
         let net_notional_after = self.net_notional + self.delta_notional;
         let net_notional = self.net_notional;
         if (net_notional.into_number() * net_notional_after.into_number()).is_negative() {

@@ -1,6 +1,6 @@
-pub mod config;
-pub mod ibc;
-pub mod send;
+pub(crate) mod config;
+pub(crate) mod ibc;
+pub(crate) mod send;
 
 use msg::contracts::ibc_execute_proxy::config::Config;
 

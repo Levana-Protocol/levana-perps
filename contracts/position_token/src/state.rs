@@ -1,6 +1,5 @@
 // re-exporting
 mod market;
-pub use market::*;
 
 use cosmwasm_std::{Addr, Deps, DepsMut, Empty, Env, QuerierWrapper, Storage};
 use cw_storage_plus::Item;
@@ -21,7 +20,7 @@ pub(crate) struct StateContext<'a> {
 }
 
 impl<'a> State<'a> {
-    pub fn new(deps: Deps<'a>, _env: Env) -> Result<(Self, &dyn Storage)> {
+    pub(crate) fn new(deps: Deps<'a>, _env: Env) -> Result<(Self, &dyn Storage)> {
         let factory_address = FACTORY_ADDR.load(deps.storage)?;
         Ok((
             State {
@@ -34,7 +33,7 @@ impl<'a> State<'a> {
 }
 
 impl<'a> StateContext<'a> {
-    pub fn new(deps: DepsMut<'a>, _env: Env) -> Result<(State<'a>, Self)> {
+    pub(crate) fn new(deps: DepsMut<'a>, _env: Env) -> Result<(State<'a>, Self)> {
         let contract_version = get_contract_version(deps.storage)?;
         let factory_address = FACTORY_ADDR.load(deps.storage)?;
         Ok((

@@ -23,15 +23,15 @@ impl State<'_> {
         }
         #[derive(Serialize, Deserialize)]
         #[serde(rename_all = "snake_case")]
-        pub enum ProfileAdminExecuteMsg {
+        enum ProfileAdminExecuteMsg {
             RemoveSpiritLevel { wallets: Vec<RemoveSpiritLevel> },
         }
 
         #[derive(Serialize, Deserialize)]
         #[serde(rename_all = "snake_case")]
-        pub struct RemoveSpiritLevel {
-            pub wallet: String,
-            pub spirit_level: Option<String>,
+        struct RemoveSpiritLevel {
+            wallet: String,
+            spirit_level: Option<String>,
         }
         ctx.response_mut().add_execute_submessage_oneshot(
             self.config.profile_contract.clone(),
@@ -51,14 +51,14 @@ impl State<'_> {
     pub(crate) fn get_profile_info(&self, owner: &Addr) -> Result<Option<ProfileInfo>> {
         #[derive(Serialize, Deserialize)]
         #[serde(rename_all = "snake_case")]
-        pub enum ProfileQueryMsg {
+        enum ProfileQueryMsg {
             GetSpiritLevel { addr: String },
         }
 
         #[derive(Serialize, Deserialize)]
         #[serde(rename_all = "snake_case")]
-        pub struct GetSpiritLevelResponse {
-            pub spirit_level: String,
+        struct GetSpiritLevelResponse {
+            spirit_level: String,
         }
 
         let resp: GetSpiritLevelResponse = self.querier.query_wasm_smart(

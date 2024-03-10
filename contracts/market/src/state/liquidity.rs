@@ -4,7 +4,6 @@ mod stats;
 use crate::state::*;
 use anyhow::Context;
 use cosmwasm_std::Order;
-pub use cw20::*;
 use cw_storage_plus::Map;
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::config::MaxLiquidity;
@@ -1002,9 +1001,9 @@ impl State<'_> {
 // Helper struct for liquidity unlock
 #[must_use]
 pub(crate) struct LiquidityUnlock {
-    pub amount: NonZero<Collateral>,
-    pub price: PricePoint,
-    pub stats: LiquidityStats,
+    pub(crate) amount: NonZero<Collateral>,
+    pub(crate) price: PricePoint,
+    pub(crate) stats: LiquidityStats,
 }
 
 impl LiquidityUnlock {
@@ -1053,9 +1052,9 @@ impl LiquidityUnlock {
 // Helper struct for liquidity lock
 #[must_use]
 pub(crate) struct LiquidityLock {
-    pub amount: NonZero<Collateral>,
-    pub stats: LiquidityStats,
-    pub price: PricePoint,
+    pub(crate) amount: NonZero<Collateral>,
+    pub(crate) stats: LiquidityStats,
+    pub(crate) price: PricePoint,
 }
 
 impl LiquidityLock {
@@ -1119,9 +1118,9 @@ impl LiquidityLock {
 // TBD: can this be consolidated into LiquidityLock with a flag?
 #[must_use]
 pub(crate) struct LiquidityUpdateLocked {
-    pub amount: Signed<Collateral>,
-    pub price: PricePoint,
-    pub stats: LiquidityStats,
+    pub(crate) amount: Signed<Collateral>,
+    pub(crate) price: PricePoint,
+    pub(crate) stats: LiquidityStats,
 }
 
 impl LiquidityUpdateLocked {
@@ -1176,8 +1175,8 @@ impl LiquidityUpdateLocked {
 
 #[must_use]
 pub(crate) struct LiquidityNewYieldToProcess {
-    pub next_index: u64,
-    pub new_yield: YieldPerToken,
+    pub(crate) next_index: u64,
+    pub(crate) new_yield: YieldPerToken,
 }
 
 impl LiquidityNewYieldToProcess {

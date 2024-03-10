@@ -50,13 +50,13 @@ pub(crate) struct PriceStorage {
 /// internal struct for satisfying both OraclePrice queries and spot price storage
 pub(crate) struct OraclePriceInternal {
     /// A map of each pyth id used in this market to the price and publish time
-    pub pyth: BTreeMap<PriceIdentifier, OraclePriceFeedPythResp>,
+    pub(crate) pyth: BTreeMap<PriceIdentifier, OraclePriceFeedPythResp>,
     /// A map of each sei denom used in this market to the price
-    pub sei: BTreeMap<String, OraclePriceFeedSeiResp>,
+    pub(crate) sei: BTreeMap<String, OraclePriceFeedSeiResp>,
     /// A map of each stride denom used in this market to the redemption price
-    pub stride: BTreeMap<String, OraclePriceFeedStrideResp>,
+    pub(crate) stride: BTreeMap<String, OraclePriceFeedStrideResp>,
     /// A map of each simple contract used in this market to the redemption price
-    pub simple: BTreeMap<Addr, OraclePriceFeedSimpleResp>,
+    pub(crate) simple: BTreeMap<Addr, OraclePriceFeedSimpleResp>,
 }
 
 impl OraclePriceInternal {
@@ -114,7 +114,7 @@ impl OraclePriceInternal {
         }
     }
 
-    pub fn compose_price(
+    pub(crate) fn compose_price(
         &self,
         market_id: &MarketId,
         feeds: &[SpotPriceFeed],
@@ -141,7 +141,7 @@ impl OraclePriceInternal {
     }
 
     // given a list of feeds, compose them into a single price and publish_time (if available)
-    pub fn compose_price_feeds(&self, feeds: &[SpotPriceFeed]) -> Result<NumberGtZero> {
+    pub(crate) fn compose_price_feeds(&self, feeds: &[SpotPriceFeed]) -> Result<NumberGtZero> {
         let mut acc_price: Option<Number> = None;
 
         for SpotPriceFeed {
@@ -619,9 +619,9 @@ impl State<'_> {
 
                                 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
                                 #[serde(rename_all = "snake_case")]
-                                pub struct RedemptionRateResponse {
-                                    pub redemption_rate: Decimal256,
-                                    pub update_time: u64,
+                                struct RedemptionRateResponse {
+                                    redemption_rate: Decimal256,
+                                    update_time: u64,
                                 }
 
                                 let resp: RedemptionRateResponse = self.querier.query_wasm_smart(

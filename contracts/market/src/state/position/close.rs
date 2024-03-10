@@ -280,7 +280,7 @@ impl ClosePositionExec {
     // rather than to just assign it to a throwaway variable.
     pub(crate) fn discard(self) {}
 
-    pub fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
+    pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
         if let Some(liquifund) = self.liquifund_via_close_msg {
             let _ = liquifund.apply(state, ctx)?;
         }

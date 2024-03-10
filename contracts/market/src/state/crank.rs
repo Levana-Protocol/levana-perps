@@ -148,7 +148,7 @@ impl State<'_> {
     // this always executes the requested cranks
     // if there is no work to be done, then crank_exec itself will be cheap
     // QueryMsg::CrankStats can be used by clients to get heuristics and decide how many to crank
-    pub fn crank_exec_batch(
+    pub(crate) fn crank_exec_batch(
         &self,
         ctx: &mut StateContext,
         start_n_execs_and_rewards: Option<(u32, Addr)>,

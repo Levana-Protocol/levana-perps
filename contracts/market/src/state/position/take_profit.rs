@@ -7,13 +7,13 @@ use shared::{
 };
 
 pub(crate) struct TakeProfitToCounterCollateral<'a> {
-    pub take_profit_price_base: TakeProfitPrice,
-    pub market_type: MarketType,
-    pub collateral: NonZero<Collateral>,
-    pub leverage_to_base: LeverageToBase,
-    pub direction: DirectionToBase,
-    pub config: &'a Config,
-    pub price_point: &'a PricePoint,
+    pub(crate) take_profit_price_base: TakeProfitPrice,
+    pub(crate) market_type: MarketType,
+    pub(crate) collateral: NonZero<Collateral>,
+    pub(crate) leverage_to_base: LeverageToBase,
+    pub(crate) direction: DirectionToBase,
+    pub(crate) config: &'a Config,
+    pub(crate) price_point: &'a PricePoint,
 }
 
 impl<'a> TakeProfitToCounterCollateral<'a> {

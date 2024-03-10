@@ -106,7 +106,7 @@ impl State<'_> {
     }
 }
 
-pub fn validate_channel(
+pub(crate) fn validate_channel(
     channel: &IbcChannel,
     counterparty_version: Option<&str>,
 ) -> Result<IbcChannelVersion> {

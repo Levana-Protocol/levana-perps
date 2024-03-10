@@ -38,7 +38,7 @@ impl State<'_> {
 }
 
 // if the amount is not greater than zero, returns Ok(None)
-pub fn get_lvn_to_grant(details: &HatchDetails) -> Result<Option<NumberGtZero>> {
+pub(crate) fn get_lvn_to_grant(details: &HatchDetails) -> Result<Option<NumberGtZero>> {
     let mut total: Decimal256 = Decimal256::zero();
 
     for egg in &details.eggs {

@@ -668,12 +668,12 @@ mod tests {
 
 #[must_use]
 pub(crate) struct PositionFeeSettlement {
-    pub position: MaybeClosedPosition,
-    pub insufficient_margin_events: Vec<InsufficientMarginEvent>,
-    pub funding_fee_payment: FundingFeePaymentWithCapping,
-    pub borrow_fee_collection: BorrowFeeCollection,
-    pub funding_payment_event: FundingPaymentEvent,
-    pub cap_crank_fee: Option<CapCrankFee>,
+    pub(crate) position: MaybeClosedPosition,
+    pub(crate) insufficient_margin_events: Vec<InsufficientMarginEvent>,
+    pub(crate) funding_fee_payment: FundingFeePaymentWithCapping,
+    pub(crate) borrow_fee_collection: BorrowFeeCollection,
+    pub(crate) funding_payment_event: FundingPaymentEvent,
+    pub(crate) cap_crank_fee: Option<CapCrankFee>,
 }
 
 impl PositionFeeSettlement {

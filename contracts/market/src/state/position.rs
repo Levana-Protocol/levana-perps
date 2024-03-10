@@ -8,12 +8,10 @@ use msg::contracts::market::{
 };
 pub(crate) use open::*;
 pub(crate) mod close;
+mod cw721;
 pub(crate) mod take_profit;
 pub(crate) mod update;
 mod validate;
-pub use validate::*;
-mod cw721;
-pub use cw721::*;
 
 use crate::constants::DEFAULT_CLOSED_POSITION_HISTORY_LIMIT;
 use crate::prelude::*;
@@ -29,9 +27,9 @@ pub(super) const OPEN_NOTIONAL_LONG_INTEREST: Item<Notional> =
 pub(super) const OPEN_NOTIONAL_SHORT_INTEREST: Item<Notional> =
     Item::new(namespace::OPEN_NOTIONAL_SHORT_INTEREST);
 
-pub struct LiquidatablePosition {
-    pub id: PositionId,
-    pub reason: LiquidationReason,
+pub(crate) struct LiquidatablePosition {
+    pub(crate) id: PositionId,
+    pub(crate) reason: LiquidationReason,
 }
 // liquidation price tracking
 
