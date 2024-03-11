@@ -45,7 +45,7 @@ impl OpenPositionExec {
             direction,
             slippage_assert,
             stop_loss_override,
-            take_profit_price,
+            take_profit_price: requested_take_profit_price,
         }: OpenPositionParams,
         price_point: &PricePoint,
     ) -> Result<Self> {
@@ -70,24 +70,37 @@ impl OpenPositionExec {
             )?;
         }
 
-        let take_profit_price_trader = take_profit_price;
-        let take_profit_price_notional = match take_profit_price {
-            TakeProfitPrice::PosInfinity => None,
-            TakeProfitPrice::Finite(x) => {
-                Some(PriceBaseInQuote::from_non_zero(x).into_notional_price(market_type))
-            }
-        };
-
-        let counter_collateral = TakeProfitToCounterCollateral {
-            take_profit_price_base: take_profit_price_trader,
+        let take_profit_counter_collateral = TakeProfitToCounterCollateral {
+            take_profit_price_base: requested_take_profit_price,
             market_type,
             collateral,
             leverage_to_base: leverage,
             direction,
             config: &state.config,
             price_point,
-        }
-        .calc()?;
+        };
+
+        let counter_collateral = take_profit_counter_collateral.calc()?;
+        let capped_take_profit_price = take_profit_counter_collateral.capped_take_profit_price()?;
+        let is_capped_take_profit_price = capped_take_profit_price != requested_take_profit_price;
+
+        let take_profit_price = match capped_take_profit_price {
+            TakeProfitPrice::PosInfinity => None,
+            TakeProfitPrice::Finite(x) => {
+                Some(PriceBaseInQuote::from_non_zero(x).into_notional_price(market_type))
+            }
+        };
+
+        let take_profit_override = if is_capped_take_profit_price {
+            match requested_take_profit_price {
+                TakeProfitPrice::PosInfinity => {
+                    bail!("requested take profit price cannot be infinity when closer than min max gains price");
+                }
+                TakeProfitPrice::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
+            }
+        } else {
+            None
+        };
 
         // FEES
         // https://www.notion.so/levana-protocol/Levana-Well-funded-Perpetuals-Whitepaper-9805a6eba56d429b839f5551dbb65c40#75bb26a1439c4a81894c2aa399471263
@@ -124,13 +137,14 @@ impl OpenPositionExec {
             // just temporarily setting _something_ here, it will be overwritten right away in `set_next_liquifunding`
             next_liquifunding: liquifunded_at,
             stop_loss_override,
-            take_profit_override: Some(take_profit_price_trader),
             liquidation_margin: LiquidationMargin::default(),
             liquidation_price: None,
-            take_profit_price: take_profit_price_notional,
+            take_profit_price,
+            take_profit_override,
+            take_profit_override_notional: take_profit_override
+                .map(|x| x.into_notional_price(market_type)),
             stop_loss_override_notional: stop_loss_override
                 .map(|x| x.into_notional_price(market_type)),
-            take_profit_override_notional: None,
         };
 
         state.set_next_liquifunding(&mut pos, liquifunded_at);

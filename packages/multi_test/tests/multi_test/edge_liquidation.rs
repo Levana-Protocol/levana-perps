@@ -3,7 +3,6 @@ use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, time::TimeJump, Pe
 use msg::{
     contracts::market::config::ConfigUpdate,
     prelude::{DirectionToBase, PriceBaseInQuote},
-    shared::price::TakeProfitPrice,
 };
 
 #[test]
@@ -81,12 +80,7 @@ fn take_profit_edge() {
 
     let position_query = market.query_position(position_id).unwrap();
 
-    let take_profit_price = match position_query.take_profit_override.unwrap() {
-        TakeProfitPrice::PosInfinity => {
-            panic!("unexpected pos infinity");
-        }
-        TakeProfitPrice::Finite(x) => x,
-    };
+    let take_profit_price = position_query.take_profit_price_base.unwrap();
 
     let below_take_profit_price = take_profit_price.into_number() - "0.01".parse().unwrap();
     let below_take_profit_price =

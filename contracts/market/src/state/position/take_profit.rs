@@ -114,7 +114,7 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
     // the take profit price is max of:
     // 1. a calculated take profit price that would lock up the minimum counter collateral allowed
     // 2. the user-requested take-profit price
-    fn capped_take_profit_price(&self) -> Result<TakeProfitPrice> {
+    pub fn capped_take_profit_price(&self) -> Result<TakeProfitPrice> {
         let Self {
             take_profit_price_base,
             market_type,

@@ -106,10 +106,14 @@ fn infinite_max_gains_perp_481() {
         //     res.max_gains_in_quote
         // );
         assert_eq!(
-            res.take_profit_override,
-            Some(TakeProfitPrice::PosInfinity),
-            "Take profit price is not infinite on iteration {i}, actual: {}",
-            res.take_profit_override.unwrap()
+            res.take_profit_override, None,
+            "Take profit price override is not infinite on iteration {i}, actual: {:?}",
+            res.take_profit_override
+        );
+        assert_eq!(
+            res.take_profit_price_base, None,
+            "Take profit price is not infinite on iteration {i}, actual: {:?}",
+            res.take_profit_price_base
         );
     }
 }
