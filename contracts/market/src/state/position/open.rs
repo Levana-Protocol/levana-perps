@@ -45,7 +45,7 @@ impl OpenPositionExec {
             direction,
             slippage_assert,
             stop_loss_override,
-            take_profit_price: requested_take_profit_price,
+            take_profit_price: take_profit_override,
         }: OpenPositionParams,
         price_point: &PricePoint,
     ) -> Result<Self> {
@@ -71,7 +71,7 @@ impl OpenPositionExec {
         }
 
         let take_profit_counter_collateral = TakeProfitToCounterCollateral {
-            take_profit_price_base: requested_take_profit_price,
+            take_profit_price_base: take_profit_override,
             market_type,
             collateral,
             leverage_to_base: leverage,
@@ -81,27 +81,19 @@ impl OpenPositionExec {
         };
 
         let counter_collateral = take_profit_counter_collateral.calc()?;
-        let capped_take_profit_price = take_profit_counter_collateral.capped_take_profit_price()?;
-        let is_capped_take_profit_price = capped_take_profit_price != requested_take_profit_price;
 
-        let take_profit_price = match capped_take_profit_price {
+        let take_profit_price = match take_profit_counter_collateral.capped_take_profit_price()? {
             TakeProfitPrice::PosInfinity => None,
             TakeProfitPrice::Finite(x) => {
                 Some(PriceBaseInQuote::from_non_zero(x).into_notional_price(market_type))
             }
         };
 
-        let take_profit_override_notional = if is_capped_take_profit_price {
-            match requested_take_profit_price {
-                TakeProfitPrice::PosInfinity => {
-                    bail!("requested take profit price cannot be infinity when closer than min max gains price");
-                }
-                TakeProfitPrice::Finite(x) => {
-                    Some(PriceBaseInQuote::from_non_zero(x).into_notional_price(market_type))
-                }
+        let take_profit_override_notional = match take_profit_override {
+            TakeProfitPrice::PosInfinity => None,
+            TakeProfitPrice::Finite(x) => {
+                Some(PriceBaseInQuote::from_non_zero(x).into_notional_price(market_type))
             }
-        } else {
-            None
         };
 
         // FEES
@@ -142,7 +134,7 @@ impl OpenPositionExec {
             liquidation_margin: LiquidationMargin::default(),
             liquidation_price: None,
             take_profit_price,
-            take_profit_override: Some(requested_take_profit_price),
+            take_profit_override: Some(take_profit_override),
             take_profit_override_notional,
             stop_loss_override_notional: stop_loss_override
                 .map(|x| x.into_notional_price(market_type)),
