@@ -177,6 +177,125 @@ fn position_take_profit_override_long() {
     trigger_and_assert(pos_id, LiquidationReason::TakeProfit);
 }
 
+fn open_long_with_take_profit(
+    market: &PerpsMarket,
+    trader: &Addr,
+    amount: &str,
+    leverage: &str,
+    take_profit: &str,
+) -> PositionId {
+    let msg = market
+        .token
+        .into_market_execute_msg(
+            &market.addr,
+            amount.parse().unwrap(),
+            MarketExecuteMsg::OpenPosition {
+                slippage_assert: None,
+                leverage: leverage.parse().unwrap(),
+                direction: DirectionToBase::Long,
+                max_gains: None,
+                stop_loss_override: None,
+                take_profit: Some(take_profit.parse().unwrap()),
+            },
+        )
+        .unwrap();
+    let queue_resp = market.exec_defer_queue_wasm_msg(trader, msg).unwrap();
+    market
+        .exec_open_position_process_queue_response(trader, queue_resp, None)
+        .unwrap()
+        .0
+}
+
+#[test]
+fn position_take_profit_override_long_2() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    let trader = market.clone_trader(0).unwrap();
+    let cranker = market.clone_trader(1).unwrap();
+    let trigger_and_assert = |pos_id: PositionId, price: &str, reason: LiquidationReason| {
+        market.exec_set_price(price.try_into().unwrap()).unwrap();
+        market.exec_crank(&cranker).unwrap();
+
+        let pos = market.query_closed_position(&trader, pos_id).unwrap();
+        assert_position_liquidated_reason(&pos, reason).unwrap();
+    };
+
+    // Test liquidation reason of the position closing close to current price with the take profit override.
+
+    market.exec_set_price("100".try_into().unwrap()).unwrap();
+
+    let pos_id = open_long_with_take_profit(&market, &trader, "100", "10", "100.1");
+
+    trigger_and_assert(pos_id, "101", LiquidationReason::TakeProfit);
+}
+
+#[test]
+fn position_take_profit_override_long_3() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    let trader = market.clone_trader(0).unwrap();
+    let cranker = market.clone_trader(1).unwrap();
+    let take_profit_override = PriceBaseInQuote::try_from_number(101u128.into()).unwrap();
+    let trigger_and_assert = |pos_id: PositionId, price: &str, reason: LiquidationReason| {
+        market.exec_set_price(price.try_into().unwrap()).unwrap();
+        market.exec_crank(&cranker).unwrap();
+
+        let pos = market.query_closed_position(&trader, pos_id).unwrap();
+        assert_position_liquidated_reason(&pos, reason).unwrap();
+    };
+
+    // Test that position is not closed after resetting the take profit override higher than what was set by open msg.
+
+    market.exec_set_price("100".try_into().unwrap()).unwrap();
+    let pos_id = open_long_with_take_profit(&market, &trader, "100", "10", "100.1");
+
+    market
+        .exec_set_trigger_order(&trader, pos_id, None, Some(take_profit_override))
+        .unwrap();
+
+    market.exec_set_price("100.2".try_into().unwrap()).unwrap();
+    market.exec_crank(&cranker).unwrap();
+
+    let _ = market
+        .query_position(pos_id)
+        .expect("Position was closed lower than the take profit override");
+
+    trigger_and_assert(pos_id, "102", LiquidationReason::TakeProfit);
+}
+
+#[test]
+fn position_take_profit_override_long_4() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    let trader = market.clone_trader(0).unwrap();
+    let cranker = market.clone_trader(1).unwrap();
+    let trigger_and_assert = |pos_id: PositionId, price: &str, reason: LiquidationReason| {
+        market.exec_set_price(price.try_into().unwrap()).unwrap();
+        market.exec_crank(&cranker).unwrap();
+
+        let pos = market.query_closed_position(&trader, pos_id).unwrap();
+        assert_position_liquidated_reason(&pos, reason).unwrap();
+    };
+
+    // Test that position is closed with max gains getting all counter collateral if the take profit override is removed.
+
+    market.exec_set_price("100".try_into().unwrap()).unwrap();
+    let pos_id = open_long_with_take_profit(&market, &trader, "100", "10", "100.1");
+
+    market
+        .exec_set_trigger_order(&trader, pos_id, None, None)
+        .unwrap();
+
+    market.exec_set_price("100.2".try_into().unwrap()).unwrap();
+    market.exec_crank(&cranker).unwrap();
+
+    let _ = market
+        .query_position(pos_id)
+        .expect("Position was closed lower than the take profit override");
+
+    trigger_and_assert(pos_id, "105", LiquidationReason::MaxGains);
+}
+
 #[test]
 fn position_take_profit_override_short() {
     // Setup
