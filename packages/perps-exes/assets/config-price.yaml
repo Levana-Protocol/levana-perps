@@ -363,12 +363,13 @@ networks:
         !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 43200 }
       ]
     stTIA_USD:
+      # This redemption rate feed updates slowly, so using 2 days of age tolerance
       feeds: [
-        !stride { denom: "ibc/698350B8A61D575025F3ED13E9AC9C0F45C89DEFE92F76D5838F1D3C1A7FF7C9", inverted: false, age_tolerance: 43200 },
+        !stride { denom: "ibc/698350B8A61D575025F3ED13E9AC9C0F45C89DEFE92F76D5838F1D3C1A7FF7C9", inverted: false, age_tolerance: 172800 },
         !pyth { key: "TIA_USD", inverted: false }
       ]
       feeds-usd: [
-        !stride { denom: "ibc/698350B8A61D575025F3ED13E9AC9C0F45C89DEFE92F76D5838F1D3C1A7FF7C9", inverted: false, age_tolerance: 43200 },
+        !stride { denom: "ibc/698350B8A61D575025F3ED13E9AC9C0F45C89DEFE92F76D5838F1D3C1A7FF7C9", inverted: false, age_tolerance: 172800 },
         !pyth { key: "TIA_USD", inverted: false }
       ]
     DYM_USD:
