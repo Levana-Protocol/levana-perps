@@ -70,7 +70,7 @@ impl OpenPositionExec {
             )?;
         }
 
-        let take_profit_counter_collateral = TakeProfitToCounterCollateral {
+        let counter_collateral = TakeProfitToCounterCollateral {
             take_profit_price_base: take_profit_override,
             market_type,
             collateral,
@@ -78,9 +78,8 @@ impl OpenPositionExec {
             direction,
             config: &state.config,
             price_point,
-        };
-
-        let counter_collateral = take_profit_counter_collateral.calc()?;
+        }
+        .calc()?;
 
         let take_profit_override_notional = match take_profit_override {
             TakeProfitPrice::PosInfinity => None,
@@ -126,6 +125,7 @@ impl OpenPositionExec {
             stop_loss_override,
             liquidation_margin: LiquidationMargin::default(),
             liquidation_price: None,
+            // this will be overwritten in position save anyway, which derives this price from counter-collateral
             take_profit_price: None,
             take_profit_override: Some(take_profit_override),
             take_profit_override_notional,
