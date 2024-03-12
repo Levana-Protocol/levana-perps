@@ -798,6 +798,16 @@ impl UpdatePositionTakeProfitPriceExec {
 
         let event = state.position_update_event(store, &original_pos, pos.clone(), price_point)?;
 
+        let take_profit_override = take_profit_price;
+        let take_profit_override_notional = match take_profit_override {
+            TakeProfitPrice::PosInfinity => None,
+            TakeProfitPrice::Finite(x) => {
+                Some(PriceBaseInQuote::from_non_zero(x).into_notional_price(market_type))
+            }
+        };
+        pos.take_profit_override = Some(take_profit_override);
+        pos.take_profit_override_notional = take_profit_override_notional;
+
         Ok(Self {
             pos,
             price_point: *price_point,

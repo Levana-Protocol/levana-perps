@@ -82,13 +82,6 @@ impl OpenPositionExec {
 
         let counter_collateral = take_profit_counter_collateral.calc()?;
 
-        let take_profit_price = match take_profit_counter_collateral.capped_take_profit_price()? {
-            TakeProfitPrice::PosInfinity => None,
-            TakeProfitPrice::Finite(x) => {
-                Some(PriceBaseInQuote::from_non_zero(x).into_notional_price(market_type))
-            }
-        };
-
         let take_profit_override_notional = match take_profit_override {
             TakeProfitPrice::PosInfinity => None,
             TakeProfitPrice::Finite(x) => {
@@ -133,7 +126,7 @@ impl OpenPositionExec {
             stop_loss_override,
             liquidation_margin: LiquidationMargin::default(),
             liquidation_price: None,
-            take_profit_price,
+            take_profit_price: None,
             take_profit_override: Some(take_profit_override),
             take_profit_override_notional,
             stop_loss_override_notional: stop_loss_override
