@@ -91,12 +91,14 @@ impl OpenPositionExec {
             }
         };
 
-        let take_profit_override = if is_capped_take_profit_price {
+        let take_profit_override_notional = if is_capped_take_profit_price {
             match requested_take_profit_price {
                 TakeProfitPrice::PosInfinity => {
                     bail!("requested take profit price cannot be infinity when closer than min max gains price");
                 }
-                TakeProfitPrice::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
+                TakeProfitPrice::Finite(x) => {
+                    Some(PriceBaseInQuote::from_non_zero(x).into_notional_price(market_type))
+                }
             }
         } else {
             None
@@ -140,9 +142,8 @@ impl OpenPositionExec {
             liquidation_margin: LiquidationMargin::default(),
             liquidation_price: None,
             take_profit_price,
-            take_profit_override,
-            take_profit_override_notional: take_profit_override
-                .map(|x| x.into_notional_price(market_type)),
+            take_profit_override: Some(requested_take_profit_price),
+            take_profit_override_notional,
             stop_loss_override_notional: stop_loss_override
                 .map(|x| x.into_notional_price(market_type)),
         };

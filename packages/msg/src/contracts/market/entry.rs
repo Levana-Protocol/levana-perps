@@ -853,7 +853,7 @@ pub struct PositionAction {
     /// If this is a position transfer, the new owner.
     pub new_owner: Option<Addr>,
     /// The take profit override, if set.
-    pub take_profit_override: Option<PriceBaseInQuote>,
+    pub take_profit_override: Option<TakeProfitPrice>,
     /// The stop loss override, if set.
     pub stop_loss_override: Option<PriceBaseInQuote>,
 }

@@ -502,6 +502,16 @@ pub enum TakeProfitPrice {
     PosInfinity,
 }
 
+impl TakeProfitPrice {
+    /// helper to extract the inner value if it is finite
+    pub fn as_finite(&self) -> Option<NonZero<Decimal256>> {
+        match self {
+            TakeProfitPrice::Finite(val) => Some(*val),
+            TakeProfitPrice::PosInfinity => None,
+        }
+    }
+}
+
 impl Display for TakeProfitPrice {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {

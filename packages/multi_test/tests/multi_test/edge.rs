@@ -135,7 +135,12 @@ fn max_gain_edge() {
 
     let pos = market.query_position(pos_id).unwrap();
 
-    let take_profit_price_override = pos.take_profit_override.unwrap().into_number();
+    let take_profit_price_override = pos
+        .take_profit_override
+        .unwrap()
+        .as_finite()
+        .unwrap()
+        .into_number();
 
     let take_profit_price_position = pos.take_profit_price_base.unwrap().into_number();
     assert!(take_profit_price_requested < take_profit_price_position);
@@ -176,11 +181,16 @@ fn max_gain_edge() {
     .into_number();
 
     let pos = market.query_position(pos_id).unwrap();
-
-    assert!(pos.take_profit_override.is_none());
+    let take_profit_price_override = pos
+        .take_profit_override
+        .unwrap()
+        .as_finite()
+        .unwrap()
+        .into_number();
 
     let take_profit_price_position = pos.take_profit_price_base.unwrap().into_number();
     assert_eq!(take_profit_price_requested, take_profit_price_position);
+    assert_eq!(take_profit_price_requested, take_profit_price_override);
 }
 
 #[test]
