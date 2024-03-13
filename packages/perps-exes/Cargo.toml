@@ -78,6 +78,7 @@ bigdecimal = { version = "0.4.2", features = ["serde"]}
 http = "1.0.0"
 headers = "0.4.0"
 tower = "0.4.13"
+headless_chrome = "1.0.9"
 
 [features]
 default = []

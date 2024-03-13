@@ -1,0 +1,7 @@
+# List all recipes
+default:
+	just --list --unsorted
+
+# Run application
+run:
+	cargo run --bin perps-market-params
