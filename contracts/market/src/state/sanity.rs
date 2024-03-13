@@ -122,7 +122,7 @@ fn liquidation_prices(store: &dyn Storage, _env: &Env) -> Result<()> {
                         PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
                     }
                     None => {
-                        if take_profit_trader_notional.is_none() {
+                        if take_profit_total.is_none() {
                             ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
                         } else {
                             ensure_at_most_one(store, PRICE_TRIGGER_ASC, posid)?;
@@ -164,7 +164,7 @@ fn liquidation_prices(store: &dyn Storage, _env: &Env) -> Result<()> {
                         PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
                     }
                     None => {
-                        if take_profit_trader_notional.is_none() {
+                        if take_profit_total.is_none() {
                             ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
                         } else {
                             ensure_at_most_one(store, PRICE_TRIGGER_DESC, posid)?;
@@ -197,7 +197,11 @@ fn ensure_missing(
 ) -> Result<()> {
     for res in m.keys(store, None, None, cosmwasm_std::Order::Ascending) {
         let (_, x) = res?;
-        anyhow::ensure!(x != posid);
+        anyhow::ensure!(
+            x != posid,
+            "found entry for position {} in liquidation map, but it shouldn't be in there",
+            posid
+        );
     }
     Ok(())
 }
