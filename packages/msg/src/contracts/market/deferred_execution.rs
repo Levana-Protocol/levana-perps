@@ -188,7 +188,7 @@ pub enum DeferredExecItem {
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
         #[serde(alias = "take_profit_override")]
-        take_profit: Option<TakeProfitPrice>,
+        take_profit: Option<TakeProfitPriceBaseInQuote>,
         /// The amount of collateral provided
         amount: NonZero<Collateral>,
         /// Crank fee already charged
@@ -263,7 +263,7 @@ pub enum DeferredExecItem {
         /// ID of position to update
         id: PositionId,
         /// New take profit price of the position
-        price: TakeProfitPrice,
+        price: TakeProfitPriceBaseInQuote,
     },
 
     /// Close a position
@@ -302,7 +302,7 @@ pub enum DeferredExecItem {
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
         #[serde(alias = "take_profit_override")]
-        take_profit: Option<TakeProfitPrice>,
+        take_profit: Option<TakeProfitPriceBaseInQuote>,
         /// The amount of collateral provided
         amount: NonZero<Collateral>,
         /// Crank fee already charged

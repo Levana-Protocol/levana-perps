@@ -525,7 +525,7 @@ async fn csv_helper(
             delta_neutrality_fee: _,
             old_owner: _,
             new_owner: _,
-            take_profit_override: _,
+            take_profit_trader: _,
             stop_loss_override: _,
         } = contract
             .first_position_action(pos_id)

@@ -845,7 +845,7 @@ fn position_update_max_gains_perp_666() {
 
     let pos = market.query_position(pos_id).unwrap();
 
-    assert_ne!(pos1.take_profit_price_base, pos.take_profit_price_base);
+    assert_ne!(pos1.take_profit_total_base, pos.take_profit_total_base);
 }
 
 #[test]

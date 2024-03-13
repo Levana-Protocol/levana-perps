@@ -7,7 +7,7 @@ use shared::{
 };
 
 pub(crate) struct TakeProfitToCounterCollateral<'a> {
-    pub(crate) take_profit_price_base: TakeProfitPrice,
+    pub(crate) take_profit_trader: TakeProfitPriceBaseInQuote,
     pub(crate) market_type: MarketType,
     pub(crate) collateral: NonZero<Collateral>,
     pub(crate) leverage_to_base: LeverageToBase,
@@ -47,7 +47,7 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
     // 2. the calculated minimum take_profit price corresponding to minimum allowed counter-collateral (will be some buffer away from spot price)
     fn counter_collateral(
         &self,
-        take_profit_price: TakeProfitPrice,
+        take_profit_price: TakeProfitPriceBaseInQuote,
     ) -> Result<NonZero<Collateral>> {
         let Self {
             market_type,
@@ -61,7 +61,7 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
         let notional_size = self.notional_size()?;
 
         match take_profit_price {
-            TakeProfitPrice::PosInfinity => {
+            TakeProfitPriceBaseInQuote::PosInfinity => {
                 let leverage_to_notional = leverage_to_base
                     .into_signed(direction)
                     .into_notional(market_type);
@@ -96,7 +96,7 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
                     }
                 }
             }
-            TakeProfitPrice::Finite(take_profit_price) => {
+            TakeProfitPriceBaseInQuote::Finite(take_profit_price) => {
                 let take_profit_price = PriceBaseInQuote::from_non_zero(take_profit_price);
                 let take_profit_price_notional = take_profit_price.into_notional_price(market_type);
 
@@ -114,9 +114,9 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
     // the take profit price is max of:
     // 1. a calculated take profit price that would lock up the minimum counter collateral allowed
     // 2. the user-requested take-profit price
-    pub fn capped_take_profit_price(&self) -> Result<TakeProfitPrice> {
+    pub fn capped_take_profit_price(&self) -> Result<TakeProfitPriceBaseInQuote> {
         let Self {
-            take_profit_price_base,
+            take_profit_trader,
             market_type,
             collateral,
             leverage_to_base,
@@ -132,13 +132,11 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
             / config.max_leverage;
 
         // user requested counter_collateral
-        let req_counter_collateral = self
-            .counter_collateral(take_profit_price_base)?
-            .into_number();
+        let req_counter_collateral = self.counter_collateral(take_profit_trader)?.into_number();
 
         // counter_collateral at requested price is above min, use requested take_profit price
         if req_counter_collateral > min_counter_collateral {
-            Ok(self.take_profit_price_base)
+            Ok(self.take_profit_trader)
         }
         // counter_collateral at requested price is below min, calculate take_profit price for min counter_collateral
         else {

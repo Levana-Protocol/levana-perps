@@ -101,7 +101,7 @@ impl State<'_> {
             delta_neutrality_fee: None,
             old_owner: Some(old_owner.clone()),
             new_owner: Some(pos.owner.clone()),
-            take_profit_override: pos.take_profit_override,
+            take_profit_trader: pos.take_profit_trader,
             stop_loss_override: pos.stop_loss_override,
         };
         let old_owner_action = PositionAction {
@@ -271,7 +271,7 @@ impl State<'_> {
                 .map(|x| x.map(|x| price_point.collateral_to_usd(x))),
             old_owner: None,
             new_owner: None,
-            take_profit_override: pos.take_profit_override,
+            take_profit_trader: pos.take_profit_trader,
             stop_loss_override: pos.stop_loss_override,
         };
 
@@ -314,7 +314,7 @@ impl State<'_> {
             ),
             old_owner: None,
             new_owner: None,
-            take_profit_override: None,
+            take_profit_trader: None,
             stop_loss_override: None,
         };
 

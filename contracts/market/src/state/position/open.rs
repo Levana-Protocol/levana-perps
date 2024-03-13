@@ -45,7 +45,7 @@ impl OpenPositionExec {
             direction,
             slippage_assert,
             stop_loss_override,
-            take_profit_price: take_profit_override,
+            take_profit_trader,
         }: OpenPositionParams,
         price_point: &PricePoint,
     ) -> Result<Self> {
@@ -71,7 +71,7 @@ impl OpenPositionExec {
         }
 
         let counter_collateral = TakeProfitToCounterCollateral {
-            take_profit_price_base: take_profit_override,
+            take_profit_trader,
             market_type,
             collateral,
             leverage_to_base: leverage,
@@ -80,13 +80,6 @@ impl OpenPositionExec {
             price_point,
         }
         .calc()?;
-
-        let take_profit_override_notional = match take_profit_override {
-            TakeProfitPrice::PosInfinity => None,
-            TakeProfitPrice::Finite(x) => {
-                Some(PriceBaseInQuote::from_non_zero(x).into_notional_price(market_type))
-            }
-        };
 
         // FEES
         // https://www.notion.so/levana-protocol/Levana-Well-funded-Perpetuals-Whitepaper-9805a6eba56d429b839f5551dbb65c40#75bb26a1439c4a81894c2aa399471263
@@ -126,9 +119,9 @@ impl OpenPositionExec {
             liquidation_margin: LiquidationMargin::default(),
             liquidation_price: None,
             // this will be overwritten in position save anyway, which derives this price from counter-collateral
-            take_profit_price: None,
-            take_profit_override: Some(take_profit_override),
-            take_profit_override_notional,
+            take_profit_total: None,
+            take_profit_trader: Some(take_profit_trader),
+            take_profit_trader_notional: take_profit_trader.into_notional(market_type),
             stop_loss_override_notional: stop_loss_override
                 .map(|x| x.into_notional_price(market_type)),
         };
@@ -288,7 +281,7 @@ impl OpenPositionExec {
                 leverage,
                 counter_leverage,
                 stop_loss_override: pos.stop_loss_override,
-                take_profit_override: pos.take_profit_override,
+                take_profit_trader: pos.take_profit_trader,
             },
             created_at: pos.created_at,
             price_point_created_at: price_point.timestamp,
@@ -308,5 +301,5 @@ pub(crate) struct OpenPositionParams {
     pub(crate) direction: DirectionToBase,
     pub(crate) slippage_assert: Option<SlippageAssert>,
     pub(crate) stop_loss_override: Option<PriceBaseInQuote>,
-    pub(crate) take_profit_price: TakeProfitPrice,
+    pub(crate) take_profit_trader: TakeProfitPriceBaseInQuote,
 }

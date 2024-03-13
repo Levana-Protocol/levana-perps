@@ -138,7 +138,7 @@ impl State<'_> {
         // it shouldn't be needed for any new orders, which do this song and dance in deferred_exec creation
         // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
         #[allow(deprecated)]
-        let take_profit_price = match (order.take_profit, order.max_gains) {
+        let take_profit_trader = match (order.take_profit, order.max_gains) {
             (None, None) => {
                 bail!("must supply at least one of take_profit or max_gains");
             }
@@ -147,10 +147,12 @@ impl State<'_> {
                 let take_profit = match take_profit {
                     None => None,
                     Some(take_profit) => match take_profit {
-                        TakeProfitPrice::PosInfinity => {
+                        TakeProfitPriceBaseInQuote::PosInfinity => {
                             bail!("cannot set infinite take profit price and max_gains")
                         }
-                        TakeProfitPrice::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
+                        TakeProfitPriceBaseInQuote::Finite(x) => {
+                            Some(PriceBaseInQuote::from_non_zero(x))
+                        }
                     },
                 };
                 BackwardsCompatTakeProfit {
@@ -174,7 +176,7 @@ impl State<'_> {
             direction: order.direction.into_base(market_type),
             slippage_assert: None,
             stop_loss_override: order.stop_loss_override,
-            take_profit_price,
+            take_profit_trader,
         };
 
         let res = match OpenPositionExec::new(self, ctx.storage, open_position_params, price_point)
@@ -387,7 +389,7 @@ impl PlaceLimitOrderExec {
         leverage: LeverageToBase,
         direction: DirectionToNotional,
         stop_loss_override: Option<PriceBaseInQuote>,
-        take_profit: TakeProfitPrice,
+        take_profit: TakeProfitPriceBaseInQuote,
         deferred_exec_crank_fee: Collateral,
         deferred_exec_crank_fee_usd: Usd,
         price: PricePoint,

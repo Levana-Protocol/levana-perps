@@ -128,23 +128,23 @@ fn max_gain_edge() {
     .unwrap();
 
     let take_profit_price_requested = match take_profit_price_requested {
-        TakeProfitPrice::Finite(value) => value,
-        TakeProfitPrice::PosInfinity => panic!("expected finite take profit price"),
+        TakeProfitPriceBaseInQuote::Finite(value) => value,
+        TakeProfitPriceBaseInQuote::PosInfinity => panic!("expected finite take profit price"),
     }
     .into_number();
 
     let pos = market.query_position(pos_id).unwrap();
 
-    let take_profit_price_override = pos
-        .take_profit_override
+    let take_profit_trader = pos
+        .take_profit_trader
         .unwrap()
         .as_finite()
         .unwrap()
         .into_number();
 
-    let take_profit_price_position = pos.take_profit_price_base.unwrap().into_number();
+    let take_profit_price_position = pos.take_profit_total_base.unwrap().into_number();
     assert!(take_profit_price_requested < take_profit_price_position);
-    assert_eq!(take_profit_price_requested, take_profit_price_override);
+    assert_eq!(take_profit_price_requested, take_profit_trader);
 
     // sanity check that this wasn't accidental
     let (pos_id, _) = market
@@ -175,22 +175,22 @@ fn max_gain_edge() {
     .unwrap();
 
     let take_profit_price_requested = match take_profit_price_requested {
-        TakeProfitPrice::Finite(value) => value,
-        TakeProfitPrice::PosInfinity => panic!("expected finite take profit price"),
+        TakeProfitPriceBaseInQuote::Finite(value) => value,
+        TakeProfitPriceBaseInQuote::PosInfinity => panic!("expected finite take profit price"),
     }
     .into_number();
 
     let pos = market.query_position(pos_id).unwrap();
-    let take_profit_price_override = pos
-        .take_profit_override
+    let take_profit_trader = pos
+        .take_profit_trader
         .unwrap()
         .as_finite()
         .unwrap()
         .into_number();
 
-    let take_profit_price_position = pos.take_profit_price_base.unwrap().into_number();
+    let take_profit_price_position = pos.take_profit_total_base.unwrap().into_number();
     assert_eq!(take_profit_price_requested, take_profit_price_position);
-    assert_eq!(take_profit_price_requested, take_profit_price_override);
+    assert_eq!(take_profit_price_requested, take_profit_trader);
 }
 
 #[test]

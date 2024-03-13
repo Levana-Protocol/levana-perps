@@ -161,7 +161,7 @@ impl State<'_> {
                 leverage,
                 counter_leverage,
                 stop_loss_override: pos.stop_loss_override,
-                take_profit_override: pos.take_profit_override,
+                take_profit_trader: pos.take_profit_trader,
             },
             deposit_collateral_delta,
             deposit_collateral_delta_usd: deposit_collateral_delta
@@ -739,7 +739,7 @@ impl UpdatePositionTakeProfitPriceExec {
         state: &State,
         store: &dyn Storage,
         pos: Position,
-        take_profit_price: TakeProfitPrice,
+        take_profit_trader: TakeProfitPriceBaseInQuote,
         price_point: &PricePoint,
     ) -> Result<Self> {
         let mut pos = pos;
@@ -754,7 +754,7 @@ impl UpdatePositionTakeProfitPriceExec {
             .1;
 
         let counter_collateral = TakeProfitToCounterCollateral {
-            take_profit_price_base: take_profit_price,
+            take_profit_trader,
             market_type,
             collateral: pos.active_collateral,
             leverage_to_base,
@@ -798,15 +798,8 @@ impl UpdatePositionTakeProfitPriceExec {
 
         let event = state.position_update_event(store, &original_pos, pos.clone(), price_point)?;
 
-        let take_profit_override = take_profit_price;
-        let take_profit_override_notional = match take_profit_override {
-            TakeProfitPrice::PosInfinity => None,
-            TakeProfitPrice::Finite(x) => {
-                Some(PriceBaseInQuote::from_non_zero(x).into_notional_price(market_type))
-            }
-        };
-        pos.take_profit_override = Some(take_profit_override);
-        pos.take_profit_override_notional = take_profit_override_notional;
+        pos.take_profit_trader = Some(take_profit_trader);
+        pos.take_profit_trader_notional = take_profit_trader.into_notional(market_type);
 
         Ok(Self {
             pos,
@@ -956,7 +949,7 @@ impl TriggerOrderExec {
         id: PositionId,
         stop_loss_override: Option<PriceBaseInQuote>,
         // TODO - make this TakeProfitPrice
-        take_profit_override: Option<PriceBaseInQuote>,
+        take_profit_trader: Option<PriceBaseInQuote>,
         price_point: PricePoint,
     ) -> Result<Self> {
         let mut pos = get_position(store, id)?;
@@ -976,10 +969,13 @@ impl TriggerOrderExec {
         pos.stop_loss_override = stop_loss_override;
         pos.stop_loss_override_notional =
             stop_loss_override.map(|x| x.into_notional_price(market_type));
-        pos.take_profit_override =
-            take_profit_override.map(|x| TakeProfitPrice::Finite(x.into_non_zero()));
-        pos.take_profit_override_notional =
-            take_profit_override.map(|x| x.into_notional_price(market_type));
+
+        if let Some(take_profit_trader) = take_profit_trader {
+            let take_profit_trader =
+                TakeProfitPriceBaseInQuote::Finite(take_profit_trader.into_non_zero());
+            pos.take_profit_trader = Some(take_profit_trader);
+            pos.take_profit_trader_notional = take_profit_trader.into_notional(market_type);
+        }
 
         Ok(Self { pos, price_point })
     }

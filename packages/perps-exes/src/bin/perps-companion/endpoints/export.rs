@@ -649,7 +649,7 @@ mod tests {
             delta_neutrality_fee: None,
             old_owner,
             new_owner,
-            take_profit_override: None,
+            take_profit_trader: None,
             stop_loss_override: None,
         }
     }

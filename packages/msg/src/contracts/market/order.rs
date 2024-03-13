@@ -29,7 +29,7 @@ pub struct LimitOrder {
     /// Take profit price
     // TODO - this should eventually become non-optional, but that would require a migration
     #[serde(alias = "take_profit_override")]
-    pub take_profit: Option<TakeProfitPrice>,
+    pub take_profit: Option<TakeProfitPriceBaseInQuote>,
     /// Crank fee charged during deferred execution and placing the limit order
     #[serde(default)]
     pub crank_fee_collateral: Collateral,
@@ -140,7 +140,7 @@ pub mod events {
         /// Stop loss price
         pub stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price
-        pub take_profit_override: Option<TakeProfitPrice>,
+        pub take_profit_override: Option<TakeProfitPriceBaseInQuote>,
     }
 
     impl From<PlaceLimitOrderEvent> for Event {
@@ -221,7 +221,7 @@ pub mod events {
                 },
                 take_profit_override: evt
                     .try_map_attr(event_key::TAKE_PROFIT_OVERRIDE, |s| {
-                        TakeProfitPrice::try_from(s)
+                        TakeProfitPriceBaseInQuote::try_from(s)
                     })
                     .transpose()?,
 

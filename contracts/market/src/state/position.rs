@@ -540,7 +540,7 @@ impl State<'_> {
             &pos.liquidation_margin,
         );
         let market_type = self.market_type(ctx.storage)?;
-        pos.take_profit_price = pos.take_profit_price(price_point, market_type)?;
+        pos.take_profit_total = pos.take_profit_price_total(price_point, market_type)?;
 
         debug_assert!(pos.liquifunded_at < pos.next_liquifunding);
 
@@ -564,16 +564,17 @@ impl State<'_> {
                     PRICE_TRIGGER_DESC.remove(ctx.storage, (liquidation_price.into(), pos.id));
                 }
 
-                if let Some(take_profit_price) = pos.take_profit_price {
-                    PRICE_TRIGGER_ASC.remove(ctx.storage, (take_profit_price.into(), pos.id));
+                if let Some(take_profit_total) = pos.take_profit_total {
+                    PRICE_TRIGGER_ASC.remove(ctx.storage, (take_profit_total.into(), pos.id));
                 }
 
                 if let Some(stop_loss_override) = pos.stop_loss_override_notional {
                     PRICE_TRIGGER_DESC.remove(ctx.storage, (stop_loss_override.into(), pos.id));
                 }
 
-                if let Some(take_profit_override) = pos.take_profit_override_notional {
-                    PRICE_TRIGGER_ASC.remove(ctx.storage, (take_profit_override.into(), pos.id));
+                if let Some(take_profit_trader_notional) = pos.take_profit_trader_notional {
+                    PRICE_TRIGGER_ASC
+                        .remove(ctx.storage, (take_profit_trader_notional.into(), pos.id));
                 }
             }
             DirectionToNotional::Short => {
@@ -581,16 +582,17 @@ impl State<'_> {
                     PRICE_TRIGGER_ASC.remove(ctx.storage, (liquidation_price.into(), pos.id));
                 }
 
-                if let Some(take_profit_price) = pos.take_profit_price {
-                    PRICE_TRIGGER_DESC.remove(ctx.storage, (take_profit_price.into(), pos.id));
+                if let Some(take_profit_total) = pos.take_profit_total {
+                    PRICE_TRIGGER_DESC.remove(ctx.storage, (take_profit_total.into(), pos.id));
                 }
 
                 if let Some(stop_loss_override) = pos.stop_loss_override_notional {
                     PRICE_TRIGGER_ASC.remove(ctx.storage, (stop_loss_override.into(), pos.id));
                 }
 
-                if let Some(take_profit_override) = pos.take_profit_override_notional {
-                    PRICE_TRIGGER_DESC.remove(ctx.storage, (take_profit_override.into(), pos.id));
+                if let Some(take_profit_trader_notional) = pos.take_profit_trader_notional {
+                    PRICE_TRIGGER_DESC
+                        .remove(ctx.storage, (take_profit_trader_notional.into(), pos.id));
                 }
             }
         }
@@ -644,10 +646,10 @@ impl State<'_> {
                     )?;
                 }
 
-                if let Some(take_profit) = pos.take_profit_price {
+                if let Some(take_profit_total) = pos.take_profit_total {
                     PRICE_TRIGGER_ASC.save(
                         ctx.storage,
-                        (take_profit.into(), pos.id),
+                        (take_profit_total.into(), pos.id),
                         &LiquidationReason::MaxGains,
                     )?;
                 }
@@ -660,10 +662,10 @@ impl State<'_> {
                     )?;
                 }
 
-                if let Some(take_profit_override) = pos.take_profit_override_notional {
+                if let Some(take_profit_trader_notional) = pos.take_profit_trader_notional {
                     PRICE_TRIGGER_ASC.save(
                         ctx.storage,
-                        (take_profit_override.into(), pos.id),
+                        (take_profit_trader_notional.into(), pos.id),
                         &LiquidationReason::TakeProfit,
                     )?;
                 }
@@ -677,10 +679,10 @@ impl State<'_> {
                     )?;
                 }
 
-                if let Some(take_profit_price) = pos.take_profit_price {
+                if let Some(take_profit_total) = pos.take_profit_total {
                     PRICE_TRIGGER_DESC.save(
                         ctx.storage,
-                        (take_profit_price.into(), pos.id),
+                        (take_profit_total.into(), pos.id),
                         &LiquidationReason::MaxGains,
                     )?;
                 }
@@ -693,10 +695,10 @@ impl State<'_> {
                     )?;
                 }
 
-                if let Some(take_profit_override) = pos.take_profit_override_notional {
+                if let Some(take_profit_trader_notional) = pos.take_profit_trader_notional {
                     PRICE_TRIGGER_DESC.save(
                         ctx.storage,
-                        (take_profit_override.into(), pos.id),
+                        (take_profit_trader_notional.into(), pos.id),
                         &LiquidationReason::TakeProfit,
                     )?;
                 }

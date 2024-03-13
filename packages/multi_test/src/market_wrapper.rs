@@ -1581,7 +1581,7 @@ impl PerpsMarket {
         &self,
         sender: &Addr,
         position_id: PositionId,
-        take_profit_price: TakeProfitPrice,
+        take_profit_price: TakeProfitPriceBaseInQuote,
     ) -> Result<DeferResponse> {
         self.exec_defer(
             sender,
