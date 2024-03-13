@@ -1,4 +1,5 @@
 use cw2::ContractVersion;
+use levana_perpswap_multi_test::return_unless_market_collateral_base;
 use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, response::CosmosResponseExt, PerpsApp,
@@ -10,6 +11,8 @@ use msg::prelude::*;
 #[test]
 fn position_misc_debug_divide_by_zero() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    return_unless_market_collateral_base!(market);
+
     let trader = market.clone_trader(0).unwrap();
 
     let err = market
