@@ -111,7 +111,7 @@ macro_rules! perp_error {
             id: $id,
             domain: $domain,
             description: format!($($t)*),
-            data: None,
+            data: None::<()>,
         }
     }};
 }
@@ -137,7 +137,7 @@ macro_rules! perp_anyhow {
             id: $id,
             domain: $domain,
             description: format!($($t)*),
-            data: None::<Option<()>>,
+            data: None::<()>,
         })
     }};
 }
@@ -164,7 +164,7 @@ macro_rules! perp_ensure {
                 id: $id,
                 domain: $domain,
                 description: format!($($t)*),
-                data: None::<Option<()>>,
+                data: None::<()>,
             }));
         }
     }};
@@ -178,7 +178,7 @@ macro_rules! perp_bail {
             id: $id,
             domain: $domain,
             description: format!($($t)*),
-            data: None::<Option<()>>,
+            data: None::<()>,
         }));
     }};
 }

@@ -456,7 +456,7 @@ impl Number {
         let s = self.to_string();
         let (integer, decimal) = s.split_once('.').unwrap_or((&s, ""));
         let price: i64 = format!("{}{}", integer, decimal).parse()?;
-        let mut expo: i32 = decimal.len() as i32;
+        let mut expo: i32 = decimal.len().try_into()?;
         if expo > 0 {
             expo = -expo;
         }
