@@ -609,10 +609,10 @@ async fn mint_dusts(
 
     let mut token_ids = vec![];
 
-    let now: u64 = chrono::Utc::now().timestamp() as u64;
+    let now: u64 = chrono::Utc::now().timestamp().try_into()?;
 
     for i in 0..mint_dusts_count {
-        let token_id = format!("{}", now + i as u64);
+        let token_id = format!("{}", now + u64::from(i));
         log::info!(
             "minting mock dust nft w/ id {} and spirit level {}",
             token_id,

@@ -1,5 +1,6 @@
 use crate::{context::LogFlag, future::Future};
 use anyhow::{Context as AnyhowContext, Result};
+use bigdecimal::ToPrimitive;
 use tokio::{io::AsyncWriteExt, sync::Mutex};
 use tokio_tungstenite::tungstenite::Message;
 
@@ -49,7 +50,7 @@ impl Context {
         let start = std::time::Instant::now();
         let res = f().await;
         let elapsed = start.elapsed();
-        let elapsed = elapsed.as_secs() as f64 + (elapsed.subsec_nanos() as f64 / 1_000_000_000.0);
+        let elapsed = elapsed.as_secs().to_f64().unwrap_or_default() + (elapsed.subsec_nanos().to_f64().unwrap_or_default() / 1_000_000_000.0);
         (elapsed, res)
     }
 
