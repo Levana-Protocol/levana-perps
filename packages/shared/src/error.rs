@@ -107,11 +107,12 @@ pub enum ErrorDomain {
 #[macro_export]
 macro_rules! perp_error {
     ($id:expr, $domain:expr, $($t:tt)*) => {{
+        let data: Option<()> = None;
         $crate::error::PerpError {
             id: $id,
             domain: $domain,
             description: format!($($t)*),
-            data: None as Option<()>,
+            data,
         }
     }};
 }
@@ -137,7 +138,7 @@ macro_rules! perp_anyhow {
             id: $id,
             domain: $domain,
             description: format!($($t)*),
-            data: None as Option<()>,
+            data: None::<Option<()>>,
         })
     }};
 }
