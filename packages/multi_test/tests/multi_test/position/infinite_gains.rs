@@ -191,6 +191,11 @@ fn update_stop_loss_inf_max_gains_perp_1071() {
     market.exec_set_price("2.0".parse().unwrap()).unwrap();
 
     market
-        .exec_set_trigger_order(&trader, pos_id, Some("0.99".parse().unwrap()), None)
+        .exec_set_trigger_order(
+            &trader,
+            pos_id,
+            Some("0.99".parse().unwrap()),
+            None::<PriceBaseInQuote>,
+        )
         .unwrap();
 }

@@ -1597,14 +1597,19 @@ impl PerpsMarket {
         sender: &Addr,
         position_id: PositionId,
         stop_loss_override: Option<PriceBaseInQuote>,
-        take_profit_override: Option<PriceBaseInQuote>,
+        take_profit: Option<impl TryInto<TakeProfitPriceBaseInQuote>>,
     ) -> Result<DeferResponse> {
         self.exec_defer_with_crank_fee(
             sender,
             &MarketExecuteMsg::SetTriggerOrder {
                 id: position_id,
                 stop_loss_override,
-                take_profit_override,
+                take_profit: take_profit
+                    .map(|x| {
+                        x.try_into()
+                            .map_err(|_| anyhow!("could not convert into take profit price"))
+                    })
+                    .transpose()?,
             },
         )
     }

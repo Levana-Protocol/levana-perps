@@ -275,15 +275,16 @@ pub enum DeferredExecItem {
     },
 
     /// Set a stop loss or take profit override.
-    /// This msg will override any previous values.
-    /// Passing None will remove the override.
     SetTriggerOrder {
         /// ID of position to modify
         id: PositionId,
         /// New stop loss price of the position
+        /// Passing None will remove the override.
         stop_loss_override: Option<PriceBaseInQuote>,
-        /// New take profit price of the position
-        take_profit_override: Option<PriceBaseInQuote>,
+        /// New take_profit price of the position
+        /// Passing None will bypass changing this
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<TakeProfitPriceBaseInQuote>,
     },
 
     /// Set a limit order to open a position when the price of the asset hits

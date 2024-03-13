@@ -184,18 +184,19 @@ pub enum ExecuteMsg {
     },
 
     /// Set a stop loss or take profit override.
-    /// This msg will override any previous values.
-    /// Passing None will remove the override.
     SetTriggerOrder {
         /// ID of position to modify
         id: PositionId,
         /// New stop loss price of the position
+        /// Passing None will remove the override.
         stop_loss_override: Option<PriceBaseInQuote>,
         /// New take profit price of the position, merely as a trigger.
+        /// Passing None will bypass changing this
         /// This does not affect the locked up counter collateral (or borrow fees etc.).
         /// if this override is further away than the position's take profit price, the position's will be triggered first
         /// if you want to update the position itself, use [ExecuteMsg::UpdatePositionTakeProfitPrice]
-        take_profit_override: Option<PriceBaseInQuote>,
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<TakeProfitPriceBaseInQuote>,
     },
 
     /// Set a limit order to open a position when the price of the asset hits
@@ -1193,7 +1194,7 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
             8 => Ok(ExecuteMsg::SetTriggerOrder {
                 id: u.arbitrary()?,
                 stop_loss_override: u.arbitrary()?,
-                take_profit_override: u.arbitrary()?,
+                take_profit: u.arbitrary()?,
             }),
             9 => Ok(ExecuteMsg::PlaceLimitOrder {
                 trigger_price: u.arbitrary()?,

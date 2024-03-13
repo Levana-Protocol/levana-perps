@@ -558,6 +558,12 @@ impl TryFrom<&str> for TakeProfitPriceBaseInQuote {
     }
 }
 
+impl From<PriceBaseInQuote> for TakeProfitPriceBaseInQuote {
+    fn from(val: PriceBaseInQuote) -> Self {
+        TakeProfitPriceBaseInQuote::Finite(val.into_non_zero())
+    }
+}
+
 impl serde::Serialize for TakeProfitPriceBaseInQuote {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

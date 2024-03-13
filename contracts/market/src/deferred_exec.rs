@@ -268,7 +268,7 @@ fn helper_execute(
         DeferredExecItem::SetTriggerOrder {
             id,
             stop_loss_override,
-            take_profit_override,
+            take_profit,
         } => {
             execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
             TriggerOrderExec::new(
@@ -276,7 +276,7 @@ fn helper_execute(
                 ctx.storage,
                 id,
                 stop_loss_override,
-                take_profit_override,
+                take_profit,
                 price_point,
             )?
             .apply(state, ctx)?;
@@ -611,7 +611,7 @@ fn helper_validate(
         DeferredExecItem::SetTriggerOrder {
             id,
             stop_loss_override,
-            take_profit_override,
+            take_profit,
         } => {
             validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?
                 .discard();
@@ -620,7 +620,7 @@ fn helper_validate(
                 store,
                 id,
                 stop_loss_override,
-                take_profit_override,
+                take_profit,
                 *price_point,
             )?
             .discard();

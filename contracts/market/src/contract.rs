@@ -260,7 +260,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         ExecuteMsg::SetTriggerOrder {
             id,
             stop_loss_override,
-            take_profit_override,
+            take_profit,
         } => {
             state.defer_execution(
                 &mut ctx,
@@ -268,7 +268,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 DeferredExecItem::SetTriggerOrder {
                     id,
                     stop_loss_override,
-                    take_profit_override,
+                    take_profit,
                 },
                 info.funds.take(),
             )?;
