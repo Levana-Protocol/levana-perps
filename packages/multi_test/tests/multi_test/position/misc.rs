@@ -8,6 +8,30 @@ use msg::contracts::market::{config::ConfigUpdate, position::events::PositionUpd
 use msg::prelude::*;
 
 #[test]
+fn position_misc_debug_divide_by_zero() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    let err = market
+        .exec_open_position(
+            &trader,
+            "10",
+            "1",
+            DirectionToBase::Long,
+            "10",
+            None,
+            None,
+            None,
+        )
+        .unwrap_err();
+
+    assert!(err
+        .to_string()
+        .to_lowercase()
+        .contains("cannot divide with zero"));
+}
+
+#[test]
 // placeholder for local debug test runs
 fn position_misc_debug_temp() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();

@@ -160,15 +160,16 @@ impl MaxGainsInQuote {
                     MaxGainsInQuote::Finite(max_gains_in_notional) => {
                         let max_gains_multiple = Number::ONE
                             - (max_gains_in_notional.into_number() + Number::ONE)
-                                / leverage_to_notional.into_number();
+                                .checked_div(leverage_to_notional.into_number())?;
 
                         if max_gains_multiple.approx_lt_relaxed(Number::ZERO) {
                             return Err(MarketError::MaxGainsTooLarge {}.into());
                         }
 
                         let counter_collateral = collateral.into_number()
-                            * max_gains_in_notional.into_number()
-                            / max_gains_multiple;
+                            * max_gains_in_notional
+                                .into_number()
+                                .checked_div(max_gains_multiple)?;
                         NonZero::<Collateral>::try_from_number(counter_collateral).with_context(|| format!("Calculated an invalid counter_collateral from max_gains: {counter_collateral}"))?
                     }
                 }
