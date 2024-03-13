@@ -1,3 +1,5 @@
+#![deny(clippy::as_conversions)]
+
 use clap::Parser;
 use cli::{Cmd, Subcommand, TestnetSub};
 

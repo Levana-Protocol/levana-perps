@@ -1,6 +1,7 @@
 //! Utilities common to all Levana contracts and Rust code
 
 #![deny(missing_docs)]
+#![deny(clippy::as_conversions)]
 
 /// Address Helpers
 pub mod cosmwasm;
