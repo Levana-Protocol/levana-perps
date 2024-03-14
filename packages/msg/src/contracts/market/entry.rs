@@ -117,7 +117,7 @@ pub enum ExecuteMsg {
         /// Take profit price of new position
         /// if max_gains is `None`, this *must* be `Some`
         #[serde(alias = "take_profit_override")]
-        take_profit: Option<TakeProfitPriceBaseInQuote>,
+        take_profit: Option<TakeProfitTrader>,
     },
 
     /// Add collateral to a position, causing leverage to decrease
@@ -180,7 +180,7 @@ pub enum ExecuteMsg {
         /// ID of position to update
         id: PositionId,
         /// New take profit price of the position
-        price: TakeProfitPriceBaseInQuote,
+        price: TakeProfitTrader,
     },
 
     /// Set a stop loss or take profit override.
@@ -196,7 +196,7 @@ pub enum ExecuteMsg {
         /// if this override is further away than the position's take profit price, the position's will be triggered first
         /// if you want to update the position itself, use [ExecuteMsg::UpdatePositionTakeProfitPrice]
         #[serde(alias = "take_profit_override")]
-        take_profit: Option<TakeProfitPriceBaseInQuote>,
+        take_profit: Option<TakeProfitTrader>,
     },
 
     /// Set a limit order to open a position when the price of the asset hits
@@ -217,7 +217,7 @@ pub enum ExecuteMsg {
         /// Take profit price of new position
         /// if max_gains is `None`, this *must* be `Some`
         #[serde(alias = "take_profit_override")]
-        take_profit: Option<TakeProfitPriceBaseInQuote>,
+        take_profit: Option<TakeProfitTrader>,
     },
 
     /// Cancel an open limit order
@@ -856,7 +856,7 @@ pub struct PositionAction {
     /// The take profit price set by the trader.
     /// For historical reasons this is optional, i.e. if the trader had set max gains price instead
     #[serde(rename = "take_profit_override")]
-    pub take_profit_trader: Option<TakeProfitPriceBaseInQuote>,
+    pub take_profit_trader: Option<TakeProfitTrader>,
     /// The stop loss override, if set.
     pub stop_loss_override: Option<PriceBaseInQuote>,
 }
@@ -1038,7 +1038,7 @@ pub struct LimitOrderResp {
     pub stop_loss_override: Option<PriceBaseInQuote>,
     #[serde(alias = "take_profit_override")]
     /// Take profit of the new position
-    pub take_profit: Option<TakeProfitPriceBaseInQuote>,
+    pub take_profit: Option<TakeProfitTrader>,
 }
 
 /// Response for [QueryMsg::LimitOrders]

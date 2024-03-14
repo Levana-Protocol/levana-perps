@@ -31,8 +31,8 @@ fn take_profit_edge() {
         // helps debugging
         #[allow(dead_code)]
         side: Side,
-        valid: Option<TakeProfitPriceBaseInQuote>,
-        invalid: Option<TakeProfitPriceBaseInQuote>,
+        valid: Option<TakeProfitTrader>,
+        invalid: Option<TakeProfitTrader>,
     }
 
     #[derive(Debug, Clone, Copy)]
@@ -46,7 +46,7 @@ fn take_profit_edge() {
             Self {
                 value: None,
                 side,
-                valid: Some(TakeProfitPriceBaseInQuote::PosInfinity),
+                valid: Some(TakeProfitTrader::PosInfinity),
                 invalid: None,
             }
         }
@@ -76,20 +76,20 @@ fn take_profit_edge() {
                         Side::Min => Self {
                             side,
                             value: Some(edge_value),
-                            valid: Some(TakeProfitPriceBaseInQuote::Finite(
+                            valid: Some(TakeProfitTrader::Finite(
                                 value.checked_add(partial_value.into_decimal256()).unwrap(),
                             )),
-                            invalid: Some(TakeProfitPriceBaseInQuote::Finite(
+                            invalid: Some(TakeProfitTrader::Finite(
                                 value.checked_sub(partial_value.into_decimal256()).unwrap(),
                             )),
                         },
                         Side::Max => Self {
                             side,
                             value: Some(edge_value),
-                            valid: Some(TakeProfitPriceBaseInQuote::Finite(
+                            valid: Some(TakeProfitTrader::Finite(
                                 value.checked_sub(partial_value.into_decimal256()).unwrap(),
                             )),
-                            invalid: Some(TakeProfitPriceBaseInQuote::Finite(
+                            invalid: Some(TakeProfitTrader::Finite(
                                 value.checked_add(partial_value.into_decimal256()).unwrap(),
                             )),
                         },

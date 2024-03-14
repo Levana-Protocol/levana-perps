@@ -196,7 +196,7 @@ pub mod events {
                     new_owner: evt.try_unchecked_addr_attr(event_key::POSITION_ACTION_NEW_OWNER)?,
                     take_profit_trader: evt
                         .try_map_attr(event_key::TAKE_PROFIT_OVERRIDE, |s| {
-                            TakeProfitPriceBaseInQuote::try_from(s)
+                            TakeProfitTrader::try_from(s)
                         })
                         .transpose()?,
                     stop_loss_override: evt

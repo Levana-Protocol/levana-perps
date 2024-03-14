@@ -301,5 +301,5 @@ pub(crate) struct OpenPositionParams {
     pub(crate) direction: DirectionToBase,
     pub(crate) slippage_assert: Option<SlippageAssert>,
     pub(crate) stop_loss_override: Option<PriceBaseInQuote>,
-    pub(crate) take_profit_trader: TakeProfitPriceBaseInQuote,
+    pub(crate) take_profit_trader: TakeProfitTrader,
 }

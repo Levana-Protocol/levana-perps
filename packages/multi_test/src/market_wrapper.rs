@@ -1581,7 +1581,7 @@ impl PerpsMarket {
         &self,
         sender: &Addr,
         position_id: PositionId,
-        take_profit_price: TakeProfitPriceBaseInQuote,
+        take_profit_price: TakeProfitTrader,
     ) -> Result<DeferResponse> {
         self.exec_defer(
             sender,
@@ -1597,7 +1597,7 @@ impl PerpsMarket {
         sender: &Addr,
         position_id: PositionId,
         stop_loss_override: Option<PriceBaseInQuote>,
-        take_profit: Option<impl TryInto<TakeProfitPriceBaseInQuote>>,
+        take_profit: Option<impl TryInto<TakeProfitTrader>>,
     ) -> Result<DeferResponse> {
         self.exec_defer_with_crank_fee(
             sender,

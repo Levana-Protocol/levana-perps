@@ -739,7 +739,7 @@ impl UpdatePositionTakeProfitPriceExec {
         state: &State,
         store: &dyn Storage,
         pos: Position,
-        take_profit_trader: TakeProfitPriceBaseInQuote,
+        take_profit_trader: TakeProfitTrader,
         price_point: &PricePoint,
     ) -> Result<Self> {
         let mut pos = pos;
@@ -948,7 +948,7 @@ impl TriggerOrderExec {
         store: &dyn Storage,
         id: PositionId,
         stop_loss_override: Option<PriceBaseInQuote>,
-        take_profit_trader: Option<TakeProfitPriceBaseInQuote>,
+        take_profit_trader: Option<TakeProfitTrader>,
         price_point: PricePoint,
     ) -> Result<Self> {
         let mut pos = get_position(store, id)?;

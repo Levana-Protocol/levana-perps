@@ -85,12 +85,10 @@ fn helper_execute(
                     let take_profit = match take_profit {
                         None => None,
                         Some(take_profit) => match take_profit {
-                            TakeProfitPriceBaseInQuote::PosInfinity => {
+                            TakeProfitTrader::PosInfinity => {
                                 bail!("cannot set infinite take profit price and max_gains")
                             }
-                            TakeProfitPriceBaseInQuote::Finite(x) => {
-                                Some(PriceBaseInQuote::from_non_zero(x))
-                            }
+                            TakeProfitTrader::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
                         },
                     };
                     BackwardsCompatTakeProfit {
@@ -306,12 +304,10 @@ fn helper_execute(
                     let take_profit = match take_profit {
                         None => None,
                         Some(take_profit) => match take_profit {
-                            TakeProfitPriceBaseInQuote::PosInfinity => {
+                            TakeProfitTrader::PosInfinity => {
                                 bail!("cannot set infinite take profit price and max_gains")
                             }
-                            TakeProfitPriceBaseInQuote::Finite(x) => {
-                                Some(PriceBaseInQuote::from_non_zero(x))
-                            }
+                            TakeProfitTrader::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
                         },
                     };
                     BackwardsCompatTakeProfit {
@@ -417,12 +413,10 @@ fn helper_validate(
                     let take_profit = match take_profit {
                         None => None,
                         Some(take_profit) => match take_profit {
-                            TakeProfitPriceBaseInQuote::PosInfinity => {
+                            TakeProfitTrader::PosInfinity => {
                                 bail!("cannot set infinite take profit price and max_gains")
                             }
-                            TakeProfitPriceBaseInQuote::Finite(x) => {
-                                Some(PriceBaseInQuote::from_non_zero(x))
-                            }
+                            TakeProfitTrader::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
                         },
                     };
                     BackwardsCompatTakeProfit {
@@ -650,12 +644,10 @@ fn helper_validate(
                     let take_profit = match take_profit {
                         None => None,
                         Some(take_profit) => match take_profit {
-                            TakeProfitPriceBaseInQuote::PosInfinity => {
+                            TakeProfitTrader::PosInfinity => {
                                 bail!("cannot set infinite take profit price and max_gains")
                             }
-                            TakeProfitPriceBaseInQuote::Finite(x) => {
-                                Some(PriceBaseInQuote::from_non_zero(x))
-                            }
+                            TakeProfitTrader::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
                         },
                     };
                     BackwardsCompatTakeProfit {

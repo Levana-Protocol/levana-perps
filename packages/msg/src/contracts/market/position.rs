@@ -91,7 +91,7 @@ pub struct Position {
     /// The take profit value set by the trader in a message.
     /// For historical reasons, this value can be optional if the user provided a max gains price.
     #[serde(rename = "take_profit_override")]
-    pub take_profit_trader: Option<TakeProfitPriceBaseInQuote>,
+    pub take_profit_trader: Option<TakeProfitTrader>,
     /// Derived directly from `take_profit_trader` to get the PriceNotionalInCollateral representation.
     /// This will be `None` if `take_profit_trader` is infinite.
     /// For historical reasons, this value will also be `None` if the user provided a max gains price.
@@ -254,7 +254,7 @@ pub struct PositionQueryResponse {
     /// The take profit value set by the trader in a message.
     /// For historical reasons, this value can be optional if the user provided a max gains price.
     #[serde(rename = "take_profit_override")]
-    pub take_profit_trader: Option<TakeProfitPriceBaseInQuote>,
+    pub take_profit_trader: Option<TakeProfitTrader>,
     /// The most recently calculated price at which the trader will achieve maximum gains and take all counter collateral.
     #[serde(rename = "take_profit_price_base")]
     pub take_profit_total_base: Option<PriceBaseInQuote>,
@@ -940,7 +940,7 @@ pub mod events {
         /// Take profit price set by trader
         /// For historical reasons, this value can be optional if the user provided a max gains price.
         #[serde(rename = "take_profit_override")]
-        pub take_profit_trader: Option<TakeProfitPriceBaseInQuote>,
+        pub take_profit_trader: Option<TakeProfitTrader>,
     }
 
     impl PositionAttributes {
@@ -1051,7 +1051,7 @@ pub mod events {
                 },
                 take_profit_trader: evt
                     .try_map_attr(event_key::TAKE_PROFIT_OVERRIDE, |s| {
-                        TakeProfitPriceBaseInQuote::try_from(s)
+                        TakeProfitTrader::try_from(s)
                     })
                     .transpose()?,
             })

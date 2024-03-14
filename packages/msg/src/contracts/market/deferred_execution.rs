@@ -188,7 +188,7 @@ pub enum DeferredExecItem {
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
         #[serde(alias = "take_profit_override")]
-        take_profit: Option<TakeProfitPriceBaseInQuote>,
+        take_profit: Option<TakeProfitTrader>,
         /// The amount of collateral provided
         amount: NonZero<Collateral>,
         /// Crank fee already charged
@@ -263,7 +263,7 @@ pub enum DeferredExecItem {
         /// ID of position to update
         id: PositionId,
         /// New take profit price of the position
-        price: TakeProfitPriceBaseInQuote,
+        price: TakeProfitTrader,
     },
 
     /// Close a position
@@ -284,7 +284,7 @@ pub enum DeferredExecItem {
         /// New take_profit price of the position
         /// Passing None will bypass changing this
         #[serde(alias = "take_profit_override")]
-        take_profit: Option<TakeProfitPriceBaseInQuote>,
+        take_profit: Option<TakeProfitTrader>,
     },
 
     /// Set a limit order to open a position when the price of the asset hits
@@ -303,7 +303,7 @@ pub enum DeferredExecItem {
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
         #[serde(alias = "take_profit_override")]
-        take_profit: Option<TakeProfitPriceBaseInQuote>,
+        take_profit: Option<TakeProfitTrader>,
         /// The amount of collateral provided
         amount: NonZero<Collateral>,
         /// Crank fee already charged

@@ -128,8 +128,8 @@ fn max_gain_edge() {
     .unwrap();
 
     let take_profit_price_requested = match take_profit_price_requested {
-        TakeProfitPriceBaseInQuote::Finite(value) => value,
-        TakeProfitPriceBaseInQuote::PosInfinity => panic!("expected finite take profit price"),
+        TakeProfitTrader::Finite(value) => value,
+        TakeProfitTrader::PosInfinity => panic!("expected finite take profit price"),
     }
     .into_number();
 
@@ -175,8 +175,8 @@ fn max_gain_edge() {
     .unwrap();
 
     let take_profit_price_requested = match take_profit_price_requested {
-        TakeProfitPriceBaseInQuote::Finite(value) => value,
-        TakeProfitPriceBaseInQuote::PosInfinity => panic!("expected finite take profit price"),
+        TakeProfitTrader::Finite(value) => value,
+        TakeProfitTrader::PosInfinity => panic!("expected finite take profit price"),
     }
     .into_number();
 
