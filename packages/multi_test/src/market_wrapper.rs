@@ -1012,10 +1012,6 @@ impl PerpsMarket {
 
         loop {
             let status = self.query_status()?;
-            if status.deferred_execution_items == 0 && status.next_crank.is_none() {
-                break;
-            }
-
             let resp = self.exec(
                 sender,
                 &MarketExecuteMsg::Crank {
@@ -1025,6 +1021,12 @@ impl PerpsMarket {
             )?;
 
             responses.push(resp);
+
+            // Only check if there is no work after doing one more crank to
+            // make sure that the last ignored "Completed" work item is also done.
+            if status.deferred_execution_items == 0 && status.next_crank.is_none() {
+                break;
+            }
         }
 
         Ok(responses)

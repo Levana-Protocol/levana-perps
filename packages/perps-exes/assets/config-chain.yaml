@@ -25,6 +25,7 @@ sei-mainnet:
   rpc-nodes:
     - https://rpc.sei-apis.com
 osmosis-mainnet:
+  age-tolerance-seconds: 42
   gas-decimals: 6
   spot-price: 
     pyth:
@@ -54,6 +55,7 @@ osmosis-mainnet:
       denom: ibc/FBB3FEF80ED2344D821D4F95C31DBFD33E4E31D5324CAD94EF756E67B749F668
       decimal-places: 18
 osmosis-testnet:
+  age-tolerance-seconds: 42
   gas-decimals: 6
   spot-price: 
     pyth:
@@ -67,8 +69,8 @@ osmosis-testnet:
   faucet: osmo1ycrm74p7uc976hu2z428l27vxj8l44zu0x0yqjr8gh775qr6gtnq9f3zsz
   explorer: "https://testnet.mintscan.io/osmosis-testnet/txs/"
   rpc-nodes:
-  - https://test-osmo-rpc.kingnodes.com
-  #- https://rpc.osmotest5.osmosis.zone
+  # - https://test-osmo-rpc.kingnodes.com
+  - https://rpc.osmotest5.osmosis.zone
   # Use dynamic gas instead
   #gas-multiplier: 1.5
 juno-testnet:

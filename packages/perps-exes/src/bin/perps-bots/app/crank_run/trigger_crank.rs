@@ -17,6 +17,7 @@
 use std::{
     collections::{HashSet, VecDeque},
     sync::Arc,
+    time::Instant,
 };
 
 use async_channel::{RecvError, TrySendError};
@@ -38,7 +39,7 @@ pub(crate) struct TriggerCrank {
 #[derive(Default)]
 struct Queue {
     /// FIFO queue of the markets to crank
-    fifo: VecDeque<(Address, MarketId, CrankTriggerReason)>,
+    fifo: VecDeque<(Address, MarketId, CrankTriggerReason, Instant)>,
     /// HashSet matching everything in fifo for efficient checking
     set: HashSet<Address>,
     /// The number of active crank guards, used for sanity checking only
@@ -52,6 +53,7 @@ enum PopResult {
         market_id: MarketId,
         more_work_exists: bool,
         reason: Box<CrankTriggerReason>,
+        queued: Instant,
     },
 }
 
@@ -76,7 +78,7 @@ impl Queue {
         assert_eq!(self.fifo.len() + self.crank_guards, self.set.len());
         match self.fifo.pop_front() {
             None => PopResult::QueueIsEmpty,
-            Some((address, market_id, reason)) => {
+            Some((address, market_id, reason, queued)) => {
                 assert!(self.set.contains(&address));
                 self.crank_guards += 1;
                 PopResult::ValueFound {
@@ -84,6 +86,7 @@ impl Queue {
                     market_id,
                     more_work_exists: !self.set.is_empty(),
                     reason: Box::new(reason),
+                    queued,
                 }
             }
         }
@@ -95,7 +98,8 @@ impl Queue {
         if self.set.contains(&address) {
             false
         } else {
-            self.fifo.push_back((address, market_id, reason));
+            self.fifo
+                .push_back((address, market_id, reason, Instant::now()));
             self.set.insert(address);
             true
         }
@@ -132,6 +136,15 @@ impl TriggerCrank {
     }
 }
 
+pub(crate) struct CrankWorkItem {
+    pub(crate) address: Address,
+    pub(crate) id: MarketId,
+    pub(crate) guard: CrankGuard,
+    pub(crate) reason: CrankTriggerReason,
+    pub(crate) queued: Instant,
+    pub(crate) received: Instant,
+}
+
 impl CrankReceiver {
     pub(super) fn new() -> Self {
         let (send, recv) = async_channel::bounded(100);
@@ -144,9 +157,7 @@ impl CrankReceiver {
         }
     }
 
-    pub(super) async fn receive_with_timeout(
-        &self,
-    ) -> Option<(Address, MarketId, CrankGuard, CrankTriggerReason)> {
+    pub(super) async fn receive_with_timeout(&self) -> Option<CrankWorkItem> {
         // This unfortunately requires more care than it seems like it should.
         // It's possible that the timeout used on receive will end up missing an
         // update. Therefore, we always recheck the queue after a we finish,
@@ -177,6 +188,7 @@ impl CrankReceiver {
                 more_work_exists,
                 market_id,
                 reason,
+                queued,
             } => {
                 // We have some work. If there's even more work available,
                 // enforce our invariant that we always have a value on the
@@ -192,15 +204,18 @@ impl CrankReceiver {
                         ),
                     }
                 }
-                Some((
+                Some(CrankWorkItem {
                     address,
-                    market_id,
-                    CrankGuard {
+                    id: market_id,
+                    guard: CrankGuard {
                         queue: self.trigger.queue.clone(),
                         address,
                     },
-                    *reason,
-                ))
+
+                    reason: *reason,
+                    queued,
+                    received: Instant::now(),
+                })
             }
         }
     }

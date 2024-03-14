@@ -1,6 +1,6 @@
 pub mod defaults;
 
-use std::{collections::HashMap, iter::Sum, path::Path};
+use std::{collections::HashMap, iter::Sum, ops::AddAssign, path::Path};
 
 use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, RawAddress};
@@ -34,6 +34,7 @@ pub struct ChainConfig {
     pub gas_decimals: GasDecimals,
     #[serde(default)]
     pub assets: HashMap<String, NativeAsset>,
+    pub age_tolerance_seconds: Option<u32>,
 }
 
 #[derive(serde::Deserialize, Clone, Debug)]
@@ -199,6 +200,12 @@ impl Sum<GasAmount> for GasAmount {
     }
 }
 
+impl AddAssign for GasAmount {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
+    }
+}
+
 impl FromStr for GasAmount {
     type Err = anyhow::Error;
 
@@ -320,6 +327,9 @@ pub struct DeploymentConfigTestnet {
     /// Minimum gas required in wallet managed by perps bots
     #[serde(default = "defaults::min_gas")]
     pub min_gas: GasAmount,
+    /// Minimum gas required in very high gas wallet managed by perps bots
+    #[serde(default = "defaults::min_gas_high_gas_wallet")]
+    pub min_gas_high_gas_wallet: GasAmount,
     /// Minimum gas required in the faucet contract
     #[serde(default = "defaults::min_gas_in_faucet")]
     pub min_gas_in_faucet: GasAmount,
@@ -481,6 +491,8 @@ pub struct WatcherConfig {
     pub rpc_health: TaskConfig,
     #[serde(default = "defaults::congestion")]
     pub congestion: TaskConfig,
+    #[serde(default = "defaults::high_gas")]
+    pub high_gas: TaskConfig,
 }
 
 impl Default for WatcherConfig {
@@ -598,6 +610,14 @@ impl Default for WatcherConfig {
                 retries: None,
                 delay_between_retries: None,
             },
+            high_gas: TaskConfig {
+                // We block internally within this service
+                // and use a channel to signal when it should be woken up
+                delay: Delay::Constant(0),
+                out_of_date: 60,
+                retries: None,
+                delay_between_retries: None,
+            },
         }
     }
 }
@@ -631,6 +651,15 @@ pub enum Delay {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MarketConfigUpdates {
     pub markets: HashMap<MarketId, ConfigUpdateAndBorrowFee>,
+    pub crank_fees: HashMap<CosmosNetwork, CrankFeeConfig>,
+}
+
+#[derive(serde::Deserialize, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct CrankFeeConfig {
+    pub charged: Usd,
+    pub surcharge: Usd,
+    pub reward: Usd,
 }
 
 #[derive(serde::Deserialize, Debug, Clone)]

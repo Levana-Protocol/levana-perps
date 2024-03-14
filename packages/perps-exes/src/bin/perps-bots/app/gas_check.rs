@@ -35,6 +35,7 @@ pub(crate) enum GasCheckWallet {
     Price,
     Managed(ManagedWallet),
     UltraCrank(usize),
+    HighGas,
 }
 
 impl Display for GasCheckWallet {
@@ -48,6 +49,7 @@ impl Display for GasCheckWallet {
             GasCheckWallet::Price => write!(f, "Price"),
             GasCheckWallet::Managed(x) => write!(f, "{x}"),
             GasCheckWallet::UltraCrank(x) => write!(f, "Ultra crank #{x}"),
+            GasCheckWallet::HighGas => write!(f, "High gas"),
         }
     }
 }
@@ -126,6 +128,7 @@ impl GasCheck {
         let mut skip_delay = false;
         let now = Utc::now();
         let cosmos = &app.cosmos_gas_check;
+        let mut total = GasAmount(Decimal256::zero());
         for Tracked {
             name,
             address,
@@ -140,6 +143,7 @@ impl GasCheck {
                     continue;
                 }
             };
+            total += gas;
             if gas >= *min_gas {
                 balances.push(format!(
                     "Sufficient gas in {name} ({address}). Found: {gas}. Minimum: {min_gas}."
@@ -163,6 +167,7 @@ impl GasCheck {
                 ));
             }
         }
+        balances.push(format!("Total gas in all wallets: {total}"));
         if !to_refill.is_empty() {
             let mut builder = TxBuilder::default();
             let denom = cosmos.get_cosmos_builder().gas_coin();

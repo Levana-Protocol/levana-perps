@@ -23,6 +23,7 @@ pub struct PythOracle {
     pub endpoint: String,
 }
 
+#[derive(Clone)]
 pub(crate) struct OffchainPriceData {
     /// Store the stable and edge values together since the IDs cannot overlap
     pub(crate) values: HashMap<PriceIdentifier, (NonZero<Decimal256>, DateTime<Utc>)>,
@@ -108,9 +109,9 @@ pub(crate) enum LatestPrice {
         /// Publish time calculated from on-chain and off-chain data sources
         off_chain_publish_time: DateTime<Utc>,
         /// Price calculated from latest on-chain oracle data
-        on_chain_price: PriceBaseInQuote,
+        on_chain_oracle_price: PriceBaseInQuote,
         /// Publish time calculated from on-chain oracle data
-        on_chain_publish_time: DateTime<Utc>,
+        on_chain_oracle_publish_time: DateTime<Utc>,
     },
     PriceTooOld,
     VolatileDiffTooLarge,
@@ -158,8 +159,8 @@ pub(crate) async fn get_latest_price(
             } => LatestPrice::PricesFound {
                 off_chain_price,
                 off_chain_publish_time,
-                on_chain_price: oracle_price.composed_price.price_base,
-                on_chain_publish_time: oracle_price
+                on_chain_oracle_price: oracle_price.composed_price.price_base,
+                on_chain_oracle_publish_time: oracle_price
                     .composed_price
                     .timestamp
                     .try_into_chrono_datetime()?,

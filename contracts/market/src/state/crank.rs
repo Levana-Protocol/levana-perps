@@ -12,6 +12,7 @@ use msg::contracts::market::{
     },
     spot_price::SpotPriceConfig,
 };
+use serde::{Deserialize, Serialize};
 
 use shared::prelude::*;
 
@@ -22,6 +23,16 @@ use super::position::{get_position, NEXT_LIQUIFUNDING, OPEN_POSITIONS};
 /// If this is unavailable, we've never completed cranking, and we should find
 /// the very first price timestamp.
 pub(super) const LAST_CRANK_COMPLETED: Item<Timestamp> = Item::new(namespace::LAST_CRANK_COMPLETED);
+const CRANK_BATCH_WEIGHT_LEFT: Item<CrankProgress> = Item::new(namespace::CRANK_BATCH_WEIGHT_LEFT);
+
+#[derive(Debug, Serialize, Deserialize)]
+struct CrankProgress {
+    weight_budget_left: u32,
+    paying_work_done: u32,
+    requested: u32,
+    rewards: Addr,
+    actual: Vec<(CrankWorkInfo, PricePoint)>,
+}
 
 pub(crate) fn crank_init(store: &mut dyn Storage) -> Result<()> {
     LAST_CRANK_COMPLETED
@@ -137,46 +148,63 @@ impl State<'_> {
     pub fn crank_exec_batch(
         &self,
         ctx: &mut StateContext,
-        n_execs: Option<u32>,
-        rewards: &Addr,
+        start_n_execs_and_rewards: Option<(u32, Addr)>,
     ) -> Result<()> {
-        let n_execs = match n_execs {
-            None => self.config.crank_execs,
-            Some(n) => n,
-        }
-        .into();
+        const REGULAR_WEIGHT: u32 = 5;
+        const COMPLETED_WEIGHT: u32 = 1;
 
-        // Since deferred execution occurs in submessages, we cannot interleave
-        // deferred execution work with other work items that will occur in the current
-        // message. Therefore, once we see a deferred execution message, we do not process
-        // any other kind of message.
-        let mut saw_deferred_exec = false;
+        let mut crank_progress = if let Some((start_n_execs, rewards)) = start_n_execs_and_rewards {
+            CrankProgress {
+                weight_budget_left: start_n_execs * REGULAR_WEIGHT,
+                paying_work_done: 0,
+                actual: vec![],
+                requested: start_n_execs,
+                rewards,
+            }
+        } else {
+            CRANK_BATCH_WEIGHT_LEFT.load(ctx.storage)?
+        };
 
-        let mut actual = vec![];
-        let mut fees_earned = 0;
-        for _ in 0..n_execs {
+        loop {
             let price_point = match self.next_crank_timestamp(ctx.storage)? {
                 None => break,
                 Some(price_point) => price_point,
             };
             let work_info = self.crank_work(ctx.storage, price_point)?;
-            let is_deferred_exec = matches!(&work_info, CrankWorkInfo::DeferredExec { .. });
-            if !is_deferred_exec && saw_deferred_exec {
-                break;
-            }
-            saw_deferred_exec = saw_deferred_exec || is_deferred_exec;
 
-            actual.push((work_info.clone(), price_point));
-            if work_info.receives_crank_rewards() {
-                fees_earned += 1;
-            }
-            self.crank_exec(ctx, work_info, &price_point)?;
+            let item_weight = match work_info {
+                CrankWorkInfo::Completed { .. } => COMPLETED_WEIGHT,
+                _ => REGULAR_WEIGHT,
+            };
+
+            match crank_progress.weight_budget_left.checked_sub(item_weight) {
+                None => {
+                    CRANK_BATCH_WEIGHT_LEFT.remove(ctx.storage);
+                    break;
+                }
+                Some(weight_budget_left) => {
+                    crank_progress.weight_budget_left = weight_budget_left;
+                    crank_progress.actual.push((work_info.clone(), price_point));
+                    if work_info.receives_crank_rewards() {
+                        crank_progress.paying_work_done += 1;
+                    }
+                    if self.crank_exec(ctx, work_info, &price_point)? {
+                        CRANK_BATCH_WEIGHT_LEFT.save(ctx.storage, &crank_progress)?;
+                        return Ok(());
+                    }
+                }
+            };
         }
 
-        self.allocate_crank_fees(ctx, rewards, fees_earned)?;
+        self.allocate_crank_fees(
+            ctx,
+            &crank_progress.rewards,
+            crank_progress.paying_work_done,
+        )?;
         ctx.response_mut().add_event(CrankExecBatchEvent {
-            requested: n_execs,
-            actual,
+            requested: crank_progress.requested as u64,
+            paying: crank_progress.paying_work_done as u64,
+            actual: crank_progress.actual,
         });
 
         Ok(())
@@ -188,7 +216,7 @@ impl State<'_> {
         ctx: &mut StateContext,
         work_info: CrankWorkInfo,
         price_point: &PricePoint,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         ctx.response_mut().add_event(CrankWorkInfoEvent {
             work_info: work_info.clone(),
             price_point: *price_point,
@@ -253,6 +281,7 @@ impl State<'_> {
                 target: _,
             } => {
                 self.process_deferred_exec(ctx, deferred_exec_id, price_point)?;
+                return Ok(true);
             }
             CrankWorkInfo::LimitOrder { order_id } => {
                 self.limit_order_execute_order(ctx, order_id, price_point)?;
@@ -267,6 +296,6 @@ impl State<'_> {
             }
         }
 
-        Ok(())
+        Ok(false)
     }
 }

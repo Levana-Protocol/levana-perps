@@ -4,6 +4,7 @@ mod crank_run;
 pub(crate) mod factory;
 pub(crate) mod faucet;
 mod gas_check;
+mod high_gas;
 mod liquidity;
 mod liquidity_transaction;
 mod price;

@@ -120,6 +120,9 @@ pub(crate) struct MainnetOpt {
     /// Used for both price and crank wallets
     #[clap(long, env = "LEVANA_BOTS_MIN_GAS")]
     pub(crate) min_gas: GasAmount,
+    /// Used for the very high gas wallet on Osmosis
+    #[clap(long, env = "LEVANA_BOTS_MIN_GAS_HIGH_GAS_WALLET")]
+    pub(crate) min_gas_high_gas_wallet: GasAmount,
     /// Minimum required in the refill wallet used to top off price and crank wallets
     #[clap(long, env = "LEVANA_BOTS_MIN_GAS_REFILL")]
     pub(crate) min_gas_refill: GasAmount,
@@ -165,15 +168,18 @@ pub(crate) struct MainnetOpt {
     #[clap(long, env = "LEVANA_BOTS_GAS_PRICE_CONGESTED", default_value_t = 0.004)]
     pub(crate) gas_price_congested: f64,
     /// Maximum gas price we'll pay on Osmosis
-    #[clap(long, env = "LEVANA_BOTS_MAX_GAS_PRICE", default_value_t = 0.0054)]
+    #[clap(long, env = "LEVANA_BOTS_MAX_GAS_PRICE", default_value_t = 0.0486)]
     pub(crate) max_gas_price: f64,
+    /// Maximum gas price we'll pay on Osmosis for urgent messages
+    #[clap(long, env = "LEVANA_BOTS_HIGHER_MAX_GAS_PRICE", default_value_t = 0.2)]
+    pub(crate) higher_max_gas_price: f64,
     /// Maximum gas price we'll pay on Osmosis for urgent messages
     #[clap(
         long,
-        env = "LEVANA_BOTS_HIGHER_MAX_GAS_PRICE",
-        default_value_t = 0.054
+        env = "LEVANA_BOTS_VERY_HIGHER_MAX_GAS_PRICE",
+        default_value_t = 2.0
     )]
-    pub(crate) higher_max_gas_price: f64,
+    pub(crate) very_higher_max_gas_price: f64,
 }
 
 impl Opt {
@@ -202,20 +208,6 @@ impl Opt {
             tracing::info!("Initialized Logging");
         }
         Ok(())
-    }
-
-    pub(crate) fn get_wallet(
-        &self,
-        address_type: AddressHrp,
-        wallet_phrase_name: &str,
-        wallet_type: &str,
-    ) -> Result<Wallet> {
-        let env_var = format!("LEVANA_BOTS_PHRASE_{wallet_phrase_name}_{wallet_type}");
-        let phrase = get_env(&env_var)?;
-        let phrase = SeedPhrase::from_str(&phrase)?;
-        let wallet = phrase.with_hrp(address_type)?;
-        tracing::info!("Wallet address for {wallet_type}: {wallet}");
-        Ok(wallet)
     }
 
     pub(crate) fn get_wallet_seed(
@@ -260,6 +252,21 @@ impl Opt {
             .with_cosmos_numbered(index.into())
             .with_hrp(address_type)?;
         tracing::info!("Crank bot wallet: {wallet}");
+        Ok(wallet)
+    }
+    pub(crate) fn get_price_wallet(
+        &self,
+        address_type: AddressHrp,
+        wallet_phrase_name: &str,
+        index: u32,
+    ) -> Result<Wallet> {
+        let env_var = format!("LEVANA_BOTS_PHRASE_{}_PRICE", wallet_phrase_name);
+        let phrase = get_env(&env_var)?;
+        let seed = SeedPhrase::from_str(&phrase)?;
+        let wallet = seed
+            .with_cosmos_numbered(index.into())
+            .with_hrp(address_type)?;
+        tracing::info!("Price bot wallet: {wallet}");
         Ok(wallet)
     }
 }

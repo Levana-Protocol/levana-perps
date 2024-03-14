@@ -90,6 +90,10 @@ pub(super) fn congestion() -> TaskConfig {
     super::WatcherConfig::default().congestion
 }
 
+pub(super) fn high_gas() -> TaskConfig {
+    super::WatcherConfig::default().high_gas
+}
+
 pub(super) fn seconds_till_ultra() -> u32 {
     // 8 minutes
     60 * 8
@@ -102,4 +106,8 @@ pub fn max_price_age_secs() -> u32 {
 
 pub fn max_allowed_price_delta() -> Decimal256 {
     "0.001".parse().unwrap()
+}
+
+pub fn min_gas_high_gas_wallet() -> GasAmount {
+    "500".parse().unwrap()
 }
