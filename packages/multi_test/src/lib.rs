@@ -1,3 +1,5 @@
+#![deny(clippy::as_conversions)]
+
 pub mod config;
 pub mod cw20_helpers;
 pub mod cw721_helpers;

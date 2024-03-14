@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 #![allow(warnings)]
+#![deny(clippy::as_conversions)]
 
 pub mod bridge;
 pub mod config;
