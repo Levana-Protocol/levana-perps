@@ -118,7 +118,7 @@ impl OpenPositionExec {
             stop_loss_override,
             liquidation_margin: LiquidationMargin::default(),
             liquidation_price: None,
-            // this will be overwritten in position save anyway, which derives this price from counter-collateral
+            // We temporarily fill in a value of None. Later, during position save, we will calculate the correct value from the actual counter collateral amount.
             take_profit_total: None,
             take_profit_trader: Some(take_profit_trader),
             take_profit_trader_notional: take_profit_trader.into_notional(market_type),
