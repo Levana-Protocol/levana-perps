@@ -156,3 +156,8 @@ hashes:
   code-ids:
     osmosis-mainnet: 319
   hash: 515a58e82ccd1bf7a683d45e4095ac4ad38d1d2cb482da36e137330d8eb1a44c
+- contract-type: market
+  gitrev: 1346f54ba2f2517f8b10b584f72e7929b38bb2d8
+  code-ids:
+    sei-mainnet: 3989
+  hash: 0063cd1b6104b91f83be95177eaa5f319cdad27930c0f21e00e471b6e4668af0
