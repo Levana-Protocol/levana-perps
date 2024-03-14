@@ -1,6 +1,6 @@
 [package]
 name = "levana_perpswap_cosmos_market"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Levana Team"]
 edition = "2021"
 
