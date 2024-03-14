@@ -84,18 +84,24 @@ pub struct Position {
     pub stop_loss_override: Option<PriceBaseInQuote>,
     /// Stored separately to ensure there are no rounding errors, since we need precise binary equivalence for lookups.
     pub stop_loss_override_notional: Option<Price>,
-    /// A trader specified price at which the position will be closed in profit
-    // TODO - this should eventually become non-optional, but that would require a migration
-    pub take_profit_override: Option<TakeProfitPrice>,
-    /// Stored separately to ensure there are no rounding errors, since we need precise binary equivalence for lookups.
-    pub take_profit_override_notional: Option<Price>,
     /// The most recently calculated liquidation price
     pub liquidation_price: Option<Price>,
-    /// The actual price at which the trader will achieve maximum gains and take all counter collateral.
-    /// This is the notional price, not the base price, to avoid rounding errors
-    pub take_profit_price: Option<Price>,
     /// The amount of liquidation margin set aside
     pub liquidation_margin: LiquidationMargin,
+    /// The take profit value set by the trader in a message.
+    /// For historical reasons, this value can be optional if the user provided a max gains price.
+    #[serde(rename = "take_profit_override")]
+    pub take_profit_trader: Option<TakeProfitTrader>,
+    /// Derived directly from `take_profit_trader` to get the PriceNotionalInCollateral representation.
+    /// This will be `None` if `take_profit_trader` is infinite.
+    /// For historical reasons, this value will also be `None` if the user provided a max gains price.
+    /// Stored separately to ensure there are no rounding errors, since we need precise binary equivalence for lookups.
+    #[serde(rename = "take_profit_override_notional")]
+    pub take_profit_trader_notional: Option<Price>,
+    /// The most recently calculated price at which the trader will achieve maximum gains and take all counter collateral.
+    /// This is the notional price, not the base price, to avoid rounding errors
+    #[serde(rename = "take_profit_price")]
+    pub take_profit_total: Option<Price>,
 }
 
 /// Liquidation margin for a position, broken down by component.
@@ -233,10 +239,8 @@ pub struct PositionQueryResponse {
     pub liquidation_margin: LiquidationMargin,
 
     /// Maximum gains, in terms of quote, the trader can achieve
-    #[deprecated(note = "Use take_profit_price_trader instead")]
+    #[deprecated(note = "Use take_profit_trader instead")]
     pub max_gains_in_quote: Option<MaxGainsInQuote>,
-    /// The actual price at which trader will achieve maximum gains and take all counter collateral.
-    pub take_profit_price_base: Option<PriceBaseInQuote>,
 
     /// Entry price
     pub entry_price_base: PriceBaseInQuote,
@@ -246,9 +250,14 @@ pub struct PositionQueryResponse {
 
     /// Stop loss price set by the trader
     pub stop_loss_override: Option<PriceBaseInQuote>,
-    /// Take profit price set by the trader
-    // TODO- this should eventually become non-optional
-    pub take_profit_override: Option<TakeProfitPrice>,
+
+    /// The take profit value set by the trader in a message.
+    /// For historical reasons, this value can be optional if the user provided a max gains price.
+    #[serde(rename = "take_profit_override")]
+    pub take_profit_trader: Option<TakeProfitTrader>,
+    /// The most recently calculated price at which the trader will achieve maximum gains and take all counter collateral.
+    #[serde(rename = "take_profit_price_base")]
+    pub take_profit_total_base: Option<PriceBaseInQuote>,
 }
 
 impl Position {
@@ -273,7 +282,7 @@ impl Position {
                     .checked_div_collateral(self.active_collateral)?,
             )),
             MarketType::CollateralIsBase => {
-                let take_profit_price = self.take_profit_price(price_point, market_type)?;
+                let take_profit_price = self.take_profit_price_total(price_point, market_type)?;
                 let take_profit_price = match take_profit_price {
                     Some(price) => price,
                     None => return Ok(MaxGainsInQuote::PosInfinity),
@@ -430,7 +439,7 @@ impl Position {
     }
 
     /// Computes the take-profit price for the position at a given spot price.
-    pub fn take_profit_price(
+    pub fn take_profit_price_total(
         &self,
         price_point: &PricePoint,
         market_type: MarketType,
@@ -684,12 +693,12 @@ impl Position {
             liquifunded_at,
             next_liquifunding,
             stop_loss_override,
-            take_profit_override,
             liquidation_margin,
             liquidation_price,
-            take_profit_price,
             stop_loss_override_notional: _,
-            take_profit_override_notional: _,
+            take_profit_trader,
+            take_profit_trader_notional: _,
+            take_profit_total,
         } = self;
 
         // TODO: remove this once the deprecated fields are fully removed
@@ -726,11 +735,11 @@ impl Position {
             max_gains_in_quote: None,
             liquidation_price_base: liquidation_price.map(|x| x.into_base_price(market_type)),
             liquidation_margin,
-            take_profit_price_base: take_profit_price.map(|x| x.into_base_price(market_type)),
+            take_profit_total_base: take_profit_total.map(|x| x.into_base_price(market_type)),
             entry_price_base: entry_price.into_base_price(market_type),
             next_liquifunding,
             stop_loss_override,
-            take_profit_override,
+            take_profit_trader,
             crank_fee_collateral: crank_fee.collateral(),
             crank_fee_usd: crank_fee.usd(),
         })
@@ -928,9 +937,10 @@ pub mod events {
         pub counter_leverage: LeverageToBase,
         /// Stop loss price
         pub stop_loss_override: Option<PriceBaseInQuote>,
-        /// Take profit price set by the trader
-        // TODO - this should eventually become non-optional, but that would require a migration
-        pub take_profit_override: Option<TakeProfitPrice>,
+        /// Take profit price set by trader
+        /// For historical reasons, this value can be optional if the user provided a max gains price.
+        #[serde(rename = "take_profit_override")]
+        pub take_profit_trader: Option<TakeProfitTrader>,
     }
 
     impl PositionAttributes {
@@ -993,10 +1003,10 @@ pub mod events {
                 );
             }
 
-            if let Some(take_profit_override) = self.take_profit_override {
+            if let Some(take_profit_trader) = self.take_profit_trader {
                 event = event.add_attribute(
                     event_key::TAKE_PROFIT_OVERRIDE,
-                    take_profit_override.to_string(),
+                    take_profit_trader.to_string(),
                 );
             }
 
@@ -1039,9 +1049,9 @@ pub mod events {
                         Some(PriceBaseInQuote::try_from_number(stop_loss_override)?)
                     }
                 },
-                take_profit_override: evt
+                take_profit_trader: evt
                     .try_map_attr(event_key::TAKE_PROFIT_OVERRIDE, |s| {
-                        TakeProfitPrice::try_from(s)
+                        TakeProfitTrader::try_from(s)
                     })
                     .transpose()?,
             })

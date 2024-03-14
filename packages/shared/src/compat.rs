@@ -17,7 +17,7 @@ pub struct BackwardsCompatTakeProfit<'a> {
 }
 
 impl<'a> BackwardsCompatTakeProfit<'a> {
-    pub fn calc(self) -> Result<TakeProfitPrice> {
+    pub fn calc(self) -> Result<TakeProfitTrader> {
         let BackwardsCompatTakeProfit {
             collateral,
             direction,
@@ -28,9 +28,9 @@ impl<'a> BackwardsCompatTakeProfit<'a> {
             take_profit,
         } = self;
         match take_profit {
-            Some(take_profit) => Ok(TakeProfitPrice::Finite(take_profit.into_non_zero())),
+            Some(take_profit) => Ok(TakeProfitTrader::Finite(take_profit.into_non_zero())),
             None => match max_gains {
-                MaxGainsInQuote::PosInfinity => Ok(TakeProfitPrice::PosInfinity),
+                MaxGainsInQuote::PosInfinity => Ok(TakeProfitTrader::PosInfinity),
                 MaxGainsInQuote::Finite(_) => {
                     let leverage_to_notional =
                         leverage.into_signed(direction).into_notional(market_type);
@@ -69,7 +69,7 @@ pub struct TakeProfitFromCounterCollateral<'a> {
     pub direction: DirectionToBase,
 }
 impl<'a> TakeProfitFromCounterCollateral<'a> {
-    pub fn calc(&self) -> Result<TakeProfitPrice> {
+    pub fn calc(&self) -> Result<TakeProfitTrader> {
         let Self {
             market_type,
             collateral,
@@ -104,11 +104,11 @@ impl<'a> TakeProfitFromCounterCollateral<'a> {
         };
 
         match take_profit_price {
-            Some(price) => Ok(TakeProfitPrice::Finite(price.into_base_price(*market_type).into_non_zero())),
+            Some(price) => Ok(TakeProfitTrader::Finite(price.into_base_price(*market_type).into_non_zero())),
             None =>
             match market_type {
                 // Infinite max gains results in a notional take profit price of 0
-                MarketType::CollateralIsBase => Ok(TakeProfitPrice::PosInfinity),
+                MarketType::CollateralIsBase => Ok(TakeProfitTrader::PosInfinity),
                 MarketType::CollateralIsQuote => Err(anyhow!("Calculated a take profit price of {take_profit_price_raw} in a collateral-is-quote market. Spot notional price: {}. Counter collateral: {}. Notional size: {}.", price_point.price_notional, self.counter_collateral,notional_size)),
             }
         }

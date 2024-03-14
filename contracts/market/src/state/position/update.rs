@@ -161,7 +161,7 @@ impl State<'_> {
                 leverage,
                 counter_leverage,
                 stop_loss_override: pos.stop_loss_override,
-                take_profit_override: pos.take_profit_override,
+                take_profit_trader: pos.take_profit_trader,
             },
             deposit_collateral_delta,
             deposit_collateral_delta_usd: deposit_collateral_delta
@@ -739,7 +739,7 @@ impl UpdatePositionTakeProfitPriceExec {
         state: &State,
         store: &dyn Storage,
         pos: Position,
-        take_profit_price: TakeProfitPrice,
+        take_profit_trader: TakeProfitTrader,
         price_point: &PricePoint,
     ) -> Result<Self> {
         let mut pos = pos;
@@ -754,7 +754,7 @@ impl UpdatePositionTakeProfitPriceExec {
             .1;
 
         let counter_collateral = TakeProfitToCounterCollateral {
-            take_profit_price_base: take_profit_price,
+            take_profit_trader,
             market_type,
             collateral: pos.active_collateral,
             leverage_to_base,
@@ -797,6 +797,9 @@ impl UpdatePositionTakeProfitPriceExec {
             LiquidityUpdate::new(state, store, counter_collateral_delta, price_point, None)?;
 
         let event = state.position_update_event(store, &original_pos, pos.clone(), price_point)?;
+
+        pos.take_profit_trader = Some(take_profit_trader);
+        pos.take_profit_trader_notional = take_profit_trader.into_notional(market_type);
 
         Ok(Self {
             pos,
@@ -945,8 +948,7 @@ impl TriggerOrderExec {
         store: &dyn Storage,
         id: PositionId,
         stop_loss_override: Option<PriceBaseInQuote>,
-        // TODO - make this TakeProfitPrice
-        take_profit_override: Option<PriceBaseInQuote>,
+        take_profit_trader: Option<TakeProfitTrader>,
         price_point: PricePoint,
     ) -> Result<Self> {
         let mut pos = get_position(store, id)?;
@@ -966,10 +968,10 @@ impl TriggerOrderExec {
         pos.stop_loss_override = stop_loss_override;
         pos.stop_loss_override_notional =
             stop_loss_override.map(|x| x.into_notional_price(market_type));
-        pos.take_profit_override =
-            take_profit_override.map(|x| TakeProfitPrice::Finite(x.into_non_zero()));
-        pos.take_profit_override_notional =
-            take_profit_override.map(|x| x.into_notional_price(market_type));
+
+        pos.take_profit_trader = take_profit_trader;
+        pos.take_profit_trader_notional =
+            take_profit_trader.and_then(|x| x.into_notional(market_type));
 
         Ok(Self { pos, price_point })
     }

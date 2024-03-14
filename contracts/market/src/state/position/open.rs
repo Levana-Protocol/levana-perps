@@ -45,7 +45,7 @@ impl OpenPositionExec {
             direction,
             slippage_assert,
             stop_loss_override,
-            take_profit_price,
+            take_profit_trader,
         }: OpenPositionParams,
         price_point: &PricePoint,
     ) -> Result<Self> {
@@ -70,16 +70,8 @@ impl OpenPositionExec {
             )?;
         }
 
-        let take_profit_price_trader = take_profit_price;
-        let take_profit_price_notional = match take_profit_price {
-            TakeProfitPrice::PosInfinity => None,
-            TakeProfitPrice::Finite(x) => {
-                Some(PriceBaseInQuote::from_non_zero(x).into_notional_price(market_type))
-            }
-        };
-
         let counter_collateral = TakeProfitToCounterCollateral {
-            take_profit_price_base: take_profit_price_trader,
+            take_profit_trader,
             market_type,
             collateral,
             leverage_to_base: leverage,
@@ -124,13 +116,14 @@ impl OpenPositionExec {
             // just temporarily setting _something_ here, it will be overwritten right away in `set_next_liquifunding`
             next_liquifunding: liquifunded_at,
             stop_loss_override,
-            take_profit_override: Some(take_profit_price_trader),
             liquidation_margin: LiquidationMargin::default(),
             liquidation_price: None,
-            take_profit_price: take_profit_price_notional,
+            // We temporarily fill in a value of None. Later, during position save, we will calculate the correct value from the actual counter collateral amount.
+            take_profit_total: None,
+            take_profit_trader: Some(take_profit_trader),
+            take_profit_trader_notional: take_profit_trader.into_notional(market_type),
             stop_loss_override_notional: stop_loss_override
                 .map(|x| x.into_notional_price(market_type)),
-            take_profit_override_notional: None,
         };
 
         state.set_next_liquifunding(&mut pos, liquifunded_at);
@@ -288,7 +281,7 @@ impl OpenPositionExec {
                 leverage,
                 counter_leverage,
                 stop_loss_override: pos.stop_loss_override,
-                take_profit_override: pos.take_profit_override,
+                take_profit_trader: pos.take_profit_trader,
             },
             created_at: pos.created_at,
             price_point_created_at: price_point.timestamp,
@@ -308,5 +301,5 @@ pub(crate) struct OpenPositionParams {
     pub(crate) direction: DirectionToBase,
     pub(crate) slippage_assert: Option<SlippageAssert>,
     pub(crate) stop_loss_override: Option<PriceBaseInQuote>,
-    pub(crate) take_profit_price: TakeProfitPrice,
+    pub(crate) take_profit_trader: TakeProfitTrader,
 }

@@ -489,35 +489,55 @@ impl TryFrom<pyth_sdk_cw::Price> for PriceCollateralInUsd {
 /// String representation of positive infinity.
 const POS_INF_STR: &str = "+Inf";
 
-/// The take profit price for a position, as supplied by client messsages.
+/// The take profit price for a position, as supplied by client messsages (in terms of BaseInQuote).
 ///
 /// Infinite take profit price is possible. However, this is an error in the case of
 /// short positions or collateral-is-quote markets.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub enum TakeProfitPrice {
+pub enum TakeProfitTrader {
     /// Finite take profit price
     Finite(NonZero<Decimal256>),
     /// Infinite take profit price
     PosInfinity,
 }
 
-impl Display for TakeProfitPrice {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl TakeProfitTrader {
+    /// helper to extract the inner value if it is finite
+    pub fn as_finite(&self) -> Option<NonZero<Decimal256>> {
         match self {
-            TakeProfitPrice::Finite(val) => val.fmt(f),
-            TakeProfitPrice::PosInfinity => write!(f, "{}", POS_INF_STR),
+            TakeProfitTrader::Finite(val) => Some(*val),
+            TakeProfitTrader::PosInfinity => None,
+        }
+    }
+
+    /// Convert to the internal price representation used by our system, as `collateral / notional`.
+    pub fn into_notional(&self, market_type: MarketType) -> Option<Price> {
+        match self {
+            TakeProfitTrader::PosInfinity => None,
+            TakeProfitTrader::Finite(x) => {
+                Some(PriceBaseInQuote::from_non_zero(*x).into_notional_price(market_type))
+            }
         }
     }
 }
 
-impl FromStr for TakeProfitPrice {
+impl Display for TakeProfitTrader {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            TakeProfitTrader::Finite(val) => val.fmt(f),
+            TakeProfitTrader::PosInfinity => write!(f, "{}", POS_INF_STR),
+        }
+    }
+}
+
+impl FromStr for TakeProfitTrader {
     type Err = PerpError;
     fn from_str(src: &str) -> Result<Self, PerpError> {
         match src {
-            POS_INF_STR => Ok(TakeProfitPrice::PosInfinity),
+            POS_INF_STR => Ok(TakeProfitTrader::PosInfinity),
             _ => match src.parse() {
-                Ok(number) => Ok(TakeProfitPrice::Finite(number)),
+                Ok(number) => Ok(TakeProfitTrader::Finite(number)),
                 Err(err) => Err(perp_error!(
                     ErrorId::Conversion,
                     ErrorDomain::Default,
@@ -530,7 +550,7 @@ impl FromStr for TakeProfitPrice {
     }
 }
 
-impl TryFrom<&str> for TakeProfitPrice {
+impl TryFrom<&str> for TakeProfitTrader {
     type Error = anyhow::Error;
 
     fn try_from(val: &str) -> Result<Self, Self::Error> {
@@ -538,19 +558,25 @@ impl TryFrom<&str> for TakeProfitPrice {
     }
 }
 
-impl serde::Serialize for TakeProfitPrice {
+impl From<PriceBaseInQuote> for TakeProfitTrader {
+    fn from(val: PriceBaseInQuote) -> Self {
+        TakeProfitTrader::Finite(val.into_non_zero())
+    }
+}
+
+impl serde::Serialize for TakeProfitTrader {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
         match self {
-            TakeProfitPrice::Finite(number) => number.serialize(serializer),
-            TakeProfitPrice::PosInfinity => serializer.serialize_str(POS_INF_STR),
+            TakeProfitTrader::Finite(number) => number.serialize(serializer),
+            TakeProfitTrader::PosInfinity => serializer.serialize_str(POS_INF_STR),
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for TakeProfitPrice {
+impl<'de> serde::Deserialize<'de> for TakeProfitTrader {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -559,7 +585,7 @@ impl<'de> serde::Deserialize<'de> for TakeProfitPrice {
     }
 }
 
-impl JsonSchema for TakeProfitPrice {
+impl JsonSchema for TakeProfitTrader {
     fn schema_name() -> String {
         "TakeProfitPrice".to_owned()
     }
@@ -577,7 +603,7 @@ impl JsonSchema for TakeProfitPrice {
 struct TakeProfitPriceVisitor;
 
 impl<'de> serde::de::Visitor<'de> for TakeProfitPriceVisitor {
-    type Value = TakeProfitPrice;
+    type Value = TakeProfitTrader;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         formatter.write_str("TakeProfitPrice")
@@ -671,14 +697,14 @@ mod tests {
 
     #[test]
     fn take_profit_price() {
-        fn go(s: &str, expected: TakeProfitPrice) {
-            let deserialized = serde_json::from_str::<TakeProfitPrice>(s).unwrap();
+        fn go(s: &str, expected: TakeProfitTrader) {
+            let deserialized = serde_json::from_str::<TakeProfitTrader>(s).unwrap();
             assert_eq!(deserialized, expected);
             let serialized = serde_json::to_string(&expected).unwrap();
             assert_eq!(serialized, s);
         }
 
-        go("\"1.2\"", TakeProfitPrice::Finite("1.2".parse().unwrap()));
-        go("\"+Inf\"", TakeProfitPrice::PosInfinity);
+        go("\"1.2\"", TakeProfitTrader::Finite("1.2".parse().unwrap()));
+        go("\"+Inf\"", TakeProfitTrader::PosInfinity);
     }
 }

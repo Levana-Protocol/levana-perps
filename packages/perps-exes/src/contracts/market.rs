@@ -205,7 +205,7 @@ impl MarketContract {
             direction,
             max_gains: Some(max_gains),
             stop_loss_override,
-            take_profit: take_profit_override.map(|x| TakeProfitPrice::Finite(x.into_non_zero())),
+            take_profit: take_profit_override.map(|x| TakeProfitTrader::Finite(x.into_non_zero())),
         };
         self.exec_with_funds(wallet, status, deposit, &msg)
             .await

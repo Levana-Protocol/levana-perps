@@ -136,11 +136,11 @@ pub mod events {
                 ),
             };
 
-            let evt = match src.action.take_profit_override {
+            let evt = match src.action.take_profit_trader {
                 None => evt,
-                Some(take_profit_override) => evt.add_attribute(
+                Some(take_profit_trader) => evt.add_attribute(
                     event_key::TAKE_PROFIT_OVERRIDE,
-                    take_profit_override.to_string(),
+                    take_profit_trader.to_string(),
                 ),
             };
 
@@ -194,9 +194,9 @@ pub mod events {
                         .try_number_attr(event_key::POSITION_ACTION_DELTA_NEUTRALITY_FEE)?,
                     old_owner: evt.try_unchecked_addr_attr(event_key::POSITION_ACTION_OLD_OWNER)?,
                     new_owner: evt.try_unchecked_addr_attr(event_key::POSITION_ACTION_NEW_OWNER)?,
-                    take_profit_override: evt
+                    take_profit_trader: evt
                         .try_map_attr(event_key::TAKE_PROFIT_OVERRIDE, |s| {
-                            TakeProfitPrice::try_from(s)
+                            TakeProfitTrader::try_from(s)
                         })
                         .transpose()?,
                     stop_loss_override: evt
