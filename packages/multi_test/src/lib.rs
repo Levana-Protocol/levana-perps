@@ -27,6 +27,7 @@ use dotenv::dotenv;
 use msg::contracts::rewards::entry::ConfigUpdate;
 use msg::prelude::*;
 use msg::token::Token;
+use num_traits::ToPrimitive;
 use rand::rngs::ThreadRng;
 use serde::{de::DeserializeOwned, Serialize};
 use std::cell::RefCell;
@@ -253,12 +254,12 @@ impl PerpsApp {
             if nanos < 0 {
                 block_info.time = block_info.time.minus_nanos(nanos.unsigned_abs());
             } else {
-                block_info.time = block_info.time.plus_nanos(nanos as u64);
+                block_info.time = block_info.time.plus_nanos(nanos.to_u64().unwrap_or_default());
             }
             if height < 0 {
                 block_info.height -= height.unsigned_abs();
             } else {
-                block_info.height += height as u64;
+                block_info.height += height.to_u64().unwrap_or_default();
             }
             if self.log_block_time_changes {
                 println!(

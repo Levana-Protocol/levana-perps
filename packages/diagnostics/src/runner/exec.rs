@@ -15,6 +15,7 @@ use msg::{
     token::Token,
 };
 use rand::{distributions::uniform::SampleRange, prelude::*};
+use num_traits::ToPrimitive;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
@@ -328,8 +329,8 @@ where
 
     async fn time_jump(&mut self) -> Result<()> {
         let seconds: i64 = self.rng.gen_range(
-            (self.market_config.liquifunding_delay_seconds / 2) as i64
-                ..(self.market_config.liquifunding_delay_seconds * 2) as i64,
+            (self.market_config.liquifunding_delay_seconds / 2).to_i64().unwrap_or_default()
+                ..(self.market_config.liquifunding_delay_seconds * 2).to_i64().unwrap_or_default(),
         );
         let resp = self.bridge.time_jump(seconds).await?;
 
