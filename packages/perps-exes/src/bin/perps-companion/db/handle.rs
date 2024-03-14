@@ -39,9 +39,9 @@ impl Db {
                     VALUES($1, $2, $3, $4)
                     RETURNING id"#,
                 address,
-                Into::<i32>::into(chain),
+                i32::from(chain),
                 market_id.to_string().replace('_', "/"),
-                environment as i32,
+                i32::from(environment),
             )
             .fetch_one(&self.pool)
             .await
@@ -88,11 +88,11 @@ impl Db {
             position_id,
             pnl_usd,
             pnl_percentage,
-            direction as i32,
+            i32::from(direction),
             TwoDecimalPoints(entry_price.into_number()).to_string(),
             TwoDecimalPoints(exit_price.into_number()).to_string(),
             leverage,
-            pnl_type as i32,
+            i32::from(pnl_type),
             wallet,
         )
         .fetch_one(&self.pool)

@@ -34,9 +34,9 @@ pub(crate) enum ChainId {
     Injective888,
 }
 
-impl Into<i32> for ChainId {
-    fn into(self) -> i32 {
-        match self {
+impl From<ChainId> for i32 {
+    fn from(value: ChainId) -> Self {
+        match value {
             ChainId::Atlantic2 => 1,
             ChainId::Dragonfire4 => 2,
             ChainId::Elgafar1 => 3,
@@ -168,11 +168,20 @@ impl ChainId {
 
 /// Which analytics environment the contract is part of
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, sqlx::Type)]
-#[repr(i32)]
 pub(crate) enum ContractEnvironment {
     Mainnet = 1,
     Beta = 2,
     Dev = 3,
+}
+
+impl From<ContractEnvironment> for i32 {
+    fn from(value: ContractEnvironment) -> Self {
+        match value {
+            ContractEnvironment::Mainnet => 1,
+            ContractEnvironment::Beta => 2,
+            ContractEnvironment::Dev => 3
+        }
+    }
 }
 
 impl ContractEnvironment {
@@ -201,10 +210,18 @@ fn is_beta(label: &str) -> bool {
 
 /// Is this is a long or short position
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, sqlx::Type)]
-#[repr(i32)]
 pub(crate) enum DirectionForDb {
     Long = 1,
     Short = 2,
+}
+
+impl From<DirectionForDb> for i32 {
+    fn from(value: DirectionForDb) -> Self {
+        match value {
+            DirectionForDb::Long => 1,
+            DirectionForDb::Short => 2
+        }
+    }
 }
 
 impl From<DirectionToBase> for DirectionForDb {
@@ -227,7 +244,6 @@ impl Display for DirectionForDb {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Deserialize, sqlx::Type)]
 #[serde(rename_all = "snake_case")]
-#[repr(i32)]
 pub(crate) enum PnlType {
     Usd = 1,
     Percent = 2,
@@ -240,6 +256,16 @@ impl From<PnlType> for String {
             PnlType::Usd => "Usd".into(),
             PnlType::Percent => "Percent".into(),
             PnlType::Both => "Both".into(),
+        }
+    }
+}
+
+impl From<PnlType> for i32 {
+    fn from(value: PnlType) -> Self {
+        match value {
+            PnlType::Usd => 1,
+            PnlType::Percent => 2,
+            PnlType::Both => 3,
         }
     }
 }
