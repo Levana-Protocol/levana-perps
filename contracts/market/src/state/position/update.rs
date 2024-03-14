@@ -969,10 +969,9 @@ impl TriggerOrderExec {
         pos.stop_loss_override_notional =
             stop_loss_override.map(|x| x.into_notional_price(market_type));
 
-        if let Some(take_profit_trader) = take_profit_trader {
-            pos.take_profit_trader = Some(take_profit_trader);
-            pos.take_profit_trader_notional = take_profit_trader.into_notional(market_type);
-        }
+        pos.take_profit_trader = take_profit_trader;
+        pos.take_profit_trader_notional =
+            take_profit_trader.and_then(|x| x.into_notional(market_type));
 
         Ok(Self { pos, price_point })
     }

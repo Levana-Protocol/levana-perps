@@ -283,7 +283,7 @@ fn position_take_profit_override_long_4() {
     let pos_id = open_long_with_take_profit(&market, &trader, "100", "10", "100.1");
 
     market
-        .exec_set_trigger_order(&trader, pos_id, None, Some("+Inf"))
+        .exec_set_trigger_order(&trader, pos_id, None, None::<PriceBaseInQuote>)
         .unwrap();
 
     market.exec_set_price("100.2".try_into().unwrap()).unwrap();
