@@ -189,4 +189,5 @@ hashes:
   gitrev: bc5b5cddd3251668f627174a6e0c2bf78da2bc6c
   code-ids:
     osmosis-mainnet: 636
+    sei-mainnet: 3997
   hash: 0ed657e06e10763f2775f534d2bb2bf2f341bcf07d77b4fac108a68a12ef959c
