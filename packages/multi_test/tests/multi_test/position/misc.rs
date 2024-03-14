@@ -1,4 +1,5 @@
 use cw2::ContractVersion;
+use levana_perpswap_multi_test::return_unless_market_collateral_base;
 use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, response::CosmosResponseExt, PerpsApp,
@@ -6,6 +7,32 @@ use levana_perpswap_multi_test::{
 use msg::contracts::market::entry::{PositionsQueryFeeApproach, StatusResp};
 use msg::contracts::market::{config::ConfigUpdate, position::events::PositionUpdateEvent};
 use msg::prelude::*;
+
+#[test]
+fn position_misc_debug_divide_by_zero() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    return_unless_market_collateral_base!(market);
+
+    let trader = market.clone_trader(0).unwrap();
+
+    let err = market
+        .exec_open_position(
+            &trader,
+            "10",
+            "1",
+            DirectionToBase::Long,
+            "10",
+            None,
+            None,
+            None,
+        )
+        .unwrap_err();
+
+    assert!(err
+        .to_string()
+        .to_lowercase()
+        .contains("cannot divide with zero"));
+}
 
 #[test]
 // placeholder for local debug test runs
