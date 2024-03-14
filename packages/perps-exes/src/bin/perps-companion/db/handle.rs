@@ -39,7 +39,7 @@ impl Db {
                     VALUES($1, $2, $3, $4)
                     RETURNING id"#,
                 address,
-                chain as i32,
+                Into::<i32>::into(chain),
                 market_id.to_string().replace('_', "/"),
                 environment as i32,
             )

@@ -7,32 +7,49 @@ use shared::storage::{DirectionToBase, Signed};
 
 /// Chains supported by this server.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, serde::Deserialize, sqlx::Type)]
-#[repr(i32)]
 pub(crate) enum ChainId {
     #[serde(rename = "atlantic-2")]
-    Atlantic2 = 1,
+    Atlantic2,
     // Leaving in place for backwards compat in a few places, but not allowing
     // new positions to be stored.
     #[serde(rename = "dragonfire-4")]
-    Dragonfire4 = 2,
+    Dragonfire4,
     #[serde(rename = "elgafar-1")]
-    Elgafar1 = 3,
+    Elgafar1,
     #[serde(rename = "juno-1")]
-    Juno1 = 4,
+    Juno1,
     #[serde(rename = "osmo-test-5")]
-    OsmoTest5 = 5,
+    OsmoTest5,
     #[serde(rename = "osmosis-1")]
-    Osmosis1 = 6,
+    Osmosis1,
     #[serde(rename = "stargaze-1")]
-    Stargaze1 = 7,
+    Stargaze1,
     #[serde(rename = "uni-6")]
-    Uni6 = 8,
+    Uni6,
     #[serde(rename = "pacific-1")]
-    Pacific1 = 9,
+    Pacific1,
     #[serde(rename = "injective-1")]
-    Injective1 = 10,
+    Injective1,
     #[serde(rename = "injective-888")]
-    Injective888 = 11,
+    Injective888,
+}
+
+impl Into<i32> for ChainId {
+    fn into(self) -> i32 {
+        match self {
+            ChainId::Atlantic2 => 1,
+            ChainId::Dragonfire4 => 2,
+            ChainId::Elgafar1 => 3,
+            ChainId::Juno1 => 4,
+            ChainId::OsmoTest5 => 5,
+            ChainId::Osmosis1 => 6,
+            ChainId::Stargaze1 => 7,
+            ChainId::Uni6 => 8,
+            ChainId::Pacific1 => 9,
+            ChainId::Injective1 => 10,
+            ChainId::Injective888 => 11,
+        }
+    }
 }
 
 impl TryFrom<&str> for ChainId {
