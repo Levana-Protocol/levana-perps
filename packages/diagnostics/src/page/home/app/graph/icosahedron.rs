@@ -1,7 +1,6 @@
 // Taken from here: https://raw.githubusercontent.com/thallada/icosahedron/master/src/lib.rs
 // but adapted so we can use Rng and access faces, and use glam instead of cgmath
 
-use num_traits::ToPrimitive;
 use rand::prelude::*;
 use std::collections::HashMap;
 use std::ops::AddAssign;
@@ -87,7 +86,7 @@ impl Polyhedron {
     }
 
     pub fn new_isocahedron(radius: f32, detail: u32) -> Polyhedron {
-        let t = (1.0 + (5_f32).sqrt()) / 2.0;
+        let t = (1.0 + (5.0 as f32).sqrt()) / 2.0;
         let mut base_isocahedron = Polyhedron {
             positions: vec![],
             cells: vec![
@@ -164,8 +163,8 @@ impl Polyhedron {
 
         for i in 0..=cols {
             new_vertices.push(vec![]);
-            let aj = a.clone().lerp(c, i.to_f32().unwrap_or_default() / cols.to_f32().unwrap_or(1.0));
-            let bj = b.clone().lerp(c, i.to_f32().unwrap_or_default() / cols.to_f32().unwrap_or(1.0));
+            let aj = a.clone().lerp(c, i as f32 / cols as f32);
+            let bj = b.clone().lerp(c, i as f32 / cols as f32);
             let rows = cols - i;
 
             for j in 0..=rows {
@@ -173,7 +172,7 @@ impl Polyhedron {
                     new_vertices[i].push(aj.normalize() * radius);
                 } else {
                     new_vertices[i]
-                    .push(aj.clone().lerp(bj, j.to_f32().unwrap_or_default() / rows.to_f32().unwrap_or(1.0)).normalize() * radius);
+                        .push(aj.clone().lerp(bj, j as f32 / rows as f32).normalize() * radius);
                 }
             }
         }
@@ -200,9 +199,9 @@ impl Polyhedron {
 
     fn add_position(&mut self, vertex: Vec3) -> usize {
         let vertex_key = (
-            (vertex.x * VERT_CACHE_PRECISION).round().to_i32().unwrap_or_default(),
-            (vertex.y * VERT_CACHE_PRECISION).round().to_i32().unwrap_or_default(),
-            (vertex.z * VERT_CACHE_PRECISION).round().to_i32().unwrap_or_default(),
+            (vertex.x * VERT_CACHE_PRECISION).round() as i32,
+            (vertex.y * VERT_CACHE_PRECISION).round() as i32,
+            (vertex.z * VERT_CACHE_PRECISION).round() as i32,
         );
         if let Some(added_vert_index) = self.added_vert_cache.get(&vertex_key) {
             return *added_vert_index;
@@ -493,9 +492,9 @@ impl Polyhedron {
     pub fn export_cells(&self) -> Vec<u32> {
         let mut cell_vec: Vec<u32> = vec![];
         for cell in &self.cells {
-            cell_vec.push(cell.a.to_u32().unwrap_or_default());
-            cell_vec.push(cell.b.to_u32().unwrap_or_default());
-            cell_vec.push(cell.c.to_u32().unwrap_or_default());
+            cell_vec.push(cell.a as u32);
+            cell_vec.push(cell.b as u32);
+            cell_vec.push(cell.c as u32);
         }
         cell_vec
     }
@@ -515,6 +514,6 @@ fn find_center_of_triangles(
     for triangle_index in triangle_indices.iter() {
         center_point += triangle_centroids[triangle_index];
     }
-    center_point /= triangle_indices.len().to_f32().unwrap_or(1.0);
+    center_point /= triangle_indices.len() as f32;
     center_point
 }

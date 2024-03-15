@@ -1,7 +1,6 @@
 use super::data::{Action, ActionKind, FarmingEmissions};
 use crate::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{prelude::*, token::Token};
-use num_traits::ToPrimitive;
 use proptest::prelude::*;
 use std::{cell::RefCell, rc::Rc};
 
@@ -102,7 +101,7 @@ impl ActionBuilder {
     }
     pub fn new_strategy(total_duration_seconds: u32) -> impl Strategy<Value = Self> {
         (0.01f32..0.99f32).prop_flat_map(move |at_perc| {
-            let at_seconds = (at_perc * total_duration_seconds.to_f32().unwrap_or_default()).to_u32().unwrap_or_default();
+            let at_seconds = (at_perc * total_duration_seconds as f32) as u32;
             let kind = prop_oneof![Self::new_deposit_strategy(), Self::new_withdraw_strategy()];
 
             kind.prop_map(move |kind| Self { kind, at_seconds })

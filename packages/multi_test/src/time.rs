@@ -1,5 +1,4 @@
 use cosmwasm_std::{BlockInfo, Timestamp};
-use num_traits::ToPrimitive;
 
 const SECS_PER_BLOCK: i64 = 7;
 pub const NANOS_PER_SECOND: i64 = 1_000_000_000;
@@ -63,14 +62,14 @@ impl BlockInfoChange {
             TimeJump::Seconds(n) => n * NANOS_PER_SECOND,
             TimeJump::Minutes(n) => n * 60 * NANOS_PER_SECOND,
             TimeJump::Hours(n) => n * 60 * 60 * NANOS_PER_SECOND,
-            TimeJump::Liquifundings(n) => n * liquifunding_duration.to_i64().unwrap_or_default() * NANOS_PER_SECOND,
+            TimeJump::Liquifundings(n) => n * liquifunding_duration as i64 * NANOS_PER_SECOND,
             TimeJump::FractionalLiquifundings(n) => {
-                ((n * liquifunding_duration.to_f64().unwrap_or_default()) * NANOS_PER_SECOND.to_f64().unwrap_or_default()).to_i64().unwrap_or_default()
+                ((n * liquifunding_duration as f64) * NANOS_PER_SECOND as f64) as i64
             }
             TimeJump::Blocks(n) => n * SECS_PER_BLOCK * NANOS_PER_SECOND,
-            TimeJump::PreciseTime(n) => n.nanos().to_i64().unwrap_or_default() - current_block_info.time.nanos().to_i64().unwrap_or_default(),
+            TimeJump::PreciseTime(n) => n.nanos() as i64 - current_block_info.time.nanos() as i64,
             TimeJump::PreciseHeight(n) => {
-                (n.to_i64().unwrap_or_default() - current_block_info.height.to_i64().unwrap_or_default()) * SECS_PER_BLOCK * NANOS_PER_SECOND
+                (n as i64 - current_block_info.height as i64) * SECS_PER_BLOCK * NANOS_PER_SECOND
             }
         };
 
@@ -108,7 +107,7 @@ mod test {
             assert_height(TimeJump::Minutes(2 * sign), 18 * sign);
             assert_height(TimeJump::Liquifundings(2 * sign), 1029 * sign);
             assert_height(
-                TimeJump::FractionalLiquifundings(0.5 * sign.to_f64().unwrap_or_default()),
+                TimeJump::FractionalLiquifundings(0.5 * sign as f64),
                 258 * sign,
             );
             assert_height(TimeJump::Blocks(0), 0);

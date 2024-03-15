@@ -12,8 +12,6 @@ use glam::{EulerRot, Mat4, Quat};
 use super::{camera::Camera, state::*};
 use crate::{page::home::app::controls::PlayState, prelude::*};
 use rand::prelude::*;
-use num_traits::ToPrimitive;
-use anyhow::{Context, Result};
 
 const SHADER_COMMON_CAMERA: &'static str = include_str!("./shader/camera.glsl");
 const SHADER_COMMON_MATH: &'static str = include_str!("./shader/math.glsl");
@@ -83,7 +81,7 @@ impl Graph {
 
     pub fn animate(&self, delta: f64) -> Result<()> {
         if self.controls.play_state.get() == PlayState::Play {
-            let delta = delta.to_f32().context("Error while converting f64 to f32.")?;
+            let delta = delta as f32;
             let mut meshes = self.meshes.borrow_mut();
             for mesh in meshes.iter_mut() {
                 mesh.animate(delta);
@@ -136,7 +134,7 @@ impl Graph {
     pub fn handle_resize(&self, rect: &web_sys::DomRectReadOnly) {
         let mut gl = self.gl.borrow_mut();
         let mut gl = gl.as_mut().unwrap();
-        let strategy = ResizeStrategy::All(rect.width().to_u32().unwrap_or_default(), rect.height().to_u32().unwrap_or_default());
+        let strategy = ResizeStrategy::All(rect.width() as u32, rect.height() as u32);
 
         gl.resize(strategy);
 
@@ -248,9 +246,9 @@ pub fn create_geometry(gl: &mut WebGl2Renderer) -> Result<GraphGeometry> {
     // indices
     let mut indices: Vec<u32> = Vec::with_capacity(sphere_geom.cells.len() * 3);
     for cell in sphere_geom.cells.iter() {
-        indices.push(cell.a.to_u32().context("Error while converting usize to u32.")?);
-        indices.push(cell.b.to_u32().context("Error while converting usize to u32.")?);
-        indices.push(cell.c.to_u32().context("Error while converting usize to u32.")?);
+        indices.push(cell.a as u32);
+        indices.push(cell.b as u32);
+        indices.push(cell.c as u32);
     }
     let sphere_indices_id = gl.create_buffer()?;
 
@@ -268,7 +266,7 @@ pub fn create_geometry(gl: &mut WebGl2Renderer) -> Result<GraphGeometry> {
         sphere_normal_id,
         sphere_indices_id,
         sphere_color_id,
-        sphere_index_count: indices.len().to_u32().context("Error while converting usize to u32.")?,
+        sphere_index_count: indices.len() as u32,
     })
 }
 

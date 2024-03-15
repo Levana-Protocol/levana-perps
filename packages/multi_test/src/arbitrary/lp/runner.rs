@@ -109,7 +109,7 @@ impl XlpStakeUnstake {
 
         // jump to half the unstaking period for imprecise checks
         market
-            .set_time(TimeJump::Seconds(i64::from(config.unstake_period_seconds) / 2))
+            .set_time(TimeJump::Seconds(config.unstake_period_seconds as i64 / 2))
             .unwrap();
         let info = market.query_lp_info(&lp).unwrap();
         assert!(
@@ -124,7 +124,7 @@ impl XlpStakeUnstake {
         // finish the unstaking period for precise checks
         market
             .set_time(TimeJump::Seconds(
-                (i64::from(config.unstake_period_seconds) / 2) + 1,
+                (config.unstake_period_seconds as i64 / 2) + 1,
             ))
             .unwrap();
         let info = market.query_lp_info(&lp).unwrap();

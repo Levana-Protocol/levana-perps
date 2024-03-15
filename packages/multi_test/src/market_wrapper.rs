@@ -384,7 +384,7 @@ impl PerpsMarket {
         let block_info_change = BlockInfoChange::from_time_jump(
             time_jump,
             self.app().block_info(),
-            config.liquifunding_delay_seconds.into(),
+            config.liquifunding_delay_seconds as u64,
         );
         self.app().set_block_info(block_info_change);
 
@@ -1778,7 +1778,7 @@ impl PerpsMarket {
             contract,
             amount
                 .into_number()
-                .to_u128_with_precision(token_info.decimals.into())
+                .to_u128_with_precision(token_info.decimals as u32)
                 .context("couldnt convert liquidity token amount")?
                 .into(),
             to_binary(msg)?,
@@ -1802,7 +1802,7 @@ impl PerpsMarket {
             contract,
             amount
                 .into_number()
-                .to_u128_with_precision(token_info.decimals.into())
+                .to_u128_with_precision(token_info.decimals as u32)
                 .context("couldnt convert liquidity token amount")?
                 .into(),
             to_binary(msg)?,
@@ -1865,7 +1865,7 @@ impl PerpsMarket {
             from,
             recipient,
             amount
-                .to_u128_with_precision(token_info.decimals.into())
+                .to_u128_with_precision(token_info.decimals as u32)
                 .context("couldnt convert liquidity token amount")?
                 .into(),
         )
@@ -1901,7 +1901,7 @@ impl PerpsMarket {
         let token_info = self.query_liquidity_token_info(kind)?;
 
         let amount = amount
-            .to_u128_with_precision(token_info.decimals.into())
+            .to_u128_with_precision(token_info.decimals as u32)
             .context("couldnt convert liquidity token amount")?
             .into();
 

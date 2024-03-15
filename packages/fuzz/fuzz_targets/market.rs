@@ -1,5 +1,4 @@
 #![no_main]
-#![deny(clippy::as_conversions)]
 
 use anyhow::Result;
 use arbitrary::Arbitrary;

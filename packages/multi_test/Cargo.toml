@@ -30,7 +30,6 @@ proptest = "1.1.0"
 dotenv = "0.15.0"
 cosmwasm-schema = {git = "https://github.com/Levana-Protocol/cosmwasm.git", rev = "6e36567b8359214f6690c8de081bb1e237803fb1", features=["allow-unknown-fields"] }
 cw-storage-plus = { version = "1.0.1", default-features = false }
-num-traits = "0.2.16"
 
 [features]
 default = ["sanity"]

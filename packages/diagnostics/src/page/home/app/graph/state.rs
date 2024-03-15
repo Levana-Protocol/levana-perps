@@ -107,8 +107,8 @@ impl Graph {
                         size: 3,
                         data_type: DataType::Float,
                         normalized: false,
-                        stride: 0_u8,
-                        offset: 0_u64,
+                        stride: 0 as u8,
+                        offset: 0 as u64,
                         is_int_array: false, // ??
                     },
                 },
@@ -119,8 +119,8 @@ impl Graph {
                         size: 3,
                         data_type: DataType::Float,
                         normalized: false,
-                        stride: 0_u8,
-                        offset: 0_u64,
+                        stride: 0 as u8,
+                        offset: 0 as u64,
                         is_int_array: false, // ??
                     },
                 },
@@ -131,8 +131,8 @@ impl Graph {
                         size: 3,
                         data_type: DataType::Float,
                         normalized: false,
-                        stride: 0_u8,
-                        offset: 0_u64,
+                        stride: 0 as u8,
+                        offset: 0 as u64,
                         is_int_array: false, // ??
                     },
                 },

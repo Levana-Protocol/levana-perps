@@ -1,6 +1,5 @@
 //! Messages and helper data types for the perps protocol.
 #![deny(missing_docs)]
-#![deny(clippy::as_conversions)]
 
 #[cfg(feature = "bridge")]
 pub mod bridge;
