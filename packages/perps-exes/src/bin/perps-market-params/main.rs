@@ -19,12 +19,15 @@ fn main() -> Result<()> {
             }
         }
 
-        cli::SubCommand::Scrape { coin } => {
+        cli::SubCommand::Scrape {
+            coin,
+            skip_processing,
+        } => {
             let coin = TryInto::<Coin>::try_into(coin)?;
             let app = CoingeckoApp::new()?;
             let plan = app.get_scrape_plan(coin.coingecko_uri().as_str())?;
             tracing::debug!("Scrape plan: {plan:?}");
-            let result = app.apply_scrape_plan(plan)?;
+            let result = app.apply_scrape_plan(plan, skip_processing)?;
             tracing::info!("Successfully scraped");
             for exchange in result {
                 tracing::info!("{}", exchange.name);

@@ -165,12 +165,15 @@ impl CoingeckoApp {
             return Ok(vec![]);
         } else {
             let mut exchanges = vec![];
+            tracing::debug!("Going to find data table");
             let exchange_table = self.tab.find_elements(selector.as_str())?;
+            tracing::debug!("Found exchange_table");
             for row in exchange_table {
                 let item = fetch_exchange_row(row)?;
                 tracing::debug!("Fetched one exchange: {}", item.name);
                 exchanges.push(item);
             }
+            self.tab.close(false)?;
             Ok(exchanges)
         }
     }
@@ -206,7 +209,7 @@ impl CoingeckoApp {
         })
     }
 
-    pub(crate) fn apply_scrape_plan(&self, plan: ScrapePlan) -> Result<Vec<ExchangeInfo>> {
+    pub(crate) fn apply_scrape_plan(&self, plan: ScrapePlan, skip_fetch: bool) -> Result<Vec<ExchangeInfo>> {
         // Workaround for celing division
         let total_pages = (plan.total_exchanges + 99) / 100;
         let mut result = vec![];
@@ -220,7 +223,7 @@ impl CoingeckoApp {
             } else {
                 None
             };
-            let mut exchanges = self.fetch_specific_spot_page(uri, true)?;
+            let mut exchanges = self.fetch_specific_spot_page(uri, skip_fetch)?;
             result.append(&mut exchanges);
         }
         Ok(result)
