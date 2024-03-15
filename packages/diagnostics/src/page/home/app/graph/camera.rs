@@ -2,6 +2,7 @@ use crate::prelude::*;
 use awsm_web::webgl::{BufferUsage, Id, WebGl2Renderer};
 use glam::{Mat4, Vec3};
 use num_traits::ToPrimitive;
+use anyhow::{Context, Result};
 
 pub struct Camera {
     pub buffer_id: Id,
@@ -40,7 +41,7 @@ impl Camera {
 
     pub fn update_viewport(&mut self, gl: &WebGl2Renderer) -> Result<()> {
         let (_, _, width, height) = gl.get_viewport();
-        let aspect = width.to_f32().unwrap_or_default() / height.to_f32().unwrap_or(1.0);
+        let aspect = width.to_f32().context("Error while converting to f32.")? / height.to_f32().context("Error while converting to f32.")?;
         self.projection = Mat4::perspective_lh(std::f32::consts::PI / 4.0, aspect, 0.1, 10000.0);
         Ok(())
     }

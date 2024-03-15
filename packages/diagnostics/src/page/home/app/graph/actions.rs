@@ -13,6 +13,7 @@ use super::{camera::Camera, state::*};
 use crate::{page::home::app::controls::PlayState, prelude::*};
 use rand::prelude::*;
 use num_traits::ToPrimitive;
+use anyhow::{Context, Result};
 
 const SHADER_COMMON_CAMERA: &'static str = include_str!("./shader/camera.glsl");
 const SHADER_COMMON_MATH: &'static str = include_str!("./shader/math.glsl");
@@ -82,7 +83,7 @@ impl Graph {
 
     pub fn animate(&self, delta: f64) -> Result<()> {
         if self.controls.play_state.get() == PlayState::Play {
-            let delta = delta.to_f32().unwrap_or_default();
+            let delta = delta.to_f32().context("Error while converting f64 to f32.")?;
             let mut meshes = self.meshes.borrow_mut();
             for mesh in meshes.iter_mut() {
                 mesh.animate(delta);
@@ -247,9 +248,9 @@ pub fn create_geometry(gl: &mut WebGl2Renderer) -> Result<GraphGeometry> {
     // indices
     let mut indices: Vec<u32> = Vec::with_capacity(sphere_geom.cells.len() * 3);
     for cell in sphere_geom.cells.iter() {
-        indices.push(cell.a.to_u32().unwrap_or_default());
-        indices.push(cell.b.to_u32().unwrap_or_default());
-        indices.push(cell.c.to_u32().unwrap_or_default());
+        indices.push(cell.a.to_u32().context("Error while converting usize to u32.")?);
+        indices.push(cell.b.to_u32().context("Error while converting usize to u32.")?);
+        indices.push(cell.c.to_u32().context("Error while converting usize to u32.")?);
     }
     let sphere_indices_id = gl.create_buffer()?;
 
@@ -267,7 +268,7 @@ pub fn create_geometry(gl: &mut WebGl2Renderer) -> Result<GraphGeometry> {
         sphere_normal_id,
         sphere_indices_id,
         sphere_color_id,
-        sphere_index_count: indices.len().to_u32().unwrap_or_default(),
+        sphere_index_count: indices.len().to_u32().context("Error while converting usize to u32.")?,
     })
 }
 
