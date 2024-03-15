@@ -60,7 +60,7 @@ impl From<ReplyId> for u64 {
             ReplyId::InstantiateMarket => 0,
             ReplyId::InstantiatePositionToken => 1,
             ReplyId::InstantiateLiquidityTokenLp => 2,
-            ReplyId::InstantiateLiquidityTokenXlp => 3
+            ReplyId::InstantiateLiquidityTokenXlp => 3,
         }
     }
 }

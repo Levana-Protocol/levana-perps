@@ -179,7 +179,7 @@ impl From<ContractEnvironment> for i32 {
         match value {
             ContractEnvironment::Mainnet => 1,
             ContractEnvironment::Beta => 2,
-            ContractEnvironment::Dev => 3
+            ContractEnvironment::Dev => 3,
         }
     }
 }
@@ -219,7 +219,7 @@ impl From<DirectionForDb> for i32 {
     fn from(value: DirectionForDb) -> Self {
         match value {
             DirectionForDb::Long => 1,
-            DirectionForDb::Short => 2
+            DirectionForDb::Short => 2,
         }
     }
 }

@@ -34,7 +34,7 @@ impl From<ReplyId> for u64 {
         match src {
             ReplyId::TransferCollateral => 0,
             ReplyId::ReinvestYield => 1,
-            ReplyId::FarmingDeposit => 2
+            ReplyId::FarmingDeposit => 2,
         }
     }
 }
