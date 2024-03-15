@@ -4,4 +4,12 @@ default:
 
 # Run application
 run:
-	cargo run --bin perps-market-params
+	cargo run --bin perps-market-params -- scrape-local
+
+# Scape levana
+scrape-levana:
+	cargo run --bin perps-market-params scrape --coin levana
+
+# Scape atom
+scrape-atom:
+	cargo run --bin perps-market-params scrape --coin cosmos-hub
