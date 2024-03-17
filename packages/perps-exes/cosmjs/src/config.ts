@@ -26,7 +26,8 @@ export const NETWORKS = {
       "addr_prefix": "osmo"
     },
     "osmosis-mainnet": {
-      "rpc_url": "https://rpc.dev-osmosis.zone",
+      "rpc_url": "https://rpc-levana.cros-nest.com",
+      // "rpc_url": "https://rpc.dev-osmosis.zone",
       "rest_url": "https://lcd.osmotest5.osmosis.zone",
       "gas_price": "0.025",
       "full_denom": "OSMO",

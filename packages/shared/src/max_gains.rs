@@ -166,11 +166,11 @@ impl MaxGainsInQuote {
                             return Err(MarketError::MaxGainsTooLarge {}.into());
                         }
 
-                        let counter_collateral = collateral.into_number()
-                            * max_gains_in_notional
-                                .into_number()
-                                .checked_div(max_gains_multiple)?;
-                        NonZero::<Collateral>::try_from_number(counter_collateral).with_context(|| format!("Calculated an invalid counter_collateral from max_gains: {counter_collateral}"))?
+                        let counter_collateral = collateral
+                            .into_number()
+                            .checked_mul(max_gains_in_notional.into_number())?
+                            .checked_div(max_gains_multiple)?;
+                        NonZero::<Collateral>::try_from_number(counter_collateral).with_context(|| format!("Calculated an invalid counter_collateral: {counter_collateral}"))?
                     }
                 }
             }
