@@ -118,7 +118,7 @@ impl State<'_> {
 #[must_use]
 pub(crate) struct ChargeDeltaNeutralityFeeResult {
     pos_id: PositionId,
-    fee: Signed<Collateral>,
+    pub(crate) fee: Signed<Collateral>,
     fee_event: DeltaNeutralityFeeEvent,
     cap_triggered_info: Option<CapTriggeredInfo>,
     total_funds_after: Collateral,
@@ -127,8 +127,8 @@ pub(crate) struct ChargeDeltaNeutralityFeeResult {
 }
 
 impl ChargeDeltaNeutralityFeeResult {
-    /// Consume this value and write its data to storage.
-    pub(crate) fn store(self, state: &State, ctx: &mut StateContext) -> Result<Signed<Collateral>> {
+    /// write its data to storage.
+    pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<Signed<Collateral>> {
         let ChargeDeltaNeutralityFeeResult {
             pos_id,
             fee,
@@ -138,7 +138,7 @@ impl ChargeDeltaNeutralityFeeResult {
             protocol_fees,
             price,
         } = self;
-        ctx.response_mut().add_event(fee_event);
+        ctx.response_mut().add_event(fee_event.clone());
 
         if let Some(CapTriggeredInfo {
             available,
@@ -182,7 +182,7 @@ struct CapTriggeredInfo {
 }
 
 impl DeltaNeutralityFeeMultiPass {
-    pub fn new(
+    pub(crate) fn new(
         store: &dyn Storage,
         config: Config,
         net_notional: Signed<Notional>,
@@ -202,7 +202,7 @@ impl DeltaNeutralityFeeMultiPass {
         })
     }
 
-    pub fn run(&mut self) -> Result<()> {
+    pub(crate) fn run(&mut self) -> Result<()> {
         let net_notional_after = self.net_notional + self.delta_notional;
         let net_notional = self.net_notional;
         if (net_notional.into_number() * net_notional_after.into_number()).is_negative() {

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
-use cosmos::Contract;
+use cosmos::{Address, Contract};
 use cosmwasm_std::Uint256;
 use msg::{
     contracts::market::{
@@ -112,8 +112,12 @@ pub(crate) enum LatestPrice {
         on_chain_oracle_price: PriceBaseInQuote,
         /// Publish time calculated from on-chain oracle data
         on_chain_oracle_publish_time: DateTime<Utc>,
+        /// Current on-chain price point
+        on_chain_price_point: PricePoint,
     },
-    PriceTooOld,
+    PriceTooOld {
+        too_old: PriceTooOld,
+    },
     VolatileDiffTooLarge,
 }
 
@@ -122,6 +126,16 @@ pub(crate) async fn get_latest_price(
     offchain_price_data: &OffchainPriceData,
     market: &Market,
 ) -> Result<LatestPrice> {
+    let on_chain_price_point = match market.market.current_price().await {
+        Ok(price_point) => price_point,
+        Err(e) => {
+            return if e.to_string().contains("price_not_found") {
+                Ok(LatestPrice::NoPriceInContract)
+            } else {
+                Err(e.into())
+            };
+        }
+    };
     let (feeds, volatile_diff_seconds) = match &market.config.spot_price {
         SpotPriceConfig::Manual { .. } => {
             bail!("Manual markets do not use an oracle")
@@ -151,7 +165,7 @@ pub(crate) async fn get_latest_price(
             feeds,
             volatile_diff_seconds,
         )? {
-            ComposedOracleFeed::UpdateTooOld => LatestPrice::PriceTooOld,
+            ComposedOracleFeed::UpdateTooOld { too_old } => LatestPrice::PriceTooOld { too_old },
             ComposedOracleFeed::VolatileDiffTooLarge => LatestPrice::VolatileDiffTooLarge,
             ComposedOracleFeed::OffChainPrice {
                 price: off_chain_price,
@@ -164,18 +178,47 @@ pub(crate) async fn get_latest_price(
                     .composed_price
                     .timestamp
                     .try_into_chrono_datetime()?,
+                on_chain_price_point,
             },
         },
     )
 }
 
+#[derive(Debug)]
+pub(crate) struct PriceTooOld {
+    pub(crate) feed: FeedType,
+    pub(crate) check_time: DateTime<Utc>,
+    pub(crate) publish_time: DateTime<Utc>,
+    pub(crate) age: i64,
+    pub(crate) age_tolerance_seconds: u32,
+}
+
 enum ComposedOracleFeed {
-    UpdateTooOld,
+    UpdateTooOld {
+        too_old: PriceTooOld,
+    },
     OffChainPrice {
         price: PriceBaseInQuote,
         publish_time: DateTime<Utc>,
     },
     VolatileDiffTooLarge,
+}
+
+#[derive(Debug)]
+pub(crate) enum FeedType {
+    Pyth { id: PriceIdentifier },
+    Stride { denom: String },
+    Simple { contract: Address },
+}
+
+impl Display for FeedType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            FeedType::Pyth { id } => write!(f, "Pyth feed {id}"),
+            FeedType::Stride { denom } => write!(f, "Stride denom {denom}"),
+            FeedType::Simple { contract } => write!(f, "Simple contract {contract}"),
+        }
+    }
 }
 
 fn compose_oracle_feeds(
@@ -210,7 +253,15 @@ fn compose_oracle_feeds(
                     .with_context(|| format!("Missing pyth price for ID {}", id))?;
                 let age = now.signed_duration_since(pyth_update).num_seconds();
                 if age >= (*age_tolerance_seconds).into() {
-                    return Ok(ComposedOracleFeed::UpdateTooOld);
+                    return Ok(ComposedOracleFeed::UpdateTooOld {
+                        too_old: PriceTooOld {
+                            feed: FeedType::Pyth { id: *id },
+                            check_time: now,
+                            publish_time: *pyth_update,
+                            age,
+                            age_tolerance_seconds: *age_tolerance_seconds,
+                        },
+                    });
                 }
 
                 update_publish_time(*pyth_update, feed.volatile, true);
@@ -235,30 +286,58 @@ fn compose_oracle_feeds(
                 );
                 sei.price.into_decimal256()
             }
-            SpotPriceFeedData::Stride { denom, .. } => {
+            SpotPriceFeedData::Stride {
+                denom,
+                age_tolerance_seconds,
+            } => {
                 // we _could_ query the redemption rate from stride chain, but it's not needed
                 // contract price is good enough
                 let stride = oracle_price.stride.get(denom).with_context(|| {
                     format!("Missing redemption rate for Stride denom: {denom}")
                 })?;
-                update_publish_time(
-                    stride.publish_time.try_into_chrono_datetime()?,
-                    feed.volatile,
-                    false,
-                );
+                let publish_time = stride.publish_time.try_into_chrono_datetime()?;
+                let age = now.signed_duration_since(publish_time).num_seconds();
+                if age >= (*age_tolerance_seconds).into() {
+                    return Ok(ComposedOracleFeed::UpdateTooOld {
+                        too_old: PriceTooOld {
+                            feed: FeedType::Stride {
+                                denom: denom.clone(),
+                            },
+                            check_time: now,
+                            publish_time,
+                            age,
+                            age_tolerance_seconds: *age_tolerance_seconds,
+                        },
+                    });
+                }
+                update_publish_time(publish_time, feed.volatile, false);
                 stride.redemption_rate.into_decimal256()
             }
-            SpotPriceFeedData::Simple { contract, .. } => {
+            SpotPriceFeedData::Simple {
+                contract,
+                age_tolerance_seconds,
+            } => {
                 let simple = oracle_price
                     .simple
                     .get(&RawAddr::from(contract))
                     .with_context(|| format!("Missing price for Simple contract: {contract}"))?;
                 if let Some(timestamp) = simple.timestamp {
-                    update_publish_time(
-                        timestamp.try_into_chrono_datetime()?,
-                        feed.volatile,
-                        false,
-                    );
+                    let timestamp = timestamp.try_into_chrono_datetime()?;
+                    let age = now.signed_duration_since(timestamp).num_seconds();
+                    if age >= (*age_tolerance_seconds).into() {
+                        return Ok(ComposedOracleFeed::UpdateTooOld {
+                            too_old: PriceTooOld {
+                                feed: FeedType::Simple {
+                                    contract: contract.as_str().parse()?,
+                                },
+                                check_time: now,
+                                publish_time: timestamp,
+                                age,
+                                age_tolerance_seconds: *age_tolerance_seconds,
+                            },
+                        });
+                    }
+                    update_publish_time(timestamp, feed.volatile, false);
                 }
                 simple.value.into_decimal256()
             }
@@ -290,7 +369,7 @@ fn compose_oracle_feeds(
 #[tracing::instrument(skip_all)]
 async fn fetch_pyth_prices(
     client: &reqwest::Client,
-    endpoint: &str,
+    endpoint: &reqwest::Url,
     ids: &HashSet<PriceIdentifier>,
     values: &mut HashMap<PriceIdentifier, (NonZero<Decimal256>, DateTime<Utc>)>,
     oldest_publish_time: &mut Option<DateTime<Utc>>,
@@ -311,15 +390,11 @@ async fn fetch_pyth_prices(
         return Ok(());
     }
 
-    let base = format!("{}api/latest_price_feeds", endpoint);
-    let records: Vec<PythRecord> = fetch_json_with_retry(|| {
-        let mut req = client.get(&base);
-        for id in ids {
-            req = req.query(&[("ids[]", id)])
-        }
-        req
-    })
-    .await?;
+    let base = endpoint.join("api/latest_price_feeds")?;
+    let ids_iter = ids.iter().map(|feed| ("ids[]", feed.to_hex()));
+    let url = reqwest::Url::parse_with_params(base.as_str(), ids_iter)?;
+
+    let records: Vec<PythRecord> = fetch_json_with_retry(|| client.get(url.clone())).await?;
 
     for PythRecord {
         id,

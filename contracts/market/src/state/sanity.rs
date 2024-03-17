@@ -84,9 +84,9 @@ fn liquidation_prices(store: &dyn Storage, _env: &Env) -> Result<()> {
         let (posid, pos) = res?;
 
         let liquidation = pos.liquidation_price;
-        let take_profit = pos.take_profit_price;
+        let take_profit_total = pos.take_profit_total;
         let stop_loss_override = pos.stop_loss_override_notional;
-        let take_profit_override = pos.take_profit_override_notional;
+        let take_profit_trader_notional = pos.take_profit_trader_notional;
         match pos.direction() {
             DirectionToNotional::Long => {
                 match liquidation {
@@ -97,7 +97,7 @@ fn liquidation_prices(store: &dyn Storage, _env: &Env) -> Result<()> {
                         ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
                     }
                 }
-                match take_profit {
+                match take_profit_total {
                     Some(price) => {
                         PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
                     }
@@ -117,12 +117,12 @@ fn liquidation_prices(store: &dyn Storage, _env: &Env) -> Result<()> {
                         }
                     }
                 }
-                match take_profit_override {
+                match take_profit_trader_notional {
                     Some(price) => {
                         PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
                     }
                     None => {
-                        if take_profit.is_none() {
+                        if take_profit_total.is_none() {
                             ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
                         } else {
                             ensure_at_most_one(store, PRICE_TRIGGER_ASC, posid)?;
@@ -139,7 +139,7 @@ fn liquidation_prices(store: &dyn Storage, _env: &Env) -> Result<()> {
                         ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
                     }
                 }
-                match take_profit {
+                match take_profit_total {
                     Some(price) => {
                         PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
                     }
@@ -159,12 +159,12 @@ fn liquidation_prices(store: &dyn Storage, _env: &Env) -> Result<()> {
                         }
                     }
                 }
-                match take_profit_override {
+                match take_profit_trader_notional {
                     Some(price) => {
                         PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
                     }
                     None => {
-                        if take_profit.is_none() {
+                        if take_profit_total.is_none() {
                             ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
                         } else {
                             ensure_at_most_one(store, PRICE_TRIGGER_DESC, posid)?;
@@ -197,7 +197,11 @@ fn ensure_missing(
 ) -> Result<()> {
     for res in m.keys(store, None, None, cosmwasm_std::Order::Ascending) {
         let (_, x) = res?;
-        anyhow::ensure!(x != posid);
+        anyhow::ensure!(
+            x != posid,
+            "found entry for position {} in liquidation map, but it shouldn't be in there",
+            posid
+        );
     }
     Ok(())
 }

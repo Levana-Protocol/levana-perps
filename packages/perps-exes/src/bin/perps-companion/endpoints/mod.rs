@@ -42,6 +42,10 @@ pub(crate) struct HomeRoute;
 pub(crate) struct HealthRoute;
 
 #[derive(TypedPath)]
+#[typed_path("/grpc-health")]
+pub(crate) struct GrpcHealthRoute;
+
+#[derive(TypedPath)]
 #[typed_path("/build-version")]
 pub(crate) struct BuildVersionRoute;
 
@@ -78,6 +82,12 @@ pub(crate) struct PnlHtml {
 #[derive(TypedPath, Deserialize)]
 #[typed_path("/pnl/:pnl_id/image.png", rejection(pnl::Error))]
 pub(crate) struct PnlImage {
+    pub(crate) pnl_id: i64,
+}
+
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/pnl/:pnl_id/image.svg", rejection(pnl::Error))]
+pub(crate) struct PnlImageSvg {
     pub(crate) pnl_id: i64,
 }
 
@@ -127,6 +137,7 @@ pub(crate) async fn launch(app: App) -> Result<()> {
     let router = axum::Router::new()
         .typed_get(common::homepage)
         .typed_get(common::healthz)
+        .typed_get(common::grpc_health)
         .typed_get(common::build_version)
         .typed_get(pnl::pnl_css)
         .typed_get(common::error_css)
@@ -136,6 +147,7 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .typed_put(pnl::pnl_url)
         .typed_get(pnl::pnl_html)
         .typed_get(pnl::pnl_image)
+        .typed_get(pnl::pnl_image_svg)
         .typed_get(export::history)
         .typed_get(whales::whales)
         .typed_get(whales::whale_css)

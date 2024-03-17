@@ -86,6 +86,7 @@ pub(crate) enum TestnetSub {
 }
 
 #[derive(clap::Parser)]
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum Subcommand {
     /// Do a complete local deployment
     LocalDeploy {
@@ -156,14 +157,14 @@ pub(crate) struct Opt {
         env = "LEVANA_BOTS_PYTH_ENDPOINT_STABLE",
         default_value = "https://hermes.pyth.network/"
     )]
-    pub(crate) pyth_endpoint_stable: String,
+    pub(crate) pyth_endpoint_stable: reqwest::Url,
     /// The edge Pyth endpoint
     #[clap(
         long,
         env = "LEVANA_BOTS_PYTH_ENDPOINT_EDGE",
         default_value = "https://hermes-beta.pyth.network/"
     )]
-    pub(crate) pyth_endpoint_edge: String,
+    pub(crate) pyth_endpoint_edge: reqwest::Url,
 }
 
 impl Opt {

@@ -70,7 +70,7 @@ pub fn instantiate(
 
     set_factory_addr(deps.storage, &factory.validate(deps.api)?)?;
     config_init(deps.api, deps.storage, config, spot_price)?;
-    meta_init(deps.storage, &market_id)?;
+    meta_init(deps.storage, &env, &market_id)?;
 
     token_init(deps.storage, &deps.querier, token)?;
     fees_init(deps.storage)?;
@@ -140,13 +140,15 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             sender: _,
         } => anyhow::bail!("Cannot nest a Receive inside another Receive"),
 
+        // TODO: remove this once the deprecated fields are fully removed
+        #[allow(deprecated)]
         ExecuteMsg::OpenPosition {
             slippage_assert,
             leverage,
             direction,
             max_gains,
             stop_loss_override,
-            take_profit_override,
+            take_profit,
         } => {
             state.defer_execution(
                 &mut ctx,
@@ -157,7 +159,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     direction,
                     max_gains,
                     stop_loss_override,
-                    take_profit_override,
+                    take_profit,
                     amount: info.funds.take()?,
                     crank_fee: Collateral::zero(),
                     crank_fee_usd: Usd::zero(),
@@ -246,10 +248,19 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             )?;
         }
 
+        ExecuteMsg::UpdatePositionTakeProfitPrice { id, price } => {
+            state.defer_execution(
+                &mut ctx,
+                info.sender,
+                DeferredExecItem::UpdatePositionTakeProfitPrice { id, price },
+                info.funds.take(),
+            )?;
+        }
+
         ExecuteMsg::SetTriggerOrder {
             id,
             stop_loss_override,
-            take_profit_override,
+            take_profit,
         } => {
             state.defer_execution(
                 &mut ctx,
@@ -257,19 +268,21 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 DeferredExecItem::SetTriggerOrder {
                     id,
                     stop_loss_override,
-                    take_profit_override,
+                    take_profit,
                 },
                 info.funds.take(),
             )?;
         }
 
+        // TODO: remove this once the deprecated fields are fully removed
+        #[allow(deprecated)]
         ExecuteMsg::PlaceLimitOrder {
             trigger_price,
             leverage,
             direction,
             max_gains,
             stop_loss_override,
-            take_profit_override,
+            take_profit,
         } => {
             state.defer_execution(
                 &mut ctx,
@@ -280,7 +293,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     direction,
                     max_gains,
                     stop_loss_override,
-                    take_profit_override,
+                    take_profit,
                     amount: info.funds.take()?,
                     crank_fee: Collateral::zero(),
                     crank_fee_usd: Usd::zero(),
@@ -543,6 +556,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             let order = state.limit_order_load(store, order_id)?;
             let market_type = state.market_type(store)?;
 
+            #[allow(deprecated)]
             LimitOrderResp {
                 order_id,
                 trigger_price: order.trigger_price,
@@ -551,7 +565,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 direction: order.direction.into_base(market_type),
                 max_gains: order.max_gains,
                 stop_loss_override: order.stop_loss_override,
-                take_profit_override: order.take_profit_override,
+                take_profit: order.take_profit,
             }
             .query_result()
         }

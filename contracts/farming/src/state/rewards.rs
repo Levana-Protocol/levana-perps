@@ -289,7 +289,7 @@ impl State<'_> {
     }
 
     /// Calculates emissions per farming tokens ratio since the last update
-    pub fn calculate_emissions_per_token_per_time(
+    pub(crate) fn calculate_emissions_per_token_per_time(
         &self,
         store: &dyn Storage,
         emissions: &Emissions,

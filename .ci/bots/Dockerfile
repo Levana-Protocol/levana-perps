@@ -1,4 +1,4 @@
-FROM alpine:3.14.2
+FROM alpine:3.19.1
 
 COPY perps-bots /usr/bin
 COPY health-check /usr/bin
@@ -9,8 +9,6 @@ ADD "https://github.com/fpco/amber/releases/download/v0.1.3/amber-x86_64-unknown
 RUN chmod 755 /usr/bin/amber
 RUN chmod 755 /usr/bin/health-check
 RUN chmod 755 /usr/bin/perps-bots
-
-RUN apk add --no-cache curl bash aws-cli
 
 ENV AMBER_YAML=/etc/amber.yaml
 

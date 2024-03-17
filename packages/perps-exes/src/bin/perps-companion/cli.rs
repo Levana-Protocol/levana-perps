@@ -16,7 +16,7 @@ pub(crate) struct Opt {
     #[clap(
         long,
         env = "LEVANA_COMPANION_OSMOSIS_MAINNET_PRIMARY_GRPC",
-        default_value = "https://grpc.dev-osmosis.zone:443"
+        default_value = "https://grpc.osmosis.zone"
     )]
     pub(crate) osmosis_mainnet_primary: String,
     /// Primary mainnet GRPC Override for Sei.
@@ -65,6 +65,12 @@ pub(crate) struct Opt {
     pub(crate) request_body_limit_bytes: usize,
     #[clap(subcommand)]
     pub(crate) pgopt: PGOpt,
+    /// Require that the fonts needed by the SVG are present
+    #[clap(long, env = "LEVANA_COMPANION_FONT_CHECK")]
+    pub(crate) font_check: bool,
+    /// Cache-bust query string parameter to force Twitter to reindex metadata
+    #[clap(long, env = "LEVANA_COMPANION_CACHE_BUST", default_value_t = 1)]
+    pub(crate) cache_bust: u32,
 }
 
 impl Opt {

@@ -10,9 +10,6 @@ use serde::de::DeserializeOwned;
 
 use crate::error::{ErrorDomain, ErrorId};
 use crate::perp_anyhow;
-/// Marker trait to ensure all events are covered here
-/// by way of state.add_event()
-pub trait PerpEvent: Into<Event> {}
 
 /// Extension trait to add methods to native cosmwasm events
 pub trait CosmwasmEventExt {

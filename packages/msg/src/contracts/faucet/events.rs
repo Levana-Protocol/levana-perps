@@ -8,7 +8,6 @@ pub struct TapEvent {
     pub asset: FaucetAsset,
 }
 
-impl PerpEvent for TapEvent {}
 impl From<TapEvent> for cosmwasm_std::Event {
     fn from(src: TapEvent) -> Self {
         let evt = cosmwasm_std::Event::new("faucet-tap").add_attributes(vec![

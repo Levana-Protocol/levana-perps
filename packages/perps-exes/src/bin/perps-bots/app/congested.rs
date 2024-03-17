@@ -24,7 +24,7 @@ impl WatchedTask for Congestion {
 }
 
 async fn check(app: &App) -> Result<WatchedTaskOutput> {
-    let info = app.get_congested_info();
+    let info = app.get_congested_info().await;
     if info.is_congested() {
         Err(anyhow::anyhow!(
             "It appears that the Osmosis chain is congested. {info:?}",

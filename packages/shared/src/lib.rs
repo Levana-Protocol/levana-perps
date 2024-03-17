@@ -1,6 +1,7 @@
 //! Utilities common to all Levana contracts and Rust code
 
 #![deny(missing_docs)]
+#![deny(clippy::as_conversions)]
 
 /// Address Helpers
 pub mod cosmwasm;
@@ -13,6 +14,7 @@ pub mod result;
 
 pub(crate) mod addr;
 pub(crate) mod auth;
+pub mod compat;
 pub mod direction;
 pub mod ibc;
 pub mod leverage;

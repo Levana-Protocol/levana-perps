@@ -20,6 +20,7 @@ pyth:
       GBP_USD: 84c2dde9633d93d1bcad84e7dc41c9d56578b7ec52fabedc1f335d673df0a7c1
       USD_CNH: eef52e09c878ad41f6a81803e3640fe04dceea727de894edd4ea117e2e332e66
       XAU_USD: 765d2ba906dbc32ca17cc11f5310a89e9ee1f6420508c63861f2f8ba4ee34bb2
+      XAG_USD: f2fb02c32b055c805e7238d628e5e9dadef274376114eb1f012337cabe93871e
       BNB_USD: 2f95862b045670cd22bee3114c39763a4a08beeb663b145d283c31d7d1101c4f
       SOL_USD: ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d
       LINK_USD: 8ac0c70fff57e9aefdf5edf44b51d62c2d433653cbb2cf5cc06bb115af04d221
@@ -33,6 +34,7 @@ pyth:
       COIN_USD: fee33f2a978bf32dd6b662b65ba8083c6773b494f8401194ec1870c640860245
       PYTH_USD: 0bbf28e9a841a1cc788f6a361b17ca072d0ea3098a1e5df1c3922d06719579ff
       NTRN_USD: a8e6517966a52cb1df864b2764f3629fde3f21d2b640b5c572fcd654cbccd65e
+      DYM_USD: a9f3b2a89c6f85a6c20a9518abde39b944e839ca49a0c92307c65974d3f14a57
   edge: 
     update-age-tolerance: 21
     # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-edge
@@ -151,6 +153,30 @@ networks:
       feeds-usd: [
         !pyth { key: "SEI_USD", inverted: false }
       ]
+    BTC_SEI:
+      feeds: [
+        !pyth { key: "BTC_USD", inverted: false },
+        !pyth { key: "SEI_USD", inverted: true },
+      ]
+      feeds-usd: [
+        !pyth { key: "SEI_USD", inverted: false },
+      ]
+    ETH_SEI:
+      feeds: [
+        !pyth { key: "ETH_USD", inverted: false },
+        !pyth { key: "SEI_USD", inverted: true },
+      ]
+      feeds-usd: [
+        !pyth { key: "SEI_USD", inverted: false },
+      ]
+    SOL_SEI:
+      feeds: [
+        !pyth { key: "SOL_USD", inverted: false },
+        !pyth { key: "SEI_USD", inverted: true },
+      ]
+      feeds-usd: [
+        !pyth { key: "SEI_USD", inverted: false },
+      ]
   osmosis-mainnet:
     ATOM_USD:
       feeds: [
@@ -189,6 +215,13 @@ networks:
         !pyth { key: "ETH_USD", inverted: false }
       ]
     BTC_USD:
+      feeds: [
+        !pyth { key: "BTC_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !pyth { key: "BTC_USD", inverted: false }
+      ]
+    wBTC_USD:
       feeds: [
         !pyth { key: "BTC_USD", inverted: false }
       ]
@@ -265,6 +298,20 @@ networks:
       feeds-usd: [
         !constant { price: "1", inverted: false }
       ]
+    GOLD_USDC:
+      feeds: [
+        !pyth { key: "XAU_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    SILVER_USDC:
+      feeds: [
+        !pyth { key: "XAG_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
     BNB_USDC:
       feeds: [
         !pyth { key: "BNB_USD", inverted: false }
@@ -301,6 +348,36 @@ networks:
       ]
       feeds-usd: [
         !pyth { key: "TIA_USD", inverted: false}
+      ]
+    milkTIA_USD:
+      # Original contract from Milky Way team with inverted redemption rate
+      # stride-contract: osmo1jt34seu48rqe6acy9ew4fgzvg502mjmrggt00d8thn5fe2g32hjsmyy7p6
+      # Correction contract
+      stride-contract: osmo1j0qqgzu2520usq5580rcf8whcckuc7nlcy7k4hxwqkwg43n2zy9q4xnf2u
+      feeds: [
+        !pyth { key: "TIA_USD", inverted: false },
+        !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 43200 }
+      ]
+      feeds-usd: [
+        !pyth { key: "TIA_USD", inverted: false },
+        !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 43200 }
+      ]
+    stTIA_USD:
+      # This redemption rate feed updates slowly, so using 2 days of age tolerance
+      feeds: [
+        !stride { denom: "ibc/698350B8A61D575025F3ED13E9AC9C0F45C89DEFE92F76D5838F1D3C1A7FF7C9", inverted: false, age_tolerance: 172800 },
+        !pyth { key: "TIA_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !stride { denom: "ibc/698350B8A61D575025F3ED13E9AC9C0F45C89DEFE92F76D5838F1D3C1A7FF7C9", inverted: false, age_tolerance: 172800 },
+        !pyth { key: "TIA_USD", inverted: false }
+      ]
+    DYM_USD:
+      feeds: [
+        !pyth { key: "DYM_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !pyth { key: "DYM_USD", inverted: false }
       ]
     LINK_USDC:
       feeds: [
@@ -360,6 +437,15 @@ networks:
         !stride { denom: "ibc/D176154B0C63D1F9C6DCFB4F70349EBF2E2B5A87A05902F57A6AE92B863E9AEC", inverted: false, age_tolerance: 43200 },
         !pyth { key: "OSMO_USD", inverted: false }
       ]
+    stDYDX_USD:
+      feeds: [
+        !stride { denom: "ibc/980E82A9F8E7CA8CD480F4577E73682A6D3855A267D1831485D7EBEF0E7A6C2C", inverted: false, age_tolerance: 43200 },
+        !pyth { key: "DYDX_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !stride { denom: "ibc/980E82A9F8E7CA8CD480F4577E73682A6D3855A267D1831485D7EBEF0E7A6C2C", inverted: false, age_tolerance: 43200 },
+        !pyth { key: "DYDX_USD", inverted: false }
+      ]
     ryETH_USD:
       feeds: [
         !simple { contract: "osmo1556egspjm44k54mdqrwkatfrk6e4mzdeum3q32fp3d2lr95rh5cq0g2hcg", inverted: false, age_tolerance: 43200 },
@@ -372,6 +458,13 @@ networks:
     NTRN_USDC:
       feeds: [
         !pyth { key: "NTRN_USD", inverted: false },
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    CNH_USDC:
+      feeds: [
+        !pyth { key: "USD_CNH", inverted: true }
       ]
       feeds-usd: [
         !constant { price: "1", inverted: false }
@@ -428,6 +521,30 @@ networks:
       feeds-usd: [
         !constant { price: "1", inverted: false }
       ]
+    BTC_SEI:
+      feeds: [
+        !pyth { key: "BTC_USD", inverted: false },
+        !pyth { key: "SEI_USD", inverted: true },
+      ]
+      feeds-usd: [
+        !pyth { key: "SEI_USD", inverted: false },
+      ]
+    ETH_SEI:
+      feeds: [
+        !pyth { key: "ETH_USD", inverted: false },
+        !pyth { key: "SEI_USD", inverted: true },
+      ]
+      feeds-usd: [
+        !pyth { key: "SEI_USD", inverted: false },
+      ]
+    SOL_SEI:
+      feeds: [
+        !pyth { key: "SOL_USD", inverted: false },
+        !pyth { key: "SEI_USD", inverted: true },
+      ]
+      feeds-usd: [
+        !pyth { key: "SEI_USD", inverted: false },
+      ]
   osmosis-testnet:
     ATOM_USD:
       feeds: [
@@ -456,6 +573,19 @@ networks:
       feeds-usd: [
         !stride { denom: "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590", inverted: false, age_tolerance: 31536000 },
         !pyth { key: "OSMO_USD", inverted: false }
+      ]
+    milkTIA_USD:
+      # Real contract from Milky Way
+      # stride-contract: osmo1jlm7dglrwfk073r2mgta66sf27htceaklx0qprlm0pupfv632p6s3mzckj
+      # RR fix contract to correct inverted redemption rate
+      stride-contract: osmo1qemh23s4qwymxyzqs0puhle60djhtytjhvv4ghdfdf0x9tgkapss6q6sj8
+      feeds: [
+        !pyth { key: "TIA_USD", inverted: false },
+        !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 31536000 }
+      ]
+      feeds-usd: [
+        !pyth { key: "TIA_USD", inverted: false },
+        !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 31536000 }
       ]
     OSMO_USDC:
       feeds: [
@@ -487,6 +617,13 @@ networks:
         !pyth { key: "ETH_USD", inverted: false },
       ]
     BTC_USD:
+      feeds: [
+        !pyth { key: "BTC_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !pyth { key: "BTC_USD", inverted: false }
+      ]
+    wBTC_USD:
       feeds: [
         !pyth { key: "BTC_USD", inverted: false }
       ]
@@ -552,6 +689,13 @@ networks:
     GOLD_USDC:
       feeds: [
         !pyth { key: "XAU_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    SILVER_USDC:
+      feeds: [
+        !pyth { key: "XAG_USD", inverted: false }
       ]
       feeds-usd: [
         !constant { price: "1", inverted: false }
@@ -635,4 +779,33 @@ networks:
       ]
       feeds-usd: [
         !constant { price: "1", inverted: false }
+      ]
+    stDYDX_USD:
+      # Intentionally using the wrong Stride info here, for testnet we just want some contract that will respond with any redemption rate.
+      stride-contract: osmo1jlm7dglrwfk073r2mgta66sf27htceaklx0qprlm0pupfv632p6s3mzckj
+      feeds: [
+        !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 31536000 },
+        !pyth { key: "DYDX_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 31536000 },
+        !pyth { key: "DYDX_USD", inverted: false }
+      ]
+    stTIA_USD:
+      # Intentionally using the wrong Stride info here, for testnet we just want some contract that will respond with any redemption rate.
+      stride-contract: osmo1jlm7dglrwfk073r2mgta66sf27htceaklx0qprlm0pupfv632p6s3mzckj
+      feeds: [
+        !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 31536000 },
+        !pyth { key: "TIA_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 31536000 },
+        !pyth { key: "TIA_USD", inverted: false }
+      ]
+    DYM_USD:
+      feeds: [
+        !pyth { key: "DYM_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !pyth { key: "DYM_USD", inverted: false }
       ]

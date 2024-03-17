@@ -181,6 +181,11 @@ hashes:
     sei-mainnet: 893
   hash: 8fb10aa5e47135d8558b79908687a67a4d2ee1c723583f6b22b54f4fdd8a872d
 - contract-type: market
+  gitrev: 2d2d3fdb0c176a950d2220ca09da4397824c4cf5
+  code-ids:
+    sei-mainnet: 1419
+  hash: fa2284c758270af3f546606b0240cc4da7ab1453d8a6aa541e9f08e65877b55c
+- contract-type: market
   gitrev: 1346f54ba2f2517f8b10b584f72e7929b38bb2d8
   code-ids:
     sei-mainnet: 3989
@@ -190,5 +195,4 @@ hashes:
   code-ids:
     osmosis-mainnet: 636
     sei-mainnet: 3997
-    injective-mainnet: 585
   hash: 0ed657e06e10763f2775f534d2bb2bf2f341bcf07d77b4fac108a68a12ef959c

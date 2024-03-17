@@ -293,12 +293,12 @@ fn position_update_max_gains() {
             perform_update(
                 DirectionToBase::Long,
                 max_gains,
-                "496.699996670471841705".parse().unwrap(),
+                "496.699999999999999989".parse().unwrap(),
             );
             perform_update(
                 DirectionToBase::Short,
                 max_gains,
-                "496.699996670471841705".parse().unwrap(),
+                "496.699999999999999989".parse().unwrap(),
             );
         }
         MarketType::CollateralIsBase => {
@@ -310,7 +310,7 @@ fn position_update_max_gains() {
             perform_update(
                 DirectionToBase::Short,
                 max_gains,
-                "1080.875958405433354248".parse().unwrap(),
+                "1080.875983250866657727".parse().unwrap(),
             );
         }
     }
@@ -323,12 +323,12 @@ fn position_update_max_gains() {
             perform_update(
                 DirectionToBase::Long,
                 max_gains,
-                "198.679998668188736682".parse().unwrap(),
+                "198.679999999999999995".parse().unwrap(),
             );
             perform_update(
                 DirectionToBase::Short,
                 max_gains,
-                "198.679998668188736682".parse().unwrap(),
+                "198.679999999999999995".parse().unwrap(),
             );
         }
         MarketType::CollateralIsBase => {
@@ -340,7 +340,7 @@ fn position_update_max_gains() {
             perform_update(
                 DirectionToBase::Short,
                 max_gains,
-                "271.992259356357591301".parse().unwrap(),
+                "271.992263289575023781".parse().unwrap(),
             );
         }
     }
@@ -396,12 +396,15 @@ fn position_update_open_interest_inner(
     let updated_pos = market.query_position(pos.id).unwrap();
     let (notional_size_to_check, other_notional_size) = query_notional_interest();
 
-    assert_eq!(
-        expected_notional_size_updated.abs(),
-        notional_size_to_check.into_signed()
-    );
+    assert!(expected_notional_size_updated
+        .abs()
+        .into_number()
+        .approx_eq(notional_size_to_check.into_number()));
     assert_eq!(Notional::zero(), other_notional_size);
-    assert_eq!(updated_pos.notional_size, expected_notional_size_updated);
+    assert!(updated_pos
+        .notional_size
+        .into_number()
+        .approx_eq(expected_notional_size_updated.into_number()));
 
     market.exec_close_position(&trader, pos_id, None).unwrap();
     let _pos = market.query_closed_position(&trader, pos.id).unwrap();
@@ -842,7 +845,7 @@ fn position_update_max_gains_perp_666() {
 
     let pos = market.query_position(pos_id).unwrap();
 
-    assert_ne!(pos1.max_gains_in_quote, pos.max_gains_in_quote);
+    assert_ne!(pos1.take_profit_total_base, pos.take_profit_total_base);
 }
 
 #[test]

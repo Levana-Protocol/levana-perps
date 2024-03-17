@@ -15,6 +15,12 @@ use super::{entry::SlippageAssert, order::OrderId, position::PositionId};
 #[derive(Copy, PartialOrd, Ord, Eq)]
 pub struct DeferredExecId(Uint64);
 
+impl std::hash::Hash for DeferredExecId {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.u64().hash(state);
+    }
+}
+
 impl DeferredExecId {
     /// First ID issued. We start with 1 instead of 0 for user friendliness.
     pub fn first() -> Self {
@@ -130,6 +136,8 @@ pub enum DeferredExecStatus {
         reason: String,
         /// Timestamp when it failed execution
         executed: Timestamp,
+        /// Price point when it was cranked, if applicable
+        crank_price: Option<PricePoint>,
     },
 }
 
@@ -174,11 +182,13 @@ pub enum DeferredExecItem {
         /// Direction of new position
         direction: DirectionToBase,
         /// Maximum gains of new position
-        max_gains: MaxGainsInQuote,
+        #[deprecated(note = "use take_profit instead")]
+        max_gains: Option<MaxGainsInQuote>,
         /// Stop loss price of new position
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
-        take_profit_override: Option<PriceBaseInQuote>,
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<TakeProfitTrader>,
         /// The amount of collateral provided
         amount: NonZero<Collateral>,
         /// Crank fee already charged
@@ -248,6 +258,14 @@ pub enum DeferredExecItem {
         max_gains: MaxGainsInQuote,
     },
 
+    /// Modify the take profit price of a position
+    UpdatePositionTakeProfitPrice {
+        /// ID of position to update
+        id: PositionId,
+        /// New take profit price of the position
+        price: TakeProfitTrader,
+    },
+
     /// Close a position
     ClosePosition {
         /// ID of position to close
@@ -257,15 +275,16 @@ pub enum DeferredExecItem {
     },
 
     /// Set a stop loss or take profit override.
-    /// This msg will override any previous values.
-    /// Passing None will remove the override.
     SetTriggerOrder {
         /// ID of position to modify
         id: PositionId,
         /// New stop loss price of the position
+        /// Passing None will remove the override.
         stop_loss_override: Option<PriceBaseInQuote>,
-        /// New take profit price of the position
-        take_profit_override: Option<PriceBaseInQuote>,
+        /// New take_profit price of the position
+        /// Passing None will bypass changing this
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<TakeProfitTrader>,
     },
 
     /// Set a limit order to open a position when the price of the asset hits
@@ -277,12 +296,14 @@ pub enum DeferredExecItem {
         leverage: LeverageToBase,
         /// Direction of new position
         direction: DirectionToBase,
-        /// Max gains of new position
-        max_gains: MaxGainsInQuote,
+        /// Maximum gains of new position
+        #[deprecated(note = "use take_profit instead")]
+        max_gains: Option<MaxGainsInQuote>,
         /// Stop loss price of new position
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
-        take_profit_override: Option<PriceBaseInQuote>,
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<TakeProfitTrader>,
         /// The amount of collateral provided
         amount: NonZero<Collateral>,
         /// Crank fee already charged
@@ -363,6 +384,9 @@ impl DeferredExecItem {
             DeferredExecItem::UpdatePositionMaxGains { id, .. } => {
                 DeferredExecTarget::Position(*id)
             }
+            DeferredExecItem::UpdatePositionTakeProfitPrice { id, .. } => {
+                DeferredExecTarget::Position(*id)
+            }
             DeferredExecItem::ClosePosition { id, .. } => DeferredExecTarget::Position(*id),
             DeferredExecItem::SetTriggerOrder { id, .. } => DeferredExecTarget::Position(*id),
             DeferredExecItem::PlaceLimitOrder { .. } => DeferredExecTarget::DoesNotExist,
@@ -381,6 +405,7 @@ impl DeferredExecItem {
             | DeferredExecItem::UpdatePositionRemoveCollateralImpactSize { .. }
             | DeferredExecItem::UpdatePositionLeverage { .. }
             | DeferredExecItem::UpdatePositionMaxGains { .. }
+            | DeferredExecItem::UpdatePositionTakeProfitPrice { .. }
             | DeferredExecItem::ClosePosition { .. }
             | DeferredExecItem::SetTriggerOrder { .. }
             | DeferredExecItem::CancelLimitOrder { .. } => Collateral::zero(),

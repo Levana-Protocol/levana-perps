@@ -141,7 +141,6 @@ pub mod events {
         pub protocol_amount_usd: Usd,
     }
 
-    impl PerpEvent for FeeEvent {}
     impl From<FeeEvent> for Event {
         fn from(
             FeeEvent {
@@ -212,14 +211,18 @@ pub mod events {
         pub direction: DirectionToBase,
     }
 
-    impl PerpEvent for FundingPaymentEvent {}
-    impl From<FundingPaymentEvent> for Event {
-        fn from(src: FundingPaymentEvent) -> Self {
+    impl From<&FundingPaymentEvent> for Event {
+        fn from(src: &FundingPaymentEvent) -> Self {
             Event::new("funding-payment")
                 .add_attribute("pos-id", src.pos_id.to_string())
                 .add_attribute("amount", src.amount.to_string())
                 .add_attribute("amount-usd", src.amount_usd.to_string())
                 .add_attribute(event_key::DIRECTION, src.direction.as_str())
+        }
+    }
+    impl From<FundingPaymentEvent> for Event {
+        fn from(src: FundingPaymentEvent) -> Self {
+            (&src).into()
         }
     }
 
@@ -246,7 +249,6 @@ pub mod events {
         pub short_rate_base: Number,
     }
 
-    impl PerpEvent for FundingRateChangeEvent {}
     impl From<FundingRateChangeEvent> for Event {
         fn from(
             FundingRateChangeEvent {
@@ -285,8 +287,6 @@ pub mod events {
         /// Amount paid to xLP holders
         pub xlp_rate: Decimal256,
     }
-
-    impl PerpEvent for BorrowFeeChangeEvent {}
 
     impl From<BorrowFeeChangeEvent> for Event {
         fn from(
@@ -332,7 +332,6 @@ pub mod events {
         pub new_balance: Collateral,
     }
 
-    impl PerpEvent for CrankFeeEvent {}
     impl From<CrankFeeEvent> for Event {
         fn from(
             CrankFeeEvent {
@@ -392,7 +391,6 @@ pub mod events {
         pub amount_usd: NonZero<Usd>,
     }
 
-    impl PerpEvent for CrankFeeEarnedEvent {}
     impl From<CrankFeeEarnedEvent> for Event {
         fn from(
             CrankFeeEarnedEvent {
@@ -432,7 +430,7 @@ pub mod events {
         /// Description of what happened
         pub desc: Option<String>,
     }
-    impl From<InsufficientMarginEvent> for Event {
+    impl From<&InsufficientMarginEvent> for Event {
         fn from(
             InsufficientMarginEvent {
                 pos,
@@ -440,7 +438,7 @@ pub mod events {
                 available,
                 requested,
                 desc,
-            }: InsufficientMarginEvent,
+            }: &InsufficientMarginEvent,
         ) -> Self {
             let evt = Event::new(event_key::INSUFFICIENT_MARGIN)
                 .add_attribute(event_key::POS_ID, pos.to_string())
@@ -453,7 +451,11 @@ pub mod events {
             }
         }
     }
-    impl PerpEvent for InsufficientMarginEvent {}
+    impl From<InsufficientMarginEvent> for Event {
+        fn from(event: InsufficientMarginEvent) -> Self {
+            (&event).into()
+        }
+    }
 
     /// Fee type which can have insufficient margin available
     #[derive(Clone, Copy, PartialEq, Eq, Debug)]

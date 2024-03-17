@@ -1,17 +1,12 @@
-use std::path::PathBuf;
-
 use anyhow::Result;
-use cosmos::{Address, Cosmos, HasAddress, TxBuilder};
-use cosmwasm_std::{from_binary, to_binary, CosmosMsg, Empty, WasmMsg};
+use cosmos::{HasAddress, TxBuilder};
+use cosmwasm_std::{to_binary, CosmosMsg, Empty, WasmMsg};
 use msg::prelude::*;
-use perps_exes::{
-    config::{ChainConfig, PriceConfig},
-    contracts::{ConfiguredCodeIds, Factory},
-};
+use perps_exes::contracts::{ConfiguredCodeIds, Factory};
 
-use crate::{cli::Opt, mainnet::get_spot_price_config, util::add_cosmos_msg};
+use crate::{cli::Opt, util::add_cosmos_msg};
 
-use super::{CodeIds, ContractType, MainnetFactories};
+use super::MainnetFactories;
 
 #[derive(clap::Parser)]
 pub(super) struct MigrateOpts {
@@ -47,10 +42,6 @@ async fn go(
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
-
-    let chain_config = ChainConfig::load(None::<PathBuf>, factory.network)?;
-    let price_config = PriceConfig::load(None::<PathBuf>)?;
-    let oracle = opt.get_oracle_info(&chain_config, &price_config, factory.network)?;
 
     let factory = app.cosmos.make_contract(factory.address);
     let current_factory_code_id = factory.info().await?.code_id;
@@ -128,7 +119,6 @@ async fn go(
         let lp = market.liquidity_token_lp;
         let xlp = market.liquidity_token_xlp;
         let pos = market.position_token;
-        let market_id = market.market_id;
         let market = market.market;
         let info = market.info().await?;
         anyhow::ensure!(info.admin == migration_admin.get_address_string(), "Invalid migration admin set up. Factory says: {migration_admin}. But market contract {market} has {}.", info.admin);

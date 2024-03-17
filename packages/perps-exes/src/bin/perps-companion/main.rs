@@ -1,3 +1,5 @@
+#![deny(clippy::as_conversions)]
+
 mod app;
 mod cli;
 mod db;

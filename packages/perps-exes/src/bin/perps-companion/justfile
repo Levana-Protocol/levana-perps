@@ -35,3 +35,7 @@ post-test:
 # Test by fetching html of above post
 get-test:
 	curl --verbose http://localhost:3000/pnl/1000
+
+# Run image
+run-remote-image:
+	docker run --name comp --net=host -p 3000:3000 --rm -it ghcr.io/levana-protocol/levana-perps/companion:023e218903f69b079bbb8812ab18c4da732c410e --app-environment test --app-version test perps-companion uri -- --postgres-uri postgresql://postgres:postgres@localhost/companion

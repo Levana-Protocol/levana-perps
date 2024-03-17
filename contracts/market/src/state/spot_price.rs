@@ -50,13 +50,13 @@ pub(crate) struct PriceStorage {
 /// internal struct for satisfying both OraclePrice queries and spot price storage
 pub(crate) struct OraclePriceInternal {
     /// A map of each pyth id used in this market to the price and publish time
-    pub pyth: BTreeMap<PriceIdentifier, OraclePriceFeedPythResp>,
+    pub(crate) pyth: BTreeMap<PriceIdentifier, OraclePriceFeedPythResp>,
     /// A map of each sei denom used in this market to the price
-    pub sei: BTreeMap<String, OraclePriceFeedSeiResp>,
+    pub(crate) sei: BTreeMap<String, OraclePriceFeedSeiResp>,
     /// A map of each stride denom used in this market to the redemption price
-    pub stride: BTreeMap<String, OraclePriceFeedStrideResp>,
+    pub(crate) stride: BTreeMap<String, OraclePriceFeedStrideResp>,
     /// A map of each simple contract used in this market to the redemption price
-    pub simple: BTreeMap<Addr, OraclePriceFeedSimpleResp>,
+    pub(crate) simple: BTreeMap<Addr, OraclePriceFeedSimpleResp>,
 }
 
 impl OraclePriceInternal {
@@ -114,7 +114,7 @@ impl OraclePriceInternal {
         }
     }
 
-    pub fn compose_price(
+    pub(crate) fn compose_price(
         &self,
         market_id: &MarketId,
         feeds: &[SpotPriceFeed],
@@ -141,7 +141,7 @@ impl OraclePriceInternal {
     }
 
     // given a list of feeds, compose them into a single price and publish_time (if available)
-    pub fn compose_price_feeds(&self, feeds: &[SpotPriceFeed]) -> Result<NumberGtZero> {
+    pub(crate) fn compose_price_feeds(&self, feeds: &[SpotPriceFeed]) -> Result<NumberGtZero> {
         let mut acc_price: Option<Number> = None;
 
         for SpotPriceFeed {
@@ -332,10 +332,14 @@ impl State<'_> {
                 self.make_price_point(store, timestamp, price_storage)
             });
 
-        let prices = match limit {
-            None => iter.collect::<Result<Vec<_>>>()?,
-            Some(limit) => iter.take(limit).collect::<Result<Vec<_>>>()?,
-        };
+        const DEFAULT_LIMIT: usize = 20;
+        let prices = iter
+            .take(
+                limit
+                    .unwrap_or(DEFAULT_LIMIT)
+                    .min(usize::try_from(QUERY_MAX_LIMIT)?),
+            )
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(prices)
     }
@@ -433,7 +437,14 @@ impl State<'_> {
             .next()
         {
             // No prices published yet, so we're allowed to use this timestamp
-            None => (),
+            None => {
+                // niche case of the first oracle price point being earlier than our instantiation time
+                // we need to wait for the oracle price to move further into the future
+                // because that time is used in initialize_borrow_fee_rate() (as now())
+                if new_publish_time < self.instantiation_time(ctx.storage)? {
+                    bail!("Cannot use a spot price publish time earlier than the contract instantiation time");
+                }
+            }
             Some(last_published) => {
                 if last_published? >= new_publish_time {
                     // New publish time is not newer that the last published time, do not add a new spot price
@@ -608,9 +619,9 @@ impl State<'_> {
 
                                 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
                                 #[serde(rename_all = "snake_case")]
-                                pub struct RedemptionRateResponse {
-                                    pub redemption_rate: Decimal256,
-                                    pub update_time: u64,
+                                struct RedemptionRateResponse {
+                                    redemption_rate: Decimal256,
+                                    update_time: u64,
                                 }
 
                                 let resp: RedemptionRateResponse = self.querier.query_wasm_smart(

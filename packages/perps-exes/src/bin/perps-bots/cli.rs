@@ -46,14 +46,14 @@ pub(crate) struct Opt {
         env = "LEVANA_BOTS_PYTH_ENDPOINT_STABLE",
         default_value = "https://hermes.pyth.network/"
     )]
-    pub(crate) pyth_endpoint_stable: String,
+    pub(crate) pyth_endpoint_stable: reqwest::Url,
     /// The edge Pyth endpoint
     #[clap(
         long,
         env = "LEVANA_BOTS_PYTH_ENDPOINT_EDGE",
         default_value = "https://hermes-beta.pyth.network/"
     )]
-    pub(crate) pyth_endpoint_edge: String,
+    pub(crate) pyth_endpoint_edge: reqwest::Url,
     /// List of markets that should be ignored
     #[clap(long, env = "LEVANA_BOTS_IGNORED_MARKETS", value_delimiter = ',')]
     pub(crate) ignored_markets: Vec<MarketId>,
@@ -63,6 +63,28 @@ pub(crate) struct Opt {
     /// Body length limit in bytes. Default is 1MB (Same as Nginx)
     #[clap(long, env = "LEVANA_BOTS_BODY_LIMIT", default_value_t = 1024000)]
     pub(crate) request_body_limit_bytes: usize,
+    /// How many blocks we're allowed to lag before we raise an error
+    #[clap(long, env = "LEVANA_BOTS_BLOCK_LAG_ALLOWED")]
+    pub(crate) block_lag_allowed: Option<u32>,
+    /// How many blocks we're allowed to lag before we raise an error
+    #[clap(long, env = "LEVANA_BOTS_BLOCK_AGE_ALLOWED")]
+    pub(crate) block_age_allowed: Option<u64>,
+    /// Referer header to denote resource requesting it
+    #[clap(
+        long,
+        env = "LEVANA_BOTS_REFERER_HEADER",
+        default_value = "https://bots.levana.exchange/"
+    )]
+    pub(crate) referer_header: reqwest::Url,
+    /// Disable optional services
+    #[clap(long, env = "LEVANA_BOTS_DISABLE_OPTIONAL_SERVICES")]
+    pub(crate) disable_optional_services: bool,
+    /// Price bot delay in milliseconds
+    #[clap(long, env = "LEVANA_BOTS_PRICE_BOT_DELAY_MILLIS")]
+    pub(crate) price_bot_delay: Option<u64>,
+    /// Log every query made by the system?
+    #[clap(long, env = "LEVANA_BOTS_LOG_REQUESTS")]
+    pub(crate) log_requests: bool,
 }
 
 #[derive(clap::Parser, Clone)]

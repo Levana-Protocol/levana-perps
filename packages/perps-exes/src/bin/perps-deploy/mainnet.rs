@@ -1,42 +1,34 @@
 mod check_price_feed_health;
 mod close_all_positions;
 mod contracts_csv;
+mod fees_paid;
 mod migrate;
+mod rewards;
 mod send_treasury;
 mod sync_config;
 mod transfer_dao_fees;
 mod update_config;
 mod wind_down;
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    path::PathBuf,
-};
+use std::{collections::BTreeMap, path::PathBuf};
 
-use chrono::{DateTime, Utc};
-use cosmos::{Address, ContractAdmin, CosmosNetwork, HasAddress, TxBuilder};
+use chrono::Utc;
+use cosmos::{Address, ContractAdmin, Cosmos, CosmosNetwork, HasAddress, TxBuilder};
 use cosmwasm_std::{to_binary, CosmosMsg, Empty};
-use msg::{
-    contracts::market::{
-        entry::NewMarketParams,
-        spot_price::{
-            PythConfigInit, PythPriceServiceNetwork, SpotPriceConfigInit, StrideConfigInit,
-        },
-    },
-    token::TokenInit,
+use msg::contracts::market::{
+    entry::NewMarketParams,
+    spot_price::{SpotPriceConfigInit, SpotPriceFeedDataInit},
 };
 use perps_exes::{
     config::{
-        ChainConfig, ConfigUpdateAndBorrowFee, MainnetFactories, MainnetFactory,
-        MarketConfigUpdates, NativeAsset, PriceConfig,
+        ChainConfig, ConfigUpdateAndBorrowFee, CrankFeeConfig, MainnetFactories, MainnetFactory,
+        MarketConfigUpdates, PriceConfig,
     },
     contracts::Factory,
     prelude::*,
 };
 
-use crate::{
-    app::OracleInfo, cli::Opt, spot_price_config::get_spot_price_config, util::get_hash_for_path,
-};
+use crate::{cli::Opt, spot_price_config::get_spot_price_config, util::get_hash_for_path};
 
 use self::{
     check_price_feed_health::CheckPriceFeedHealthOpts, close_all_positions::CloseAllPositionsOpts,
@@ -52,6 +44,7 @@ pub(crate) struct MainnetOpt {
 }
 
 #[derive(clap::Parser)]
+#[allow(clippy::large_enum_variant)]
 enum Sub {
     /// Store all perps contracts on chain
     StorePerpsContracts {
@@ -123,6 +116,16 @@ enum Sub {
         #[clap(flatten)]
         inner: CloseAllPositionsOpts,
     },
+    /// Collect rewards in all markets in a mainnet factory
+    Rewards {
+        #[clap(flatten)]
+        inner: rewards::RewardsOpts,
+    },
+    /// Produce a report on fees paid by a wallet across a factory
+    FeesPaid {
+        #[clap(flatten)]
+        inner: fees_paid::FeesPaidOpts,
+    },
 }
 
 pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
@@ -148,6 +151,8 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
         Sub::ContractsCsv { inner } => inner.go(opt).await?,
         Sub::CheckPriceFeedHealth { inner } => inner.go(opt).await?,
         Sub::CloseAllPositions { inner } => inner.go(opt).await?,
+        Sub::Rewards { inner } => inner.go(opt).await?,
+        Sub::FeesPaid { inner } => inner.go(opt).await?,
     }
     Ok(())
 }
@@ -210,27 +215,6 @@ impl CodeIds {
         network: CosmosNetwork,
     ) -> Result<u64> {
         self.get(contract_type, opt, network).map(|x| x.code_id)
-    }
-
-    fn get_by_gitrev(
-        &self,
-        contract_type: ContractType,
-        network: CosmosNetwork,
-        gitrev: &str,
-    ) -> Result<u64> {
-        let mut iter = self
-            .hashes
-            .iter()
-            .filter(|x| x.gitrev == gitrev && x.contract_type == contract_type)
-            .flat_map(|x| x.code_ids.get(&network).copied());
-        let first = iter
-            .next()
-            .with_context(|| format!("No {contract_type:?} contract found for gitrev {gitrev}"))?;
-        anyhow::ensure!(
-            iter.next().is_none(),
-            "Found multiple {contract_type:?} contracts for gitrev {gitrev}"
-        );
-        Ok(first)
     }
 }
 
@@ -482,20 +466,11 @@ struct AddMarketOpts {
     factory: String,
     /// New market ID to add
     #[clap(long)]
-    market_id: MarketId,
+    market_id: Vec<MarketId>,
 }
 
 async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpts) -> Result<()> {
-    let ConfigUpdateAndBorrowFee {
-        config: market_config_update,
-        initial_borrow_fee_rate,
-    } = {
-        let mut market_config_updates = MarketConfigUpdates::load(&opt.market_config)?;
-        market_config_updates
-            .markets
-            .remove(&market_id)
-            .with_context(|| format!("No config update found for market ID: {market_id}"))?
-    };
+    let market_config_updates = MarketConfigUpdates::load(&opt.market_config)?;
 
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
@@ -504,47 +479,75 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpt
     let price_config = PriceConfig::load(None::<PathBuf>)?;
     let oracle = opt.get_oracle_info(&chain_config, &price_config, factory.network)?;
 
-    let collateral_name = market_id.get_collateral();
-    let token = chain_config
-        .assets
-        .get(collateral_name)
-        .with_context(|| {
-            format!(
-                "No definition for asset {collateral_name} for network {}",
-                factory.network
-            )
-        })?
-        .into();
+    let mut simtx = TxBuilder::default();
+    let mut msgs = vec![];
 
-    let msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
-        new_market: NewMarketParams {
-            spot_price: get_spot_price_config(&oracle, &price_config, &market_id)?,
-            market_id,
-            token,
-            config: Some(market_config_update),
-            initial_borrow_fee_rate,
-            initial_price: None,
-        },
-    };
-    let msg = strip_nulls(msg)?;
+    let network = factory.network;
     let factory = app.cosmos.make_contract(factory.address);
-
     let factory = Factory::from_contract(factory);
-    log::info!("Need to make a proposal");
-
     let owner = factory.query_owner().await?;
-    log::info!("CW3 contract: {owner}");
-    log::info!(
-        "Message: {}",
-        serde_json::to_string(&CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
+
+    for market_id in market_id {
+        let ConfigUpdateAndBorrowFee {
+            config: mut market_config_update,
+            initial_borrow_fee_rate,
+        } = {
+            market_config_updates
+                .markets
+                .get(&market_id)
+                .cloned()
+                .with_context(|| format!("No config update found for market ID: {market_id}"))?
+        };
+        let CrankFeeConfig {
+            charged,
+            surcharge,
+            reward,
+        } = market_config_updates
+            .crank_fees
+            .get(&network)
+            .with_context(|| format!("No crank fee config found for network {network}"))?;
+        market_config_update.crank_fee_charged = Some(*charged);
+        market_config_update.crank_fee_surcharge = Some(*surcharge);
+        market_config_update.crank_fee_reward = Some(*reward);
+
+        let collateral_name = market_id.get_collateral();
+        let token = chain_config
+            .assets
+            .get(collateral_name)
+            .with_context(|| {
+                format!("No definition for asset {collateral_name} for network {network}",)
+            })?
+            .into();
+
+        let spot_price = get_spot_price_config(&oracle, &market_id)?;
+        validate_spot_price_config(&app.cosmos, &spot_price, &market_id).await?;
+
+        let msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
+            new_market: NewMarketParams {
+                spot_price,
+                market_id,
+                token,
+                config: Some(market_config_update),
+                initial_borrow_fee_rate,
+                initial_price: None,
+            },
+        };
+        let msg = strip_nulls(msg)?;
+
+        simtx.add_execute_message(&factory, owner, vec![], &msg)?;
+        msgs.push(CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
             contract_addr: factory.to_string(),
             msg: to_binary(&msg)?,
-            funds: vec![]
-        }))?
-    );
+            funds: vec![],
+        }));
+    }
 
-    let simres = TxBuilder::default()
-        .add_execute_message(factory, owner, vec![], &msg)?
+    log::info!("Need to make a proposal");
+
+    log::info!("CW3 contract: {owner}");
+    log::info!("Message: {}", serde_json::to_string(&msgs)?);
+
+    let simres = simtx
         .simulate(&app.cosmos, &[owner])
         .await
         .context("Could not simulate message")?;
@@ -552,6 +555,82 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpt
     log::debug!("Simulation response: {simres:?}");
 
     Ok(())
+}
+
+async fn validate_spot_price_config(
+    cosmos: &Cosmos,
+    spot_price: &SpotPriceConfigInit,
+    market_id: &MarketId,
+) -> Result<()> {
+    log::info!("Validating spot price config for {market_id}");
+
+    match spot_price {
+        SpotPriceConfigInit::Manual { .. } => {
+            anyhow::bail!("Unsupported manual price config for {market_id}")
+        }
+        SpotPriceConfigInit::Oracle {
+            pyth: _,
+            stride,
+            feeds,
+            feeds_usd,
+            volatile_diff_seconds: _,
+        } => {
+            for feed in feeds.iter().chain(feeds_usd.iter()) {
+                match &feed.data {
+                    // No need to check the constant feed
+                    SpotPriceFeedDataInit::Constant { price: _ } => (),
+                    SpotPriceFeedDataInit::Pyth {
+                        id: _,
+                        age_tolerance_seconds: _,
+                    } => {
+                        // In theory could do some sanity checking of the Pyth
+                        // feeds here, but that's usually well handled via testnet testing. Skipping for
+                        // now.
+                    }
+                    SpotPriceFeedDataInit::Stride {
+                        denom,
+                        age_tolerance_seconds: _,
+                    } => {
+                        #[derive(serde::Serialize)]
+                        #[serde(rename_all = "snake_case")]
+                        enum StrideQuery<'a> {
+                            RedemptionRate { denom: &'a str },
+                        }
+
+                        let stride = stride.as_ref().with_context(|| format!("Using a Stride feed with denom {denom}, but no Stride contract configured"))?;
+                        let stride =
+                            cosmos.make_contract(stride.contract_address.as_str().parse()?);
+                        let res: serde_json::Value =
+                            stride.query(StrideQuery::RedemptionRate { denom }).await?;
+                        log::info!(
+                            "Queried Stride contract {stride} with denom {denom}, got result {}",
+                            serde_json::to_string(&res)?
+                        );
+                    }
+                    SpotPriceFeedDataInit::Sei { denom } => anyhow::bail!(
+                        "No longer supporting Sei native oracle, provided denom is: {denom}"
+                    ),
+                    SpotPriceFeedDataInit::Simple {
+                        contract,
+                        age_tolerance_seconds: _,
+                    } => {
+                        #[derive(serde::Serialize)]
+                        #[serde(rename_all = "snake_case")]
+                        enum SimpleQuery {
+                            Price {},
+                        }
+                        let contract = cosmos.make_contract(contract.as_str().parse()?);
+                        let res: serde_json::Value = contract.query(SimpleQuery::Price {}).await?;
+                        log::info!(
+                            "Queried simple contract {contract}, got result {}",
+                            serde_json::to_string(&res)?
+                        );
+                    }
+                }
+            }
+            Ok(())
+        }
+    }
 }
 
 pub(crate) fn strip_nulls<T: serde::Serialize>(x: T) -> Result<serde_json::Value> {

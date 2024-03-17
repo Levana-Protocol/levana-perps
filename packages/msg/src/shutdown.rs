@@ -107,6 +107,7 @@ impl ShutdownImpact {
             ExecuteMsg::UpdatePositionRemoveCollateralImpactSize { .. } => Some(Self::NewTrades),
             ExecuteMsg::UpdatePositionLeverage { .. } => Some(Self::NewTrades),
             ExecuteMsg::UpdatePositionMaxGains { .. } => Some(Self::NewTrades),
+            ExecuteMsg::UpdatePositionTakeProfitPrice { .. } => Some(Self::NewTrades),
             ExecuteMsg::SetTriggerOrder { .. } => Some(Self::NewTrades),
             ExecuteMsg::ClosePosition { .. } => Some(Self::ClosePositions),
             ExecuteMsg::DepositLiquidity { .. } => Some(Self::DepositLiquidity),

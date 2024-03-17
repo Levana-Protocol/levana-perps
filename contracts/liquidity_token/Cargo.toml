@@ -35,4 +35,4 @@ anyhow = "1.0.67"
 cw-utils = "1.0.1"
 
 [dev-dependencies]
-cosmwasm-schema = "1.1.9"
+cosmwasm-schema = {git = "https://github.com/Levana-Protocol/cosmwasm.git", rev = "6e36567b8359214f6690c8de081bb1e237803fb1", features=["allow-unknown-fields"] }

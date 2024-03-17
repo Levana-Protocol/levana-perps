@@ -40,6 +40,6 @@ pyth-sdk-cw = "1.2.0"
 sei-cosmwasm = { version = "0.4.12", optional = true }
 
 [dev-dependencies]
-cosmwasm-schema = "1.1.9"
+cosmwasm-schema = {git = "https://github.com/Levana-Protocol/cosmwasm.git", rev = "6e36567b8359214f6690c8de081bb1e237803fb1", features=["allow-unknown-fields"] }
 shared = {package = "levana_perpswap_cosmos_shared", path = "../../packages/shared", features = ["debug_log"] }
 proptest = "1.0.0"

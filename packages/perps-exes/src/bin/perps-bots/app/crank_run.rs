@@ -18,10 +18,11 @@ use std::time::Instant;
 use anyhow::{Context, Result};
 use axum::async_trait;
 
+use chrono::Duration;
 use cosmos::proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
 use msg::prelude::MarketExecuteMsg;
-use perps_exes::prelude::MarketContract;
+use perps_exes::prelude::{MarketContract, MarketId};
 
 use crate::app::CrankTriggerReason;
 use crate::util::misc::track_tx_fees;
@@ -30,7 +31,7 @@ use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 use self::trigger_crank::{CrankReceiver, CrankWorkItem};
 
 use super::gas_check::GasCheckWallet;
-use super::{App, AppBuilder};
+use super::{App, AppBuilder, GasLevel};
 pub(crate) use trigger_crank::TriggerCrank;
 
 struct Worker {
@@ -87,7 +88,6 @@ impl App {
         crank_wallet: &Wallet,
         recv: &CrankReceiver,
     ) -> Result<WatchedTaskOutput> {
-        // Wait for up to 20 seconds for new work to appear. If it doesn't, update our status message that no cranking was needed.
         let CrankWorkItem {
             address: market,
             id: market_id,
@@ -95,15 +95,11 @@ impl App {
             reason,
             queued,
             received,
-        } = match recv.receive_with_timeout().await {
-            None => {
-                return Ok(WatchedTaskOutput::new("No crank work needed").suppress());
-            }
-            Some(crank_needed) => crank_needed,
-        };
-
+        } = recv.receive_work().await?;
         let start_crank = Instant::now();
-        let run_result = self.crank(crank_wallet, market, reason, None).await?;
+        let run_result = self
+            .crank(crank_wallet, market, &market_id, reason, None)
+            .await?;
 
         // Successfully cranked, check if there's more work and, if so, schedule it to be started again
         std::mem::drop(crank_guard);
@@ -124,38 +120,48 @@ impl App {
             Err(e) => format!("Failed getting status to check for new crank work: {e:?}.").into(),
         };
 
-        Ok(WatchedTaskOutput::new(match run_result {
+        let output = match run_result {
             RunResult::NormalRun(txres) => {
+                let message =
                 format!(
                     "Successfully turned the crank for market {market} in transaction {}. {}. Queued delay: {:?}, Elapsed since starting to crank: {:?}",
                     txres.txhash, more_work, received.saturating_duration_since(queued), start_crank.elapsed(),
-                )
+                );
+                WatchedTaskOutput::new(message)
             }
             RunResult::OutOfGas => {
-                format!("Got an 'out of gas' code 11 when trying to crank. {more_work}")
+                let message =
+                    format!("Got an 'out of gas' code 11 when trying to crank. {more_work}");
+                WatchedTaskOutput::new(message)
+                    .set_expiry(Duration::seconds(10))
+                    .set_error()
             }
             RunResult::OsmosisEpoch(e) => {
-                format!("Ignoring crank run error since we think we're in the Osmosis epoch, error: {e:?}")
+                let message = format!("Ignoring crank run error since we think we're in the Osmosis epoch, error: {e:?}");
+                WatchedTaskOutput::new(message)
             }
             RunResult::OsmosisCongested(e) => {
-                format!("Ignoring crank run error since we think the Osmosis chain is overly congested, error: {e:?}")
+                let message = format!("Ignoring crank run error since we think the Osmosis chain is overly congested, error: {e:?}");
+                WatchedTaskOutput::new(message)
             }
-        })
-        .skip_delay())
+        };
+
+        Ok(output.skip_delay())
     }
 
     pub(crate) async fn crank(
         &self,
         crank_wallet: &Wallet,
         market: Address,
+        market_id: &MarketId,
         reason: CrankTriggerReason,
         // an array of N execs to try with fallbacks
         execs: Option<&[u32]>,
     ) -> Result<RunResult> {
-        let cosmos = if reason.needs_high_gas().is_some() {
-            &self.cosmos_high_gas
-        } else {
-            &self.cosmos
+        let cosmos = match reason.gas_level() {
+            GasLevel::Normal => &self.cosmos,
+            // we won't use the very high gas wallet in cranking, that's reserved for the high gas task
+            GasLevel::High | GasLevel::VeryHigh => &self.cosmos_high_gas,
         };
 
         let rewards = self
@@ -212,7 +218,7 @@ impl App {
         match builder
             .sign_and_broadcast_cosmos_tx(cosmos, crank_wallet)
             .await
-            .with_context(|| format!("Unable to turn crank for market {market}"))
+            .with_context(|| format!("Unable to turn crank for market {market_id} ({market})"))
         {
             Ok(txres) => {
                 track_tx_fees(self, crank_wallet.get_address(), &txres).await;
@@ -221,7 +227,7 @@ impl App {
             Err(e) => {
                 if self.is_osmosis_epoch() {
                     Ok(RunResult::OsmosisEpoch(e))
-                } else if self.get_congested_info().is_congested() {
+                } else if self.get_congested_info().await.is_congested() {
                     Ok(RunResult::OsmosisCongested(e))
                 } else {
                     let error_as_str = format!("{e:?}");

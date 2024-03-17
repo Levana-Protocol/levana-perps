@@ -109,7 +109,7 @@ impl Bridge {
         &self,
         amount: NumberGtZero,
     ) -> Result<BridgeResponse<Vec<cosmwasm_std::Event>>> {
-        self.send_exec_msg(ClientToBridgeMsg::MintCollateral { amount: amount })
+        self.send_exec_msg(ClientToBridgeMsg::MintCollateral { amount })
             .await
     }
     pub async fn mint_and_deposit_lp(

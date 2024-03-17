@@ -84,7 +84,6 @@ pub mod events {
         pub actual: Vec<(CrankWorkInfo, PricePoint)>,
     }
 
-    impl PerpEvent for CrankExecBatchEvent {}
     impl From<CrankExecBatchEvent> for Event {
         fn from(
             CrankExecBatchEvent {
@@ -137,7 +136,6 @@ pub mod events {
         pub price_point: PricePoint,
     }
 
-    impl PerpEvent for CrankWorkInfoEvent {}
     impl From<CrankWorkInfoEvent> for Event {
         fn from(
             CrankWorkInfoEvent {
@@ -227,7 +225,7 @@ pub mod events {
             let get_liquidation_reason = || -> anyhow::Result<LiquidationReason> {
                 match evt.string_attr("liquidation-reason")?.as_str() {
                     "liquidated" => Ok(LiquidationReason::Liquidated),
-                    "take-profit" => Ok(LiquidationReason::MaxGains),
+                    "take-profit" => Ok(LiquidationReason::TakeProfit),
                     _ => Err(PerpError::unimplemented().into()),
                 }
             };

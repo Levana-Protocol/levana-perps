@@ -102,7 +102,7 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
 
         for (key, default_value) in default_config {
             let expected = if key == "spot_price" {
-                let spot_price_config = get_spot_price_config(&oracle, &price_config, &market_id)?;
+                let spot_price_config = get_spot_price_config(&oracle, &market_id)?;
                 serde_json::to_value(spot_price_config)?
             } else if is_unused_key(&key) {
                 continue;

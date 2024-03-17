@@ -110,11 +110,14 @@ pub enum ExecuteMsg {
         /// Direction of new position
         direction: DirectionToBase,
         /// Maximum gains of new position
-        max_gains: MaxGainsInQuote,
+        #[deprecated(note = "Use take_profit instead")]
+        max_gains: Option<MaxGainsInQuote>,
         /// Stop loss price of new position
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
-        take_profit_override: Option<PriceBaseInQuote>,
+        /// if max_gains is `None`, this *must* be `Some`
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<TakeProfitTrader>,
     },
 
     /// Add collateral to a position, causing leverage to decrease
@@ -172,16 +175,28 @@ pub enum ExecuteMsg {
         max_gains: MaxGainsInQuote,
     },
 
+    /// Modify the take profit price of a position
+    UpdatePositionTakeProfitPrice {
+        /// ID of position to update
+        id: PositionId,
+        /// New take profit price of the position
+        price: TakeProfitTrader,
+    },
+
     /// Set a stop loss or take profit override.
-    /// This msg will override any previous values.
-    /// Passing None will remove the override.
     SetTriggerOrder {
         /// ID of position to modify
         id: PositionId,
         /// New stop loss price of the position
+        /// Passing None will remove the override.
         stop_loss_override: Option<PriceBaseInQuote>,
-        /// New take profit price of the position
-        take_profit_override: Option<PriceBaseInQuote>,
+        /// New take profit price of the position, merely as a trigger.
+        /// Passing None will bypass changing this
+        /// This does not affect the locked up counter collateral (or borrow fees etc.).
+        /// if this override is further away than the position's take profit price, the position's will be triggered first
+        /// if you want to update the position itself, use [ExecuteMsg::UpdatePositionTakeProfitPrice]
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<TakeProfitTrader>,
     },
 
     /// Set a limit order to open a position when the price of the asset hits
@@ -193,12 +208,16 @@ pub enum ExecuteMsg {
         leverage: LeverageToBase,
         /// Direction of new position
         direction: DirectionToBase,
-        /// Max gains of new position
-        max_gains: MaxGainsInQuote,
+
+        /// Maximum gains of new position
+        #[deprecated(note = "Use take_profit instead")]
+        max_gains: Option<MaxGainsInQuote>,
         /// Stop loss price of new position
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
-        take_profit_override: Option<PriceBaseInQuote>,
+        /// if max_gains is `None`, this *must* be `Some`
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<TakeProfitTrader>,
     },
 
     /// Cancel an open limit order
@@ -814,6 +833,8 @@ pub struct PositionAction {
     pub kind: PositionActionKind,
     /// Timestamp when the action occurred
     pub timestamp: Timestamp,
+    /// Timestamp of the PricePoint used for this action, if relevant
+    pub price_timestamp: Option<Timestamp>,
     /// the amount of collateral at the time of the action
     #[serde(alias = "active_collateral")]
     pub collateral: Collateral,
@@ -832,8 +853,10 @@ pub struct PositionAction {
     pub old_owner: Option<Addr>,
     /// If this is a position transfer, the new owner.
     pub new_owner: Option<Addr>,
-    /// The take profit override, if set.
-    pub take_profit_override: Option<PriceBaseInQuote>,
+    /// The take profit price set by the trader.
+    /// For historical reasons this is optional, i.e. if the trader had set max gains price instead
+    #[serde(rename = "take_profit_override")]
+    pub take_profit_trader: Option<TakeProfitTrader>,
     /// The stop loss override, if set.
     pub stop_loss_override: Option<PriceBaseInQuote>,
 }
@@ -1009,11 +1032,13 @@ pub struct LimitOrderResp {
     /// Direction of the new position
     pub direction: DirectionToBase,
     /// Max gains of the new position
-    pub max_gains: MaxGainsInQuote,
+    #[deprecated(note = "Use take_profit instead")]
+    pub max_gains: Option<MaxGainsInQuote>,
     /// Stop loss of the new position
     pub stop_loss_override: Option<PriceBaseInQuote>,
+    #[serde(alias = "take_profit_override")]
     /// Take profit of the new position
-    pub take_profit_override: Option<PriceBaseInQuote>,
+    pub take_profit: Option<TakeProfitTrader>,
 }
 
 /// Response for [QueryMsg::LimitOrders]
@@ -1139,9 +1164,9 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
                 slippage_assert: u.arbitrary()?,
                 leverage: u.arbitrary()?,
                 direction: u.arbitrary()?,
-                max_gains: u.arbitrary()?,
+                max_gains: None,
                 stop_loss_override: u.arbitrary()?,
-                take_profit_override: u.arbitrary()?,
+                take_profit: Some(u.arbitrary()?),
             }),
             2 => Ok(ExecuteMsg::UpdatePositionAddCollateralImpactLeverage { id: u.arbitrary()? }),
             3 => Ok(ExecuteMsg::UpdatePositionAddCollateralImpactSize {
@@ -1169,15 +1194,15 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
             8 => Ok(ExecuteMsg::SetTriggerOrder {
                 id: u.arbitrary()?,
                 stop_loss_override: u.arbitrary()?,
-                take_profit_override: u.arbitrary()?,
+                take_profit: u.arbitrary()?,
             }),
             9 => Ok(ExecuteMsg::PlaceLimitOrder {
                 trigger_price: u.arbitrary()?,
                 leverage: u.arbitrary()?,
                 direction: u.arbitrary()?,
-                max_gains: u.arbitrary()?,
+                max_gains: None,
                 stop_loss_override: u.arbitrary()?,
-                take_profit_override: u.arbitrary()?,
+                take_profit: Some(u.arbitrary()?),
             }),
             10 => Ok(ExecuteMsg::CancelLimitOrder {
                 order_id: u.arbitrary()?,

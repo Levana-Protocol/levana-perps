@@ -28,6 +28,13 @@ pub enum MarketError {
         market_type: MarketType,
         direction: DirectionToBase,
     },
+    #[error(
+        "Infinite take profit price can only be used on long positions for collateral-is-base markets"
+    )]
+    InvalidInfiniteTakeProfitPrice {
+        market_type: MarketType,
+        direction: DirectionToBase,
+    },
     #[error("Max gains are too large")]
     MaxGainsTooLarge {},
     #[error("Unable to withdraw {requested}. Only {available} LP tokens held.")]
@@ -146,6 +153,12 @@ pub enum MarketError {
         "No price publish time found, there is likely a spot price config error for this market"
     )]
     NoPricePublishTimeFound,
+    #[error("Cannot close position {id}, it was already closed at {close_time}. Close reason: {reason}.")]
+    PositionAlreadyClosed {
+        id: Uint64,
+        close_time: Timestamp,
+        reason: String,
+    },
 }
 
 /// Was the price provided by the trader too high or too low?
@@ -246,6 +259,9 @@ impl MarketError {
     fn get_error_id(&self) -> ErrorId {
         match self {
             MarketError::InvalidInfiniteMaxGains { .. } => ErrorId::InvalidInfiniteMaxGains,
+            MarketError::InvalidInfiniteTakeProfitPrice { .. } => {
+                ErrorId::InvalidInfiniteTakeProfitPrice
+            }
             MarketError::MaxGainsTooLarge {} => ErrorId::MaxGainsTooLarge,
             MarketError::WithdrawTooMuch { .. } => ErrorId::WithdrawTooMuch,
             MarketError::InsufficientLiquidityForWithdrawal { .. } => {
@@ -279,6 +295,7 @@ impl MarketError {
             MarketError::LimitOrderAlreadyCanceling { .. } => ErrorId::LimitOrderAlreadyCanceling,
             MarketError::PositionAlreadyClosing { .. } => ErrorId::PositionAlreadyClosing,
             MarketError::NoPricePublishTimeFound => ErrorId::NoPricePublishTimeFound,
+            MarketError::PositionAlreadyClosed { .. } => ErrorId::PositionAlreadyClosed,
         }
     }
 }

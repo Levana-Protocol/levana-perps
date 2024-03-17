@@ -99,17 +99,22 @@ fn infinite_max_gains_perp_481() {
         // Position is still open, confirm that it's still considered infinite.
 
         let res = market.query_position(pos_id).unwrap();
+        // assert_eq!(
+        //     res.max_gains_in_quote,
+        //     MaxGainsInQuote::PosInfinity,
+        //     "Max gains is not infinite on iteration {i}, actual: {}",
+        //     res.max_gains_in_quote
+        // );
         assert_eq!(
-            res.max_gains_in_quote,
-            MaxGainsInQuote::PosInfinity,
-            "Max gains is not infinite on iteration {i}, actual: {}",
-            res.max_gains_in_quote
+            res.take_profit_trader,
+            Some(TakeProfitTrader::PosInfinity),
+            "Take profit price override is not infinite on iteration {i}, actual: {:?}",
+            res.take_profit_trader
         );
         assert_eq!(
-            res.take_profit_price_base,
-            None,
-            "Take profit price is not None on iteration {i}, actual: {}",
-            res.take_profit_price_base.unwrap()
+            res.take_profit_total_base, None,
+            "Take profit price is not infinite on iteration {i}, actual: {:?}",
+            res.take_profit_total_base
         );
     }
 }
@@ -186,6 +191,11 @@ fn update_stop_loss_inf_max_gains_perp_1071() {
     market.exec_set_price("2.0".parse().unwrap()).unwrap();
 
     market
-        .exec_set_trigger_order(&trader, pos_id, Some("0.99".parse().unwrap()), None)
+        .exec_set_trigger_order(
+            &trader,
+            pos_id,
+            Some("0.99".parse().unwrap()),
+            None::<PriceBaseInQuote>,
+        )
         .unwrap();
 }

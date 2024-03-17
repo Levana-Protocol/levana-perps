@@ -1,5 +1,6 @@
 use crate::state::*;
 use cosmwasm_std::Order;
+use crank::position::liquifund::PositionLiquifund;
 use cw_storage_plus::{Bound, PrefixBound};
 use msg::contracts::market::{
     crank::{
@@ -15,6 +16,8 @@ use msg::contracts::market::{
 use serde::{Deserialize, Serialize};
 
 use shared::prelude::*;
+
+use self::position::close::ClosePositionExec;
 
 use super::position::{get_position, NEXT_LIQUIFUNDING, OPEN_POSITIONS};
 
@@ -145,7 +148,7 @@ impl State<'_> {
     // this always executes the requested cranks
     // if there is no work to be done, then crank_exec itself will be cheap
     // QueryMsg::CrankStats can be used by clients to get heuristics and decide how many to crank
-    pub fn crank_exec_batch(
+    pub(crate) fn crank_exec_batch(
         &self,
         ctx: &mut StateContext,
         start_n_execs_and_rewards: Option<(u32, Addr)>,
@@ -202,8 +205,8 @@ impl State<'_> {
             crank_progress.paying_work_done,
         )?;
         ctx.response_mut().add_event(CrankExecBatchEvent {
-            requested: crank_progress.requested as u64,
-            paying: crank_progress.paying_work_done as u64,
+            requested: u64::from(crank_progress.requested),
+            paying: u64::from(crank_progress.paying_work_done),
             actual: crank_progress.actual,
         });
 
@@ -243,7 +246,8 @@ impl State<'_> {
             }
             CrankWorkInfo::CloseAllPositions { position } => {
                 let pos = get_position(ctx.storage, position)?;
-                self.close_position_via_msg(ctx, pos, *price_point)?;
+                ClosePositionExec::new_via_msg(self, ctx.storage, pos, *price_point)?
+                    .apply(self, ctx)?;
             }
             CrankWorkInfo::Liquidation {
                 position,
@@ -261,7 +265,8 @@ impl State<'_> {
 
                 // We want to liquifund up until the price point's timestamp and make sure we shouldn't be liquidated for some other reason.
                 let ends_at = price_point.timestamp;
-                let mcp = self.position_liquifund(ctx, pos, starts_at, ends_at, true)?;
+                let mcp = PositionLiquifund::new(self, ctx.storage, pos, starts_at, ends_at, true)?
+                    .apply(self, ctx)?;
 
                 let close_position_instructions = match mcp {
                     MaybeClosedPosition::Open(pos) => ClosePositionInstructions {
@@ -274,7 +279,8 @@ impl State<'_> {
                     },
                     MaybeClosedPosition::Close(x) => x,
                 };
-                self.close_position(ctx, close_position_instructions)?;
+                ClosePositionExec::new(self, ctx.storage, close_position_instructions, None)?
+                    .apply(self, ctx)?;
             }
             CrankWorkInfo::DeferredExec {
                 deferred_exec_id,

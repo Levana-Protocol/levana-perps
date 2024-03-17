@@ -9,6 +9,7 @@ use msg::{
         cw20::entry::BalanceResponse,
         market::{
             config::{Config, ConfigUpdate},
+            deferred_execution::{DeferredExecId, GetDeferredExecResp},
             entry::{
                 ClosedPositionsResp, ExecuteOwnerMsg, LpAction, LpActionHistoryResp, LpInfoResp,
                 OraclePriceResp, PositionAction, PositionActionHistoryResp, PriceWouldTriggerResp,
@@ -202,9 +203,9 @@ impl MarketContract {
             slippage_assert,
             leverage,
             direction,
-            max_gains,
+            max_gains: Some(max_gains),
             stop_loss_override,
-            take_profit_override,
+            take_profit: take_profit_override.map(|x| TakeProfitTrader::Finite(x.into_non_zero())),
         };
         self.exec_with_funds(wallet, status, deposit, &msg)
             .await
@@ -350,6 +351,33 @@ impl MarketContract {
             info: response,
         };
         Ok(position_response)
+    }
+
+    pub async fn all_closed_positions(
+        &self,
+        owner: impl HasAddress,
+    ) -> Result<Vec<ClosedPosition>> {
+        let mut cursor = None;
+        let mut res = vec![];
+        loop {
+            let ClosedPositionsResp {
+                mut positions,
+                cursor: new_cursor,
+            } = self
+                .0
+                .query(MarketQueryMsg::ClosedPositionHistory {
+                    owner: owner.get_address_string().into(),
+                    cursor: cursor.take(),
+                    limit: None,
+                    order: None,
+                })
+                .await?;
+            res.append(&mut positions);
+            match new_cursor {
+                Some(new_cursor) => cursor = Some(new_cursor),
+                None => break Ok(res),
+            }
+        }
     }
 
     pub async fn raw_query_positions(
@@ -685,5 +713,12 @@ impl MarketContract {
             .query_raw(CLOSE_ALL_POSITIONS)
             .await
             .map(|v| !v.is_empty())
+    }
+
+    pub async fn get_deferred_exec(&self, id: DeferredExecId) -> Result<GetDeferredExecResp> {
+        self.0
+            .query(MarketQueryMsg::GetDeferredExec { id })
+            .await
+            .map_err(|e| e.into())
     }
 }

@@ -123,6 +123,8 @@ pub struct MarketPriceFeedConfigs {
     pub feeds: Vec<MarketPriceFeedConfig>,
     /// feed of the collateral asset in terms of USD
     pub feeds_usd: Vec<MarketPriceFeedConfig>,
+    /// Override the Stride contract address for this market
+    pub stride_contract: Option<Address>,
 }
 
 #[derive(serde::Deserialize, Debug, Clone)]
@@ -502,19 +504,19 @@ impl Default for WatcherConfig {
             delay_between_retries: defaults::delay_between_retries(),
             balance: TaskConfig {
                 delay: Delay::Constant(20),
-                out_of_date: 180,
+                out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,
             },
             gas_check: TaskConfig {
                 delay: Delay::Constant(60),
-                out_of_date: 180,
+                out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,
             },
             liquidity: TaskConfig {
                 delay: Delay::Constant(120),
-                out_of_date: 180,
+                out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,
             },
@@ -523,44 +525,44 @@ impl Default for WatcherConfig {
                     low: 120,
                     high: 1200,
                 },
-                out_of_date: 180,
+                out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,
             },
             utilization: TaskConfig {
                 delay: Delay::Constant(120),
-                out_of_date: 120,
+                out_of_date: Some(120),
                 retries: None,
                 delay_between_retries: None,
             },
             track_balance: TaskConfig {
                 delay: Delay::Constant(60),
-                out_of_date: 60,
+                out_of_date: Some(60),
                 retries: None,
                 delay_between_retries: None,
             },
             crank_watch: TaskConfig {
                 delay: Delay::Constant(30),
-                out_of_date: 60,
+                out_of_date: Some(60),
                 retries: None,
                 delay_between_retries: None,
             },
             crank_run: TaskConfig {
                 // We block internally within the crank run service
-                delay: Delay::Constant(0),
-                out_of_date: 60,
+                delay: Delay::NoDelay,
+                out_of_date: None,
                 retries: None,
                 delay_between_retries: None,
             },
             get_factory: TaskConfig {
                 delay: Delay::Constant(60),
-                out_of_date: 180,
-                retries: None,
-                delay_between_retries: None,
+                out_of_date: Some(180),
+                retries: Some(5),
+                delay_between_retries: Some(30),
             },
             price: TaskConfig {
                 delay: Delay::NewBlock,
-                out_of_date: 30,
+                out_of_date: Some(30),
                 // Intentionally using different defaults to make sure price
                 // updates come through quickly. We increase our retries to
                 // compensate for the shorter delay.
@@ -569,52 +571,52 @@ impl Default for WatcherConfig {
             },
             stale: TaskConfig {
                 delay: Delay::Constant(30),
-                out_of_date: 180,
-                retries: None,
-                delay_between_retries: None,
+                out_of_date: Some(180),
+                retries: Some(5),
+                delay_between_retries: Some(20),
             },
             stats: TaskConfig {
                 delay: Delay::Constant(30),
-                out_of_date: 180,
+                out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,
             },
             stats_alert: TaskConfig {
                 delay: Delay::Constant(30),
-                out_of_date: 180,
+                out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,
             },
             ultra_crank: TaskConfig {
                 delay: Delay::Constant(120),
-                out_of_date: 180,
+                out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,
             },
             liquidity_transaction: TaskConfig {
                 delay: Delay::Constant(120),
-                out_of_date: 180,
+                out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,
             },
             rpc_health: TaskConfig {
                 delay: Delay::Constant(300),
-                out_of_date: 500,
+                out_of_date: Some(500),
                 retries: None,
                 delay_between_retries: None,
             },
             congestion: TaskConfig {
                 // OK to be fast on this, we use cached data
                 delay: Delay::Constant(2),
-                out_of_date: 2,
+                out_of_date: Some(2),
                 retries: None,
                 delay_between_retries: None,
             },
             high_gas: TaskConfig {
                 // We block internally within this service
                 // and use a channel to signal when it should be woken up
-                delay: Delay::Constant(0),
-                out_of_date: 60,
+                delay: Delay::NoDelay,
+                out_of_date: None,
                 retries: None,
                 delay_between_retries: None,
             },
@@ -630,7 +632,7 @@ pub struct TaskConfig {
     /// How many seconds before we should consider the result out of date
     ///
     /// This does not include the delay time
-    pub out_of_date: u32,
+    pub out_of_date: Option<u32>,
     /// How many times to retry before giving up, overriding the general watcher
     /// config
     pub retries: Option<usize>,
@@ -642,6 +644,7 @@ pub struct TaskConfig {
 #[derive(serde::Deserialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum Delay {
+    NoDelay,
     Constant(u64),
     NewBlock,
     Random { low: u64, high: u64 },

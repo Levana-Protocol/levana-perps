@@ -136,18 +136,22 @@ pub(crate) struct TaskStatuses {
     statuses: Arc<StatusMap>,
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct TaskStatus {
     last_result: TaskResult,
     last_retry_error: Option<TaskError>,
     current_run_started: Option<DateTime<Utc>>,
+    /// Is the last_result out of date ?
     #[serde(skip)]
-    out_of_date: Duration,
+    out_of_date: Option<Duration>,
+    /// Should we expire the status of last result ?
+    #[serde(skip)]
+    expire_last_result: Option<Duration>,
     counts: TaskCounts,
 }
 
-#[derive(Clone, Copy, Default, serde::Serialize)]
+#[derive(Clone, Copy, Default, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct TaskCounts {
     pub(crate) successes: usize,
@@ -160,14 +164,14 @@ impl TaskCounts {
     }
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct TaskResult {
     pub(crate) value: Arc<TaskResultValue>,
     pub(crate) updated: DateTime<Utc>,
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum TaskResultValue {
     Ok(Cow<'static, str>),
@@ -187,7 +191,7 @@ impl TaskResultValue {
     }
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct TaskError {
     pub(crate) value: Arc<String>,
@@ -201,18 +205,31 @@ enum OutOfDateType {
 }
 
 impl TaskStatus {
+    fn is_expired(&self) -> bool {
+        if let Some(expiry_duration) = self.expire_last_result {
+            let last_run = self.last_result.updated;
+            let now = Utc::now();
+            last_run + expiry_duration <= now
+        } else {
+            false
+        }
+    }
+
     fn is_out_of_date(&self) -> OutOfDateType {
         match self.current_run_started {
-            Some(started) => {
-                let now = Utc::now();
-                if started + Duration::seconds(300) <= now {
-                    OutOfDateType::Very
-                } else if started + self.out_of_date <= now {
-                    OutOfDateType::Slightly
-                } else {
-                    OutOfDateType::Not
+            Some(started) => match self.out_of_date {
+                Some(out_of_date) => {
+                    let now = Utc::now();
+                    if started + Duration::seconds(300) <= now {
+                        OutOfDateType::Very
+                    } else if started + out_of_date <= now {
+                        OutOfDateType::Slightly
+                    } else {
+                        OutOfDateType::Not
+                    }
                 }
-            }
+                None => OutOfDateType::Not,
+            },
             None => OutOfDateType::Not,
         }
     }
@@ -342,7 +359,9 @@ impl AppBuilder {
         T: WatchedTask,
     {
         let config = label.task_config_for(&self.app.config.watcher);
-        let out_of_date = chrono::Duration::seconds(config.out_of_date.into());
+        let out_of_date = config
+            .out_of_date
+            .map(|item| chrono::Duration::seconds(item.into()));
         let task_status = Arc::new(RwLock::new(TaskStatus {
             last_result: TaskResult {
                 value: TaskResultValue::NotYetRun.into(),
@@ -352,6 +371,7 @@ impl AppBuilder {
             current_run_started: None,
             out_of_date,
             counts: Default::default(),
+            expire_last_result: None,
         }));
         {
             let old = self.watcher.statuses.insert(label, task_status.clone());
@@ -373,6 +393,7 @@ impl AppBuilder {
                         current_run_started: Some(Utc::now()),
                         out_of_date,
                         counts: old.counts,
+                        expire_last_result: old.expire_last_result,
                     };
                     guard.counts
                 };
@@ -382,6 +403,7 @@ impl AppBuilder {
                         Heartbeat {
                             task_status: task_status.clone(),
                         },
+                        out_of_date.is_some(),
                     )
                     .await;
                 let res = match res {
@@ -391,7 +413,9 @@ impl AppBuilder {
                             Ok(WatchedTaskOutput {
                             skip_delay: false,
                             suppress: false,
-                            message: format!("Ignoring an error because the chain appears to be paused (Osmosis epoch). Error was:\n{err:?}").into()
+                            message: format!("Ignoring an error because the chain appears to be paused (Osmosis epoch). Error was:\n{err:?}").into(),
+                                expire_alert: None,
+				error: false
                         })
                         } else {
                             Err(err)
@@ -403,6 +427,8 @@ impl AppBuilder {
                         skip_delay,
                         message,
                         suppress,
+                        expire_alert,
+                        error,
                     }) => {
                         if label.show_output() {
                             tracing::info!("{label}: Success! {message}");
@@ -415,8 +441,20 @@ impl AppBuilder {
                             let title = label.to_string();
                             if label.triggers_alert(None) {
                                 match &*old.last_result.value {
-                                    // Was a success, still a success, do nothing
-                                    TaskResultValue::Ok(_) => (),
+                                    TaskResultValue::Ok(_) => {
+                                        if error {
+                                            // Was a success, but not a success now
+                                            sentry::with_scope(
+                                                |scope| scope.set_tag("part-name", title.clone()),
+                                                || {
+                                                    sentry::capture_message(
+                                                        &format!("{title}: {message}"),
+                                                        sentry::Level::Error,
+                                                    )
+                                                },
+                                            );
+                                        }
+                                    }
                                     TaskResultValue::Err(err) => {
                                         sentry::with_scope(
                                             |scope| scope.set_tag("part-name", title.clone()),
@@ -446,6 +484,8 @@ impl AppBuilder {
                                 last_result: TaskResult {
                                     value: if suppress {
                                         guard.last_result.value.clone()
+                                    } else if error {
+                                        TaskResultValue::Err(message.into()).into()
                                     } else {
                                         TaskResultValue::Ok(message).into()
                                     },
@@ -455,14 +495,25 @@ impl AppBuilder {
                                 current_run_started: None,
                                 out_of_date,
                                 counts: TaskCounts {
-                                    successes: old_counts.successes + 1,
+                                    successes: if error {
+                                        old_counts.successes
+                                    } else {
+                                        old_counts.successes + 1
+                                    },
+                                    errors: if error {
+                                        old_counts.errors + 1
+                                    } else {
+                                        old_counts.errors
+                                    },
                                     ..old_counts
                                 },
+                                expire_last_result: expire_alert,
                             };
                         }
                         retries = 0;
                         if !skip_delay {
                             match config.delay {
+                                perps_exes::config::Delay::NoDelay => (),
                                 perps_exes::config::Delay::Constant(secs) => {
                                     tokio::time::sleep(tokio::time::Duration::from_secs(secs))
                                         .await;
@@ -473,6 +524,10 @@ impl AppBuilder {
                                         .await;
                                 }
                                 perps_exes::config::Delay::NewBlock => {
+                                    if let Some(duration) = app.config.price_bot_delay {
+                                        tokio::time::sleep(duration).await;
+                                    }
+
                                     // Wait for a new block to appear
                                     loop {
                                         match app.cosmos.get_latest_block_info().await {
@@ -484,7 +539,7 @@ impl AppBuilder {
                                             }
                                             Err(e) => {
                                                 tracing::error!(
-                                                    "Unable to query latest block info: {e:?}"
+                                                    "Unable to query latest block info: {e}"
                                                 );
                                             }
                                         }
@@ -567,6 +622,7 @@ impl AppBuilder {
                                     errors: old_counts.errors + 1,
                                     ..old_counts
                                 },
+                                expire_last_result: None,
                             };
                         } else {
                             {
@@ -584,6 +640,7 @@ impl AppBuilder {
                                         retries: old_counts.retries + 1,
                                         ..old_counts
                                     },
+                                    expire_last_result: None,
                                 };
                             }
                         }
@@ -606,9 +663,18 @@ impl AppBuilder {
 
 #[derive(Debug)]
 pub(crate) struct WatchedTaskOutput {
+    /// Should we skip delay between tasks ? If yes, then we dont
+    /// sleep once the task gets completed.
     skip_delay: bool,
+    /// Should we supress the output ? If we supress, the new output
+    /// won't be reflected. The last_result value will be used instead.
     suppress: bool,
     message: Cow<'static, str>,
+    /// Controls the stickiness of this message. After how long should
+    /// we treat this as a non alert ?
+    expire_alert: Option<Duration>,
+    /// Is the message an error ?
+    error: bool,
 }
 
 impl WatchedTaskOutput {
@@ -617,7 +683,14 @@ impl WatchedTaskOutput {
             skip_delay: false,
             suppress: false,
             message: message.into(),
+            expire_alert: None,
+            error: false,
         }
+    }
+
+    pub(crate) fn set_expiry(mut self, expire_duration: Duration) -> Self {
+        self.expire_alert = Some(expire_duration);
+        self
     }
 
     pub(crate) fn skip_delay(mut self) -> Self {
@@ -625,8 +698,8 @@ impl WatchedTaskOutput {
         self
     }
 
-    pub(crate) fn suppress(mut self) -> Self {
-        self.suppress = true;
+    pub(crate) fn set_error(mut self) -> Self {
+        self.error = true;
         self
     }
 }
@@ -642,17 +715,22 @@ pub(crate) trait WatchedTask: Send + Sync + 'static {
         &mut self,
         app: Arc<App>,
         heartbeat: Heartbeat,
+        should_timeout: bool,
     ) -> Result<WatchedTaskOutput> {
-        match tokio::time::timeout(
-            tokio::time::Duration::from_secs(MAX_TASK_SECONDS),
-            self.run_single(app, heartbeat),
-        )
-        .await
-        {
-            Ok(x) => x,
-            Err(e) => Err(anyhow::anyhow!(
-                "Running a single task took too long, killing. Elapsed time: {e}"
-            )),
+        if should_timeout {
+            match tokio::time::timeout(
+                tokio::time::Duration::from_secs(MAX_TASK_SECONDS),
+                self.run_single(app, heartbeat),
+            )
+            .await
+            {
+                Ok(x) => x,
+                Err(e) => Err(anyhow::anyhow!(
+                    "Running a single task took too long, killing. Elapsed time: {e}"
+                )),
+            }
+        } else {
+            self.run_single(app, heartbeat).await
         }
     }
 }
@@ -673,6 +751,7 @@ impl Heartbeat {
             current_run_started: Some(Utc::now()),
             out_of_date: old.out_of_date,
             counts: old.counts,
+            expire_last_result: old.expire_last_result,
         };
     }
 }
@@ -708,15 +787,21 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
                     skip_delay,
                     message,
                     suppress,
+                    expire_alert: _,
+                    error,
                 }) => {
                     if suppress {
                         errors.push(format!("Found a 'suppress' which is not supported for per-market updates: {message}"));
                     }
-                    successes.push(format!(
-                        "{market} {addr}: {message}",
-                        market = market.market_id,
-                        addr = market.market
-                    ));
+                    if error {
+                        errors.push(message.into_owned());
+                    } else {
+                        successes.push(format!(
+                            "{market} {addr}: {message}",
+                            market = market.market_id,
+                            addr = market.market
+                        ));
+                    }
                     total_skip_delay = skip_delay || total_skip_delay;
                 }
                 Err(e) => errors.push(format!(
@@ -732,6 +817,8 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
                 skip_delay: total_skip_delay,
                 message: successes.join("\n").into(),
                 suppress: false,
+                expire_alert: None,
+                error: false,
             })
         } else {
             let mut msg = String::new();
@@ -792,15 +879,21 @@ impl<T: WatchedTaskPerMarketParallel> WatchedTask for ParallelWatcher<T> {
                         skip_delay,
                         message,
                         suppress,
+                        expire_alert: _,
+                        error,
                     }) => {
                         if suppress {
                             errors.push(format!("Found a 'suppress' which is not supported for per-market updates: {message}"));
                         }
-                        successes.push(format!(
-                            "{market} {addr}: {message}",
-                            market = market.market_id,
-                            addr = market.market
-                        ));
+                        if error {
+                            errors.push(message.into_owned());
+                        } else {
+                            successes.push(format!(
+                                "{market} {addr}: {message}",
+                                market = market.market_id,
+                                addr = market.market
+                            ));
+                        }
                         total_skip_delay = skip_delay || total_skip_delay;
                     }
                     Err(e) => errors.push(format!(
@@ -819,6 +912,8 @@ impl<T: WatchedTaskPerMarketParallel> WatchedTask for ParallelWatcher<T> {
                 skip_delay: total_skip_delay,
                 message: successes.join("\n").into(),
                 suppress: false,
+                expire_alert: None,
+                error: false,
             })
         } else {
             let mut msg = String::new();
@@ -831,7 +926,7 @@ impl<T: WatchedTaskPerMarketParallel> WatchedTask for ParallelWatcher<T> {
     }
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 struct RenderedStatus {
     label: TaskLabel,
@@ -877,6 +972,12 @@ impl TaskStatuses {
         );
 
         if template.alert {
+            let failure_status = template
+                .statuses
+                .iter()
+                .filter(|x| x.short.alert())
+                .collect::<Vec<_>>();
+            tracing::error!("Status failure: {:#?}", failure_status);
             *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
         }
 
@@ -893,6 +994,12 @@ impl TaskStatuses {
         let mut res = Json(&template).into_response();
 
         if template.alert {
+            let failure_status = template
+                .statuses
+                .iter()
+                .filter(|x| x.short.alert())
+                .collect::<Vec<_>>();
+            tracing::error!("Status failure: {:#?}", failure_status);
             *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
         }
 
@@ -910,12 +1017,18 @@ impl TaskStatuses {
         };
         let statuses = self.statuses(label).await;
         let alert = statuses.iter().any(|x| x.short.alert());
+
         statuses
-            .into_iter()
-            .for_each(|rendered| response_builder.add(rendered).unwrap());
+            .iter()
+            .for_each(|rendered| response_builder.add(rendered.clone()).unwrap());
         let mut res = response_builder.into_response();
 
         if alert {
+            let failure_status = statuses
+                .iter()
+                .filter(|x| x.short.alert())
+                .collect::<Vec<_>>();
+            tracing::error!("Status failure: {:#?}", failure_status);
             *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
         }
 
@@ -928,7 +1041,7 @@ struct ResponseBuilder {
     any_errors: bool,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 enum ShortStatus {
     Error,
@@ -953,7 +1066,11 @@ impl TaskStatus {
             }
             TaskResultValue::Err(_) => {
                 if label.triggers_alert(selected_label) {
-                    ShortStatus::Error
+                    if self.is_expired() {
+                        ShortStatus::ErrorNoAlert
+                    } else {
+                        ShortStatus::Error
+                    }
                 } else {
                     ShortStatus::ErrorNoAlert
                 }
@@ -1013,6 +1130,7 @@ impl ResponseBuilder {
                     current_run_started,
                     out_of_date: _,
                     counts: _,
+                    expire_last_result: _,
                 },
             short,
         }: RenderedStatus,

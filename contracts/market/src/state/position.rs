@@ -1,21 +1,17 @@
-mod liquifund;
+pub(crate) mod liquifund;
 
 use cosmwasm_std::Order;
-pub use liquifund::*;
 mod open;
 use msg::contracts::market::{
     entry::{ClosedPositionCursor, ClosedPositionsResp, PositionsQueryFeeApproach},
     position::events::{PositionSaveEvent, PositionSaveReason},
 };
 pub(crate) use open::*;
-mod close;
-pub use close::*;
-mod update;
-pub use update::*;
-mod validate;
-pub use validate::*;
+pub(crate) mod close;
 mod cw721;
-pub use cw721::*;
+pub(crate) mod take_profit;
+pub(crate) mod update;
+mod validate;
 
 use crate::constants::DEFAULT_CLOSED_POSITION_HISTORY_LIMIT;
 use crate::prelude::*;
@@ -31,9 +27,9 @@ pub(super) const OPEN_NOTIONAL_LONG_INTEREST: Item<Notional> =
 pub(super) const OPEN_NOTIONAL_SHORT_INTEREST: Item<Notional> =
     Item::new(namespace::OPEN_NOTIONAL_SHORT_INTEREST);
 
-pub struct LiquidatablePosition {
-    pub id: PositionId,
-    pub reason: LiquidationReason,
+pub(crate) struct LiquidatablePosition {
+    pub(crate) id: PositionId,
+    pub(crate) reason: LiquidationReason,
 }
 // liquidation price tracking
 
@@ -171,6 +167,7 @@ impl State<'_> {
         let order = order.unwrap_or(OrderInMessage::Descending);
         let limit: usize = limit
             .unwrap_or(DEFAULT_CLOSED_POSITION_HISTORY_LIMIT)
+            .min(QUERY_MAX_LIMIT)
             .try_into()?;
 
         let (min, max) = match (cursor, order) {
@@ -218,178 +215,6 @@ impl State<'_> {
             positions,
             cursor: continuation_cursor,
         })
-    }
-
-    /// Validate that we can perform the net open interest adjustment described
-    pub(crate) fn check_adjust_net_open_interest(
-        &self,
-        store: &dyn Storage,
-        notional_size_diff: Signed<Notional>,
-        dir: DirectionToNotional,
-        assert_delta_neutrality_fee_cap: bool,
-    ) -> Result<AdjustOpenInterestResult> {
-        let long_before = self.open_long_interest(store)?;
-        let short_before = self.open_short_interest(store)?;
-
-        let long_after;
-        let short_after;
-        let adjust_res;
-        match dir {
-            DirectionToNotional::Long => {
-                long_after = long_before
-                    .checked_add_signed(notional_size_diff)
-                    .context("adjust_net_open_interest: long interest would be negative")?;
-                short_after = short_before;
-                adjust_res = AdjustOpenInterestResult::Long(long_after);
-            }
-            DirectionToNotional::Short => {
-                long_after = long_before;
-                short_after = short_before
-                    .checked_add_signed(-notional_size_diff)
-                    .context("adjust_net_open_interest: short interest would be negative")?;
-                adjust_res = AdjustOpenInterestResult::Short(short_after);
-            }
-        };
-
-        if assert_delta_neutrality_fee_cap {
-            let net_notional_before = long_before
-                .into_signed()
-                .checked_sub(short_before.into_signed())?;
-            let net_notional_after = long_after
-                .into_signed()
-                .checked_sub(short_after.into_signed())?;
-
-            let cap: Number = self.config.delta_neutrality_fee_cap.into();
-            let sensitivity: Number = self.config.delta_neutrality_fee_sensitivity.into();
-
-            let is_capped_low = |x| x <= -cap;
-            let is_capped_high = |x| x >= cap;
-
-            let instant_delta_neutrality_before_uncapped =
-                net_notional_before.into_number() / sensitivity;
-            let instant_delta_neutrality_after_uncapped =
-                net_notional_after.into_number() / sensitivity;
-
-            let is_capped_low_before = is_capped_low(instant_delta_neutrality_before_uncapped);
-            let is_capped_high_before = is_capped_high(instant_delta_neutrality_before_uncapped);
-            let is_capped_low_after = is_capped_low(instant_delta_neutrality_after_uncapped);
-            let is_capped_high_after = is_capped_high(instant_delta_neutrality_after_uncapped);
-
-            // these strings are just to make error messages easier to understand
-            // since the UX is in terms of DirectionToBase, not DirectionToNotional
-            let market_type = self.market_type(store)?;
-            // May be different from dir, since updating/closing a position can
-            // cause a notional size diff which is opposite to the position
-            // direction.
-            let notional_direction = if notional_size_diff.is_positive_or_zero() {
-                DirectionToNotional::Long
-            } else {
-                DirectionToNotional::Short
-            };
-            let base_direction = notional_direction.into_base(market_type);
-
-            let res = if is_capped_low_before {
-                match notional_direction {
-                    // We were already too short, disallow going shorter
-                    DirectionToNotional::Short => Err(already(
-                        base_direction,
-                        cap,
-                        sensitivity,
-                        instant_delta_neutrality_before_uncapped,
-                        net_notional_before,
-                        net_notional_after,
-                    )),
-                    // We don't allow the user to swing the market all the way from capped low to capped high
-                    DirectionToNotional::Long => {
-                        if is_capped_high_after {
-                            Err(flipped(
-                                base_direction,
-                                cap,
-                                sensitivity,
-                                instant_delta_neutrality_before_uncapped,
-                                instant_delta_neutrality_after_uncapped,
-                                net_notional_before,
-                                net_notional_after,
-                            ))
-                        } else {
-                            Ok(())
-                        }
-                    }
-                }
-            } else if is_capped_high_before {
-                match notional_direction {
-                    // We were already too long, disallow going longer
-                    DirectionToNotional::Long => Err(already(
-                        base_direction,
-                        cap,
-                        sensitivity,
-                        instant_delta_neutrality_before_uncapped,
-                        net_notional_before,
-                        net_notional_after,
-                    )),
-                    // We don't allow the user to swing the market all the way from capped high to capped low
-                    DirectionToNotional::Short => {
-                        if is_capped_low_after {
-                            Err(flipped(
-                                base_direction,
-                                cap,
-                                sensitivity,
-                                instant_delta_neutrality_before_uncapped,
-                                instant_delta_neutrality_after_uncapped,
-                                net_notional_before,
-                                net_notional_after,
-                            ))
-                        } else {
-                            Ok(())
-                        }
-                    }
-                }
-            } else if is_capped_low_after {
-                debug_assert!(notional_size_diff <= Signed::zero());
-                Err(newly(
-                    base_direction,
-                    cap,
-                    sensitivity,
-                    instant_delta_neutrality_after_uncapped,
-                    net_notional_before,
-                    net_notional_after,
-                ))
-            } else if is_capped_high_after {
-                debug_assert!(notional_size_diff >= Signed::zero());
-                Err(newly(
-                    base_direction,
-                    cap,
-                    sensitivity,
-                    instant_delta_neutrality_after_uncapped,
-                    net_notional_before,
-                    net_notional_after,
-                ))
-            } else {
-                Ok(())
-            };
-
-            res.map(|()| adjust_res).map_err(MarketError::into_anyhow)
-        } else {
-            Ok(adjust_res)
-        }
-    }
-
-    pub(crate) fn adjust_net_open_interest(
-        &self,
-        ctx: &mut StateContext,
-        notional_size_diff: Signed<Notional>,
-        dir: DirectionToNotional,
-        assert_delta_neutrality_fee_cap: bool,
-    ) -> Result<()> {
-        self.check_adjust_net_open_interest(
-            ctx.storage,
-            notional_size_diff,
-            dir,
-            assert_delta_neutrality_fee_cap,
-        )?
-        .store(ctx)?;
-
-        Ok(())
     }
 
     pub(crate) fn open_long_interest(&self, store: &dyn Storage) -> Result<Notional> {
@@ -715,7 +540,7 @@ impl State<'_> {
             &pos.liquidation_margin,
         );
         let market_type = self.market_type(ctx.storage)?;
-        pos.take_profit_price = pos.take_profit_price(price_point, market_type)?;
+        pos.take_profit_total = pos.take_profit_price_total(price_point, market_type)?;
 
         debug_assert!(pos.liquifunded_at < pos.next_liquifunding);
 
@@ -739,16 +564,17 @@ impl State<'_> {
                     PRICE_TRIGGER_DESC.remove(ctx.storage, (liquidation_price.into(), pos.id));
                 }
 
-                if let Some(take_profit_price) = pos.take_profit_price {
-                    PRICE_TRIGGER_ASC.remove(ctx.storage, (take_profit_price.into(), pos.id));
+                if let Some(take_profit_total) = pos.take_profit_total {
+                    PRICE_TRIGGER_ASC.remove(ctx.storage, (take_profit_total.into(), pos.id));
                 }
 
                 if let Some(stop_loss_override) = pos.stop_loss_override_notional {
                     PRICE_TRIGGER_DESC.remove(ctx.storage, (stop_loss_override.into(), pos.id));
                 }
 
-                if let Some(take_profit_override) = pos.take_profit_override_notional {
-                    PRICE_TRIGGER_ASC.remove(ctx.storage, (take_profit_override.into(), pos.id));
+                if let Some(take_profit_trader_notional) = pos.take_profit_trader_notional {
+                    PRICE_TRIGGER_ASC
+                        .remove(ctx.storage, (take_profit_trader_notional.into(), pos.id));
                 }
             }
             DirectionToNotional::Short => {
@@ -756,16 +582,17 @@ impl State<'_> {
                     PRICE_TRIGGER_ASC.remove(ctx.storage, (liquidation_price.into(), pos.id));
                 }
 
-                if let Some(take_profit_price) = pos.take_profit_price {
-                    PRICE_TRIGGER_DESC.remove(ctx.storage, (take_profit_price.into(), pos.id));
+                if let Some(take_profit_total) = pos.take_profit_total {
+                    PRICE_TRIGGER_DESC.remove(ctx.storage, (take_profit_total.into(), pos.id));
                 }
 
                 if let Some(stop_loss_override) = pos.stop_loss_override_notional {
                     PRICE_TRIGGER_ASC.remove(ctx.storage, (stop_loss_override.into(), pos.id));
                 }
 
-                if let Some(take_profit_override) = pos.take_profit_override_notional {
-                    PRICE_TRIGGER_DESC.remove(ctx.storage, (take_profit_override.into(), pos.id));
+                if let Some(take_profit_trader_notional) = pos.take_profit_trader_notional {
+                    PRICE_TRIGGER_DESC
+                        .remove(ctx.storage, (take_profit_trader_notional.into(), pos.id));
                 }
             }
         }
@@ -819,10 +646,10 @@ impl State<'_> {
                     )?;
                 }
 
-                if let Some(take_profit) = pos.take_profit_price {
+                if let Some(take_profit_total) = pos.take_profit_total {
                     PRICE_TRIGGER_ASC.save(
                         ctx.storage,
-                        (take_profit.into(), pos.id),
+                        (take_profit_total.into(), pos.id),
                         &LiquidationReason::MaxGains,
                     )?;
                 }
@@ -835,10 +662,10 @@ impl State<'_> {
                     )?;
                 }
 
-                if let Some(take_profit_override) = pos.take_profit_override_notional {
+                if let Some(take_profit_trader_notional) = pos.take_profit_trader_notional {
                     PRICE_TRIGGER_ASC.save(
                         ctx.storage,
-                        (take_profit_override.into(), pos.id),
+                        (take_profit_trader_notional.into(), pos.id),
                         &LiquidationReason::TakeProfit,
                     )?;
                 }
@@ -852,10 +679,10 @@ impl State<'_> {
                     )?;
                 }
 
-                if let Some(take_profit_price) = pos.take_profit_price {
+                if let Some(take_profit_total) = pos.take_profit_total {
                     PRICE_TRIGGER_DESC.save(
                         ctx.storage,
-                        (take_profit_price.into(), pos.id),
+                        (take_profit_total.into(), pos.id),
                         &LiquidationReason::MaxGains,
                     )?;
                 }
@@ -868,10 +695,10 @@ impl State<'_> {
                     )?;
                 }
 
-                if let Some(take_profit_override) = pos.take_profit_override_notional {
+                if let Some(take_profit_trader_notional) = pos.take_profit_trader_notional {
                     PRICE_TRIGGER_DESC.save(
                         ctx.storage,
-                        (take_profit_override.into(), pos.id),
+                        (take_profit_trader_notional.into(), pos.id),
                         &LiquidationReason::TakeProfit,
                     )?;
                 }
@@ -884,22 +711,185 @@ impl State<'_> {
 
 /// Result of checking if we can adjust net open interest
 #[must_use]
-pub(crate) enum AdjustOpenInterestResult {
+pub(crate) enum AdjustOpenInterest {
     /// Set the long interest to this value
     Long(Notional),
     /// Set the short interest to this value
     Short(Notional),
 }
 
-impl AdjustOpenInterestResult {
-    pub(crate) fn store(self, ctx: &mut StateContext) -> Result<()> {
+impl AdjustOpenInterest {
+    /// Validate that we can perform the net open interest adjustment described
+    pub(crate) fn new(
+        state: &State,
+        store: &dyn Storage,
+        notional_size_diff: Signed<Notional>,
+        dir: DirectionToNotional,
+        assert_delta_neutrality_fee_cap: bool,
+    ) -> Result<Self> {
+        let long_before = state.open_long_interest(store)?;
+        let short_before = state.open_short_interest(store)?;
+
+        let long_after;
+        let short_after;
+        let adjust_res;
+        match dir {
+            DirectionToNotional::Long => {
+                long_after = long_before
+                    .checked_add_signed(notional_size_diff)
+                    .context("adjust_net_open_interest: long interest would be negative")?;
+                short_after = short_before;
+                adjust_res = Self::Long(long_after);
+            }
+            DirectionToNotional::Short => {
+                long_after = long_before;
+                short_after = short_before
+                    .checked_add_signed(-notional_size_diff)
+                    .context("adjust_net_open_interest: short interest would be negative")?;
+                adjust_res = Self::Short(short_after);
+            }
+        };
+
+        if assert_delta_neutrality_fee_cap {
+            let net_notional_before = long_before
+                .into_signed()
+                .checked_sub(short_before.into_signed())?;
+            let net_notional_after = long_after
+                .into_signed()
+                .checked_sub(short_after.into_signed())?;
+
+            let cap: Number = state.config.delta_neutrality_fee_cap.into();
+            let sensitivity: Number = state.config.delta_neutrality_fee_sensitivity.into();
+
+            let is_capped_low = |x| x <= -cap;
+            let is_capped_high = |x| x >= cap;
+
+            let instant_delta_neutrality_before_uncapped =
+                net_notional_before.into_number() / sensitivity;
+            let instant_delta_neutrality_after_uncapped =
+                net_notional_after.into_number() / sensitivity;
+
+            let is_capped_low_before = is_capped_low(instant_delta_neutrality_before_uncapped);
+            let is_capped_high_before = is_capped_high(instant_delta_neutrality_before_uncapped);
+            let is_capped_low_after = is_capped_low(instant_delta_neutrality_after_uncapped);
+            let is_capped_high_after = is_capped_high(instant_delta_neutrality_after_uncapped);
+
+            // these strings are just to make error messages easier to understand
+            // since the UX is in terms of DirectionToBase, not DirectionToNotional
+            let market_type = state.market_type(store)?;
+            // May be different from dir, since updating/closing a position can
+            // cause a notional size diff which is opposite to the position
+            // direction.
+            let notional_direction = if notional_size_diff.is_positive_or_zero() {
+                DirectionToNotional::Long
+            } else {
+                DirectionToNotional::Short
+            };
+            let base_direction = notional_direction.into_base(market_type);
+
+            let res = if is_capped_low_before {
+                match notional_direction {
+                    // We were already too short, disallow going shorter
+                    DirectionToNotional::Short => Err(already(
+                        base_direction,
+                        cap,
+                        sensitivity,
+                        instant_delta_neutrality_before_uncapped,
+                        net_notional_before,
+                        net_notional_after,
+                    )),
+                    // We don't allow the user to swing the market all the way from capped low to capped high
+                    DirectionToNotional::Long => {
+                        if is_capped_high_after {
+                            Err(flipped(
+                                base_direction,
+                                cap,
+                                sensitivity,
+                                instant_delta_neutrality_before_uncapped,
+                                instant_delta_neutrality_after_uncapped,
+                                net_notional_before,
+                                net_notional_after,
+                            ))
+                        } else {
+                            Ok(())
+                        }
+                    }
+                }
+            } else if is_capped_high_before {
+                match notional_direction {
+                    // We were already too long, disallow going longer
+                    DirectionToNotional::Long => Err(already(
+                        base_direction,
+                        cap,
+                        sensitivity,
+                        instant_delta_neutrality_before_uncapped,
+                        net_notional_before,
+                        net_notional_after,
+                    )),
+                    // We don't allow the user to swing the market all the way from capped high to capped low
+                    DirectionToNotional::Short => {
+                        if is_capped_low_after {
+                            Err(flipped(
+                                base_direction,
+                                cap,
+                                sensitivity,
+                                instant_delta_neutrality_before_uncapped,
+                                instant_delta_neutrality_after_uncapped,
+                                net_notional_before,
+                                net_notional_after,
+                            ))
+                        } else {
+                            Ok(())
+                        }
+                    }
+                }
+            } else if is_capped_low_after {
+                debug_assert!(notional_size_diff <= Signed::zero());
+                Err(newly(
+                    base_direction,
+                    cap,
+                    sensitivity,
+                    instant_delta_neutrality_after_uncapped,
+                    net_notional_before,
+                    net_notional_after,
+                ))
+            } else if is_capped_high_after {
+                debug_assert!(notional_size_diff >= Signed::zero());
+                Err(newly(
+                    base_direction,
+                    cap,
+                    sensitivity,
+                    instant_delta_neutrality_after_uncapped,
+                    net_notional_before,
+                    net_notional_after,
+                ))
+            } else {
+                Ok(())
+            };
+
+            res.map(|()| adjust_res).map_err(MarketError::into_anyhow)
+        } else {
+            Ok(adjust_res)
+        }
+    }
+    pub(crate) fn net_notional(
+        &self,
+        state: &State,
+        store: &dyn Storage,
+    ) -> Result<Signed<Notional>> {
+        Ok(match self {
+            Self::Long(long) => {
+                long.into_signed() - state.open_short_interest(store)?.into_signed()
+            }
+            Self::Short(short) => {
+                state.open_long_interest(store)?.into_signed() - short.into_signed()
+            }
+        })
+    }
+    pub(crate) fn apply(self, ctx: &mut StateContext) -> Result<()> {
         match self {
-            AdjustOpenInterestResult::Long(long) => {
-                OPEN_NOTIONAL_LONG_INTEREST.save(ctx.storage, &long)?
-            }
-            AdjustOpenInterestResult::Short(short) => {
-                OPEN_NOTIONAL_SHORT_INTEREST.save(ctx.storage, &short)?
-            }
+            Self::Long(long) => OPEN_NOTIONAL_LONG_INTEREST.save(ctx.storage, &long)?,
+            Self::Short(short) => OPEN_NOTIONAL_SHORT_INTEREST.save(ctx.storage, &short)?,
         }
         Ok(())
     }

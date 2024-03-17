@@ -291,11 +291,11 @@ enum FarmingEpochStartTime {
 impl FarmingEpochStartTime {
     const ITEM: Item<'static, Self> = Item::new("farming-epoch");
 
-    pub fn may_load(store: &dyn Storage) -> Result<Option<Self>> {
+    pub(crate) fn may_load(store: &dyn Storage) -> Result<Option<Self>> {
         Self::ITEM.may_load(store).map_err(|err| err.into())
     }
 
-    pub fn save(&self, store: &mut dyn Storage) -> Result<()> {
+    pub(crate) fn save(&self, store: &mut dyn Storage) -> Result<()> {
         Self::ITEM.save(store, self).map_err(|err| err.into())
     }
 }

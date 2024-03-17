@@ -39,12 +39,12 @@ fn position_data_long() {
         liquifunded_at: Default::default(),
         next_liquifunding: Default::default(),
         stop_loss_override: None,
-        take_profit_override: None,
+        take_profit_trader: None,
         liquidation_margin: Default::default(),
         liquidation_price: None,
-        take_profit_price: None,
+        take_profit_total: None,
         stop_loss_override_notional: None,
-        take_profit_override_notional: None,
+        take_profit_trader_notional: None,
     };
 
     let liquidation_price =
@@ -66,7 +66,7 @@ fn position_data_long() {
         Number::from(90u64)
     );
     assert_eq!(
-        pos.take_profit_price(&price_point, MarketType::CollateralIsQuote)
+        pos.take_profit_price_total(&price_point, MarketType::CollateralIsQuote)
             .unwrap()
             .unwrap()
             .into_number(),
@@ -108,12 +108,12 @@ fn position_data_short() {
         liquifunded_at: Default::default(),
         next_liquifunding: Default::default(),
         stop_loss_override: None,
-        take_profit_override: None,
+        take_profit_trader: None,
         liquidation_margin: Default::default(),
         liquidation_price: None,
-        take_profit_price: None,
+        take_profit_total: None,
         stop_loss_override_notional: None,
-        take_profit_override_notional: None,
+        take_profit_trader_notional: None,
     };
 
     let liquidation_price =
@@ -135,7 +135,7 @@ fn position_data_short() {
         Number::from_ratio_u256(15u64, 100u64)
     );
     assert_eq!(
-        pos.take_profit_price(&price_point, MarketType::CollateralIsQuote)
+        pos.take_profit_price_total(&price_point, MarketType::CollateralIsQuote)
             .unwrap()
             .unwrap()
             .into_number(),
@@ -176,17 +176,17 @@ fn position_data_infinite_max_gains() {
         liquifunded_at: Default::default(),
         next_liquifunding: Default::default(),
         stop_loss_override: None,
-        take_profit_override: None,
+        take_profit_trader: None,
         liquidation_margin: Default::default(),
         liquidation_price: None,
-        take_profit_price: None,
+        take_profit_total: None,
         stop_loss_override_notional: None,
-        take_profit_override_notional: None,
+        take_profit_trader_notional: None,
     };
 
     // infinity max gains in notional asset
     assert_eq!(
-        pos.take_profit_price(&price_point, MarketType::CollateralIsBase)
+        pos.take_profit_price_total(&price_point, MarketType::CollateralIsBase)
             .unwrap(),
         None
     );
@@ -211,12 +211,12 @@ fn position_data_open_flip_short() {
         liquifunded_at: Default::default(),
         next_liquifunding: Default::default(),
         stop_loss_override: None,
-        take_profit_override: None,
+        take_profit_trader: None,
         liquidation_margin: Default::default(),
         liquidation_price: None,
-        take_profit_price: None,
+        take_profit_total: None,
         stop_loss_override_notional: None,
-        take_profit_override_notional: None,
+        take_profit_trader_notional: None,
     };
 
     let price = Price::try_from_number(Number::from(300u64)).unwrap();
@@ -279,12 +279,12 @@ fn position_data_open_flip_long() {
         liquifunded_at: Default::default(),
         next_liquifunding: Default::default(),
         stop_loss_override: None,
-        take_profit_override: None,
+        take_profit_trader: None,
         liquidation_margin: Default::default(),
         liquidation_price: None,
-        take_profit_price: None,
+        take_profit_total: None,
         stop_loss_override_notional: None,
-        take_profit_override_notional: None,
+        take_profit_trader_notional: None,
     };
 
     let price = Price::try_from_number(Number::from(300u64)).unwrap();

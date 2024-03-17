@@ -1,7 +1,4 @@
-// FIXME - started fixing up warnings for the sake of this PR
-// but at a certain point it just seemed too much work for a temporary situation
-// this should be brought back as the deploy code is refactored
-#![allow(warnings)]
+#![deny(clippy::as_conversions)]
 
 use clap::Parser;
 use cli::{Cmd, Subcommand, TestnetSub};

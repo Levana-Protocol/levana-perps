@@ -1,7 +1,7 @@
 // re-exporting
 pub(crate) mod config;
 pub(crate) mod crank;
-pub mod data_series;
+pub(crate) mod data_series;
 pub(crate) mod deferred_execution;
 pub(crate) mod delta_neutrality_fee;
 pub(crate) mod fees;

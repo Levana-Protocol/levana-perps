@@ -193,7 +193,12 @@ fn position_stop_loss_long() {
         .unwrap();
 
     market
-        .exec_set_trigger_order(&trader, pos_id, Some(stop_loss_override), None)
+        .exec_set_trigger_order(
+            &trader,
+            pos_id,
+            Some(stop_loss_override),
+            None::<PriceBaseInQuote>,
+        )
         .unwrap();
 
     trigger_and_assert(pos_id);
@@ -251,7 +256,12 @@ fn position_stop_loss_short() {
         .unwrap();
 
     market
-        .exec_set_trigger_order(&trader, pos_id, Some(stop_loss_override), None)
+        .exec_set_trigger_order(
+            &trader,
+            pos_id,
+            Some(stop_loss_override),
+            None::<PriceBaseInQuote>,
+        )
         .unwrap();
 
     trigger_and_assert(pos_id);

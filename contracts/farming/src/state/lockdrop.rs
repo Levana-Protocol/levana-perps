@@ -321,7 +321,7 @@ struct Balance {
 }
 
 impl Balance {
-    pub fn total(&self) -> Result<Collateral> {
+    pub(crate) fn total(&self) -> Result<Collateral> {
         let total_deposit = self.deposit_before_sunset + self.deposit_after_sunset;
         let total_withdrawal = self.withdrawal_before_sunset + self.withdrawal_after_sunset;
         let total = total_deposit.checked_sub(total_withdrawal)?;
@@ -342,10 +342,11 @@ impl LockdropBuckets {
     const TOTAL_SHARES: Item<'static, LockdropShares> =
         Item::new(namespace::LOCKDROP_BUCKETS_TOTAL_SHARES);
 
-    pub fn init(storage: &mut dyn Storage, msg: &InstantiateMsg) -> Result<()> {
+    pub(crate) fn init(storage: &mut dyn Storage, msg: &InstantiateMsg) -> Result<()> {
         for bucket in msg.lockdrop_buckets.iter() {
-            let duration =
-                Duration::from_seconds((bucket.bucket_id.0 * msg.lockdrop_month_seconds) as u64);
+            let duration = Duration::from_seconds(u64::try_from(
+                bucket.bucket_id.0 * msg.lockdrop_month_seconds,
+            )?);
 
             Self::MULTIPLIER.save(storage, bucket.bucket_id, &bucket.multiplier)?;
             Self::DURATION.save(storage, bucket.bucket_id, &duration)?;

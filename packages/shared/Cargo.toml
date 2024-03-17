@@ -15,7 +15,7 @@ schemars = { version = "0.8.11", default-features = false }
 anyhow = "1.0.67"
 cw2 = "1.0.0"
 serde-json-wasm = "0.4.1"
-cosmwasm-schema = "1.1.9"
+cosmwasm-schema = {git = "https://github.com/Levana-Protocol/cosmwasm.git", rev = "6e36567b8359214f6690c8de081bb1e237803fb1", features=["allow-unknown-fields"] }
 arbitrary = { version = "1.2.0", optional = true, default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.90", default-features = false }
 pyth-sdk-cw = "1.0.0"

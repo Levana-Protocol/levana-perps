@@ -83,6 +83,14 @@ impl LiquidityStats {
         }))
         .context("liquidity_deposit_inner: new shares is (impossibly) 0")
     }
+
+    /// approximate equality comparison, helpful for tests
+    pub fn approx_eq(&self, other: &Self) -> bool {
+        self.locked.approx_eq(other.locked)
+            && self.unlocked.approx_eq(other.unlocked)
+            && self.total_lp.approx_eq(other.total_lp)
+            && self.total_xlp.approx_eq(other.total_xlp)
+    }
 }
 
 /// Liquidity events
@@ -101,7 +109,6 @@ pub mod events {
         pub withdrawn_funds_usd: NonZero<Usd>,
     }
 
-    impl PerpEvent for WithdrawEvent {}
     impl From<WithdrawEvent> for cosmwasm_std::Event {
         fn from(src: WithdrawEvent) -> Self {
             cosmwasm_std::Event::new("liquidity-withdraw").add_attributes(vec![
@@ -122,7 +129,6 @@ pub mod events {
         pub shares: NonZero<LpToken>,
     }
 
-    impl PerpEvent for DepositEvent {}
     impl From<DepositEvent> for cosmwasm_std::Event {
         fn from(src: DepositEvent) -> Self {
             cosmwasm_std::Event::new("liquidity-deposit").add_attributes(vec![
@@ -139,7 +145,6 @@ pub mod events {
         pub amount: NonZero<Collateral>,
     }
 
-    impl PerpEvent for LockEvent {}
     impl From<LockEvent> for cosmwasm_std::Event {
         fn from(src: LockEvent) -> Self {
             cosmwasm_std::Event::new("liquidity-lock")
@@ -153,7 +158,6 @@ pub mod events {
         pub amount: NonZero<Collateral>,
     }
 
-    impl PerpEvent for UnlockEvent {}
     impl From<UnlockEvent> for cosmwasm_std::Event {
         fn from(src: UnlockEvent) -> Self {
             cosmwasm_std::Event::new("liquidity-unlock")
@@ -167,7 +171,6 @@ pub mod events {
         pub amount: Signed<Collateral>,
     }
 
-    impl PerpEvent for LockUpdateEvent {}
     impl From<LockUpdateEvent> for cosmwasm_std::Event {
         fn from(src: LockUpdateEvent) -> Self {
             cosmwasm_std::Event::new("liquidity-update")
@@ -224,8 +227,6 @@ pub mod events {
         }
     }
 
-    impl PerpEvent for LiquidityPoolSizeEvent {}
-
     impl From<LiquidityPoolSizeEvent> for cosmwasm_std::Event {
         fn from(src: LiquidityPoolSizeEvent) -> Self {
             cosmwasm_std::Event::new("liquidity-pool-size").add_attributes(vec![
@@ -274,8 +275,6 @@ pub mod events {
         /// Current delta neutrality ratio: net-notional in collateral / total liquidity.
         pub delta_neutrality_ratio: Signed<Decimal256>,
     }
-
-    impl PerpEvent for DeltaNeutralityRatioEvent {}
 
     impl From<DeltaNeutralityRatioEvent> for cosmwasm_std::Event {
         fn from(

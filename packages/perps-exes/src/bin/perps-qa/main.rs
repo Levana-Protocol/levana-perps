@@ -1,3 +1,5 @@
+#![deny(clippy::as_conversions)]
+
 mod capping;
 mod cli;
 mod wallet;
@@ -185,7 +187,7 @@ async fn main_inner() -> Result<()> {
                 .liquidation_price_base
                 .map_or("No price found".to_owned(), |item| item.to_string());
             let take_profit_price = position
-                .take_profit_price_base
+                .take_profit_total_base
                 .map_or("No price found".to_owned(), |item| item.to_string());
             println!("Collateral: {}", position.deposit_collateral);
             println!("Active Collateral: {}", position.active_collateral);
@@ -197,7 +199,6 @@ async fn main_inner() -> Result<()> {
                 }
             );
             println!("Leverage: {}", position.leverage);
-            println!("Max gains: {}", position.max_gains_in_quote);
             println!("Liquidation Price: {}", liquidation_price);
             println!("Profit price: {}", take_profit_price);
         }

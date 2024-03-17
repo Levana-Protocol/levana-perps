@@ -11,7 +11,6 @@ use chrono::Utc;
 use cosmos::{Address, HasAddress};
 use cosmos::{Coin, Cosmos};
 use cosmos::{DynamicGasMultiplier, Wallet};
-use cosmwasm_std::Decimal256;
 use parking_lot::Mutex;
 use perps_exes::config::GasAmount;
 use reqwest::Client;
@@ -137,8 +136,8 @@ pub(crate) struct App {
     pub(crate) live_since: DateTime<Utc>,
     pub(crate) gas_refill: RwLock<HashMap<Address, GasRecords>>,
     pub(crate) funds_used: RwLock<HashMap<Address, FundUsed>>,
-    pub(crate) endpoint_stable: String,
-    pub(crate) endpoint_edge: String,
+    pub(crate) endpoint_stable: reqwest::Url,
+    pub(crate) endpoint_edge: reqwest::Url,
     pub(crate) pyth_market_hours: PythMarketHours,
     pub(crate) opt: Opt,
     pub(crate) epoch_last_seen: Mutex<Option<Instant>>,
@@ -166,6 +165,17 @@ impl Opt {
             tracing::info!("Overriding chain ID to: {chain_id}");
             builder.set_chain_id(chain_id.clone());
         }
+        if let Some(block_lag_allowed) = self.block_lag_allowed {
+            tracing::info!("Overriding block lag allowed to: {block_lag_allowed}");
+            builder.set_block_lag_allowed(Some(block_lag_allowed));
+        }
+        if let Some(block_age_allowed) = self.block_age_allowed {
+            tracing::info!("Overriding block age allowed to: {block_age_allowed}");
+            builder.set_latest_block_age_allowed(Some(Duration::from_secs(block_age_allowed)));
+        }
+        if config.log_requests {
+            builder.set_log_requests(true);
+        }
         match &config.gas_multiplier {
             Some(x) => {
                 tracing::info!("Setting static gas multiplier value of {x}");
@@ -183,7 +193,7 @@ impl Opt {
             builder.set_max_gas_price(inner.max_gas_price);
         }
 
-        builder.set_referer_header(Some("https://bots.levana.exchange/".to_owned()));
+        builder.set_referer_header(Some(self.referer_header.to_string()));
         builder.build().await.map_err(|e| e.into())
     }
 
@@ -211,6 +221,7 @@ impl Opt {
                 let (_, factory, frontend) = get_factory_info_testnet(
                     &cosmos,
                     &client,
+                    self.referer_header.clone(),
                     inner.tracker,
                     inner.faucet,
                     &inner.contract_family,
@@ -359,20 +370,14 @@ pub(crate) enum CrankTriggerReason {
         #[allow(dead_code)]
         on_chain_oracle_publish_time: DateTime<Utc>,
     },
-    LargePriceDelta {
-        oracle_to_off_chain_delta: Decimal256,
-        market_to_off_chain_delta: Decimal256,
-        // if the price delta is large, we may want to use a different wallet
-        very_high_price_delta: bool,
-    },
     /// Something in the crank queue, either deferred exec or liquifunding, needs a new price.
     CrankNeedsNewPrice {
-        #[allow(dead_code)]
-        on_chain_oracle_publish_time: DateTime<Utc>,
         work_item: DateTime<Utc>,
     },
     CrankWorkAvailable,
-    PriceWillTrigger,
+    PriceWillTrigger {
+        gas_level: GasLevel,
+    },
     MoreWorkFound,
 }
 
@@ -385,13 +390,7 @@ impl Display for CrankTriggerReason {
                 off_chain_publish_time: _,
                 on_chain_oracle_publish_time: _,
             } => write!(f, "On chain price too old {on_chain_age:?}"),
-            CrankTriggerReason::LargePriceDelta {
-                oracle_to_off_chain_delta,
-                market_to_off_chain_delta,
-                very_high_price_delta: _,
-            } => write!(f, "Large price delta found, delta to oracle: {oracle_to_off_chain_delta}, delta to market: {market_to_off_chain_delta}"),
             CrankTriggerReason::CrankNeedsNewPrice {
-                on_chain_oracle_publish_time: _,
                 work_item: deferred_work_item,
             } => write!(
                 f,
@@ -400,8 +399,11 @@ impl Display for CrankTriggerReason {
             CrankTriggerReason::CrankWorkAvailable => {
                 f.write_str("Price bot discovered crank work available")
             }
-            CrankTriggerReason::PriceWillTrigger => {
-                f.write_str("New price would trigger an action")
+            CrankTriggerReason::PriceWillTrigger { gas_level } => {
+                write!(
+                    f,
+                    "New price would trigger an action with {gas_level} gas level"
+                )
             }
             CrankTriggerReason::MoreWorkFound => f.write_str("Crank running discovered more work"),
         }
@@ -413,37 +415,42 @@ impl CrankTriggerReason {
         match self {
             CrankTriggerReason::NoPriceOnChain
             | CrankTriggerReason::OnChainTooOld { .. }
-            | CrankTriggerReason::LargePriceDelta { .. }
             | CrankTriggerReason::CrankNeedsNewPrice { .. }
-            | CrankTriggerReason::PriceWillTrigger => true,
+            | CrankTriggerReason::PriceWillTrigger { .. } => true,
             CrankTriggerReason::CrankWorkAvailable | CrankTriggerReason::MoreWorkFound => false,
         }
     }
 
-    /// Does this action warrant paying very high gas costs?
-    pub(crate) fn needs_high_gas(&self) -> Option<HighGas> {
+    /// What gas level is warranted for this action?
+    pub(crate) fn gas_level(&self) -> GasLevel {
         match self {
-            CrankTriggerReason::LargePriceDelta {
-                very_high_price_delta,
-                ..
-            } => Some(if *very_high_price_delta {
-                HighGas::VeryHigh
-            } else {
-                HighGas::High
-            }),
+            CrankTriggerReason::PriceWillTrigger { gas_level } => *gas_level,
             CrankTriggerReason::NoPriceOnChain
             | CrankTriggerReason::OnChainTooOld { .. }
             | CrankTriggerReason::CrankNeedsNewPrice { .. }
             | CrankTriggerReason::CrankWorkAvailable
-            | CrankTriggerReason::PriceWillTrigger
-            | CrankTriggerReason::MoreWorkFound => None,
+            | CrankTriggerReason::MoreWorkFound => GasLevel::Normal,
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum HighGas {
+/// What level of gas is necessary when doing a price update for a price trigger?
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+pub(crate) enum GasLevel {
+    /// Normal, not a particularly high price delta
+    Normal,
+    /// We've passed the high gas delta from config, so use more gas
     High,
-    // So high we treat it differently with its own wallet
+    /// The delta is high enough to risk a delayed-trigger attack, use a separate task and much higher gas
     VeryHigh,
+}
+
+impl Display for GasLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(match self {
+            GasLevel::Normal => "normal",
+            GasLevel::High => "high",
+            GasLevel::VeryHigh => "very high",
+        })
+    }
 }

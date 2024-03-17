@@ -34,7 +34,7 @@ pub(crate) fn add_cosmos_msg(
                 });
                 Ok(())
             }
-            BankMsg::Burn { amount } => anyhow::bail!("No support for burn"),
+            BankMsg::Burn { amount: _ } => anyhow::bail!("No support for burn"),
             _ => anyhow::bail!("Unknown BankMsg variant"),
         },
         CosmosMsg::Custom(_) => anyhow::bail!("No support for custom"),
@@ -71,7 +71,7 @@ pub(crate) fn add_cosmos_msg(
                 .map(|_| ())
                 .map_err(|e| e.into()),
             WasmMsg::UpdateAdmin { .. } => anyhow::bail!("No support for UpdateAdmin"),
-            WasmMsg::ClearAdmin { contract_addr } => anyhow::bail!("No support for ClearAdmin"),
+            WasmMsg::ClearAdmin { contract_addr: _ } => anyhow::bail!("No support for ClearAdmin"),
             _ => anyhow::bail!("Unknown Wasm variant"),
         },
         CosmosMsg::Gov(_) => anyhow::bail!("No support for gov"),

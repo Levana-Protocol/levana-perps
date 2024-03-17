@@ -1,6 +1,8 @@
+mod deferred_exec;
 mod list_contracts;
 mod lp_history;
 mod token_balances;
+mod tvl_report;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -53,6 +55,11 @@ enum Sub {
         #[clap(flatten)]
         inner: OpenPositionCsvOpt,
     },
+    /// Export deferred execution IDs and status
+    DeferredExecCsv {
+        #[clap(flatten)]
+        inner: deferred_exec::DeferredExecCsvOpt,
+    },
     /// Export a CSV with stats on LP actions
     LpActionCsv {
         #[clap(flatten)]
@@ -68,6 +75,11 @@ enum Sub {
         #[clap(flatten)]
         inner: list_contracts::ListContractsOpt,
     },
+    /// Capture TVL (trader and LP deposits) for all markets
+    TvlReport {
+        #[clap(flatten)]
+        inner: tvl_report::TvlReportOpt,
+    },
 }
 
 impl UtilOpt {
@@ -77,9 +89,11 @@ impl UtilOpt {
             Sub::DeployPyth { inner } => deploy_pyth_opt(opt, inner).await,
             Sub::TradeVolume { inner } => trade_volume(opt, inner).await,
             Sub::OpenPositionCsv { inner } => open_position_csv(opt, inner).await,
+            Sub::DeferredExecCsv { inner } => inner.go(opt).await,
             Sub::LpActionCsv { inner } => inner.go(opt).await,
             Sub::TokenBalances { inner } => inner.go(opt).await,
             Sub::ListContracts { inner } => inner.go().await,
+            Sub::TvlReport { inner } => inner.go(opt).await,
         }
     }
 }
@@ -92,9 +106,6 @@ struct UpdatePythOpt {
     /// Market ID to do the update for
     #[clap(long)]
     market: Vec<MarketId>,
-    /// Override Pyth config file
-    #[clap(long, env = "LEVANA_BOTS_CONFIG_PYTH")]
-    pub(crate) config_pyth: Option<PathBuf>,
     /// Override chain config file
     #[clap(long, env = "LEVANA_BOTS_CONFIG_CHAIN")]
     pub(crate) config_chain: Option<PathBuf>,
@@ -108,7 +119,6 @@ async fn update_pyth(
     UpdatePythOpt {
         market,
         network,
-        config_pyth,
         config_chain,
         keep_going,
     }: UpdatePythOpt,
@@ -497,7 +507,7 @@ async fn csv_helper(
 
         if let Some(record) = old_data.get(&(MarketId::clone(&market_id), pos_id)) {
             let mut csv = csv.lock().await;
-            csv.serialize(&record)?;
+            csv.serialize(record)?;
             csv.flush()?;
             continue;
         }
@@ -506,6 +516,7 @@ async fn csv_helper(
             id,
             kind,
             timestamp,
+            price_timestamp,
             collateral: _,
             transfer_collateral: _,
             leverage,
@@ -514,7 +525,7 @@ async fn csv_helper(
             delta_neutrality_fee: _,
             old_owner: _,
             new_owner: _,
-            take_profit_override: _,
+            take_profit_trader: _,
             stop_loss_override: _,
         } = contract
             .first_position_action(pos_id)
@@ -524,6 +535,9 @@ async fn csv_helper(
         anyhow::ensure!(id == Some(pos_id));
 
         let timestamp = timestamp.try_into_chrono_datetime()?;
+        let price_timestamp = price_timestamp
+            .map(|x| x.try_into_chrono_datetime())
+            .transpose()?;
         let leverage = leverage
             .with_context(|| format!("Missing leverage on position open action for {pos_id}"))?;
 
@@ -537,6 +551,7 @@ async fn csv_helper(
             market: MarketId::clone(&market_id),
             id: pos_id,
             timestamp,
+            price_timestamp,
             leverage,
         };
 
@@ -569,6 +584,7 @@ struct PositionRecordCommon {
     market: MarketId,
     id: PositionId,
     timestamp: DateTime<Utc>,
+    price_timestamp: Option<DateTime<Utc>>,
     leverage: LeverageToBase,
 }
 
@@ -608,6 +624,7 @@ impl PositionRecord {
             market,
             id,
             timestamp,
+            price_timestamp,
             leverage,
         }: PositionRecordCommon,
         position: &PositionQueryResponse,
@@ -625,7 +642,7 @@ impl PositionRecord {
         Ok(Self {
             market: market.clone(),
             id,
-            opened_at: timestamp,
+            opened_at: price_timestamp.unwrap_or(timestamp),
             closed_at: None,
             leverage,
             owner: position.owner.as_str().parse()?,
@@ -647,6 +664,7 @@ impl PositionRecord {
             market,
             id,
             timestamp,
+            price_timestamp,
             leverage,
         }: PositionRecordCommon,
         position: &ClosedPosition,
@@ -664,7 +682,7 @@ impl PositionRecord {
         Ok(Self {
             market,
             id,
-            opened_at: timestamp,
+            opened_at: price_timestamp.unwrap_or(timestamp),
             closed_at: Some(position.close_time.try_into_chrono_datetime()?),
             leverage,
             owner: position.owner.as_str().parse()?,

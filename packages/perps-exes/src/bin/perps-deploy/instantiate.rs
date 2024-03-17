@@ -2,11 +2,7 @@ use std::collections::HashSet;
 
 use anyhow::{Context, Result};
 use cosmos::{Address, CodeId, ContractAdmin, Cosmos, HasAddress, Wallet};
-use msg::contracts::market::config::Config as MarketConfig;
-use msg::contracts::market::entry::{InitialPrice, StatusResp};
-use msg::contracts::market::spot_price::{
-    PythConfigInit, PythPriceServiceNetwork, SpotPriceConfig, SpotPriceConfigInit, StrideConfigInit,
-};
+use msg::contracts::market::spot_price::{PythConfigInit, SpotPriceConfigInit, StrideConfigInit};
 use msg::prelude::*;
 use msg::{
     contracts::{
@@ -73,16 +69,18 @@ impl App {
                         .markets
                         .get(&market_id)
                         .with_context(|| format!("No oracle market found for {market_id}"))?;
-
-                    let global_price_config = &self.basic.price_config;
+                    let stride = match market.stride_contract_override {
+                        Some(stride) => Some(stride),
+                        None => oracle.stride_fallback.clone().map(|x| x.contract),
+                    };
 
                     SpotPriceConfigInit::Oracle {
                         pyth: oracle.pyth.as_ref().map(|pyth| PythConfigInit {
                             contract_address: pyth.contract.get_address_string().into(),
                             network: pyth.r#type,
                         }),
-                        stride: oracle.stride.as_ref().map(|stride| StrideConfigInit {
-                            contract_address: stride.contract.get_address_string().into(),
+                        stride: stride.map(|addr| StrideConfigInit {
+                            contract_address: addr.get_address_string().into(),
                         }),
                         feeds: market
                             .feeds
@@ -120,7 +118,6 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateOpt) -> Result<()> {
         code_id_source: CodeIdSource::Tracker(app.tracker),
         trading_competition: app.trading_competition,
         faucet_admin: Some(app.wallet_manager),
-        price_source: app.price_source.clone(),
     })
     .await?;
 
@@ -174,7 +171,6 @@ pub(crate) struct InstantiateParams<'a> {
     pub(crate) trading_competition: bool,
     /// Address that should be set as a faucet admin
     pub(crate) faucet_admin: Option<Address>,
-    pub(crate) price_source: crate::app::PriceSourceConfig,
 }
 
 pub(crate) struct InstantiateMarket {
@@ -200,7 +196,6 @@ pub(crate) async fn instantiate(
         faucet_admin,
         markets,
         family,
-        price_source,
     }: InstantiateParams<'_>,
 ) -> Result<InstantiateResponse> {
     let (
@@ -266,7 +261,6 @@ pub(crate) async fn instantiate(
                     trading_competition,
                     faucet_admin,
                     factory: factory.clone(),
-                    spot_price: spot_price.clone(),
                 },
             )
             .await?;
@@ -311,9 +305,11 @@ pub(crate) async fn instantiate(
             SpotPriceConfigInit::Oracle {
                 feeds, feeds_usd, ..
             } => {
-                if feeds.iter().chain(feeds_usd.iter()).any(|f| match f.data {
-                    msg::contracts::market::spot_price::SpotPriceFeedDataInit::Pyth { .. } => true,
-                    _ => false,
+                if feeds.iter().chain(feeds_usd.iter()).any(|f| {
+                    matches!(
+                        f.data,
+                        msg::contracts::market::spot_price::SpotPriceFeedDataInit::Pyth { .. }
+                    )
                 }) {
                     log::info!("not doing initial crank for {} because it contains pyth feeds which may need a publish first", market.market_id);
                 } else {
@@ -362,7 +358,6 @@ pub(crate) struct AddMarketParams {
     pub(crate) trading_competition: bool,
     pub(crate) faucet_admin: Option<Address>,
     pub(crate) factory: Factory,
-    pub(crate) spot_price: SpotPriceConfigInit,
 }
 
 impl InstantiateMarket {
@@ -375,7 +370,6 @@ impl InstantiateMarket {
             trading_competition,
             faucet_admin,
             factory,
-            spot_price,
         }: AddMarketParams,
     ) -> Result<MarketResponse> {
         let InstantiateMarket {

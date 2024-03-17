@@ -62,6 +62,7 @@ pub enum ErrorId {
 
     // Errors that come from MarketError
     InvalidInfiniteMaxGains,
+    InvalidInfiniteTakeProfitPrice,
     MaxGainsTooLarge,
     WithdrawTooMuch,
     InsufficientLiquidityForWithdrawal,
@@ -78,6 +79,8 @@ pub enum ErrorId {
     LimitOrderAlreadyCanceling,
     PositionAlreadyClosing,
     NoPricePublishTimeFound,
+    PositionAlreadyClosed,
+    MissingTakeProfit,
 }
 
 /// Source within the protocol for the error
@@ -108,7 +111,7 @@ macro_rules! perp_error {
             id: $id,
             domain: $domain,
             description: format!($($t)*),
-            data: None as Option<()>,
+            data: None::<()>,
         }
     }};
 }
@@ -134,7 +137,7 @@ macro_rules! perp_anyhow {
             id: $id,
             domain: $domain,
             description: format!($($t)*),
-            data: None as Option<()>,
+            data: None::<()>,
         })
     }};
 }
@@ -161,7 +164,7 @@ macro_rules! perp_ensure {
                 id: $id,
                 domain: $domain,
                 description: format!($($t)*),
-                data: None as Option<()>,
+                data: None::<()>,
             }));
         }
     }};
@@ -175,7 +178,7 @@ macro_rules! perp_bail {
             id: $id,
             domain: $domain,
             description: format!($($t)*),
-            data: None as Option<()>,
+            data: None::<()>,
         }));
     }};
 }

@@ -84,6 +84,11 @@ pub(crate) struct BotConfig {
     pub(crate) ignored_markets: HashSet<MarketId>,
     /// How many seconds to ignore errors after an epoch
     pub(crate) ignore_errors_after_epoch_seconds: u32,
+    /// Run optional services?
+    pub(crate) run_optional_services: bool,
+    /// How long to delay after price bot completes before running again
+    pub(crate) price_bot_delay: Option<tokio::time::Duration>,
+    pub(crate) log_requests: bool,
 }
 
 pub(crate) struct NeedsPriceUpdateParams {
@@ -214,15 +219,7 @@ impl Opt {
             } else {
                 None
             },
-            high_gas_wallet: if partial.price {
-                Some(Arc::new(self.get_price_wallet(
-                    network.get_address_hrp(),
-                    &wallet_phrase_name,
-                    1,
-                )?))
-            } else {
-                None
-            },
+            high_gas_wallet: None,
             watcher: partial.watcher.clone(),
             gas_multiplier,
             needs_price_update_params: NeedsPriceUpdateParams {
@@ -240,6 +237,9 @@ impl Opt {
             ignored_markets: self.ignored_markets.iter().cloned().collect(),
             // Never used on testnet, just setting a reasonable default
             ignore_errors_after_epoch_seconds: 300,
+            run_optional_services: !self.disable_optional_services,
+            price_bot_delay: self.price_bot_delay.map(tokio::time::Duration::from_millis),
+            log_requests: self.log_requests,
         };
 
         Ok((config, Some(faucet_bot_runner)))
@@ -284,9 +284,14 @@ impl Opt {
 
         let gas_wallet = get_wallet(1)?;
         let price_wallet = get_wallet(2)?;
-        let high_gas_wallet = get_wallet(3)?;
+
+        let (high_gas_wallet, crank_wallet_start) = match network.get_address_hrp().as_str() {
+            "osmo" => (Some(Arc::new(get_wallet(3)?)), 4),
+            _ => (None, 3),
+        };
+
         let crank_wallets = (0..*crank_wallets)
-            .map(|idx| get_wallet(idx + 4))
+            .map(|idx| get_wallet(idx + crank_wallet_start))
             .collect::<Result<_, _>>()?;
 
         let watcher = match watcher_config {
@@ -317,7 +322,7 @@ impl Opt {
             network: *network,
             price_wallet: Some(price_wallet.into()),
             crank_wallets,
-            high_gas_wallet: Some(Arc::new(high_gas_wallet)),
+            high_gas_wallet,
             watcher,
             gas_multiplier: *gas_multiplier,
             needs_price_update_params: NeedsPriceUpdateParams {
@@ -337,6 +342,9 @@ impl Opt {
             gas_wallet: Arc::new(gas_wallet),
             ignored_markets: self.ignored_markets.iter().cloned().collect(),
             ignore_errors_after_epoch_seconds: *ignore_errors_after_epoch_seconds,
+            run_optional_services: !self.disable_optional_services,
+            price_bot_delay: self.price_bot_delay.map(tokio::time::Duration::from_millis),
+            log_requests: self.log_requests,
         })
     }
 }

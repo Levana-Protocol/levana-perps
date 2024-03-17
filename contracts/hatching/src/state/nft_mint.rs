@@ -92,11 +92,11 @@ pub(crate) enum NftExecuteMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub(crate) struct MintMsg {
     /// Unique ID of the NFT
-    pub token_id: String,
+    pub(crate) token_id: String,
     /// The owner of the newly minted NFT
-    pub owner: String,
+    pub(crate) owner: String,
     /// Any custom extension used by this contract
-    pub extension: Metadata,
+    pub(crate) extension: Metadata,
 }
 
 pub(crate) fn babydragon_nft_mint_msg(

@@ -3,11 +3,7 @@ use std::{collections::HashSet, path::PathBuf, sync::Arc};
 use crate::cli::Opt;
 use cosmos::{Address, CosmosNetwork};
 use msg::{
-    contracts::{
-        cw20::entry::AllAccountsResponse,
-        liquidity_token::LiquidityTokenKind,
-        market::entry::{LpAction, LpActionKind},
-    },
+    contracts::{cw20::entry::AllAccountsResponse, liquidity_token::LiquidityTokenKind},
     prelude::*,
 };
 use perps_exes::{contracts::Factory, prelude::MarketContract};
@@ -39,6 +35,7 @@ struct ToProcess {
     lp: Address,
     market: MarketContract,
     market_id: Arc<MarketId>,
+    price: Arc<PricePoint>,
 }
 
 async fn go(
@@ -98,6 +95,19 @@ async fn handle_market(
     let mut seen = HashSet::new();
     let market_id = Arc::new(market.market_id);
 
+    let market_contract = MarketContract::new(market.market.clone());
+    let price = match market_contract.current_price().await {
+        Ok(price) => Arc::new(price),
+        Err(e) => {
+            if e.to_string().contains("price_not_found") {
+                tracing::warn!("No price found for market {market_id}");
+                return Ok(());
+            } else {
+                return Err(e.into());
+            }
+        }
+    };
+
     for kind in [LiquidityTokenKind::Lp, LiquidityTokenKind::Xlp] {
         let mut start_after = None;
 
@@ -124,6 +134,7 @@ async fn handle_market(
                         lp: addr,
                         market: MarketContract::new(market.market.clone()),
                         market_id: market_id.clone(),
+                        price: price.clone(),
                     })
                     .await?;
                 }
@@ -142,63 +153,43 @@ async fn worker(
         lp,
         market,
         market_id,
+        price,
     }) = rx.recv().await
     {
         #[derive(serde::Serialize)]
         struct Record<'a> {
             market_id: &'a MarketId,
             addr: Address,
-            collateral_deposited_lp_info: Collateral,
-            collateral_deposited: Collateral,
-            collateral_withdrawn: Collateral,
-            collateral_remaining: Collateral,
             yield_withdrawn: Collateral,
             yield_pending: Collateral,
-            first_action: Option<chrono::DateTime<chrono::Utc>>,
-            last_action: Option<chrono::DateTime<chrono::Utc>>,
+            lp_collateral: Collateral,
+            xlp_collateral: Collateral,
+            xlp_unstaking: Collateral,
+            holdings_usd: Usd,
         }
 
         let lp_info = market.lp_info(lp).await?;
 
-        let mut record = Record {
+        let record = Record {
             market_id: &market_id,
             addr: lp,
-            collateral_deposited_lp_info: lp_info.history.deposit,
-            collateral_deposited: Collateral::zero(),
-            collateral_remaining: lp_info.lp_collateral + lp_info.xlp_collateral,
             yield_withdrawn: lp_info.history.r#yield,
             yield_pending: lp_info.available_yield_lp + lp_info.available_yield_xlp,
-            collateral_withdrawn: Collateral::zero(),
-            first_action: None,
-            last_action: None,
+            lp_collateral: lp_info.lp_collateral,
+            xlp_collateral: lp_info.xlp_collateral,
+            xlp_unstaking: lp_info
+                .unstaking
+                .map_or_else(Collateral::zero, |unstaking| {
+                    Collateral::from_decimal256(
+                        (unstaking.xlp_unstaking.raw() - unstaking.collected).into_decimal256()
+                            / unstaking.xlp_unstaking.into_decimal256()
+                            * unstaking.xlp_unstaking_collateral.into_decimal256(),
+                    )
+                }),
+            holdings_usd: price.collateral_to_usd(
+                lp_info.available_yield + lp_info.lp_collateral + lp_info.xlp_collateral,
+            ),
         };
-
-        let actions = market.get_lp_actions(lp).await?;
-        for LpAction {
-            kind,
-            timestamp,
-            tokens: _,
-            collateral,
-            collateral_usd: _,
-        } in actions
-        {
-            match kind {
-                LpActionKind::DepositLp => record.collateral_deposited += collateral,
-                LpActionKind::DepositXlp => record.collateral_deposited += collateral,
-                LpActionKind::ReinvestYieldLp => record.collateral_deposited += collateral,
-                LpActionKind::ReinvestYieldXlp => record.collateral_deposited += collateral,
-                LpActionKind::UnstakeXlp => (),
-                LpActionKind::CollectLp => (),
-                LpActionKind::Withdraw => record.collateral_withdrawn += collateral,
-                LpActionKind::ClaimYield => (),
-            }
-
-            let timestamp = timestamp.try_into_chrono_datetime()?;
-            if record.first_action.is_none() {
-                record.first_action = Some(timestamp);
-            }
-            record.last_action = Some(timestamp);
-        }
 
         let mut csv = csv.lock().await;
         csv.serialize(&record)?;

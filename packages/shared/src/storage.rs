@@ -194,10 +194,11 @@ pub fn map_key<'a, K: PrimaryKey<'a>>(namespace: &str, key: &K) -> Vec<u8> {
 }
 
 fn encode_length(bytes: &[u8]) -> [u8; 2] {
-    if bytes.len() > 0xFFFF {
+    if let Ok(len) = u16::try_from(bytes.len()) {
+        len.to_be_bytes()
+    } else {
         panic!("only supports namespaces up to length 0xFFFF")
     }
-    (bytes.len() as u16).to_be_bytes()
 }
 
 #[cfg(test)]

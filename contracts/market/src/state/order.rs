@@ -10,10 +10,13 @@ use msg::contracts::market::order::events::{
     CancelLimitOrderEvent, ExecuteLimitOrderEvent, PlaceLimitOrderEvent,
 };
 use msg::contracts::market::order::{LimitOrder, OrderId};
+use msg::contracts::market::position::events::PositionSaveReason;
 use msg::contracts::market::position::CollateralAndUsd;
 use msg::prelude::*;
+use shared::compat::BackwardsCompatTakeProfit;
 
-use super::position::OpenPositionParams;
+use super::fees::CapCrankFee;
+use super::position::{OpenPositionExec, OpenPositionParams};
 
 /// Stores the last used [OrderId]
 const LAST_ORDER_ID: Item<OrderId> = Item::new(namespace::LAST_ORDER_ID);
@@ -34,86 +37,6 @@ const EXECUTED_LIMIT_ORDERS: Map<(&Addr, u64), ExecutedLimitOrder> =
     Map::new(namespace::EXECUTED_LIMIT_ORDERS);
 
 impl State<'_> {
-    /// Sets a [LimitOrder]
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn limit_order_set_order(
-        &self,
-        ctx: &mut StateContext,
-        owner: Addr,
-        trigger_price: PriceBaseInQuote,
-        collateral: NonZero<Collateral>,
-        leverage: LeverageToBase,
-        direction: DirectionToNotional,
-        max_gains: MaxGainsInQuote,
-        stop_loss_override: Option<PriceBaseInQuote>,
-        take_profit_override: Option<PriceBaseInQuote>,
-        deferred_exec_crank_fee: Collateral,
-        deferred_exec_crank_fee_usd: Usd,
-        price: &PricePoint,
-    ) -> Result<OrderId> {
-        let last_order_id = LAST_ORDER_ID
-            .may_load(ctx.storage)?
-            .unwrap_or_else(|| OrderId::new(0));
-        let order_id = OrderId::new(last_order_id.u64() + 1);
-        LAST_ORDER_ID.save(ctx.storage, &order_id)?;
-
-        let crank_fee_usd = self.config.crank_fee_charged;
-        let crank_fee = price.usd_to_collateral(crank_fee_usd);
-        self.collect_crank_fee(ctx, TradeId::LimitOrder(order_id), crank_fee, crank_fee_usd)?;
-        let collateral = collateral
-            .checked_sub(crank_fee)
-            .context("Insufficient funds to cover fees, failed on crank fee")?;
-
-        let order = LimitOrder {
-            order_id,
-            owner: owner.clone(),
-            trigger_price,
-            collateral,
-            leverage,
-            direction,
-            max_gains,
-            stop_loss_override,
-            take_profit_override,
-            crank_fee_collateral: crank_fee.checked_add(deferred_exec_crank_fee)?,
-            crank_fee_usd: crank_fee_usd.checked_add(deferred_exec_crank_fee_usd)?,
-        };
-
-        LIMIT_ORDERS.save(ctx.storage, order_id, &order)?;
-
-        let market_type = self.market_type(ctx.storage)?;
-        match direction {
-            DirectionToNotional::Long => LIMIT_ORDERS_BY_PRICE_LONG.save(
-                ctx.storage,
-                (trigger_price.into_price_key(market_type), order_id),
-                &(),
-            )?,
-            DirectionToNotional::Short => LIMIT_ORDERS_BY_PRICE_SHORT.save(
-                ctx.storage,
-                (trigger_price.into_price_key(market_type), order_id),
-                &(),
-            )?,
-        }
-
-        LIMIT_ORDERS_BY_ADDR.save(ctx.storage, (&owner, order_id), &())?;
-
-        let direction_to_base = direction.into_base(market_type);
-        ctx.response.add_event(PlaceLimitOrderEvent {
-            market_type,
-            collateral: order.collateral,
-            collateral_usd: price.collateral_to_usd_non_zero(collateral),
-            leverage: order.leverage.into_signed(direction_to_base),
-            direction: direction_to_base,
-            max_gains,
-            stop_loss_override,
-            order_id,
-            owner,
-            trigger_price,
-            take_profit_override,
-        });
-
-        Ok(order_id)
-    }
-
     /// Returns the next long or short [LimitOrder] whose trigger price is above the specified price
     /// for long orders or below the specified price for short orders.
     ///
@@ -211,22 +134,54 @@ impl State<'_> {
 
         let market_type = self.market_type(ctx.storage)?;
 
+        // this is kept in case we're executing an order that was already placed in the old system
+        // it shouldn't be needed for any new orders, which do this song and dance in deferred_exec creation
+        // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
+        #[allow(deprecated)]
+        let take_profit_trader = match (order.take_profit, order.max_gains) {
+            (None, None) => {
+                bail!("must supply at least one of take_profit or max_gains");
+            }
+            (Some(take_profit_price), None) => take_profit_price,
+            (take_profit, Some(max_gains)) => {
+                let take_profit = match take_profit {
+                    None => None,
+                    Some(take_profit) => match take_profit {
+                        TakeProfitTrader::PosInfinity => {
+                            bail!("cannot set infinite take profit price and max_gains")
+                        }
+                        TakeProfitTrader::Finite(x) => Some(PriceBaseInQuote::from_non_zero(x)),
+                    },
+                };
+                BackwardsCompatTakeProfit {
+                    collateral: order.collateral,
+                    market_type,
+                    direction: order.direction.into_base(market_type),
+                    leverage: order.leverage,
+                    max_gains,
+                    take_profit,
+                    price_point,
+                }
+                .calc()?
+            }
+        };
+
         let open_position_params = OpenPositionParams {
             owner: order.owner.clone(),
             collateral: order.collateral,
             crank_fee: CollateralAndUsd::from_pair(order.crank_fee_collateral, order.crank_fee_usd),
             leverage: order.leverage,
             direction: order.direction.into_base(market_type),
-            max_gains_in_quote: order.max_gains,
             slippage_assert: None,
             stop_loss_override: order.stop_loss_override,
-            take_profit_override: order.take_profit_override,
+            take_profit_trader,
         };
-        let res = self.validate_new_position(ctx.storage, open_position_params, price_point);
 
-        let res = match res {
+        let res = match OpenPositionExec::new(self, ctx.storage, open_position_params, price_point)
+        {
             Ok(validated_position) => {
-                let pos_id = self.open_validated_position(ctx, validated_position, false)?;
+                let pos_id =
+                    validated_position.apply(self, ctx, PositionSaveReason::ExecuteLimitOrder)?;
                 Ok(pos_id)
             }
             Err(e) => {
@@ -295,8 +250,12 @@ impl State<'_> {
             order.unwrap_or(Order::Ascending),
         );
 
-        const MAX_LIMIT: u32 = 20;
-        let limit = limit.unwrap_or(MAX_LIMIT).min(MAX_LIMIT).try_into()?;
+        const ORDER_DEFAULT_LIMIT: u32 = 20;
+
+        let limit = limit
+            .unwrap_or(ORDER_DEFAULT_LIMIT)
+            .min(QUERY_MAX_LIMIT)
+            .try_into()?;
         let mut orders = Vec::with_capacity(limit);
         let mut next_start_after = None;
         for _ in 0..limit {
@@ -304,6 +263,8 @@ impl State<'_> {
                 Some((order_id, _)) => {
                     let order = LIMIT_ORDERS.load(storage, order_id)?;
                     let market_type = self.market_type(storage)?;
+
+                    #[allow(deprecated)]
                     let order_resp = LimitOrderResp {
                         order_id,
                         trigger_price: order.trigger_price,
@@ -312,7 +273,7 @@ impl State<'_> {
                         direction: order.direction.into_base(market_type),
                         max_gains: order.max_gains,
                         stop_loss_override: order.stop_loss_override,
-                        take_profit_override: order.take_profit_override,
+                        take_profit: order.take_profit,
                     };
 
                     orders.push(order_resp);
@@ -348,23 +309,6 @@ impl State<'_> {
             order_id,
             owner
         );
-
-        Ok(())
-    }
-
-    /// Cancels a limit order
-    pub(crate) fn limit_order_cancel_order(
-        &self,
-        ctx: &mut StateContext,
-        order_id: OrderId,
-    ) -> Result<()> {
-        let order = LIMIT_ORDERS.load(ctx.storage, order_id)?;
-        self.limit_order_remove(ctx.storage, &order)?;
-
-        // send collateral back to the user
-        self.add_token_transfer_msg(ctx, &order.owner, order.collateral)?;
-
-        ctx.response.add_event(CancelLimitOrderEvent { order_id });
 
         Ok(())
     }
@@ -420,5 +364,155 @@ impl State<'_> {
             orders,
             next_start_after,
         })
+    }
+}
+
+#[must_use]
+pub(crate) struct PlaceLimitOrderExec {
+    order_id: OrderId,
+    crank_fee: CapCrankFee,
+    order: LimitOrder,
+    price: PricePoint,
+}
+
+impl PlaceLimitOrderExec {
+    /// Sets a [LimitOrder]
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new(
+        state: &State,
+        store: &dyn Storage,
+        owner: Addr,
+        trigger_price: PriceBaseInQuote,
+        collateral: NonZero<Collateral>,
+        leverage: LeverageToBase,
+        direction: DirectionToNotional,
+        stop_loss_override: Option<PriceBaseInQuote>,
+        take_profit: TakeProfitTrader,
+        deferred_exec_crank_fee: Collateral,
+        deferred_exec_crank_fee_usd: Usd,
+        price: PricePoint,
+    ) -> Result<Self> {
+        let last_order_id = LAST_ORDER_ID
+            .may_load(store)?
+            .unwrap_or_else(|| OrderId::new(0));
+        let order_id = OrderId::new(last_order_id.u64() + 1);
+
+        let crank_fee = CapCrankFee::new(
+            price.usd_to_collateral(state.config.crank_fee_charged),
+            state.config.crank_fee_charged,
+            TradeId::LimitOrder(order_id),
+        );
+        let collateral = collateral
+            .checked_sub(crank_fee.amount)
+            .context("Insufficient funds to cover fees, failed on crank fee")?;
+
+        #[allow(deprecated)]
+        let order = LimitOrder {
+            order_id,
+            owner: owner.clone(),
+            trigger_price,
+            collateral,
+            leverage,
+            direction,
+            stop_loss_override,
+            max_gains: None,
+            take_profit: Some(take_profit),
+            crank_fee_collateral: crank_fee.amount.checked_add(deferred_exec_crank_fee)?,
+            crank_fee_usd: crank_fee
+                .amount_usd
+                .checked_add(deferred_exec_crank_fee_usd)?,
+        };
+
+        Ok(Self {
+            order_id,
+            crank_fee,
+            order,
+            price,
+        })
+    }
+
+    // This is a no-op, but it's more expressive to call discard() or apply()
+    // rather than to just assign it to a throwaway variable.
+    pub(crate) fn discard(self) {}
+
+    pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<OrderId> {
+        let Self {
+            order_id,
+            crank_fee,
+            order,
+            price,
+        } = self;
+
+        LAST_ORDER_ID.save(ctx.storage, &order_id)?;
+        crank_fee.apply(state, ctx)?;
+
+        LIMIT_ORDERS.save(ctx.storage, order_id, &order)?;
+
+        let market_type = state.market_type(ctx.storage)?;
+
+        match order.direction {
+            DirectionToNotional::Long => LIMIT_ORDERS_BY_PRICE_LONG.save(
+                ctx.storage,
+                (order.trigger_price.into_price_key(market_type), order_id),
+                &(),
+            )?,
+            DirectionToNotional::Short => LIMIT_ORDERS_BY_PRICE_SHORT.save(
+                ctx.storage,
+                (order.trigger_price.into_price_key(market_type), order_id),
+                &(),
+            )?,
+        }
+
+        LIMIT_ORDERS_BY_ADDR.save(ctx.storage, (&order.owner, order_id), &())?;
+
+        let direction_to_base = order.direction.into_base(market_type);
+
+        #[allow(deprecated)]
+        ctx.response.add_event(PlaceLimitOrderEvent {
+            market_type,
+            collateral: order.collateral,
+            collateral_usd: price.collateral_to_usd_non_zero(order.collateral),
+            leverage: order.leverage.into_signed(direction_to_base),
+            direction: direction_to_base,
+            max_gains: order.max_gains,
+            stop_loss_override: order.stop_loss_override,
+            order_id,
+            owner: order.owner,
+            trigger_price: order.trigger_price,
+            take_profit_override: order.take_profit,
+        });
+        Ok(self.order_id)
+    }
+}
+
+#[must_use]
+pub(crate) struct CancelLimitOrderExec {
+    order_id: OrderId,
+    order: LimitOrder,
+}
+
+impl CancelLimitOrderExec {
+    /// Cancels a [LimitOrder]
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new(store: &dyn Storage, order_id: OrderId) -> Result<Self> {
+        let order = LIMIT_ORDERS.load(store, order_id)?;
+
+        Ok(Self { order_id, order })
+    }
+
+    // This is a no-op, but it's more expressive to call discard() or apply()
+    // rather than to just assign it to a throwaway variable.
+    pub(crate) fn discard(self) {}
+
+    pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<()> {
+        let Self { order_id, order } = self;
+        state.limit_order_remove(ctx.storage, &order)?;
+
+        // send collateral back to the user
+        state.add_token_transfer_msg(ctx, &order.owner, order.collateral)?;
+
+        ctx.response.add_event(CancelLimitOrderEvent { order_id });
+
+        Ok(())
     }
 }

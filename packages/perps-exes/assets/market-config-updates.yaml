@@ -107,19 +107,53 @@ markets:
 
   SEI_USD:
     config:
-      trading_fee_notional_size: 0.0022
-      trading_fee_counter_collateral: 0.0022
-      max_leverage: 10
-      carry_leverage: 5
+      carry_leverage: 15
       funding_rate_sensitivity: 2
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.3
-      delta_neutrality_fee_sensitivity: 7500000
+      delta_neutrality_fee_sensitivity: 20000000
       borrow_fee_rate_min_annualized: 0.04
-      delta_neutrality_fee_cap: 0.014
-      delta_neutrality_fee_tax: 0.5
+      delta_neutrality_fee_tax: 0.25
       liquidity_cooldown_seconds: 86400
-      exposure_margin_ratio: 0.01
+
+    initial-borrow-fee-rate: 0.08
+
+  BTC_SEI:
+    config:
+      carry_leverage: 15
+      funding_rate_sensitivity: 2
+      target_utilization: 0.5
+      borrow_fee_sensitivity: 0.3
+      delta_neutrality_fee_sensitivity: 20000000
+      borrow_fee_rate_min_annualized: 0.04
+      delta_neutrality_fee_tax: 0.25
+      liquidity_cooldown_seconds: 86400
+
+    initial-borrow-fee-rate: 0.08
+
+  ETH_SEI:
+    config:
+      carry_leverage: 15
+      funding_rate_sensitivity: 2
+      target_utilization: 0.5
+      borrow_fee_sensitivity: 0.3
+      delta_neutrality_fee_sensitivity: 20000000
+      borrow_fee_rate_min_annualized: 0.04
+      delta_neutrality_fee_tax: 0.25
+      liquidity_cooldown_seconds: 86400
+
+    initial-borrow-fee-rate: 0.08
+
+  SOL_SEI:
+    config:
+      carry_leverage: 15
+      funding_rate_sensitivity: 2
+      target_utilization: 0.5
+      borrow_fee_sensitivity: 0.3
+      delta_neutrality_fee_sensitivity: 20000000
+      borrow_fee_rate_min_annualized: 0.04
+      delta_neutrality_fee_tax: 0.25
+      liquidity_cooldown_seconds: 86400
 
     initial-borrow-fee-rate: 0.08
 
@@ -146,6 +180,20 @@ markets:
       borrow_fee_sensitivity: 0.2
     initial-borrow-fee-rate: 0.05
   BTC_USD:
+    config:
+      # effectively infinity
+      delta_neutrality_fee_sensitivity: 50000000000
+      borrow_fee_sensitivity: 0.3
+      funding_rate_max_annualized: "0.45"
+      borrow_fee_rate_max_annualized: "0.30"
+      target_utilization: "0.5"
+      funding_rate_sensitivity: 1
+      carry_leverage: 15
+      borrow_fee_rate_min_annualized: 0.03
+      liquidity_cooldown_seconds: 86400
+
+    initial-borrow-fee-rate: 0.05
+  wBTC_USD:
     config:
       # effectively infinity
       delta_neutrality_fee_sensitivity: 50000000000
@@ -216,7 +264,7 @@ markets:
       borrow_fee_rate_min_annualized: 0.05
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.3
-      delta_neutrality_fee_sensitivity: 250000000
+      delta_neutrality_fee_sensitivity: 25000000
       carry_leverage: 15
       delta_neutrality_fee_tax: 0.1
       liquidity_cooldown_seconds: 86400
@@ -268,12 +316,25 @@ markets:
       borrow_fee_rate_min_annualized: 0.05
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.3
-      delta_neutrality_fee_sensitivity: 150000000
+      delta_neutrality_fee_sensitivity: 4300000
       carry_leverage: 15
       delta_neutrality_fee_tax: 0.1
       liquidity_cooldown_seconds: 86400
 
     initial-borrow-fee-rate: 0.1
+
+  DYM_USD:
+    config:
+      funding_rate_sensitivity: 2
+      borrow_fee_rate_min_annualized: 0.04
+      target_utilization: 0.5
+      borrow_fee_sensitivity: 0.3
+      delta_neutrality_fee_sensitivity: 40000000
+      delta_neutrality_fee_tax: 0.25
+      carry_leverage: 15
+      liquidity_cooldown_seconds: 86400
+
+    initial-borrow-fee-rate: 0.08
 
   INJ_USD:
     config:
@@ -294,7 +355,7 @@ markets:
       borrow_fee_rate_min_annualized: 0.08
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.3
-      delta_neutrality_fee_sensitivity: 40000000
+      delta_neutrality_fee_sensitivity: 1000000
       delta_neutrality_fee_tax: 0.25
       carry_leverage: 15
       liquidity_cooldown_seconds: 86400
@@ -320,8 +381,8 @@ markets:
     initial-borrow-fee-rate: 0.06
   EUR_USDC:
     config:
-      max_leverage: 100
-      carry_leverage: 25
+      max_leverage: 50
+      carry_leverage: 20
       funding_rate_sensitivity: 1
       funding_rate_max_annualized: 0.45
       borrow_fee_rate_min_annualized: 0.03
@@ -329,15 +390,15 @@ markets:
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.15
       delta_neutrality_fee_sensitivity: 50000000000
-      delta_neutrality_fee_cap: 0.0001
+      delta_neutrality_fee_cap: 0.0002
       liquidity_cooldown_seconds: 86400
-      exposure_margin_ratio: 0.002
+      exposure_margin_ratio: 0.004
 
     initial-borrow-fee-rate: 0.05
   GBP_USDC:
     config:
-      max_leverage: 100
-      carry_leverage: 25
+      max_leverage: 50
+      carry_leverage: 20
       funding_rate_sensitivity: 1
       funding_rate_max_annualized: 0.45
       borrow_fee_rate_min_annualized: 0.03
@@ -345,17 +406,15 @@ markets:
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.15
       delta_neutrality_fee_sensitivity: 50000000000
-      delta_neutrality_fee_cap: 0.0001
+      delta_neutrality_fee_cap: 0.0002
       liquidity_cooldown_seconds: 86400
-      exposure_margin_ratio: 0.002
+      exposure_margin_ratio: 0.004
 
     initial-borrow-fee-rate: 0.05
   CNH_USDC:
     config:
-      trading_fee_notional_size: 0.001
-      trading_fee_counter_collateral: 0.001
-      max_leverage: 100
-      carry_leverage: 25
+      max_leverage: 50
+      carry_leverage: 20
       funding_rate_sensitivity: 1
       funding_rate_max_annualized: 0.45
       borrow_fee_rate_min_annualized: 0.03
@@ -363,20 +422,16 @@ markets:
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.15
       delta_neutrality_fee_sensitivity: 50000000000
-      delta_neutrality_fee_cap: 0.0001
-      delta_neutrality_fee_tax: 0.05
+      delta_neutrality_fee_cap: 0.0002
       liquifunding_delay_seconds: 21600
-      liquifunding_delay_fuzz_seconds: 3600
       liquidity_cooldown_seconds: 86400
-      exposure_margin_ratio: 0.002
+      exposure_margin_ratio: 0.004
 
     initial-borrow-fee-rate: 0.05
   GOLD_USDC:
     config:
-      trading_fee_notional_size: 0.001
-      trading_fee_counter_collateral: 0.001
-      max_leverage: 100
-      carry_leverage: 25
+      max_leverage: 50
+      carry_leverage: 20
       funding_rate_sensitivity: 1
       funding_rate_max_annualized: 0.45
       borrow_fee_rate_min_annualized: 0.03
@@ -384,12 +439,27 @@ markets:
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.15
       delta_neutrality_fee_sensitivity: 50000000000
-      delta_neutrality_fee_cap: 0.0001
-      delta_neutrality_fee_tax: 0.05
+      delta_neutrality_fee_cap: 0.0002
       liquifunding_delay_seconds: 21600
-      liquifunding_delay_fuzz_seconds: 3600
       liquidity_cooldown_seconds: 86400
-      exposure_margin_ratio: 0.002
+      exposure_margin_ratio: 0.004
+
+    initial-borrow-fee-rate: 0.05
+  SILVER_USDC:
+    config:
+      max_leverage: 50
+      carry_leverage: 20
+      funding_rate_sensitivity: 1
+      funding_rate_max_annualized: 0.45
+      borrow_fee_rate_min_annualized: 0.03
+      borrow_fee_rate_max_annualized: 0.3
+      target_utilization: 0.5
+      borrow_fee_sensitivity: 0.15
+      delta_neutrality_fee_sensitivity: 5000000000
+      delta_neutrality_fee_cap: 0.0002
+      liquifunding_delay_seconds: 21600
+      liquidity_cooldown_seconds: 86400
+      exposure_margin_ratio: 0.004
 
     initial-borrow-fee-rate: 0.05
 
@@ -412,7 +482,7 @@ markets:
       borrow_fee_rate_min_annualized: 0.03
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.3
-      delta_neutrality_fee_sensitivity: 300000000
+      delta_neutrality_fee_sensitivity: 1000000
       carry_leverage: 15
       delta_neutrality_fee_tax: 0.1
       liquidity_cooldown_seconds: 86400
@@ -433,7 +503,7 @@ markets:
 
   SOL_USDC:
     config:
-      delta_neutrality_fee_sensitivity: 500000000
+      delta_neutrality_fee_sensitivity: 5000000
       funding_rate_sensitivity: 1.5
       carry_leverage: 15
       borrow_fee_sensitivity: 0.3
@@ -486,7 +556,7 @@ markets:
 
   LINK_USDC:
     config:
-      delta_neutrality_fee_sensitivity: 400000000
+      delta_neutrality_fee_sensitivity: 26666666
       funding_rate_sensitivity: 1.5
       carry_leverage: 15
       borrow_fee_sensitivity: 0.3
@@ -546,15 +616,50 @@ markets:
       borrow_fee_rate_min_annualized: 0.08
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.3
-      delta_neutrality_fee_sensitivity: 40000000
+      delta_neutrality_fee_sensitivity: 1000
       delta_neutrality_fee_tax: 0.25
       carry_leverage: 15
       liquidity_cooldown_seconds: 86400
 
     initial-borrow-fee-rate: 0.16
 
-
   TIA_USD:
+    config:
+      trading_fee_notional_size: 0.002
+      trading_fee_counter_collateral: 0.002
+      max_leverage: 10
+      carry_leverage: 5
+      funding_rate_sensitivity: 2
+      target_utilization: 0.5
+      delta_neutrality_fee_sensitivity: 20000000
+      borrow_fee_sensitivity: 0.3
+      delta_neutrality_fee_cap: 0.015
+      delta_neutrality_fee_tax: 0.25
+      borrow_fee_rate_min_annualized: 0.08
+      liquidity_cooldown_seconds: 86400
+      exposure_margin_ratio: 0.01
+
+    initial-borrow-fee-rate: 0.16
+
+  milkTIA_USD:
+    config:
+      trading_fee_notional_size: 0.002
+      trading_fee_counter_collateral: 0.002
+      max_leverage: 10
+      carry_leverage: 5
+      funding_rate_sensitivity: 2
+      target_utilization: 0.5
+      delta_neutrality_fee_sensitivity: 20000000
+      borrow_fee_sensitivity: 0.3
+      delta_neutrality_fee_cap: 0.015
+      delta_neutrality_fee_tax: 0.25
+      borrow_fee_rate_min_annualized: 0.08
+      liquidity_cooldown_seconds: 86400
+      exposure_margin_ratio: 0.01
+
+    initial-borrow-fee-rate: 0.16
+
+  stTIA_USD:
     config:
       trading_fee_notional_size: 0.002
       trading_fee_counter_collateral: 0.002
@@ -577,7 +682,20 @@ markets:
       carry_leverage: 15
       funding_rate_sensitivity: 2
       target_utilization: 0.5
-      delta_neutrality_fee_sensitivity: 75000000
+      delta_neutrality_fee_sensitivity: 13000000
+      borrow_fee_sensitivity: 0.3
+      delta_neutrality_fee_tax: 0.25
+      borrow_fee_rate_min_annualized: 0.03
+      liquidity_cooldown_seconds: 86400
+
+    initial-borrow-fee-rate: 0.06
+
+  stDYDX_USD:
+    config:
+      carry_leverage: 15
+      funding_rate_sensitivity: 2
+      target_utilization: 0.5
+      delta_neutrality_fee_sensitivity: 13000000
       borrow_fee_sensitivity: 0.3
       delta_neutrality_fee_tax: 0.25
       borrow_fee_rate_min_annualized: 0.03
@@ -590,7 +708,7 @@ markets:
       carry_leverage: 15
       funding_rate_sensitivity: 2
       target_utilization: 0.5
-      delta_neutrality_fee_sensitivity: 90000000
+      delta_neutrality_fee_sensitivity: 20000000
       borrow_fee_sensitivity: 0.3
       delta_neutrality_fee_tax: 0.25
       borrow_fee_rate_min_annualized: 0.12

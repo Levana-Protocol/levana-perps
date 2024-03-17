@@ -9,7 +9,6 @@ use msg::{
     contracts::market::spot_price::{PythPriceServiceNetwork, SpotPriceFeed, SpotPriceFeedData},
     prelude::*,
 };
-use once_cell::sync::OnceCell;
 use perps_exes::config::{
     ChainConfig, ChainPythConfig, ChainStrideConfig, ConfigTestnet, DeploymentConfigTestnet,
     MarketPriceFeedConfig, PriceConfig,
@@ -63,7 +62,8 @@ pub(crate) enum PriceSourceConfig {
 #[derive(Clone, Debug)]
 pub(crate) struct OracleInfo {
     pub pyth: Option<ChainPythConfig>,
-    pub stride: Option<ChainStrideConfig>,
+    /// Fallback config if not overridden by a market
+    pub stride_fallback: Option<ChainStrideConfig>,
     pub markets: HashMap<MarketId, OracleMarketPriceFeeds>,
 }
 
@@ -71,6 +71,7 @@ pub(crate) struct OracleInfo {
 pub(crate) struct OracleMarketPriceFeeds {
     pub feeds: Vec<SpotPriceFeed>,
     pub feeds_usd: Vec<SpotPriceFeed>,
+    pub stride_contract_override: Option<Address>,
 }
 
 /// Complete app for mainnet
@@ -127,7 +128,6 @@ impl Opt {
 
     pub(crate) async fn load_app(&self, family: &str) -> Result<App> {
         let config = ConfigTestnet::load(self.config_testnet.as_ref())?;
-        let price_config = PriceConfig::load(self.config_price.as_ref())?;
         let partial = config.get_deployment_info(family)?;
         let basic = self.load_basic_app(partial.network).await?;
 
@@ -223,17 +223,13 @@ impl Opt {
                             PythPriceServiceNetwork::Stable => &global_price_config.pyth.stable,
                         };
 
-                        let id = pyth_config
-                            .feed_ids
-                            .get(&key)
-                            .with_context(|| {
-                                format!("No pyth config found for {} on {:?}", key, network)
-                            })?
-                            .clone();
+                        let id = pyth_config.feed_ids.get(&key).with_context(|| {
+                            format!("No pyth config found for {} on {:?}", key, network)
+                        })?;
 
                         feeds.push(SpotPriceFeed {
                             data: SpotPriceFeedData::Pyth {
-                                id,
+                                id: *id,
                                 age_tolerance_seconds: chain_config
                                     .age_tolerance_seconds
                                     .unwrap_or(pyth_config.update_age_tolerance),
@@ -278,19 +274,18 @@ impl Opt {
                 OracleMarketPriceFeeds {
                     feeds: map_feeds(&price_feed_configs.feeds)?,
                     feeds_usd: map_feeds(&price_feed_configs.feeds_usd)?,
+                    stride_contract_override: price_feed_configs.stride_contract,
                 },
             );
         }
         Ok(OracleInfo {
             pyth: chain_spot_price_config.pyth.clone(),
-            stride: chain_spot_price_config.stride.clone(),
+            stride_fallback: chain_spot_price_config.stride.clone(),
             markets,
         })
     }
 
     pub(crate) async fn load_app_mainnet(&self, network: CosmosNetwork) -> Result<AppMainnet> {
-        let price_config = PriceConfig::load(self.config_price.as_ref())?;
-        let chain_config = ChainConfig::load(self.config_chain.as_ref(), network)?;
         let cosmos = self.connect(network).await?;
         let wallet = self.get_lazy_wallet(network)?;
 
