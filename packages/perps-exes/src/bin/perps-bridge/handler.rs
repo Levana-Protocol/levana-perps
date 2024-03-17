@@ -1,4 +1,3 @@
-#![allow(clippy::as_conversions)]
 use crate::{context::LogFlag, future::Future};
 use anyhow::{Context as AnyhowContext, Result};
 use tokio::{io::AsyncWriteExt, sync::Mutex};
@@ -50,6 +49,7 @@ impl Context {
         let start = std::time::Instant::now();
         let res = f().await;
         let elapsed = start.elapsed();
+        #[allow(clippy::as_conversions)]
         let elapsed = elapsed.as_secs() as f64 + (elapsed.subsec_nanos() as f64 / 1_000_000_000.0);
         (elapsed, res)
     }
