@@ -205,8 +205,8 @@ impl State<'_> {
             crank_progress.paying_work_done,
         )?;
         ctx.response_mut().add_event(CrankExecBatchEvent {
-            requested: crank_progress.requested as u64,
-            paying: crank_progress.paying_work_done as u64,
+            requested: u64::from(crank_progress.requested),
+            paying: u64::from(crank_progress.paying_work_done),
             actual: crank_progress.actual,
         });
 

@@ -7,32 +7,49 @@ use shared::storage::{DirectionToBase, Signed};
 
 /// Chains supported by this server.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, serde::Deserialize, sqlx::Type)]
-#[repr(i32)]
 pub(crate) enum ChainId {
     #[serde(rename = "atlantic-2")]
-    Atlantic2 = 1,
+    Atlantic2,
     // Leaving in place for backwards compat in a few places, but not allowing
     // new positions to be stored.
     #[serde(rename = "dragonfire-4")]
-    Dragonfire4 = 2,
+    Dragonfire4,
     #[serde(rename = "elgafar-1")]
-    Elgafar1 = 3,
+    Elgafar1,
     #[serde(rename = "juno-1")]
-    Juno1 = 4,
+    Juno1,
     #[serde(rename = "osmo-test-5")]
-    OsmoTest5 = 5,
+    OsmoTest5,
     #[serde(rename = "osmosis-1")]
-    Osmosis1 = 6,
+    Osmosis1,
     #[serde(rename = "stargaze-1")]
-    Stargaze1 = 7,
+    Stargaze1,
     #[serde(rename = "uni-6")]
-    Uni6 = 8,
+    Uni6,
     #[serde(rename = "pacific-1")]
-    Pacific1 = 9,
+    Pacific1,
     #[serde(rename = "injective-1")]
-    Injective1 = 10,
+    Injective1,
     #[serde(rename = "injective-888")]
-    Injective888 = 11,
+    Injective888,
+}
+
+impl From<ChainId> for i32 {
+    fn from(value: ChainId) -> Self {
+        match value {
+            ChainId::Atlantic2 => 1,
+            ChainId::Dragonfire4 => 2,
+            ChainId::Elgafar1 => 3,
+            ChainId::Juno1 => 4,
+            ChainId::OsmoTest5 => 5,
+            ChainId::Osmosis1 => 6,
+            ChainId::Stargaze1 => 7,
+            ChainId::Uni6 => 8,
+            ChainId::Pacific1 => 9,
+            ChainId::Injective1 => 10,
+            ChainId::Injective888 => 11,
+        }
+    }
 }
 
 impl TryFrom<&str> for ChainId {
@@ -151,11 +168,20 @@ impl ChainId {
 
 /// Which analytics environment the contract is part of
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, sqlx::Type)]
-#[repr(i32)]
 pub(crate) enum ContractEnvironment {
     Mainnet = 1,
     Beta = 2,
     Dev = 3,
+}
+
+impl From<ContractEnvironment> for i32 {
+    fn from(value: ContractEnvironment) -> Self {
+        match value {
+            ContractEnvironment::Mainnet => 1,
+            ContractEnvironment::Beta => 2,
+            ContractEnvironment::Dev => 3,
+        }
+    }
 }
 
 impl ContractEnvironment {
@@ -184,10 +210,18 @@ fn is_beta(label: &str) -> bool {
 
 /// Is this is a long or short position
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, sqlx::Type)]
-#[repr(i32)]
 pub(crate) enum DirectionForDb {
     Long = 1,
     Short = 2,
+}
+
+impl From<DirectionForDb> for i32 {
+    fn from(value: DirectionForDb) -> Self {
+        match value {
+            DirectionForDb::Long => 1,
+            DirectionForDb::Short => 2,
+        }
+    }
 }
 
 impl From<DirectionToBase> for DirectionForDb {
@@ -210,7 +244,6 @@ impl Display for DirectionForDb {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Deserialize, sqlx::Type)]
 #[serde(rename_all = "snake_case")]
-#[repr(i32)]
 pub(crate) enum PnlType {
     Usd = 1,
     Percent = 2,
@@ -223,6 +256,16 @@ impl From<PnlType> for String {
             PnlType::Usd => "Usd".into(),
             PnlType::Percent => "Percent".into(),
             PnlType::Both => "Both".into(),
+        }
+    }
+}
+
+impl From<PnlType> for i32 {
+    fn from(value: PnlType) -> Self {
+        match value {
+            PnlType::Usd => 1,
+            PnlType::Percent => 2,
+            PnlType::Both => 3,
         }
     }
 }

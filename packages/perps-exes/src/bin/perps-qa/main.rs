@@ -1,3 +1,5 @@
+#![deny(clippy::as_conversions)]
+
 mod capping;
 mod cli;
 mod wallet;

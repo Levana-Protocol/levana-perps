@@ -55,8 +55,12 @@ impl TryFrom<u64> for ReplyId {
 }
 
 impl From<ReplyId> for u64 {
-    fn from(src: ReplyId) -> u64 {
-        // SAFE: due to repr(u64)
-        src as u64
+    fn from(value: ReplyId) -> Self {
+        match value {
+            ReplyId::InstantiateMarket => 0,
+            ReplyId::InstantiatePositionToken => 1,
+            ReplyId::InstantiateLiquidityTokenLp => 2,
+            ReplyId::InstantiateLiquidityTokenXlp => 3,
+        }
     }
 }

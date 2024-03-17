@@ -1,3 +1,5 @@
+#![deny(clippy::as_conversions)]
+
 pub mod config;
 pub mod contracts;
 pub mod discovery;

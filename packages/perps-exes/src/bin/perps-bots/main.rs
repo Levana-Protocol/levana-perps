@@ -1,3 +1,5 @@
+#![deny(clippy::as_conversions)]
+
 use anyhow::{Context, Result};
 use clap::Parser;
 use parking_lot::deadlock;
