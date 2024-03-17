@@ -100,7 +100,7 @@ impl TryFrom<String> for ChainId {
 }
 
 impl ChainId {
-    pub(crate) fn all() -> [ChainId; 9] {
+    pub(crate) fn all() -> [ChainId; 10] {
         [
             ChainId::Atlantic2,
             ChainId::Elgafar1,
@@ -111,6 +111,7 @@ impl ChainId {
             ChainId::Uni6,
             ChainId::Pacific1,
             ChainId::Injective1,
+            ChainId::Injective888,
         ]
     }
 
