@@ -1,3 +1,6 @@
+// The types must be represented with repr statement which is using as conversion internally.
+#![allow(clippy::as_conversions)]
+
 use std::fmt::Display;
 
 use anyhow::Result;
@@ -7,31 +10,32 @@ use shared::storage::{DirectionToBase, Signed};
 
 /// Chains supported by this server.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, serde::Deserialize, sqlx::Type)]
+#[repr(i32)]
 pub(crate) enum ChainId {
     #[serde(rename = "atlantic-2")]
-    Atlantic2,
+    Atlantic2 = 1,
     // Leaving in place for backwards compat in a few places, but not allowing
     // new positions to be stored.
     #[serde(rename = "dragonfire-4")]
-    Dragonfire4,
+    Dragonfire4 = 2,
     #[serde(rename = "elgafar-1")]
-    Elgafar1,
+    Elgafar1 = 3,
     #[serde(rename = "juno-1")]
-    Juno1,
+    Juno1 = 4,
     #[serde(rename = "osmo-test-5")]
-    OsmoTest5,
+    OsmoTest5 = 5,
     #[serde(rename = "osmosis-1")]
-    Osmosis1,
+    Osmosis1 = 6,
     #[serde(rename = "stargaze-1")]
-    Stargaze1,
+    Stargaze1 = 7,
     #[serde(rename = "uni-6")]
-    Uni6,
+    Uni6 = 8,
     #[serde(rename = "pacific-1")]
-    Pacific1,
+    Pacific1 = 9,
     #[serde(rename = "injective-1")]
-    Injective1,
+    Injective1 = 10,
     #[serde(rename = "injective-888")]
-    Injective888,
+    Injective888 = 11,
 }
 
 impl From<ChainId> for i32 {
@@ -168,6 +172,7 @@ impl ChainId {
 
 /// Which analytics environment the contract is part of
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, sqlx::Type)]
+#[repr(i32)]
 pub(crate) enum ContractEnvironment {
     Mainnet = 1,
     Beta = 2,
@@ -210,6 +215,7 @@ fn is_beta(label: &str) -> bool {
 
 /// Is this is a long or short position
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, sqlx::Type)]
+#[repr(i32)]
 pub(crate) enum DirectionForDb {
     Long = 1,
     Short = 2,
@@ -244,6 +250,7 @@ impl Display for DirectionForDb {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Deserialize, sqlx::Type)]
 #[serde(rename_all = "snake_case")]
+#[repr(i32)]
 pub(crate) enum PnlType {
     Usd = 1,
     Percent = 2,
