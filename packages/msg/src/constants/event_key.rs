@@ -103,3 +103,10 @@ pub(crate) const DEFERRED_EXEC_ID: &str = "deferred-exec-id";
 pub(crate) const DEFERRED_EXEC_OWNER: &str = "deferred-exec-owner";
 pub(crate) const DEFERRED_EXEC_TARGET: &str = "deferred-exec-target";
 pub(crate) const SUCCESS: &str = "success";
+
+pub(crate) const LIQUIDATION_MARGIN_BORROW: &str = "liquidation-margin-borrow";
+pub(crate) const LIQUIDATION_MARGIN_FUNDING: &str = "liquidation-margin-funding";
+pub(crate) const LIQUIDATION_MARGIN_DNF: &str = "liquidation-margin-dnf";
+pub(crate) const LIQUIDATION_MARGIN_CRANK: &str = "liquidation-margin-crank";
+pub(crate) const LIQUIDATION_MARGIN_EXPOSURE: &str = "liquidation-margin-exposure";
+pub(crate) const LIQUIDATION_MARGIN_TOTAL: &str = "liquidation-margin-total";

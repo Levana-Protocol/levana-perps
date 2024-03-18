@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use msg::contracts::market::position::{ClosedPosition, LiquidationReason, PositionCloseReason};
 
 pub(crate) fn position_liquidated_reason(pos: &ClosedPosition) -> Result<LiquidationReason> {
+    assert!(pos.liquidation_margin.is_some());
     match pos.reason {
         PositionCloseReason::Liquidated(reason) => Ok(reason),
         _ => Err(anyhow!("position should have been liquidated/take-profit")),
