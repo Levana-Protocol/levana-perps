@@ -273,7 +273,9 @@ impl State<'_> {
                         direction: order.direction.into_base(market_type),
                         max_gains: order.max_gains,
                         stop_loss_override: order.stop_loss_override,
-                        take_profit: order.take_profit,
+                        take_profit: backwards_compat_limit_order_take_profit(
+                            self, storage, &order,
+                        )?,
                     };
 
                     orders.push(order_resp);
@@ -514,5 +516,49 @@ impl CancelLimitOrderExec {
         ctx.response.add_event(CancelLimitOrderEvent { order_id });
 
         Ok(())
+    }
+}
+
+// this will eventually be removed, it's just for backwards-compat
+pub(crate) fn backwards_compat_limit_order_take_profit(
+    state: &State,
+    store: &dyn Storage,
+    order: &LimitOrder,
+) -> Result<TakeProfitTrader> {
+    match order.take_profit {
+        Some(x) => Ok(x),
+        None => {
+            let market_type = state.market_type(store)?;
+
+            // we want to use the trigger price here, but, we need to get it as a PricePoint
+            // this isn't done anywhere else in the codebase, so just create one via patching here
+            let mut price_point = state.current_spot_price(store)?;
+
+            price_point.price_notional = order.trigger_price.into_notional_price(market_type);
+            price_point.price_base = order.trigger_price;
+            price_point.price_usd = PriceCollateralInUsd::from_non_zero(
+                NonZero::new(
+                    price_point
+                        .base_to_usd(Base::from_decimal256(
+                            order.trigger_price.into_non_zero().into_decimal256(),
+                        ))
+                        .into_decimal256(),
+                )
+                .context("must be non-zero")?,
+            );
+            #[allow(deprecated)]
+            BackwardsCompatTakeProfit {
+                collateral: order.collateral,
+                leverage: order.leverage,
+                direction: order.direction.into_base(market_type),
+                max_gains: order
+                    .max_gains
+                    .context("max_gains should be set in limit order backwards-compat branch")?,
+                take_profit: None,
+                market_type,
+                price_point: &price_point,
+            }
+            .calc()
+        }
     }
 }
