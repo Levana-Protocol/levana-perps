@@ -105,7 +105,7 @@ struct UpdatePythOpt {
     #[clap(long, env = "COSMOS_NETWORK")]
     network: PerpsNetwork,
     /// Market ID to do the update for
-    #[clap(long)]
+    #[clap(long, required = true)]
     market: Vec<MarketId>,
     /// Override chain config file
     #[clap(long, env = "LEVANA_BOTS_CONFIG_CHAIN")]
@@ -128,7 +128,7 @@ async fn update_pyth(
     let pyth = chain
         .spot_price
         .and_then(|spot_price| spot_price.pyth)
-        .context("No Pyth oracle found for network {network}")?;
+        .with_context(|| format!("No Pyth oracle found for network {network}"))?;
     let basic = opt.load_basic_app(network).await?;
     let wallet = basic.get_wallet()?;
 
