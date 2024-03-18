@@ -262,6 +262,7 @@ impl ClosePositionExec {
             active_collateral,
             delta_neutrality_fee_collateral: pos.delta_neutrality_fee.collateral(),
             delta_neutrality_fee_usd: pos.delta_neutrality_fee.usd(),
+            liquidation_margin: Some(pos.liquidation_margin),
         };
 
         Ok(Self {

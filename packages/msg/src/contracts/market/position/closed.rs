@@ -4,7 +4,7 @@ use shared::prelude::*;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-use super::{Position, PositionId, PositionQueryResponse};
+use super::{LiquidationMargin, Position, PositionId, PositionQueryResponse};
 
 /// Information on a closed position
 #[cw_serde]
@@ -99,6 +99,10 @@ pub struct ClosedPosition {
 
     /// the reason the position is closed
     pub reason: PositionCloseReason,
+
+    /// liquidation margin at the time of close
+    /// Optional for the sake of backwards-compatibility
+    pub liquidation_margin: Option<LiquidationMargin>,
 }
 
 /// Reason the position was closed

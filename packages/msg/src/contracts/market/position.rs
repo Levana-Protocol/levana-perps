@@ -648,6 +648,7 @@ impl Position {
                         active_collateral,
                         delta_neutrality_fee_collateral: pos.delta_neutrality_fee.collateral(),
                         delta_neutrality_fee_usd: pos.delta_neutrality_fee.usd(),
+                        liquidation_margin: Some(pos.liquidation_margin),
                     },
                 )))
             }
@@ -1096,6 +1097,7 @@ pub mod events {
                         close_time,
                         settlement_time,
                         reason,
+                        liquidation_margin,
                     },
             }: PositionCloseEvent,
         ) -> Self {
@@ -1157,6 +1159,21 @@ pub mod events {
             if let Some(x) = price_point_created_at {
                 event = event.add_attribute(event_key::PRICE_POINT_CREATED_AT, x.to_string());
             }
+            if let Some(x) = liquidation_margin {
+                event = event
+                    .add_attribute(event_key::LIQUIDATION_MARGIN_BORROW, x.borrow.to_string())
+                    .add_attribute(event_key::LIQUIDATION_MARGIN_FUNDING, x.funding.to_string())
+                    .add_attribute(
+                        event_key::LIQUIDATION_MARGIN_DNF,
+                        x.delta_neutrality.to_string(),
+                    )
+                    .add_attribute(event_key::LIQUIDATION_MARGIN_CRANK, x.crank.to_string())
+                    .add_attribute(
+                        event_key::LIQUIDATION_MARGIN_EXPOSURE,
+                        x.exposure.to_string(),
+                    )
+                    .add_attribute(event_key::LIQUIDATION_MARGIN_TOTAL, x.total().to_string());
+            }
             event
         }
     }
@@ -1213,6 +1230,28 @@ pub mod events {
                     evt.number_attr(event_key::ENTRY_PRICE)?,
                 )?,
                 active_collateral: evt.decimal_attr(event_key::ACTIVE_COLLATERAL)?,
+                liquidation_margin: match (
+                    evt.try_decimal_attr::<Collateral>(event_key::LIQUIDATION_MARGIN_BORROW)?,
+                    evt.try_decimal_attr::<Collateral>(event_key::LIQUIDATION_MARGIN_FUNDING)?,
+                    evt.try_decimal_attr::<Collateral>(event_key::LIQUIDATION_MARGIN_DNF)?,
+                    evt.try_decimal_attr::<Collateral>(event_key::LIQUIDATION_MARGIN_CRANK)?,
+                    evt.try_decimal_attr::<Collateral>(event_key::LIQUIDATION_MARGIN_EXPOSURE)?,
+                ) {
+                    (
+                        Some(borrow),
+                        Some(funding),
+                        Some(delta_neutrality),
+                        Some(crank),
+                        Some(exposure),
+                    ) => Some(LiquidationMargin {
+                        borrow,
+                        funding,
+                        delta_neutrality,
+                        crank,
+                        exposure,
+                    }),
+                    _ => None,
+                },
             };
             Ok(PositionCloseEvent { closed_position })
         }
