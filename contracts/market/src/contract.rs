@@ -257,10 +257,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             )?;
         }
 
-        ExecuteMsg::UpdatePositionStopLossPrice {
-            id,
-            stop_loss,
-        } => {
+        ExecuteMsg::UpdatePositionStopLossPrice { id, stop_loss } => {
             state.defer_execution(
                 &mut ctx,
                 info.sender,
@@ -286,8 +283,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 info.funds.take(),
             )?;
         }
-
-
 
         // TODO: remove this once the deprecated fields are fully removed
         #[allow(deprecated)]

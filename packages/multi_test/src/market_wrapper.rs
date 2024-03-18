@@ -42,7 +42,11 @@ use msg::contracts::market::deferred_execution::{
     DeferredExecWithStatus, GetDeferredExecResp, ListDeferredExecsResp,
 };
 use msg::contracts::market::entry::{
-    ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees, InitialPrice, LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpAction, LpActionHistoryResp, LpInfoResp, PositionActionHistoryResp, PositionsQueryFeeApproach, PriceForQuery, PriceWouldTriggerResp, QueryMsg, SlippageAssert, SpotPriceHistoryResp, StatusResp, StopLoss, TradeHistorySummary, TraderActionHistoryResp
+    ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
+    InitialPrice, LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpAction,
+    LpActionHistoryResp, LpInfoResp, PositionActionHistoryResp, PositionsQueryFeeApproach,
+    PriceForQuery, PriceWouldTriggerResp, QueryMsg, SlippageAssert, SpotPriceHistoryResp,
+    StatusResp, StopLoss, TradeHistorySummary, TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
 use msg::contracts::market::spot_price::{
@@ -1596,7 +1600,7 @@ impl PerpsMarket {
     ) -> Result<DeferResponse> {
         self.exec_defer(
             sender,
-            &MarketExecuteMsg::UpdatePositionStopLossPrice { 
+            &MarketExecuteMsg::UpdatePositionStopLossPrice {
                 id: position_id,
                 stop_loss,
             },

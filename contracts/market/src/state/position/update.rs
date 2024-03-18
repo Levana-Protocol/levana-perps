@@ -1021,11 +1021,11 @@ impl UpdatePositionStopLossPriceExec {
             StopLoss::Remove => {
                 pos.stop_loss_override = None;
                 pos.stop_loss_override_notional = None;
-            },
+            }
             StopLoss::Price(price) => {
                 pos.stop_loss_override = Some(price);
                 pos.stop_loss_override_notional = Some(price.into_notional_price(market_type));
-            },
+            }
         }
 
         Ok(Self { pos, price_point })

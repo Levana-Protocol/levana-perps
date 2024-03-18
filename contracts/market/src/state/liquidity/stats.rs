@@ -244,7 +244,7 @@ impl State<'_> {
             ExecuteMsg::UpdatePositionLeverage { .. } => true,
             ExecuteMsg::UpdatePositionMaxGains { .. } => true,
             ExecuteMsg::UpdatePositionTakeProfitPrice { .. } => true,
-            ExecuteMsg::UpdatePositionStopLossPrice{ .. } => true,
+            ExecuteMsg::UpdatePositionStopLossPrice { .. } => true,
             #[allow(deprecated)]
             ExecuteMsg::SetTriggerOrder { .. } => true,
             ExecuteMsg::ClosePosition { .. } => true,

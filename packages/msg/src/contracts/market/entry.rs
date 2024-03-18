@@ -1374,7 +1374,7 @@ pub struct PriceWouldTriggerResp {
     pub would_trigger: bool,
 }
 
-/// Stop loss configuration 
+/// Stop loss configuration
 #[cw_serde]
 pub enum StopLoss {
     /// Remove stop loss price for the position

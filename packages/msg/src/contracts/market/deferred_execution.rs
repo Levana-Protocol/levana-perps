@@ -8,7 +8,11 @@ use cosmwasm_std::StdResult;
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
 use shared::prelude::*;
 
-use super::{entry::{SlippageAssert, StopLoss}, order::OrderId, position::PositionId};
+use super::{
+    entry::{SlippageAssert, StopLoss},
+    order::OrderId,
+    position::PositionId,
+};
 
 /// A unique numeric ID for each deferred execution in the protocol.
 #[cw_serde]
@@ -273,7 +277,6 @@ pub enum DeferredExecItem {
         /// New stop loss price of the position
         stop_loss: StopLoss,
     },
-
 
     /// Close a position
     ClosePosition {

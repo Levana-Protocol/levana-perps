@@ -194,11 +194,7 @@ fn position_stop_loss_long() {
         .unwrap();
 
     market
-        .exec_update_position_stop_loss(
-            &trader,
-            pos_id,
-            StopLoss::Price(stop_loss_override),
-        )
+        .exec_update_position_stop_loss(&trader, pos_id, StopLoss::Price(stop_loss_override))
         .unwrap();
 
     trigger_and_assert(pos_id);
@@ -256,11 +252,7 @@ fn position_stop_loss_short() {
         .unwrap();
 
     market
-        .exec_update_position_stop_loss(
-            &trader,
-            pos_id,
-            StopLoss::Price(stop_loss_override),
-        )
+        .exec_update_position_stop_loss(&trader, pos_id, StopLoss::Price(stop_loss_override))
         .unwrap();
 
     trigger_and_assert(pos_id);

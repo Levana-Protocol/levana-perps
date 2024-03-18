@@ -191,10 +191,6 @@ fn update_stop_loss_inf_max_gains_perp_1071() {
     market.exec_set_price("2.0".parse().unwrap()).unwrap();
 
     market
-        .exec_update_position_stop_loss(
-            &trader,
-            pos_id,
-            StopLoss::Price("0.99".parse().unwrap()),
-        )
+        .exec_update_position_stop_loss(&trader, pos_id, StopLoss::Price("0.99".parse().unwrap()))
         .unwrap();
 }
