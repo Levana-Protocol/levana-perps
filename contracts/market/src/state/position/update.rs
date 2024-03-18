@@ -5,7 +5,7 @@ use crate::state::liquidity::{LiquidityLock, LiquidityUnlock};
 use crate::state::position::get_position;
 use crate::state::position::take_profit::TakeProfitToCounterCollateral;
 use msg::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
-use msg::contracts::market::entry::PositionActionKind;
+use msg::contracts::market::entry::{PositionActionKind, StopLoss};
 use msg::contracts::market::fees::events::FeeSource;
 use msg::contracts::market::position::events::{
     calculate_position_collaterals, PositionAttributes, PositionSaveReason, PositionTradingFee,
@@ -980,6 +980,60 @@ impl TriggerOrderExec {
     // rather than to just assign it to a throwaway variable.
     pub(crate) fn discard(self) {}
 
+    pub(crate) fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
+        state.position_save(
+            ctx,
+            &mut self.pos,
+            &self.price_point,
+            true,
+            false,
+            PositionSaveReason::Update,
+        )?;
+
+        Ok(())
+    }
+}
+
+// This is a helper struct, created from read-only storage.
+// Most of the validation is done while creating the struct, which allows for
+// error recovery in the submessage handler.
+// State is then mutably updated by calling .apply()
+#[must_use]
+pub(crate) struct UpdatePositionStopLossPriceExec {
+    pos: Position,
+    price_point: PricePoint,
+}
+
+impl UpdatePositionStopLossPriceExec {
+    pub(crate) fn new(
+        state: &State,
+        store: &dyn Storage,
+        id: PositionId,
+        stop_loss: StopLoss,
+        price_point: PricePoint,
+    ) -> Result<Self> {
+        let mut pos = get_position(store, id)?;
+        let market_type = state.market_id(store)?.get_market_type();
+
+        debug_assert!(pos.liquifunded_at == price_point.timestamp);
+
+        match stop_loss {
+            StopLoss::Remove => {
+                pos.stop_loss_override = None;
+                pos.stop_loss_override_notional = None;
+            },
+            StopLoss::Price(price) => {
+                pos.stop_loss_override = Some(price);
+                pos.stop_loss_override_notional = Some(price.into_notional_price(market_type));
+            },
+        }
+
+        Ok(Self { pos, price_point })
+    }
+
+    // This is a no-op, but it's more expressive to call discard() or apply()
+    // rather than to just assign it to a throwaway variable.
+    pub(crate) fn discard(self) {}
     pub(crate) fn apply(mut self, state: &State, ctx: &mut StateContext) -> Result<()> {
         state.position_save(
             ctx,

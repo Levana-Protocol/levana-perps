@@ -42,11 +42,7 @@ use msg::contracts::market::deferred_execution::{
     DeferredExecWithStatus, GetDeferredExecResp, ListDeferredExecsResp,
 };
 use msg::contracts::market::entry::{
-    ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
-    InitialPrice, LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpAction,
-    LpActionHistoryResp, LpInfoResp, PositionActionHistoryResp, PositionsQueryFeeApproach,
-    PriceForQuery, PriceWouldTriggerResp, QueryMsg, SlippageAssert, SpotPriceHistoryResp,
-    StatusResp, TradeHistorySummary, TraderActionHistoryResp,
+    ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees, InitialPrice, LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpAction, LpActionHistoryResp, LpInfoResp, PositionActionHistoryResp, PositionsQueryFeeApproach, PriceForQuery, PriceWouldTriggerResp, QueryMsg, SlippageAssert, SpotPriceHistoryResp, StatusResp, StopLoss, TradeHistorySummary, TraderActionHistoryResp
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
 use msg::contracts::market::spot_price::{
@@ -1592,24 +1588,17 @@ impl PerpsMarket {
         )
     }
 
-    pub fn exec_set_trigger_order(
+    pub fn exec_update_position_stop_loss(
         &self,
         sender: &Addr,
         position_id: PositionId,
-        stop_loss_override: Option<PriceBaseInQuote>,
-        take_profit: Option<impl TryInto<TakeProfitTrader>>,
+        stop_loss: StopLoss,
     ) -> Result<DeferResponse> {
-        self.exec_defer_with_crank_fee(
+        self.exec_defer(
             sender,
-            &MarketExecuteMsg::SetTriggerOrder {
+            &MarketExecuteMsg::UpdatePositionStopLossPrice { 
                 id: position_id,
-                stop_loss_override,
-                take_profit: take_profit
-                    .map(|x| {
-                        x.try_into()
-                            .map_err(|_| anyhow!("could not convert into take profit price"))
-                    })
-                    .transpose()?,
+                stop_loss,
             },
         )
     }

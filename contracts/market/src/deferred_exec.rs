@@ -23,6 +23,7 @@ use crate::state::{
         update::{
             TriggerOrderExec, UpdatePositionCollateralExec, UpdatePositionLeverageExec,
             UpdatePositionMaxGainsExec, UpdatePositionSizeExec, UpdatePositionTakeProfitPriceExec,
+            UpdatePositionStopLossPriceExec,
         },
         OpenPositionExec, OpenPositionParams,
     },
@@ -251,6 +252,21 @@ fn helper_execute(
                 get_position(ctx.storage, id)?,
                 take_profit_price,
                 &price_point,
+            )?
+            .apply(state, ctx)?;
+            Ok(DeferredExecCompleteTarget::Position(id))
+        }
+        DeferredExecItem::UpdatePositionStopLossPrice {
+            id,
+            stop_loss,
+        } => {
+            execute_slippage_assert_and_liquifund(state, ctx, id, None, None, &price_point)?;
+            UpdatePositionStopLossPriceExec::new(
+                state,
+                ctx.storage,
+                id,
+                stop_loss,
+                price_point,
             )?
             .apply(state, ctx)?;
             Ok(DeferredExecCompleteTarget::Position(id))
@@ -593,6 +609,22 @@ fn helper_validate(
                 price_point,
             )?
             .discard();
+            Ok(())
+        }
+        DeferredExecItem::UpdatePositionStopLossPrice {
+            id,
+            stop_loss,
+        } => {
+            validate_slippage_assert_and_liquifund(state, store, id, None, None, price_point)?
+                .discard();
+            UpdatePositionStopLossPriceExec::new(
+                state,
+                store,
+                id,
+                stop_loss,
+                *price_point,
+            )?
+            .discard(); 
             Ok(())
         }
         DeferredExecItem::ClosePosition {

@@ -257,6 +257,19 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             )?;
         }
 
+        ExecuteMsg::UpdatePositionStopLossPrice {
+            id,
+            stop_loss,
+        } => {
+            state.defer_execution(
+                &mut ctx,
+                info.sender,
+                DeferredExecItem::UpdatePositionStopLossPrice { id, stop_loss },
+                info.funds.take(),
+            )?;
+        }
+
+        #[allow(deprecated)]
         ExecuteMsg::SetTriggerOrder {
             id,
             stop_loss_override,
@@ -273,6 +286,8 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 info.funds.take(),
             )?;
         }
+
+
 
         // TODO: remove this once the deprecated fields are fully removed
         #[allow(deprecated)]

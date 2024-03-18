@@ -108,6 +108,8 @@ impl ShutdownImpact {
             ExecuteMsg::UpdatePositionLeverage { .. } => Some(Self::NewTrades),
             ExecuteMsg::UpdatePositionMaxGains { .. } => Some(Self::NewTrades),
             ExecuteMsg::UpdatePositionTakeProfitPrice { .. } => Some(Self::NewTrades),
+            ExecuteMsg::UpdatePositionStopLossPrice { .. } => Some(Self::NewTrades),
+            #[allow(deprecated)]
             ExecuteMsg::SetTriggerOrder { .. } => Some(Self::NewTrades),
             ExecuteMsg::ClosePosition { .. } => Some(Self::ClosePositions),
             ExecuteMsg::DepositLiquidity { .. } => Some(Self::DepositLiquidity),

@@ -171,7 +171,7 @@ fn position_take_profit_override_long() {
         .unwrap();
 
     market
-        .exec_set_trigger_order(&trader, pos_id, None, Some(take_profit_override))
+        .exec_update_position_take_profit(&trader, pos_id, TakeProfitTrader::Finite(take_profit_override.into_non_zero()))
         .unwrap();
 
     trigger_and_assert(pos_id, LiquidationReason::TakeProfit);
@@ -250,7 +250,7 @@ fn position_take_profit_override_long_3() {
     let pos_id = open_long_with_take_profit(&market, &trader, "100", "10", "100.1");
 
     market
-        .exec_set_trigger_order(&trader, pos_id, None, Some(take_profit_override))
+        .exec_update_position_take_profit(&trader, pos_id, TakeProfitTrader::Finite(take_profit_override.into_non_zero()))
         .unwrap();
 
     market.exec_set_price("100.2".try_into().unwrap()).unwrap();
@@ -282,9 +282,9 @@ fn position_take_profit_override_long_4() {
     market.exec_set_price("100".try_into().unwrap()).unwrap();
     let pos_id = open_long_with_take_profit(&market, &trader, "100", "10", "100.1");
 
-    market
-        .exec_set_trigger_order(&trader, pos_id, None, None::<PriceBaseInQuote>)
-        .unwrap();
+    // market
+    //     .exec_set_trigger_order(&trader, pos_id, None, None::<PriceBaseInQuote>)
+    //     .unwrap();
 
     market.exec_set_price("100.2".try_into().unwrap()).unwrap();
     market.exec_crank(&cranker).unwrap();
@@ -348,7 +348,7 @@ fn position_take_profit_override_short() {
         .unwrap();
 
     market
-        .exec_set_trigger_order(&trader, pos_id, None, Some(take_profit_override))
+        .exec_update_position_take_profit(&trader, pos_id, TakeProfitTrader::Finite(take_profit_override.into_non_zero()))
         .unwrap();
 
     trigger_and_assert(pos_id, LiquidationReason::TakeProfit);

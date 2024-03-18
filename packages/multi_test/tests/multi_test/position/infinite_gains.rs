@@ -2,7 +2,7 @@ use cosmwasm_std::Addr;
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, return_unless_market_collateral_base, time::TimeJump, PerpsApp,
 };
-use msg::prelude::*;
+use msg::{contracts::market::entry::StopLoss, prelude::*};
 
 #[test]
 fn test_infinite_max_gains_fail() {
@@ -191,11 +191,10 @@ fn update_stop_loss_inf_max_gains_perp_1071() {
     market.exec_set_price("2.0".parse().unwrap()).unwrap();
 
     market
-        .exec_set_trigger_order(
+        .exec_update_position_stop_loss(
             &trader,
             pos_id,
-            Some("0.99".parse().unwrap()),
-            None::<PriceBaseInQuote>,
+            StopLoss::Price("0.99".parse().unwrap()),
         )
         .unwrap();
 }

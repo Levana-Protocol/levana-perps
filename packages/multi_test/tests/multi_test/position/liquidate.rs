@@ -6,6 +6,7 @@ use levana_perpswap_multi_test::{
     PerpsApp,
 };
 use msg::contracts::market::config::ConfigUpdate;
+use msg::contracts::market::entry::StopLoss;
 use msg::contracts::market::position::PositionId;
 use msg::prelude::*;
 
@@ -193,11 +194,10 @@ fn position_stop_loss_long() {
         .unwrap();
 
     market
-        .exec_set_trigger_order(
+        .exec_update_position_stop_loss(
             &trader,
             pos_id,
-            Some(stop_loss_override),
-            None::<PriceBaseInQuote>,
+            StopLoss::Price(stop_loss_override),
         )
         .unwrap();
 
@@ -256,11 +256,10 @@ fn position_stop_loss_short() {
         .unwrap();
 
     market
-        .exec_set_trigger_order(
+        .exec_update_position_stop_loss(
             &trader,
             pos_id,
-            Some(stop_loss_override),
-            None::<PriceBaseInQuote>,
+            StopLoss::Price(stop_loss_override),
         )
         .unwrap();
 
