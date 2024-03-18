@@ -34,7 +34,9 @@ pub(crate) enum SubCommand {
         path: PathBuf
     },
     /// List Supported coins with it's id
-    Coins {}
+    Coins {},
+    /// Test
+    Test {}
 }
 
 fn coin_parser(arg: &str) -> Result<Coin> {
