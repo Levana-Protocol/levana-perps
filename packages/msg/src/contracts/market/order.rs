@@ -28,6 +28,7 @@ pub struct LimitOrder {
     pub stop_loss_override: Option<PriceBaseInQuote>,
     /// Take profit price
     // TODO - this should eventually become non-optional, but that would require a migration
+    // it is, however, non-optional in LimitOrderResp
     #[serde(alias = "take_profit_override")]
     pub take_profit: Option<TakeProfitTrader>,
     /// Crank fee charged during deferred execution and placing the limit order

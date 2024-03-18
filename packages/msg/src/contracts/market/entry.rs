@@ -1038,7 +1038,7 @@ pub struct LimitOrderResp {
     pub stop_loss_override: Option<PriceBaseInQuote>,
     #[serde(alias = "take_profit_override")]
     /// Take profit of the new position
-    pub take_profit: Option<TakeProfitTrader>,
+    pub take_profit: TakeProfitTrader,
 }
 
 /// Response for [QueryMsg::LimitOrders]
