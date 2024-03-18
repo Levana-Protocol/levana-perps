@@ -13,7 +13,7 @@ mod wind_down;
 use std::{collections::BTreeMap, path::PathBuf};
 
 use chrono::Utc;
-use cosmos::{Address, ContractAdmin, Cosmos, CosmosNetwork, HasAddress, TxBuilder};
+use cosmos::{Address, ContractAdmin, Cosmos, HasAddress, TxBuilder};
 use cosmwasm_std::{to_binary, CosmosMsg, Empty};
 use msg::contracts::market::{
     entry::NewMarketParams,
@@ -26,6 +26,7 @@ use perps_exes::{
     },
     contracts::Factory,
     prelude::*,
+    PerpsNetwork,
 };
 
 use crate::{cli::Opt, spot_price_config::get_spot_price_config, util::get_hash_for_path};
@@ -50,7 +51,7 @@ enum Sub {
     StorePerpsContracts {
         /// Network to use.
         #[clap(long, env = "COSMOS_NETWORK")]
-        network: CosmosNetwork,
+        network: PerpsNetwork,
         /// Override the code ID, only works if to-upload is specified and has a single value
         #[clap(long)]
         code_id: Option<u64>,
@@ -188,7 +189,7 @@ impl CodeIds {
         &self,
         contract_type: ContractType,
         opt: &Opt,
-        network: CosmosNetwork,
+        network: PerpsNetwork,
     ) -> Result<StoredCodeId> {
         let contract_path = opt.get_contract_path(contract_type.as_str());
         let hash = get_hash_for_path(&contract_path)?;
@@ -212,7 +213,7 @@ impl CodeIds {
         &self,
         contract_type: ContractType,
         opt: &Opt,
-        network: CosmosNetwork,
+        network: PerpsNetwork,
     ) -> Result<u64> {
         self.get(contract_type, opt, network).map(|x| x.code_id)
     }
@@ -269,13 +270,13 @@ impl FromStr for ContractType {
 struct StoredContract {
     contract_type: ContractType,
     gitrev: String,
-    code_ids: BTreeMap<CosmosNetwork, u64>,
+    code_ids: BTreeMap<PerpsNetwork, u64>,
     hash: String,
 }
 
 async fn store_perps_contracts(
     opt: Opt,
-    network: CosmosNetwork,
+    network: PerpsNetwork,
     code_id: Option<u64>,
     granter: Option<Address>,
     to_upload: &[ContractType],
@@ -350,7 +351,7 @@ async fn store_perps_contracts(
 struct InstantiateFactoryOpts {
     /// Network to use.
     #[clap(long, env = "COSMOS_NETWORK")]
-    network: CosmosNetwork,
+    network: PerpsNetwork,
     /// On-chain label for the factory contract
     #[clap(long)]
     factory_label: String,

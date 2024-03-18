@@ -12,7 +12,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
-use cosmos::{Address, CosmosNetwork, HasAddress, TxBuilder};
+use cosmos::{Address, HasAddress, TxBuilder};
 use msg::contracts::market::{
     entry::{PositionAction, PositionActionKind, TradeHistorySummary},
     position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
@@ -20,6 +20,7 @@ use msg::contracts::market::{
 };
 use perps_exes::{
     config::ChainConfig, contracts::Factory, prelude::MarketContract, pyth::get_oracle_update_msg,
+    PerpsNetwork,
 };
 use serde_json::json;
 use shared::storage::{
@@ -102,7 +103,7 @@ impl UtilOpt {
 struct UpdatePythOpt {
     /// Network to use.
     #[clap(long, env = "COSMOS_NETWORK")]
-    network: CosmosNetwork,
+    network: PerpsNetwork,
     /// Market ID to do the update for
     #[clap(long)]
     market: Vec<MarketId>,
@@ -187,7 +188,7 @@ async fn update_pyth(
 struct DeployPythOpt {
     /// Network to use.
     #[clap(long, env = "COSMOS_NETWORK")]
-    network: CosmosNetwork,
+    network: PerpsNetwork,
     /// File containing wormhole WASM
     #[clap(long)]
     wormhole: PathBuf,
@@ -313,7 +314,7 @@ async fn deploy_pyth_opt(
 struct TradeVolumeOpt {
     /// Network to use.
     #[clap(long, env = "COSMOS_NETWORK")]
-    network: CosmosNetwork,
+    network: PerpsNetwork,
     /// Market address
     market: Address,
 }
@@ -391,7 +392,7 @@ async fn trade_volume(
 struct OpenPositionCsvOpt {
     /// Network to use.
     #[clap(long, env = "COSMOS_NETWORK")]
-    network: CosmosNetwork,
+    network: PerpsNetwork,
     /// Factory address
     #[clap(long)]
     factory: Address,

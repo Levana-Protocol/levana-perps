@@ -9,9 +9,7 @@ use crate::cli::{Cmd, Subcommand};
 use anyhow::Result;
 use clap::Parser;
 use cli::HatchEggOpt;
-use cosmos::{
-    Address, Contract, Cosmos, CosmosNetwork, HasAddress, HasAddressHrp, SeedPhrase, Wallet,
-};
+use cosmos::{Address, Contract, Cosmos, HasAddress, HasAddressHrp, SeedPhrase, Wallet};
 use mock_nft::Metadata;
 use msg::contracts::hatching::{
     config::Config as HatchConfig,
@@ -24,7 +22,7 @@ use msg::contracts::hatching::{
 };
 use msg::contracts::rewards::entry::ExecuteMsg::Claim;
 use msg::contracts::rewards::entry::{QueryMsg::RewardsInfo, RewardsInfoResp};
-use perps_exes::prelude::*;
+use perps_exes::{prelude::*, PerpsNetwork};
 use serde::{Deserialize, Serialize};
 
 struct Hatch {
@@ -42,7 +40,7 @@ struct Hatch {
 
 impl Hatch {
     pub async fn new(
-        network: CosmosNetwork,
+        network: PerpsNetwork,
         wallet: SeedPhrase,
         nft_mint_admin_wallet: SeedPhrase,
         profile_admin_wallet: SeedPhrase,

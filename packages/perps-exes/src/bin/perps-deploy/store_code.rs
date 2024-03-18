@@ -3,7 +3,7 @@ use std::{process::Output, str::FromStr};
 use anyhow::Result;
 use cosmos::{Cosmos, CosmosNetwork, Wallet};
 use msg::contracts::tracker::entry::CodeIdResp;
-use perps_exes::config::parse_deployment;
+use perps_exes::{config::parse_deployment, PerpsNetwork};
 
 use crate::{cli::Opt, tracker::Tracker, util::get_hash_for_path};
 
@@ -14,7 +14,7 @@ pub(crate) struct StoreCodeOpt {
     family: Option<String>,
     /// Network to use. Either this or family must be provided.
     #[clap(long, env = "COSMOS_NETWORK", global = true)]
-    network: Option<CosmosNetwork>,
+    network: Option<PerpsNetwork>,
 
     /// Contract types to store. If not provided, the perps protocol suite of contracts will be stored.
     #[clap(
@@ -109,7 +109,7 @@ pub(crate) async fn go(
 pub(crate) async fn store_code(
     opt: &Opt,
     cosmos: &Cosmos,
-    network: CosmosNetwork,
+    network: PerpsNetwork,
     wallet: &Wallet,
     tracker: &Tracker,
     contract_types: &[&str],
@@ -124,10 +124,12 @@ pub(crate) async fn store_code(
             CodeIdResp::NotFound {} => {
                 log::info!("Contract {ct} has SHA256 {hash} and is not on blockchain, uploading");
                 let code_id = match (ct, network) {
-                    ("market", CosmosNetwork::OsmosisTestnet) => {
+                    ("market", PerpsNetwork::Regular(CosmosNetwork::OsmosisTestnet)) => {
                         store_market_cosmjs("osmosis").await?
                     }
-                    ("market", CosmosNetwork::SeiTestnet) => store_market_cosmjs("sei").await?,
+                    ("market", PerpsNetwork::Regular(CosmosNetwork::SeiTestnet)) => {
+                        store_market_cosmjs("sei").await?
+                    }
                     _ => cosmos.store_code_path(wallet, &path).await?.get_code_id(),
                 };
                 log::info!("Upload complete, new code ID is {code_id}, logging with the tracker");

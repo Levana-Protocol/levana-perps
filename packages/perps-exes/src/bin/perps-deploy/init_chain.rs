@@ -1,6 +1,7 @@
 use anyhow::Result;
-use cosmos::{ContractAdmin, CosmosNetwork};
+use cosmos::ContractAdmin;
 use msg::contracts::faucet::entry::GasAllowance;
+use perps_exes::PerpsNetwork;
 
 use crate::cli::Opt;
 use crate::store_code::CW20;
@@ -9,7 +10,7 @@ use crate::store_code::CW20;
 pub(crate) struct InitChainOpt {
     /// Network to use.
     #[clap(long, env = "COSMOS_NETWORK")]
-    network: CosmosNetwork,
+    network: PerpsNetwork,
     /// Number of seconds to limit taps to
     #[clap(long, default_value = "300")]
     tap_limit: u32,
@@ -91,7 +92,7 @@ pub(crate) async fn go(
         .await?;
     log::info!("Gas sent in {}", res.txhash);
 
-    log::info!("Please remember to update assets/config.yaml with the new addresses!");
+    log::info!("Please remember to update assets/config-chain.yaml with the new addresses!");
 
     // In the future, do we want to automatically add admins?
 

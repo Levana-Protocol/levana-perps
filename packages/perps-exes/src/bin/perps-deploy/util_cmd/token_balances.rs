@@ -1,8 +1,9 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use cosmos::{Address, CosmosNetwork};
+use cosmos::Address;
 use itertools::Itertools;
 use msg::prelude::*;
+use perps_exes::PerpsNetwork;
 
 use crate::cli::Opt;
 
@@ -19,7 +20,7 @@ pub(crate) struct TokenBalancesOpt {
     output_csv: PathBuf,
     /// Network to use.
     #[clap(long, env = "COSMOS_NETWORK")]
-    network: CosmosNetwork,
+    network: PerpsNetwork,
 }
 
 impl TokenBalancesOpt {

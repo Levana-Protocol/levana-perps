@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use anyhow::{Context, Result};
-use cosmos::{Cosmos, CosmosNetwork};
-use perps_exes::{config::MainnetFactories, contracts::Factory};
+use cosmos::Cosmos;
+use perps_exes::{config::MainnetFactories, contracts::Factory, PerpsNetwork};
 use resvg::usvg::fontdb::Database;
 
 use crate::{cli::Opt, db::handle::Db, types::ChainId};
@@ -12,7 +12,7 @@ pub(crate) struct App {
     pub(crate) cosmos: HashMap<ChainId, Cosmos>,
     pub(crate) opt: Opt,
     pub(crate) db: Db,
-    pub(crate) factories: Vec<(Factory, CosmosNetwork)>,
+    pub(crate) factories: Vec<(Factory, PerpsNetwork)>,
     pub(crate) client: reqwest::Client,
     pub(crate) fontdb: Database,
 }
@@ -63,7 +63,7 @@ impl App {
             .into_iter()
             .filter(|x| x.canonical)
             .map(|factory| {
-                let chain_id = ChainId::from_cosmos_network(factory.network)?;
+                let chain_id = ChainId::from_perps_network(factory.network)?;
                 let cosmos = cosmos_map
                     .get(&chain_id)
                     .with_context(|| format!("No Cosmos client found for {chain_id}"))?;

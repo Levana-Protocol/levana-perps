@@ -1,6 +1,6 @@
-use cosmos::{Address, CosmosNetwork, SeedPhrase};
+use cosmos::{Address, SeedPhrase};
 use msg::{contracts::market::position::PositionId, prelude::*};
-use perps_exes::{build_version, UpdatePositionCollateralImpact};
+use perps_exes::{build_version, PerpsNetwork, UpdatePositionCollateralImpact};
 
 #[derive(clap::Parser)]
 #[clap(version = build_version())]
@@ -131,7 +131,7 @@ pub(crate) enum Subcommand {
 pub(crate) struct Opt {
     /// Network to use, overrides the contract family setting
     #[clap(long, env = "COSMOS_NETWORK", global = true)]
-    pub network: Option<CosmosNetwork>,
+    pub network: Option<PerpsNetwork>,
     /// Override gRPC endpoint
     #[clap(long, env = "COSMOS_GRPC", global = true)]
     pub cosmos_grpc: Option<String>,

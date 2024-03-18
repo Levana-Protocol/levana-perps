@@ -1,9 +1,9 @@
 use std::{net::SocketAddr, path::PathBuf, str::FromStr};
 
 use anyhow::{Context, Result};
-use cosmos::{Address, AddressHrp, CosmosNetwork, SeedPhrase, Wallet};
+use cosmos::{Address, AddressHrp, SeedPhrase, Wallet};
 use cosmwasm_std::Decimal256;
-use perps_exes::{build_version, config::GasAmount};
+use perps_exes::{build_version, config::GasAmount, PerpsNetwork};
 use shared::storage::MarketId;
 use tracing::Level;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
@@ -136,7 +136,7 @@ pub(crate) struct MainnetOpt {
     #[clap(long, env = "LEVANA_BOTS_SEED_PHRASE")]
     pub(crate) seed: SeedPhrase,
     #[clap(long, env = "COSMOS_NETWORK")]
-    pub(crate) network: CosmosNetwork,
+    pub(crate) network: PerpsNetwork,
     #[clap(long, env = "COSMOS_GAS_MULTIPLIER")]
     pub(crate) gas_multiplier: Option<f64>,
     /// Used for both price and crank wallets
