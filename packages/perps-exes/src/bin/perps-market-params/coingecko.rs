@@ -21,7 +21,7 @@ pub(crate) struct ScrapePlan {
     uri: Option<String>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) struct ScrapePlan2 {
     total_exchanges: u32,
     coin_id: String,
@@ -229,46 +229,29 @@ fn fetch_exchange_row_scraper<'a>(node: ElementRef<'a>) -> Result<ExchangeInfo> 
     })
 }
 
-pub(crate) fn fetch_specific_spot_page_scrape(
-    mut file: File,
-    skip_fetch: bool,
-) -> Result<Vec<ExchangeInfo>> {
-    if skip_fetch {
-        return Ok(vec![]);
-    } else {
-        // let market_selector = "main div [data-coin-show-target=\"markets\"]";
-        let selector = format!("table tbody tr");
-        // selector = format!("{market_selector} table tbody tr");
-        let mut buffer = String::new();
-        // todo: Check if we need to even have tempfile and just pass Bytes
-        file.read_to_string(&mut buffer)?;
+pub(crate) fn fetch_specific_spot_page_scrape(exchange_page: &str) -> Result<Vec<ExchangeInfo>> {
+    let selector = format!("table tbody tr");
 
-        let document = Html::parse_document(&buffer);
-        let table_selector =
-            Selector::parse(&selector).map_err(|_| anyhow!("Error constructing table selector"))?;
+    let document = Html::parse_document(exchange_page);
+    let table_selector =
+        Selector::parse(&selector).map_err(|_| anyhow!("Error constructing table selector"))?;
 
-        let mut exchanges = vec![];
-        tracing::debug!("Going to find data table");
-        let exchange_table = document.select(&table_selector);
-        tracing::debug!("Found exchange_table");
-        for row in exchange_table {
-            let item = fetch_exchange_row_scraper(row)?;
-            tracing::debug!("Fetched one exchange: {}", item.name);
-            exchanges.push(item);
-        }
-        Ok(exchanges)
+    let mut exchanges = vec![];
+    tracing::debug!("Going to find data table");
+    let exchange_table = document.select(&table_selector);
+    tracing::debug!("Found exchange_table");
+    for row in exchange_table {
+        let item = fetch_exchange_row_scraper(row)?;
+        tracing::debug!("Fetched one exchange: {}", item.name);
+        exchanges.push(item);
     }
+    Ok(exchanges)
 }
 
-pub(crate) fn get_scrape_plan_scrapy() -> Result<ScrapePlan2> {
+pub(crate) fn get_scrape_plan_scrapy(coin_page: &str) -> Result<ScrapePlan2> {
     let market_selector = "main div [data-coin-show-target=\"markets\"]";
 
-    let mut buffer = String::new();
-    // todo: Check if we need to even have tempfile and just pass Bytes
-    let mut file = std::fs::File::open("/home/sibi/fpco/github/levana/levana-perps/packages/perps-exes/src/bin/perps-market-params/test.html")?;
-    file.read_to_string(&mut buffer)?;
-
-    let document = Html::parse_document(&buffer);
+    let document = Html::parse_document(&coin_page);
     let market_s = Selector::parse(&market_selector)
         .map_err(|_| anyhow!("Error constructing market_selector"))?;
 
@@ -350,31 +333,32 @@ impl CoingeckoApp {
         }
     }
 
-    pub(crate) fn download_coin_page(&self, uri: &str) -> Result<()> {
+    pub(crate) fn download_coin_page(&self, uri: &str) -> Result<String> {
         self.tab.navigate_to(uri)?.wait_until_navigated()?;
         tracing::debug!("Gonna click market");
         self.tab.find_element("#tab-markets")?.click()?;
 
-        let mut file = File::create("prog_test.html")?;
         let content = self.tab.get_content()?;
-        file.write(content.as_bytes())?;
-        Ok(())
+        Ok(content)
     }
 
-    fn download_exchange_page(&self, plan: ScrapePlan) -> Result<Vec<String>> {
+    pub(crate) fn download_exchange_pages(&self, plan: &ScrapePlan2) -> Result<Vec<String>> {
         // Workaround for celing division
-        let total_pages = (plan.total_exchanges + 99) / 100;
-        // let mut result = vec![];
-        for page in 1..=total_pages {
-            tracing::debug!("Gonna scrape page {page}");
+        let mut total_pages = (plan.total_exchanges + 99) / 100;
+        total_pages += 1;
+                let mut results = vec![];
+        for page in 1..total_pages {
+            tracing::debug!("Gonna download exchange page {page}");
+            let uri = format!(
+                "https://www.coingecko.com/en/coins/{}/markets/spot?items=100&page={page}",
+                plan.coin_id
+            );
+            self.tab.navigate_to(&uri)?.wait_until_navigated()?;
+            let content = self.tab.get_content()?;
+            results.push(content)
         }
 
-        // self.tab.navigate_to(uri)?.wait_until_navigated()?;
-        // let bytes = self.client.get(uri).send()?.bytes()?;
-        // let mut exchange_file = tempfile::tempfile()?;
-        // exchange_file.write(&bytes.to_vec())?;
-        // Ok(exchange_file)
-        todo!()
+        Ok(results)
     }
 
     pub(crate) fn apply_scrape_plan(
