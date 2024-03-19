@@ -33,6 +33,7 @@ jobs:
               - 'packages/shared/**'
               - 'packages/multi_test/**'
               - 'packages/fuzz/**'
+              - '.ci/**'
       - name: Check commit
         run: just check-commits
       - name: Login to GitHub Container Registry
