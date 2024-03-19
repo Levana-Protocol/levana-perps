@@ -854,7 +854,7 @@ checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 [[package]]
 name = "cosmos"
 version = "0.1.0"
-source = "git+https://github.com/Levana-Protocol/levana-cosmos-rs.git?rev=12f749c837b8a5eba37f6e657de073e887f7176d#12f749c837b8a5eba37f6e657de073e887f7176d"
+source = "git+https://github.com/Levana-Protocol/levana-cosmos-rs.git?rev=e670f08d41b3f2722f9cf6f8d5ec27f33f24ca4e#e670f08d41b3f2722f9cf6f8d5ec27f33f24ca4e"
 dependencies = [
  "base64 0.21.3",
  "bech32",
@@ -863,6 +863,7 @@ dependencies = [
  "chrono",
  "cosmos-sdk-proto",
  "cosmwasm-std",
+ "flate2",
  "fs-err",
  "hex",
  "hkd32",
@@ -1590,11 +1591,12 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flate2"
-version = "1.0.27"
+version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6c98ee8095e9d1dcbf2fcc6d95acccb90d1c81db1e44725c6a984b1dbdfb010"
+checksum = "46303f565772937ffe1d394a4fac6f411c6013172fadde9dcdb1e147a086940e"
 dependencies = [
  "crc32fast",
+ "libz-sys",
  "miniz_oxide",
 ]
 
@@ -2759,6 +2761,17 @@ name = "libsqlite3-sys"
 version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf4e226dcd58b4be396f7bd3c20da8fdee2911400705297ba7d2d7cc2c30f716"
+dependencies = [
+ "cc",
+ "pkg-config",
+ "vcpkg",
+]
+
+[[package]]
+name = "libz-sys"
+version = "1.1.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "037731f5d3aaa87a5675e895b63ddff1a87624bc29f77004ea829809654e48f6"
 dependencies = [
  "cc",
  "pkg-config",

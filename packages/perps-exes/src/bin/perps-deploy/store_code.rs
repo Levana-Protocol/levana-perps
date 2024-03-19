@@ -1,7 +1,7 @@
-use std::{process::Output, str::FromStr};
+use std::str::FromStr;
 
 use anyhow::Result;
-use cosmos::{Cosmos, CosmosNetwork, Wallet};
+use cosmos::{Cosmos, Wallet};
 use msg::contracts::tracker::entry::CodeIdResp;
 use perps_exes::{config::parse_deployment, PerpsNetwork};
 
@@ -95,21 +95,12 @@ pub(crate) async fn go(
     let wallet = basic.get_wallet()?;
     let (tracker, _) = basic.get_tracker_and_faucet()?;
 
-    store_code(
-        &opt,
-        &basic.cosmos,
-        network,
-        wallet,
-        &tracker,
-        contracts.names(),
-    )
-    .await
+    store_code(&opt, &basic.cosmos, wallet, &tracker, contracts.names()).await
 }
 
 pub(crate) async fn store_code(
     opt: &Opt,
     cosmos: &Cosmos,
-    network: PerpsNetwork,
     wallet: &Wallet,
     tracker: &Tracker,
     contract_types: &[&str],
@@ -123,15 +114,7 @@ pub(crate) async fn store_code(
         match tracker.get_code_by_hash(hash.clone()).await? {
             CodeIdResp::NotFound {} => {
                 log::info!("Contract {ct} has SHA256 {hash} and is not on blockchain, uploading");
-                let code_id = match (ct, network) {
-                    ("market", PerpsNetwork::Regular(CosmosNetwork::OsmosisTestnet)) => {
-                        store_market_cosmjs("osmosis").await?
-                    }
-                    ("market", PerpsNetwork::Regular(CosmosNetwork::SeiTestnet)) => {
-                        store_market_cosmjs("sei").await?
-                    }
-                    _ => cosmos.store_code_path(wallet, &path).await?.get_code_id(),
-                };
+                let code_id = cosmos.store_code_path(wallet, &path).await?.get_code_id();
                 log::info!("Upload complete, new code ID is {code_id}, logging with the tracker");
                 let res = tracker
                     .store_code(wallet, ct.to_owned(), code_id, hash, gitrev.clone())
@@ -156,38 +139,4 @@ pub(crate) async fn store_code(
     }
 
     Ok(())
-}
-
-async fn store_market_cosmjs(network: &str) -> Result<u64> {
-    log::info!("Calling out to cosmjs script to upload market contract for {network}");
-    let Output {
-        status,
-        stdout,
-        stderr,
-    } = tokio::process::Command::new("yarn")
-        .current_dir("packages/perps-exes/cosmjs")
-        .arg(format!("upload:{network}"))
-        .output()
-        .await?;
-    if status.success() {
-        let stdout = String::from_utf8(stdout).map_or_else(|x| format!("{x:?}"), |x| x);
-        for line in stdout.lines() {
-            if let Some(code_id) = line
-                .strip_prefix("Contract uploaded with code ID ")
-                .and_then(|x| u64::from_str(x).ok())
-            {
-                return Ok(code_id);
-            }
-        }
-        let stderr = String::from_utf8(stderr).map_or_else(|x| format!("{x:?}"), |x| x);
-        Err(anyhow::anyhow!(
-            "Did not found code ID in output:\nstdout: {stdout}\nstderr: {stderr}"
-        ))
-    } else {
-        let stdout = String::from_utf8(stdout).map_or_else(|x| format!("{x:?}"), |x| x);
-        let stderr = String::from_utf8(stderr).map_or_else(|x| format!("{x:?}"), |x| x);
-        Err(anyhow::anyhow!(
-            "cosmjs failed.\nstdout: {stdout}\nstderr: {stderr}"
-        ))
-    }
 }
