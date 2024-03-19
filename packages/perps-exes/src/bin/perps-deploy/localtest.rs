@@ -67,6 +67,7 @@ impl OsmoLocalProcess {
         log::info!("Going to spawn new osmolocal");
         Ok(OsmoLocalProcess(
             Command::new("./.ci/osmolocal.sh")
+                .arg("--no-terminal")
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
