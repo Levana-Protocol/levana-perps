@@ -2,16 +2,18 @@ use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{Context, Result};
 use cosmos::{
-    error::WalletError, Address, AddressHrp, Cosmos, CosmosNetwork, HasAddress, HasAddressHrp,
-    SeedPhrase, Wallet,
+    error::WalletError, Address, AddressHrp, Cosmos, HasAddress, HasAddressHrp, SeedPhrase, Wallet,
 };
 use msg::{
     contracts::market::spot_price::{PythPriceServiceNetwork, SpotPriceFeed, SpotPriceFeedData},
     prelude::*,
 };
-use perps_exes::config::{
-    ChainConfig, ChainPythConfig, ChainStrideConfig, ConfigTestnet, DeploymentConfigTestnet,
-    MarketPriceFeedConfig, PriceConfig,
+use perps_exes::{
+    config::{
+        ChainConfig, ChainPythConfig, ChainStrideConfig, ConfigTestnet, DeploymentConfigTestnet,
+        MarketPriceFeedConfig, PriceConfig,
+    },
+    PerpsNetwork,
 };
 
 use crate::{cli::Opt, faucet::Faucet, tracker::Tracker};
@@ -36,7 +38,7 @@ pub(crate) struct BasicApp {
     wallet: LazyWallet,
     pub(crate) chain_config: ChainConfig,
     pub(crate) price_config: PriceConfig,
-    pub(crate) network: CosmosNetwork,
+    pub(crate) network: PerpsNetwork,
 }
 
 /// Complete app for talking to a testnet with a specific contract family
@@ -89,7 +91,7 @@ impl AppMainnet {
 impl Opt {
     pub(crate) async fn connect(
         &self,
-        network: CosmosNetwork,
+        network: PerpsNetwork,
     ) -> Result<Cosmos, cosmos::error::BuilderError> {
         let mut builder = network.builder().await?;
         if let Some(grpc) = &self.cosmos_grpc {
@@ -107,11 +109,11 @@ impl Opt {
         builder.build().await
     }
 
-    fn get_lazy_wallet(&self, network: CosmosNetwork) -> Result<LazyWallet, WalletError> {
+    fn get_lazy_wallet(&self, network: PerpsNetwork) -> Result<LazyWallet, WalletError> {
         LazyWallet::new(self.wallet.clone(), network.get_address_hrp())
     }
 
-    pub(crate) async fn load_basic_app(&self, network: CosmosNetwork) -> Result<BasicApp> {
+    pub(crate) async fn load_basic_app(&self, network: PerpsNetwork) -> Result<BasicApp> {
         let cosmos = self.connect(network).await?;
         let wallet = self.get_lazy_wallet(network)?;
         let chain_config = ChainConfig::load(self.config_chain.as_ref(), network)?;
@@ -171,7 +173,7 @@ impl Opt {
         &self,
         chain_config: &ChainConfig,
         global_price_config: &PriceConfig,
-        network: CosmosNetwork,
+        network: PerpsNetwork,
     ) -> Result<OracleInfo> {
         let chain_spot_price_config = chain_config
             .spot_price
@@ -285,7 +287,7 @@ impl Opt {
         })
     }
 
-    pub(crate) async fn load_app_mainnet(&self, network: CosmosNetwork) -> Result<AppMainnet> {
+    pub(crate) async fn load_app_mainnet(&self, network: PerpsNetwork) -> Result<AppMainnet> {
         let cosmos = self.connect(network).await?;
         let wallet = self.get_lazy_wallet(network)?;
 

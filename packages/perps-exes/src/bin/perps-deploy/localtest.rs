@@ -1,6 +1,6 @@
-use cosmos::{CosmosNetwork, HasAddress, HasAddressHrp, SeedPhrase};
+use cosmos::{HasAddress, HasAddressHrp, SeedPhrase};
 use msg::prelude::*;
-use perps_exes::PerpApp;
+use perps_exes::{PerpApp, PerpsNetwork};
 
 use std::{
     process::{Child, Command, Stdio},
@@ -22,7 +22,7 @@ use crate::{
 pub(crate) struct TestsOpt {
     /// Network to use. Either this or family must be provided.
     #[clap(long, env = "COSMOS_NETWORK")]
-    pub(crate) network: CosmosNetwork,
+    pub(crate) network: PerpsNetwork,
     /// Skip initialization
     #[clap(long)]
     skip_init: bool,
@@ -124,7 +124,7 @@ pub(crate) async fn go(opt: Opt, opts: TestsOpt) -> Result<()> {
 
 async fn wait_till_network_is_up(
     wallet: SeedPhrase,
-    network: CosmosNetwork,
+    network: PerpsNetwork,
     ol: &mut OsmoLocalProcess,
 ) -> Result<()> {
     let total_estimated_seconds = Duration::from_secs(15);

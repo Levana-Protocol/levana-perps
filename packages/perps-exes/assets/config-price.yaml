@@ -809,3 +809,11 @@ networks:
       feeds-usd: [
         !pyth { key: "DYM_USD", inverted: false }
       ]
+  dymension-testnet:
+    DYM_USD:
+      feeds: [
+        !pyth { key: "DYM_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !pyth { key: "DYM_USD", inverted: false }
+      ]

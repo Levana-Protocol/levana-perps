@@ -20,6 +20,7 @@ use msg::contracts::market::liquidity::LiquidityStats;
 use perps_exes::{
     contracts::{Factory, MarketInfo},
     prelude::MarketContract,
+    PerpsNetwork,
 };
 use reqwest::Client;
 use shared::storage::{LpToken, MarketId, Signed, UnsignedDecimal};
@@ -132,8 +133,8 @@ fn to_percent(s: &str) -> String {
 
 #[derive(Debug)]
 enum Work {
-    Factory(CosmosNetwork, Factory, Sender<Work>),
-    Market(CosmosNetwork, MarketInfo),
+    Factory(PerpsNetwork, Factory, Sender<Work>),
+    Market(PerpsNetwork, MarketInfo),
 }
 
 async fn load_whale_data(app: &App, show_addresses: bool) -> Result<WhaleData> {
@@ -222,7 +223,7 @@ struct AprDailyAvg {
 }
 
 async fn load_whale_market_data(
-    network: CosmosNetwork,
+    network: PerpsNetwork,
     market_info: MarketInfo,
     client: &reqwest::Client,
 ) -> Result<WhaleMarketData> {
@@ -247,9 +248,11 @@ async fn load_whale_market_data(
     Ok(WhaleMarketData {
         address: market.get_address(),
         chain: match network {
-            CosmosNetwork::OsmosisMainnet => SimpleCosmosNetwork::Osmosis,
-            CosmosNetwork::SeiMainnet => SimpleCosmosNetwork::Sei,
-            CosmosNetwork::InjectiveMainnet => SimpleCosmosNetwork::Injective,
+            PerpsNetwork::Regular(CosmosNetwork::OsmosisMainnet) => SimpleCosmosNetwork::Osmosis,
+            PerpsNetwork::Regular(CosmosNetwork::SeiMainnet) => SimpleCosmosNetwork::Sei,
+            PerpsNetwork::Regular(CosmosNetwork::InjectiveMainnet) => {
+                SimpleCosmosNetwork::Injective
+            }
             _ => anyhow::bail!("Unsupported network: {network}"),
         },
         market_id: match market_info.market_id.as_str() {

@@ -1,9 +1,11 @@
 //! Code for discovering information on a contract family
 
-use cosmos::{Address, CosmosNetwork};
+use cosmos::Address;
+
+use crate::PerpsNetwork;
 
 pub struct ConnectionInfo {
-    pub network: CosmosNetwork,
+    pub network: PerpsNetwork,
     pub factory_address: Address,
     pub faucet_address: Address,
 }
@@ -12,14 +14,14 @@ pub struct ConnectionInfo {
 struct ServerInfo {
     factory: Address,
     faucet: Address,
-    network: CosmosNetwork,
+    network: PerpsNetwork,
 }
 
 impl ConnectionInfo {
     pub async fn load(
         client: &reqwest::Client,
         family: &str,
-        network_override: Option<CosmosNetwork>,
+        network_override: Option<PerpsNetwork>,
         factory_override: Option<Address>,
         faucet_override: Option<Address>,
     ) -> anyhow::Result<ConnectionInfo> {

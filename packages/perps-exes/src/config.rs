@@ -14,6 +14,8 @@ use msg::{
 };
 use pyth_sdk_cw::PriceIdentifier;
 
+use crate::PerpsNetwork;
+
 /// Configuration for chainwide data.
 ///
 /// This contains information which would be valid for multiple different
@@ -94,7 +96,7 @@ pub struct ChainStrideConfig {
 pub struct PriceConfig {
     pub pyth: PythPriceConfig,
     /// Mappings from a key to price feed
-    pub networks: HashMap<CosmosNetwork, HashMap<MarketId, MarketPriceFeedConfigs>>,
+    pub networks: HashMap<PerpsNetwork, HashMap<MarketId, MarketPriceFeedConfigs>>,
 }
 
 /// Overall configuration of Pyth, for information valid across all chains.
@@ -368,8 +370,8 @@ fn load_yaml<T: serde::de::DeserializeOwned>(
 }
 
 impl ChainConfig {
-    pub fn load(config_file: Option<impl AsRef<Path>>, network: CosmosNetwork) -> Result<Self> {
-        load_yaml::<HashMap<CosmosNetwork, Self>>(
+    pub fn load(config_file: Option<impl AsRef<Path>>, network: PerpsNetwork) -> Result<Self> {
+        load_yaml::<HashMap<PerpsNetwork, Self>>(
             "config-chain.yaml",
             include_bytes!("../assets/config-chain.yaml"),
             config_file,
@@ -428,16 +430,20 @@ impl PriceConfig {
 
 pub struct DeploymentInfo {
     pub config: DeploymentConfigTestnet,
-    pub network: CosmosNetwork,
+    pub network: PerpsNetwork,
     pub wallet_phrase_name: String,
 }
 
 /// Parse a deployment name (like osmobeta) into network and family (like osmosis-testnet and beta).
-pub fn parse_deployment(deployment: &str) -> Result<(CosmosNetwork, &str)> {
-    const NETWORKS: &[(CosmosNetwork, &str)] = &[
-        (CosmosNetwork::OsmosisTestnet, "osmo"),
-        (CosmosNetwork::SeiTestnet, "sei"),
-        (CosmosNetwork::InjectiveTestnet, "inj"),
+pub fn parse_deployment(deployment: &str) -> Result<(PerpsNetwork, &str)> {
+    const NETWORKS: &[(PerpsNetwork, &str)] = &[
+        (PerpsNetwork::Regular(CosmosNetwork::OsmosisTestnet), "osmo"),
+        (PerpsNetwork::Regular(CosmosNetwork::SeiTestnet), "sei"),
+        (
+            PerpsNetwork::Regular(CosmosNetwork::InjectiveTestnet),
+            "inj",
+        ),
+        (PerpsNetwork::DymensionTestnet, "dym"),
     ];
     for (network, prefix) in NETWORKS {
         if let Some(suffix) = deployment.strip_prefix(prefix) {
@@ -654,7 +660,7 @@ pub enum Delay {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MarketConfigUpdates {
     pub markets: HashMap<MarketId, ConfigUpdateAndBorrowFee>,
-    pub crank_fees: HashMap<CosmosNetwork, CrankFeeConfig>,
+    pub crank_fees: HashMap<PerpsNetwork, CrankFeeConfig>,
 }
 
 #[derive(serde::Deserialize, Debug)]
@@ -714,7 +720,7 @@ impl MainnetFactories {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MainnetFactory {
     pub address: Address,
-    pub network: CosmosNetwork,
+    pub network: PerpsNetwork,
     pub label: String,
     pub instantiate_code_id: u64,
     pub instantiate_at: DateTime<Utc>,
