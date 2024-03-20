@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use anyhow::{anyhow, Context, Result};
 use headless_chrome::{Browser, Tab};
@@ -42,7 +42,7 @@ pub(crate) enum ExchangeKind {
 impl TryFrom<String> for ExchangeKind {
     type Error = anyhow::Error;
 
-    fn try_from(value: String) -> std::prelude::v1::Result<Self, Self::Error> {
+    fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
             "cex" => Ok(ExchangeKind::Cex),
             "dex" => Ok(ExchangeKind::Dex),
@@ -55,6 +55,18 @@ impl TryFrom<String> for ExchangeKind {
 pub(crate) enum Coin {
     Atom,
     Levana,
+}
+
+impl FromStr for Coin {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "cosmos-hub" => Ok(Coin::Atom),
+            "levana" => Ok(Coin::Levana),
+            other => Err(anyhow!("Unrecognized coin {other}")),
+        }
+    }
 }
 
 impl From<Coin> for String {
@@ -73,22 +85,14 @@ pub(crate) fn market_config_key(coin: &Coin) -> Option<String> {
     }
 }
 
-impl TryFrom<String> for Coin {
-    type Error = anyhow::Error;
-
-    fn try_from(value: String) -> std::prelude::v1::Result<Self, Self::Error> {
-        match &value[..] {
-            "cosmos-hub" => Ok(Coin::Atom),
-            "levana" => Ok(Coin::Levana),
-            other => Err(anyhow!("Unrecognized coin {other}")),
-        }
-    }
-}
-
 impl Coin {
     pub(crate) fn coingecko_uri(self) -> String {
         let coin_id = Into::<String>::into(self);
         format!("https://www.coingecko.com/en/coins/{coin_id}")
+    }
+
+    pub(crate) fn all() -> [Coin; 2] {
+        [Coin::Atom, Coin::Levana]
     }
 }
 
