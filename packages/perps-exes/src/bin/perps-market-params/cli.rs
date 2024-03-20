@@ -50,13 +50,10 @@ impl Opt {
         let env_filter = EnvFilter::from_default_env();
         let env_filter = if std::env::var("RUST_LOG").is_ok() {
             env_filter
+        } else if self.verbose {
+            env_filter.add_directive(format!("{}=debug,info", env!("CARGO_CRATE_NAME")).parse()?)
         } else {
-            if self.verbose {
-                env_filter
-                    .add_directive(format!("{}=debug,info", env!("CARGO_CRATE_NAME")).parse()?)
-            } else {
-                env_filter.add_directive(format!("{}=info", env!("CARGO_CRATE_NAME")).parse()?)
-            }
+            env_filter.add_directive(format!("{}=info", env!("CARGO_CRATE_NAME")).parse()?)
         };
 
         tracing_subscriber::registry()

@@ -94,8 +94,8 @@ impl Coin {
 
 fn find_page_info(info: String) -> Result<u32> {
     let items = info.split_whitespace();
-    let items = items.skip(4);
-    let total = items.skip(1).next().context("Missing total element")?;
+    let mut items = items.skip(4);
+    let total = items.nth(1).context("Missing total element")?;
     let total: u32 = total.parse()?;
     Ok(total)
 }
@@ -108,7 +108,7 @@ fn process_percentage(amount: String) -> String {
     amount.chars().filter(|c| !['%'].contains(c)).collect()
 }
 
-fn fetch_exchange_row_scraper<'a>(node: ElementRef<'a>) -> Result<ExchangeInfo> {
+fn fetch_exchange_row_scraper(node: ElementRef<'_>) -> Result<ExchangeInfo> {
     let initial_selector =
         Selector::parse("td").map_err(|_| anyhow!("Error constructing td selector"))?;
 
@@ -177,7 +177,7 @@ fn fetch_exchange_row_scraper<'a>(node: ElementRef<'a>) -> Result<ExchangeInfo> 
 }
 
 pub(crate) fn fetch_specific_spot_page_scrape(exchange_page: &str) -> Result<Vec<ExchangeInfo>> {
-    let selector = format!("table tbody tr");
+    let selector = "table tbody tr".to_owned();
 
     let document = Html::parse_document(exchange_page);
     let table_selector =
@@ -198,8 +198,8 @@ pub(crate) fn fetch_specific_spot_page_scrape(exchange_page: &str) -> Result<Vec
 pub(crate) fn get_scrape_plan_scrapy(coin_page: &str) -> Result<ScrapePlan2> {
     let market_selector = "main div [data-coin-show-target=\"markets\"]";
 
-    let document = Html::parse_document(&coin_page);
-    let market_s = Selector::parse(&market_selector)
+    let document = Html::parse_document(coin_page);
+    let market_s = Selector::parse(market_selector)
         .map_err(|_| anyhow!("Error constructing market_selector"))?;
 
     let element = document

@@ -29,9 +29,7 @@ pub(crate) fn get_current_dnf(market: &MarketsConfig, coin: &Coin) -> Option<f64
     match key {
         Some(key) => {
             let value = market.markets.get(&key);
-            value
-                .map(|item| item.config.delta_neutrality_fee_sensitivity)
-                .flatten()
+            value.and_then(|item| item.config.delta_neutrality_fee_sensitivity)
         }
         None => None,
     }
@@ -42,7 +40,7 @@ pub(crate) fn compute_dnf_sensitivity(exchanges: Vec<ExchangeInfo>) -> anyhow::R
     let exchanges = exchanges.iter().filter(|exchange| {
         exchange.kind != ExchangeKind::Dex
             || exchange.name.to_lowercase() != "htx"
-            || exchange.stale != true
+            || !exchange.stale
     });
     let max_volume_exchange = exchanges
         .clone()
