@@ -1,0 +1,19 @@
+# List all recipes
+default:
+	just --list --unsorted
+
+# Run application
+run:
+	cargo run --bin perps-market-params -- test
+
+# Scape levana
+scrape-levana:
+	cargo run --bin perps-market-params scrape --coin levana
+
+# Scape atom
+scrape-atom:
+	cargo run --bin perps-market-params scrape --coin cosmos-hub
+
+# Scape local
+scrape-local:
+	cargo run --bin perps-market-params scrape-local
