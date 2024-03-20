@@ -66,6 +66,13 @@ impl From<Coin> for String {
     }
 }
 
+pub(crate) fn market_config_key(coin: &Coin) -> Option<String> {
+    match coin {
+        Coin::Atom => Some("ATOM_USD".to_owned()),
+        Coin::Levana => None,
+    }
+}
+
 impl TryFrom<String> for Coin {
     type Error = anyhow::Error;
 

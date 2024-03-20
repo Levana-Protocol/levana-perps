@@ -27,8 +27,8 @@ pub(crate) enum SubCommand {
     /// Scrape local file
     ScrapeLocal {
         /// Local file
-        #[clap(long, default_value="./spot_test_page.html")]
-        path: PathBuf
+        #[clap(long, default_value = "./spot_test_page.html")]
+        path: PathBuf,
     },
     /// List Supported coins with it's id
     Coins {},
@@ -37,7 +37,7 @@ pub(crate) enum SubCommand {
         /// Coin string. Eg: levana
         #[arg(value_parser = coin_parser, long)]
         coin: Coin,
-    }
+    },
 }
 
 fn coin_parser(arg: &str) -> Result<Coin> {
