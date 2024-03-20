@@ -30,16 +30,16 @@ pub(crate) struct ScrapePlan2 {
 #[derive(Debug)]
 pub(crate) struct ExchangeInfo {
     pub(crate) name: String,
-    kind: ExchangeKind,
-    positive_two_depth: f64,
-    negative_two_depth: f64,
-    twenty_four_volume: f64,
-    volume_percentage: Option<f64>,
-    stale: bool,
+    pub(crate) kind: ExchangeKind,
+    pub(crate) positive_two_depth: f64,
+    pub(crate) negative_two_depth: f64,
+    pub(crate) twenty_four_volume: f64,
+    pub(crate) volume_percentage: Option<f64>,
+    pub(crate) stale: bool,
 }
 
-#[derive(Debug)]
-enum ExchangeKind {
+#[derive(Debug, Eq, PartialEq)]
+pub(crate) enum ExchangeKind {
     Cex,
     Dex,
 }
@@ -346,7 +346,7 @@ impl CoingeckoApp {
         // Workaround for celing division
         let mut total_pages = (plan.total_exchanges + 99) / 100;
         total_pages += 1;
-                let mut results = vec![];
+        let mut results = vec![];
         for page in 1..total_pages {
             tracing::debug!("Gonna download exchange page {page}");
             let uri = format!(
@@ -451,4 +451,21 @@ mod tests {
 
 fn my_float_conversion(input: f32) -> Result<i64> {
     Ok(input.trunc().to_string().parse()?)
+}
+
+pub(crate) fn get_exchanges(app: CoingeckoApp, coin: Coin) -> Result<Vec<ExchangeInfo>> {
+    let coin_uri = coin.coingecko_uri();
+    let coin_page = app.download_coin_page(&coin_uri)?;
+
+    let plan = get_scrape_plan_scrapy(&coin_page)?;
+    tracing::debug!("Computed plan: {plan:?}");
+
+    let exchanges = app.download_exchange_pages(&plan)?;
+    let mut result = vec![];
+    for exchange in exchanges {
+        tracing::debug!("Going fetch from exchange");
+        let mut coin_exchanges = fetch_specific_spot_page_scrape(&exchange)?;
+        result.append(&mut coin_exchanges);
+    }
+    Ok(result)
 }

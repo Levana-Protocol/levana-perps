@@ -35,8 +35,12 @@ pub(crate) enum SubCommand {
     },
     /// List Supported coins with it's id
     Coins {},
-    /// Test
-    Test {}
+    /// Compute DNF sensitivity
+    Dnf {
+        /// Coin string. Eg: levana
+        #[arg(value_parser = coin_parser, long)]
+        coin: Coin,
+    }
 }
 
 fn coin_parser(arg: &str) -> Result<Coin> {
