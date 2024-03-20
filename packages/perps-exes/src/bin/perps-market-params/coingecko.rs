@@ -1,18 +1,13 @@
-use std::{
-    fs::File,
-    io::{Read, Write},
-    path::PathBuf,
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
-use headless_chrome::{Browser, Element, Tab};
+use headless_chrome::{Browser, Tab};
 use scraper::{ElementRef, Html, Selector};
 
 pub(crate) struct CoingeckoApp {
+    #[allow(dead_code)]
     browser: Browser,
     tab: Arc<Tab>,
-    client: reqwest::blocking::Client,
 }
 
 #[derive(Debug, PartialEq)]
@@ -98,67 +93,12 @@ fn find_page_info(info: String) -> Result<u32> {
     Ok(total)
 }
 
-fn find_total_exchanges<'a>(element: Element<'a>) -> Result<u32> {
-    let result = element.find_element("div .tw-mt-5 div [data-view-component=\"true\"]")?;
-    let result = result.get_inner_text()?;
-    find_page_info(result)
-}
-
-// fn find_total_exchanges_scrapy<'a>(element: <'a>) -> Result<u32> {
-//     let result = element.find_element("div .tw-mt-5 div [data-view-component=\"true\"]")?;
-//     let result = result.get_inner_text()?;
-//     find_page_info(result)
-// }
-
 fn process_usd_amount(amount: String) -> String {
     amount.chars().filter(|c| !['$', ','].contains(c)).collect()
 }
 
 fn process_percentage(amount: String) -> String {
     amount.chars().filter(|c| !['%'].contains(c)).collect()
-}
-
-fn fetch_exchange_row<'a>(element: Element<'a>) -> Result<ExchangeInfo> {
-    let columns = element.find_elements("td")?;
-    let columns = columns.iter();
-    let mut columns = columns.skip(1);
-    let exchange_name = columns.next().context("Missing column for exchange_name")?;
-    let name = exchange_name.get_inner_text()?;
-    let exchange_type = columns.next().context("Missing column for exchange_type")?;
-    let exchange_type = exchange_type.find_element("span div")?.get_inner_text()?;
-    let kind: ExchangeKind = exchange_type.try_into()?;
-    let mut columns = columns.skip(3);
-    let positive_two_depth = columns.next().context("Missing column for +2% depth")?;
-    let positive_two_depth = positive_two_depth
-        .get_attribute_value("data-sort")?
-        .context("No data-sourt attribute found for +2% depth")?
-        .parse()?;
-    let negative_two_depth = columns.next().context("Missing column for -2% depth")?;
-    let negative_two_depth = negative_two_depth
-        .get_attribute_value("data-sort")?
-        .context("No data-sourt attribute found for -2% depth")?
-        .parse()?;
-    let twenty_four_volume = columns.next().context("Missing column for 24h volume")?;
-    let twenty_four_volume = twenty_four_volume.find_element("span")?;
-    let twenty_four_volume = twenty_four_volume.get_inner_text()?;
-    let twenty_four_volume = process_usd_amount(twenty_four_volume).parse()?;
-    let volume = columns.next().context("Missing column for volume%")?;
-    let volume = volume.get_inner_text()?;
-    // Stale data sometimes shows volume percentage as hypen to
-    // indicate missing data.
-    let volume_percentage = process_percentage(volume).parse().ok();
-    let last_updated = columns.next().context("Missing column for Last updated")?;
-    let last_updated = last_updated.find_element("div span")?.get_inner_text()?;
-    let stale = !last_updated.to_lowercase().starts_with("recent");
-    Ok(ExchangeInfo {
-        name,
-        kind,
-        positive_two_depth,
-        negative_two_depth,
-        twenty_four_volume,
-        volume_percentage,
-        stale,
-    })
 }
 
 fn fetch_exchange_row_scraper<'a>(node: ElementRef<'a>) -> Result<ExchangeInfo> {
@@ -294,43 +234,7 @@ impl CoingeckoApp {
         let tab = browser.new_tab()?;
         let user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
         tab.set_user_agent(user_agent, None, None)?;
-        let client = reqwest::blocking::Client::builder()
-            .user_agent(user_agent)
-            .build()?;
-        Ok(CoingeckoApp {
-            browser,
-            tab,
-            client,
-        })
-    }
-
-    pub(crate) fn fetch_specific_spot_page(
-        &self,
-        uri: Option<String>,
-        skip_fetch: bool,
-    ) -> Result<Vec<ExchangeInfo>> {
-        let market_selector = "main div [data-coin-show-target=\"markets\"]";
-        let mut selector = format!("table tbody tr");
-        if let Some(uri) = uri {
-            self.tab.navigate_to(uri.as_str())?.wait_until_navigated()?;
-        } else {
-            selector = format!("{market_selector} table tbody tr");
-        }
-        if skip_fetch {
-            return Ok(vec![]);
-        } else {
-            let mut exchanges = vec![];
-            tracing::debug!("Going to find data table");
-            let exchange_table = self.tab.find_elements(selector.as_str())?;
-            tracing::debug!("Found exchange_table");
-            for row in exchange_table {
-                let item = fetch_exchange_row(row)?;
-                tracing::debug!("Fetched one exchange: {}", item.name);
-                exchanges.push(item);
-            }
-            self.tab.close(false)?;
-            Ok(exchanges)
-        }
+        Ok(CoingeckoApp { browser, tab })
     }
 
     pub(crate) fn download_coin_page(&self, uri: &str) -> Result<String> {
@@ -360,45 +264,21 @@ impl CoingeckoApp {
 
         Ok(results)
     }
-
-    pub(crate) fn apply_scrape_plan(
-        &self,
-        plan: ScrapePlan,
-        skip_fetch: bool,
-    ) -> Result<Vec<ExchangeInfo>> {
-        // Workaround for celing division
-        let total_pages = (plan.total_exchanges + 99) / 100;
-        let mut result = vec![];
-        for page in 1..=total_pages {
-            tracing::debug!("Gonna scrape page {page}");
-            let uri = if let Some(uri) = &plan.uri {
-                Some(format!(
-                    "https://www.coingecko.com{}?items=10&page={page}",
-                    uri
-                ))
-            } else {
-                None
-            };
-            let mut exchanges = self.fetch_specific_spot_page(uri, skip_fetch)?;
-            result.append(&mut exchanges);
-        }
-        Ok(result)
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::fs::File;
+    use std::{fs::File, io::Read, path::PathBuf};
 
     use crate::coingecko::{
-        fetch_exchange_row_scraper, fetch_specific_spot_page_scrape, find_page_info,
-        my_float_conversion, process_usd_amount, CoingeckoApp, ScrapePlan,
+        fetch_specific_spot_page_scrape, find_page_info, get_scrape_plan_scrapy,
+        process_usd_amount, ScrapePlan2,
     };
 
     #[test]
     fn total_info_parsing() {
         let result = find_page_info("Showing 1 to 10 of 309 results".to_owned()).unwrap();
-        assert_eq!(result, 31, "Total computed pages");
+        assert_eq!(result, 309, "Total computed pages");
     }
 
     #[test]
@@ -409,48 +289,32 @@ mod tests {
 
     #[test]
     fn spot_page() {
-        let fs = File::open("/home/sibi/fpco/github/levana/levana-perps/packages/perps-exes/src/bin/perps-market-params/spot_test_page.html").unwrap();
-        let result = fetch_specific_spot_page_scrape(fs, false).unwrap();
+        let mut spot_page = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        spot_page.push("src/bin/perps-market-params/assets/spot_test_page.html");
+        let mut fs = File::open(spot_page).unwrap();
+        let mut exchange_page = String::new();
+        fs.read_to_string(&mut exchange_page).unwrap();
+        let result = fetch_specific_spot_page_scrape(&exchange_page).unwrap();
         assert_eq!(result.len(), 100, "Fetched 100 exchanges");
     }
 
-    // #[test]
-    // fn spot_page() {
-    //     let app = CoingeckoApp::new().unwrap();
-    //     // todo: takes 7 minuts for 100 rows, so best to use 3 rows or something like that
-    //     let result = app.fetch_specific_spot_page("file:///home/sibi/fpco/github/levana/levana-perps/packages/perps-exes/src/bin/perps-market-params/spot_test_page.html").unwrap();
-    //     assert_eq!(result.len(), 100, "Fetched 100 exchanges");
-    // }
-
-    // #[test]
-    // fn scrape_plan() {
-    //     let app = CoingeckoApp::new().unwrap();
-    //     let result = app.get_scrape_plan("file:///home/sibi/fpco/github/levana/levana-perps/packages/perps-exes/src/bin/perps-market-params/test.html").unwrap();
-    //     assert_eq!(
-    //         result,
-    //         ScrapePlan {
-    //             total_exchanges: 309,
-    //             uri: "/en/coins/1481/markets/spot".to_owned()
-    //         },
-    //         "Scraped plan"
-    //     );
-    // }
-
     #[test]
-    fn float_plan() {
-        let result = my_float_conversion(32.6).unwrap();
-        assert_eq!(result, 32);
-
-        let result = my_float_conversion(32.001).unwrap();
-        assert_eq!(result, 32);
-
-        let result = my_float_conversion(32.7).unwrap();
-        assert_eq!(result, 32);
+    fn scrape_plan() {
+        let mut coin_page = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        coin_page.push("src/bin/perps-market-params/assets/coin_page.html");
+        let mut fs = File::open(coin_page).unwrap();
+        let mut coin_page = String::new();
+        fs.read_to_string(&mut coin_page).unwrap();
+        let result = get_scrape_plan_scrapy(&coin_page).unwrap();
+        assert_eq!(
+            result,
+            ScrapePlan2 {
+                total_exchanges: 309,
+                coin_id: "1481".to_owned()
+            },
+            "Scraped plan"
+        );
     }
-}
-
-fn my_float_conversion(input: f32) -> Result<i64> {
-    Ok(input.trunc().to_string().parse()?)
 }
 
 pub(crate) fn get_exchanges(app: CoingeckoApp, coin: Coin) -> Result<Vec<ExchangeInfo>> {

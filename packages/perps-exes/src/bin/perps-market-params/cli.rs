@@ -23,9 +23,6 @@ pub(crate) enum SubCommand {
         /// Coin string. Eg: levana
         #[arg(value_parser = coin_parser, long)]
         coin: Coin,
-        /// Skip processing elements in the page
-        #[arg(long, short)]
-        skip_processing: bool
     },
     /// Scrape local file
     ScrapeLocal {

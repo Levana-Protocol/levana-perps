@@ -1,8 +1,8 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::Parser;
-use coingecko::{get_scrape_plan_scrapy, Coin};
+use coingecko::Coin;
 use market_param::compute_dnf_sensitivity;
-use std::{fs::File, io::Read};
+use std::io::Read;
 
 use crate::{
     cli::Opt,
@@ -26,7 +26,6 @@ fn main() -> Result<()> {
         }
         cli::SubCommand::Scrape {
             coin,
-            skip_processing,
         } => {
             let app = CoingeckoApp::new()?;
             let exchanges = get_exchanges(app, coin)?;

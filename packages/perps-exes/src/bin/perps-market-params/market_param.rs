@@ -4,7 +4,7 @@ use crate::coingecko::{ExchangeInfo, ExchangeKind};
 
 pub(crate) fn compute_dnf_sensitivity(exchanges: Vec<ExchangeInfo>) -> anyhow::Result<f64> {
     // Algorithm: https://staff.levana.finance/new-market-checklist#dnf-sensitivity
-    let mut exchanges = exchanges.iter().filter(|exchange| {
+    let exchanges = exchanges.iter().filter(|exchange| {
         exchange.kind != ExchangeKind::Dex
             || exchange.name.to_lowercase() != "htx"
             || exchange.stale != true
