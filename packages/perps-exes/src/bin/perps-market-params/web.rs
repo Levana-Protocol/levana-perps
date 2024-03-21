@@ -58,9 +58,9 @@ async fn main_inner(coins: Vec<Coin>) -> Result<()> {
     });
 
     // We should never exit...
-    set.join_next().await;
+    let res = set.join_next().await;
     set.abort_all();
-    Err(anyhow::anyhow!("Unexpected join_next completion"))
+    Err(anyhow::anyhow!("Unexpected join_next completion: {res:?}"))
 }
 
 #[derive(serde::Deserialize)]

@@ -41,7 +41,7 @@ pub(crate) enum SubCommand {
     /// Serve web application
     Serve {
         /// Coins to track
-        #[arg(long, env = "LEVANA_MPARAM_COINS")]
+        #[arg(long, env = "LEVANA_MPARAM_COINS", value_delimiter = ',')]
         coins: Vec<Coin>
     }
 }

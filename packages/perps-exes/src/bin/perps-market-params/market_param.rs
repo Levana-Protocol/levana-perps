@@ -1,9 +1,9 @@
-use std::{collections::HashMap, time::Duration, sync::Arc, ops::Deref};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use anyhow::{Context, anyhow};
+use anyhow::{anyhow, Context};
 
 use crate::{
-    coingecko::{market_config_key, Coin, ExchangeInfo, ExchangeKind, get_exchanges, CoingeckoApp},
+    coingecko::{get_exchanges, market_config_key, Coin, CoingeckoApp, ExchangeInfo, ExchangeKind},
     web::NotifyApp,
 };
 
@@ -71,12 +71,11 @@ pub(crate) fn compute_coin_dnfs(app: Arc<NotifyApp>, coins: Vec<Coin>) -> anyhow
     loop {
         for coin in &coins {
             tracing::info!("Going to compute DNF for {coin:?}");
-            let configured_dnf =
-                get_current_dnf(&market_config, &coin).context("No DNF configured for {coin:?}")?;
+            let configured_dnf = get_current_dnf(&market_config, &coin)
+                .context(format!("No DNF configured for {coin:?}"))?;
             let exchanges = get_exchanges(&coingecko_app, coin.clone())?;
             let dnf = compute_dnf_sensitivity(exchanges)?;
             // todo: slack alert
-
 
             tracing::info!("Finished computing DNF for {coin:?}: {dnf}");
             app.dnf.write().insert(coin.clone(), dnf);
@@ -84,5 +83,5 @@ pub(crate) fn compute_coin_dnfs(app: Arc<NotifyApp>, coins: Vec<Coin>) -> anyhow
         tracing::info!("Going to sleep 24 hours");
         std::thread::sleep(Duration::from_secs(60 * 60 * 24));
     }
-    Err(anyhow!("Unexpected finish on compute_coin_dnfs"))
+    unreachable!("Unexpected finish in compute_coin_dnfs")
 }
