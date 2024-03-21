@@ -1,7 +1,7 @@
-use std::{str::FromStr, sync::Arc};
+use std::{fmt::Display, str::FromStr, sync::Arc, time::Duration};
 
 use anyhow::{anyhow, Context, Result};
-use headless_chrome::{Browser, Tab};
+use headless_chrome::{Browser, LaunchOptions, Tab};
 use scraper::{ElementRef, Html, Selector};
 
 pub(crate) struct CoingeckoApp {
@@ -22,7 +22,7 @@ pub(crate) struct ScrapePlan2 {
     coin_id: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub(crate) struct ExchangeInfo {
     pub(crate) name: String,
     pub(crate) kind: ExchangeKind,
@@ -51,10 +51,19 @@ impl TryFrom<String> for ExchangeKind {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone, serde::Serialize, Hash, PartialEq, Eq)]
 pub(crate) enum Coin {
     Atom,
     Levana,
+}
+
+impl Display for Coin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Coin::Atom => write!(f, "Atom"),
+            Coin::Levana => write!(f, "Levana"),
+        }
+    }
 }
 
 impl FromStr for Coin {
@@ -62,18 +71,9 @@ impl FromStr for Coin {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "cosmos-hub" => Ok(Coin::Atom),
+            "atom" => Ok(Coin::Atom),
             "levana" => Ok(Coin::Levana),
             other => Err(anyhow!("Unrecognized coin {other}")),
-        }
-    }
-}
-
-impl From<Coin> for String {
-    fn from(value: Coin) -> Self {
-        match value {
-            Coin::Atom => "cosmos-hub".to_owned(),
-            Coin::Levana => "levana".to_owned(),
         }
     }
 }
@@ -85,9 +85,16 @@ pub(crate) fn market_config_key(coin: &Coin) -> Option<String> {
     }
 }
 
+pub(crate) fn map_coin_to_coingecko_id(coin: &Coin) -> &str {
+    match coin {
+        Coin::Atom => "cosmos-hub",
+        Coin::Levana => "levana",
+    }
+}
+
 impl Coin {
-    pub(crate) fn coingecko_uri(self) -> String {
-        let coin_id = Into::<String>::into(self);
+    pub(crate) fn coingecko_uri(&self) -> String {
+        let coin_id = map_coin_to_coingecko_id(self);
         format!("https://www.coingecko.com/en/coins/{coin_id}")
     }
 
@@ -120,7 +127,15 @@ fn fetch_exchange_row_scraper(node: ElementRef<'_>) -> Result<ExchangeInfo> {
 
     let mut columns = columns.skip(1);
     let exchange_name = columns.next().context("Missing column for exchange_name")?;
-    let name = exchange_name.inner_html().trim().to_owned();
+    let name_selector =
+        Selector::parse("div a div").map_err(|_| anyhow!("Error constructing name_selector"))?;
+    let name = exchange_name
+        .select(&name_selector)
+        .next()
+        .context("Missing value for exchange_name")?
+        .inner_html()
+        .trim()
+        .to_owned();
     let exchange_type = columns.next().context("Missing column for exchange_type")?;
     let span_div =
         Selector::parse("span div").map_err(|_| anyhow!("Error constructing span div selector"))?;
@@ -241,7 +256,11 @@ pub(crate) fn get_scrape_plan_scrapy(coin_page: &str) -> Result<ScrapePlan2> {
 
 impl CoingeckoApp {
     pub(crate) fn new() -> Result<Self> {
-        let browser = Browser::default()?;
+        let browser = Browser::new(
+            LaunchOptions::default_builder()
+                .idle_browser_timeout(Duration::from_secs(60 * 60 * 25))
+                .build()?,
+        )?;
         let tab = browser.new_tab()?;
         let user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
         tab.set_user_agent(user_agent, None, None)?;
@@ -283,7 +302,7 @@ mod tests {
 
     use crate::coingecko::{
         fetch_specific_spot_page_scrape, find_page_info, get_scrape_plan_scrapy,
-        process_usd_amount, ScrapePlan2,
+        process_usd_amount, ExchangeInfo, ExchangeKind, ScrapePlan2,
     };
 
     #[test]
@@ -307,6 +326,21 @@ mod tests {
         fs.read_to_string(&mut exchange_page).unwrap();
         let result = fetch_specific_spot_page_scrape(&exchange_page).unwrap();
         assert_eq!(result.len(), 100, "Fetched 100 exchanges");
+
+        let first_exchange = result.get(0).unwrap();
+        assert_eq!(
+            *first_exchange,
+            ExchangeInfo {
+                name: "CEX.IO".to_owned(),
+                kind: ExchangeKind::Cex,
+                positive_two_depth: 1020189.4156407921,
+                negative_two_depth: 338547.66893188225,
+                twenty_four_volume: 15729.0,
+                volume_percentage: Some(0.0),
+                stale: false
+            },
+            "Extracted a single exchange"
+        )
     }
 
     #[test]
@@ -328,7 +362,7 @@ mod tests {
     }
 }
 
-pub(crate) fn get_exchanges(app: CoingeckoApp, coin: Coin) -> Result<Vec<ExchangeInfo>> {
+pub(crate) fn get_exchanges(app: &CoingeckoApp, coin: Coin) -> Result<Vec<ExchangeInfo>> {
     let coin_uri = coin.coingecko_uri();
     let coin_page = app.download_coin_page(&coin_uri)?;
 
