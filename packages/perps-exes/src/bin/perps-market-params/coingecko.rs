@@ -51,7 +51,7 @@ impl TryFrom<String> for ExchangeKind {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(crate) enum Coin {
     Atom,
     Levana,

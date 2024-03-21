@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use coingecko::Coin;
 use market_param::compute_dnf_sensitivity;
+use web::axum_main;
 
 use crate::{
     cli::Opt,
@@ -13,6 +14,8 @@ use crate::{
 mod cli;
 mod coingecko;
 mod market_param;
+mod web;
+mod routes;
 
 fn main() -> Result<()> {
     let opt = Opt::parse();
@@ -45,6 +48,11 @@ fn main() -> Result<()> {
             let dnf = compute_dnf_sensitivity(exchanges)?;
             tracing::info!("Computed DNF sensitivity: {dnf}");
         }
+        cli::SubCommand::Serve { coins } => {
+            axum_main()?
+        },
+
+
     }
     Ok(())
 }
