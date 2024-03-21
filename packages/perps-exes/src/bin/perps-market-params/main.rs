@@ -16,6 +16,7 @@ mod coingecko;
 mod market_param;
 mod web;
 mod routes;
+mod slack;
 
 fn main() -> Result<()> {
     let opt = Opt::parse();
@@ -48,8 +49,8 @@ fn main() -> Result<()> {
             let dnf = compute_dnf_sensitivity(exchanges)?;
             tracing::info!("Computed DNF sensitivity: {dnf}");
         }
-        cli::SubCommand::Serve { coins } => {
-            axum_main(coins)?
+        cli::SubCommand::Serve { opt  } => {
+            axum_main(opt)?
         },
 
 

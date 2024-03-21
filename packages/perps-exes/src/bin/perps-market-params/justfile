@@ -17,3 +17,7 @@ scrape-atom:
 # Scape local
 scrape-local:
 	cargo run --bin perps-market-params scrape-local
+
+# Run web app
+serve:
+	cargo run --bin perps-market-params serve --coins cosmos-hub --dnf-threshold 0

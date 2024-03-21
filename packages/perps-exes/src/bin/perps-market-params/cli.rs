@@ -40,10 +40,22 @@ pub(crate) enum SubCommand {
     },
     /// Serve web application
     Serve {
-        /// Coins to track
-        #[arg(long, env = "LEVANA_MPARAM_COINS", value_delimiter = ',')]
-        coins: Vec<Coin>
-    }
+        #[clap(flatten)]
+        opt: ServeOpt
+    },
+}
+
+#[derive(clap::Parser, Clone, Debug)]
+pub(crate) struct ServeOpt {
+    /// Coins to track
+    #[arg(long, env = "LEVANA_MPARAM_COINS", value_delimiter = ',')]
+    pub(crate) coins: Vec<Coin>,
+    /// Slack webhook to send alert notification
+    #[arg(long, env = "LEVANA_MPARAM_SLACK_WEBHOOK")]
+    pub(crate) slack_webhook: reqwest::Url,
+    /// DNF threshold beyond which to raise alert
+    #[arg(long, env = "LEVANA_MPARAM_DNF_THRESHOLD", default_value = "10.0")]
+    pub(crate) dnf_threshold: f64,
 }
 
 impl Opt {

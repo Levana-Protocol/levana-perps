@@ -13,12 +13,12 @@ use tokio::task::JoinSet;
 use crate::{
     coingecko::Coin,
     market_param::compute_coin_dnfs,
-    routes::{HealthRoute, HomeRoute},
+    routes::{HealthRoute, HomeRoute}, cli::ServeOpt,
 };
 
 #[tokio::main(flavor = "multi_thread")]
-pub(crate) async fn axum_main(coins: Vec<Coin>) -> Result<()> {
-    main_inner(coins).await
+pub(crate) async fn axum_main(opt: ServeOpt) -> Result<()> {
+    main_inner(opt).await
 }
 
 #[derive(Clone)]
@@ -34,20 +34,20 @@ impl NotifyApp {
     }
 }
 
-async fn main_inner(coins: Vec<Coin>) -> Result<()> {
+async fn main_inner(opt: ServeOpt) -> Result<()> {
     let state = Arc::new(NotifyApp::new());
 
     let mut set = JoinSet::new();
-    let my_state = state.clone();
-    let my_coins = coins.clone();
+    let dnf_state = state.clone();
+    let opt = opt.clone();
     set.spawn_blocking(|| {
-        compute_coin_dnfs(my_state, my_coins)
+        compute_coin_dnfs(dnf_state, opt)
     });
 
     let router = axum::Router::new()
         .typed_get(index)
         .typed_get(healthz)
-        .with_state(state.clone());
+        .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
 
