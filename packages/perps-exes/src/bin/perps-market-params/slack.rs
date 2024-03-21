@@ -1,19 +1,22 @@
-use reqwest::{Url, blocking::Client};
 use anyhow::anyhow;
+use reqwest::{blocking::Client, Url};
 
 pub(crate) struct SlackApp {
     webhook: Url,
-    client: Client
+    client: Client,
 }
 
 impl SlackApp {
-
     pub(crate) fn new(webhook: Url) -> Self {
         let client = Client::new();
-        SlackApp { webhook, client  }
+        SlackApp { webhook, client }
     }
 
-    pub(crate) fn send_notification(&self, message: String, description: String) -> anyhow::Result<()> {
+    pub(crate) fn send_notification(
+        &self,
+        message: String,
+        description: String,
+    ) -> anyhow::Result<()> {
         let value = serde_json::json!(
         {
             "text": "Market Parameter alert",

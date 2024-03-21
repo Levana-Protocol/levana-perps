@@ -1,11 +1,11 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 
 use crate::{
     cli::ServeOpt,
     coingecko::{get_exchanges, market_config_key, Coin, CoingeckoApp, ExchangeInfo, ExchangeKind},
-    slack::{self, SlackApp},
+    slack::SlackApp,
     web::NotifyApp,
 };
 

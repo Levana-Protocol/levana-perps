@@ -11,9 +11,10 @@ use parking_lot::RwLock;
 use tokio::task::JoinSet;
 
 use crate::{
+    cli::ServeOpt,
     coingecko::Coin,
     market_param::compute_coin_dnfs,
-    routes::{HealthRoute, HomeRoute}, cli::ServeOpt,
+    routes::{HealthRoute, HomeRoute},
 };
 
 #[tokio::main(flavor = "multi_thread")]
@@ -40,9 +41,7 @@ async fn main_inner(opt: ServeOpt) -> Result<()> {
     let mut set = JoinSet::new();
     let dnf_state = state.clone();
     let opt = opt.clone();
-    set.spawn_blocking(|| {
-        compute_coin_dnfs(dnf_state, opt)
-    });
+    set.spawn_blocking(|| compute_coin_dnfs(dnf_state, opt));
 
     let router = axum::Router::new()
         .typed_get(index)

@@ -126,8 +126,15 @@ fn fetch_exchange_row_scraper(node: ElementRef<'_>) -> Result<ExchangeInfo> {
 
     let mut columns = columns.skip(1);
     let exchange_name = columns.next().context("Missing column for exchange_name")?;
-    let name_selector = Selector::parse("div a div").map_err(|_| anyhow!("Error constructing name_selector"))?;
-    let name = exchange_name.select(&name_selector).next().context("Missing value for exchange_name")?.inner_html().trim().to_owned();
+    let name_selector =
+        Selector::parse("div a div").map_err(|_| anyhow!("Error constructing name_selector"))?;
+    let name = exchange_name
+        .select(&name_selector)
+        .next()
+        .context("Missing value for exchange_name")?
+        .inner_html()
+        .trim()
+        .to_owned();
     let exchange_type = columns.next().context("Missing column for exchange_type")?;
     let span_div =
         Selector::parse("span div").map_err(|_| anyhow!("Error constructing span div selector"))?;

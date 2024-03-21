@@ -41,7 +41,7 @@ pub(crate) enum SubCommand {
     /// Serve web application
     Serve {
         #[clap(flatten)]
-        opt: ServeOpt
+        opt: ServeOpt,
     },
 }
 
