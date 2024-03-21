@@ -1,6 +1,7 @@
 use anyhow::Result;
-use cosmos::{Address, CosmosNetwork};
+use cosmos::Address;
 use msg::contracts::hatching::entry::MigrateMsg as HatchMigrateMsg;
+use perps_exes::PerpsNetwork;
 
 use crate::{
     cli::Opt,
@@ -14,7 +15,7 @@ pub(crate) struct MigrateRewardsOpt {
     pub(crate) contracts: Contracts,
     /// Network to use
     #[clap(long, env = "COSMOS_NETWORK")]
-    pub(crate) network: CosmosNetwork,
+    pub(crate) network: PerpsNetwork,
 
     /// hatching contract address
     #[clap(

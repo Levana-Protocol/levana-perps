@@ -7,7 +7,7 @@ use msg::contracts::{
     market::{config::ConfigUpdate, spot_price::SpotPriceConfigInit},
 };
 use msg::prelude::*;
-use perps_exes::config::ConfigTestnet;
+use perps_exes::{config::ConfigTestnet, PerpsNetwork};
 
 use crate::{
     cli::Opt,
@@ -22,7 +22,7 @@ use crate::{
 pub(crate) struct LocalDeployOpt {
     /// Network to use. Either this or family must be provided.
     #[clap(long, env = "COSMOS_NETWORK")]
-    pub(crate) network: CosmosNetwork,
+    pub(crate) network: PerpsNetwork,
     /// Initial price to set the market to.
     ///
     /// Provided as a convenience to make local testing easier.
@@ -46,7 +46,9 @@ pub(crate) async fn go(
     let config_testnet = ConfigTestnet::load(opt.config_testnet.as_ref())?;
 
     match network {
-        CosmosNetwork::JunoLocal | CosmosNetwork::OsmosisLocal | CosmosNetwork::WasmdLocal => (),
+        PerpsNetwork::Regular(
+            CosmosNetwork::JunoLocal | CosmosNetwork::OsmosisLocal | CosmosNetwork::WasmdLocal,
+        ) => (),
         _ => anyhow::bail!("Please only use local deploy for a local --network"),
     }
 

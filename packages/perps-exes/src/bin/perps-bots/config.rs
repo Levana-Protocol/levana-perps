@@ -1,12 +1,13 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
-use cosmos::{Address, CosmosNetwork, HasAddressHrp, Wallet};
+use cosmos::{Address, HasAddressHrp, Wallet};
 use perps_exes::{
     config::{
         ChainConfig, ConfigTestnet, DeploymentInfo, GasAmount, GasDecimals, LiquidityConfig,
         LiquidityTransactionConfig, TraderConfig, UtilizationConfig, WatcherConfig,
     },
     prelude::*,
+    PerpsNetwork,
 };
 
 use crate::{
@@ -61,7 +62,7 @@ pub(crate) struct BotConfigMainnet {
 
 pub(crate) struct BotConfig {
     pub(crate) by_type: BotConfigByType,
-    pub(crate) network: CosmosNetwork,
+    pub(crate) network: PerpsNetwork,
     /// Wallet used to update Pyth oracle contract
     pub(crate) price_wallet: Option<Arc<Wallet>>,
     /// Wallets that are used to perform cranking

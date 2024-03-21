@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use axum::{extract::State, response::IntoResponse, Json};
 use chrono::{DateTime, Utc};
-use cosmos::{Address, CosmosNetwork, HasAddress};
+use cosmos::{Address, HasAddress};
+use perps_exes::PerpsNetwork;
 use shared::storage::MarketId;
 
 use crate::{
@@ -19,7 +20,7 @@ struct FactoryResp<'a> {
     #[serde(flatten)]
     frontend_info_testnet: Option<&'a FrontendInfoTestnet>,
 
-    network: CosmosNetwork,
+    network: PerpsNetwork,
     price_api: &'a str,
     explorer: &'a str,
     maintenance: Option<&'a String>,

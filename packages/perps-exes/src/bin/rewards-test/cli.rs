@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use cosmos::{Address, CosmosNetwork, SeedPhrase};
+use cosmos::{Address, SeedPhrase};
 use msg::prelude::NumberGtZero;
-use perps_exes::build_version;
+use perps_exes::{build_version, PerpsNetwork};
 
 #[derive(clap::Parser)]
 #[clap(version = build_version())]
@@ -45,7 +45,7 @@ pub(crate) struct HatchEggOpt {
 
     /// Network to use for hatching
     #[clap(long, env = "HATCH_COSMOS_NETWORK")]
-    pub hatch_network: CosmosNetwork,
+    pub hatch_network: PerpsNetwork,
 
     /// Mnemonic phrase for the hatching wallet
     #[clap(long, env = "HATCH_COSMOS_WALLET")]
@@ -53,7 +53,7 @@ pub(crate) struct HatchEggOpt {
 
     /// Network to use for the minted nft rewards
     #[clap(long, env = "NFT_MINT_COSMOS_NETWORK")]
-    pub nft_mint_network: CosmosNetwork,
+    pub nft_mint_network: PerpsNetwork,
 
     /// Mnemonic phrase for the minted nft rewards wallet
     #[clap(long, env = "NFT_MINT_COSMOS_WALLET")]
@@ -61,7 +61,7 @@ pub(crate) struct HatchEggOpt {
 
     /// Network to use for LVN rewards
     #[clap(long, env = "LVN_REWARDS_COSMOS_NETWORK")]
-    pub lvn_rewards_network: CosmosNetwork,
+    pub lvn_rewards_network: PerpsNetwork,
 
     /// Mnemonic phrase for the lvn rewards wallet. This is the wallet that is receiving rewards.
     #[clap(long, env = "LVN_REWARDS_COSMOS_WALLET")]
@@ -146,7 +146,7 @@ pub(crate) struct MintTestOpt {
 
     /// Network to use for hatching
     #[clap(long, env = "HATCH_COSMOS_NETWORK")]
-    pub hatch_network: CosmosNetwork,
+    pub hatch_network: PerpsNetwork,
 
     /// Mnemonic phrase for the hatching wallet
     #[clap(long, env = "HATCH_COSMOS_WALLET")]

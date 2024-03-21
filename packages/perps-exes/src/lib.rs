@@ -3,12 +3,12 @@
 pub mod config;
 pub mod contracts;
 pub mod discovery;
+mod network;
 pub mod prelude;
 pub mod pyth;
 
 use cosmos::{
-    proto::cosmos::base::abci::v1beta1::TxResponse, Address, Contract, Cosmos, CosmosNetwork,
-    HasAddress, Wallet,
+    proto::cosmos::base::abci::v1beta1::TxResponse, Address, Contract, Cosmos, HasAddress, Wallet,
 };
 use cosmos::{HasAddressHrp, SeedPhrase};
 use msg::contracts::market::entry::StatusResp;
@@ -27,6 +27,8 @@ use msg::{
 };
 use prelude::MarketContract;
 use std::time::Duration;
+
+pub use network::PerpsNetwork;
 
 /// Get the Git SHA from GitHub Actions env vars
 pub fn build_version() -> &'static str {
@@ -55,7 +57,7 @@ impl PerpApp {
         factory_contract_addr: Address,
         faucet_contract_addr: Option<Address>,
         market_id: MarketId,
-        network: CosmosNetwork,
+        network: PerpsNetwork,
     ) -> Result<PerpApp> {
         let builder = network.builder().await?;
         let cosmos = builder.build().await?;

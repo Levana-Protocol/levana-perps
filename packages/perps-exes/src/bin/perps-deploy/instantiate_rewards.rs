@@ -12,13 +12,14 @@ use cosmwasm_std::IbcOrder;
 use msg::contracts::hatching::{
     dragon_mint::DragonMintExtra, entry::ExecuteMsg as HatchingExecuteMsg, ibc::IbcChannelVersion,
 };
+use perps_exes::PerpsNetwork;
 use serde::{Deserialize, Serialize};
 
 #[derive(clap::Parser)]
 pub(crate) struct InstantiateRewardsOpt {
     /// Network to use
     #[clap(long, env = "COSMOS_NETWORK")]
-    pub(crate) network: CosmosNetwork,
+    pub(crate) network: PerpsNetwork,
     /// Contracts to instantiate
     #[clap(long, env = "CONTRACTS")]
     pub(crate) contracts: Contracts,
@@ -79,7 +80,9 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                 .context("Must specify --ibc-execute-proxy when instantiating ibc-execute")?
             {
                 IbcExecuteProxyTarget::NftMint => {
-                    let mint_contract = if network == CosmosNetwork::JunoMainnet {
+                    let mint_contract = if network
+                        == PerpsNetwork::Regular(CosmosNetwork::JunoMainnet)
+                    {
                         bail!("no mint contract on mainnet!")
                     } else {
                         instantiate_testnet_nft_contract(&basic, "Levana Baby Dragons Mock").await?
@@ -120,7 +123,8 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
             };
         }
         Contracts::Hatching => {
-            let burn_egg_contract = if network == CosmosNetwork::JunoMainnet {
+            let burn_egg_contract = if network == PerpsNetwork::Regular(CosmosNetwork::JunoMainnet)
+            {
                 // eggs are in dragon contract
                 "juno1a90f8jdwm4h43yzqgj4xqzcfxt4l98ev970vwz6l9m02wxlpqd2squuv6k".to_string()
             } else {
@@ -129,7 +133,8 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                     .get_address_string()
             };
 
-            let burn_dust_contract = if network == CosmosNetwork::JunoMainnet {
+            let burn_dust_contract = if network == PerpsNetwork::Regular(CosmosNetwork::JunoMainnet)
+            {
                 // dust is in loot contract
                 "juno1gmnkf4fs0qrwxdjcwngq3n2gpxm7t24g8n4hufhyx58873he85ss8q9va4".to_string()
             } else {
@@ -138,7 +143,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                     .get_address_string()
             };
 
-            let profile_contract = if network == CosmosNetwork::JunoMainnet {
+            let profile_contract = if network == PerpsNetwork::Regular(CosmosNetwork::JunoMainnet) {
                 "juno12fdnmycnuvhua3y9pzxweu2eqqv77k454h0w8vwjjajvjrawuaksfn88u9".to_string()
             } else {
                 let dragon_riders_contract =
@@ -172,7 +177,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
                 )
                 .await?;
 
-            if network != CosmosNetwork::JunoMainnet {
+            if network != PerpsNetwork::Regular(CosmosNetwork::JunoMainnet) {
                 log::info!("giving hatching contract nft burn permissions");
                 let mut minters = HashSet::new();
                 minters.insert(contract.get_address_string());
@@ -285,7 +290,7 @@ pub(crate) async fn go(opt: Opt, inst_opt: InstantiateRewardsOpt) -> Result<()> 
             );
             log::info!("lvn rewards ibc port is {}", info.ibc_port_id);
 
-            if network != CosmosNetwork::OsmosisMainnet {
+            if network != PerpsNetwork::Regular(CosmosNetwork::OsmosisMainnet) {
                 const AMOUNT: u128 = 100000000;
                 log::info!(
                     "giving {AMOUNT} of {lvn_denom} to {}",
@@ -327,8 +332,8 @@ async fn instantiate_testnet_nft_contract(
     // was created by downloading the wasm from mainnet dragon contract
     // and uploading it to testnet
     let code_id: u64 = match app.network {
-        CosmosNetwork::JunoTestnet => 1668,
-        CosmosNetwork::StargazeTestnet => 2075,
+        PerpsNetwork::Regular(CosmosNetwork::JunoTestnet) => 1668,
+        PerpsNetwork::Regular(CosmosNetwork::StargazeTestnet) => 2075,
         _ => bail!("nft contract is only supported on stargaze and juno testnets for now"),
     };
 
@@ -400,7 +405,7 @@ async fn instantiate_testnet_profile_contract(
     // was created by downloading the wasm from mainnet dragon contract
     // and uploading it to testnet
     let code_id: u64 = match app.network {
-        CosmosNetwork::JunoTestnet => 1820,
+        PerpsNetwork::Regular(CosmosNetwork::JunoTestnet) => 1820,
         _ => bail!("profile contract is only supported on juno testnet for now"),
     };
 

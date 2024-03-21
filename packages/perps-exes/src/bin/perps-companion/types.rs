@@ -6,6 +6,7 @@ use std::fmt::Display;
 use anyhow::Result;
 use cosmos::CosmosNetwork;
 use cosmwasm_std::Decimal256;
+use perps_exes::PerpsNetwork;
 use shared::storage::{DirectionToBase, Signed};
 
 /// Chains supported by this server.
@@ -138,7 +139,16 @@ impl ChainId {
         })
     }
 
-    pub(crate) fn from_cosmos_network(network: CosmosNetwork) -> Result<Self> {
+    pub(crate) fn from_perps_network(network: PerpsNetwork) -> Result<Self> {
+        match network {
+            PerpsNetwork::Regular(network) => Self::from_cosmos_network(network),
+            PerpsNetwork::DymensionTestnet => Err(anyhow::anyhow!(
+                "Cannot run companion server for Dymension testnet"
+            )),
+        }
+    }
+
+    fn from_cosmos_network(network: CosmosNetwork) -> Result<Self> {
         match network {
             CosmosNetwork::JunoTestnet => Ok(ChainId::Uni6),
             CosmosNetwork::JunoMainnet => Ok(ChainId::Juno1),

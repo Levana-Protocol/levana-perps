@@ -1,19 +1,19 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use crate::cli::Opt;
-use cosmos::{Address, CosmosNetwork};
+use cosmos::Address;
 use msg::{
     contracts::{cw20::entry::AllAccountsResponse, liquidity_token::LiquidityTokenKind},
     prelude::*,
 };
-use perps_exes::{contracts::Factory, prelude::MarketContract};
+use perps_exes::{contracts::Factory, prelude::MarketContract, PerpsNetwork};
 use tokio::{sync::Mutex, task::JoinSet};
 
 #[derive(clap::Parser)]
 pub(super) struct LpActionCsvOpt {
     /// Network to use.
     #[clap(long, env = "COSMOS_NETWORK")]
-    network: CosmosNetwork,
+    network: PerpsNetwork,
     /// Factory address
     #[clap(long)]
     factory: Address,

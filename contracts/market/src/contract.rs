@@ -7,6 +7,7 @@ use crate::state::{
     fees::fees_init,
     liquidity::{liquidity_init, yield_init},
     meta::meta_init,
+    order::backwards_compat_limit_order_take_profit,
     position::{get_position, positions_init},
     set_factory_addr,
     token::token_init,
@@ -575,7 +576,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 direction: order.direction.into_base(market_type),
                 max_gains: order.max_gains,
                 stop_loss_override: order.stop_loss_override,
-                take_profit: order.take_profit,
+                take_profit: backwards_compat_limit_order_take_profit(&state, store, &order)?,
             }
             .query_result()
         }
