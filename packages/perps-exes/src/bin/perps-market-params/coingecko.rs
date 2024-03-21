@@ -59,7 +59,10 @@ pub(crate) enum Coin {
 
 impl Display for Coin {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", Into::<String>::into(*self))
+        match self {
+            Coin::Atom => write!(f, "Atom"),
+            Coin::Levana => write!(f, "Levana"),
+        }
     }
 }
 
@@ -68,18 +71,9 @@ impl FromStr for Coin {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "cosmos-hub" => Ok(Coin::Atom),
+            "atom" => Ok(Coin::Atom),
             "levana" => Ok(Coin::Levana),
             other => Err(anyhow!("Unrecognized coin {other}")),
-        }
-    }
-}
-
-impl From<Coin> for String {
-    fn from(value: Coin) -> Self {
-        match value {
-            Coin::Atom => "cosmos-hub".to_owned(),
-            Coin::Levana => "levana".to_owned(),
         }
     }
 }
@@ -91,9 +85,16 @@ pub(crate) fn market_config_key(coin: &Coin) -> Option<String> {
     }
 }
 
+pub(crate) fn map_coin_to_coingecko_id(coin: &Coin) -> &str {
+    match coin {
+        Coin::Atom => "cosmos-hub",
+        Coin::Levana => "levana",
+    }
+}
+
 impl Coin {
-    pub(crate) fn coingecko_uri(self) -> String {
-        let coin_id = Into::<String>::into(self);
+    pub(crate) fn coingecko_uri(&self) -> String {
+        let coin_id = map_coin_to_coingecko_id(self);
         format!("https://www.coingecko.com/en/coins/{coin_id}")
     }
 

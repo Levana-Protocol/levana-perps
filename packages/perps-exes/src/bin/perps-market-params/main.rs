@@ -7,7 +7,7 @@ use web::axum_main;
 use crate::{
     cli::Opt,
     coingecko::fetch_specific_spot_page_scrape,
-    coingecko::{get_exchanges, CoingeckoApp},
+    coingecko::{get_exchanges, map_coin_to_coingecko_id, CoingeckoApp},
     market_param::{get_current_dnf, load_markets_config},
 };
 
@@ -23,8 +23,8 @@ fn main() -> Result<()> {
     opt.init_logger()?;
     match opt.sub {
         cli::SubCommand::Coins {} => {
-            for coin in Coin::all() {
-                tracing::info!("{coin:?} (id: {})", Into::<String>::into(coin));
+            for coin in &Coin::all() {
+                tracing::info!("{coin} (coingecko id: {})", map_coin_to_coingecko_id(coin));
             }
         }
         cli::SubCommand::Scrape { coin } => {
