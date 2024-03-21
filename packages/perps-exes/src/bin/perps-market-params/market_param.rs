@@ -1,8 +1,11 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration, sync::Arc, ops::Deref};
 
-use anyhow::Context;
+use anyhow::{Context, anyhow};
 
-use crate::coingecko::{market_config_key, Coin, ExchangeInfo, ExchangeKind};
+use crate::{
+    coingecko::{market_config_key, Coin, ExchangeInfo, ExchangeKind, get_exchanges, CoingeckoApp},
+    web::NotifyApp,
+};
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub(crate) struct MarketsConfig {
@@ -58,4 +61,28 @@ pub(crate) fn compute_dnf_sensitivity(exchanges: Vec<ExchangeInfo>) -> anyhow::R
         .min(max_volume_exchange.positive_two_depth);
     let dnf = (min_depth_liquidity / market_share) * 25.0;
     Ok(dnf)
+}
+
+pub(crate) fn compute_coin_dnfs(app: Arc<NotifyApp>, coins: Vec<Coin>) -> anyhow::Result<()> {
+    let coingecko_app = CoingeckoApp::new()?;
+    let market_config = include_bytes!("../../../assets/market-config-updates.yaml");
+    let market_config = load_markets_config(market_config)?;
+
+    loop {
+        for coin in &coins {
+            tracing::info!("Going to compute DNF for {coin:?}");
+            let configured_dnf =
+                get_current_dnf(&market_config, &coin).context("No DNF configured for {coin:?}")?;
+            let exchanges = get_exchanges(&coingecko_app, coin.clone())?;
+            let dnf = compute_dnf_sensitivity(exchanges)?;
+            // todo: slack alert
+
+
+            tracing::info!("Finished computing DNF for {coin:?}: {dnf}");
+            app.dnf.write().insert(coin.clone(), dnf);
+        }
+        tracing::info!("Going to sleep 24 hours");
+        std::thread::sleep(Duration::from_secs(60 * 60 * 24));
+    }
+    Err(anyhow!("Unexpected finish on compute_coin_dnfs"))
 }

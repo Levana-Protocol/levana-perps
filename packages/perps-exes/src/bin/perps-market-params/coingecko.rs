@@ -1,7 +1,7 @@
-use std::{str::FromStr, sync::Arc};
+use std::{fmt::Display, str::FromStr, sync::Arc, time::Duration};
 
 use anyhow::{anyhow, Context, Result};
-use headless_chrome::{Browser, Tab};
+use headless_chrome::{Browser, LaunchOptions, Tab};
 use scraper::{ElementRef, Html, Selector};
 
 pub(crate) struct CoingeckoApp {
@@ -51,10 +51,16 @@ impl TryFrom<String> for ExchangeKind {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Copy, Clone, serde::Serialize, Hash, PartialEq, Eq)]
 pub(crate) enum Coin {
     Atom,
     Levana,
+}
+
+impl Display for Coin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", Into::<String>::into(*self))
+    }
 }
 
 impl FromStr for Coin {
@@ -241,7 +247,11 @@ pub(crate) fn get_scrape_plan_scrapy(coin_page: &str) -> Result<ScrapePlan2> {
 
 impl CoingeckoApp {
     pub(crate) fn new() -> Result<Self> {
-        let browser = Browser::default()?;
+        let browser = Browser::new(
+            LaunchOptions::default_builder()
+                .idle_browser_timeout(Duration::from_secs(60 * 60 * 25))
+                .build()?,
+        )?;
         let tab = browser.new_tab()?;
         let user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
         tab.set_user_agent(user_agent, None, None)?;
@@ -328,7 +338,7 @@ mod tests {
     }
 }
 
-pub(crate) fn get_exchanges(app: CoingeckoApp, coin: Coin) -> Result<Vec<ExchangeInfo>> {
+pub(crate) fn get_exchanges(app: &CoingeckoApp, coin: Coin) -> Result<Vec<ExchangeInfo>> {
     let coin_uri = coin.coingecko_uri();
     let coin_page = app.download_coin_page(&coin_uri)?;
 

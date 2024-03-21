@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use askama::Template;
 use axum::{
     extract::{Query, State},
@@ -8,20 +8,22 @@ use axum::{
 };
 use axum_extra::routing::RouterExt;
 use parking_lot::RwLock;
+use tokio::task::JoinSet;
 
 use crate::{
     coingecko::Coin,
+    market_param::compute_coin_dnfs,
     routes::{HealthRoute, HomeRoute},
 };
 
 #[tokio::main(flavor = "multi_thread")]
-pub(crate) async fn axum_main() -> Result<()> {
-    main_inner().await
+pub(crate) async fn axum_main(coins: Vec<Coin>) -> Result<()> {
+    main_inner(coins).await
 }
 
 #[derive(Clone)]
 pub(crate) struct NotifyApp {
-    dnf: Arc<RwLock<HashMap<Coin, f64>>>,
+    pub(crate) dnf: Arc<RwLock<HashMap<Coin, f64>>>,
 }
 
 impl NotifyApp {
@@ -32,17 +34,33 @@ impl NotifyApp {
     }
 }
 
-async fn main_inner() -> Result<()> {
+async fn main_inner(coins: Vec<Coin>) -> Result<()> {
     let state = Arc::new(NotifyApp::new());
+
+    let mut set = JoinSet::new();
+    let my_state = state.clone();
+    let my_coins = coins.clone();
+    set.spawn_blocking(|| {
+        compute_coin_dnfs(my_state, my_coins)
+    });
 
     let router = axum::Router::new()
         .typed_get(index)
         .typed_get(healthz)
-        .with_state(state);
+        .with_state(state.clone());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
-    axum::serve(listener, router).await?;
-    Ok(())
+
+    set.spawn(async {
+        axum::serve(listener, router)
+            .await
+            .context("Background axum task should never complete")
+    });
+
+    // We should never exit...
+    set.join_next().await;
+    set.abort_all();
+    Err(anyhow::anyhow!("Unexpected join_next completion"))
 }
 
 #[derive(serde::Deserialize)]

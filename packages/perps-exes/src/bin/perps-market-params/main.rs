@@ -20,7 +20,6 @@ mod routes;
 fn main() -> Result<()> {
     let opt = Opt::parse();
     opt.init_logger()?;
-    let market_config = include_bytes!("../../../assets/market-config-updates.yaml");
     match opt.sub {
         cli::SubCommand::Coins {} => {
             for coin in Coin::all() {
@@ -29,7 +28,7 @@ fn main() -> Result<()> {
         }
         cli::SubCommand::Scrape { coin } => {
             let app = CoingeckoApp::new()?;
-            let exchanges = get_exchanges(app, coin)?;
+            let exchanges = get_exchanges(&app, coin)?;
             tracing::info!("Successfully scraped: {} exchanges", exchanges.len());
         }
         cli::SubCommand::ScrapeLocal { path } => {
@@ -39,17 +38,18 @@ fn main() -> Result<()> {
         }
         cli::SubCommand::Dnf { coin } => {
             let app = CoingeckoApp::new()?;
+            let market_config = include_bytes!("../../../assets/market-config-updates.yaml");
             let market_config = load_markets_config(market_config)?;
             let configured_dnf = get_current_dnf(&market_config, &coin);
             if let Some(configured_dnf) = configured_dnf {
                 tracing::info!("Configured DNF sensitivity: {configured_dnf}");
             }
-            let exchanges = get_exchanges(app, coin)?;
+            let exchanges = get_exchanges(&app, coin)?;
             let dnf = compute_dnf_sensitivity(exchanges)?;
             tracing::info!("Computed DNF sensitivity: {dnf}");
         }
         cli::SubCommand::Serve { coins } => {
-            axum_main()?
+            axum_main(coins)?
         },
 
 
