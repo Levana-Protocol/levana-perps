@@ -1248,6 +1248,31 @@ impl PerpsMarket {
     // and just use strings as needed, but exec_open_position_raw
     // is available where you have the precise type
     #[allow(clippy::too_many_arguments)]
+    pub fn exec_open_position_take_profit(
+        &self,
+        sender: &Addr,
+        collateral: impl TryInto<NumberGtZero, Error = anyhow::Error>,
+        leverage: impl TryInto<LeverageToBase, Error = anyhow::Error>,
+        direction: DirectionToBase,
+        slippage_assert: Option<SlippageAssert>,
+        stop_loss_override: Option<PriceBaseInQuote>,
+        take_profit: TakeProfitTrader,
+    ) -> Result<(PositionId, DeferResponse)> {
+        self.exec_open_position_take_profit_raw(
+            sender,
+            collateral.try_into()?.into(),
+            slippage_assert,
+            leverage.try_into()?,
+            direction,
+            stop_loss_override,
+            take_profit,
+        )
+    }
+
+    // Taking TryInto impls allows us to avoid noise in the tests
+    // and just use strings as needed, but exec_open_position_raw
+    // is available where you have the precise type
+    #[allow(clippy::too_many_arguments)]
     pub fn exec_open_position_refresh_price(
         &self,
         sender: &Addr,
@@ -1305,6 +1330,30 @@ impl PerpsMarket {
     }
 
     #[allow(clippy::too_many_arguments)]
+    pub fn exec_open_position_take_profit_raw(
+        &self,
+        sender: &Addr,
+        collateral: Number,
+        slippage_assert: Option<SlippageAssert>,
+        leverage: LeverageToBase,
+        direction: DirectionToBase,
+        stop_loss_override: Option<PriceBaseInQuote>,
+        take_profit: TakeProfitTrader,
+    ) -> Result<(PositionId, DeferResponse)> {
+        let queue_resp = self.exec_open_position_take_profit_raw_queue_only(
+            sender,
+            collateral,
+            slippage_assert,
+            leverage,
+            direction,
+            stop_loss_override,
+            take_profit,
+        )?;
+
+        self.exec_open_position_process_queue_response(sender, queue_resp, None)
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub fn exec_open_position_queue_only(
         &self,
         sender: &Addr,
@@ -1345,6 +1394,7 @@ impl PerpsMarket {
     }
 
     // this does *not* automatic time jump
+    // backwards-compatible for max-gains
     #[allow(clippy::too_many_arguments)]
     pub fn exec_open_position_raw_queue_only(
         &self,
@@ -1357,17 +1407,7 @@ impl PerpsMarket {
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
     ) -> Result<DeferQueueResponse> {
-        if self.id.get_market_type() == MarketType::CollateralIsBase {
-            // let price = self.query_current_price()?;
-            // let config = self.query_config()?;
-            // println!("{} at price of {} (or {}) is {}", collateral, price.price, price.price.into_protocol_price(MarketType::CollateralIsBase), collateral * price.price.to_number());
-            // let n:Number = leverage.try_into()?;
-            // leverage = (n + Number::ONE).try_into()?;
-            //direction = direction.invert();
-        }
-
         let price = self.query_current_price()?;
-
         let collateral = Collateral::try_from_number(collateral)?;
 
         // eh, this is a nice convenience to not have to rewrite all the tests
@@ -1382,6 +1422,37 @@ impl PerpsMarket {
             price_point: &price,
         }
         .calc()?;
+
+        let msg = self.token.into_market_execute_msg(
+            &self.addr,
+            collateral,
+            MarketExecuteMsg::OpenPosition {
+                slippage_assert,
+                leverage,
+                direction,
+                max_gains: None,
+                stop_loss_override,
+                take_profit: Some(take_profit),
+            },
+        )?;
+
+        // Open position always happens through a deferred exec
+        self.exec_defer_queue_wasm_msg(sender, msg)
+    }
+
+    // this does *not* automatic time jump
+    #[allow(clippy::too_many_arguments)]
+    pub fn exec_open_position_take_profit_raw_queue_only(
+        &self,
+        sender: &Addr,
+        collateral: Number,
+        slippage_assert: Option<SlippageAssert>,
+        leverage: LeverageToBase,
+        direction: DirectionToBase,
+        stop_loss_override: Option<PriceBaseInQuote>,
+        take_profit: TakeProfitTrader,
+    ) -> Result<DeferQueueResponse> {
+        let collateral = Collateral::try_from_number(collateral)?;
 
         let msg = self.token.into_market_execute_msg(
             &self.addr,
