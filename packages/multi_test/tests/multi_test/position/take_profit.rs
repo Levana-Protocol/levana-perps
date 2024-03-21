@@ -178,7 +178,7 @@ fn position_take_profit_override_long() {
         )
         .unwrap();
 
-    trigger_and_assert(pos_id, LiquidationReason::TakeProfit);
+    trigger_and_assert(pos_id, LiquidationReason::MaxGains);
 }
 
 fn open_long_with_take_profit(
@@ -285,14 +285,16 @@ fn position_take_profit_override_long_4() {
         assert_position_liquidated_reason(&pos, reason).unwrap();
     };
 
-    // Test that position is closed with max gains getting all counter collateral if the take profit override is removed.
-
     market.exec_set_price("100".try_into().unwrap()).unwrap();
     let pos_id = open_long_with_take_profit(&market, &trader, "100", "10", "100.1");
 
-    // market
-    //     .exec_set_trigger_order(&trader, pos_id, None, None::<PriceBaseInQuote>)
-    //     .unwrap();
+    market
+        .exec_update_position_take_profit(
+            &trader,
+            pos_id,
+            TakeProfitTrader::Finite("101".parse().unwrap()),
+        )
+        .unwrap();
 
     market.exec_set_price("100.2".try_into().unwrap()).unwrap();
     market.exec_crank(&cranker).unwrap();
@@ -363,7 +365,7 @@ fn position_take_profit_override_short() {
         )
         .unwrap();
 
-    trigger_and_assert(pos_id, LiquidationReason::TakeProfit);
+    trigger_and_assert(pos_id, LiquidationReason::MaxGains);
 }
 
 fn position_take_profit_long_helper(price: u128, check_liquidation_reason: bool) {
