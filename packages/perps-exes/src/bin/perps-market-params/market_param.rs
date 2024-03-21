@@ -43,8 +43,8 @@ pub(crate) fn compute_dnf_sensitivity(exchanges: Vec<ExchangeInfo>) -> anyhow::R
     tracing::debug!("Total exchanges: {}", exchanges.len());
     let exchanges = exchanges.iter().filter(|exchange| {
         exchange.kind != ExchangeKind::Dex
-            || exchange.name.to_lowercase() != "htx"
-            || !exchange.stale
+            && exchange.name.to_lowercase() != "htx"
+            && !exchange.stale
     });
     let max_volume_exchange = exchanges
         .clone()
