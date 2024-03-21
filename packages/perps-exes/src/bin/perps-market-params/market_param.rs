@@ -40,6 +40,7 @@ pub(crate) fn get_current_dnf(market: &MarketsConfig, coin: &Coin) -> Option<f64
 
 pub(crate) fn compute_dnf_sensitivity(exchanges: Vec<ExchangeInfo>) -> anyhow::Result<f64> {
     // Algorithm: https://staff.levana.finance/new-market-checklist#dnf-sensitivity
+    tracing::debug!("Total exchanges: {}", exchanges.len());
     let exchanges = exchanges.iter().filter(|exchange| {
         exchange.kind != ExchangeKind::Dex
             || exchange.name.to_lowercase() != "htx"
@@ -49,6 +50,7 @@ pub(crate) fn compute_dnf_sensitivity(exchanges: Vec<ExchangeInfo>) -> anyhow::R
         .clone()
         .max_by(|a, b| a.twenty_four_volume.total_cmp(&b.twenty_four_volume))
         .context("No max value found")?;
+    tracing::debug!("Max volume exchange: {max_volume_exchange:#?}");
     let total_volume_percentage = exchanges
         .map(|exchange| exchange.volume_percentage.unwrap_or_default())
         .sum::<f64>();
@@ -56,6 +58,7 @@ pub(crate) fn compute_dnf_sensitivity(exchanges: Vec<ExchangeInfo>) -> anyhow::R
         .volume_percentage
         .context("Exchange with maximum volume doesn't have metric")?
         / total_volume_percentage;
+    tracing::debug!("Market share: {market_share}");
     let min_depth_liquidity = max_volume_exchange
         .negative_two_depth
         .min(max_volume_exchange.positive_two_depth);
@@ -74,6 +77,7 @@ pub(crate) fn compute_coin_dnfs(app: Arc<NotifyApp>, coins: Vec<Coin>) -> anyhow
             let configured_dnf = get_current_dnf(&market_config, &coin)
                 .context(format!("No DNF configured for {coin:?}"))?;
             let exchanges = get_exchanges(&coingecko_app, coin.clone())?;
+            tracing::info!("Total exchanges found: {} for {coin:?}", exchanges.len());
             let dnf = compute_dnf_sensitivity(exchanges)?;
             // todo: slack alert
 

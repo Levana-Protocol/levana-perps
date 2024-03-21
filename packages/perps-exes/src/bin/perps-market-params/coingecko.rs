@@ -22,7 +22,7 @@ pub(crate) struct ScrapePlan2 {
     coin_id: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub(crate) struct ExchangeInfo {
     pub(crate) name: String,
     pub(crate) kind: ExchangeKind,
@@ -126,7 +126,8 @@ fn fetch_exchange_row_scraper(node: ElementRef<'_>) -> Result<ExchangeInfo> {
 
     let mut columns = columns.skip(1);
     let exchange_name = columns.next().context("Missing column for exchange_name")?;
-    let name = exchange_name.inner_html().trim().to_owned();
+    let name_selector = Selector::parse("div a div").map_err(|_| anyhow!("Error constructing name_selector"))?;
+    let name = exchange_name.select(&name_selector).next().context("Missing value for exchange_name")?.inner_html().trim().to_owned();
     let exchange_type = columns.next().context("Missing column for exchange_type")?;
     let span_div =
         Selector::parse("span div").map_err(|_| anyhow!("Error constructing span div selector"))?;
@@ -293,7 +294,7 @@ mod tests {
 
     use crate::coingecko::{
         fetch_specific_spot_page_scrape, find_page_info, get_scrape_plan_scrapy,
-        process_usd_amount, ScrapePlan2,
+        process_usd_amount, ExchangeInfo, ExchangeKind, ScrapePlan2,
     };
 
     #[test]
@@ -317,6 +318,21 @@ mod tests {
         fs.read_to_string(&mut exchange_page).unwrap();
         let result = fetch_specific_spot_page_scrape(&exchange_page).unwrap();
         assert_eq!(result.len(), 100, "Fetched 100 exchanges");
+
+        let first_exchange = result.get(0).unwrap();
+        assert_eq!(
+            *first_exchange,
+            ExchangeInfo {
+                name: "CEX.IO".to_owned(),
+                kind: ExchangeKind::Cex,
+                positive_two_depth: 1020189.4156407921,
+                negative_two_depth: 338547.66893188225,
+                twenty_four_volume: 15729.0,
+                volume_percentage: Some(0.0),
+                stale: false
+            },
+            "Extracted a single exchange"
+        )
     }
 
     #[test]
