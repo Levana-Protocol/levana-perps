@@ -214,3 +214,13 @@ overrides:
     traders: 0
     default-market-ids:
       - ETH_USD
+  dymbeta:
+    wallet-manager-address: osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k
+    price: true
+    crank: 1
+    liquidity: false
+    utilization: false
+    balance: false
+    traders: 0
+    default-market-ids:
+      - DYM_USD
