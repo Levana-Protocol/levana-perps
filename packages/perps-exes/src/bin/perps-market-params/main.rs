@@ -24,7 +24,7 @@ fn main() -> Result<()> {
     match opt.sub {
         cli::SubCommand::Coins {} => {
             for coin in Coin::all() {
-                tracing::info!("{coin:?} (id: {})", Into::<String>::into(coin.clone()));
+                tracing::info!("{coin:?} (id: {})", Into::<String>::into(coin));
             }
         }
         cli::SubCommand::Scrape { coin } => {

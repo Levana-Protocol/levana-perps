@@ -78,9 +78,9 @@ pub(crate) fn compute_coin_dnfs(app: Arc<NotifyApp>, opt: ServeOpt) -> anyhow::R
     loop {
         for coin in &coins {
             tracing::info!("Going to compute DNF for {coin:?}");
-            let configured_dnf = get_current_dnf(&market_config, &coin)
+            let configured_dnf = get_current_dnf(&market_config, coin)
                 .context(format!("No DNF configured for {coin:?}"))?;
-            let exchanges = get_exchanges(&coingecko_app, coin.clone())?;
+            let exchanges = get_exchanges(&coingecko_app, *coin)?;
             tracing::info!("Total exchanges found: {} for {coin:?}", exchanges.len());
             let dnf = compute_dnf_sensitivity(exchanges)?;
             let diff = (configured_dnf - dnf).abs() * 100.0;
@@ -94,7 +94,7 @@ pub(crate) fn compute_coin_dnfs(app: Arc<NotifyApp>, opt: ServeOpt) -> anyhow::R
                 )?;
             }
             tracing::info!("Finished computing DNF for {coin:?}: {dnf}");
-            app.dnf.write().insert(coin.clone(), dnf);
+            app.dnf.write().insert(*coin, dnf);
         }
         tracing::info!("Going to sleep 24 hours");
         std::thread::sleep(Duration::from_secs(60 * 60 * 24));
