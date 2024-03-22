@@ -1,12 +1,13 @@
-use std::{path::PathBuf, str::FromStr};
+use std::{error::Error, fmt::Display, path::PathBuf, str::FromStr};
 
 use anyhow::{Context, Result};
 use clap::Subcommand;
+use cosmos::{Address, CosmosNetwork};
 use tracing_subscriber::{
     fmt, prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
 };
 
-use crate::coingecko::Coin;
+use crate::coingecko::{Coin, QuoteAsset};
 
 #[derive(clap::Parser)]
 pub(crate) struct Opt {
@@ -22,7 +23,7 @@ pub(crate) enum SubCommand {
     Scrape {
         /// Coin string. Eg: levana
         #[arg(long)]
-        coin: Coin,
+        coin: MarketId,
     },
     /// Scrape local file
     ScrapeLocal {
@@ -36,7 +37,7 @@ pub(crate) enum SubCommand {
     Dnf {
         /// Coin string. Eg: levana
         #[arg(long)]
-        coin: Coin,
+        coin: MarketId,
     },
     /// Serve web application
     Serve {
@@ -56,11 +57,41 @@ pub(crate) struct ServeOpt {
     /// DNF threshold beyond which to raise alert
     #[arg(long, env = "LEVANA_MPARAM_DNF_THRESHOLD", default_value = "10.0")]
     pub(crate) dnf_threshold: f64,
+    /// Mainnet factories
+    #[clap(long, env = "LEVANA_MPARAM_MAINNET_FACTORIES", value_parser=parse_key_val::<CosmosNetwork, Address>, default_value = "osmosis-mainnet=osmo1ssw6x553kzqher0earlkwlxasfm2stnl3ms3ma2zz4tnajxyyaaqlucd45,sei-mainnet=sei18rdj3asllguwr6lnyu2sw8p8nut0shuj3sme27ndvvw4gakjnjqqper95h,injective-mainnet=inj1vdu3s39dl8t5l88tyqwuhzklsx9587adv8cnn9", use_value_delimiter=true, value_delimiter=',')]
+    pub(crate) mainnet_factories: Vec<(CosmosNetwork, Address)>,
 }
 
+/// Parse a single key-value pair
+fn parse_key_val<T, U>(s: &str) -> Result<(T, U), Box<dyn Error + Send + Sync + 'static>>
+where
+    T: std::str::FromStr,
+    T::Err: Error + Send + Sync + 'static,
+    U: std::str::FromStr,
+    U::Err: Error + Send + Sync + 'static,
+{
+    let (key, value) = s
+        .split_once('=')
+        .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
+    Ok((key.parse()?, value.parse()?))
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, serde::Serialize)]
 pub(crate) struct MarketId {
-    base: Coin,
-    quote: String,
+    pub(crate) base: Coin,
+    quote: QuoteAsset,
+}
+
+impl MarketId {
+    pub(crate) fn base_quote(&self) -> String {
+        format!("{}_{}", self.base, self.quote)
+    }
+}
+
+impl Display for MarketId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}_{}", self.base, self.quote)
+    }
 }
 
 impl FromStr for MarketId {
@@ -70,7 +101,8 @@ impl FromStr for MarketId {
         let mut markets = s.split('_');
         let base = markets.next().context("No base asset found")?;
         let base = FromStr::from_str(base)?;
-        let quote = markets.next().context("No quote asset found")?.to_owned();
+        let quote = markets.next().context("No quote asset found")?;
+        let quote = FromStr::from_str(quote)?;
         Ok(MarketId { base, quote })
     }
 }

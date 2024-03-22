@@ -8,7 +8,6 @@ use crate::{
     cli::Opt,
     coingecko::fetch_specific_spot_page_scrape,
     coingecko::{get_exchanges, map_coin_to_coingecko_id, CoingeckoApp},
-    market_param::{get_current_dnf, load_markets_config},
 };
 
 mod cli;
@@ -39,12 +38,6 @@ fn main() -> Result<()> {
         }
         cli::SubCommand::Dnf { coin } => {
             let app = CoingeckoApp::new()?;
-            let market_config = include_bytes!("../../../assets/market-config-updates.yaml");
-            let market_config = load_markets_config(market_config)?;
-            let configured_dnf = get_current_dnf(&market_config, &coin);
-            if let Some(configured_dnf) = configured_dnf {
-                tracing::info!("Configured DNF sensitivity: {configured_dnf}");
-            }
             let exchanges = get_exchanges(&app, coin)?;
             let dnf = compute_dnf_sensitivity(exchanges)?;
             tracing::info!("Computed DNF sensitivity: {dnf}");
