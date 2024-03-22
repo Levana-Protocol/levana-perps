@@ -1,6 +1,6 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Subcommand;
 use tracing_subscriber::{
     fmt, prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
@@ -49,13 +49,30 @@ pub(crate) enum SubCommand {
 pub(crate) struct ServeOpt {
     /// Coins to track
     #[arg(long, env = "LEVANA_MPARAM_COINS", value_delimiter = ',')]
-    pub(crate) coins: Vec<Coin>,
+    pub(crate) coins: Vec<MarketId>,
     /// Slack webhook to send alert notification
     #[arg(long, env = "LEVANA_MPARAM_SLACK_WEBHOOK")]
     pub(crate) slack_webhook: reqwest::Url,
     /// DNF threshold beyond which to raise alert
     #[arg(long, env = "LEVANA_MPARAM_DNF_THRESHOLD", default_value = "10.0")]
     pub(crate) dnf_threshold: f64,
+}
+
+pub(crate) struct MarketId {
+    base: Coin,
+    quote: String,
+}
+
+impl FromStr for MarketId {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut markets = s.split('_');
+        let base = markets.next().context("No base asset found")?;
+        let base = FromStr::from_str(base)?;
+        let quote = markets.next().context("No quote asset found")?.to_owned();
+        Ok(MarketId { base, quote })
+    }
 }
 
 impl Opt {

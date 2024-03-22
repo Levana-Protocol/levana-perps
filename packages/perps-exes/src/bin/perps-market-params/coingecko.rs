@@ -57,6 +57,24 @@ pub(crate) enum Coin {
     Levana,
 }
 
+#[derive(Debug, Copy, Clone, serde::Serialize, Hash, PartialEq, Eq)]
+pub(crate) enum QuoteAsset {
+    Usd,
+    Usdc,
+}
+
+impl FromStr for QuoteAsset {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "USD" => Ok(QuoteAsset::Usd),
+            "USDC" => Ok(QuoteAsset::Usdc),
+            other => Err(anyhow!("Unsupported quote asset: {other}"))
+        }
+    }
+}
+
 impl Display for Coin {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
