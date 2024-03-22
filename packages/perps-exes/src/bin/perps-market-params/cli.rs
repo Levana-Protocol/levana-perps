@@ -72,7 +72,7 @@ where
 {
     let (key, value) = s
         .split_once('=')
-        .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
+        .with_context(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
     Ok((key.parse()?, value.parse()?))
 }
 
