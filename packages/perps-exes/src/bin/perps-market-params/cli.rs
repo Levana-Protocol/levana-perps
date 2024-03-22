@@ -49,8 +49,8 @@ pub(crate) enum SubCommand {
 #[derive(clap::Parser, Clone, Debug)]
 pub(crate) struct ServeOpt {
     /// Coins to track
-    #[arg(long, env = "LEVANA_MPARAM_COINS", value_delimiter = ',')]
-    pub(crate) coins: Vec<MarketId>,
+    #[arg(long, env = "LEVANA_MPARAM_MARKET_IDS", value_delimiter = ',')]
+    pub(crate) market_ids: Vec<MarketId>,
     /// Slack webhook to send alert notification
     #[arg(long, env = "LEVANA_MPARAM_SLACK_WEBHOOK")]
     pub(crate) slack_webhook: reqwest::Url,

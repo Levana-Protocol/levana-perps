@@ -69,7 +69,7 @@ pub(crate) fn compute_dnf_sensitivity(exchanges: Vec<ExchangeInfo>) -> anyhow::R
 
 pub(crate) fn compute_coin_dnfs(app: Arc<NotifyApp>, opt: ServeOpt) -> anyhow::Result<()> {
     let coingecko_app = CoingeckoApp::new()?;
-    let market_ids = opt.coins;
+    let market_ids = opt.market_ids;
     let http_app = HttpApp::new(opt.slack_webhook);
 
     loop {
