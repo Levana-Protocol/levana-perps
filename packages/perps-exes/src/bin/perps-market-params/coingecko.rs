@@ -282,11 +282,15 @@ pub(crate) fn get_scrape_plan_scrapy(coin_page: &str) -> Result<ScrapePlan2> {
 
 impl CoingeckoApp {
     pub(crate) fn new() -> Result<Self> {
+        tracing::debug!("Going to create browser");
         let browser = Browser::new(
             LaunchOptions::default_builder()
+                // https://github.com/rust-headless-chrome/rust-headless-chrome/issues/344#issuecomment-1444733739
+                .sandbox(false)
                 .idle_browser_timeout(Duration::from_secs(60 * 60 * 25))
                 .build()?,
         )?;
+        tracing::debug!("Going to create new tab");
         let tab = browser.new_tab()?;
         let user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
         tab.set_user_agent(user_agent, None, None)?;

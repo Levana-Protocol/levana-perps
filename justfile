@@ -162,6 +162,7 @@ download-health-check:
 	env GH_TOKEN="$LEVANA_DEVOPS_REPO_PAT" gh release download v0.10 --repo https://github.com/Levana-Protocol/devops/
 	cp health-check ./.ci/bots
 	cp health-check ./.ci/companion
+	cp health-check ./.ci/market-analyzer
 
 # Run companion
 run-companion:
@@ -282,3 +283,16 @@ check-commits:
 	git fetch origin main --depth=1
 	git log --pretty=format:"%ae" $(git branch --show-current)...origin/main > email
 	awk -f ./.ci/commit-check.awk email
+
+# Build perps-market-params binary in release mode
+cargo-market-params-release:
+    cargo build --bin perps-market-params --release --target x86_64-unknown-linux-musl
+
+# Build perps-market-params docker image
+build-market-params-image:
+	cp target/x86_64-unknown-linux-musl/release/perps-market-params .ci/market-analyzer/
+	cd .ci/market-analyzer && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/perps-market-params:{{GIT_SHA}}
+
+# Push perps-market-params docker image
+push-market-params-image:
+	docker push ghcr.io/levana-protocol/levana-perps/perps-market-params:{{GIT_SHA}}
