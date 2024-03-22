@@ -4,6 +4,8 @@ use anyhow::{anyhow, Context, Result};
 use headless_chrome::{Browser, LaunchOptions, Tab};
 use scraper::{ElementRef, Html, Selector};
 
+use crate::cli::MarketId;
+
 pub(crate) struct CoingeckoApp {
     #[allow(dead_code)]
     browser: Browser,
@@ -55,6 +57,34 @@ impl TryFrom<String> for ExchangeKind {
 pub(crate) enum Coin {
     Atom,
     Levana,
+    Eth,
+}
+
+#[derive(Debug, Copy, Clone, serde::Serialize, Hash, PartialEq, Eq)]
+pub(crate) enum QuoteAsset {
+    Usd,
+    Usdc,
+}
+
+impl Display for QuoteAsset {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            QuoteAsset::Usd => write!(f, "Usd"),
+            QuoteAsset::Usdc => write!(f, "Usdc"),
+        }
+    }
+}
+
+impl FromStr for QuoteAsset {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "USD" => Ok(QuoteAsset::Usd),
+            "USDC" => Ok(QuoteAsset::Usdc),
+            other => Err(anyhow!("Unsupported quote asset: {other}")),
+        }
+    }
 }
 
 impl Display for Coin {
@@ -62,6 +92,7 @@ impl Display for Coin {
         match self {
             Coin::Atom => write!(f, "Atom"),
             Coin::Levana => write!(f, "Levana"),
+            Coin::Eth => write!(f, "Eth"),
         }
     }
 }
@@ -71,17 +102,11 @@ impl FromStr for Coin {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "atom" => Ok(Coin::Atom),
-            "levana" => Ok(Coin::Levana),
+            "ATOM" => Ok(Coin::Atom),
+            "LEVANA" => Ok(Coin::Levana),
+            "ETH" => Ok(Coin::Eth),
             other => Err(anyhow!("Unrecognized coin {other}")),
         }
-    }
-}
-
-pub(crate) fn market_config_key(coin: &Coin) -> Option<String> {
-    match coin {
-        Coin::Atom => Some("ATOM_USD".to_owned()),
-        Coin::Levana => None,
     }
 }
 
@@ -89,6 +114,7 @@ pub(crate) fn map_coin_to_coingecko_id(coin: &Coin) -> &str {
     match coin {
         Coin::Atom => "cosmos-hub",
         Coin::Levana => "levana",
+        Coin::Eth => "ethereum",
     }
 }
 
@@ -362,8 +388,8 @@ mod tests {
     }
 }
 
-pub(crate) fn get_exchanges(app: &CoingeckoApp, coin: Coin) -> Result<Vec<ExchangeInfo>> {
-    let coin_uri = coin.coingecko_uri();
+pub(crate) fn get_exchanges(app: &CoingeckoApp, coin: MarketId) -> Result<Vec<ExchangeInfo>> {
+    let coin_uri = coin.base.coingecko_uri();
     let coin_page = app.download_coin_page(&coin_uri)?;
 
     let plan = get_scrape_plan_scrapy(&coin_page)?;

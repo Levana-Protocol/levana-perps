@@ -11,8 +11,7 @@ use parking_lot::RwLock;
 use tokio::task::JoinSet;
 
 use crate::{
-    cli::ServeOpt,
-    coingecko::Coin,
+    cli::{MarketId, ServeOpt},
     market_param::compute_coin_dnfs,
     routes::{HealthRoute, HomeRoute},
 };
@@ -24,7 +23,7 @@ pub(crate) async fn axum_main(opt: ServeOpt) -> Result<()> {
 
 #[derive(Clone)]
 pub(crate) struct NotifyApp {
-    pub(crate) dnf: Arc<RwLock<HashMap<Coin, f64>>>,
+    pub(crate) dnf: Arc<RwLock<HashMap<MarketId, f64>>>,
 }
 
 impl NotifyApp {
@@ -69,7 +68,7 @@ pub(crate) struct NoQueryString {}
 #[derive(Template, serde::Serialize)]
 #[template(path = "market_params.html")]
 struct IndexTemplate {
-    dnf: HashMap<Coin, f64>,
+    dnf: HashMap<MarketId, f64>,
 }
 
 pub(crate) async fn index(

@@ -1,15 +1,18 @@
 use anyhow::anyhow;
+use cosmos::{Address, CosmosNetwork};
 use reqwest::{blocking::Client, Url};
 
-pub(crate) struct SlackApp {
+use crate::market_param::MarketsConfig;
+
+pub(crate) struct HttpApp {
     webhook: Url,
     client: Client,
 }
 
-impl SlackApp {
+impl HttpApp {
     pub(crate) fn new(webhook: Url) -> Self {
         let client = Client::new();
-        SlackApp { webhook, client }
+        HttpApp { webhook, client }
     }
 
     pub(crate) fn send_notification(
@@ -52,5 +55,25 @@ impl SlackApp {
                 response.status()
             ))
         }
+    }
+
+    pub(crate) fn fetch_market_status(
+        &self,
+        factories: &[(CosmosNetwork, Address)],
+    ) -> anyhow::Result<MarketsConfig> {
+        let mut result = MarketsConfig { markets: vec![] };
+        for (network, factory) in factories {
+            let url = reqwest::Url::parse_with_params(
+                "https://querier-mainnet.levana.finance/v1/perps/markets",
+                &[
+                    ("network", &network.to_string()),
+                    ("factory", &factory.to_string()),
+                ],
+            )?;
+            let mut response: MarketsConfig =
+                self.client.get(url).send()?.error_for_status()?.json()?;
+            result.markets.append(&mut response.markets);
+        }
+        Ok(result)
     }
 }
