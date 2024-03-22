@@ -63,7 +63,7 @@ pub(crate) struct ServeOpt {
 }
 
 /// Parse a single key-value pair
-fn parse_key_val<T, U>(s: &str) -> Result<(T, U), anyhow::Error>
+fn parse_key_val<T, U>(s: &str) -> anyhow::Result<(T, U)>
 where
     T: std::str::FromStr,
     T::Err: Error + Send + Sync + 'static,
