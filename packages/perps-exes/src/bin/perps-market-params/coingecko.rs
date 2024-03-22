@@ -100,8 +100,8 @@ impl FromStr for Coin {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "atom" => Ok(Coin::Atom),
-            "levana" => Ok(Coin::Levana),
+            "ATOM" => Ok(Coin::Atom),
+            "LEVANA" => Ok(Coin::Levana),
             other => Err(anyhow!("Unrecognized coin {other}")),
         }
     }

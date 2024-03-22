@@ -27,15 +27,21 @@ pub(crate) struct Market {
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub(crate) struct MarketParam {
-    pub(crate) delta_neutrality_fee_sensitivity: Option<f64>,
+    pub(crate) delta_neutrality_fee_sensitivity: String,
 }
 
 impl MarketsConfig {
-    pub(crate) fn get_dnf(&self, market_id: &MarketId) -> Option<f64> {
-        self.markets
+    pub(crate) fn get_dnf(&self, market_id: &MarketId) -> anyhow::Result<f64> {
+        let result = self
+            .markets
             .iter()
-            .find(|item| item.status.market_id.to_lowercase() == market_id.base_quote().to_lowercase())
-            .and_then(|item| item.status.config.delta_neutrality_fee_sensitivity)
+            .find(|item| {
+                item.status.market_id.to_lowercase() == market_id.base_quote().to_lowercase()
+            })
+            .map(|item| item.status.config.delta_neutrality_fee_sensitivity.clone())
+            .context("No dnf found")?;
+        let result = result.parse()?;
+        Ok(result)
     }
 }
 
@@ -73,6 +79,7 @@ pub(crate) fn compute_coin_dnfs(app: Arc<NotifyApp>, opt: ServeOpt) -> anyhow::R
     let http_app = HttpApp::new(opt.slack_webhook);
 
     loop {
+        tracing::info!("Going to fetch market status from querier");
         let market_config = http_app.fetch_market_status(&opt.mainnet_factories[..])?;
         for market_id in &market_ids {
             tracing::info!("Going to compute DNF for {market_id:?}");
