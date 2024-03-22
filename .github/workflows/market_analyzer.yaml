@@ -15,7 +15,7 @@ env:
   RUSTUP_MAX_RETRIES: 10
 
 jobs:
-  bots-image:
+  market-analyzer-image:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
