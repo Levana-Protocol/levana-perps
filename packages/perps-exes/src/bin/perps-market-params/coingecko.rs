@@ -57,6 +57,7 @@ impl TryFrom<String> for ExchangeKind {
 pub(crate) enum Coin {
     Atom,
     Levana,
+    Eth,
 }
 
 #[derive(Debug, Copy, Clone, serde::Serialize, Hash, PartialEq, Eq)]
@@ -91,6 +92,7 @@ impl Display for Coin {
         match self {
             Coin::Atom => write!(f, "Atom"),
             Coin::Levana => write!(f, "Levana"),
+            Coin::Eth => write!(f, "Eth"),
         }
     }
 }
@@ -102,6 +104,7 @@ impl FromStr for Coin {
         match s {
             "ATOM" => Ok(Coin::Atom),
             "LEVANA" => Ok(Coin::Levana),
+            "ETH" => Ok(Coin::Eth),
             other => Err(anyhow!("Unrecognized coin {other}")),
         }
     }
@@ -111,6 +114,7 @@ pub(crate) fn map_coin_to_coingecko_id(coin: &Coin) -> &str {
     match coin {
         Coin::Atom => "cosmos-hub",
         Coin::Levana => "levana",
+        Coin::Eth => "ethereum",
     }
 }
 
