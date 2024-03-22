@@ -1,7 +1,7 @@
 FROM alpine:3.19.1
 
 RUN apk upgrade
-RUN apk install chromium
+RUN apk add chromium
 
 COPY --chmod=755 health-check /usr/bin/health-check
 COPY --chmod=755 perps-market-params /usr/bin/perps-market-params
