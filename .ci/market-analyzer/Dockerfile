@@ -1,10 +1,4 @@
-FROM ubuntu:24.04
-
-RUN apt update -y
-RUN apt install wget file -y
-
-RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-RUN apt-get install -y ./google-chrome-stable_current_amd64.deb
+FROM alpine:3.19.1
 
 USER 1000
 
