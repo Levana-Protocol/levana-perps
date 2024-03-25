@@ -16,6 +16,9 @@ env:
 jobs:
   bots-image:
     runs-on: ubuntu-latest
+    concurrency:
+      group: ci-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
       - uses: taiki-e/install-action@v2

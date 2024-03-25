@@ -9,3 +9,7 @@ run:
 # Download levana marketd data
 download-levana-market:
 	cargo run --bin perps-market-params market --market-id LEVANA_USD
+
+# Compute dnf
+compute-dnf:
+	cargo run --bin perps-market-params dnf --market-id LEVANA_USD

@@ -16,6 +16,9 @@ env:
 jobs:
   companion-image:
     runs-on: ubuntu-latest
+    concurrency:
+      group: ci-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v3
       - uses: taiki-e/install-action@v2
