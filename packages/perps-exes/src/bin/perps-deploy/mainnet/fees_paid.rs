@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, ops::AddAssign, path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use cosmos::Address;
@@ -23,6 +23,9 @@ pub(super) struct FeesPaidOpts {
     /// Number of concurrent tasks
     #[clap(long, default_value_t = 16)]
     workers: u32,
+    /// Feeds paid so far
+    #[clap(long)]
+    paid_fees: Option<Usd>,
 }
 impl FeesPaidOpts {
     pub(super) async fn go(self, opt: crate::cli::Opt) -> Result<()> {
@@ -36,6 +39,7 @@ async fn go(
         wallet,
         csv,
         workers,
+        paid_fees,
     }: FeesPaidOpts,
 ) -> Result<()> {
     let csv = ::csv::Writer::from_path(&csv)?;
@@ -95,17 +99,43 @@ async fn go(
         rx
     };
 
+    struct FeeStats {
+        trading: Usd,
+        borrow: Usd,
+        crank: Usd,
+    }
+
+    impl AddAssign for FeeStats {
+        fn add_assign(&mut self, rhs: Self) {
+            self.trading += rhs.trading;
+            self.borrow += rhs.borrow;
+            self.crank += rhs.crank;
+        }
+    }
+
+    impl FeeStats {
+        pub(crate) fn new() -> Self {
+            FeeStats {
+                trading: Usd::zero(),
+                borrow: Usd::zero(),
+                crank: Usd::zero(),
+            }
+        }
+    }
+
     let mut set = JoinSet::new();
     for _ in 0..workers {
         let csv = csv.clone();
         let rx = rx.clone();
         set.spawn(async move {
+            let mut fees = FeeStats::new();
             loop {
                 let (market_id, market, wallet) = match rx.recv().await {
                     Ok(tuple) => tuple,
-                    Err(_) => break anyhow::Ok(()),
+                    Err(_) => break anyhow::Ok(fees),
                 };
                 log::info!("Processing {market_id}/{wallet}");
+
                 for pos in market.all_open_positions(wallet).await?.info {
                     let mut csv = csv.lock();
                     csv.serialize(&Record {
@@ -119,6 +149,11 @@ async fn go(
                         dnf_usd: pos.delta_neutrality_fee_usd,
                         crank_usd: pos.crank_fee_usd,
                     })?;
+                    fees += FeeStats {
+                        trading: pos.trading_fee_usd,
+                        borrow: pos.borrow_fee_usd,
+                        crank: pos.crank_fee_usd,
+                    };
                     csv.flush()?;
                 }
                 for pos in market.all_closed_positions(wallet).await? {
@@ -134,6 +169,11 @@ async fn go(
                         dnf_usd: pos.delta_neutrality_fee_usd,
                         crank_usd: pos.crank_fee_usd,
                     })?;
+                    fees += FeeStats {
+                        trading: pos.trading_fee_usd,
+                        borrow: pos.borrow_fee_usd,
+                        crank: pos.crank_fee_usd,
+                    };
                     csv.flush()?;
                 }
             }
@@ -142,9 +182,10 @@ async fn go(
 
     std::mem::drop(rx);
 
+    let mut stats = FeeStats::new();
     while let Some(res) = set.join_next().await {
         match res {
-            Ok(Ok(())) => (),
+            Ok(Ok(fees)) => stats += fees,
             Ok(Err(e)) => {
                 set.abort_all();
                 return Err(e);
@@ -154,6 +195,17 @@ async fn go(
                 return Err(e.into());
             }
         }
+    }
+
+    log::info!("Total Trading USD: {}", stats.trading);
+    log::info!("Total Borrow USD: {}", stats.borrow);
+    log::info!("Crank Crank USD: {}", stats.crank);
+
+    let total_fees = stats.trading + stats.borrow + stats.crank;
+    log::info!("Total fees: {total_fees}");
+    if let Some(paid_fees) = paid_fees {
+        let to_pay = total_fees - paid_fees;
+        log::info!("Fees to be paid: {to_pay}");
     }
 
     Ok(())
