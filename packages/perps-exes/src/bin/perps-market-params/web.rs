@@ -8,17 +8,17 @@ use axum::{
 };
 use axum_extra::routing::RouterExt;
 use parking_lot::RwLock;
+use shared::storage::MarketId;
 use tokio::task::JoinSet;
 
 use crate::{
-    cli::{MarketId, ServeOpt},
+    cli::{Opt, ServeOpt},
     market_param::compute_coin_dnfs,
     routes::{HealthRoute, HomeRoute},
 };
 
-#[tokio::main(flavor = "multi_thread")]
-pub(crate) async fn axum_main(opt: ServeOpt) -> Result<()> {
-    main_inner(opt).await
+pub(crate) async fn axum_main(serve_opt: ServeOpt, opt: Opt) -> Result<()> {
+    main_inner(serve_opt, opt).await
 }
 
 #[derive(Clone)]
@@ -34,13 +34,12 @@ impl NotifyApp {
     }
 }
 
-async fn main_inner(opt: ServeOpt) -> Result<()> {
+async fn main_inner(serve_opt: ServeOpt, opt: Opt) -> Result<()> {
     let state = Arc::new(NotifyApp::new());
 
     let mut set = JoinSet::new();
     let dnf_state = state.clone();
-    let opt = opt.clone();
-    set.spawn_blocking(|| compute_coin_dnfs(dnf_state, opt));
+    set.spawn(async { compute_coin_dnfs(dnf_state, serve_opt, opt).await });
 
     let router = axum::Router::new()
         .typed_get(index)

@@ -4,20 +4,8 @@ default:
 
 # Run application
 run:
-	cargo run --bin perps-market-params -- test
+	cargo run --bin perps-market-params -- help
 
-# Scape levana
-scrape-levana:
-	cargo run --bin perps-market-params scrape --coin levana
-
-# Scape atom
-scrape-atom:
-	cargo run --bin perps-market-params scrape --coin cosmos-hub
-
-# Scape local
-scrape-local:
-	cargo run --bin perps-market-params scrape-local
-
-# Run web app
-serve:
-	cargo run --bin perps-market-params serve --market-ids ETH_USD --dnf-threshold 0
+# Download levana marketd data
+download-levana-market:
+	cargo run --bin perps-market-params market --market-id LEVANA_USD

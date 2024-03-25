@@ -1,43 +1,43 @@
-use std::{error::Error, fmt::Display, path::PathBuf, str::FromStr};
+use std::{error::Error, path::PathBuf};
 
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use cosmos::{Address, CosmosNetwork};
+use shared::storage::MarketId;
 use tracing_subscriber::{
     fmt, prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
 };
 
-use crate::coingecko::{Coin, QuoteAsset};
-
-#[derive(clap::Parser)]
+#[derive(clap::Parser, Clone)]
 pub(crate) struct Opt {
+    /// Verbose flag
     #[clap(long)]
     verbose: bool,
+    /// CMC key
+    #[clap(long, env = "LEVANA_MPARAM_CMC_KEY")]
+    pub(crate) cmc_key: String,
     #[clap(subcommand)]
-    pub sub: SubCommand,
+    pub(crate) sub: SubCommand,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, Clone)]
 pub(crate) enum SubCommand {
-    /// Scrape particular coin
-    Scrape {
-        /// Coin string. Eg: levana
-        #[arg(long)]
-        coin: MarketId,
-    },
-    /// Scrape local file
-    ScrapeLocal {
-        /// Local file
-        #[clap(long, default_value = "./spot_test_page.html")]
-        path: PathBuf,
-    },
     /// List supported coins with their IDs
     Coins {},
     /// Compute DNF sensitivity
     Dnf {
-        /// Coin string. Eg: levana
+        /// Market ID. Eg: ATOM_USD
         #[arg(long)]
-        coin: MarketId,
+        market_id: MarketId,
+    },
+    /// Download market data in csv
+    Market {
+        /// Destination file location
+        #[arg(long, default_value = "market.csv")]
+        out: PathBuf,
+        /// Market ID. Eg: ATOM_USD
+        #[arg(long)]
+        market_id: MarketId,
     },
     /// Serve web application
     Serve {
@@ -74,37 +74,6 @@ where
         .split_once('=')
         .with_context(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
     Ok((key.parse()?, value.parse()?))
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, serde::Serialize)]
-pub(crate) struct MarketId {
-    pub(crate) base: Coin,
-    quote: QuoteAsset,
-}
-
-impl MarketId {
-    pub(crate) fn base_quote(&self) -> String {
-        format!("{}_{}", self.base, self.quote)
-    }
-}
-
-impl Display for MarketId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}_{}", self.base, self.quote)
-    }
-}
-
-impl FromStr for MarketId {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut markets = s.split('_');
-        let base = markets.next().context("No base asset found")?;
-        let base = FromStr::from_str(base)?;
-        let quote = markets.next().context("No quote asset found")?;
-        let quote = FromStr::from_str(quote)?;
-        Ok(MarketId { base, quote })
-    }
 }
 
 impl Opt {

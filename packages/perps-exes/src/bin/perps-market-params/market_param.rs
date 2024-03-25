@@ -1,10 +1,11 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Context;
+use shared::storage::MarketId;
 
 use crate::{
-    cli::{MarketId, ServeOpt},
-    coingecko::{get_exchanges, CoingeckoApp, ExchangeInfo, ExchangeKind},
+    cli::{Opt, ServeOpt},
+    coingecko::{CmcMarketPair, ExchangeKind},
     slack::HttpApp,
     web::NotifyApp,
 };
@@ -36,7 +37,7 @@ impl MarketsConfig {
             .markets
             .iter()
             .find(|item| {
-                item.status.market_id.to_lowercase() == market_id.base_quote().to_lowercase()
+                item.status.market_id.to_lowercase() == market_id.get_base().to_lowercase()
             })
             .map(|item| item.status.config.delta_neutrality_fee_sensitivity.clone())
             .context("No dnf found")?;
@@ -45,69 +46,71 @@ impl MarketsConfig {
     }
 }
 
-pub(crate) fn compute_dnf_sensitivity(exchanges: Vec<ExchangeInfo>) -> anyhow::Result<f64> {
+pub(crate) fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<f64> {
     // Algorithm: https://staff.levana.finance/new-market-checklist#dnf-sensitivity
     tracing::debug!("Total exchanges: {}", exchanges.len());
     let exchanges = exchanges.iter().filter(|exchange| {
-        exchange.kind != ExchangeKind::Dex
-            && exchange.name.to_lowercase() != "htx"
-            && !exchange.stale
+        exchange.center_type != ExchangeKind::Dex
+            && exchange.exchange_name.to_lowercase() != "htx"
+            && exchange.market_reputation > 0.3
     });
     let max_volume_exchange = exchanges
         .clone()
-        .max_by(|a, b| a.twenty_four_volume.total_cmp(&b.twenty_four_volume))
+        .max_by(|a, b| a.volume_usd.total_cmp(&b.volume_usd))
         .context("No max value found")?;
     tracing::debug!("Max volume exchange: {max_volume_exchange:#?}");
     let total_volume_percentage = exchanges
-        .map(|exchange| exchange.volume_percentage.unwrap_or_default())
+        .map(|exchange| exchange.volume_percent)
         .sum::<f64>();
-    let market_share = max_volume_exchange
-        .volume_percentage
-        .context("Exchange with maximum volume doesn't have metric")?
-        / total_volume_percentage;
+    let market_share = max_volume_exchange.volume_percent / total_volume_percentage;
     tracing::debug!("Market share: {market_share}");
     let min_depth_liquidity = max_volume_exchange
-        .negative_two_depth
-        .min(max_volume_exchange.positive_two_depth);
+        .depth_usd_negative_two
+        .min(max_volume_exchange.depth_usd_positive_two);
     let dnf = (min_depth_liquidity / market_share) * 25.0;
     Ok(dnf)
 }
 
-pub(crate) fn compute_coin_dnfs(app: Arc<NotifyApp>, opt: ServeOpt) -> anyhow::Result<()> {
-    tracing::info!("Going to create coingecko app");
-    let coingecko_app = CoingeckoApp::new()?;
-    tracing::info!("Finished creating coingecko app");
-    let market_ids = opt.market_ids;
-    let http_app = HttpApp::new(opt.slack_webhook);
+pub(crate) async fn compute_coin_dnfs(
+    app: Arc<NotifyApp>,
+    serve_opt: ServeOpt,
+    opt: Opt,
+) -> anyhow::Result<()> {
+    let market_ids = serve_opt.market_ids;
+    let http_app = HttpApp::new(Some(serve_opt.slack_webhook), opt.cmc_key.clone());
 
     loop {
         tracing::info!("Going to fetch market status from querier");
-        let market_config = http_app.fetch_market_status(&opt.mainnet_factories[..])?;
+        let market_config = http_app
+            .fetch_market_status(&serve_opt.mainnet_factories[..])
+            .await?;
         for market_id in &market_ids {
             tracing::info!("Going to compute DNF for {market_id:?}");
             let configured_dnf = market_config
                 .get_dnf(market_id)
                 .context(format!("No DNF configured for {market_id:?}"))?;
-            let exchanges = get_exchanges(&coingecko_app, *market_id)?;
+            let exchanges = http_app.get_market_pair(market_id.clone()).await?;
             tracing::info!(
                 "Total exchanges found: {} for {market_id:?}",
-                exchanges.len()
+                exchanges.data.market_pairs.len()
             );
-            let dnf = compute_dnf_sensitivity(exchanges)?;
+            let dnf = compute_dnf_sensitivity(exchanges.data.market_pairs)?;
             let diff = (configured_dnf - dnf).abs() * 100.0;
             let percentage_diff = diff / configured_dnf;
             tracing::info!("Percentage DNF deviation for {market_id}: {percentage_diff} %");
-            if percentage_diff > opt.dnf_threshold {
+            if percentage_diff > serve_opt.dnf_threshold {
                 tracing::info!("Going to send Slack notification");
-                http_app.send_notification(
-                    format!("Detected DNF change for {market_id:?}"),
-                    format!("Deviation: {percentage_diff} %"),
-                )?;
+                http_app
+                    .send_notification(
+                        format!("Detected DNF change for {market_id:?}"),
+                        format!("Deviation: {percentage_diff} %"),
+                    )
+                    .await?;
             }
             tracing::info!("Finished computing DNF for {market_id:?}: {dnf}");
-            app.dnf.write().insert(*market_id, dnf);
+            app.dnf.write().insert(market_id.clone(), dnf);
         }
         tracing::info!("Going to sleep 24 hours");
-        std::thread::sleep(Duration::from_secs(60 * 60 * 24));
+        tokio::time::sleep(Duration::from_secs(60 * 60 * 24)).await;
     }
 }
