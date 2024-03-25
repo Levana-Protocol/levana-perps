@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, ops::AddAssign, path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use cosmos::Address;
@@ -105,6 +105,14 @@ async fn go(
         crank: Usd,
     }
 
+    impl AddAssign for FeeStats {
+        fn add_assign(&mut self, rhs: Self) {
+            self.trading += rhs.trading;
+            self.borrow += rhs.borrow;
+            self.crank += rhs.crank;
+        }
+    }
+
     impl FeeStats {
         pub(crate) fn new() -> Self {
             FeeStats {
@@ -112,12 +120,6 @@ async fn go(
                 borrow: Usd::zero(),
                 crank: Usd::zero(),
             }
-        }
-
-        pub(crate) fn add_trading_borrow_crank(&mut self, trading: Usd, borrow: Usd, crank: Usd) {
-            self.trading += trading;
-            self.borrow += borrow;
-            self.crank += crank;
         }
     }
 
@@ -147,11 +149,11 @@ async fn go(
                         dnf_usd: pos.delta_neutrality_fee_usd,
                         crank_usd: pos.crank_fee_usd,
                     })?;
-                    fees.add_trading_borrow_crank(
-                        pos.trading_fee_usd,
-                        pos.borrow_fee_usd,
-                        pos.crank_fee_usd,
-                    );
+                    fees += FeeStats {
+                        trading: pos.trading_fee_usd,
+                        borrow: pos.borrow_fee_usd,
+                        crank: pos.crank_fee_usd,
+                    };
                     csv.flush()?;
                 }
                 for pos in market.all_closed_positions(wallet).await? {
@@ -167,11 +169,11 @@ async fn go(
                         dnf_usd: pos.delta_neutrality_fee_usd,
                         crank_usd: pos.crank_fee_usd,
                     })?;
-                    fees.add_trading_borrow_crank(
-                        pos.trading_fee_usd,
-                        pos.borrow_fee_usd,
-                        pos.crank_fee_usd,
-                    );
+                    fees += FeeStats {
+                        trading: pos.trading_fee_usd,
+                        borrow: pos.borrow_fee_usd,
+                        crank: pos.crank_fee_usd,
+                    };
                     csv.flush()?;
                 }
             }
@@ -183,7 +185,7 @@ async fn go(
     let mut stats = FeeStats::new();
     while let Some(res) = set.join_next().await {
         match res {
-            Ok(Ok(fees)) => stats.add_trading_borrow_crank(fees.trading, fees.borrow, fees.crank),
+            Ok(Ok(fees)) => stats += fees,
             Ok(Err(e)) => {
                 set.abort_all();
                 return Err(e);
