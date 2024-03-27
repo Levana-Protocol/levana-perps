@@ -112,12 +112,7 @@ pub(crate) async fn compute_coin_dnfs(
             let configured_dnf = market_config
                 .get_chain_dnf(market_id)
                 .context(format!("No DNF configured for {market_id:?}"))?;
-            let exchanges = http_app.get_market_pair(market_id.clone()).await?;
-            tracing::info!(
-                "Total exchanges found: {} for {market_id:?}",
-                exchanges.data.market_pairs.len()
-            );
-            let dnf = compute_dnf_sensitivity(exchanges.data.market_pairs)?;
+            let dnf = dnf_sensitivity(&http_app, market_id).await?;
             let diff = (configured_dnf - dnf).abs() * 100.0;
             let percentage_diff = diff / configured_dnf;
             tracing::info!("Percentage DNF deviation for {market_id}: {percentage_diff} %");
