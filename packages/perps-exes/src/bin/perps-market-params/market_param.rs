@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Context;
-use shared::storage::MarketId;
+use shared::storage::{MarketId, MarketType};
 
 use crate::{
     cli::{Opt, ServeOpt},
@@ -32,7 +32,7 @@ pub(crate) struct MarketParam {
 }
 
 impl MarketsConfig {
-    pub(crate) fn get_dnf(&self, market_id: &MarketId) -> anyhow::Result<f64> {
+    pub(crate) fn get_chain_dnf(&self, market_id: &MarketId) -> anyhow::Result<f64> {
         let result = self
             .markets
             .iter()
@@ -46,7 +46,27 @@ impl MarketsConfig {
     }
 }
 
-pub(crate) fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<f64> {
+pub(crate) async fn dnf_sensitivity(http_app: &HttpApp, market_id: &MarketId) -> anyhow::Result<f64> {
+    let quote_asset = market_id.get_quote();
+    if quote_asset == "USD" || quote_asset == "USDC" {
+        let exchanges = http_app.get_market_pair(market_id.clone()).await?;
+        tracing::debug!(
+            "Total exchanges found: {} for {market_id:?}",
+            exchanges.data.market_pairs.len()
+        );
+        return compute_dnf_sensitivity(exchanges.data.market_pairs);
+    }
+    let base_asset = market_id.get_base();
+    let base_market_id = MarketId::new(base_asset, "USD", MarketType::CollateralIsQuote);
+    let quote_market_id = MarketId::new(quote_asset, "USD", MarketType::CollateralIsQuote);
+    let base_exchanges = http_app.get_market_pair(base_market_id).await?;
+    let quote_exchanges = http_app.get_market_pair(quote_market_id).await?;
+    let base_dnf = compute_dnf_sensitivity(base_exchanges.data.market_pairs)?;
+    let quote_dnf = compute_dnf_sensitivity(quote_exchanges.data.market_pairs)?;
+    Ok(base_dnf.min(quote_dnf))
+}
+
+fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<f64> {
     // Algorithm: https://staff.levana.finance/new-market-checklist#dnf-sensitivity
     tracing::debug!("Total exchanges: {}", exchanges.len());
     let exchanges = exchanges.iter().filter(|exchange| {
@@ -87,7 +107,7 @@ pub(crate) async fn compute_coin_dnfs(
         for market_id in &market_ids {
             tracing::info!("Going to compute DNF for {market_id:?}");
             let configured_dnf = market_config
-                .get_dnf(market_id)
+                .get_chain_dnf(market_id)
                 .context(format!("No DNF configured for {market_id:?}"))?;
             let exchanges = http_app.get_market_pair(market_id.clone()).await?;
             tracing::info!(
