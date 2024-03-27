@@ -46,7 +46,10 @@ impl MarketsConfig {
     }
 }
 
-pub(crate) async fn dnf_sensitivity(http_app: &HttpApp, market_id: &MarketId) -> anyhow::Result<f64> {
+pub(crate) async fn dnf_sensitivity(
+    http_app: &HttpApp,
+    market_id: &MarketId,
+) -> anyhow::Result<f64> {
     let quote_asset = market_id.get_quote();
     if quote_asset == "USD" || quote_asset == "USDC" {
         let exchanges = http_app.get_market_pair(market_id.clone()).await?;
@@ -132,5 +135,40 @@ pub(crate) async fn compute_coin_dnfs(
         }
         tracing::info!("Going to sleep 24 hours");
         tokio::time::sleep(Duration::from_secs(60 * 60 * 24)).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::coingecko::CmcMarketPair;
+
+    #[tokio::test]
+    async fn sample_dnf_computation() {
+        let exchanges = vec![
+            CmcMarketPair {
+                exchange_id: 1,
+                exchange_name: "mexc".to_owned(),
+                market_pair: "LVN_USD".to_owned(),
+                depth_usd_negative_two: 5828.0,
+                depth_usd_positive_two: 7719.0,
+                volume_percent: 1.06,
+                volume_usd: 27304.39,
+                market_reputation: 0.6,
+                center_type: crate::coingecko::ExchangeKind::Cex,
+            },
+            CmcMarketPair {
+                exchange_id: 2,
+                exchange_name: "gate.io".to_owned(),
+                market_pair: "LVN_USD".to_owned(),
+                depth_usd_negative_two: 1756.0,
+                depth_usd_positive_two: 22140.0,
+                volume_percent: 0.9,
+                volume_usd: 23065.95,
+                market_reputation: 0.6,
+                center_type: crate::coingecko::ExchangeKind::Cex,
+            },
+        ];
+        let dnf = super::compute_dnf_sensitivity(exchanges).unwrap();
+        assert_eq!(dnf.round(), 269408.0, "Expected DNF");
     }
 }
