@@ -1,10 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
 use coingecko::Coin;
-use market_param::compute_dnf_sensitivity;
 use web::axum_main;
 
-use crate::{cli::Opt, slack::HttpApp};
+use crate::{cli::Opt, market_param::dnf_sensitivity, slack::HttpApp};
 
 mod cli;
 mod coingecko;
@@ -29,12 +28,7 @@ async fn main_inner(opt: Opt) -> Result<()> {
         }
         cli::SubCommand::Dnf { market_id } => {
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
-            let exchanges = http_app.get_market_pair(market_id.clone()).await?;
-            tracing::info!(
-                "Total exchanges found: {} for {market_id:?}",
-                exchanges.data.market_pairs.len()
-            );
-            let dnf = compute_dnf_sensitivity(exchanges.data.market_pairs)?;
+            let dnf = dnf_sensitivity(&http_app, &market_id).await?;
             tracing::info!("Computed DNF sensitivity: {dnf}");
         }
         cli::SubCommand::Serve { opt: serve_opt } => axum_main(serve_opt, opt).await?,
