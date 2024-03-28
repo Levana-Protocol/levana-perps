@@ -8,7 +8,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     concurrency:
-      group: ci-${{ github.ref }}
+      group: ci-localosmo-${{ github.ref }}
       cancel-in-progress: true
     steps:
       - uses: KengoTODA/actions-setup-docker-compose@main
