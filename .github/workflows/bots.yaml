@@ -17,7 +17,7 @@ jobs:
   bots-image:
     runs-on: ubuntu-latest
     concurrency:
-      group: ci-${{ github.ref }}
+      group: ci-bots-${{ github.ref }}
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4

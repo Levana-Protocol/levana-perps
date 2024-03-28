@@ -19,7 +19,7 @@ jobs:
   rust_tests:
     runs-on: ubuntu-latest
     concurrency:
-      group: ci-${{ github.ref }}
+      group: ci-test-${{ github.ref }}
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
