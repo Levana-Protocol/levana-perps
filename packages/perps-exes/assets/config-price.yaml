@@ -26,6 +26,12 @@ pyth:
       LINK_USD: 8ac0c70fff57e9aefdf5edf44b51d62c2d433653cbb2cf5cc06bb115af04d221
       AXL_USD: 60144b1d5c9e9851732ad1d9760e3485ef80be39b984f6bf60f82b28a2b7f126
       DOGE_USD: dcef50dd0a4cd2dcc17e45df1676dcb336a11a61c69df7a0299b0150c672d25c
+      WIF_USD: 4ca4beeca86f0d164160323817a4e42b10010a724c2217c6ee41b54cd4cc61fc
+      BONK_USD: 72b021217ca3fe68922a19aaf990109cb9d84e9ad004b4d2025ad6f529314419
+      SHIB_USD: f0d57deca57b3da2fe63a493f4c25925fdfd8edf834b20f93e1f84dbd1504d4a
+      FLOKI_USD: 6b1381ce7e874dc5410b197ac8348162c0dd6c0d4c9cd6322672d6c2b1d58293
+      MEME_USD: cd2cee36951a571e035db0dfad138e6ecdb06b517cc3373cd7db5d3609b7927c
+      PEPE_USD: d69731a2e74ac1ce884fc3890f7ee324b6deb66147055249568869ed700882e4
       LUNA_USD: e6ccd3f878cf338e6732bf59f60943e8ca2c28402fc4d9c258503b2edbe74a31
       TIA_USD: 09f7c1d7dfbb7df2b8fe3d3d87ee94a2259d212da4f30c1f0540d066dfa44723
       DYDX_USD: 6489800bb8974169adfe35937bf6736507097d13c190d760c557108c7e93a81b
@@ -393,6 +399,48 @@ networks:
       feeds-usd: [
         !constant { price: "1", inverted: false }
       ]
+    WIF_USDC:
+      feeds: [
+        !pyth { key: "WIF_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    BONK_USDC:
+      feeds: [
+        !pyth { key: "BONK_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    SHIB_USDC:
+      feeds: [
+        !pyth { key: "SHIB_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    FLOKI_USDC:
+      feeds: [
+        !pyth { key: "FLOKI_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    MEME_USDC:
+      feeds: [
+        !pyth { key: "MEME_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    PEPE_USDC:
+      feeds: [
+        !pyth { key: "PEPE_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
     LUNA_USDC:
       feeds: [
         !pyth { key: "LUNA_USD", inverted: false }
@@ -726,6 +774,48 @@ networks:
     DOGE_USDC:
       feeds: [
         !pyth { key: "DOGE_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    WIF_USDC:
+      feeds: [
+        !pyth { key: "WIF_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    BONK_USDC:
+      feeds: [
+        !pyth { key: "BONK_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    SHIB_USDC:
+      feeds: [
+        !pyth { key: "SHIB_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    FLOKI_USDC:
+      feeds: [
+        !pyth { key: "FLOKI_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    MEME_USDC:
+      feeds: [
+        !pyth { key: "MEME_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    PEPE_USDC:
+      feeds: [
+        !pyth { key: "PEPE_USD", inverted: false }
       ]
       feeds-usd: [
         !constant { price: "1", inverted: false }
