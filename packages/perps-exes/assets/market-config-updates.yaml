@@ -539,6 +539,84 @@ markets:
 
     initial-borrow-fee-rate: 0.05
 
+  WIF_USDC:
+    config:
+      delta_neutrality_fee_sensitivity: 40000000
+      funding_rate_sensitivity: 1.5
+      carry_leverage: 15
+      borrow_fee_sensitivity: 0.3
+      borrow_fee_rate_min_annualized: 0.1
+      target_utilization: 0.5
+      delta_neutrality_fee_tax: 0.2
+      liquidity_cooldown_seconds: 86400
+
+    initial-borrow-fee-rate: 0.2
+
+  BONK_USDC:
+    config:
+      delta_neutrality_fee_sensitivity: 100000000
+      funding_rate_sensitivity: 1.5
+      carry_leverage: 15
+      borrow_fee_sensitivity: 0.3
+      borrow_fee_rate_min_annualized: 0.1
+      target_utilization: 0.5
+      delta_neutrality_fee_tax: 0.2
+      liquidity_cooldown_seconds: 86400
+
+    initial-borrow-fee-rate: 0.2
+
+  SHIB_USDC:
+    config:
+      delta_neutrality_fee_sensitivity: 240000000
+      funding_rate_sensitivity: 1.5
+      carry_leverage: 15
+      borrow_fee_sensitivity: 0.3
+      borrow_fee_rate_min_annualized: 0.15
+      target_utilization: 0.5
+      delta_neutrality_fee_tax: 0.2
+      liquidity_cooldown_seconds: 86400
+
+    initial-borrow-fee-rate: 0.25
+
+  FLOKI_USDC:
+    config:
+      delta_neutrality_fee_sensitivity: 70000000
+      funding_rate_sensitivity: 1.5
+      carry_leverage: 15
+      borrow_fee_sensitivity: 0.3
+      borrow_fee_rate_min_annualized: 0.2
+      target_utilization: 0.5
+      delta_neutrality_fee_tax: 0.2
+      liquidity_cooldown_seconds: 86400
+
+    initial-borrow-fee-rate: 0.35
+
+  MEME_USDC:
+    config:
+      delta_neutrality_fee_sensitivity: 50000000
+      funding_rate_sensitivity: 1.5
+      carry_leverage: 15
+      borrow_fee_sensitivity: 0.3
+      borrow_fee_rate_min_annualized: 0.1
+      target_utilization: 0.5
+      delta_neutrality_fee_tax: 0.2
+      liquidity_cooldown_seconds: 86400
+
+    initial-borrow-fee-rate: 0.2
+
+  PEPE_USDC:
+    config:
+      delta_neutrality_fee_sensitivity: 150000000
+      funding_rate_sensitivity: 1.5
+      carry_leverage: 15
+      borrow_fee_sensitivity: 0.3
+      borrow_fee_rate_min_annualized: 0.2
+      target_utilization: 0.5
+      delta_neutrality_fee_tax: 0.2
+      liquidity_cooldown_seconds: 86400
+
+    initial-borrow-fee-rate: 0.35
+
   LUNA_USDC:
     config:
       delta_neutrality_fee_sensitivity: 15000000
