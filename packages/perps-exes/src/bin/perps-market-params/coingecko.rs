@@ -1,6 +1,11 @@
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
+use serde::{
+    de::{Unexpected, Visitor},
+    Deserialize,
+};
+use shared::storage::MarketId;
 
 #[derive(Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub(crate) enum ExchangeKind {
@@ -21,20 +26,89 @@ pub(crate) struct CmcData {
     pub(crate) market_pairs: Vec<CmcMarketPair>,
 }
 
-#[derive(serde::Deserialize, Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) struct CmcMarketPair {
-    pub(crate) exchange_id: u32,
+    pub(crate) exchange_id: ExchangeId,
     pub(crate) exchange_name: String,
-    pub(crate) market_pair: String,
+    pub(crate) market_id: MarketId,
     pub(crate) depth_usd_negative_two: f64,
     pub(crate) depth_usd_positive_two: f64,
-    pub(crate) volume_percent: f64,
-    /// 24 hour volume
-    pub(crate) volume_usd: f64,
-    pub(crate) market_reputation: f64,
-    pub(crate) center_type: ExchangeKind,
+    pub(crate) volume_24h_usd: f64,
+    pub(crate) outlier_detected: f64,
 }
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) struct ExchangeId(u32);
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) struct CMCExchange {
+    id: ExchangeId,
+    name: String,
+    slug: String
+}
+
+impl ExchangeId {
+    pub (crate) fn exchange_type(&self) -> anyhow::Result<ExchangeKind> {
+        Err(anyhow!("Exchange type not known {}", self.0))
+    }
+}
+
+impl<'de> Deserialize<'de> for CmcMarketPair {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Result {
+            exchange: CmcExchange,
+            market_pair: String,
+            outlier_detected: f64,
+            quote: CmcQuote,
+        }
+
+        #[derive(Deserialize)]
+        struct CmcQuote {
+            #[serde(rename(deserialize = "USD"))]
+            usd: QuoteUsd,
+        }
+
+        #[derive(Deserialize)]
+        struct QuoteUsd {
+            // Occasionally volume can be excluded for a certain exchange
+            volume_24h: f64,
+            depth_negative_two: Option<f64>,
+            depth_positive_two: Option<f64>,
+        }
+
+        #[derive(Deserialize)]
+        struct CmcExchange {
+            id: u32,
+            name: String,
+        }
+
+        let result = Result::deserialize(deserializer)?;
+
+        let market_pair = result.market_pair.replace("/", "_");
+        let market_pair = MarketId::from_str(&market_pair).map_err(|_| {
+            serde::de::Error::invalid_value(Unexpected::Str(&market_pair), &"Valid market id")
+        })?;
+
+        Ok(CmcMarketPair {
+            exchange_id: ExchangeId(result.exchange.id) ,
+            exchange_name: result.exchange.name,
+            market_id: market_pair,
+            depth_usd_negative_two: result.quote.usd.depth_negative_two.unwrap_or_default(),
+            depth_usd_positive_two: result.quote.usd.depth_positive_two.unwrap_or_default(),
+            volume_24h_usd: result.quote.usd.volume_24h,
+            outlier_detected: result.outlier_detected,
+        })
+    }
+}
+
+// todo: put convert = usd
 
 #[derive(Debug, Copy, Clone, serde::Serialize, Hash, PartialEq, Eq)]
 pub(crate) enum Coin {

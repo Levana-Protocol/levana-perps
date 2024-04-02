@@ -1,6 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Context;
+use itertools::Itertools;
 use shared::storage::{MarketId, MarketType};
 
 use crate::{
@@ -37,7 +38,7 @@ impl MarketsConfig {
             .markets
             .iter()
             .find(|item| {
-                item.status.market_id.to_lowercase() == market_id.get_base().to_lowercase()
+                item.status.market_id.to_lowercase() == market_id.to_string().to_lowercase()
             })
             .map(|item| item.status.config.delta_neutrality_fee_sensitivity.clone())
             .context("No dnf found")?;
@@ -72,20 +73,34 @@ pub(crate) async fn dnf_sensitivity(
 fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<f64> {
     // Algorithm: https://staff.levana.finance/new-market-checklist#dnf-sensitivity
     tracing::debug!("Total exchanges: {}", exchanges.len());
-    let exchanges = exchanges.iter().filter(|exchange| {
-        exchange.center_type != ExchangeKind::Dex
-            && exchange.exchange_name.to_lowercase() != "htx"
-            && exchange.market_reputation > 0.3
-    });
+    let exchanges = exchanges
+        .iter()
+        .filter(|exchange| {
+            exchange.exchange_name.to_lowercase() != "htx" && exchange.outlier_detected > 0.3
+        })
+        .filter_map(|item| match item.exchange_id.exchange_type() {
+            Ok(exchange_kind) => {
+                if exchange_kind == ExchangeKind::Dex {
+                    None
+                } else {
+                    Some(item)
+                }
+            }
+            Err(err) => {
+                tracing::debug!("Not able to find exchange type: {err}");
+                None
+            }
+        });
+
     let max_volume_exchange = exchanges
         .clone()
-        .max_by(|a, b| a.volume_usd.total_cmp(&b.volume_usd))
+        .max_by(|a, b| a.volume_24h_usd.total_cmp(&b.volume_24h_usd))
         .context("No max value found")?;
     tracing::debug!("Max volume exchange: {max_volume_exchange:#?}");
     let total_volume_percentage = exchanges
-        .map(|exchange| exchange.volume_percent)
+        .map(|exchange| exchange.volume_24h_usd)
         .sum::<f64>();
-    let market_share = max_volume_exchange.volume_percent / total_volume_percentage;
+    let market_share = max_volume_exchange.volume_24h_usd / total_volume_percentage;
     tracing::debug!("Market share: {market_share}");
     let min_depth_liquidity = max_volume_exchange
         .depth_usd_negative_two
@@ -143,23 +158,23 @@ mod tests {
             CmcMarketPair {
                 exchange_id: 1,
                 exchange_name: "mexc".to_owned(),
-                market_pair: "LVN_USD".to_owned(),
+                market_id: "LVN_USD".to_owned(),
                 depth_usd_negative_two: 5828.0,
                 depth_usd_positive_two: 7719.0,
                 volume_percent: 1.06,
-                volume_usd: 27304.39,
-                market_reputation: 0.6,
+                volume_24h_usd: 27304.39,
+                outlier_detected: 0.6,
                 center_type: crate::coingecko::ExchangeKind::Cex,
             },
             CmcMarketPair {
                 exchange_id: 2,
                 exchange_name: "gate.io".to_owned(),
-                market_pair: "LVN_USD".to_owned(),
+                market_id: "LVN_USD".to_owned(),
                 depth_usd_negative_two: 1756.0,
                 depth_usd_positive_two: 22140.0,
                 volume_percent: 0.9,
-                volume_usd: 23065.95,
-                market_reputation: 0.6,
+                volume_24h_usd: 23065.95,
+                outlier_detected: 0.6,
                 center_type: crate::coingecko::ExchangeKind::Cex,
             },
         ];

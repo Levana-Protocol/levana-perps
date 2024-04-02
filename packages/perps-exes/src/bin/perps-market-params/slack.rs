@@ -4,7 +4,7 @@ use reqwest::{Client, Url};
 use shared::storage::MarketId;
 
 use crate::{
-    coingecko::{CmcExchangeInfo, Coin},
+    coingecko::{CMCExchange, CmcExchangeInfo, Coin},
     market_param::MarketsConfig,
 };
 
@@ -118,6 +118,20 @@ impl HttpApp {
         Ok(result)
     }
 
+    pub(crate) async fn get_exchanges(&self) -> anyhow::Result<CMCExchange> {
+        let uri = Url::parse("https://pro-api.coinmarketcap.com/v1/exchange/map")?;
+        let result = self
+            .client
+            .get(uri)
+            .header("X-CMC_PRO_API_KEY", &self.cmc_key)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+        Ok(result)
+    }
+
     pub(crate) async fn get_market_pair(
         &self,
         market_id: MarketId,
@@ -129,13 +143,13 @@ impl HttpApp {
         let limit = 5000;
         let uri = |start: u32| {
             Url::parse_with_params(
-                "https://pro-api.coinmarketcap.com/v1/exchange/listings/latest",
+                "https://pro-api.coinmarketcap.com/v2/cryptocurrency/market-pairs/latest",
                 [
                     ("id", coin.cmc_id().to_string().as_str()),
                     ("limit", 5000.to_string().as_str()),
                     ("start", start.to_string().as_str()),
                     ("category", "spot"),
-                    ("centerType", "cex"),
+                    ("convert", "usd"),
                 ],
             )
         };
