@@ -51,6 +51,19 @@ markets:
 
     initial-borrow-fee-rate: 0.05
 
+  stkATOM_USD:
+    config:
+      delta_neutrality_fee_sensitivity: 100000000
+      funding_rate_sensitivity: 2
+      borrow_fee_rate_min_annualized: 0.03
+      target_utilization: 0.5
+      borrow_fee_sensitivity: 0.3
+      carry_leverage: 15
+      delta_neutrality_fee_tax: 0.25
+      liquidity_cooldown_seconds: 86400
+
+    initial-borrow-fee-rate: 0.05
+
   OSMO_USD:
     config:
       trading_fee_notional_size: 0.002
