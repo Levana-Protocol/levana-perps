@@ -34,18 +34,29 @@ async fn main_inner(opt: Opt) -> Result<()> {
             let result = http_app.get_market_pair(market_id).await?;
             let result = result.data.market_pairs;
             let exchanges = http_app.get_exchanges().await?;
-            let exchanges = exchanges.iter();
+            let mut unsupported_exchanges = vec![];
             for market in result {
                 if market.exchange_id.exchange_type().is_err() {
                     let exchange = exchanges
                         .clone()
+                        .into_iter()
                         .find(|item| item.id == market.exchange_id)
                         .context(format!(
                             "Not able to find exchange id {:?}",
                             market.exchange_id
                         ))?;
-                    tracing::info!("Unsupported exchange: {} (id: {:?})", exchange.name, market.exchange_id);
+                    unsupported_exchanges.push(exchange);
                 }
+            }
+            unsupported_exchanges.sort();
+            unsupported_exchanges.dedup();
+            for exchange in unsupported_exchanges {
+                tracing::info!(
+                    "Unsupported exchange: {} (slug: {}, id: {})",
+                    exchange.name,
+                    exchange.slug,
+                    exchange.id.0
+                );
             }
         }
         cli::SubCommand::Markets {} => {

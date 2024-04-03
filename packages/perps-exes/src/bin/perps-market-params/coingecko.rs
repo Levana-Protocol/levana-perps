@@ -38,24 +38,27 @@ pub(crate) struct CmcMarketPair {
     pub(crate) outlier_detected: f64,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Clone, PartialOrd, Eq, Ord)]
 #[serde(rename_all = "snake_case")]
-pub(crate) struct ExchangeId(u32);
+pub(crate) struct ExchangeId(pub(crate) u32);
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Clone, PartialOrd, Eq, Ord)]
 #[serde(rename_all = "snake_case")]
 pub(crate) struct CMCExchange {
     pub(crate) id: ExchangeId,
     pub(crate) name: String,
-    pub(crate) slug: String
+    pub(crate) slug: String,
 }
 
 impl ExchangeId {
-    pub (crate) fn exchange_type(&self) -> anyhow::Result<ExchangeKind> {
-        // match self.0 {
-
-        // }
-        Err(anyhow!("Exchange type not known {}", self.0))
+    pub(crate) fn exchange_type(&self) -> anyhow::Result<ExchangeKind> {
+        match self.0 {
+            339 | 270 | 407 | 302 | 102 | 521 | 294 | 24 | 36 | 89 | 125 | 151 | 154 | 16 | 37
+            | 42 | 50 | 68 | 82 | 194 | 200 | 325 | 9665 | 9584 | 9450 | 9449 | 9200 | 8961
+            | 8884 => Ok(ExchangeKind::Cex),
+            1707 | 1454 | 1187 | 1530 | 1567 | 1344 | 1714 | 9244 => Ok(ExchangeKind::Dex),
+            other => Err(anyhow!("Exchange type not known for id {}", other)),
+        }
     }
 }
 
@@ -100,7 +103,7 @@ impl<'de> Deserialize<'de> for CmcMarketPair {
         })?;
 
         Ok(CmcMarketPair {
-            exchange_id: ExchangeId(result.exchange.id) ,
+            exchange_id: ExchangeId(result.exchange.id),
             exchange_name: result.exchange.name,
             market_id: market_pair,
             depth_usd_negative_two: result.quote.usd.depth_negative_two.unwrap_or_default(),
