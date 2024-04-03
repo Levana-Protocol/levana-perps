@@ -3,12 +3,16 @@ use msg::contracts::market::config::ConfigUpdate;
 use perps_exes::prelude::MarketContract;
 
 use perps_exes::contracts::Factory;
+use shared::storage::MarketId;
 
 #[derive(clap::Parser)]
 pub(crate) struct UpdateMarketConfigsOpt {
     /// Family name for these contracts
     #[clap(long, env = "PERPS_FAMILY")]
     family: String,
+    /// Update only this specific market
+    #[clap(long)]
+    market_id: Option<MarketId>,
     /// Update message JSON
     update: String,
 }
@@ -32,7 +36,15 @@ impl UpdateMarketConfigsOpt {
             }
         };
 
-        let markets = factory.get_markets().await?;
+        let mut markets = factory.get_markets().await?;
+
+        if let Some(market_id) = self.market_id {
+            let market = markets
+                .into_iter()
+                .find(|market| market.market_id == market_id)
+                .context(format!("No market id {market_id} found"))?;
+            markets = vec![market];
+        }
 
         for market in markets {
             log::info!("Updating market: {}", market.market_id);
