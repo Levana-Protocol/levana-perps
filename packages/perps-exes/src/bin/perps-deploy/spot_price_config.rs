@@ -12,7 +12,7 @@ pub(crate) fn get_spot_price_config(
     let market = oracle
         .markets
         .get(market_id)
-        .with_context(|| format!("No oracle market found for {market_id}"))?;
+        .with_context(|| format!("No spot price config found for {market_id}"))?;
     let stride = match market.stride_contract_override {
         Some(stride) => Some(stride),
         None => oracle.stride_fallback.clone().map(|stride| stride.contract),

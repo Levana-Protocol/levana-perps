@@ -73,6 +73,9 @@ osmosis-mainnet:
     wBTC:
       denom: factory/osmo1z0qrq605sjgcqpylfl4aa6s90x738j7m58wyatt0tdzflg2ha26q67k743/wbtc
       decimal-places: 8
+    stkATOM:
+      denom: ibc/CAA179E40F0266B0B29FB5EAA288FB9212E628822265D4141EBD1C47C3CBFCBC
+      decimal-places: 6
 osmosis-testnet:
   age-tolerance-seconds: 42
   gas-decimals: 6
