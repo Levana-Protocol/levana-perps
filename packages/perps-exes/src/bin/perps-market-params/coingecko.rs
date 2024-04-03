@@ -38,20 +38,23 @@ pub(crate) struct CmcMarketPair {
     pub(crate) outlier_detected: f64,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) struct ExchangeId(u32);
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) struct CMCExchange {
-    id: ExchangeId,
-    name: String,
-    slug: String
+    pub(crate) id: ExchangeId,
+    pub(crate) name: String,
+    pub(crate) slug: String
 }
 
 impl ExchangeId {
     pub (crate) fn exchange_type(&self) -> anyhow::Result<ExchangeKind> {
+        // match self.0 {
+
+        // }
         Err(anyhow!("Exchange type not known {}", self.0))
     }
 }

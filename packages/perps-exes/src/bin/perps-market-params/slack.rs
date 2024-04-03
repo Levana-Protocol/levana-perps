@@ -118,9 +118,15 @@ impl HttpApp {
         Ok(result)
     }
 
-    pub(crate) async fn get_exchanges(&self) -> anyhow::Result<CMCExchange> {
+    pub(crate) async fn get_exchanges(&self) -> anyhow::Result<Vec<CMCExchange>> {
         let uri = Url::parse("https://pro-api.coinmarketcap.com/v1/exchange/map")?;
-        let result = self
+
+        #[derive(serde::Deserialize)]
+        struct Result {
+            data: Vec<CMCExchange>,
+        }
+
+        let result: Result = self
             .client
             .get(uri)
             .header("X-CMC_PRO_API_KEY", &self.cmc_key)
@@ -129,7 +135,7 @@ impl HttpApp {
             .error_for_status()?
             .json()
             .await?;
-        Ok(result)
+        Ok(result.data)
     }
 
     pub(crate) async fn get_market_pair(

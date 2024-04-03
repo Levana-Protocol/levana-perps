@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Parser;
 use coingecko::Coin;
 use cosmos::{Address, CosmosNetwork};
@@ -28,15 +28,25 @@ async fn main_inner(opt: Opt) -> Result<()> {
             for coin in &Coin::all() {
                 tracing::info!("{coin:?} (cmc id: {})", coin.cmc_id());
             }
-        },
+        }
         cli::SubCommand::Exchanges { market_id } => {
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
             let result = http_app.get_market_pair(market_id).await?;
             let result = result.data.market_pairs;
+            let exchanges = http_app.get_exchanges().await?;
+            let exchanges = exchanges.iter();
             for market in result {
-                tracing::info!("Exchange id: {:?}", market.exchange_id)
+                if market.exchange_id.exchange_type().is_err() {
+                    let exchange = exchanges
+                        .clone()
+                        .find(|item| item.id == market.exchange_id)
+                        .context(format!(
+                            "Not able to find exchange id {:?}",
+                            market.exchange_id
+                        ))?;
+                    tracing::info!("Unsupported exchange: {} (id: {:?})", exchange.name, market.exchange_id);
+                }
             }
-
         }
         cli::SubCommand::Markets {} => {
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
