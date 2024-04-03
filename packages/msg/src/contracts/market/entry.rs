@@ -183,7 +183,18 @@ pub enum ExecuteMsg {
         price: TakeProfitTrader,
     },
 
+    /// Update the stop loss price of a position
+    UpdatePositionStopLossPrice {
+        /// ID of position to update
+        id: PositionId,
+        /// New stop loss price of the position, or remove
+        stop_loss: StopLoss,
+    },
+
     /// Set a stop loss or take profit override.
+    /// Deprecated, use UpdatePositionStopLossPrice instead
+    // not sure why this causes a warning here...
+    // #[deprecated(note = "Use UpdatePositionStopLossPrice instead")]
     SetTriggerOrder {
         /// ID of position to modify
         id: PositionId,
@@ -1191,6 +1202,7 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
                 id: u.arbitrary()?,
                 max_gains: u.arbitrary()?,
             }),
+            #[allow(deprecated)]
             8 => Ok(ExecuteMsg::SetTriggerOrder {
                 id: u.arbitrary()?,
                 stop_loss_override: u.arbitrary()?,
@@ -1360,4 +1372,13 @@ pub struct SpotPriceHistoryResp {
 pub struct PriceWouldTriggerResp {
     /// Would a price update trigger a liquidation/take profit/etc?
     pub would_trigger: bool,
+}
+
+/// Stop loss configuration
+#[cw_serde]
+pub enum StopLoss {
+    /// Remove stop loss price for the position
+    Remove,
+    /// Set the stop loss price for the position
+    Price(PriceBaseInQuote),
 }

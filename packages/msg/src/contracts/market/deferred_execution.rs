@@ -8,7 +8,11 @@ use cosmwasm_std::StdResult;
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
 use shared::prelude::*;
 
-use super::{entry::SlippageAssert, order::OrderId, position::PositionId};
+use super::{
+    entry::{SlippageAssert, StopLoss},
+    order::OrderId,
+    position::PositionId,
+};
 
 /// A unique numeric ID for each deferred execution in the protocol.
 #[cw_serde]
@@ -266,6 +270,14 @@ pub enum DeferredExecItem {
         price: TakeProfitTrader,
     },
 
+    /// Modify the stop loss price of a position
+    UpdatePositionStopLossPrice {
+        /// ID of position to update
+        id: PositionId,
+        /// New stop loss price of the position
+        stop_loss: StopLoss,
+    },
+
     /// Close a position
     ClosePosition {
         /// ID of position to close
@@ -387,6 +399,9 @@ impl DeferredExecItem {
             DeferredExecItem::UpdatePositionTakeProfitPrice { id, .. } => {
                 DeferredExecTarget::Position(*id)
             }
+            DeferredExecItem::UpdatePositionStopLossPrice { id, .. } => {
+                DeferredExecTarget::Position(*id)
+            }
             DeferredExecItem::ClosePosition { id, .. } => DeferredExecTarget::Position(*id),
             DeferredExecItem::SetTriggerOrder { id, .. } => DeferredExecTarget::Position(*id),
             DeferredExecItem::PlaceLimitOrder { .. } => DeferredExecTarget::DoesNotExist,
@@ -406,6 +421,7 @@ impl DeferredExecItem {
             | DeferredExecItem::UpdatePositionLeverage { .. }
             | DeferredExecItem::UpdatePositionMaxGains { .. }
             | DeferredExecItem::UpdatePositionTakeProfitPrice { .. }
+            | DeferredExecItem::UpdatePositionStopLossPrice { .. }
             | DeferredExecItem::ClosePosition { .. }
             | DeferredExecItem::SetTriggerOrder { .. }
             | DeferredExecItem::CancelLimitOrder { .. } => Collateral::zero(),
