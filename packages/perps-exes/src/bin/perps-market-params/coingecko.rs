@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use serde::{
-    de::{Unexpected, Visitor},
+    de::Unexpected,
     Deserialize,
 };
 use shared::storage::MarketId;

@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Context;
-use itertools::Itertools;
+
 use shared::storage::{MarketId, MarketType};
 
 use crate::{

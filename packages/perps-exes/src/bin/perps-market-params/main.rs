@@ -50,13 +50,17 @@ async fn main_inner(opt: Opt) -> Result<()> {
             }
             unsupported_exchanges.sort();
             unsupported_exchanges.dedup();
-            for exchange in unsupported_exchanges {
+            for exchange in &unsupported_exchanges {
                 tracing::info!(
                     "Unsupported exchange: {} (slug: {}, id: {})",
                     exchange.name,
                     exchange.slug,
                     exchange.id.0
                 );
+            }
+
+            if unsupported_exchanges.is_empty() {
+                tracing::info!("All exchanges are supported");
             }
         }
         cli::SubCommand::Markets {} => {

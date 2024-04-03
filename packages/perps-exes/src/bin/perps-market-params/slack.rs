@@ -174,10 +174,10 @@ impl HttpApp {
         // Ceiled division
         let iterations = (total_exchanges + limit - 1) / limit;
 
-        tracing::info!("total iterations: {iterations}");
+        tracing::debug!("total iterations: {iterations}");
 
         for index in 0..iterations {
-            tracing::info!("Iteration {index}");
+            tracing::debug!("Iteration {index}");
             start += limit;
             let uri = uri(start)?;
 
