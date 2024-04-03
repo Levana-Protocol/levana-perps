@@ -1,10 +1,7 @@
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
-use serde::{
-    de::Unexpected,
-    Deserialize,
-};
+use serde::{de::Unexpected, Deserialize};
 use shared::storage::MarketId;
 
 #[derive(Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -107,7 +104,7 @@ impl<'de> Deserialize<'de> for CmcMarketPair {
 
         let result = Result::deserialize(deserializer)?;
 
-        let market_pair = result.market_pair.replace("/", "_");
+        let market_pair = result.market_pair.replace('/', "_");
         let market_pair = MarketId::from_str(&market_pair).map_err(|_| {
             serde::de::Error::invalid_value(Unexpected::Str(&market_pair), &"Valid market id")
         })?;

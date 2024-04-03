@@ -6,7 +6,7 @@ use shared::storage::{MarketId, MarketType};
 
 use crate::{
     cli::{Opt, ServeOpt},
-    coingecko::{CmcMarketPair, ExchangeKind},
+    coingecko::{CmcMarketPair, ExchangeId, ExchangeKind},
     slack::HttpApp,
     web::NotifyApp,
 };
@@ -70,27 +70,24 @@ pub(crate) async fn dnf_sensitivity(
     Ok(base_dnf.min(quote_dnf))
 }
 
+fn is_centralized_exchange(id: &ExchangeId) -> bool {
+    match id.exchange_type() {
+        Ok(kind) => kind == ExchangeKind::Cex,
+        Err(_) => {
+            tracing::debug!("Not able to find exchange type for {id:?}");
+            false
+        }
+    }
+}
+
 fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<f64> {
     // Algorithm: https://staff.levana.finance/new-market-checklist#dnf-sensitivity
     tracing::debug!("Total exchanges: {}", exchanges.len());
-    let exchanges = exchanges
-        .iter()
-        .filter(|exchange| {
-            exchange.exchange_name.to_lowercase() != "htx" && exchange.outlier_detected > 0.3
-        })
-        .filter_map(|item| match item.exchange_id.exchange_type() {
-            Ok(exchange_kind) => {
-                if exchange_kind == ExchangeKind::Dex {
-                    None
-                } else {
-                    Some(item)
-                }
-            }
-            Err(err) => {
-                tracing::debug!("Not able to find exchange type: {err}");
-                None
-            }
-        });
+    let exchanges = exchanges.iter().filter(|exchange| {
+        exchange.exchange_name.to_lowercase() != "htx"
+            && exchange.outlier_detected < 0.3
+            && is_centralized_exchange(&exchange.exchange_id)
+    });
 
     let max_volume_exchange = exchanges
         .clone()
@@ -150,35 +147,35 @@ pub(crate) async fn compute_coin_dnfs(
 
 #[cfg(test)]
 mod tests {
-    use crate::coingecko::CmcMarketPair;
+    use std::str::FromStr;
 
-    #[tokio::test]
-    async fn sample_dnf_computation() {
+    use shared::storage::MarketId;
+
+    use crate::coingecko::{CmcMarketPair, ExchangeId};
+
+    #[test]
+    fn sample_dnf_computation() {
         let exchanges = vec![
             CmcMarketPair {
-                exchange_id: 1,
+                exchange_id: crate::coingecko::ExchangeId(50),
                 exchange_name: "mexc".to_owned(),
-                market_id: "LVN_USD".to_owned(),
+                market_id: MarketId::from_str("LVN_USD").unwrap(),
                 depth_usd_negative_two: 5828.0,
                 depth_usd_positive_two: 7719.0,
-                volume_percent: 1.06,
                 volume_24h_usd: 27304.39,
-                outlier_detected: 0.6,
-                center_type: crate::coingecko::ExchangeKind::Cex,
+                outlier_detected: 0.2,
             },
             CmcMarketPair {
-                exchange_id: 2,
+                exchange_id: ExchangeId(42),
                 exchange_name: "gate.io".to_owned(),
-                market_id: "LVN_USD".to_owned(),
+                market_id: MarketId::from_str("LVN_USD").unwrap(),
                 depth_usd_negative_two: 1756.0,
                 depth_usd_positive_two: 22140.0,
-                volume_percent: 0.9,
                 volume_24h_usd: 23065.95,
-                outlier_detected: 0.6,
-                center_type: crate::coingecko::ExchangeKind::Cex,
+                outlier_detected: 0.0,
             },
         ];
         let dnf = super::compute_dnf_sensitivity(exchanges).unwrap();
-        assert_eq!(dnf.round(), 269408.0, "Expected DNF");
+        assert_eq!(dnf.round(), 268783.0, "Expected DNF");
     }
 }
