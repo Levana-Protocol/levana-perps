@@ -601,12 +601,18 @@ async fn validate_spot_price_config(
                         let stride = stride.as_ref().with_context(|| format!("Using a Stride feed with denom {denom}, but no Stride contract configured"))?;
                         let stride =
                             cosmos.make_contract(stride.contract_address.as_str().parse()?);
-                        let res: serde_json::Value =
+
+                        #[derive(serde::Deserialize)]
+                        #[serde(rename_all = "snake_case")]
+                        struct RedemptionRateResp {
+                            redemption_rate: Decimal256,
+                        }
+                        let RedemptionRateResp { redemption_rate } =
                             stride.query(StrideQuery::RedemptionRate { denom }).await?;
                         log::info!(
-                            "Queried Stride contract {stride} with denom {denom}, got result {}",
-                            serde_json::to_string(&res)?
+                            "Queried Stride contract {stride} with denom {denom}, got redemption rate of {redemption_rate}"
                         );
+                        anyhow::ensure!(redemption_rate >= Decimal256::one(), "Redemption rates should always be at least 1, very likely the contract has the purchase rate instead. See: https://blog.levana.finance/milktia-market-mispricing-proposed-solution-6a994e9ecdfa");
                     }
                     SpotPriceFeedDataInit::Sei { denom } => anyhow::bail!(
                         "No longer supporting Sei native oracle, provided denom is: {denom}"
