@@ -62,9 +62,20 @@ pub(crate) struct ServeOpt {
     /// Slack webhook to send alert notification
     #[arg(long, env = "LEVANA_MPARAM_SLACK_WEBHOOK")]
     pub(crate) slack_webhook: reqwest::Url,
-    /// DNF threshold beyond which to raise alert
-    #[arg(long, env = "LEVANA_MPARAM_DNF_THRESHOLD", default_value = "10.0")]
-    pub(crate) dnf_threshold: f64,
+    /// DNF increase threshold beyond which to raise alert
+    #[arg(
+        long,
+        env = "LEVANA_MPARAM_DNF_INCREASE_THRESHOLD",
+        default_value = "50.0"
+    )]
+    pub(crate) dnf_increase_threshold: f64,
+    /// DNF decrease beyond which to raise alert
+    #[arg(
+        long,
+        env = "LEVANA_MPARAM_DNF_DECREASE_THRESHOLD",
+        default_value = "10.0"
+    )]
+    pub(crate) dnf_decrease_threshold: f64,
     /// Mainnet factories
     #[clap(long, env = "LEVANA_MPARAM_MAINNET_FACTORIES", value_parser=parse_key_val::<CosmosNetwork, Address>, default_value = "osmosis-mainnet=osmo1ssw6x553kzqher0earlkwlxasfm2stnl3ms3ma2zz4tnajxyyaaqlucd45,sei-mainnet=sei18rdj3asllguwr6lnyu2sw8p8nut0shuj3sme27ndvvw4gakjnjqqper95h,injective-mainnet=inj1vdu3s39dl8t5l88tyqwuhzklsx9587adv8cnn9", use_value_delimiter=true, value_delimiter=',')]
     pub(crate) mainnet_factories: Vec<(CosmosNetwork, Address)>,

@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Context;
-
+use bigdecimal::Zero;
 use shared::storage::{MarketId, MarketType};
 
 use crate::{
@@ -106,6 +106,23 @@ fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<f64>
     Ok(dnf)
 }
 
+fn validate_dnf_diff_percentage(
+    dnf: f64,
+    configured_dnf: f64,
+    dnf_increase_threshold: f64,
+    dnf_decrease_threshold: f64,
+) -> (f64, bool) {
+    let diff = (configured_dnf - dnf) * 100.0;
+    let percentage_diff = diff / configured_dnf;
+    (
+        percentage_diff,
+        percentage_diff.is_zero()
+            || (percentage_diff.is_sign_positive() && percentage_diff <= dnf_increase_threshold)
+            || (percentage_diff.is_sign_negative()
+                && percentage_diff.abs() <= dnf_decrease_threshold),
+    )
+}
+
 pub(crate) async fn compute_coin_dnfs(
     app: Arc<NotifyApp>,
     serve_opt: ServeOpt,
@@ -125,10 +142,14 @@ pub(crate) async fn compute_coin_dnfs(
                 .get_chain_dnf(market_id)
                 .context(format!("No DNF configured for {market_id:?}"))?;
             let dnf = dnf_sensitivity(&http_app, market_id).await?;
-            let diff = (configured_dnf - dnf).abs() * 100.0;
-            let percentage_diff = diff / configured_dnf;
+            let (percentage_diff, validated) = validate_dnf_diff_percentage(
+                dnf,
+                configured_dnf,
+                serve_opt.dnf_increase_threshold,
+                serve_opt.dnf_decrease_threshold,
+            );
             tracing::info!("Percentage DNF deviation for {market_id}: {percentage_diff} %");
-            if percentage_diff > serve_opt.dnf_threshold {
+            if !validated {
                 tracing::info!("Going to send Slack notification");
                 http_app
                     .send_notification(
@@ -147,6 +168,7 @@ pub(crate) async fn compute_coin_dnfs(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use std::str::FromStr;
 
     use shared::storage::MarketId;
@@ -177,5 +199,32 @@ mod tests {
         ];
         let dnf = super::compute_dnf_sensitivity(exchanges).unwrap();
         assert_eq!(dnf.round(), 268783.0, "Expected DNF");
+    }
+
+    #[test]
+    fn validate_for_dnf_change_which_exceeds_threshold() {
+        let (percentage_diff_1, validated_1) = validate_dnf_diff_percentage(0.4, 1.0, 50.0, 10.0);
+        assert_eq!(percentage_diff_1.round(), 60.0);
+        assert!(!validated_1);
+
+        let (percentage_diff_2, validated_2) = validate_dnf_diff_percentage(1.2, 1.0, 50.0, 10.0);
+        assert_eq!(percentage_diff_2.round(), -20.0);
+        assert!(!validated_2);
+    }
+
+    #[test]
+    fn validate_for_dnf_change_for_happy_case() {
+        let (percentage_diff_1, validated_1) = validate_dnf_diff_percentage(0.8, 1.0, 50.0, 10.0);
+        assert_eq!(percentage_diff_1.round(), 20.0);
+        assert!(validated_1);
+
+        let (percentage_diff_2, validated_2) = validate_dnf_diff_percentage(1.05, 1.0, 50.0, 10.0);
+        assert_eq!(percentage_diff_2.round(), -5.0);
+        assert!(validated_2);
+
+        let (percentage_diff_zero, validated_zero) =
+            validate_dnf_diff_percentage(1.0, 1.0, 50.0, 10.0);
+        assert_eq!(percentage_diff_zero.round(), 0.0);
+        assert!(validated_zero);
     }
 }
