@@ -24,6 +24,14 @@ pub(crate) struct Opt {
 pub(crate) enum SubCommand {
     /// List supported coins with their IDs
     Coins {},
+    /// List all market ids of Levana
+    Markets {},
+    /// List all exchanges for a specific market id
+    Exchanges {
+        /// Market ID. Eg: ATOM_USD
+        #[arg(long)]
+        market_id: MarketId,
+    },
     /// Compute DNF sensitivity
     Dnf {
         /// Market ID. Eg: ATOM_USD

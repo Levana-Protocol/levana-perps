@@ -13,3 +13,15 @@ download-levana-market:
 # Compute dnf
 compute-dnf:
 	cargo run --bin perps-market-params dnf --market-id LEVANA_USD
+
+# Serve web app
+serve:
+	cargo run --bin perps-market-params serve
+
+# Download market.csv data
+download-market-csv:
+	cargo run --bin perps-market-params market --market-id ATOM_USD
+
+# List exchanges
+exchanges:
+	cargo run --bin perps-market-params exchanges --market-id ATOM_USD
