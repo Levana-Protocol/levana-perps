@@ -31,7 +31,7 @@ async fn main_inner(opt: Opt) -> Result<()> {
         }
         cli::SubCommand::Exchanges { market_id } => {
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
-            let result = http_app.get_market_pair(market_id).await?;
+            let result = http_app.get_market_pair(market_id.clone()).await?;
             let result = result.data.market_pairs;
             let exchanges = http_app.get_exchanges().await?;
             let mut unsupported_exchanges = vec![];
@@ -60,7 +60,12 @@ async fn main_inner(opt: Opt) -> Result<()> {
             }
 
             if unsupported_exchanges.is_empty() {
-                tracing::info!("All exchanges are supported");
+                tracing::info!("All exchanges are supported for {market_id}");
+            } else {
+                tracing::info!(
+                    "Total unsupported exchanges for {market_id}: {}",
+                    unsupported_exchanges.len()
+                );
             }
         }
         cli::SubCommand::Markets { market_ids } => {
