@@ -62,7 +62,10 @@ async fn main_inner(opt: Opt) -> Result<()> {
             if unsupported_exchanges.is_empty() {
                 tracing::info!("All exchanges are supported for {market_id}");
             } else {
-                tracing::info!("Total unsupported exchanges for {market_id}: {}", unsupported_exchanges.len());
+                tracing::info!(
+                    "Total unsupported exchanges for {market_id}: {}",
+                    unsupported_exchanges.len()
+                );
             }
         }
         cli::SubCommand::Markets { market_ids } => {
