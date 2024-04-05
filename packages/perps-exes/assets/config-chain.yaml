@@ -137,7 +137,5 @@ dymension-testnet:
   faucet: rol1436kxs0w2es6xlqpp9rd35e3d0cjnw4sv8j3a7483sgks29jqwgs8rxp8l
   spot-price:
     pyth:
-      # FIXME tried doing an instantiation myself and it didn't work.
-      # Waiting on Pyth team
-      contract: rol1gclfrvam6a33yhpw3ut3arajyqs06esdvt9pfvluzwsslap9p6uq7swnqu
+      contract: rol1pvrwmjuusn9wh34j7y520g8gumuy9xtl3gvprlljfdpwju3x7ucszdyfs8
       type: stable
