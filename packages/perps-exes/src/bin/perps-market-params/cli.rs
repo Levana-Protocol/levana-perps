@@ -27,7 +27,7 @@ pub(crate) enum SubCommand {
     /// List all market ids of Levana
     Markets {
         /// Skip these market ids
-        #[arg(long, env = "LEVANA_MPARAM_MARKET_IDS", value_delimiter = ',')]
+        #[arg(long, env = "LEVANA_MPARAM_SKIPPED_MARKET_IDS", value_delimiter = ',')]
         market_ids: Vec<MarketId>,
     },
     /// List all exchanges for a specific market id
