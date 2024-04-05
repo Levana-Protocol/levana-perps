@@ -12,7 +12,7 @@ download-levana-market:
 
 # Compute dnf
 compute-dnf:
-	cargo run --bin perps-market-params dnf --market-id LEVANA_USD
+	cargo run --bin perps-market-params dnf --market-id LUNA_USDC
 
 # Serve web app
 serve:
@@ -28,4 +28,4 @@ download-market-csv:
 
 # List unsupported exchanges
 exchanges:
-	cargo run --bin perps-market-params exchanges --market-id SEI_USD
+	cargo run --bin perps-market-params exchanges --market-id LUNA_USDC
