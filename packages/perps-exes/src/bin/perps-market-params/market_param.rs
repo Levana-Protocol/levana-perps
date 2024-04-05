@@ -149,10 +149,16 @@ pub(crate) async fn compute_coin_dnfs(
             tracing::info!("Percentage DNF deviation for {market_id}: {percentage_diff} %");
             if !validated {
                 tracing::info!("Going to send Slack notification");
+                let (icon, status) = if percentage_diff.is_sign_positive() {
+                    (":chart_with_upwards_trend:", "increase")
+                } else {
+                    (":chart_with_downwards_trend:", "decrease")
+                };
+                let percentage_diff = percentage_diff.abs().round();
                 http_app
                     .send_notification(
-                        format!("Detected DNF change for {market_id:?}"),
-                        format!("Deviation: {percentage_diff} %"),
+                        format!("{icon} Detected DNF change for {market_id}"),
+                        format!("Deviation {status}: *{percentage_diff}%*"),
                     )
                     .await?;
             }
