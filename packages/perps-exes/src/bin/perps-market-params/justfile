@@ -18,10 +18,14 @@ compute-dnf:
 serve:
 	cargo run --bin perps-market-params serve
 
+# List levana's markets
+markets:
+	cargo run --bin perps-market-params markets
+
 # Download market.csv data
 download-market-csv:
 	cargo run --bin perps-market-params market --market-id ATOM_USD
 
-# List exchanges
+# List unsupported exchanges
 exchanges:
-	cargo run --bin perps-market-params exchanges --market-id ATOM_USD
+	cargo run --bin perps-market-params exchanges --market-id OSMO_USD

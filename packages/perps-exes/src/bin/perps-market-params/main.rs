@@ -63,7 +63,7 @@ async fn main_inner(opt: Opt) -> Result<()> {
                 tracing::info!("All exchanges are supported");
             }
         }
-        cli::SubCommand::Markets {} => {
+        cli::SubCommand::Markets { market_ids } => {
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
             let markets = vec![
                 (
@@ -83,8 +83,14 @@ async fn main_inner(opt: Opt) -> Result<()> {
                     )?,
                 ),
             ];
+            tracing::info!("Skipping {0} deployed markets", market_ids.len());
             let result = http_app.fetch_market_status(&markets[..]).await?;
-            for market in result.markets {
+            let markets = result
+                .markets
+                .into_iter()
+                .filter(|market| !market_ids.contains(&market.status.market_id));
+
+            for market in markets {
                 tracing::info!("{}", market.status.market_id);
             }
         }

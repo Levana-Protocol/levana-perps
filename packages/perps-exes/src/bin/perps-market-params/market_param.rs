@@ -24,7 +24,7 @@ pub(crate) struct MarketStatus {
 #[derive(Debug, Clone, serde::Deserialize)]
 pub(crate) struct Market {
     pub(crate) config: MarketParam,
-    pub(crate) market_id: String,
+    pub(crate) market_id: MarketId,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -37,9 +37,7 @@ impl MarketsConfig {
         let result = self
             .markets
             .iter()
-            .find(|item| {
-                item.status.market_id.to_lowercase() == market_id.to_string().to_lowercase()
-            })
+            .find(|item| item.status.market_id == *market_id)
             .map(|item| item.status.config.delta_neutrality_fee_sensitivity.clone())
             .context("No dnf found")?;
         let result = result.parse()?;
