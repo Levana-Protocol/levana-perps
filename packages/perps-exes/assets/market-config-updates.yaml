@@ -68,14 +68,14 @@ markets:
     config:
       trading_fee_notional_size: 0.002
       trading_fee_counter_collateral: 0.002
-      max_leverage: 4
-      carry_leverage: 2
+      max_leverage: 6
+      carry_leverage: 3
       funding_rate_sensitivity: 2
       target_utilization: 0.5
-      delta_neutrality_fee_sensitivity: 10000000
+      delta_neutrality_fee_sensitivity: 25000000
       borrow_fee_sensitivity: 0.3
-      delta_neutrality_fee_cap: 0.03
-      delta_neutrality_fee_tax: 0.5
+      delta_neutrality_fee_cap: 0.025
+      delta_neutrality_fee_tax: 0.35
       borrow_fee_rate_min_annualized: 0.06
       liquidity_cooldown_seconds: 86400
       exposure_margin_ratio: 0.02
@@ -86,14 +86,14 @@ markets:
     config:
       trading_fee_notional_size: 0.002
       trading_fee_counter_collateral: 0.002
-      max_leverage: 4
-      carry_leverage: 2
+      max_leverage: 6
+      carry_leverage: 3
       funding_rate_sensitivity: 2
       target_utilization: 0.5
-      delta_neutrality_fee_sensitivity: 10000000
+      delta_neutrality_fee_sensitivity: 25000000
       borrow_fee_sensitivity: 0.3
-      delta_neutrality_fee_cap: 0.03
-      delta_neutrality_fee_tax: 0.5
+      delta_neutrality_fee_cap: 0.025
+      delta_neutrality_fee_tax: 0.35
       borrow_fee_rate_min_annualized: 0.03
       liquidity_cooldown_seconds: 86400
       exposure_margin_ratio: 0.02
@@ -175,11 +175,13 @@ markets:
     config:
       trading_fee_notional_size: 0.002
       trading_fee_counter_collateral: 0.002
-      max_leverage: 4
-      carry_leverage: 2
-      delta_neutrality_fee_cap: 0.03
-      delta_neutrality_fee_sensitivity: 3000000
-      delta_neutrality_fee_tax: 0.7
+      max_leverage: 6
+      carry_leverage: 3
+      funding_rate_sensitivity: 2
+      target_utilization: 0.5
+      delta_neutrality_fee_sensitivity: 25000000
+      delta_neutrality_fee_cap: 0.025
+      delta_neutrality_fee_tax: 0.35
       liquidity_cooldown_seconds: 86400
       borrow_fee_sensitivity: 0.3
       exposure_margin_ratio: 0.02
