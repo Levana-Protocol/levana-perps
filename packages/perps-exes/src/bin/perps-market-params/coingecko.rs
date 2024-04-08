@@ -153,7 +153,6 @@ pub(crate) enum Coin {
     Dogecoin,
     Wbtc,
     Avax,
-    Dot,
     Btc,
     StAtom,
     StDYDX,
@@ -169,6 +168,8 @@ pub(crate) enum Coin {
     Dydx,
     Inj,
     StTia,
+    Wif,
+    Dot,
 }
 
 impl FromStr for Coin {
@@ -198,6 +199,7 @@ impl FromStr for Coin {
             "DYDX" => Ok(Coin::Dydx),
             "INJ" => Ok(Coin::Inj),
             "stTIA" => Ok(Coin::StTia),
+            "WIF" => Ok(Coin::Wif),
             other => Err(anyhow!("Unsupported coin {other}")),
         }
     }
@@ -213,7 +215,6 @@ impl Coin {
             Coin::Dogecoin => 74,
             Coin::Wbtc => 3717,
             Coin::Avax => 5805,
-            Coin::Dot => 6636,
             Coin::Btc => 1,
             Coin::StAtom => 21686,
             Coin::StDYDX => 29428,
@@ -229,6 +230,8 @@ impl Coin {
             Coin::Dydx => 28324,
             Coin::Inj => 7226,
             Coin::StTia => 29427,
+            Coin::Wif => 28752,
+            Coin::Dot => 6636,
         }
     }
 

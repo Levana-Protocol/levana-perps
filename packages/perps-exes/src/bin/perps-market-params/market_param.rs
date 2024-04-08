@@ -1,7 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Context;
-use bigdecimal::Zero;
 use shared::storage::{MarketId, MarketType};
 
 use crate::{
@@ -104,21 +103,31 @@ fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<f64>
     Ok(dnf)
 }
 
-fn validate_dnf_diff_percentage(
-    dnf: f64,
+struct DnfNotify {
+    configured_dnf: f64,
+    computed_dnf: f64,
+    percentage_diff: f64,
+    should_notify: bool,
+}
+
+fn compute_dnf_notify(
+    computed_dnf: f64,
     configured_dnf: f64,
     dnf_increase_threshold: f64,
     dnf_decrease_threshold: f64,
-) -> (f64, bool) {
-    let diff = (configured_dnf - dnf) * 100.0;
+) -> DnfNotify {
+    let diff = (configured_dnf - computed_dnf) * 100.0;
     let percentage_diff = diff / configured_dnf;
-    (
+    let should_notify = (percentage_diff.is_sign_positive()
+        && percentage_diff <= dnf_increase_threshold)
+        || (percentage_diff.is_sign_negative() && percentage_diff.abs() <= dnf_decrease_threshold);
+    let should_notify = !should_notify;
+    DnfNotify {
+        configured_dnf,
+        computed_dnf,
         percentage_diff,
-        percentage_diff.is_zero()
-            || (percentage_diff.is_sign_positive() && percentage_diff <= dnf_increase_threshold)
-            || (percentage_diff.is_sign_negative()
-                && percentage_diff.abs() <= dnf_decrease_threshold),
-    )
+        should_notify,
+    }
 }
 
 pub(crate) async fn compute_coin_dnfs(
@@ -140,29 +149,39 @@ pub(crate) async fn compute_coin_dnfs(
                 .get_chain_dnf(market_id)
                 .context(format!("No DNF configured for {market_id:?}"))?;
             let dnf = dnf_sensitivity(&http_app, market_id).await?;
-            let (percentage_diff, validated) = validate_dnf_diff_percentage(
+            let dnf_notify = compute_dnf_notify(
                 dnf,
                 configured_dnf,
                 serve_opt.dnf_increase_threshold,
                 serve_opt.dnf_decrease_threshold,
             );
-            tracing::info!("Percentage DNF deviation for {market_id}: {percentage_diff} %");
-            if !validated {
+            tracing::info!(
+                "Percentage DNF deviation for {market_id}: {} %",
+                dnf_notify.percentage_diff
+            );
+            if dnf_notify.should_notify {
                 tracing::info!("Going to send Slack notification");
-                let (icon, status) = if percentage_diff.is_sign_positive() {
+                let (icon, status) = if dnf_notify.percentage_diff.is_sign_positive() {
                     (":chart_with_upwards_trend:", "increase")
                 } else {
                     (":chart_with_downwards_trend:", "decrease")
                 };
-                let percentage_diff = percentage_diff.abs().round();
+                let percentage_diff = dnf_notify.percentage_diff.abs().round();
                 http_app
                     .send_notification(
                         format!("{icon} Detected DNF change for {market_id}"),
-                        format!("Deviation {status}: *{percentage_diff}%*"),
+                        format!(
+                            "Deviation {status}: *{percentage_diff}%* \n Recommended DNF: *{}*",
+                            dnf_notify.computed_dnf.round()
+                        ),
                     )
                     .await?;
             }
-            tracing::info!("Finished computing DNF for {market_id:?}: {dnf}");
+            tracing::info!(
+                "Finished computing DNF for {market_id:?}: {} (Configured DNF: {})",
+                dnf_notify.computed_dnf,
+                dnf_notify.configured_dnf
+            );
             app.dnf.write().insert(market_id.clone(), dnf);
         }
         tracing::info!("Going to sleep 24 hours");
@@ -207,28 +226,27 @@ mod tests {
 
     #[test]
     fn validate_for_dnf_change_which_exceeds_threshold() {
-        let (percentage_diff_1, validated_1) = validate_dnf_diff_percentage(0.4, 1.0, 50.0, 10.0);
-        assert_eq!(percentage_diff_1.round(), 60.0);
-        assert!(!validated_1);
+        let dnf_notify = compute_dnf_notify(0.4, 1.0, 50.0, 10.0);
+        assert_eq!(dnf_notify.percentage_diff, 60.0);
+        assert!(dnf_notify.should_notify);
 
-        let (percentage_diff_2, validated_2) = validate_dnf_diff_percentage(1.2, 1.0, 50.0, 10.0);
-        assert_eq!(percentage_diff_2.round(), -20.0);
-        assert!(!validated_2);
+        let dnf_notify = compute_dnf_notify(1.2, 1.0, 50.0, 10.0);
+        assert_eq!(dnf_notify.percentage_diff.round(), -20.0);
+        assert!(dnf_notify.should_notify);
     }
 
     #[test]
     fn validate_for_dnf_change_for_happy_case() {
-        let (percentage_diff_1, validated_1) = validate_dnf_diff_percentage(0.8, 1.0, 50.0, 10.0);
-        assert_eq!(percentage_diff_1.round(), 20.0);
-        assert!(validated_1);
+        let dnf_notify = compute_dnf_notify(0.8, 1.0, 50.0, 10.0);
+        assert_eq!(dnf_notify.percentage_diff.round(), 20.0);
+        assert!(!dnf_notify.should_notify);
 
-        let (percentage_diff_2, validated_2) = validate_dnf_diff_percentage(1.05, 1.0, 50.0, 10.0);
-        assert_eq!(percentage_diff_2.round(), -5.0);
-        assert!(validated_2);
+        let dnf_notify = compute_dnf_notify(1.05, 1.0, 50.0, 10.0);
+        assert_eq!(dnf_notify.percentage_diff.round(), -5.0);
+        assert!(!dnf_notify.should_notify);
 
-        let (percentage_diff_zero, validated_zero) =
-            validate_dnf_diff_percentage(1.0, 1.0, 50.0, 10.0);
-        assert_eq!(percentage_diff_zero.round(), 0.0);
-        assert!(validated_zero);
+        let dnf_notify = compute_dnf_notify(1.0, 1.0, 50.0, 10.0);
+        assert_eq!(dnf_notify.percentage_diff, 0.0);
+        assert!(!dnf_notify.should_notify);
     }
 }
