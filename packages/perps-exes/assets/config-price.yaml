@@ -603,6 +603,48 @@ networks:
       feeds-usd: [
         !pyth { key: "SEI_USD", inverted: false },
       ]
+    WIF_USDC:
+      feeds: [
+        !pyth { key: "WIF_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    BONK_USDC:
+      feeds: [
+        !pyth { key: "BONK_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    SHIB_USDC:
+      feeds: [
+        !pyth { key: "SHIB_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    FLOKI_USDC:
+      feeds: [
+        !pyth { key: "FLOKI_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    MEME_USDC:
+      feeds: [
+        !pyth { key: "MEME_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
+    PEPE_USDC:
+      feeds: [
+        !pyth { key: "PEPE_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
   osmosis-testnet:
     ATOM_USD:
       feeds: [
