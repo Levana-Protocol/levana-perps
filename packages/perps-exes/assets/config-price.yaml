@@ -504,6 +504,15 @@ networks:
         !stride { denom: "ibc/980E82A9F8E7CA8CD480F4577E73682A6D3855A267D1831485D7EBEF0E7A6C2C", inverted: false, age_tolerance: 43200 },
         !pyth { key: "DYDX_USD", inverted: false }
       ]
+    stDYM_USD:
+      feeds: [
+        !stride { denom: "ibc/D53E785DC9C5C2CA50CADB1EFE4DE5D0C30418BE0E9C6F2AF9F092A247E8BC22", inverted: false, age_tolerance: 43200 },
+        !pyth { key: "DYM_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !stride { denom: "ibc/D53E785DC9C5C2CA50CADB1EFE4DE5D0C30418BE0E9C6F2AF9F092A247E8BC22", inverted: false, age_tolerance: 43200 },
+        !pyth { key: "DYM_USD", inverted: false }
+      ]
     ryETH_USD:
       feeds: [
         !simple { contract: "osmo1556egspjm44k54mdqrwkatfrk6e4mzdeum3q32fp3d2lr95rh5cq0g2hcg", inverted: false, age_tolerance: 43200 },
@@ -932,6 +941,17 @@ networks:
       feeds-usd: [
         !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 31536000 },
         !pyth { key: "DYDX_USD", inverted: false }
+      ]
+    stDYM_USD:
+      # Intentionally using the wrong Stride info here, for testnet we just want some contract that will respond with any redemption rate.
+      stride-contract: osmo1jlm7dglrwfk073r2mgta66sf27htceaklx0qprlm0pupfv632p6s3mzckj
+      feeds: [
+        !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 31536000 },
+        !pyth { key: "DYM_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 31536000 },
+        !pyth { key: "DYM_USD", inverted: false }
       ]
     stTIA_USD:
       # Intentionally using the wrong Stride info here, for testnet we just want some contract that will respond with any redemption rate.

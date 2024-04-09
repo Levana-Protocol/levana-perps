@@ -351,6 +351,19 @@ markets:
 
     initial-borrow-fee-rate: 0.08
 
+  stDYM_USD:
+    config:
+      funding_rate_sensitivity: 2
+      borrow_fee_rate_min_annualized: 0.04
+      target_utilization: 0.5
+      borrow_fee_sensitivity: 0.3
+      delta_neutrality_fee_sensitivity: 40000000
+      delta_neutrality_fee_tax: 0.25
+      carry_leverage: 15
+      liquidity_cooldown_seconds: 86400
+
+    initial-borrow-fee-rate: 0.05
+
   INJ_USD:
     config:
       funding_rate_sensitivity: 2
