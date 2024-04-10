@@ -21,15 +21,21 @@ pub(crate) async fn axum_main(serve_opt: ServeOpt, opt: Opt) -> Result<()> {
     main_inner(serve_opt, opt).await
 }
 
+#[derive(Clone, serde::Serialize)]
+pub(crate) struct MarketParams {
+    pub dnf: f64,
+    pub configured_dnf: f64,
+    pub percentage_diff: f64,
+}
 #[derive(Clone)]
 pub(crate) struct NotifyApp {
-    pub(crate) dnf: Arc<RwLock<HashMap<MarketId, f64>>>,
+    pub(crate) market_params: Arc<RwLock<HashMap<MarketId, MarketParams>>>,
 }
 
 impl NotifyApp {
     pub(crate) fn new() -> Self {
         NotifyApp {
-            dnf: Arc::new(RwLock::new(HashMap::new())),
+            market_params: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
@@ -67,7 +73,7 @@ pub(crate) struct NoQueryString {}
 #[derive(Template, serde::Serialize)]
 #[template(path = "market_params.html")]
 struct IndexTemplate {
-    dnf: HashMap<MarketId, f64>,
+    market_params: HashMap<MarketId, MarketParams>,
 }
 
 pub(crate) async fn index(
@@ -75,8 +81,8 @@ pub(crate) async fn index(
     app: State<Arc<NotifyApp>>,
     _: Query<NoQueryString>,
 ) -> axum::response::Response {
-    let dnf = app.dnf.read().clone();
-    let index_page = IndexTemplate { dnf }.render();
+    let market_params = app.market_params.read().clone();
+    let index_page = IndexTemplate { market_params }.render();
     match index_page {
         Ok(page) => Html::from(page).into_response(),
         Err(err) => {

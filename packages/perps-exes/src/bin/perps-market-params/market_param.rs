@@ -7,7 +7,7 @@ use crate::{
     cli::{Opt, ServeOpt},
     coingecko::{CmcMarketPair, ExchangeId, ExchangeKind},
     slack::HttpApp,
-    web::NotifyApp,
+    web::{MarketParams, NotifyApp},
 };
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -182,7 +182,14 @@ pub(crate) async fn compute_coin_dnfs(
                 dnf_notify.computed_dnf,
                 dnf_notify.configured_dnf
             );
-            app.dnf.write().insert(market_id.clone(), dnf);
+            app.market_params.write().insert(
+                market_id.clone(),
+                MarketParams {
+                    dnf,
+                    configured_dnf,
+                    percentage_diff: dnf_notify.percentage_diff,
+                },
+            );
         }
         tracing::info!("Going to sleep 24 hours");
         tokio::time::sleep(Duration::from_secs(60 * 60 * 24)).await;
