@@ -27,15 +27,15 @@
             {% for (key, value) in market_params %}
             <tr>
               <td class="table-light">
-		{{ key }}
+		            {{ key }}
               </td>
-              <td class="table-light">
-                {{ value.dnf }}
+              <td class="table-light {% if value.should_notify %} text-danger {% else %} text-success {% endif %}">
+                {{ value.computed_dnf }}
               </td>
-              <td class="table-light">
+              <td class="table-light {% if value.should_notify %} text-danger {% else %} text-success {% endif %}">
                 {{ value.configured_dnf }}
               </td>
-              <td class="table-light">
+              <td class="table-light {% if value.should_notify %} text-danger {% else %} text-success {% endif %}">
                 {{ value.percentage_diff }}
               </td>
             </tr>

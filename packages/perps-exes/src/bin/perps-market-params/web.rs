@@ -13,7 +13,7 @@ use tokio::task::JoinSet;
 
 use crate::{
     cli::{Opt, ServeOpt},
-    market_param::compute_coin_dnfs,
+    market_param::{compute_coin_dnfs, DnfNotify},
     routes::{HealthRoute, HomeRoute},
 };
 
@@ -21,15 +21,9 @@ pub(crate) async fn axum_main(serve_opt: ServeOpt, opt: Opt) -> Result<()> {
     main_inner(serve_opt, opt).await
 }
 
-#[derive(Clone, serde::Serialize)]
-pub(crate) struct MarketParams {
-    pub dnf: f64,
-    pub configured_dnf: f64,
-    pub percentage_diff: f64,
-}
 #[derive(Clone)]
 pub(crate) struct NotifyApp {
-    pub(crate) market_params: Arc<RwLock<HashMap<MarketId, MarketParams>>>,
+    pub(crate) market_params: Arc<RwLock<HashMap<MarketId, DnfNotify>>>,
 }
 
 impl NotifyApp {
@@ -73,7 +67,7 @@ pub(crate) struct NoQueryString {}
 #[derive(Template, serde::Serialize)]
 #[template(path = "market_params.html")]
 struct IndexTemplate {
-    market_params: HashMap<MarketId, MarketParams>,
+    market_params: HashMap<MarketId, DnfNotify>,
 }
 
 pub(crate) async fn index(
