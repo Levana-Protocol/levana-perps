@@ -1,4 +1,5 @@
 mod balance;
+mod block_lag;
 mod congested;
 mod crank_run;
 pub(crate) mod factory;
@@ -42,6 +43,7 @@ impl AppBuilder {
         // Start the tasks that run on all deployments
         self.start_factory_task()?;
         self.track_stale()?;
+        self.track_block_lag()?;
 
         if self.app.config.run_optional_services {
             self.track_stats()?;

@@ -103,11 +103,12 @@ fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<f64>
     Ok(dnf)
 }
 
-struct DnfNotify {
-    configured_dnf: f64,
-    computed_dnf: f64,
-    percentage_diff: f64,
-    should_notify: bool,
+#[derive(Clone, serde::Serialize)]
+pub struct DnfNotify {
+    pub configured_dnf: f64,
+    pub computed_dnf: f64,
+    pub percentage_diff: f64,
+    pub should_notify: bool,
 }
 
 fn compute_dnf_notify(
@@ -182,7 +183,9 @@ pub(crate) async fn compute_coin_dnfs(
                 dnf_notify.computed_dnf,
                 dnf_notify.configured_dnf
             );
-            app.dnf.write().insert(market_id.clone(), dnf);
+            app.market_params
+                .write()
+                .insert(market_id.clone(), dnf_notify);
         }
         tracing::info!("Going to sleep 24 hours");
         tokio::time::sleep(Duration::from_secs(60 * 60 * 24)).await;

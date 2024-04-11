@@ -134,6 +134,9 @@ injective-mainnet:
     INJ:
       denom: inj
       decimal-places: 18
+    USDT:
+      denom: peggy0xdAC17F958D2ee523a2206206994597C13D831ec7
+      decimal-places: 6
 dymension-testnet:
   gas-decimals: 6
   tracker: rol1plr28ztj64a47a32lw7tdae8vluzm2lm7nqk364r4ws50rgwyzgsgju4zn
@@ -141,4 +144,23 @@ dymension-testnet:
   spot-price:
     pyth:
       contract: rol1pvrwmjuusn9wh34j7y520g8gumuy9xtl3gvprlljfdpwju3x7ucszdyfs8
+      type: stable
+neutron-testnet:
+  gas-decimals: 6
+  explorer: "https://www.mintscan.io/neutron-testnet/txs/"
+  tracker: neutron1clafqjzrwpmaqpgmlpdyaz2lklsykz0n9gyf5ysguvy25uszxh7smjqqcc
+  faucet: neutron1mmpf9gymelvr33cxu5jt848ufg2zqe3s3h2p9xwz5m6jhtj7zl3qzg7lcf
+  spot-price:
+    pyth:
+      contract: neutron15ldst8t80982akgr8w8ekcytejzkmfpgdkeq4xgtge48qs7435jqp87u3t
+      type: stable
+  rpc-nodes:
+  - https://rpc-falcron.pion-1.ntrn.tech
+  - https://neutron-testnet-rpc.polkachu.com
+neutron-mainnet:
+  gas-decimals: 6
+  explorer: "https://www.mintscan.io/neutron/txs/"
+  spot-price:
+    pyth:
+      contract: neutron1m2emc93m9gpwgsrsf2vylv9xvgqh654630v7dfrhrkmr5slly53spg85wv
       type: stable
