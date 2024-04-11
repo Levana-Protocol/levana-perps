@@ -959,3 +959,11 @@ networks:
       feeds-usd: [
         !pyth { key: "DYM_USD", inverted: false }
       ]
+  neutron-testnet:
+    NTRN_USD:
+      feeds: [
+        !pyth { key: "NTRN_USD", inverted: false },
+      ]
+      feeds-usd: [
+        !pyth { key: "NTRN_USD", inverted: false },
+      ]
