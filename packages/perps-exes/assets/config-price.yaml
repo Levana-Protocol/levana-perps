@@ -70,6 +70,13 @@ networks:
       feeds-usd: [
         !pyth { key: "BTC_USD", inverted: false }
       ]
+    BTC_USDT:
+      feeds: [
+        !pyth { key: "BTC_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
+      ]
     ETH_USD:
       feeds: [
         !pyth { key: "ETH_USD", inverted: false }
@@ -143,6 +150,13 @@ networks:
       ]
       feeds-usd: [
         !pyth { key: "INJ_USD", inverted: false}
+      ]
+    BTC_USDT:
+      feeds: [
+        !pyth { key: "BTC_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !constant { price: "1", inverted: false }
       ]
   sei-mainnet:
     ETH_USD:
