@@ -13,7 +13,7 @@ use tokio::task::JoinSet;
 
 use crate::{
     cli::{Opt, ServeOpt},
-    market_param::compute_coin_dnfs,
+    market_param::{compute_coin_dnfs, DnfNotify},
     routes::{HealthRoute, HomeRoute},
 };
 
@@ -23,13 +23,13 @@ pub(crate) async fn axum_main(serve_opt: ServeOpt, opt: Opt) -> Result<()> {
 
 #[derive(Clone)]
 pub(crate) struct NotifyApp {
-    pub(crate) dnf: Arc<RwLock<HashMap<MarketId, f64>>>,
+    pub(crate) market_params: Arc<RwLock<HashMap<MarketId, DnfNotify>>>,
 }
 
 impl NotifyApp {
     pub(crate) fn new() -> Self {
         NotifyApp {
-            dnf: Arc::new(RwLock::new(HashMap::new())),
+            market_params: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
@@ -67,7 +67,7 @@ pub(crate) struct NoQueryString {}
 #[derive(Template, serde::Serialize)]
 #[template(path = "market_params.html")]
 struct IndexTemplate {
-    dnf: HashMap<MarketId, f64>,
+    market_params: HashMap<MarketId, DnfNotify>,
 }
 
 pub(crate) async fn index(
@@ -75,8 +75,8 @@ pub(crate) async fn index(
     app: State<Arc<NotifyApp>>,
     _: Query<NoQueryString>,
 ) -> axum::response::Response {
-    let dnf = app.dnf.read().clone();
-    let index_page = IndexTemplate { dnf }.render();
+    let market_params = app.market_params.read().clone();
+    let index_page = IndexTemplate { market_params }.render();
     match index_page {
         Ok(page) => Html::from(page).into_response(),
         Err(err) => {
