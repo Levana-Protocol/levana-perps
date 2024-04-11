@@ -76,6 +76,9 @@ osmosis-mainnet:
     stkATOM:
       denom: ibc/CAA179E40F0266B0B29FB5EAA288FB9212E628822265D4141EBD1C47C3CBFCBC
       decimal-places: 6
+    stDYM:
+      denom: ibc/D53E785DC9C5C2CA50CADB1EFE4DE5D0C30418BE0E9C6F2AF9F092A247E8BC22
+      decimal-places: 18
 osmosis-testnet:
   age-tolerance-seconds: 42
   gas-decimals: 6
