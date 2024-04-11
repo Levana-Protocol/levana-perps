@@ -44,6 +44,7 @@ pub(crate) enum TaskLabel {
     RpcHealth,
     Congestion,
     HighGas,
+    BlockLag,
 }
 
 impl TaskLabel {
@@ -64,6 +65,7 @@ impl TaskLabel {
             "rpc-health" => Some(TaskLabel::RpcHealth),
             "congestion" => Some(TaskLabel::Congestion),
             "high-gas" => Some(TaskLabel::HighGas),
+            "block-lag" => Some(TaskLabel::BlockLag),
             _ => {
                 // Being lazy, skipping UltraCrank and Trader, they aren't needed
                 let index = s.strip_prefix("crank-run-")?;
@@ -93,6 +95,7 @@ impl TaskLabel {
             TaskLabel::RpcHealth => false,
             TaskLabel::Congestion => false,
             TaskLabel::HighGas => true,
+            TaskLabel::BlockLag => false,
         }
     }
 }
@@ -256,6 +259,7 @@ impl TaskLabel {
             TaskLabel::RpcHealth => config.rpc_health,
             TaskLabel::Congestion => config.congestion,
             TaskLabel::HighGas => config.high_gas,
+            TaskLabel::BlockLag => config.block_lag,
         }
     }
 
@@ -283,6 +287,7 @@ impl TaskLabel {
             TaskLabel::RpcHealth => false,
             TaskLabel::Congestion => false,
             TaskLabel::HighGas => true,
+            TaskLabel::BlockLag => true,
         }
     }
 
@@ -306,6 +311,7 @@ impl TaskLabel {
             TaskLabel::RpcHealth => "rpc-health".into(),
             TaskLabel::Congestion => "congestion".into(),
             TaskLabel::HighGas => "high-gas".into(),
+            TaskLabel::BlockLag => "block-lag".into(),
         }
     }
 }
