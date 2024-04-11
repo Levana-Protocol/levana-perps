@@ -501,6 +501,8 @@ pub struct WatcherConfig {
     pub congestion: TaskConfig,
     #[serde(default = "defaults::high_gas")]
     pub high_gas: TaskConfig,
+    #[serde(default = "defaults::block_lag")]
+    pub block_lag: TaskConfig,
 }
 
 impl Default for WatcherConfig {
@@ -623,6 +625,12 @@ impl Default for WatcherConfig {
                 // and use a channel to signal when it should be woken up
                 delay: Delay::NoDelay,
                 out_of_date: None,
+                retries: None,
+                delay_between_retries: None,
+            },
+            block_lag: TaskConfig {
+                delay: Delay::Constant(20),
+                out_of_date: Some(20),
                 retries: None,
                 delay_between_retries: None,
             },
