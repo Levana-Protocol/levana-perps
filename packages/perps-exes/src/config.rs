@@ -444,6 +444,7 @@ pub fn parse_deployment(deployment: &str) -> Result<(PerpsNetwork, &str)> {
             "inj",
         ),
         (PerpsNetwork::DymensionTestnet, "dym"),
+        (PerpsNetwork::Regular(CosmosNetwork::NeutronTestnet), "ntrn"),
     ];
     for (network, prefix) in NETWORKS {
         if let Some(suffix) = deployment.strip_prefix(prefix) {
