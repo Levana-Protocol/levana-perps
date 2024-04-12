@@ -98,7 +98,8 @@ impl State<'_> {
         let xlp_instant_rate = XLP_BORROW_FEE_DATA_SERIES.sum(store, starts_at, ends_at)?;
 
         let lp = Collateral::try_from_number(
-            ((lp_instant_rate * pos.counter_collateral.into_number())? / Number::from(NS_PER_YEAR))?,
+            ((lp_instant_rate * pos.counter_collateral.into_number())?
+                / Number::from(NS_PER_YEAR))?,
         )?;
         let xlp = Collateral::try_from_number(
             ((xlp_instant_rate * pos.counter_collateral.into_number())?
