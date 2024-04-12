@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use cosmwasm_std::{Decimal256, OverflowError, Uint128, Uint256};
 use std::{
     fmt::Display,
-    ops::{Add, AddAssign, Sub, SubAssign},
+    ops::{Add, Sub},
     str::FromStr,
 };
 
@@ -228,30 +228,18 @@ macro_rules! unsigned {
         }
 
         impl Add for $t {
-            type Output = Self;
+            type Output = anyhow::Result<Self, OverflowError>;
 
             fn add(self, rhs: Self) -> Self::Output {
-                Self(self.0 + rhs.0)
-            }
-        }
-
-        impl AddAssign for $t {
-            fn add_assign(&mut self, rhs: Self) {
-                self.0 += rhs.0;
+                Ok(Self(self.0.checked_add(rhs.0)?))
             }
         }
 
         impl Sub for $t {
-            type Output = Self;
+            type Output = anyhow::Result<Self, OverflowError>;
 
             fn sub(self, rhs: Self) -> Self::Output {
-                Self(self.0 - rhs.0)
-            }
-        }
-
-        impl SubAssign for $t {
-            fn sub_assign(&mut self, rhs: Self) {
-                self.0 -= rhs.0;
+                Ok(Self(self.0.checked_sub(rhs.0)?))
             }
         }
 

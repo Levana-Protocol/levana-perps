@@ -101,16 +101,22 @@ fn pending_fees_in_query() {
     let closed = market.query_closed_position(&trader, pos_id).unwrap();
 
     // Since deferred execution, we always have an extra time jump between query and close. Account for that difference.
-    let fee_difference = closed.borrow_fee_collateral.into_signed() + closed.funding_fee_collateral
-        - pos.borrow_fee_collateral.into_signed()
-        - pos.funding_fee_collateral;
+    let fee_difference =
+        (((closed.borrow_fee_collateral.into_signed() + closed.funding_fee_collateral).unwrap()
+            - pos.borrow_fee_collateral.into_signed())
+        .unwrap()
+            - pos.funding_fee_collateral)
+            .unwrap();
 
-    assert_eq!(closed.pnl_collateral, pos.pnl_collateral - fee_difference);
+    assert_eq!(
+        closed.pnl_collateral,
+        (pos.pnl_collateral - fee_difference).unwrap()
+    );
 
     // Ensure that the DNF before closing (taken from pos_no_fees) plus the
     // calculated DNF amount equals the final DNF value.
     assert_eq!(
-        pos_no_fees.delta_neutrality_fee_collateral + dnf_on_close,
+        (pos_no_fees.delta_neutrality_fee_collateral + dnf_on_close).unwrap(),
         closed.delta_neutrality_fee_collateral
     );
 
@@ -121,8 +127,9 @@ fn pending_fees_in_query() {
     );
     assert_eq!(
         closed.pnl_collateral,
-        pos_accumulated_fees.pnl_collateral
-            - pos_accumulated_fees.dnf_on_close_collateral
-            - fee_difference,
+        ((pos_accumulated_fees.pnl_collateral - pos_accumulated_fees.dnf_on_close_collateral)
+            .unwrap()
+            - fee_difference)
+            .unwrap(),
     );
 }

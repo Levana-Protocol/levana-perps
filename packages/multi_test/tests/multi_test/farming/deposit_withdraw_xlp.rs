@@ -30,7 +30,7 @@ fn deposit_xlp() {
     market
         .exec_farming_deposit_xlp(
             &lp,
-            NonZero::new(info1.xlp_amount + "1".parse().unwrap()).unwrap(),
+            NonZero::new((info1.xlp_amount + "1".parse().unwrap()).unwrap()).unwrap(),
         )
         .unwrap_err();
     market
@@ -50,7 +50,7 @@ fn deposit_xlp() {
     market
         .exec_farming_withdraw_xlp(
             &lp,
-            Some(NonZero::new(stats2.farming_tokens + "1".parse().unwrap()).unwrap()),
+            Some(NonZero::new((stats2.farming_tokens + "1".parse().unwrap()).unwrap()).unwrap()),
         )
         .unwrap_err();
     market

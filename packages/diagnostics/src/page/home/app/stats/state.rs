@@ -66,13 +66,8 @@ impl<T: NumberExt> NumberSliceExt for &[T] {
         let max = self.iter().map(|x| x.into_number_ext()).max();
 
         max.and_then(|max| {
-            let denom = max - min;
-
-            if denom == Number::ZERO {
-                return None;
-            } else {
-                Some((value - min) / denom)
-            }
+            let denom = (max - min).ok()?;
+            ((value - min).ok()? / denom).ok()
         })
     }
 }

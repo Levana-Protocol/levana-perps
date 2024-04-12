@@ -50,14 +50,15 @@ fn position_update_collateral_impact_leverage() {
 
         assert_eq!(
             updated_pos.deposit_collateral,
-            initial_collateral.into_signed() + collateral_delta
+            (initial_collateral.into_signed() + collateral_delta).unwrap()
         );
 
         assert!(
             updated_pos
                 .leverage
                 .into_number()
-                .approx_eq_eps(expected_leverage.into_number(), Number::EPS_E6),
+                .approx_eq_eps(expected_leverage.into_number(), Number::EPS_E6)
+                .unwrap(),
             "direction: {:?}, expected_leverage: {}, actual_leverage: {}",
             direction,
             expected_leverage,
@@ -166,14 +167,15 @@ fn position_update_collateral_impact_size() {
 
         assert_eq!(
             updated_pos.deposit_collateral,
-            initial_collateral.into_signed() + collateral_delta
+            (initial_collateral.into_signed() + collateral_delta).unwrap()
         );
 
         assert!(
             updated_pos
                 .notional_size
                 .into_number()
-                .approx_eq_eps(expected_size.into_number(), Number::EPS_E6),
+                .approx_eq_eps(expected_size.into_number(), Number::EPS_E6)
+                .unwrap(),
             "direction: {:?}, expected_size: {}, actual_size: {}",
             direction,
             expected_size,
@@ -277,7 +279,8 @@ fn position_update_max_gains() {
             updated_pos
                 .counter_collateral
                 .into_number()
-                .approx_eq_eps(expected_counter_collateral.into_number(), Number::EPS_E6),
+                .approx_eq_eps(expected_counter_collateral.into_number(), Number::EPS_E6)
+                .unwrap(),
             "direction: {:?}, expected_counter_collateral: {}, actual_counter_collateral: {}",
             direction,
             expected_counter_collateral,
@@ -399,12 +402,14 @@ fn position_update_open_interest_inner(
     assert!(expected_notional_size_updated
         .abs()
         .into_number()
-        .approx_eq(notional_size_to_check.into_number()));
+        .approx_eq(notional_size_to_check.into_number())
+        .unwrap());
     assert_eq!(Notional::zero(), other_notional_size);
     assert!(updated_pos
         .notional_size
         .into_number()
-        .approx_eq(expected_notional_size_updated.into_number()));
+        .approx_eq(expected_notional_size_updated.into_number())
+        .unwrap());
 
     market.exec_close_position(&trader, pos_id, None).unwrap();
     let _pos = market.query_closed_position(&trader, pos.id).unwrap();
@@ -527,7 +532,8 @@ fn position_update_leverage() {
             updated_pos
                 .active_collateral
                 .into_number()
-                .approx_eq_eps(expected_active_collateral.into_number(), Number::EPS_E6),
+                .approx_eq_eps(expected_active_collateral.into_number(), Number::EPS_E6)
+                .unwrap(),
             "active_collateral {} is not equal to expected {} for {:?} position",
             updated_pos.active_collateral,
             expected_active_collateral,
@@ -537,7 +543,8 @@ fn position_update_leverage() {
             updated_pos
                 .leverage
                 .into_number()
-                .approx_eq_eps(expected_leverage.into_number(), Number::EPS_E6),
+                .approx_eq_eps(expected_leverage.into_number(), Number::EPS_E6)
+                .unwrap(),
             "leverage {} is not equal to expected {} for {:?} position",
             updated_pos.leverage,
             expected_leverage,
@@ -614,6 +621,7 @@ fn test_position_update_max_leverage_fail() {
             &trader,
             pos_id,
             (market.query_config().unwrap().max_leverage * Number::from(2u64))
+                .unwrap()
                 .to_string()
                 .parse()
                 .unwrap(),
@@ -662,9 +670,9 @@ fn position_update_abs_notional_size() {
         pub fn size_sign_abs(&self) -> Sign {
             match *self {
                 ChangeKind::Collateral(delta) => delta.into(),
-                ChangeKind::Leverage(leverage) => {
-                    (Number::from(leverage) - Number::from(10u64)).into()
-                }
+                ChangeKind::Leverage(leverage) => (Number::from(leverage) - Number::from(10u64))
+                    .unwrap()
+                    .into(),
             }
         }
         pub fn size_sign_opinionated(
@@ -750,7 +758,7 @@ fn position_update_abs_notional_size() {
                 let updated_pos = market.query_position(pos_id).unwrap();
 
                 assert_eq!(
-                    updated_pos.notional_size - original_pos.notional_size,
+                    (updated_pos.notional_size - original_pos.notional_size).unwrap(),
                     evt.notional_size_delta
                 );
 

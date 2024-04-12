@@ -386,11 +386,14 @@ fn defer_before_crank_2855() {
 
     assert!(update_active_collateral > initial_active_collateral);
     assert!(
-        update_active_collateral.sub(initial_active_collateral)
+        update_active_collateral
+            .sub(initial_active_collateral)
+            .unwrap()
             > (update_event
                 .active_collateral_delta
                 .into_number()
                 .mul(Number::from_str("10").unwrap()))
+            .unwrap()
             .abs()
     );
 

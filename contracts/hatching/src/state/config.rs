@@ -67,9 +67,6 @@ pub(crate) fn lvn_from_nft_spirit_level(
     };
     let lvn_multiplier: NumberGtZero = lvn_multiplier.parse()?;
 
-    let lvn =
-        NumberGtZero::try_from_number(spirit_level.into_number() * lvn_multiplier.into_number())
-            .context("cannot have non-zero lvn")?;
-
-    Ok(lvn)
+    NumberGtZero::try_from_number((spirit_level.into_number() * lvn_multiplier.into_number())?)
+        .context("cannot have non-zero lvn")
 }

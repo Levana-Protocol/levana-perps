@@ -60,7 +60,7 @@ pub async fn test_wallet_balance_decrease(perp_app: &PerpApp) -> Result<()> {
     let direction = DirectionToBase::Long;
     let max_gains = MaxGainsInQuote::from_str("0.44")?;
     let max_slippage = Number::from_str("1")?;
-    let tolerance = max_slippage / 100;
+    let tolerance = (max_slippage / 100)?;
     let entry_price = PriceBaseInQuote::from_str("9.9")?;
     let leverage = LeverageToBase::from_str("10")?;
 
@@ -114,7 +114,7 @@ pub async fn test_update_collateral(perp_app: &PerpApp) -> Result<()> {
     let direction = DirectionToBase::Long;
     let max_gains = MaxGainsInQuote::from_str("0.44")?;
     let max_slippage = Number::from_str("1")?;
-    let tolerance = max_slippage / 100;
+    let tolerance = (max_slippage / 100)?;
     let entry_price = PriceBaseInQuote::from_str("9.9")?;
     let leverage = LeverageToBase::from_str("10")?;
 
@@ -172,9 +172,8 @@ pub async fn test_update_collateral(perp_app: &PerpApp) -> Result<()> {
         _ => bail!("More than one position found"),
     };
 
-    let delta = position_detail.deposit_collateral.into_number()
-        - Number::from_str("105")?
-        - slippage_fee.into_number();
+    let delta = ((position_detail.deposit_collateral.into_number() - Number::from_str("105")?)?
+        - slippage_fee.into_number())?;
     ensure!(
         delta < Number::from_str("1")?,
         format!(
@@ -211,9 +210,8 @@ pub async fn test_update_collateral(perp_app: &PerpApp) -> Result<()> {
     };
 
     ensure!(
-        position_detail.deposit_collateral.into_number()
-            - Number::from_str("100")?
-            - slippage_fee.into_number()
+        ((position_detail.deposit_collateral.into_number() - Number::from_str("100")?)?
+            - slippage_fee.into_number())?
             < Number::from_str("1")?,
         format!(
             "Postion reduced successfully: {}",
@@ -253,7 +251,7 @@ pub async fn test_update_leverage(perp_app: &PerpApp) -> Result<()> {
     let direction = DirectionToBase::Long;
     let max_gains = MaxGainsInQuote::from_str("0.44")?;
     let max_slippage = Number::from_str("1")?;
-    let tolerance = max_slippage / 100;
+    let tolerance = (max_slippage / 100)?;
     let entry_price = PriceBaseInQuote::from_str("9.47")?;
     let leverage = LeverageToBase::from_str("10")?;
 
@@ -288,7 +286,7 @@ pub async fn test_update_leverage(perp_app: &PerpApp) -> Result<()> {
     let new_position_detail = perp_app.market.position_detail(position_detail.id).await?;
 
     let diff_leverage =
-        new_position_detail.leverage.into_number() - position_detail.leverage.into_number();
+        (new_position_detail.leverage.into_number() - position_detail.leverage.into_number())?;
 
     ensure!(
         diff_leverage > "0.9".parse()? && diff_leverage < "1".parse()?,
@@ -307,7 +305,7 @@ pub async fn test_update_max_gains(perp_app: &PerpApp) -> Result<()> {
     let direction = DirectionToBase::Long;
     let max_gains = MaxGainsInQuote::from_str("0.44")?;
     let max_slippage = Number::from_str("1")?;
-    let tolerance = max_slippage / 100;
+    let tolerance = (max_slippage / 100)?;
     let entry_price = PriceBaseInQuote::from_str("9.47")?;
     let leverage = LeverageToBase::from_str("10")?;
 
@@ -344,13 +342,13 @@ pub async fn test_update_max_gains(perp_app: &PerpApp) -> Result<()> {
     // TODO: remove this once the deprecated fields are fully removed
     #[allow(deprecated)]
     if let Some(max_gains) = new_position_detail.max_gains_in_quote {
-        let diff_max_gains = match max_gains {
+        let diff_max_gains = (match max_gains {
             MaxGainsInQuote::Finite(x) => x.into_number(),
             MaxGainsInQuote::PosInfinity => anyhow::bail!("Infinite max gains for new position"),
         } - match max_gains {
             MaxGainsInQuote::Finite(x) => x.into_number(),
             MaxGainsInQuote::PosInfinity => anyhow::bail!("Infinite max gains for position_detail"),
-        };
+        })?;
 
         // 0.5 - 0.44 = 0.06
         ensure!(

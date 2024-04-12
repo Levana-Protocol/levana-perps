@@ -59,7 +59,7 @@ impl ConfigDefaults {
         // Spreadsheet calculated this value:
         //
         // https://docs.google.com/spreadsheets/d/15EG3I6XnaUKI20ja7XiCqLOjFS80QhKdnoL-PsjzJ-0/edit#gid=0
-        NumberGtZero::try_from(Number::ONE / Number::try_from("12").unwrap()).unwrap()
+        NumberGtZero::try_from((Number::ONE / Number::try_from("12").unwrap()).unwrap()).unwrap()
     }
 
     pub fn max_xlp_rewards_multiplier() -> NumberGtZero {

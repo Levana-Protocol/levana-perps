@@ -78,7 +78,7 @@ impl PositionUpdateRemoveCollateralImpactSize {
 
             let slippage_assert = Some(SlippageAssert {
                 price: PriceBaseInQuote::try_from_number(
-                    market_price.price_base.into_number() * Number::two(),
+                    (market_price.price_base.into_number() * Number::two()).unwrap(),
                 )
                 .unwrap(),
                 tolerance: "0.0".parse().unwrap(),
@@ -104,7 +104,7 @@ impl PositionUpdateRemoveCollateralImpactSize {
             let market_price = market.query_current_price().unwrap();
             let slippage_assert = Some(SlippageAssert {
                 price: PriceBaseInQuote::try_from_number(
-                    market_price.price_base.into_number() * Number::two(),
+                    (market_price.price_base.into_number() * Number::two()).unwrap(),
                 )
                 .unwrap(),
                 tolerance: "100000.0".parse().unwrap(),
@@ -151,8 +151,9 @@ impl PositionUpdateAddCollateralImpactSize {
 
                 let slippage_assert = Some(SlippageAssert {
                     price: PriceBaseInQuote::try_from_number(
-                        market_price.price_base.into_number()
-                            * Number::try_from(slippage_assert.to_string()).unwrap(),
+                        (market_price.price_base.into_number()
+                            * Number::try_from(slippage_assert.to_string()).unwrap())
+                        .unwrap(),
                     )
                     .unwrap(),
                     tolerance: "0.1".parse().unwrap(),
@@ -181,8 +182,9 @@ impl PositionUpdateAddCollateralImpactSize {
 
                 let slippage_assert = Some(SlippageAssert {
                     price: PriceBaseInQuote::try_from_number(
-                        market_price.price_base.into_number()
-                            * Number::try_from(slippage_assert.to_string()).unwrap(),
+                        (market_price.price_base.into_number()
+                            * Number::try_from(slippage_assert.to_string()).unwrap())
+                        .unwrap(),
                     )
                     .unwrap(),
                     tolerance: "0.1".parse().unwrap(),

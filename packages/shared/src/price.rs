@@ -437,11 +437,11 @@ impl TryFrom<pyth_sdk_cw::Price> for Number {
     fn try_from(price: pyth_sdk_cw::Price) -> Result<Self, Self::Error> {
         let n: Number = price.price.to_string().parse()?;
 
-        Ok(match price.expo.cmp(&0) {
-            std::cmp::Ordering::Equal => n,
+        match price.expo.cmp(&0) {
+            std::cmp::Ordering::Equal => Ok(n),
             std::cmp::Ordering::Greater => n * Number::from(10u128.pow(price.expo.unsigned_abs())),
             std::cmp::Ordering::Less => n / Number::from(10u128.pow(price.expo.unsigned_abs())),
-        })
+        }
     }
 }
 

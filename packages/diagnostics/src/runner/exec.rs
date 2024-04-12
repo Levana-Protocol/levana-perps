@@ -140,7 +140,7 @@ where
 
         let leverage = self.rand_leverage(direction, self.market_type);
         let max_gains =
-            self.rand_max_gains(direction, leverage, self.market_type, &self.market_config);
+            self.rand_max_gains(direction, leverage, self.market_type, &self.market_config)?;
 
         let min_collateral: f64 = price_point
             .usd_to_collateral(self.market_config.minimum_deposit_usd)
@@ -234,7 +234,7 @@ where
                             pos.leverage,
                             self.market_type,
                             &self.market_config,
-                        ),
+                        )?,
                     };
                     (execute_msg, None)
                 }
@@ -264,7 +264,7 @@ where
                     .await?;
                 self.bridge
                     .mint_and_deposit_lp(
-                        (funds * pos.leverage.into_number())
+                        (funds * pos.leverage.into_number())?
                             .try_into_non_zero()
                             .unwrap(),
                     )
@@ -405,7 +405,7 @@ where
         leverage_base: LeverageToBase,
         market_type: MarketType,
         config: &MarketConfig,
-    ) -> MaxGainsInQuote {
+    ) -> Result<MaxGainsInQuote> {
         fn calculate_max_gains_range_collateral_is_base(
             max_leverage_base: LeverageToBase,
             leverage: LeverageToBase,
@@ -442,7 +442,7 @@ where
 
         let leverage_notional: f32 = leverage_base
             .into_signed(direction)
-            .into_notional(market_type)
+            .into_notional(market_type)?
             .into_number()
             .to_string()
             .parse::<f32>()
@@ -451,7 +451,7 @@ where
 
         let max_leverage_notional: f32 = max_leverage_base
             .into_signed(direction)
-            .into_notional(market_type)
+            .into_notional(market_type)?
             .into_number()
             .to_string()
             .parse::<f32>()
@@ -492,7 +492,7 @@ where
             )
         };
 
-        if max_gains_can_be_infinite {
+        Ok(if max_gains_can_be_infinite {
             if self.rng.gen::<bool>() {
                 MaxGainsInQuote::PosInfinity
             } else {
@@ -500,6 +500,6 @@ where
             }
         } else {
             finite
-        }
+        })
     }
 }

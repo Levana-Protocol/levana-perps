@@ -123,8 +123,10 @@ impl Display for SimpleCosmosNetwork {
     }
 }
 
-fn ratio_to_percent(r: Signed<Decimal256>) -> String {
-    to_percent(&(r * Decimal256::from_ratio(100u8, 1u8).into_signed()).to_string())
+fn ratio_to_percent(r: Signed<Decimal256>) -> Result<String> {
+    Ok(to_percent(
+        &(r * Decimal256::from_ratio(100u8, 1u8).into_signed())?.to_string(),
+    ))
 }
 
 fn to_percent(s: &str) -> String {
@@ -260,8 +262,8 @@ async fn load_whale_market_data(
             "ryETH_USD" => "YieldETH_USD".parse()?,
             _ => market_info.market_id,
         },
-        long_funding: ratio_to_percent(long_funding),
-        short_funding: ratio_to_percent(short_funding),
+        long_funding: ratio_to_percent(long_funding)?,
+        short_funding: ratio_to_percent(short_funding)?,
         lp_apr_1d,
         xlp_apr_1d,
         lp_apr_7d,

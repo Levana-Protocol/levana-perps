@@ -175,14 +175,14 @@ impl OraclePriceInternal {
             };
 
             let price = if *inverted {
-                Number::ONE / price.into_number()
+                (Number::ONE / price.into_number())?
             } else {
                 price.into_number()
             };
 
             acc_price = match acc_price {
                 None => Some(price),
-                Some(prev_price) => Some(prev_price * price),
+                Some(prev_price) => Some((prev_price * price)?),
             }
         }
 
@@ -745,9 +745,12 @@ mod tests {
 
         let eth = Number::try_from(eth_usd).unwrap();
         let btc = Number::try_from(btc_usd).unwrap();
-        let btc = Number::ONE / btc;
+        let btc = (Number::ONE / btc).unwrap();
         let eth_btc = eth * btc;
 
-        assert_eq!(eth_btc, Number::try_from("0.062758112133468261").unwrap());
+        assert_eq!(
+            eth_btc.unwrap(),
+            Number::try_from("0.062758112133468261").unwrap()
+        );
     }
 }

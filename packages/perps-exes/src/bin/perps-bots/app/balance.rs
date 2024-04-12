@@ -42,8 +42,8 @@ impl WatchedTaskPerMarket for TrackBalance {
 
 async fn check_balance_single(market: &MarketContract) -> Result<()> {
     let status = market.status().await?;
-    let net_notional = status.long_notional.into_number() - status.short_notional.into_number();
-    let instant = net_notional / status.config.delta_neutrality_fee_sensitivity.into_signed();
+    let net_notional = (status.long_notional.into_number() - status.short_notional.into_number())?;
+    let instant = (net_notional / status.config.delta_neutrality_fee_sensitivity.into_signed())?;
     let instant_abs = instant.abs_unsigned();
     if instant_abs <= status.config.delta_neutrality_fee_cap.raw() {
         Ok(())
@@ -94,8 +94,8 @@ async fn single_market(
     let market_id = &market.market_id;
     let market = &market.market;
     let status = market.status().await?;
-    let net_notional = status.long_notional.into_number() - status.short_notional.into_number();
-    let instant = net_notional / status.config.delta_neutrality_fee_sensitivity.into_signed();
+    let net_notional = (status.long_notional.into_number() - status.short_notional.into_number())?;
+    let instant = (net_notional / status.config.delta_neutrality_fee_sensitivity.into_signed())?;
     let instant_abs = instant.abs_unsigned();
 
     // Ensure the protocol stays within a 1/3 portion of the cap
@@ -132,7 +132,7 @@ async fn single_market(
 
     // If utilization ratio is too high, back off
     if status.liquidity.locked.into_decimal256()
-        / (status.liquidity.total_collateral()).into_decimal256()
+        / (status.liquidity.total_collateral()?).into_decimal256()
         > "0.99".parse().unwrap()
     {
         anyhow::bail!("Cannot balance {market_id}, utilization ratio is too high");
@@ -154,7 +154,7 @@ async fn single_market(
     // into notional leverage and then getting its absolute value.
     let leverage_divider = leverage
         .into_signed(direction)
-        .into_notional(market_id.get_market_type())
+        .into_notional(market_id.get_market_type())?
         .into_number()
         .abs_unsigned();
 

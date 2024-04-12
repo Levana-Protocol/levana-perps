@@ -68,15 +68,18 @@ async fn check_liquidity_transaction_alert(
         RiseDown,
     }
 
-    let diff_total_liqudity = latest_stats.liquidity.total_collateral().into_signed()
-        - historical_status.liquidity.total_collateral().into_signed();
+    let diff_total_liqudity = (latest_stats.liquidity.total_collateral()?.into_signed()
+        - historical_status
+            .liquidity
+            .total_collateral()?
+            .into_signed())?;
     let change_type = if diff_total_liqudity.is_strictly_positive() {
         DeltaChange::RiseUp
     } else {
         DeltaChange::RiseDown
     };
 
-    let historical_total_collateral = historical_status.liquidity.total_collateral();
+    let historical_total_collateral = historical_status.liquidity.total_collateral()?;
     // If this is not ensured, you would get divide by zero errors
     ensure!(
         historical_total_collateral.ne(&Collateral::zero()),

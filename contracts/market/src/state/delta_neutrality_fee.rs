@@ -203,11 +203,11 @@ impl DeltaNeutralityFeeMultiPass {
     }
 
     pub(crate) fn run(&mut self) -> Result<()> {
-        let net_notional_after = self.net_notional + self.delta_notional;
+        let net_notional_after = (self.net_notional + self.delta_notional)?;
         let net_notional = self.net_notional;
-        if (net_notional.into_number() * net_notional_after.into_number()).is_negative() {
+        if (net_notional.into_number() * net_notional_after.into_number())?.is_negative() {
             self.update_inner(-net_notional)?;
-            self.update_inner(self.delta_notional + net_notional)?;
+            self.update_inner((self.delta_notional + net_notional)?)?;
         } else {
             self.update_inner(self.delta_notional)?;
         }
@@ -272,7 +272,7 @@ impl DeltaNeutralityFeeMultiPass {
                 // This should just be a rounding error, so prove that with a debug assertion
                 debug_assert!((-n)
                     .into_number()
-                    .approx_eq(total_in_fund_so_far.into_number()));
+                    .approx_eq(total_in_fund_so_far.into_number())?);
                 -total_in_fund_so_far.into_signed()
             } else {
                 n
@@ -298,13 +298,13 @@ impl DeltaNeutralityFeeMultiPass {
             None => amount_in_collateral,
         };
 
-        self.fees += amount_in_collateral;
+        self.fees = (self.fees + amount_in_collateral)?;
 
         debug_assert!(
-            (self.total_in_fund_before_calc.into_signed() + self.fees).is_positive_or_zero()
+            (self.total_in_fund_before_calc.into_signed() + self.fees)?.is_positive_or_zero()
         );
 
-        self.net_notional += delta_notional;
+        self.net_notional = (self.net_notional + delta_notional)?;
 
         Ok(())
     }
@@ -316,23 +316,26 @@ fn calculate_delta_neutrality_fee_amount(
     net_notional: Number,
     delta_notional: Number,
 ) -> Result<Number> {
-    let notional_low_cap = -cap * sensitivity;
-    let notional_high_cap = cap * sensitivity;
+    let notional_low_cap = (-cap * sensitivity)?;
+    let notional_high_cap = (cap * sensitivity)?;
 
-    let delta_notional_at_low_cap =
-        (net_notional + delta_notional).min(notional_low_cap) - net_notional.min(notional_low_cap);
-    let delta_notional_at_high_cap = (net_notional + delta_notional).max(notional_high_cap)
-        - net_notional.max(notional_high_cap);
+    let delta_notional_at_low_cap = ((net_notional + delta_notional)?.min(notional_low_cap)
+        - net_notional.min(notional_low_cap))?;
+    let delta_notional_at_high_cap = ((net_notional + delta_notional)?.max(notional_high_cap)
+        - net_notional.max(notional_high_cap))?;
     let delta_notional_uncapped =
-        delta_notional - delta_notional_at_low_cap - delta_notional_at_high_cap;
+        ((delta_notional - delta_notional_at_low_cap)? - delta_notional_at_high_cap)?;
 
-    let mut delta_neutrality_fee_amount = delta_notional_at_low_cap * -cap;
-    delta_neutrality_fee_amount += delta_notional_at_high_cap * cap;
-    delta_neutrality_fee_amount += (delta_notional_uncapped * delta_notional_uncapped
-        + Number::two()
-            * delta_notional_uncapped
-            * net_notional.min(notional_high_cap).max(notional_low_cap))
-        / (Number::two() * sensitivity);
+    let mut delta_neutrality_fee_amount = (delta_notional_at_low_cap * -cap)?;
+    delta_neutrality_fee_amount =
+        (delta_neutrality_fee_amount + (delta_notional_at_high_cap * cap)?)?;
+
+    let net_notional_cap = net_notional.min(notional_high_cap).max(notional_low_cap);
+    let amount = (((delta_notional_uncapped * delta_notional_uncapped)?
+        + ((Number::two() * delta_notional_uncapped)? * net_notional_cap)?)?
+        / (Number::two() * sensitivity)?)?;
+
+    delta_neutrality_fee_amount = (delta_neutrality_fee_amount + amount)?;
 
     Ok(delta_neutrality_fee_amount)
 }
@@ -354,15 +357,15 @@ mod test {
         let fee2 = calculate_delta_neutrality_fee_amount(
             cap,
             sensitivity,
-            net_notional + delta,
-            -(net_notional + delta),
+            (net_notional + delta).unwrap(),
+            -(net_notional + delta).unwrap(),
         )
         .unwrap();
         let fee3 =
             calculate_delta_neutrality_fee_amount(cap, sensitivity, net_notional, -net_notional)
                 .unwrap();
 
-        assert_eq!(fee1 + fee2, fee3)
+        assert_eq!((fee1 + fee2).unwrap(), fee3)
     }
 
     proptest! {

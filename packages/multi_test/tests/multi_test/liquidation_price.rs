@@ -60,7 +60,8 @@ fn liquidation_price() {
                 position_data
                     .leverage
                     .into_number()
-                    .approx_eq_eps("10.20418576".parse().unwrap(), Number::EPS_E6),
+                    .approx_eq_eps("10.20418576".parse().unwrap(), Number::EPS_E6)
+                    .unwrap(),
                 "leverage is miscalculated"
             );
         }
@@ -84,7 +85,8 @@ fn liquidation_price() {
                 position_data
                     .leverage
                     .into_number()
-                    .approx_eq_eps("10.13065974".parse().unwrap(), Number::EPS_E6),
+                    .approx_eq_eps("10.13065974".parse().unwrap(), Number::EPS_E6)
+                    .unwrap(),
                 "leverage is miscalculated"
             );
         }
@@ -125,6 +127,7 @@ fn liquidation_price_updates_perp_874() {
     // amount. It should trigger a liquidation.
     let new_price: PriceBaseInQuote = (liquidation_price2.into_number()
         + "0.0001".parse().unwrap())
+    .unwrap()
     .to_string()
     .parse()
     .unwrap();
@@ -170,6 +173,7 @@ fn deposit_collateral_stops_liquidation_perp_874() {
     // amount. It should _not_ trigger a liquidation.
     let new_price: PriceBaseInQuote = (liquidation_price1.into_number()
         + "0.000001".parse().unwrap())
+    .unwrap()
     .to_string()
     .parse()
     .unwrap();
@@ -219,7 +223,7 @@ fn pnl_from_liquidation_perp_1404() {
 
     let closed = market.query_closed_position(&trader, pos_id).unwrap();
 
-    let additional_pnl = closed.pnl_collateral - pos.pnl_collateral;
+    let additional_pnl = (closed.pnl_collateral - pos.pnl_collateral).unwrap();
     assert!(
         additional_pnl < "-0.1".parse().unwrap(),
         "Didn't lose more money from price movement. Old PnL: {}. New PnL: {}. Additional PnL: {}.",
@@ -284,7 +288,7 @@ fn normal_price_trader_gets_something() {
     market.exec_crank(&Addr::unchecked("anybody")).unwrap();
 
     let closed = market.query_closed_position(&trader, pos_id).unwrap();
-    assert!(closed.active_collateral < pos_after_open.liquidation_margin.total());
+    assert!(closed.active_collateral < pos_after_open.liquidation_margin.total().unwrap());
     assert!(closed.active_collateral > Collateral::zero());
     assert!(closed.pnl_collateral > "-100".parse().unwrap());
 }

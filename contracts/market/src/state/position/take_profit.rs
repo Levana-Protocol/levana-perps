@@ -64,7 +64,7 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
             TakeProfitTrader::PosInfinity => {
                 let leverage_to_notional = leverage_to_base
                     .into_signed(direction)
-                    .into_notional(market_type);
+                    .into_notional(market_type)?;
 
                 let notional_size_in_collateral =
                     leverage_to_notional.checked_mul_collateral(collateral)?;
@@ -102,8 +102,8 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
 
                 let counter_collateral = take_profit_price_notional
                     .into_number()
-                    .sub(price_point.price_notional.into_number())
-                    .mul(notional_size.into_number());
+                    .sub(price_point.price_notional.into_number())?
+                    .mul(notional_size.into_number())?;
 
                 NonZero::new(Collateral::try_from_number(counter_collateral)?)
                     .context("counter_collateral is zero")
@@ -126,10 +126,10 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
         } = *self;
 
         // minimum allowed counter-collateral
-        let min_counter_collateral = price_point
+        let min_counter_collateral = (price_point
             .notional_to_collateral(self.notional_size()?.abs_unsigned())
             .into_number()
-            / config.max_leverage;
+            / config.max_leverage)?;
 
         // user requested counter_collateral
         let req_counter_collateral = self.counter_collateral(take_profit_trader)?.into_number();

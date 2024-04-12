@@ -33,7 +33,7 @@ impl<'a> BackwardsCompatTakeProfit<'a> {
                 MaxGainsInQuote::PosInfinity => Ok(TakeProfitTrader::PosInfinity),
                 MaxGainsInQuote::Finite(_) => {
                     let leverage_to_notional =
-                        leverage.into_signed(direction).into_notional(market_type);
+                        leverage.into_signed(direction).into_notional(market_type)?;
 
                     let notional_size_in_collateral =
                         leverage_to_notional.checked_mul_collateral(collateral)?;
@@ -93,7 +93,7 @@ impl<'a> TakeProfitFromCounterCollateral<'a> {
                 .checked_div(notional_size.into_number())?,
         )?;
 
-        let take_profit_price = if take_profit_price_raw.approx_eq(Number::ZERO) {
+        let take_profit_price = if take_profit_price_raw.approx_eq(Number::ZERO)? {
             None
         } else {
             debug_assert!(
@@ -124,7 +124,7 @@ pub fn calc_notional_size(
 ) -> Result<Signed<Notional>> {
     let leverage_to_base = leverage.into_signed(direction);
 
-    let leverage_to_notional = leverage_to_base.into_notional(market_type);
+    let leverage_to_notional = leverage_to_base.into_notional(market_type)?;
 
     let notional_size_in_collateral = leverage_to_notional.checked_mul_collateral(collateral)?;
 

@@ -46,7 +46,7 @@ impl Opt {
                 .timestamp;
 
             let net_notional =
-                status.long_notional.into_signed() - status.short_notional.into_signed();
+                (status.long_notional.into_signed() - status.short_notional.into_signed())?;
 
             let largest_net_abs = Notional::from_decimal256(
                 status.config.delta_neutrality_fee_sensitivity.raw()

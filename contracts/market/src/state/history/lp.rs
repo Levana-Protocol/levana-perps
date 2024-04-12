@@ -192,8 +192,8 @@ impl State<'_> {
         let deposit = deposit.raw();
         let deposit_usd = price.collateral_to_usd(deposit);
 
-        summary.deposit += deposit;
-        summary.deposit_usd += deposit_usd;
+        summary.deposit = (summary.deposit + deposit)?;
+        summary.deposit_usd = (summary.deposit_usd + deposit_usd)?;
 
         LP_HISTORY_SUMMARY.save(ctx.storage, addr, &summary)?;
 
@@ -217,8 +217,8 @@ impl State<'_> {
         let yield_earned = yield_earned.raw();
         let yield_usd = price.collateral_to_usd(yield_earned);
 
-        summary.r#yield += yield_earned;
-        summary.yield_usd += yield_usd;
+        summary.r#yield = (summary.r#yield + yield_earned)?;
+        summary.yield_usd = (summary.yield_usd + yield_usd)?;
 
         LP_HISTORY_SUMMARY.save(ctx.storage, addr, &summary)?;
 

@@ -68,15 +68,15 @@ async fn check_liquidity_transaction_alert(
         RiseDown,
     }
 
-    let diff_total_deposits = latest_stats.liquidity.total_tokens().into_signed()
-        - historical_status.liquidity.total_tokens().into_signed();
+    let diff_total_deposits = (latest_stats.liquidity.total_tokens()?.into_signed()
+        - historical_status.liquidity.total_tokens()?.into_signed())?;
     let change_type = if diff_total_deposits.is_strictly_positive() {
         DeltaChange::RiseUp
     } else {
         DeltaChange::RiseDown
     };
 
-    let historical_total_tokens = historical_status.liquidity.total_tokens();
+    let historical_total_tokens = historical_status.liquidity.total_tokens()?;
     // If this is not ensured, you would get divide by zero errors
     ensure!(
         historical_total_tokens.ne(&LpToken::zero()),

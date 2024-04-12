@@ -403,15 +403,15 @@ enum ActionWithReason {
 }
 
 impl NeedsPriceUpdateInfo {
-    fn actions(&self, params: &NeedsPriceUpdateParams) -> ActionWithReason {
+    fn actions(&self, params: &NeedsPriceUpdateParams) -> Result<ActionWithReason> {
         // Keep the protocol lively: if on-chain price is too old or too
         // different from off-chain price, update price and crank.
         let oracle_to_off_chain_delta = (self.on_chain_oracle_price.into_number()
-            - self.off_chain_price.into_number())
+            - self.off_chain_price.into_number())?
         .abs_unsigned()
             / self.off_chain_price.into_non_zero().raw();
         let market_to_off_chain_delta = (self.on_chain_market_price.into_number()
-            - self.off_chain_price.into_number())
+            - self.off_chain_price.into_number())?
         .abs_unsigned()
             / self.off_chain_price.into_non_zero().raw();
 
@@ -434,21 +434,23 @@ impl NeedsPriceUpdateInfo {
             } else {
                 GasLevel::Normal
             };
-            return ActionWithReason::WorkNeeded(CrankTriggerReason::PriceWillTrigger {
-                gas_level,
-            });
+            return Ok(ActionWithReason::WorkNeeded(
+                CrankTriggerReason::PriceWillTrigger { gas_level },
+            ));
         }
 
         let on_chain_age = self
             .off_chain_publish_time
             .signed_duration_since(self.on_chain_market_publish_time);
         if on_chain_age > params.on_chain_publish_time_age_threshold {
-            return ActionWithReason::WorkNeeded(CrankTriggerReason::OnChainTooOld {
-                on_chain_age,
-                off_chain_publish_time: self.off_chain_publish_time,
-                // here we provide the publish time from the market because it is the older of the two.
-                on_chain_oracle_publish_time: self.on_chain_market_publish_time,
-            });
+            return Ok(ActionWithReason::WorkNeeded(
+                CrankTriggerReason::OnChainTooOld {
+                    on_chain_age,
+                    off_chain_publish_time: self.off_chain_publish_time,
+                    // here we provide the publish time from the market because it is the older of the two.
+                    on_chain_oracle_publish_time: self.on_chain_market_publish_time,
+                },
+            ));
         }
 
         // See comment on needs_crank = true below.
@@ -474,9 +476,11 @@ impl NeedsPriceUpdateInfo {
             if timestamp <= self.off_chain_publish_time
                 && timestamp > self.on_chain_oracle_publish_time
             {
-                return ActionWithReason::WorkNeeded(CrankTriggerReason::CrankNeedsNewPrice {
-                    work_item: timestamp,
-                });
+                return Ok(ActionWithReason::WorkNeeded(
+                    CrankTriggerReason::CrankNeedsNewPrice {
+                        work_item: timestamp,
+                    },
+                ));
             }
         }
 
@@ -484,11 +488,13 @@ impl NeedsPriceUpdateInfo {
         // become available. Now just check if there's already work available to process
         // and, if so, do a crank.
         if needs_crank || self.crank_work_available.is_some() {
-            return ActionWithReason::WorkNeeded(CrankTriggerReason::CrankWorkAvailable);
+            return Ok(ActionWithReason::WorkNeeded(
+                CrankTriggerReason::CrankWorkAvailable,
+            ));
         }
 
         // Nothing else caused a price update or crank, so no actions needed
-        ActionWithReason::NoWorkAvailable
+        Ok(ActionWithReason::NoWorkAvailable)
     }
 }
 
@@ -546,7 +552,7 @@ async fn check_market_needs_price_update(
                 exposure_margin_ratio: status.config.exposure_margin_ratio,
             };
 
-            Ok(info.actions(&app.config.needs_price_update_params))
+            info.actions(&app.config.needs_price_update_params)
         }
     }
 }

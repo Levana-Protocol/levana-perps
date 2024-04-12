@@ -233,8 +233,8 @@ impl State<'_> {
         &self,
         store: &dyn Storage,
     ) -> Result<Signed<Notional>> {
-        Ok(self.open_long_interest(store)?.into_signed()
-            - self.open_short_interest(store)?.into_signed())
+        self.open_long_interest(store)?.into_signed()
+            - self.open_short_interest(store)?.into_signed()
     }
 
     pub(crate) fn position_token_addr(&self, store: &dyn Storage) -> Result<Addr> {
@@ -262,7 +262,7 @@ impl State<'_> {
         // liquifunding for more details
         let original_direction_to_base = pos
             .active_leverage_to_notional(&spot_price)
-            .into_base(market_type)
+            .into_base(market_type)?
             .split()
             .0;
 
@@ -526,7 +526,7 @@ impl State<'_> {
         }
 
         perp_ensure!(
-            pos.active_collateral.raw() >= pos.liquidation_margin.total(),
+            pos.active_collateral.raw() >= pos.liquidation_margin.total()?,
             ErrorId::InsufficientMargin,
             ErrorDomain::Market,
             "Active collateral cannot be less than liquidation margin: {} vs {:?}",
@@ -765,9 +765,9 @@ impl AdjustOpenInterest {
             let is_capped_high = |x| x >= cap;
 
             let instant_delta_neutrality_before_uncapped =
-                net_notional_before.into_number() / sensitivity;
+                (net_notional_before.into_number() / sensitivity)?;
             let instant_delta_neutrality_after_uncapped =
-                net_notional_after.into_number() / sensitivity;
+                (net_notional_after.into_number() / sensitivity)?;
 
             let is_capped_low_before = is_capped_low(instant_delta_neutrality_before_uncapped);
             let is_capped_high_before = is_capped_high(instant_delta_neutrality_before_uncapped);
@@ -877,14 +877,14 @@ impl AdjustOpenInterest {
         state: &State,
         store: &dyn Storage,
     ) -> Result<Signed<Notional>> {
-        Ok(match self {
+        match self {
             Self::Long(long) => {
                 long.into_signed() - state.open_short_interest(store)?.into_signed()
             }
             Self::Short(short) => {
                 state.open_long_interest(store)?.into_signed() - short.into_signed()
             }
-        })
+        }
     }
     pub(crate) fn apply(self, ctx: &mut StateContext) -> Result<()> {
         match self {

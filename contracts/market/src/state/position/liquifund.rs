@@ -111,7 +111,7 @@ impl PositionLiquifund {
         let market_type = state.market_type(store)?;
         let original_direction_to_base = pos
             .active_leverage_to_notional(&end_price)
-            .into_base(market_type)
+            .into_base(market_type)?
             .split()
             .0;
 
@@ -158,7 +158,7 @@ impl PositionLiquifund {
         // After settlement, a position might need to be liquidated because the position does not
         // have enough collateral left to cover the liquidation margin for the upcoming period.
         let liquidation_margin = pos.liquidation_margin(&end_price, config)?;
-        if pos.active_collateral.raw() <= liquidation_margin.total() {
+        if pos.active_collateral.raw() <= liquidation_margin.total()? {
             let position = MaybeClosedPosition::Close(ClosePositionInstructions {
                 pos,
                 // Exposure is 0 here: we've already added in the exposure
@@ -185,7 +185,7 @@ impl PositionLiquifund {
         // trader will lose money.
         let new_direction_to_base = pos
             .active_leverage_to_notional(&end_price)
-            .into_base(market_type)
+            .into_base(market_type)?
             .split()
             .0;
         if original_direction_to_base != new_direction_to_base {

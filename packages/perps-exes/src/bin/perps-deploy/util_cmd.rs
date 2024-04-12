@@ -630,16 +630,16 @@ impl PositionRecord {
         }: PositionRecordCommon,
         position: &PositionQueryResponse,
     ) -> Result<Self> {
-        let total_fees_collateral = position.borrow_fee_collateral.into_signed()
-            + position.funding_fee_collateral
-            + position.crank_fee_collateral.into_signed()
-            + position.trading_fee_collateral.into_signed()
-            + position.delta_neutrality_fee_collateral;
-        let total_fees_usd = position.borrow_fee_usd.into_signed()
-            + position.funding_fee_usd
-            + position.crank_fee_usd.into_signed()
-            + position.trading_fee_usd.into_signed()
-            + position.delta_neutrality_fee_usd;
+        let total_fees_collateral = ((((position.borrow_fee_collateral.into_signed()
+            + position.funding_fee_collateral)?
+            + position.crank_fee_collateral.into_signed())?
+            + position.trading_fee_collateral.into_signed())?
+            + position.delta_neutrality_fee_collateral)?;
+        let total_fees_usd = ((((position.borrow_fee_usd.into_signed()
+            + position.funding_fee_usd)?
+            + position.crank_fee_usd.into_signed())?
+            + position.trading_fee_usd.into_signed())?
+            + position.delta_neutrality_fee_usd)?;
         Ok(Self {
             market: market.clone(),
             id,
@@ -670,16 +670,16 @@ impl PositionRecord {
         }: PositionRecordCommon,
         position: &ClosedPosition,
     ) -> Result<Self> {
-        let total_fees_collateral = position.borrow_fee_collateral.into_signed()
-            + position.funding_fee_collateral
-            + position.crank_fee_collateral.into_signed()
-            + position.trading_fee_collateral.into_signed()
-            + position.delta_neutrality_fee_collateral;
-        let total_fees_usd = position.borrow_fee_usd.into_signed()
-            + position.funding_fee_usd
-            + position.crank_fee_usd.into_signed()
-            + position.trading_fee_usd.into_signed()
-            + position.delta_neutrality_fee_usd;
+        let total_fees_collateral = ((((position.borrow_fee_collateral.into_signed()
+            + position.funding_fee_collateral)?
+            + position.crank_fee_collateral.into_signed())?
+            + position.trading_fee_collateral.into_signed())?
+            + position.delta_neutrality_fee_collateral)?;
+        let total_fees_usd = ((((position.borrow_fee_usd.into_signed()
+            + position.funding_fee_usd)?
+            + position.crank_fee_usd.into_signed())?
+            + position.trading_fee_usd.into_signed())?
+            + position.delta_neutrality_fee_usd)?;
         Ok(Self {
             market,
             id,

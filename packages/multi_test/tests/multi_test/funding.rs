@@ -63,7 +63,10 @@ fn funding_rates_typical() {
         MarketType::CollateralIsBase => {
             let expected = Number::from_str("-0.122222").unwrap();
             assert!(
-                rates.long_funding.approx_eq_eps(expected, Number::EPS_E6),
+                rates
+                    .long_funding
+                    .approx_eq_eps(expected, Number::EPS_E6)
+                    .unwrap(),
                 "long_funding_base {} does not equal {}",
                 rates.long_funding,
                 expected
@@ -100,7 +103,8 @@ fn funding_rates_typical() {
             assert!(
                 rates
                     .long_funding
-                    .approx_eq_eps(expected_long_rate, Number::EPS_E6),
+                    .approx_eq_eps(expected_long_rate, Number::EPS_E6)
+                    .unwrap(),
                 "long_funding_base {} does not equal {}",
                 rates.long_funding,
                 expected_long_rate
@@ -110,7 +114,8 @@ fn funding_rates_typical() {
             assert!(
                 rates
                     .short_funding
-                    .approx_eq_eps(expected_short_rate, Number::EPS_E6),
+                    .approx_eq_eps(expected_short_rate, Number::EPS_E6)
+                    .unwrap(),
                 "short_funding_base {} does not equal {}",
                 rates.short_funding,
                 expected_short_rate
@@ -148,7 +153,8 @@ fn funding_rates_typical() {
             assert!(
                 rates
                     .long_funding
-                    .approx_eq_eps(expected_long_rate, Number::EPS_E6),
+                    .approx_eq_eps(expected_long_rate, Number::EPS_E6)
+                    .unwrap(),
                 "long_funding_base {} does not equal {}",
                 rates.long_funding,
                 expected_long_rate
@@ -158,7 +164,8 @@ fn funding_rates_typical() {
             assert!(
                 rates
                     .short_funding
-                    .approx_eq_eps(expected_short_rate, Number::EPS_E6),
+                    .approx_eq_eps(expected_short_rate, Number::EPS_E6)
+                    .unwrap(),
                 "short_funding_base {} does not equal {}",
                 rates.short_funding,
                 expected_short_rate
@@ -186,7 +193,8 @@ fn funding_rates_typical() {
             assert!(
                 rates
                     .long_funding
-                    .approx_eq_eps(expected_long_rate, Number::EPS_E6),
+                    .approx_eq_eps(expected_long_rate, Number::EPS_E6)
+                    .unwrap(),
                 "long_funding_base {} does not equal {}",
                 rates.long_funding,
                 expected_long_rate
@@ -196,7 +204,8 @@ fn funding_rates_typical() {
             assert!(
                 rates
                     .short_funding
-                    .approx_eq_eps(expected_short_rate, Number::EPS_E6),
+                    .approx_eq_eps(expected_short_rate, Number::EPS_E6)
+                    .unwrap(),
                 "short_funding_base {} does not equal {}",
                 rates.short_funding,
                 expected_short_rate
@@ -302,53 +311,67 @@ fn funding_payment_typical() {
     let divisor = Number::from(365u64 * 24u64 / 2u64);
 
     let funding_estimate =
-        -long_before_epoch.notional_size.abs().into_number() * rates.long_funding / divisor;
-    let borrow_fee = -long_before_epoch.counter_collateral.into_number()
-        * rates.borrow_fee.into_number()
-        / divisor;
+        ((-long_before_epoch.notional_size.abs().into_number() * rates.long_funding).unwrap()
+            / divisor)
+            .unwrap();
+    let borrow_fee = ((-long_before_epoch.counter_collateral.into_number()
+        * rates.borrow_fee.into_number())
+    .unwrap()
+        / divisor)
+        .unwrap();
 
     assert!(
-        (long_after_epoch.active_collateral.into_number() - long_before_epoch.active_collateral.into_number())
-            .approx_eq(funding_estimate + borrow_fee),
+        (long_after_epoch.active_collateral.into_number() - long_before_epoch.active_collateral.into_number()).unwrap()
+            .approx_eq((funding_estimate + borrow_fee).unwrap()).unwrap(),
         "after active: {}, before active: {}, delta: {}, funding estimate: {funding_estimate}, borrow fee: {borrow_fee}. Off by: {}",
         long_after_epoch.active_collateral,
         long_before_epoch.active_collateral,
-        long_after_epoch.active_collateral.into_number() - long_before_epoch.active_collateral.into_number(),
-        long_after_epoch.active_collateral.into_number() - long_before_epoch.active_collateral.into_number()
-            - funding_estimate - borrow_fee,
+        (long_after_epoch.active_collateral.into_number() - long_before_epoch.active_collateral.into_number()).unwrap(),
+        ((long_after_epoch.active_collateral.into_number() - long_before_epoch.active_collateral.into_number()).unwrap()
+            - (funding_estimate - borrow_fee).unwrap()).unwrap(),
     );
 
     assert!(long_after_epoch
         .funding_fee_collateral
         .into_number()
-        .approx_eq(-funding_estimate));
+        .approx_eq(-funding_estimate)
+        .unwrap());
     assert_ne!(long_after_epoch.funding_fee_usd, Signed::zero());
     assert!(long_after_epoch
         .borrow_fee_collateral
         .into_number()
-        .approx_eq(-borrow_fee));
+        .approx_eq(-borrow_fee)
+        .unwrap());
     assert_ne!(long_after_epoch.borrow_fee_usd, Usd::zero());
 
     // short pos; 365 days, 24 hours, but 2 epochs of time.
     let funding_estimate =
-        -short_before_epoch.notional_size.abs().into_number() * rates.short_funding / divisor;
-    let borrow_fee = -short_before_epoch.counter_collateral.into_number()
-        * rates.borrow_fee.into_number()
-        / divisor;
+        ((-short_before_epoch.notional_size.abs().into_number() * rates.short_funding).unwrap()
+            / divisor)
+            .unwrap();
+    let borrow_fee = ((-short_before_epoch.counter_collateral.into_number()
+        * rates.borrow_fee.into_number())
+    .unwrap()
+        / divisor)
+        .unwrap();
 
     assert!((short_after_epoch.active_collateral.into_number()
         - short_before_epoch.active_collateral.into_number())
-    .approx_eq(funding_estimate + borrow_fee));
+    .unwrap()
+    .approx_eq((funding_estimate + borrow_fee).unwrap())
+    .unwrap());
 
     assert!(short_after_epoch
         .funding_fee_collateral
         .into_number()
-        .approx_eq(-funding_estimate));
+        .approx_eq(-funding_estimate)
+        .unwrap());
     assert_ne!(short_after_epoch.funding_fee_usd, Signed::zero());
     assert!(short_after_epoch
         .borrow_fee_collateral
         .into_number()
-        .approx_eq(-borrow_fee));
+        .approx_eq(-borrow_fee)
+        .unwrap());
     assert_ne!(short_after_epoch.borrow_fee_usd, Usd::zero());
 }
 
@@ -411,14 +434,18 @@ fn funding_borrow_fee() {
     let pos1 = market.query_position(pos1_id).unwrap();
     let pos2 = market.query_position(pos2_id).unwrap();
     let rates = market.query_status().unwrap();
-    let pos1_borrow_fee = pos1.counter_collateral.into_number() * rates.borrow_fee.into_number()
-        / Number::from(365u64 * 24u64);
-    let pos2_borrow_fee = pos2.counter_collateral.into_number() * rates.borrow_fee.into_number()
-        / Number::from(365u64 * 24u64);
+    let pos1_borrow_fee =
+        ((pos1.counter_collateral.into_number() * rates.borrow_fee.into_number()).unwrap()
+            / Number::from(365u64 * 24u64))
+        .unwrap();
+    let pos2_borrow_fee =
+        ((pos2.counter_collateral.into_number() * rates.borrow_fee.into_number()).unwrap()
+            / Number::from(365u64 * 24u64))
+        .unwrap();
 
-    let expected_borrow_fees_balance = fees_before.wallets
-        + Collateral::try_from_number(pos1_borrow_fee).unwrap()
-        + Collateral::try_from_number(pos2_borrow_fee).unwrap();
+    let expected_borrow_fees_balance =
+        (fees_before.wallets + Collateral::try_from_number(pos1_borrow_fee).unwrap()).unwrap()
+            + Collateral::try_from_number(pos2_borrow_fee).unwrap();
 
     // Trigger liquifunding
 
@@ -429,8 +456,7 @@ fn funding_borrow_fee() {
     // Get actual yield fund balance and assert
 
     let fees_after = market.query_fees().unwrap();
-
-    assert_eq!(expected_borrow_fees_balance, fees_after.wallets);
+    assert_eq!(expected_borrow_fees_balance, Ok(fees_after.wallets));
 
     // check that our estimates match the actual
     let pos1 = market.query_position(pos1_id).unwrap();
@@ -592,7 +618,8 @@ fn funding_rates_capped() {
             assert!(
                 rates
                     .long_funding
-                    .approx_eq_eps(expected_long_rate, Number::EPS_E6),
+                    .approx_eq_eps(expected_long_rate, Number::EPS_E6)
+                    .unwrap(),
                 "long_funding_base {} does not equal {}",
                 rates.long_funding,
                 expected_long_rate
@@ -602,7 +629,8 @@ fn funding_rates_capped() {
             assert!(
                 rates
                     .short_funding
-                    .approx_eq_eps(expected_short_rate, Number::EPS_E6),
+                    .approx_eq_eps(expected_short_rate, Number::EPS_E6)
+                    .unwrap(),
                 "short_funding_base {} does not equal {}",
                 rates.short_funding,
                 expected_short_rate

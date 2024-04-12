@@ -1,6 +1,7 @@
 //! Data types for tracking liquidity
 use anyhow::{Context, Result};
 use cosmwasm_schema::cw_serde;
+use cosmwasm_std::OverflowError;
 use shared::prelude::*;
 
 /// Protocol wide stats on liquidity
@@ -19,12 +20,12 @@ pub struct LiquidityStats {
 
 impl LiquidityStats {
     /// Total amount of locked and unlocked collateral.
-    pub fn total_collateral(&self) -> Collateral {
+    pub fn total_collateral(&self) -> Result<Collateral, OverflowError> {
         self.locked + self.unlocked
     }
 
     /// Total number of LP and xLP tokens
-    pub fn total_tokens(&self) -> LpToken {
+    pub fn total_tokens(&self) -> Result<LpToken, OverflowError> {
         self.total_lp + self.total_xlp
     }
 
@@ -40,13 +41,13 @@ impl LiquidityStats {
         if lp.is_zero() {
             return Ok(Collateral::zero());
         }
-        let total_collateral = self.total_collateral();
+        let total_collateral = self.total_collateral()?;
 
         anyhow::ensure!(
             !total_collateral.approx_eq(Collateral::zero()),
             "LiquidityStats::lp_to_collateral: no liquidity is in the pool"
         );
-        let total_tokens = self.total_tokens();
+        let total_tokens = self.total_tokens()?;
         debug_assert_ne!(total_tokens, LpToken::zero());
 
         Ok(Collateral::from_decimal256(
@@ -69,14 +70,14 @@ impl LiquidityStats {
     ///
     /// If there is currently no liquidity in the pool, this will use a 1:1 ratio.
     pub fn collateral_to_lp(&self, amount: NonZero<Collateral>) -> Result<NonZero<LpToken>> {
-        let total_collateral = self.total_collateral();
+        let total_collateral = self.total_collateral()?;
 
         NonZero::new(LpToken::from_decimal256(if total_collateral.is_zero() {
             debug_assert!(self.total_lp.is_zero());
             debug_assert!(self.total_xlp.is_zero());
             amount.into_decimal256()
         } else {
-            self.total_tokens()
+            self.total_tokens()?
                 .into_decimal256()
                 .checked_mul(amount.into_decimal256())?
                 .checked_div(total_collateral.into_decimal256())?
@@ -200,9 +201,9 @@ pub mod events {
 
     impl LiquidityPoolSizeEvent {
         /// Generate a value from protocol stats and the current price.
-        pub fn from_stats(stats: &LiquidityStats, price: &PricePoint) -> Self {
-            let total_collateral = stats.total_collateral();
-            let total_tokens = stats.total_tokens();
+        pub fn from_stats(stats: &LiquidityStats, price: &PricePoint) -> Result<Self> {
+            let total_collateral = stats.total_collateral()?;
+            let total_tokens = stats.total_tokens()?;
             let (lp_collateral, xlp_collateral) = if total_tokens.is_zero() {
                 debug_assert_eq!(total_collateral, Collateral::zero());
                 (Collateral::zero(), Collateral::zero())
@@ -211,10 +212,12 @@ pub mod events {
                     * stats.total_lp.into_decimal256()
                     / total_tokens.into_decimal256();
                 let lp_collateral = Collateral::from_decimal256(lp_collateral);
-                let xlp_collateral = total_collateral - lp_collateral;
+                let xlp_collateral = (total_collateral - lp_collateral)?;
+
                 (lp_collateral, xlp_collateral)
             };
-            Self {
+
+            Ok(Self {
                 locked: stats.locked,
                 locked_usd: price.collateral_to_usd(stats.locked),
                 unlocked: stats.unlocked,
@@ -223,7 +226,7 @@ pub mod events {
                 xlp_collateral,
                 total_lp: stats.total_lp,
                 total_xlp: stats.total_xlp,
-            }
+            })
         }
     }
 

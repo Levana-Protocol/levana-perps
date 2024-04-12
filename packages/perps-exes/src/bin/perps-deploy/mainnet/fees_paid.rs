@@ -1,7 +1,8 @@
-use std::{collections::HashMap, ops::AddAssign, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, ops::Add, path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use cosmos::Address;
+use cosmwasm_std::OverflowError;
 use msg::contracts::market::position::PositionId;
 use parking_lot::Mutex;
 use perps_exes::{
@@ -105,11 +106,15 @@ async fn go(
         crank: Usd,
     }
 
-    impl AddAssign for FeeStats {
-        fn add_assign(&mut self, rhs: Self) {
-            self.trading += rhs.trading;
-            self.borrow += rhs.borrow;
-            self.crank += rhs.crank;
+    impl Add for FeeStats {
+        type Output = anyhow::Result<Self, OverflowError>;
+
+        fn add(mut self, rhs: Self) -> Self::Output {
+            self.trading = (self.trading + rhs.trading)?;
+            self.borrow = (self.borrow + rhs.borrow)?;
+            self.crank = (self.crank + rhs.crank)?;
+
+            Ok(self)
         }
     }
 
@@ -149,11 +154,12 @@ async fn go(
                         dnf_usd: pos.delta_neutrality_fee_usd,
                         crank_usd: pos.crank_fee_usd,
                     })?;
-                    fees += FeeStats {
-                        trading: pos.trading_fee_usd,
-                        borrow: pos.borrow_fee_usd,
-                        crank: pos.crank_fee_usd,
-                    };
+                    fees = (fees
+                        + FeeStats {
+                            trading: pos.trading_fee_usd,
+                            borrow: pos.borrow_fee_usd,
+                            crank: pos.crank_fee_usd,
+                        })?;
                     csv.flush()?;
                 }
                 for pos in market.all_closed_positions(wallet).await? {
@@ -169,11 +175,12 @@ async fn go(
                         dnf_usd: pos.delta_neutrality_fee_usd,
                         crank_usd: pos.crank_fee_usd,
                     })?;
-                    fees += FeeStats {
-                        trading: pos.trading_fee_usd,
-                        borrow: pos.borrow_fee_usd,
-                        crank: pos.crank_fee_usd,
-                    };
+                    fees = (fees
+                        + FeeStats {
+                            trading: pos.trading_fee_usd,
+                            borrow: pos.borrow_fee_usd,
+                            crank: pos.crank_fee_usd,
+                        })?;
                     csv.flush()?;
                 }
             }
@@ -185,7 +192,7 @@ async fn go(
     let mut stats = FeeStats::new();
     while let Some(res) = set.join_next().await {
         match res {
-            Ok(Ok(fees)) => stats += fees,
+            Ok(Ok(fees)) => stats = (stats + fees)?,
             Ok(Err(e)) => {
                 set.abort_all();
                 return Err(e);
@@ -201,10 +208,10 @@ async fn go(
     log::info!("Total Borrow USD: {}", stats.borrow);
     log::info!("Crank Crank USD: {}", stats.crank);
 
-    let total_fees = stats.trading + stats.borrow + stats.crank;
+    let total_fees = ((stats.trading + stats.borrow)? + stats.crank)?;
     log::info!("Total fees: {total_fees}");
     if let Some(paid_fees) = paid_fees {
-        let to_pay = total_fees - paid_fees;
+        let to_pay = (total_fees - paid_fees)?;
         log::info!("Fees to be paid: {to_pay}");
     }
 

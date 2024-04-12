@@ -28,7 +28,8 @@ fn liquidation_edge() {
 
     let liquidation_price = position_query.liquidation_price_base.unwrap();
 
-    let above_liquidation_price = liquidation_price.into_number() + "0.01".parse().unwrap();
+    let above_liquidation_price =
+        (liquidation_price.into_number() + "0.01".parse().unwrap()).unwrap();
     let above_liquidation_price =
         PriceBaseInQuote::try_from_number(above_liquidation_price).unwrap();
 
@@ -44,7 +45,8 @@ fn liquidation_edge() {
         .query_closed_position(&trader, position_id)
         .unwrap_err();
 
-    let below_liquidation_price = liquidation_price.into_number() - "0.01".parse().unwrap();
+    let below_liquidation_price =
+        (liquidation_price.into_number() - "0.01".parse().unwrap()).unwrap();
     let below_liquidation_price =
         PriceBaseInQuote::try_from_number(below_liquidation_price).unwrap();
 
@@ -82,7 +84,8 @@ fn take_profit_edge() {
 
     let take_profit_price = position_query.take_profit_total_base.unwrap();
 
-    let below_take_profit_price = take_profit_price.into_number() - "0.01".parse().unwrap();
+    let below_take_profit_price =
+        (take_profit_price.into_number() - "0.01".parse().unwrap()).unwrap();
     let below_take_profit_price =
         PriceBaseInQuote::try_from_number(below_take_profit_price).unwrap();
 
@@ -98,7 +101,8 @@ fn take_profit_edge() {
         .query_closed_position(&trader, position_id)
         .unwrap_err();
 
-    let above_take_profit_price = take_profit_price.into_number() + "0.01".parse().unwrap();
+    let above_take_profit_price =
+        (take_profit_price.into_number() + "0.01".parse().unwrap()).unwrap();
     let above_take_profit_price =
         PriceBaseInQuote::try_from_number(above_take_profit_price).unwrap();
 
@@ -147,7 +151,7 @@ fn insufficient_liquidation_margin() {
     let liquidation_price = position_query.liquidation_price_base.unwrap();
 
     let above_liquidation_price =
-        liquidation_price.into_number() + "0.000000000000000009".parse().unwrap();
+        (liquidation_price.into_number() + "0.000000000000000009".parse().unwrap()).unwrap();
     let above_liquidation_price =
         PriceBaseInQuote::try_from_number(above_liquidation_price).unwrap();
 
@@ -159,7 +163,9 @@ fn insufficient_liquidation_margin() {
         .unwrap();
 
     let position_query = market.query_position(position_id).unwrap();
-    assert!(position_query.active_collateral.raw() > position_query.liquidation_margin.total());
+    assert!(
+        position_query.active_collateral.raw() > position_query.liquidation_margin.total().unwrap()
+    );
 
     // Trigger liquifunding
     market.set_time(TimeJump::Liquifundings(1)).unwrap();

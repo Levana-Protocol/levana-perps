@@ -35,8 +35,9 @@ fn liquidity_deposit_new_user() {
     assert_eq!(
         new_liquidity_stats,
         LiquidityStats {
-            unlocked: initial_liquidity_stats.unlocked
-                + Collateral::try_from_number(amount).unwrap(),
+            unlocked: (initial_liquidity_stats.unlocked
+                + Collateral::try_from_number(amount).unwrap())
+            .unwrap(),
             ..new_liquidity_stats
         }
     );
@@ -76,15 +77,17 @@ fn liquidity_withdraw_new_user() {
 
     // Assert
 
-    let unlocked = deposit_amount - withdraw_amount;
-    assert_eq!(start_balance - unlocked, end_balance);
+    let unlocked = (deposit_amount - withdraw_amount).unwrap();
+    assert_eq!((start_balance - unlocked).unwrap(), end_balance);
 
     assert_eq!(
         LiquidityStats {
-            unlocked: liquidity_stats_after_deposit.unlocked
-                - Collateral::try_from_number(unlocked).unwrap(),
-            total_lp: liquidity_stats_after_deposit.total_lp
-                - LpToken::try_from_number(unlocked).unwrap(),
+            unlocked: (liquidity_stats_after_deposit.unlocked
+                - Collateral::try_from_number(unlocked).unwrap())
+            .unwrap(),
+            total_lp: (liquidity_stats_after_deposit.total_lp
+                - LpToken::try_from_number(unlocked).unwrap())
+            .unwrap(),
             locked: liquidity_stats_after_deposit.locked,
             total_xlp: liquidity_stats_after_deposit.total_xlp,
         },
@@ -144,11 +147,11 @@ fn liquidity_share_allocation_with_trading() {
 
     // Assert pre-liquidation
     assert_eq!(
-        liquidity_stats_pre_liquidation.locked,
+        Ok(liquidity_stats_pre_liquidation.locked),
         initial_liquidity_stats.locked + Collateral::try_from_number(collateral).unwrap()
     );
     assert_eq!(
-        liquidity_stats_pre_liquidation.unlocked,
+        Ok(liquidity_stats_pre_liquidation.unlocked),
         initial_liquidity_stats.unlocked + Collateral::from(500u64) // 500 == lp deposits - collateral
     );
 
@@ -161,7 +164,7 @@ fn liquidity_share_allocation_with_trading() {
     let _pos = market.query_closed_position(&trader, pos_id).unwrap();
 
     let liquidity_stats_post_liquidation = market.query_liquidity_stats().unwrap();
-    let total_shares = initial_liquidity_stats.unlocked + Collateral::from(600u64);
+    let total_shares = (initial_liquidity_stats.unlocked + Collateral::from(600u64)).unwrap();
     let total_liquidity = liquidity_stats_post_liquidation.unlocked;
 
     let assert_lp = |lp: &Addr, shares: Number| {
@@ -170,9 +173,11 @@ fn liquidity_share_allocation_with_trading() {
         market.exec_withdraw_liquidity(lp, None).unwrap();
 
         let end_balance = market.query_collateral_balance(lp).unwrap();
-        let actual_return = end_balance - start_balance;
-        let expected_return =
-            total_liquidity.into_number() / total_shares.into_number() * shares.into_number();
+        let actual_return = (end_balance - start_balance).unwrap();
+        let expected_return = ((total_liquidity.into_number() / total_shares.into_number())
+            .unwrap()
+            * shares.into_number())
+        .unwrap();
 
         assert_eq!(
             actual_return.to_u128_with_precision(6),
@@ -239,10 +244,14 @@ fn liquidity_claim_yield_from_borrow_fee() {
 
     let config = market.query_config().unwrap();
     let pos = market.query_position(pos_id).unwrap();
-    let mut trading_fee = pos.notional_size_in_collateral.into_number()
-        * config.trading_fee_notional_size.into_number();
-    trading_fee +=
-        pos.counter_collateral.into_number() * config.trading_fee_counter_collateral.into_number();
+    let mut trading_fee = (pos.notional_size_in_collateral.into_number()
+        * config.trading_fee_notional_size.into_number())
+    .unwrap();
+    trading_fee = (trading_fee
+        + (pos.counter_collateral.into_number()
+            * config.trading_fee_counter_collateral.into_number())
+        .unwrap())
+    .unwrap();
 
     // Calculate borrow fee
 
@@ -250,15 +259,17 @@ fn liquidity_claim_yield_from_borrow_fee() {
 
     let rates = market.query_status().unwrap();
     let delay_nanos = Duration::from_seconds(config.liquifunding_delay_seconds as u64).as_nanos();
-    let accumulated_rate = rates.borrow_fee.into_number() * delay_nanos;
-    let borrow_fee =
-        accumulated_rate * pos.counter_collateral.into_number() / Number::from(NS_PER_YEAR);
+    let accumulated_rate = (rates.borrow_fee.into_number() * delay_nanos).unwrap();
+    let borrow_fee = ((accumulated_rate * pos.counter_collateral.into_number()).unwrap()
+        / Number::from(NS_PER_YEAR))
+    .unwrap();
 
     // Assert
 
-    let trading_fee_yield = trading_fee / Number::from(4u64);
-    let borrow_fee_yield = borrow_fee / Number::from(4u64);
+    let trading_fee_yield = (trading_fee / Number::from(4u64)).unwrap();
+    let borrow_fee_yield = (borrow_fee / Number::from(4u64)).unwrap();
     let expected_yield = (borrow_fee_yield + trading_fee_yield)
+        .unwrap()
         .checked_mul_number("0.7".parse().unwrap())
         .unwrap() // take protocol tax
         .to_u128_with_precision(6)
@@ -268,7 +279,7 @@ fn liquidity_claim_yield_from_borrow_fee() {
     market.exec_claim_yield(&lp1).unwrap();
     let wallet_balance_after_claim = market.query_collateral_balance(&lp1).unwrap();
 
-    let actual_yield = wallet_balance_after_claim - wallet_balance_before_claim;
+    let actual_yield = (wallet_balance_after_claim - wallet_balance_before_claim).unwrap();
     let actual_yield = actual_yield.to_u128_with_precision(6).unwrap();
 
     assert_eq!(actual_yield, expected_yield);
@@ -293,8 +304,9 @@ fn liquidity_token_transfer() {
     assert_eq!(
         new_liquidity_stats,
         LiquidityStats {
-            unlocked: initial_liquidity_stats.unlocked
-                + Collateral::try_from_number(amount).unwrap(),
+            unlocked: (initial_liquidity_stats.unlocked
+                + Collateral::try_from_number(amount).unwrap())
+            .unwrap(),
             ..new_liquidity_stats
         }
     );
@@ -333,7 +345,7 @@ fn liquidity_token_transfer() {
         .unwrap();
     let transfer_balance_joe = Number::from_fixed_u128(cw20_balance.into(), decimals);
 
-    assert_eq!(transfer_balance_lp, amount - transfer_amount);
+    assert_eq!(transfer_balance_lp, (amount - transfer_amount).unwrap());
     assert_eq!(transfer_balance_joe, transfer_amount);
 
     // transfer back (deliberately use cw20 message, not liquidity token)
@@ -397,12 +409,15 @@ fn liquidity_stake_xlp() {
 
     // Staking more than we have should still fail
     market
-        .exec_stake_lp(&new_lp, Some(info.lp_amount.into_number() + Number::ONE))
+        .exec_stake_lp(
+            &new_lp,
+            Some((info.lp_amount.into_number() + Number::ONE).unwrap()),
+        )
         .unwrap_err();
 
     // But staking less than we have should work
-    let to_stake = info.lp_amount.into_number() / 2;
-    let remaining_lp = info.lp_amount.into_number() - to_stake; // to deal with rounding
+    let to_stake = (info.lp_amount.into_number() / 2).unwrap();
+    let remaining_lp = (info.lp_amount.into_number() - to_stake).unwrap(); // to deal with rounding
     market.exec_stake_lp(&new_lp, Some(to_stake)).unwrap();
 
     let info = market.query_lp_info(&new_lp).unwrap();
@@ -463,14 +478,14 @@ fn liquidity_unstake_xlp() {
     assert_eq!(stats.total_xlp, new_info.xlp_amount);
     assert_eq!(
         stats.unlocked.into_number(),
-        init_stats.unlocked.into_number() + amount
+        (init_stats.unlocked.into_number() + amount).unwrap()
     );
 
     // Unstaking more than we have fails
     market
         .exec_unstake_xlp(
             &new_lp,
-            Some(new_info.xlp_amount.into_number() + Number::ONE),
+            Some((new_info.xlp_amount.into_number() + Number::ONE).unwrap()),
         )
         .unwrap_err();
 
@@ -478,7 +493,7 @@ fn liquidity_unstake_xlp() {
     market
         .exec_unstake_xlp(
             &new_lp,
-            Some(stats.total_xlp.into_number() / Number::from(2u64)),
+            Some((stats.total_xlp.into_number() / Number::from(2u64)).unwrap()),
         )
         .unwrap();
 
@@ -868,7 +883,7 @@ fn lp_info_during_unstake_perp_736() {
         assert_ne!(lp_info.lp_amount, "0".parse().unwrap());
         assert_eq!(
             LpToken::from_str("12").unwrap(),
-            lp_info.lp_amount + lp_info.xlp_amount,
+            (lp_info.lp_amount + lp_info.xlp_amount).unwrap(),
             "LP + xLP is not 12: {lp_info:?}"
         );
         let new_pending = lp_info.unstaking.unwrap().pending;
@@ -878,7 +893,7 @@ fn lp_info_during_unstake_perp_736() {
         // We left behind 2 xLP tokens, so the pending amount plus those 2
         // should always be the total xLP available.
         assert_eq!(
-            new_pending,
+            Ok(new_pending),
             lp_info.xlp_amount - LpToken::from_str("2").unwrap()
         );
     }
@@ -1042,12 +1057,13 @@ fn reinvest_partial() {
         .unwrap();
 
     let balance_after = market.query_collateral_balance(&new_lp).unwrap();
-    let two_thirds = lp_info.available_yield - third.raw();
+    let two_thirds = (lp_info.available_yield - third.raw()).unwrap();
 
     // Use approximate equals because we don't handle the "dust" (collateral below the precision of the CW20);
-    let diff = balance_after - balance_before;
+    let diff = (balance_after - balance_before).unwrap();
     assert!(
-        diff.approx_eq_eps(two_thirds.into_number(), Number::EPS_E6),
+        diff.approx_eq_eps(two_thirds.into_number(), Number::EPS_E6)
+            .unwrap(),
         "{diff} != {two_thirds}"
     );
 
@@ -1067,7 +1083,7 @@ fn lp_transfer() {
         let _ = market.exec_claim_yield(lp);
         let wallet_balance_after_claim = market.query_collateral_balance(lp).unwrap();
 
-        wallet_balance_after_claim - wallet_balance_before_claim
+        (wallet_balance_after_claim - wallet_balance_before_claim).unwrap()
     };
 
     // Get some LP
@@ -2132,8 +2148,8 @@ fn liquidity_zero_dust_2487_inner(price_change_multiplier: Decimal256, lp_amount
 
     // sanity check that we're starting from a baseline
     let liquidity = market.query_liquidity_stats().unwrap();
-    assert_eq!(liquidity.total_collateral(), Collateral::zero());
-    assert_eq!(liquidity.total_tokens(), LpToken::zero());
+    assert_eq!(liquidity.total_collateral(), Ok(Collateral::zero()));
+    assert_eq!(liquidity.total_tokens(), Ok(LpToken::zero()));
 
     // LP Mint & Deposit
     let lp_deposit = Number::try_from(lp_amount.to_string()).unwrap();
@@ -2184,8 +2200,8 @@ fn liquidity_zero_dust_2487_inner(price_change_multiplier: Decimal256, lp_amount
     // sanity check, liquidity has gained some interesting amount
     let liquidity = market.query_liquidity_stats().unwrap();
     assert_ne!(
-        liquidity.total_collateral(),
-        liquidity_before_open.total_collateral() - counter_collateral.raw()
+        Ok(liquidity.total_collateral().unwrap()),
+        liquidity_before_open.total_collateral().unwrap() - counter_collateral.raw()
     );
 
     // withdraw all liquidity
@@ -2194,8 +2210,8 @@ fn liquidity_zero_dust_2487_inner(price_change_multiplier: Decimal256, lp_amount
     let liquidity = market.query_liquidity_stats().unwrap();
 
     // liquidity is truly zero
-    assert_eq!(liquidity.total_tokens(), LpToken::zero());
-    assert_eq!(liquidity.total_collateral(), Collateral::zero());
+    assert_eq!(liquidity.total_tokens(), Ok(LpToken::zero()));
+    assert_eq!(liquidity.total_collateral(), Ok(Collateral::zero()));
 
     // demonstrate that the protocol is still working fine
     let lp_deposit = Number::from(1000u64);
