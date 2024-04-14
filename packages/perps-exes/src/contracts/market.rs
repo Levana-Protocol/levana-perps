@@ -586,14 +586,19 @@ impl MarketContract {
         msg: &MarketExecuteMsg,
     ) -> Result<TxResponse> {
         let price = self.current_price().await?;
-        let crank_fee_usd = status.config.crank_fee_charged
-            + status
-                .config
-                .crank_fee_surcharge
-                .checked_mul_dec(Decimal256::from_ratio(
-                    status.deferred_execution_items / 10,
-                    1u32,
-                ))?;
+        let crank_fee_usd = {
+            let crank_fee_surcharge =
+                status
+                    .config
+                    .crank_fee_surcharge
+                    .checked_mul_dec(Decimal256::from_ratio(
+                        status.deferred_execution_items / 10,
+                        1u32,
+                    ))?;
+
+            crank_fee_surcharge + status.config.crank_fee_charged
+        }?;
+
         let crank_fee = price.usd_to_collateral(crank_fee_usd);
 
         // Add a small multiplier to account for rounding errors. In real life

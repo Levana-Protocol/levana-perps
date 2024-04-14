@@ -47,7 +47,7 @@ impl Stats {
         msg_elapsed: f64,
         execute_msg: ExecuteMsg,
         events: Vec<CosmosEvent>,
-    ) -> EventUpdateResult {
+    ) -> Result<EventUpdateResult> {
         let mut res = EventUpdateResult::new();
 
         // first parse all the events to accummulate the changes
@@ -56,19 +56,25 @@ impl Stats {
                 let evt: PositionOpenEvent = event.clone().try_into().unwrap();
                 res.open_positions.push(evt.position_attributes.pos_id);
                 let value = evt.position_attributes.collaterals.deposit_collateral;
-                res.deposit_collateral =
-                    Some(res.deposit_collateral.map_or(value, |prev| prev + value));
+                res.deposit_collateral = Some(
+                    res.deposit_collateral
+                        .map_or(Ok(value), |prev| prev + value)?,
+                );
             } else if event.ty.starts_with("wasm-position-close") {
                 let evt: PositionCloseEvent = event.clone().try_into().unwrap();
                 res.closed_positions.push(evt.closed_position.id);
                 let value = evt.closed_position.deposit_collateral;
-                res.deposit_collateral =
-                    Some(-res.deposit_collateral.map_or(value, |prev| prev - value));
+                res.deposit_collateral = Some(
+                    -res.deposit_collateral
+                        .map_or(Ok(value), |prev| prev - value)?,
+                );
             } else if event.ty.starts_with("wasm-position-update") {
                 let evt: PositionUpdateEvent = event.clone().try_into().unwrap();
                 let value = evt.deposit_collateral_delta;
-                res.deposit_collateral =
-                    Some(-res.deposit_collateral.map_or(value, |prev| prev - value));
+                res.deposit_collateral = Some(
+                    -res.deposit_collateral
+                        .map_or(Ok(value), |prev| prev - value)?,
+                );
             } else if event.ty.starts_with("wasm-spot-price") {
                 let evt: SpotPriceEvent = event.clone().try_into().unwrap();
                 res.prices.push(evt.price_base);
@@ -86,8 +92,10 @@ impl Stats {
 
         // deposit collateral
         if let Some(collateral) = res.deposit_collateral {
-            self.deposit_collateral
-                .replace_with(|prev| *prev + collateral);
+            let mut lock = self.deposit_collateral.lock_mut();
+            if let Ok(new) = *lock + collateral {
+                *lock = new;
+            }
         }
 
         // price
@@ -103,7 +111,7 @@ impl Stats {
             events,
         }));
 
-        res
+        Ok(res)
     }
 
     pub fn update_time_jump(&self, msg_id: u64, msg_elapsed: f64, seconds: i64) {

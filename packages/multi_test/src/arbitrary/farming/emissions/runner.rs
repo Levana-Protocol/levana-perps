@@ -16,7 +16,7 @@ impl FarmingEmissions {
         self.do_simulation(&lp)?;
 
         let claimed = self.claim_lvn_rewards(&lp)?;
-        self.check_actions_claim(&lp, claimed);
+        self.check_actions_claim(&lp, claimed)?;
 
         self.check_last_remaining_rewards(&lp)?;
 
@@ -49,7 +49,7 @@ impl FarmingEmissions {
 
             token.assert_eq(
                 NonZero::new(farmer_stats_before_claim.emission_rewards).unwrap(),
-                NonZero::new(balance_after_claim - balance_before_claim).unwrap(),
+                NonZero::new((balance_after_claim - balance_before_claim).unwrap()).unwrap(),
             );
         } else {
             println!("no last remaining rewards");
@@ -74,7 +74,8 @@ impl FarmingEmissions {
         market.exec_farming_claim_emissions(lp).unwrap();
 
         let wallet_rewards_after_claim = market.query_reward_token_balance(&token, lp);
-        let wallet_rewards_claimed = wallet_rewards_after_claim - wallet_rewards_before_claim;
+        let wallet_rewards_claimed =
+            (wallet_rewards_after_claim - wallet_rewards_before_claim).unwrap();
         println!("claimed {} rewards", wallet_rewards_claimed);
 
         token.assert_eq(
@@ -85,10 +86,10 @@ impl FarmingEmissions {
         Ok(wallet_rewards_claimed)
     }
 
-    fn check_actions_claim(&self, lp: &Addr, wallet_rewards_claimed: LvnToken) {
+    fn check_actions_claim(&self, lp: &Addr, wallet_rewards_claimed: LvnToken) -> Result<()> {
         let market = self.market.borrow_mut();
         let token = market.rewards_token();
-        let expected = self.expected_rewards(lp);
+        let expected = self.expected_rewards(lp)?;
 
         if expected > LvnToken::zero() && wallet_rewards_claimed > LvnToken::zero() {
             token.assert_eq(
@@ -96,9 +97,11 @@ impl FarmingEmissions {
                 NonZero::new(wallet_rewards_claimed).unwrap(),
             );
         }
+
+        Ok(())
     }
 
-    fn expected_rewards(&self, _lp: &Addr) -> LvnToken {
+    fn expected_rewards(&self, _lp: &Addr) -> Result<LvnToken> {
         let total_emissions_duration =
             Number::from_ratio_u256(self.emissions_duration_seconds, 1u32);
         let total_emissions_amount = self.emissions_amount.into_number();
@@ -116,28 +119,28 @@ impl FarmingEmissions {
             };
 
             if farming_tokens_total > Number::ZERO {
-                let lvn_per_token = total_emissions_amount / farming_tokens_total;
-                let timeslice_ratio = time_since_last_action / total_emissions_duration;
-                let timeslice_emissions = lvn_per_token * timeslice_ratio;
+                let lvn_per_token = (total_emissions_amount / farming_tokens_total)?;
+                let timeslice_ratio = (time_since_last_action / total_emissions_duration)?;
+                let timeslice_emissions = (lvn_per_token * timeslice_ratio)?;
                 let lp_farming_tokens = farming_tokens_total; // this will change with multiple lps
-                let lp_timeslice_emissions = timeslice_emissions * lp_farming_tokens;
+                let lp_timeslice_emissions = (timeslice_emissions * lp_farming_tokens)?;
 
-                accrued_emissions += lp_timeslice_emissions;
+                accrued_emissions = (accrued_emissions + lp_timeslice_emissions)?;
             }
 
             match action.kind {
                 ActionKind::Deposit(collateral) => {
-                    farming_tokens_total += collateral.into_number();
+                    farming_tokens_total = (farming_tokens_total + collateral.into_number())?;
                 }
                 ActionKind::Withdraw(collateral) => {
-                    farming_tokens_total -= collateral.into_number();
+                    farming_tokens_total = (farming_tokens_total - collateral.into_number())?;
                 }
             }
 
             prev_action = Some(action);
         }
 
-        LvnToken::from_decimal256(accrued_emissions.abs_unsigned())
+        Ok(LvnToken::from_decimal256(accrued_emissions.abs_unsigned()))
     }
 
     fn do_simulation(&self, lp: &Addr) -> Result<()> {
@@ -241,7 +244,7 @@ impl FarmingEmissions {
         market.exec_withdraw_liquidity(lp, None).unwrap();
 
         let balance_after_unstake = market.query_collateral_balance(lp).unwrap();
-        let balance_diff_after_unstake = balance_after_unstake - balance_before;
+        let balance_diff_after_unstake = (balance_after_unstake - balance_before).unwrap();
 
         Ok(Some(balance_diff_after_unstake))
     }

@@ -111,7 +111,7 @@ impl ClosePositionExec {
         // local value, not the active_collateral on the position.
         debug_assert!(pos.active_collateral.raw() >= pos.liquidation_margin.delta_neutrality);
         debug_assert!(
-            pos.active_collateral.into_signed() + capped_exposure
+            (pos.active_collateral.into_signed() + capped_exposure)?
                 >= pos.liquidation_margin.delta_neutrality.into_signed()
         );
         let dnf = state.charge_delta_neutrality_fee_no_update(
@@ -325,9 +325,12 @@ impl ClosePositionExec {
 
         CLOSED_POSITIONS.save(ctx.storage, self.closed_position.id, &self.closed_position)?;
 
-        ctx.response_mut().add_event(PositionCloseEvent {
+        let event = PositionCloseEvent {
             closed_position: self.closed_position,
-        });
+        };
+
+        ctx.response_mut().add_event(Event::try_from(event)?);
+
         Ok(())
     }
 }

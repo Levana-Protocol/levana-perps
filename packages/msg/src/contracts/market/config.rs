@@ -236,7 +236,7 @@ impl Config {
             );
         }
 
-        if self.carry_leverage.into_number() + Number::ONE > self.max_leverage {
+        if (self.carry_leverage.into_number() + Number::ONE)? > self.max_leverage {
             perp_bail!(
                 ErrorId::Config,
                 ErrorDomain::Market,

@@ -37,11 +37,11 @@ impl FarmingEmissions {
                         if let Ok(collateral) = collateral {
                             let kind = match action_builder.kind {
                                 ActionBuilderKind::Deposit(_) => {
-                                    current_deposit += collateral;
+                                    current_deposit = (current_deposit + collateral).unwrap();
                                     ActionKind::Deposit(collateral)
                                 }
                                 ActionBuilderKind::WithdrawPerc(_) => {
-                                    current_deposit -= collateral;
+                                    current_deposit = (current_deposit - collateral).unwrap();
                                     ActionKind::Withdraw(collateral)
                                 }
                             };

@@ -54,6 +54,7 @@ fn position_data_long() {
     assert_eq!(
         pos.active_leverage_to_notional(&price_point)
             .into_base(market_type)
+            .unwrap()
             .split()
             .1
             .raw(),
@@ -123,6 +124,7 @@ fn position_data_short() {
     assert_eq!(
         pos.active_leverage_to_notional(&price_point)
             .into_base(market_type)
+            .unwrap()
             .split()
             .1
             .into_number(),
@@ -245,14 +247,19 @@ fn position_data_open_flip_short() {
     let expected_notional_size: Number = "-2".parse().unwrap();
     let expected_counter_collateral: Number = "200".parse().unwrap();
     assert!(
-        (expected_notional_size - pos_data.notional_size.into_number()).approx_eq(Number::ZERO),
+        (expected_notional_size - pos_data.notional_size.into_number())
+            .unwrap()
+            .approx_eq(Number::ZERO)
+            .unwrap(),
         "{} != {}",
         expected_notional_size,
         pos_data.notional_size
     );
     assert!(
         (expected_counter_collateral - pos_data.counter_collateral.into_number())
-            .approx_eq(Number::ZERO),
+            .unwrap()
+            .approx_eq(Number::ZERO)
+            .unwrap(),
         "{} != {}",
         expected_counter_collateral,
         pos_data.counter_collateral
@@ -313,14 +320,19 @@ fn position_data_open_flip_long() {
     let expected_notional_size: Number = "2".parse().unwrap();
     let expected_counter_collateral: Number = "200".parse().unwrap();
     assert!(
-        (expected_notional_size - pos_data.notional_size.into_number()).approx_eq(Number::ZERO),
+        (expected_notional_size - pos_data.notional_size.into_number())
+            .unwrap()
+            .approx_eq(Number::ZERO)
+            .unwrap(),
         "{} != {}",
         expected_notional_size,
         pos_data.notional_size
     );
     assert!(
         (expected_counter_collateral - pos_data.counter_collateral.into_number())
-            .approx_eq(Number::ZERO),
+            .unwrap()
+            .approx_eq(Number::ZERO)
+            .unwrap(),
         "{} != {}",
         expected_counter_collateral,
         pos_data.counter_collateral

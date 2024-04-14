@@ -27,7 +27,7 @@ impl State<'_> {
 
         let leverage_to_base = leverage.into_signed(pos.direction().into_base(market_type));
 
-        let leverage_to_notional = leverage_to_base.into_notional(market_type);
+        let leverage_to_notional = leverage_to_base.into_notional(market_type)?;
 
         let notional_size_in_collateral =
             leverage_to_notional.checked_mul_collateral(pos.active_collateral)?;
@@ -42,10 +42,10 @@ impl State<'_> {
         collateral_delta: Signed<Collateral>,
     ) -> Result<Signed<Notional>> {
         let pos = get_position(store, id)?;
-        let scale_factor = (pos.active_collateral.into_number() + collateral_delta.into_number())
+        let scale_factor = (pos.active_collateral.into_number() + collateral_delta.into_number())?
             .checked_div(pos.active_collateral.into_number())?;
         Ok(Signed::<Notional>::from_number(
-            pos.notional_size.into_number() * scale_factor,
+            (pos.notional_size.into_number() * scale_factor)?,
         ))
     }
 
@@ -103,8 +103,8 @@ impl State<'_> {
         let market_type = market_id.get_market_type();
 
         // For PERP-996, ensure that the direction to base didn't flip.
-        let old_direction_to_base = old_leverage.into_base(market_type).split().0;
-        let new_direction_to_base = new_leverage.into_base(market_type).split().0;
+        let old_direction_to_base = old_leverage.into_base(market_type)?.split().0;
+        let new_direction_to_base = new_leverage.into_base(market_type)?.split().0;
         if old_direction_to_base != new_direction_to_base {
             // Sanity check: max gains should not be computable in this case.
             debug_assert_eq!(
@@ -120,30 +120,30 @@ impl State<'_> {
             )
         }
 
-        let leverage_delta = new_leverage.into_number() - old_leverage.into_number();
+        let leverage_delta = (new_leverage.into_number() - old_leverage.into_number())?;
         let counter_collateral_delta =
-            pos.counter_collateral.into_signed() - original_pos.counter_collateral.into_signed();
+            (pos.counter_collateral.into_signed() - original_pos.counter_collateral.into_signed())?;
         let counter_leverage_delta =
-            new_counter_leverage.into_number() - old_counter_leverage.into_number();
+            (new_counter_leverage.into_number() - old_counter_leverage.into_number())?;
         let active_collateral_delta =
-            pos.active_collateral.into_signed() - original_pos.active_collateral.into_signed();
+            (pos.active_collateral.into_signed() - original_pos.active_collateral.into_signed())?;
         let trading_fee_delta =
-            pos.trading_fee.collateral() - original_pos.trading_fee.collateral();
-        let delta_neutrality_fee_delta =
-            pos.delta_neutrality_fee.collateral() - original_pos.delta_neutrality_fee.collateral();
-        let notional_size_delta = pos.notional_size - original_pos.notional_size;
-        let notional_size_abs_delta = pos.notional_size.abs() - original_pos.notional_size.abs();
+            (pos.trading_fee.collateral() - original_pos.trading_fee.collateral())?;
+        let delta_neutrality_fee_delta = (pos.delta_neutrality_fee.collateral()
+            - original_pos.delta_neutrality_fee.collateral())?;
+        let notional_size_delta = (pos.notional_size - original_pos.notional_size)?;
+        let notional_size_abs_delta = (pos.notional_size.abs() - original_pos.notional_size.abs())?;
 
         let deposit_collateral_delta =
-            pos.deposit_collateral.collateral() - original_pos.deposit_collateral.collateral();
+            (pos.deposit_collateral.collateral() - original_pos.deposit_collateral.collateral())?;
         let collaterals = calculate_position_collaterals(&pos)?;
         let trading_fee = PositionTradingFee {
             trading_fee: pos.trading_fee.collateral(),
             trading_fee_usd: pos.trading_fee.usd(),
         };
 
-        let (direction, leverage) = new_leverage.into_base(market_type).split();
-        let (_, counter_leverage) = new_counter_leverage.into_base(market_type).split();
+        let (direction, leverage) = new_leverage.into_base(market_type)?.split();
+        let (_, counter_leverage) = new_counter_leverage.into_base(market_type)?.split();
         let notional_size = pos.notional_size;
         let evt = PositionUpdateEvent {
             position_attributes: PositionAttributes {
@@ -311,7 +311,7 @@ impl UpdatePositionSizeExec {
             .into_signed()
             .checked_add(collateral_delta)?
             .into_number()
-            .approx_gt_strict(Number::ZERO)
+            .approx_gt_strict(Number::ZERO)?
         {
             perp_bail!(
                 ErrorId::PositionUpdate,
@@ -320,8 +320,9 @@ impl UpdatePositionSizeExec {
             );
         }
 
-        let scale_factor = ((pos.active_collateral.into_number() + collateral_delta.into_number())
-            / pos.active_collateral.into_number())
+        let scale_factor = ((pos.active_collateral.into_number()
+            + collateral_delta.into_number())?
+            / pos.active_collateral.into_number())?
         .try_into_non_zero()
         .context("scale_factor is negative or zero")?;
         pos.active_collateral = pos.active_collateral.checked_add_signed(collateral_delta)?;
@@ -336,7 +337,7 @@ impl UpdatePositionSizeExec {
         let old_counter_collateral = pos.counter_collateral.raw();
         let new_counter_collateral = pos.counter_collateral.checked_mul_non_zero(scale_factor)?;
         let counter_collateral_delta =
-            new_counter_collateral.into_signed() - old_counter_collateral.into_signed();
+            (new_counter_collateral.into_signed() - old_counter_collateral.into_signed())?;
         pos.counter_collateral = new_counter_collateral;
 
         let market_type = state.market_type(store)?;
@@ -367,7 +368,7 @@ impl UpdatePositionSizeExec {
         pos.trading_fee
             .checked_add_assign(trading_fee_delta, price_point)?;
 
-        let notional_size_diff = pos.notional_size - original_pos.notional_size;
+        let notional_size_diff = (pos.notional_size - original_pos.notional_size)?;
 
         let dnf = state.charge_delta_neutrality_fee(
             store,
@@ -482,7 +483,7 @@ impl UpdatePositionLeverageExec {
         let mut pos = pos;
         let original_pos = pos.clone();
 
-        if notional_size.into_number().approx_eq(Number::ZERO) {
+        if notional_size.into_number().approx_eq(Number::ZERO)? {
             perp_bail!(
                 ErrorId::PositionUpdate,
                 ErrorDomain::Market,
@@ -513,7 +514,7 @@ impl UpdatePositionLeverageExec {
         )
         .context("new_counter_collateral is zero")?;
         let counter_collateral_delta =
-            new_counter_collateral.into_signed() - old_counter_collateral.into_signed();
+            (new_counter_collateral.into_signed() - old_counter_collateral.into_signed())?;
         pos.counter_collateral = new_counter_collateral;
 
         let market_type = state.market_id(store)?.get_market_type();
@@ -544,7 +545,7 @@ impl UpdatePositionLeverageExec {
 
         // Validation
 
-        let notional_size_diff = pos.notional_size - original_pos.notional_size;
+        let notional_size_diff = (pos.notional_size - original_pos.notional_size)?;
 
         let dnf = state.charge_delta_neutrality_fee(
             store,
@@ -651,7 +652,7 @@ impl UpdatePositionMaxGainsExec {
         let old_counter_collateral = pos.counter_collateral;
         let new_counter_collateral = counter_collateral;
         let counter_collateral_delta =
-            new_counter_collateral.into_signed() - old_counter_collateral.into_signed();
+            (new_counter_collateral.into_signed() - old_counter_collateral.into_signed())?;
         pos.counter_collateral = new_counter_collateral;
 
         // Validate leverage _before_ we reduce trading fees from active collateral
@@ -674,7 +675,7 @@ impl UpdatePositionMaxGainsExec {
         pos.trading_fee
             .checked_add_assign(trading_fee_delta, price_point)?;
 
-        let notional_size_diff = pos.notional_size - original_pos.notional_size;
+        let notional_size_diff = (pos.notional_size - original_pos.notional_size)?;
         debug_assert!(notional_size_diff.is_zero());
 
         let liquidity_update =
@@ -749,7 +750,7 @@ impl UpdatePositionTakeProfitPriceExec {
 
         let leverage_to_base = pos
             .active_leverage_to_notional(price_point)
-            .into_base(market_type)
+            .into_base(market_type)?
             .split()
             .1;
 
@@ -767,7 +768,7 @@ impl UpdatePositionTakeProfitPriceExec {
         let old_counter_collateral = pos.counter_collateral;
         let new_counter_collateral = counter_collateral;
         let counter_collateral_delta =
-            new_counter_collateral.into_signed() - old_counter_collateral.into_signed();
+            (new_counter_collateral.into_signed() - old_counter_collateral.into_signed())?;
         pos.counter_collateral = new_counter_collateral;
 
         // Validate leverage _before_ we reduce trading fees from active collateral
@@ -790,7 +791,7 @@ impl UpdatePositionTakeProfitPriceExec {
         pos.trading_fee
             .checked_add_assign(trading_fee_delta, price_point)?;
 
-        let notional_size_diff = pos.notional_size - original_pos.notional_size;
+        let notional_size_diff = (pos.notional_size - original_pos.notional_size)?;
         debug_assert!(notional_size_diff.is_zero());
 
         let liquidity_update =

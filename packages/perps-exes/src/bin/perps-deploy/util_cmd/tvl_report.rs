@@ -86,7 +86,7 @@ async fn go_factory(
                     amount.parse::<u128>()?,
                     (*collateral_decimal_places).into(),
                 )?;
-                locked_collateral += Collateral::from_decimal256(amount);
+                locked_collateral = (locked_collateral + Collateral::from_decimal256(amount))?;
             } else {
                 other_tokens.push(format!("{amount}{denom}"));
             }

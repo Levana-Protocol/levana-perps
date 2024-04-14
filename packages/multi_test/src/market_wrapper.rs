@@ -786,7 +786,8 @@ impl PerpsMarket {
         if let Some(unstaking) = &lp_info_resp.unstaking {
             anyhow::ensure!(
                 unstaking.xlp_unstaking.raw()
-                    == unstaking.collected + unstaking.available + unstaking.pending,
+                    == ((unstaking.collected + unstaking.available).unwrap() + unstaking.pending)
+                        .unwrap(),
                 "Incoherent unstaking value: {unstaking:?}"
             );
         }

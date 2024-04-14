@@ -208,7 +208,7 @@ fn helper_execute(
             if let Some(slippage_assert) = slippage_assert {
                 let market_type = state.market_id(ctx.storage)?.get_market_type();
                 let pos = get_position(ctx.storage, id)?;
-                let delta_notional_size = notional_size - pos.notional_size;
+                let delta_notional_size = (notional_size - pos.notional_size)?;
                 state.do_slippage_assert(
                     ctx.storage,
                     slippage_assert,
@@ -558,7 +558,7 @@ fn helper_validate(
             if let Some(slippage_assert) = slippage_assert {
                 let market_type = state.market_id(store)?.get_market_type();
 
-                let delta_notional_size = notional_size - pos.notional_size;
+                let delta_notional_size = (notional_size - pos.notional_size)?;
                 state.do_slippage_assert(
                     store,
                     slippage_assert,
@@ -736,7 +736,7 @@ fn update_position_slippage_assert(
     if let Some(slippage_assert) = slippage_assert {
         let market_type = state.market_id(store)?.get_market_type();
         let pos = get_position(store, id)?;
-        let delta_notional_size = notional_size.unwrap_or(pos.notional_size) - pos.notional_size;
+        let delta_notional_size = (notional_size.unwrap_or(pos.notional_size) - pos.notional_size)?;
         state.do_slippage_assert(
             store,
             slippage_assert,

@@ -41,7 +41,7 @@ impl WatchedTaskPerMarket for StatsAlert {
 async fn check_stats_alert(market: &MarketContract, mainnet: &BotConfigMainnet) -> Result<()> {
     let status = market.status().await?;
 
-    let total = status.liquidity.total_collateral();
+    let total = status.liquidity.total_collateral()?;
 
     anyhow::ensure!(!total.is_zero(), "No liquidity in the market");
 

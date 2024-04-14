@@ -82,7 +82,7 @@ impl State<'_> {
     ) -> Result<()> {
         // If we have no more liquidity in the system, but we still have some
         // active LP or xLP tokens. Need to ask the crank to wipe them out.
-        if stats.total_collateral().is_zero() && !stats.total_tokens().is_zero() {
+        if stats.total_collateral()?.is_zero() && !stats.total_tokens()?.is_zero() {
             let stats = LiquidityStats {
                 locked: Collateral::zero(),
                 unlocked: Collateral::zero(),

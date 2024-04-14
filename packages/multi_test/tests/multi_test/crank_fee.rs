@@ -48,7 +48,7 @@ fn crank_fee_is_charged_and_paid() {
     let crank_fee_reward = price.usd_to_collateral(config.crank_fee_reward);
     assert_eq!(
         market.query_fees().unwrap().crank,
-        crank_fee_charged - crank_fee_reward
+        (crank_fee_charged - crank_fee_reward).unwrap()
     );
     assert_eq!(
         market.query_position(pos_id).unwrap().crank_fee_collateral,
@@ -71,7 +71,7 @@ fn crank_fee_is_charged_and_paid() {
     let crank_fees_pending = market.query_lp_info(&cranker).unwrap().available_yield;
     assert_eq!(
         // our current collateral-to-usd price is 1, so just compare directly
-        (fees_after_crank + crank_fees_pending).into_decimal256(),
+        (fees_after_crank + crank_fees_pending).unwrap().into_decimal256(),
         config.crank_fee_charged.into_decimal256() + crank_fee_charged.into_decimal256() - crank_fee_reward.into_decimal256(),
         "fees_after_crank: {fees_after_crank}. crank_fees_pending: {crank_fees_pending}. charged: {}", config.crank_fee_charged
     );
@@ -234,7 +234,7 @@ fn crank_fee_to_rewards_wallet() {
 
     assert_eq!(
         market.query_fees().unwrap().crank,
-        price.usd_to_collateral(config.crank_fee_charged - config.crank_fee_reward)
+        price.usd_to_collateral((config.crank_fee_charged - config.crank_fee_reward).unwrap())
     );
     assert_eq!(
         market.query_position(pos_id).unwrap().crank_fee_collateral,
@@ -266,7 +266,7 @@ fn crank_fee_to_rewards_wallet() {
     let config = market.query_config().unwrap();
     assert_eq!(
         // our current collateral-to-usd price is 1, so just compare directly
-        (fees_after_crank + crank_fees_pending).into_decimal256(),
+        (fees_after_crank + crank_fees_pending).unwrap().into_decimal256(),
         config.crank_fee_charged.into_decimal256() + config.crank_fee_charged.into_decimal256() - config.crank_fee_reward.into_decimal256(),
         "fees_after_crank: {fees_after_crank}. crank_fees_pending: {crank_fees_pending}. charged: {}", config.crank_fee_charged
     );

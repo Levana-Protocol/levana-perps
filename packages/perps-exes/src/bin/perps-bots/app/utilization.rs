@@ -54,7 +54,7 @@ async fn single_market(
     faucet: Address,
 ) -> Result<WatchedTaskOutput> {
     let status = market.status().await?;
-    let total = status.liquidity.total_collateral();
+    let total = status.liquidity.total_collateral()?;
     if total.is_zero() {
         return Ok(WatchedTaskOutput::new("No deposited collateral"));
     }
@@ -169,17 +169,17 @@ async fn single_market(
         );
         // Since we're opening an unpopular position: add the high cap with the
         // absolute value of net notional.
-        let largest_notional_size_abs = notional_high_cap
+        let largest_notional_size_abs = (notional_high_cap
             + match direction {
-                DirectionToBase::Long => status.short_notional - status.long_notional,
-                DirectionToBase::Short => status.long_notional - status.short_notional,
-            };
+                DirectionToBase::Long => (status.short_notional - status.long_notional)?,
+                DirectionToBase::Short => (status.long_notional - status.short_notional)?,
+            })?;
         let largest_deposit_collateral = price
             .notional_to_collateral(Notional::from_decimal256(
                 largest_notional_size_abs.into_decimal256().checked_div(
                     leverage
                         .into_signed(direction)
-                        .into_notional(status.market_type)
+                        .into_notional(status.market_type)?
                         .into_number()
                         .abs_unsigned(),
                 )?,
@@ -236,7 +236,8 @@ fn counter_to_deposit(
                     anyhow::bail!("Infinite max gains are only allowed on Long positions");
                 }
 
-                let leverage_notional = leverage.into_signed(direction).into_notional(market_type);
+                let leverage_notional =
+                    leverage.into_signed(direction).into_notional(market_type)?;
 
                 NonZero::new(Collateral::from_decimal256(
                     counter
@@ -246,16 +247,17 @@ fn counter_to_deposit(
                 .context("counter_to_deposit: got a 0 deposit collateral")?
             }
             MaxGainsInQuote::Finite(max_gains_in_notional) => {
-                let leverage_notional = leverage.into_signed(direction).into_notional(market_type);
-                let max_gains_multiple = Number::ONE
-                    - (max_gains_in_notional.into_number() + Number::ONE)
-                        .checked_div(leverage_notional.into_number().abs())?;
+                let leverage_notional =
+                    leverage.into_signed(direction).into_notional(market_type)?;
+                let max_gains_multiple = (Number::ONE
+                    - (max_gains_in_notional.into_number() + Number::ONE)?
+                        .checked_div(leverage_notional.into_number().abs())?)?;
 
-                if max_gains_multiple.approx_lt_relaxed(Number::ZERO) {
+                if max_gains_multiple.approx_lt_relaxed(Number::ZERO)? {
                     return Err(MarketError::MaxGainsTooLarge {}.into());
                 }
 
-                let deposit = (counter.into_number() * max_gains_multiple)
+                let deposit = (counter.into_number() * max_gains_multiple)?
                     .checked_div(max_gains_in_notional.into_number())?;
 
                 NonZero::<Collateral>::try_from_number(deposit).with_context(|| {

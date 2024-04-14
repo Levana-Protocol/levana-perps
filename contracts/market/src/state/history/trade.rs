@@ -30,13 +30,14 @@ pub(crate) fn trade_volume_usd(
 ) -> Result<Usd> {
     let leverage = pos
         .active_leverage_to_notional(price_point)
-        .into_base(market_type)
+        .into_base(market_type)?
         .split()
         .1;
     let trade_volume_collateral = pos
         .active_collateral
         .raw()
         .checked_mul_dec(leverage.raw().into_decimal256())?;
+
     Ok(price_point.collateral_to_usd(trade_volume_collateral))
 }
 
@@ -53,7 +54,7 @@ fn trade_volume_usd_from_closed(pos: &ClosedPosition, price_point: &PricePoint) 
                 .into_signed(),
         },
     };
-    let trade_volume_notional = pos.notional_size + collateral_factor;
+    let trade_volume_notional = (pos.notional_size + collateral_factor)?;
     Ok(price_point.notional_to_usd(trade_volume_notional.abs_unsigned()))
 }
 
@@ -252,7 +253,7 @@ impl State<'_> {
         let market_type = self.market_type(ctx.storage)?;
         let leverage = pos
             .active_leverage_to_notional(&price_point)
-            .into_base(market_type)
+            .into_base(market_type)?
             .split()
             .1;
         let trade_fee_usd = trading_fee.map(|x| price_point.collateral_to_usd(x));
@@ -359,7 +360,7 @@ impl State<'_> {
     ) -> Result<()> {
         let mut summary = self.trade_history_get_summary(ctx.storage, addr)?;
 
-        summary.realized_pnl += pnl_usd;
+        summary.realized_pnl = (summary.realized_pnl + pnl_usd)?;
         TRADE_HISTORY_SUMMARY.save(ctx.storage, addr, &summary)?;
 
         ctx.response.add_event(PnlEvent { pnl, pnl_usd });

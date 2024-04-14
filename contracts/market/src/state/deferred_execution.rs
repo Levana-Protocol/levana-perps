@@ -178,13 +178,17 @@ impl State<'_> {
         DEFERRED_EXECS_BY_WALLET.save(ctx.storage, (trader.clone(), new_id), &())?;
 
         // Determine the amount of crank fee we need to charge.
-        let new_crank_fee_usd = self.config.crank_fee_charged
-            + self
+        let new_crank_fee_usd = {
+            let crank_fee_surcharge = self
                 .config
                 .crank_fee_surcharge
                 // Intentionally dividing at the u64 level and not Decimal so we
                 // get the expected step-wise decrease from round-down divison.
                 .checked_mul_dec(Decimal256::from_ratio(queue_size / 10, 1u32))?;
+
+            self.config.crank_fee_charged + crank_fee_surcharge
+        }?;
+
         // Even though we never want to use historical prices while executing
         // the deferred queue, for collecting the crank fee we have to use an
         // existing price in the system. This calculation isn't part of the
@@ -379,8 +383,9 @@ impl State<'_> {
             if !item.status.is_pending() {
                 break;
             }
-            deposited += item.item.deposited_amount();
+            deposited = (deposited + item.item.deposited_amount())?;
         }
+
         Ok(deposited)
     }
 

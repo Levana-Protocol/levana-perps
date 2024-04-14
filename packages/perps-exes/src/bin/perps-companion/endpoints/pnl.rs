@@ -274,6 +274,7 @@ impl PositionInfo {
                         active_collateral,
                     )
                     .into_base(status.market_type)
+                    .map_err(|_| Error::MathOverflow)?
                     .split()
                     .1
                     .into_number(),
@@ -290,8 +291,12 @@ impl PositionInfo {
                 _ => match deposit_collateral_usd.try_into_non_negative_value() {
                     None => None,
                     Some(deposit) => {
-                        let percent = pos.pnl_usd.into_number() / deposit.into_number()
-                            * Decimal256::from_ratio(100u32, 1u32).into_signed();
+                        let percent = (
+                            // We check for 0 above.
+                            (pos.pnl_usd.into_number() / deposit.into_number()).unwrap()
+                                * Decimal256::from_ratio(100u32, 1u32).into_signed()
+                        )
+                        .map_err(|_| Error::MathOverflow)?;
                         let plus = if percent.is_negative() { "" } else { "+" };
                         Some(format!("{plus}{}%", TwoDecimalPoints(percent)))
                     }
@@ -413,6 +418,8 @@ pub(crate) enum Error {
     InvalidPage,
     #[error("Missing PnL values")]
     PnlValueMissing,
+    #[error("Math operation overflowed")]
+    MathOverflow,
 }
 
 impl IntoResponse for Error {
@@ -435,6 +442,7 @@ impl IntoResponse for Error {
                 }
                 Error::InvalidPage => http::status::StatusCode::NOT_FOUND,
                 Error::PnlValueMissing => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                Error::MathOverflow => http::status::StatusCode::INTERNAL_SERVER_ERROR,
             },
             error: self.clone(),
         }

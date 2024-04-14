@@ -274,7 +274,7 @@ mod test {
     fn number_serde() {
         let a = Number::from(300u64);
         let b = Number::from(7u64);
-        let res = a / b;
+        let res = (a / b).unwrap();
 
         assert_eq!(serde_json::to_value(res).unwrap(), "42.857142857142857142");
         assert_eq!(
@@ -296,26 +296,26 @@ mod test {
         let a = Number::from(300u64);
         let b = Number::from(7u64);
 
-        assert_eq!((a + b).to_string(), "307");
-        assert_eq!((a - b).to_string(), "293");
-        assert_eq!((b - a).to_string(), "-293");
-        assert_eq!((a * b).to_string(), "2100");
-        assert_eq!((a / b).to_string(), "42.857142857142857142");
+        assert_eq!((a + b).unwrap().to_string(), "307");
+        assert_eq!((a - b).unwrap().to_string(), "293");
+        assert_eq!((b - a).unwrap().to_string(), "-293");
+        assert_eq!((a * b).unwrap().to_string(), "2100");
+        assert_eq!((a / b).unwrap().to_string(), "42.857142857142857142");
 
         let a = -a;
         let b = -b;
-        assert_eq!((a + b).to_string(), "-307");
-        assert_eq!((a - b).to_string(), "-293");
-        assert_eq!((b - a).to_string(), "293");
-        assert_eq!((a * b).to_string(), "2100");
-        assert_eq!((a / b).to_string(), "42.857142857142857142");
+        assert_eq!((a + b).unwrap().to_string(), "-307");
+        assert_eq!((a - b).unwrap().to_string(), "-293");
+        assert_eq!((b - a).unwrap().to_string(), "293");
+        assert_eq!((a * b).unwrap().to_string(), "2100");
+        assert_eq!((a / b).unwrap().to_string(), "42.857142857142857142");
 
         let a = -a;
-        assert_eq!((a + b).to_string(), "293");
-        assert_eq!((a - b).to_string(), "307");
-        assert_eq!((b - a).to_string(), "-307");
-        assert_eq!((a * b).to_string(), "-2100");
-        assert_eq!((a / b).to_string(), "-42.857142857142857142");
+        assert_eq!((a + b).unwrap().to_string(), "293");
+        assert_eq!((a - b).unwrap().to_string(), "307");
+        assert_eq!((b - a).unwrap().to_string(), "-307");
+        assert_eq!((a * b).unwrap().to_string(), "-2100");
+        assert_eq!((a / b).unwrap().to_string(), "-42.857142857142857142");
     }
 
     #[test]
@@ -324,8 +324,8 @@ mod test {
         let b = Number::from_str("0.007").unwrap();
 
         assert!(a > b);
-        assert!(a.approx_gt_strict(b));
-        assert!(a.approx_gt_relaxed(b));
+        assert!(a.approx_gt_strict(b).unwrap());
+        assert!(a.approx_gt_relaxed(b).unwrap());
         assert!(a != b);
 
         let a = Number::from_str("4.2").unwrap();
@@ -333,37 +333,37 @@ mod test {
 
         assert!(a <= b);
         assert!(a >= b);
-        assert!(a.approx_eq(b));
+        assert!(a.approx_eq(b).unwrap());
         assert!(a == b);
 
         let a = Number::from_str("4.2").unwrap();
         let b = Number::from_str("-4.2").unwrap();
 
         assert!(a > b);
-        assert!(a.approx_gt_strict(b));
-        assert!(a.approx_gt_relaxed(b));
+        assert!(a.approx_gt_strict(b).unwrap());
+        assert!(a.approx_gt_relaxed(b).unwrap());
         assert!(a != b);
 
         let a = Number::from_str("-4.2").unwrap();
         let b = Number::from_str("4.2").unwrap();
 
         assert!(a < b);
-        assert!(a.approx_lt_relaxed(b));
+        assert!(a.approx_lt_relaxed(b).unwrap());
         assert!(a != b);
 
         let a = Number::from_str("-4.5").unwrap();
         let b = Number::from_str("-4.2").unwrap();
 
         assert!(a < b);
-        assert!(a.approx_lt_relaxed(b));
+        assert!(a.approx_lt_relaxed(b).unwrap());
         assert!(a != b);
 
         let a = Number::from_str("-4.2").unwrap();
         let b = Number::from_str("-4.5").unwrap();
 
         assert!(a > b);
-        assert!(a.approx_gt_strict(b));
-        assert!(a.approx_gt_relaxed(b));
+        assert!(a.approx_gt_strict(b).unwrap());
+        assert!(a.approx_gt_relaxed(b).unwrap());
         assert!(a != b);
     }
 
@@ -447,7 +447,7 @@ mod test {
     #[test]
     fn basic_multiplication() {
         let num = Number::from_str("1.1").unwrap();
-        let twopointtwo = num * 2u64;
+        let twopointtwo = (num * 2u64).unwrap();
         assert_eq!(twopointtwo, Number::from_str("2.2").unwrap());
     }
 }

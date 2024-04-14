@@ -174,20 +174,21 @@ async fn worker(
             market_id: &market_id,
             addr: lp,
             yield_withdrawn: lp_info.history.r#yield,
-            yield_pending: lp_info.available_yield_lp + lp_info.available_yield_xlp,
+            yield_pending: (lp_info.available_yield_lp + lp_info.available_yield_xlp)?,
             lp_collateral: lp_info.lp_collateral,
             xlp_collateral: lp_info.xlp_collateral,
-            xlp_unstaking: lp_info
-                .unstaking
-                .map_or_else(Collateral::zero, |unstaking| {
-                    Collateral::from_decimal256(
-                        (unstaking.xlp_unstaking.raw() - unstaking.collected).into_decimal256()
+            xlp_unstaking: lp_info.unstaking.map_or_else(
+                || Ok(Collateral::zero()),
+                |unstaking| {
+                    anyhow::Ok(Collateral::from_decimal256(
+                        (unstaking.xlp_unstaking.raw() - unstaking.collected)?.into_decimal256()
                             / unstaking.xlp_unstaking.into_decimal256()
                             * unstaking.xlp_unstaking_collateral.into_decimal256(),
-                    )
-                }),
+                    ))
+                },
+            )?,
             holdings_usd: price.collateral_to_usd(
-                lp_info.available_yield + lp_info.lp_collateral + lp_info.xlp_collateral,
+                ((lp_info.available_yield + lp_info.lp_collateral)? + lp_info.xlp_collateral)?,
             ),
         };
 

@@ -431,5 +431,5 @@ fn artificial_slippage_charge_change_net_notional_sign() {
     let status2 = market.query_status().unwrap();
     let net_notional2 = status2.long_notional - status2.short_notional;
     assert_eq!(net_notional1, net_notional2);
-    assert_eq!(open_amount1, open_amount2 + open_amount3);
+    assert_eq!(open_amount1, (open_amount2 + open_amount3).unwrap());
 }

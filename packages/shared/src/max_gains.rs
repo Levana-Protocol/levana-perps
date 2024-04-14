@@ -158,11 +158,11 @@ impl MaxGainsInQuote {
                             .context("notional_size_in_collateral is zero")?
                     }
                     MaxGainsInQuote::Finite(max_gains_in_notional) => {
-                        let max_gains_multiple = Number::ONE
-                            - (max_gains_in_notional.into_number() + Number::ONE)
-                                .checked_div(leverage_to_notional.into_number())?;
+                        let max_gains_multiple = (Number::ONE
+                            - (max_gains_in_notional.into_number() + Number::ONE)?
+                                .checked_div(leverage_to_notional.into_number())?)?;
 
-                        if max_gains_multiple.approx_lt_relaxed(Number::ZERO) {
+                        if max_gains_multiple.approx_lt_relaxed(Number::ZERO)? {
                             return Err(MarketError::MaxGainsTooLarge {}.into());
                         }
 

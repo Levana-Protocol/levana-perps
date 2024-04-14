@@ -53,7 +53,7 @@ impl OpenPositionExec {
 
         let leverage_to_base = leverage.into_signed(direction);
 
-        let leverage_to_notional = leverage_to_base.into_notional(market_type);
+        let leverage_to_notional = leverage_to_base.into_notional(market_type)?;
 
         let notional_size_in_collateral =
             leverage_to_notional.checked_mul_collateral(collateral)?;
@@ -171,7 +171,7 @@ impl OpenPositionExec {
 
         // Check for sufficient margin
         perp_ensure!(
-            pos.active_collateral.raw() >= pos.liquidation_margin.total(),
+            pos.active_collateral.raw() >= pos.liquidation_margin.total()?,
             ErrorId::InsufficientMargin,
             ErrorDomain::Market,
             "insufficient margin, active collateral: {}, liquidation_margin: {:?}",
@@ -246,11 +246,11 @@ impl OpenPositionExec {
 
         let (direction, leverage) = pos
             .active_leverage_to_notional(&price_point)
-            .into_base(market_type)
+            .into_base(market_type)?
             .split();
         let (_, counter_leverage) = pos
             .counter_leverage_to_notional(&price_point)
-            .into_base(market_type)
+            .into_base(market_type)?
             .split();
 
         state.position_history_add_open_update_action(

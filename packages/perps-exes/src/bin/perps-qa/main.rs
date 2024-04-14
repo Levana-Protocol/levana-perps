@@ -126,7 +126,7 @@ async fn main_inner() -> Result<()> {
             let slippage_assert = match (current_price, max_slippage) {
                 (None, None) => None,
                 (Some(current_price), Some(max_slippage)) => {
-                    let tolerance = max_slippage / 100;
+                    let tolerance = (max_slippage / 100)?;
                     log::debug!("Current price: {}", current_price);
                     log::debug!("Tolerance: {}", tolerance);
                     Some(SlippageAssert {
@@ -270,18 +270,18 @@ async fn main_inner() -> Result<()> {
             println!("Open short interest (in notional): {short_notional}");
             println!(
                 "Total interest (in notional): {}",
-                long_notional + short_notional
+                (long_notional + short_notional)?
             );
             println!(
                 "Net interest (in notional): {}",
-                long_notional.into_signed() - short_notional.into_signed()
+                (long_notional.into_signed() - short_notional.into_signed())?
             );
             println!("Open long interest (in USD): {long_usd}");
             println!("Open short interest (in USD): {short_usd}");
-            println!("Total interest (in USD): {}", long_usd + short_usd);
+            println!("Total interest (in USD): {}", (long_usd + short_usd)?);
             println!(
                 "Net interest (in USD): {}",
-                long_usd.into_signed() - short_usd.into_signed()
+                (long_usd.into_signed() - short_usd.into_signed())?
             );
             println!(
                 "Instant delta neutrality: {}",

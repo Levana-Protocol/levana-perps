@@ -112,7 +112,7 @@ impl State<'_> {
             config: self.config.clone(),
             liquidity,
             next_crank,
-            borrow_fee: borrow_fee.total(),
+            borrow_fee: borrow_fee.total()?,
             borrow_fee_lp: borrow_fee.lp,
             borrow_fee_xlp: borrow_fee.xlp,
             long_funding,

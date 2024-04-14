@@ -386,7 +386,10 @@ fn position_take_profit_long_helper(price: u128, check_liquidation_reason: bool)
         .unwrap();
 
     let balance_after_open = market.query_collateral_balance(&trader).unwrap();
-    assert_eq!(balance_before_open - balance_after_open, collateral);
+    assert_eq!(
+        (balance_before_open - balance_after_open).unwrap(),
+        collateral
+    );
 
     let pos = market.query_position(pos_id).unwrap();
     let counter_collateral = pos.counter_collateral;
@@ -412,7 +415,9 @@ fn position_take_profit_long_helper(price: u128, check_liquidation_reason: bool)
     }
 
     assert!(balance_after_close > balance_before_open);
-    assert!(balance_after_close - balance_before_open <= counter_collateral.into_number());
+    assert!(
+        (balance_after_close - balance_before_open).unwrap() <= counter_collateral.into_number()
+    );
 
     // confirm that we get no positions when we query
     let positions = market.query_positions(&trader).unwrap();

@@ -73,7 +73,7 @@ fn position_misc_debug_temp() {
 
     assert_eq!(
         updated_pos.deposit_collateral,
-        pos.deposit_collateral + collateral_delta
+        (pos.deposit_collateral + collateral_delta).unwrap()
     );
 }
 

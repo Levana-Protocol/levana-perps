@@ -183,9 +183,11 @@ fn locked_balances(state: &State, store: &dyn Storage) -> Result<()> {
     let mut counter_collateral = Collateral::zero();
     for position in OPEN_POSITIONS.range(store, None, None, cosmwasm_std::Order::Ascending) {
         let (_, position) = position?;
-        counter_collateral += position.counter_collateral.raw();
+        counter_collateral = (counter_collateral + position.counter_collateral.raw())?;
     }
+
     anyhow::ensure!(stats.locked == counter_collateral);
+
     Ok(())
 }
 
@@ -252,10 +254,10 @@ fn liquidity_balances(
     for res in state.iter_liquidity_stats_addrs(store) {
         let (_, value) = res?;
         anyhow::ensure!(!value.is_empty());
-        sum_lp += value.lp;
-        sum_xlp += value.xlp;
+        sum_lp = (sum_lp + value.lp)?;
+        sum_xlp = (sum_xlp + value.xlp)?;
         if let Some(unstaking) = value.unstaking {
-            sum_lp += unstaking.xlp_amount.raw() - unstaking.collected;
+            sum_lp = (sum_lp + (unstaking.xlp_amount.raw() - unstaking.collected)?)?;
         }
     }
     anyhow::ensure!(total_lp == sum_lp);
@@ -265,7 +267,7 @@ fn liquidity_balances(
     let actual = token.query_balance(querier, &env.contract.address)?;
 
     // exact amounts are checked in token_balance
-    anyhow::ensure!(locked + unlocked <= actual);
+    anyhow::ensure!((locked + unlocked)? <= actual);
     Ok(())
 }
 
@@ -288,16 +290,18 @@ impl SubTotals {
         fund_transfers: &HashMap<Addr, NonZero<Collateral>>,
     ) -> Result<Self> {
         let fees = ALL_FEES.may_load(store)?.context("ALL_FEES not set")?;
+        let mut pending_transfer = Collateral::zero();
+
+        for transfer in fund_transfers.values() {
+            pending_transfer = (pending_transfer + transfer.raw())?;
+        }
+
         let mut subtotals = SubTotals {
             position_collateral: Collateral::zero(),
             limit_order_collateral: Collateral::zero(),
-
             liquidity_stats: state.load_liquidity_stats(store)?,
             fees,
-            pending_transfer: fund_transfers
-                .values()
-                .fold(Collateral::zero(), |acc, curr| acc + curr.raw()),
-
+            pending_transfer,
             net_funding_paid: get_total_net_funding_paid(store)?,
             delta_neutrality_fund: DELTA_NEUTRALITY_FUND.may_load(store)?.unwrap_or_default(),
             deferred_exec: state.deferred_exec_deposit_balance(store)?,
@@ -305,11 +309,13 @@ impl SubTotals {
 
         for position in OPEN_POSITIONS.range(store, None, None, Order::Ascending) {
             let (_, position) = position?;
-            subtotals.position_collateral += position.active_collateral.raw();
+            subtotals.position_collateral =
+                (subtotals.position_collateral + position.active_collateral.raw())?;
         }
 
         for order in state.limit_order_load_all(store)? {
-            subtotals.limit_order_collateral += order.collateral.raw();
+            subtotals.limit_order_collateral =
+                (subtotals.limit_order_collateral + order.collateral.raw())?;
         }
 
         Ok(subtotals)
@@ -326,18 +332,26 @@ impl SubTotals {
             delta_neutrality_fund,
             deferred_exec,
         } = self;
-        let positive_total = *pending_transfer
-            + *position_collateral
-            + *limit_order_collateral
-            + liquidity_stats.unlocked
-            + liquidity_stats.locked
-            + fees.protocol
-            + fees.wallets
-            + fees.crank
-            + *delta_neutrality_fund
-            + *deferred_exec;
 
-        let total = positive_total.into_signed() + *funding_fee_imbalance;
+        let mut positive_total = Collateral::zero();
+
+        for value in [
+            *pending_transfer,
+            *position_collateral,
+            *limit_order_collateral,
+            liquidity_stats.unlocked,
+            liquidity_stats.locked,
+            fees.protocol,
+            fees.wallets,
+            fees.crank,
+            *delta_neutrality_fund,
+            *deferred_exec,
+        ] {
+            positive_total = (positive_total + value)?;
+        }
+
+        let total = (positive_total.into_signed() + *funding_fee_imbalance)?;
+
         total
             .try_into_non_negative_value()
             .with_context(|| format!("Calculated total is negative: {self:?}"))
@@ -374,7 +388,7 @@ fn token_balance(
     // of precision.
     let epsilon = "0.0001".parse()?;
     anyhow::ensure!(
-        (token_balance.into_signed() - calculated_total.into_signed()).abs() < epsilon,
+        (token_balance.into_signed() - calculated_total.into_signed())?.abs() < epsilon,
         "Mismatched token balance.  Actual: {token_balance}. Calculated: {calculated_total}.\nDetails: {subtotals:?}"
     );
 
@@ -385,8 +399,9 @@ fn sufficient_collateral_for_margins(store: &dyn Storage) -> Result<()> {
     let mut total_funding_margin_calculated = Collateral::zero();
     for res in OPEN_POSITIONS.range(store, None, None, Order::Ascending) {
         let (_, pos) = res?;
-        anyhow::ensure!(pos.active_collateral.raw() >= pos.liquidation_margin.total());
-        total_funding_margin_calculated += pos.liquidation_margin.funding;
+        anyhow::ensure!(pos.active_collateral.raw() >= pos.liquidation_margin.total()?);
+        total_funding_margin_calculated =
+            (total_funding_margin_calculated + pos.liquidation_margin.funding)?;
     }
 
     anyhow::ensure!(total_funding_margin_calculated == get_total_funding_margin(store)?);
@@ -421,7 +436,8 @@ fn check_lp_info(
     anyhow::ensure!(lp_amount.is_zero() == lp_collateral.is_zero());
     anyhow::ensure!(xlp_amount.is_zero() == xlp_collateral.is_zero());
     anyhow::ensure!(
-        *available_yield == *available_yield_lp + *available_yield_xlp + *available_crank_rewards
+        *available_yield
+            == ((*available_yield_lp + *available_yield_xlp)? + *available_crank_rewards)?
     );
     if let Some(unstaking) = unstaking {
         let UnstakingStatus {
@@ -433,7 +449,7 @@ fn check_lp_info(
             available,
             pending,
         } = unstaking;
-        anyhow::ensure!(xlp_unstaking.raw() == *collected + *available + *pending);
+        anyhow::ensure!(xlp_unstaking.raw() == ((*collected + *available)? + *pending)?);
     }
     Ok(())
 }

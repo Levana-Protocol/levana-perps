@@ -2,6 +2,7 @@ use super::period::FarmingPeriod;
 use crate::prelude::farming::RawFarmerStats;
 use crate::prelude::*;
 use crate::state::period::LockdropDurations;
+use cosmwasm_std::OverflowError;
 use serde::{Deserialize, Serialize};
 
 /// The total amount of LVN rewards designated for lockdrop participants
@@ -158,7 +159,7 @@ impl State<'_> {
             // multiple withdrawals accumulate in withdrawal_after_sunset, but this max is never surpassed
             // therefore the available `amount` can never be negative
             let balance_before_sunset =
-                balance.deposit_before_sunset - balance.withdrawal_before_sunset;
+                (balance.deposit_before_sunset - balance.withdrawal_before_sunset)?;
             let half_balance_before_sunset =
                 balance_before_sunset.into_decimal256() / Decimal256::two();
             let available =
@@ -321,12 +322,11 @@ struct Balance {
 }
 
 impl Balance {
-    pub(crate) fn total(&self) -> Result<Collateral> {
-        let total_deposit = self.deposit_before_sunset + self.deposit_after_sunset;
-        let total_withdrawal = self.withdrawal_before_sunset + self.withdrawal_after_sunset;
-        let total = total_deposit.checked_sub(total_withdrawal)?;
+    pub(crate) fn total(&self) -> Result<Collateral, OverflowError> {
+        let total_deposit = (self.deposit_before_sunset + self.deposit_after_sunset)?;
+        let total_withdrawal = (self.withdrawal_before_sunset + self.withdrawal_after_sunset)?;
 
-        Ok(total)
+        total_deposit - total_withdrawal
     }
 }
 

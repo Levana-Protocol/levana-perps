@@ -14,15 +14,28 @@ impl State<'_> {
             .try_into_non_negative_value()
             .context("Max allowed leverage is negative")?;
 
-        let current_leverage =
-            current_leverage.map(|x| x.into_base(market_type).split().1.into_decimal256());
+        let current_leverage = if let Some(current_leverage) = current_leverage {
+            Some(
+                current_leverage
+                    .into_base(market_type)?
+                    .split()
+                    .1
+                    .into_decimal256(),
+            )
+        } else {
+            None
+        };
+
         let new_leverage = new_leverage_notional
-            .into_base(market_type)
+            .into_base(market_type)?
             .split()
             .1
             .into_decimal256();
 
-        let is_out_of_range = if new_leverage_notional.into_number().approx_eq(Number::ZERO) {
+        let is_out_of_range = if new_leverage_notional
+            .into_number()
+            .approx_eq(Number::ZERO)?
+        {
             true
         } else {
             match current_leverage {
@@ -60,7 +73,7 @@ impl State<'_> {
         let counter_leverage = counter_leverage_to_notional.into_number().abs();
         let current_leverage = current_leverage.map(|x| x.into_number().abs());
 
-        let is_out_of_range = if !counter_leverage.approx_gt_relaxed(Number::ONE) {
+        let is_out_of_range = if !counter_leverage.approx_gt_relaxed(Number::ONE)? {
             // We allow the counter leverage to be between 0 and 1 if we were already less than 1 and we're not making it any worse
             match current_leverage {
                 // We're updating. If the leverage got closer to 0 then we're out of bounds
@@ -74,7 +87,7 @@ impl State<'_> {
                     // happen even if the new value is out of range still
                     false
                 }
-                _ => !counter_leverage.approx_lt_relaxed(max_allowed_leverage),
+                _ => !(counter_leverage.approx_lt_relaxed(max_allowed_leverage))?,
             }
         };
 
@@ -166,8 +179,8 @@ impl State<'_> {
             price_point,
             delta_neutrality_fee_margin,
         )?;
-        let fee_rate = delta_neutrality_fee.into_number() / delta_notional_size.into_number();
-        let price = price_point.price_notional.into_number() * (Number::ONE + fee_rate);
+        let fee_rate = (delta_neutrality_fee.into_number() / delta_notional_size.into_number())?;
+        let price = (price_point.price_notional.into_number() * (Number::ONE + fee_rate)?)?;
 
         let slippage_assert_price = slippage_assert
             .price
@@ -175,19 +188,19 @@ impl State<'_> {
             .into_number();
 
         let slippage_opt = if delta_notional_size.is_strictly_positive() {
-            if price <= slippage_assert_price * (Number::ONE + slippage_assert.tolerance) {
+            if price <= (slippage_assert_price * (Number::ONE + slippage_assert.tolerance)?)? {
                 None
             } else {
                 Some(
-                    (Number::from(100u64) * (price - slippage_assert_price))
+                    (Number::from(100u64) * (price - slippage_assert_price)?)?
                         .checked_div(slippage_assert_price),
                 )
             }
-        } else if price >= slippage_assert_price * (Number::ONE - slippage_assert.tolerance) {
+        } else if price >= (slippage_assert_price * (Number::ONE - slippage_assert.tolerance)?)? {
             None
         } else {
             Some(
-                (Number::from(100u64) * (slippage_assert_price - price))
+                (Number::from(100u64) * (slippage_assert_price - price)?)?
                     .checked_div(slippage_assert_price),
             )
         };
@@ -201,7 +214,7 @@ impl State<'_> {
                     ErrorDomain::Market,
                     "Slippage is exceeding provided tolerance. Slippage is {}%, max tolerance is {}%. Current price: {}. Asserted price: {}.",
                     slippage.map_or("Inf".to_string(), |s| format!("{:?}", s)),
-                    Number::from(100u64) * slippage_assert.tolerance,
+                    (Number::from(100u64) * slippage_assert.tolerance)?,
                     price_point.price_base,
                     slippage_assert.price,
                 ))

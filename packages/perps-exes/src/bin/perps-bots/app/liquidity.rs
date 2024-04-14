@@ -65,7 +65,7 @@ async fn single_market(
     faucet: Address,
 ) -> Result<WatchedTaskOutput> {
     let status = market.status().await?;
-    let total = status.liquidity.total_collateral();
+    let total = status.liquidity.total_collateral()?;
     let bounds = worker
         .liquidity_config
         .markets
@@ -121,11 +121,11 @@ async fn single_market(
         .ok()
         .and_then(NonZero::new)
     {
-        Action::Deposit(missing.raw() + Collateral::one())
+        Action::Deposit((missing.raw() + Collateral::one())?)
     } else if util < low_util {
         Action::Withdraw(total.checked_sub(target_liquidity)?)
     } else if util > high_util {
-        Action::Deposit(target_liquidity - total)
+        Action::Deposit((target_liquidity - total)?)
     } else {
         Action::None
     };
@@ -178,8 +178,8 @@ async fn single_market(
                     WatchedTaskOutput::new("Won't withdraw less than 1 liquidity")
                 } else {
                     let lp_tokens = to_withdraw.into_decimal256()
-                        * status.liquidity.total_tokens().into_decimal256()
-                        / status.liquidity.total_collateral().into_decimal256();
+                        * status.liquidity.total_tokens()?.into_decimal256()
+                        / status.liquidity.total_collateral()?.into_decimal256();
                     let lp_tokens = NonZero::new(LpToken::from_decimal256(lp_tokens))
                         .context("Somehow got 0 to withdraw")?;
                     market.withdraw(&worker.wallet, lp_tokens).await?;

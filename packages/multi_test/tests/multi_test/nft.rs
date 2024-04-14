@@ -44,8 +44,9 @@ fn nft_position() {
 
     assert_eq!(
         Number::try_from(meta.get_attr("pos-active-collateral").unwrap()).unwrap(),
-        Number::try_from("98.9").unwrap()
-            - defer_res.exec_resp().first_delta_neutrality_fee_amount()
+        (Number::try_from("98.9").unwrap()
+            - defer_res.exec_resp().first_delta_neutrality_fee_amount())
+        .unwrap()
     );
 }
 

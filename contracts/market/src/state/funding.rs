@@ -4,7 +4,7 @@ pub(crate) mod borrow_fees;
 use crate::prelude::*;
 use crate::state::data_series::DataSeries;
 use anyhow::Context;
-use cosmwasm_std::Decimal256;
+use cosmwasm_std::{Decimal256, OverflowError};
 use msg::contracts::market::fees::events::{
     BorrowFeeChangeEvent, FeeType, FundingPaymentEvent, FundingRateChangeEvent,
     InsufficientMarginEvent, TradeId,
@@ -49,14 +49,15 @@ const TOTAL_FUNDING_MARGIN: Item<Collateral> = Item::new(namespace::TOTAL_FUNDIN
 #[cfg(debug_assertions)]
 fn debug_check_invariants(store: &dyn Storage, pos_margin: Collateral) {
     let total_paid = TOTAL_NET_FUNDING_PAID.load(store).unwrap();
-    let total_margin =
-        TOTAL_FUNDING_MARGIN.load(store).unwrap().into_signed() - pos_margin.into_signed();
-    let sum = total_paid + total_margin;
+    let total_margin = (TOTAL_FUNDING_MARGIN.load(store).unwrap().into_signed()
+        - pos_margin.into_signed())
+    .unwrap();
+    let sum = (total_paid + total_margin).unwrap();
 
     // Add an epsilon to account for rounding errors
     let sum = sum + Signed::<Collateral>::from_number(Number::EPS_E7);
     assert!(
-        sum.is_positive_or_zero(),
+        sum.unwrap().is_positive_or_zero(),
         "Total funding payments invariants failed. Margin: {total_margin}. Paid: {total_paid}"
     );
 }
@@ -72,15 +73,15 @@ impl State<'_> {
         const NS_PER_YEAR: u128 = 31_536_000_000_000_000;
 
         Ok(Signed::<Collateral>::from_number(
-            match pos.direction() {
+            ((match pos.direction() {
                 DirectionToNotional::Long => LONG_RF_PRICE_PREFIX_SUM
                     .sum(store, starts_at, ends_at)
                     .unwrap_or(Number::ZERO),
                 DirectionToNotional::Short => SHORT_RF_PRICE_PREFIX_SUM
                     .sum(store, starts_at, ends_at)
                     .unwrap_or(Number::ZERO),
-            } * pos.notional_size.abs().into_number()
-                / Number::from(NS_PER_YEAR),
+            } * pos.notional_size.abs().into_number())?
+                / Number::from(NS_PER_YEAR))?,
         ))
     }
 
@@ -97,10 +98,12 @@ impl State<'_> {
         let xlp_instant_rate = XLP_BORROW_FEE_DATA_SERIES.sum(store, starts_at, ends_at)?;
 
         let lp = Collateral::try_from_number(
-            lp_instant_rate * pos.counter_collateral.into_number() / Number::from(NS_PER_YEAR),
+            ((lp_instant_rate * pos.counter_collateral.into_number())?
+                / Number::from(NS_PER_YEAR))?,
         )?;
         let xlp = Collateral::try_from_number(
-            xlp_instant_rate * pos.counter_collateral.into_number() / Number::from(NS_PER_YEAR),
+            ((xlp_instant_rate * pos.counter_collateral.into_number())?
+                / Number::from(NS_PER_YEAR))?,
         )?;
 
         Ok(LpAndXlp { lp, xlp })
@@ -173,7 +176,7 @@ impl State<'_> {
             .checked_mul(Number::from(nanos_since_last_rate))?
             .checked_div(Number::from(NS_PER_DAY))?;
         let calculated_rate = previous_rate
-            .total()
+            .total()?
             .into_number()
             .checked_add(rate_delta)?;
         let total_rate = calculated_rate
@@ -213,15 +216,20 @@ impl State<'_> {
                 self.config.max_xlp_rewards_multiplier.raw(),
                 stats.total_lp,
                 stats.total_xlp,
-            );
+            )?;
 
             let lp_shares = stats.total_lp;
-            let xlp_shares =
-                LpToken::from_decimal256(stats.total_xlp.into_decimal256() * multiplier);
-            let shares = lp_shares + xlp_shares;
+            let xlp_shares = LpToken::from_decimal256(
+                stats.total_xlp.into_decimal256().checked_mul(multiplier)?,
+            );
+            let shares = (lp_shares + xlp_shares)?;
 
-            let lp = total_rate * lp_shares.into_decimal256() / shares.into_decimal256();
-            let xlp = total_rate - lp; // use subtraction to avoid rounding errors
+            let lp = total_rate
+                .checked_mul(lp_shares.into_decimal256())?
+                .checked_div(shares.into_decimal256())?;
+
+            let xlp = total_rate.checked_sub(lp)?; // use subtraction to avoid rounding errors
+
             BorrowFees { lp, xlp }
         })
     }
@@ -241,29 +249,41 @@ impl State<'_> {
         let instant_open_long = self.open_long_interest(store)?;
         let funding_rate_sensitivity = config.funding_rate_sensitivity;
 
-        let total_interest = (instant_open_long + instant_open_short).into_decimal256();
-        let notional_high_cap = config.delta_neutrality_fee_sensitivity.into_decimal256()
-            * config.delta_neutrality_fee_cap.into_decimal256();
-        let funding_rate_sensitivity_from_delta_neutrality =
-            rf_per_annual_cap * total_interest / notional_high_cap;
+        let total_interest = (instant_open_long + instant_open_short)?.into_decimal256();
+        let notional_high_cap = config
+            .delta_neutrality_fee_sensitivity
+            .into_decimal256()
+            .checked_mul(config.delta_neutrality_fee_cap.into_decimal256())?;
+        let funding_rate_sensitivity_from_delta_neutrality = rf_per_annual_cap
+            .checked_mul(total_interest)?
+            .checked_div(notional_high_cap)?;
 
         let effective_funding_rate_sensitivity =
             funding_rate_sensitivity.max(funding_rate_sensitivity_from_delta_neutrality);
         let rf_popular = || -> Result<Decimal256> {
             Ok(std::cmp::min(
-                effective_funding_rate_sensitivity
-                    * (instant_net_open_interest.abs_unsigned().into_decimal256()
-                        / (instant_open_long + instant_open_short).into_decimal256()),
+                effective_funding_rate_sensitivity.checked_mul(
+                    instant_net_open_interest
+                        .abs_unsigned()
+                        .into_decimal256()
+                        .checked_div((instant_open_long + instant_open_short)?.into_decimal256())?,
+                )?,
                 rf_per_annual_cap,
             ))
         };
 
         let rf_unpopular = || -> Result<Decimal256> {
             match instant_open_long.cmp(&instant_open_short) {
-                std::cmp::Ordering::Greater => Ok(rf_popular()?
-                    * (instant_open_long.into_decimal256() / instant_open_short.into_decimal256())),
-                std::cmp::Ordering::Less => Ok(rf_popular()?
-                    * (instant_open_short.into_decimal256() / instant_open_long.into_decimal256())),
+                std::cmp::Ordering::Greater => Ok(rf_popular()?.checked_mul(
+                    instant_open_long
+                        .into_decimal256()
+                        .checked_div(instant_open_short.into_decimal256())?,
+                )?),
+                std::cmp::Ordering::Less => Ok(rf_popular()?.checked_mul(
+                    instant_open_short
+                        .into_decimal256()
+                        .checked_div(instant_open_long.into_decimal256())?,
+                )?),
                 std::cmp::Ordering::Equal => Ok(Decimal256::zero()),
             }
         };
@@ -296,12 +316,16 @@ impl State<'_> {
         let spot_price = price_point.price_notional;
 
         let (long_rate, short_rate) = self.derive_instant_funding_rate_annual(ctx.storage)?;
-        LONG_RF_PRICE_PREFIX_SUM.append(ctx.storage, time, long_rate * spot_price.into_number())?;
+        LONG_RF_PRICE_PREFIX_SUM.append(
+            ctx.storage,
+            time,
+            (long_rate * spot_price.into_number())?,
+        )?;
 
         SHORT_RF_PRICE_PREFIX_SUM.append(
             ctx.storage,
             time,
-            short_rate * spot_price.into_number(),
+            (short_rate * spot_price.into_number())?,
         )?;
 
         let (long_rate_base, short_rate_base) = match self.market_id(ctx.storage)?.get_market_type()
@@ -623,10 +647,12 @@ fn calc_multiplier(
     max_multiplier: Decimal256,
     total_lp: LpToken,
     total_xlp: LpToken,
-) -> Decimal256 {
+) -> Result<Decimal256, OverflowError> {
     debug_assert!(!(total_lp.is_zero() && total_xlp.is_zero()));
-    (min_multiplier * total_xlp.into_decimal256() + max_multiplier * total_lp.into_decimal256())
-        / (total_lp + total_xlp).into_decimal256()
+    Ok((min_multiplier
+        .checked_mul(total_xlp.into_decimal256())?
+        .checked_add(max_multiplier.checked_mul(total_lp.into_decimal256())?))?
+        / (total_lp + total_xlp)?.into_decimal256())
 }
 
 #[cfg(test)]
@@ -645,6 +671,7 @@ mod tests {
             total_lp.parse().unwrap(),
             total_xlp.parse().unwrap(),
         )
+        .unwrap()
     }
 
     #[test]
@@ -713,7 +740,7 @@ impl PositionFeeSettlement {
             .checked_add_assign(funding_timeslice_owed.amount, &price)?;
 
         position.borrow_fee.checked_add_assign(
-            borrow_fee_timeslice_owed.lp + borrow_fee_timeslice_owed.xlp,
+            (borrow_fee_timeslice_owed.lp + borrow_fee_timeslice_owed.xlp)?,
             &price,
         )?;
 
@@ -747,15 +774,15 @@ impl PositionFeeSettlement {
         };
 
         // Update the active collateral
-        debug_assert!(position.active_collateral.raw() >= position.liquidation_margin.total());
-        let to_subtract = borrow_fee_timeslice_owed.lp.into_signed()
-            + borrow_fee_timeslice_owed.xlp.into_signed()
-            + funding_timeslice_owed.amount
+        debug_assert!(position.active_collateral.raw() >= position.liquidation_margin.total()?);
+        let to_subtract = (((borrow_fee_timeslice_owed.lp.into_signed()
+            + borrow_fee_timeslice_owed.xlp.into_signed())?
+            + funding_timeslice_owed.amount)?
             + cap_crank_fee
                 .as_ref()
                 .map(|crank_fee| crank_fee.amount.into_signed())
-                .unwrap_or(Collateral::zero().into_signed());
-        debug_assert!(to_subtract <= position.liquidation_margin.total().into_signed());
+                .unwrap_or(Collateral::zero().into_signed()))?;
+        debug_assert!(to_subtract <= position.liquidation_margin.total()?.into_signed());
 
         let position = match position
             .active_collateral

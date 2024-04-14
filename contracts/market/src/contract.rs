@@ -691,8 +691,8 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
                 &price,
                 pos_delta_neutrality_fee_margin,
             )?;
-            let fee_rate = fees.into_number() / notional_delta.into_number();
-            let price = price.price_notional.into_number() * (Number::ONE + fee_rate);
+            let fee_rate = (fees.into_number() / notional_delta.into_number())?;
+            let price = (price.price_notional.into_number() * (Number::ONE + fee_rate)?)?;
             DeltaNeutralityFeeResp {
                 amount: fees,
                 fund_total: DELTA_NEUTRALITY_FUND.may_load(store)?.unwrap_or_default(),

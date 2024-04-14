@@ -53,7 +53,7 @@ impl State<'_> {
         let lp_fee = amount.lp.checked_sub(protocol_fee_lp)?;
         let xlp_fee = amount.xlp.checked_sub(protocol_fee_xlp)?;
         let protocol_fee = protocol_fee_lp.checked_add(protocol_fee_xlp)?;
-        debug_assert_eq!(protocol_fee + lp_fee + xlp_fee, amount.lp + amount.xlp);
+        debug_assert_eq!((protocol_fee + lp_fee)? + xlp_fee, amount.lp + amount.xlp);
 
         let liquidity_yield_to_process = self.liquidity_process_new_yield(
             store,
@@ -90,7 +90,7 @@ impl State<'_> {
         let protocol_tax = self.config.protocol_tax;
         let protocol_fee = amount.checked_mul_dec(protocol_tax)?;
         let lp_and_xlp_fee = amount.checked_sub(protocol_fee)?;
-        debug_assert_eq!(protocol_fee + lp_and_xlp_fee, amount);
+        debug_assert_eq!(protocol_fee + lp_and_xlp_fee, Ok(amount));
 
         // Use the current ratio of LP to xLP rewards to split up the trading fee
         // We can assert that there is at least some liquidity in the system
@@ -127,8 +127,8 @@ impl State<'_> {
         };
 
         ALL_FEES.update(ctx.storage, |mut fee| {
-            fee.wallets += lp_fee + xlp_fee;
-            fee.protocol += protocol_fee;
+            fee.wallets = (fee.wallets + (lp_fee + xlp_fee)?)?;
+            fee.protocol = (fee.protocol + protocol_fee)?;
 
             anyhow::Ok(fee)
         })?;
@@ -248,7 +248,10 @@ impl State<'_> {
         }
 
         let max_payments = Collateral::from_decimal256(
-            self.config.crank_fee_reward.into_decimal256() * Decimal256::from_atomics(cranks, 0)?,
+            self.config
+                .crank_fee_reward
+                .into_decimal256()
+                .checked_mul(Decimal256::from_atomics(cranks, 0)?)?,
         );
         let mut fees = ALL_FEES.load(ctx.storage)?;
         let payment = max_payments.min(fees.crank);
@@ -307,8 +310,8 @@ impl BorrowFeeCollection {
         liquidity_yield_to_process.apply(state, ctx)?;
 
         ALL_FEES.update::<_, anyhow::Error>(ctx.storage, |mut fee| {
-            fee.wallets += event.lp_amount + event.xlp_amount;
-            fee.protocol += event.protocol_amount;
+            fee.wallets = (fee.wallets + (event.lp_amount + event.xlp_amount)?)?;
+            fee.protocol = (fee.protocol + event.protocol_amount)?;
             Ok(fee)
         })?;
 

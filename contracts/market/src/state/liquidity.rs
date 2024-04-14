@@ -298,7 +298,7 @@ impl State<'_> {
         stats: &LiquidityStats,
         price_point: &PricePoint,
     ) -> Result<()> {
-        let total_liquidity = stats.total_collateral();
+        let total_liquidity = stats.total_collateral()?;
 
         // Use the market type internal to the protocol
         let long_interest_protocol = self.open_long_interest(ctx.storage)?;
@@ -339,7 +339,7 @@ impl State<'_> {
         price: &PricePoint,
     ) -> Result<()> {
         ctx.response_mut()
-            .add_event(LiquidityPoolSizeEvent::from_stats(liquidity_stats, price));
+            .add_event(LiquidityPoolSizeEvent::from_stats(liquidity_stats, price)?);
 
         self.add_delta_neutrality_ratio_event(ctx, liquidity_stats, price)
     }
@@ -362,8 +362,8 @@ impl State<'_> {
         // Update liquidity and calculate shares
 
         let new_shares = liquidity_stats.collateral_to_lp(amount)?;
-        liquidity_stats.total_lp += new_shares.raw();
-        liquidity_stats.unlocked += amount.raw();
+        liquidity_stats.total_lp = (liquidity_stats.total_lp + new_shares.raw())?;
+        liquidity_stats.unlocked = (liquidity_stats.unlocked + amount.raw())?;
 
         self.save_liquidity_stats(ctx.storage, &liquidity_stats)?;
         let price = self.current_spot_price(ctx.storage)?;
@@ -446,15 +446,15 @@ impl State<'_> {
         let long_interest_protocol = self.open_long_interest(ctx.storage)?;
         let short_interest_protocol = self.open_short_interest(ctx.storage)?;
         let net_notional =
-            long_interest_protocol.into_signed() - short_interest_protocol.into_signed();
+            (long_interest_protocol.into_signed() - short_interest_protocol.into_signed())?;
         let price = self.current_spot_price(ctx.storage)?;
         let min_unlocked_liquidity = self.min_unlocked_liquidity(net_notional, &price)?;
-        if liquidity_to_return.raw() + min_unlocked_liquidity > liquidity_stats.unlocked {
+        if (liquidity_to_return.raw() + min_unlocked_liquidity)? > liquidity_stats.unlocked {
             return Err(MarketError::InsufficientLiquidityForWithdrawal {
                 requested_lp: shares_to_withdraw,
                 requested_collateral: liquidity_to_return,
                 unlocked: (liquidity_stats.unlocked.into_signed()
-                    - min_unlocked_liquidity.into_signed())
+                    - min_unlocked_liquidity.into_signed())?
                 .max(Collateral::zero().into_signed())
                 .abs_unsigned(),
             }
@@ -471,11 +471,11 @@ impl State<'_> {
 
         // PERP-2487: rounding errors can leave a little bit of "dust" in collateral
         // we need to zero it out here if there's no liquidity tokens left
-        if liquidity_stats.total_tokens().is_zero() {
+        if liquidity_stats.total_tokens()?.is_zero() {
             // sanity check, it really should just be dust, at most
             anyhow::ensure!(
                 liquidity_stats
-                    .total_collateral()
+                    .total_collateral()?
                     .approx_eq(Collateral::zero()),
                 "liquidity_withdraw: no lp tokens left, but collateral is not zero"
             );
@@ -784,8 +784,8 @@ impl State<'_> {
             .as_nanos();
             let elapsed_ratio: Number = Number::from(elapsed_since_last_collected)
                 .checked_div(unstaking_info.unstake_duration.as_nanos().into())?;
-            elapsed_ratio.checked_mul(unstaking_info.xlp_amount.into_number())?
-        };
+            elapsed_ratio.checked_mul(unstaking_info.xlp_amount.into_number())
+        }?;
 
         debug_assert!(
             unstaking_info.collected.into_number().checked_add(amount)?
@@ -829,7 +829,7 @@ impl State<'_> {
             Some(unstaked_lp) => unstaked_lp,
         };
 
-        unstaking_info.collected += unstaked_lp.raw();
+        unstaking_info.collected = (unstaking_info.collected + unstaked_lp.raw())?;
         unstaking_info.last_collected = self.now();
         match unstaking_info
             .collected
@@ -909,7 +909,7 @@ impl State<'_> {
         // Handle the degenerate case where all liquidity has been drained from
         // the pool. In such as case: we reset all balances to 0, except for the
         // available yield.
-        let (lp_amount, xlp_amount, unstaking) = if stats.total_collateral().is_zero() {
+        let (lp_amount, xlp_amount, unstaking) = if stats.total_collateral()?.is_zero() {
             (LpToken::zero(), LpToken::zero(), None)
         } else {
             (lp_amount, xlp_amount, unstaking)
@@ -945,7 +945,7 @@ impl State<'_> {
         };
         let price = self.current_spot_price(ctx.storage)?;
         let deposit = price.collateral_to_usd(deposit.raw());
-        let current = stats.total_collateral();
+        let current = stats.total_collateral()?;
         let current = price.collateral_to_usd(current);
 
         let new_total = current.checked_add(deposit)?;
@@ -1074,13 +1074,14 @@ impl LiquidityLock {
             None => {
                 let long_interest_protocol = state.open_long_interest(store)?;
                 let short_interest_protocol = state.open_short_interest(store)?;
-                long_interest_protocol.into_signed() - short_interest_protocol.into_signed()
+                (long_interest_protocol.into_signed() - short_interest_protocol.into_signed())?
             }
         };
-        net_notional += delta_notional.unwrap_or_else(|| Notional::zero().into_signed());
+        net_notional =
+            (net_notional + delta_notional.unwrap_or_else(|| Notional::zero().into_signed()))?;
         let min_unlocked_liquidity = state.min_unlocked_liquidity(net_notional, &price)?;
 
-        if min_unlocked_liquidity + amount.raw() > stats.unlocked {
+        if (min_unlocked_liquidity + amount.raw())? > stats.unlocked {
             Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed lock! not enough unlocked liquidity in the protocol! (asked for {}, only {} available with {} minimum. net notional is {})", amount, stats.unlocked, min_unlocked_liquidity, net_notional))
         } else {
             stats.locked = stats.locked.checked_add(amount.raw())?;

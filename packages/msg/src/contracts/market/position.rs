@@ -7,7 +7,7 @@ pub use collateral_and_usd::*;
 
 use anyhow::Result;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Decimal256, StdResult};
+use cosmwasm_std::{Addr, Decimal256, OverflowError, StdResult};
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
 use shared::prelude::*;
 use std::fmt;
@@ -126,8 +126,8 @@ pub struct LiquidationMargin {
 
 impl LiquidationMargin {
     /// Total value of the liquidation margin fields
-    pub fn total(&self) -> Collateral {
-        self.borrow + self.funding + self.delta_neutrality + self.crank + self.exposure
+    pub fn total(&self) -> Result<Collateral, OverflowError> {
+        ((self.borrow + self.funding)? + (self.delta_neutrality + self.crank)?)? + self.exposure
     }
 }
 
@@ -348,13 +348,13 @@ impl Position {
     ) -> Result<Signed<Base>> {
         let leverage = self
             .active_leverage_to_notional(price_point)
-            .into_base(market_type);
+            .into_base(market_type)?;
         let active_collateral = price_point.collateral_to_base_non_zero(self.active_collateral);
         leverage.checked_mul_base(active_collateral)
     }
 
     /// Calculate the PnL of this position in terms of the collateral.
-    pub fn pnl_in_collateral(&self) -> Signed<Collateral> {
+    pub fn pnl_in_collateral(&self) -> Result<Signed<Collateral>> {
         self.active_collateral.into_signed() - self.deposit_collateral.collateral()
     }
 
@@ -363,9 +363,10 @@ impl Position {
     /// Note that this is not equivalent to converting the collateral PnL into
     /// USD, since we follow a cost basis model in this function, tracking the
     /// price of the collateral asset in terms of USD for each transaction.
-    pub fn pnl_in_usd(&self, price_point: &PricePoint) -> Signed<Usd> {
+    pub fn pnl_in_usd(&self, price_point: &PricePoint) -> Result<Signed<Usd>> {
         let active_collateral_in_usd =
             price_point.collateral_to_usd_non_zero(self.active_collateral);
+
         active_collateral_in_usd.into_signed() - self.deposit_collateral.usd()
     }
 
@@ -432,9 +433,13 @@ impl Position {
         active_collateral: NonZero<Collateral>,
         liquidation_margin: &LiquidationMargin,
     ) -> Option<Price> {
-        let liquidation_price = price.into_number()
-            - (active_collateral.into_number() - liquidation_margin.total().into_number())
-                / self.notional_size.into_number();
+        let liquidation_margin = liquidation_margin.total().ok()?.into_number();
+        let liquidation_price = (price.into_number()
+            - ((active_collateral.into_number() - liquidation_margin).ok()?
+                / self.notional_size.into_number())
+            .ok()?)
+        .ok()?;
+
         Price::try_from_number(liquidation_price).ok()
     }
 
@@ -450,7 +455,7 @@ impl Position {
                 .checked_div(self.notional_size.into_number())?,
         )?;
 
-        let take_profit_price = if take_profit_price_raw.approx_eq(Number::ZERO) {
+        let take_profit_price = if take_profit_price_raw.approx_eq(Number::ZERO)? {
             None
         } else {
             debug_assert!(
@@ -492,9 +497,9 @@ impl Position {
         end_price: PricePoint,
         liquidation_margin: Collateral,
     ) -> Result<(MaybeClosedPosition, Signed<Collateral>)> {
-        let price_delta = end_price.price_notional.into_number() - start_price.into_number();
+        let price_delta = (end_price.price_notional.into_number() - start_price.into_number())?;
         let exposure =
-            Signed::<Collateral>::from_number(price_delta * self.notional_size.into_number());
+            Signed::<Collateral>::from_number((price_delta * self.notional_size.into_number())?);
         let min_exposure = liquidation_margin
             .into_signed()
             .checked_sub(self.active_collateral.into_signed())?;
@@ -555,7 +560,7 @@ impl Position {
         let (settle_price_result, _exposure) = self.settle_price_exposure(
             start_price.price_notional,
             end_price,
-            liquidation_margin.total(),
+            liquidation_margin.total()?,
         )?;
 
         let result = match settle_price_result {
@@ -564,7 +569,7 @@ impl Position {
                 // liquifunding for more details
                 let new_direction_to_base = pos
                     .active_leverage_to_notional(&end_price)
-                    .into_base(market_type)
+                    .into_base(market_type)?
                     .split()
                     .0;
                 if original_direction_to_base == new_direction_to_base {
@@ -665,15 +670,15 @@ impl Position {
     ) -> Result<PositionQueryResponse> {
         let (direction_to_base, leverage) = self
             .active_leverage_to_notional(&end_price)
-            .into_base(market_type)
+            .into_base(market_type)?
             .split();
         let counter_leverage = self
             .counter_leverage_to_notional(&end_price)
-            .into_base(market_type)
+            .into_base(market_type)?
             .split()
             .1;
-        let pnl_collateral = self.pnl_in_collateral();
-        let pnl_usd = self.pnl_in_usd(&end_price);
+        let pnl_collateral = self.pnl_in_collateral()?;
+        let pnl_usd = self.pnl_in_usd(&end_price)?;
         let notional_size_in_collateral = self.notional_size_in_collateral(&end_price);
         let position_size_base = self.position_size_base(market_type, &end_price)?;
 
@@ -1066,8 +1071,10 @@ pub mod events {
         pub closed_position: ClosedPosition,
     }
 
-    impl From<PositionCloseEvent> for Event {
-        fn from(
+    impl TryFrom<PositionCloseEvent> for Event {
+        type Error = anyhow::Error;
+
+        fn try_from(
             PositionCloseEvent {
                 closed_position:
                     ClosedPosition {
@@ -1100,7 +1107,7 @@ pub mod events {
                         liquidation_margin,
                     },
             }: PositionCloseEvent,
-        ) -> Self {
+        ) -> anyhow::Result<Self> {
             let mut event = Event::new(event_key::POSITION_CLOSE)
                 .add_attribute(event_key::POS_OWNER, owner.to_string())
                 .add_attribute(event_key::POS_ID, id.to_string())
@@ -1172,9 +1179,10 @@ pub mod events {
                         event_key::LIQUIDATION_MARGIN_EXPOSURE,
                         x.exposure.to_string(),
                     )
-                    .add_attribute(event_key::LIQUIDATION_MARGIN_TOTAL, x.total().to_string());
+                    .add_attribute(event_key::LIQUIDATION_MARGIN_TOTAL, x.total()?.to_string());
             }
-            event
+
+            Ok(event)
         }
     }
     impl TryFrom<Event> for PositionCloseEvent {

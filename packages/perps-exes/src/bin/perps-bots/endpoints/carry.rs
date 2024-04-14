@@ -198,7 +198,7 @@ pub(crate) async fn carry_inner(
                 pos.notional_size
             )
             .as_str();
-            total_notional_size += pos.notional_size.into_number();
+            total_notional_size = (total_notional_size + pos.notional_size.into_number())?;
             if pos.notional_size.is_negative() {
                 has_short = true;
             } else {
