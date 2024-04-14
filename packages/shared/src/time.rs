@@ -127,7 +127,7 @@ impl Timestamp {
 
         Utc.timestamp_opt(secs.try_into()?, nanos.try_into()?)
             .single()
-            .context("Could not convert {self} into DateTime<Utc>")
+            .with_context(|| format!("Could not convert {self} into DateTime<Utc>"))
     }
 }
 

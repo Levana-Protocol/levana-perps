@@ -12,7 +12,7 @@ mod wind_down;
 
 use std::{collections::BTreeMap, path::PathBuf};
 
-use chrono::Utc;
+use chrono::{TimeZone, Utc};
 use cosmos::{Address, ContractAdmin, Cosmos, HasAddress, TxBuilder};
 use cosmwasm_std::{to_binary, CosmosMsg, Empty};
 use msg::contracts::market::{
@@ -590,7 +590,7 @@ async fn validate_spot_price_config(
                     }
                     SpotPriceFeedDataInit::Stride {
                         denom,
-                        age_tolerance_seconds: _,
+                        age_tolerance_seconds,
                     } => {
                         #[derive(serde::Serialize)]
                         #[serde(rename_all = "snake_case")]
@@ -606,13 +606,25 @@ async fn validate_spot_price_config(
                         #[serde(rename_all = "snake_case")]
                         struct RedemptionRateResp {
                             redemption_rate: Decimal256,
+                            update_time: u64,
                         }
-                        let RedemptionRateResp { redemption_rate } =
-                            stride.query(StrideQuery::RedemptionRate { denom }).await?;
+                        let RedemptionRateResp {
+                            redemption_rate,
+                            update_time,
+                        } = stride.query(StrideQuery::RedemptionRate { denom }).await?;
+                        let update_time = Utc
+                            .timestamp_opt(update_time.try_into()?, 0)
+                            .single()
+                            .with_context(|| {
+                                format!("Could not convert {update_time} to DateTime<Utc>")
+                            })?;
+                        let age = Utc::now().signed_duration_since(update_time);
                         log::info!(
-                            "Queried Stride contract {stride} with denom {denom}, got redemption rate of {redemption_rate}"
+                            "Queried Stride contract {stride} with denom {denom}, got redemption rate of {redemption_rate} updated {update_time} (age: {age:?})"
                         );
                         anyhow::ensure!(redemption_rate >= Decimal256::one(), "Redemption rates should always be at least 1, very likely the contract has the purchase rate instead. See: https://blog.levana.finance/milktia-market-mispricing-proposed-solution-6a994e9ecdfa");
+                        let tolerance = chrono::Duration::seconds((*age_tolerance_seconds).into());
+                        anyhow::ensure!(age < tolerance, "Stride update is too old. Expected age is less than {tolerance:?}, but got {age:?}");
                     }
                     SpotPriceFeedDataInit::Sei { denom } => anyhow::bail!(
                         "No longer supporting Sei native oracle, provided denom is: {denom}"
