@@ -520,11 +520,11 @@ networks:
       ]
     stDYM_USD:
       feeds: [
-        !stride { denom: "ibc/D53E785DC9C5C2CA50CADB1EFE4DE5D0C30418BE0E9C6F2AF9F092A247E8BC22", inverted: false, age_tolerance: 43200 },
+        !stride { denom: "ibc/D53E785DC9C5C2CA50CADB1EFE4DE5D0C30418BE0E9C6F2AF9F092A247E8BC22", inverted: false, age_tolerance: 172800 },
         !pyth { key: "DYM_USD", inverted: false }
       ]
       feeds-usd: [
-        !stride { denom: "ibc/D53E785DC9C5C2CA50CADB1EFE4DE5D0C30418BE0E9C6F2AF9F092A247E8BC22", inverted: false, age_tolerance: 43200 },
+        !stride { denom: "ibc/D53E785DC9C5C2CA50CADB1EFE4DE5D0C30418BE0E9C6F2AF9F092A247E8BC22", inverted: false, age_tolerance: 172800 },
         !pyth { key: "DYM_USD", inverted: false }
       ]
     ryETH_USD:
