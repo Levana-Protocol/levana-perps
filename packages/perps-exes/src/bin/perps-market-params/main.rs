@@ -6,7 +6,11 @@ use coingecko::Coin;
 use cosmos::{Address, CosmosNetwork};
 use web::axum_main;
 
-use crate::{cli::Opt, market_param::dnf_sensitivity, slack::HttpApp};
+use crate::{
+    cli::Opt,
+    market_param::{compute_dnf_notify, dnf_sensitivity},
+    slack::HttpApp,
+};
 
 mod cli;
 mod coingecko;
@@ -100,9 +104,48 @@ async fn main_inner(opt: Opt) -> Result<()> {
             }
         }
         cli::SubCommand::Dnf { market_id } => {
+            let markets = vec![
+                (
+                    CosmosNetwork::OsmosisMainnet,
+                    Address::from_str(
+                        "osmo1ssw6x553kzqher0earlkwlxasfm2stnl3ms3ma2zz4tnajxyyaaqlucd45",
+                    )?,
+                ),
+                (
+                    CosmosNetwork::InjectiveMainnet,
+                    Address::from_str("inj1vdu3s39dl8t5l88tyqwuhzklsx9587adv8cnn9")?,
+                ),
+                (
+                    CosmosNetwork::SeiMainnet,
+                    Address::from_str(
+                        "sei18rdj3asllguwr6lnyu2sw8p8nut0shuj3sme27ndvvw4gakjnjqqper95h",
+                    )?,
+                ),
+            ];
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
             let dnf = dnf_sensitivity(&http_app, &market_id).await?;
-            tracing::info!("Computed DNF sensitivity: {dnf}");
+            let market_config = http_app.fetch_market_status(&markets).await?;
+            let configured_dnf = market_config.get_chain_dnf(&market_id);
+            let configured_dnf = match configured_dnf {
+                Ok(configured_dnf) => {
+                    tracing::info!("Configured DNF sensitivity: {}", configured_dnf);
+                    configured_dnf
+                }
+                Err(err) => {
+                    tracing::warn!("{err}");
+                    0.0
+                }
+            };
+
+            let dnf_notify = compute_dnf_notify(dnf, configured_dnf, 100.0, 50.0);
+            tracing::info!("Computed DNF sensitivity: {}", dnf_notify.computed_dnf);
+
+            if configured_dnf != 0.0 {
+                tracing::info!(
+                    "Percentage diff ({market_id}): {}",
+                    dnf_notify.percentage_diff
+                );
+            }
         }
         cli::SubCommand::Serve { opt: serve_opt } => axum_main(serve_opt, opt).await?,
         cli::SubCommand::Market { out, market_id } => {

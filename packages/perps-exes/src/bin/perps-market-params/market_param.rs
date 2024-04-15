@@ -104,14 +104,14 @@ fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<f64>
 }
 
 #[derive(Clone, serde::Serialize)]
-pub struct DnfNotify {
-    pub configured_dnf: f64,
-    pub computed_dnf: f64,
-    pub percentage_diff: f64,
-    pub should_notify: bool,
+pub(crate) struct DnfNotify {
+    pub(crate) configured_dnf: f64,
+    pub(crate) computed_dnf: f64,
+    pub(crate) percentage_diff: f64,
+    pub(crate) should_notify: bool,
 }
 
-fn compute_dnf_notify(
+pub(crate) fn compute_dnf_notify(
     computed_dnf: f64,
     configured_dnf: f64,
     dnf_increase_threshold: f64,
