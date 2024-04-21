@@ -614,7 +614,7 @@ markets:
 
   BONK_USDC:
     config:
-      delta_neutrality_fee_sensitivity: 100000000
+      delta_neutrality_fee_sensitivity: 4273874192464
       funding_rate_sensitivity: 1.5
       carry_leverage: 15
       borrow_fee_sensitivity: 0.3
@@ -627,7 +627,7 @@ markets:
 
   SHIB_USDC:
     config:
-      delta_neutrality_fee_sensitivity: 240000000
+      delta_neutrality_fee_sensitivity: 1635156448309
       funding_rate_sensitivity: 1.5
       carry_leverage: 15
       borrow_fee_sensitivity: 0.3
@@ -640,7 +640,7 @@ markets:
 
   FLOKI_USDC:
     config:
-      delta_neutrality_fee_sensitivity: 70000000
+      delta_neutrality_fee_sensitivity: 72172408878
       funding_rate_sensitivity: 1.5
       carry_leverage: 15
       borrow_fee_sensitivity: 0.3
@@ -653,7 +653,7 @@ markets:
 
   MEME_USDC:
     config:
-      delta_neutrality_fee_sensitivity: 50000000
+      delta_neutrality_fee_sensitivity: 1038611440
       funding_rate_sensitivity: 1.5
       carry_leverage: 15
       borrow_fee_sensitivity: 0.3
@@ -666,7 +666,7 @@ markets:
 
   PEPE_USDC:
     config:
-      delta_neutrality_fee_sensitivity: 16706912961294
+      delta_neutrality_fee_sensitivity: 21969106926089
       funding_rate_sensitivity: 1.5
       carry_leverage: 15
       borrow_fee_sensitivity: 0.3
