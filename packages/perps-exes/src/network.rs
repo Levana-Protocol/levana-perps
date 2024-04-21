@@ -25,10 +25,10 @@ impl PerpsNetwork {
         match self {
             PerpsNetwork::Regular(network) => network.builder().await,
             PerpsNetwork::DymensionTestnet => Ok(CosmosBuilder::new(
-                "rollappwasm_8888-3",
+                "rollappwasm_1234-2",
                 "urax",
                 Self::DymensionTestnet.get_address_hrp(),
-                "http://18.185.30.44:9090",
+                "http://18.199.53.161:9090",
             )),
         }
     }
