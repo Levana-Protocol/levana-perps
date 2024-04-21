@@ -169,6 +169,7 @@ pub(crate) enum Coin {
     Inj,
     StTia,
     Wif,
+    Pepe,
     Dot,
 }
 
@@ -200,6 +201,7 @@ impl FromStr for Coin {
             "INJ" => Ok(Coin::Inj),
             "stTIA" => Ok(Coin::StTia),
             "WIF" => Ok(Coin::Wif),
+            "PEPE" => Ok(Coin::Pepe),
             other => Err(anyhow!("Unsupported coin {other}")),
         }
     }
@@ -231,6 +233,7 @@ impl Coin {
             Coin::Inj => 7226,
             Coin::StTia => 29427,
             Coin::Wif => 28752,
+            Coin::Pepe => 24478,
             Coin::Dot => 6636,
         }
     }

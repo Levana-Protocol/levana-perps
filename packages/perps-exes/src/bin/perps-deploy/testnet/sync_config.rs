@@ -101,7 +101,7 @@ async fn go(
                 let spot_price_config = get_spot_price_config(&oracle, &market_id)?;
                 serde_json::to_value(spot_price_config)?
                 // Keys that no longer exist in ConfigUpdate
-            } else if is_unused_key(&key) {
+            } else if is_unused_key(&key) || is_testnet_ignored_key(&key) {
                 continue;
             } else {
                 let expected_value = expected_config
@@ -154,4 +154,9 @@ pub(crate) fn is_unused_key(key: &str) -> bool {
         || key == "price_update_too_old_seconds"
         || key == "staleness_seconds"
         || key == "unpend_limit"
+}
+
+/// Keys which are intentionally ignored for testnet purposes
+fn is_testnet_ignored_key(key: &str) -> bool {
+    key == "unstake_period_seconds"
 }

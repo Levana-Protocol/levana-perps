@@ -1,4 +1,6 @@
-use anyhow::anyhow;
+use std::collections::HashMap;
+
+use anyhow::{anyhow, Context};
 use cosmos::{Address, CosmosNetwork};
 use reqwest::{Client, Url};
 use shared::storage::MarketId;
@@ -189,5 +191,49 @@ impl HttpApp {
         }
 
         Ok(result)
+    }
+
+    pub(crate) async fn get_price_in_usd(&self, market_id: &MarketId) -> anyhow::Result<f64> {
+        let base_asset = market_id.get_base();
+        let coin: Coin = base_asset.parse()?;
+        // https://coinmarketcap.com/api/documentation/v1/#operation/getV2CryptocurrencyQuotesLatest
+        let id = coin.cmc_id().to_string();
+        let uri = Url::parse_with_params(
+            "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest",
+            [("id", id.as_str()), ("convert", "usd")],
+        )?;
+
+        #[derive(serde::Deserialize)]
+        struct CmcOuter {
+            data: HashMap<String, CmcData>,
+        }
+        #[derive(serde::Deserialize)]
+        struct CmcData {
+            quote: CmcQuote,
+        }
+        #[derive(serde::Deserialize)]
+        struct CmcQuote {
+            #[serde(rename = "USD")]
+            usd: CmcQuoteUsd,
+        }
+        #[derive(serde::Deserialize)]
+        struct CmcQuoteUsd {
+            price: f64,
+        }
+
+        let CmcOuter { mut data } = self
+            .client
+            .get(uri)
+            .header("X-CMC_PRO_API_KEY", &self.cmc_key)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+        let CmcData { quote } = data
+            .remove(&id)
+            .with_context(|| format!("Latest quotes from CMC is missing entry for ID {id}"))?;
+
+        Ok(quote.usd.price)
     }
 }

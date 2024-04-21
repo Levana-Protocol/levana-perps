@@ -666,7 +666,7 @@ markets:
 
   PEPE_USDC:
     config:
-      delta_neutrality_fee_sensitivity: 150000000
+      delta_neutrality_fee_sensitivity: 16706912961294
       funding_rate_sensitivity: 1.5
       carry_leverage: 15
       borrow_fee_sensitivity: 0.3
