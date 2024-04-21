@@ -109,7 +109,7 @@ struct UpdatePythOpt {
     market: Vec<MarketId>,
     /// Override chain config file
     #[clap(long, env = "LEVANA_BOTS_CONFIG_CHAIN")]
-    pub(crate) config_chain: Option<PathBuf>,
+    pub(crate) config_chain: Option<String>,
     /// Keep going infinitely
     #[clap(long)]
     pub(crate) keep_going: bool,
@@ -124,7 +124,7 @@ async fn update_pyth(
         keep_going,
     }: UpdatePythOpt,
 ) -> Result<()> {
-    let chain = ChainConfig::load(config_chain, network)?;
+    let chain = ChainConfig::load(config_chain.as_deref(), network)?;
     let pyth = chain
         .spot_price
         .and_then(|spot_price| spot_price.pyth)

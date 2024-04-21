@@ -22,7 +22,7 @@ async fn go(
     opt: crate::cli::Opt,
     TransferDaoFeesOpts { factory, market_id }: TransferDaoFeesOpts,
 ) -> Result<()> {
-    let factories = MainnetFactories::load()?;
+    let factories = MainnetFactories::load(None)?;
     let factory = factories.get(&factory)?;
 
     let app = opt.load_app_mainnet(factory.network).await?;

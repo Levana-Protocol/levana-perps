@@ -110,9 +110,6 @@ pub(crate) struct TestnetOpt {
     /// Override the number of trading bots to run
     #[clap(long, env = "LEVANA_BOTS_TRADERS")]
     pub(crate) traders: Option<u32>,
-    /// Override the contents of the DeploymentConfig in YAML format
-    #[clap(long, env = "LEVANA_BOTS_DEPLOYMENT_CONFIG")]
-    pub(crate) deployment_config: Option<String>,
     /// Deployment name to use (aka contract family)
     #[clap(long, env = "LEVANA_BOTS_DEPLOYMENT")]
     pub(crate) deployment: String,
@@ -120,10 +117,10 @@ pub(crate) struct TestnetOpt {
     pub(crate) gas_multiplier: Option<f64>,
     /// Override testnet config file
     #[clap(long, env = "LEVANA_BOTS_CONFIG_TESTNET")]
-    pub(crate) config_testnet: Option<PathBuf>,
+    pub(crate) config_testnet: Option<String>,
     /// Override chain config file
     #[clap(long, env = "LEVANA_BOTS_CONFIG_CHAIN")]
-    pub(crate) config_chain: Option<PathBuf>,
+    pub(crate) config_chain: Option<String>,
     /// Number of seconds before HTTP connections (especially to Pyth) will time out
     #[clap(long, env = "LEVANA_BOTS_HTTP_TIMEOUT_SECONDS", default_value_t = 10)]
     pub(crate) http_timeout_seconds: u32,
@@ -148,8 +145,13 @@ pub(crate) struct MainnetOpt {
     /// Minimum required in the refill wallet used to top off price and crank wallets
     #[clap(long, env = "LEVANA_BOTS_MIN_GAS_REFILL")]
     pub(crate) min_gas_refill: GasAmount,
-    #[clap(long, env = "LEVANA_BOTS_WATCHER_CONFIG")]
-    pub(crate) watcher_config: Option<String>,
+    /// Config file containing the bot-watcher config
+    #[clap(
+        long,
+        env = "LEVANA_BOTS_WATCHER_CONFIG",
+        default_value = "packages/perps-exes/assets/bot-watcher.toml"
+    )]
+    pub(crate) watcher_config: String,
     #[clap(long, env = "LEVANA_BOTS_MAX_PRICE_AGE_SECS")]
     pub(crate) max_price_age_secs: Option<u32>,
     #[clap(long, env = "LEVANA_BOTS_MAX_ALLOWED_PRICE_DELTA")]

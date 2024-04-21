@@ -1,6 +1,6 @@
 pub mod defaults;
 
-use std::{collections::HashMap, iter::Sum, ops::AddAssign, path::Path};
+use std::{collections::HashMap, iter::Sum, ops::AddAssign};
 
 use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, RawAddress};
@@ -130,7 +130,7 @@ pub struct MarketPriceFeedConfigs {
 }
 
 #[derive(serde::Deserialize, Debug, Clone)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields, tag = "type")]
 pub enum MarketPriceFeedConfig {
     Pyth {
         key: String,
@@ -351,30 +351,37 @@ pub struct DeploymentConfigTestnet {
     pub qa_price_updates: bool,
 }
 
-fn load_yaml<T: serde::de::DeserializeOwned>(
-    static_path: &str,
-    static_contents: &[u8],
-    runtime_path: Option<impl AsRef<Path>>,
+pub fn load_config<T: serde::de::DeserializeOwned>(
+    path_prefix: &str,
+    env_prefix: &str,
 ) -> Result<T> {
-    match runtime_path {
-        Some(path) => {
-            let path = path.as_ref();
-            let mut file = fs_err::File::open(path)?;
-            serde_yaml::from_reader(&mut file)
-                .with_context(|| format!("Parse error reading from YAML file {}", path.display()))
-        }
-        None => serde_yaml::from_slice(static_contents).with_context(|| {
-            format!("Parse error reading from compiled-in YAML file {static_path}")
-        }),
-    }
+    config::Config::builder()
+        .add_source(config::File::with_name(path_prefix))
+        .add_source(config::Environment::with_prefix(env_prefix))
+        .build()
+        .and_then(|x| match x.try_deserialize() {
+            Ok(x) => Ok(x),
+            Err(e) => {
+                println!("{e:#?}");
+                Err(e)
+            }
+        })
+        .with_context(|| format!("Error loading config from file {path_prefix}"))
+}
+
+pub fn save_toml<T: serde::Serialize>(path_prefix: &str, value: &T) -> Result<()> {
+    let path = format!("{path_prefix}.toml");
+    toml::to_string_pretty(value)
+        .map_err(anyhow::Error::from)
+        .and_then(|content| fs_err::write(&path, content).map_err(|e| e.into()))
+        .with_context(|| format!("Error saving TOML file {path}"))
 }
 
 impl ChainConfig {
-    pub fn load(config_file: Option<impl AsRef<Path>>, network: PerpsNetwork) -> Result<Self> {
-        load_yaml::<HashMap<PerpsNetwork, Self>>(
-            "config-chain.yaml",
-            include_bytes!("../assets/config-chain.yaml"),
-            config_file,
+    pub fn load(config_file: Option<&str>, network: PerpsNetwork) -> Result<Self> {
+        load_config::<HashMap<PerpsNetwork, Self>>(
+            config_file.unwrap_or("packages/perps-exes/assets/config-chain"),
+            "LEVANA_CHAIN",
         )?
         .remove(&network)
         .with_context(|| format!("No chain config found for {network}"))
@@ -382,11 +389,10 @@ impl ChainConfig {
 }
 
 impl ConfigTestnet {
-    pub fn load(config_file: Option<impl AsRef<Path>>) -> Result<Self> {
-        load_yaml(
-            "config-testnet.yaml",
-            include_bytes!("../assets/config-testnet.yaml"),
-            config_file,
+    pub fn load(config_file: Option<&str>) -> Result<Self> {
+        load_config(
+            config_file.unwrap_or("packages/perps-exes/assets/config-testnet"),
+            "LEVANA_TESTNET",
         )
     }
 
@@ -419,11 +425,10 @@ impl ConfigTestnet {
 }
 
 impl PriceConfig {
-    pub fn load(config_file: Option<impl AsRef<Path>>) -> Result<Self> {
-        load_yaml(
-            "config-price.yaml",
-            include_bytes!("../assets/config-price.yaml"),
-            config_file,
+    pub fn load(config_file: Option<&str>) -> Result<Self> {
+        load_config(
+            config_file.unwrap_or("packages/perps-exes/assets/config-price"),
+            "LEVANA_PRICE",
         )
     }
 }
@@ -688,11 +693,8 @@ pub struct ConfigUpdateAndBorrowFee {
 }
 
 impl MarketConfigUpdates {
-    pub fn load(path: impl AsRef<Path>) -> Result<Self> {
-        let path = path.as_ref();
-        let mut file = fs_err::File::open(path)?;
-        serde_yaml::from_reader(&mut file)
-            .with_context(|| format!("Error loading MarketConfigUpdates from {}", path.display()))
+    pub fn load(path_prefix: &str) -> Result<Self> {
+        load_config(path_prefix, "LEVANA_MARKET")
     }
 }
 
@@ -743,23 +745,13 @@ pub struct MainnetFactory {
 }
 
 impl MainnetFactories {
-    const PATH: &str = "packages/perps-exes/assets/mainnet-factories.yaml";
+    const PATH: &str = "packages/perps-exes/assets/mainnet-factories";
 
-    pub fn load_hard_coded() -> Result<Self> {
-        serde_yaml::from_slice(include_bytes!("../assets/mainnet-factories.yaml")).context(
-            "Error loading MainnetFactories from compile-time ../assets/mainnet-factories.yaml",
-        )
-    }
-
-    pub fn load() -> Result<Self> {
-        let mut file = fs_err::File::open(Self::PATH)?;
-        serde_yaml::from_reader(&mut file)
-            .with_context(|| format!("Error loading MainnetFactories from {}", Self::PATH))
+    pub fn load(path_prefix: Option<&str>) -> Result<Self> {
+        load_config(path_prefix.unwrap_or(Self::PATH), "LEVANA_FACTORIES")
     }
 
     pub fn save(&self) -> Result<()> {
-        let mut file = fs_err::File::create(Self::PATH)?;
-        serde_yaml::to_writer(&mut file, self)
-            .with_context(|| format!("Error saving MainnetFactories to {}", Self::PATH))
+        save_toml(Self::PATH, self)
     }
 }

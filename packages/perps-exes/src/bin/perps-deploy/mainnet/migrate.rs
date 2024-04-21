@@ -39,7 +39,7 @@ async fn go(
         position_token_code_id,
     }: MigrateOpts,
 ) -> Result<()> {
-    let factories = MainnetFactories::load()?;
+    let factories = MainnetFactories::load(None)?;
     let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
 

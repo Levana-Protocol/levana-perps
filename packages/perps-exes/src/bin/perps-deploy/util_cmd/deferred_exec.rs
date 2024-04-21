@@ -166,7 +166,7 @@ async fn go(
     opt: crate::cli::Opt,
     DeferredExecCsvOpt { factory, csv }: DeferredExecCsvOpt,
 ) -> Result<()> {
-    let factories = MainnetFactories::load()?;
+    let factories = MainnetFactories::load(None)?;
     let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
     let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));

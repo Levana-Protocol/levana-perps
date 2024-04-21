@@ -35,7 +35,7 @@ async fn go(
         address: Address,
     }
 
-    let factories = MainnetFactories::load()?;
+    let factories = MainnetFactories::load(None)?;
     let factory = factories.get(&factory)?;
 
     csv.serialize(Record {

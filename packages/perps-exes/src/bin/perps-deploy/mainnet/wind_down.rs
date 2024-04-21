@@ -52,7 +52,7 @@ async fn go(
         .map(|impact| serde_json::from_value(serde_json::Value::String(impact)))
         .collect::<Result<Vec<ShutdownImpact>, _>>()?;
 
-    let factories = MainnetFactories::load()?;
+    let factories = MainnetFactories::load(None)?;
     let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
 

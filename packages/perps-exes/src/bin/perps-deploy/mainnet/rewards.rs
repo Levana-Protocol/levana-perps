@@ -25,7 +25,7 @@ impl RewardsOpts {
 }
 
 async fn go(opt: crate::cli::Opt, RewardsOpts { factory, market_id }: RewardsOpts) -> Result<()> {
-    let factories = MainnetFactories::load()?;
+    let factories = MainnetFactories::load(None)?;
     let factory = factories.get(&factory)?;
 
     let app = opt.load_app_mainnet(factory.network).await?;

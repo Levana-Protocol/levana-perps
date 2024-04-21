@@ -34,7 +34,7 @@ struct Record<'a> {
 
 async fn go(opt: crate::cli::Opt, TvlReportOpt { csv }: TvlReportOpt) -> Result<()> {
     let mut csv = ::csv::Writer::from_path(&csv)?;
-    let factories = MainnetFactories::load()?;
+    let factories = MainnetFactories::load(None)?;
 
     for factory in ["osmomainnet1", "seimainnet1", "injmainnet1"] {
         go_factory(&mut csv, &opt, &factories, factory).await?;

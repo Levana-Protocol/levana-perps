@@ -29,7 +29,7 @@ async fn go(
     opt: Opt,
     CloseAllPositionsOpts { factory, market }: CloseAllPositionsOpts,
 ) -> Result<()> {
-    let factories = MainnetFactories::load()?;
+    let factories = MainnetFactories::load(None)?;
     let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
 

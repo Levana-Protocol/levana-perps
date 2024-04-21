@@ -10,7 +10,7 @@ mod transfer_dao_fees;
 mod update_config;
 mod wind_down;
 
-use std::{collections::BTreeMap, path::PathBuf};
+use std::collections::BTreeMap;
 
 use chrono::{TimeZone, Utc};
 use cosmos::{Address, ContractAdmin, Cosmos, HasAddress, TxBuilder};
@@ -21,8 +21,8 @@ use msg::contracts::market::{
 };
 use perps_exes::{
     config::{
-        ChainConfig, ConfigUpdateAndBorrowFee, CrankFeeConfig, MainnetFactories, MainnetFactory,
-        MarketConfigUpdates, PriceConfig,
+        load_config, save_toml, ChainConfig, ConfigUpdateAndBorrowFee, CrankFeeConfig,
+        MainnetFactories, MainnetFactory, MarketConfigUpdates, PriceConfig,
     },
     contracts::Factory,
     prelude::*,
@@ -167,18 +167,14 @@ struct CodeIds {
 }
 
 impl CodeIds {
-    const PATH: &str = "packages/perps-exes/assets/mainnet-code-ids.yaml";
+    const PATH: &str = "packages/perps-exes/assets/mainnet-code-ids";
 
     fn load() -> Result<Self> {
-        let mut file = fs_err::File::open(Self::PATH)?;
-        serde_yaml::from_reader(&mut file)
-            .with_context(|| format!("Error loading CodeIds from {}", Self::PATH))
+        load_config(Self::PATH, "LEVANA_CODEID")
     }
 
     fn save(&self) -> Result<()> {
-        let mut file = fs_err::File::create(Self::PATH)?;
-        serde_yaml::to_writer(&mut file, self)
-            .with_context(|| format!("Error saving CodeIds to {}", Self::PATH))
+        save_toml(Self::PATH, self)
     }
 
     fn get_mut_by_hash(&mut self, hash: &str) -> Option<&mut StoredContract> {
@@ -395,7 +391,7 @@ async fn instantiate_factory(
     let app = opt.load_app_mainnet(network).await?;
     let wallet = app.get_wallet()?;
     let code_ids = CodeIds::load()?;
-    let mut factories = MainnetFactories::load()?;
+    let mut factories = MainnetFactories::load(None)?;
 
     anyhow::ensure!(
         factories.get(&ident).is_err(),
@@ -473,11 +469,11 @@ struct AddMarketOpts {
 async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpts) -> Result<()> {
     let market_config_updates = MarketConfigUpdates::load(&opt.market_config)?;
 
-    let factories = MainnetFactories::load()?;
+    let factories = MainnetFactories::load(None)?;
     let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
-    let chain_config = ChainConfig::load(None::<PathBuf>, factory.network)?;
-    let price_config = PriceConfig::load(None::<PathBuf>)?;
+    let chain_config = ChainConfig::load(None, factory.network)?;
+    let price_config = PriceConfig::load(None)?;
     let oracle = opt.get_oracle_info(&chain_config, &price_config, factory.network)?;
 
     let mut simtx = TxBuilder::default();

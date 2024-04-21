@@ -14,7 +14,6 @@ shared = { path = "../shared", package = "levana_perpswap_cosmos_shared", featur
 ] }
 serde = { version = "1.0.193", features = ["derive"] }
 serde_json = "1.0.108"
-serde_yaml = "0.9.27"
 log = "0.4.20"
 cosmos = { git = "https://github.com/fpco/cosmos-rs.git", rev = "9e6c909c4a8ddf001584390b780ee20a99d668da" }
 cosmwasm-std = "1.1.9"
@@ -78,6 +77,8 @@ bigdecimal = { version = "0.4.2", features = ["serde"]}
 http = "1.0.0"
 headers = "0.4.0"
 tower = "0.4.13"
+config = { version = "0.14.0", features = ["toml"], default-features = false }
+toml = "0.8.12"
 
 [features]
 default = []

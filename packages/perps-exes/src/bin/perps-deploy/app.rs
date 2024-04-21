@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 
 use anyhow::{Context, Result};
 use cosmos::{
@@ -50,7 +50,7 @@ pub(crate) struct App {
     pub(crate) faucet: Faucet,
     pub(crate) dev_settings: bool,
     pub(crate) default_market_ids: Vec<MarketId>,
-    pub(crate) market_config: PathBuf,
+    pub(crate) market_config: String,
     pub(crate) price_source: PriceSourceConfig,
     pub(crate) config_testnet: ConfigTestnet,
 }
@@ -116,8 +116,8 @@ impl Opt {
     pub(crate) async fn load_basic_app(&self, network: PerpsNetwork) -> Result<BasicApp> {
         let cosmos = self.connect(network).await?;
         let wallet = self.get_lazy_wallet(network)?;
-        let chain_config = ChainConfig::load(self.config_chain.as_ref(), network)?;
-        let price_config = PriceConfig::load(self.config_price.as_ref())?;
+        let chain_config = ChainConfig::load(self.config_chain.as_deref(), network)?;
+        let price_config = PriceConfig::load(self.config_price.as_deref())?;
 
         Ok(BasicApp {
             cosmos,
@@ -129,7 +129,7 @@ impl Opt {
     }
 
     pub(crate) async fn load_app(&self, family: &str) -> Result<App> {
-        let config = ConfigTestnet::load(self.config_testnet.as_ref())?;
+        let config = ConfigTestnet::load(self.config_testnet.as_deref())?;
         let partial = config.get_deployment_info(family)?;
         let basic = self.load_basic_app(partial.network).await?;
 

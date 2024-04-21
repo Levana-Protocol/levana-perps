@@ -58,7 +58,7 @@ impl App {
             cosmos_map.insert(chain_id, cosmos);
         }
 
-        let factories = MainnetFactories::load_hard_coded()?
+        let factories = MainnetFactories::load(opt.mainnet_factories.as_deref())?
             .factories
             .into_iter()
             .filter(|x| x.canonical)

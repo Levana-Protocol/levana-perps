@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use anyhow::{Context, Result};
 use cosmos::{HasAddress, TxBuilder};
 use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, WasmMsg};
@@ -37,12 +35,12 @@ impl SyncConfigOpts {
 }
 
 async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) -> Result<()> {
-    let factories = MainnetFactories::load()?;
+    let factories = MainnetFactories::load(None)?;
     let factory = factories.get(&factory)?;
     let network = factory.network;
 
-    let chain_config = ChainConfig::load(None::<PathBuf>, factory.network)?;
-    let price_config = PriceConfig::load(None::<PathBuf>)?;
+    let chain_config = ChainConfig::load(None, factory.network)?;
+    let price_config = PriceConfig::load(None)?;
     let oracle = opt.get_oracle_info(&chain_config, &price_config, network)?;
 
     let app = opt.load_app_mainnet(factory.network).await?;

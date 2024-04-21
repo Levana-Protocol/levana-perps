@@ -12,6 +12,10 @@ pub(crate) struct Opt {
     )]
     pub(crate) bind: SocketAddr,
 
+    /// Location of the mainnet factories config file
+    #[clap(long, env = "LEVANA_MAINNET_FACTORIES", global = true)]
+    pub(crate) mainnet_factories: Option<String>,
+
     /// Primary mainnet GRPC Override for Osmosis.
     #[clap(
         long,

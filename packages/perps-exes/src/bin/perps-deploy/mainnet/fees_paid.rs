@@ -58,7 +58,7 @@ async fn go(
         crank_usd: Usd,
     }
 
-    let factories = MainnetFactories::load()?;
+    let factories = MainnetFactories::load(None)?;
 
     let mut wallets = HashMap::<&'static str, Vec<Address>>::new();
 

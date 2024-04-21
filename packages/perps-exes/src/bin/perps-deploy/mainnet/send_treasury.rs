@@ -32,7 +32,7 @@ async fn go(
     opt: crate::cli::Opt,
     SendTreasuryOpts { factory, dest }: SendTreasuryOpts,
 ) -> Result<()> {
-    let factories = MainnetFactories::load()?;
+    let factories = MainnetFactories::load(None)?;
     let factory = factories.get(&factory)?;
 
     let app = opt.load_app_mainnet(factory.network).await?;

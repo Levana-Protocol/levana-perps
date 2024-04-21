@@ -137,20 +137,20 @@ pub(crate) struct Opt {
     wasm_dir: PathBuf,
     /// Override Price config file
     #[clap(long, env = "LEVANA_BOTS_CONFIG_PRICE")]
-    pub(crate) config_price: Option<PathBuf>,
+    pub(crate) config_price: Option<String>,
     /// Override chain config file
     #[clap(long, env = "LEVANA_BOTS_CONFIG_CHAIN")]
-    pub(crate) config_chain: Option<PathBuf>,
+    pub(crate) config_chain: Option<String>,
     /// Override testnet config file
     #[clap(long, env = "LEVANA_BOTS_CONFIG_TESTNET")]
-    pub(crate) config_testnet: Option<PathBuf>,
+    pub(crate) config_testnet: Option<String>,
     /// Override the market config update file
     #[clap(
         long,
         env = "LEVANA_BOTS_MARKET_CONFIG_UPDATE",
-        default_value = "packages/perps-exes/assets/market-config-updates.yaml"
+        default_value = "packages/perps-exes/assets/market-config-updates"
     )]
-    pub(crate) market_config: PathBuf,
+    pub(crate) market_config: String,
     /// The stable Pyth endpoint
     #[clap(
         long,

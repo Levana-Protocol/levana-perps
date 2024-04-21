@@ -22,7 +22,7 @@ impl ListContractsOpt {
     pub(super) async fn go(self) -> Result<()> {
         let ListContractsOpt { factory, output } = self;
         let mut csv = csv::Writer::from_path(&output)?;
-        let factories = MainnetFactories::load()?;
+        let factories = MainnetFactories::load(None)?;
         for factory in factory {
             go(factories.get(&factory)?, &mut csv).await?;
         }

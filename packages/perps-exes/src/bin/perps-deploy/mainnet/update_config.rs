@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use anyhow::{Context, Result};
 use cosmos::HasAddress;
 use cosmwasm_std::{to_binary, CosmosMsg, Empty, WasmMsg};
@@ -49,14 +47,14 @@ async fn go(
     }: UpdateConfigOpts,
 ) -> Result<()> {
     let update: ConfigUpdate = serde_json::from_str(&config).context("Invalid ConfigUpdate")?;
-    let factories = MainnetFactories::load()?;
+    let factories = MainnetFactories::load(None)?;
     let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
 
     let spot_price_helper = if spot_price {
         Some({
-            let chain_config = ChainConfig::load(None::<PathBuf>, factory.network)?;
-            let price_config = PriceConfig::load(None::<PathBuf>)?;
+            let chain_config = ChainConfig::load(None, factory.network)?;
+            let price_config = PriceConfig::load(None)?;
             let oracle = opt.get_oracle_info(&chain_config, &price_config, factory.network)?;
             move |market_id| get_spot_price_config(&oracle, &market_id)
         })
