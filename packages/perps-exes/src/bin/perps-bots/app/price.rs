@@ -253,8 +253,13 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                 Err(e) => {
                     tracing::error!("Error: {e:?}\nRetrying...");
                     let mut builder = TxBuilder::default();
-                    if let Some(oracle_msg) =
-                        price_get_update_oracles_msg(&worker.wallet, &app, &multi_message.markets[..], &offchain_price_data).await?
+                    if let Some(oracle_msg) = price_get_update_oracles_msg(
+                        &worker.wallet,
+                        &app,
+                        &multi_message.markets[..],
+                        &offchain_price_data,
+                    )
+                    .await?
                     {
                         builder.add_message(oracle_msg);
 
@@ -315,14 +320,8 @@ pub(crate) struct MultiMessageEntity {
     pub(crate) trigger: Vec<(Address, MarketId, CrankTriggerReason)>,
 }
 
-async fn process_cosmos_tx(
-    tx: TxBuilder,
-    app: &App,
-    wallet: &Wallet,
-) -> Result<String> {
-    let response = tx
-        .sign_and_broadcast_cosmos_tx(&app.cosmos, wallet)
-        .await;
+async fn process_cosmos_tx(tx: TxBuilder, app: &App, wallet: &Wallet) -> Result<String> {
+    let response = tx.sign_and_broadcast_cosmos_tx(&app.cosmos, wallet).await;
 
     process_tx_result(app, wallet, &Instant::now(), response).await
 }
