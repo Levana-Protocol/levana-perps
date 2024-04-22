@@ -60,12 +60,12 @@ pub(crate) async fn dnf_sensitivity(
         let dnf_in_notional = dnf_in_usd / price;
         return Ok(dnf_in_notional);
     }
+    anyhow::ensure!(market_id.get_market_type() == MarketType::CollateralIsBase);
     let base_asset = market_id.get_base();
     let base_market_id = MarketId::new(base_asset, "USD", MarketType::CollateralIsQuote);
     let quote_market_id = MarketId::new(quote_asset, "USD", MarketType::CollateralIsQuote);
     let base_exchanges = http_app.get_market_pair(base_market_id).await?;
     let quote_exchanges = http_app.get_market_pair(quote_market_id).await?;
-    // TODO Do these require conversion from quote to notional?
     let base_dnf = compute_dnf_sensitivity(base_exchanges.data.market_pairs)?;
     let quote_dnf = compute_dnf_sensitivity(quote_exchanges.data.market_pairs)?;
     Ok(base_dnf.min(quote_dnf))
