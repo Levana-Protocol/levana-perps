@@ -65,9 +65,17 @@ pub(crate) async fn dnf_sensitivity(
     let quote_market_id = MarketId::new(quote_asset, "USD", MarketType::CollateralIsBase);
     let base_exchanges = http_app.get_market_pair(base_market_id.clone()).await?;
     let quote_exchanges = http_app.get_market_pair(quote_market_id.clone()).await?;
-    let base_dnf = compute_dnf_sensitivity(base_exchanges.data.market_pairs)?;
-    let quote_dnf = compute_dnf_sensitivity(quote_exchanges.data.market_pairs)?;
-    Ok(base_dnf.min(quote_dnf))
+    let base_dnf_in_quote = compute_dnf_sensitivity(base_exchanges.data.market_pairs)?;
+    let base_dnf_in_notional = {
+        let price = http_app.get_price_in_usd(&base_market_id).await?;
+        base_dnf_in_quote / price
+    };
+    let quote_dnf_in_quote = compute_dnf_sensitivity(quote_exchanges.data.market_pairs)?;
+    let quote_dnf_in_notional = {
+        let price = http_app.get_price_in_usd(&quote_market_id).await?;
+        quote_dnf_in_quote / price
+    };
+    Ok(base_dnf_in_notional.min(quote_dnf_in_notional))
 }
 
 fn is_centralized_exchange(id: &ExchangeId) -> bool {
