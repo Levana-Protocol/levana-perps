@@ -58,6 +58,11 @@ pub struct Config {
     /// Minimum counterpoint to [Config::max_xlp_rewards_multiplier]
     pub min_xlp_rewards_multiplier: NumberGtZero,
     /// Delta neutrality fee sensitivity parameter.
+    ///
+    /// Higher values indicate markets with greater depth of liquidity, and allow for
+    /// larger divergence for delta neutrality in the markets.
+    ///
+    /// This value is specified in the notional asset.
     pub delta_neutrality_fee_sensitivity: NumberGtZero,
     /// Delta neutrality fee cap parameter, given as a percentage
     pub delta_neutrality_fee_cap: NumberGtZero,

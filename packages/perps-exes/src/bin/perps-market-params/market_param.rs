@@ -49,14 +49,18 @@ pub(crate) async fn dnf_sensitivity(
     market_id: &MarketId,
 ) -> anyhow::Result<f64> {
     let quote_asset = market_id.get_quote();
-    if quote_asset == "USD" || quote_asset == "USDC" {
+    if quote_asset == "USD" || quote_asset == "USDC" || quote_asset == "USDT" {
         let exchanges = http_app.get_market_pair(market_id.clone()).await?;
         tracing::debug!(
             "Total exchanges found: {} for {market_id:?}",
             exchanges.data.market_pairs.len()
         );
-        return compute_dnf_sensitivity(exchanges.data.market_pairs);
+        let dnf_in_usd = compute_dnf_sensitivity(exchanges.data.market_pairs)?;
+        let price = http_app.get_price_in_usd(market_id).await?;
+        let dnf_in_notional = dnf_in_usd / price;
+        return Ok(dnf_in_notional);
     }
+    anyhow::ensure!(market_id.get_market_type() == MarketType::CollateralIsBase);
     let base_asset = market_id.get_base();
     let base_market_id = MarketId::new(base_asset, "USD", MarketType::CollateralIsQuote);
     let quote_market_id = MarketId::new(quote_asset, "USD", MarketType::CollateralIsQuote);
