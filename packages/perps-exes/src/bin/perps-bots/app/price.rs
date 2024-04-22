@@ -235,16 +235,11 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                 trigger: markets_to_crank.to_vec(),
             };
 
-            let now = Instant::now();
-
             let tx =
-                construct_multi_message(multi_message, &worker.wallet, &app, &offchain_price_data)
+                construct_multi_message(&multi_message, &worker.wallet, &app, &offchain_price_data)
                     .await?;
 
-            let response = tx
-                .sign_and_broadcast_cosmos_tx(&app.cosmos, &worker.wallet)
-                .await;
-            let result = process_tx_result(&app, &worker.wallet, &now, response).await;
+            let result = process_cosmos_tx(tx, &app, &worker.wallet).await;
             match result {
                 Ok(res) => {
                     successes.push(res);
@@ -255,7 +250,26 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                             .await;
                     }
                 }
-                Err(e) => errors.push(format!("{e:?}")),
+                Err(e) => {
+                    tracing::error!("Error: {e:?}\nRetrying...");
+                    let mut builder = TxBuilder::default();
+                    if let Some(oracle_msg) =
+                        price_get_update_oracles_msg(&worker.wallet, &app, &multi_message.markets[..], &offchain_price_data).await?
+                    {
+                        builder.add_message(oracle_msg);
+
+                        let result = process_cosmos_tx(builder, &app, &worker.wallet).await;
+                        if let Ok(res) = result {
+                            successes.push(res);
+                            for (market, market_id, reason) in markets_to_update.iter().cloned() {
+                                worker
+                                    .trigger_crank
+                                    .trigger_crank(market, market_id, reason)
+                                    .await;
+                            }
+                        }
+                    }
+                }
             }
         } else {
             successes.push("No markets needed an oracle update".to_owned());
@@ -301,6 +315,18 @@ pub(crate) struct MultiMessageEntity {
     pub(crate) trigger: Vec<(Address, MarketId, CrankTriggerReason)>,
 }
 
+async fn process_cosmos_tx(
+    tx: TxBuilder,
+    app: &App,
+    wallet: &Wallet,
+) -> Result<String> {
+    let response = tx
+        .sign_and_broadcast_cosmos_tx(&app.cosmos, wallet)
+        .await;
+
+    process_tx_result(app, wallet, &Instant::now(), response).await
+}
+
 async fn process_tx_result(
     app: &App,
     wallet: &Wallet,
@@ -331,7 +357,7 @@ async fn process_tx_result(
 /// Construct TxBuilder for both Oracle Update price feed as well as
 /// to do the minimal cranking.
 async fn construct_multi_message(
-    message: MultiMessageEntity,
+    message: &MultiMessageEntity,
     wallet: &Wallet,
     app: &App,
     offchain_price_data: &OffchainPriceData,
@@ -342,7 +368,7 @@ async fn construct_multi_message(
     {
         builder.add_message(oracle_msg);
     }
-    for (market, _, _) in message.trigger {
+    for (market, _, _) in &message.trigger {
         let rewards = app
             .config
             .get_crank_rewards_wallet()
