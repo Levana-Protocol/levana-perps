@@ -141,10 +141,13 @@ dymension-testnet:
   gas-decimals: 6
   tracker: rol1plr28ztj64a47a32lw7tdae8vluzm2lm7nqk364r4ws50rgwyzgsgju4zn
   faucet: rol1vguuxez2h5ekltfj9gjd62fs5k4rl2zy5hfrncasykzw08rezpfsakwv7k
+  explorer: "https://dymension-fake-explorer"
   spot-price:
     pyth:
       contract: rol1pvrwmjuusn9wh34j7y520g8gumuy9xtl3gvprlljfdpwju3x7ucszdyfs8
       type: stable
+  rpc-nodes:
+  - http://18.199.53.161:26657
 neutron-testnet:
   gas-decimals: 6
   explorer: "https://www.mintscan.io/neutron-testnet/txs/"
