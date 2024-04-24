@@ -129,6 +129,15 @@ networks:
       feeds-usd: [
         !pyth { key: "INJ_USD", inverted: false }
       ]
+    stINJ_USD:
+      feeds: [
+        !pyth { key: "INJ_USD", inverted: false },
+        !stride { denom: "ibc/AC87717EA002B0123B10A05063E69BCA274BA2C44D842AEEB41558D2856DCE93", inverted: false, age_tolerance: 172800 },
+      ]
+      feeds-usd: [
+        !pyth { key: "INJ_USD", inverted: false },
+        !stride { denom: "ibc/AC87717EA002B0123B10A05063E69BCA274BA2C44D842AEEB41558D2856DCE93", inverted: false, age_tolerance: 172800 },
+      ]
     BNB_USDT:
       feeds: [
         !pyth { key: "BNB_USD", inverted: false }

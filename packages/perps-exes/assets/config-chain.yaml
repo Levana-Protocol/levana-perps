@@ -128,6 +128,8 @@ injective-mainnet:
     pyth:
       contract: inj12j43nf2f0qumnt2zrrmpvnsqgzndxefujlvr08
       type: stable
+    stride:
+      contract: inj1n55xxawhaq4mn9pmgqvhxcukcel2emgc5gx39t
   rpc-nodes:
   - https://sentry.tm.injective.network
   assets:
@@ -137,6 +139,9 @@ injective-mainnet:
     USDT:
       denom: peggy0xdAC17F958D2ee523a2206206994597C13D831ec7
       decimal-places: 6
+    stINJ:
+      denom: ibc/AC87717EA002B0123B10A05063E69BCA274BA2C44D842AEEB41558D2856DCE93
+      decimal-places: 18
 dymension-testnet:
   gas-decimals: 6
   tracker: rol1plr28ztj64a47a32lw7tdae8vluzm2lm7nqk364r4ws50rgwyzgsgju4zn
