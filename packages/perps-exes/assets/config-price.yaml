@@ -349,7 +349,7 @@ networks:
         !pyth { key: "ATOM_USD", inverted: false }
       ]
     stkATOM_USD:
-      stride-contract: osmo15f3hlrj5ydq496c0xfgfju0227pa009g42c4efu2tacz3y3et86qa0z27e
+      stride-contract: osmo1v8yvkng3p9gcdw7ssxpp79k34fyk7ch0dqvjuqvhd8cpwytv2kjsggeadm
       feeds: [
         !stride { denom: "ibc/CAA179E40F0266B0B29FB5EAA288FB9212E628822265D4141EBD1C47C3CBFCBC", inverted: false, age_tolerance: 43200 },
         !pyth { key: "ATOM_USD", inverted: false }
