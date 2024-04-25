@@ -252,6 +252,10 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                 }
                 Err(e) => {
                     tracing::error!("Error: {e:?}\nRetrying...");
+
+                    // Correct, not technically a success, but we want to display this info in the UI without forcing it to be treated as an error.
+                    successes.push(format!("Error while doing multimessage price update, retrying with single message updates: {e:?}"));
+
                     let mut builder = TxBuilder::default();
                     if let Some(oracle_msg) = price_get_update_oracles_msg(
                         &worker.wallet,
@@ -264,13 +268,21 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                         builder.add_message(oracle_msg);
 
                         let result = process_cosmos_tx(builder, &app, &worker.wallet).await;
-                        if let Ok(res) = result {
-                            successes.push(res);
-                            for (market, market_id, reason) in markets_to_update.iter().cloned() {
-                                worker
-                                    .trigger_crank
-                                    .trigger_crank(market, market_id, reason)
-                                    .await;
+                        match result {
+                            Ok(res) => {
+                                successes.push(res);
+                                for (market, market_id, reason) in markets_to_update.iter().cloned()
+                                {
+                                    worker
+                                        .trigger_crank
+                                        .trigger_crank(market, market_id, reason)
+                                        .await;
+                                }
+                            }
+                            Err(e2) => {
+                                errors.push("Failed both multimessage and single message price update. Errors:".to_owned());
+                                errors.push(format!("Multimessage error: {e:?}"));
+                                errors.push(format!("Single message error: {e2:?}"));
                             }
                         }
                     }
