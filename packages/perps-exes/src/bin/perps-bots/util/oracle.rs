@@ -289,6 +289,9 @@ fn compose_oracle_feeds(
                     let age = now
                         .signed_duration_since(on_chain_pyth_update)
                         .num_seconds();
+                    // Add (arbitrarily) 3 seconds to the age to minimize cases
+                    // of submitting a transaction that lands after the age tolerance fails.
+                    let age = age + 3;
                     if age >= age_tolerance_seconds.into() {
                         requires_pyth_update = true;
                     }
