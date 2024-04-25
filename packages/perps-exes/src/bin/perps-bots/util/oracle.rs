@@ -114,6 +114,8 @@ pub(crate) enum LatestPrice {
         on_chain_oracle_publish_time: DateTime<Utc>,
         /// Current on-chain price point
         on_chain_price_point: PricePoint,
+        /// Did any of the feeds indicate that a Pyth update was needed?
+        requires_pyth_update: bool,
     },
     PriceTooOld {
         too_old: PriceTooOld,
@@ -170,6 +172,7 @@ pub(crate) async fn get_latest_price(
             ComposedOracleFeed::OffChainPrice {
                 price: off_chain_price,
                 publish_time: off_chain_publish_time,
+                requires_pyth_update,
             } => LatestPrice::PricesFound {
                 off_chain_price,
                 off_chain_publish_time,
@@ -179,6 +182,7 @@ pub(crate) async fn get_latest_price(
                     .timestamp
                     .try_into_chrono_datetime()?,
                 on_chain_price_point,
+                requires_pyth_update,
             },
         },
     )
@@ -200,6 +204,7 @@ enum ComposedOracleFeed {
     OffChainPrice {
         price: PriceBaseInQuote,
         publish_time: DateTime<Utc>,
+        requires_pyth_update: bool,
     },
     VolatileDiffTooLarge,
 }
@@ -230,6 +235,7 @@ fn compose_oracle_feeds(
     let mut final_price = Decimal256::one();
     let mut publish_times = None::<(DateTime<Utc>, DateTime<Utc>)>;
     let now = Utc::now();
+    let mut requires_pyth_update = false;
 
     let mut update_publish_time =
         |new_time: DateTime<Utc>, is_volatile_opt: Option<bool>, is_volatile_default: bool| {
@@ -248,23 +254,46 @@ fn compose_oracle_feeds(
                 id,
                 age_tolerance_seconds,
             } => {
-                let (price, pyth_update) = pyth_prices
+                // We perform two age checks. First: make sure that the
+                // off-chain price is new enough to satisfy age tolerance. If not, we don't want to
+                // interact with this market at all.
+                let (price, off_chain_pyth_update) = pyth_prices
                     .get(id)
                     .with_context(|| format!("Missing pyth price for ID {}", id))?;
-                let age = now.signed_duration_since(pyth_update).num_seconds();
-                if age >= (*age_tolerance_seconds).into() {
+                let off_chain_pyth_update = *off_chain_pyth_update;
+
+                let off_chain_age = now
+                    .signed_duration_since(off_chain_pyth_update)
+                    .num_seconds();
+                let age_tolerance_seconds = *age_tolerance_seconds;
+                if off_chain_age >= age_tolerance_seconds.into() {
                     return Ok(ComposedOracleFeed::UpdateTooOld {
                         too_old: PriceTooOld {
                             feed: FeedType::Pyth { id: *id },
                             check_time: now,
-                            publish_time: *pyth_update,
-                            age,
-                            age_tolerance_seconds: *age_tolerance_seconds,
+                            publish_time: off_chain_pyth_update,
+                            age: off_chain_age,
+                            age_tolerance_seconds,
                         },
                     });
                 }
+                update_publish_time(off_chain_pyth_update, feed.volatile, true);
 
-                update_publish_time(*pyth_update, feed.volatile, true);
+                // Now that we know we have a recent enough off-chain price,
+                // check if the on-chain price is too old. If it is, indicate that we need to do a
+                // price update in order to crank.
+                if let Some(on_chain_pyth_update) = oracle_price.pyth.get(id) {
+                    let on_chain_pyth_update = on_chain_pyth_update
+                        .publish_time
+                        .try_into_chrono_datetime()?;
+                    let age = now
+                        .signed_duration_since(on_chain_pyth_update)
+                        .num_seconds();
+                    if age >= age_tolerance_seconds.into() {
+                        requires_pyth_update = true;
+                    }
+                }
+
                 price.into_decimal256()
             }
             SpotPriceFeedData::Constant { price } => {
@@ -362,6 +391,7 @@ fn compose_oracle_feeds(
         ComposedOracleFeed::OffChainPrice {
             price: PriceBaseInQuote::from_non_zero(price),
             publish_time: oldest,
+            requires_pyth_update,
         }
     })
 }
