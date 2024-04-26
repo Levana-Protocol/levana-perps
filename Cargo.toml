@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
     # Real protocol, mainnet contracts
     "contracts/factory",

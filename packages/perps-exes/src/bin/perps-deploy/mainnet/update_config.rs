@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use cosmos::HasAddress;
-use cosmwasm_std::{to_binary, CosmosMsg, Empty, WasmMsg};
+use cosmwasm_std::{to_json_binary, CosmosMsg, Empty, WasmMsg};
 use msg::{
     contracts::market::{config::ConfigUpdate, entry::ExecuteOwnerMsg},
     prelude::MarketExecuteMsg,
@@ -83,7 +83,7 @@ async fn go(
             }
             anyhow::Ok(CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
                 contract_addr: market.market.get_address_string(),
-                msg: to_binary(&strip_nulls(MarketExecuteMsg::Owner(
+                msg: to_json_binary(&strip_nulls(MarketExecuteMsg::Owner(
                     ExecuteOwnerMsg::ConfigUpdate {
                         update: Box::new(update),
                     },

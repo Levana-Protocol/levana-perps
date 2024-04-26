@@ -34,6 +34,7 @@ async fn main() -> Result<()> {
         pool.spawn_pinned({
             let ctx = ctx.clone();
             move || {
+                #[allow(clippy::arc_with_non_send_sync)]
                 let market = Arc::new(Mutex::new(
                     PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap(),
                 ));

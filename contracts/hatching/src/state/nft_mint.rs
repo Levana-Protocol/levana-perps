@@ -1,5 +1,5 @@
 use super::{State, StateContext};
-use cosmwasm_std::{to_binary, IbcMsg, IbcTimeout};
+use cosmwasm_std::{to_json_binary, IbcMsg, IbcTimeout};
 use msg::contracts::{
     hatching::{
         dragon_mint::DragonMintExtra,
@@ -43,7 +43,7 @@ impl State<'_> {
 
         ctx.response_mut().add_message(IbcMsg::SendPacket {
             channel_id,
-            data: to_binary(&nfts_to_mint)?,
+            data: to_json_binary(&nfts_to_mint)?,
             timeout: IbcTimeout::with_timestamp(self.env.block.time.plus_seconds(TIMEOUT_SECONDS)),
         });
 
@@ -69,7 +69,7 @@ impl State<'_> {
                     babydragon_nft_mint_msg(nft_mint_owner.clone(), egg, extra)
                 })
                 .map(|mint_msg| {
-                    to_binary(&NftExecuteMsg::Mint(mint_msg?)).map_err(|err| err.into())
+                    to_json_binary(&NftExecuteMsg::Mint(mint_msg?)).map_err(|err| err.into())
                 })
                 .collect::<Result<Vec<_>>>()?,
         ))

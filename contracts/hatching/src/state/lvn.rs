@@ -1,5 +1,5 @@
 use super::{State, StateContext};
-use cosmwasm_std::{to_binary, IbcMsg, IbcTimeout};
+use cosmwasm_std::{to_json_binary, IbcMsg, IbcTimeout};
 use msg::contracts::hatching::{ibc::IbcExecuteMsg, HatchDetails};
 use shared::{ibc::TIMEOUT_SECONDS, prelude::*};
 
@@ -29,7 +29,7 @@ impl State<'_> {
 
         ctx.response_mut().add_message(IbcMsg::SendPacket {
             channel_id,
-            data: to_binary(&msg)?,
+            data: to_json_binary(&msg)?,
             timeout: IbcTimeout::with_timestamp(self.env.block.time.plus_seconds(TIMEOUT_SECONDS)),
         });
 

@@ -145,13 +145,12 @@ pub trait CosmwasmEventExt {
 
     /// Parse an attribute with the absolute leverage (to base)
     fn leverage_to_base_attr(&self, key: &str) -> anyhow::Result<LeverageToBase> {
-        self.map_attr_result(key, |s| LeverageToBase::from_str(s))
+        self.map_attr_result(key, LeverageToBase::from_str)
     }
 
     /// Parse an optional attribute with the absolute leverage (to base)
     fn try_leverage_to_base_attr(&self, key: &str) -> anyhow::Result<Option<LeverageToBase>> {
-        self.try_map_attr(key, |s| LeverageToBase::from_str(s))
-            .transpose()
+        self.try_map_attr(key, LeverageToBase::from_str).transpose()
     }
 
     /// Parse an address attribute without checking validity

@@ -4,7 +4,7 @@ use crate::prelude::*;
 use crate::state::farming::RawFarmerStats;
 use crate::state::reply::BonusFundReplyData;
 use anyhow::ensure;
-use cosmwasm_std::{to_binary, BankMsg, CosmosMsg, SubMsg, WasmMsg};
+use cosmwasm_std::{to_json_binary, BankMsg, CosmosMsg, SubMsg, WasmMsg};
 use cw_storage_plus::Item;
 use msg::contracts::market::entry::LpInfoResp;
 use msg::prelude::ratio::InclusiveRatio;
@@ -458,7 +458,7 @@ impl State<'_> {
                 .map(Collateral::from_decimal256)?;
             let reinvest_msg = WasmMsg::Execute {
                 contract_addr: self.market_info.addr.to_string(),
-                msg: to_binary(&ReinvestYield {
+                msg: to_json_binary(&ReinvestYield {
                     stake_to_xlp: true,
                     amount: Some(reinvest_amount),
                 })?,

@@ -1,6 +1,6 @@
 //! Ibc helpers
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{to_binary, Binary};
+use cosmwasm_std::{to_json_binary, Binary};
 
 /// Timeout in seconds for IBC packets
 pub const TIMEOUT_SECONDS: u64 = 60 * 10; // 10 minutes
@@ -15,12 +15,12 @@ enum Ack {
 
 /// IBC ACK success
 pub fn ack_success() -> Binary {
-    to_binary(&Ack::Result(b"1".into())).unwrap()
+    to_json_binary(&Ack::Result(b"1".into())).unwrap()
 }
 
 /// IBC ACK failure
 pub fn ack_fail(err: anyhow::Error) -> Binary {
-    to_binary(&Ack::Error(err.to_string())).unwrap()
+    to_json_binary(&Ack::Error(err.to_string())).unwrap()
 }
 
 /// Common IBC Events

@@ -16,8 +16,8 @@ use crate::time::{BlockInfoChange, TimeJump};
 use anyhow::Context;
 pub use anyhow::{anyhow, Result};
 use cosmwasm_std::{
-    to_binary, to_vec, Addr, Binary, Coin, ContractResult, CosmosMsg, Empty, QueryRequest,
-    StdError, SystemResult, Uint128, WasmMsg, WasmQuery,
+    to_json_binary, to_json_vec, Addr, Binary, Coin, ContractResult, CosmosMsg, Empty,
+    QueryRequest, StdError, SystemResult, Uint128, WasmMsg, WasmQuery,
 };
 use cw_multi_test::{AppResponse, BankSudo, Executor, SudoMsg};
 use msg::bridge::{ClientToBridgeMsg, ClientToBridgeWrapper};
@@ -436,11 +436,11 @@ impl PerpsMarket {
 
         let request: QueryRequest<Empty> = WasmQuery::Smart {
             contract_addr: market_addr.into(),
-            msg: to_binary(msg)?,
+            msg: to_json_binary(msg)?,
         }
         .into();
 
-        let raw = to_vec(&request).map_err(|serialize_err| {
+        let raw = to_json_vec(&request).map_err(|serialize_err| {
             StdError::generic_err(format!("Serializing QueryRequest: {}", serialize_err))
         })?;
         match self.app().wrap().raw_query(&raw) {
@@ -459,7 +459,7 @@ impl PerpsMarket {
             sender,
             WasmMsg::Execute {
                 contract_addr: self.addr.to_string(),
-                msg: to_binary(&msg)?,
+                msg: to_json_binary(&msg)?,
                 funds: Vec::new(),
             },
         )
@@ -492,7 +492,7 @@ impl PerpsMarket {
         Ok(match NonZero::new(amount) {
             None => WasmMsg::Execute {
                 contract_addr: market_addr.to_string(),
-                msg: to_binary(msg)?,
+                msg: to_json_binary(msg)?,
                 funds: vec![],
             },
             Some(amount) => {
@@ -1512,7 +1512,7 @@ impl PerpsMarket {
             sender,
             WasmMsg::Execute {
                 contract_addr: self.addr.to_string(),
-                msg: to_binary(&MarketExecuteMsg::ClosePosition {
+                msg: to_json_binary(&MarketExecuteMsg::ClosePosition {
                     id: position_id,
                     slippage_assert,
                 })?,
@@ -1609,7 +1609,7 @@ impl PerpsMarket {
             sender,
             WasmMsg::Execute {
                 contract_addr: self.addr.to_string(),
-                msg: to_binary(&MarketExecuteMsg::UpdatePositionLeverage {
+                msg: to_json_binary(&MarketExecuteMsg::UpdatePositionLeverage {
                     id: position_id,
                     leverage,
                     slippage_assert,
@@ -1851,7 +1851,7 @@ impl PerpsMarket {
                 .to_u128_with_precision(token_info.decimals as u32)
                 .context("couldnt convert liquidity token amount")?
                 .into(),
-            to_binary(msg)?,
+            to_json_binary(msg)?,
         )
     }
 
@@ -1875,7 +1875,7 @@ impl PerpsMarket {
                 .to_u128_with_precision(token_info.decimals as u32)
                 .context("couldnt convert liquidity token amount")?
                 .into(),
-            to_binary(msg)?,
+            to_json_binary(msg)?,
         )
     }
     fn exec_liquidity_token_send_raw(
@@ -2157,7 +2157,7 @@ impl PerpsMarket {
 
         let msg = WasmMsg::Execute {
             contract_addr: farming_addr.into_string(),
-            msg: to_binary(msg)?,
+            msg: to_json_binary(msg)?,
             funds,
         };
         self.exec_wasm_msg(wallet, msg)

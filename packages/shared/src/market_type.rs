@@ -42,6 +42,7 @@ impl PartialEq for MarketId {
 
 impl Eq for MarketId {}
 
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for MarketId {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.encoded.partial_cmp(&other.encoded)

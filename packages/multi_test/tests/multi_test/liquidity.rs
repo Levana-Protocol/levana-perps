@@ -2010,7 +2010,7 @@ fn liquidity_cooldown_works() {
             ends_at: _,
             seconds_remaining,
         } => assert_eq!(seconds_remaining, 3600),
-        _ => Err(err).unwrap(),
+        _ => panic!("{:?}", err),
     }
     let err = market
         .exec_liquidity_token_transfer(LiquidityTokenKind::Lp, &lp1, &lp0, "1".parse().unwrap())
@@ -2021,7 +2021,7 @@ fn liquidity_cooldown_works() {
             ends_at: _,
             seconds_remaining,
         } => assert_eq!(seconds_remaining, 3600),
-        _ => Err(err).unwrap(),
+        _ => panic!("{:?}", err),
     }
 
     // But it's fine for the original LP to transfer to us
@@ -2103,7 +2103,7 @@ fn liquidity_cooldown_no_cooldown_xlp() {
             ends_at: _,
             seconds_remaining,
         } => assert_eq!(seconds_remaining, 3600),
-        _ => Err(err).unwrap(),
+        _ => panic!("{:?}", err),
     }
     let err = market
         .exec_liquidity_token_transfer(LiquidityTokenKind::Lp, &lp0, &lp1, "1".parse().unwrap())
@@ -2114,7 +2114,7 @@ fn liquidity_cooldown_no_cooldown_xlp() {
             ends_at: _,
             seconds_remaining,
         } => assert_eq!(seconds_remaining, 3600),
-        _ => Err(err).unwrap(),
+        _ => panic!("{:?}", err),
     }
     market
         .exec_liquidity_token_transfer(LiquidityTokenKind::Xlp, &lp0, &lp1, "1".parse().unwrap())

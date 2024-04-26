@@ -74,7 +74,7 @@ async fn main_inner(opt: Opt) -> Result<()> {
         }
         cli::SubCommand::Markets { market_ids } => {
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
-            let markets = vec![
+            let markets = [
                 (
                     CosmosNetwork::OsmosisMainnet,
                     Address::from_str(

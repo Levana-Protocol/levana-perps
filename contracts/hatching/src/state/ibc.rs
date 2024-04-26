@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    from_binary, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcOrder,
+    from_json, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcOrder,
     IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg,
 };
 use msg::contracts::{
@@ -89,12 +89,12 @@ impl State<'_> {
             bail!("packet failed on the other chain");
         }
 
-        if let Ok(msgs) = from_binary::<IbcProxyContractMessages>(&ack.original_packet.data) {
+        if let Ok(msgs) = from_json::<IbcProxyContractMessages>(&ack.original_packet.data) {
             // there should be at least one message, since an empty list
             // is never sent to the in the first place, but better safe than sorry
-            let first_message = msgs.0.get(0).context("no ibc proxy contract messages")?;
+            let first_message = msgs.0.first().context("no ibc proxy contract messages")?;
             // get the hatch id from the first minted NFT. They're all the same
-            match from_binary::<NftExecuteMsg>(first_message)? {
+            match from_json::<NftExecuteMsg>(first_message)? {
                 NftExecuteMsg::Mint(msg) => {
                     let hatch_id = self.get_hatch_id_from_token_id(ctx.storage, &msg.token_id)?;
                     self.update_hatch_status(ctx, hatch_id, |mut status| {
@@ -106,7 +106,7 @@ impl State<'_> {
 
             // NOTE: we could clear all the token id -> hatch id mappings here, but it's not necessary
             // and preserving it could possibly be useful for debugging
-        } else if let Ok(msg) = from_binary::<IbcExecuteMsg>(&ack.original_packet.data) {
+        } else if let Ok(msg) = from_json::<IbcExecuteMsg>(&ack.original_packet.data) {
             match msg {
                 IbcExecuteMsg::GrantLvn { hatch_id, .. } => {
                     self.update_hatch_status(ctx, hatch_id.parse()?, |mut status| {

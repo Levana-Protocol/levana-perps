@@ -1,4 +1,4 @@
-use cosmwasm_std::to_binary;
+use cosmwasm_std::to_json_binary;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{contracts::liquidity_token::LiquidityTokenKind, prelude::*, token::Token};
 
@@ -13,7 +13,7 @@ fn directly_call_receive() {
             &MarketExecuteMsg::Receive {
                 sender: fakesender.into(),
                 amount: 1000000000u128.into(),
-                msg: to_binary(&MarketExecuteMsg::DepositLiquidity {
+                msg: to_json_binary(&MarketExecuteMsg::DepositLiquidity {
                     stake_to_xlp: false,
                 })
                 .unwrap(),

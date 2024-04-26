@@ -5,7 +5,7 @@
 use anyhow::{bail, Result};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{
-    entry_point, to_binary, Deps, DepsMut, Env, Event, MessageInfo, QueryResponse, Response,
+    entry_point, to_json_binary, Deps, DepsMut, Env, Event, MessageInfo, QueryResponse, Response,
 };
 use cosmwasm_std::{Addr, BlockInfo, Decimal256, Timestamp};
 use cw2::set_contract_version;
@@ -145,12 +145,12 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<QueryResponse> {
     match msg {
         QueryMsg::Owner {} => {
             let owner = OWNER.load(deps.storage)?;
-            let res = to_binary(&OwnerResp { owner })?;
+            let res = to_json_binary(&OwnerResp { owner })?;
             Ok(res)
         }
         QueryMsg::Price {} => {
             let price = PRICE.load(deps.storage)?;
-            let res = to_binary(&price)?;
+            let res = to_json_binary(&price)?;
             Ok(res)
         }
     }
