@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    from_binary, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcOrder,
+    from_json, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcOrder,
     IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg,
 };
 use msg::contracts::ibc_execute_proxy::entry::{IbcProxyContractMessages, InstantiateMsg};
@@ -107,7 +107,7 @@ impl State<'_> {
         msg: IbcPacketReceiveMsg,
     ) -> Result<()> {
         // The other side *must* send this data type
-        let msgs: IbcProxyContractMessages = from_binary(&msg.packet.data)?;
+        let msgs: IbcProxyContractMessages = from_json(msg.packet.data)?;
 
         self.send(ctx, msgs.0)?;
 

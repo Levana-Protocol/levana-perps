@@ -655,44 +655,6 @@ fn calc_multiplier(
         / (total_lp + total_xlp)?.into_decimal256())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn go(
-        min_multiplier: &str,
-        max_multiplier: &str,
-        total_lp: &str,
-        total_xlp: &str,
-    ) -> Decimal256 {
-        calc_multiplier(
-            min_multiplier.parse().unwrap(),
-            max_multiplier.parse().unwrap(),
-            total_lp.parse().unwrap(),
-            total_xlp.parse().unwrap(),
-        )
-        .unwrap()
-    }
-
-    #[test]
-    fn all_lp() {
-        assert_eq!(go("2", "5", "500", "0"), Decimal256::from_str("5").unwrap());
-    }
-
-    #[test]
-    fn all_xlp() {
-        assert_eq!(go("2", "5", "0", "500"), Decimal256::from_str("2").unwrap());
-    }
-
-    #[test]
-    fn even_split() {
-        assert_eq!(
-            go("2", "5", "500", "500"),
-            Decimal256::from_str("3.5").unwrap()
-        );
-    }
-}
-
 #[must_use]
 pub(crate) struct PositionFeeSettlement {
     pub(crate) position: MaybeClosedPosition,
@@ -868,5 +830,43 @@ impl FundingFeePaymentWithCapping {
         debug_check_invariants(ctx.storage, self.margin_to_check);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn go(
+        min_multiplier: &str,
+        max_multiplier: &str,
+        total_lp: &str,
+        total_xlp: &str,
+    ) -> Decimal256 {
+        calc_multiplier(
+            min_multiplier.parse().unwrap(),
+            max_multiplier.parse().unwrap(),
+            total_lp.parse().unwrap(),
+            total_xlp.parse().unwrap(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn all_lp() {
+        assert_eq!(go("2", "5", "500", "0"), Decimal256::from_str("5").unwrap());
+    }
+
+    #[test]
+    fn all_xlp() {
+        assert_eq!(go("2", "5", "0", "500"), Decimal256::from_str("2").unwrap());
+    }
+
+    #[test]
+    fn even_split() {
+        assert_eq!(
+            go("2", "5", "500", "500"),
+            Decimal256::from_str("3.5").unwrap()
+        );
     }
 }

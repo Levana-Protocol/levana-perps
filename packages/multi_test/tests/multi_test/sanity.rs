@@ -5,7 +5,7 @@ use msg::prelude::*;
 #[test]
 fn sanity_open_long_min_values() {
     open_position_and_assert(
-        100u64.try_into().unwrap(),
+        100u64.into(),
         "1.1".try_into().unwrap(),
         DirectionToBase::Long,
         "1".try_into().unwrap(),
@@ -15,7 +15,7 @@ fn sanity_open_long_min_values() {
 #[test]
 fn sanity_open_long_mid_values() {
     open_position_and_assert(
-        100u64.try_into().unwrap(),
+        100u64.into(),
         "15".parse().unwrap(),
         DirectionToBase::Long,
         "45".try_into().unwrap(),
@@ -29,7 +29,7 @@ fn sanity_open_long_max_values() {
         let config = market.query_config().unwrap();
         let leverage = (config.max_leverage - Number::from(5u64)).unwrap();
         open_position_and_assert(
-            100u64.try_into().unwrap(),
+            100u64.into(),
             leverage.to_string().parse().unwrap(),
             DirectionToBase::Long,
             MaxGainsInQuote::PosInfinity,
@@ -40,7 +40,7 @@ fn sanity_open_long_max_values() {
 #[test]
 fn sanity_open_short_min_values() {
     open_position_and_assert(
-        100u64.try_into().unwrap(),
+        100u64.into(),
         "0.25".try_into().unwrap(),
         DirectionToBase::Short,
         MaxGainsInQuote::Finite("0.01".try_into().unwrap()),
@@ -50,7 +50,7 @@ fn sanity_open_short_min_values() {
 #[test]
 fn sanity_open_short_mid_values() {
     open_position_and_assert(
-        100u64.try_into().unwrap(),
+        100u64.into(),
         "10".try_into().unwrap(),
         DirectionToBase::Short,
         MaxGainsInQuote::Finite("3".parse().unwrap()),
@@ -60,7 +60,7 @@ fn sanity_open_short_mid_values() {
 #[test]
 fn sanity_open_short_max_values() {
     open_position_and_assert(
-        100u64.try_into().unwrap(),
+        100u64.into(),
         "30".try_into().unwrap(),
         DirectionToBase::Short,
         MaxGainsInQuote::Finite("15".parse().unwrap()),

@@ -3,7 +3,7 @@ use cosmos::{
     Address, Contract, HasAddress, HasAddressHrp, HasContract, HasCosmos, TxBuilder, Wallet,
 };
 
-use cosmwasm_std::to_binary;
+use cosmwasm_std::to_json_binary;
 use msg::{
     contracts::{
         cw20::entry::BalanceResponse,
@@ -122,7 +122,7 @@ impl MarketContract {
             msg::contracts::cw20::entry::ExecuteMsg::Send {
                 contract: self.0.get_address_string().into(),
                 amount: funds.into(),
-                msg: to_binary(msg)?,
+                msg: to_json_binary(msg)?,
             },
         )
         .await

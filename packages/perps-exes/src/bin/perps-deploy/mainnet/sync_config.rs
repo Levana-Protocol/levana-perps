@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use cosmos::{HasAddress, TxBuilder};
-use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, WasmMsg};
+use cosmwasm_std::{to_json_binary, Addr, CosmosMsg, Empty, WasmMsg};
 use msg::{
     contracts::market::{
         config::{Config, ConfigUpdate},
@@ -145,7 +145,7 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
             let update: ConfigUpdate = serde_json::from_value(update)?;
             updates.push(CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
                 contract_addr: market.get_address_string(),
-                msg: to_binary(&strip_nulls(MarketExecuteMsg::Owner(
+                msg: to_json_binary(&strip_nulls(MarketExecuteMsg::Owner(
                     ExecuteOwnerMsg::ConfigUpdate {
                         update: Box::new(update),
                     },

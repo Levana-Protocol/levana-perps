@@ -9,7 +9,7 @@ use std::{
 use crate::{config::CONFIG, prelude::*};
 use anyhow::{anyhow, Result};
 use awsm_web::loaders::helpers::{spawn_handle, FutureHandle};
-use cosmwasm_std::{from_binary, Addr};
+use cosmwasm_std::{from_json, Addr};
 use dominator_helpers::futures::AsyncLoader;
 use futures::lock::Mutex as AsyncMutex;
 use futures::{
@@ -91,7 +91,7 @@ impl Bridge {
             BridgeToClientMsg::MarketQueryResult { result } => Ok(BridgeResponse {
                 msg_id,
                 msg_elapsed: recv_wrapper.elapsed,
-                data: from_binary(&result)?,
+                data: from_json(&result)?,
             }),
             _ => Err(anyhow!("unexpected response")),
         }

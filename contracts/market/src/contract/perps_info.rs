@@ -6,7 +6,7 @@
 //!
 //! * Any collateral that is sent is actually gets used
 
-use cosmwasm_std::{from_binary, MessageInfo};
+use cosmwasm_std::{from_json, MessageInfo};
 use msg::token::Token;
 
 use crate::prelude::*;
@@ -51,7 +51,7 @@ impl State<'_> {
                 msg,
             } => {
                 // CW20 receive message, parse the inner information and ensure this was the correct contract.
-                let msg: ExecuteMsg = from_binary(&msg)?;
+                let msg: ExecuteMsg = from_json(msg)?;
 
                 let source = self.get_token(store)?;
                 let funds = match source {

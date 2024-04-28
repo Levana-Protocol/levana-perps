@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    from_binary, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcOrder,
+    from_json, IbcChannel, IbcChannelCloseMsg, IbcChannelConnectMsg, IbcChannelOpenMsg, IbcOrder,
     IbcPacketAckMsg, IbcPacketReceiveMsg, IbcPacketTimeoutMsg,
 };
 use msg::contracts::hatching::ibc::{IbcChannelVersion, IbcExecuteMsg};
@@ -70,7 +70,7 @@ impl State<'_> {
         ctx: &mut StateContext,
         msg: IbcPacketReceiveMsg,
     ) -> Result<()> {
-        from_binary(&msg.packet.data)
+        from_json(msg.packet.data)
             .map_err(|err| err.into())
             .and_then(|msg| {
                 match msg {

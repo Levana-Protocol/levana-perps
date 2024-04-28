@@ -14,7 +14,7 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 use chrono::{TimeZone, Utc};
 use cosmos::{Address, ContractAdmin, Cosmos, HasAddress, TxBuilder};
-use cosmwasm_std::{to_binary, CosmosMsg, Empty};
+use cosmwasm_std::{to_json_binary, CosmosMsg, Empty};
 use msg::contracts::market::{
     entry::NewMarketParams,
     spot_price::{SpotPriceConfigInit, SpotPriceFeedDataInit},
@@ -167,7 +167,7 @@ struct CodeIds {
 }
 
 impl CodeIds {
-    const PATH: &str = "packages/perps-exes/assets/mainnet-code-ids.yaml";
+    const PATH: &'static str = "packages/perps-exes/assets/mainnet-code-ids.yaml";
 
     fn load() -> Result<Self> {
         let mut file = fs_err::File::open(Self::PATH)?;
@@ -538,7 +538,7 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpt
         simtx.add_execute_message(&factory, owner, vec![], &msg)?;
         msgs.push(CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
             contract_addr: factory.to_string(),
-            msg: to_binary(&msg)?,
+            msg: to_json_binary(&msg)?,
             funds: vec![],
         }));
     }

@@ -75,10 +75,10 @@ pub fn smart_query_no_parse(
 ) -> anyhow::Result<Binary> {
     let request: QueryRequest<Empty> = WasmQuery::Smart {
         contract_addr: contract_addr.into(),
-        msg: cosmwasm_std::to_binary(msg)?,
+        msg: cosmwasm_std::to_json_binary(msg)?,
     }
     .into();
-    let raw = cosmwasm_std::to_vec(&request).map_err(|serialize_err| {
+    let raw = cosmwasm_std::to_json_vec(&request).map_err(|serialize_err| {
         StdError::generic_err(format!("Serializing QueryRequest: {}", serialize_err))
     })?;
     match querier.raw_query(&raw) {

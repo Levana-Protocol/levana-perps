@@ -1,5 +1,5 @@
 use anyhow::Result;
-use cosmwasm_std::{to_binary, QueryResponse};
+use cosmwasm_std::{to_json_binary, QueryResponse};
 use serde::Serialize;
 /// Makes it easy to call .query_result() on any Serialize
 /// and standardizes so query() entry points also return a ContractResult
@@ -9,7 +9,7 @@ pub trait QueryResultExt {
 }
 impl<T: Serialize> QueryResultExt for T {
     fn query_result(&self) -> Result<QueryResponse> {
-        to_binary(self).map_err(|err| err.into())
+        to_json_binary(self).map_err(|err| err.into())
     }
 }
 

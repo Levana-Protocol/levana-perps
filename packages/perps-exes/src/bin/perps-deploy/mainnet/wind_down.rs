@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use cosmos::{HasAddress, TxBuilder};
-use cosmwasm_std::{to_binary, CosmosMsg, Empty, WasmMsg};
+use cosmwasm_std::{to_json_binary, CosmosMsg, Empty, WasmMsg};
 use msg::{
     prelude::FactoryExecuteMsg,
     shutdown::{ShutdownEffect, ShutdownImpact},
@@ -79,7 +79,7 @@ async fn go(
     let msg = CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
         contract_addr: factory.get_address_string(),
         funds: vec![],
-        msg: to_binary(&FactoryExecuteMsg::Shutdown {
+        msg: to_json_binary(&FactoryExecuteMsg::Shutdown {
             impacts: impacts.clone(),
             markets: market,
             effect: if enable {

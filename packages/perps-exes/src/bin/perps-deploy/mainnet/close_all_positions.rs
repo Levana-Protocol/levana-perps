@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use cosmos::{HasAddress, TxBuilder};
-use cosmwasm_std::{to_binary, CosmosMsg, Empty, WasmMsg};
+use cosmwasm_std::{to_json_binary, CosmosMsg, Empty, WasmMsg};
 use msg::prelude::MarketExecuteMsg;
 use perps_exes::contracts::Factory;
 use shared::storage::MarketId;
@@ -45,7 +45,7 @@ async fn go(
         let msg = CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
             contract_addr: market.get_address_string(),
             funds: vec![],
-            msg: to_binary(&MarketExecuteMsg::CloseAllPositions {})?,
+            msg: to_json_binary(&MarketExecuteMsg::CloseAllPositions {})?,
         });
         add_cosmos_msg(&mut builder, wind_down, &msg)?;
         msgs.push(msg);

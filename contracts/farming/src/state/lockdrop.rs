@@ -335,7 +335,7 @@ impl LockdropBuckets {
         Map::new(namespace::LOCKDROP_BUCKETS_MULTIPLIER);
     const DURATION: Map<'static, LockdropBucketId, Duration> =
         Map::new(namespace::LOCKDROP_BUCKETS_DURATION);
-    const BALANCES: Map<'static, (&Addr, LockdropBucketId), Balance> =
+    const BALANCES: Map<'static, (&'static Addr, LockdropBucketId), Balance> =
         Map::new(namespace::LOCKDROP_BUCKETS_BALANCES);
     const BALANCES_BY_BUCKET: Map<'static, LockdropBucketId, Collateral> =
         Map::new(namespace::LOCKDROP_BALANCES_BY_BUCKET);
@@ -344,9 +344,8 @@ impl LockdropBuckets {
 
     pub(crate) fn init(storage: &mut dyn Storage, msg: &InstantiateMsg) -> Result<()> {
         for bucket in msg.lockdrop_buckets.iter() {
-            let duration = Duration::from_seconds(u64::try_from(
-                bucket.bucket_id.0 * msg.lockdrop_month_seconds,
-            )?);
+            let duration =
+                Duration::from_seconds(u64::from(bucket.bucket_id.0 * msg.lockdrop_month_seconds));
 
             Self::MULTIPLIER.save(storage, bucket.bucket_id, &bucket.multiplier)?;
             Self::DURATION.save(storage, bucket.bucket_id, &duration)?;
