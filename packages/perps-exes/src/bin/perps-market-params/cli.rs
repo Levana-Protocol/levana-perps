@@ -56,6 +56,8 @@ pub(crate) enum SubCommand {
         #[clap(flatten)]
         opt: ServeOpt,
     },
+    /// List potential coin IDs for the given symbol
+    ListIds { symbol: String },
 }
 
 #[derive(clap::Parser, Clone, Debug)]
