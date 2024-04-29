@@ -60,6 +60,7 @@
           <div class="p-1"><i class="bi bi-check-circle text-success"></i> <span class="fw-bold">Live since </span><span class="text-secondary">{{live_since}}</span></div>
           <div class="p-1"><i class="bi bi-check-circle text-success"></i> <span class="fw-bold">Current time </span><span class="text-secondary">{{now}}</span></div>
           <div class="p-1"><i class="bi bi-check-circle text-success"></i> <span class="fw-bold">Gas multiplier </span><span class="text-secondary">{{gas_multiplier}} (gas refill: {{gas_multiplier_gas_check}})</span></div>
+          <div class="p-1"><i class="bi bi-check-circle text-success"></i> <span class="fw-bold">Gas price </span><span class="text-secondary">{{gas_price}}</span></div>
           {% match max_gas_prices %}
             {% when Some with (prices) %}
               <div class="p-1">
