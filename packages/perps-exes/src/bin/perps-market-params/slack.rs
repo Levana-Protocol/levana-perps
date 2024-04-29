@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::{anyhow, Context};
+use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork};
 use reqwest::{Client, Url};
 use shared::storage::MarketId;
@@ -236,4 +237,41 @@ impl HttpApp {
 
         Ok(quote.usd.price)
     }
+
+    pub(crate) async fn get_symbol_map(&self, symbol: &str) -> anyhow::Result<Vec<SymbolMap>> {
+        // https://coinmarketcap.com/api/documentation/v1/#operation/getV1CryptocurrencyMap
+
+        let uri = Url::parse_with_params(
+            "https://pro-api.coinmarketcap.com/v1/cryptocurrency/map",
+            [("symbol", symbol)],
+        )?;
+
+        #[derive(serde::Deserialize)]
+        struct CmcOuter {
+            data: Vec<SymbolMap>,
+        }
+
+        let CmcOuter { data } = self
+            .client
+            .get(uri)
+            .header("X-CMC_PRO_API_KEY", &self.cmc_key)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+        Ok(data)
+    }
+}
+
+// We're just using the Debug impl for output, ignore unused fields.
+#[allow(dead_code)]
+#[derive(serde::Deserialize, Debug)]
+pub(crate) struct SymbolMap {
+    id: u64,
+    name: String,
+    symbol: String,
+    slug: String,
+    first_historical_data: Option<DateTime<Utc>>,
+    last_historical_data: Option<DateTime<Utc>>,
 }

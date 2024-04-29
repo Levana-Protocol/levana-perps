@@ -161,6 +161,12 @@ async fn main_inner(opt: Opt) -> Result<()> {
             }
             writer.flush()?;
         }
+        cli::SubCommand::ListIds { symbol } => {
+            let http_app = HttpApp::new(None, opt.cmc_key.clone());
+            for symbol in http_app.get_symbol_map(&symbol).await? {
+                println!("{symbol:#?}");
+            }
+        }
     }
     Ok(())
 }
