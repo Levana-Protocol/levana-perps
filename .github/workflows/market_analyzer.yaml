@@ -39,10 +39,6 @@ jobs:
         with:
           workspaces: |
             .
-      - name: Download health-check
-        run: just download-health-check
-        env:
-          LEVANA_DEVOPS_REPO_PAT: ${{ secrets.LEVANA_DEVOPS_REPO_PAT }}
       - name: Dependencies
         run: sudo apt install musl-tools -y
       - name: Build market-params binary
