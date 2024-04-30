@@ -390,10 +390,8 @@ networks:
         !pyth { key: "TIA_USD", inverted: false}
       ]
     milkTIA_USD:
-      # Original contract from Milky Way team with inverted redemption rate
-      # stride-contract: osmo1jt34seu48rqe6acy9ew4fgzvg502mjmrggt00d8thn5fe2g32hjsmyy7p6
-      # Correction contract
-      stride-contract: osmo1j0qqgzu2520usq5580rcf8whcckuc7nlcy7k4hxwqkwg43n2zy9q4xnf2u
+      # v3 contract from Milky Way team
+      stride-contract: osmo1atjchsl64ewkapy0p4a7h0pvprhpt0jwelem2es0jrd4fqwx7kgslxsvvl
       feeds: [
         !pyth { key: "TIA_USD", inverted: false },
         !stride { denom: "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA", inverted: false, age_tolerance: 43200 }
