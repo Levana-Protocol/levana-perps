@@ -428,6 +428,8 @@ struct NeedsPriceUpdateInfo {
     /// concern of the price delta actually has an additional buffer of trading fees and
     /// liquidation margin for fees after settling pending fees.
     exposure_margin_ratio: Decimal256,
+    /// Does the public time listed in the oracle violate the price feed's age tolerance?
+    requires_pyth_update: bool,
 }
 
 #[derive(Debug)]
@@ -479,7 +481,7 @@ impl NeedsPriceUpdateInfo {
         let on_chain_age = self
             .off_chain_publish_time
             .signed_duration_since(self.on_chain_market_publish_time);
-        if on_chain_age > params.on_chain_publish_time_age_threshold {
+        if on_chain_age > params.on_chain_publish_time_age_threshold || self.requires_pyth_update {
             return Ok(ActionWithReason::WorkNeeded(
                 CrankTriggerReason::OnChainTooOld {
                     on_chain_age,
@@ -559,6 +561,7 @@ async fn check_market_needs_price_update(
             on_chain_oracle_price,
             on_chain_oracle_publish_time,
             on_chain_price_point: market_price,
+            requires_pyth_update,
         } => {
             let price_will_trigger = market.market.price_would_trigger(off_chain_price).await?;
 
@@ -587,6 +590,7 @@ async fn check_market_needs_price_update(
                 on_chain_market_price: market_price.price_base,
                 on_chain_market_publish_time: market_price.timestamp.try_into_chrono_datetime()?,
                 exposure_margin_ratio: status.config.exposure_margin_ratio,
+                requires_pyth_update,
             };
 
             info.actions(&app.config.needs_price_update_params)
