@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Context;
-use shared::storage::{MarketId, MarketType};
+use shared::storage::MarketId;
 
 use crate::{
     cli::{Opt, ServeOpt},
@@ -48,27 +48,27 @@ pub(crate) async fn dnf_sensitivity(
     http_app: &HttpApp,
     market_id: &MarketId,
 ) -> anyhow::Result<f64> {
-    let quote_asset = market_id.get_quote();
-    if quote_asset == "USD" || quote_asset == "USDC" || quote_asset == "USDT" {
-        let exchanges = http_app.get_market_pair(market_id.clone()).await?;
+    let base_asset = AssetName(market_id.get_base());
+    let quote_asset = AssetName(market_id.get_quote());
+    if quote_asset.is_usd_equiv() {
+        let exchanges = http_app.get_market_pair(base_asset).await?;
         tracing::debug!(
             "Total exchanges found: {} for {market_id:?}",
             exchanges.data.market_pairs.len()
         );
         let dnf_in_usd = compute_dnf_sensitivity(exchanges.data.market_pairs)?;
-        let price = http_app.get_price_in_usd(market_id).await?;
-        let dnf_in_notional = dnf_in_usd / price;
-        return Ok(dnf_in_notional);
+        return dnf_in_usd.to_asset_amount(base_asset, http_app).await;
     }
-    anyhow::ensure!(market_id.get_market_type() == MarketType::CollateralIsBase);
-    let base_asset = market_id.get_base();
-    let base_market_id = MarketId::new(base_asset, "USD", MarketType::CollateralIsQuote);
-    let quote_market_id = MarketId::new(quote_asset, "USD", MarketType::CollateralIsQuote);
-    let base_exchanges = http_app.get_market_pair(base_market_id).await?;
-    let quote_exchanges = http_app.get_market_pair(quote_market_id).await?;
-    let base_dnf = compute_dnf_sensitivity(base_exchanges.data.market_pairs)?;
-    let quote_dnf = compute_dnf_sensitivity(quote_exchanges.data.market_pairs)?;
-    Ok(base_dnf.min(quote_dnf))
+    let base_exchanges = http_app.get_market_pair(base_asset).await?;
+    let quote_exchanges = http_app.get_market_pair(quote_asset).await?;
+    let base_dnf_in_usd = compute_dnf_sensitivity(base_exchanges.data.market_pairs)?;
+    let quote_dnf_in_usd = compute_dnf_sensitivity(quote_exchanges.data.market_pairs)?;
+    let dnf_in_usd = if base_dnf_in_usd > quote_dnf_in_usd {
+        quote_dnf_in_usd
+    } else {
+        base_dnf_in_usd
+    };
+    dnf_in_usd.to_asset_amount(base_asset, http_app).await
 }
 
 fn is_centralized_exchange(id: &ExchangeId) -> bool {
@@ -81,7 +81,29 @@ fn is_centralized_exchange(id: &ExchangeId) -> bool {
     }
 }
 
-fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<f64> {
+#[derive(Clone, Copy)]
+pub(crate) struct AssetName<'a>(pub(crate) &'a str);
+impl AssetName<'_> {
+    /// Is the asset either USD or a stablecoin pinned to USD?
+    fn is_usd_equiv(&self) -> bool {
+        self.0 == "USD" || self.0 == "USDC" || self.0 == "USDT"
+    }
+}
+#[derive(PartialOrd, PartialEq)]
+struct MyUsd(f64);
+
+impl MyUsd {
+    async fn to_asset_amount(
+        &self,
+        asset: AssetName<'_>,
+        http_app: &HttpApp,
+    ) -> anyhow::Result<f64> {
+        let price = http_app.get_price_in_usd(asset).await?;
+        Ok(self.0 / price)
+    }
+}
+
+fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<MyUsd> {
     // Algorithm: https://staff.levana.finance/new-market-checklist#dnf-sensitivity
     tracing::debug!("Total exchanges: {}", exchanges.len());
     let exchanges = exchanges.iter().filter(|exchange| {
@@ -104,7 +126,7 @@ fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<f64>
         .depth_usd_negative_two
         .min(max_volume_exchange.depth_usd_positive_two);
     let dnf = (min_depth_liquidity / market_share) * 25.0;
-    Ok(dnf)
+    Ok(MyUsd(dnf))
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -228,7 +250,7 @@ mod tests {
             },
         ];
         let dnf = super::compute_dnf_sensitivity(exchanges).unwrap();
-        assert_eq!(dnf.round(), 268783.0, "Expected DNF");
+        assert_eq!(dnf.0.round(), 268783.0, "Expected DNF");
     }
 
     #[test]

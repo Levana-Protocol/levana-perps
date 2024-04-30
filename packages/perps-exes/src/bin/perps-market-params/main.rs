@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use coingecko::Coin;
 use cosmos::{Address, CosmosNetwork};
+use market_param::AssetName;
 use web::axum_main;
 
 use crate::{
@@ -35,7 +36,9 @@ async fn main_inner(opt: Opt) -> Result<()> {
         }
         cli::SubCommand::Exchanges { market_id } => {
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
-            let result = http_app.get_market_pair(market_id.clone()).await?;
+            let result = http_app
+                .get_market_pair(AssetName(market_id.get_base()))
+                .await?;
             let result = result.data.market_pairs;
             let exchanges = http_app.get_exchanges().await?;
             let mut unsupported_exchanges = vec![];
@@ -150,7 +153,9 @@ async fn main_inner(opt: Opt) -> Result<()> {
         cli::SubCommand::Serve { opt: serve_opt } => axum_main(serve_opt, opt).await?,
         cli::SubCommand::Market { out, market_id } => {
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
-            let exchanges = http_app.get_market_pair(market_id.clone()).await?;
+            let exchanges = http_app
+                .get_market_pair(AssetName(market_id.get_base()))
+                .await?;
             tracing::info!(
                 "Total exchanges found: {} for {market_id:?}",
                 exchanges.data.market_pairs.len()
