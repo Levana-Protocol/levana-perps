@@ -41,6 +41,7 @@ pyth:
       PYTH_USD: 0bbf28e9a841a1cc788f6a361b17ca072d0ea3098a1e5df1c3922d06719579ff
       NTRN_USD: a8e6517966a52cb1df864b2764f3629fde3f21d2b640b5c572fcd654cbccd65e
       DYM_USD: a9f3b2a89c6f85a6c20a9518abde39b944e839ca49a0c92307c65974d3f14a57
+      SCRT_USD: ac5a498aa407c3642257dc8bd8b92efda656e708b22be9b96febcb77878d6bfa
   edge: 
     update-age-tolerance: 21
     # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-edge
@@ -993,6 +994,20 @@ networks:
       ]
       feeds-usd: [
         !pyth { key: "DYM_USD", inverted: false }
+      ]
+    AKT_USD:
+      feeds: [
+        !pyth { key: "AKT_USD", inverted: false}
+      ]
+      feeds-usd: [
+        !pyth { key: "AKT_USD", inverted: false}
+      ]
+    SCRT_USD:
+      feeds: [
+        !pyth { key: "SCRT_USD", inverted: false}
+      ]
+      feeds-usd: [
+        !pyth { key: "SCRT_USD", inverted: false}
       ]
   dymension-testnet:
     DYM_USD:
