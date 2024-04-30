@@ -3,11 +3,10 @@ use std::collections::HashMap;
 use anyhow::{anyhow, Context};
 use cosmos::{Address, CosmosNetwork};
 use reqwest::{Client, Url};
-use shared::storage::MarketId;
 
 use crate::{
     coingecko::{CMCExchange, CmcExchangeInfo, Coin},
-    market_param::MarketsConfig,
+    market_param::{AssetName, MarketsConfig},
 };
 
 pub(crate) struct HttpApp {
@@ -142,9 +141,8 @@ impl HttpApp {
 
     pub(crate) async fn get_market_pair(
         &self,
-        market_id: MarketId,
+        AssetName(base_asset): AssetName<'_>,
     ) -> anyhow::Result<CmcExchangeInfo> {
-        let base_asset = market_id.get_base();
         let coin: Coin = base_asset.parse()?;
         let mut start: u32 = 1;
         // https://coinmarketcap.com/api/documentation/v1/#operation/getV1ExchangeListingsLatest
@@ -193,8 +191,10 @@ impl HttpApp {
         Ok(result)
     }
 
-    pub(crate) async fn get_price_in_usd(&self, market_id: &MarketId) -> anyhow::Result<f64> {
-        let base_asset = market_id.get_base();
+    pub(crate) async fn get_price_in_usd(
+        &self,
+        AssetName(base_asset): AssetName<'_>,
+    ) -> anyhow::Result<f64> {
         let coin: Coin = base_asset.parse()?;
         // https://coinmarketcap.com/api/documentation/v1/#operation/getV2CryptocurrencyQuotesLatest
         let id = coin.cmc_id().to_string();
