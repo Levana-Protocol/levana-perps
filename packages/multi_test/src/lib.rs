@@ -10,7 +10,6 @@ pub mod response;
 //pub mod test_strategies;
 pub mod arbitrary;
 pub mod contracts;
-pub mod rewards_helpers;
 pub mod simple_oracle;
 pub mod time;
 
@@ -22,7 +21,6 @@ use cosmwasm_std::{
 };
 use cw_multi_test::{App, AppResponse, BankSudo, Contract, Executor, SudoMsg};
 use dotenv::dotenv;
-use msg::contracts::rewards::entry::ConfigUpdate;
 use msg::prelude::*;
 use msg::token::Token;
 use rand::rngs::ThreadRng;
@@ -46,7 +44,6 @@ pub struct PerpsApp {
     pub users: HashSet<Addr>,
     pub factory_addr: Addr,
     pub log_block_time_changes: bool,
-    pub rewards_addr: Addr,
     pub simple_oracle_addr: Addr,
     pub simple_oracle_usd_addr: Addr,
 }
@@ -74,8 +71,6 @@ pub(crate) enum PerpsContract {
     PositionToken,
     LiquidityToken,
     Cw20,
-    Rewards,
-    Farming,
     SimpleOracle,
 }
 
@@ -93,8 +88,6 @@ impl PerpsApp {
         let cw20_code_id = app.store_code(contract_cw20());
         let position_token_code_id = app.store_code(contract_position_token());
         let liquidity_token_code_id = app.store_code(contract_liquidity_token());
-        let rewards_code_id = app.store_code(contract_rewards());
-        let farming_code_id = app.store_code(contract_farming());
         let simple_oracle_code_id = app.store_code(contract_simple_oracle());
 
         let factory_addr = app.instantiate_contract(
@@ -113,22 +106,6 @@ impl PerpsApp {
             },
             &[],
             "factory",
-            Some(TEST_CONFIG.migration_admin.clone()),
-        )?;
-
-        let rewards_addr = app.instantiate_contract(
-            rewards_code_id,
-            Addr::unchecked(&TEST_CONFIG.protocol_owner),
-            &msg::contracts::rewards::entry::InstantiateMsg {
-                config: ConfigUpdate {
-                    immediately_transferable: Decimal256::from_str("0.25")?,
-                    token_denom: TEST_CONFIG.rewards_token_denom.clone(),
-                    unlock_duration_seconds: 60,
-                    factory_addr: factory_addr.clone().into_string(),
-                },
-            },
-            &[],
-            "rewards",
             Some(TEST_CONFIG.migration_admin.clone()),
         )?;
 
@@ -160,9 +137,6 @@ impl PerpsApp {
                 (PerpsContract::Cw20, cw20_code_id),
                 (PerpsContract::PositionToken, position_token_code_id),
                 (PerpsContract::LiquidityToken, liquidity_token_code_id),
-                (PerpsContract::Rewards, rewards_code_id),
-                (PerpsContract::Farming, farming_code_id),
-                (PerpsContract::Farming, farming_code_id),
                 (PerpsContract::SimpleOracle, simple_oracle_code_id),
             ]
             .into(),
@@ -172,7 +146,6 @@ impl PerpsApp {
             rng: rand::thread_rng(),
             users: HashSet::new(),
             log_block_time_changes: false,
-            rewards_addr,
             simple_oracle_addr,
             simple_oracle_usd_addr,
         };
@@ -350,25 +323,6 @@ pub(crate) fn contract_factory() -> Box<dyn Contract<Empty>> {
             factory::contract::query,
         )
         .with_reply(factory::contract::reply),
-    )
-}
-
-pub(crate) fn contract_rewards() -> Box<dyn Contract<Empty>> {
-    Box::new(LocalContractWrapper::new(
-        rewards::contract::instantiate,
-        rewards::contract::execute,
-        rewards::contract::query,
-    ))
-}
-
-pub(crate) fn contract_farming() -> Box<dyn Contract<Empty>> {
-    Box::new(
-        LocalContractWrapper::new(
-            farming::lifecycle::instantiate,
-            farming::execute::execute,
-            farming::query::query,
-        )
-        .with_reply(farming::execute::reply),
     )
 }
 

@@ -95,10 +95,10 @@ pub(crate) const AVAILABLE: &str = "available";
 pub(crate) const REQUESTED: &str = "requested";
 pub(crate) const DESC: &str = "desc";
 
-pub(crate) const GRANT_REWARDS: &str = "grant-rewards";
-pub(crate) const CLAIM_REWARDS: &str = "claim-rewards";
-pub(crate) const REWARDS_RECIPIENT: &str = "rewards-recipient";
-pub(crate) const REWARDS_AMOUNT: &str = "rewards-amount";
+// pub(crate) const GRANT_REWARDS: &str = "grant-rewards";
+// pub(crate) const CLAIM_REWARDS: &str = "claim-rewards";
+// pub(crate) const REWARDS_RECIPIENT: &str = "rewards-recipient";
+// pub(crate) const REWARDS_AMOUNT: &str = "rewards-amount";
 pub(crate) const DEFERRED_EXEC_ID: &str = "deferred-exec-id";
 pub(crate) const DEFERRED_EXEC_OWNER: &str = "deferred-exec-owner";
 pub(crate) const DEFERRED_EXEC_TARGET: &str = "deferred-exec-target";
