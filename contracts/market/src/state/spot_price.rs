@@ -653,7 +653,7 @@ impl State<'_> {
                                 }
 
                                 let publish_time = Timestamp::from_seconds(resp.update_time);
-                                let redemption_rate = Number::try_from(resp.redemption_rate)?;
+                                let redemption_rate = Number::from(resp.redemption_rate);
                                 let redemption_rate = NumberGtZero::try_from(redemption_rate)
                                     .context("redemption_rate must be > 0")?;
 

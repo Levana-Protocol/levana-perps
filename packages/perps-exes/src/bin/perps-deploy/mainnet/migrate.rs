@@ -1,6 +1,6 @@
 use anyhow::Result;
 use cosmos::{HasAddress, TxBuilder};
-use cosmwasm_std::{to_binary, CosmosMsg, Empty, WasmMsg};
+use cosmwasm_std::{to_json_binary, CosmosMsg, Empty, WasmMsg};
 use msg::prelude::*;
 use perps_exes::contracts::{ConfiguredCodeIds, Factory};
 
@@ -58,7 +58,7 @@ async fn go(
         if current_market_code_id.get_code_id() != market_code_id {
             factory_msgs.push(CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
                 contract_addr: factory.get_address_string(),
-                msg: to_binary(&FactoryExecuteMsg::SetMarketCodeId {
+                msg: to_json_binary(&FactoryExecuteMsg::SetMarketCodeId {
                     code_id: market_code_id.to_string(),
                 })?,
                 funds: vec![],
@@ -69,7 +69,7 @@ async fn go(
         if current_liquidity_token_code_id.get_code_id() != liquidity_token_code_id {
             factory_msgs.push(CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
                 contract_addr: factory.get_address_string(),
-                msg: to_binary(&FactoryExecuteMsg::SetLiquidityTokenCodeId {
+                msg: to_json_binary(&FactoryExecuteMsg::SetLiquidityTokenCodeId {
                     code_id: liquidity_token_code_id.to_string(),
                 })?,
                 funds: vec![],
@@ -80,7 +80,7 @@ async fn go(
         if current_position_token_code_id.get_code_id() != position_token_code_id {
             factory_msgs.push(CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
                 contract_addr: factory.get_address_string(),
-                msg: to_binary(&FactoryExecuteMsg::SetPositionTokenCodeId {
+                msg: to_json_binary(&FactoryExecuteMsg::SetPositionTokenCodeId {
                     code_id: position_token_code_id.to_string(),
                 })?,
                 funds: vec![],
@@ -110,7 +110,7 @@ async fn go(
             msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
                 contract_addr: factory.get_address_string(),
                 new_code_id: factory_code_id,
-                msg: to_binary(&msg::contracts::factory::entry::MigrateMsg {})?,
+                msg: to_json_binary(&msg::contracts::factory::entry::MigrateMsg {})?,
             }));
         }
     }
@@ -127,7 +127,7 @@ async fn go(
                 msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
                     contract_addr: market.get_address_string(),
                     new_code_id: market_code_id,
-                    msg: to_binary(&msg::contracts::market::entry::MigrateMsg {})?,
+                    msg: to_json_binary(&msg::contracts::market::entry::MigrateMsg {})?,
                 }));
             }
         }
@@ -138,7 +138,7 @@ async fn go(
                 msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
                     contract_addr: lp.get_address_string(),
                     new_code_id: liquidity_token_code_id,
-                    msg: to_binary(&msg::contracts::liquidity_token::entry::MigrateMsg {})?,
+                    msg: to_json_binary(&msg::contracts::liquidity_token::entry::MigrateMsg {})?,
                 }));
             }
             let info = xlp.info().await?;
@@ -146,7 +146,7 @@ async fn go(
                 msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
                     contract_addr: xlp.get_address_string(),
                     new_code_id: liquidity_token_code_id,
-                    msg: to_binary(&msg::contracts::liquidity_token::entry::MigrateMsg {})?,
+                    msg: to_json_binary(&msg::contracts::liquidity_token::entry::MigrateMsg {})?,
                 }));
             }
         }
@@ -157,7 +157,7 @@ async fn go(
                 msgs.push(CosmosMsg::Wasm(WasmMsg::Migrate {
                     contract_addr: pos.get_address_string(),
                     new_code_id: position_token_code_id,
-                    msg: to_binary(&msg::contracts::position_token::entry::MigrateMsg {})?,
+                    msg: to_json_binary(&msg::contracts::position_token::entry::MigrateMsg {})?,
                 }));
             }
         }

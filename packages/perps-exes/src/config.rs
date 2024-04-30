@@ -743,7 +743,7 @@ pub struct MainnetFactory {
 }
 
 impl MainnetFactories {
-    const PATH: &str = "packages/perps-exes/assets/mainnet-factories.yaml";
+    const PATH: &'static str = "packages/perps-exes/assets/mainnet-factories.yaml";
 
     pub fn load_hard_coded() -> Result<Self> {
         serde_yaml::from_slice(include_bytes!("../assets/mainnet-factories.yaml")).context(

@@ -272,7 +272,7 @@ async fn main() -> Result<()> {
                     .details
                     .unwrap();
 
-                assert_eq!(details.eggs.get(0).unwrap().lvn, "3.5547".parse().unwrap());
+                assert_eq!(details.eggs.first().unwrap().lvn, "3.5547".parse().unwrap());
                 // we've some spirit level, but there might have been some previously somehow
                 assert!(details.profile.unwrap().lvn >= "2.9643".parse().unwrap());
 

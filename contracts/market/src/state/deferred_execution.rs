@@ -2,7 +2,7 @@ use crate::state::fees::CapCrankFee;
 use crate::state::position::get_position;
 use crate::state::State;
 use anyhow::Result;
-use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, Storage, SubMsg, SubMsgResult};
+use cosmwasm_std::{to_json_binary, Addr, CosmosMsg, Empty, Storage, SubMsg, SubMsgResult};
 use cw_storage_plus::{Item, Map};
 use msg::contracts::market::deferred_execution::{
     DeferredExecCompleteTarget, DeferredExecExecutedEvent, DeferredExecId, DeferredExecItem,
@@ -398,7 +398,7 @@ impl State<'_> {
         ctx.response_mut().add_raw_submessage(SubMsg::reply_always(
             CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
                 contract_addr: self.env.contract.address.clone().into_string(),
-                msg: to_binary(&MarketExecuteMsg::PerformDeferredExec {
+                msg: to_json_binary(&MarketExecuteMsg::PerformDeferredExec {
                     id,
                     price_point_timestamp: price_point.timestamp,
                 })?,

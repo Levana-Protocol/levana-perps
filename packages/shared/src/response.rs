@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use cosmwasm_std::{
-    from_binary, to_binary, wasm_execute, CosmosMsg, Empty, Event, IbcBasicResponse,
+    from_json, to_json_binary, wasm_execute, CosmosMsg, Empty, Event, IbcBasicResponse,
     IbcReceiveResponse, Response, SubMsg, WasmMsg,
 };
 use cw2::ContractVersion;
@@ -82,7 +82,7 @@ impl ResponseBuilder {
         label: L,
         msg: &T,
     ) -> Result<()> {
-        let payload = to_binary(msg)?;
+        let payload = to_json_binary(msg)?;
 
         // the common case
         // more fine-grained control via raw submessage
@@ -182,7 +182,7 @@ impl ResponseBuilder {
     pub fn set_data(&mut self, data: &impl Serialize) -> Result<()> {
         match self.resp.data {
             None => {
-                let data = to_binary(data)?;
+                let data = to_json_binary(data)?;
                 self.resp.data = Some(data);
             }
             Some(_) => anyhow::bail!("data already exists, use update_data instead"),
@@ -195,7 +195,7 @@ impl ResponseBuilder {
     pub fn get_data<T: DeserializeOwned>(&self) -> Result<Option<T>> {
         match &self.resp.data {
             None => Ok(None),
-            Some(data) => Ok(Some(from_binary(data)?)),
+            Some(data) => Ok(Some(from_json(data)?)),
         }
     }
 
@@ -211,7 +211,7 @@ impl ResponseBuilder {
     ) -> Result<()> {
         let data = self.get_data()?;
         let updated = f(data);
-        self.resp.data = Some(to_binary(&updated)?);
+        self.resp.data = Some(to_json_binary(&updated)?);
 
         Ok(())
     }

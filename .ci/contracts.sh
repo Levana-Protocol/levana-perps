@@ -29,9 +29,9 @@ if [ -n "${SEI:-}" ]; then
 fi
 
 if [[ -n "${OPTIMIZER_ARM64:-}" ]]; then
-    OPTIMIZER_VERSION="cosmwasm/workspace-optimizer-arm64":0.14.0
+    OPTIMIZER_VERSION="cosmwasm/workspace-optimizer-arm64":0.15.1
 else
-    OPTIMIZER_VERSION="cosmwasm/workspace-optimizer":0.14.0
+    OPTIMIZER_VERSION="cosmwasm/workspace-optimizer":0.15.1
 fi
 
 mkdir -p "$TARGET_CACHE" "$REGISTRY_CACHE" "$ARTIFACTS" "$CARGO_GIT_CACHE"

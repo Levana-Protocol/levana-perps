@@ -1,4 +1,4 @@
-use cosmwasm_std::from_binary;
+use cosmwasm_std::from_json;
 use msg::token::Token;
 
 use crate::prelude::*;
@@ -84,7 +84,7 @@ impl State<'_> {
         // replace the sender and msg with the cw20 if need-be
         let (sender, msg) = match msg {
             ExecuteMsg::Receive { sender, msg, .. } => {
-                (sender.validate(self.api)?, from_binary(&msg)?)
+                (sender.validate(self.api)?, from_json(msg)?)
             }
             _ => (info.sender, msg),
         };

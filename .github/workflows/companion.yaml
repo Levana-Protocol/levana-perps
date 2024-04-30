@@ -32,7 +32,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.71.0
+          toolchain: 1.75.0
           components: rustfmt, clippy
           targets: x86_64-unknown-linux-musl
       - uses: Swatinem/rust-cache@v2
@@ -43,10 +43,6 @@ jobs:
         run: sudo apt install musl-tools -y
       - name: Build companion binary
         run: just cargo-companion-release
-      - name: Download health-check
-        run: just download-health-check
-        env:
-          LEVANA_DEVOPS_REPO_PAT: ${{ secrets.LEVANA_DEVOPS_REPO_PAT }}
       - name: Build image
         run: just build-companion-image
       - name: Push image

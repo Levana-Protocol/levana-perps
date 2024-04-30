@@ -17,8 +17,8 @@ pub mod time;
 use anyhow::{anyhow, bail, Context, Result};
 use config::TEST_CONFIG;
 use cosmwasm_std::{
-    from_slice, Addr, Binary, Deps, DepsMut, Empty, Env, MessageInfo, QuerierWrapper,
-    QueryResponse, Reply, Response,
+    from_json, Addr, Binary, Deps, DepsMut, Empty, Env, MessageInfo, QuerierWrapper, QueryResponse,
+    Reply, Response,
 };
 use cw_multi_test::{App, AppResponse, BankSudo, Contract, Executor, SudoMsg};
 use dotenv::dotenv;
@@ -462,7 +462,7 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<Response<Empty>> {
-        let msg: ExecuteMsg = from_slice(&msg)?;
+        let msg: ExecuteMsg = from_json(msg)?;
         (self.execute)(deps, env, info, msg)
     }
 
@@ -473,12 +473,12 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<Response<Empty>> {
-        let msg: InstantiateMsg = from_slice(&msg)?;
+        let msg: InstantiateMsg = from_json(msg)?;
         (self.instantiate)(deps, env, info, msg)
     }
 
     fn query(&self, deps: Deps<Empty>, env: Env, msg: Vec<u8>) -> Result<Binary> {
-        let msg: QueryMsg = from_slice(&msg)?;
+        let msg: QueryMsg = from_json(msg)?;
         (self.query)(deps, env, msg)
     }
 

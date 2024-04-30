@@ -1,13 +1,11 @@
 FROM alpine:3.19.1
 
-COPY perps-bots /usr/bin
-COPY health-check /usr/bin
+ADD --chmod=755  https://github.com/fpco/amber/releases/download/v0.1.3/amber-x86_64-unknown-linux-musl /usr/bin/amber
+ADD --chmod=755 https://github.com/fpco/health-check/releases/download/v0.1.0/health-check-x86_64-unknown-linux-musl /usr/bin/health-check
+
 COPY amber.yaml /etc/amber.yaml
+COPY perps-bots /usr/bin
 
-ADD "https://github.com/fpco/amber/releases/download/v0.1.3/amber-x86_64-unknown-linux-musl" "/usr/bin/amber"
-
-RUN chmod 755 /usr/bin/amber
-RUN chmod 755 /usr/bin/health-check
 RUN chmod 755 /usr/bin/perps-bots
 
 ENV AMBER_YAML=/etc/amber.yaml

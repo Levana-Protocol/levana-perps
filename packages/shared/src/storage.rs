@@ -1,7 +1,7 @@
 //! Helpers for dealing with CosmWasm storage.
 
 pub use crate::prelude::*;
-use cosmwasm_std::{from_binary, Binary, Empty, QuerierWrapper};
+use cosmwasm_std::{from_json, Binary, Empty, QuerierWrapper};
 use cw_storage_plus::{KeyDeserialize, Prefixer, PrimaryKey};
 
 /// A multilevel [Map] where the suffix of the key monotonically increases.
@@ -108,7 +108,7 @@ pub fn load_external_item<T: serde::de::DeserializeOwned>(
     // and so we have to extract the name in the happy path too
     let key: Binary = key.into();
     let debug_key_name = if cfg!(debug_assertions) {
-        from_binary::<String>(&key).ok()
+        from_json::<String>(&key).ok()
     } else {
         None
     };

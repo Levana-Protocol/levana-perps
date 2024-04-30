@@ -228,7 +228,7 @@ impl PerpError {
 
         match &self.data {
             None => evt,
-            // this should only fail if the inner to_vec of serde fails. that's a (very unlikely) genuine panic situation
+            // this should only fail if the inner to_json_vec of serde fails. that's a (very unlikely) genuine panic situation
             Some(data) => evt.add_attribute("error-data", serde_json::to_string(data).unwrap()),
         }
     }

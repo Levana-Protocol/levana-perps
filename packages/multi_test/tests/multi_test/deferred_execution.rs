@@ -2,7 +2,7 @@
 
 use std::ops::{Mul, Sub};
 
-use cosmwasm_std::{to_binary, WasmMsg};
+use cosmwasm_std::{to_json_binary, WasmMsg};
 use levana_perpswap_multi_test::{
     config::{SpotPriceKind, DEFAULT_MARKET},
     market_wrapper::{DeferQueueResponse, DeferResponse, PerpsMarket},
@@ -132,7 +132,7 @@ fn cannot_perform_deferred_exec() {
             &cranker,
             WasmMsg::Execute {
                 contract_addr: market.addr.clone().into_string(),
-                msg: to_binary(&MarketExecuteMsg::PerformDeferredExec {
+                msg: to_json_binary(&MarketExecuteMsg::PerformDeferredExec {
                     id: exec.id,
                     price_point_timestamp: Timestamp::default(),
                 })
