@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use anyhow::Result;
-use cosmos::{Cosmos, Wallet};
+use cosmos::{Cosmos, CosmosNetwork, HasAddressHrp, Wallet};
 use msg::contracts::tracker::entry::CodeIdResp;
 use perps_exes::{config::parse_deployment, PerpsNetwork};
 
@@ -114,7 +114,18 @@ pub(crate) async fn store_code(
         match tracker.get_code_by_hash(hash.clone()).await? {
             CodeIdResp::NotFound {} => {
                 log::info!("Contract {ct} has SHA256 {hash} and is not on blockchain, uploading");
-                let code_id = cosmos.store_code_path(wallet, &path).await?.get_code_id();
+                let code_id = {
+                    let cosmos = match cosmos.get_address_hrp().as_str() {
+                        // Gas caps on Sei, need to use an aggressive multiplier
+                        "sei" => {
+                            let mut builder = CosmosNetwork::SeiTestnet.builder().await?;
+                            builder.set_gas_estimate_multiplier(1.01);
+                            builder.build().await?
+                        }
+                        _ => cosmos.clone(),
+                    };
+                    cosmos.store_code_path(wallet, &path).await?.get_code_id()
+                };
                 log::info!("Upload complete, new code ID is {code_id}, logging with the tracker");
                 let res = tracker
                     .store_code(wallet, ct.to_owned(), code_id, hash, gitrev.clone())
