@@ -2499,21 +2499,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "levana_perpswap_cosmos_farming"
-version = "0.1.0-beta.1"
-dependencies = [
- "anyhow",
- "cosmwasm-std",
- "cw-storage-plus",
- "cw-utils",
- "cw2",
- "levana_perpswap_cosmos_msg",
- "schemars",
- "semver",
- "serde",
-]
-
-[[package]]
 name = "levana_perpswap_cosmos_faucet"
 version = "0.1.0-beta.15"
 dependencies = [
@@ -2527,46 +2512,6 @@ dependencies = [
  "schemars",
  "semver",
  "serde",
- "thiserror",
-]
-
-[[package]]
-name = "levana_perpswap_cosmos_hatching"
-version = "0.1.0-beta.16"
-dependencies = [
- "anyhow",
- "cosmwasm-schema 2.0.0-beta.1",
- "cosmwasm-std",
- "cw-storage-plus",
- "cw-utils",
- "cw2",
- "levana_perpswap_cosmos_msg",
- "levana_perpswap_cosmos_shared",
- "once_cell",
- "schemars",
- "semver",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "levana_perpswap_cosmos_ibc_execute_proxy"
-version = "0.1.0-beta.15"
-dependencies = [
- "anyhow",
- "cosmwasm-schema 2.0.0-beta.1",
- "cosmwasm-std",
- "cw-storage-plus",
- "cw-utils",
- "cw2",
- "levana_perpswap_cosmos_msg",
- "levana_perpswap_cosmos_shared",
- "once_cell",
- "schemars",
- "semver",
- "serde",
- "serde_json",
  "thiserror",
 ]
 
@@ -2651,22 +2596,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "levana_perpswap_cosmos_rewards"
-version = "0.1.0-beta.15"
-dependencies = [
- "anyhow",
- "cosmwasm-schema 2.0.0-beta.1",
- "cosmwasm-std",
- "cw-storage-plus",
- "cw2",
- "levana_perpswap_cosmos_msg",
- "levana_perpswap_cosmos_shared",
- "schemars",
- "semver",
- "serde",
-]
-
-[[package]]
 name = "levana_perpswap_cosmos_shared"
 version = "0.1.0-beta.15"
 dependencies = [
@@ -2714,12 +2643,10 @@ dependencies = [
  "dotenv",
  "levana_perpswap_cosmos_cw20",
  "levana_perpswap_cosmos_factory",
- "levana_perpswap_cosmos_farming",
  "levana_perpswap_cosmos_liquidity_token",
  "levana_perpswap_cosmos_market",
  "levana_perpswap_cosmos_msg",
  "levana_perpswap_cosmos_position_token",
- "levana_perpswap_cosmos_rewards",
  "once_cell",
  "proptest",
  "rand",

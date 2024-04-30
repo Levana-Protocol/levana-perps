@@ -7,12 +7,6 @@ members = [
     "contracts/market",
     "contracts/position_token",
 
-    # Non-perps, mainnet contracts (i.e. gamification, governance, LVN, etc.)
-    "contracts/hatching",
-    "contracts/rewards",
-    "contracts/ibc_execute_proxy",
-    "contracts/farming",
-
     # Testnet support contracts
     "contracts/cw20",
     "contracts/faucet",
