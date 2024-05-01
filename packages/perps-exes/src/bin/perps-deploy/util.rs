@@ -40,6 +40,7 @@ pub(crate) fn add_cosmos_msg(
         CosmosMsg::Custom(_) => anyhow::bail!("No support for custom"),
         CosmosMsg::Staking(_) => anyhow::bail!("No support for staking"),
         CosmosMsg::Distribution(_) => anyhow::bail!("No support for distribution"),
+        #[allow(deprecated)]
         CosmosMsg::Stargate { .. } => anyhow::bail!("No support for stargate"),
         CosmosMsg::Ibc(_) => anyhow::bail!("No support for IBC"),
         CosmosMsg::Wasm(wasm) => match wasm {
@@ -80,7 +81,7 @@ pub(crate) fn add_cosmos_msg(
 }
 
 fn convert_msg(msg: &cosmwasm_std::Binary) -> Result<serde_json::Value> {
-    serde_json::from_slice(&msg.0).context("Unable to convert binary to JSON value")
+    serde_json::from_slice(&msg.as_slice()).context("Unable to convert binary to JSON value")
 }
 
 fn convert_funds(funds: &[cosmwasm_std::Coin]) -> Vec<cosmos::Coin> {
