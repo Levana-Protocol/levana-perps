@@ -67,6 +67,8 @@ impl<'a> Prefixer<'a> for DeferredExecId {
 impl KeyDeserialize for DeferredExecId {
     type Output = DeferredExecId;
 
+    const KEY_ELEMS: u16 = 1;
+
     #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         u64::from_vec(value).map(|x| DeferredExecId(Uint64::new(x)))

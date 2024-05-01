@@ -94,7 +94,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     }
                 }
                 if let Some(enforce_info_sender) = enforce_info_sender {
-                    if enforce_info_sender != info.sender {
+                    if &enforce_info_sender != info.sender.as_str() {
                         bail!(
                             "invalid sender, expected: {}, got: {}",
                             enforce_info_sender,

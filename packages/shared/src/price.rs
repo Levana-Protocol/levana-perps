@@ -417,6 +417,8 @@ impl<'a> Prefixer<'a> for PriceKey {
 impl KeyDeserialize for PriceKey {
     type Output = Price;
 
+    const KEY_ELEMS: u16 = 1;
+
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         value
             .try_into()

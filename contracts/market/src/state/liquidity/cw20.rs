@@ -647,7 +647,7 @@ fn uint_128_into_lp_token(amount: u128) -> Result<LpToken> {
 
 fn allowances_map(
     kind: LiquidityTokenKind,
-) -> Map<'static, (&'static Addr, &'static Addr), AllowanceResponse> {
+) -> Map<(&'static Addr, &'static Addr), AllowanceResponse> {
     match kind {
         LiquidityTokenKind::Lp => LP_ALLOWANCES,
         LiquidityTokenKind::Xlp => XLP_ALLOWANCES,
@@ -655,7 +655,7 @@ fn allowances_map(
 }
 fn allowances_spender_map(
     kind: LiquidityTokenKind,
-) -> Map<'static, (&'static Addr, &'static Addr), AllowanceResponse> {
+) -> Map<(&'static Addr, &'static Addr), AllowanceResponse> {
     match kind {
         LiquidityTokenKind::Lp => LP_ALLOWANCES_SPENDER,
         LiquidityTokenKind::Xlp => XLP_ALLOWANCES_SPENDER,

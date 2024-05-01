@@ -11,12 +11,12 @@ pub(crate) struct DataPoint {
 }
 
 /// A DataSeries tracks values over time and allows for efficient operations over a given range in the series
-pub(crate) struct DataSeries<'a> {
-    map: Map<'a, Timestamp, DataPoint>,
+pub(crate) struct DataSeries {
+    map: Map<Timestamp, DataPoint>,
 }
 
-impl<'a> DataSeries<'a> {
-    pub(crate) const fn new(namespace: &'a str) -> Self {
+impl DataSeries {
+    pub(crate) const fn new(namespace: &'static str) -> Self {
         DataSeries {
             map: Map::new(namespace),
         }

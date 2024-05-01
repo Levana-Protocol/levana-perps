@@ -9,7 +9,7 @@ use cw_storage_plus::{KeyDeserialize, Prefixer, PrimaryKey};
 /// This represents a common pattern where we want to store a data series by
 /// some key, such as a series of position events per position. The [u64] is
 /// guaranteed to monotonically increase over time per `K` value.
-pub type MonotonicMultilevelMap<'a, K, T> = Map<'a, (K, u64), T>;
+pub type MonotonicMultilevelMap<'a, K, T> = Map<(K, u64), T>;
 
 /// Push a new value to a [MonotonicMultilevelMap].
 pub fn push_to_monotonic_multilevel_map<'a, K, T>(
@@ -60,7 +60,7 @@ where
 ///
 /// This represents a common pattern where we want to store data with unique keys
 /// The [u64] key is guaranteed to monotonically increase over time per pushed value.
-pub type MonotonicMap<'a, T> = Map<'a, u64, T>;
+pub type MonotonicMap<'a, T> = Map<u64, T>;
 
 /// Push a new value to a [MonotonicMap].
 pub fn push_to_monotonic_map<T>(store: &mut dyn Storage, m: MonotonicMap<T>, t: &T) -> Result<u64>

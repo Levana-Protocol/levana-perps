@@ -228,19 +228,19 @@ impl ResponseBuilder {
 
     /// Turn the accumulated response into an IBC Receive success response
     pub fn into_ibc_recv_response_success(self) -> IbcReceiveResponse {
-        let mut resp = IbcReceiveResponse::default();
+        let mut resp = IbcReceiveResponse::new(ack_success());
         resp.messages = self.resp.messages;
         resp.attributes = self.resp.attributes;
         resp.events = self.resp.events;
-        resp.set_ack(ack_success())
+        resp
     }
 
     /// Turn the accumulated response into an IBC Receive fail response
     pub fn into_ibc_recv_response_fail(self, error: anyhow::Error) -> IbcReceiveResponse {
-        let mut resp = IbcReceiveResponse::default();
+        let mut resp = IbcReceiveResponse::new(ack_fail(error));
         resp.messages = self.resp.messages;
         resp.attributes = self.resp.attributes;
         resp.events = self.resp.events;
-        resp.set_ack(ack_fail(error))
+        resp
     }
 }
