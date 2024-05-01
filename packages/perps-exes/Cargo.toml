@@ -16,7 +16,7 @@ serde = { version = "1.0.199", features = ["derive"] }
 serde_json = "1.0.108"
 serde_yaml = "0.9.27"
 log = "0.4.20"
-cosmos = { git = "https://github.com/fpco/cosmos-rs.git", rev = "bf5472f4f2f12c5d6891b1b881edc928d9fa3fa1" }
+cosmos = { git = "https://github.com/fpco/cosmos-rs.git", rev = "c30568258109c73388a093895f457d86f75fd67b" }
 cosmwasm-std = "2.0.2"
 tokio = { version = "1.34.0", default-features = false, features = [
 	"time",
@@ -39,7 +39,7 @@ reqwest = { version = "0.11.22", default-features = false, features = [
 	"gzip",
 	"brotli"
 ] }
-chrono = { version = "0.4.31", features = ["serde"] }
+chrono = { version = "0.4.38", features = ["serde"] }
 axum = { version = "0.7.1", features = [ "tracing", "macros"] }
 axum-extra = { version = "0.9.0", features = ["typed-routing", "typed-header"] }
 tower-http = { version = "0.5.0", features = ["cors", "auth", "timeout", "limit", "trace"] }
