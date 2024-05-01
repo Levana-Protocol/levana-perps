@@ -13,5 +13,5 @@ done
 popd
 
 DEST=../docs/src/source-code.md
-echo "| `$1` | [Code](https://static.levana.finance/perps-source/levana-perps-$1.tar.gz) | [Checksums](https://static.levana.finance/perps-source/levana-perps-$1-checksums.txt) |" >> "$DEST"
+echo "| \`$1\` | [Code](https://static.levana.finance/perps-source/levana-perps-$1.tar.gz) | [Checksums](https://static.levana.finance/perps-source/levana-perps-$1-checksums.txt) |" >> "$DEST"
 echo "Don't forget to push changes for $DEST"
