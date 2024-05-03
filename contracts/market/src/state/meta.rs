@@ -30,8 +30,7 @@ impl State<'_> {
             None => {
                 // Backwards compatibility for markets that were created before the instantiation timestamp was stored
                 // this can be removed once it's ensured that all markets are migrated with the instantiation timestamp set
-                let map: Map<Timestamp, DataPoint> =
-                    Map::new(namespace::LP_BORROW_FEE_DATA_SERIES);
+                let map: Map<Timestamp, DataPoint> = Map::new(namespace::LP_BORROW_FEE_DATA_SERIES);
                 let key = map
                     .keys(store, None, None, Order::Ascending)
                     .next()

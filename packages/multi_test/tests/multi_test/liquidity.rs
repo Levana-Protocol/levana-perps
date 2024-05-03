@@ -788,9 +788,7 @@ fn drain_all_liquidity_perp_705() {
 
     // Force a take profit on both positions
     market.exec_set_price("1.2".parse().unwrap()).unwrap();
-    market
-        .exec_crank_till_finished(&crank)
-        .unwrap();
+    market.exec_crank_till_finished(&crank).unwrap();
     market.exec_set_price("0.8".parse().unwrap()).unwrap();
     // Crank until we realize we need to reset LP balances
     let mut found_reset = false;
@@ -823,9 +821,7 @@ fn drain_all_liquidity_perp_705() {
         .unwrap_err();
 
     // Now crank till all balances are reset
-    market
-        .exec_crank_till_finished(&crank)
-        .unwrap();
+    market.exec_crank_till_finished(&crank).unwrap();
 
     // Ensure we have no liquidity left
     let stats = market.query_liquidity_stats().unwrap();
@@ -2146,9 +2142,7 @@ fn liquidity_zero_dust_2487_inner(price_change_multiplier: Decimal256, lp_amount
 
     let init_craker = MockApi::default().addr_make("init-cranker");
     // just get an initial price in there
-    market
-        .exec_crank_n(&init_craker, 1)
-        .unwrap();
+    market.exec_crank_n(&init_craker, 1).unwrap();
     market.exec_refresh_price().unwrap();
 
     let lp = market.clone_lp(0).unwrap();

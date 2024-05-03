@@ -1,4 +1,4 @@
-use cosmwasm_std::{testing::MockApi};
+use cosmwasm_std::testing::MockApi;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, time::TimeJump, PerpsApp};
 use msg::{contracts::market::config::ConfigUpdate, prelude::*};
 

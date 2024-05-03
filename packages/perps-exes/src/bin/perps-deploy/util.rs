@@ -81,7 +81,7 @@ pub(crate) fn add_cosmos_msg(
 }
 
 fn convert_msg(msg: &cosmwasm_std::Binary) -> Result<serde_json::Value> {
-    serde_json::from_slice(&msg.as_slice()).context("Unable to convert binary to JSON value")
+    serde_json::from_slice(msg.as_slice()).context("Unable to convert binary to JSON value")
 }
 
 fn convert_funds(funds: &[cosmwasm_std::Coin]) -> Vec<cosmos::Coin> {
