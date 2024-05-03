@@ -15,6 +15,7 @@ pub mod time;
 
 use anyhow::{anyhow, bail, Context, Result};
 use config::TEST_CONFIG;
+use cosmwasm_std::testing::MockApi;
 use cosmwasm_std::{
     from_json, Addr, Binary, Deps, DepsMut, Empty, Env, MessageInfo, QuerierWrapper, QueryResponse,
     Reply, Response,
@@ -155,6 +156,7 @@ impl PerpsApp {
 
     // returned bool is true iff it's a newly created user
     pub fn get_user(&mut self, name: &str, token: &Token, funds: Number) -> Result<(Addr, bool)> {
+        let name = MockApi::default().addr_make(name);
         let addr = Addr::unchecked(name);
         if self.users.contains(&addr) {
             Ok((addr, false))
