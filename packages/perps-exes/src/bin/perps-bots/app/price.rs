@@ -481,7 +481,7 @@ impl NeedsPriceUpdateInfo {
         let on_chain_age = self
             .off_chain_publish_time
             .signed_duration_since(self.on_chain_market_publish_time);
-        if on_chain_age > params.on_chain_publish_time_age_threshold || self.requires_pyth_update {
+        if on_chain_age > params.on_chain_publish_time_age_threshold {
             return Ok(ActionWithReason::WorkNeeded(
                 CrankTriggerReason::OnChainTooOld {
                     on_chain_age,
@@ -528,7 +528,9 @@ impl NeedsPriceUpdateInfo {
         // and, if so, do a crank.
         if needs_crank || self.crank_work_available.is_some() {
             return Ok(ActionWithReason::WorkNeeded(
-                CrankTriggerReason::CrankWorkAvailable,
+                CrankTriggerReason::CrankWorkAvailable {
+                    requires_pyth_update: self.requires_pyth_update,
+                },
             ));
         }
 
@@ -783,7 +785,7 @@ impl ReasonStats {
             CrankTriggerReason::NoPriceOnChain => self.no_price_found += 1,
             CrankTriggerReason::OnChainTooOld { .. } => self.too_old += 1,
             CrankTriggerReason::CrankNeedsNewPrice { .. } => self.deferred_needs_new_price += 1,
-            CrankTriggerReason::CrankWorkAvailable => self.crank_work_available += 1,
+            CrankTriggerReason::CrankWorkAvailable { .. } => self.crank_work_available += 1,
             CrankTriggerReason::PriceWillTrigger { gas_level } => match gas_level {
                 GasLevel::Normal => self.normal_trigger += 1,
                 GasLevel::High => self.high_trigger += 1,
