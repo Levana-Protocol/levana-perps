@@ -1,16 +1,17 @@
+use cosmwasm_std::testing::MockApi;
 use levana_perpswap_multi_test::{
     contracts::cw20_receive::{MockCw20ReceiverContract, Payload as MockCw20Payload},
     market_wrapper::PerpsMarket,
     PerpsApp,
 };
-use msg::{contracts::liquidity_token::LiquidityTokenKind, prelude::*};
+use msg::contracts::liquidity_token::LiquidityTokenKind;
 
 #[test]
 fn lp_token_cw20_send() {
     let app = PerpsApp::new_cell().unwrap();
     let market = PerpsMarket::new(app.clone()).unwrap();
     let contract = MockCw20ReceiverContract::new(app).unwrap();
-    let lp = Addr::unchecked("alice");
+    let lp = MockApi::default().addr_make("alice");
     let lp_token_addr = market
         .query_liquidity_token_addr(LiquidityTokenKind::Lp)
         .unwrap();
@@ -44,8 +45,8 @@ fn lp_token_cw20_send_from() {
     let app = PerpsApp::new_cell().unwrap();
     let market = PerpsMarket::new(app.clone()).unwrap();
     let contract = MockCw20ReceiverContract::new(app).unwrap();
-    let lp = Addr::unchecked("alice");
-    let otherlp = Addr::unchecked("bob");
+    let lp = MockApi::default().addr_make("alice");
+    let otherlp = MockApi::default().addr_make("bob");
     let lp_token_addr = market
         .query_liquidity_token_addr(LiquidityTokenKind::Lp)
         .unwrap();
