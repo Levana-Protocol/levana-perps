@@ -21,6 +21,8 @@ pub(super) struct MigrateOpts {
     liquidity_token_code_id: Option<u64>,
     #[clap(long)]
     position_token_code_id: Option<u64>,
+    #[clap(long)]
+    markets: Vec<MarketId>,
 }
 
 impl MigrateOpts {
@@ -37,6 +39,7 @@ async fn go(
         factory_code_id,
         liquidity_token_code_id,
         position_token_code_id,
+        markets,
     }: MigrateOpts,
 ) -> Result<()> {
     let factories = MainnetFactories::load()?;
@@ -116,6 +119,10 @@ async fn go(
     }
 
     for market in factory.get_markets().await? {
+        if !markets.is_empty() && !markets.contains(&market.market_id) {
+            tracing::info!("Skipping market: {}", market.market_id);
+            continue;
+        }
         let lp = market.liquidity_token_lp;
         let xlp = market.liquidity_token_xlp;
         let pos = market.position_token;
