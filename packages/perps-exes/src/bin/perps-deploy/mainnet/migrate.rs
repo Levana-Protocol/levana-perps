@@ -23,6 +23,12 @@ pub(super) struct MigrateOpts {
     position_token_code_id: Option<u64>,
     #[clap(long)]
     markets: Vec<MarketId>,
+    #[clap(long)]
+    wrapped: bool,
+    #[clap(long, default_value = "Add real title")]
+    title: String,
+    #[clap(long, default_value = "Add real description")]
+    desc: String,
 }
 
 impl MigrateOpts {
@@ -40,6 +46,9 @@ async fn go(
         liquidity_token_code_id,
         position_token_code_id,
         markets,
+        wrapped,
+        title,
+        desc,
     }: MigrateOpts,
 ) -> Result<()> {
     let factories = MainnetFactories::load()?;
@@ -98,7 +107,10 @@ async fn go(
         log::info!("Update factory message");
         let owner = factory.query_owner().await?;
         log::info!("CW3 contract: {owner}");
-        log::info!("Message: {}", serde_json::to_string(&factory_msgs)?);
+        log::info!(
+            "Message: {}",
+            message_string(&factory_msgs, wrapped, &title, &desc)?
+        );
         signers.push(owner);
         for msg in &factory_msgs {
             add_cosmos_msg(&mut builder, owner, msg)?;
@@ -173,10 +185,19 @@ async fn go(
     if !msgs.is_empty() {
         log::info!("Migrate existing markets");
         log::info!("CW3 contract: {migration_admin}");
-        log::info!("Message: {}", serde_json::to_string(&msgs)?);
         signers.push(migration_admin);
-        for msg in &msgs {
-            add_cosmos_msg(&mut builder, migration_admin, msg)?;
+
+        let chunks = msgs.chunks(30);
+        let chunk_count = chunks.len();
+        for (idx, msgs) in chunks.enumerate() {
+            let idx = idx + 1;
+            log::info!(
+                "Message {idx}/{chunk_count}: {}",
+                message_string(msgs, wrapped, &title, &desc)?
+            );
+            for msg in msgs {
+                add_cosmos_msg(&mut builder, migration_admin, msg)?;
+            }
         }
     }
 
@@ -187,9 +208,35 @@ async fn go(
             .simulate(&app.cosmos, &signers)
             .await
             .context("Unable to simulate CW3 messages")?;
-        log::info!("Successfully simulated messages");
+        log::info!("Successfully simulated messages, used {} gas", res.gas_used);
         log::debug!("Full simulate response: {res:?}");
     }
 
     Ok(())
+}
+
+fn message_string(
+    msgs: &[CosmosMsg],
+    wrapped: bool,
+    title: &str,
+    description: &str,
+) -> Result<String> {
+    Ok(if wrapped {
+        #[derive(serde::Serialize)]
+        #[serde(rename_all = "snake_case")]
+        enum Cw3Exec<'a> {
+            Propose {
+                title: String,
+                description: String,
+                msgs: &'a [CosmosMsg],
+            },
+        }
+        serde_json::to_string(&Cw3Exec::Propose {
+            title: title.to_owned(),
+            description: description.to_owned(),
+            msgs,
+        })?
+    } else {
+        serde_json::to_string(msgs)?
+    })
 }
