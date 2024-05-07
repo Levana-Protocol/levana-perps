@@ -22,7 +22,7 @@ library = []
 [dependencies]
 msg = {package = "levana_perpswap_cosmos_msg", path = "../../packages/msg" }
 shared = {package = "levana_perpswap_cosmos_shared", path = "../../packages/shared" }
-cosmwasm-std = { version = "2.0.2", features = ["abort"] }
+cosmwasm-std = { workspace = true, features = ["abort"] }
 cw2 = "2.0.0"
 cw-storage-plus = "2.0.0"
 schemars = "0.8.17"
@@ -32,4 +32,4 @@ semver = "1.0.15"
 anyhow = "1.0.82"
 
 [dev-dependencies]
-cosmwasm-schema = {git = "https://github.com/Levana-Protocol/cosmwasm.git", rev = "cd3ae282e21e5082dd4cff8d23535159d59cb7d8", features=["allow-unknown-fields"] }
+cosmwasm-schema = { workspace = true, features=["allow-unknown-fields"] }

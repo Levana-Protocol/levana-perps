@@ -11,7 +11,8 @@ crate-type = ["cdylib", "rlib"]
 msg = {package = "levana_perpswap_cosmos_msg", path = "../msg" }
 serde = "1.0.199"
 serde_json = "1.0.93"
-cosmwasm-std = { version = "2.0.2", features = ["abort"] }
+cosmwasm-std = { workspace = true, features = ["abort"] }
+cosmwasm-schema = { workspace = true, features=["allow-unknown-fields"] }
 anyhow = { version = "1.0.82", features = ["backtrace"] }
 cw-multi-test = "2.0.1"
 market = {package = "levana_perpswap_cosmos_market", path = "../../contracts/market" }
@@ -26,7 +27,6 @@ cosmos-sdk-proto = { version = "0.21.1", features = ["cosmwasm"] }
 cw2 = "2.0.0"
 proptest = "1.1.0"
 dotenv = "0.15.0"
-cosmwasm-schema = {git = "https://github.com/Levana-Protocol/cosmwasm.git", rev = "cd3ae282e21e5082dd4cff8d23535159d59cb7d8", features=["allow-unknown-fields"] }
 cw-storage-plus = { version = "2.0.0", default-features = false }
 
 [features]

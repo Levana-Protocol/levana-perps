@@ -27,7 +27,7 @@ awsm_web = { version = "0.38.0", features = ["loaders", "dom", "serde_iso", "tic
 once_cell = "1.17.1"
 dominator_helpers = "0.7.2"
 msg = {package = "levana_perpswap_cosmos_msg", path = "../msg", features = ["bridge"]}
-cosmwasm-std = { version = "2.0.2" }
+cosmwasm-std = { workspace = true, features = ["abort"] }
 chrono = "0.4.31"
 async-lock = "2.6.0"
 rand = "0.8.5"
