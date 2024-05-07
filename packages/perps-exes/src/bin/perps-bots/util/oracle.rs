@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use cosmos::{Address, Contract};
 use cosmwasm_std::Uint256;
 use msg::{
@@ -438,9 +438,8 @@ async fn fetch_pyth_prices(
         },
     } in records
     {
-        let publish_time = match NaiveDateTime::from_timestamp_opt(publish_time, 0) {
+        let publish_time = match DateTime::from_timestamp(publish_time, 0) {
             Some(publish_time) => {
-                let publish_time = publish_time.and_utc();
                 match *oldest_publish_time {
                     None => *oldest_publish_time = Some(publish_time),
                     Some(oldest) => {
@@ -456,6 +455,7 @@ async fn fetch_pyth_prices(
                 Utc::now()
             }
         };
+
         anyhow::ensure!(expo <= 0, "Exponent from Pyth must always be negative");
         let price = Decimal256::from_atomics(price, expo.abs().try_into()?)?;
         let price = NumberGtZero::try_from_decimal(price)

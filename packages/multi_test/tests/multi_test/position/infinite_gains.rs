@@ -1,4 +1,4 @@
-use cosmwasm_std::Addr;
+use cosmwasm_std::testing::MockApi;
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, return_unless_market_collateral_base, time::TimeJump, PerpsApp,
 };
@@ -45,9 +45,10 @@ fn infinite_max_gains_perp_481() {
     // Only works in collateral-is-base markets, since otherwise we cannot have infinite max gains.
     return_unless_market_collateral_base!(market);
     let trader = market.clone_trader(0).unwrap();
+    let mock_api = MockApi::default();
 
     market
-        .exec_mint_and_deposit_liquidity(&Addr::unchecked("provider"), 1_000_000_000u64.into())
+        .exec_mint_and_deposit_liquidity(&mock_api.addr_make("provider"), 1_000_000_000u64.into())
         .unwrap();
 
     const ORIG_PRICE: u64 = 100;
@@ -88,7 +89,7 @@ fn infinite_max_gains_perp_481() {
             )
             .unwrap();
         market
-            .exec_crank_till_finished(&Addr::unchecked("cranker"))
+            .exec_crank_till_finished(&mock_api.addr_make("cranker"))
             .unwrap();
 
         // If the position closed (from liquidation), our tests are done.

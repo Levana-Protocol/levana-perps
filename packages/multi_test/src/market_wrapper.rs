@@ -265,8 +265,8 @@ impl PerpsMarket {
             .context("could not instantiate")?
             .attributes
             .iter()
-            .find(|a| a.key == "_contract_addr")
-            .context("could not instantiate")?
+            .find(|a| a.key == "_contract_address")
+            .context("could not find contract_address")?
             .value
             .clone();
 

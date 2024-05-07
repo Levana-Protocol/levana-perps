@@ -2,21 +2,22 @@ use crate::{extensions::TokenExt, time::TimeJump};
 
 use super::data::*;
 use anyhow::Result;
-use cosmwasm_std::Addr;
+use cosmwasm_std::testing::MockApi;
 use msg::prelude::*;
 
 impl LpDepositWithdraw {
     pub fn run(&self) -> Result<()> {
         let market = self.market.borrow_mut();
+        let mock_api = MockApi::default();
 
         market.exec_refresh_price()?;
-        market.exec_crank_till_finished(&Addr::unchecked("cranker"))?;
+        market.exec_crank_till_finished(&mock_api.addr_make("cranker"))?;
 
         let init_liquidity_stats = market.query_liquidity_stats().unwrap();
         let collateral = self.collateral.into_number();
         let deposit = self.deposit.into_number();
         let withdraw = self.withdraw.into_number();
-        let lp = Addr::unchecked("new-lp");
+        let lp = mock_api.addr_make("new-lp");
 
         // mint some tokens so we _can_ deposit
         market
@@ -84,15 +85,16 @@ impl XlpStakeUnstake {
     pub fn run(&self) -> Result<()> {
         let market = self.market.borrow_mut();
         let config = market.query_config().unwrap();
+        let mock_api = MockApi::default();
 
         market.exec_refresh_price()?;
-        market.exec_crank_till_finished(&Addr::unchecked("cranker"))?;
+        market.exec_crank_till_finished(&mock_api.addr_make("cranker"))?;
 
         let deposit = self.deposit.into_number();
         let stake = self.stake.into_number();
         let unstake = self.unstake.into_number();
 
-        let lp = Addr::unchecked("new-lp");
+        let lp = mock_api.addr_make("new-lp");
 
         // deposit LP
         market
@@ -170,7 +172,8 @@ impl LpYield {
     pub fn run(&self) -> Result<()> {
         let market = &mut *self.market.borrow_mut();
         let market_config = market.query_config().unwrap();
-        let lp = Addr::unchecked("new-lp");
+        let mock_api = MockApi::default();
+        let lp = mock_api.addr_make("new-lp");
         let init_lp_pool = (self.pos_collateral.into_number() * market_config.max_leverage)?;
         let lp_deposit = self.lp_deposit.into_number();
         let trader = market.clone_trader(0).unwrap();
@@ -179,7 +182,7 @@ impl LpYield {
         // we're starting with a market without any LP, so create the pool
         // from a different user, with enough to support trades
         market
-            .exec_mint_and_deposit_liquidity(&Addr::unchecked("prior-lp-pool"), init_lp_pool)
+            .exec_mint_and_deposit_liquidity(&mock_api.addr_make("prior-lp-pool"), init_lp_pool)
             .unwrap();
 
         // deposit our liquidity
@@ -190,7 +193,8 @@ impl LpYield {
         // // Open position
 
         market.exec_refresh_price()?;
-        market.exec_crank_till_finished(&Addr::unchecked("cranker"))?;
+        let cranker = mock_api.addr_make("cranker");
+        market.exec_crank_till_finished(&cranker)?;
 
         let (pos_id, _) = market
             .exec_open_position(
@@ -212,9 +216,7 @@ impl LpYield {
             ))
             .unwrap();
         market.exec_refresh_price().unwrap();
-        market
-            .exec_crank_till_finished(&Addr::unchecked("cranker"))
-            .unwrap();
+        market.exec_crank_till_finished(&cranker).unwrap();
 
         if self.close_position {
             market.exec_close_position(&trader, pos_id, None).unwrap();

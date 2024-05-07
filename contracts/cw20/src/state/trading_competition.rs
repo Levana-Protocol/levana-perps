@@ -37,7 +37,7 @@ impl State<'_> {
         }
         .validate(self.api)?;
 
-        if market_address.as_str() == recipient {
+        if market_address == recipient {
             Ok(())
         } else {
             Err(perp_anyhow!(

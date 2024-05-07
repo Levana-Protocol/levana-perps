@@ -1,10 +1,11 @@
+use cosmwasm_std::testing::MockApi;
 use proptest::prelude::*;
 use std::cell::RefCell;
 use std::ops::Mul;
 use std::rc::Rc;
 use std::str::FromStr;
 
-use cosmwasm_std::{Addr, Decimal256, Uint128, Uint256};
+use cosmwasm_std::{Decimal256, Uint128, Uint256};
 use levana_perpswap_multi_test::arbitrary::lp::data::LpYield;
 use levana_perpswap_multi_test::config::{SpotPriceKind, TokenKind, DEFAULT_MARKET, TEST_CONFIG};
 use levana_perpswap_multi_test::return_unless_market_collateral_quote;
@@ -26,7 +27,7 @@ fn liquidity_deposit_new_user() {
     let initial_liquidity_stats = market.query_liquidity_stats().unwrap();
     let amount = Number::from(100u64);
 
-    let new_lp = Addr::unchecked("new_lp");
+    let new_lp = MockApi::default().addr_make("new_lp");
     market
         .exec_mint_and_deposit_liquidity(&new_lp, amount)
         .unwrap();
@@ -50,7 +51,7 @@ fn liquidity_deposit_new_user() {
 fn liquidity_withdraw_new_user() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
-    let new_lp = Addr::unchecked("new-lp");
+    let new_lp = MockApi::default().addr_make("new-lp");
 
     // Mint & Deposit
 
@@ -104,9 +105,10 @@ fn liquidity_share_allocation_with_trading() {
     let cranker = market.clone_trader(1).unwrap();
     let initial_liquidity_stats = market.query_liquidity_stats().unwrap();
 
-    let lp1 = Addr::unchecked("lp1");
-    let lp2 = Addr::unchecked("lp2");
-    let lp3 = Addr::unchecked("lp3");
+    let mock_api = MockApi::default();
+    let lp1 = mock_api.addr_make("lp1");
+    let lp2 = mock_api.addr_make("lp2");
+    let lp3 = mock_api.addr_make("lp3");
 
     // Mint & Deposit separately
 
@@ -209,7 +211,7 @@ fn liquidity_claim_yield_from_borrow_fee() {
 
     let trader = market.clone_trader(0).unwrap();
     let cranker = market.clone_trader(1).unwrap();
-    let lp1 = Addr::unchecked("lp1");
+    let lp1 = MockApi::default().addr_make("lp1");
 
     // Mint & Deposit separately
 
@@ -293,7 +295,8 @@ fn liquidity_token_transfer() {
         .unwrap();
     let initial_liquidity_stats = market.query_liquidity_stats().unwrap();
 
-    let new_lp = Addr::unchecked("new-lp");
+    let mock_api = MockApi::default();
+    let new_lp = mock_api.addr_make("new-lp");
     let amount = Number::from(100u64);
 
     market
@@ -328,7 +331,7 @@ fn liquidity_token_transfer() {
     assert_eq!(start_balance, amount);
 
     // transfer
-    let joe_shmoe = Addr::unchecked("joe-shmoe");
+    let joe_shmoe = mock_api.addr_make("joe-shmoe");
     let transfer_amount = Number::from(30u64);
 
     market
@@ -386,7 +389,7 @@ fn liquidity_token_transfer() {
 fn liquidity_stake_xlp() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
-    let new_lp = Addr::unchecked("new-lp");
+    let new_lp = MockApi::default().addr_make("new-lp");
 
     let info = market.query_lp_info(&new_lp).unwrap();
     assert_eq!(info.lp_amount, LpToken::zero(),);
@@ -438,7 +441,7 @@ fn liquidity_stake_xlp() {
 fn liquidity_unstake_xlp() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
-    let new_lp = Addr::unchecked("new-lp");
+    let new_lp = MockApi::default().addr_make("new-lp");
 
     // Capture initial stats
     let init_stats = market.query_liquidity_stats().unwrap();
@@ -522,7 +525,7 @@ fn liquidity_unstake_xlp() {
 #[test]
 fn test_collect_unlocked_lp() {
     let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    let new_lp = Addr::unchecked("new-lp");
+    let new_lp = MockApi::default().addr_make("new-lp");
     let amount = Number::from(100u64);
 
     market.automatic_time_jump_enabled = false;
@@ -586,7 +589,7 @@ fn liquidity_xlp_receives_rewards() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
     // Get some xLP and no LP
-    let new_lp = Addr::unchecked("new-lp");
+    let new_lp = MockApi::default().addr_make("new-lp");
     let amount = Number::from(100u64);
     market
         .exec_mint_and_deposit_liquidity(&new_lp, amount)
@@ -633,7 +636,7 @@ fn perp_699_negative_xlp_fees() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
     // Get some xLP and no LP
-    let new_lp = Addr::unchecked("new-lp");
+    let new_lp = MockApi::default().addr_make("new-lp");
     let amount = Number::from(100u64);
     market
         .exec_mint_and_deposit_liquidity(&new_lp, amount)
@@ -666,7 +669,7 @@ fn lp_info_api() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
     // Get some xLP and no LP
-    let new_lp = Addr::unchecked("new-lp");
+    let new_lp = MockApi::default().addr_make("new-lp");
     let amount = Number::from(100u64);
     market
         .exec_mint_and_deposit_liquidity(&new_lp, amount)
@@ -721,7 +724,7 @@ fn lp_info_api() {
 #[test]
 fn lp_info_unknown_lp() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    let addr = Addr::unchecked("unknown-lp");
+    let addr = MockApi::default().addr_make("unknown-lp");
 
     // This shouldn't fail
     market.query_lp_info(&addr).unwrap();
@@ -781,16 +784,16 @@ fn drain_all_liquidity_perp_705() {
     market.exec_claim_yield(lp).unwrap();
     market.exec_claim_yield(lp).unwrap_err();
 
+    let crank = MockApi::default().addr_make("crank");
+
     // Force a take profit on both positions
     market.exec_set_price("1.2".parse().unwrap()).unwrap();
-    market
-        .exec_crank_till_finished(&Addr::unchecked("crank"))
-        .unwrap();
+    market.exec_crank_till_finished(&crank).unwrap();
     market.exec_set_price("0.8".parse().unwrap()).unwrap();
     // Crank until we realize we need to reset LP balances
     let mut found_reset = false;
     for _ in 0..100 {
-        market.exec_crank_single(&Addr::unchecked("crank")).unwrap();
+        market.exec_crank_single(&crank).unwrap();
         let crank_stats = market.query_crank_stats().unwrap();
         if crank_stats == Some(msg::contracts::market::crank::CrankWorkInfo::ResetLpBalances {}) {
             found_reset = true;
@@ -818,9 +821,7 @@ fn drain_all_liquidity_perp_705() {
         .unwrap_err();
 
     // Now crank till all balances are reset
-    market
-        .exec_crank_till_finished(&Addr::unchecked("crank"))
-        .unwrap();
+    market.exec_crank_till_finished(&crank).unwrap();
 
     // Ensure we have no liquidity left
     let stats = market.query_liquidity_stats().unwrap();
@@ -857,7 +858,7 @@ fn lp_info_during_unstake_perp_736() {
     let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     market.automatic_time_jump_enabled = false;
 
-    let addr = Addr::unchecked("liquidity-provider");
+    let addr = MockApi::default().addr_make("liquidity-provider");
 
     market
         .exec_mint_and_deposit_liquidity(&addr, "12".parse().unwrap())
@@ -902,7 +903,7 @@ fn lp_info_during_unstake_perp_736() {
 #[test]
 fn lp_info_partial_collection_perp_802() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    let addr = Addr::unchecked("liquidity-provider");
+    let addr = MockApi::default().addr_make("liquidity-provider");
 
     market
         .exec_mint_and_deposit_liquidity(&addr, "12".parse().unwrap())
@@ -923,7 +924,7 @@ fn lp_info_partial_collection_perp_802() {
 #[test]
 fn direct_query_matches_lp_info_perp_827() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    let addr = Addr::unchecked("liquidity-provider");
+    let addr = MockApi::default().addr_make("liquidity-provider");
 
     market
         .exec_mint_and_deposit_liquidity(&addr, "12".parse().unwrap())
@@ -961,7 +962,7 @@ fn direct_query_matches_lp_info_perp_827() {
 #[test]
 fn unstaking_available_until_collection() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    let addr = Addr::unchecked("liquidity-provider");
+    let addr = MockApi::default().addr_make("liquidity-provider");
 
     market
         .exec_mint_and_deposit_liquidity(&addr, "12".parse().unwrap())
@@ -987,7 +988,7 @@ fn unstaking_available_until_collection() {
 fn liquidity_deposit_withdraw_fractional() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
-    let new_lp = Addr::unchecked("new-lp");
+    let new_lp = MockApi::default().addr_make("new-lp");
 
     // Mint & Deposit
 
@@ -1014,7 +1015,7 @@ fn reinvest_partial() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
     // Get some xLP and no LP
-    let new_lp = Addr::unchecked("new-lp");
+    let new_lp = MockApi::default().addr_make("new-lp");
     market
         .exec_mint_and_deposit_liquidity(&new_lp, "100".parse().unwrap())
         .unwrap();
@@ -1076,7 +1077,8 @@ fn reinvest_partial() {
 #[test]
 fn lp_transfer() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    let cranker = Addr::unchecked("cranker");
+    let mock_api = MockApi::default();
+    let cranker = mock_api.addr_make("cranker");
 
     let claim_yield = |lp: &Addr| -> Number {
         let wallet_balance_before_claim = market.query_collateral_balance(lp).unwrap();
@@ -1087,8 +1089,8 @@ fn lp_transfer() {
     };
 
     // Get some LP
-    let lp1 = Addr::unchecked("new-lp-1");
-    let lp2 = Addr::unchecked("new-lp-2");
+    let lp1 = mock_api.addr_make("new-lp-1");
+    let lp2 = mock_api.addr_make("new-lp-2");
     let amount = Number::from(100u64);
 
     market
@@ -1212,10 +1214,11 @@ fn rewards_while_unstaking() {
     market.automatic_time_jump_enabled = false;
 
     let trader = market.clone_trader(0).unwrap();
-    let cranker = Addr::unchecked("cranker");
-    let justlp = Addr::unchecked("justlp");
-    let justxlp = Addr::unchecked("justxlp");
-    let unstaking = Addr::unchecked("unstaking");
+    let mock_api = MockApi::default();
+    let cranker = mock_api.addr_make("cranker");
+    let justlp = mock_api.addr_make("justlp");
+    let justxlp = mock_api.addr_make("justxlp");
+    let unstaking = mock_api.addr_make("unstaking");
 
     // Have all three wallets deposit, open a position, and crank for a while to
     // get different LP vs xLP rates.
@@ -1327,7 +1330,7 @@ fn transfer_while_unstaking() {
     market.automatic_time_jump_enabled = false;
 
     let trader = market.clone_trader(0).unwrap();
-    let unstaking = Addr::unchecked("unstaking");
+    let unstaking = MockApi::default().addr_make("unstaking");
 
     market
         .exec_mint_and_deposit_liquidity(&unstaking, "1000".parse().unwrap())
@@ -1414,7 +1417,7 @@ fn xlp_balance_is_transferable() {
     market.automatic_time_jump_enabled = false;
 
     let trader = market.clone_trader(0).unwrap();
-    let unstaking = Addr::unchecked("unstaking");
+    let unstaking = MockApi::default().addr_make("unstaking");
 
     market
         .exec_mint_and_deposit_liquidity(&unstaking, "1000".parse().unwrap())
@@ -1598,7 +1601,7 @@ fn reinvest_history_perp_1418() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
     // Get some LP
-    let new_lp = Addr::unchecked("new-lp");
+    let new_lp = MockApi::default().addr_make("new-lp");
     market
         .exec_mint_and_deposit_liquidity(&new_lp, "100".parse().unwrap())
         .unwrap();
@@ -1647,7 +1650,7 @@ fn reinvest_history_perp_1418_partial() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
     // Get some LP
-    let new_lp = Addr::unchecked("new-lp");
+    let new_lp = MockApi::default().addr_make("new-lp");
     market
         .exec_mint_and_deposit_liquidity(&new_lp, "100".parse().unwrap())
         .unwrap();
@@ -1932,7 +1935,7 @@ fn carry_leverage_min_liquidity_update_max_gains() {
 fn carry_leverage_min_liquidity_withdraw() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
-    let new_lp = Addr::unchecked("new-lp");
+    let new_lp = MockApi::default().addr_make("new-lp");
     market
         .exec_mint_and_deposit_liquidity(&new_lp, "3000".parse().unwrap())
         .unwrap();
@@ -2137,10 +2140,9 @@ fn liquidity_zero_dust_2487_inner(price_change_multiplier: Decimal256, lp_amount
     )
     .unwrap();
 
+    let init_craker = MockApi::default().addr_make("init-cranker");
     // just get an initial price in there
-    market
-        .exec_crank_n(&Addr::unchecked("init-cranker"), 1)
-        .unwrap();
+    market.exec_crank_n(&init_craker, 1).unwrap();
     market.exec_refresh_price().unwrap();
 
     let lp = market.clone_lp(0).unwrap();
