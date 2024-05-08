@@ -199,6 +199,7 @@ hashes:
 - contract-type: factory
   gitrev: ab41b7d1bf6507cb5880ce267298d31ecd04c980
   code-ids:
+    neutron-mainnet: 1191
     osmosis-mainnet: 755
     sei-mainnet: 4608
     injective-mainnet: 813
@@ -206,6 +207,7 @@ hashes:
 - contract-type: market
   gitrev: ab41b7d1bf6507cb5880ce267298d31ecd04c980
   code-ids:
+    neutron-mainnet: 1192
     osmosis-mainnet: 762
     sei-mainnet: 4609
     injective-mainnet: 815
@@ -213,6 +215,7 @@ hashes:
 - contract-type: liquidity-token
   gitrev: ab41b7d1bf6507cb5880ce267298d31ecd04c980
   code-ids:
+    neutron-mainnet: 1193
     osmosis-mainnet: 763
     sei-mainnet: 4610
     injective-mainnet: 814
@@ -220,6 +223,7 @@ hashes:
 - contract-type: position-token
   gitrev: ab41b7d1bf6507cb5880ce267298d31ecd04c980
   code-ids:
+    neutron-mainnet: 1194
     osmosis-mainnet: 764
     sei-mainnet: 4611
     injective-mainnet: 816
