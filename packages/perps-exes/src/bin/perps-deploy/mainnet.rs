@@ -466,7 +466,7 @@ struct AddMarketOpts {
     #[clap(long)]
     factory: String,
     /// New market ID to add
-    #[clap(long)]
+    #[clap(long, required = true)]
     market_id: Vec<MarketId>,
 }
 
