@@ -914,3 +914,7 @@ crank-fees:
     charged: 0.05
     surcharge: 0.025
     reward: 0.045
+  neutron-mainnet:
+    charged: 0.05
+    surcharge: 0.025
+    reward: 0.045

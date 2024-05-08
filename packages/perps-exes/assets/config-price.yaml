@@ -1,5 +1,5 @@
 pyth:
-  stable: 
+  stable:
     # although this is set on each feed in the market config
     # for the sake of simplicity, it's only defined top-level in deploy config
     # and then at runtime it's duplicated for each feed as-needed
@@ -42,7 +42,7 @@ pyth:
       NTRN_USD: a8e6517966a52cb1df864b2764f3629fde3f21d2b640b5c572fcd654cbccd65e
       DYM_USD: a9f3b2a89c6f85a6c20a9518abde39b944e839ca49a0c92307c65974d3f14a57
       SCRT_USD: ac5a498aa407c3642257dc8bd8b92efda656e708b22be9b96febcb77878d6bfa
-  edge: 
+  edge:
     update-age-tolerance: 21
     # Price feeds listed at: https://pyth.network/developers/price-feed-ids#cosmwasm-edge
     feed-ids:
@@ -55,7 +55,7 @@ pyth:
       LINK_USD: "83be4ed61dd8a3518d198098ce37240c494710a7b9d85e35d9fceac21df08994"
       AXL_USD: "72fe21b4ba5661f194b5f17bfadcc59eddd3e0e53198d040e5091c6dfb558108"
 
-networks: 
+networks:
   injective-testnet:
     INJ_USD:
       feeds: [
@@ -1016,6 +1016,21 @@ networks:
         !pyth { key: "DYM_USD", inverted: false }
       ]
   neutron-testnet:
+    NTRN_USD:
+      feeds: [
+        !pyth { key: "NTRN_USD", inverted: false },
+      ]
+      feeds-usd: [
+        !pyth { key: "NTRN_USD", inverted: false },
+      ]
+    amATOM_USD:
+      feeds: [
+        !pyth { key: "ATOM_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !pyth { key: "ATOM_USD", inverted: false }
+      ]
+  neutron-mainnet:
     NTRN_USD:
       feeds: [
         !pyth { key: "NTRN_USD", inverted: false },
