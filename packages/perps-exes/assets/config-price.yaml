@@ -1023,3 +1023,10 @@ networks:
       feeds-usd: [
         !pyth { key: "NTRN_USD", inverted: false },
       ]
+    amATOM_USD:
+      feeds: [
+        !pyth { key: "ATOM_USD", inverted: false }
+      ]
+      feeds-usd: [
+        !pyth { key: "ATOM_USD", inverted: false }
+      ]

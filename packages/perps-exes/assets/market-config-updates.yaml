@@ -38,6 +38,19 @@ markets:
 
     initial-borrow-fee-rate: 0.2
 
+  amATOM_USD:
+    config:
+      delta_neutrality_fee_sensitivity: 100000000
+      funding_rate_sensitivity: 2
+      carry_leverage: 15
+      borrow_fee_sensitivity: 0.3
+      borrow_fee_rate_min_annualized: 0.1
+      target_utilization: 0.5
+      delta_neutrality_fee_tax: 0.25
+      liquidity_cooldown_seconds: 86400
+
+    initial-borrow-fee-rate: 0.2
+
   stATOM_USD:
     config:
       delta_neutrality_fee_sensitivity: 100000000

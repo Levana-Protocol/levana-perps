@@ -70,7 +70,7 @@ impl Faucet {
     ) -> Result<()> {
         let name = name.into();
         let tap_amount: Decimal256 = match name.as_str() {
-            "ATOM" => "1000",
+            "ATOM" | "amATOM" => "1000",
             "stATOM" => "1000",
             "USDC" => "20000",
             "USDT" => "20000",
