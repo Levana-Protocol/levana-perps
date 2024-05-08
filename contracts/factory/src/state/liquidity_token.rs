@@ -62,13 +62,13 @@ pub(crate) fn save_liquidity_token_addr(
     Ok(())
 }
 
-pub(crate) fn addrs_map(kind: LiquidityTokenKind) -> Map<'static, MarketId, Addr> {
+pub(crate) fn addrs_map(kind: LiquidityTokenKind) -> Map<MarketId, Addr> {
     match kind {
         LiquidityTokenKind::Lp => LP_ADDRS,
         LiquidityTokenKind::Xlp => XLP_ADDRS,
     }
 }
-pub(crate) fn addrs_map_rev(kind: LiquidityTokenKind) -> Map<'static, &'static Addr, MarketId> {
+pub(crate) fn addrs_map_rev(kind: LiquidityTokenKind) -> Map<&'static Addr, MarketId> {
     match kind {
         LiquidityTokenKind::Lp => LP_ADDRS_REVERSE,
         LiquidityTokenKind::Xlp => XLP_ADDRS_REVERSE,

@@ -178,6 +178,8 @@ impl ShutdownImpact {
 impl KeyDeserialize for ShutdownImpact {
     type Output = ShutdownImpact;
 
+    const KEY_ELEMS: u16 = 1;
+
     fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
         ShutdownImpact::try_from_bytes(&value)
             .map_err(|x| cosmwasm_std::StdError::parse_err("ShutdownImpact", x))

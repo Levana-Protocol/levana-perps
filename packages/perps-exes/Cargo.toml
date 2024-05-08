@@ -5,19 +5,20 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.75"
+anyhow = "1.0.82"
 msg = { path = "../msg", package = "levana_perpswap_cosmos_msg", features = [
 	"bridge",
 ] }
 shared = { path = "../shared", package = "levana_perpswap_cosmos_shared", features = [
 	"chrono",
 ] }
-serde = { version = "1.0.193", features = ["derive"] }
+serde = { version = "1.0.199", features = ["derive"] }
 serde_json = "1.0.108"
 serde_yaml = "0.9.27"
 log = "0.4.20"
-cosmos = { git = "https://github.com/fpco/cosmos-rs.git", rev = "825d5938f0993807d4d127d3f842c07cbe019249" }
-cosmwasm-std = "1.5.4"
+cosmos = { workspace = true }
+cosmwasm-std = { workspace = true }
+pyth-sdk-cw = { workspace = true }
 tokio = { version = "1.34.0", default-features = false, features = [
 	"time",
 	"rt",
@@ -39,20 +40,19 @@ reqwest = { version = "0.11.22", default-features = false, features = [
 	"gzip",
 	"brotli"
 ] }
-chrono = { version = "0.4.31", features = ["serde"] }
+chrono = { version = "0.4.38", features = ["serde"] }
 axum = { version = "0.7.1", features = [ "tracing", "macros"] }
 axum-extra = { version = "0.9.0", features = ["typed-routing", "typed-header"] }
 tower-http = { version = "0.5.0", features = ["cors", "auth", "timeout", "limit", "trace"] }
 futures = "0.3.29"
 tokio-tungstenite = "0.20.1"
 tokio-util = { version = "0.7.10", features = ["full"] }
-cw-multi-test = "0.16.2"
+cw-multi-test = "2.0.1"
 rand = "0.8"
-pyth-sdk-cw = "1.2.0"
 csv = "1.3.0"
 tonic = "0.10.2"
 askama = "0.12.1"
-cw-utils = "1.0.1"
+cw-utils = "2.0.0"
 thiserror = "1.0.50"
 resvg = "0.36.0"
 axum-macros = "0.4.0"

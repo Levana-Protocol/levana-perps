@@ -1,4 +1,4 @@
-use cosmwasm_std::Addr;
+use cosmwasm_std::testing::MockApi;
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, response::CosmosResponseExt,
     return_unless_market_collateral_quote, PerpsApp,
@@ -140,7 +140,7 @@ fn trade_history_works() {
 #[test]
 fn lp_history_works() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    let lp = Addr::unchecked("new_lp");
+    let lp = MockApi::default().addr_make("new_lp");
 
     let summary = market.query_lp_info(&lp).unwrap().history;
     assert_eq!(summary.deposit_usd, Usd::zero());
@@ -483,7 +483,7 @@ fn price_history_works() {
 #[test]
 fn lp_history_works_bidirectional() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    let lp = Addr::unchecked("new_lp");
+    let lp = MockApi::default().addr_make("new_lp");
 
     let summary = market.query_lp_info(&lp).unwrap().history;
     assert_eq!(summary.deposit_usd, Usd::zero());

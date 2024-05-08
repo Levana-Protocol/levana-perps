@@ -33,20 +33,10 @@ pub(crate) enum TestnetSub {
         #[clap(flatten)]
         inner: crate::testnet::add_market::AddMarketOpt,
     },
-    /// Instantiate rewards contracts
-    InstantiateRewards {
-        #[clap(flatten)]
-        inner: crate::instantiate_rewards::InstantiateRewardsOpt,
-    },
     /// Migrate existing contracts
     Migrate {
         #[clap(flatten)]
         inner: crate::migrate::MigrateOpt,
-    },
-    /// Migrate rewards contracts
-    MigrateRewards {
-        #[clap(flatten)]
-        inner: crate::migrate_rewards::MigrateRewardsOpt,
     },
     /// Instantiate chain-wide contracts as a one time setup
     InitChain {

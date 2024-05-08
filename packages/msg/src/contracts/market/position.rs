@@ -847,6 +847,8 @@ impl<'a> Prefixer<'a> for PositionId {
 impl KeyDeserialize for PositionId {
     type Output = PositionId;
 
+    const KEY_ELEMS: u16 = 1;
+
     #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         u64::from_vec(value).map(|x| PositionId(Uint64::new(x)))

@@ -1,4 +1,4 @@
-use cosmwasm_std::Addr;
+use cosmwasm_std::testing::MockApi;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, time::TimeJump, PerpsApp};
 use msg::{contracts::market::config::ConfigUpdate, prelude::*};
 
@@ -16,7 +16,7 @@ fn crank_fee_is_charged_and_paid() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     enable_crank_fee(&market).unwrap();
     let trader = market.clone_trader(0).unwrap();
-    let cranker = Addr::unchecked("cranker");
+    let cranker = MockApi::default().addr_make("cranker");
 
     // Get starting token balance for the cranker
     assert_eq!(
@@ -119,7 +119,7 @@ fn fund_crank_pool() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     enable_crank_fee(&market).unwrap();
     let trader = market.clone_trader(0).unwrap();
-    let funder = Addr::unchecked("funder");
+    let funder = MockApi::default().addr_make("funder");
 
     assert_eq!(market.query_fees().unwrap().crank, Collateral::zero());
     market
@@ -197,8 +197,8 @@ fn crank_fee_to_rewards_wallet() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     enable_crank_fee(&market).unwrap();
     let trader = market.clone_trader(0).unwrap();
-    let cranker = Addr::unchecked("cranker");
-    let rewards = Addr::unchecked("rewards");
+    let cranker = MockApi::default().addr_make("cranker");
+    let rewards = MockApi::default().addr_make("rewards");
 
     // Get starting token balance for the cranker and rewards
     assert_eq!(

@@ -134,6 +134,8 @@ impl<'a> Prefixer<'a> for DirectionToNotional {
 impl KeyDeserialize for DirectionToNotional {
     type Output = u8;
 
+    const KEY_ELEMS: u16 = 1;
+
     #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         Ok(u8::from_cw_bytes(value.as_slice().try_into().map_err(

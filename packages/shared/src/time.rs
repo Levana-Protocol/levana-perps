@@ -161,6 +161,8 @@ impl<'a> PrimaryKey<'a> for Timestamp {
 impl KeyDeserialize for Timestamp {
     type Output = Timestamp;
 
+    const KEY_ELEMS: u16 = 1;
+
     fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
         u64::from_vec(value).map(Timestamp)
     }

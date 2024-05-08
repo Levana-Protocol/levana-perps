@@ -374,7 +374,9 @@ pub(crate) enum CrankTriggerReason {
     CrankNeedsNewPrice {
         work_item: DateTime<Utc>,
     },
-    CrankWorkAvailable,
+    CrankWorkAvailable {
+        requires_pyth_update: bool,
+    },
     PriceWillTrigger {
         gas_level: GasLevel,
     },
@@ -396,8 +398,13 @@ impl Display for CrankTriggerReason {
                 f,
                 "Deferred work item needs new price (later than {deferred_work_item})"
             ),
-            CrankTriggerReason::CrankWorkAvailable => {
-                f.write_str("Price bot discovered crank work available")
+            CrankTriggerReason::CrankWorkAvailable {
+                requires_pyth_update,
+            } => {
+                write!(
+                    f,
+                    "Price bot discovered crank work available (price: {requires_pyth_update})"
+                )
             }
             CrankTriggerReason::PriceWillTrigger { gas_level } => {
                 write!(
@@ -417,7 +424,10 @@ impl CrankTriggerReason {
             | CrankTriggerReason::OnChainTooOld { .. }
             | CrankTriggerReason::CrankNeedsNewPrice { .. }
             | CrankTriggerReason::PriceWillTrigger { .. } => true,
-            CrankTriggerReason::CrankWorkAvailable | CrankTriggerReason::MoreWorkFound => false,
+            CrankTriggerReason::CrankWorkAvailable {
+                requires_pyth_update,
+            } => *requires_pyth_update,
+            CrankTriggerReason::MoreWorkFound => false,
         }
     }
 
@@ -428,7 +438,7 @@ impl CrankTriggerReason {
             CrankTriggerReason::NoPriceOnChain
             | CrankTriggerReason::OnChainTooOld { .. }
             | CrankTriggerReason::CrankNeedsNewPrice { .. }
-            | CrankTriggerReason::CrankWorkAvailable
+            | CrankTriggerReason::CrankWorkAvailable { .. }
             | CrankTriggerReason::MoreWorkFound => GasLevel::Normal,
         }
     }

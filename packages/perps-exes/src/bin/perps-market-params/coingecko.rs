@@ -181,6 +181,10 @@ pub(crate) enum Coin {
     StOsmo,
     Axl,
     Tia,
+    /// Akash
+    Akt,
+    /// Secret network
+    Scrt,
 }
 
 impl FromStr for Coin {
@@ -222,6 +226,8 @@ impl FromStr for Coin {
             "stOSMO" => Ok(Coin::StOsmo),
             "AXL" => Ok(Coin::Axl),
             "TIA" => Ok(Coin::Tia),
+            "AKT" => Ok(Coin::Akt),
+            "SCRT" => Ok(Coin::Scrt),
             other => Err(anyhow!("Unsupported coin {other}")),
         }
     }
@@ -265,6 +271,8 @@ impl Coin {
             Coin::StOsmo => 29429,
             Coin::Axl => 17799,
             Coin::Tia => 22861,
+            Coin::Akt => 7431,
+            Coin::Scrt => 5604,
         }
     }
 

@@ -151,7 +151,7 @@ impl State<'_> {
 
     pub(crate) fn get_history_helper<'a, K, T>(
         &self,
-        map: Map<'a, (K, u64), T>,
+        map: Map<(K, u64), T>,
         store: &dyn Storage,
         id: K,
         start_after: Option<u64>,
