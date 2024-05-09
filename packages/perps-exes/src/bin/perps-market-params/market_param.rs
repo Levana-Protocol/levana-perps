@@ -48,9 +48,11 @@ pub(crate) async fn dnf_sensitivity(
     http_app: &HttpApp,
     market_id: &MarketId,
 ) -> anyhow::Result<f64> {
+    tracing::debug!("Going to compute dnf_sensitivity for {market_id}");
     let base_asset = AssetName(market_id.get_base());
     let quote_asset = AssetName(market_id.get_quote());
     if quote_asset.is_usd_equiv() {
+        tracing::debug!("Fetch exchanges");
         let exchanges = http_app.get_market_pair(base_asset).await?;
         tracing::debug!(
             "Total exchanges found: {} for {market_id:?}",
@@ -59,7 +61,9 @@ pub(crate) async fn dnf_sensitivity(
         let dnf_in_usd = compute_dnf_sensitivity(exchanges.data.market_pairs)?;
         return dnf_in_usd.to_asset_amount(base_asset, http_app).await;
     }
+    tracing::debug!("Fetch base_exchanges");
     let base_exchanges = http_app.get_market_pair(base_asset).await?;
+    tracing::debug!("Fetch quote_exchanges");
     let quote_exchanges = http_app.get_market_pair(quote_asset).await?;
     let base_dnf_in_usd = compute_dnf_sensitivity(base_exchanges.data.market_pairs)?;
     let quote_dnf_in_usd = compute_dnf_sensitivity(quote_exchanges.data.market_pairs)?;
@@ -221,9 +225,6 @@ pub(crate) async fn compute_coin_dnfs(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
-
-    use shared::storage::MarketId;
 
     use crate::coingecko::{CmcMarketPair, ExchangeId};
 
@@ -233,7 +234,7 @@ mod tests {
             CmcMarketPair {
                 exchange_id: crate::coingecko::ExchangeId(50),
                 exchange_name: "mexc".to_owned(),
-                market_id: MarketId::from_str("LVN_USD").unwrap(),
+                market_id: "LVN_USD".to_owned(),
                 depth_usd_negative_two: 5828.0,
                 depth_usd_positive_two: 7719.0,
                 volume_24h_usd: 27304.39,
@@ -242,7 +243,7 @@ mod tests {
             CmcMarketPair {
                 exchange_id: ExchangeId(42),
                 exchange_name: "gate.io".to_owned(),
-                market_id: MarketId::from_str("LVN_USD").unwrap(),
+                market_id: "LVN_USD".to_owned(),
                 depth_usd_negative_two: 1756.0,
                 depth_usd_positive_two: 22140.0,
                 volume_24h_usd: 23065.95,
