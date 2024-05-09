@@ -22,7 +22,7 @@ pub(crate) struct CmcData {
     pub(crate) market_pairs: Vec<CmcMarketPair>,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, PartialEq, Clone)]
 #[serde(rename_all = "snake_case")]
 pub(crate) struct CmcMarketPair {
     pub(crate) exchange_id: ExchangeId,

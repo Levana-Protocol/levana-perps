@@ -29,14 +29,14 @@
               <td class="table-light">
 		            {{ key }}
               </td>
-              <td class="table-light {% if value.should_notify %} text-danger {% else %} text-success {% endif %}">
+              <td class="table-light">
                 {{ value.computed_dnf }}
               </td>
-              <td class="table-light {% if value.should_notify %} text-danger {% else %} text-success {% endif %}">
+              <td class="table-light">
                 {{ value.configured_dnf }}
               </td>
               <td class="table-light {% if value.should_notify %} text-danger {% else %} text-success {% endif %}">
-                {{ value.percentage_diff }}
+                {{ value.percentage_diff|fmt("{:.2}") }}
               </td>
             </tr>
             {% endfor %}
