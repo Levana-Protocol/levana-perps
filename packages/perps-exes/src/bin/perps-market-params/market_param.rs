@@ -131,7 +131,7 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
         let exchanges: Vec<_> = exchanges
             .filter(|item| *item != max_volume_exchange)
             .collect();
-        if exchanges.len() == 0 {
+        if exchanges.is_empty() {
             bail!("No valid exchange data found")
         } else {
             filter_invalid_exchanges(exchanges)
