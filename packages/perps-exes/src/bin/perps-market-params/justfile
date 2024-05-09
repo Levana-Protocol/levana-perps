@@ -12,7 +12,7 @@ download-levana-market:
 
 # Compute dnf
 compute-dnf:
-	cargo run --bin perps-market-params dnf --market-id DOT_USD
+	cargo run --bin perps-market-params dnf --market-id ETH_USD
 
 # Serve web app
 serve:
@@ -24,7 +24,7 @@ markets:
 
 # Download market.csv data
 download-market-csv:
-	cargo run --bin perps-market-params market --market-id ATOM_USD
+	cargo run --bin perps-market-params market --market-id ETH_USD
 
 # List unsupported exchanges
 exchanges:

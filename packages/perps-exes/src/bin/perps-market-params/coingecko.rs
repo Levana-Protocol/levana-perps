@@ -1,8 +1,7 @@
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
-use serde::{de::Unexpected, Deserialize};
-use shared::storage::MarketId;
+use serde::Deserialize;
 
 #[derive(Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub(crate) enum ExchangeKind {
@@ -28,7 +27,7 @@ pub(crate) struct CmcData {
 pub(crate) struct CmcMarketPair {
     pub(crate) exchange_id: ExchangeId,
     pub(crate) exchange_name: String,
-    pub(crate) market_id: MarketId,
+    pub(crate) market_id: String,
     pub(crate) depth_usd_negative_two: f64,
     pub(crate) depth_usd_positive_two: f64,
     pub(crate) volume_24h_usd: f64,
@@ -126,15 +125,10 @@ impl<'de> Deserialize<'de> for CmcMarketPair {
 
         let result = Result::deserialize(deserializer)?;
 
-        let market_pair = result.market_pair.replace('/', "_");
-        let market_pair = MarketId::from_str(&market_pair).map_err(|_| {
-            serde::de::Error::invalid_value(Unexpected::Str(&market_pair), &"Valid market id")
-        })?;
-
         Ok(CmcMarketPair {
             exchange_id: ExchangeId(result.exchange.id),
             exchange_name: result.exchange.name,
-            market_id: market_pair,
+            market_id: result.market_pair,
             depth_usd_negative_two: result.quote.usd.depth_negative_two.unwrap_or_default(),
             depth_usd_positive_two: result.quote.usd.depth_positive_two.unwrap_or_default(),
             volume_24h_usd: result.quote.usd.volume_24h,

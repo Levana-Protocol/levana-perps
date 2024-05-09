@@ -48,9 +48,11 @@ pub(crate) async fn dnf_sensitivity(
     http_app: &HttpApp,
     market_id: &MarketId,
 ) -> anyhow::Result<f64> {
+    tracing::debug!("Going to compute dnf_sensitivity for {market_id}");
     let base_asset = AssetName(market_id.get_base());
     let quote_asset = AssetName(market_id.get_quote());
     if quote_asset.is_usd_equiv() {
+        tracing::debug!("Fetch exchanges");
         let exchanges = http_app.get_market_pair(base_asset).await?;
         tracing::debug!(
             "Total exchanges found: {} for {market_id:?}",
@@ -59,7 +61,9 @@ pub(crate) async fn dnf_sensitivity(
         let dnf_in_usd = compute_dnf_sensitivity(exchanges.data.market_pairs)?;
         return dnf_in_usd.to_asset_amount(base_asset, http_app).await;
     }
+    tracing::debug!("Fetch base_exchanges");
     let base_exchanges = http_app.get_market_pair(base_asset).await?;
+    tracing::debug!("Fetch quote_exchanges");
     let quote_exchanges = http_app.get_market_pair(quote_asset).await?;
     let base_dnf_in_usd = compute_dnf_sensitivity(base_exchanges.data.market_pairs)?;
     let quote_dnf_in_usd = compute_dnf_sensitivity(quote_exchanges.data.market_pairs)?;
