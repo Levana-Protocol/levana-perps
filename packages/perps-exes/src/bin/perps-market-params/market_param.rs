@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 use shared::storage::MarketId;
 
 use crate::{
@@ -107,10 +107,13 @@ impl MyUsd {
     }
 }
 
-fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<MyUsd> {
-    // Algorithm: https://staff.levana.finance/new-market-checklist#dnf-sensitivity
-    tracing::debug!("Total exchanges: {}", exchanges.len());
-    let exchanges = exchanges.iter().filter(|exchange| {
+struct DnfExchanges {
+    exchanges: Vec<CmcMarketPair>,
+    max_exchange: CmcMarketPair,
+}
+
+fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfExchanges> {
+    let exchanges = exchanges.into_iter().filter(|exchange| {
         exchange.exchange_name.to_lowercase() != "htx"
             && exchange.outlier_detected < 0.3
             && is_centralized_exchange(&exchange.exchange_id)
@@ -120,6 +123,36 @@ fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<MyUs
         .clone()
         .max_by(|a, b| a.volume_24h_usd.total_cmp(&b.volume_24h_usd))
         .context("No max value found")?;
+
+    if max_volume_exchange.depth_usd_negative_two == 0.0
+        || max_volume_exchange.depth_usd_positive_two == 0.0
+    {
+        // Skip this exchange
+        let exchanges: Vec<_> = exchanges
+            .filter(|item| *item != max_volume_exchange)
+            .collect();
+        if exchanges.len() == 0 {
+            bail!("No valid exchange data found")
+        } else {
+            filter_invalid_exchanges(exchanges)
+        }
+    } else {
+        Ok(DnfExchanges {
+            exchanges: exchanges.collect(),
+            max_exchange: max_volume_exchange,
+        })
+    }
+}
+
+fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<MyUsd> {
+    // Algorithm: https://staff.levana.finance/new-market-checklist#dnf-sensitivity
+    tracing::debug!("Total exchanges: {}", exchanges.len());
+    let dnf_exchange = filter_invalid_exchanges(exchanges)?;
+
+    let exchanges = dnf_exchange.exchanges.iter();
+
+    let max_volume_exchange = dnf_exchange.max_exchange;
+
     tracing::debug!("Max volume exchange: {max_volume_exchange:#?}");
     let total_volume_percentage = exchanges
         .map(|exchange| exchange.volume_24h_usd)
