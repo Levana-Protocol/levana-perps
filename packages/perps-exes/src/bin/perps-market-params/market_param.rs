@@ -172,6 +172,16 @@ pub(crate) struct DnfNotify {
     pub(crate) computed_dnf: f64,
     pub(crate) percentage_diff: f64,
     pub(crate) should_notify: bool,
+    pub(crate) status: ConfiguredDnfStatus,
+}
+
+#[derive(Clone, serde::Serialize)]
+pub(crate) enum ConfiguredDnfStatus {
+    // If configured_dnf - computed_dnf is positive, it means that the
+    // configured_dnf should be modified to be lower.  And hence the
+    // configured_dnf is lenient and should be lowered.
+    Lenient,
+    Strict,
 }
 
 pub(crate) fn compute_dnf_notify(
@@ -191,6 +201,11 @@ pub(crate) fn compute_dnf_notify(
         computed_dnf,
         percentage_diff,
         should_notify,
+        status: if percentage_diff.is_sign_positive() {
+            ConfiguredDnfStatus::Lenient
+        } else {
+            ConfiguredDnfStatus::Strict
+        },
     }
 }
 
@@ -225,17 +240,23 @@ pub(crate) async fn compute_coin_dnfs(
             );
             if dnf_notify.should_notify {
                 tracing::info!("Going to send Slack notification");
-                let (icon, status) = if dnf_notify.percentage_diff.is_sign_positive() {
-                    (":chart_with_upwards_trend:", "increase")
-                } else {
-                    (":chart_with_downwards_trend:", "decrease")
-                };
                 let percentage_diff = dnf_notify.percentage_diff.abs().round();
+                let (icon, status) = match dnf_notify.status {
+                    ConfiguredDnfStatus::Lenient => (
+                        ":chart_with_downwards_trend:",
+                        format!("lenient (*Decrease* it by {}%)", percentage_diff),
+                    ),
+                    ConfiguredDnfStatus::Strict => (
+                        ":chart_with_upwards_trend:",
+                        format!("strict (*Increase* it by {}%)", percentage_diff),
+                    ),
+                };
+
                 http_app
                     .send_notification(
-                        format!("{icon} Detected DNF change for {market_id}"),
+                        format!("{icon} Recommended DNF change for {market_id}"),
                         format!(
-                            "Deviation {status}: *{percentage_diff}%* \n Configured DNF: *{}* \n Recommended DNF: *{}*",
+                            "Configured DNF is {status} \n Configured DNF: *{}* \n Recommended DNF: *{}*",
                             dnf_notify.configured_dnf, dnf_notify.computed_dnf.round()
                         ),
                     )
@@ -249,6 +270,13 @@ pub(crate) async fn compute_coin_dnfs(
             app.market_params
                 .write()
                 .insert(market_id.clone(), dnf_notify);
+            if serve_opt.cmc_wait_seconds > 0 {
+                tracing::info!(
+                    "Going to sleep {} seconds to avoid getting rate limited",
+                    serve_opt.cmc_wait_seconds
+                );
+                tokio::time::sleep(Duration::from_secs(serve_opt.cmc_wait_seconds)).await;
+            }
         }
         tracing::info!("Going to sleep 24 hours");
         tokio::time::sleep(Duration::from_secs(60 * 60 * 24)).await;
