@@ -235,8 +235,8 @@ pub(crate) async fn compute_coin_dnfs(
                     .send_notification(
                         format!("{icon} Detected DNF change for {market_id}"),
                         format!(
-                            "Deviation {status}: *{percentage_diff}%* \n Recommended DNF: *{}*",
-                            dnf_notify.computed_dnf.round()
+                            "Deviation {status}: *{percentage_diff}%* \n Configured DNF: *{}* \n Recommended DNF: *{}*",
+                            dnf_notify.configured_dnf, dnf_notify.computed_dnf.round()
                         ),
                     )
                     .await?;

@@ -179,6 +179,11 @@ pub(crate) enum Coin {
     Akt,
     /// Secret network
     Scrt,
+    RyEth,
+    AxlEth,
+    StkAtom,
+    StDym,
+    MilkTia,
 }
 
 impl FromStr for Coin {
@@ -222,28 +227,41 @@ impl FromStr for Coin {
             "TIA" => Ok(Coin::Tia),
             "AKT" => Ok(Coin::Akt),
             "SCRT" => Ok(Coin::Scrt),
+            "ryETH" => Ok(Coin::RyEth),
+            "axlETH" => Ok(Coin::AxlEth),
+            "stkATOM" => Ok(Coin::StkAtom),
+            "stDYM" => Ok(Coin::StDym),
+            "milkTIA" => Ok(Coin::MilkTia),
             other => Err(anyhow!("Unsupported coin {other}")),
         }
     }
 }
 
+const BTC_CMC_ID: u32 = 1;
+const ATOM_CMC_ID: u32 = 3794;
+const DYDX_CMC_ID: u32 = 28324;
+const ETH_CMC_ID: u32 = 1027;
+const TIA_CMC_ID: u32 = 22861;
+const OSMO_CMC_ID: u32 = 12220;
+const DYM_CMC_ID: u32 = 28932;
+
 impl Coin {
     pub(crate) fn cmc_id(&self) -> u32 {
         match self {
             // https://coinmarketcap.com/api/documentation/v1/#operation/getV1CryptocurrencyMap
-            Coin::Atom => 3794,
+            Coin::Atom => ATOM_CMC_ID,
             Coin::Levana => 28660,
-            Coin::Eth => 1027,
+            Coin::Eth => ETH_CMC_ID,
             Coin::Dogecoin => 74,
-            Coin::Wbtc => 3717,
+            Coin::Wbtc => BTC_CMC_ID,
             Coin::Avax => 5805,
-            Coin::Btc => 1,
-            Coin::StAtom => 21686,
-            Coin::StDYDX => 29428,
+            Coin::Btc => BTC_CMC_ID,
+            Coin::StAtom => ATOM_CMC_ID,
+            Coin::StDYDX => DYDX_CMC_ID,
             Coin::Bnb => 1839,
             Coin::Luna => 20314,
-            Coin::Dym => 28932,
-            Coin::Osmo => 12220,
+            Coin::Dym => DYM_CMC_ID,
+            Coin::Osmo => OSMO_CMC_ID,
             Coin::Link => 1975,
             Coin::Sol => 5426,
             Coin::Sei => 23149,
@@ -251,7 +269,7 @@ impl Coin {
             Coin::Silver => 28239,
             Coin::Dydx => 28324,
             Coin::Inj => 7226,
-            Coin::StTia => 29427,
+            Coin::StTia => TIA_CMC_ID,
             Coin::Wif => 28752,
             Coin::Pepe => 24478,
             Coin::Bonk => 23095,
@@ -262,11 +280,16 @@ impl Coin {
             Coin::Rune => 4157,
             Coin::Ntrn => 26680,
             Coin::Eur => 2790,
-            Coin::StOsmo => 29429,
+            Coin::StOsmo => OSMO_CMC_ID,
             Coin::Axl => 17799,
-            Coin::Tia => 22861,
+            Coin::Tia => TIA_CMC_ID,
             Coin::Akt => 7431,
             Coin::Scrt => 5604,
+            Coin::RyEth => ETH_CMC_ID,
+            Coin::AxlEth => ETH_CMC_ID,
+            Coin::StkAtom => ATOM_CMC_ID,
+            Coin::StDym => DYM_CMC_ID,
+            Coin::MilkTia => TIA_CMC_ID,
         }
     }
 
