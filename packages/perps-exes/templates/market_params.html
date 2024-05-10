@@ -30,7 +30,7 @@
 		            {{ key }}
               </td>
               <td class="table-light">
-                {{ value.computed_dnf }}
+                {{ value.computed_dnf|fmt("{:.2}") }}
               </td>
               <td class="table-light">
                 {{ value.configured_dnf }}
