@@ -249,6 +249,13 @@ pub(crate) async fn compute_coin_dnfs(
             app.market_params
                 .write()
                 .insert(market_id.clone(), dnf_notify);
+            if serve_opt.cmc_wait_seconds > 0 {
+                tracing::info!(
+                    "Going to sleep {} seconds to avoid getting rate limited",
+                    serve_opt.cmc_wait_seconds
+                );
+                tokio::time::sleep(Duration::from_secs(serve_opt.cmc_wait_seconds)).await;
+            }
         }
         tracing::info!("Going to sleep 24 hours");
         tokio::time::sleep(Duration::from_secs(60 * 60 * 24)).await;
