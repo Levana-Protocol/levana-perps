@@ -7,6 +7,7 @@ use msg::{
     contracts::market::{
         config::{Config, ConfigUpdate},
         entry::ExecuteOwnerMsg,
+        spot_price::{SpotPriceConfig, SpotPriceFeedData},
     },
     prelude::MarketExecuteMsg,
 };
@@ -130,9 +131,15 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
             let actual = actual_config.remove(&key).with_context(|| {
                 format!("Missing actual config value {key} for market {}", market_id)
             })?;
-            if actual != expected {
+
+            let matches = if key == "spot_price" {
+                do_spot_prices_match_enough(actual.clone(), expected.clone())
+            } else {
+                actual == expected
+            };
+            if !matches {
                 println!(
-                    "Mismatched paramter for {market_id}: {key}. Actual: {}. Expected: {}.",
+                    "Mismatched paramter for {market_id}: {key}.\nActual  : {}\nExpected: {}\n\n",
                     serde_json::to_string(&actual)?,
                     serde_json::to_string(&expected)?
                 );
@@ -174,4 +181,46 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
     }
 
     Ok(())
+}
+
+fn do_spot_prices_match_enough(actual: serde_json::Value, expected: serde_json::Value) -> bool {
+    (|| {
+        let mut actual: SpotPriceConfig = serde_json::from_value(actual)?;
+        let mut expected: SpotPriceConfig = serde_json::from_value(expected)?;
+        strip_unneeded(&mut actual);
+        strip_unneeded(&mut expected);
+        anyhow::Ok(actual == expected)
+    })()
+    .unwrap_or(false)
+}
+
+fn strip_unneeded(spot_price: &mut SpotPriceConfig) {
+    match spot_price {
+        SpotPriceConfig::Manual { admin: _ } => (),
+        SpotPriceConfig::Oracle {
+            pyth,
+            stride,
+            feeds,
+            feeds_usd,
+            volatile_diff_seconds: _,
+        } => {
+            let mut has_pyth = false;
+            let mut has_stride = false;
+            for feed in feeds.iter().chain(feeds_usd.iter()) {
+                match feed.data {
+                    SpotPriceFeedData::Constant { .. } => (),
+                    SpotPriceFeedData::Pyth { .. } => has_pyth = true,
+                    SpotPriceFeedData::Stride { .. } => has_stride = true,
+                    SpotPriceFeedData::Sei { .. } => (),
+                    SpotPriceFeedData::Simple { .. } => (),
+                }
+            }
+            if !has_pyth {
+                *pyth = None;
+            }
+            if !has_stride {
+                *stride = None;
+            }
+        }
+    }
 }
