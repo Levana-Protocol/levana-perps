@@ -33,6 +33,13 @@ pub(crate) struct Opt {
         default_value = "https://inj-priv-grpc.kingnodes.com"
     )]
     pub(crate) injective_mainnet_primary: String,
+    /// Primary mainnet GRPC Override for Neutron.
+    #[clap(
+        long,
+        env = "LEVANA_COMPANION_NEUTRON_MAINNET_PRIMARY_GRPC",
+        default_value = "http://grpc-kralum.neutron-1.neutron.org"
+    )]
+    pub(crate) neutron_mainnet_primary: String,
     /// Fallback GRPC endpoints for Osmosis mainnet.
     #[clap(
         long,
@@ -57,6 +64,14 @@ pub(crate) struct Opt {
         default_value = "https://sei-grpc.lavenderfive.com"
     )]
     pub(crate) sei_mainnet_fallbacks: Vec<String>,
+    /// Fallback GRPC endpoints for Neutron mainnet.
+    #[clap(
+        long,
+        env = "LEVANA_COMPANION_NEUTRON_MAINNET_FALLBACKS_GRPC",
+        value_delimiter = ',',
+        default_value = "http://c7f58ef9-1d78-4e15-a818-d02c8f50fc67.neutron-1.mesa-grpc.newmetric.xyz"
+    )]
+    pub(crate) neutron_mainnet_fallbacks: Vec<String>,
     /// Reqests timeout in seconds
     #[clap(long, env = "LEVANA_COMPANION_REQUEST_TIMEOUT", default_value_t = 5)]
     pub(crate) request_timeout_seconds: u64,

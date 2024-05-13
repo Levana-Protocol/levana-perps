@@ -34,6 +34,7 @@ impl App {
                 | ChainId::OsmoTest5
                 | ChainId::Stargaze1
                 | ChainId::Uni6
+                | ChainId::Pion1
                 | ChainId::Injective888 => None,
                 ChainId::Osmosis1 => {
                     Some((&opt.osmosis_mainnet_primary, &opt.osmosis_mainnet_fallbacks))
@@ -43,6 +44,9 @@ impl App {
                     &opt.injective_mainnet_primary,
                     &opt.injective_mainnet_fallbacks,
                 )),
+                ChainId::Neutron1 => {
+                    Some((&opt.neutron_mainnet_primary, &opt.neutron_mainnet_fallbacks))
+                }
             };
 
             if let Some((primary, fallbacks)) = grpc {

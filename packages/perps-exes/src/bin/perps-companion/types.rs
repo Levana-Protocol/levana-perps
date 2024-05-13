@@ -37,6 +37,10 @@ pub(crate) enum ChainId {
     Injective1 = 10,
     #[serde(rename = "injective-888")]
     Injective888 = 11,
+    #[serde(rename = "neutron-1")]
+    Neutron1 = 12,
+    #[serde(rename = "pion-1")]
+    Pion1 = 13,
 }
 
 impl From<ChainId> for i32 {
@@ -53,6 +57,8 @@ impl From<ChainId> for i32 {
             ChainId::Pacific1 => 9,
             ChainId::Injective1 => 10,
             ChainId::Injective888 => 11,
+            ChainId::Neutron1 => 12,
+            ChainId::Pion1 => 13,
         }
     }
 }
@@ -72,6 +78,8 @@ impl TryFrom<&str> for ChainId {
             "stargaze-1" => Ok(ChainId::Stargaze1),
             "uni-6" => Ok(ChainId::Uni6),
             "pacific-1" => Ok(ChainId::Pacific1),
+            "neutron-1" => Ok(ChainId::Neutron1),
+            "pion-1" => Ok(ChainId::Pion1),
             _ => Err(anyhow::anyhow!("Unknown chain ID: {value}")),
         }
     }
@@ -92,6 +100,8 @@ impl Display for ChainId {
             ChainId::Pacific1 => "pacific-1",
             ChainId::Injective1 => "injective-1",
             ChainId::Injective888 => "injective-888",
+            ChainId::Neutron1 => "neutron-1",
+            ChainId::Pion1 => "pion-1",
         })
     }
 }
@@ -105,7 +115,7 @@ impl TryFrom<String> for ChainId {
 }
 
 impl ChainId {
-    pub(crate) fn all() -> [ChainId; 10] {
+    pub(crate) fn all() -> [ChainId; 12] {
         [
             ChainId::Atlantic2,
             ChainId::Elgafar1,
@@ -117,6 +127,8 @@ impl ChainId {
             ChainId::Pacific1,
             ChainId::Injective1,
             ChainId::Injective888,
+            ChainId::Neutron1,
+            ChainId::Pion1
         ]
     }
 
@@ -136,6 +148,8 @@ impl ChainId {
             ChainId::Pacific1 => CosmosNetwork::SeiMainnet,
             ChainId::Injective1 => CosmosNetwork::InjectiveMainnet,
             ChainId::Injective888 => CosmosNetwork::InjectiveTestnet,
+            ChainId::Neutron1 => CosmosNetwork::NeutronMainnet,
+            ChainId::Pion1 => CosmosNetwork::NeutronTestnet,
         })
     }
 
@@ -160,6 +174,8 @@ impl ChainId {
             CosmosNetwork::StargazeMainnet => Ok(ChainId::Stargaze1),
             CosmosNetwork::InjectiveMainnet => Ok(ChainId::Injective1),
             CosmosNetwork::InjectiveTestnet => Ok(ChainId::Injective888),
+            CosmosNetwork::NeutronMainnet => Ok(ChainId::Neutron1),
+            CosmosNetwork::NeutronTestnet => Ok(ChainId::Pion1),
             _ => Err(anyhow::anyhow!("Unsupported network: {network}")),
         }
     }
@@ -177,6 +193,8 @@ impl ChainId {
             ChainId::Pacific1 => true,
             ChainId::Injective1 => true,
             ChainId::Injective888 => false,
+            ChainId::Neutron1 => true,
+            ChainId::Pion1 => false,
         }
     }
 }

@@ -111,6 +111,7 @@ enum SimpleCosmosNetwork {
     Injective,
     Osmosis,
     Sei,
+    Neutron
 }
 
 impl Display for SimpleCosmosNetwork {
@@ -119,6 +120,7 @@ impl Display for SimpleCosmosNetwork {
             SimpleCosmosNetwork::Injective => "injective",
             SimpleCosmosNetwork::Osmosis => "osmosis",
             SimpleCosmosNetwork::Sei => "sei",
+            SimpleCosmosNetwork::Neutron => "neutron",
         })
     }
 }
@@ -254,6 +256,9 @@ async fn load_whale_market_data(
             PerpsNetwork::Regular(CosmosNetwork::SeiMainnet) => SimpleCosmosNetwork::Sei,
             PerpsNetwork::Regular(CosmosNetwork::InjectiveMainnet) => {
                 SimpleCosmosNetwork::Injective
+            }
+            PerpsNetwork::Regular(CosmosNetwork::NeutronMainnet) => {
+                SimpleCosmosNetwork::Neutron
             }
             _ => anyhow::bail!("Unsupported network: {network}"),
         },
