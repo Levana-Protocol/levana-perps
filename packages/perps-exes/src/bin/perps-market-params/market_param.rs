@@ -217,7 +217,6 @@ pub(crate) async fn compute_coin_dnfs(
     serve_opt: ServeOpt,
     opt: Opt,
 ) -> anyhow::Result<()> {
-    let market_ids = serve_opt.market_ids;
     let http_app = HttpApp::new(Some(serve_opt.slack_webhook), opt.cmc_key.clone());
 
     loop {
@@ -225,7 +224,14 @@ pub(crate) async fn compute_coin_dnfs(
         let market_config = http_app
             .fetch_market_status(&serve_opt.mainnet_factories[..])
             .await?;
-        for market_id in &market_ids {
+        let markets = market_config
+            .clone()
+            .markets
+            .into_iter()
+            .filter(|market| !serve_opt.skip_market_ids.contains(&market.status.market_id))
+            .collect::<Vec<_>>();
+        for market_id in &markets {
+            let market_id = &market_id.status.market_id;
             tracing::info!("Going to compute DNF for {market_id:?}");
             let configured_dnf = market_config
                 .get_chain_dnf(market_id)

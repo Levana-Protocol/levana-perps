@@ -25,6 +25,28 @@ fn main() -> Result<()> {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main_inner(opt: Opt) -> Result<()> {
+    let factories = MainnetFactories::load_hard_coded()?.factories;
+    let markets = factories
+        .into_iter()
+        .filter(|item| item.canonical)
+        .map(|item| {
+            let network = item.network;
+            let network = match network {
+                perps_exes::PerpsNetwork::Regular(network) => Ok(network),
+                perps_exes::PerpsNetwork::DymensionTestnet => {
+                    Err(anyhow!("Unsupported Dymension testnet"))
+                }
+            };
+            network.map(|network| (network, item.address))
+        })
+        .filter(|item| match item {
+            Ok((network, _)) => network.is_mainnet(),
+            Err(_) => true,
+        })
+        .collect::<Result<Vec<_>>>();
+
+    let markets = markets?;
+
     match opt.sub.clone() {
         cli::SubCommand::Exchanges { market_id } => {
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
@@ -69,29 +91,6 @@ async fn main_inner(opt: Opt) -> Result<()> {
         }
         cli::SubCommand::Markets { market_ids } => {
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
-            let factories = MainnetFactories::load_hard_coded()?.factories;
-            let markets = factories
-                .into_iter()
-                .filter(|item| item.canonical)
-                .map(|item| {
-                    let network = item.network;
-                    let network = match network {
-                        perps_exes::PerpsNetwork::Regular(network) => Ok(network),
-                        perps_exes::PerpsNetwork::DymensionTestnet => {
-                            Err(anyhow!("Unsupported Dymension testnet"))
-                        }
-                    };
-                    network.map(|network| (network, item.address))
-                })
-                .filter(|item| match item {
-                    Ok((network, _)) => network.is_mainnet(),
-                    Err(_) => true,
-                })
-                .collect::<Result<Vec<_>>>();
-
-            let markets = markets?;
-
-            tracing::info!("markets: {markets:?}");
 
             tracing::info!("Skipping {0} deployed markets", market_ids.len());
             let result = http_app.fetch_market_status(&markets[..]).await?;
@@ -105,28 +104,6 @@ async fn main_inner(opt: Opt) -> Result<()> {
             }
         }
         cli::SubCommand::Dnf { market_id } => {
-            let factories = MainnetFactories::load_hard_coded()?.factories;
-            let markets = factories
-                .into_iter()
-                .filter(|item| item.canonical)
-                .map(|item| {
-                    let network = item.network;
-                    let network = match network {
-                        perps_exes::PerpsNetwork::Regular(network) => Ok(network),
-                        perps_exes::PerpsNetwork::DymensionTestnet => {
-                            Err(anyhow!("Unsupported Dymension testnet"))
-                        }
-                    };
-                    network.map(|network| (network, item.address))
-                })
-                .filter(|item| match item {
-                    Ok((network, _)) => network.is_mainnet(),
-                    Err(_) => true,
-                })
-                .collect::<Result<Vec<_>>>();
-
-            let markets = markets?;
-
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
             let dnf = dnf_sensitivity(&http_app, &market_id).await?;
             let market_config = http_app.fetch_market_status(&markets).await?;
