@@ -267,7 +267,7 @@ impl Coin {
             Coin::Sei => 23149,
             Coin::Pyth => 28177,
             Coin::Silver => 28239,
-            Coin::Dydx => 28324,
+            Coin::Dydx => DYDX_CMC_ID,
             Coin::Inj => 7226,
             Coin::StTia => TIA_CMC_ID,
             Coin::Wif => 28752,
