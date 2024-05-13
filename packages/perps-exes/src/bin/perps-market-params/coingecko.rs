@@ -3,7 +3,7 @@ use std::str::FromStr;
 use anyhow::{anyhow, Result};
 use serde::Deserialize;
 
-#[derive(Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize, Clone)]
 pub(crate) enum ExchangeKind {
     Cex,
     Dex,
@@ -47,6 +47,15 @@ pub(crate) struct CMCExchange {
 }
 
 impl ExchangeId {
+    /// Best way to determine if an exchange is CEX or DEX, is to go
+    /// to the cryptocurrency page of the CMC and try finding the
+    /// markets. Then based on the CEX or DEX filter, you can find the
+    /// exchange type.
+
+    /// Another way to determine if through the coingecko page. Eg:
+    /// https://www.coingecko.com/en/exchanges/okx
+    ///
+    /// Unfortunately, CMC doesn't provide an API for this currently.
     pub(crate) fn exchange_type(&self) -> anyhow::Result<ExchangeKind> {
         match self.0 {
             339 | 270 | 407 | 302 | 102 | 521 | 294 | 24 | 36 | 89 | 125 | 151 | 154 | 16 | 37
@@ -67,7 +76,8 @@ impl ExchangeId {
             | 34 | 100 | 127 | 166 | 201 | 209 | 223 | 228 | 248 | 252 | 363 | 419 | 480 | 514
             | 843 | 844 | 945 | 9613 | 73 | 80 | 705 | 1173 | 258 | 483 | 644 | 655 | 1071
             | 1091 | 61 | 106 | 139 | 171 | 250 | 280 | 321 | 364 | 1371 | 369 | 997 | 96
-            | 9588 | 922 | 925 | 137 | 1037 | 7893 | 605 => Ok(ExchangeKind::Cex),
+            | 9588 | 922 | 925 | 137 | 1037 | 7893 | 605 | 9798 | 9867 | 633 | 5750 | 7680
+            | 9957 | 723 | 1414 | 7699 | 9786 | 9933 => Ok(ExchangeKind::Cex),
             1707 | 1454 | 1187 | 1530 | 1567 | 1344 | 1714 | 9244 | 1165 | 1293 | 1327 | 1395
             | 1447 | 1547 | 1551 | 1614 | 1657 | 1665 | 6255 | 6444 | 6706 | 6757 | 8915 | 9245
             | 1342 | 1426 | 1612 | 8161 | 1069 | 246 | 267 | 1062 | 1063 | 1070 | 1141 | 1206
@@ -84,7 +94,8 @@ impl ExchangeId {
             | 1398 | 1496 | 1528 | 1580 | 756 | 1101 | 1190 | 1310 | 1314 | 1418 | 1456 | 1692
             | 1699 | 5327 | 6420 | 6753 | 7392 | 503 | 7086 | 8913 | 9243 | 249 | 310 | 856
             | 983 | 1232 | 1281 | 1370 | 1378 | 1407 | 1413 | 1457 | 1480 | 1487 | 1489 | 1514
-            | 1515 | 1584 | 1599 | 1685 | 1931 | 5430 | 7440 | 8003 | 8877 => Ok(ExchangeKind::Dex),
+            | 1515 | 1584 | 1599 | 1685 | 1931 | 5430 | 7440 | 8003 | 8877 | 9882 | 9883 | 1577
+            | 1623 | 8964 | 7806 => Ok(ExchangeKind::Dex),
             other => Err(anyhow!("Exchange type not known for id {}", other)),
         }
     }

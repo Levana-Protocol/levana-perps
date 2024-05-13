@@ -5,7 +5,7 @@ use shared::storage::MarketId;
 
 use crate::{
     cli::{Opt, ServeOpt},
-    coingecko::{CmcMarketPair, ExchangeId, ExchangeKind},
+    coingecko::{CmcMarketPair, ExchangeKind},
     slack::HttpApp,
     web::NotifyApp,
 };
@@ -75,16 +75,6 @@ pub(crate) async fn dnf_sensitivity(
     dnf_in_usd.to_asset_amount(base_asset, http_app).await
 }
 
-fn is_centralized_exchange(id: &ExchangeId) -> bool {
-    match id.exchange_type() {
-        Ok(kind) => kind == ExchangeKind::Cex,
-        Err(_) => {
-            tracing::debug!("Not able to find exchange type for {id:?}");
-            false
-        }
-    }
-}
-
 #[derive(Clone, Copy)]
 pub(crate) struct AssetName<'a>(pub(crate) &'a str);
 impl AssetName<'_> {
@@ -114,10 +104,22 @@ struct DnfExchanges {
 
 fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfExchanges> {
     let exchanges = exchanges.into_iter().filter(|exchange| {
-        exchange.exchange_name.to_lowercase() != "htx"
-            && exchange.outlier_detected < 0.3
-            && is_centralized_exchange(&exchange.exchange_id)
+        exchange.exchange_name.to_lowercase() != "htx" && exchange.outlier_detected < 0.3
     });
+
+    let exchanges = exchanges
+        .map(|exchange| {
+            let exchange_type = exchange.exchange_id.exchange_type();
+            exchange_type.map(|exchange_kind| (exchange, exchange_kind))
+        })
+        .collect::<anyhow::Result<Vec<_>>>();
+
+    let exchanges = exchanges?
+        .into_iter()
+        .filter_map(|(exchange, exchange_type)| match exchange_type {
+            ExchangeKind::Cex => Some(exchange),
+            ExchangeKind::Dex => None,
+        });
 
     let max_volume_exchange = exchanges
         .clone()
@@ -129,6 +131,7 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
     {
         // Skip this exchange
         let exchanges: Vec<_> = exchanges
+            .into_iter()
             .filter(|item| *item != max_volume_exchange)
             .collect();
         if exchanges.is_empty() {
