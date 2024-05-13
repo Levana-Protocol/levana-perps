@@ -1,9 +1,7 @@
-use std::str::FromStr;
-
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::Parser;
-use cosmos::{Address, CosmosNetwork};
 use market_param::AssetName;
+use perps_exes::config::MainnetFactories;
 use web::axum_main;
 
 use crate::{
@@ -71,24 +69,30 @@ async fn main_inner(opt: Opt) -> Result<()> {
         }
         cli::SubCommand::Markets { market_ids } => {
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
-            let markets = [
-                (
-                    CosmosNetwork::OsmosisMainnet,
-                    Address::from_str(
-                        "osmo1ssw6x553kzqher0earlkwlxasfm2stnl3ms3ma2zz4tnajxyyaaqlucd45",
-                    )?,
-                ),
-                (
-                    CosmosNetwork::InjectiveMainnet,
-                    Address::from_str("inj1vdu3s39dl8t5l88tyqwuhzklsx9587adv8cnn9")?,
-                ),
-                (
-                    CosmosNetwork::SeiMainnet,
-                    Address::from_str(
-                        "sei18rdj3asllguwr6lnyu2sw8p8nut0shuj3sme27ndvvw4gakjnjqqper95h",
-                    )?,
-                ),
-            ];
+            let factories = MainnetFactories::load_hard_coded()?.factories;
+            let markets = factories
+                .into_iter()
+                .filter(|item| item.canonical)
+                .map(|item| {
+                    let network = item.network;
+                    let network = match network {
+                        perps_exes::PerpsNetwork::Regular(network) => Ok(network),
+                        perps_exes::PerpsNetwork::DymensionTestnet => {
+                            Err(anyhow!("Unsupported Dymension testnet"))
+                        }
+                    };
+                    network.and_then(|network| Ok((network, item.address)))
+                })
+                .filter(|item| match item {
+                    Ok((network, _)) => network.is_mainnet(),
+                    Err(_) => true,
+                })
+                .collect::<Result<Vec<_>>>();
+
+            let markets = markets?;
+
+            tracing::info!("markets: {markets:?}");
+
             tracing::info!("Skipping {0} deployed markets", market_ids.len());
             let result = http_app.fetch_market_status(&markets[..]).await?;
             let markets = result
@@ -101,24 +105,28 @@ async fn main_inner(opt: Opt) -> Result<()> {
             }
         }
         cli::SubCommand::Dnf { market_id } => {
-            let markets = vec![
-                (
-                    CosmosNetwork::OsmosisMainnet,
-                    Address::from_str(
-                        "osmo1ssw6x553kzqher0earlkwlxasfm2stnl3ms3ma2zz4tnajxyyaaqlucd45",
-                    )?,
-                ),
-                (
-                    CosmosNetwork::InjectiveMainnet,
-                    Address::from_str("inj1vdu3s39dl8t5l88tyqwuhzklsx9587adv8cnn9")?,
-                ),
-                (
-                    CosmosNetwork::SeiMainnet,
-                    Address::from_str(
-                        "sei18rdj3asllguwr6lnyu2sw8p8nut0shuj3sme27ndvvw4gakjnjqqper95h",
-                    )?,
-                ),
-            ];
+            let factories = MainnetFactories::load_hard_coded()?.factories;
+            let markets = factories
+                .into_iter()
+                .filter(|item| item.canonical)
+                .map(|item| {
+                    let network = item.network;
+                    let network = match network {
+                        perps_exes::PerpsNetwork::Regular(network) => Ok(network),
+                        perps_exes::PerpsNetwork::DymensionTestnet => {
+                            Err(anyhow!("Unsupported Dymension testnet"))
+                        }
+                    };
+                    network.and_then(|network| Ok((network, item.address)))
+                })
+                .filter(|item| match item {
+                    Ok((network, _)) => network.is_mainnet(),
+                    Err(_) => true,
+                })
+                .collect::<Result<Vec<_>>>();
+
+            let markets = markets?;
+
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
             let dnf = dnf_sensitivity(&http_app, &market_id).await?;
             let market_config = http_app.fetch_market_status(&markets).await?;
@@ -166,6 +174,6 @@ async fn main_inner(opt: Opt) -> Result<()> {
                 println!("{symbol:#?}");
             }
         }
-    }
+    };
     Ok(())
 }
