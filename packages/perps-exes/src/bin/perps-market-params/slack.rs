@@ -145,6 +145,7 @@ impl HttpApp {
         AssetName(base_asset): AssetName<'_>,
     ) -> anyhow::Result<CmcExchangeInfo> {
         let coin: Coin = base_asset.parse()?;
+        let coin = coin.to_wrapped_coin().0;
         let mut start: u32 = 1;
         // https://coinmarketcap.com/api/documentation/v1/#operation/getV1ExchangeListingsLatest
         let limit = 5000;

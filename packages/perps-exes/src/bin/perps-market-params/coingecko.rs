@@ -293,7 +293,61 @@ impl Coin {
         }
     }
 
-    pub(crate) fn all() -> [Coin; 3] {
-        [Coin::Atom, Coin::Levana, Coin::Eth]
+    pub(crate) fn to_wrapped_coin(&self) -> WrappedCoin {
+        match self {
+            Coin::Atom => WrappedCoin(Coin::Atom),
+            Coin::Levana => WrappedCoin(Coin::Levana),
+            Coin::Eth => WrappedCoin(Coin::Eth),
+            Coin::Dogecoin => WrappedCoin(Coin::Dogecoin),
+            Coin::Wbtc => WrappedCoin(Coin::Btc),
+            Coin::Avax => WrappedCoin(Coin::Avax),
+            Coin::Btc => WrappedCoin(Coin::Btc),
+            Coin::StAtom => WrappedCoin(Coin::Atom),
+            Coin::StDYDX => WrappedCoin(Coin::Dydx),
+            Coin::Bnb => WrappedCoin(Coin::Bnb),
+            Coin::Luna => WrappedCoin(Coin::Luna),
+            Coin::Dym => WrappedCoin(Coin::Dym),
+            Coin::Osmo => WrappedCoin(Coin::Osmo),
+            Coin::Link => WrappedCoin(Coin::Link),
+            Coin::Sol => WrappedCoin(Coin::Sol),
+            Coin::Sei => WrappedCoin(Coin::Sei),
+            Coin::Pyth => WrappedCoin(Coin::Pyth),
+            Coin::Silver => WrappedCoin(Coin::Silver),
+            Coin::Dydx => WrappedCoin(Coin::Dydx),
+            Coin::Inj => WrappedCoin(Coin::Inj),
+            Coin::StTia => WrappedCoin(Coin::Tia),
+            Coin::Wif => WrappedCoin(Coin::Wif),
+            Coin::Pepe => WrappedCoin(Coin::Pepe),
+            Coin::Bonk => WrappedCoin(Coin::Bonk),
+            Coin::Shib => WrappedCoin(Coin::Shib),
+            Coin::Floki => WrappedCoin(Coin::Floki),
+            Coin::Meme => WrappedCoin(Coin::Meme),
+            Coin::Dot => WrappedCoin(Coin::Dot),
+            Coin::Rune => WrappedCoin(Coin::Rune),
+            Coin::Ntrn => WrappedCoin(Coin::Ntrn),
+            Coin::Eur => WrappedCoin(Coin::Eur),
+            Coin::StOsmo => WrappedCoin(Coin::Osmo),
+            Coin::Axl => WrappedCoin(Coin::Axl),
+            Coin::Tia => WrappedCoin(Coin::Tia),
+            Coin::Akt => WrappedCoin(Coin::Akt),
+            Coin::Scrt => WrappedCoin(Coin::Scrt),
+            Coin::RyEth => WrappedCoin(Coin::Eth),
+            Coin::AxlEth => WrappedCoin(Coin::Eth),
+            Coin::StkAtom => WrappedCoin(Coin::Atom),
+            Coin::StDym => WrappedCoin(Coin::Dym),
+            Coin::MilkTia => WrappedCoin(Coin::Tia),
+        }
+    }
+}
+
+/// WrappedCoin is an abstraction over Coin that is used to decide
+/// which coin is actually used for the computation of DNF.  For cases
+/// like stOSMO, we use OSMO to decide the DNF and we use WrappedCoin
+/// to differentiate it.
+pub(crate) struct WrappedCoin(pub(crate) Coin);
+
+impl From<&Coin> for WrappedCoin {
+    fn from(value: &Coin) -> Self {
+        WrappedCoin(*value)
     }
 }
