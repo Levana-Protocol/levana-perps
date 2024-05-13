@@ -2,7 +2,6 @@ use std::str::FromStr;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use coingecko::Coin;
 use cosmos::{Address, CosmosNetwork};
 use market_param::AssetName;
 use web::axum_main;
@@ -29,11 +28,6 @@ fn main() -> Result<()> {
 #[tokio::main(flavor = "multi_thread")]
 async fn main_inner(opt: Opt) -> Result<()> {
     match opt.sub.clone() {
-        cli::SubCommand::Coins {} => {
-            for coin in &Coin::all() {
-                tracing::info!("{coin:?} (cmc id: {})", coin.cmc_id());
-            }
-        }
         cli::SubCommand::Exchanges { market_id } => {
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
             let result = http_app

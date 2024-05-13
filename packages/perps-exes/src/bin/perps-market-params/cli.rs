@@ -22,8 +22,6 @@ pub(crate) struct Opt {
 
 #[derive(Subcommand, Debug, Clone)]
 pub(crate) enum SubCommand {
-    /// List supported coins with their IDs
-    Coins {},
     /// List all market ids of Levana
     Markets {
         /// Skip these market ids
