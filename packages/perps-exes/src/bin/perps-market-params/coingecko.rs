@@ -293,7 +293,7 @@ impl Coin {
         }
     }
 
-    pub(crate) fn to_wrapped_coin(&self) -> WrappedCoin {
+    pub(crate) fn to_wrapped_coin(self) -> WrappedCoin {
         match self {
             Coin::Atom => WrappedCoin(Coin::Atom),
             Coin::Levana => WrappedCoin(Coin::Levana),
