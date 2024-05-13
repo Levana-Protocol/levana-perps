@@ -376,7 +376,7 @@ markets:
       borrow_fee_rate_min_annualized: 0.05
       target_utilization: 0.5
       borrow_fee_sensitivity: 0.3
-      delta_neutrality_fee_sensitivity: 4300000
+      delta_neutrality_fee_sensitivity: 6551939
       carry_leverage: 15
       delta_neutrality_fee_tax: 0.1
       liquidity_cooldown_seconds: 86400
@@ -614,7 +614,7 @@ markets:
 
   DOGE_USDC:
     config:
-      delta_neutrality_fee_sensitivity: 300000000
+      delta_neutrality_fee_sensitivity: 1512625910
       funding_rate_sensitivity: 1.5
       carry_leverage: 15
       borrow_fee_sensitivity: 0.3
@@ -653,7 +653,7 @@ markets:
 
   SHIB_USDC:
     config:
-      delta_neutrality_fee_sensitivity: 1635156448309
+      delta_neutrality_fee_sensitivity: 8713028219969
       funding_rate_sensitivity: 1.5
       carry_leverage: 15
       borrow_fee_sensitivity: 0.3
@@ -679,7 +679,7 @@ markets:
 
   MEME_USDC:
     config:
-      delta_neutrality_fee_sensitivity: 1038611440
+      delta_neutrality_fee_sensitivity: 2332078583
       funding_rate_sensitivity: 1.5
       carry_leverage: 15
       borrow_fee_sensitivity: 0.3
@@ -705,7 +705,7 @@ markets:
 
   LUNA_USDC:
     config:
-      delta_neutrality_fee_sensitivity: 15000000
+      delta_neutrality_fee_sensitivity: 24101464
       max_leverage: 4
       carry_leverage: 2
       funding_rate_sensitivity: 2
@@ -749,7 +749,7 @@ markets:
       carry_leverage: 2
       funding_rate_sensitivity: 2
       target_utilization: 0.5
-      delta_neutrality_fee_sensitivity: 2500000
+      delta_neutrality_fee_sensitivity: 9578797
       borrow_fee_sensitivity: 0.3
       delta_neutrality_fee_cap: 0.03
       delta_neutrality_fee_tax: 0.5
@@ -846,7 +846,7 @@ markets:
       carry_leverage: 15
       funding_rate_sensitivity: 2
       target_utilization: 0.5
-      delta_neutrality_fee_sensitivity: 13000000
+      delta_neutrality_fee_sensitivity: 39844679
       borrow_fee_sensitivity: 0.3
       delta_neutrality_fee_tax: 0.25
       borrow_fee_rate_min_annualized: 0.03
@@ -859,7 +859,7 @@ markets:
       carry_leverage: 15
       funding_rate_sensitivity: 2
       target_utilization: 0.5
-      delta_neutrality_fee_sensitivity: 13000000
+      delta_neutrality_fee_sensitivity: 39844679
       borrow_fee_sensitivity: 0.3
       delta_neutrality_fee_tax: 0.25
       borrow_fee_rate_min_annualized: 0.03
