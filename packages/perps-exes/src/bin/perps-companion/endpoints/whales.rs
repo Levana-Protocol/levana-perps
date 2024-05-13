@@ -111,7 +111,7 @@ enum SimpleCosmosNetwork {
     Injective,
     Osmosis,
     Sei,
-    Neutron
+    Neutron,
 }
 
 impl Display for SimpleCosmosNetwork {
@@ -257,9 +257,7 @@ async fn load_whale_market_data(
             PerpsNetwork::Regular(CosmosNetwork::InjectiveMainnet) => {
                 SimpleCosmosNetwork::Injective
             }
-            PerpsNetwork::Regular(CosmosNetwork::NeutronMainnet) => {
-                SimpleCosmosNetwork::Neutron
-            }
+            PerpsNetwork::Regular(CosmosNetwork::NeutronMainnet) => SimpleCosmosNetwork::Neutron,
             _ => anyhow::bail!("Unsupported network: {network}"),
         },
         market_id: match market_info.market_id.as_str() {

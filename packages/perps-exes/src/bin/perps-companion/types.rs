@@ -128,7 +128,7 @@ impl ChainId {
             ChainId::Injective1,
             ChainId::Injective888,
             ChainId::Neutron1,
-            ChainId::Pion1
+            ChainId::Pion1,
         ]
     }
 
