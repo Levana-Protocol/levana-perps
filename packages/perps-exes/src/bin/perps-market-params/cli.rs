@@ -60,7 +60,7 @@ pub(crate) enum SubCommand {
 
 #[derive(clap::Parser, Clone, Debug)]
 pub(crate) struct ServeOpt {
-    /// Market Ids to skip. By default tracks all market ids of different markets.
+    /// Market Ids to skip
     #[arg(long, env = "LEVANA_MPARAM_SKIP_MARKET_IDS", value_delimiter = ',')]
     pub(crate) skip_market_ids: Vec<MarketId>,
     /// Slack webhook to send alert notification
