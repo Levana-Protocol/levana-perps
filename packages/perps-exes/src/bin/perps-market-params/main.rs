@@ -81,7 +81,7 @@ async fn main_inner(opt: Opt) -> Result<()> {
                             Err(anyhow!("Unsupported Dymension testnet"))
                         }
                     };
-                    network.and_then(|network| Ok((network, item.address)))
+                    network.map(|network| (network, item.address))
                 })
                 .filter(|item| match item {
                     Ok((network, _)) => network.is_mainnet(),
@@ -117,7 +117,7 @@ async fn main_inner(opt: Opt) -> Result<()> {
                             Err(anyhow!("Unsupported Dymension testnet"))
                         }
                     };
-                    network.and_then(|network| Ok((network, item.address)))
+                    network.map(|network| (network, item.address))
                 })
                 .filter(|item| match item {
                     Ok((network, _)) => network.is_mainnet(),
