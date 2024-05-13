@@ -121,7 +121,6 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
             ExchangeKind::Dex => None,
         });
 
-
     let max_volume_exchange = exchanges
         .clone()
         .max_by(|a, b| a.volume_24h_usd.total_cmp(&b.volume_24h_usd))
