@@ -30,7 +30,7 @@ pg-terminate-conn:
 
 # Test by posting data
 post-test:
-	curl --verbose --header "Accept: application/json" --header "Content-Type: application/json" --request POST --data '{"address":"sei1g9p9e90m67crr08s4vta48pjk68ldpru9h6x7s8fj3satze4447spcmfkj","chain":"atlantic-2","position_id":"1","pnl_type":"usd"}' http://localhost:3000/pnl-url
+	curl --verbose --header "Accept: application/json" --header "Content-Type: application/json" --request POST --data '{"address":"neutron1awkajw4ltv0uw3jhqg5gx2lwkwl0nyg4krq54dg8x5w7qawcymyqenzcnk","chain":"neutron-1","position_id":"1","pnl_type":"usd"}' http://localhost:3000/pnl-url
 
 # Test by fetching html of above post
 get-test:
