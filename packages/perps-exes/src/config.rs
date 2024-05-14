@@ -1,13 +1,15 @@
 pub mod defaults;
 
-use std::{collections::HashMap, iter::Sum, ops::AddAssign, path::Path};
+use std::{collections::HashMap, fmt::Write, iter::Sum, ops::AddAssign, path::Path};
 
 use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, RawAddress};
 use cosmwasm_std::{Uint128, Uint256};
 use msg::{
     contracts::market::{
-        config::ConfigUpdate, entry::InitialPrice, spot_price::PythPriceServiceNetwork,
+        config::{defaults::ConfigDefaults, ConfigUpdate},
+        entry::InitialPrice,
+        spot_price::PythPriceServiceNetwork,
     },
     prelude::*,
     token::TokenInit,
@@ -691,8 +693,68 @@ impl MarketConfigUpdates {
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
         let mut file = fs_err::File::open(path)?;
-        serde_yaml::from_reader(&mut file)
-            .with_context(|| format!("Error loading MarketConfigUpdates from {}", path.display()))
+        let res: MarketConfigUpdates = serde_yaml::from_reader(&mut file).with_context(|| {
+            format!("Error loading MarketConfigUpdates from {}", path.display())
+        })?;
+        res.validate_carry_leverage()?;
+        Ok(res)
+    }
+
+    fn validate_carry_leverage(&self) -> Result<()> {
+        struct Mismatch<'a> {
+            market: &'a MarketId,
+            configured_carry_leverage: Decimal256,
+            expected_carry_leverage: Decimal256,
+        }
+
+        let default_max_leverage = ConfigDefaults::max_leverage();
+        let default_carry_leverage = ConfigDefaults::carry_leverage();
+        let seven: Decimal256 = "7".parse()?;
+        let two: Decimal256 = "2".parse()?;
+        let mismatches = self
+            .markets
+            .iter()
+            .filter_map(|(market_id, update)| {
+                let max_leverage = update
+                    .config
+                    .max_leverage
+                    .unwrap_or(default_max_leverage)
+                    .abs_unsigned();
+                let expected_carry_leverage = seven.min(max_leverage / two);
+                let configured_carry_leverage = update
+                    .config
+                    .carry_leverage
+                    .unwrap_or(default_carry_leverage);
+
+                if expected_carry_leverage == configured_carry_leverage {
+                    None
+                } else {
+                    Some(Mismatch {
+                        market: market_id,
+                        configured_carry_leverage,
+                        expected_carry_leverage,
+                    })
+                }
+            })
+            .collect::<Vec<_>>();
+
+        if mismatches.is_empty() {
+            Ok(())
+        } else {
+            let mut msg = "Unexpected carry leverage values provided:\n".to_owned();
+            for Mismatch {
+                market,
+                configured_carry_leverage,
+                expected_carry_leverage,
+            } in mismatches
+            {
+                writeln!(
+                    &mut msg,
+                    "{market}: Expected: {expected_carry_leverage}. Found: {configured_carry_leverage}"
+                )?;
+            }
+            Err(anyhow::anyhow!("{msg}"))
+        }
     }
 }
 
