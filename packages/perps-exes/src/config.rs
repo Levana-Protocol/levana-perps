@@ -5,6 +5,10 @@ use std::{collections::HashMap, fmt::Write, iter::Sum, ops::AddAssign, path::Pat
 use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, RawAddress};
 use cosmwasm_std::{Uint128, Uint256};
+use figment::{
+    providers::{Env, Format, Yaml},
+    Figment,
+};
 use msg::{
     contracts::market::{
         config::{defaults::ConfigDefaults, ConfigUpdate},
@@ -807,15 +811,11 @@ pub struct MainnetFactory {
 impl MainnetFactories {
     const PATH: &'static str = "packages/perps-exes/assets/mainnet-factories.yaml";
 
-    pub fn load_hard_coded() -> Result<Self> {
-        serde_yaml::from_slice(include_bytes!("../assets/mainnet-factories.yaml")).context(
-            "Error loading MainnetFactories from compile-time ../assets/mainnet-factories.yaml",
-        )
-    }
-
     pub fn load() -> Result<Self> {
-        let mut file = fs_err::File::open(Self::PATH)?;
-        serde_yaml::from_reader(&mut file)
+        Figment::new()
+            .merge(Yaml::file(Self::PATH))
+            .merge(Env::prefixed("LEVANA_MAINNET_FACTORIES_"))
+            .extract()
             .with_context(|| format!("Error loading MainnetFactories from {}", Self::PATH))
     }
 
