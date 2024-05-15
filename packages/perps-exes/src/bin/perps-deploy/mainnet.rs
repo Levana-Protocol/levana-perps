@@ -476,7 +476,7 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpt
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
-    let chain_config = ChainConfig::load(None::<PathBuf>, factory.network)?;
+    let chain_config = ChainConfig::load(factory.network)?;
     let price_config = PriceConfig::load(None::<PathBuf>)?;
     let oracle = opt.get_oracle_info(&chain_config, &price_config, factory.network)?;
 

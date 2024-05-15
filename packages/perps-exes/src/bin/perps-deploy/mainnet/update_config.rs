@@ -55,7 +55,7 @@ async fn go(
 
     let spot_price_helper = if spot_price {
         Some({
-            let chain_config = ChainConfig::load(None::<PathBuf>, factory.network)?;
+            let chain_config = ChainConfig::load(factory.network)?;
             let price_config = PriceConfig::load(None::<PathBuf>)?;
             let oracle = opt.get_oracle_info(&chain_config, &price_config, factory.network)?;
             move |market_id| get_spot_price_config(&oracle, &market_id)

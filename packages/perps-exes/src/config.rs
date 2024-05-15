@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, RawAddress};
 use cosmwasm_std::{Uint128, Uint256};
 use figment::{
-    providers::{Env, Format, Toml},
+    providers::{Env, Format, Toml, Yaml},
     Figment,
 };
 use msg::{
@@ -376,14 +376,26 @@ fn load_yaml<T: serde::de::DeserializeOwned>(
 }
 
 impl ChainConfig {
-    pub fn load(config_file: Option<impl AsRef<Path>>, network: PerpsNetwork) -> Result<Self> {
-        load_yaml::<HashMap<PerpsNetwork, Self>>(
-            "config-chain.yaml",
-            include_bytes!("../assets/config-chain.yaml"),
-            config_file,
-        )?
-        .remove(&network)
-        .with_context(|| format!("No chain config found for {network}"))
+    const PATH: &'static str = "packages/perps-exes/assets/config-chain.yaml";
+
+    pub fn load(network: PerpsNetwork) -> Result<Self> {
+        Self::load_from(Self::PATH, network)
+    }
+
+    pub fn load_from_opt(config_file: Option<&Path>, network: PerpsNetwork) -> Result<Self> {
+        match config_file {
+            Some(config_file) => Self::load_from(config_file, network),
+            None => Self::load(network),
+        }
+    }
+
+    pub fn load_from(config_file: impl AsRef<Path>, network: PerpsNetwork) -> Result<Self> {
+        Figment::new()
+            .merge(Yaml::file(config_file))
+            .merge(Env::prefixed("LEVANA_CHAIN_CONFIG_"))
+            .extract::<HashMap<PerpsNetwork, _>>()?
+            .remove(&network)
+            .with_context(|| format!("No chain config found for {network}"))
     }
 }
 

@@ -41,7 +41,7 @@ async fn go(
     let wallet = app.basic.get_wallet()?;
     let factory = app.tracker.get_factory(&family).await?.into_contract();
 
-    let chain_config = ChainConfig::load(None::<PathBuf>, app.basic.network)?;
+    let chain_config = ChainConfig::load(app.basic.network)?;
     let price_config = PriceConfig::load(None::<PathBuf>)?;
     let oracle = opt.get_oracle_info(&chain_config, &price_config, app.basic.network)?;
 

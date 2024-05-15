@@ -124,7 +124,7 @@ async fn update_pyth(
         keep_going,
     }: UpdatePythOpt,
 ) -> Result<()> {
-    let chain = ChainConfig::load(config_chain, network)?;
+    let chain = ChainConfig::load_from_opt(config_chain.as_deref(), network)?;
     let pyth = chain
         .spot_price
         .and_then(|spot_price| spot_price.pyth)

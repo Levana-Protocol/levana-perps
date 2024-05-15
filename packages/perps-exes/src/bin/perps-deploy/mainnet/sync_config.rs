@@ -42,7 +42,7 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
     let factory = factories.get(&factory)?;
     let network = factory.network;
 
-    let chain_config = ChainConfig::load(None::<PathBuf>, factory.network)?;
+    let chain_config = ChainConfig::load(factory.network)?;
     let price_config = PriceConfig::load(None::<PathBuf>)?;
     let oracle = opt.get_oracle_info(&chain_config, &price_config, network)?;
 
