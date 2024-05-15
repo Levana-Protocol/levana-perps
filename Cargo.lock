@@ -3073,6 +3073,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "tokio-util",
+ "toml 0.8.12",
  "tonic 0.10.2",
  "tower",
  "tower-http",

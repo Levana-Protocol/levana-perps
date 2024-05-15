@@ -810,13 +810,16 @@ pub struct MainnetFactory {
 
 impl MainnetFactories {
     const PATH: &'static str = "packages/perps-exes/assets/mainnet-factories.yaml";
+    const TOML_PATH: &'static str = "packages/perps-exes/assets/mainnet-factories.toml";
 
     pub fn load() -> Result<Self> {
-        Figment::new()
+        let x = Figment::new()
             .merge(Yaml::file(Self::PATH))
             .merge(Env::prefixed("LEVANA_MAINNET_FACTORIES_"))
             .extract()
-            .with_context(|| format!("Error loading MainnetFactories from {}", Self::PATH))
+            .with_context(|| format!("Error loading MainnetFactories from {}", Self::PATH))?;
+        fs_err::write(Self::TOML_PATH, toml::to_string_pretty(&x)?)?;
+        Ok(x)
     }
 
     pub fn save(&self) -> Result<()> {
