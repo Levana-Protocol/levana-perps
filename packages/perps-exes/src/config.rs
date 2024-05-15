@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, RawAddress};
 use cosmwasm_std::{Uint128, Uint256};
 use figment::{
-    providers::{Env, Format, Yaml},
+    providers::{Env, Format, Toml},
     Figment,
 };
 use msg::{
@@ -809,22 +809,27 @@ pub struct MainnetFactory {
 }
 
 impl MainnetFactories {
-    const PATH: &'static str = "packages/perps-exes/assets/mainnet-factories.yaml";
-    const TOML_PATH: &'static str = "packages/perps-exes/assets/mainnet-factories.toml";
+    const PATH: &'static str = "packages/perps-exes/assets/mainnet-factories.toml";
 
     pub fn load() -> Result<Self> {
-        let x = Figment::new()
-            .merge(Yaml::file(Self::PATH))
+        Figment::new()
+            .merge(Toml::file(Self::PATH))
             .merge(Env::prefixed("LEVANA_MAINNET_FACTORIES_"))
             .extract()
-            .with_context(|| format!("Error loading MainnetFactories from {}", Self::PATH))?;
-        fs_err::write(Self::TOML_PATH, toml::to_string_pretty(&x)?)?;
-        Ok(x)
+            .with_context(|| format!("Error loading MainnetFactories from {}", Self::PATH))
     }
 
     pub fn save(&self) -> Result<()> {
-        let mut file = fs_err::File::create(Self::PATH)?;
-        serde_yaml::to_writer(&mut file, self)
-            .with_context(|| format!("Error saving MainnetFactories to {}", Self::PATH))
+        save_toml(Self::PATH, self)
     }
+}
+
+pub fn save_toml<P, T>(path: P, value: &T) -> Result<()>
+where
+    P: AsRef<Path>,
+    T: serde::Serialize,
+{
+    let path = path.as_ref();
+    (|| fs_err::write(path, toml::to_string_pretty(value)?).map_err(anyhow::Error::from))()
+        .with_context(|| format!("Unable to save TOML file {}", path.display()))
 }
