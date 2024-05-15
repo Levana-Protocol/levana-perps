@@ -1,0 +1,210 @@
+[osmosis-testnet]
+tracker = "osmo1l3ypxctzcdev9dmyydlzrflqz52f0wsqmzkuyq9dvpdnqx69wvvq9zszh2"
+faucet = "osmo1ycrm74p7uc976hu2z428l27vxj8l44zu0x0yqjr8gh775qr6gtnq9f3zsz"
+explorer = "https://testnet.mintscan.io/osmosis-testnet/txs/"
+rpc-nodes = ["https://rpc.osmotest5.osmosis.zone"]
+gas-decimals = 6
+age-tolerance-seconds = 42
+
+[osmosis-testnet.spot-price.pyth]
+contract = "osmo1hpdzqku55lmfmptpyj6wdlugqs5etr6teqf7r4yqjjrxjznjhtuqqu5kdh"
+type = "stable"
+
+[osmosis-testnet.spot-price.stride]
+contract = "osmo1345tvsyt9kkzapffpr2hg04a6qrlfrczt7gy8amn6ku6ca5us77q0rtqqz"
+
+[osmosis-testnet.assets]
+
+[sei-testnet]
+tracker = "sei14k4xcy6dfdyqvpvx6njxptry2urcp98f74lv49m36u7gkdkv7s6qleq4tp"
+faucet = "sei1czf3age49j99yrkxynmetysh3p2x8tp429mv23jme7zj8hytwhesnqngza"
+explorer = "https://www.seiscan.app/atlantic-2/txs/"
+rpc-nodes = ["https://rpc.atlantic-2.seinetwork.io"]
+gas-decimals = 6
+
+[sei-testnet.spot-price.pyth]
+contract = "sei1w2rxq6eckak47s25crxlhmq96fzjwdtjgdwavn56ggc0qvxvw7rqczxyfy"
+type = "stable"
+
+[sei-testnet.assets]
+
+[neutron-mainnet]
+explorer = "https://www.mintscan.io/neutron/txs/"
+rpc-nodes = []
+gas-decimals = 6
+
+[neutron-mainnet.spot-price.pyth]
+contract = "neutron1m2emc93m9gpwgsrsf2vylv9xvgqh654630v7dfrhrkmr5slly53spg85wv"
+type = "stable"
+
+[neutron-mainnet.assets.NTRN]
+denom = "untrn"
+decimal-places = 6
+
+[stargaze-testnet]
+tracker = "stars1vfa0a8846ay2l2ehmqtwxgpcxzes9m598kw6mjh50zgnqhxgwmys7fkew3"
+faucet = "stars1pnlmx33qgx7822t7tc73znu0ddkxzcg29rshpls6acdlrrr7snkst4xwq6"
+explorer = "https://testnet-explorer.publicawesome.dev/stargaze/tx/"
+rpc-nodes = []
+gas-decimals = 6
+
+[stargaze-testnet.assets]
+
+[osmosis-mainnet]
+explorer = "https://www.mintscan.io/osmosis/txs/"
+rpc-nodes = []
+gas-multiplier = 1.5
+gas-decimals = 6
+age-tolerance-seconds = 42
+
+[osmosis-mainnet.spot-price.pyth]
+contract = "osmo13ge29x4e2s63a8ytz2px8gurtyznmue4a69n5275692v3qn3ks8q7cwck7"
+type = "stable"
+
+[osmosis-mainnet.spot-price.stride]
+contract = "osmo1df5d9wr6s3xp49qe3sgzyd6gwr4yxwl2ydey08rgac5u02wqnvyq0pd5m9"
+
+[osmosis-mainnet.assets.milkTIA]
+denom = "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA"
+decimal-places = 6
+
+[osmosis-mainnet.assets.DYM]
+denom = "ibc/9A76CDF0CBCEF37923F32518FA15E5DC92B9F56128292BC4D63C4AEA76CBB110"
+decimal-places = 18
+
+[osmosis-mainnet.assets.OSMO]
+denom = "uosmo"
+decimal-places = 6
+
+[osmosis-mainnet.assets.stTIA]
+denom = "ibc/698350B8A61D575025F3ED13E9AC9C0F45C89DEFE92F76D5838F1D3C1A7FF7C9"
+decimal-places = 6
+
+[osmosis-mainnet.assets.stkATOM]
+denom = "ibc/CAA179E40F0266B0B29FB5EAA288FB9212E628822265D4141EBD1C47C3CBFCBC"
+decimal-places = 6
+
+[osmosis-mainnet.assets.stOSMO]
+denom = "ibc/D176154B0C63D1F9C6DCFB4F70349EBF2E2B5A87A05902F57A6AE92B863E9AEC"
+decimal-places = 6
+
+[osmosis-mainnet.assets.stDYM]
+denom = "ibc/D53E785DC9C5C2CA50CADB1EFE4DE5D0C30418BE0E9C6F2AF9F092A247E8BC22"
+decimal-places = 18
+
+[osmosis-mainnet.assets.TIA]
+denom = "ibc/D79E7D83AB399BFFF93433E54FAA480C191248FC556924A2A8351AE2638B3877"
+decimal-places = 6
+
+[osmosis-mainnet.assets.wBTC]
+denom = "factory/osmo1z0qrq605sjgcqpylfl4aa6s90x738j7m58wyatt0tdzflg2ha26q67k743/wbtc"
+decimal-places = 8
+
+[osmosis-mainnet.assets.nBTC]
+denom = "ibc/75345531D87BD90BF108BE7240BD721CB2CB0A1F16D4EBA71B09EC3C43E15C8F"
+decimal-places = 14
+
+[osmosis-mainnet.assets.USDC]
+denom = "ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4"
+decimal-places = 6
+
+[osmosis-mainnet.assets.ryETH]
+denom = "ibc/FBB3FEF80ED2344D821D4F95C31DBFD33E4E31D5324CAD94EF756E67B749F668"
+decimal-places = 18
+
+[osmosis-mainnet.assets.stDYDX]
+denom = "ibc/980E82A9F8E7CA8CD480F4577E73682A6D3855A267D1831485D7EBEF0E7A6C2C"
+decimal-places = 18
+
+[neutron-testnet]
+tracker = "neutron1clafqjzrwpmaqpgmlpdyaz2lklsykz0n9gyf5ysguvy25uszxh7smjqqcc"
+faucet = "neutron1mmpf9gymelvr33cxu5jt848ufg2zqe3s3h2p9xwz5m6jhtj7zl3qzg7lcf"
+explorer = "https://www.mintscan.io/neutron-testnet/txs/"
+rpc-nodes = [
+    "https://rpc-falcron.pion-1.ntrn.tech",
+    "https://neutron-testnet-rpc.polkachu.com",
+]
+gas-decimals = 6
+
+[neutron-testnet.spot-price.pyth]
+contract = "neutron15ldst8t80982akgr8w8ekcytejzkmfpgdkeq4xgtge48qs7435jqp87u3t"
+type = "stable"
+
+[neutron-testnet.assets]
+
+[injective-testnet]
+tracker = "inj16z0ztf8uzad8tgvhrkhrmq8c7hmg8xe2ktf4nf"
+faucet = "inj1lmgcv26vtdjap42a8sz6w3l95uwrt9jv24n3he"
+explorer = "https://testnet.explorer.injective.network/transaction/"
+rpc-nodes = ["https://injective-testnet-rpc.polkachu.com"]
+gas-decimals = 18
+
+[injective-testnet.spot-price.pyth]
+contract = "inj18rlflp3735h25jmjx97d22c72sxk260amdjxlu"
+type = "edge"
+
+[injective-testnet.assets]
+
+[osmosis-local]
+rpc-nodes = []
+gas-decimals = 6
+
+[osmosis-local.assets]
+
+[injective-mainnet]
+explorer = "https://explorer.injective.network/transaction/"
+rpc-nodes = ["https://sentry.tm.injective.network"]
+gas-decimals = 18
+
+[injective-mainnet.spot-price.pyth]
+contract = "inj12j43nf2f0qumnt2zrrmpvnsqgzndxefujlvr08"
+type = "stable"
+
+[injective-mainnet.spot-price.stride]
+contract = "inj1n55xxawhaq4mn9pmgqvhxcukcel2emgc5gx39t"
+
+[injective-mainnet.assets.USDT]
+denom = "peggy0xdAC17F958D2ee523a2206206994597C13D831ec7"
+decimal-places = 6
+
+[injective-mainnet.assets.INJ]
+denom = "inj"
+decimal-places = 18
+
+[injective-mainnet.assets.stINJ]
+denom = "ibc/AC87717EA002B0123B10A05063E69BCA274BA2C44D842AEEB41558D2856DCE93"
+decimal-places = 18
+
+[dymension-testnet]
+tracker = "rol1plr28ztj64a47a32lw7tdae8vluzm2lm7nqk364r4ws50rgwyzgsgju4zn"
+faucet = "rol1vguuxez2h5ekltfj9gjd62fs5k4rl2zy5hfrncasykzw08rezpfsakwv7k"
+explorer = "https://dymension-fake-explorer"
+rpc-nodes = ["http://18.199.53.161:26657"]
+gas-decimals = 6
+
+[dymension-testnet.spot-price.pyth]
+contract = "rol1pvrwmjuusn9wh34j7y520g8gumuy9xtl3gvprlljfdpwju3x7ucszdyfs8"
+type = "stable"
+
+[dymension-testnet.assets]
+
+[sei-mainnet]
+rpc-nodes = ["https://rpc.sei-apis.com"]
+gas-decimals = 6
+
+[sei-mainnet.spot-price.pyth]
+contract = "sei15d2tyq2jzxmpg32y3am3w62dts32qgzmds9qnr6c87r0gwwr7ynqal0x38"
+type = "stable"
+
+[sei-mainnet.assets.SEI]
+denom = "usei"
+decimal-places = 6
+
+[juno-testnet]
+tracker = "juno1u23qyg0j4y5mzhessf0kcnjuqwg48kpufj5vujsq7kxxgxfnv5pqjmkmr4"
+faucet = "juno15rwad8twfrj34q7ep2sgrz3lqqs7vj939z9p4kccvfu9qm6mn55qxn7gy3"
+explorer = "https://testnet.mintscan.io/juno-testnet/txs/"
+rpc-nodes = []
+gas-decimals = 6
+
+[juno-testnet.assets]

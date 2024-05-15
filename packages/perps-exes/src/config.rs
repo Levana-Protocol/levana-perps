@@ -26,7 +26,7 @@ use crate::PerpsNetwork;
 ///
 /// This contains information which would be valid for multiple different
 /// contract deployments on a single chain.
-#[derive(serde::Deserialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ChainConfig {
     pub tracker: Option<Address>,
@@ -45,7 +45,7 @@ pub struct ChainConfig {
     pub age_tolerance_seconds: Option<u32>,
 }
 
-#[derive(serde::Deserialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct NativeAsset {
     pub denom: String,
@@ -67,7 +67,7 @@ impl From<&NativeAsset> for TokenInit {
 }
 
 /// Spot price config for a given chain
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ChainSpotPriceConfig {
     /// Pyth configuration, required on chains that use pyth feeds
@@ -77,7 +77,7 @@ pub struct ChainSpotPriceConfig {
 }
 
 /// Configuration for pyth
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ChainPythConfig {
     /// The address of the pyth oracle contract
@@ -89,7 +89,7 @@ pub struct ChainPythConfig {
 }
 
 /// Configuration for stride
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ChainStrideConfig {
     /// The address of the redemption rate contract
@@ -163,7 +163,9 @@ pub enum MarketPriceFeedConfig {
 }
 
 /// Number of decimals in the gas coin
-#[derive(serde::Deserialize, Clone, Debug, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    serde::Deserialize, serde::Serialize, Clone, Debug, Copy, PartialEq, Eq, PartialOrd, Ord,
+)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct GasDecimals(pub u8);
 impl GasDecimals {
@@ -377,6 +379,7 @@ fn load_yaml<T: serde::de::DeserializeOwned>(
 
 impl ChainConfig {
     const PATH: &'static str = "packages/perps-exes/assets/config-chain.yaml";
+    const PATH_TOML: &'static str = "packages/perps-exes/assets/config-chain.toml";
 
     pub fn load(network: PerpsNetwork) -> Result<Self> {
         Self::load_from(Self::PATH, network)
@@ -390,11 +393,12 @@ impl ChainConfig {
     }
 
     pub fn load_from(config_file: impl AsRef<Path>, network: PerpsNetwork) -> Result<Self> {
-        Figment::new()
-            .merge(Yaml::file(config_file))
+        let mut x = Figment::new()
+            .merge(Yaml::file(&config_file))
             .merge(Env::prefixed("LEVANA_CHAIN_CONFIG_"))
-            .extract::<HashMap<PerpsNetwork, _>>()?
-            .remove(&network)
+            .extract::<HashMap<PerpsNetwork, _>>()?;
+        save_toml(Self::PATH_TOML, &x)?;
+        x.remove(&network)
             .with_context(|| format!("No chain config found for {network}"))
     }
 }
