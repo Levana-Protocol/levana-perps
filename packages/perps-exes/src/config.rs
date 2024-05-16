@@ -833,7 +833,7 @@ impl MainnetFactories {
             .merge(Env::prefixed("LEVANA_MAINNET_FACTORIES_"))
             .extract()
             .with_context(|| format!("Error loading MainnetFactories from {}", Self::PATH))?;
-        tracing::debug!("Loaded mainnet factories: {res:?}");
+        tracing::debug!("Loaded mainnet factories: {res:#?}");
         Ok(res)
     }
 
