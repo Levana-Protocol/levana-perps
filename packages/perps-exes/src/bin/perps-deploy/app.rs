@@ -116,7 +116,7 @@ impl Opt {
     pub(crate) async fn load_basic_app(&self, network: PerpsNetwork) -> Result<BasicApp> {
         let cosmos = self.connect(network).await?;
         let wallet = self.get_lazy_wallet(network)?;
-        let chain_config = ChainConfig::load(self.config_chain.as_ref(), network)?;
+        let chain_config = ChainConfig::load_from_opt(self.config_chain.as_deref(), network)?;
         let price_config = PriceConfig::load(self.config_price.as_ref())?;
 
         Ok(BasicApp {

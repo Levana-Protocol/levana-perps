@@ -25,7 +25,7 @@ fn main() -> Result<()> {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main_inner(opt: Opt) -> Result<()> {
-    let factories = MainnetFactories::load_hard_coded()?.factories;
+    let factories = MainnetFactories::load()?.factories;
     let markets = factories
         .into_iter()
         .filter(|item| item.canonical)

@@ -5,6 +5,10 @@ use std::{collections::HashMap, fmt::Write, iter::Sum, ops::AddAssign, path::Pat
 use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, RawAddress};
 use cosmwasm_std::{Uint128, Uint256};
+use figment::{
+    providers::{Env, Format, Toml},
+    Figment,
+};
 use msg::{
     contracts::market::{
         config::{defaults::ConfigDefaults, ConfigUpdate},
@@ -22,7 +26,7 @@ use crate::PerpsNetwork;
 ///
 /// This contains information which would be valid for multiple different
 /// contract deployments on a single chain.
-#[derive(serde::Deserialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ChainConfig {
     pub tracker: Option<Address>,
@@ -41,7 +45,7 @@ pub struct ChainConfig {
     pub age_tolerance_seconds: Option<u32>,
 }
 
-#[derive(serde::Deserialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct NativeAsset {
     pub denom: String,
@@ -63,7 +67,7 @@ impl From<&NativeAsset> for TokenInit {
 }
 
 /// Spot price config for a given chain
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ChainSpotPriceConfig {
     /// Pyth configuration, required on chains that use pyth feeds
@@ -73,7 +77,7 @@ pub struct ChainSpotPriceConfig {
 }
 
 /// Configuration for pyth
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ChainPythConfig {
     /// The address of the pyth oracle contract
@@ -85,7 +89,7 @@ pub struct ChainPythConfig {
 }
 
 /// Configuration for stride
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ChainStrideConfig {
     /// The address of the redemption rate contract
@@ -159,7 +163,9 @@ pub enum MarketPriceFeedConfig {
 }
 
 /// Number of decimals in the gas coin
-#[derive(serde::Deserialize, Clone, Debug, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    serde::Deserialize, serde::Serialize, Clone, Debug, Copy, PartialEq, Eq, PartialOrd, Ord,
+)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct GasDecimals(pub u8);
 impl GasDecimals {
@@ -372,14 +378,28 @@ fn load_yaml<T: serde::de::DeserializeOwned>(
 }
 
 impl ChainConfig {
-    pub fn load(config_file: Option<impl AsRef<Path>>, network: PerpsNetwork) -> Result<Self> {
-        load_yaml::<HashMap<PerpsNetwork, Self>>(
-            "config-chain.yaml",
-            include_bytes!("../assets/config-chain.yaml"),
-            config_file,
-        )?
-        .remove(&network)
-        .with_context(|| format!("No chain config found for {network}"))
+    const PATH: &'static str = "packages/perps-exes/assets/config-chain.toml";
+
+    pub fn load(network: PerpsNetwork) -> Result<Self> {
+        Self::load_from(Self::PATH, network)
+    }
+
+    pub fn load_from_opt(config_file: Option<&Path>, network: PerpsNetwork) -> Result<Self> {
+        match config_file {
+            Some(config_file) => Self::load_from(config_file, network),
+            None => Self::load(network),
+        }
+    }
+
+    pub fn load_from(config_file: impl AsRef<Path>, network: PerpsNetwork) -> Result<Self> {
+        let mut config = Figment::new()
+            .merge(Toml::file(&config_file))
+            .merge(Env::prefixed("LEVANA_CHAIN_CONFIG_"))
+            .extract::<HashMap<PerpsNetwork, _>>()?;
+        tracing::debug!("Loaded chain config: {config:#?}");
+        config
+            .remove(&network)
+            .with_context(|| format!("No chain config found for {network}"))
     }
 }
 
@@ -805,23 +825,29 @@ pub struct MainnetFactory {
 }
 
 impl MainnetFactories {
-    const PATH: &'static str = "packages/perps-exes/assets/mainnet-factories.yaml";
-
-    pub fn load_hard_coded() -> Result<Self> {
-        serde_yaml::from_slice(include_bytes!("../assets/mainnet-factories.yaml")).context(
-            "Error loading MainnetFactories from compile-time ../assets/mainnet-factories.yaml",
-        )
-    }
+    const PATH: &'static str = "packages/perps-exes/assets/mainnet-factories.toml";
 
     pub fn load() -> Result<Self> {
-        let mut file = fs_err::File::open(Self::PATH)?;
-        serde_yaml::from_reader(&mut file)
-            .with_context(|| format!("Error loading MainnetFactories from {}", Self::PATH))
+        let res = Figment::new()
+            .merge(Toml::file(Self::PATH))
+            .merge(Env::prefixed("LEVANA_MAINNET_FACTORIES_"))
+            .extract()
+            .with_context(|| format!("Error loading MainnetFactories from {}", Self::PATH))?;
+        tracing::debug!("Loaded mainnet factories: {res:#?}");
+        Ok(res)
     }
 
     pub fn save(&self) -> Result<()> {
-        let mut file = fs_err::File::create(Self::PATH)?;
-        serde_yaml::to_writer(&mut file, self)
-            .with_context(|| format!("Error saving MainnetFactories to {}", Self::PATH))
+        save_toml(Self::PATH, self)
     }
+}
+
+pub fn save_toml<P, T>(path: P, value: &T) -> Result<()>
+where
+    P: AsRef<Path>,
+    T: serde::Serialize,
+{
+    let path = path.as_ref();
+    (|| fs_err::write(path, toml::to_string_pretty(value)?).map_err(anyhow::Error::from))()
+        .with_context(|| format!("Unable to save TOML file {}", path.display()))
 }

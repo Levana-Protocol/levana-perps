@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
+use std::{collections::HashSet, sync::Arc};
 
 use cosmos::{Address, HasAddressHrp, Wallet};
 use perps_exes::{
@@ -141,7 +141,7 @@ impl Opt {
             gas_decimals,
             assets: _,
             age_tolerance_seconds: _,
-        } = ChainConfig::load(testnet.config_chain.as_ref(), network)?;
+        } = ChainConfig::load_from_opt(testnet.config_chain.as_deref(), network)?;
         let partial = match &testnet.deployment_config {
             Some(s) => serde_yaml::from_str(s)?,
             None => partial,
@@ -299,7 +299,7 @@ impl Opt {
             Some(yaml) => serde_yaml::from_str(yaml).context("Invalid watcher config on CLI")?,
             None => WatcherConfig::default(),
         };
-        let gas_decimals = ChainConfig::load(None::<PathBuf>, *network)?.gas_decimals;
+        let gas_decimals = ChainConfig::load(*network)?.gas_decimals;
         Ok(BotConfig {
             by_type: BotConfigByType::Mainnet {
                 inner: BotConfigMainnet {

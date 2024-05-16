@@ -78,6 +78,8 @@ bigdecimal = { version = "0.4.2", features = ["serde"]}
 http = "1.0.0"
 headers = "0.4.0"
 tower = "0.4.13"
+figment = { version = "0.10.18", features = ["env", "yaml", "toml"] }
+toml = "0.8.12"
 
 [features]
 default = []
