@@ -396,7 +396,7 @@ impl ChainConfig {
             .merge(Toml::file(&config_file))
             .merge(Env::prefixed("LEVANA_CHAIN_CONFIG_"))
             .extract::<HashMap<PerpsNetwork, _>>()?;
-        tracing::debug!("Loaded chain config: {config:?}");
+        tracing::debug!("Loaded chain config: {config:#?}");
         config
             .remove(&network)
             .with_context(|| format!("No chain config found for {network}"))
