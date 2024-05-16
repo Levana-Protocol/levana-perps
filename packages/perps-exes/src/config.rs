@@ -392,10 +392,12 @@ impl ChainConfig {
     }
 
     pub fn load_from(config_file: impl AsRef<Path>, network: PerpsNetwork) -> Result<Self> {
-        Figment::new()
+        let mut config = Figment::new()
             .merge(Toml::file(&config_file))
             .merge(Env::prefixed("LEVANA_CHAIN_CONFIG_"))
-            .extract::<HashMap<PerpsNetwork, _>>()?
+            .extract::<HashMap<PerpsNetwork, _>>()?;
+        tracing::debug!("Loaded chain config: {config:?}");
+        config
             .remove(&network)
             .with_context(|| format!("No chain config found for {network}"))
     }
@@ -826,11 +828,13 @@ impl MainnetFactories {
     const PATH: &'static str = "packages/perps-exes/assets/mainnet-factories.toml";
 
     pub fn load() -> Result<Self> {
-        Figment::new()
+        let res = Figment::new()
             .merge(Toml::file(Self::PATH))
             .merge(Env::prefixed("LEVANA_MAINNET_FACTORIES_"))
             .extract()
-            .with_context(|| format!("Error loading MainnetFactories from {}", Self::PATH))
+            .with_context(|| format!("Error loading MainnetFactories from {}", Self::PATH))?;
+        tracing::debug!("Loaded mainnet factories: {res:?}");
+        Ok(res)
     }
 
     pub fn save(&self) -> Result<()> {
