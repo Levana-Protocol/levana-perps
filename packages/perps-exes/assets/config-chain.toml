@@ -116,6 +116,10 @@ decimal-places = 18
 denom = "ibc/980E82A9F8E7CA8CD480F4577E73682A6D3855A267D1831485D7EBEF0E7A6C2C"
 decimal-places = 18
 
+[osmosis-mainnet.assets.AKT]
+denom = "ibc/1480B8FD20AD5FCAE81EA87584D269547DD4D436843C1D20F15E00EB64743EF4"
+decimal-places = 6
+
 [neutron-testnet]
 tracker = "neutron1clafqjzrwpmaqpgmlpdyaz2lklsykz0n9gyf5ysguvy25uszxh7smjqqcc"
 faucet = "neutron1mmpf9gymelvr33cxu5jt848ufg2zqe3s3h2p9xwz5m6jhtj7zl3qzg7lcf"
