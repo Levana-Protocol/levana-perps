@@ -125,7 +125,7 @@ impl Opt {
         testnet: &TestnetOpt,
     ) -> Result<(BotConfig, Option<FaucetBotRunner>)> {
         let http_timeout_seconds = testnet.http_timeout_seconds;
-        let config = ConfigTestnet::load(testnet.config_testnet.as_ref())?;
+        let config = ConfigTestnet::load_from_opt(testnet.config_testnet.as_deref())?;
         let DeploymentInfo {
             config: partial,
             network,
@@ -142,10 +142,6 @@ impl Opt {
             assets: _,
             age_tolerance_seconds: _,
         } = ChainConfig::load_from_opt(testnet.config_chain.as_deref(), network)?;
-        let partial = match &testnet.deployment_config {
-            Some(s) => serde_yaml::from_str(s)?,
-            None => partial,
-        };
 
         let faucet_bot_wallet = self.get_faucet_bot_wallet(network.get_address_hrp())?;
         let faucet = faucet.with_context(|| format!("No faucet found for {network}"))?;
@@ -256,7 +252,6 @@ impl Opt {
             min_gas,
             min_gas_high_gas_wallet,
             min_gas_refill,
-            watcher_config,
             max_price_age_secs,
             max_allowed_price_delta,
             low_util_ratio,
@@ -295,10 +290,7 @@ impl Opt {
             .map(|idx| get_wallet(idx + crank_wallet_start))
             .collect::<Result<_, _>>()?;
 
-        let watcher = match watcher_config {
-            Some(yaml) => serde_yaml::from_str(yaml).context("Invalid watcher config on CLI")?,
-            None => WatcherConfig::default(),
-        };
+        let watcher = WatcherConfig::default();
         let gas_decimals = ChainConfig::load(*network)?.gas_decimals;
         Ok(BotConfig {
             by_type: BotConfigByType::Mainnet {

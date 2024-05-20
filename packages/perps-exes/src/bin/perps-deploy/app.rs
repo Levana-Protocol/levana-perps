@@ -117,7 +117,7 @@ impl Opt {
         let cosmos = self.connect(network).await?;
         let wallet = self.get_lazy_wallet(network)?;
         let chain_config = ChainConfig::load_from_opt(self.config_chain.as_deref(), network)?;
-        let price_config = PriceConfig::load(self.config_price.as_ref())?;
+        let price_config = PriceConfig::load_from_opt(self.config_price.as_deref())?;
 
         Ok(BasicApp {
             cosmos,
@@ -129,7 +129,7 @@ impl Opt {
     }
 
     pub(crate) async fn load_app(&self, family: &str) -> Result<App> {
-        let config = ConfigTestnet::load(self.config_testnet.as_ref())?;
+        let config = ConfigTestnet::load_from_opt(self.config_testnet.as_deref())?;
         let partial = config.get_deployment_info(family)?;
         let basic = self.load_basic_app(partial.network).await?;
 

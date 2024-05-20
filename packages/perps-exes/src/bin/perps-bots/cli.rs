@@ -110,9 +110,6 @@ pub(crate) struct TestnetOpt {
     /// Override the number of trading bots to run
     #[clap(long, env = "LEVANA_BOTS_TRADERS")]
     pub(crate) traders: Option<u32>,
-    /// Override the contents of the DeploymentConfig in YAML format
-    #[clap(long, env = "LEVANA_BOTS_DEPLOYMENT_CONFIG")]
-    pub(crate) deployment_config: Option<String>,
     /// Deployment name to use (aka contract family)
     #[clap(long, env = "LEVANA_BOTS_DEPLOYMENT")]
     pub(crate) deployment: String,
@@ -148,8 +145,6 @@ pub(crate) struct MainnetOpt {
     /// Minimum required in the refill wallet used to top off price and crank wallets
     #[clap(long, env = "LEVANA_BOTS_MIN_GAS_REFILL")]
     pub(crate) min_gas_refill: GasAmount,
-    #[clap(long, env = "LEVANA_BOTS_WATCHER_CONFIG")]
-    pub(crate) watcher_config: Option<String>,
     #[clap(long, env = "LEVANA_BOTS_MAX_PRICE_AGE_SECS")]
     pub(crate) max_price_age_secs: Option<u32>,
     #[clap(long, env = "LEVANA_BOTS_MAX_ALLOWED_PRICE_DELTA")]

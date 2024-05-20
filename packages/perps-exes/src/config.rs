@@ -1,6 +1,6 @@
 pub mod defaults;
 
-use std::{collections::HashMap, fmt::Write, iter::Sum, ops::AddAssign, path::Path};
+use std::{collections::BTreeMap, fmt::Write, iter::Sum, ops::AddAssign, path::Path};
 
 use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, RawAddress};
@@ -41,7 +41,7 @@ pub struct ChainConfig {
     /// Number of decimals in the gas coin
     pub gas_decimals: GasDecimals,
     #[serde(default)]
-    pub assets: HashMap<String, NativeAsset>,
+    pub assets: BTreeMap<String, NativeAsset>,
     pub age_tolerance_seconds: Option<u32>,
 }
 
@@ -97,16 +97,16 @@ pub struct ChainStrideConfig {
 }
 
 /// Overall configuration of prices, for information valid across all chains.
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PriceConfig {
     pub pyth: PythPriceConfig,
     /// Mappings from a key to price feed
-    pub networks: HashMap<PerpsNetwork, HashMap<MarketId, MarketPriceFeedConfigs>>,
+    pub networks: BTreeMap<PerpsNetwork, BTreeMap<MarketId, MarketPriceFeedConfigs>>,
 }
 
 /// Overall configuration of Pyth, for information valid across all chains.
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PythPriceConfig {
     /// Configuration for stable feeds
@@ -116,15 +116,15 @@ pub struct PythPriceConfig {
 }
 
 /// Overall configuration of Pyth, for information valid across all chains.
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PythPriceServiceConfig {
     /// How old a price to allow, in seconds
     pub update_age_tolerance: u32,
     /// Mappings from a key to price feed  id
-    pub feed_ids: HashMap<String, PriceIdentifier>,
+    pub feed_ids: BTreeMap<String, PriceIdentifier>,
 }
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MarketPriceFeedConfigs {
     /// feed of the base asset in terms of the quote asset
@@ -135,7 +135,7 @@ pub struct MarketPriceFeedConfigs {
     pub stride_contract: Option<Address>,
 }
 
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum MarketPriceFeedConfig {
     Pyth {
@@ -241,22 +241,22 @@ impl std::fmt::Debug for GasAmount {
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ConfigTestnet {
-    deployments: HashMap<String, DeploymentConfigTestnet>,
-    overrides: HashMap<String, DeploymentConfigTestnet>,
+    deployments: BTreeMap<String, DeploymentConfigTestnet>,
+    overrides: BTreeMap<String, DeploymentConfigTestnet>,
     pub price_api: String,
     pub liquidity: LiquidityConfig,
     pub utilization: UtilizationConfig,
     pub trader: TraderConfig,
     /// QA wallet used for price updates
     pub qa_wallet: RawAddress,
-    pub initial_prices: HashMap<MarketId, InitialPrice>,
+    pub initial_prices: BTreeMap<MarketId, InitialPrice>,
 }
 
-#[derive(serde::Deserialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct LiquidityConfig {
     /// Min and max per different markets
-    pub markets: HashMap<MarketId, LiquidityBounds>,
+    pub markets: BTreeMap<MarketId, LiquidityBounds>,
     /// Lower bound of util ratio, at which point we would withdraw liquidity
     pub min_util_delta: Signed<Decimal256>,
     /// Upper bound of util ratio, at which point we would deposit liquidity
@@ -276,7 +276,7 @@ pub struct LiquidityTransactionConfig {
     pub total_deposits_percentage: Decimal256,
 }
 
-#[derive(serde::Deserialize, Clone, Copy, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct UtilizationConfig {
     /// Lower bound of util ratio, at which point we would open a position
@@ -285,7 +285,7 @@ pub struct UtilizationConfig {
     pub max_util_delta: Signed<Decimal256>,
 }
 
-#[derive(serde::Deserialize, Clone, Copy, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct TraderConfig {
     /// Upper bound of util ratio, at which point we always close a position
@@ -296,7 +296,7 @@ pub struct TraderConfig {
     pub max_borrow_fee: Decimal256,
 }
 
-#[derive(serde::Deserialize, Clone, Copy, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct LiquidityBounds {
     pub min: Collateral,
@@ -359,24 +359,6 @@ pub struct DeploymentConfigTestnet {
     pub qa_price_updates: bool,
 }
 
-fn load_yaml<T: serde::de::DeserializeOwned>(
-    static_path: &str,
-    static_contents: &[u8],
-    runtime_path: Option<impl AsRef<Path>>,
-) -> Result<T> {
-    match runtime_path {
-        Some(path) => {
-            let path = path.as_ref();
-            let mut file = fs_err::File::open(path)?;
-            serde_yaml::from_reader(&mut file)
-                .with_context(|| format!("Parse error reading from YAML file {}", path.display()))
-        }
-        None => serde_yaml::from_slice(static_contents).with_context(|| {
-            format!("Parse error reading from compiled-in YAML file {static_path}")
-        }),
-    }
-}
-
 impl ChainConfig {
     const PATH: &'static str = "packages/perps-exes/assets/config-chain.toml";
 
@@ -392,24 +374,32 @@ impl ChainConfig {
     }
 
     pub fn load_from(config_file: impl AsRef<Path>, network: PerpsNetwork) -> Result<Self> {
-        let mut config = Figment::new()
-            .merge(Toml::file(&config_file))
-            .merge(Env::prefixed("LEVANA_CHAIN_CONFIG_"))
-            .extract::<HashMap<PerpsNetwork, _>>()?;
-        tracing::debug!("Loaded chain config: {config:#?}");
-        config
-            .remove(&network)
-            .with_context(|| format!("No chain config found for {network}"))
+        load_toml::<_, BTreeMap<PerpsNetwork, Self>>(
+            config_file,
+            "LEVANA_CHAIN_CONFIG_",
+            "chain config",
+        )?
+        .remove(&network)
+        .with_context(|| format!("No chain config found for {network}"))
     }
 }
 
 impl ConfigTestnet {
-    pub fn load(config_file: Option<impl AsRef<Path>>) -> Result<Self> {
-        load_yaml(
-            "config-testnet.yaml",
-            include_bytes!("../assets/config-testnet.yaml"),
-            config_file,
-        )
+    const PATH: &'static str = "packages/perps-exes/assets/config-testnet.toml";
+
+    pub fn load() -> Result<Self> {
+        Self::load_from(Self::PATH)
+    }
+
+    pub fn load_from_opt(config_file: Option<&Path>) -> Result<Self> {
+        match config_file {
+            Some(config_file) => Self::load_from(config_file),
+            None => Self::load(),
+        }
+    }
+
+    pub fn load_from(config_file: impl AsRef<Path>) -> Result<Self> {
+        load_toml(config_file, "LEVANA_TESTNET_", "testnet config")
     }
 
     /// Provide the deployment name, such as osmodev, dragonqa, or seibeta
@@ -441,12 +431,21 @@ impl ConfigTestnet {
 }
 
 impl PriceConfig {
-    pub fn load(config_file: Option<impl AsRef<Path>>) -> Result<Self> {
-        load_yaml(
-            "config-price.yaml",
-            include_bytes!("../assets/config-price.yaml"),
-            config_file,
-        )
+    const PATH: &'static str = "packages/perps-exes/assets/config-price.toml";
+
+    pub fn load() -> Result<Self> {
+        Self::load_from(Self::PATH)
+    }
+
+    pub fn load_from_opt(config_file: Option<&Path>) -> Result<Self> {
+        match config_file {
+            Some(config_file) => Self::load_from(config_file),
+            None => Self::load(),
+        }
+    }
+
+    pub fn load_from(config_file: impl AsRef<Path>) -> Result<Self> {
+        load_toml(config_file, "LEVANA_PRICE_", "price config")
     }
 }
 
@@ -479,7 +478,7 @@ pub fn parse_deployment(deployment: &str) -> Result<(PerpsNetwork, &str)> {
     ))
 }
 
-#[derive(serde::Deserialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct WatcherConfig {
     /// How many times to retry before giving up
@@ -661,7 +660,7 @@ impl Default for WatcherConfig {
     }
 }
 
-#[derive(serde::Deserialize, Clone, Copy, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct TaskConfig {
     /// Seconds to delay between runs
@@ -678,7 +677,7 @@ pub struct TaskConfig {
     pub delay_between_retries: Option<u32>,
 }
 
-#[derive(serde::Deserialize, Clone, Copy, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum Delay {
     NoDelay,
@@ -687,14 +686,14 @@ pub enum Delay {
     Random { low: u64, high: u64 },
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MarketConfigUpdates {
-    pub markets: HashMap<MarketId, ConfigUpdateAndBorrowFee>,
-    pub crank_fees: HashMap<PerpsNetwork, CrankFeeConfig>,
+    pub markets: BTreeMap<MarketId, ConfigUpdateAndBorrowFee>,
+    pub crank_fees: BTreeMap<PerpsNetwork, CrankFeeConfig>,
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct CrankFeeConfig {
     pub charged: Usd,
@@ -702,7 +701,7 @@ pub struct CrankFeeConfig {
     pub reward: Usd,
 }
 
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct ConfigUpdateAndBorrowFee {
     pub config: ConfigUpdate,
@@ -711,13 +710,10 @@ pub struct ConfigUpdateAndBorrowFee {
 
 impl MarketConfigUpdates {
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {
-        let path = path.as_ref();
-        let mut file = fs_err::File::open(path)?;
-        let res: MarketConfigUpdates = serde_yaml::from_reader(&mut file).with_context(|| {
-            format!("Error loading MarketConfigUpdates from {}", path.display())
-        })?;
-        res.validate_carry_leverage()?;
-        Ok(res)
+        let config: Self = load_toml(path, "LEVANA_MARKETS_", "markets config")?;
+
+        config.validate_carry_leverage()?;
+        Ok(config)
     }
 
     fn validate_carry_leverage(&self) -> Result<()> {
@@ -828,18 +824,27 @@ impl MainnetFactories {
     const PATH: &'static str = "packages/perps-exes/assets/mainnet-factories.toml";
 
     pub fn load() -> Result<Self> {
-        let res = Figment::new()
-            .merge(Toml::file(Self::PATH))
-            .merge(Env::prefixed("LEVANA_MAINNET_FACTORIES_"))
-            .extract()
-            .with_context(|| format!("Error loading MainnetFactories from {}", Self::PATH))?;
-        tracing::debug!("Loaded mainnet factories: {res:#?}");
-        Ok(res)
+        load_toml(Self::PATH, "LEVANA_MAINNET_FACTORIES_", "mainnet factories")
     }
 
     pub fn save(&self) -> Result<()> {
         save_toml(Self::PATH, self)
     }
+}
+
+pub fn load_toml<P, T>(path: P, env_prefix: &str, config_desc: &str) -> Result<T>
+where
+    P: AsRef<Path>,
+    T: serde::de::DeserializeOwned + std::fmt::Debug,
+{
+    let path = path.as_ref();
+    let config = Figment::new()
+        .merge(Toml::file(path))
+        .merge(Env::prefixed(env_prefix))
+        .extract()
+        .with_context(|| format!("Unable to load {config_desc} from {}", path.display()))?;
+    tracing::debug!("Loaded {config_desc}: {config:#?}");
+    Ok(config)
 }
 
 pub fn save_toml<P, T>(path: P, value: &T) -> Result<()>
