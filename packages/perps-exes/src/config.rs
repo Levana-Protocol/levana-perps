@@ -1,9 +1,9 @@
 pub mod defaults;
 
-use std::{collections::HashMap, fmt::Write, iter::Sum, ops::AddAssign, path::Path};
+use std::{collections::BTreeMap, fmt::Write, iter::Sum, ops::AddAssign, path::Path};
 
 use chrono::{DateTime, Utc};
-use cosmos::{Address, CosmosNetwork, RawAddress};
+use cosmos::{Address, CosmosNetwork};
 use cosmwasm_std::{Uint128, Uint256};
 use figment::{
     providers::{Env, Format, Toml},
@@ -41,7 +41,7 @@ pub struct ChainConfig {
     /// Number of decimals in the gas coin
     pub gas_decimals: GasDecimals,
     #[serde(default)]
-    pub assets: HashMap<String, NativeAsset>,
+    pub assets: BTreeMap<String, NativeAsset>,
     pub age_tolerance_seconds: Option<u32>,
 }
 
@@ -97,16 +97,16 @@ pub struct ChainStrideConfig {
 }
 
 /// Overall configuration of prices, for information valid across all chains.
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PriceConfig {
     pub pyth: PythPriceConfig,
     /// Mappings from a key to price feed
-    pub networks: HashMap<PerpsNetwork, HashMap<MarketId, MarketPriceFeedConfigs>>,
+    pub networks: BTreeMap<PerpsNetwork, BTreeMap<MarketId, MarketPriceFeedConfigs>>,
 }
 
 /// Overall configuration of Pyth, for information valid across all chains.
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PythPriceConfig {
     /// Configuration for stable feeds
@@ -116,15 +116,15 @@ pub struct PythPriceConfig {
 }
 
 /// Overall configuration of Pyth, for information valid across all chains.
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PythPriceServiceConfig {
     /// How old a price to allow, in seconds
     pub update_age_tolerance: u32,
     /// Mappings from a key to price feed  id
-    pub feed_ids: HashMap<String, PriceIdentifier>,
+    pub feed_ids: BTreeMap<String, PriceIdentifier>,
 }
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MarketPriceFeedConfigs {
     /// feed of the base asset in terms of the quote asset
@@ -135,7 +135,7 @@ pub struct MarketPriceFeedConfigs {
     pub stride_contract: Option<Address>,
 }
 
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum MarketPriceFeedConfig {
     Pyth {
@@ -238,25 +238,25 @@ impl std::fmt::Debug for GasAmount {
     }
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ConfigTestnet {
-    deployments: HashMap<String, DeploymentConfigTestnet>,
-    overrides: HashMap<String, DeploymentConfigTestnet>,
+    deployments: BTreeMap<String, DeploymentConfigTestnet>,
+    overrides: BTreeMap<String, DeploymentConfigTestnet>,
     pub price_api: String,
     pub liquidity: LiquidityConfig,
     pub utilization: UtilizationConfig,
     pub trader: TraderConfig,
     /// QA wallet used for price updates
-    pub qa_wallet: RawAddress,
-    pub initial_prices: HashMap<MarketId, InitialPrice>,
+    pub qa_wallet: Address, // FIXME change back to RawAddress
+    pub initial_prices: BTreeMap<MarketId, InitialPrice>,
 }
 
-#[derive(serde::Deserialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct LiquidityConfig {
     /// Min and max per different markets
-    pub markets: HashMap<MarketId, LiquidityBounds>,
+    pub markets: BTreeMap<MarketId, LiquidityBounds>,
     /// Lower bound of util ratio, at which point we would withdraw liquidity
     pub min_util_delta: Signed<Decimal256>,
     /// Upper bound of util ratio, at which point we would deposit liquidity
@@ -276,7 +276,7 @@ pub struct LiquidityTransactionConfig {
     pub total_deposits_percentage: Decimal256,
 }
 
-#[derive(serde::Deserialize, Clone, Copy, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct UtilizationConfig {
     /// Lower bound of util ratio, at which point we would open a position
@@ -285,7 +285,7 @@ pub struct UtilizationConfig {
     pub max_util_delta: Signed<Decimal256>,
 }
 
-#[derive(serde::Deserialize, Clone, Copy, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct TraderConfig {
     /// Upper bound of util ratio, at which point we always close a position
@@ -296,14 +296,14 @@ pub struct TraderConfig {
     pub max_borrow_fee: Decimal256,
 }
 
-#[derive(serde::Deserialize, Clone, Copy, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct LiquidityBounds {
     pub min: Collateral,
     pub max: Collateral,
 }
 
-#[derive(serde::Deserialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct DeploymentConfigTestnet {
     /// How many crank run wallets to set up
@@ -316,7 +316,7 @@ pub struct DeploymentConfigTestnet {
     #[serde(default = "defaults::seconds_till_ultra")]
     pub seconds_till_ultra: u32,
     pub price: bool,
-    pub wallet_manager_address: RawAddress,
+    pub wallet_manager_address: Address, // FIXME change back to RawAddress
     #[serde(default)]
     pub dev_settings: bool,
     #[serde(default)]
@@ -395,7 +395,7 @@ impl ChainConfig {
         let mut config = Figment::new()
             .merge(Toml::file(&config_file))
             .merge(Env::prefixed("LEVANA_CHAIN_CONFIG_"))
-            .extract::<HashMap<PerpsNetwork, _>>()?;
+            .extract::<BTreeMap<PerpsNetwork, _>>()?;
         tracing::debug!("Loaded chain config: {config:#?}");
         config
             .remove(&network)
@@ -479,7 +479,7 @@ pub fn parse_deployment(deployment: &str) -> Result<(PerpsNetwork, &str)> {
     ))
 }
 
-#[derive(serde::Deserialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct WatcherConfig {
     /// How many times to retry before giving up
@@ -661,7 +661,7 @@ impl Default for WatcherConfig {
     }
 }
 
-#[derive(serde::Deserialize, Clone, Copy, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct TaskConfig {
     /// Seconds to delay between runs
@@ -678,7 +678,7 @@ pub struct TaskConfig {
     pub delay_between_retries: Option<u32>,
 }
 
-#[derive(serde::Deserialize, Clone, Copy, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum Delay {
     NoDelay,
@@ -687,14 +687,14 @@ pub enum Delay {
     Random { low: u64, high: u64 },
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MarketConfigUpdates {
-    pub markets: HashMap<MarketId, ConfigUpdateAndBorrowFee>,
-    pub crank_fees: HashMap<PerpsNetwork, CrankFeeConfig>,
+    pub markets: BTreeMap<MarketId, ConfigUpdateAndBorrowFee>,
+    pub crank_fees: BTreeMap<PerpsNetwork, CrankFeeConfig>,
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct CrankFeeConfig {
     pub charged: Usd,
@@ -702,7 +702,7 @@ pub struct CrankFeeConfig {
     pub reward: Usd,
 }
 
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct ConfigUpdateAndBorrowFee {
     pub config: ConfigUpdate,

@@ -21,7 +21,10 @@ use msg::contracts::market::{
     spot_price::{PythPriceServiceNetwork, SpotPriceFeedData},
 };
 use perps_exes::{
-    config::ChainConfig, contracts::Factory, prelude::MarketContract, pyth::get_oracle_update_msg,
+    config::{save_toml, ChainConfig, ConfigTestnet, MarketConfigUpdates, PriceConfig},
+    contracts::Factory,
+    prelude::MarketContract,
+    pyth::get_oracle_update_msg,
     PerpsNetwork,
 };
 use serde_json::json;
@@ -29,6 +32,8 @@ use shared::storage::{
     Collateral, DirectionToBase, LeverageToBase, MarketId, Notional, Signed, UnsignedDecimal, Usd,
 };
 use tokio::{sync::Mutex, task::JoinSet};
+
+use crate::mainnet::CodeIds;
 
 #[derive(clap::Parser)]
 pub(crate) struct UtilOpt {
@@ -83,6 +88,8 @@ enum Sub {
         #[clap(flatten)]
         inner: tvl_report::TvlReportOpt,
     },
+    /// Convert config files to TOML
+    ToToml,
 }
 
 impl UtilOpt {
@@ -97,6 +104,7 @@ impl UtilOpt {
             Sub::TokenBalances { inner } => inner.go(opt).await,
             Sub::ListContracts { inner } => inner.go().await,
             Sub::TvlReport { inner } => inner.go(opt).await,
+            Sub::ToToml => to_toml(),
         }
     }
 }
@@ -704,4 +712,24 @@ impl PositionRecord {
             active_collateral: Collateral::zero(),
         })
     }
+}
+
+fn to_toml() -> Result<()> {
+    let config =
+        MarketConfigUpdates::load("packages/perps-exes/assets/market-config-updates.yaml")?;
+    save_toml(
+        "packages/perps-exes/assets/market-config-updates.toml",
+        &config,
+    )?;
+
+    let config = PriceConfig::load(None::<PathBuf>)?;
+    save_toml("packages/perps-exes/assets/config-price.toml", &config)?;
+
+    let config = ConfigTestnet::load(None::<PathBuf>)?;
+    save_toml("packages/perps-exes/assets/config-testnet.toml", &config)?;
+
+    let config = CodeIds::load()?;
+    save_toml("packages/perps-exes/assets/mainnet-code-ids.toml", &config)?;
+
+    Ok(())
 }

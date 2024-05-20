@@ -161,7 +161,7 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
 /// Stores code ID by the SHA256 hash of the contract.
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-struct CodeIds {
+pub(crate) struct CodeIds {
     /// Uses a Vec instead of a HashMap to keep consistent ordering and avoid large diffs.
     hashes: Vec<StoredContract>,
 }
@@ -169,7 +169,7 @@ struct CodeIds {
 impl CodeIds {
     const PATH: &'static str = "packages/perps-exes/assets/mainnet-code-ids.yaml";
 
-    fn load() -> Result<Self> {
+    pub(crate) fn load() -> Result<Self> {
         let mut file = fs_err::File::open(Self::PATH)?;
         serde_yaml::from_reader(&mut file)
             .with_context(|| format!("Error loading CodeIds from {}", Self::PATH))

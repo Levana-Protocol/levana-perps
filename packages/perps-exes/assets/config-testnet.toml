@@ -1,0 +1,1641 @@
+price-api = "https://price-api.levana.exchange/"
+qa-wallet = "levana1ssnwszx2dutvlrpwwgefpfyswgrrm059qp2zr2"
+
+[deployments.beta]
+crank = 4
+ultra-crank = 0
+seconds-till-ultra = 480
+price = true
+wallet-manager-address = "osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k"
+dev-settings = false
+trading-competition = false
+liquidity = true
+utilization = true
+balance = true
+traders = 0
+default-market-ids = [
+    "ATOM_USD",
+    "BTC_USD",
+]
+ignore-stale = false
+min-gas = "1"
+min-gas-high-gas-wallet = "500"
+min-gas-in-faucet = "10000"
+min-gas-in-gas-wallet = "10000"
+max-price-age-secs = 3600
+max-allowed-price-delta = "0.001"
+qa-price-updates = false
+
+[deployments.beta.watcher]
+retries = 6
+delay-between-retries = 20
+
+[deployments.beta.watcher.balance]
+out-of-date = 180
+
+[deployments.beta.watcher.balance.delay]
+constant = 20
+
+[deployments.beta.watcher.gas-check]
+out-of-date = 180
+
+[deployments.beta.watcher.gas-check.delay]
+constant = 60
+
+[deployments.beta.watcher.liquidity]
+out-of-date = 180
+
+[deployments.beta.watcher.liquidity.delay]
+constant = 120
+
+[deployments.beta.watcher.trader]
+out-of-date = 180
+
+[deployments.beta.watcher.trader.delay.random]
+low = 120
+high = 1200
+
+[deployments.beta.watcher.utilization]
+out-of-date = 120
+
+[deployments.beta.watcher.utilization.delay]
+constant = 120
+
+[deployments.beta.watcher.track-balance]
+out-of-date = 60
+
+[deployments.beta.watcher.track-balance.delay]
+constant = 60
+
+[deployments.beta.watcher.crank-watch]
+out-of-date = 60
+
+[deployments.beta.watcher.crank-watch.delay]
+constant = 30
+
+[deployments.beta.watcher.crank-run]
+delay = "no-delay"
+
+[deployments.beta.watcher.get-factory]
+out-of-date = 180
+retries = 5
+delay-between-retries = 30
+
+[deployments.beta.watcher.get-factory.delay]
+constant = 60
+
+[deployments.beta.watcher.price]
+delay = "new-block"
+out-of-date = 30
+retries = 20
+delay-between-retries = 1
+
+[deployments.beta.watcher.stale]
+out-of-date = 180
+retries = 5
+delay-between-retries = 20
+
+[deployments.beta.watcher.stale.delay]
+constant = 30
+
+[deployments.beta.watcher.stats]
+out-of-date = 180
+
+[deployments.beta.watcher.stats.delay]
+constant = 30
+
+[deployments.beta.watcher.stats-alert]
+out-of-date = 180
+
+[deployments.beta.watcher.stats-alert.delay]
+constant = 30
+
+[deployments.beta.watcher.ultra-crank]
+out-of-date = 180
+
+[deployments.beta.watcher.ultra-crank.delay]
+constant = 120
+
+[deployments.beta.watcher.liquidity-transaction]
+out-of-date = 180
+
+[deployments.beta.watcher.liquidity-transaction.delay]
+constant = 120
+
+[deployments.beta.watcher.rpc-health]
+out-of-date = 500
+
+[deployments.beta.watcher.rpc-health.delay]
+constant = 300
+
+[deployments.beta.watcher.congestion]
+out-of-date = 2
+
+[deployments.beta.watcher.congestion.delay]
+constant = 2
+
+[deployments.beta.watcher.high-gas]
+delay = "no-delay"
+
+[deployments.beta.watcher.block-lag]
+out-of-date = 20
+
+[deployments.beta.watcher.block-lag.delay]
+constant = 20
+
+[deployments.ci]
+crank = 4
+ultra-crank = 0
+seconds-till-ultra = 480
+price = true
+wallet-manager-address = "osmo1ghgpnmxgt6xz463423hhnx8zp99dwt563wnllv"
+dev-settings = true
+trading-competition = false
+liquidity = true
+utilization = true
+balance = true
+traders = 0
+default-market-ids = [
+    "nBTC_USD",
+    "ATOM_USD",
+    "OSMO_USDC",
+    "ETH_BTC",
+    "BTC_USD",
+    "axlETH_USD",
+    "BTC_INJ",
+]
+ignore-stale = false
+min-gas = "1"
+min-gas-high-gas-wallet = "500"
+min-gas-in-faucet = "10000"
+min-gas-in-gas-wallet = "10000"
+max-price-age-secs = 3600
+max-allowed-price-delta = "0.001"
+qa-price-updates = false
+
+[deployments.ci.watcher]
+retries = 6
+delay-between-retries = 20
+
+[deployments.ci.watcher.balance]
+out-of-date = 180
+
+[deployments.ci.watcher.balance.delay]
+constant = 20
+
+[deployments.ci.watcher.gas-check]
+out-of-date = 180
+
+[deployments.ci.watcher.gas-check.delay]
+constant = 60
+
+[deployments.ci.watcher.liquidity]
+out-of-date = 180
+
+[deployments.ci.watcher.liquidity.delay]
+constant = 120
+
+[deployments.ci.watcher.trader]
+out-of-date = 180
+
+[deployments.ci.watcher.trader.delay.random]
+low = 120
+high = 1200
+
+[deployments.ci.watcher.utilization]
+out-of-date = 120
+
+[deployments.ci.watcher.utilization.delay]
+constant = 120
+
+[deployments.ci.watcher.track-balance]
+out-of-date = 60
+
+[deployments.ci.watcher.track-balance.delay]
+constant = 60
+
+[deployments.ci.watcher.crank-watch]
+out-of-date = 60
+
+[deployments.ci.watcher.crank-watch.delay]
+constant = 30
+
+[deployments.ci.watcher.crank-run]
+delay = "no-delay"
+
+[deployments.ci.watcher.get-factory]
+out-of-date = 180
+retries = 5
+delay-between-retries = 30
+
+[deployments.ci.watcher.get-factory.delay]
+constant = 60
+
+[deployments.ci.watcher.price]
+delay = "new-block"
+out-of-date = 30
+retries = 20
+delay-between-retries = 1
+
+[deployments.ci.watcher.stale]
+out-of-date = 180
+retries = 5
+delay-between-retries = 20
+
+[deployments.ci.watcher.stale.delay]
+constant = 30
+
+[deployments.ci.watcher.stats]
+out-of-date = 180
+
+[deployments.ci.watcher.stats.delay]
+constant = 30
+
+[deployments.ci.watcher.stats-alert]
+out-of-date = 180
+
+[deployments.ci.watcher.stats-alert.delay]
+constant = 30
+
+[deployments.ci.watcher.ultra-crank]
+out-of-date = 180
+
+[deployments.ci.watcher.ultra-crank.delay]
+constant = 120
+
+[deployments.ci.watcher.liquidity-transaction]
+out-of-date = 180
+
+[deployments.ci.watcher.liquidity-transaction.delay]
+constant = 120
+
+[deployments.ci.watcher.rpc-health]
+out-of-date = 500
+
+[deployments.ci.watcher.rpc-health.delay]
+constant = 300
+
+[deployments.ci.watcher.congestion]
+out-of-date = 2
+
+[deployments.ci.watcher.congestion.delay]
+constant = 2
+
+[deployments.ci.watcher.high-gas]
+delay = "no-delay"
+
+[deployments.ci.watcher.block-lag]
+out-of-date = 20
+
+[deployments.ci.watcher.block-lag.delay]
+constant = 20
+
+[deployments.debug]
+crank = 4
+ultra-crank = 0
+seconds-till-ultra = 480
+price = true
+wallet-manager-address = "levana19ta8kepflecc7n2rdruduj9ydt72z2xy0gl5e9"
+dev-settings = true
+trading-competition = false
+liquidity = false
+utilization = false
+balance = false
+traders = 0
+default-market-ids = [
+    "BTC_USD",
+    "ETH_USD",
+]
+ignore-stale = false
+min-gas = "1"
+min-gas-high-gas-wallet = "500"
+min-gas-in-faucet = "10000"
+min-gas-in-gas-wallet = "10000"
+max-price-age-secs = 3600
+max-allowed-price-delta = "0.001"
+qa-price-updates = false
+
+[deployments.debug.watcher]
+retries = 6
+delay-between-retries = 20
+
+[deployments.debug.watcher.balance]
+out-of-date = 180
+
+[deployments.debug.watcher.balance.delay]
+constant = 20
+
+[deployments.debug.watcher.gas-check]
+out-of-date = 180
+
+[deployments.debug.watcher.gas-check.delay]
+constant = 60
+
+[deployments.debug.watcher.liquidity]
+out-of-date = 180
+
+[deployments.debug.watcher.liquidity.delay]
+constant = 120
+
+[deployments.debug.watcher.trader]
+out-of-date = 180
+
+[deployments.debug.watcher.trader.delay.random]
+low = 120
+high = 1200
+
+[deployments.debug.watcher.utilization]
+out-of-date = 120
+
+[deployments.debug.watcher.utilization.delay]
+constant = 120
+
+[deployments.debug.watcher.track-balance]
+out-of-date = 60
+
+[deployments.debug.watcher.track-balance.delay]
+constant = 60
+
+[deployments.debug.watcher.crank-watch]
+out-of-date = 60
+
+[deployments.debug.watcher.crank-watch.delay]
+constant = 30
+
+[deployments.debug.watcher.crank-run]
+delay = "no-delay"
+
+[deployments.debug.watcher.get-factory]
+out-of-date = 180
+retries = 5
+delay-between-retries = 30
+
+[deployments.debug.watcher.get-factory.delay]
+constant = 60
+
+[deployments.debug.watcher.price]
+delay = "new-block"
+out-of-date = 30
+retries = 20
+delay-between-retries = 1
+
+[deployments.debug.watcher.stale]
+out-of-date = 180
+retries = 5
+delay-between-retries = 20
+
+[deployments.debug.watcher.stale.delay]
+constant = 30
+
+[deployments.debug.watcher.stats]
+out-of-date = 180
+
+[deployments.debug.watcher.stats.delay]
+constant = 30
+
+[deployments.debug.watcher.stats-alert]
+out-of-date = 180
+
+[deployments.debug.watcher.stats-alert.delay]
+constant = 30
+
+[deployments.debug.watcher.ultra-crank]
+out-of-date = 180
+
+[deployments.debug.watcher.ultra-crank.delay]
+constant = 120
+
+[deployments.debug.watcher.liquidity-transaction]
+out-of-date = 180
+
+[deployments.debug.watcher.liquidity-transaction.delay]
+constant = 120
+
+[deployments.debug.watcher.rpc-health]
+out-of-date = 500
+
+[deployments.debug.watcher.rpc-health.delay]
+constant = 300
+
+[deployments.debug.watcher.congestion]
+out-of-date = 2
+
+[deployments.debug.watcher.congestion.delay]
+constant = 2
+
+[deployments.debug.watcher.high-gas]
+delay = "no-delay"
+
+[deployments.debug.watcher.block-lag]
+out-of-date = 20
+
+[deployments.debug.watcher.block-lag.delay]
+constant = 20
+
+[deployments.dev]
+crank = 4
+ultra-crank = 0
+seconds-till-ultra = 480
+price = true
+wallet-manager-address = "osmo1lkc7lnq204m4yeydcdg94stkm50jjyglh7ucel"
+dev-settings = true
+trading-competition = false
+liquidity = true
+utilization = true
+balance = true
+traders = 0
+default-market-ids = [
+    "ATOM_USD",
+    "BTC_USD",
+]
+ignore-stale = false
+min-gas = "1"
+min-gas-high-gas-wallet = "500"
+min-gas-in-faucet = "10000"
+min-gas-in-gas-wallet = "10000"
+max-price-age-secs = 3600
+max-allowed-price-delta = "0.001"
+qa-price-updates = false
+
+[deployments.dev.watcher]
+retries = 6
+delay-between-retries = 20
+
+[deployments.dev.watcher.balance]
+out-of-date = 180
+
+[deployments.dev.watcher.balance.delay]
+constant = 20
+
+[deployments.dev.watcher.gas-check]
+out-of-date = 180
+
+[deployments.dev.watcher.gas-check.delay]
+constant = 60
+
+[deployments.dev.watcher.liquidity]
+out-of-date = 180
+
+[deployments.dev.watcher.liquidity.delay]
+constant = 120
+
+[deployments.dev.watcher.trader]
+out-of-date = 180
+
+[deployments.dev.watcher.trader.delay.random]
+low = 120
+high = 1200
+
+[deployments.dev.watcher.utilization]
+out-of-date = 120
+
+[deployments.dev.watcher.utilization.delay]
+constant = 120
+
+[deployments.dev.watcher.track-balance]
+out-of-date = 60
+
+[deployments.dev.watcher.track-balance.delay]
+constant = 60
+
+[deployments.dev.watcher.crank-watch]
+out-of-date = 60
+
+[deployments.dev.watcher.crank-watch.delay]
+constant = 30
+
+[deployments.dev.watcher.crank-run]
+delay = "no-delay"
+
+[deployments.dev.watcher.get-factory]
+out-of-date = 180
+retries = 5
+delay-between-retries = 30
+
+[deployments.dev.watcher.get-factory.delay]
+constant = 60
+
+[deployments.dev.watcher.price]
+delay = "new-block"
+out-of-date = 30
+retries = 20
+delay-between-retries = 1
+
+[deployments.dev.watcher.stale]
+out-of-date = 180
+retries = 5
+delay-between-retries = 20
+
+[deployments.dev.watcher.stale.delay]
+constant = 30
+
+[deployments.dev.watcher.stats]
+out-of-date = 180
+
+[deployments.dev.watcher.stats.delay]
+constant = 30
+
+[deployments.dev.watcher.stats-alert]
+out-of-date = 180
+
+[deployments.dev.watcher.stats-alert.delay]
+constant = 30
+
+[deployments.dev.watcher.ultra-crank]
+out-of-date = 180
+
+[deployments.dev.watcher.ultra-crank.delay]
+constant = 120
+
+[deployments.dev.watcher.liquidity-transaction]
+out-of-date = 180
+
+[deployments.dev.watcher.liquidity-transaction.delay]
+constant = 120
+
+[deployments.dev.watcher.rpc-health]
+out-of-date = 500
+
+[deployments.dev.watcher.rpc-health.delay]
+constant = 300
+
+[deployments.dev.watcher.congestion]
+out-of-date = 2
+
+[deployments.dev.watcher.congestion.delay]
+constant = 2
+
+[deployments.dev.watcher.high-gas]
+delay = "no-delay"
+
+[deployments.dev.watcher.block-lag]
+out-of-date = 20
+
+[deployments.dev.watcher.block-lag.delay]
+constant = 20
+
+[deployments.qa]
+crank = 4
+ultra-crank = 0
+seconds-till-ultra = 480
+price = false
+wallet-manager-address = "levana1ep4uavfsyw5dp7ymtkpvj8qm4mc8ellph9408d"
+dev-settings = true
+trading-competition = false
+liquidity = false
+utilization = false
+balance = false
+traders = 0
+default-market-ids = [
+    "ATOM_USD",
+    "OSMO_USDC",
+    "ETH_BTC",
+    "BTC_USD",
+]
+ignore-stale = true
+min-gas = "1"
+min-gas-high-gas-wallet = "500"
+min-gas-in-faucet = "10000"
+min-gas-in-gas-wallet = "10000"
+max-price-age-secs = 3600
+max-allowed-price-delta = "0.001"
+qa-price-updates = true
+
+[deployments.qa.watcher]
+retries = 6
+delay-between-retries = 20
+
+[deployments.qa.watcher.balance]
+out-of-date = 180
+
+[deployments.qa.watcher.balance.delay]
+constant = 20
+
+[deployments.qa.watcher.gas-check]
+out-of-date = 180
+
+[deployments.qa.watcher.gas-check.delay]
+constant = 60
+
+[deployments.qa.watcher.liquidity]
+out-of-date = 180
+
+[deployments.qa.watcher.liquidity.delay]
+constant = 120
+
+[deployments.qa.watcher.trader]
+out-of-date = 180
+
+[deployments.qa.watcher.trader.delay.random]
+low = 120
+high = 1200
+
+[deployments.qa.watcher.utilization]
+out-of-date = 120
+
+[deployments.qa.watcher.utilization.delay]
+constant = 120
+
+[deployments.qa.watcher.track-balance]
+out-of-date = 60
+
+[deployments.qa.watcher.track-balance.delay]
+constant = 60
+
+[deployments.qa.watcher.crank-watch]
+out-of-date = 60
+
+[deployments.qa.watcher.crank-watch.delay]
+constant = 30
+
+[deployments.qa.watcher.crank-run]
+delay = "no-delay"
+
+[deployments.qa.watcher.get-factory]
+out-of-date = 180
+retries = 5
+delay-between-retries = 30
+
+[deployments.qa.watcher.get-factory.delay]
+constant = 60
+
+[deployments.qa.watcher.price]
+delay = "new-block"
+out-of-date = 30
+retries = 20
+delay-between-retries = 1
+
+[deployments.qa.watcher.stale]
+out-of-date = 180
+retries = 5
+delay-between-retries = 20
+
+[deployments.qa.watcher.stale.delay]
+constant = 30
+
+[deployments.qa.watcher.stats]
+out-of-date = 180
+
+[deployments.qa.watcher.stats.delay]
+constant = 30
+
+[deployments.qa.watcher.stats-alert]
+out-of-date = 180
+
+[deployments.qa.watcher.stats-alert.delay]
+constant = 30
+
+[deployments.qa.watcher.ultra-crank]
+out-of-date = 180
+
+[deployments.qa.watcher.ultra-crank.delay]
+constant = 120
+
+[deployments.qa.watcher.liquidity-transaction]
+out-of-date = 180
+
+[deployments.qa.watcher.liquidity-transaction.delay]
+constant = 120
+
+[deployments.qa.watcher.rpc-health]
+out-of-date = 500
+
+[deployments.qa.watcher.rpc-health.delay]
+constant = 300
+
+[deployments.qa.watcher.congestion]
+out-of-date = 2
+
+[deployments.qa.watcher.congestion.delay]
+constant = 2
+
+[deployments.qa.watcher.high-gas]
+delay = "no-delay"
+
+[deployments.qa.watcher.block-lag]
+out-of-date = 20
+
+[deployments.qa.watcher.block-lag.delay]
+constant = 20
+
+[overrides.dymbeta]
+crank = 1
+ultra-crank = 0
+seconds-till-ultra = 480
+price = true
+wallet-manager-address = "osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k"
+dev-settings = false
+trading-competition = false
+liquidity = false
+utilization = false
+balance = false
+traders = 0
+default-market-ids = ["DYM_USD"]
+ignore-stale = false
+min-gas = "1"
+min-gas-high-gas-wallet = "500"
+min-gas-in-faucet = "10000"
+min-gas-in-gas-wallet = "10000"
+max-price-age-secs = 3600
+max-allowed-price-delta = "0.001"
+qa-price-updates = false
+
+[overrides.dymbeta.watcher]
+retries = 6
+delay-between-retries = 20
+
+[overrides.dymbeta.watcher.balance]
+out-of-date = 180
+
+[overrides.dymbeta.watcher.balance.delay]
+constant = 20
+
+[overrides.dymbeta.watcher.gas-check]
+out-of-date = 180
+
+[overrides.dymbeta.watcher.gas-check.delay]
+constant = 60
+
+[overrides.dymbeta.watcher.liquidity]
+out-of-date = 180
+
+[overrides.dymbeta.watcher.liquidity.delay]
+constant = 120
+
+[overrides.dymbeta.watcher.trader]
+out-of-date = 180
+
+[overrides.dymbeta.watcher.trader.delay.random]
+low = 120
+high = 1200
+
+[overrides.dymbeta.watcher.utilization]
+out-of-date = 120
+
+[overrides.dymbeta.watcher.utilization.delay]
+constant = 120
+
+[overrides.dymbeta.watcher.track-balance]
+out-of-date = 60
+
+[overrides.dymbeta.watcher.track-balance.delay]
+constant = 60
+
+[overrides.dymbeta.watcher.crank-watch]
+out-of-date = 60
+
+[overrides.dymbeta.watcher.crank-watch.delay]
+constant = 30
+
+[overrides.dymbeta.watcher.crank-run]
+delay = "no-delay"
+
+[overrides.dymbeta.watcher.get-factory]
+out-of-date = 180
+retries = 5
+delay-between-retries = 30
+
+[overrides.dymbeta.watcher.get-factory.delay]
+constant = 60
+
+[overrides.dymbeta.watcher.price]
+delay = "new-block"
+out-of-date = 30
+retries = 20
+delay-between-retries = 1
+
+[overrides.dymbeta.watcher.stale]
+out-of-date = 180
+retries = 5
+delay-between-retries = 20
+
+[overrides.dymbeta.watcher.stale.delay]
+constant = 30
+
+[overrides.dymbeta.watcher.stats]
+out-of-date = 180
+
+[overrides.dymbeta.watcher.stats.delay]
+constant = 30
+
+[overrides.dymbeta.watcher.stats-alert]
+out-of-date = 180
+
+[overrides.dymbeta.watcher.stats-alert.delay]
+constant = 30
+
+[overrides.dymbeta.watcher.ultra-crank]
+out-of-date = 180
+
+[overrides.dymbeta.watcher.ultra-crank.delay]
+constant = 120
+
+[overrides.dymbeta.watcher.liquidity-transaction]
+out-of-date = 180
+
+[overrides.dymbeta.watcher.liquidity-transaction.delay]
+constant = 120
+
+[overrides.dymbeta.watcher.rpc-health]
+out-of-date = 500
+
+[overrides.dymbeta.watcher.rpc-health.delay]
+constant = 300
+
+[overrides.dymbeta.watcher.congestion]
+out-of-date = 2
+
+[overrides.dymbeta.watcher.congestion.delay]
+constant = 2
+
+[overrides.dymbeta.watcher.high-gas]
+delay = "no-delay"
+
+[overrides.dymbeta.watcher.block-lag]
+out-of-date = 20
+
+[overrides.dymbeta.watcher.block-lag.delay]
+constant = 20
+
+[overrides.injbeta]
+crank = 4
+ultra-crank = 0
+seconds-till-ultra = 480
+price = true
+wallet-manager-address = "osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k"
+dev-settings = false
+trading-competition = false
+liquidity = true
+utilization = true
+balance = true
+traders = 0
+default-market-ids = ["ETH_USD"]
+ignore-stale = false
+min-gas = "1"
+min-gas-high-gas-wallet = "500"
+min-gas-in-faucet = "10000"
+min-gas-in-gas-wallet = "10000"
+max-price-age-secs = 3600
+max-allowed-price-delta = "0.001"
+qa-price-updates = false
+
+[overrides.injbeta.watcher]
+retries = 6
+delay-between-retries = 20
+
+[overrides.injbeta.watcher.balance]
+out-of-date = 180
+
+[overrides.injbeta.watcher.balance.delay]
+constant = 20
+
+[overrides.injbeta.watcher.gas-check]
+out-of-date = 180
+
+[overrides.injbeta.watcher.gas-check.delay]
+constant = 60
+
+[overrides.injbeta.watcher.liquidity]
+out-of-date = 180
+
+[overrides.injbeta.watcher.liquidity.delay]
+constant = 120
+
+[overrides.injbeta.watcher.trader]
+out-of-date = 180
+
+[overrides.injbeta.watcher.trader.delay.random]
+low = 120
+high = 1200
+
+[overrides.injbeta.watcher.utilization]
+out-of-date = 120
+
+[overrides.injbeta.watcher.utilization.delay]
+constant = 120
+
+[overrides.injbeta.watcher.track-balance]
+out-of-date = 60
+
+[overrides.injbeta.watcher.track-balance.delay]
+constant = 60
+
+[overrides.injbeta.watcher.crank-watch]
+out-of-date = 60
+
+[overrides.injbeta.watcher.crank-watch.delay]
+constant = 30
+
+[overrides.injbeta.watcher.crank-run]
+delay = "no-delay"
+
+[overrides.injbeta.watcher.get-factory]
+out-of-date = 180
+retries = 5
+delay-between-retries = 30
+
+[overrides.injbeta.watcher.get-factory.delay]
+constant = 60
+
+[overrides.injbeta.watcher.price]
+delay = "new-block"
+out-of-date = 30
+retries = 20
+delay-between-retries = 1
+
+[overrides.injbeta.watcher.stale]
+out-of-date = 180
+retries = 5
+delay-between-retries = 20
+
+[overrides.injbeta.watcher.stale.delay]
+constant = 30
+
+[overrides.injbeta.watcher.stats]
+out-of-date = 180
+
+[overrides.injbeta.watcher.stats.delay]
+constant = 30
+
+[overrides.injbeta.watcher.stats-alert]
+out-of-date = 180
+
+[overrides.injbeta.watcher.stats-alert.delay]
+constant = 30
+
+[overrides.injbeta.watcher.ultra-crank]
+out-of-date = 180
+
+[overrides.injbeta.watcher.ultra-crank.delay]
+constant = 120
+
+[overrides.injbeta.watcher.liquidity-transaction]
+out-of-date = 180
+
+[overrides.injbeta.watcher.liquidity-transaction.delay]
+constant = 120
+
+[overrides.injbeta.watcher.rpc-health]
+out-of-date = 500
+
+[overrides.injbeta.watcher.rpc-health.delay]
+constant = 300
+
+[overrides.injbeta.watcher.congestion]
+out-of-date = 2
+
+[overrides.injbeta.watcher.congestion.delay]
+constant = 2
+
+[overrides.injbeta.watcher.high-gas]
+delay = "no-delay"
+
+[overrides.injbeta.watcher.block-lag]
+out-of-date = 20
+
+[overrides.injbeta.watcher.block-lag.delay]
+constant = 20
+
+[overrides.seibeta]
+crank = 4
+ultra-crank = 0
+seconds-till-ultra = 480
+price = true
+wallet-manager-address = "osmo12vhejqqdgnszlcs7nqdvlx3p5eqyudfslevx3k"
+dev-settings = false
+trading-competition = false
+liquidity = true
+utilization = true
+balance = true
+traders = 0
+default-market-ids = [
+    "ETH_USD",
+    "BTC_USD",
+]
+ignore-stale = false
+min-gas = "1000"
+min-gas-high-gas-wallet = "500"
+min-gas-in-faucet = "2000000"
+min-gas-in-gas-wallet = "1000000"
+max-price-age-secs = 3600
+max-allowed-price-delta = "0.001"
+qa-price-updates = false
+
+[overrides.seibeta.watcher]
+retries = 10
+delay-between-retries = 20
+
+[overrides.seibeta.watcher.balance]
+out-of-date = 180
+
+[overrides.seibeta.watcher.balance.delay]
+constant = 20
+
+[overrides.seibeta.watcher.gas-check]
+out-of-date = 180
+
+[overrides.seibeta.watcher.gas-check.delay]
+constant = 60
+
+[overrides.seibeta.watcher.liquidity]
+out-of-date = 180
+
+[overrides.seibeta.watcher.liquidity.delay]
+constant = 120
+
+[overrides.seibeta.watcher.trader]
+out-of-date = 180
+
+[overrides.seibeta.watcher.trader.delay.random]
+low = 120
+high = 1200
+
+[overrides.seibeta.watcher.utilization]
+out-of-date = 120
+
+[overrides.seibeta.watcher.utilization.delay]
+constant = 120
+
+[overrides.seibeta.watcher.track-balance]
+out-of-date = 60
+
+[overrides.seibeta.watcher.track-balance.delay]
+constant = 60
+
+[overrides.seibeta.watcher.crank-watch]
+out-of-date = 60
+
+[overrides.seibeta.watcher.crank-watch.delay]
+constant = 30
+
+[overrides.seibeta.watcher.crank-run]
+delay = "no-delay"
+
+[overrides.seibeta.watcher.get-factory]
+out-of-date = 180
+retries = 5
+delay-between-retries = 30
+
+[overrides.seibeta.watcher.get-factory.delay]
+constant = 60
+
+[overrides.seibeta.watcher.price]
+delay = "new-block"
+out-of-date = 30
+retries = 20
+delay-between-retries = 1
+
+[overrides.seibeta.watcher.stale]
+out-of-date = 180
+retries = 5
+delay-between-retries = 20
+
+[overrides.seibeta.watcher.stale.delay]
+constant = 30
+
+[overrides.seibeta.watcher.stats]
+out-of-date = 180
+
+[overrides.seibeta.watcher.stats.delay]
+constant = 30
+
+[overrides.seibeta.watcher.stats-alert]
+out-of-date = 180
+
+[overrides.seibeta.watcher.stats-alert.delay]
+constant = 30
+
+[overrides.seibeta.watcher.ultra-crank]
+out-of-date = 180
+
+[overrides.seibeta.watcher.ultra-crank.delay]
+constant = 120
+
+[overrides.seibeta.watcher.liquidity-transaction]
+out-of-date = 180
+
+[overrides.seibeta.watcher.liquidity-transaction.delay]
+constant = 120
+
+[overrides.seibeta.watcher.rpc-health]
+out-of-date = 500
+
+[overrides.seibeta.watcher.rpc-health.delay]
+constant = 300
+
+[overrides.seibeta.watcher.congestion]
+out-of-date = 2
+
+[overrides.seibeta.watcher.congestion.delay]
+constant = 2
+
+[overrides.seibeta.watcher.high-gas]
+delay = "no-delay"
+
+[overrides.seibeta.watcher.block-lag]
+out-of-date = 20
+
+[overrides.seibeta.watcher.block-lag.delay]
+constant = 20
+
+[overrides.seici]
+crank = 4
+ultra-crank = 0
+seconds-till-ultra = 480
+price = true
+wallet-manager-address = "osmo1ghgpnmxgt6xz463423hhnx8zp99dwt563wnllv"
+dev-settings = true
+trading-competition = false
+liquidity = true
+utilization = true
+balance = true
+traders = 0
+default-market-ids = [
+    "ATOM_USD",
+    "OSMO_USDC",
+    "ETH_BTC",
+    "BTC_USD",
+]
+ignore-stale = false
+min-gas = "1000"
+min-gas-high-gas-wallet = "500"
+min-gas-in-faucet = "2000000"
+min-gas-in-gas-wallet = "1000000"
+max-price-age-secs = 3600
+max-allowed-price-delta = "0.001"
+qa-price-updates = false
+
+[overrides.seici.watcher]
+retries = 6
+delay-between-retries = 20
+
+[overrides.seici.watcher.balance]
+out-of-date = 180
+
+[overrides.seici.watcher.balance.delay]
+constant = 20
+
+[overrides.seici.watcher.gas-check]
+out-of-date = 180
+
+[overrides.seici.watcher.gas-check.delay]
+constant = 60
+
+[overrides.seici.watcher.liquidity]
+out-of-date = 180
+
+[overrides.seici.watcher.liquidity.delay]
+constant = 120
+
+[overrides.seici.watcher.trader]
+out-of-date = 180
+
+[overrides.seici.watcher.trader.delay.random]
+low = 120
+high = 1200
+
+[overrides.seici.watcher.utilization]
+out-of-date = 120
+
+[overrides.seici.watcher.utilization.delay]
+constant = 120
+
+[overrides.seici.watcher.track-balance]
+out-of-date = 60
+
+[overrides.seici.watcher.track-balance.delay]
+constant = 60
+
+[overrides.seici.watcher.crank-watch]
+out-of-date = 60
+
+[overrides.seici.watcher.crank-watch.delay]
+constant = 30
+
+[overrides.seici.watcher.crank-run]
+delay = "no-delay"
+
+[overrides.seici.watcher.get-factory]
+out-of-date = 180
+retries = 5
+delay-between-retries = 30
+
+[overrides.seici.watcher.get-factory.delay]
+constant = 60
+
+[overrides.seici.watcher.price]
+delay = "new-block"
+out-of-date = 30
+retries = 20
+delay-between-retries = 1
+
+[overrides.seici.watcher.stale]
+out-of-date = 180
+retries = 5
+delay-between-retries = 20
+
+[overrides.seici.watcher.stale.delay]
+constant = 30
+
+[overrides.seici.watcher.stats]
+out-of-date = 180
+
+[overrides.seici.watcher.stats.delay]
+constant = 30
+
+[overrides.seici.watcher.stats-alert]
+out-of-date = 180
+
+[overrides.seici.watcher.stats-alert.delay]
+constant = 30
+
+[overrides.seici.watcher.ultra-crank]
+out-of-date = 180
+
+[overrides.seici.watcher.ultra-crank.delay]
+constant = 120
+
+[overrides.seici.watcher.liquidity-transaction]
+out-of-date = 180
+
+[overrides.seici.watcher.liquidity-transaction.delay]
+constant = 120
+
+[overrides.seici.watcher.rpc-health]
+out-of-date = 500
+
+[overrides.seici.watcher.rpc-health.delay]
+constant = 300
+
+[overrides.seici.watcher.congestion]
+out-of-date = 2
+
+[overrides.seici.watcher.congestion.delay]
+constant = 2
+
+[overrides.seici.watcher.high-gas]
+delay = "no-delay"
+
+[overrides.seici.watcher.block-lag]
+out-of-date = 20
+
+[overrides.seici.watcher.block-lag.delay]
+constant = 20
+
+[overrides.seidebug]
+crank = 4
+ultra-crank = 0
+seconds-till-ultra = 480
+price = true
+wallet-manager-address = "levana19ta8kepflecc7n2rdruduj9ydt72z2xy0gl5e9"
+dev-settings = true
+trading-competition = false
+liquidity = false
+utilization = false
+balance = false
+traders = 0
+default-market-ids = [
+    "BTC_USD",
+    "ETH_USD",
+]
+ignore-stale = false
+min-gas = "1000"
+min-gas-high-gas-wallet = "500"
+min-gas-in-faucet = "2000000"
+min-gas-in-gas-wallet = "1000000"
+max-price-age-secs = 3600
+max-allowed-price-delta = "0.001"
+qa-price-updates = false
+
+[overrides.seidebug.watcher]
+retries = 6
+delay-between-retries = 20
+
+[overrides.seidebug.watcher.balance]
+out-of-date = 180
+
+[overrides.seidebug.watcher.balance.delay]
+constant = 20
+
+[overrides.seidebug.watcher.gas-check]
+out-of-date = 180
+
+[overrides.seidebug.watcher.gas-check.delay]
+constant = 60
+
+[overrides.seidebug.watcher.liquidity]
+out-of-date = 180
+
+[overrides.seidebug.watcher.liquidity.delay]
+constant = 120
+
+[overrides.seidebug.watcher.trader]
+out-of-date = 180
+
+[overrides.seidebug.watcher.trader.delay.random]
+low = 120
+high = 1200
+
+[overrides.seidebug.watcher.utilization]
+out-of-date = 120
+
+[overrides.seidebug.watcher.utilization.delay]
+constant = 120
+
+[overrides.seidebug.watcher.track-balance]
+out-of-date = 60
+
+[overrides.seidebug.watcher.track-balance.delay]
+constant = 60
+
+[overrides.seidebug.watcher.crank-watch]
+out-of-date = 60
+
+[overrides.seidebug.watcher.crank-watch.delay]
+constant = 30
+
+[overrides.seidebug.watcher.crank-run]
+delay = "no-delay"
+
+[overrides.seidebug.watcher.get-factory]
+out-of-date = 180
+retries = 5
+delay-between-retries = 30
+
+[overrides.seidebug.watcher.get-factory.delay]
+constant = 60
+
+[overrides.seidebug.watcher.price]
+delay = "new-block"
+out-of-date = 30
+retries = 20
+delay-between-retries = 1
+
+[overrides.seidebug.watcher.stale]
+out-of-date = 180
+retries = 5
+delay-between-retries = 20
+
+[overrides.seidebug.watcher.stale.delay]
+constant = 30
+
+[overrides.seidebug.watcher.stats]
+out-of-date = 180
+
+[overrides.seidebug.watcher.stats.delay]
+constant = 30
+
+[overrides.seidebug.watcher.stats-alert]
+out-of-date = 180
+
+[overrides.seidebug.watcher.stats-alert.delay]
+constant = 30
+
+[overrides.seidebug.watcher.ultra-crank]
+out-of-date = 180
+
+[overrides.seidebug.watcher.ultra-crank.delay]
+constant = 120
+
+[overrides.seidebug.watcher.liquidity-transaction]
+out-of-date = 180
+
+[overrides.seidebug.watcher.liquidity-transaction.delay]
+constant = 120
+
+[overrides.seidebug.watcher.rpc-health]
+out-of-date = 500
+
+[overrides.seidebug.watcher.rpc-health.delay]
+constant = 300
+
+[overrides.seidebug.watcher.congestion]
+out-of-date = 2
+
+[overrides.seidebug.watcher.congestion.delay]
+constant = 2
+
+[overrides.seidebug.watcher.high-gas]
+delay = "no-delay"
+
+[overrides.seidebug.watcher.block-lag]
+out-of-date = 20
+
+[overrides.seidebug.watcher.block-lag.delay]
+constant = 20
+
+[overrides.seidev]
+crank = 4
+ultra-crank = 0
+seconds-till-ultra = 480
+price = true
+wallet-manager-address = "osmo1lkc7lnq204m4yeydcdg94stkm50jjyglh7ucel"
+dev-settings = true
+trading-competition = false
+liquidity = true
+utilization = true
+balance = true
+traders = 0
+default-market-ids = [
+    "ATOM_USD",
+    "BTC_USD",
+]
+ignore-stale = false
+min-gas = "1000"
+min-gas-high-gas-wallet = "500"
+min-gas-in-faucet = "2000000"
+min-gas-in-gas-wallet = "1000000"
+max-price-age-secs = 3600
+max-allowed-price-delta = "0.001"
+qa-price-updates = false
+
+[overrides.seidev.watcher]
+retries = 6
+delay-between-retries = 20
+
+[overrides.seidev.watcher.balance]
+out-of-date = 180
+
+[overrides.seidev.watcher.balance.delay]
+constant = 20
+
+[overrides.seidev.watcher.gas-check]
+out-of-date = 180
+
+[overrides.seidev.watcher.gas-check.delay]
+constant = 60
+
+[overrides.seidev.watcher.liquidity]
+out-of-date = 180
+
+[overrides.seidev.watcher.liquidity.delay]
+constant = 120
+
+[overrides.seidev.watcher.trader]
+out-of-date = 180
+
+[overrides.seidev.watcher.trader.delay.random]
+low = 120
+high = 1200
+
+[overrides.seidev.watcher.utilization]
+out-of-date = 120
+
+[overrides.seidev.watcher.utilization.delay]
+constant = 120
+
+[overrides.seidev.watcher.track-balance]
+out-of-date = 60
+
+[overrides.seidev.watcher.track-balance.delay]
+constant = 60
+
+[overrides.seidev.watcher.crank-watch]
+out-of-date = 60
+
+[overrides.seidev.watcher.crank-watch.delay]
+constant = 30
+
+[overrides.seidev.watcher.crank-run]
+delay = "no-delay"
+
+[overrides.seidev.watcher.get-factory]
+out-of-date = 180
+retries = 5
+delay-between-retries = 30
+
+[overrides.seidev.watcher.get-factory.delay]
+constant = 60
+
+[overrides.seidev.watcher.price]
+delay = "new-block"
+out-of-date = 30
+retries = 20
+delay-between-retries = 1
+
+[overrides.seidev.watcher.stale]
+out-of-date = 180
+retries = 5
+delay-between-retries = 20
+
+[overrides.seidev.watcher.stale.delay]
+constant = 30
+
+[overrides.seidev.watcher.stats]
+out-of-date = 180
+
+[overrides.seidev.watcher.stats.delay]
+constant = 30
+
+[overrides.seidev.watcher.stats-alert]
+out-of-date = 180
+
+[overrides.seidev.watcher.stats-alert.delay]
+constant = 30
+
+[overrides.seidev.watcher.ultra-crank]
+out-of-date = 180
+
+[overrides.seidev.watcher.ultra-crank.delay]
+constant = 120
+
+[overrides.seidev.watcher.liquidity-transaction]
+out-of-date = 180
+
+[overrides.seidev.watcher.liquidity-transaction.delay]
+constant = 120
+
+[overrides.seidev.watcher.rpc-health]
+out-of-date = 500
+
+[overrides.seidev.watcher.rpc-health.delay]
+constant = 300
+
+[overrides.seidev.watcher.congestion]
+out-of-date = 2
+
+[overrides.seidev.watcher.congestion.delay]
+constant = 2
+
+[overrides.seidev.watcher.high-gas]
+delay = "no-delay"
+
+[overrides.seidev.watcher.block-lag]
+out-of-date = 20
+
+[overrides.seidev.watcher.block-lag.delay]
+constant = 20
+
+[liquidity]
+min-util-delta = "-0.05"
+max-util-delta = "0.02"
+target-util-delta = "-0.02"
+
+[liquidity.markets.ATOM_USD]
+min = "10000"
+max = "10000000"
+
+[liquidity.markets.BTC_USD]
+min = "100"
+max = "10000"
+
+[liquidity.markets.ETH_BTC]
+min = "1000"
+max = "1000000"
+
+[liquidity.markets.ETH_USD]
+min = "1000"
+max = "1000000"
+
+[liquidity.markets.OSMO_USD]
+min = "100000"
+max = "100000000"
+
+[liquidity.markets.OSMO_USDC]
+min = "100000"
+max = "100000000"
+
+[liquidity.markets.SEI_USD]
+min = "100000"
+max = "100000000"
+
+[liquidity.markets.axlETH_USD]
+min = "1000"
+max = "1000000"
+
+[liquidity.markets.nBTC_USD]
+min = "100"
+max = "10000"
+
+[liquidity.markets.ryETH_USD]
+min = "1000"
+max = "1000000"
+
+[utilization]
+min-util-delta = "-0.1"
+max-util-delta = "-0.05"
+
+[trader]
+max-util-delta = "0.05"
+min-borrow-fee = "0.1"
+max-borrow-fee = "0.2"
+
+[initial-prices.ATOM_USD]
+price = "7"
+price_usd = "7"
+
+[initial-prices.BTC_USD]
+price = "28000"
+price_usd = "28000"
+
+[initial-prices.ETH_BTC]
+price = "0.5"
+price_usd = "28000"
+
+[initial-prices.OSMO_USDC]
+price = "0.3"
+price_usd = "1"
+
+[initial-prices.stATOM_USD]
+price = "8"
+price_usd = "8"

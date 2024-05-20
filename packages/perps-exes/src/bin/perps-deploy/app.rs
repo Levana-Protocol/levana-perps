@@ -146,7 +146,12 @@ impl Opt {
 
         // only create pyth_info (with markets etc.) if we have a pyth address and do not specify
         let price_source = if qa_price_updates {
-            PriceSourceConfig::Wallet(config.qa_wallet.with_hrp(partial.network.get_address_hrp()))
+            PriceSourceConfig::Wallet(
+                config
+                    .qa_wallet
+                    .raw()
+                    .with_hrp(partial.network.get_address_hrp()),
+            )
         } else {
             PriceSourceConfig::Oracle(self.get_oracle_info(
                 &basic.chain_config,
@@ -156,7 +161,9 @@ impl Opt {
         };
 
         Ok(App {
-            wallet_manager: wallet_manager_address.with_hrp(partial.network.get_address_hrp()),
+            wallet_manager: wallet_manager_address
+                .raw()
+                .with_hrp(partial.network.get_address_hrp()),
             trading_competition,
             dev_settings,
             tracker,
