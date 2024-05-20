@@ -43,7 +43,7 @@ pub(crate) async fn go(
 ) -> Result<InstantiateResponse> {
     let basic = opt.load_basic_app(network).await?;
     let wallet = basic.get_wallet()?;
-    let config_testnet = ConfigTestnet::load(opt.config_testnet.as_ref())?;
+    let config_testnet = ConfigTestnet::load_from_opt(opt.config_testnet.as_deref())?;
 
     match network {
         PerpsNetwork::Regular(

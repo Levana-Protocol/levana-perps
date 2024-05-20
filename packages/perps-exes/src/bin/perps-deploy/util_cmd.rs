@@ -716,16 +716,16 @@ impl PositionRecord {
 
 fn to_toml() -> Result<()> {
     let config =
-        MarketConfigUpdates::load("packages/perps-exes/assets/market-config-updates.yaml")?;
+        MarketConfigUpdates::load("packages/perps-exes/assets/market-config-updates.toml")?;
     save_toml(
         "packages/perps-exes/assets/market-config-updates.toml",
         &config,
     )?;
 
-    let config = PriceConfig::load(None::<PathBuf>)?;
+    let config = PriceConfig::load()?;
     save_toml("packages/perps-exes/assets/config-price.toml", &config)?;
 
-    let config = ConfigTestnet::load(None::<PathBuf>)?;
+    let config = ConfigTestnet::load()?;
     save_toml("packages/perps-exes/assets/config-testnet.toml", &config)?;
 
     let config = CodeIds::load()?;

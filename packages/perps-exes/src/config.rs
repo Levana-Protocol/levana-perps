@@ -359,24 +359,6 @@ pub struct DeploymentConfigTestnet {
     pub qa_price_updates: bool,
 }
 
-fn load_yaml<T: serde::de::DeserializeOwned>(
-    static_path: &str,
-    static_contents: &[u8],
-    runtime_path: Option<impl AsRef<Path>>,
-) -> Result<T> {
-    match runtime_path {
-        Some(path) => {
-            let path = path.as_ref();
-            let mut file = fs_err::File::open(path)?;
-            serde_yaml::from_reader(&mut file)
-                .with_context(|| format!("Parse error reading from YAML file {}", path.display()))
-        }
-        None => serde_yaml::from_slice(static_contents).with_context(|| {
-            format!("Parse error reading from compiled-in YAML file {static_path}")
-        }),
-    }
-}
-
 impl ChainConfig {
     const PATH: &'static str = "packages/perps-exes/assets/config-chain.toml";
 
@@ -392,24 +374,32 @@ impl ChainConfig {
     }
 
     pub fn load_from(config_file: impl AsRef<Path>, network: PerpsNetwork) -> Result<Self> {
-        let mut config = Figment::new()
-            .merge(Toml::file(&config_file))
-            .merge(Env::prefixed("LEVANA_CHAIN_CONFIG_"))
-            .extract::<BTreeMap<PerpsNetwork, _>>()?;
-        tracing::debug!("Loaded chain config: {config:#?}");
-        config
-            .remove(&network)
-            .with_context(|| format!("No chain config found for {network}"))
+        load_toml::<_, BTreeMap<PerpsNetwork, Self>>(
+            config_file,
+            "LEVANA_CHAIN_CONFIG_",
+            "chain config",
+        )?
+        .remove(&network)
+        .with_context(|| format!("No chain config found for {network}"))
     }
 }
 
 impl ConfigTestnet {
-    pub fn load(config_file: Option<impl AsRef<Path>>) -> Result<Self> {
-        load_yaml(
-            "config-testnet.yaml",
-            include_bytes!("../assets/config-testnet.yaml"),
-            config_file,
-        )
+    const PATH: &'static str = "packages/perps-exes/assets/config-testnet.toml";
+
+    pub fn load() -> Result<Self> {
+        Self::load_from(Self::PATH)
+    }
+
+    pub fn load_from_opt(config_file: Option<&Path>) -> Result<Self> {
+        match config_file {
+            Some(config_file) => Self::load_from(config_file),
+            None => Self::load(),
+        }
+    }
+
+    pub fn load_from(config_file: impl AsRef<Path>) -> Result<Self> {
+        load_toml(config_file, "LEVANA_TESTNET_", "testnet config")
     }
 
     /// Provide the deployment name, such as osmodev, dragonqa, or seibeta
@@ -441,12 +431,21 @@ impl ConfigTestnet {
 }
 
 impl PriceConfig {
-    pub fn load(config_file: Option<impl AsRef<Path>>) -> Result<Self> {
-        load_yaml(
-            "config-price.yaml",
-            include_bytes!("../assets/config-price.yaml"),
-            config_file,
-        )
+    const PATH: &'static str = "packages/perps-exes/assets/config-price.toml";
+
+    pub fn load() -> Result<Self> {
+        Self::load_from(Self::PATH)
+    }
+
+    pub fn load_from_opt(config_file: Option<&Path>) -> Result<Self> {
+        match config_file {
+            Some(config_file) => Self::load_from(config_file),
+            None => Self::load(),
+        }
+    }
+
+    pub fn load_from(config_file: impl AsRef<Path>) -> Result<Self> {
+        load_toml(config_file, "LEVANA_PRICE_", "price config")
     }
 }
 
@@ -711,13 +710,10 @@ pub struct ConfigUpdateAndBorrowFee {
 
 impl MarketConfigUpdates {
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {
-        let path = path.as_ref();
-        let mut file = fs_err::File::open(path)?;
-        let res: MarketConfigUpdates = serde_yaml::from_reader(&mut file).with_context(|| {
-            format!("Error loading MarketConfigUpdates from {}", path.display())
-        })?;
-        res.validate_carry_leverage()?;
-        Ok(res)
+        let config: Self = load_toml(path, "LEVANA_MARKETS_", "markets config")?;
+
+        config.validate_carry_leverage()?;
+        Ok(config)
     }
 
     fn validate_carry_leverage(&self) -> Result<()> {
@@ -828,18 +824,27 @@ impl MainnetFactories {
     const PATH: &'static str = "packages/perps-exes/assets/mainnet-factories.toml";
 
     pub fn load() -> Result<Self> {
-        let res = Figment::new()
-            .merge(Toml::file(Self::PATH))
-            .merge(Env::prefixed("LEVANA_MAINNET_FACTORIES_"))
-            .extract()
-            .with_context(|| format!("Error loading MainnetFactories from {}", Self::PATH))?;
-        tracing::debug!("Loaded mainnet factories: {res:#?}");
-        Ok(res)
+        load_toml(Self::PATH, "LEVANA_MAINNET_FACTORIES_", "mainnet factories")
     }
 
     pub fn save(&self) -> Result<()> {
         save_toml(Self::PATH, self)
     }
+}
+
+pub fn load_toml<P, T>(path: P, env_prefix: &str, config_desc: &str) -> Result<T>
+where
+    P: AsRef<Path>,
+    T: serde::de::DeserializeOwned + std::fmt::Debug,
+{
+    let path = path.as_ref();
+    let config = Figment::new()
+        .merge(Toml::file(path))
+        .merge(Env::prefixed(env_prefix))
+        .extract()
+        .with_context(|| format!("Unable to load {config_desc} from {}", path.display()))?;
+    tracing::debug!("Loaded {config_desc}: {config:#?}");
+    Ok(config)
 }
 
 pub fn save_toml<P, T>(path: P, value: &T) -> Result<()>

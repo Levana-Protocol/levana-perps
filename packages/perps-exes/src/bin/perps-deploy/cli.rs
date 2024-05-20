@@ -138,7 +138,7 @@ pub(crate) struct Opt {
     #[clap(
         long,
         env = "LEVANA_BOTS_MARKET_CONFIG_UPDATE",
-        default_value = "packages/perps-exes/assets/market-config-updates.yaml"
+        default_value = "packages/perps-exes/assets/market-config-updates.toml"
     )]
     pub(crate) market_config: PathBuf,
     /// The stable Pyth endpoint

@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use anyhow::{Context, Result};
 use cosmos::HasAddress;
 use cosmwasm_std::{to_json_binary, CosmosMsg, Empty, WasmMsg};
@@ -56,7 +54,7 @@ async fn go(
     let spot_price_helper = if spot_price {
         Some({
             let chain_config = ChainConfig::load(factory.network)?;
-            let price_config = PriceConfig::load(None::<PathBuf>)?;
+            let price_config = PriceConfig::load()?;
             let oracle = opt.get_oracle_info(&chain_config, &price_config, factory.network)?;
             move |market_id| get_spot_price_config(&oracle, &market_id)
         })

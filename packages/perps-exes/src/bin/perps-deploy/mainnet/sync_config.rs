@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use anyhow::{Context, Result};
 use cosmos::{HasAddress, TxBuilder};
 use cosmwasm_std::{to_json_binary, Addr, CosmosMsg, Empty, WasmMsg};
@@ -43,7 +41,7 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
     let network = factory.network;
 
     let chain_config = ChainConfig::load(factory.network)?;
-    let price_config = PriceConfig::load(None::<PathBuf>)?;
+    let price_config = PriceConfig::load()?;
     let oracle = opt.get_oracle_info(&chain_config, &price_config, network)?;
 
     let app = opt.load_app_mainnet(factory.network).await?;

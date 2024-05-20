@@ -125,7 +125,7 @@ impl Opt {
         testnet: &TestnetOpt,
     ) -> Result<(BotConfig, Option<FaucetBotRunner>)> {
         let http_timeout_seconds = testnet.http_timeout_seconds;
-        let config = ConfigTestnet::load(testnet.config_testnet.as_ref())?;
+        let config = ConfigTestnet::load_from_opt(testnet.config_testnet.as_deref())?;
         let DeploymentInfo {
             config: partial,
             network,
