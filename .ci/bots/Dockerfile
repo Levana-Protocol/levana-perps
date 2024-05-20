@@ -4,7 +4,7 @@ ADD --chmod=755  https://github.com/fpco/amber/releases/download/v0.1.3/amber-x8
 ADD --chmod=755 https://github.com/fpco/health-check/releases/download/v0.1.0/health-check-x86_64-unknown-linux-musl /usr/bin/health-check
 
 COPY amber.yaml /etc/amber.yaml
-COPY packages/perps-exes/assets/*.toml /etc
+COPY ["etc/*.toml", "/etc"]
 COPY perps-bots /usr/bin
 
 RUN chmod 755 /usr/bin/perps-bots

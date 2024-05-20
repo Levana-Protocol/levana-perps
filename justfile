@@ -137,6 +137,8 @@ cargo-bots-release:
 
 # Build bots docker image
 build-bots-image:
+	rm -rf .ci/bots/etc
+	cp -r packages/perps-exes/assets .ci/bots/etc
 	cp target/x86_64-unknown-linux-musl/release/perps-bots .ci/bots
 	cd .ci/bots && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/bots:{{GIT_SHA}}
 
