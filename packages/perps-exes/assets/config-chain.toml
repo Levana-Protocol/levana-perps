@@ -1,7 +1,7 @@
 [osmosis-testnet]
 tracker = "osmo1l3ypxctzcdev9dmyydlzrflqz52f0wsqmzkuyq9dvpdnqx69wvvq9zszh2"
 faucet = "osmo1ycrm74p7uc976hu2z428l27vxj8l44zu0x0yqjr8gh775qr6gtnq9f3zsz"
-explorer = "https://testnet.mintscan.io/osmosis-testnet/txs/"
+explorer = "https://mintscan.io/osmosis-testnet/txs/"
 rpc-nodes = ["https://rpc.osmotest5.osmosis.zone"]
 gas-decimals = 6
 age-tolerance-seconds = 42
@@ -207,7 +207,7 @@ decimal-places = 6
 [juno-testnet]
 tracker = "juno1u23qyg0j4y5mzhessf0kcnjuqwg48kpufj5vujsq7kxxgxfnv5pqjmkmr4"
 faucet = "juno15rwad8twfrj34q7ep2sgrz3lqqs7vj939z9p4kccvfu9qm6mn55qxn7gy3"
-explorer = "https://testnet.mintscan.io/juno-testnet/txs/"
+explorer = "https://mintscan.io/juno-testnet/txs/"
 rpc-nodes = []
 gas-decimals = 6
 
