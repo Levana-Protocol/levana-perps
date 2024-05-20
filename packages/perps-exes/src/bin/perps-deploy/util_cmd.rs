@@ -208,11 +208,11 @@ async fn deploy_pyth_opt(
     // What are these magical JSON messages below? They're taken directly from
     // the upload to Osmosis testnet. See these links:
     //
-    // - https://testnet.mintscan.io/osmosis-testnet/wasm/contract/osmo12u2vqdecdte84kg6c3d40nwzjsya59hsj048n687m9q3t6wdmqgsq6zrlx
-    // - https://testnet.mintscan.io/osmosis-testnet/wasm/contract/osmo1224ksv5ckfcuz2geeqfpdu2u3uf706y5fx8frtgz6egmgy0hkxxqtgad95
-    // - https://testnet.mintscan.io/osmosis-testnet/txs/0C75CE16C91F32A902E43A6326B63800DA5182EFC52AA245E101C6374E3671B1?height=481108
-    // - https://testnet.mintscan.io/osmosis-testnet/txs/F58EF5AC1A1941362339A2355F2A2DD44BF46522C37E3D60602C0E731B36F0B6?height=481109
-    // - https://testnet.mintscan.io/osmosis-testnet/txs/59984BB3216E6A7D44501B11EE1F51735E9DE9C8D24D87343B9DDB480F3B5ED3?height=481110
+    // - https://mintscan.io/osmosis-testnet/wasm/contract/osmo12u2vqdecdte84kg6c3d40nwzjsya59hsj048n687m9q3t6wdmqgsq6zrlx
+    // - https://mintscan.io/osmosis-testnet/wasm/contract/osmo1224ksv5ckfcuz2geeqfpdu2u3uf706y5fx8frtgz6egmgy0hkxxqtgad95
+    // - https://mintscan.io/osmosis-testnet/txs/0C75CE16C91F32A902E43A6326B63800DA5182EFC52AA245E101C6374E3671B1?height=481108
+    // - https://mintscan.io/osmosis-testnet/txs/F58EF5AC1A1941362339A2355F2A2DD44BF46522C37E3D60602C0E731B36F0B6?height=481109
+    // - https://mintscan.io/osmosis-testnet/txs/59984BB3216E6A7D44501B11EE1F51735E9DE9C8D24D87343B9DDB480F3B5ED3?height=481110
     let basic = opt.load_basic_app(network).await?;
     let wallet = basic.get_wallet()?;
 
