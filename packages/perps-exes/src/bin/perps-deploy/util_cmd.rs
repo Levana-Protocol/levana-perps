@@ -15,7 +15,9 @@ use chrono::{DateTime, Utc};
 use cosmos::{Address, HasAddress, TxBuilder};
 use msg::contracts::market::{
     entry::{PositionAction, PositionActionKind, TradeHistorySummary},
-    position::{ClosedPosition, PositionId, PositionQueryResponse, PositionsResp},
+    position::{
+        ClosedPosition, PositionCloseReason, PositionId, PositionQueryResponse, PositionsResp,
+    },
     spot_price::{PythPriceServiceNetwork, SpotPriceFeedData},
 };
 use perps_exes::{
@@ -596,6 +598,7 @@ struct PositionRecord {
     id: PositionId,
     opened_at: DateTime<Utc>,
     closed_at: Option<DateTime<Utc>>,
+    close_reason: Option<PositionCloseReason>,
     leverage: LeverageToBase,
     owner: Address,
     direction: DirectionToBase,
@@ -645,6 +648,7 @@ impl PositionRecord {
             id,
             opened_at: price_timestamp.unwrap_or(timestamp),
             closed_at: None,
+            close_reason: None,
             leverage,
             owner: position.owner.as_str().parse()?,
             direction: position.direction_to_base,
@@ -685,6 +689,7 @@ impl PositionRecord {
             id,
             opened_at: price_timestamp.unwrap_or(timestamp),
             closed_at: Some(position.close_time.try_into_chrono_datetime()?),
+            close_reason: Some(position.reason),
             leverage,
             owner: position.owner.as_str().parse()?,
             direction: position.direction_to_base,
