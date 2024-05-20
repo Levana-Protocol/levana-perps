@@ -653,7 +653,7 @@ markets:
 
   SHIB_USDC:
     config:
-      delta_neutrality_fee_sensitivity: 8713028219969
+      delta_neutrality_fee_sensitivity: 18962128239885
       funding_rate_sensitivity: 1.5
       carry_leverage: 7
       borrow_fee_sensitivity: 0.3
