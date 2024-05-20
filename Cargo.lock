@@ -3066,7 +3066,6 @@ dependencies = [
  "sentry-tracing",
  "serde",
  "serde_json",
- "serde_yaml",
  "sha2 0.10.8",
  "sqlx",
  "thiserror",

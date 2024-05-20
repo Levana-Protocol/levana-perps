@@ -21,8 +21,8 @@ use msg::contracts::market::{
 };
 use perps_exes::{
     config::{
-        load_toml, ChainConfig, ConfigUpdateAndBorrowFee, CrankFeeConfig, MainnetFactories,
-        MainnetFactory, MarketConfigUpdates, PriceConfig,
+        load_toml, save_toml, ChainConfig, ConfigUpdateAndBorrowFee, CrankFeeConfig,
+        MainnetFactories, MainnetFactory, MarketConfigUpdates, PriceConfig,
     },
     contracts::Factory,
     prelude::*,
@@ -174,9 +174,7 @@ impl CodeIds {
     }
 
     fn save(&self) -> Result<()> {
-        let mut file = fs_err::File::create(Self::PATH)?;
-        serde_yaml::to_writer(&mut file, self)
-            .with_context(|| format!("Error saving CodeIds to {}", Self::PATH))
+        save_toml(Self::PATH, self)
     }
 
     fn get_mut_by_hash(&mut self, hash: &str) -> Option<&mut StoredContract> {
