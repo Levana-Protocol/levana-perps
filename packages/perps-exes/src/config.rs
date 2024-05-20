@@ -3,7 +3,7 @@ pub mod defaults;
 use std::{collections::BTreeMap, fmt::Write, iter::Sum, ops::AddAssign, path::Path};
 
 use chrono::{DateTime, Utc};
-use cosmos::{Address, CosmosNetwork};
+use cosmos::{Address, CosmosNetwork, RawAddress};
 use cosmwasm_std::{Uint128, Uint256};
 use figment::{
     providers::{Env, Format, Toml},
@@ -238,7 +238,7 @@ impl std::fmt::Debug for GasAmount {
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Debug)]
+#[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ConfigTestnet {
     deployments: BTreeMap<String, DeploymentConfigTestnet>,
@@ -248,7 +248,7 @@ pub struct ConfigTestnet {
     pub utilization: UtilizationConfig,
     pub trader: TraderConfig,
     /// QA wallet used for price updates
-    pub qa_wallet: Address, // FIXME change back to RawAddress
+    pub qa_wallet: RawAddress,
     pub initial_prices: BTreeMap<MarketId, InitialPrice>,
 }
 
@@ -303,7 +303,7 @@ pub struct LiquidityBounds {
     pub max: Collateral,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
+#[derive(serde::Deserialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct DeploymentConfigTestnet {
     /// How many crank run wallets to set up
@@ -316,7 +316,7 @@ pub struct DeploymentConfigTestnet {
     #[serde(default = "defaults::seconds_till_ultra")]
     pub seconds_till_ultra: u32,
     pub price: bool,
-    pub wallet_manager_address: Address, // FIXME change back to RawAddress
+    pub wallet_manager_address: RawAddress,
     #[serde(default)]
     pub dev_settings: bool,
     #[serde(default)]
