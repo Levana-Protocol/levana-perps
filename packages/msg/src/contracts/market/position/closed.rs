@@ -222,3 +222,23 @@ pub enum PositionOrPendingClose {
     /// The value stored here may change after actual close occurs due to pending payments.
     PendingClose(Box<ClosedPosition>),
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ser_de_position_close_reason() {
+        for value in [
+            PositionCloseReason::Direct,
+            PositionCloseReason::Liquidated(LiquidationReason::Liquidated),
+            PositionCloseReason::Liquidated(LiquidationReason::MaxGains),
+            PositionCloseReason::Liquidated(LiquidationReason::StopLoss),
+            PositionCloseReason::Liquidated(LiquidationReason::TakeProfit),
+        ] {
+            let json = serde_json::to_string(&value).unwrap();
+            let parsed = serde_json::from_str(&json).unwrap();
+            assert_eq!(value, parsed);
+        }
+    }
+}
