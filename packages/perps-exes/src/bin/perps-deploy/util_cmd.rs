@@ -16,7 +16,8 @@ use cosmos::{Address, HasAddress, TxBuilder};
 use msg::contracts::market::{
     entry::{PositionAction, PositionActionKind, TradeHistorySummary},
     position::{
-        ClosedPosition, PositionCloseReason, PositionId, PositionQueryResponse, PositionsResp,
+        ClosedPosition, LiquidationReason, PositionCloseReason, PositionId, PositionQueryResponse,
+        PositionsResp,
     },
     spot_price::{PythPriceServiceNetwork, SpotPriceFeedData},
 };
@@ -422,16 +423,10 @@ async fn open_position_csv(
         workers,
     }: OpenPositionCsvOpt,
 ) -> Result<()> {
-    let old_data = Arc::new(match load_old_data(&csv) {
-        Ok(x) => {
-            tracing::info!("Loaded {} records from old CSV", x.len());
-            x
-        }
-        Err(e) => {
-            tracing::info!("Unable to load old CSV data from {}: {e:?}", csv.display());
-            HashMap::new()
-        }
-    });
+    let old_data = load_old_data(&csv)
+        .with_context(|| format!("Unable to load old CSV data from {}", csv.display()))?;
+    tracing::info!("Loaded {} records from old CSV", old_data.len());
+    let old_data = Arc::new(old_data);
     let cosmos = opt.connect(network).await?;
     let factory = Factory::from_contract(cosmos.make_contract(factory));
     let csv = ::csv::Writer::from_path(&csv)?;
@@ -598,7 +593,7 @@ struct PositionRecord {
     id: PositionId,
     opened_at: DateTime<Utc>,
     closed_at: Option<DateTime<Utc>>,
-    close_reason: Option<PositionCloseReason>,
+    close_reason: Option<MyPositionCloseReason>,
     leverage: LeverageToBase,
     owner: Address,
     direction: DirectionToBase,
@@ -616,10 +611,20 @@ struct PositionRecord {
 fn load_old_data(
     path: &Path,
 ) -> Result<HashMap<(MarketId, PositionId), PositionRecord>, csv::Error> {
-    csv::Reader::from_path(path)?
-        .into_deserialize()
-        .map(|res: Result<PositionRecord, _>| res.map(|rec| ((rec.market.clone(), rec.id), rec)))
-        .collect()
+    if path.exists() {
+        csv::Reader::from_path(path)?
+            .into_deserialize()
+            .map(|res: Result<PositionRecord, _>| {
+                res.map(|rec| ((rec.market.clone(), rec.id), rec))
+            })
+            .collect()
+    } else {
+        tracing::info!(
+            "No file {} found, starting data load from scratch",
+            path.display()
+        );
+        Ok(HashMap::new())
+    }
 }
 
 impl PositionRecord {
@@ -689,7 +694,7 @@ impl PositionRecord {
             id,
             opened_at: price_timestamp.unwrap_or(timestamp),
             closed_at: Some(position.close_time.try_into_chrono_datetime()?),
-            close_reason: Some(position.reason),
+            close_reason: Some(position.reason.into()),
             leverage,
             owner: position.owner.as_str().parse()?,
             direction: position.direction_to_base,
@@ -703,5 +708,29 @@ impl PositionRecord {
             total_fees_usd,
             active_collateral: Collateral::zero(),
         })
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum MyPositionCloseReason {
+    Direct,
+    Liquidated,
+    MaxGains,
+    StopLoss,
+    TakeProfit,
+}
+
+impl From<PositionCloseReason> for MyPositionCloseReason {
+    fn from(reason: PositionCloseReason) -> Self {
+        match reason {
+            PositionCloseReason::Liquidated(reason) => match reason {
+                LiquidationReason::Liquidated => MyPositionCloseReason::Liquidated,
+                LiquidationReason::MaxGains => MyPositionCloseReason::MaxGains,
+                LiquidationReason::StopLoss => MyPositionCloseReason::StopLoss,
+                LiquidationReason::TakeProfit => MyPositionCloseReason::TakeProfit,
+            },
+            PositionCloseReason::Direct => MyPositionCloseReason::Direct,
+        }
     }
 }
