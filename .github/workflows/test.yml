@@ -27,7 +27,7 @@ jobs:
         with:
           tool: just@1.16.0
       - name: Sample test
-        run: just run-localosmo
+        run: ./.ci/osmolocal.sh --no-terminal
       - uses: dorny/paths-filter@v3
         id: contracts
         with:
