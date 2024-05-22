@@ -51,7 +51,7 @@ fn kill_osmo_local() {
                 log::info!("Killing osmolocal exited with {ec:?}");
             }
         }
-        Err(e) => log::info!("Problem killing junolocal: {e:?}"),
+        Err(e) => log::info!("Problem killing osmolocal: {e:?}"),
     }
 }
 
