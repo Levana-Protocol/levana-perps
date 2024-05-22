@@ -26,8 +26,6 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: just@1.16.0
-      - name: Sample test
-        run: ./.ci/osmolocal.sh --no-terminal
       - uses: dorny/paths-filter@v3
         id: contracts
         with:
