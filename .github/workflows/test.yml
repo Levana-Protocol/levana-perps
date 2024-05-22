@@ -85,9 +85,6 @@ jobs:
       - name: Print contract sizes
         if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/develop') }}
         run: ls -l wasm/artifacts/*.wasm
-      - name: Build local osmosis
-        if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/develop') }}
-        run: just build-localosmosis
       - name: On Chain tests (Rust)
         if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/develop') }}
         run: just contracts-test
