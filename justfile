@@ -6,10 +6,6 @@ GIT_SHA := `git rev-parse HEAD`
 default:
 	just --list --unsorted
 
-# Build localosmosis
-build-localosmosis:
-	cd ./.ci && docker image build . -f osmolocal.Dockerfile -t localosmo
-
 # Run localosmo
 run-localosmo:
 	./.ci/osmolocal.sh
