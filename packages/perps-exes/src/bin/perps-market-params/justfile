@@ -28,4 +28,4 @@ download-market-csv:
 
 # List unsupported exchanges
 exchanges:
-	cargo run --bin perps-market-params exchanges --market-id DOT_USDC
+	cargo run --bin perps-market-params exchanges --market-id BTC_USD
