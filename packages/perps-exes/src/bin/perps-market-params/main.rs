@@ -36,6 +36,9 @@ async fn main_inner(opt: Opt) -> Result<()> {
                 perps_exes::PerpsNetwork::DymensionTestnet => {
                     Err(anyhow!("Unsupported Dymension testnet"))
                 }
+                perps_exes::PerpsNetwork::NibiruTestnet => {
+                    Err(anyhow!("Unsupported Nibiru testnet"))
+                }
             };
             network.map(|network| (network, item.address))
         })

@@ -7,6 +7,7 @@ use cosmos::{error::BuilderError, AddressHrp, CosmosBuilder, CosmosNetwork, HasA
 pub enum PerpsNetwork {
     Regular(CosmosNetwork),
     DymensionTestnet,
+    NibiruTestnet,
 }
 
 impl FromStr for PerpsNetwork {
@@ -15,6 +16,7 @@ impl FromStr for PerpsNetwork {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
             "dymension-testnet" => PerpsNetwork::DymensionTestnet,
+            "nibiru-testnet" => PerpsNetwork::NibiruTestnet,
             _ => PerpsNetwork::Regular(s.parse()?),
         })
     }
@@ -29,6 +31,12 @@ impl PerpsNetwork {
                 "urax",
                 Self::DymensionTestnet.get_address_hrp(),
                 "http://18.199.53.161:9090",
+            )),
+            PerpsNetwork::NibiruTestnet => Ok(CosmosBuilder::new(
+                "nibiru-testnet-1",
+                "unibi",
+                Self::NibiruTestnet.get_address_hrp(),
+                "https://grpc.testnet-1.nibiru.fi",
             )),
         }
     }
@@ -45,6 +53,7 @@ impl HasAddressHrp for PerpsNetwork {
         match self {
             PerpsNetwork::Regular(network) => network.get_address_hrp(),
             PerpsNetwork::DymensionTestnet => AddressHrp::from_static("rol"),
+            PerpsNetwork::NibiruTestnet => AddressHrp::from_static("nibi"),
         }
     }
 }
@@ -57,6 +66,7 @@ impl serde::Serialize for PerpsNetwork {
         match self {
             PerpsNetwork::Regular(network) => network.serialize(serializer),
             PerpsNetwork::DymensionTestnet => serializer.serialize_str("dymension-testnet"),
+            PerpsNetwork::NibiruTestnet => serializer.serialize_str("nibiru-testnet"),
         }
     }
 }
@@ -92,6 +102,7 @@ impl Display for PerpsNetwork {
         match self {
             PerpsNetwork::Regular(network) => network.fmt(f),
             PerpsNetwork::DymensionTestnet => f.write_str("dymension-testnet"),
+            PerpsNetwork::NibiruTestnet => f.write_str("nibiru-testnet"),
         }
     }
 }
