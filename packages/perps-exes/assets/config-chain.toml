@@ -212,3 +212,10 @@ rpc-nodes = []
 gas-decimals = 6
 
 [juno-testnet.assets]
+
+[nibiru-testnet]
+tracker = "nibi1gk2us05y4mu2z3ategk253yn6hlautzwwwe6vq8apsctljmqwa4qdswakq"
+faucet = "nibi1e5e52yd7hk2j3plfxwfldsn33v4dye2ez0zmjwqea0upcvgmhs2q07mhlj"
+# explorer = "https://dymension-fake-explorer"
+rpc-nodes = ["https://rpc.testnet-1.nibiru.fi"]
+gas-decimals = 6
