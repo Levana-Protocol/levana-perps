@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: taiki-e/install-action@v2
         with:
-          tool: just@1.16.0
+          tool: just@1.25.2
       - uses: dorny/paths-filter@v3
         id: contracts
         with:
@@ -40,7 +40,7 @@ jobs:
       - name: Check commit
         run: just check-commits
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -117,7 +117,7 @@ jobs:
           credentials: "https://levana-bot:${{secrets.GH_BOT_PAT}}@github.com"
       - uses: taiki-e/install-action@v2
         with:
-          tool: just@1.16.0
+          tool: just@1.25.0
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.75.0
@@ -139,7 +139,7 @@ jobs:
           just cargo-release
           cp target/release/perps-qa target/release/perps-qa-apple-darwin
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: target/release/perps-qa-apple-darwin
