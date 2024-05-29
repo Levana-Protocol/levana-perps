@@ -148,6 +148,7 @@ cargo-companion-release:
 
 # Build companion docker image
 build-companion-image:
+	cp ./packages/perps-exes/assets/mainnet-factories.toml .ci/companion/
 	cp target/x86_64-unknown-linux-musl/release/perps-companion .ci/companion
 	cd .ci/companion && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/companion:{{GIT_SHA}}
 
