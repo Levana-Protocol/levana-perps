@@ -215,13 +215,6 @@ off-chain-term-coverage:
 fuzz:
 	cargo +nightly fuzz run market --fuzz-dir packages/fuzz
 
-# For right now, justfiles to not support parallel execution
-# so use npm-run-all to kick things off
-# build-type: release or dev
-# exec-type: sanity or performance
-diagnostics-gui build-type exec-type:
-	cd ./packages/diagnostics && yarn serve:{{build-type}}:{{exec-type}}
-
 # Run bots directly (for dev purposes, not for production)
 bots:
 	cargo run --bin perps-bots

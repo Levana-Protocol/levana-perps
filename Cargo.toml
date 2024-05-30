@@ -20,9 +20,6 @@ members = [
     "packages/multi_test",
     "packages/fuzz",
 
-    # Diagnostics gui
-    "packages/diagnostics",
-
     # Helper executables for testing, deploying, and running bots
     "packages/perps-exes",
 ]
