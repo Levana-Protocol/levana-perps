@@ -52,18 +52,6 @@ It's also an updated dev environment, with multichain support and a native SDK i
 * `cargo install cargo-fuzz` to install the fuzz testing tool
 * `just fuzz`
 
-## Diagnostics GUI
-
-* [install trunk.rs](https://trunkrs.dev/#install) - install the Trunk builder for frontend rust/wasm
-* `yarn install` in `packages/diagnostics` - install the yarn dependencies
-* `just diagnostics-gui [dev/release] [sanity/performance]` - run things
-
-  where `sanity` means to run with sanity checks, `performance` means without, `dev` means to run debug builds, and `release` means to run production builds
-
-  so for example, `just diagnostics-gui dev sanity` will capture all the debug info, but be slow, while `just diagnostics-gui release performance` will miss some debug info and assertions, but run fast
-
-  a log of all actions is written to the .gitignored `bridge.log`
-
 
 # Getting started with various chains
 
