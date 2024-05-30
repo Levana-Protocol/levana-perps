@@ -230,13 +230,26 @@ pub(crate) async fn compute_coin_dnfs(
             .into_iter()
             .filter(|market| !serve_opt.skip_market_ids.contains(&market.status.market_id))
             .collect::<Vec<_>>();
+        let mut error_markets = vec![];
+
         for market_id in &markets {
             let market_id = &market_id.status.market_id;
             tracing::info!("Going to compute DNF for {market_id:?}");
             let configured_dnf = market_config
                 .get_chain_dnf(market_id)
                 .context(format!("No DNF configured for {market_id:?}"))?;
-            let dnf = dnf_sensitivity(&http_app, market_id).await?;
+            let dnf = dnf_sensitivity(&http_app, market_id).await;
+            let dnf = match dnf {
+                Ok(dnf) => dnf,
+                Err(ref error) => {
+                    if error.to_string().contains("Exchange type not known for id") {
+                        error_markets.push(market_id);
+                        continue;
+                    } else {
+                        dnf?
+                    }
+                }
+            };
             let dnf_notify = compute_dnf_notify(
                 dnf,
                 configured_dnf,
@@ -287,6 +300,13 @@ pub(crate) async fn compute_coin_dnfs(
                 tokio::time::sleep(Duration::from_secs(serve_opt.cmc_wait_seconds)).await;
             }
         }
+        if !error_markets.is_empty() {
+            let description = format!("Markets: {:?}", error_markets);
+            http_app
+                .send_notification("MPA: Unrecognized exchanges found".to_owned(), description)
+                .await?;
+        }
+
         tracing::info!("Going to sleep 24 hours");
         tokio::time::sleep(Duration::from_secs(60 * 60 * 24)).await;
     }
