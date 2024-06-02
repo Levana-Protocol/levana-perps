@@ -22,7 +22,10 @@ use msg::contracts::market::{
     spot_price::{PythPriceServiceNetwork, SpotPriceFeedData},
 };
 use perps_exes::{
-    config::ChainConfig, contracts::Factory, prelude::MarketContract, pyth::get_oracle_update_msg,
+    config::{ChainConfig, MainnetFactories},
+    contracts::Factory,
+    prelude::MarketContract,
+    pyth::get_oracle_update_msg,
     PerpsNetwork,
 };
 use serde_json::json;
@@ -393,12 +396,9 @@ async fn trade_volume(
 
 #[derive(clap::Parser)]
 struct OpenPositionCsvOpt {
-    /// Network to use.
-    #[clap(long, env = "COSMOS_NETWORK")]
-    network: PerpsNetwork,
-    /// Factory address
+    /// Factory name
     #[clap(long)]
-    factory: Address,
+    factory: String,
     /// Output CSV file
     #[clap(long)]
     csv: PathBuf,
@@ -417,7 +417,6 @@ struct ToProcess {
 async fn open_position_csv(
     opt: crate::cli::Opt,
     OpenPositionCsvOpt {
-        network,
         factory,
         csv,
         workers,
@@ -427,8 +426,11 @@ async fn open_position_csv(
         .with_context(|| format!("Unable to load old CSV data from {}", csv.display()))?;
     tracing::info!("Loaded {} records from old CSV", old_data.len());
     let old_data = Arc::new(old_data);
-    let cosmos = opt.connect(network).await?;
-    let factory = Factory::from_contract(cosmos.make_contract(factory));
+    let factories = MainnetFactories::load()?;
+    let factory = factories.get(&factory)?;
+    let app = opt.load_app_mainnet(factory.network).await?;
+
+    let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
     let csv = ::csv::Writer::from_path(&csv)?;
     let csv = Arc::new(Mutex::new(csv));
 
