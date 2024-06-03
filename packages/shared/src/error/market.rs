@@ -159,6 +159,24 @@ pub enum MarketError {
         close_time: Timestamp,
         reason: String,
     },
+    #[error("Insufficient locked liquidity in protocol to perform the given unlock. Requested: {requested}. Total locked: {total_locked}.")]
+    InsufficientLiquidityForUnlock {
+        requested: NonZero<Collateral>,
+        total_locked: Collateral,
+    },
+    #[error("Insufficient unlocked liquidity in the protocol. Requested: {requested}. Total available: {total_unlocked}. Total allowed with carry leverage restrictions: {allowed}.")]
+    Liquidity {
+        /// Total amount of liquidity requested to take from unlocked pool.
+        requested: NonZero<Collateral>,
+        /// Total amount of liquidity available in the unlocked pool.
+        total_unlocked: Collateral,
+        /// Liquidity allowed to be taken for this action.
+        ///
+        /// In particular, carry leverage may restrict the total amount of
+        /// liquidity that can be used to ensure sufficient funds for cash-and-carry
+        /// balancing operations.
+        allowed: Collateral,
+    },
 }
 
 /// Was the price provided by the trader too high or too low?
@@ -296,6 +314,10 @@ impl MarketError {
             MarketError::PositionAlreadyClosing { .. } => ErrorId::PositionAlreadyClosing,
             MarketError::NoPricePublishTimeFound => ErrorId::NoPricePublishTimeFound,
             MarketError::PositionAlreadyClosed { .. } => ErrorId::PositionAlreadyClosed,
+            MarketError::InsufficientLiquidityForUnlock { .. } => {
+                ErrorId::InsufficientLiquidityForUnlock
+            }
+            MarketError::Liquidity { .. } => ErrorId::Liquidity,
         }
     }
 }

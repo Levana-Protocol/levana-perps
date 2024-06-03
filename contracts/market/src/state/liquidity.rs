@@ -1017,7 +1017,11 @@ impl LiquidityUnlock {
     ) -> Result<Self> {
         let mut stats = stats.unwrap_or(state.load_liquidity_stats(store)?);
         if amount.raw() > stats.locked {
-            Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed unlock! not enough locked liquidity in the protocol! (asked for {}, only {} available)", amount, stats.locked))
+            Err(MarketError::InsufficientLiquidityForUnlock {
+                requested: amount,
+                total_locked: stats.locked,
+            }
+            .into_anyhow())
         } else {
             stats.locked = stats.locked.checked_sub(amount.raw())?;
             stats.unlocked = stats.unlocked.checked_add(amount.raw())?;
@@ -1082,7 +1086,12 @@ impl LiquidityLock {
         let min_unlocked_liquidity = state.min_unlocked_liquidity(net_notional, &price)?;
 
         if (min_unlocked_liquidity + amount.raw())? > stats.unlocked {
-            Err(perp_anyhow!(ErrorId::Liquidity, ErrorDomain::Market, "failed lock! not enough unlocked liquidity in the protocol! (asked for {}, only {} available with {} minimum. net notional is {})", amount, stats.unlocked, min_unlocked_liquidity, net_notional))
+            Err(MarketError::Liquidity {
+                requested: amount,
+                total_unlocked: stats.unlocked,
+                allowed: min_unlocked_liquidity,
+            }
+            .into_anyhow())
         } else {
             stats.locked = stats.locked.checked_add(amount.raw())?;
             stats.unlocked = stats.unlocked.checked_sub(amount.raw())?;

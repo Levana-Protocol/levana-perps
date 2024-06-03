@@ -31,7 +31,6 @@ pub enum ErrorId {
     PriceAlreadyExists,
     PriceNotFound,
     PriceTooOld,
-    Liquidity,
     PositionUpdate,
     NativeFunds,
     Cw20Funds,
@@ -81,6 +80,8 @@ pub enum ErrorId {
     NoPricePublishTimeFound,
     PositionAlreadyClosed,
     MissingTakeProfit,
+    InsufficientLiquidityForUnlock,
+    Liquidity,
 }
 
 /// Source within the protocol for the error
