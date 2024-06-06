@@ -6,13 +6,20 @@ use crate::util_cmd::{load_data_from_csv, open_position_csv, OpenPositionCsvOpt,
 use anyhow::{anyhow, Context, Result};
 use chrono::{Duration, Utc};
 use itertools::Itertools;
+use perps_exes::config::MainnetFactories;
 use reqwest::Client;
 
 #[derive(clap::Parser)]
 pub(super) struct TopTradersOpt {
     /// Factory name
-    #[clap(long, env = "LEVANA_TRADERS_FACTORY")]
-    factory: String,
+    #[clap(
+        long,
+        env = "LEVANA_TRADERS_FACTORIES",
+        default_value = "osmomainnet1,seimainnet1,injmainnet1,ntrnmainnet1",
+        use_value_delimiter = true,
+        value_delimiter = ','
+    )]
+    factories: Vec<String>,
     /// Slack webhook to publish the notification
     #[arg(long, env = "LEVANA_TRADERS_SLACK_WEBHOOK")]
     pub(crate) slack_webhook: reqwest::Url,
@@ -29,12 +36,33 @@ impl TopTradersOpt {
 
 async fn go(
     TopTradersOpt {
-        factory,
+        factories,
         slack_webhook,
         workers,
     }: TopTradersOpt,
     opt: Opt,
 ) -> Result<()> {
+    let mainnet_factories = MainnetFactories::load()?;
+    let mut notification_message = "".to_owned();
+    for factory in factories {
+        let active_traders_count =
+            active_traders_on_factory(factory.clone(), opt.clone(), workers).await?;
+        let factory = mainnet_factories.get(&factory)?.network;
+        notification_message += format!(
+            "*{}* traders are active on _{}_\n",
+            active_traders_count, factory
+        )
+        .as_str();
+    }
+    send_slack_notification(
+        slack_webhook,
+        "Number of active traders".to_owned(),
+        notification_message,
+    )
+    .await?;
+    Ok(())
+}
+async fn active_traders_on_factory(factory: String, opt: Opt, workers: u32) -> Result<usize> {
     let csv_filename: PathBuf = std::env::current_dir()?.join(format!("{}.csv", factory.clone()));
     tracing::info!("CSV filename: {}", csv_filename.to_str().unwrap());
     if let Err(e) = open_position_csv(
@@ -79,13 +107,13 @@ async fn go(
         .unique()
         .count();
     tracing::info!("Here's the csv data length: {:?}", active_trader_count);
-    send_slack_notification(slack_webhook, active_trader_count).await?;
-    Ok(())
+    Ok(active_trader_count)
 }
 
 pub(crate) async fn send_slack_notification(
     webhook: reqwest::Url,
-    count: usize,
+    header: String,
+    message: String,
 ) -> anyhow::Result<()> {
     let value = serde_json::json!(
     {
@@ -95,7 +123,7 @@ pub(crate) async fn send_slack_notification(
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": "Number of active traders",
+                    "text": header,
                 }
             },
             {
@@ -103,7 +131,7 @@ pub(crate) async fn send_slack_notification(
                 "block_id": "section567",
                 "text": {
                     "type": "mrkdwn",
-                    "text": format!("*{}* traders were active in 24 hours", count),
+                    "text": message,
                 },
                 "accessory": {
                     "type": "image",
