@@ -711,64 +711,108 @@ pub struct ConfigUpdateAndBorrowFee {
 
 impl MarketConfigUpdates {
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
         let config: Self = load_toml(path, "LEVANA_MARKETS_", "markets config")?;
 
-        config.validate_carry_leverage()?;
+        config.validate().with_context(|| {
+            format!(
+                "Unable to parse MarketConfigUpdates from {}",
+                path.display()
+            )
+        })?;
         Ok(config)
     }
 
-    fn validate_carry_leverage(&self) -> Result<()> {
-        struct Mismatch<'a> {
-            market: &'a MarketId,
-            configured_carry_leverage: Decimal256,
-            expected_carry_leverage: Decimal256,
+    fn validate(&self) -> Result<()> {
+        enum Mismatch<'a> {
+            CarryLeverage {
+                market: &'a MarketId,
+                configured: Decimal256,
+                expected: Decimal256,
+            },
+            DnfCap {
+                market: &'a MarketId,
+                configured: NonZero<Decimal256>,
+                expected: NonZero<Decimal256>,
+            },
         }
+        let mut mismatches: Vec<Mismatch> = vec![];
 
         let default_max_leverage = ConfigDefaults::max_leverage();
         let default_carry_leverage = ConfigDefaults::carry_leverage();
+        let default_dnf_cap = ConfigDefaults::delta_neutrality_fee_cap();
         let seven: Decimal256 = "7".parse()?;
         let two: Decimal256 = "2".parse()?;
-        let mismatches = self
-            .markets
-            .iter()
-            .filter_map(|(market_id, update)| {
-                let max_leverage = update
-                    .config
-                    .max_leverage
-                    .unwrap_or(default_max_leverage)
-                    .abs_unsigned();
-                let expected_carry_leverage = seven.min(max_leverage / two);
-                let configured_carry_leverage = update
-                    .config
-                    .carry_leverage
-                    .unwrap_or(default_carry_leverage);
+        for (market_id, update) in &self.markets {
+            let max_leverage = update
+                .config
+                .max_leverage
+                .unwrap_or(default_max_leverage)
+                .abs_unsigned();
+            let expected_carry_leverage = seven.min(max_leverage / two);
+            let configured_carry_leverage = update
+                .config
+                .carry_leverage
+                .unwrap_or(default_carry_leverage);
 
-                if expected_carry_leverage == configured_carry_leverage {
-                    None
-                } else {
-                    Some(Mismatch {
-                        market: market_id,
-                        configured_carry_leverage,
-                        expected_carry_leverage,
-                    })
-                }
-            })
-            .collect::<Vec<_>>();
+            if expected_carry_leverage != configured_carry_leverage {
+                mismatches.push(Mismatch::CarryLeverage {
+                    market: market_id,
+                    configured: configured_carry_leverage,
+                    expected: expected_carry_leverage,
+                })
+            }
+
+            let expected_dnf_cap = match max_leverage.to_string().parse::<u32>()? {
+                4 => "0.03",
+                6 => "0.025",
+                10 => "0.015",
+                30 => "0.005",
+                50 => "0.0002",
+                max_leverage => anyhow::bail!("Unexpected max leverage value: {max_leverage}"),
+            }
+            .parse()?;
+            let dnf_cap = update
+                .config
+                .delta_neutrality_fee_cap
+                .unwrap_or(default_dnf_cap);
+            // For now we're ignoring caps which are too low
+            if dnf_cap > expected_dnf_cap {
+                mismatches.push(Mismatch::DnfCap {
+                    market: market_id,
+                    configured: dnf_cap,
+                    expected: expected_dnf_cap,
+                })
+            }
+        }
 
         if mismatches.is_empty() {
             Ok(())
         } else {
-            let mut msg = "Unexpected carry leverage values provided:\n".to_owned();
-            for Mismatch {
-                market,
-                configured_carry_leverage,
-                expected_carry_leverage,
-            } in mismatches
-            {
-                writeln!(
-                    &mut msg,
-                    "{market}: Expected: {expected_carry_leverage}. Found: {configured_carry_leverage}"
-                )?;
+            let mut msg = "Unexpected config values provided:\n".to_owned();
+            for mismatch in mismatches {
+                match mismatch {
+                    Mismatch::CarryLeverage {
+                        market,
+                        configured,
+                        expected,
+                    } => {
+                        writeln!(
+                            &mut msg,
+                            "{market} carry leverage: Expected: {expected}. Found: {configured}"
+                        )?;
+                    }
+                    Mismatch::DnfCap {
+                        market,
+                        configured,
+                        expected,
+                    } => {
+                        writeln!(
+                            &mut msg,
+                            "{market} DNF cap: Expected: {expected}. Found: {configured}"
+                        )?;
+                    }
+                }
             }
             Err(anyhow::anyhow!("{msg}"))
         }
