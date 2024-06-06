@@ -1,0 +1,126 @@
+use std::cmp::Ordering;
+use std::path::PathBuf;
+
+use crate::cli::Opt;
+use crate::util_cmd::{load_data_from_csv, open_position_csv, OpenPositionCsvOpt, PositionRecord};
+use anyhow::{anyhow, Context, Result};
+use chrono::{Duration, Utc};
+use itertools::Itertools;
+use reqwest::Client;
+
+#[derive(clap::Parser)]
+pub(super) struct TopTradersOpt {
+    /// Factory name
+    #[clap(long, env = "LEVANA_TRADERS_FACTORY")]
+    factory: String,
+    /// Slack webhook to publish the notification
+    #[arg(long, env = "LEVANA_TRADERS_SLACK_WEBHOOK")]
+    pub(crate) slack_webhook: reqwest::Url,
+    /// How many separate worker tasks to create for parallel loading
+    #[clap(long, default_value = "30")]
+    workers: u32,
+}
+
+impl TopTradersOpt {
+    pub(super) async fn go(self, opt: Opt) -> Result<()> {
+        go(self, opt).await
+    }
+}
+
+async fn go(
+    TopTradersOpt {
+        factory,
+        slack_webhook,
+        workers,
+    }: TopTradersOpt,
+    opt: Opt,
+) -> Result<()> {
+    let csv_filename: PathBuf = std::env::current_dir()?.join(format!("{}.csv", factory.clone()));
+    tracing::info!("CSV filename: {}", csv_filename.to_str().unwrap());
+    if let Err(e) = open_position_csv(
+        opt,
+        OpenPositionCsvOpt {
+            factory,
+            csv: csv_filename.clone(),
+            workers,
+        },
+    )
+    .await
+    {
+        tracing::error!("Error while generating open position csv file: {}", e);
+    }
+
+    tracing::info!("Reading csv data");
+    let csv_data = load_data_from_csv(&csv_filename).with_context(|| {
+        format!(
+            "Unable to load old CSV data from {}",
+            csv_filename.display()
+        )
+    })?;
+    let former_threshold = Utc::now() - Duration::hours(24);
+    let active_trader_count = csv_data
+        .values()
+        .filter_map(
+            |PositionRecord {
+                 opened_at,
+                 closed_at,
+                 owner,
+                 ..
+             }| match (opened_at, closed_at) {
+                (opened_at, _) if opened_at.cmp(&former_threshold) == Ordering::Greater => {
+                    Some(owner)
+                }
+                (_, Some(closed_at)) if closed_at.cmp(&former_threshold) == Ordering::Greater => {
+                    Some(owner)
+                }
+                (_, _) => None,
+            },
+        )
+        .unique()
+        .count();
+    tracing::info!("Here's the csv data length: {:?}", active_trader_count);
+    send_slack_notification(slack_webhook, active_trader_count).await?;
+    Ok(())
+}
+
+pub(crate) async fn send_slack_notification(
+    webhook: reqwest::Url,
+    count: usize,
+) -> anyhow::Result<()> {
+    let value = serde_json::json!(
+    {
+        "text": "Active traders in 24 hours",
+        "blocks": [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "Number of active traders",
+                }
+            },
+            {
+                "type": "section",
+                "block_id": "section567",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": format!("*{}* traders were active in 24 hours", count),
+                },
+                "accessory": {
+                    "type": "image",
+                    "image_url": "https://static.levana.finance/icons/levana-token.png",
+                    "alt_text": "Levana Dragons"
+                }
+            }
+        ]
+    });
+    let client = Client::new();
+    let response = client.post(webhook.clone()).json(&value).send().await?;
+    if response.status().is_success() {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "Slack notification POST request failed with code {}",
+            response.status()
+        ))
+    }
+}

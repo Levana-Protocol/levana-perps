@@ -2,6 +2,7 @@ mod deferred_exec;
 mod list_contracts;
 mod lp_history;
 mod token_balances;
+mod top_traders;
 mod tvl_report;
 
 use std::{
@@ -87,6 +88,11 @@ enum Sub {
         #[clap(flatten)]
         inner: tvl_report::TvlReportOpt,
     },
+    /// Publish the number of active traders in 24 hours
+    TopTraders {
+        #[clap(flatten)]
+        inner: top_traders::TopTradersOpt,
+    },
 }
 
 impl UtilOpt {
@@ -101,6 +107,7 @@ impl UtilOpt {
             Sub::TokenBalances { inner } => inner.go(opt).await,
             Sub::ListContracts { inner } => inner.go().await,
             Sub::TvlReport { inner } => inner.go(opt).await,
+            Sub::TopTraders { inner } => inner.go(opt).await,
         }
     }
 }
@@ -395,7 +402,7 @@ async fn trade_volume(
 }
 
 #[derive(clap::Parser)]
-struct OpenPositionCsvOpt {
+pub(crate) struct OpenPositionCsvOpt {
     /// Factory name
     #[clap(long)]
     factory: String,
@@ -414,7 +421,7 @@ struct ToProcess {
     market_id: Arc<MarketId>,
 }
 
-async fn open_position_csv(
+pub(crate) async fn open_position_csv(
     opt: crate::cli::Opt,
     OpenPositionCsvOpt {
         factory,
@@ -422,7 +429,7 @@ async fn open_position_csv(
         workers,
     }: OpenPositionCsvOpt,
 ) -> Result<()> {
-    let old_data = load_old_data(&csv)
+    let old_data = load_data_from_csv(&csv)
         .with_context(|| format!("Unable to load old CSV data from {}", csv.display()))?;
     tracing::info!("Loaded {} records from old CSV", old_data.len());
     let old_data = Arc::new(old_data);
@@ -590,7 +597,7 @@ struct PositionRecordCommon {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-struct PositionRecord {
+pub(crate) struct PositionRecord {
     market: MarketId,
     id: PositionId,
     opened_at: DateTime<Utc>,
@@ -610,7 +617,7 @@ struct PositionRecord {
     total_fees_usd: Signed<Usd>,
 }
 
-fn load_old_data(
+pub(crate) fn load_data_from_csv(
     path: &Path,
 ) -> Result<HashMap<(MarketId, PositionId), PositionRecord>, csv::Error> {
     if path.exists() {
