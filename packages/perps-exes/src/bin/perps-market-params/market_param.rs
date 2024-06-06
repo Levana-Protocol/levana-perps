@@ -29,6 +29,7 @@ pub(crate) struct Market {
 #[derive(Debug, Clone, serde::Deserialize)]
 pub(crate) struct MarketParam {
     pub(crate) delta_neutrality_fee_sensitivity: String,
+    pub(crate) max_leverage: String,
 }
 
 impl MarketsConfig {
@@ -41,6 +42,30 @@ impl MarketsConfig {
             .context("No dnf found")?;
         let result = result.parse()?;
         Ok(result)
+    }
+
+    pub(crate) fn get_chain_max_leverage(&self, market_id: &MarketId) -> anyhow::Result<f64> {
+        let result = self
+            .markets
+            .iter()
+            .find(|item| item.status.market_id == *market_id)
+            .map(|item| item.status.config.max_leverage.clone())
+            .context("No dnf found")?;
+        let result = result.parse()?;
+        Ok(result)
+    }
+}
+
+fn dnf_sensitivity_to_max_leverage(dnf_sensitivity: f64) -> f64 {
+    let million = 1000000.0;
+    if dnf_sensitivity < (2.0 * million) {
+        4.0
+    } else if dnf_sensitivity >= (2.0 * million) && dnf_sensitivity < (50.0 * million) {
+        10.0
+    } else if dnf_sensitivity >= (50.0 * million) && dnf_sensitivity < (200.0 * million) {
+        30.0
+    } else {
+        50.0
     }
 }
 
@@ -238,6 +263,9 @@ pub(crate) async fn compute_coin_dnfs(
             let configured_dnf = market_config
                 .get_chain_dnf(market_id)
                 .context(format!("No DNF configured for {market_id:?}"))?;
+            let configured_max_leverage = market_config
+                .get_chain_max_leverage(market_id)
+                .context(format!("No max_leverage configured for {market_id:?}"))?;
             let dnf = dnf_sensitivity(&http_app, market_id).await;
             let dnf = match dnf {
                 Ok(dnf) => dnf,
@@ -250,6 +278,22 @@ pub(crate) async fn compute_coin_dnfs(
                     }
                 }
             };
+            let max_leverage = dnf_sensitivity_to_max_leverage(dnf);
+            tracing::info!("Configured max_leverage for {market_id}: {configured_max_leverage}");
+            tracing::info!("Recommended max_leverage for {market_id}: {max_leverage}");
+
+            if configured_max_leverage != max_leverage {
+                http_app
+                    .send_notification(
+                        format!(":information_source: Recommended Max leverage change for {market_id}"),
+                        format!(
+                            "Configured Max leverage: *{}* \n Recommended Max leverage: *{}*",
+                            configured_max_leverage, max_leverage
+                        ),
+                    )
+                    .await?;
+            }
+
             let dnf_notify = compute_dnf_notify(
                 dnf,
                 configured_dnf,
