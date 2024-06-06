@@ -285,7 +285,9 @@ pub(crate) async fn compute_coin_dnfs(
             if configured_max_leverage != max_leverage {
                 http_app
                     .send_notification(
-                        format!(":information_source: Recommended Max leverage change for {market_id}"),
+                        format!(
+                            ":information_source: Recommended Max leverage change for {market_id}"
+                        ),
                         format!(
                             "Configured Max leverage: *{}* \n Recommended Max leverage: *{}*",
                             configured_max_leverage, max_leverage
