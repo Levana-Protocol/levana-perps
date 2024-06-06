@@ -6,7 +6,7 @@ use web::axum_main;
 
 use crate::{
     cli::Opt,
-    market_param::{compute_dnf_notify, dnf_sensitivity},
+    market_param::{compute_dnf_notify, dnf_sensitivity, DnfInNotional},
     slack::HttpApp,
 };
 
@@ -118,14 +118,15 @@ async fn main_inner(opt: Opt) -> Result<()> {
                 }
                 Err(err) => {
                     tracing::warn!("{err}");
-                    0.0
+                    DnfInNotional(0.0)
                 }
             };
 
-            let dnf_notify = compute_dnf_notify(dnf, configured_dnf, 100.0, 50.0);
+            let dnf_notify =
+                compute_dnf_notify(dnf.dnf_in_notional, configured_dnf.clone(), 100.0, 50.0);
             tracing::info!("Computed DNF sensitivity: {}", dnf_notify.computed_dnf);
 
-            if configured_dnf != 0.0 {
+            if configured_dnf.0 != 0.0 {
                 tracing::info!(
                     "Percentage diff ({market_id}): {}",
                     dnf_notify.percentage_diff
