@@ -50,7 +50,7 @@ impl MarketsConfig {
             .iter()
             .find(|item| item.status.market_id == *market_id)
             .map(|item| item.status.config.max_leverage.clone())
-            .context("No dnf found")?;
+            .context("No max_leverage found")?;
         let result = result.parse()?;
         Ok(result)
     }
