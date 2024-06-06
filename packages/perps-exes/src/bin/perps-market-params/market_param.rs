@@ -418,26 +418,26 @@ mod tests {
 
     #[test]
     fn validate_for_dnf_change_which_exceeds_threshold() {
-        let dnf_notify = compute_dnf_notify(0.4, 1.0, 50.0, 10.0);
+        let dnf_notify = compute_dnf_notify(DnfInNotional(0.4), DnfInNotional(1.0), 50.0, 10.0);
         assert_eq!(dnf_notify.percentage_diff, 60.0);
         assert!(dnf_notify.should_notify);
 
-        let dnf_notify = compute_dnf_notify(1.2, 1.0, 50.0, 10.0);
+        let dnf_notify = compute_dnf_notify(DnfInNotional(1.2), DnfInNotional(1.0), 50.0, 10.0);
         assert_eq!(dnf_notify.percentage_diff.round(), -20.0);
         assert!(dnf_notify.should_notify);
     }
 
     #[test]
     fn validate_for_dnf_change_for_happy_case() {
-        let dnf_notify = compute_dnf_notify(0.8, 1.0, 50.0, 10.0);
+        let dnf_notify = compute_dnf_notify(DnfInNotional(0.8), DnfInNotional(1.0), 50.0, 10.0);
         assert_eq!(dnf_notify.percentage_diff.round(), 20.0);
         assert!(!dnf_notify.should_notify);
 
-        let dnf_notify = compute_dnf_notify(1.05, 1.0, 50.0, 10.0);
+        let dnf_notify = compute_dnf_notify(DnfInNotional(1.05), DnfInNotional(1.0), 50.0, 10.0);
         assert_eq!(dnf_notify.percentage_diff.round(), -5.0);
         assert!(!dnf_notify.should_notify);
 
-        let dnf_notify = compute_dnf_notify(1.0, 1.0, 50.0, 10.0);
+        let dnf_notify = compute_dnf_notify(DnfInNotional(1.0), DnfInNotional(1.0), 50.0, 10.0);
         assert_eq!(dnf_notify.percentage_diff, 0.0);
         assert!(!dnf_notify.should_notify);
     }
