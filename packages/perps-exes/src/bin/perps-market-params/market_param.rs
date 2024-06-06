@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{fmt::Display, sync::Arc, time::Duration};
 
 use anyhow::{bail, Context};
 use shared::storage::MarketId;
@@ -33,7 +33,7 @@ pub(crate) struct MarketParam {
 }
 
 impl MarketsConfig {
-    pub(crate) fn get_chain_dnf(&self, market_id: &MarketId) -> anyhow::Result<f64> {
+    pub(crate) fn get_chain_dnf(&self, market_id: &MarketId) -> anyhow::Result<DnfInNotional> {
         let result = self
             .markets
             .iter()
@@ -41,7 +41,7 @@ impl MarketsConfig {
             .map(|item| item.status.config.delta_neutrality_fee_sensitivity.clone())
             .context("No dnf found")?;
         let result = result.parse()?;
-        Ok(result)
+        Ok(DnfInNotional(result))
     }
 
     pub(crate) fn get_chain_max_leverage(&self, market_id: &MarketId) -> anyhow::Result<f64> {
@@ -56,7 +56,8 @@ impl MarketsConfig {
     }
 }
 
-fn dnf_sensitivity_to_max_leverage(dnf_sensitivity: f64) -> f64 {
+fn dnf_sensitivity_to_max_leverage(dnf_sensitivity: DnfInUsd) -> f64 {
+    let dnf_sensitivity = dnf_sensitivity.0;
     let million = 1000000.0;
     if dnf_sensitivity < (2.0 * million) {
         4.0
@@ -69,10 +70,27 @@ fn dnf_sensitivity_to_max_leverage(dnf_sensitivity: f64) -> f64 {
     }
 }
 
+#[derive(PartialOrd, PartialEq, Clone, serde::Serialize)]
+pub(crate) struct DnfInNotional(pub(crate) f64);
+
+impl Display for DnfInNotional {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{}", self.0)
+    }
+}
+
+#[derive(PartialOrd, PartialEq, Clone, serde::Serialize)]
+pub(crate) struct DnfInUsd(pub(crate) f64);
+
+pub(crate) struct Dnf {
+    pub(crate) dnf_in_notional: DnfInNotional,
+    pub(crate) dnf_in_usd: DnfInUsd,
+}
+
 pub(crate) async fn dnf_sensitivity(
     http_app: &HttpApp,
     market_id: &MarketId,
-) -> anyhow::Result<f64> {
+) -> anyhow::Result<Dnf> {
     tracing::debug!("Going to compute dnf_sensitivity for {market_id}");
     let base_asset = AssetName(market_id.get_base());
     let quote_asset = AssetName(market_id.get_quote());
@@ -84,7 +102,11 @@ pub(crate) async fn dnf_sensitivity(
             exchanges.data.market_pairs.len()
         );
         let dnf_in_usd = compute_dnf_sensitivity(exchanges.data.market_pairs)?;
-        return dnf_in_usd.to_asset_amount(base_asset, http_app).await;
+        let dnf_in_base = dnf_in_usd.to_asset_amount(base_asset, http_app).await?;
+        return Ok(Dnf {
+            dnf_in_notional: DnfInNotional(dnf_in_base),
+            dnf_in_usd: DnfInUsd(dnf_in_usd.0),
+        });
     }
     tracing::debug!("Fetch base_exchanges");
     let base_exchanges = http_app.get_market_pair(base_asset).await?;
@@ -97,7 +119,11 @@ pub(crate) async fn dnf_sensitivity(
     } else {
         base_dnf_in_usd
     };
-    dnf_in_usd.to_asset_amount(base_asset, http_app).await
+    let dnf_in_base = dnf_in_usd.to_asset_amount(base_asset, http_app).await?;
+    Ok(Dnf {
+        dnf_in_notional: DnfInNotional(dnf_in_base),
+        dnf_in_usd: DnfInUsd(dnf_in_usd.0),
+    })
 }
 
 #[derive(Clone, Copy)]
@@ -196,8 +222,8 @@ fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<MyUs
 
 #[derive(Clone, serde::Serialize)]
 pub(crate) struct DnfNotify {
-    pub(crate) configured_dnf: f64,
-    pub(crate) computed_dnf: f64,
+    pub(crate) configured_dnf: DnfInNotional,
+    pub(crate) computed_dnf: DnfInNotional,
     pub(crate) percentage_diff: f64,
     pub(crate) should_notify: bool,
     pub(crate) status: ConfiguredDnfStatus,
@@ -213,8 +239,8 @@ pub(crate) enum ConfiguredDnfStatus {
 }
 
 pub(crate) fn compute_dnf_notify(
-    computed_dnf: f64,
-    configured_dnf: f64,
+    comp @ DnfInNotional(computed_dnf): DnfInNotional,
+    conf @ DnfInNotional(configured_dnf): DnfInNotional,
     dnf_increase_threshold: f64,
     dnf_decrease_threshold: f64,
 ) -> DnfNotify {
@@ -225,8 +251,8 @@ pub(crate) fn compute_dnf_notify(
         || (percentage_diff.is_sign_negative() && percentage_diff.abs() <= dnf_decrease_threshold);
     let should_notify = !should_notify;
     DnfNotify {
-        configured_dnf,
-        computed_dnf,
+        configured_dnf: conf,
+        computed_dnf: comp,
         percentage_diff,
         should_notify,
         status: if percentage_diff.is_sign_positive() {
@@ -278,7 +304,7 @@ pub(crate) async fn compute_coin_dnfs(
                     }
                 }
             };
-            let max_leverage = dnf_sensitivity_to_max_leverage(dnf);
+            let max_leverage = dnf_sensitivity_to_max_leverage(dnf.dnf_in_usd);
             tracing::info!("Configured max_leverage for {market_id}: {configured_max_leverage}");
             tracing::info!("Recommended max_leverage for {market_id}: {max_leverage}");
 
@@ -297,7 +323,7 @@ pub(crate) async fn compute_coin_dnfs(
             }
 
             let dnf_notify = compute_dnf_notify(
-                dnf,
+                dnf.dnf_in_notional,
                 configured_dnf,
                 serve_opt.dnf_increase_threshold,
                 serve_opt.dnf_decrease_threshold,
@@ -325,15 +351,15 @@ pub(crate) async fn compute_coin_dnfs(
                         format!("{icon} Recommended DNF change for {market_id}"),
                         format!(
                             "Configured DNF is {status} \n Configured DNF: *{}* \n Recommended DNF: *{}*",
-                            dnf_notify.configured_dnf, dnf_notify.computed_dnf.round()
+                            dnf_notify.configured_dnf.0, dnf_notify.computed_dnf.0.round()
                         ),
                     )
                     .await?;
             }
             tracing::info!(
                 "Finished computing DNF for {market_id:?}: {} (Configured DNF: {})",
-                dnf_notify.computed_dnf,
-                dnf_notify.configured_dnf
+                dnf_notify.computed_dnf.0,
+                dnf_notify.configured_dnf.0
             );
             app.market_params
                 .write()
