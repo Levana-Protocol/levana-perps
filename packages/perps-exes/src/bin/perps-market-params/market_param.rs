@@ -94,6 +94,7 @@ pub(crate) async fn dnf_sensitivity(
     tracing::debug!("Going to compute dnf_sensitivity for {market_id}");
     let base_asset = AssetName(market_id.get_base());
     let quote_asset = AssetName(market_id.get_quote());
+
     if quote_asset.is_usd_equiv() {
         tracing::debug!("Fetch exchanges");
         let exchanges = http_app.get_market_pair(base_asset).await?;
@@ -102,12 +103,30 @@ pub(crate) async fn dnf_sensitivity(
             exchanges.data.market_pairs.len()
         );
         let dnf_in_usd = compute_dnf_sensitivity(exchanges.data.market_pairs)?;
-        let dnf_in_base = dnf_in_usd.to_asset_amount(base_asset, http_app).await?;
+        let dnf_in_base = dnf_in_usd
+            .to_asset_amount(NotionalAsset(base_asset.0), http_app)
+            .await?;
         return Ok(Dnf {
             dnf_in_notional: DnfInNotional(dnf_in_base),
             dnf_in_usd: DnfInUsd(dnf_in_usd.0),
         });
     }
+
+    let notional_asset = match market_id.get_market_type() {
+        shared::storage::MarketType::CollateralIsQuote => {
+            if base_asset.0.ends_with('+') {
+                NotionalAsset(quote_asset.0)
+            } else if quote_asset.0.ends_with('+') {
+                NotionalAsset(base_asset.0)
+            } else if quote_asset.is_usd_equiv() || quote_asset.0 == "EUR" {
+                NotionalAsset(base_asset.0)
+            } else {
+                NotionalAsset(quote_asset.0)
+            }
+        }
+        shared::storage::MarketType::CollateralIsBase => NotionalAsset(market_id.get_quote()),
+    };
+
     tracing::debug!("Fetch base_exchanges");
     let base_exchanges = http_app.get_market_pair(base_asset).await?;
     tracing::debug!("Fetch quote_exchanges");
@@ -119,7 +138,7 @@ pub(crate) async fn dnf_sensitivity(
     } else {
         base_dnf_in_usd
     };
-    let dnf_in_base = dnf_in_usd.to_asset_amount(base_asset, http_app).await?;
+    let dnf_in_base = dnf_in_usd.to_asset_amount(notional_asset, http_app).await?;
     Ok(Dnf {
         dnf_in_notional: DnfInNotional(dnf_in_base),
         dnf_in_usd: DnfInUsd(dnf_in_usd.0),
@@ -128,6 +147,10 @@ pub(crate) async fn dnf_sensitivity(
 
 #[derive(Clone, Copy)]
 pub(crate) struct AssetName<'a>(pub(crate) &'a str);
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct NotionalAsset<'a>(pub(crate) &'a str);
+
 impl AssetName<'_> {
     /// Is the asset either USD or a stablecoin pinned to USD?
     fn is_usd_equiv(&self) -> bool {
@@ -140,7 +163,7 @@ struct MyUsd(f64);
 impl MyUsd {
     async fn to_asset_amount(
         &self,
-        asset: AssetName<'_>,
+        asset: NotionalAsset<'_>,
         http_app: &HttpApp,
     ) -> anyhow::Result<f64> {
         let price = http_app.get_price_in_usd(asset).await?;
