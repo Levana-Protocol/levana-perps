@@ -112,20 +112,7 @@ pub(crate) async fn dnf_sensitivity(
         });
     }
 
-    let notional_asset = match market_id.get_market_type() {
-        shared::storage::MarketType::CollateralIsQuote => {
-            if base_asset.0.ends_with('+') {
-                NotionalAsset(quote_asset.0)
-            } else if quote_asset.0.ends_with('+') {
-                NotionalAsset(base_asset.0)
-            } else if quote_asset.is_usd_equiv() || quote_asset.0 == "EUR" {
-                NotionalAsset(base_asset.0)
-            } else {
-                NotionalAsset(quote_asset.0)
-            }
-        }
-        shared::storage::MarketType::CollateralIsBase => NotionalAsset(market_id.get_quote()),
-    };
+    let notional_asset = NotionalAsset(market_id.get_notional());
 
     tracing::debug!("Fetch base_exchanges");
     let base_exchanges = http_app.get_market_pair(base_asset).await?;
