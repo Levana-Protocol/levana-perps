@@ -67,12 +67,12 @@ pub(crate) async fn dnf_sensitivity(
     let quote_exchanges = http_app.get_market_pair(quote_asset).await?;
     let base_dnf_in_usd = compute_dnf_sensitivity(base_exchanges.data.market_pairs)?;
     let quote_dnf_in_usd = compute_dnf_sensitivity(quote_exchanges.data.market_pairs)?;
-    let dnf_in_usd = if base_dnf_in_usd > quote_dnf_in_usd {
-        quote_dnf_in_usd
+    let (dnf_in_usd, asset_type) = if base_dnf_in_usd > quote_dnf_in_usd {
+        (quote_dnf_in_usd, quote_asset)
     } else {
-        base_dnf_in_usd
+        (base_dnf_in_usd, base_asset)
     };
-    dnf_in_usd.to_asset_amount(base_asset, http_app).await
+    dnf_in_usd.to_asset_amount(asset_type, http_app).await
 }
 
 #[derive(Clone, Copy)]
