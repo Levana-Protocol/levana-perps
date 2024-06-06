@@ -730,11 +730,6 @@ impl MarketConfigUpdates {
                 configured: Decimal256,
                 expected: Decimal256,
             },
-            MaxLeverage {
-                market: &'a MarketId,
-                configured: Decimal256,
-                expected: Decimal256,
-            },
             DnfCap {
                 market: &'a MarketId,
                 configured: NonZero<Decimal256>,
@@ -745,7 +740,6 @@ impl MarketConfigUpdates {
 
         let default_max_leverage = ConfigDefaults::max_leverage();
         let default_carry_leverage = ConfigDefaults::carry_leverage();
-        let default_dnf_sensitivity = ConfigDefaults::delta_neutrality_fee_sensitivity();
         let default_dnf_cap = ConfigDefaults::delta_neutrality_fee_cap();
         let seven: Decimal256 = "7".parse()?;
         let two: Decimal256 = "2".parse()?;
@@ -767,30 +761,6 @@ impl MarketConfigUpdates {
                     configured: configured_carry_leverage,
                     expected: expected_carry_leverage,
                 })
-            }
-
-            let dnf_sensitivity = update
-                .config
-                .delta_neutrality_fee_sensitivity
-                .unwrap_or(default_dnf_sensitivity)
-                .raw();
-            let expected_max_leverage =
-                if dnf_sensitivity < Decimal256::from_ratio(20_000_000u32, 1u8) {
-                    Decimal256::from_ratio(4u8, 1u8)
-                } else if dnf_sensitivity < Decimal256::from_ratio(50_000_000u32, 1u8) {
-                    Decimal256::from_ratio(10u8, 1u8)
-                } else if dnf_sensitivity < Decimal256::from_ratio(200_000_000u32, 1u8) {
-                    Decimal256::from_ratio(30u8, 1u8)
-                } else {
-                    Decimal256::from_ratio(50u8, 1u8)
-                };
-            // For now we're ignoring too-low-leverage
-            if expected_max_leverage < max_leverage {
-                mismatches.push(Mismatch::MaxLeverage {
-                    market: market_id,
-                    configured: max_leverage,
-                    expected: expected_max_leverage,
-                });
             }
 
             let expected_dnf_cap = match max_leverage.to_string().parse::<u32>()? {
@@ -830,16 +800,6 @@ impl MarketConfigUpdates {
                         writeln!(
                             &mut msg,
                             "{market} carry leverage: Expected: {expected}. Found: {configured}"
-                        )?;
-                    }
-                    Mismatch::MaxLeverage {
-                        market,
-                        configured,
-                        expected,
-                    } => {
-                        writeln!(
-                            &mut msg,
-                            "{market} max leverage: Expected: {expected}. Found: {configured}"
                         )?;
                     }
                     Mismatch::DnfCap {
