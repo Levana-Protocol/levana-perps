@@ -141,7 +141,7 @@ impl Opt {
             gas_decimals,
             assets: _,
             age_tolerance_seconds: _,
-        } = ChainConfig::load_from_opt(testnet.config_chain.as_deref(), network)?;
+        } = ChainConfig::load_from_opt(self.config_chain.as_deref(), network)?;
 
         let faucet_bot_wallet = self.get_faucet_bot_wallet(network.get_address_hrp())?;
         let faucet = faucet.with_context(|| format!("No faucet found for {network}"))?;
@@ -291,7 +291,8 @@ impl Opt {
             .collect::<Result<_, _>>()?;
 
         let watcher = WatcherConfig::default();
-        let gas_decimals = ChainConfig::load(*network)?.gas_decimals;
+        let gas_decimals =
+            ChainConfig::load_from_opt(self.config_chain.as_deref(), *network)?.gas_decimals;
         Ok(BotConfig {
             by_type: BotConfigByType::Mainnet {
                 inner: BotConfigMainnet {

@@ -37,9 +37,12 @@ pub(crate) struct Opt {
     pub(crate) rpc_url: Option<String>,
     #[clap(subcommand)]
     pub(crate) sub: Sub,
-    /// Override the Pyth config file
+    /// Override the price config file
     #[clap(long, env = "LEVANA_BOTS_PRICE_CONFIG")]
     pub(crate) price_config: Option<PathBuf>,
+    /// Override chain config file
+    #[clap(long, env = "LEVANA_BOTS_CONFIG_CHAIN")]
+    pub(crate) config_chain: Option<PathBuf>,
     /// The stable Pyth endpoint
     #[clap(
         long,
@@ -118,9 +121,6 @@ pub(crate) struct TestnetOpt {
     /// Override testnet config file
     #[clap(long, env = "LEVANA_BOTS_CONFIG_TESTNET")]
     pub(crate) config_testnet: Option<PathBuf>,
-    /// Override chain config file
-    #[clap(long, env = "LEVANA_BOTS_CONFIG_CHAIN")]
-    pub(crate) config_chain: Option<PathBuf>,
     /// Number of seconds before HTTP connections (especially to Pyth) will time out
     #[clap(long, env = "LEVANA_BOTS_HTTP_TIMEOUT_SECONDS", default_value_t = 10)]
     pub(crate) http_timeout_seconds: u32,
