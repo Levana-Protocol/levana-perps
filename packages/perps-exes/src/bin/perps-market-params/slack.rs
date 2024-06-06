@@ -7,7 +7,7 @@ use reqwest::{Client, Url};
 
 use crate::{
     coingecko::{CMCExchange, CmcExchangeInfo, Coin},
-    market_param::{AssetName, MarketsConfig},
+    market_param::{AssetName, MarketsConfig, NotionalAsset},
 };
 
 pub(crate) struct HttpApp {
@@ -195,9 +195,9 @@ impl HttpApp {
 
     pub(crate) async fn get_price_in_usd(
         &self,
-        AssetName(base_asset): AssetName<'_>,
+        NotionalAsset(notional_asset): NotionalAsset<'_>,
     ) -> anyhow::Result<f64> {
-        let coin: Coin = base_asset.parse()?;
+        let coin: Coin = notional_asset.parse()?;
         // https://coinmarketcap.com/api/documentation/v1/#operation/getV2CryptocurrencyQuotesLatest
         let id = coin.cmc_id().to_string();
         let uri = Url::parse_with_params(
