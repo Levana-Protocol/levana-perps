@@ -49,7 +49,7 @@ async fn go(
             active_traders_on_factory(factory.clone(), opt.clone(), workers).await?;
         let factory = mainnet_factories.get(&factory)?.network;
         notification_message += format!(
-            "*{}* traders are active on _{}_\n",
+            "*{}* traders are active on _*{}*_\n",
             active_traders_count, factory
         )
         .as_str();
