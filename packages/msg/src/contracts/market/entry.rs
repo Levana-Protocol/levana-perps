@@ -1382,3 +1382,22 @@ pub enum StopLoss {
     /// Set the stop loss price for the position
     Price(PriceBaseInQuote),
 }
+
+impl FromStr for StopLoss {
+    type Err = PerpError;
+    fn from_str(src: &str) -> Result<StopLoss, PerpError> {
+        match src {
+            "remove" => Ok(StopLoss::Remove),
+            _ => match src.parse() {
+                Ok(number) => Ok(StopLoss::Price(number)),
+                Err(err) => Err(perp_error!(
+                    ErrorId::Conversion,
+                    ErrorDomain::Default,
+                    "error converting {} to StopLoss , {}",
+                    src,
+                    err
+                )),
+            },
+        }
+    }
+}
