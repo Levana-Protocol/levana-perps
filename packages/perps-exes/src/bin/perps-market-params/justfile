@@ -12,7 +12,7 @@ download-levana-market:
 
 # Compute dnf
 compute-dnf:
-	cargo run --bin perps-market-params dnf --market-id DOT_USDC
+	cargo run --bin perps-market-params dnf --market-id BTC_USD
 
 # Serve web app
 serve:
