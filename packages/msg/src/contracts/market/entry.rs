@@ -9,6 +9,8 @@ use crate::{contracts::liquidity_token::LiquidityTokenKind, token::TokenInit};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Binary, BlockInfo, Decimal256, Uint128};
 use pyth_sdk_cw::PriceIdentifier;
+use schemars::schema::{InstanceType, SchemaObject};
+use schemars::JsonSchema;
 use shared::prelude::*;
 use std::collections::BTreeMap;
 use std::fmt::Formatter;
@@ -1375,7 +1377,7 @@ pub struct PriceWouldTriggerResp {
 }
 
 /// Stop loss configuration
-#[cw_serde]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum StopLoss {
     /// Remove stop loss price for the position
     Remove,
@@ -1399,5 +1401,66 @@ impl FromStr for StopLoss {
                 )),
             },
         }
+    }
+}
+
+impl TryFrom<&str> for StopLoss {
+    type Error = anyhow::Error;
+
+    fn try_from(val: &str) -> Result<Self, Self::Error> {
+        Self::from_str(val).map_err(|err| err.into())
+    }
+}
+
+impl serde::Serialize for StopLoss {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            StopLoss::Price(price) => price.serialize(serializer),
+            StopLoss::Remove => serializer.serialize_str("remove"),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for StopLoss {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_str(StopLossVisitor)
+    }
+}
+
+impl JsonSchema for StopLoss {
+    fn schema_name() -> String {
+        "StopLoss".to_owned()
+    }
+
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        SchemaObject {
+            instance_type: Some(InstanceType::String.into()),
+            format: Some("stop-loss".to_owned()),
+            ..Default::default()
+        }
+        .into()
+    }
+}
+
+struct StopLossVisitor;
+impl<'de> serde::de::Visitor<'de> for StopLossVisitor {
+    type Value = StopLoss;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("StopLoss")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        v.parse()
+            .map_err(|_| E::custom(format!("Invalid StopLoss: {v}")))
     }
 }
