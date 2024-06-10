@@ -47,21 +47,23 @@ async fn go(
     for factory in factories {
         let active_traders_count =
             active_traders_on_factory(factory.clone(), opt.clone(), workers).await?;
-        let factory = mainnet_factories.get(&factory)?.network;
+        let network_label = mainnet_factories.get(&factory)?.network;
         notification_message += format!(
-            "*{}* traders are active on _*{}*_\n",
-            active_traders_count, factory
+            "*{}* traders were active on _*{}*_\n",
+            active_traders_count,
+            get_factory_name_from_network_label(network_label.to_string())?
         )
         .as_str();
     }
     send_slack_notification(
         slack_webhook,
-        "Number of active traders".to_owned(),
+        "Number of active traders (Last 24 hours)".to_owned(),
         notification_message,
     )
     .await?;
     Ok(())
 }
+
 async fn active_traders_on_factory(factory: String, opt: Opt, workers: u32) -> Result<usize> {
     let csv_filename: PathBuf = std::env::current_dir()?.join(format!("{}.csv", factory.clone()));
     tracing::info!("CSV filename: {}", csv_filename.to_str().unwrap());
@@ -149,6 +151,21 @@ pub(crate) async fn send_slack_notification(
         Err(anyhow!(
             "Slack notification POST request failed with code {}",
             response.status()
+        ))
+    }
+}
+
+fn get_factory_name_from_network_label(network: String) -> anyhow::Result<String> {
+    if let Some(factory) = network.split('-').next() {
+        let mut factory_chars = factory.chars();
+        match factory_chars.next() {
+            None => Ok(String::new()),
+            Some(char) => Ok(char.to_uppercase().chain(factory_chars).collect()),
+        }
+    } else {
+        Err(anyhow!(
+            "Can not get factory name from the network label: {}",
+            network
         ))
     }
 }
