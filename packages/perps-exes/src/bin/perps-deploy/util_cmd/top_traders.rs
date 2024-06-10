@@ -11,15 +11,6 @@ use reqwest::Client;
 
 #[derive(clap::Parser)]
 pub(super) struct TopTradersOpt {
-    /// Factory name
-    #[clap(
-        long,
-        env = "LEVANA_TRADERS_FACTORIES",
-        default_value = "osmomainnet1,seimainnet1,injmainnet1,ntrnmainnet1",
-        use_value_delimiter = true,
-        value_delimiter = ','
-    )]
-    factories: Vec<String>,
     /// Directory path to contain csv files
     #[clap(long, env = "LEVANA_TRADERS_BUFF_DIR")]
     pub(crate) buff_dir: PathBuf,
@@ -39,20 +30,25 @@ impl TopTradersOpt {
 
 async fn go(
     TopTradersOpt {
-        factories,
         buff_dir,
         slack_webhook,
         workers,
     }: TopTradersOpt,
     opt: Opt,
 ) -> Result<()> {
-    let mainnet_factories = MainnetFactories::load()?;
+    let mainnet_factories = MainnetFactories::load()?.factories;
     let mut notification_message = "".to_owned();
-    for factory in factories {
+    for factory in mainnet_factories {
+        if !factory.canonical {
+            continue;
+        }
+
+        let ident = factory.ident.with_context(|| {
+            format!("Factory identifier does not exist for {}", factory.network)
+        })?;
         let active_traders_count =
-            active_traders_on_factory(factory.clone(), buff_dir.clone(), opt.clone(), workers)
-                .await?;
-        let network_label = mainnet_factories.get(&factory)?.network;
+            active_traders_on_factory(ident, buff_dir.clone(), opt.clone(), workers).await?;
+        let network_label = factory.network;
         notification_message += format!(
             "*{}* traders were active on _*{}*_\n",
             active_traders_count,
