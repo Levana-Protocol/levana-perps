@@ -20,8 +20,11 @@ pub(super) struct TopTradersOpt {
         value_delimiter = ','
     )]
     factories: Vec<String>,
+    /// Directory path to contain csv files
+    #[clap(long, env = "LEVANA_TRADERS_BUFF_DIR")]
+    pub(crate) buff_dir: PathBuf,
     /// Slack webhook to publish the notification
-    #[arg(long, env = "LEVANA_TRADERS_SLACK_WEBHOOK")]
+    #[clap(long, env = "LEVANA_TRADERS_SLACK_WEBHOOK")]
     pub(crate) slack_webhook: reqwest::Url,
     /// How many separate worker tasks to create for parallel loading
     #[clap(long, default_value = "30")]
@@ -37,6 +40,7 @@ impl TopTradersOpt {
 async fn go(
     TopTradersOpt {
         factories,
+        buff_dir,
         slack_webhook,
         workers,
     }: TopTradersOpt,
@@ -46,7 +50,8 @@ async fn go(
     let mut notification_message = "".to_owned();
     for factory in factories {
         let active_traders_count =
-            active_traders_on_factory(factory.clone(), opt.clone(), workers).await?;
+            active_traders_on_factory(factory.clone(), buff_dir.clone(), opt.clone(), workers)
+                .await?;
         let network_label = mainnet_factories.get(&factory)?.network;
         notification_message += format!(
             "*{}* traders were active on _*{}*_\n",
@@ -64,8 +69,13 @@ async fn go(
     Ok(())
 }
 
-async fn active_traders_on_factory(factory: String, opt: Opt, workers: u32) -> Result<usize> {
-    let csv_filename: PathBuf = std::env::current_dir()?.join(format!("{}.csv", factory.clone()));
+async fn active_traders_on_factory(
+    factory: String,
+    buff_dir: PathBuf,
+    opt: Opt,
+    workers: u32,
+) -> Result<usize> {
+    let csv_filename: PathBuf = buff_dir.join(format!("{}.csv", factory.clone()));
     tracing::info!("CSV filename: {}", csv_filename.to_str().unwrap());
     if let Err(e) = open_position_csv(
         opt,
