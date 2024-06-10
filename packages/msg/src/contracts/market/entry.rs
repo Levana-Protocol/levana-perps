@@ -1405,10 +1405,10 @@ impl FromStr for StopLoss {
 }
 
 impl TryFrom<&str> for StopLoss {
-    type Error = anyhow::Error;
+    type Error = PerpError;
 
     fn try_from(val: &str) -> Result<Self, Self::Error> {
-        Self::from_str(val).map_err(|err| err.into())
+        Self::from_str(val)
     }
 }
 
