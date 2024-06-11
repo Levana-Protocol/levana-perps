@@ -1376,6 +1376,8 @@ pub struct PriceWouldTriggerResp {
     pub would_trigger: bool,
 }
 
+/// String representation of remove.
+const REMOVE_STR: &str = "remove";
 /// Stop loss configuration
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum StopLoss {
@@ -1389,7 +1391,7 @@ impl FromStr for StopLoss {
     type Err = PerpError;
     fn from_str(src: &str) -> Result<StopLoss, PerpError> {
         match src {
-            "remove" => Ok(StopLoss::Remove),
+            REMOVE_STR => Ok(StopLoss::Remove),
             _ => match src.parse() {
                 Ok(number) => Ok(StopLoss::Price(number)),
                 Err(err) => Err(perp_error!(
@@ -1419,7 +1421,7 @@ impl serde::Serialize for StopLoss {
     {
         match self {
             StopLoss::Price(price) => price.serialize(serializer),
-            StopLoss::Remove => serializer.serialize_str("remove"),
+            StopLoss::Remove => serializer.serialize_str(REMOVE_STR),
         }
     }
 }
@@ -1470,12 +1472,14 @@ impl<'de> serde::de::Visitor<'de> for StopLossVisitor {
     {
         if let Some((key, value)) = map.next_entry()? {
             match key {
-                "remove" => Ok(Self::Value::Remove),
+                REMOVE_STR => Ok(Self::Value::Remove),
                 "price" => Ok(Self::Value::Price(value)),
-                _ => Err(serde::de::Error::custom("ABC")),
+                _ => Err(serde::de::Error::custom(format!(
+                    "Invalid StopLoss field: {key}"
+                ))),
             }
         } else {
-            Err(serde::de::Error::missing_field("abc"))
+            Err(serde::de::Error::custom("Empty StopLoss Object"))
         }
     }
 }
@@ -1488,14 +1492,12 @@ mod tests {
     fn deserialize_stop_loss() {
         let go = serde_json::from_str::<StopLoss>;
 
-        // TODO: Confirm that the previous code accepted the String version,
-        // not the Number version. We only need to make the code backwards
-        // compatible enough to work with what was previously there.
-        // go(r#"{"price": 2.2}"#).unwrap();
         go(r#"{"price": "2.2"}"#).unwrap();
         go("\"remove\"").unwrap();
         go("\"2.2\"").unwrap();
         go("\"-2.2\"").unwrap_err();
+        go(r#"{}"#).unwrap_err();
+        go(r#"{"error-field": "2.2"}"#).unwrap_err();
         go("").unwrap_err();
     }
 }
