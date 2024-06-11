@@ -1463,4 +1463,35 @@ impl<'de> serde::de::Visitor<'de> for StopLossVisitor {
         v.parse()
             .map_err(|_| E::custom(format!("Invalid StopLoss: {v}")))
     }
+
+    // fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    // where
+    //     A: serde::de::MapAccess<'de>,
+    // {
+    //     if let Some((key, value)) = map.next_entry()? {
+    //         match key {
+    //             "remove" => Ok(Self::Value::Remove),
+    //             "price" => Ok(Self::Value::Price(value)),
+    //             _ => Err(serde::de::Error::custom("ABC")),
+    //         }
+    //     } else {
+    //         Err(serde::de::Error::missing_field("abc"))
+    //     }
+    // }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::StopLoss;
+
+    #[test]
+    fn deserialize_stop_loss() {
+        let go = serde_json::from_str::<StopLoss>;
+
+        go("\"price\": 2.2").unwrap();
+        go("\"remove\"").unwrap();
+        go("\"2.2\"").unwrap();
+        go("\"-2.2\"").unwrap_err();
+        go("").unwrap_err();
+    }
 }
