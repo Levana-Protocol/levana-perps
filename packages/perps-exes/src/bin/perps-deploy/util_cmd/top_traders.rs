@@ -72,7 +72,7 @@ async fn active_traders_on_factory(
     workers: u32,
 ) -> Result<usize> {
     let csv_filename: PathBuf = buff_dir.join(format!("{}.csv", factory.clone()));
-    tracing::info!("CSV filename: {}", csv_filename.to_str().unwrap());
+    tracing::info!("CSV filename: {}", csv_filename.as_path().display());
     if let Err(e) = open_position_csv(
         opt,
         OpenPositionCsvOpt {
@@ -114,7 +114,10 @@ async fn active_traders_on_factory(
         )
         .unique()
         .count();
-    tracing::info!("Here's the csv data length: {:?}", active_trader_count);
+    tracing::info!(
+        "Here's the count of active traders: {:?}",
+        active_trader_count
+    );
     Ok(active_trader_count)
 }
 
