@@ -56,7 +56,7 @@ impl MarketsConfig {
     }
 }
 
-fn dnf_sensitivity_to_max_leverage(dnf_sensitivity: DnfInUsd) -> f64 {
+pub(crate) fn dnf_sensitivity_to_max_leverage(dnf_sensitivity: DnfInUsd) -> f64 {
     let dnf_sensitivity = dnf_sensitivity.0;
     let million = 1000000.0;
     if dnf_sensitivity < (2.0 * million) {
@@ -75,7 +75,7 @@ pub(crate) struct DnfInNotional(pub(crate) f64);
 
 impl Display for DnfInNotional {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{}", self.0)
+        write!(f, "{}", self.0)
     }
 }
 
@@ -85,6 +85,17 @@ pub(crate) struct DnfInUsd(pub(crate) f64);
 pub(crate) struct Dnf {
     pub(crate) dnf_in_notional: DnfInNotional,
     pub(crate) dnf_in_usd: DnfInUsd,
+}
+
+impl DnfInUsd {
+    async fn to_asset_amount(
+        &self,
+        asset: NotionalAsset<'_>,
+        http_app: &HttpApp,
+    ) -> anyhow::Result<f64> {
+        let price = http_app.get_price_in_usd(asset).await?;
+        Ok(self.0 / price)
+    }
 }
 
 pub(crate) async fn dnf_sensitivity(
@@ -144,19 +155,6 @@ impl AssetName<'_> {
         self.0 == "USD" || self.0 == "USDC" || self.0 == "USDT"
     }
 }
-#[derive(PartialOrd, PartialEq)]
-struct MyUsd(f64);
-
-impl MyUsd {
-    async fn to_asset_amount(
-        &self,
-        asset: NotionalAsset<'_>,
-        http_app: &HttpApp,
-    ) -> anyhow::Result<f64> {
-        let price = http_app.get_price_in_usd(asset).await?;
-        Ok(self.0 / price)
-    }
-}
 
 struct DnfExchanges {
     exchanges: Vec<CmcMarketPair>,
@@ -208,7 +206,7 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
     }
 }
 
-fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<MyUsd> {
+fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfInUsd> {
     // Algorithm: https://staff.levana.finance/new-market-checklist#dnf-sensitivity
     tracing::debug!("Total exchanges: {}", exchanges.len());
     let dnf_exchange = filter_invalid_exchanges(exchanges)?;
@@ -227,7 +225,7 @@ fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<MyUs
         .depth_usd_negative_two
         .min(max_volume_exchange.depth_usd_positive_two);
     let dnf = (min_depth_liquidity / market_share) * 25.0;
-    Ok(MyUsd(dnf))
+    Ok(DnfInUsd(dnf))
 }
 
 #[derive(Clone, serde::Serialize)]
