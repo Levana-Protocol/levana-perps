@@ -79,6 +79,21 @@ impl Display for DnfInNotional {
     }
 }
 
+impl DnfInNotional {
+    pub(crate) async fn to_asset_amount(
+        &self,
+        asset: NotionalAsset<'_>,
+        http_app: &HttpApp,
+    ) -> anyhow::Result<DnfInUsd> {
+        if asset.is_usd_equiv() {
+            Ok(DnfInUsd(self.0))
+        } else {
+            let price = http_app.get_price_in_usd(asset).await?;
+            Ok(DnfInUsd(self.0 * price))
+        }
+    }
+}
+
 #[derive(PartialOrd, PartialEq, Clone, serde::Serialize)]
 pub(crate) struct DnfInUsd(pub(crate) f64);
 
@@ -150,6 +165,13 @@ pub(crate) struct AssetName<'a>(pub(crate) &'a str);
 pub(crate) struct NotionalAsset<'a>(pub(crate) &'a str);
 
 impl AssetName<'_> {
+    /// Is the asset either USD or a stablecoin pinned to USD?
+    fn is_usd_equiv(&self) -> bool {
+        self.0 == "USD" || self.0 == "USDC" || self.0 == "USDT"
+    }
+}
+
+impl NotionalAsset<'_> {
     /// Is the asset either USD or a stablecoin pinned to USD?
     fn is_usd_equiv(&self) -> bool {
         self.0 == "USD" || self.0 == "USDC" || self.0 == "USDT"
@@ -312,7 +334,11 @@ pub(crate) async fn compute_coin_dnfs(
                     }
                 }
             };
-            let max_leverage = dnf_sensitivity_to_max_leverage(dnf.dnf_in_usd);
+            let max_leverage = dnf_sensitivity_to_max_leverage(
+                configured_dnf
+                    .to_asset_amount(NotionalAsset(market_id.get_notional()), &http_app)
+                    .await?,
+            );
             tracing::info!("Configured max_leverage for {market_id}: {configured_max_leverage}");
             tracing::info!("Recommended max_leverage for {market_id}: {max_leverage}");
 

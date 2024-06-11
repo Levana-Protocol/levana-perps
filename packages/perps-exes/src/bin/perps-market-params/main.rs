@@ -8,6 +8,7 @@ use crate::{
     cli::Opt,
     market_param::{
         compute_dnf_notify, dnf_sensitivity, dnf_sensitivity_to_max_leverage, DnfInNotional,
+        NotionalAsset,
     },
     slack::HttpApp,
 };
@@ -123,9 +124,15 @@ async fn main_inner(opt: Opt) -> Result<()> {
                     DnfInNotional(0.0)
                 }
             };
-            let configured_max_leverage = market_config
+            let actual_configured_max_leverage = market_config
                 .get_chain_max_leverage(&market_id)
                 .context("No max_leverage configured")?;
+            let recommended_configured_max_leverage = dnf_sensitivity_to_max_leverage(
+                configured_dnf
+                    .to_asset_amount(NotionalAsset(market_id.get_notional()), &http_app)
+                    .await?,
+            );
+
             let max_leverage = dnf_sensitivity_to_max_leverage(dnf.dnf_in_usd);
 
             let dnf_notify =
@@ -139,8 +146,11 @@ async fn main_inner(opt: Opt) -> Result<()> {
                 );
             }
 
-            tracing::info!("Configured max_leverage: {configured_max_leverage}");
-            tracing::info!("Recommended max_leverage: {max_leverage}");
+            tracing::info!("Configured max_leverage: {actual_configured_max_leverage}");
+            tracing::info!(
+                "Recommended configured max_leverage: {recommended_configured_max_leverage}"
+            );
+            tracing::info!("Recommended max_leverage (based on new DNF): {max_leverage}");
         }
         cli::SubCommand::Serve { opt: serve_opt } => axum_main(serve_opt, opt).await?,
         cli::SubCommand::Market { out, market_id } => {
