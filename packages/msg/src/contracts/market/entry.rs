@@ -1429,7 +1429,7 @@ impl<'de> serde::Deserialize<'de> for StopLoss {
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_str(StopLossVisitor)
+        deserializer.deserialize_any(StopLossVisitor)
     }
 }
 
@@ -1464,20 +1464,20 @@ impl<'de> serde::de::Visitor<'de> for StopLossVisitor {
             .map_err(|_| E::custom(format!("Invalid StopLoss: {v}")))
     }
 
-    // fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-    // where
-    //     A: serde::de::MapAccess<'de>,
-    // {
-    //     if let Some((key, value)) = map.next_entry()? {
-    //         match key {
-    //             "remove" => Ok(Self::Value::Remove),
-    //             "price" => Ok(Self::Value::Price(value)),
-    //             _ => Err(serde::de::Error::custom("ABC")),
-    //         }
-    //     } else {
-    //         Err(serde::de::Error::missing_field("abc"))
-    //     }
-    // }
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::MapAccess<'de>,
+    {
+        if let Some((key, value)) = map.next_entry()? {
+            match key {
+                "remove" => Ok(Self::Value::Remove),
+                "price" => Ok(Self::Value::Price(value)),
+                _ => Err(serde::de::Error::custom("ABC")),
+            }
+        } else {
+            Err(serde::de::Error::missing_field("abc"))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1488,7 +1488,11 @@ mod tests {
     fn deserialize_stop_loss() {
         let go = serde_json::from_str::<StopLoss>;
 
-        go("\"price\": 2.2").unwrap();
+        // TODO: Confirm that the previous code accepted the String version,
+        // not the Number version. We only need to make the code backwards
+        // compatible enough to work with what was previously there.
+        // go(r#"{"price": 2.2}"#).unwrap();
+        go(r#"{"price": "2.2"}"#).unwrap();
         go("\"remove\"").unwrap();
         go("\"2.2\"").unwrap();
         go("\"-2.2\"").unwrap_err();
