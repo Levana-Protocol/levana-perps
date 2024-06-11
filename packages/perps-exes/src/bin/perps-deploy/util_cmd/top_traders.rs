@@ -73,10 +73,12 @@ async fn active_traders_on_factory(
 ) -> Result<usize> {
     let csv_filename: PathBuf = buff_dir.join(format!("{}.csv", factory.clone()));
     tracing::info!("CSV filename: {}", csv_filename.as_path().display());
-    if let Err(e) = open_position_csv(
-        opt,
+
+    let mut workers = workers;
+    while let Err(e) = open_position_csv(
+        opt.clone(),
         OpenPositionCsvOpt {
-            factory,
+            factory: factory.clone(),
             csv: csv_filename.clone(),
             workers,
         },
@@ -84,6 +86,15 @@ async fn active_traders_on_factory(
     .await
     {
         tracing::error!("Error while generating open position csv file: {}", e);
+        workers /= 2;
+        if workers == 0 {
+            return Err(e);
+        } else {
+            tracing::info!(
+                "Reduce the count of workers into {} and try again...",
+                workers
+            );
+        }
     }
 
     tracing::info!("Reading csv data");
