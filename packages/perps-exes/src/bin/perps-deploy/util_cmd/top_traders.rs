@@ -21,6 +21,9 @@ pub(super) struct TopTradersOpt {
     /// How many separate worker tasks to create for parallel loading
     #[clap(long, default_value = "30")]
     workers: u32,
+    /// Number of retries when an error occurs while generating a csv file
+    #[clap(long, env = "LEVANA_TRADERS_RETRIES", default_value_t = 3)]
+    retries: u32,
     /// Provide gRPC endpoint override for osmosis mainnet
     #[clap(
         long,
@@ -94,6 +97,7 @@ async fn go(
         buff_dir,
         slack_webhook,
         workers,
+        retries,
         osmosis_mainnet_primary_grpc,
         osmosis_mainnet_fallbacks_grpc,
         sei_mainnet_primary_grpc,
@@ -139,10 +143,12 @@ async fn go(
             buff_dir.clone(),
             opt.clone(),
             workers,
+            retries,
             factory_primary_grpc,
             factory_fallbacks_grpc,
         )
         .await?;
+
         let network_label = factory.network;
         notification_message += format!(
             "*{}* traders were active on _*{}*_\n",
@@ -165,25 +171,32 @@ async fn active_traders_on_factory(
     buff_dir: PathBuf,
     opt: Opt,
     workers: u32,
+    mut retries: u32,
     factory_primary_grpc: String,
     factory_fallbacks_grpc: Vec<String>,
 ) -> Result<usize> {
     let csv_filename: PathBuf = buff_dir.join(format!("{}.csv", factory.clone()));
     tracing::info!("CSV filename: {}", csv_filename.as_path().display());
 
-    if let Err(e) = open_position_csv(
-        opt,
+    while let Err(e) = open_position_csv(
+        opt.clone(),
         OpenPositionCsvOpt {
-            factory,
+            factory: factory.clone(),
             csv: csv_filename.clone(),
             workers,
-            factory_primary_grpc: Some(factory_primary_grpc),
-            factory_fallbacks_grpc,
+            factory_primary_grpc: Some(factory_primary_grpc.clone()),
+            factory_fallbacks_grpc: factory_fallbacks_grpc.clone(),
         },
     )
     .await
     {
-        tracing::error!("Error while generating open position csv file: {}", e);
+        tracing::error!("Error while generating open position csv file\n{}", e);
+        if retries > 0 {
+            retries -= 1;
+            tracing::info!("Retrying...");
+        } else {
+            return Err(e);
+        }
     }
 
     tracing::info!("Reading csv data");

@@ -42,6 +42,7 @@ pub(crate) struct UtilOpt {
 }
 
 #[derive(clap::Parser)]
+#[allow(clippy::large_enum_variant)]
 enum Sub {
     /// Set the price in a Pyth oracle
     UpdatePyth {
