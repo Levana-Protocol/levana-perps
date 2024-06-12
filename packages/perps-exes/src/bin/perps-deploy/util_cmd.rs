@@ -412,6 +412,12 @@ pub(crate) struct OpenPositionCsvOpt {
     /// How many separate worker tasks to create for parallel loading
     #[clap(long, default_value = "30")]
     workers: u32,
+    /// Optional gRPC endpoint override for factory
+    #[clap(long)]
+    factory_primary_grpc: Option<String>,
+    /// Provide optional gRPC fallbacks URLs for factory
+    #[clap(long, value_delimiter = ',')]
+    pub(crate) factory_fallbacks_grpc: Vec<String>,
 }
 
 struct ToProcess {
@@ -427,6 +433,8 @@ pub(crate) async fn open_position_csv(
         factory,
         csv,
         workers,
+        factory_primary_grpc,
+        factory_fallbacks_grpc,
     }: OpenPositionCsvOpt,
 ) -> Result<()> {
     let old_data = load_data_from_csv(&csv)
@@ -435,9 +443,22 @@ pub(crate) async fn open_position_csv(
     let old_data = Arc::new(old_data);
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
-    let app = opt.load_app_mainnet(factory.network).await?;
 
-    let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
+    let cosmos = if let Some(factory_primary_grpc) = factory_primary_grpc {
+        let mut builder = factory.network.builder().await?;
+
+        builder.set_grpc_url(factory_primary_grpc);
+        for fallback in factory_fallbacks_grpc.clone() {
+            builder.add_grpc_fallback_url(fallback);
+        }
+
+        builder.build_lazy()?
+    } else {
+        opt.load_app_mainnet(factory.network).await?.cosmos
+    };
+    tracing::info!("cosmos loaded!");
+
+    let factory = Factory::from_contract(cosmos.make_contract(factory.address));
     let csv = ::csv::Writer::from_path(&csv)?;
     let csv = Arc::new(Mutex::new(csv));
 
