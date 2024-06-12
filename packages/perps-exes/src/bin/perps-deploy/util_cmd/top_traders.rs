@@ -20,6 +20,21 @@ pub(super) struct TopTradersOpt {
     /// How many separate worker tasks to create for parallel loading
     #[clap(long, default_value = "30")]
     workers: u32,
+    /// Provide gRPC endpoint override for osmosis mainnet
+    #[clap(
+        long,
+        env = "LEVANA_TRADERS_OSMOSIS_MAINNET_PRIMARY_GRPC",
+        default_value = "https://osmo-priv-grpc.kingnodes.com"
+    )]
+    osmosis_mainnet_primary_grpc: String,
+    /// Provide optional gRPC fallbacks URLs for osmosis mainnet
+    #[clap(
+        long,
+        env = "LEVANA_TRADERS_OSMOSIS_MAINNET_FALLBACKS_GRPC",
+        default_value = "http://c7f58ef9-1d78-4e15-a818-d02c8f50fc67.osmosis-1.mesa-grpc.newmetric.xyz,http://146.190.0.132:9090,https://grpc.osmosis.zone,http://osmosis-grpc.polkachu.com:12590",
+        value_delimiter = ','
+    )]
+    osmosis_mainnet_fallbacks_grpc: Vec<String>,
 }
 
 impl TopTradersOpt {
@@ -33,6 +48,8 @@ async fn go(
         buff_dir,
         slack_webhook,
         workers,
+        osmosis_mainnet_primary_grpc,
+        osmosis_mainnet_fallbacks_grpc,
     }: TopTradersOpt,
     opt: Opt,
 ) -> Result<()> {
@@ -46,8 +63,25 @@ async fn go(
         let ident = factory.ident.with_context(|| {
             format!("Factory identifier does not exist for {}", factory.network)
         })?;
-        let active_traders_count =
-            active_traders_on_factory(ident, buff_dir.clone(), opt.clone(), workers).await?;
+        let (factory_primary_grpc, factory_fallbacks_grpc) = match factory.network {
+            perps_exes::PerpsNetwork::Regular(cosmos::CosmosNetwork::OsmosisMainnet) => (
+                osmosis_mainnet_primary_grpc.clone(),
+                osmosis_mainnet_fallbacks_grpc.clone(),
+            ),
+            _ => (
+                osmosis_mainnet_primary_grpc.clone(),
+                osmosis_mainnet_fallbacks_grpc.clone(),
+            ),
+        };
+        let active_traders_count = active_traders_on_factory(
+            ident,
+            buff_dir.clone(),
+            opt.clone(),
+            workers,
+            factory_primary_grpc,
+            factory_fallbacks_grpc,
+        )
+        .await?;
         let network_label = factory.network;
         notification_message += format!(
             "*{}* traders were active on _*{}*_\n",
@@ -70,6 +104,8 @@ async fn active_traders_on_factory(
     buff_dir: PathBuf,
     opt: Opt,
     workers: u32,
+    factory_primary_grpc: String,
+    factory_fallbacks_grpc: Vec<String>,
 ) -> Result<usize> {
     let csv_filename: PathBuf = buff_dir.join(format!("{}.csv", factory.clone()));
     tracing::info!("CSV filename: {}", csv_filename.as_path().display());
@@ -80,8 +116,8 @@ async fn active_traders_on_factory(
             factory,
             csv: csv_filename.clone(),
             workers,
-            factory_primary_grpc: None,
-            factory_fallbacks_grpc: vec![],
+            factory_primary_grpc: Some(factory_primary_grpc),
+            factory_fallbacks_grpc,
         },
     )
     .await

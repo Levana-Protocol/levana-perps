@@ -417,7 +417,7 @@ pub(crate) struct OpenPositionCsvOpt {
     factory_primary_grpc: Option<String>,
     /// Provide optional gRPC fallbacks URLs for factory
     #[clap(long, value_delimiter = ',')]
-    pub(crate) factory_fallbacks_grpc: Vec<String>,
+    factory_fallbacks_grpc: Vec<String>,
 }
 
 struct ToProcess {
