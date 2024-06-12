@@ -3,10 +3,11 @@ use std::path::PathBuf;
 
 use crate::cli::Opt;
 use crate::util_cmd::{load_data_from_csv, open_position_csv, OpenPositionCsvOpt, PositionRecord};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use chrono::{Duration, Utc};
+use cosmos::CosmosNetwork;
 use itertools::Itertools;
-use perps_exes::config::MainnetFactories;
+use perps_exes::{config::MainnetFactories, PerpsNetwork};
 use reqwest::Client;
 
 #[derive(clap::Parser)]
@@ -35,6 +36,51 @@ pub(super) struct TopTradersOpt {
         value_delimiter = ','
     )]
     osmosis_mainnet_fallbacks_grpc: Vec<String>,
+    /// Provide gRPC endpoint override for sei mainnet
+    #[clap(
+        long,
+        env = "LEVANA_TRADERS_SEI_MAINNET_PRIMARY_GRPC",
+        default_value = "https://sei-priv-grpc.kingnodes.com"
+    )]
+    sei_mainnet_primary_grpc: String,
+    /// Provide optional gRPC fallbacks URLs for sei mainnet
+    #[clap(
+        long,
+        env = "LEVANA_TRADERS_SEI_MAINNET_FALLBACKS_GRPC",
+        default_value = "http://sei-grpc.polkachu.com:11990,https://grpc.sei-apis.com,https://sei-grpc.brocha.in",
+        value_delimiter = ','
+    )]
+    sei_mainnet_fallbacks_grpc: Vec<String>,
+    /// Provide gRPC endpoint override for injective mainnet
+    #[clap(
+        long,
+        env = "LEVANA_TRADERS_INJECTIVE_MAINNET_PRIMARY_GRPC",
+        default_value = "https://inj-priv-grpc.kingnodes.com"
+    )]
+    injective_mainnet_primary_grpc: String,
+    /// Provide optional gRPC fallbacks URLs for injective mainnet
+    #[clap(
+        long,
+        env = "LEVANA_TRADERS_INJECTIVE_MAINNET_FALLBACKS_GRPC",
+        default_value = "http://c7f58ef9-1d78-4e15-a818-d02c8f50fc67.injective-1.mesa-grpc.newmetric.xyz,http://injective-grpc.polkachu.com:14390",
+        value_delimiter = ','
+    )]
+    injective_mainnet_fallbacks_grpc: Vec<String>,
+    /// Provide gRPC endpoint override for neutron mainnet
+    #[clap(
+        long,
+        env = "LEVANA_TRADERS_NEUTRON_MAINNET_PRIMARY_GRPC",
+        default_value = "http://c7f58ef9-1d78-4e15-a818-d02c8f50fc67.neutron-1.mesa-grpc.newmetric.xyz"
+    )]
+    neutron_mainnet_primary_grpc: String,
+    /// Provide optional gRPC fallbacks URLs for neutron mainnet
+    #[clap(
+        long,
+        env = "LEVANA_TRADERS_NEUTRON_MAINNET_FALLBACKS_GRPC",
+        default_value = "http://neutron-grpc.rpc.p2p.world:3001,http://grpc-kralum.neutron-1.neutron.org",
+        value_delimiter = ','
+    )]
+    neutron_mainnet_fallbacks_grpc: Vec<String>,
 }
 
 impl TopTradersOpt {
@@ -50,6 +96,12 @@ async fn go(
         workers,
         osmosis_mainnet_primary_grpc,
         osmosis_mainnet_fallbacks_grpc,
+        sei_mainnet_primary_grpc,
+        sei_mainnet_fallbacks_grpc,
+        injective_mainnet_primary_grpc,
+        injective_mainnet_fallbacks_grpc,
+        neutron_mainnet_primary_grpc,
+        neutron_mainnet_fallbacks_grpc,
     }: TopTradersOpt,
     opt: Opt,
 ) -> Result<()> {
@@ -64,14 +116,23 @@ async fn go(
             format!("Factory identifier does not exist for {}", factory.network)
         })?;
         let (factory_primary_grpc, factory_fallbacks_grpc) = match factory.network {
-            perps_exes::PerpsNetwork::Regular(cosmos::CosmosNetwork::OsmosisMainnet) => (
+            PerpsNetwork::Regular(CosmosNetwork::OsmosisMainnet) => (
                 osmosis_mainnet_primary_grpc.clone(),
                 osmosis_mainnet_fallbacks_grpc.clone(),
             ),
-            _ => (
-                osmosis_mainnet_primary_grpc.clone(),
-                osmosis_mainnet_fallbacks_grpc.clone(),
+            PerpsNetwork::Regular(CosmosNetwork::SeiMainnet) => (
+                sei_mainnet_primary_grpc.clone(),
+                sei_mainnet_fallbacks_grpc.clone(),
             ),
+            PerpsNetwork::Regular(CosmosNetwork::InjectiveMainnet) => (
+                injective_mainnet_primary_grpc.clone(),
+                injective_mainnet_fallbacks_grpc.clone(),
+            ),
+            PerpsNetwork::Regular(CosmosNetwork::NeutronMainnet) => (
+                neutron_mainnet_primary_grpc.clone(),
+                neutron_mainnet_fallbacks_grpc.clone(),
+            ),
+            _ => bail!("Unsupported network: {}", factory.network),
         };
         let active_traders_count = active_traders_on_factory(
             ident,

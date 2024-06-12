@@ -456,7 +456,6 @@ pub(crate) async fn open_position_csv(
     } else {
         opt.load_app_mainnet(factory.network).await?.cosmos
     };
-    tracing::info!("cosmos loaded!");
 
     let factory = Factory::from_contract(cosmos.make_contract(factory.address));
     let csv = ::csv::Writer::from_path(&csv)?;
