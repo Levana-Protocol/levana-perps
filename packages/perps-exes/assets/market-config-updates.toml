@@ -50,6 +50,7 @@ initial-borrow-fee-rate = "0.1"
 
 [markets.AVAX_USDC.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.05"
 target_utilization = "0.5"
@@ -62,7 +63,7 @@ liquidity_cooldown_seconds = 86400
 initial-borrow-fee-rate = "0.17"
 
 [markets.AXL_USD.config]
-max_leverage = "4"
+max_leverage = "10"
 carry_leverage = "2"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.09"
@@ -79,6 +80,7 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.BNB_USDC.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
@@ -92,6 +94,7 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.BNB_USDT.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
@@ -131,6 +134,7 @@ initial-borrow-fee-rate = "0.08"
 
 [markets.BTC_SEI.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.04"
 target_utilization = "0.5"
@@ -143,6 +147,7 @@ liquidity_cooldown_seconds = 86400
 initial-borrow-fee-rate = "0.05"
 
 [markets.BTC_USD.config]
+max_leverage = "50"
 carry_leverage = "7"
 funding_rate_sensitivity = "1"
 funding_rate_max_annualized = "0.45"
@@ -158,6 +163,7 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.BTC_USDT.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1"
 funding_rate_max_annualized = "0.45"
 borrow_fee_rate_min_annualized = "0.03"
@@ -196,6 +202,7 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.DOGE_USDC.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
@@ -209,6 +216,7 @@ initial-borrow-fee-rate = "0.1"
 
 [markets.DOT_USD.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.05"
 target_utilization = "0.5"
@@ -248,6 +256,7 @@ initial-borrow-fee-rate = "0.08"
 
 [markets.DYM_USD.config]
 carry_leverage = "7"
+max_leverage = "10"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.04"
 target_utilization = "0.5"
@@ -270,6 +279,7 @@ initial-borrow-fee-rate = "0.08"
 
 [markets.ETH_SEI.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.04"
 target_utilization = "0.5"
@@ -283,6 +293,7 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.ETH_USD.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
@@ -312,6 +323,7 @@ initial-borrow-fee-rate = "0.35"
 
 [markets.FLOKI_USDC.config]
 carry_leverage = "7"
+max_leverage = "10"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.2"
 target_utilization = "0.5"
@@ -360,6 +372,7 @@ initial-borrow-fee-rate = "0.16"
 
 [markets.INJ_USD.config]
 carry_leverage = "7"
+max_leverage = "10"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.08"
 target_utilization = "0.5"
@@ -373,6 +386,7 @@ initial-borrow-fee-rate = "0.16"
 
 [markets.INJ_USDC.config]
 carry_leverage = "7"
+max_leverage = "10"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.08"
 target_utilization = "0.5"
@@ -386,6 +400,7 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.LINK_USDC.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
@@ -399,6 +414,7 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.LINK_USDT.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
@@ -411,7 +427,7 @@ liquidity_cooldown_seconds = 86400
 initial-borrow-fee-rate = "0.05"
 
 [markets.LUNA_USDC.config]
-max_leverage = "4"
+max_leverage = "10"
 carry_leverage = "2"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.03"
@@ -490,7 +506,7 @@ initial-borrow-fee-rate = "0.12"
 [markets.OSMO_USD.config]
 trading_fee_notional_size = "0.002"
 trading_fee_counter_collateral = "0.002"
-max_leverage = "6"
+max_leverage = "10"
 carry_leverage = "3"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.06"
@@ -524,6 +540,7 @@ initial-borrow-fee-rate = "0.35"
 
 [markets.PEPE_USDC.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.2"
 target_utilization = "0.5"
@@ -584,6 +601,7 @@ initial-borrow-fee-rate = "0.08"
 
 [markets.SEI_USD.config]
 carry_leverage = "7"
+max_leverage = "10"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.04"
 target_utilization = "0.5"
@@ -597,6 +615,7 @@ initial-borrow-fee-rate = "0.25"
 
 [markets.SHIB_USDC.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.15"
 target_utilization = "0.5"
@@ -628,6 +647,7 @@ initial-borrow-fee-rate = "0.08"
 
 [markets.SOL_SEI.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.04"
 target_utilization = "0.5"
@@ -641,6 +661,7 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.SOL_USDC.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
@@ -737,6 +758,7 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.axlETH_USD.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
@@ -780,6 +802,7 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.ryETH_USD.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
@@ -806,6 +829,7 @@ initial-borrow-fee-rate = "0.06"
 
 [markets.stDYDX_USD.config]
 carry_leverage = "7"
+max_leverage = "10"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
@@ -819,6 +843,7 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.stDYM_USD.config]
 carry_leverage = "7"
+max_leverage = "10"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.04"
 target_utilization = "0.5"
@@ -846,7 +871,7 @@ initial-borrow-fee-rate = "0.06"
 [markets.stOSMO_USD.config]
 trading_fee_notional_size = "0.002"
 trading_fee_counter_collateral = "0.002"
-max_leverage = "6"
+max_leverage = "10"
 carry_leverage = "3"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.03"
@@ -894,6 +919,7 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.wBTC_USD.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1"
 funding_rate_max_annualized = "0.45"
 borrow_fee_rate_min_annualized = "0.03"
