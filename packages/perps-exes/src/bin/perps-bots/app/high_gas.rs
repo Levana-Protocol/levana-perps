@@ -12,7 +12,6 @@ use super::{
 use anyhow::Result;
 use async_channel::RecvError;
 use axum::async_trait;
-use chrono::Duration;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
 use msg::contracts::market::entry::ExecuteMsg as MarketExecuteMsg;
 use parking_lot::Mutex;
@@ -216,7 +215,7 @@ impl WatchedTask for Worker {
                                     received.elapsed());
                     return Ok(WatchedTaskOutput::new(msg)
                         .set_error()
-                        .set_expiry(Duration::seconds(10)));
+                        .set_expiry(std::time::Duration::from_secs(10)));
                 } else {
                     let error_as_str = format!("{e:?}");
                     if error_as_str.contains("out of gas") || error_as_str.contains("code 11") {
@@ -225,7 +224,7 @@ impl WatchedTask for Worker {
                                         received.elapsed());
                         return Ok(WatchedTaskOutput::new(msg)
                             .set_error()
-                            .set_expiry(Duration::seconds(10)));
+                            .set_expiry(std::time::Duration::from_secs(10)));
                     } else {
                         let msg = format!("[VERY HIGH GAS]\n{}\nDelta between queued and now: {:?}\nDelta between received and now: {:?}",
                                         e,
@@ -233,7 +232,7 @@ impl WatchedTask for Worker {
                                         received.elapsed());
                         return Ok(WatchedTaskOutput::new(msg)
                             .set_error()
-                            .set_expiry(Duration::seconds(10)));
+                            .set_expiry(std::time::Duration::from_secs(10)));
                     }
                 }
             }
