@@ -335,11 +335,8 @@ impl State<'_> {
             },
         )?;
 
-        if let Some(price_point) = self.next_crank_timestamp(ctx.storage)? {
-            self.deferred_validate(ctx.storage, new_id, &price_point)?;
-        } else {
-            return Err(anyhow!("Price point is not available."));
-        }
+        let price_point = self.current_spot_price(ctx.storage)?;
+        self.deferred_validate(ctx.storage, new_id, &price_point)?;
 
         match target {
             DeferredExecTarget::DoesNotExist => (),
