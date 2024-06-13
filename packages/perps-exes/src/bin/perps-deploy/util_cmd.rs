@@ -29,6 +29,7 @@ use perps_exes::{
     pyth::get_oracle_update_msg,
     PerpsNetwork,
 };
+use reqwest::Url;
 use serde_json::json;
 use shared::storage::{
     Collateral, DirectionToBase, LeverageToBase, MarketId, Notional, Signed, UnsignedDecimal, Usd,
@@ -415,10 +416,10 @@ pub(crate) struct OpenPositionCsvOpt {
     workers: u32,
     /// Optional gRPC endpoint override for factory
     #[clap(long)]
-    factory_primary_grpc: Option<String>,
+    factory_primary_grpc: Option<Url>,
     /// Provide optional gRPC fallbacks URLs for factory
     #[clap(long, value_delimiter = ',')]
-    factory_fallbacks_grpc: Vec<String>,
+    factory_fallbacks_grpc: Vec<Url>,
 }
 
 struct ToProcess {
@@ -452,6 +453,7 @@ pub(crate) async fn open_position_csv(
         for fallback in factory_fallbacks_grpc.clone() {
             builder.add_grpc_fallback_url(fallback);
         }
+        builder.set_referer_header(Some("https://trade-history.levana.exchange/".to_owned()));
 
         builder.build_lazy()?
     } else {

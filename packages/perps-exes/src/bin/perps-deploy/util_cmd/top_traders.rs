@@ -8,7 +8,7 @@ use chrono::{Duration, Utc};
 use cosmos::CosmosNetwork;
 use itertools::Itertools;
 use perps_exes::{config::MainnetFactories, PerpsNetwork};
-use reqwest::Client;
+use reqwest::{Client, Url};
 
 #[derive(clap::Parser)]
 pub(super) struct TopTradersOpt {
@@ -30,7 +30,7 @@ pub(super) struct TopTradersOpt {
         env = "LEVANA_TRADERS_OSMOSIS_MAINNET_PRIMARY_GRPC",
         default_value = "https://osmo-priv-grpc.kingnodes.com"
     )]
-    osmosis_mainnet_primary_grpc: String,
+    osmosis_mainnet_primary_grpc: Url,
     /// Provide optional gRPC fallbacks URLs for osmosis mainnet
     #[clap(
         long,
@@ -38,14 +38,14 @@ pub(super) struct TopTradersOpt {
         default_value = "http://c7f58ef9-1d78-4e15-a818-d02c8f50fc67.osmosis-1.mesa-grpc.newmetric.xyz,http://146.190.0.132:9090,https://grpc.osmosis.zone,http://osmosis-grpc.polkachu.com:12590",
         value_delimiter = ','
     )]
-    osmosis_mainnet_fallbacks_grpc: Vec<String>,
+    osmosis_mainnet_fallbacks_grpc: Vec<Url>,
     /// Provide gRPC endpoint override for sei mainnet
     #[clap(
         long,
         env = "LEVANA_TRADERS_SEI_MAINNET_PRIMARY_GRPC",
         default_value = "https://sei-priv-grpc.kingnodes.com"
     )]
-    sei_mainnet_primary_grpc: String,
+    sei_mainnet_primary_grpc: Url,
     /// Provide optional gRPC fallbacks URLs for sei mainnet
     #[clap(
         long,
@@ -53,14 +53,14 @@ pub(super) struct TopTradersOpt {
         default_value = "http://sei-grpc.polkachu.com:11990,https://grpc.sei-apis.com,https://sei-grpc.brocha.in",
         value_delimiter = ','
     )]
-    sei_mainnet_fallbacks_grpc: Vec<String>,
+    sei_mainnet_fallbacks_grpc: Vec<Url>,
     /// Provide gRPC endpoint override for injective mainnet
     #[clap(
         long,
         env = "LEVANA_TRADERS_INJECTIVE_MAINNET_PRIMARY_GRPC",
         default_value = "https://inj-priv-grpc.kingnodes.com"
     )]
-    injective_mainnet_primary_grpc: String,
+    injective_mainnet_primary_grpc: Url,
     /// Provide optional gRPC fallbacks URLs for injective mainnet
     #[clap(
         long,
@@ -68,14 +68,14 @@ pub(super) struct TopTradersOpt {
         default_value = "http://c7f58ef9-1d78-4e15-a818-d02c8f50fc67.injective-1.mesa-grpc.newmetric.xyz,http://injective-grpc.polkachu.com:14390",
         value_delimiter = ','
     )]
-    injective_mainnet_fallbacks_grpc: Vec<String>,
+    injective_mainnet_fallbacks_grpc: Vec<Url>,
     /// Provide gRPC endpoint override for neutron mainnet
     #[clap(
         long,
         env = "LEVANA_TRADERS_NEUTRON_MAINNET_PRIMARY_GRPC",
         default_value = "http://c7f58ef9-1d78-4e15-a818-d02c8f50fc67.neutron-1.mesa-grpc.newmetric.xyz"
     )]
-    neutron_mainnet_primary_grpc: String,
+    neutron_mainnet_primary_grpc: Url,
     /// Provide optional gRPC fallbacks URLs for neutron mainnet
     #[clap(
         long,
@@ -83,7 +83,7 @@ pub(super) struct TopTradersOpt {
         default_value = "http://neutron-grpc.rpc.p2p.world:3001,http://grpc-kralum.neutron-1.neutron.org",
         value_delimiter = ','
     )]
-    neutron_mainnet_fallbacks_grpc: Vec<String>,
+    neutron_mainnet_fallbacks_grpc: Vec<Url>,
 }
 
 impl TopTradersOpt {
@@ -171,13 +171,14 @@ async fn active_traders_on_factory(
     buff_dir: PathBuf,
     opt: Opt,
     workers: u32,
-    mut retries: u32,
-    factory_primary_grpc: String,
-    factory_fallbacks_grpc: Vec<String>,
+    retries: u32,
+    factory_primary_grpc: Url,
+    factory_fallbacks_grpc: Vec<Url>,
 ) -> Result<usize> {
     let csv_filename: PathBuf = buff_dir.join(format!("{}.csv", factory.clone()));
     tracing::info!("CSV filename: {}", csv_filename.as_path().display());
 
+    let mut attempted_retries = 0;
     while let Err(e) = open_position_csv(
         opt.clone(),
         OpenPositionCsvOpt {
@@ -190,10 +191,10 @@ async fn active_traders_on_factory(
     )
     .await
     {
-        tracing::error!("Error while generating open position csv file\n{}", e);
-        if retries > 0 {
-            retries -= 1;
-            tracing::info!("Retrying...");
+        if attempted_retries < retries {
+            attempted_retries += 1;
+            tracing::error!("Received error while generating csv files: {e}");
+            tracing::info!("Retrying... Attempt {attempted_retries}/{retries}");
         } else {
             return Err(e);
         }
