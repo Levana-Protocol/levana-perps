@@ -9,6 +9,8 @@ use crate::{contracts::liquidity_token::LiquidityTokenKind, token::TokenInit};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Binary, BlockInfo, Decimal256, Uint128};
 use pyth_sdk_cw::PriceIdentifier;
+use schemars::schema::{InstanceType, SchemaObject};
+use schemars::JsonSchema;
 use shared::prelude::*;
 use std::collections::BTreeMap;
 use std::fmt::Formatter;
@@ -1374,11 +1376,128 @@ pub struct PriceWouldTriggerResp {
     pub would_trigger: bool,
 }
 
+/// String representation of remove.
+const REMOVE_STR: &str = "remove";
 /// Stop loss configuration
-#[cw_serde]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum StopLoss {
     /// Remove stop loss price for the position
     Remove,
     /// Set the stop loss price for the position
     Price(PriceBaseInQuote),
+}
+
+impl FromStr for StopLoss {
+    type Err = PerpError;
+    fn from_str(src: &str) -> Result<StopLoss, PerpError> {
+        match src {
+            REMOVE_STR => Ok(StopLoss::Remove),
+            _ => match src.parse() {
+                Ok(number) => Ok(StopLoss::Price(number)),
+                Err(err) => Err(perp_error!(
+                    ErrorId::Conversion,
+                    ErrorDomain::Default,
+                    "error converting {} to StopLoss , {}",
+                    src,
+                    err
+                )),
+            },
+        }
+    }
+}
+
+impl TryFrom<&str> for StopLoss {
+    type Error = PerpError;
+
+    fn try_from(val: &str) -> Result<Self, Self::Error> {
+        Self::from_str(val)
+    }
+}
+
+impl serde::Serialize for StopLoss {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            StopLoss::Price(price) => price.serialize(serializer),
+            StopLoss::Remove => serializer.serialize_str(REMOVE_STR),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for StopLoss {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(StopLossVisitor)
+    }
+}
+
+impl JsonSchema for StopLoss {
+    fn schema_name() -> String {
+        "StopLoss".to_owned()
+    }
+
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        SchemaObject {
+            instance_type: Some(InstanceType::String.into()),
+            format: Some("stop-loss".to_owned()),
+            ..Default::default()
+        }
+        .into()
+    }
+}
+
+struct StopLossVisitor;
+impl<'de> serde::de::Visitor<'de> for StopLossVisitor {
+    type Value = StopLoss;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("StopLoss")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        v.parse()
+            .map_err(|_| E::custom(format!("Invalid StopLoss: {v}")))
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::MapAccess<'de>,
+    {
+        if let Some((key, value)) = map.next_entry()? {
+            match key {
+                REMOVE_STR => Ok(Self::Value::Remove),
+                "price" => Ok(Self::Value::Price(value)),
+                _ => Err(serde::de::Error::custom(format!(
+                    "Invalid StopLoss field: {key}"
+                ))),
+            }
+        } else {
+            Err(serde::de::Error::custom("Empty StopLoss Object"))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::StopLoss;
+
+    #[test]
+    fn deserialize_stop_loss() {
+        let go = serde_json::from_str::<StopLoss>;
+
+        go(r#"{"price": "2.2"}"#).unwrap();
+        go("\"remove\"").unwrap();
+        go("\"2.2\"").unwrap();
+        go("\"-2.2\"").unwrap_err();
+        go(r#"{}"#).unwrap_err();
+        go(r#"{"error-field": "2.2"}"#).unwrap_err();
+        go("").unwrap_err();
+    }
 }
