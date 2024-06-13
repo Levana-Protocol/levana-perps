@@ -283,16 +283,16 @@ build-market-params-image:
 push-market-params-image:
 	docker push ghcr.io/levana-protocol/levana-perps/perps-market-params:{{GIT_SHA}}
 
-# Build perps-market-params binary in release mode
+# Build perps-deploy binary in release mode
 cargo-perps-deploy-release:
     cargo build --bin perps-deploy --release --target x86_64-unknown-linux-musl
 
-# Build perps-market-params docker image
+# Build perps-deploy docker image
 build-perps-deploy-image:
 	cp ./packages/perps-exes/assets/mainnet-factories.toml .ci/perps-deploy/
 	cp target/x86_64-unknown-linux-musl/release/perps-deploy .ci/perps-deploy/
 	cd .ci/perps-deploy && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/perps-deploy:{{GIT_SHA}}
 
-# Push perps-market-params docker image
+# Push perps-deploy docker image
 push-perps-deploy-image:
 	docker push ghcr.io/levana-protocol/levana-perps/perps-deploy:{{GIT_SHA}}
