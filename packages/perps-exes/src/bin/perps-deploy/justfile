@@ -1,0 +1,7 @@
+# List all recipes
+default:
+	just --list --unsorted
+
+# Run top traders
+top-traders:
+	cargo run --bin perps-deploy util top-traders
