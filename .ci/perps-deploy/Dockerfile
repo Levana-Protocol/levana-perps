@@ -11,6 +11,6 @@ WORKDIR /app
 COPY --chmod=755 --chown=1000 ./mainnet-factories.toml /app/packages/perps-exes/assets
 COPY --chmod=755 --chown=1000 perps-deploy /usr/bin/perps-deploy
 
-ENTRYPOINT [ "/usr/bin/health-check", "--task-output-timeout", "90000", "--app-description", "Perps Deploy (K8s mainnet)", "perps-deploy" ]
+ENTRYPOINT [ "/usr/bin/health-check", "--task-output-timeout", "90000", "--app-description", "Perps Deploy (K8s mainnet)", "--can-exit", "perps-deploy" ]
 
-CMD [ "serve" ]
+CMD [ "util", "top-traders" ]
