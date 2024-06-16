@@ -2,6 +2,7 @@ mod deferred_exec;
 mod list_contracts;
 mod lp_history;
 mod token_balances;
+mod top_traders;
 mod tvl_report;
 
 use std::{
@@ -28,6 +29,7 @@ use perps_exes::{
     pyth::get_oracle_update_msg,
     PerpsNetwork,
 };
+use reqwest::Url;
 use serde_json::json;
 use shared::storage::{
     Collateral, DirectionToBase, LeverageToBase, MarketId, Notional, Signed, UnsignedDecimal, Usd,
@@ -41,6 +43,7 @@ pub(crate) struct UtilOpt {
 }
 
 #[derive(clap::Parser)]
+#[allow(clippy::large_enum_variant)]
 enum Sub {
     /// Set the price in a Pyth oracle
     UpdatePyth {
@@ -87,6 +90,11 @@ enum Sub {
         #[clap(flatten)]
         inner: tvl_report::TvlReportOpt,
     },
+    /// Publish the number of active traders in 24 hours
+    TopTraders {
+        #[clap(flatten)]
+        inner: top_traders::TopTradersOpt,
+    },
 }
 
 impl UtilOpt {
@@ -101,6 +109,7 @@ impl UtilOpt {
             Sub::TokenBalances { inner } => inner.go(opt).await,
             Sub::ListContracts { inner } => inner.go().await,
             Sub::TvlReport { inner } => inner.go(opt).await,
+            Sub::TopTraders { inner } => inner.go(opt).await,
         }
     }
 }
@@ -395,7 +404,7 @@ async fn trade_volume(
 }
 
 #[derive(clap::Parser)]
-struct OpenPositionCsvOpt {
+pub(crate) struct OpenPositionCsvOpt {
     /// Factory name
     #[clap(long)]
     factory: String,
@@ -405,6 +414,12 @@ struct OpenPositionCsvOpt {
     /// How many separate worker tasks to create for parallel loading
     #[clap(long, default_value = "30")]
     workers: u32,
+    /// Optional gRPC endpoint override for factory
+    #[clap(long)]
+    factory_primary_grpc: Option<Url>,
+    /// Provide optional gRPC fallbacks URLs for factory
+    #[clap(long, value_delimiter = ',')]
+    factory_fallbacks_grpc: Vec<Url>,
 }
 
 struct ToProcess {
@@ -414,23 +429,38 @@ struct ToProcess {
     market_id: Arc<MarketId>,
 }
 
-async fn open_position_csv(
+pub(crate) async fn open_position_csv(
     opt: crate::cli::Opt,
     OpenPositionCsvOpt {
         factory,
         csv,
         workers,
+        factory_primary_grpc,
+        factory_fallbacks_grpc,
     }: OpenPositionCsvOpt,
 ) -> Result<()> {
-    let old_data = load_old_data(&csv)
+    let old_data = load_data_from_csv(&csv)
         .with_context(|| format!("Unable to load old CSV data from {}", csv.display()))?;
     tracing::info!("Loaded {} records from old CSV", old_data.len());
     let old_data = Arc::new(old_data);
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
-    let app = opt.load_app_mainnet(factory.network).await?;
 
-    let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
+    let cosmos = if let Some(factory_primary_grpc) = factory_primary_grpc {
+        let mut builder = factory.network.builder().await?;
+
+        builder.set_grpc_url(factory_primary_grpc);
+        for fallback in factory_fallbacks_grpc.clone() {
+            builder.add_grpc_fallback_url(fallback);
+        }
+        builder.set_referer_header(Some("https://trade-history.levana.exchange/".to_owned()));
+
+        builder.build_lazy()?
+    } else {
+        opt.load_app_mainnet(factory.network).await?.cosmos
+    };
+
+    let factory = Factory::from_contract(cosmos.make_contract(factory.address));
     let csv = ::csv::Writer::from_path(&csv)?;
     let csv = Arc::new(Mutex::new(csv));
 
@@ -590,7 +620,7 @@ struct PositionRecordCommon {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-struct PositionRecord {
+pub(crate) struct PositionRecord {
     market: MarketId,
     id: PositionId,
     opened_at: DateTime<Utc>,
@@ -610,7 +640,7 @@ struct PositionRecord {
     total_fees_usd: Signed<Usd>,
 }
 
-fn load_old_data(
+pub(crate) fn load_data_from_csv(
     path: &Path,
 ) -> Result<HashMap<(MarketId, PositionId), PositionRecord>, csv::Error> {
     if path.exists() {

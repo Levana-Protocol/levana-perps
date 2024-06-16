@@ -1,7 +1,7 @@
 FROM alpine:3.19.1
 
 ADD --chmod=755  https://github.com/fpco/amber/releases/download/v0.1.3/amber-x86_64-unknown-linux-musl /usr/bin/amber
-ADD --chmod=755 https://github.com/fpco/health-check/releases/download/v0.1.0/health-check-x86_64-unknown-linux-musl /usr/bin/health-check
+ADD --chmod=755 https://github.com/fpco/health-check/releases/download/v0.3.0/health-check-x86_64-unknown-linux-musl /usr/bin/health-check
 
 COPY amber.yaml /etc/amber.yaml
 COPY ["etc/*.toml", "/etc"]

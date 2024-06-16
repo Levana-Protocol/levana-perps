@@ -50,26 +50,28 @@ initial-borrow-fee-rate = "0.1"
 
 [markets.AVAX_USDC.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.05"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "6551939"
 delta_neutrality_fee_tax = "0.1"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [markets.AXL_USD]
 initial-borrow-fee-rate = "0.17"
 
 [markets.AXL_USD.config]
-max_leverage = "4"
-carry_leverage = "2"
+max_leverage = "10"
+carry_leverage = "5"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.09"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "9578797"
-delta_neutrality_fee_cap = "0.03"
+delta_neutrality_fee_cap = "0.015"
 delta_neutrality_fee_tax = "0.5"
 liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
@@ -79,12 +81,14 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.BNB_USDC.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "1000000"
 delta_neutrality_fee_tax = "0.1"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [markets.BNB_USDT]
@@ -92,12 +96,14 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.BNB_USDT.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "300000000"
 delta_neutrality_fee_tax = "0.1"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [markets.BONK_USDC]
@@ -131,18 +137,21 @@ initial-borrow-fee-rate = "0.08"
 
 [markets.BTC_SEI.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.04"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "20000000"
 delta_neutrality_fee_tax = "0.25"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [markets.BTC_USD]
 initial-borrow-fee-rate = "0.05"
 
 [markets.BTC_USD.config]
+max_leverage = "50"
 carry_leverage = "7"
 funding_rate_sensitivity = "1"
 funding_rate_max_annualized = "0.45"
@@ -151,6 +160,7 @@ borrow_fee_rate_max_annualized = "0.3"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "50000000000"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [markets.BTC_USDT]
@@ -158,6 +168,7 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.BTC_USDT.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1"
 funding_rate_max_annualized = "0.45"
 borrow_fee_rate_min_annualized = "0.03"
@@ -165,6 +176,7 @@ borrow_fee_rate_max_annualized = "0.3"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "50000000000"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [markets.CNH_USDC]
@@ -196,12 +208,14 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.DOGE_USDC.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "1512625910"
 delta_neutrality_fee_tax = "0.1"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [markets.DOT_USD]
@@ -209,12 +223,14 @@ initial-borrow-fee-rate = "0.1"
 
 [markets.DOT_USD.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.05"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "250000000"
 delta_neutrality_fee_tax = "0.1"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [markets.DOT_USDC]
@@ -247,7 +263,8 @@ liquidity_cooldown_seconds = 86400
 initial-borrow-fee-rate = "0.08"
 
 [markets.DYM_USD.config]
-carry_leverage = "7"
+carry_leverage = "5"
+max_leverage = "10"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.04"
 target_utilization = "0.5"
@@ -270,12 +287,14 @@ initial-borrow-fee-rate = "0.08"
 
 [markets.ETH_SEI.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.04"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "20000000"
 delta_neutrality_fee_tax = "0.25"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [markets.ETH_USD]
@@ -283,11 +302,13 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.ETH_USD.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.2"
 delta_neutrality_fee_sensitivity = "50000000000"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [markets.EUR_USDC]
@@ -311,7 +332,8 @@ exposure_margin_ratio = "0.004"
 initial-borrow-fee-rate = "0.35"
 
 [markets.FLOKI_USDC.config]
-carry_leverage = "7"
+carry_leverage = "5"
+max_leverage = "10"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.2"
 target_utilization = "0.5"
@@ -359,7 +381,8 @@ exposure_margin_ratio = "0.004"
 initial-borrow-fee-rate = "0.16"
 
 [markets.INJ_USD.config]
-carry_leverage = "7"
+carry_leverage = "5"
+max_leverage = "10"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.08"
 target_utilization = "0.5"
@@ -372,7 +395,8 @@ liquidity_cooldown_seconds = 86400
 initial-borrow-fee-rate = "0.16"
 
 [markets.INJ_USDC.config]
-carry_leverage = "7"
+carry_leverage = "5"
+max_leverage = "10"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.08"
 target_utilization = "0.5"
@@ -386,12 +410,14 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.LINK_USDC.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "26666666"
 delta_neutrality_fee_tax = "0.1"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [markets.LINK_USDT]
@@ -399,20 +425,22 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.LINK_USDT.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "400000000"
 delta_neutrality_fee_tax = "0.1"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [markets.LUNA_USDC]
 initial-borrow-fee-rate = "0.05"
 
 [markets.LUNA_USDC.config]
-max_leverage = "4"
-carry_leverage = "2"
+max_leverage = "10"
+carry_leverage = "5"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
@@ -490,14 +518,14 @@ initial-borrow-fee-rate = "0.12"
 [markets.OSMO_USD.config]
 trading_fee_notional_size = "0.002"
 trading_fee_counter_collateral = "0.002"
-max_leverage = "6"
-carry_leverage = "3"
+max_leverage = "10"
+carry_leverage = "5"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.06"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "25000000"
-delta_neutrality_fee_cap = "0.025"
+delta_neutrality_fee_cap = "0.015"
 delta_neutrality_fee_tax = "0.35"
 liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
@@ -524,12 +552,14 @@ initial-borrow-fee-rate = "0.35"
 
 [markets.PEPE_USDC.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.2"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "21969106926089"
 delta_neutrality_fee_tax = "0.2"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [markets.PYTH_USDC]
@@ -583,7 +613,8 @@ exposure_margin_ratio = "0.02"
 initial-borrow-fee-rate = "0.08"
 
 [markets.SEI_USD.config]
-carry_leverage = "7"
+carry_leverage = "5"
+max_leverage = "10"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.04"
 target_utilization = "0.5"
@@ -597,12 +628,14 @@ initial-borrow-fee-rate = "0.25"
 
 [markets.SHIB_USDC.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.15"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "18962128239885"
 delta_neutrality_fee_tax = "0.2"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [markets.SILVER_USDC]
@@ -628,12 +661,14 @@ initial-borrow-fee-rate = "0.08"
 
 [markets.SOL_SEI.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.04"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "20000000"
 delta_neutrality_fee_tax = "0.25"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [markets.SOL_USDC]
@@ -641,12 +676,14 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.SOL_USDC.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "5000000"
 delta_neutrality_fee_tax = "0.1"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [markets.SOL_USDT]
@@ -737,11 +774,13 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.axlETH_USD.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.2"
 delta_neutrality_fee_sensitivity = "50000000000"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [markets.milkTIA_USD]
@@ -780,12 +819,14 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.ryETH_USD.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "50000000000"
 delta_neutrality_fee_tax = "0.1"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [markets.stATOM_USD]
@@ -805,7 +846,8 @@ liquidity_cooldown_seconds = 86400
 initial-borrow-fee-rate = "0.06"
 
 [markets.stDYDX_USD.config]
-carry_leverage = "7"
+carry_leverage = "5"
+max_leverage = "10"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
@@ -818,7 +860,8 @@ liquidity_cooldown_seconds = 86400
 initial-borrow-fee-rate = "0.05"
 
 [markets.stDYM_USD.config]
-carry_leverage = "7"
+carry_leverage = "5"
+max_leverage = "10"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.04"
 target_utilization = "0.5"
@@ -846,14 +889,14 @@ initial-borrow-fee-rate = "0.06"
 [markets.stOSMO_USD.config]
 trading_fee_notional_size = "0.002"
 trading_fee_counter_collateral = "0.002"
-max_leverage = "6"
-carry_leverage = "3"
+max_leverage = "10"
+carry_leverage = "5"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "25000000"
-delta_neutrality_fee_cap = "0.025"
+delta_neutrality_fee_cap = "0.015"
 delta_neutrality_fee_tax = "0.35"
 liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
@@ -894,6 +937,7 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.wBTC_USD.config]
 carry_leverage = "7"
+max_leverage = "50"
 funding_rate_sensitivity = "1"
 funding_rate_max_annualized = "0.45"
 borrow_fee_rate_min_annualized = "0.03"
@@ -901,6 +945,7 @@ borrow_fee_rate_max_annualized = "0.3"
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "50000000000"
+delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [crank-fees.osmosis-mainnet]
