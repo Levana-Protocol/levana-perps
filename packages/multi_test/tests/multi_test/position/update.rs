@@ -1,4 +1,5 @@
-use levana_perpswap_multi_test::config::DefaultMarket;
+use levana_perpswap_multi_test::config::{DefaultMarket, DEFAULT_MARKET};
+use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, position_helpers::assert_position_liquidated,
     response::CosmosResponseExt, PerpsApp,
@@ -15,6 +16,14 @@ fn position_update_collateral_impact_leverage() {
                           collateral_delta: Signed<Collateral>,
                           expected_leverage: Number| {
         let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+        market
+            .exec_set_config(ConfigUpdate {
+                borrow_fee_rate_max_annualized: Some("0.00000000000000001".parse().unwrap()),
+                borrow_fee_rate_min_annualized: Some("0.00000000000000001".parse().unwrap()),
+                ..Default::default()
+            })
+            .unwrap();
+
         let trader = market.clone_trader(0).unwrap();
         let initial_collateral = Collateral::from_str("100").unwrap();
 
@@ -41,14 +50,15 @@ fn position_update_collateral_impact_leverage() {
 
         assert_eq!(
             updated_pos.deposit_collateral,
-            initial_collateral.into_signed() + collateral_delta
+            (initial_collateral.into_signed() + collateral_delta).unwrap()
         );
 
         assert!(
             updated_pos
                 .leverage
                 .into_number()
-                .approx_eq_eps(expected_leverage.into_number(), Number::EPS_E6),
+                .approx_eq_eps(expected_leverage.into_number(), Number::EPS_E6)
+                .unwrap(),
             "direction: {:?}, expected_leverage: {}, actual_leverage: {}",
             direction,
             expected_leverage,
@@ -125,6 +135,11 @@ fn position_update_collateral_impact_size() {
                           collateral_delta: Signed<Collateral>,
                           expected_size: Number| {
         let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+        market
+            .exec_set_config(ConfigUpdate {
+                ..Default::default()
+            })
+            .unwrap();
         let trader = market.clone_trader(0).unwrap();
         let initial_collateral = Collateral::from_str("100").unwrap();
 
@@ -141,22 +156,26 @@ fn position_update_collateral_impact_size() {
             )
             .unwrap();
 
+        market.set_time(TimeJump::Blocks(-1)).unwrap();
+
         market
             .exec_update_position_collateral_impact_size(&trader, pos_id, collateral_delta, None)
             .unwrap();
 
+        market.set_time(TimeJump::Blocks(-1)).unwrap();
         let updated_pos = market.query_position(pos_id).unwrap();
 
         assert_eq!(
             updated_pos.deposit_collateral,
-            initial_collateral.into_signed() + collateral_delta
+            (initial_collateral.into_signed() + collateral_delta).unwrap()
         );
 
         assert!(
             updated_pos
                 .notional_size
                 .into_number()
-                .approx_eq_eps(expected_size.into_number(), Number::EPS_E6),
+                .approx_eq_eps(expected_size.into_number(), Number::EPS_E6)
+                .unwrap(),
             "direction: {:?}, expected_size: {}, actual_size: {}",
             direction,
             expected_size,
@@ -247,17 +266,21 @@ fn position_update_max_gains() {
             )
             .unwrap();
 
+        market.set_time(TimeJump::Blocks(-1)).unwrap();
+
         market
             .exec_update_position_max_gains(&trader, pos_id, max_gains)
             .unwrap();
 
+        market.set_time(TimeJump::Blocks(-1)).unwrap();
         let updated_pos = market.query_position(pos_id).unwrap();
 
         assert!(
             updated_pos
                 .counter_collateral
                 .into_number()
-                .approx_eq_eps(expected_counter_collateral.into_number(), Number::EPS_E6),
+                .approx_eq_eps(expected_counter_collateral.into_number(), Number::EPS_E6)
+                .unwrap(),
             "direction: {:?}, expected_counter_collateral: {}, actual_counter_collateral: {}",
             direction,
             expected_counter_collateral,
@@ -270,8 +293,16 @@ fn position_update_max_gains() {
     let max_gains = MaxGainsInQuote::from_str("5").unwrap();
     match DefaultMarket::market_type() {
         MarketType::CollateralIsQuote => {
-            perform_update(DirectionToBase::Long, max_gains, "496.7".parse().unwrap());
-            perform_update(DirectionToBase::Short, max_gains, "496.7".parse().unwrap());
+            perform_update(
+                DirectionToBase::Long,
+                max_gains,
+                "496.699999999999999989".parse().unwrap(),
+            );
+            perform_update(
+                DirectionToBase::Short,
+                max_gains,
+                "496.699999999999999989".parse().unwrap(),
+            );
         }
         MarketType::CollateralIsBase => {
             perform_update(
@@ -282,7 +313,7 @@ fn position_update_max_gains() {
             perform_update(
                 DirectionToBase::Short,
                 max_gains,
-                "1080.875983".parse().unwrap(),
+                "1080.875983250866657727".parse().unwrap(),
             );
         }
     }
@@ -292,8 +323,16 @@ fn position_update_max_gains() {
     let max_gains = MaxGainsInQuote::from_str("2").unwrap();
     match DefaultMarket::market_type() {
         MarketType::CollateralIsQuote => {
-            perform_update(DirectionToBase::Long, max_gains, "198.68".parse().unwrap());
-            perform_update(DirectionToBase::Short, max_gains, "198.68".parse().unwrap());
+            perform_update(
+                DirectionToBase::Long,
+                max_gains,
+                "198.679999999999999995".parse().unwrap(),
+            );
+            perform_update(
+                DirectionToBase::Short,
+                max_gains,
+                "198.679999999999999995".parse().unwrap(),
+            );
         }
         MarketType::CollateralIsBase => {
             perform_update(
@@ -304,7 +343,7 @@ fn position_update_max_gains() {
             perform_update(
                 DirectionToBase::Short,
                 max_gains,
-                "271.992263".parse().unwrap(),
+                "271.992263289575023781".parse().unwrap(),
             );
         }
     }
@@ -317,7 +356,7 @@ fn position_update_open_interest_inner(
     expected_notional_size_updated: Signed<Notional>,
 ) {
     let query_notional_interest = || -> (Notional, Notional) {
-        let open_interest: StatusResp = market.query(&QueryMsg::Status {}).unwrap();
+        let open_interest: StatusResp = market.query(&QueryMsg::Status { price: None }).unwrap();
         match direction {
             DirectionToBase::Long => (open_interest.long_notional, open_interest.short_notional),
             DirectionToBase::Short => (open_interest.short_notional, open_interest.long_notional),
@@ -326,6 +365,9 @@ fn position_update_open_interest_inner(
 
     market
         .exec_set_config(ConfigUpdate {
+            // very small value to minimize the borrow fee impact
+            borrow_fee_rate_max_annualized: Some("0.00000000000000001".parse().unwrap()),
+            borrow_fee_rate_min_annualized: Some("0.00000000000000001".parse().unwrap()),
             trading_fee_notional_size: Some("0.001".parse().unwrap()),
             trading_fee_counter_collateral: Some("0.001".parse().unwrap()),
             delta_neutrality_fee_sensitivity: Some("50000000".parse().unwrap()),
@@ -357,16 +399,21 @@ fn position_update_open_interest_inner(
     let updated_pos = market.query_position(pos.id).unwrap();
     let (notional_size_to_check, other_notional_size) = query_notional_interest();
 
-    assert_eq!(
-        expected_notional_size_updated.abs(),
-        notional_size_to_check.into_signed()
-    );
+    assert!(expected_notional_size_updated
+        .abs()
+        .into_number()
+        .approx_eq(notional_size_to_check.into_number())
+        .unwrap());
     assert_eq!(Notional::zero(), other_notional_size);
-    assert_eq!(updated_pos.notional_size, expected_notional_size_updated);
+    assert!(updated_pos
+        .notional_size
+        .into_number()
+        .approx_eq(expected_notional_size_updated.into_number())
+        .unwrap());
 
     market.exec_close_position(&trader, pos_id, None).unwrap();
     let _pos = market.query_closed_position(&trader, pos.id).unwrap();
-    let open_interest: StatusResp = market.query(&QueryMsg::Status {}).unwrap();
+    let open_interest: StatusResp = market.query(&QueryMsg::Status { price: None }).unwrap();
 
     assert_eq!(open_interest.short_notional, Notional::zero());
     assert_eq!(open_interest.long_notional, Notional::zero());
@@ -485,7 +532,8 @@ fn position_update_leverage() {
             updated_pos
                 .active_collateral
                 .into_number()
-                .approx_eq_eps(expected_active_collateral.into_number(), Number::EPS_E6),
+                .approx_eq_eps(expected_active_collateral.into_number(), Number::EPS_E6)
+                .unwrap(),
             "active_collateral {} is not equal to expected {} for {:?} position",
             updated_pos.active_collateral,
             expected_active_collateral,
@@ -495,7 +543,8 @@ fn position_update_leverage() {
             updated_pos
                 .leverage
                 .into_number()
-                .approx_eq_eps(expected_leverage.into_number(), Number::EPS_E6),
+                .approx_eq_eps(expected_leverage.into_number(), Number::EPS_E6)
+                .unwrap(),
             "leverage {} is not equal to expected {} for {:?} position",
             updated_pos.leverage,
             expected_leverage,
@@ -572,6 +621,7 @@ fn test_position_update_max_leverage_fail() {
             &trader,
             pos_id,
             (market.query_config().unwrap().max_leverage * Number::from(2u64))
+                .unwrap()
                 .to_string()
                 .parse()
                 .unwrap(),
@@ -620,9 +670,9 @@ fn position_update_abs_notional_size() {
         pub fn size_sign_abs(&self) -> Sign {
             match *self {
                 ChangeKind::Collateral(delta) => delta.into(),
-                ChangeKind::Leverage(leverage) => {
-                    (Number::from(leverage) - Number::from(10u64)).into()
-                }
+                ChangeKind::Leverage(leverage) => (Number::from(leverage) - Number::from(10u64))
+                    .unwrap()
+                    .into(),
             }
         }
         pub fn size_sign_opinionated(
@@ -657,9 +707,13 @@ fn position_update_abs_notional_size() {
     for market_type in market_types {
         for direction in directions.clone() {
             for change_kind in change_kinds.clone() {
-                let market =
-                    PerpsMarket::new_with_type(PerpsApp::new_cell().unwrap(), market_type, true)
-                        .unwrap();
+                let market = PerpsMarket::new_with_type(
+                    PerpsApp::new_cell().unwrap(),
+                    market_type,
+                    true,
+                    DEFAULT_MARKET.spot_price,
+                )
+                .unwrap();
                 let trader = market.clone_trader(0).unwrap();
 
                 // with a price of just 1 it's hard to see the changes between market types, so change it
@@ -695,6 +749,7 @@ fn position_update_abs_notional_size() {
                 };
 
                 let evt: PositionUpdateEvent = update_res
+                    .exec_resp()
                     .event_first("position-update")
                     .unwrap()
                     .try_into()
@@ -703,7 +758,7 @@ fn position_update_abs_notional_size() {
                 let updated_pos = market.query_position(pos_id).unwrap();
 
                 assert_eq!(
-                    updated_pos.notional_size - original_pos.notional_size,
+                    (updated_pos.notional_size - original_pos.notional_size).unwrap(),
                     evt.notional_size_delta
                 );
 
@@ -798,7 +853,7 @@ fn position_update_max_gains_perp_666() {
 
     let pos = market.query_position(pos_id).unwrap();
 
-    assert_ne!(pos1.max_gains_in_quote, pos.max_gains_in_quote);
+    assert_ne!(pos1.take_profit_total_base, pos.take_profit_total_base);
 }
 
 #[test]

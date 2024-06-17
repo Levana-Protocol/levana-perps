@@ -15,7 +15,7 @@ use super::{App, AppBuilder};
 
 impl AppBuilder {
     pub(super) fn launch_faucet_task(&mut self, runner: FaucetBotRunner) {
-        let contract = self.app.cosmos.make_contract(self.app.config.faucet);
+        let contract = self.app.cosmos.make_contract(runner.faucet);
         self.watch_background(runner.start(contract));
     }
 }
@@ -24,17 +24,23 @@ pub(crate) struct FaucetBot {
     wallet_address: Address,
     hcaptcha_secret: String,
     tx: tokio::sync::mpsc::Sender<TapRequest>,
+    faucet: Address,
 }
 
 impl FaucetBot {
-    pub(crate) fn new(wallet: Wallet, hcaptcha_secret: String) -> (Self, FaucetBotRunner) {
+    pub(crate) fn new(
+        wallet: Wallet,
+        hcaptcha_secret: String,
+        faucet: Address,
+    ) -> (Self, FaucetBotRunner) {
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         let bot = FaucetBot {
             wallet_address: wallet.get_address(),
             hcaptcha_secret,
             tx,
+            faucet,
         };
-        let runner = FaucetBotRunner { wallet, rx };
+        let runner = FaucetBotRunner { wallet, rx, faucet };
         (bot, runner)
     }
 
@@ -53,7 +59,7 @@ impl FaucetBot {
         recipient: Address,
         cw20s: Vec<Address>,
     ) -> Result<Arc<String>, FaucetTapError> {
-        let contract = app.cosmos.make_contract(app.config.faucet);
+        let contract = app.cosmos.make_contract(self.faucet);
         match contract
             .query(QueryMsg::IsTapEligible {
                 addr: recipient.get_address_string().into(),
@@ -131,11 +137,14 @@ pub(crate) enum FaucetTapError {
     CannotQueryCaptcha {},
     #[error("The captcha provided was invalid, please try again.")]
     InvalidCaptcha {},
+    #[error("Unfortunately we cannot provide a faucet for mainnet.")]
+    Mainnet {},
 }
 
-pub struct FaucetBotRunner {
+pub(crate) struct FaucetBotRunner {
     wallet: Wallet,
     rx: tokio::sync::mpsc::Receiver<TapRequest>,
+    faucet: Address,
 }
 
 impl FaucetBotRunner {
@@ -170,20 +179,20 @@ impl FaucetBotRunner {
                     let txhash = Arc::new(res.txhash);
                     for req in reqs {
                         if let Err(e) = req.tx.send(Ok(txhash.clone())) {
-                            log::warn!("Faucet tapper no longer waiting: {e:?}");
+                            tracing::warn!("Faucet tapper no longer waiting: {e:?}");
                         }
                     }
                     break;
                 }
                 Err(e) => {
-                    log::error!("{e:?}");
+                    tracing::error!("{e:?}");
                     retries += 1;
                     if retries >= 10 {
                         for req in reqs {
                             if let Err(e) = req.tx.send(Err(FaucetTapError::Contract {
                                 inner: e.to_string(),
                             })) {
-                                log::warn!("Faucet tapper no longer waiting: {e:?}");
+                                tracing::warn!("Faucet tapper no longer waiting: {e:?}");
                             }
                         }
                         break;
@@ -193,7 +202,11 @@ impl FaucetBotRunner {
         }
     }
 
-    async fn try_tap(&self, contract: &Contract, reqs: &[TapRequest]) -> Result<TxResponse> {
+    async fn try_tap(
+        &self,
+        contract: &Contract,
+        reqs: &[TapRequest],
+    ) -> cosmos::Result<TxResponse> {
         contract
             .execute(
                 &self.wallet,

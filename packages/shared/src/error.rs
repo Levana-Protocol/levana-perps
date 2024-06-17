@@ -31,7 +31,6 @@ pub enum ErrorId {
     PriceAlreadyExists,
     PriceNotFound,
     PriceTooOld,
-    Liquidity,
     PositionUpdate,
     NativeFunds,
     Cw20Funds,
@@ -62,6 +61,7 @@ pub enum ErrorId {
 
     // Errors that come from MarketError
     InvalidInfiniteMaxGains,
+    InvalidInfiniteTakeProfitPrice,
     MaxGainsTooLarge,
     WithdrawTooMuch,
     InsufficientLiquidityForWithdrawal,
@@ -71,6 +71,17 @@ pub enum ErrorId {
     MinimumDeposit,
     Congestion,
     MaxLiquidity,
+    InvalidTriggerPrice,
+    LiquidityCooldown,
+    PendingDeferredExec,
+    VolatilePriceFeedTimeDelta,
+    LimitOrderAlreadyCanceling,
+    PositionAlreadyClosing,
+    NoPricePublishTimeFound,
+    PositionAlreadyClosed,
+    MissingTakeProfit,
+    InsufficientLiquidityForUnlock,
+    Liquidity,
 }
 
 /// Source within the protocol for the error
@@ -89,6 +100,8 @@ pub enum ErrorDomain {
     Faucet,
     Pyth,
     Farming,
+    Stride,
+    SimpleOracle,
 }
 
 /// Generate a [PerpError] value
@@ -99,7 +112,7 @@ macro_rules! perp_error {
             id: $id,
             domain: $domain,
             description: format!($($t)*),
-            data: None as Option<()>,
+            data: None::<()>,
         }
     }};
 }
@@ -125,7 +138,7 @@ macro_rules! perp_anyhow {
             id: $id,
             domain: $domain,
             description: format!($($t)*),
-            data: None as Option<()>,
+            data: None::<()>,
         })
     }};
 }
@@ -152,7 +165,7 @@ macro_rules! perp_ensure {
                 id: $id,
                 domain: $domain,
                 description: format!($($t)*),
-                data: None as Option<()>,
+                data: None::<()>,
             }));
         }
     }};
@@ -166,7 +179,7 @@ macro_rules! perp_bail {
             id: $id,
             domain: $domain,
             description: format!($($t)*),
-            data: None as Option<()>,
+            data: None::<()>,
         }));
     }};
 }
@@ -216,7 +229,7 @@ impl PerpError {
 
         match &self.data {
             None => evt,
-            // this should only fail if the inner to_vec of serde fails. that's a (very unlikely) genuine panic situation
+            // this should only fail if the inner to_json_vec of serde fails. that's a (very unlikely) genuine panic situation
             Some(data) => evt.add_attribute("error-data", serde_json::to_string(data).unwrap()),
         }
     }

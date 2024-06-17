@@ -2,26 +2,41 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::async_trait;
-use cosmos::{Address, Wallet};
+use cosmos::{Address, HasAddress, Wallet};
 use cosmwasm_std::Fraction;
-use perps_exes::prelude::*;
+use perps_exes::{
+    config::{LiquidityBounds, LiquidityConfig},
+    prelude::*,
+};
 
-use crate::watcher::{WatchedTaskOutput, WatchedTaskPerMarket};
+use crate::{
+    config::BotConfigTestnet,
+    util::markets::Market,
+    wallet_manager::ManagedWallet,
+    watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
+};
 
 use super::{factory::FactoryInfo, App, AppBuilder};
 
 pub(super) struct Liquidity {
     pub(super) app: Arc<App>,
+    liquidity_config: LiquidityConfig,
     pub(super) wallet: Wallet,
+    testnet: Arc<BotConfigTestnet>,
 }
 
 impl AppBuilder {
-    pub(super) fn launch_liquidity(&mut self, wallet: Wallet) -> Result<()> {
-        let liquidity = Liquidity {
-            app: self.app.clone(),
-            wallet,
-        };
-        self.watch_periodic(crate::watcher::TaskLabel::Liquidity, liquidity)
+    pub(super) fn start_liquidity(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
+        if let Some(liquidity_config) = &testnet.liquidity_config {
+            let liquidity = Liquidity {
+                app: self.app.clone(),
+                liquidity_config: liquidity_config.clone(),
+                wallet: self.get_track_wallet(&testnet, ManagedWallet::Liquidity)?,
+                testnet,
+            };
+            self.watch_periodic(crate::watcher::TaskLabel::Liquidity, liquidity)?;
+        }
+        Ok(())
     }
 }
 
@@ -30,11 +45,10 @@ impl WatchedTaskPerMarket for Liquidity {
     async fn run_single_market(
         &mut self,
         _app: &App,
-        factory: &FactoryInfo,
-        market: &MarketId,
-        addr: Address,
+        _factory: &FactoryInfo,
+        market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, market, addr, factory.faucet).await
+        single_market(self, &market.market_id, &market.market, self.testnet.faucet).await
     }
 }
 
@@ -47,19 +61,20 @@ enum Action {
 async fn single_market(
     worker: &Liquidity,
     market_id: &MarketId,
-    market_addr: Address,
+    market: &MarketContract,
     faucet: Address,
 ) -> Result<WatchedTaskOutput> {
-    let market = MarketContract::new(worker.app.cosmos.make_contract(market_addr));
     let status = market.status().await?;
-    let total = status.liquidity.total_collateral();
+    let total = status.liquidity.total_collateral()?;
     let bounds = worker
-        .app
-        .config
         .liquidity_config
         .markets
         .get(market_id)
-        .with_context(|| format!("No bounds available for market {market_id}"))?;
+        .copied()
+        .unwrap_or_else(|| LiquidityBounds {
+            min: "1000000".parse().unwrap(),
+            max: "100000000".parse().unwrap(),
+        });
     let min_liquidity = bounds.min;
     let max_liquidity = bounds.max;
     let util = if total.is_zero() {
@@ -67,17 +82,25 @@ async fn single_market(
     } else {
         status.liquidity.locked.into_decimal256() / total.into_decimal256()
     };
-    let high_util = worker.app.config.liquidity_config.max_util;
-    let low_util = worker.app.config.liquidity_config.min_util;
-    let target_liquidity = status.liquidity.locked.checked_mul_dec(
-        worker
-            .app
-            .config
-            .liquidity_config
-            .target_util
-            .inv()
-            .context("Cannot invert target util")?,
-    )?;
+    let high_util = status
+        .config
+        .target_utilization
+        .raw()
+        .checked_add_signed(worker.liquidity_config.max_util_delta)?;
+    let low_util = status
+        .config
+        .target_utilization
+        .raw()
+        .checked_add_signed(worker.liquidity_config.min_util_delta)?;
+    let target_util = status
+        .config
+        .target_utilization
+        .raw()
+        .checked_add_signed(worker.liquidity_config.target_util_delta)?;
+    let target_liquidity = status
+        .liquidity
+        .locked
+        .checked_mul_dec(target_util.inv().context("Cannot invert target util")?)?;
 
     let lp_info = market.lp_info(&worker.wallet).await.with_context(|| {
         format!(
@@ -98,11 +121,11 @@ async fn single_market(
         .ok()
         .and_then(NonZero::new)
     {
-        Action::Deposit(missing.raw() + Collateral::one())
+        Action::Deposit((missing.raw() + Collateral::one())?)
     } else if util < low_util {
         Action::Withdraw(total.checked_sub(target_liquidity)?)
     } else if util > high_util {
-        Action::Deposit(target_liquidity - total)
+        Action::Deposit((target_liquidity - total)?)
     } else {
         Action::None
     };
@@ -112,25 +135,28 @@ async fn single_market(
             let max_deposit = max_liquidity.checked_sub(lp_info.lp_collateral)?;
             let to_deposit = to_deposit.min(max_deposit);
             if to_deposit < Collateral::one() {
-                return Ok(WatchedTaskOutput {
-                    skip_delay: false,
-                    message: "Too little collateral to warrant a deposit, skipping".to_owned(),
-                });
+                return Ok(WatchedTaskOutput::new(
+                    "Too little collateral to warrant a deposit, skipping",
+                ));
             }
             let cw20 = match &status.collateral {
                 msg::token::Token::Cw20 {
                     addr,
                     decimal_places: _,
                 } => addr.as_str().parse()?,
-                msg::token::Token::Native { .. } => anyhow::bail!("No support for native coins"),
+                msg::token::Token::Native { .. } => {
+                    // Not treating this as an error, we simply won't provide liquidity
+                    return Ok(WatchedTaskOutput::new(
+                        "No support for native coins".to_owned(),
+                    ));
+                }
             };
             worker
-                .app
-                .config
+                .testnet
                 .wallet_manager
                 .mint(
                     worker.app.cosmos.clone(),
-                    *worker.wallet.address(),
+                    worker.wallet.get_address(),
                     to_deposit,
                     &status,
                     cw20,
@@ -139,36 +165,29 @@ async fn single_market(
                 .await?;
             let to_deposit = NonZero::new(to_deposit).context("to_deposit is 0")?;
             market.deposit(&worker.wallet, &status, to_deposit).await?;
-            WatchedTaskOutput {
-                skip_delay: true,
-                message: format!("Deposited {to_deposit} liquidity"),
-            }
+            WatchedTaskOutput::new(format!("Deposited {to_deposit} liquidity")).skip_delay()
         }
         Action::Withdraw(to_withdraw) => {
-            let max_withdrawal = lp_info.lp_collateral.checked_sub(min_liquidity)?;
-            let to_withdraw = to_withdraw.min(max_withdrawal);
-            assert!(to_withdraw <= lp_info.lp_collateral);
-            if to_withdraw < Collateral::one() {
-                WatchedTaskOutput {
-                    skip_delay: false,
-                    message: "Won't withdraw less than 1 liquidity".to_owned(),
-                }
+            if let Some(cooldown) = lp_info.liquidity_cooldown {
+                WatchedTaskOutput::new(format!("Want to withdraw {to_withdraw}, but liquidity cooldown in affect for {} seconds until {}", cooldown.seconds, cooldown.at))
             } else {
-                let lp_tokens = to_withdraw.into_decimal256()
-                    * status.liquidity.total_tokens().into_decimal256()
-                    / status.liquidity.total_collateral().into_decimal256();
-                let lp_tokens = NonZero::new(LpToken::from_decimal256(lp_tokens))
-                    .context("Somehow got 0 to withdraw")?;
-                market.withdraw(&worker.wallet, lp_tokens).await?;
-                WatchedTaskOutput {
-                    skip_delay: true,
-                    message: format!("Withdrew {to_withdraw} collateral"),
+                let max_withdrawal = lp_info.lp_collateral.checked_sub(min_liquidity)?;
+                let to_withdraw = to_withdraw.min(max_withdrawal);
+                assert!(to_withdraw <= lp_info.lp_collateral);
+                if to_withdraw < Collateral::one() {
+                    WatchedTaskOutput::new("Won't withdraw less than 1 liquidity")
+                } else {
+                    let lp_tokens = to_withdraw.into_decimal256()
+                        * status.liquidity.total_tokens()?.into_decimal256()
+                        / status.liquidity.total_collateral()?.into_decimal256();
+                    let lp_tokens = NonZero::new(LpToken::from_decimal256(lp_tokens))
+                        .context("Somehow got 0 to withdraw")?;
+                    market.withdraw(&worker.wallet, lp_tokens).await?;
+                    WatchedTaskOutput::new(format!("Withdrew {to_withdraw} collateral"))
+                        .skip_delay()
                 }
             }
         }
-        Action::None => WatchedTaskOutput {
-            skip_delay: false,
-            message: "No actions needed".to_owned(),
-        },
+        Action::None => WatchedTaskOutput::new("No actions needed"),
     })
 }

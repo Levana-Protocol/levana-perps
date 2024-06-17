@@ -1,9 +1,9 @@
 use std::str::FromStr;
 
 use anyhow::Result;
-use cosmos::{Cosmos, CosmosNetwork, Wallet};
+use cosmos::{Cosmos, CosmosNetwork, HasAddressHrp, Wallet};
 use msg::contracts::tracker::entry::CodeIdResp;
-use perps_exes::config::parse_deployment;
+use perps_exes::{config::parse_deployment, PerpsNetwork};
 
 use crate::{cli::Opt, tracker::Tracker, util::get_hash_for_path};
 
@@ -14,7 +14,7 @@ pub(crate) struct StoreCodeOpt {
     family: Option<String>,
     /// Network to use. Either this or family must be provided.
     #[clap(long, env = "COSMOS_NETWORK", global = true)]
-    network: Option<CosmosNetwork>,
+    network: Option<PerpsNetwork>,
 
     /// Contract types to store. If not provided, the perps protocol suite of contracts will be stored.
     #[clap(
@@ -24,12 +24,6 @@ pub(crate) struct StoreCodeOpt {
         global = true
     )]
     contracts: Contracts,
-
-    /// Use the following market contract code ID instead of uploading.
-    ///
-    /// Useful because some networks currently aren't working well with uploads
-    #[clap(long)]
-    market_code_id: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -57,14 +51,7 @@ impl FromStr for Contracts {
 impl Contracts {
     pub fn names(&self) -> &[&str] {
         match self {
-            Contracts::PerpsProtocol => &[
-                CW20,
-                FACTORY,
-                LIQUIDITY_TOKEN,
-                MARKET,
-                POSITION_TOKEN,
-                PYTH_BRIDGE,
-            ],
+            Contracts::PerpsProtocol => &[CW20, FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN],
             Contracts::Hatching => &[HATCHING],
             Contracts::IbcExecuteProxy => &[IBC_EXECUTE_PROXY],
             Contracts::LvnRewards => &[LVN_REWARDS],
@@ -77,7 +64,6 @@ pub(crate) const FACTORY: &str = "factory";
 pub(crate) const LIQUIDITY_TOKEN: &str = "liquidity_token";
 pub(crate) const MARKET: &str = "market";
 pub(crate) const POSITION_TOKEN: &str = "position_token";
-pub(crate) const PYTH_BRIDGE: &str = "pyth_bridge";
 pub(crate) const HATCHING: &str = "hatching";
 pub(crate) const IBC_EXECUTE_PROXY: &str = "ibc_execute_proxy";
 pub(crate) const LVN_REWARDS: &str = "rewards";
@@ -88,7 +74,6 @@ pub(crate) async fn go(
         family,
         network,
         contracts,
-        market_code_id,
     }: StoreCodeOpt,
 ) -> Result<()> {
     let network = match (family, network) {
@@ -107,17 +92,10 @@ pub(crate) async fn go(
     };
 
     let basic = opt.load_basic_app(network).await?;
+    let wallet = basic.get_wallet()?;
     let (tracker, _) = basic.get_tracker_and_faucet()?;
 
-    store_code(
-        &opt,
-        &basic.cosmos,
-        &basic.wallet,
-        &tracker,
-        contracts.names(),
-        market_code_id,
-    )
-    .await
+    store_code(&opt, &basic.cosmos, wallet, &tracker, contracts.names()).await
 }
 
 pub(crate) async fn store_code(
@@ -126,7 +104,6 @@ pub(crate) async fn store_code(
     wallet: &Wallet,
     tracker: &Tracker,
     contract_types: &[&str],
-    market_code_id: Option<u64>,
 ) -> Result<()> {
     let gitrev = opt.get_gitrev()?;
     log::info!("Compiled WASM comes from gitrev {gitrev}");
@@ -137,12 +114,17 @@ pub(crate) async fn store_code(
         match tracker.get_code_by_hash(hash.clone()).await? {
             CodeIdResp::NotFound {} => {
                 log::info!("Contract {ct} has SHA256 {hash} and is not on blockchain, uploading");
-                let code_id = match market_code_id {
-                    Some(code_id) if ct == "market" => {
-                        log::info!("Using override market code ID of: {code_id}");
-                        code_id
-                    }
-                    _ => cosmos.store_code_path(wallet, &path).await?.get_code_id(),
+                let code_id = {
+                    let cosmos = match cosmos.get_address_hrp().as_str() {
+                        // Gas caps on Sei, need to use an aggressive multiplier
+                        "sei" => {
+                            let mut builder = CosmosNetwork::SeiTestnet.builder().await?;
+                            builder.set_gas_estimate_multiplier(1.01);
+                            builder.build().await?
+                        }
+                        _ => cosmos.clone(),
+                    };
+                    cosmos.store_code_path(wallet, &path).await?.get_code_id()
                 };
                 log::info!("Upload complete, new code ID is {code_id}, logging with the tracker");
                 let res = tracker

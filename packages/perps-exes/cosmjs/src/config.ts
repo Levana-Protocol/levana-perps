@@ -25,6 +25,16 @@ export const NETWORKS = {
       "chain_id": "osmo-test-5",
       "addr_prefix": "osmo"
     },
+    "osmosis-mainnet": {
+      "rpc_url": "https://rpc-levana.cros-nest.com",
+      // "rpc_url": "https://rpc.dev-osmosis.zone",
+      "rest_url": "https://lcd.osmotest5.osmosis.zone",
+      "gas_price": "0.025",
+      "full_denom": "OSMO",
+      "denom": "uosmo",
+      "chain_id": "osmosis-1",
+      "addr_prefix": "osmo"
+    },
     "juno-mainnet": {
       "rpc_url": "https://juno-rpc.polkachu.com",
       "rest_url": "https://juno-api.polkachu.com",
@@ -44,12 +54,21 @@ export const NETWORKS = {
       "addr_prefix": "stars"
     },
     "sei-testnet": {
-      "rpc_url": "https://sei-testnet-2-rpc.brocha.in",
-      "rest_url": "https://sei-testnet-2-rest.brocha.in",
-      "gas_price": "0.025",
+      "rpc_url": "https://rpc-testnet.sei-apis.com",
+      "rest_url": "https://rest-testnet.sei-apis.com",
+      "gas_price": "0.1",
       "full_denom": "SEI",
       "denom": "usei",
       "chain_id": "atlantic-2",
+      "addr_prefix": "sei"
+    },
+    "sei-mainnet": {
+      "rpc_url": "https://rpc.wallet.pacific-1.sei.io",
+      "rest_url": "https://rest.wallet.pacific-1.sei.io",
+      "gas_price": "0.1",
+      "full_denom": "SEI",
+      "denom": "usei",
+      "chain_id": "pacific-1",
       "addr_prefix": "sei"
     }
 }

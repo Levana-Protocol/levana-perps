@@ -30,13 +30,21 @@ WASM="$RELEASE_DIR/levana_perpswap_cosmos_$CONTRACT_NAME.wasm"
 echo "BUILDING $CONTRACT_NAME"
 cd "$CONTRACT_PATH"
 
-RUSTFLAGS="-C link-arg=-s" cargo build --release --lib --target=wasm32-unknown-unknown
+if [[ $CONTRACT_NAME == "market" && -n "${SEI:-}" ]]; then
+    echo ""
+    echo "---Building with SEI feature---"
+    echo ""
+    RUSTFLAGS="-C link-arg=-s" cargo build --features=sei --release --lib --target=wasm32-unknown-unknown
+else
+    RUSTFLAGS="-C link-arg=-s" cargo build --release --lib --target=wasm32-unknown-unknown
+fi
+
 
 INTERMEDIATE_SHA=$(sha256sum -- "$WASM" | sed 's,../target,target,g')
 echo "$INTERMEDIATE_SHA" >>"$INTERMEDIATE_SHAS"
 
 OPTIMIZED_WASM="$WASM_DIR/artifacts/levana_perpswap_cosmos_$CONTRACT_NAME.wasm"
-$WASM_OPT -Os "$WASM" -o "$OPTIMIZED_WASM"
+$WASM_OPT -Os --signext-lowering "$WASM" -o "$OPTIMIZED_WASM" 
 done
 
 cd "$WASM_DIR/artifacts"

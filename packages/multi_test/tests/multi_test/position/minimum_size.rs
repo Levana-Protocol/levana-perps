@@ -20,6 +20,7 @@ fn custom_market_setup() -> anyhow::Result<PerpsMarket> {
     let token_init = match DEFAULT_MARKET.token_kind {
         TokenKind::Native => TokenInit::Native {
             denom: TEST_CONFIG.native_denom.to_string(),
+            decimal_places: 6,
         },
         TokenKind::Cw20 => {
             let addr = app
@@ -34,7 +35,9 @@ fn custom_market_setup() -> anyhow::Result<PerpsMarket> {
         token_init,
         "1".parse()?,
         Some("1".parse()?),
+        None,
         true,
+        DEFAULT_MARKET.spot_price,
     )
 }
 

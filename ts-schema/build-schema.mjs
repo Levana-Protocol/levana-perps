@@ -51,6 +51,10 @@ async function generateTs(srcFolder, targetFolder, combineFolder = false) {
         throw new Error(`schema folder does not exist!`)
     }
 
+    const schemaOptions = {
+        additionalProperties: false
+    }
+
     const files = await fsExtra.readdir(srcFolder);
 
     for (const file of files) {
@@ -67,7 +71,7 @@ async function generateTs(srcFolder, targetFolder, combineFolder = false) {
             const schemas = JSON.parse(contents);
             const { contract_name } = schemas;
             if (!contract_name || contract_name === "") {
-                const ts = await compileFromFile(src);
+                const ts = await compileFromFile(src, schemaOptions);
                 const basename = path.basename(src);
                 const dest = path.resolve(`${targetFolder}/${basename.replace(".json", ".ts")}`);
                 fsExtra.writeFileSync(dest, ts);
@@ -77,7 +81,7 @@ async function generateTs(srcFolder, targetFolder, combineFolder = false) {
                 for (const [key, data] of Object.entries(schemas)) {
                     if (data?.hasOwnProperty("$schema")) {
                         const name = `${contract_name}_${key}`;
-                        const ts = await compile(data, name);
+                        const ts = await compile(data, name, schemaOptions);
                         const dest = path.resolve(`${targetFolder}/${name}.ts`);
 
                         fsExtra.writeFileSync(dest, ts);
@@ -88,7 +92,7 @@ async function generateTs(srcFolder, targetFolder, combineFolder = false) {
                     for (const [key, data] of Object.entries(schemas.responses)) {
                         if (data?.hasOwnProperty("$schema")) {
                             const name = `${contract_name}_response_to_${key}`;
-                            const ts = await compile(data, name);
+                            const ts = await compile(data, name, schemaOptions);
                             const dest = path.resolve(`${targetFolder}/${name}.ts`);
 
                             fsExtra.writeFileSync(dest, ts);

@@ -7,10 +7,9 @@ use std::convert::TryFrom;
 const INSTANTIATE_MARKET: Item<InstantiateMarket> = Item::new(namespace::REPLY_INSTANTIATE_MARKET);
 
 #[derive(Serialize, Deserialize)]
-pub struct InstantiateMarket {
-    pub market_id: MarketId,
-    pub migration_admin: Addr,
-    pub price_admin: Addr,
+pub(crate) struct InstantiateMarket {
+    pub(crate) market_id: MarketId,
+    pub(crate) migration_admin: Addr,
 }
 
 pub(crate) fn reply_get_instantiate_market(store: &dyn Storage) -> Result<InstantiateMarket> {
@@ -29,7 +28,7 @@ pub(crate) fn reply_set_instantiate_market(
 #[allow(clippy::enum_variant_names)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u64)]
-pub enum ReplyId {
+pub(crate) enum ReplyId {
     InstantiateMarket = 0,
     InstantiatePositionToken = 1,
     InstantiateLiquidityTokenLp = 2,
@@ -56,7 +55,12 @@ impl TryFrom<u64> for ReplyId {
 }
 
 impl From<ReplyId> for u64 {
-    fn from(src: ReplyId) -> u64 {
-        src as u64
+    fn from(value: ReplyId) -> Self {
+        match value {
+            ReplyId::InstantiateMarket => 0,
+            ReplyId::InstantiatePositionToken => 1,
+            ReplyId::InstantiateLiquidityTokenLp => 2,
+            ReplyId::InstantiateLiquidityTokenXlp => 3,
+        }
     }
 }

@@ -11,17 +11,31 @@ impl State<'_> {
         let max_allowed_leverage = self
             .config
             .max_leverage
-            .try_into_positive_value()
+            .try_into_non_negative_value()
             .context("Max allowed leverage is negative")?;
-        let current_leverage =
-            current_leverage.map(|x| x.into_base(market_type).split().1.into_decimal256());
+
+        let current_leverage = if let Some(current_leverage) = current_leverage {
+            Some(
+                current_leverage
+                    .into_base(market_type)?
+                    .split()
+                    .1
+                    .into_decimal256(),
+            )
+        } else {
+            None
+        };
+
         let new_leverage = new_leverage_notional
-            .into_base(market_type)
+            .into_base(market_type)?
             .split()
             .1
             .into_decimal256();
 
-        let is_out_of_range = if new_leverage_notional.into_number().approx_eq(Number::ZERO) {
+        let is_out_of_range = if new_leverage_notional
+            .into_number()
+            .approx_eq(Number::ZERO)?
+        {
             true
         } else {
             match current_leverage {
@@ -59,7 +73,7 @@ impl State<'_> {
         let counter_leverage = counter_leverage_to_notional.into_number().abs();
         let current_leverage = current_leverage.map(|x| x.into_number().abs());
 
-        let is_out_of_range = if !counter_leverage.approx_gt_relaxed(Number::ONE) {
+        let is_out_of_range = if !counter_leverage.approx_gt_relaxed(Number::ONE)? {
             // We allow the counter leverage to be between 0 and 1 if we were already less than 1 and we're not making it any worse
             match current_leverage {
                 // We're updating. If the leverage got closer to 0 then we're out of bounds
@@ -73,7 +87,7 @@ impl State<'_> {
                     // happen even if the new value is out of range still
                     false
                 }
-                _ => !counter_leverage.approx_lt_relaxed(max_allowed_leverage),
+                _ => !(counter_leverage.approx_lt_relaxed(max_allowed_leverage))?,
             }
         };
 
@@ -121,10 +135,9 @@ impl State<'_> {
     /// Ensure we meet the requirements for minimum deposit collateral
     pub(crate) fn validate_minimum_deposit_collateral(
         &self,
-        store: &dyn Storage,
         deposit_collateral: Collateral,
+        price_point: &PricePoint,
     ) -> Result<()> {
-        let price_point = self.spot_price(store, None)?;
         let deposit = price_point.collateral_to_usd(deposit_collateral);
 
         // We allow up to a 10% dip on the minimum deposit to allow for price fluctuations.
@@ -147,136 +160,27 @@ impl State<'_> {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn validate_order_price(
-        &self,
-        order_price: Price,
-        order_price_base: PriceBaseInQuote,
-        lower_bound: Option<Price>,
-        lower_bound_base: Option<PriceBaseInQuote>,
-        upper_bound: Option<Price>,
-        upper_bound_base: Option<PriceBaseInQuote>,
-        market_type: MarketType,
-        name: &str,
-    ) -> Result<()> {
-        let (lower_bound_comparison, upper_bound_comparison) = match market_type {
-            MarketType::CollateralIsQuote => ("greater", "less"),
-            MarketType::CollateralIsBase => ("less", "greater"),
-        };
-
-        if let Some(lower_bound) = lower_bound {
-            anyhow::ensure!(
-                order_price > lower_bound,
-                "{} trigger {} must be {} than {}",
-                name,
-                order_price_base,
-                lower_bound_comparison,
-                lower_bound_base.ok_or_else(|| anyhow!("no external lower bound provided"))?
-            )
-        }
-
-        if let Some(upper_bound) = upper_bound {
-            anyhow::ensure!(
-                order_price < upper_bound,
-                "{} trigger {} must be {} than {}",
-                name,
-                order_price_base,
-                upper_bound_comparison,
-                upper_bound_base.ok_or_else(|| anyhow!("no external upper bound provided"))?
-            )
-        }
-
-        Ok(())
-    }
-
-    pub(crate) fn position_validate_trigger_orders(
-        &self,
-        pos: &Position,
-        market_type: MarketType,
-        current_price: PricePoint,
-    ) -> Result<()> {
-        if let Some(stop_loss_override) = pos.stop_loss_override {
-            match pos.direction() {
-                DirectionToNotional::Long => {
-                    self.validate_order_price(
-                        stop_loss_override.into_notional_price(market_type),
-                        stop_loss_override,
-                        pos.liquidation_price,
-                        pos.liquidation_price
-                            .map(|price| price.into_base_price(market_type)),
-                        Some(current_price.price_notional),
-                        Some(current_price.price_base),
-                        market_type,
-                        "Stop loss",
-                    )?;
-                }
-                DirectionToNotional::Short => {
-                    self.validate_order_price(
-                        stop_loss_override.into_notional_price(market_type),
-                        stop_loss_override,
-                        Some(current_price.price_notional),
-                        Some(current_price.price_base),
-                        pos.liquidation_price,
-                        pos.liquidation_price
-                            .map(|price| price.into_base_price(market_type)),
-                        market_type,
-                        "Stop loss",
-                    )?;
-                }
-            }
-        }
-
-        if let Some(take_profit_override) = pos.take_profit_override {
-            match pos.direction() {
-                DirectionToNotional::Long => self.validate_order_price(
-                    take_profit_override.into_notional_price(market_type),
-                    take_profit_override,
-                    Some(current_price.price_notional),
-                    Some(current_price.price_base),
-                    pos.take_profit_price,
-                    pos.take_profit_price
-                        .map(|price| price.into_base_price(market_type)),
-                    market_type,
-                    "Take profit",
-                )?,
-                DirectionToNotional::Short => self.validate_order_price(
-                    take_profit_override.into_notional_price(market_type),
-                    take_profit_override,
-                    pos.take_profit_price,
-                    pos.take_profit_price
-                        .map(|price| price.into_base_price(market_type)),
-                    Some(current_price.price_notional),
-                    Some(current_price.price_base),
-                    market_type,
-                    "Take profit",
-                )?,
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn do_slippage_assert(
+    pub(crate) fn do_slippage_assert(
         &self,
         store: &dyn Storage,
         slippage_assert: SlippageAssert,
         delta_notional_size: Signed<Notional>,
         market_type: MarketType,
         delta_neutrality_fee_margin: Option<Collateral>,
+        price_point: &PricePoint,
     ) -> Result<()> {
         if delta_notional_size.is_zero() {
             return Ok(());
         }
 
-        let price_point = self.spot_price(store, None)?;
         let delta_neutrality_fee = self.calc_delta_neutrality_fee(
             store,
             delta_notional_size,
             price_point,
             delta_neutrality_fee_margin,
         )?;
-        let fee_rate = delta_neutrality_fee.into_number() / delta_notional_size.into_number();
-        let price = price_point.price_notional.into_number() * (Number::ONE + fee_rate);
+        let fee_rate = (delta_neutrality_fee.into_number() / delta_notional_size.into_number())?;
+        let price = (price_point.price_notional.into_number() * (Number::ONE + fee_rate)?)?;
 
         let slippage_assert_price = slippage_assert
             .price
@@ -284,19 +188,19 @@ impl State<'_> {
             .into_number();
 
         let slippage_opt = if delta_notional_size.is_strictly_positive() {
-            if price <= slippage_assert_price * (Number::ONE + slippage_assert.tolerance) {
+            if price <= (slippage_assert_price * (Number::ONE + slippage_assert.tolerance)?)? {
                 None
             } else {
                 Some(
-                    (Number::from(100u64) * (price - slippage_assert_price))
+                    (Number::from(100u64) * (price - slippage_assert_price)?)?
                         .checked_div(slippage_assert_price),
                 )
             }
-        } else if price >= slippage_assert_price * (Number::ONE - slippage_assert.tolerance) {
+        } else if price >= (slippage_assert_price * (Number::ONE - slippage_assert.tolerance)?)? {
             None
         } else {
             Some(
-                (Number::from(100u64) * (slippage_assert_price - price))
+                (Number::from(100u64) * (slippage_assert_price - price)?)?
                     .checked_div(slippage_assert_price),
             )
         };
@@ -308,10 +212,11 @@ impl State<'_> {
                 Err(perp_anyhow!(
                     ErrorId::SlippageAssert,
                     ErrorDomain::Market,
-                    "Slippage is exceeding provided tolerance. Slippage is {}%, max tolerance is {}%. Current price: {}. Asserted price: {}.",
+                    "Slippage is exceeding provided tolerance. Slippage is {}%, max tolerance is {}%. Current price: {}. Current price including DNF: {}. Asserted price: {}.",
                     slippage.map_or("Inf".to_string(), |s| format!("{:?}", s)),
-                    Number::from(100u64) * slippage_assert.tolerance,
+                    (Number::from(100u64) * slippage_assert.tolerance)?,
                     price_point.price_base,
+                    price,
                     slippage_assert.price,
                 ))
             }

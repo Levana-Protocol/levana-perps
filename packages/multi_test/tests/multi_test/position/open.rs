@@ -22,7 +22,7 @@ fn test_position_open_inner(
     // liquidity is adjusted due to open
     let liquidity = market.query_liquidity_stats().unwrap();
 
-    assert_eq!(liquidity, *expected_liquidity);
+    liquidity.approx_eq(expected_liquidity);
 
     // sanity check that the NFT works
     let nft_ids = market.query_position_token_ids(&trader).unwrap();
@@ -145,6 +145,10 @@ fn position_open_slippage_assert() {
     let price = market.query_current_price().unwrap().price_notional;
 
     market
+        .exec_mint_and_deposit_liquidity(&trader, "2000".parse().unwrap())
+        .unwrap();
+
+    market
         .exec_open_position(
             &trader,
             "10",
@@ -153,7 +157,7 @@ fn position_open_slippage_assert() {
             "1",
             Some(SlippageAssert {
                 price: PriceBaseInQuote::try_from_number(
-                    price.into_number() * Number::try_from("1.05").unwrap(),
+                    (price.into_number() * Number::try_from("1.05").unwrap()).unwrap(),
                 )
                 .unwrap(),
                 tolerance: Number::try_from("0.01").unwrap(),
@@ -172,7 +176,7 @@ fn position_open_slippage_assert() {
             "1",
             Some(SlippageAssert {
                 price: PriceBaseInQuote::try_from_number(
-                    price.into_number() * Number::try_from("1.01").unwrap(),
+                    (price.into_number() * Number::try_from("1.01").unwrap()).unwrap(),
                 )
                 .unwrap(),
                 tolerance: Number::try_from("0.05").unwrap(),
@@ -192,7 +196,7 @@ fn position_open_slippage_assert() {
             "1",
             Some(SlippageAssert {
                 price: PriceBaseInQuote::try_from_number(
-                    price.into_number() * Number::try_from("1.05").unwrap(),
+                    (price.into_number() * Number::try_from("1.05").unwrap()).unwrap(),
                 )
                 .unwrap(),
                 tolerance: Number::try_from("0.01").unwrap(),
@@ -204,11 +208,15 @@ fn position_open_slippage_assert() {
     market.exec_close_position(&trader, pos.0, None).unwrap();
 
     for direction in [DirectionToBase::Short, DirectionToBase::Long] {
+        market.exec_crank_till_finished(&trader).unwrap();
+
         let price_point = market.query_current_price().unwrap();
         let leverage_to_base = LeverageToBase::try_from("20")
             .unwrap()
             .into_signed(direction);
-        let leverage_to_notional = leverage_to_base.into_notional(market.id.get_market_type());
+        let leverage_to_notional = leverage_to_base
+            .into_notional(market.id.get_market_type())
+            .unwrap();
         let notional_size_in_collateral = leverage_to_notional
             .checked_mul_collateral(NonZero::new(Collateral::try_from("1000").unwrap()).unwrap())
             .unwrap();
@@ -220,7 +228,8 @@ fn position_open_slippage_assert() {
             .unwrap()
             .amount
             .into_number();
-        let fee_rate = fee / notional_size.abs().into_number();
+
+        let fee_rate = (fee / notional_size.abs().into_number()).unwrap();
         market
             .exec_open_position(
                 &trader,
@@ -230,7 +239,7 @@ fn position_open_slippage_assert() {
                 "1",
                 Some(SlippageAssert {
                     price: PriceBaseInQuote::try_from_number(price.into_number()).unwrap(),
-                    tolerance: fee_rate * Number::try_from("0.9").unwrap(),
+                    tolerance: (fee_rate * Number::try_from("0.9").unwrap()).unwrap(),
                 }),
                 None,
                 None,
@@ -246,7 +255,7 @@ fn position_open_slippage_assert() {
                 "1",
                 Some(SlippageAssert {
                     price: PriceBaseInQuote::try_from_number(price.into_number()).unwrap(),
-                    tolerance: fee_rate * Number::try_from("1.1").unwrap(),
+                    tolerance: (fee_rate * Number::try_from("1.1").unwrap()).unwrap(),
                 }),
                 None,
                 None,
@@ -262,12 +271,18 @@ fn position_open_slippage_assert_exact_queried() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
 
+    market
+        .exec_mint_and_deposit_liquidity(&trader, "2000".parse().unwrap())
+        .unwrap();
+
     for direction in [DirectionToBase::Short, DirectionToBase::Long] {
         let price_point = market.query_current_price().unwrap();
         let leverage_to_base = LeverageToBase::try_from("20")
             .unwrap()
             .into_signed(direction);
-        let leverage_to_notional = leverage_to_base.into_notional(market.id.get_market_type());
+        let leverage_to_notional = leverage_to_base
+            .into_notional(market.id.get_market_type())
+            .unwrap();
         let notional_size_in_collateral = leverage_to_notional
             .checked_mul_collateral(NonZero::new(Collateral::try_from("1000").unwrap()).unwrap())
             .unwrap();

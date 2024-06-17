@@ -1,4 +1,4 @@
-use cosmwasm_std::Decimal256;
+use cosmwasm_std::{Decimal256, OverflowError};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Copy)]
 pub(crate) struct BorrowFees {
@@ -7,7 +7,7 @@ pub(crate) struct BorrowFees {
 }
 
 impl BorrowFees {
-    pub(crate) fn total(&self) -> Decimal256 {
-        self.lp + self.xlp
+    pub(crate) fn total(&self) -> Result<Decimal256, OverflowError> {
+        self.lp.checked_add(self.xlp)
     }
 }

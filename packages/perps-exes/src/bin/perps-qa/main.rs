@@ -1,5 +1,8 @@
+#![deny(clippy::as_conversions)]
+
 mod capping;
 mod cli;
+mod wallet;
 
 use crate::cli::Cmd;
 use anyhow::Result;
@@ -33,9 +36,9 @@ async fn main_inner() -> Result<()> {
 
     log::debug!("Factory address: {}", factory_address);
 
-    let mut builder = network.builder();
+    let mut builder = network.builder().await?;
     if let Some(grpc) = opt.cosmos_grpc {
-        builder.grpc_url = grpc;
+        builder.set_grpc_url(grpc);
     }
     let cosmos = builder.build().await?;
 
@@ -123,7 +126,7 @@ async fn main_inner() -> Result<()> {
             let slippage_assert = match (current_price, max_slippage) {
                 (None, None) => None,
                 (Some(current_price), Some(max_slippage)) => {
-                    let tolerance = max_slippage / 100;
+                    let tolerance = (max_slippage / 100)?;
                     log::debug!("Current price: {}", current_price);
                     log::debug!("Tolerance: {}", tolerance);
                     Some(SlippageAssert {
@@ -160,8 +163,8 @@ async fn main_inner() -> Result<()> {
                 price.price_usd
             );
         }
-        cli::Subcommand::SetPrice { price } => {
-            let tx = perp_contract.set_price(price).await?;
+        cli::Subcommand::SetPrice { price, price_usd } => {
+            let tx = perp_contract.set_price(price, price_usd).await?;
             println!("Transaction hash: {}", tx.txhash);
             log::debug!("Raw log: {}", tx.raw_log);
         }
@@ -171,7 +174,7 @@ async fn main_inner() -> Result<()> {
             log::debug!("Raw log: {}", tx.raw_log);
         }
         cli::Subcommand::Crank {} => {
-            perp_contract.crank().await?;
+            perp_contract.crank(None).await?;
         }
         cli::Subcommand::AllClosePositions {} => {
             let closed_positions = perp_contract.get_closed_positions().await?;
@@ -184,7 +187,7 @@ async fn main_inner() -> Result<()> {
                 .liquidation_price_base
                 .map_or("No price found".to_owned(), |item| item.to_string());
             let take_profit_price = position
-                .take_profit_price_base
+                .take_profit_total_base
                 .map_or("No price found".to_owned(), |item| item.to_string());
             println!("Collateral: {}", position.deposit_collateral);
             println!("Active Collateral: {}", position.active_collateral);
@@ -196,7 +199,6 @@ async fn main_inner() -> Result<()> {
                 }
             );
             println!("Leverage: {}", position.leverage);
-            println!("Max gains: {}", position.max_gains_in_quote);
             println!("Liquidation Price: {}", liquidation_price);
             println!("Profit price: {}", take_profit_price);
         }
@@ -268,18 +270,18 @@ async fn main_inner() -> Result<()> {
             println!("Open short interest (in notional): {short_notional}");
             println!(
                 "Total interest (in notional): {}",
-                long_notional + short_notional
+                (long_notional + short_notional)?
             );
             println!(
                 "Net interest (in notional): {}",
-                long_notional.into_signed() - short_notional.into_signed()
+                (long_notional.into_signed() - short_notional.into_signed())?
             );
             println!("Open long interest (in USD): {long_usd}");
             println!("Open short interest (in USD): {short_usd}");
-            println!("Total interest (in USD): {}", long_usd + short_usd);
+            println!("Total interest (in USD): {}", (long_usd + short_usd)?);
             println!(
                 "Net interest (in USD): {}",
-                long_usd.into_signed() - short_usd.into_signed()
+                (long_usd.into_signed() - short_usd.into_signed())?
             );
             println!(
                 "Instant delta neutrality: {}",
@@ -296,6 +298,7 @@ async fn main_inner() -> Result<()> {
             log::debug!("Raw log: {}", tx.raw_log);
         }
         cli::Subcommand::CappingReport { inner } => inner.go(perp_contract).await?,
+        cli::Subcommand::WalletReport { inner } => inner.run(cosmos).await?,
     }
     Ok(())
 }

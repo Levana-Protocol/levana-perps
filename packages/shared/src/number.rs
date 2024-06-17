@@ -75,7 +75,7 @@
 //! However, if we want to do math with a different underlying type - we do need
 //! to drop down to that common type. There's two approaches (both of which
 //! return an Option, in case the resulting value is zero):
-//!     
+//!
 //!   1. If the inner NonZero type stays the same (i.e. it's all `Collateral`)
 //!     then call `.raw()` to get the inner type, do your math, and then convert
 //!     back to the NonZero wrapper via `NonZero::new()`
@@ -91,7 +91,7 @@
 //! use levana_perpswap_cosmos_shared::number::*;
 //! use cosmwasm_std::Decimal256;
 //! use std::str::FromStr;
-//!  
+//!
 //! let lhs:NonZero<Collateral> = "1.23".parse().unwrap();
 //! let rhs:Collateral = "4.56".parse().unwrap();
 //! let collateral_result = lhs.raw().checked_add(rhs).unwrap();
@@ -105,7 +105,7 @@
 //! use levana_perpswap_cosmos_shared::number::*;
 //! use cosmwasm_std::Decimal256;
 //! use std::str::FromStr;
-//!  
+//!
 //! let lhs:NonZero<Collateral> = "1.23".parse().unwrap();
 //! let rhs:Decimal256 = "4.56".parse().unwrap();
 //! let decimal_result = lhs.into_decimal256().checked_add(rhs).unwrap();
@@ -157,16 +157,14 @@
 //! ```
 
 mod convert;
-pub use convert::*;
 mod ops;
-pub use ops::*;
 mod serialize;
-pub use ops::*;
 use schemars::schema::{InstanceType, Metadata, SchemaObject};
 use schemars::JsonSchema;
 mod nonzero;
 pub use self::types::*;
 
+pub mod ratio;
 mod types;
 
 // schemars could not figure out that it is serialized as a string
@@ -187,7 +185,7 @@ impl<T: UnsignedDecimal> JsonSchema for Signed<T> {
         };
 
         let mut meta = match obj.metadata {
-            None => Box::new(Metadata::default()),
+            None => Box::<Metadata>::default(),
             Some(m) => m,
         };
 
@@ -276,7 +274,7 @@ mod test {
     fn number_serde() {
         let a = Number::from(300u64);
         let b = Number::from(7u64);
-        let res = a / b;
+        let res = (a / b).unwrap();
 
         assert_eq!(serde_json::to_value(res).unwrap(), "42.857142857142857142");
         assert_eq!(
@@ -298,26 +296,26 @@ mod test {
         let a = Number::from(300u64);
         let b = Number::from(7u64);
 
-        assert_eq!((a + b).to_string(), "307");
-        assert_eq!((a - b).to_string(), "293");
-        assert_eq!((b - a).to_string(), "-293");
-        assert_eq!((a * b).to_string(), "2100");
-        assert_eq!((a / b).to_string(), "42.857142857142857142");
+        assert_eq!((a + b).unwrap().to_string(), "307");
+        assert_eq!((a - b).unwrap().to_string(), "293");
+        assert_eq!((b - a).unwrap().to_string(), "-293");
+        assert_eq!((a * b).unwrap().to_string(), "2100");
+        assert_eq!((a / b).unwrap().to_string(), "42.857142857142857142");
 
         let a = -a;
         let b = -b;
-        assert_eq!((a + b).to_string(), "-307");
-        assert_eq!((a - b).to_string(), "-293");
-        assert_eq!((b - a).to_string(), "293");
-        assert_eq!((a * b).to_string(), "2100");
-        assert_eq!((a / b).to_string(), "42.857142857142857142");
+        assert_eq!((a + b).unwrap().to_string(), "-307");
+        assert_eq!((a - b).unwrap().to_string(), "-293");
+        assert_eq!((b - a).unwrap().to_string(), "293");
+        assert_eq!((a * b).unwrap().to_string(), "2100");
+        assert_eq!((a / b).unwrap().to_string(), "42.857142857142857142");
 
         let a = -a;
-        assert_eq!((a + b).to_string(), "293");
-        assert_eq!((a - b).to_string(), "307");
-        assert_eq!((b - a).to_string(), "-307");
-        assert_eq!((a * b).to_string(), "-2100");
-        assert_eq!((a / b).to_string(), "-42.857142857142857142");
+        assert_eq!((a + b).unwrap().to_string(), "293");
+        assert_eq!((a - b).unwrap().to_string(), "307");
+        assert_eq!((b - a).unwrap().to_string(), "-307");
+        assert_eq!((a * b).unwrap().to_string(), "-2100");
+        assert_eq!((a / b).unwrap().to_string(), "-42.857142857142857142");
     }
 
     #[test]
@@ -326,8 +324,8 @@ mod test {
         let b = Number::from_str("0.007").unwrap();
 
         assert!(a > b);
-        assert!(a.approx_gt_strict(b));
-        assert!(a.approx_gt_relaxed(b));
+        assert!(a.approx_gt_strict(b).unwrap());
+        assert!(a.approx_gt_relaxed(b).unwrap());
         assert!(a != b);
 
         let a = Number::from_str("4.2").unwrap();
@@ -335,37 +333,37 @@ mod test {
 
         assert!(a <= b);
         assert!(a >= b);
-        assert!(a.approx_eq(b));
+        assert!(a.approx_eq(b).unwrap());
         assert!(a == b);
 
         let a = Number::from_str("4.2").unwrap();
         let b = Number::from_str("-4.2").unwrap();
 
         assert!(a > b);
-        assert!(a.approx_gt_strict(b));
-        assert!(a.approx_gt_relaxed(b));
+        assert!(a.approx_gt_strict(b).unwrap());
+        assert!(a.approx_gt_relaxed(b).unwrap());
         assert!(a != b);
 
         let a = Number::from_str("-4.2").unwrap();
         let b = Number::from_str("4.2").unwrap();
 
         assert!(a < b);
-        assert!(a.approx_lt_relaxed(b));
+        assert!(a.approx_lt_relaxed(b).unwrap());
         assert!(a != b);
 
         let a = Number::from_str("-4.5").unwrap();
         let b = Number::from_str("-4.2").unwrap();
 
         assert!(a < b);
-        assert!(a.approx_lt_relaxed(b));
+        assert!(a.approx_lt_relaxed(b).unwrap());
         assert!(a != b);
 
         let a = Number::from_str("-4.2").unwrap();
         let b = Number::from_str("-4.5").unwrap();
 
         assert!(a > b);
-        assert!(a.approx_gt_strict(b));
-        assert!(a.approx_gt_relaxed(b));
+        assert!(a.approx_gt_strict(b).unwrap());
+        assert!(a.approx_gt_relaxed(b).unwrap());
         assert!(a != b);
     }
 
@@ -449,7 +447,7 @@ mod test {
     #[test]
     fn basic_multiplication() {
         let num = Number::from_str("1.1").unwrap();
-        let twopointtwo = num * 2u64;
+        let twopointtwo = (num * 2u64).unwrap();
         assert_eq!(twopointtwo, Number::from_str("2.2").unwrap());
     }
 }

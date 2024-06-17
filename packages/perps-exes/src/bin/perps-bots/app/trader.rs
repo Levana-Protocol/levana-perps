@@ -4,11 +4,13 @@ use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, Cosmos, HasAddress, Wallet};
 use msg::{contracts::market::entry::StatusResp, prelude::*};
-use perps_exes::prelude::*;
+use perps_exes::{config::TraderConfig, prelude::*};
 use rand::Rng;
 
 use crate::{
-    config::BotConfig,
+    config::BotConfigTestnet,
+    util::markets::Market,
+    wallet_manager::ManagedWallet,
     watcher::{WatchedTaskOutput, WatchedTaskPerMarket},
 };
 
@@ -17,15 +19,26 @@ use super::{factory::FactoryInfo, App, AppBuilder};
 pub(super) struct Trader {
     pub(super) app: Arc<App>,
     pub(super) wallet: Wallet,
+    config: TraderConfig,
+    testnet: Arc<BotConfigTestnet>,
 }
 
 impl AppBuilder {
-    pub(super) fn launch_trader(&mut self, wallet: Wallet, index: usize) -> Result<()> {
-        let trader = Trader {
-            app: self.app.clone(),
-            wallet,
-        };
-        self.watch_periodic(crate::watcher::TaskLabel::Trader { index }, trader)
+    pub(super) fn start_traders(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
+        if let Some((traders, config)) = testnet.trader_config {
+            for index in 1..=traders {
+                let wallet = self.get_track_wallet(&testnet, ManagedWallet::Trader(index))?;
+                let trader = Trader {
+                    app: self.app.clone(),
+                    wallet,
+                    config,
+                    testnet: testnet.clone(),
+                };
+                self.watch_periodic(crate::watcher::TaskLabel::Trader { index }, trader)?;
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -34,11 +47,10 @@ impl WatchedTaskPerMarket for Trader {
     async fn run_single_market(
         &mut self,
         _app: &App,
-        factory: &FactoryInfo,
-        _market: &MarketId,
-        addr: Address,
+        _factory: &FactoryInfo,
+        market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, addr, factory.faucet).await
+        single_market(self, &market.market, self.testnet.faucet).await
     }
 }
 
@@ -46,7 +58,7 @@ pub(crate) struct EnsureCollateral<'a> {
     pub(crate) market: &'a MarketContract,
     pub(crate) wallet: &'a Wallet,
     pub(crate) status: &'a StatusResp,
-    pub(crate) config: &'a BotConfig,
+    pub(crate) testnet: &'a BotConfigTestnet,
     pub(crate) cosmos: &'a Cosmos,
     pub(crate) min: Collateral,
     pub(crate) to_mint: Collateral,
@@ -67,7 +79,7 @@ impl EnsureCollateral<'_> {
             msg::token::Token::Native { .. } => anyhow::bail!("Native not supported"),
         };
         if balance < self.min {
-            self.config
+            self.testnet
                 .wallet_manager
                 .mint(
                     self.cosmos.clone(),
@@ -85,18 +97,17 @@ impl EnsureCollateral<'_> {
 
 async fn single_market(
     worker: &Trader,
-    market_addr: Address,
+    market: &MarketContract,
     faucet: Address,
 ) -> Result<WatchedTaskOutput> {
-    let market = MarketContract::new(worker.app.cosmos.make_contract(market_addr));
     let status = market.status().await?;
 
     // Make sure we always have at least 50,000 tokens
     EnsureCollateral {
-        market: &market,
+        market,
         wallet: &worker.wallet,
         status: &status,
-        config: &worker.app.config,
+        testnet: &worker.testnet,
         cosmos: &worker.app.cosmos,
         min: "50000".parse().unwrap(),
         to_mint: "200000".parse().unwrap(),
@@ -105,18 +116,15 @@ async fn single_market(
     .run()
     .await?;
 
-    let total = status.liquidity.total_collateral();
+    let total = status.liquidity.total_collateral()?;
     if total.is_zero() {
-        return Ok(WatchedTaskOutput {
-            skip_delay: false,
-            message: "No liquidity available".to_owned(),
-        });
+        return Ok(WatchedTaskOutput::new("No liquidity available".to_owned()));
     }
     let util_ratio = status
         .liquidity
         .locked
         .into_decimal256()
-        .checked_div(status.liquidity.total_collateral().into_decimal256())?;
+        .checked_div(status.liquidity.total_collateral()?.into_decimal256())?;
 
     enum Action {
         Open,
@@ -124,11 +132,16 @@ async fn single_market(
         CloseMany,
     }
 
-    let action = if util_ratio > worker.app.config.trader_config.max_util {
+    let max_util = status
+        .config
+        .target_utilization
+        .raw()
+        .checked_add_signed(worker.config.max_util_delta)?;
+    let action = if util_ratio > max_util {
         Action::CloseMany
-    } else if status.borrow_fee < worker.app.config.trader_config.min_borrow_fee {
+    } else if status.borrow_fee < worker.config.min_borrow_fee {
         Action::Open
-    } else if status.borrow_fee > worker.app.config.trader_config.max_borrow_fee {
+    } else if status.borrow_fee > worker.config.max_borrow_fee {
         Action::CloseMany
     } else {
         let to_u32 = |x: Decimal256| -> Result<u32, _> {
@@ -137,8 +150,8 @@ async fn single_market(
                 .to_string()
                 .parse()
         };
-        let min = to_u32(worker.app.config.trader_config.min_borrow_fee)?;
-        let max = to_u32(worker.app.config.trader_config.max_borrow_fee)?;
+        let min = to_u32(worker.config.min_borrow_fee)?;
+        let max = to_u32(worker.config.max_borrow_fee)?;
         let cutoff = to_u32(status.borrow_fee)?;
         let rand = rand::thread_rng().gen_range(min..=max);
         let should_close = cutoff > rand;
@@ -180,7 +193,7 @@ async fn single_market(
             }
         }
         Action::Open => {
-            let denominator = (status.long_notional + status.short_notional).into_decimal256();
+            let denominator = (status.long_notional + status.short_notional)?.into_decimal256();
             let short_likelihood = if denominator.is_zero() {
                 0.5
             } else {
@@ -213,8 +226,5 @@ async fn single_market(
             format!("Opened new position: {deposit} {direction:?} {leverage}x")
         }
     };
-    Ok(WatchedTaskOutput {
-        skip_delay: false,
-        message,
-    })
+    Ok(WatchedTaskOutput::new(message))
 }

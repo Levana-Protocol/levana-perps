@@ -1,11 +1,38 @@
 use cw2::ContractVersion;
+use levana_perpswap_multi_test::return_unless_market_collateral_base;
 use levana_perpswap_multi_test::time::TimeJump;
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, response::CosmosResponseExt, PerpsApp,
 };
-use msg::contracts::market::entry::StatusResp;
+use msg::contracts::market::entry::{PositionsQueryFeeApproach, StatusResp};
 use msg::contracts::market::{config::ConfigUpdate, position::events::PositionUpdateEvent};
 use msg::prelude::*;
+
+#[test]
+fn position_misc_debug_divide_by_zero() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    return_unless_market_collateral_base!(market);
+
+    let trader = market.clone_trader(0).unwrap();
+
+    let err = market
+        .exec_open_position(
+            &trader,
+            "10",
+            "1",
+            DirectionToBase::Long,
+            "10",
+            None,
+            None,
+            None,
+        )
+        .unwrap_err();
+
+    assert!(err
+        .to_string()
+        .to_lowercase()
+        .contains("cannot divide with zero"));
+}
 
 #[test]
 // placeholder for local debug test runs
@@ -34,6 +61,7 @@ fn position_misc_debug_temp() {
         .unwrap();
 
     let pos_evt: PositionUpdateEvent = update_res
+        .exec_resp()
         .event_first("position-update")
         .unwrap()
         .try_into()
@@ -45,7 +73,7 @@ fn position_misc_debug_temp() {
 
     assert_eq!(
         updated_pos.deposit_collateral,
-        pos.deposit_collateral + collateral_delta
+        (pos.deposit_collateral + collateral_delta).unwrap()
     );
 }
 
@@ -96,7 +124,7 @@ fn version_and_meta() {
     assert!(!market_version.version.is_empty());
 
     let status: StatusResp = market
-        .query(&msg::contracts::market::entry::QueryMsg::Status {})
+        .query(&msg::contracts::market::entry::QueryMsg::Status { price: None })
         .unwrap();
     assert!(!status.base.is_empty());
     assert!(!status.quote.is_empty());
@@ -154,6 +182,10 @@ fn funding_payment_flips_direction() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
 
+    market
+        .exec_mint_and_deposit_liquidity(&trader, "2000".parse().unwrap())
+        .unwrap();
+
     // Open a massively large long position so that the short position receives a large funding payment
     market
         .exec_open_position(
@@ -186,19 +218,30 @@ fn funding_payment_flips_direction() {
     market.set_time(TimeJump::Liquifundings(1)).unwrap();
     market.exec_refresh_price().unwrap();
 
+    // Update the price point in the market contract forcing the position
+    // into a "pending close" state, but not actually doing liquifunding
+    // which will liquidate the position.
+    market.exec_crank_n(&trader, 0).unwrap();
+
     // In collateral-is-base markets, the position should now be in the
     // ready-to-liquidate state. For collateral-is-quote, we don't have
     // off-by-one leverage so there's no issue.
     match market.id.get_market_type() {
         MarketType::CollateralIsQuote => {
             market
-                .query_position_pending_close(pos_id, false)
+                .query_position_pending_close(pos_id, PositionsQueryFeeApproach::AllFees)
                 .unwrap_err();
-            market.query_position_with_pending_fees(pos_id).unwrap();
+            market
+                .query_position_with_pending_fees(pos_id, PositionsQueryFeeApproach::AllFees)
+                .unwrap();
         }
         MarketType::CollateralIsBase => {
-            market.query_position_pending_close(pos_id, false).unwrap();
-            market.query_position_with_pending_fees(pos_id).unwrap_err();
+            market
+                .query_position_pending_close(pos_id, PositionsQueryFeeApproach::AllFees)
+                .unwrap();
+            market
+                .query_position_with_pending_fees(pos_id, PositionsQueryFeeApproach::AllFees)
+                .unwrap_err();
 
             // If we ignore the pending fees though, it should be computable
             market.query_position(pos_id).unwrap();

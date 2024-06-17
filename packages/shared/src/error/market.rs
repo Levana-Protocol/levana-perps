@@ -28,6 +28,13 @@ pub enum MarketError {
         market_type: MarketType,
         direction: DirectionToBase,
     },
+    #[error(
+        "Infinite take profit price can only be used on long positions for collateral-is-base markets"
+    )]
+    InvalidInfiniteTakeProfitPrice {
+        market_type: MarketType,
+        direction: DirectionToBase,
+    },
     #[error("Max gains are too large")]
     MaxGainsTooLarge {},
     #[error("Unable to withdraw {requested}. Only {available} LP tokens held.")]
@@ -35,7 +42,7 @@ pub enum MarketError {
         requested: NonZero<LpToken>,
         available: NonZero<LpToken>,
     },
-    #[error("Insufficient unlocked liquidity for withdrawal. Requested {requested_collateral} ({requested_lp} LP tokens), only {unlocked} liquidity available.")]
+    #[error("Insufficient unlocked liquidity for withdrawal. Requested {requested_collateral} ({requested_lp} LP tokens), only {unlocked} liquidity available until min liquidity.")]
     InsufficientLiquidityForWithdrawal {
         requested_lp: NonZero<LpToken>,
         requested_collateral: NonZero<Collateral>,
@@ -76,6 +83,146 @@ pub enum MarketError {
         deposit: Usd,
         max: Usd,
     },
+    #[error("Cannot perform this action since it would exceed delta neutrality limits - protocol is already too long")]
+    DeltaNeutralityFeeAlreadyLong {
+        cap: Number,
+        sensitivity: Number,
+        instant_before: Number,
+        net_notional_before: Signed<Notional>,
+        net_notional_after: Signed<Notional>,
+    },
+    #[error("Cannot perform this action since it would exceed delta neutrality limits - protocol is already too short")]
+    DeltaNeutralityFeeAlreadyShort {
+        cap: Number,
+        sensitivity: Number,
+        instant_before: Number,
+        net_notional_before: Signed<Notional>,
+        net_notional_after: Signed<Notional>,
+    },
+    #[error("Cannot perform this action since it would exceed delta neutrality limits - protocol would become too long")]
+    DeltaNeutralityFeeNewlyLong {
+        cap: Number,
+        sensitivity: Number,
+        instant_after: Number,
+        net_notional_before: Signed<Notional>,
+        net_notional_after: Signed<Notional>,
+    },
+    #[error( "Cannot perform this action since it would exceed delta neutrality limits - protocol would become too short")]
+    DeltaNeutralityFeeNewlyShort {
+        cap: Number,
+        sensitivity: Number,
+        instant_after: Number,
+        net_notional_before: Signed<Notional>,
+        net_notional_after: Signed<Notional>,
+    },
+    #[error("Cannot perform this action since it would exceed delta neutrality limits - protocol would go from too long to too short")]
+    DeltaNeutralityFeeLongToShort {
+        cap: Number,
+        sensitivity: Number,
+        instant_before: Number,
+        instant_after: Number,
+        net_notional_before: Signed<Notional>,
+        net_notional_after: Signed<Notional>,
+    },
+    #[error("Cannot perform this action since it would exceed delta neutrality limits - protocol would go from too short to too long")]
+    DeltaNeutralityFeeShortToLong {
+        cap: Number,
+        sensitivity: Number,
+        instant_before: Number,
+        instant_after: Number,
+        net_notional_before: Signed<Notional>,
+        net_notional_after: Signed<Notional>,
+    },
+    #[error("Liquidity cooldown in effect, will end in {seconds_remaining} seconds.")]
+    LiquidityCooldown {
+        ends_at: Timestamp,
+        seconds_remaining: u64,
+    },
+    #[error("Cannot perform the given action while a pending action is waiting for the position")]
+    PendingDeferredExec {},
+    #[error("The difference between oldest and newest publish timestamp is too large. Oldest: {oldest}. Newest: {newest}.")]
+    VolatilePriceFeedTimeDelta {
+        oldest: Timestamp,
+        newest: Timestamp,
+    },
+    #[error("Limit order {order_id} is already canceling")]
+    LimitOrderAlreadyCanceling { order_id: Uint64 },
+    #[error("Position {position_id} is already closing")]
+    PositionAlreadyClosing { position_id: Uint64 },
+    #[error(
+        "No price publish time found, there is likely a spot price config error for this market"
+    )]
+    NoPricePublishTimeFound,
+    #[error("Cannot close position {id}, it was already closed at {close_time}. Close reason: {reason}.")]
+    PositionAlreadyClosed {
+        id: Uint64,
+        close_time: Timestamp,
+        reason: String,
+    },
+    #[error("Insufficient locked liquidity in protocol to perform the given unlock. Requested: {requested}. Total locked: {total_locked}.")]
+    InsufficientLiquidityForUnlock {
+        requested: NonZero<Collateral>,
+        total_locked: Collateral,
+    },
+    #[error("Insufficient unlocked liquidity in the protocol. Requested: {requested}. Total available: {total_unlocked}. Total allowed with carry leverage restrictions: {allowed}.")]
+    Liquidity {
+        /// Total amount of liquidity requested to take from unlocked pool.
+        requested: NonZero<Collateral>,
+        /// Total amount of liquidity available in the unlocked pool.
+        total_unlocked: Collateral,
+        /// Liquidity allowed to be taken for this action.
+        ///
+        /// In particular, carry leverage may restrict the total amount of
+        /// liquidity that can be used to ensure sufficient funds for cash-and-carry
+        /// balancing operations.
+        allowed: Collateral,
+    },
+}
+
+/// Was the price provided by the trader too high or too low?
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TriggerPriceMustBe {
+    /// Specified price must be less than the bound
+    Less,
+    /// Specified price must be greater than the bound
+    Greater,
+}
+
+impl Display for TriggerPriceMustBe {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                TriggerPriceMustBe::Greater => "greater",
+                TriggerPriceMustBe::Less => "less",
+            }
+        )
+    }
+}
+
+/// What type of price trigger occurred?
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TriggerType {
+    /// A stop loss
+    StopLoss,
+    /// A take profit
+    TakeProfit,
+}
+
+impl Display for TriggerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                TriggerType::StopLoss => "stop loss",
+                TriggerType::TakeProfit => "take profit",
+            }
+        )
+    }
 }
 
 /// What was the user doing when they hit the congestion error message?
@@ -130,6 +277,9 @@ impl MarketError {
     fn get_error_id(&self) -> ErrorId {
         match self {
             MarketError::InvalidInfiniteMaxGains { .. } => ErrorId::InvalidInfiniteMaxGains,
+            MarketError::InvalidInfiniteTakeProfitPrice { .. } => {
+                ErrorId::InvalidInfiniteTakeProfitPrice
+            }
             MarketError::MaxGainsTooLarge {} => ErrorId::MaxGainsTooLarge,
             MarketError::WithdrawTooMuch { .. } => ErrorId::WithdrawTooMuch,
             MarketError::InsufficientLiquidityForWithdrawal { .. } => {
@@ -141,6 +291,33 @@ impl MarketError {
             MarketError::MinimumDeposit { .. } => ErrorId::MinimumDeposit,
             MarketError::Congestion { .. } => ErrorId::Congestion,
             MarketError::MaxLiquidity { .. } => ErrorId::MaxLiquidity,
+            MarketError::DeltaNeutralityFeeAlreadyLong { .. } => {
+                ErrorId::DeltaNeutralityFeeAlreadyLong
+            }
+            MarketError::DeltaNeutralityFeeAlreadyShort { .. } => {
+                ErrorId::DeltaNeutralityFeeAlreadyShort
+            }
+            MarketError::DeltaNeutralityFeeNewlyLong { .. } => ErrorId::DeltaNeutralityFeeNewlyLong,
+            MarketError::DeltaNeutralityFeeNewlyShort { .. } => {
+                ErrorId::DeltaNeutralityFeeNewlyShort
+            }
+            MarketError::DeltaNeutralityFeeLongToShort { .. } => {
+                ErrorId::DeltaNeutralityFeeLongToShort
+            }
+            MarketError::DeltaNeutralityFeeShortToLong { .. } => {
+                ErrorId::DeltaNeutralityFeeShortToLong
+            }
+            MarketError::LiquidityCooldown { .. } => ErrorId::LiquidityCooldown,
+            MarketError::PendingDeferredExec {} => ErrorId::PendingDeferredExec,
+            MarketError::VolatilePriceFeedTimeDelta { .. } => ErrorId::VolatilePriceFeedTimeDelta,
+            MarketError::LimitOrderAlreadyCanceling { .. } => ErrorId::LimitOrderAlreadyCanceling,
+            MarketError::PositionAlreadyClosing { .. } => ErrorId::PositionAlreadyClosing,
+            MarketError::NoPricePublishTimeFound => ErrorId::NoPricePublishTimeFound,
+            MarketError::PositionAlreadyClosed { .. } => ErrorId::PositionAlreadyClosed,
+            MarketError::InsufficientLiquidityForUnlock { .. } => {
+                ErrorId::InsufficientLiquidityForUnlock
+            }
+            MarketError::Liquidity { .. } => ErrorId::Liquidity,
         }
     }
 }

@@ -17,7 +17,7 @@ impl State<'_> {
         &self,
         store: &dyn Storage,
         notional_delta: Signed<Notional>,
-        price: PricePoint,
+        price: &PricePoint,
         liquidation_margin_factor: Option<Collateral>,
     ) -> Result<Signed<Collateral>> {
         let mut calc = DeltaNeutralityFeeMultiPass::new(
@@ -38,13 +38,13 @@ impl State<'_> {
         store: &dyn Storage,
         pos: &mut Position,
         notional_delta: Signed<Notional>,
-        price: PricePoint,
+        price: &PricePoint,
         reason: DeltaNeutralityFeeReason,
     ) -> Result<ChargeDeltaNeutralityFeeResult> {
         let res =
             self.charge_delta_neutrality_fee_no_update(store, pos, notional_delta, price, reason)?;
         pos.active_collateral = pos.active_collateral.checked_sub_signed(res.fee)?;
-        pos.add_delta_neutrality_fee(res.fee, &price)?;
+        pos.add_delta_neutrality_fee(res.fee, price)?;
         Ok(res)
     }
 
@@ -55,7 +55,7 @@ impl State<'_> {
         store: &dyn Storage,
         pos: &Position,
         notional_delta: Signed<Notional>,
-        price: PricePoint,
+        price: &PricePoint,
         reason: DeltaNeutralityFeeReason,
     ) -> Result<ChargeDeltaNeutralityFeeResult> {
         let mut calc = DeltaNeutralityFeeMultiPass::new(
@@ -104,12 +104,12 @@ impl State<'_> {
             cap_triggered_info: calc.cap_triggered_info,
             total_funds_after,
             protocol_fees,
-            price,
+            price: *price,
         })
     }
 }
 
-/// Result of charging a delta neturality fee.
+/// Result of charging a delta neutrality fee.
 ///
 /// This struct keeps track of the results of successfully calculating a delta
 /// neutrality fee to be charged. We do this in a two-step process
@@ -118,7 +118,7 @@ impl State<'_> {
 #[must_use]
 pub(crate) struct ChargeDeltaNeutralityFeeResult {
     pos_id: PositionId,
-    fee: Signed<Collateral>,
+    pub(crate) fee: Signed<Collateral>,
     fee_event: DeltaNeutralityFeeEvent,
     cap_triggered_info: Option<CapTriggeredInfo>,
     total_funds_after: Collateral,
@@ -127,8 +127,8 @@ pub(crate) struct ChargeDeltaNeutralityFeeResult {
 }
 
 impl ChargeDeltaNeutralityFeeResult {
-    /// Consume this value and write its data to storage.
-    pub(crate) fn store(self, state: &State, ctx: &mut StateContext) -> Result<Signed<Collateral>> {
+    /// write its data to storage.
+    pub(crate) fn apply(self, state: &State, ctx: &mut StateContext) -> Result<Signed<Collateral>> {
         let ChargeDeltaNeutralityFeeResult {
             pos_id,
             fee,
@@ -138,7 +138,7 @@ impl ChargeDeltaNeutralityFeeResult {
             protocol_fees,
             price,
         } = self;
-        ctx.response_mut().add_event(fee_event);
+        ctx.response_mut().add_event(fee_event.clone());
 
         if let Some(CapTriggeredInfo {
             available,
@@ -163,6 +163,7 @@ impl ChargeDeltaNeutralityFeeResult {
 
 // the delta neutrality fee is done in multiple passes sometimes
 // so it's all encapsulated in this struct
+#[derive(Debug)]
 struct DeltaNeutralityFeeMultiPass {
     fees: Signed<Collateral>,
     total_in_fund_before_calc: Collateral,
@@ -181,12 +182,12 @@ struct CapTriggeredInfo {
 }
 
 impl DeltaNeutralityFeeMultiPass {
-    pub fn new(
+    pub(crate) fn new(
         store: &dyn Storage,
         config: Config,
         net_notional: Signed<Notional>,
         delta_notional: Signed<Notional>,
-        price: PricePoint,
+        price: &PricePoint,
         liquidation_margin_factor: Option<Collateral>,
     ) -> Result<Self> {
         Ok(Self {
@@ -195,18 +196,18 @@ impl DeltaNeutralityFeeMultiPass {
             delta_notional,
             fees: Signed::<Collateral>::zero(),
             total_in_fund_before_calc: DELTA_NEUTRALITY_FUND.may_load(store)?.unwrap_or_default(),
-            price,
+            price: *price,
             liquidation_margin_factor,
             cap_triggered_info: None,
         })
     }
 
-    pub fn run(&mut self) -> Result<()> {
-        let net_notional_after = self.net_notional + self.delta_notional;
+    pub(crate) fn run(&mut self) -> Result<()> {
+        let net_notional_after = (self.net_notional + self.delta_notional)?;
         let net_notional = self.net_notional;
-        if (net_notional.into_number() * net_notional_after.into_number()).is_negative() {
+        if (net_notional.into_number() * net_notional_after.into_number())?.is_negative() {
             self.update_inner(-net_notional)?;
-            self.update_inner(self.delta_notional + net_notional)?;
+            self.update_inner((self.delta_notional + net_notional)?)?;
         } else {
             self.update_inner(self.delta_notional)?;
         }
@@ -271,7 +272,7 @@ impl DeltaNeutralityFeeMultiPass {
                 // This should just be a rounding error, so prove that with a debug assertion
                 debug_assert!((-n)
                     .into_number()
-                    .approx_eq(total_in_fund_so_far.into_number()));
+                    .approx_eq(total_in_fund_so_far.into_number())?);
                 -total_in_fund_so_far.into_signed()
             } else {
                 n
@@ -297,13 +298,13 @@ impl DeltaNeutralityFeeMultiPass {
             None => amount_in_collateral,
         };
 
-        self.fees += amount_in_collateral;
+        self.fees = (self.fees + amount_in_collateral)?;
 
         debug_assert!(
-            (self.total_in_fund_before_calc.into_signed() + self.fees).is_positive_or_zero()
+            (self.total_in_fund_before_calc.into_signed() + self.fees)?.is_positive_or_zero()
         );
 
-        self.net_notional += delta_notional;
+        self.net_notional = (self.net_notional + delta_notional)?;
 
         Ok(())
     }
@@ -315,23 +316,26 @@ fn calculate_delta_neutrality_fee_amount(
     net_notional: Number,
     delta_notional: Number,
 ) -> Result<Number> {
-    let notional_low_cap = -cap * sensitivity;
-    let notional_high_cap = cap * sensitivity;
+    let notional_low_cap = (-cap * sensitivity)?;
+    let notional_high_cap = (cap * sensitivity)?;
 
-    let delta_notional_at_low_cap =
-        (net_notional + delta_notional).min(notional_low_cap) - net_notional.min(notional_low_cap);
-    let delta_notional_at_high_cap = (net_notional + delta_notional).max(notional_high_cap)
-        - net_notional.max(notional_high_cap);
+    let delta_notional_at_low_cap = ((net_notional + delta_notional)?.min(notional_low_cap)
+        - net_notional.min(notional_low_cap))?;
+    let delta_notional_at_high_cap = ((net_notional + delta_notional)?.max(notional_high_cap)
+        - net_notional.max(notional_high_cap))?;
     let delta_notional_uncapped =
-        delta_notional - delta_notional_at_low_cap - delta_notional_at_high_cap;
+        ((delta_notional - delta_notional_at_low_cap)? - delta_notional_at_high_cap)?;
 
-    let mut delta_neutrality_fee_amount = delta_notional_at_low_cap * -cap;
-    delta_neutrality_fee_amount += delta_notional_at_high_cap * cap;
-    delta_neutrality_fee_amount += (delta_notional_uncapped * delta_notional_uncapped
-        + Number::two()
-            * delta_notional_uncapped
-            * net_notional.min(notional_high_cap).max(notional_low_cap))
-        / (Number::two() * sensitivity);
+    let mut delta_neutrality_fee_amount = (delta_notional_at_low_cap * -cap)?;
+    delta_neutrality_fee_amount =
+        (delta_neutrality_fee_amount + (delta_notional_at_high_cap * cap)?)?;
+
+    let net_notional_cap = net_notional.min(notional_high_cap).max(notional_low_cap);
+    let amount = (((delta_notional_uncapped * delta_notional_uncapped)?
+        + ((Number::two() * delta_notional_uncapped)? * net_notional_cap)?)?
+        / (Number::two() * sensitivity)?)?;
+
+    delta_neutrality_fee_amount = (delta_neutrality_fee_amount + amount)?;
 
     Ok(delta_neutrality_fee_amount)
 }
@@ -353,19 +357,20 @@ mod test {
         let fee2 = calculate_delta_neutrality_fee_amount(
             cap,
             sensitivity,
-            net_notional + delta,
-            -(net_notional + delta),
+            (net_notional + delta).unwrap(),
+            -(net_notional + delta).unwrap(),
         )
         .unwrap();
         let fee3 =
             calculate_delta_neutrality_fee_amount(cap, sensitivity, net_notional, -net_notional)
                 .unwrap();
 
-        assert_eq!(fee1 + fee2, fee3)
+        assert_eq!((fee1 + fee2).unwrap(), fee3)
     }
 
     proptest! {
         #[test]
+        #[cfg_attr(not(feature = "proptest"), ignore)]
         fn delta_neutrality_fee_amount(
             cap in 0.0f32..1.0,
             sensitivity in 1.0f32..10.0,

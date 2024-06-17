@@ -1,10 +1,11 @@
 use anyhow::Result;
 use axum::async_trait;
-use cosmos::Address;
 use msg::{contracts::market::entry::StatusResp, prelude::*};
-use perps_exes::contracts::MarketContract;
 
-use crate::watcher::{TaskLabel, WatchedTaskOutput, WatchedTaskPerMarket};
+use crate::{
+    util::markets::Market,
+    watcher::{TaskLabel, WatchedTaskOutput, WatchedTaskPerMarket},
+};
 
 use super::{factory::FactoryInfo, App, AppBuilder};
 
@@ -21,18 +22,13 @@ struct Stats;
 impl WatchedTaskPerMarket for Stats {
     async fn run_single_market(
         &mut self,
-        app: &App,
+        _app: &App,
         _factory: &FactoryInfo,
-        _market: &MarketId,
-        addr: Address,
+        market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        let market = MarketContract::new(app.cosmos.make_contract(addr));
-        let status = market.status().await?;
+        let status = market.market.status().await?;
         let market_stats = MarketStats { status };
-        Ok(WatchedTaskOutput {
-            message: market_stats.to_string(),
-            skip_delay: false,
-        })
+        Ok(WatchedTaskOutput::new(market_stats.to_string()))
     }
 }
 
@@ -43,25 +39,31 @@ struct MarketStats {
 impl Display for MarketStats {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let MarketStats { status } = self;
+        let total_collateral = status.liquidity.total_collateral();
         writeln!(f)?;
         writeln!(f, "Total locked   liquidity: {}", status.liquidity.locked)?;
         writeln!(f, "Total unlocked liquidity: {}", status.liquidity.unlocked)?;
         writeln!(
             f,
             "Total          liquidity: {}",
-            status.liquidity.total_collateral()
+            match status.liquidity.total_collateral() {
+                Ok(value) => value.to_string(),
+                Err(_) => "overflow".into(),
+            }
         )?;
-        writeln!(
-            f,
-            "Utilization ratio: {}",
-            status
-                .liquidity
-                .locked
-                .into_decimal256()
-                .checked_div(status.liquidity.total_collateral().into_decimal256())
-                .ok()
-                .unwrap_or_default()
-        )?;
+        writeln!(f, "Utilization ratio: {}", {
+            match total_collateral {
+                Ok(value) => status
+                    .liquidity
+                    .locked
+                    .into_decimal256()
+                    .checked_div(value.into_decimal256())
+                    .ok()
+                    .unwrap_or_default()
+                    .to_string(),
+                Err(_) => "overflow".into(),
+            }
+        })?;
 
         writeln!(f, "Total long  interest (in USD): {}", status.long_usd)?;
         writeln!(f, "Total short interest (in USD): {}", status.short_usd)?;

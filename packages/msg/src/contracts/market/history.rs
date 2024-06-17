@@ -16,7 +16,6 @@ pub mod events {
         pub volume_usd: Usd,
     }
 
-    impl PerpEvent for TradeVolumeEvent {}
     impl From<TradeVolumeEvent> for Event {
         fn from(src: TradeVolumeEvent) -> Self {
             Event::new("history-trade-volume")
@@ -41,7 +40,6 @@ pub mod events {
         pub pnl_usd: Signed<Usd>,
     }
 
-    impl PerpEvent for PnlEvent {}
     impl From<PnlEvent> for Event {
         fn from(src: PnlEvent) -> Self {
             Event::new("history-pnl")
@@ -68,7 +66,6 @@ pub mod events {
         pub action: PositionAction,
     }
 
-    impl PerpEvent for PositionActionEvent {}
     impl From<PositionActionEvent> for Event {
         fn from(src: PositionActionEvent) -> Self {
             let evt = Event::new("history-position-action")
@@ -89,7 +86,19 @@ pub mod events {
                 .add_attribute(
                     event_key::POSITION_ACTION_COLLATERAL,
                     src.action.collateral.to_string(),
+                )
+                .add_attribute(
+                    event_key::POSITION_ACTION_TRANSFER,
+                    src.action.transfer_collateral.to_string(),
                 );
+
+            let evt = match src.action.price_timestamp {
+                Some(price_timestamp) => evt.add_attribute(
+                    event_key::POSITION_ACTION_PRICE_TIMESTAMP,
+                    price_timestamp.to_string(),
+                ),
+                None => evt,
+            };
 
             let evt = match src.action.leverage {
                 Some(leverage) => {
@@ -127,6 +136,22 @@ pub mod events {
                 ),
             };
 
+            let evt = match src.action.take_profit_trader {
+                None => evt,
+                Some(take_profit_trader) => evt.add_attribute(
+                    event_key::TAKE_PROFIT_OVERRIDE,
+                    take_profit_trader.to_string(),
+                ),
+            };
+
+            let evt = match src.action.stop_loss_override {
+                None => evt,
+                Some(stop_loss_override) => evt.add_attribute(
+                    event_key::STOP_LOSS_OVERRIDE,
+                    stop_loss_override.to_string(),
+                ),
+            };
+
             match src.action.new_owner {
                 None => evt,
                 Some(new_owner) => evt.add_attribute(
@@ -154,7 +179,10 @@ pub mod events {
                         _ => Err(PerpError::unimplemented().into()),
                     })?,
                     timestamp: evt.timestamp_attr(event_key::POSITION_ACTION_TIMESTAMP)?,
+                    price_timestamp: evt
+                        .try_timestamp_attr(event_key::POSITION_ACTION_PRICE_TIMESTAMP)?,
                     collateral: evt.decimal_attr(event_key::POSITION_ACTION_COLLATERAL)?,
+                    transfer_collateral: evt.signed_attr(event_key::POSITION_ACTION_TRANSFER)?,
                     leverage: evt.try_leverage_to_base_attr(event_key::POSITION_ACTION_LEVERAGE)?,
                     max_gains: evt
                         .try_map_attr(event_key::POSITION_ACTION_MAX_GAINS, |value| {
@@ -166,6 +194,13 @@ pub mod events {
                         .try_number_attr(event_key::POSITION_ACTION_DELTA_NEUTRALITY_FEE)?,
                     old_owner: evt.try_unchecked_addr_attr(event_key::POSITION_ACTION_OLD_OWNER)?,
                     new_owner: evt.try_unchecked_addr_attr(event_key::POSITION_ACTION_NEW_OWNER)?,
+                    take_profit_trader: evt
+                        .try_map_attr(event_key::TAKE_PROFIT_OVERRIDE, |s| {
+                            TakeProfitTrader::try_from(s)
+                        })
+                        .transpose()?,
+                    stop_loss_override: evt
+                        .try_price_base_in_quote(event_key::STOP_LOSS_OVERRIDE)?,
                 },
             })
         }
@@ -181,7 +216,6 @@ pub mod events {
         pub action_id: u64,
     }
 
-    impl PerpEvent for LpActionEvent {}
     impl From<LpActionEvent> for Event {
         fn from(src: LpActionEvent) -> Self {
             let event = Event::new("history-lp-action")
@@ -257,7 +291,6 @@ pub mod events {
         pub deposit_usd: Usd,
     }
 
-    impl PerpEvent for LpDepositEvent {}
     impl From<LpDepositEvent> for Event {
         fn from(src: LpDepositEvent) -> Self {
             Event::new("history-lp-deposit")
@@ -286,7 +319,6 @@ pub mod events {
         pub yield_usd: Usd,
     }
 
-    impl PerpEvent for LpYieldEvent {}
     impl From<LpYieldEvent> for Event {
         fn from(
             LpYieldEvent {

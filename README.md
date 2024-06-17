@@ -52,18 +52,6 @@ It's also an updated dev environment, with multichain support and a native SDK i
 * `cargo install cargo-fuzz` to install the fuzz testing tool
 * `just fuzz`
 
-## Diagnostics GUI
-
-* [install trunk.rs](https://trunkrs.dev/#install) - install the Trunk builder for frontend rust/wasm
-* `yarn install` in `packages/diagnostics` - install the yarn dependencies
-* `just diagnostics-gui [dev/release] [sanity/performance]` - run things
-
-  where `sanity` means to run with sanity checks, `performance` means without, `dev` means to run debug builds, and `release` means to run production builds
-
-  so for example, `just diagnostics-gui dev sanity` will capture all the debug info, but be slow, while `just diagnostics-gui release performance` will miss some debug info and assertions, but run fast
-
-  a log of all actions is written to the .gitignored `bridge.log`
-
 
 # Getting started with various chains
 
@@ -86,9 +74,9 @@ When you deploy, you'll need to have the deployer seed phrase. This is available
     * Or, with native tools: `just build-contracts-native`
 2. Set your seed phrase to an environment variable: `export COSMOS_WALLET="deployer seed phrase"`
 3. Set the appropriate contract family: `export PERPS_FAMILY=dragonci`
-4. Store the WASM code on the blockchain: `cargo run --bin perps-deploy store-code`
-5. To deploy a fresh set of contracts: `cargo run --bin perps-deploy instantiate`
-6. To migrate an existing set of contracts: `cargo run --bin perps-deploy migrate`
+4. Store the WASM code on the blockchain: `cargo run --bin perps-deploy testnet store-code`
+5. To deploy a fresh set of contracts: `cargo run --bin perps-deploy testnet instantiate`
+6. To migrate an existing set of contracts: `cargo run --bin perps-deploy testnet migrate`
 
 # Basic wasmd setup
 

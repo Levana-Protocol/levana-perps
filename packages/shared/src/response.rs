@@ -1,9 +1,12 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
 use cosmwasm_std::{
-    to_binary, wasm_execute, CosmosMsg, Empty, Event, IbcBasicResponse, IbcReceiveResponse,
-    Response, SubMsg, WasmMsg,
+    from_json, to_json_binary, wasm_execute, CosmosMsg, Empty, Event, IbcBasicResponse,
+    IbcReceiveResponse, Response, SubMsg, WasmMsg,
 };
 use cw2::ContractVersion;
+use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::ibc::{ack_fail, ack_success};
@@ -14,6 +17,7 @@ use crate::prelude::*;
 pub struct ResponseBuilder {
     resp: Response,
     event_type: EventType,
+    event_type_count: HashMap<String, u32>,
 }
 
 enum EventType {
@@ -41,6 +45,7 @@ impl ResponseBuilder {
             event_type: EventType::EmitEvents {
                 common_attrs: standard_event_attributes(contract_version),
             },
+            event_type_count: HashMap::new(),
         }
     }
 
@@ -49,6 +54,7 @@ impl ResponseBuilder {
         ResponseBuilder {
             resp: Response::new(),
             event_type: EventType::MuteEvents,
+            event_type_count: HashMap::new(),
         }
     }
 
@@ -76,7 +82,7 @@ impl ResponseBuilder {
         label: L,
         msg: &T,
     ) -> Result<()> {
-        let payload = to_binary(msg)?;
+        let payload = to_json_binary(msg)?;
 
         // the common case
         // more fine-grained control via raw submessage
@@ -116,7 +122,8 @@ impl ResponseBuilder {
         Ok(())
     }
 
-    pub(crate) fn add_raw_submessage(&mut self, msg: SubMsg<Empty>) {
+    /// Add a raw submsg. Helpful if you need to handle a reply.
+    pub fn add_raw_submessage(&mut self, msg: SubMsg<Empty>) {
         self.resp.messages.push(msg);
     }
 
@@ -155,11 +162,58 @@ impl ResponseBuilder {
 
         match &self.event_type {
             EventType::MuteEvents => (),
-            EventType::EmitEvents { common_attrs } => self
-                .resp
-                .events
-                .push(event.add_attributes(common_attrs.clone())),
+            EventType::EmitEvents { common_attrs } => {
+                let mut event = event.add_attributes(common_attrs.clone());
+
+                let event_type_count = self.event_type_count.entry(event.ty.clone()).or_default();
+
+                if *event_type_count > 0 {
+                    event.ty = format!("{}-{}", event.ty, *event_type_count);
+                }
+
+                *event_type_count += 1;
+
+                self.resp.events.push(event)
+            }
         }
+    }
+
+    /// Set response data
+    pub fn set_data(&mut self, data: &impl Serialize) -> Result<()> {
+        match self.resp.data {
+            None => {
+                let data = to_json_binary(data)?;
+                self.resp.data = Some(data);
+            }
+            Some(_) => anyhow::bail!("data already exists, use update_data instead"),
+        }
+
+        Ok(())
+    }
+
+    /// Get response data
+    pub fn get_data<T: DeserializeOwned>(&self) -> Result<Option<T>> {
+        match &self.resp.data {
+            None => Ok(None),
+            Some(data) => Ok(Some(from_json(data)?)),
+        }
+    }
+
+    /// Remove response data
+    pub fn remove_data(&mut self) {
+        self.resp.data = None;
+    }
+
+    /// Update response data
+    pub fn update_data<T: Serialize + DeserializeOwned>(
+        &mut self,
+        f: impl FnOnce(Option<T>) -> T,
+    ) -> Result<()> {
+        let data = self.get_data()?;
+        let updated = f(data);
+        self.resp.data = Some(to_json_binary(&updated)?);
+
+        Ok(())
     }
 
     /// Turn the accumulated response into an IBC Basic response
@@ -174,19 +228,19 @@ impl ResponseBuilder {
 
     /// Turn the accumulated response into an IBC Receive success response
     pub fn into_ibc_recv_response_success(self) -> IbcReceiveResponse {
-        let mut resp = IbcReceiveResponse::default();
+        let mut resp = IbcReceiveResponse::new(ack_success());
         resp.messages = self.resp.messages;
         resp.attributes = self.resp.attributes;
         resp.events = self.resp.events;
-        resp.set_ack(ack_success())
+        resp
     }
 
     /// Turn the accumulated response into an IBC Receive fail response
     pub fn into_ibc_recv_response_fail(self, error: anyhow::Error) -> IbcReceiveResponse {
-        let mut resp = IbcReceiveResponse::default();
+        let mut resp = IbcReceiveResponse::new(ack_fail(error));
         resp.messages = self.resp.messages;
         resp.attributes = self.resp.attributes;
         resp.events = self.resp.events;
-        resp.set_ack(ack_fail(error))
+        resp
     }
 }

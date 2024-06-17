@@ -1,84 +1,159 @@
+use std::{sync::Arc, time::Instant};
+
 use anyhow::Result;
 use axum::async_trait;
-use chrono::{DateTime, Utc};
-use cosmos::{Address, Cosmos};
-use msg::prelude::*;
-use perps_exes::{contracts::MarketContract, timestamp_to_date_time};
+use chrono::Utc;
+use cosmos::{HasAddress, HasAddressHrp};
+use perps_exes::contracts::MarketContract;
 
-use crate::watcher::{TaskLabel, WatchedTaskOutput, WatchedTaskPerMarket};
+use crate::{
+    config::BotConfigByType,
+    util::markets::Market,
+    watcher::{ParallelWatcher, TaskLabel, WatchedTaskOutput, WatchedTaskPerMarketParallel},
+};
 
 use super::{factory::FactoryInfo, App, AppBuilder};
 
 impl AppBuilder {
     pub(super) fn track_stale(&mut self) -> Result<()> {
-        self.watch_periodic(TaskLabel::Stale, Stale)
+        let ignore_stale = match &self.app.config.by_type {
+            BotConfigByType::Testnet { inner } => inner.ignore_stale,
+            BotConfigByType::Mainnet { .. } => false,
+        };
+        if !ignore_stale {
+            self.watch_periodic(TaskLabel::Stale, ParallelWatcher::new(Stale::default()))?;
+        }
+        Ok(())
     }
 }
 
-#[derive(Clone)]
-struct Stale;
+#[derive(Default)]
+struct Stale {}
 
 #[async_trait]
-impl WatchedTaskPerMarket for Stale {
+impl WatchedTaskPerMarketParallel for Stale {
     async fn run_single_market(
-        &mut self,
+        self: Arc<Self>,
         app: &App,
         _factory: &FactoryInfo,
-        _market: &MarketId,
-        addr: Address,
+        market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        check_stale_single(&app.cosmos, addr)
+        self.check_stale_single(&market.market, app)
             .await
-            .map(|message| WatchedTaskOutput {
-                skip_delay: false,
-                message,
-            })
+            .map(WatchedTaskOutput::new)
     }
 }
 
-async fn check_stale_single(cosmos: &Cosmos, addr: Address) -> Result<String> {
-    let market = MarketContract::new(cosmos.make_contract(addr));
-    let status = market.status().await?;
-    let last_crank_completed = status
-        .last_crank_completed
-        .context("No cranks completed yet")?;
-    let last_crank_completed = timestamp_to_date_time(last_crank_completed)?;
-    let mk_message = |msg| Msg {
-        msg,
-        last_crank_completed,
-        unpend_queue_size: status.unpend_queue_size,
-        unpend_limit: status.config.unpend_limit,
-    };
-    if status.is_stale() {
-        Err(mk_message("Protocol is in stale state").to_anyhow())
-    } else if status.congested {
-        Err(mk_message("Protocol is in congested state").to_anyhow())
-    } else {
-        Ok(mk_message("Protocol is neither stale nor congested").to_string())
+impl Stale {
+    async fn check_stale_single(&self, market: &MarketContract, app: &App) -> Result<String> {
+        let status = market.status().await?;
+
+        let next_deferred = match status.next_deferred_execution {
+            Some(next_deferred) => next_deferred.try_into_chrono_datetime()?,
+            None => return Ok("No deferred execution items found, we're not stale".to_owned()),
+        };
+
+        let age = Utc::now().signed_duration_since(next_deferred);
+        if age.num_minutes() < 5 {
+            return Ok("Oldest deferred execution item is less than 5 minutes old".to_owned());
+        }
+
+        if app.is_osmosis_epoch() {
+            return Ok(
+                "Ignoring old deferred exec item since we're in the Osmosis epoch".to_owned(),
+            );
+        }
+        if app.get_congested_info().await.is_congested() {
+            return Ok("Ignoring stale state since Osmosis appears to be congested".to_owned());
+        }
+
+        // TODO in the future, we'd like to give a grace period after the
+        // markets reopen for deferred exec items to catch up. Waiting until we start
+        // seeing spurious errors on mainnet to address this.
+        if app
+            .pyth_prices_closed(market.get_address(), &status.config)
+            .await?
+        {
+            return Ok("Ignoring old deferred exec item since we're the market is in off hours for price updates".to_owned());
+        }
+
+        Err(anyhow::anyhow!(
+            "Oldest pending deferred exec item is too old ({age})"
+        ))
     }
 }
 
-struct Msg<'a> {
-    msg: &'a str,
-    last_crank_completed: DateTime<Utc>,
-    unpend_queue_size: u32,
-    unpend_limit: u32,
-}
+impl App {
+    /// Do we think we're in the middle of an Osmosis epoch?
+    pub(crate) fn is_osmosis_epoch(&self) -> bool {
+        let mut guard = self.epoch_last_seen.lock();
 
-impl Display for Msg<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let Msg {
-            msg,
-            last_crank_completed,
-            unpend_queue_size,
-            unpend_limit,
-        } = self;
-        write!(f, "{msg}. Last completed crank timestamp: {last_crank_completed}. Unpend queue size: {unpend_queue_size}/{unpend_limit}.")
+        if self.cosmos.is_chain_paused() {
+            *guard = Some(Instant::now());
+            return true;
+        }
+
+        let epoch_last_seen = match *guard {
+            None => return false,
+            Some(epoch_last_seen) => epoch_last_seen,
+        };
+
+        let now = Instant::now();
+        let age = match now.checked_duration_since(epoch_last_seen) {
+            None => {
+                tracing::warn!("is_osmosis_epoch: checked_duration_since returned a None");
+                return false;
+            }
+            Some(age) => age,
+        };
+
+        if age.as_secs() > self.config.ignore_errors_after_epoch_seconds.into() {
+            // Happened too long ago, so we're not in the epoch anymore
+            *guard = None;
+            false
+        } else {
+            true
+        }
+    }
+
+    /// Gas price congestion info for Osmosis mainnet
+    pub(crate) async fn get_congested_info(&self) -> CongestedInfo {
+        match &self.config.by_type {
+            BotConfigByType::Mainnet { inner }
+                if self.cosmos.get_address_hrp().as_str() == "osmo" =>
+            {
+                CongestedInfo::OsmosisMainnet {
+                    base: self.cosmos.get_base_gas_price().await,
+                    congested: inner.gas_price_congested,
+                    max: inner.max_gas_price,
+                }
+            }
+            _ => CongestedInfo::NotOsmosisMainnet,
+        }
     }
 }
 
-impl Msg<'_> {
-    fn to_anyhow(&self) -> anyhow::Error {
-        anyhow!("{}", self)
+#[derive(Debug)]
+pub(crate) enum CongestedInfo {
+    NotOsmosisMainnet,
+    OsmosisMainnet {
+        base: f64,
+        congested: f64,
+        // Just present for the Debug output
+        #[allow(dead_code)]
+        max: f64,
+    },
+}
+
+impl CongestedInfo {
+    pub(crate) fn is_congested(&self) -> bool {
+        match self {
+            CongestedInfo::NotOsmosisMainnet => false,
+            CongestedInfo::OsmosisMainnet {
+                base,
+                congested,
+                max: _,
+            } => base >= congested,
+        }
     }
 }

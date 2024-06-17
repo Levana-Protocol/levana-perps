@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use cosmos::RawWallet;
+use cosmos::SeedPhrase;
 use perps_exes::build_version;
 
 use crate::localtest;
@@ -16,12 +16,7 @@ pub(crate) struct Cmd {
 }
 
 #[derive(clap::Parser)]
-pub(crate) enum Subcommand {
-    /// Do a complete local deployment
-    LocalDeploy {
-        #[clap(flatten)]
-        inner: crate::local_deploy::LocalDeployOpt,
-    },
+pub(crate) enum TestnetSub {
     /// Store the contracts and notify the tracker. Skips any contracts that are
     /// already uploaded.
     StoreCode {
@@ -33,33 +28,80 @@ pub(crate) enum Subcommand {
         #[clap(flatten)]
         inner: crate::instantiate::InstantiateOpt,
     },
-    /// Instantiate rewards contracts
-    InstantiateRewards {
+    /// Add a market to an existing contract
+    AddMarket {
         #[clap(flatten)]
-        inner: crate::instantiate_rewards::InstantiateRewardsOpt,
+        inner: crate::testnet::add_market::AddMarketOpt,
     },
     /// Migrate existing contracts
     Migrate {
         #[clap(flatten)]
         inner: crate::migrate::MigrateOpt,
     },
-    /// On Chain tests
-    OnChainTests {
-        #[clap(flatten)]
-        inner: localtest::TestsOpt,
-    },
     /// Instantiate chain-wide contracts as a one time setup
     InitChain {
         #[clap(flatten)]
         inner: crate::init_chain::InitChainOpt,
     },
-    /// Perform post-deploy market setup for public facing markets
-    ///
-    /// This is responsible for activities like depositing collateral and
-    /// opening enough positions to create a 90% utilization ratio.
-    SetupMarket {
+    /// Deposit collateral into a market, useful for the trading competition
+    Deposit {
         #[clap(flatten)]
-        inner: crate::setup_market::SetupMarketOpt,
+        inner: crate::testnet::deposit::DepositOpt,
+    },
+    /// Enable a market, useful for starting a trading competition
+    EnableMarket {
+        #[clap(flatten)]
+        inner: crate::testnet::enable_market::EnableMarketOpt,
+    },
+    /// Disable a market at the given timestamp, good for trading competition
+    DisableMarketAt {
+        #[clap(flatten)]
+        inner: crate::testnet::disable::DisableMarketAtOpt,
+    },
+    /// Close all positions in the market, good for trading competition
+    CloseAllPositions {
+        #[clap(flatten)]
+        inner: crate::testnet::disable::CloseAllPositionsOpt,
+    },
+    /// Update the configs in all markets with the given message
+    UpdateMarketConfigs {
+        #[clap(flatten)]
+        inner: crate::testnet::update_market_configs::UpdateMarketConfigsOpt,
+    },
+    /// Sync config against the local config
+    SyncConfig {
+        #[clap(flatten)]
+        inner: crate::testnet::sync_config::SyncConfigOpts,
+    },
+}
+
+#[derive(clap::Parser)]
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum Subcommand {
+    /// Do a complete local deployment
+    LocalDeploy {
+        #[clap(flatten)]
+        inner: crate::local_deploy::LocalDeployOpt,
+    },
+    /// On Chain tests
+    OnChainTests {
+        #[clap(flatten)]
+        inner: localtest::TestsOpt,
+    },
+    /// Testnet-specific commands.
+    Testnet {
+        #[clap(subcommand)]
+        inner: TestnetSub,
+    },
+    /// Mainnet-specific deployment activities.
+    Mainnet {
+        #[clap(flatten)]
+        inner: crate::mainnet::MainnetOpt,
+    },
+    /// General purpose utility commands
+    Util {
+        #[clap(flatten)]
+        inner: crate::util_cmd::UtilOpt,
     },
 }
 
@@ -68,15 +110,51 @@ pub(crate) struct Opt {
     /// Override gRPC endpoint
     #[clap(long, env = "COSMOS_GRPC", global = true)]
     pub(crate) cosmos_grpc: Option<String>,
+    /// Override gas multiplier
+    #[clap(long, env = "COSMOS_GAS_MULTIPLIER", global = true)]
+    pub(crate) cosmos_gas_multiplier: Option<f64>,
+    /// Override chain ID
+    #[clap(long, env = "COSMOS_CHAIN_ID", global = true)]
+    pub(crate) cosmos_chain_id: Option<String>,
     /// Mnemonic phrase for the Wallet
     #[clap(long, env = "COSMOS_WALLET")]
-    pub(crate) wallet: Option<RawWallet>,
+    pub(crate) wallet: Option<SeedPhrase>,
     /// Turn on verbose logging
     #[clap(long, short, global = true)]
     verbose: bool,
     /// Directory containing the generated WASM files.
     #[clap(long, default_value = "./wasm/artifacts", env = "PERPS_WASM_DIR")]
     wasm_dir: PathBuf,
+    /// Override Price config file
+    #[clap(long, env = "LEVANA_BOTS_CONFIG_PRICE")]
+    pub(crate) config_price: Option<PathBuf>,
+    /// Override chain config file
+    #[clap(long, env = "LEVANA_BOTS_CONFIG_CHAIN")]
+    pub(crate) config_chain: Option<PathBuf>,
+    /// Override testnet config file
+    #[clap(long, env = "LEVANA_BOTS_CONFIG_TESTNET")]
+    pub(crate) config_testnet: Option<PathBuf>,
+    /// Override the market config update file
+    #[clap(
+        long,
+        env = "LEVANA_BOTS_MARKET_CONFIG_UPDATE",
+        default_value = "packages/perps-exes/assets/market-config-updates.toml"
+    )]
+    pub(crate) market_config: PathBuf,
+    /// The stable Pyth endpoint
+    #[clap(
+        long,
+        env = "LEVANA_BOTS_PYTH_ENDPOINT_STABLE",
+        default_value = "https://hermes.pyth.network/"
+    )]
+    pub(crate) pyth_endpoint_stable: reqwest::Url,
+    /// The edge Pyth endpoint
+    #[clap(
+        long,
+        env = "LEVANA_BOTS_PYTH_ENDPOINT_EDGE",
+        default_value = "https://hermes-beta.pyth.network/"
+    )]
+    pub(crate) pyth_endpoint_edge: reqwest::Url,
 }
 
 impl Opt {

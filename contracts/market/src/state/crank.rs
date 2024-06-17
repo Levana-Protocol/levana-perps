@@ -1,27 +1,45 @@
 use crate::state::*;
 use cosmwasm_std::Order;
+use crank::position::liquifund::PositionLiquifund;
 use cw_storage_plus::{Bound, PrefixBound};
 use msg::contracts::market::{
-    crank::{events::CrankExecBatchEvent, CrankWorkInfo},
+    crank::{
+        events::{CrankExecBatchEvent, CrankWorkInfoEvent},
+        CrankWorkInfo,
+    },
     position::{
         events::PositionSaveReason, ClosePositionInstructions, MaybeClosedPosition,
         PositionCloseReason,
     },
+    spot_price::SpotPriceConfig,
 };
+use serde::{Deserialize, Serialize};
 
 use shared::prelude::*;
 
-use super::position::{get_position, NEXT_LIQUIFUNDING, NEXT_STALE, OPEN_POSITIONS};
+use self::position::close::ClosePositionExec;
+
+use super::position::{get_position, NEXT_LIQUIFUNDING, OPEN_POSITIONS};
 
 /// The last price point timestamp for which the cranking process was completed.
 ///
 /// If this is unavailable, we've never completed cranking, and we should find
 /// the very first price timestamp.
 pub(super) const LAST_CRANK_COMPLETED: Item<Timestamp> = Item::new(namespace::LAST_CRANK_COMPLETED);
+const CRANK_BATCH_WEIGHT_LEFT: Item<CrankProgress> = Item::new(namespace::CRANK_BATCH_WEIGHT_LEFT);
 
-pub(crate) fn crank_init(store: &mut dyn Storage, env: &Env) -> Result<()> {
+#[derive(Debug, Serialize, Deserialize)]
+struct CrankProgress {
+    weight_budget_left: u32,
+    paying_work_done: u32,
+    requested: u32,
+    rewards: Addr,
+    actual: Vec<(CrankWorkInfo, PricePoint)>,
+}
+
+pub(crate) fn crank_init(store: &mut dyn Storage) -> Result<()> {
     LAST_CRANK_COMPLETED
-        .save(store, &env.block.time.into())
+        .save(store, &Timestamp::from_seconds(0))
         .map_err(|err| err.into())
 }
 
@@ -32,163 +50,183 @@ impl State<'_> {
         self.spot_price_after(store, min)
     }
 
-    /// Has the crank finished computations for all previous price points?
-    ///
-    /// If this is the case, the protocol is up-to-date and we can directly add
-    /// liquidation prices to the liquidation data structures, bypassing the
-    /// unpending queue.
-    pub(crate) fn is_crank_up_to_date(&self, store: &dyn Storage) -> Result<bool> {
-        Ok(match self.next_crank_timestamp(store)? {
-            // No price point exists after the last crank completed, therefore
-            // we're fully up to date
-            None => true,
-            Some(next_crank_timestamp) => {
-                // There is a price point that still needs to be calculated. We
-                // never crank the very latest price point, so check if there's
-                // a newer price point. If there is, we're falling behind on the
-                // crank. If the next price update available is the most recent
-                // price update: we're fully up to date.
-                let latest_price = self.spot_price_latest_opt(store)?;
-                match latest_price {
-                    // This should really never happen since we know there's at
-                    // least one price point available by the return from
-                    // next_crank_timestamp. But if it does, we'll default to
-                    // being not up to date.
-                    None => false,
-                    // Only consider the crank up to date if the two timestamps
-                    // match.
-                    Some(latest_price) => latest_price.timestamp == next_crank_timestamp.timestamp,
-                }
-            }
-        })
-    }
-
-    pub(crate) fn crank_work(&self, store: &dyn Storage) -> Result<Option<CrankWorkInfo>> {
-        if self.get_close_all_positions(store)? {
+    fn get_close_all_positions_work(&self, store: &dyn Storage) -> Result<Option<PositionId>> {
+        Ok(if self.get_close_all_positions(store)? {
+            #[allow(clippy::manual_map)]
             if let Some(position) = OPEN_POSITIONS
                 .keys(store, None, None, Order::Ascending)
                 .next()
                 .transpose()?
             {
-                return Ok(Some(CrankWorkInfo::CloseAllPositions { position }));
+                Some(position)
+            } else {
+                None
             }
-        }
-
-        if self.should_reset_lp_balances(store)? {
-            return Ok(Some(CrankWorkInfo::ResetLpBalances {}));
-        }
-
-        Ok(match self.next_crank_timestamp(store)? {
-            None => None,
-            Some(price_point) => Some({
-                if let Some(((_, position), _)) = NEXT_LIQUIFUNDING
-                    .prefix_range(
-                        store,
-                        None,
-                        Some(PrefixBound::inclusive(price_point.timestamp)),
-                        cosmwasm_std::Order::Ascending,
-                    )
-                    .next()
-                    .transpose()?
-                {
-                    CrankWorkInfo::Liquifunding { position }
-                } else if let Some(position) =
-                    self.pending_liquidation_prices(store, price_point.timestamp)?
-                {
-                    CrankWorkInfo::UnpendLiquidationPrices { position }
-                } else if let Some(pos) =
-                    self.liquidatable_position(store, price_point.price_notional)?
-                {
-                    CrankWorkInfo::Liquidation {
-                        position: pos.id,
-                        liquidation_reason: pos.reason,
-                        price_point_timestamp: price_point.timestamp,
-                    }
-                } else if let Some(order_id) =
-                    self.limit_order_triggered_order(store, price_point.price_notional)?
-                {
-                    CrankWorkInfo::LimitOrder { order_id }
-                } else {
-                    CrankWorkInfo::Completed {
-                        price_point_timestamp: price_point.timestamp,
-                    }
-                }
-            }),
+        } else {
+            None
         })
+    }
+
+    /// Takes in a price_point from the next_crank_timestamp method
+    pub(crate) fn crank_work(
+        &self,
+        store: &dyn Storage,
+        price_point: PricePoint,
+    ) -> Result<CrankWorkInfo> {
+        if self.should_reset_lp_balances(store)? {
+            return Ok(CrankWorkInfo::ResetLpBalances {});
+        }
+
+        Ok(
+            if let Some(((_, position), _)) = NEXT_LIQUIFUNDING
+                .prefix_range(
+                    store,
+                    None,
+                    Some(PrefixBound::inclusive(price_point.timestamp)),
+                    cosmwasm_std::Order::Ascending,
+                )
+                .next()
+                .transpose()?
+            {
+                CrankWorkInfo::Liquifunding { position }
+            } else if let Some(position) = self.get_close_all_positions_work(store)? {
+                // We only try to close all positions _after_ we've done all
+                // liquifunding. We need to ensure that all positions are liquifunded up until the
+                // current price point before trying to close them.
+                CrankWorkInfo::CloseAllPositions { position }
+            } else if let Some(pos) =
+                self.liquidatable_position(store, price_point.price_notional)?
+            {
+                CrankWorkInfo::Liquidation {
+                    position: pos.id,
+                    liquidation_reason: pos.reason,
+                }
+            } else if let Some((deferred_exec_id, target)) =
+                self.next_crankable_deferred_exec_id(store, price_point.timestamp)?
+            {
+                CrankWorkInfo::DeferredExec {
+                    deferred_exec_id,
+                    target,
+                }
+            } else if let Some(order_id) =
+                self.limit_order_triggered_order(store, price_point.price_notional)?
+            {
+                CrankWorkInfo::LimitOrder { order_id }
+            } else {
+                CrankWorkInfo::Completed {}
+            },
+        )
+    }
+
+    /// Would the given price update trigger any liquidations?
+    pub(crate) fn price_would_trigger(
+        &self,
+        store: &dyn Storage,
+        new_price: PriceBaseInQuote,
+    ) -> Result<bool> {
+        // Get the latest price available in the oracle
+        let oracle_price = match &self.config.spot_price {
+            SpotPriceConfig::Manual { .. } => self.current_spot_price(store)?.price_notional,
+            SpotPriceConfig::Oracle {
+                feeds, feeds_usd, ..
+            } => {
+                let oracle_price = self.get_oracle_price(false)?;
+                let market_id = self.market_id(store)?;
+                let price_storage =
+                    oracle_price.compose_price(market_id, feeds, feeds_usd, self.now())?;
+                price_storage.price
+            }
+        };
+
+        let new_price = new_price.into_notional_price(self.market_type(store)?);
+        Ok(
+            self.newly_liquidatable_position(store, oracle_price, new_price)
+                || self.limit_order_newly_triggered_order(store, oracle_price, new_price),
+        )
     }
 
     // this always executes the requested cranks
     // if there is no work to be done, then crank_exec itself will be cheap
     // QueryMsg::CrankStats can be used by clients to get heuristics and decide how many to crank
-    pub fn crank_exec_batch(
+    pub(crate) fn crank_exec_batch(
         &self,
         ctx: &mut StateContext,
-        n_execs: Option<u32>,
-        rewards: &Addr,
+        start_n_execs_and_rewards: Option<(u32, Addr)>,
     ) -> Result<()> {
-        let n_execs = match n_execs {
-            None => self.config.crank_execs,
-            Some(n) => n,
-        }
-        .into();
+        const REGULAR_WEIGHT: u32 = 5;
+        const COMPLETED_WEIGHT: u32 = 1;
 
-        let mut real_cranks = 0;
-        for _ in 0..n_execs {
-            match self.crank_work(ctx.storage)? {
+        let mut crank_progress = if let Some((start_n_execs, rewards)) = start_n_execs_and_rewards {
+            CrankProgress {
+                weight_budget_left: start_n_execs * REGULAR_WEIGHT,
+                paying_work_done: 0,
+                actual: vec![],
+                requested: start_n_execs,
+                rewards,
+            }
+        } else {
+            CRANK_BATCH_WEIGHT_LEFT.load(ctx.storage)?
+        };
+
+        loop {
+            let price_point = match self.next_crank_timestamp(ctx.storage)? {
                 None => break,
-                Some(work_info) => {
-                    self.crank_exec(ctx, work_info)?;
-                    real_cranks += 1;
+                Some(price_point) => price_point,
+            };
+            let work_info = self.crank_work(ctx.storage, price_point)?;
+
+            let item_weight = match work_info {
+                CrankWorkInfo::Completed { .. } => COMPLETED_WEIGHT,
+                _ => REGULAR_WEIGHT,
+            };
+
+            match crank_progress.weight_budget_left.checked_sub(item_weight) {
+                None => {
+                    CRANK_BATCH_WEIGHT_LEFT.remove(ctx.storage);
+                    break;
+                }
+                Some(weight_budget_left) => {
+                    crank_progress.weight_budget_left = weight_budget_left;
+                    crank_progress.actual.push((work_info.clone(), price_point));
+                    if work_info.receives_crank_rewards() {
+                        crank_progress.paying_work_done += 1;
+                    }
+                    if self.crank_exec(ctx, work_info, &price_point)? {
+                        CRANK_BATCH_WEIGHT_LEFT.save(ctx.storage, &crank_progress)?;
+                        return Ok(());
+                    }
                 }
             };
         }
 
+        self.allocate_crank_fees(
+            ctx,
+            &crank_progress.rewards,
+            crank_progress.paying_work_done,
+        )?;
         ctx.response_mut().add_event(CrankExecBatchEvent {
-            requested: n_execs,
-            actual: real_cranks.into(),
+            requested: u64::from(crank_progress.requested),
+            paying: u64::from(crank_progress.paying_work_done),
+            actual: crank_progress.actual,
         });
-
-        self.allocate_crank_fees(ctx, rewards, real_cranks)?;
 
         Ok(())
     }
 
-    /// What is the ending timestamp for liquifunding and liquidation?
-    ///
-    /// Generally speaking, the crank performs its actions up until "now." That
-    /// means liquifunding does fee calculations up until the current timestamp,
-    /// and liquidations occur as of the current timestamp. The one exception to
-    /// this is when the protocol is stale. In that case, we do not have well
-    /// fundedness guarantees beyond the point where the protocol became stale,
-    /// and we therefore calculate up until the protocol entered stale.
-    ///
-    /// This function checks if the protocol is stale and, if so, returns that
-    /// timestamp. Otherwise it returns now.
-    fn stale_or_now(&self, store: &dyn Storage) -> Result<Timestamp> {
-        let now = self.now();
-        Ok(
-            match NEXT_STALE
-                .keys(store, None, None, cosmwasm_std::Order::Ascending)
-                .next()
-                .transpose()?
-            {
-                Some((stale, _)) if now > stale => stale,
-                _ => now,
-            },
-        )
-    }
-
     /// Perform a single crank execution.
-    fn crank_exec(&self, ctx: &mut StateContext, work_info: CrankWorkInfo) -> Result<()> {
-        // get our current playhead time and price for liquidations
-        ctx.response_mut().add_event(work_info.clone());
+    fn crank_exec(
+        &self,
+        ctx: &mut StateContext,
+        work_info: CrankWorkInfo,
+        price_point: &PricePoint,
+    ) -> Result<bool> {
+        ctx.response_mut().add_event(CrankWorkInfoEvent {
+            work_info: work_info.clone(),
+            price_point: *price_point,
+        });
 
         // do the work
         match work_info {
-            CrankWorkInfo::CloseAllPositions { position } => {
-                let pos = get_position(ctx.storage, position)?;
-                self.close_position_via_msg(ctx, pos)?;
-            }
             CrankWorkInfo::ResetLpBalances {} => {
                 self.crank_reset_lp_balances(ctx)?;
             }
@@ -196,6 +234,7 @@ impl State<'_> {
                 let pos = get_position(ctx.storage, position)?;
                 let starts_at = pos.liquifunded_at;
                 let ends_at = pos.next_liquifunding;
+                debug_assert!(ends_at <= price_point.timestamp);
                 self.position_liquifund_store(
                     ctx,
                     pos,
@@ -205,43 +244,64 @@ impl State<'_> {
                     PositionSaveReason::Crank,
                 )?;
             }
-            CrankWorkInfo::UnpendLiquidationPrices { position } => {
-                self.unpend_liquidation_prices(ctx, position)?;
+            CrankWorkInfo::CloseAllPositions { position } => {
+                let pos = get_position(ctx.storage, position)?;
+                ClosePositionExec::new_via_msg(self, ctx.storage, pos, *price_point)?
+                    .apply(self, ctx)?;
             }
             CrankWorkInfo::Liquidation {
                 position,
                 liquidation_reason,
-                price_point_timestamp,
             } => {
                 let pos = get_position(ctx.storage, position)?;
 
+                // Do one more liquifunding before closing the position to
+                // pay out fees. This may end up closing the position on its own, otherwise we
+                // explicitly close it ourselves because we hit a trigger.
                 let starts_at = pos.liquifunded_at;
-                let ends_at = self.stale_or_now(ctx.storage)?;
-                let mcp = self.position_liquifund(ctx, pos, starts_at, ends_at, true)?;
+
+                // All positions that need to be liquifunded at this time _must_ have already be liquifunded.
+                debug_assert!(pos.next_liquifunding >= price_point.timestamp);
+
+                // We want to liquifund up until the price point's timestamp and make sure we shouldn't be liquidated for some other reason.
+                let ends_at = price_point.timestamp;
+                let mcp = PositionLiquifund::new(self, ctx.storage, pos, starts_at, ends_at, true)?
+                    .apply(self, ctx)?;
 
                 let close_position_instructions = match mcp {
                     MaybeClosedPosition::Open(pos) => ClosePositionInstructions {
                         pos,
-                        exposure: Signed::zero(),
-                        close_time: ends_at,
-                        settlement_time: price_point_timestamp,
+                        capped_exposure: Signed::zero(),
+                        additional_losses: Collateral::zero(),
+                        settlement_price: *price_point,
                         reason: PositionCloseReason::Liquidated(liquidation_reason),
+                        closed_during_liquifunding: false,
                     },
                     MaybeClosedPosition::Close(x) => x,
                 };
-                self.close_position(ctx, close_position_instructions)?;
+                ClosePositionExec::new(self, ctx.storage, close_position_instructions, None)?
+                    .apply(self, ctx)?;
+            }
+            CrankWorkInfo::DeferredExec {
+                deferred_exec_id,
+                target: _,
+            } => {
+                self.process_deferred_exec(ctx, deferred_exec_id, price_point)?;
+                return Ok(true);
             }
             CrankWorkInfo::LimitOrder { order_id } => {
-                self.limit_order_execute_order(ctx, order_id)?;
+                self.limit_order_execute_order(ctx, order_id, price_point)?;
             }
-            CrankWorkInfo::Completed {
-                price_point_timestamp,
-            } => {
-                self.accumulate_funding_rate(ctx, price_point_timestamp)?;
-                LAST_CRANK_COMPLETED.save(ctx.storage, &price_point_timestamp)?;
+            CrankWorkInfo::Completed {} => {
+                // Now that we've finished all updates for this price point,
+                // accumulate the updated borrow fee and funding rates.
+                self.accumulate_borrow_fee_rate(ctx, price_point)
+                    .map_err(|e| anyhow::anyhow!("accumulate_borrow_fee_rate failed: {e:?}"))?;
+                self.accumulate_funding_rate(ctx, price_point)?;
+                LAST_CRANK_COMPLETED.save(ctx.storage, &price_point.timestamp)?;
             }
         }
 
-        Ok(())
+        Ok(false)
     }
 }

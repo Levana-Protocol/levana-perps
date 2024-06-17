@@ -90,17 +90,17 @@ fn main() {
     write_factory();
     finalize("factory");
 
+    write_faucet();
+    finalize("faucet");
+
+    write_liquidity_token();
+    finalize("liquidity_token");
+
     write_market();
     finalize("market");
 
     write_position_token();
     finalize("position_token");
-
-    write_liquidity_token();
-    finalize("liquidity_token");
-
-    write_faucet();
-    finalize("faucet");
 
     write_error();
     finalize("error");
@@ -200,5 +200,5 @@ fn write_error() {
     let path = paths.schema.join("error.json");
     let obj = cosmwasm_schema::schema_for!(PerpError);
     let json = serde_json::to_string_pretty(&obj).unwrap();
-    std::fs::write(&path, json).unwrap();
+    std::fs::write(path, json).unwrap();
 }

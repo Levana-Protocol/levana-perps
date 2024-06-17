@@ -3,7 +3,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use cosmwasm_std::{
-    entry_point, from_binary, Binary, Deps, DepsMut, Env, MessageInfo, QueryResponse, Response,
+    entry_point, from_json, Binary, Deps, DepsMut, Env, MessageInfo, QueryResponse, Response,
     Uint128,
 };
 use cw_multi_test::Executor;
@@ -78,7 +78,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             sender,
             amount,
             msg,
-        } => match from_binary::<Payload>(&msg)? {
+        } => match from_json::<Payload>(&msg)? {
             Payload::Print {
                 value,
                 enforce_sender,
@@ -94,7 +94,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                     }
                 }
                 if let Some(enforce_info_sender) = enforce_info_sender {
-                    if enforce_info_sender != info.sender {
+                    if enforce_info_sender != info.sender.as_str() {
                         bail!(
                             "invalid sender, expected: {}, got: {}",
                             enforce_info_sender,

@@ -35,7 +35,7 @@ impl Number {
     /// helper to get from native currency to Number
     /// e.g. from uusd to UST, as a Decimal
     pub fn from_fixed_u128(amount: u128, places: u32) -> Self {
-        Self::from(amount) / Self::from(10u128.pow(places))
+        (Self::from(amount) / Self::from(10u128.pow(places))).unwrap()
     }
 
     /// Useful for when Number is used as a PrimaryKey

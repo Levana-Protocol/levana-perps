@@ -1,15 +1,14 @@
-use cosmos::{Address, Contract, Cosmos, HasAddress, Wallet};
+use cosmos::{Contract, Cosmos, HasAddress};
 use msg::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
+use msg::contracts::market::config::Config;
 use msg::prelude::*;
+use perps_exes::prelude::MarketContract;
+use std::collections::HashSet;
 use std::fmt::Debug;
-
-use crate::config::BotConfig;
-
-use super::oracle::Pyth;
 
 #[derive(Clone)]
 pub(crate) struct Market {
-    pub(crate) market: Contract,
+    pub(crate) market: MarketContract,
     #[allow(dead_code)]
     pub(crate) position_token: Contract,
     #[allow(dead_code)]
@@ -17,7 +16,7 @@ pub(crate) struct Market {
     #[allow(dead_code)]
     pub(crate) liquidity_token_xlp: Contract,
     pub(crate) market_id: MarketId,
-    pub(crate) price_admin: String,
+    pub(crate) config: Config,
 }
 
 impl Debug for Market {
@@ -29,16 +28,11 @@ impl Debug for Market {
     }
 }
 
-#[derive(Clone, Debug)]
-pub(crate) enum PriceApi {
-    Pyth(Pyth),
-    Manual {
-        symbol: String,
-        symbol_usd: Option<String>,
-    },
-}
-
-pub(crate) async fn get_markets(cosmos: &Cosmos, factory: &Contract) -> Result<Vec<Market>> {
+pub(crate) async fn get_markets(
+    cosmos: &Cosmos,
+    factory: &Contract,
+    ignored_markets: &HashSet<MarketId>,
+) -> Result<Vec<Market>> {
     let mut res = vec![];
     let mut start_after = None;
 
@@ -55,62 +49,34 @@ pub(crate) async fn get_markets(cosmos: &Cosmos, factory: &Contract) -> Result<V
         }
 
         for market_id in markets {
+            if ignored_markets.contains(&market_id) {
+                continue;
+            }
             let MarketInfoResponse {
                 market_addr,
                 position_token,
                 liquidity_token_lp,
                 liquidity_token_xlp,
-                price_admin,
             } = factory
                 .query(msg::contracts::factory::entry::QueryMsg::MarketInfo {
                     market_id: market_id.clone(),
                 })
                 .await?;
-            res.push(Market {
-                market: cosmos.make_contract(market_addr.into_string().parse()?),
-                position_token: cosmos.make_contract(position_token.into_string().parse()?),
-                liquidity_token_lp: cosmos.make_contract(liquidity_token_lp.into_string().parse()?),
-                liquidity_token_xlp: cosmos
-                    .make_contract(liquidity_token_xlp.into_string().parse()?),
-                market_id,
-                price_admin: price_admin.into_string(),
-            });
+            let market =
+                MarketContract::new(cosmos.make_contract(market_addr.into_string().parse()?));
+            if !market.is_wound_down().await? {
+                res.push(Market {
+                    config: market.status().await?.config,
+                    market,
+                    position_token: cosmos.make_contract(position_token.into_string().parse()?),
+                    liquidity_token_lp: cosmos
+                        .make_contract(liquidity_token_lp.into_string().parse()?),
+                    liquidity_token_xlp: cosmos
+                        .make_contract(liquidity_token_xlp.into_string().parse()?),
+                    market_id,
+                });
+            }
         }
     }
     Ok(res)
-}
-
-impl Market {
-    pub(crate) async fn get_price_api(
-        &self,
-        wallet: &Wallet,
-        cosmos: &Cosmos,
-        config: &BotConfig,
-    ) -> Result<PriceApi> {
-        let Self {
-            price_admin,
-            market_id,
-            ..
-        } = self;
-
-        if *price_admin == wallet.get_address_string() {
-            let symbol = if market_id.get_quote() == "USDC" {
-                format!("{}_USD", market_id.get_base())
-            } else {
-                market_id.to_string()
-            };
-
-            let symbol_usd = if market_id.is_notional_usd() {
-                None
-            } else {
-                Some(format!("{}_USD", market_id.get_collateral()))
-            };
-
-            Ok(PriceApi::Manual { symbol, symbol_usd })
-        } else {
-            let bridge_addr = Address::from_str(price_admin)?;
-            let pyth = Pyth::new(cosmos, config, bridge_addr, market_id.clone()).await?;
-            Ok(PriceApi::Pyth(pyth))
-        }
-    }
 }

@@ -5,6 +5,8 @@ use crate::{
     perp_error,
 };
 use anyhow::Result;
+#[cfg(feature = "chrono")]
+use chrono::{DateTime, TimeZone, Utc};
 use cosmwasm_std::{Decimal256, Timestamp as CWTimestamp};
 use cw_storage_plus::{KeyDeserialize, Prefixer, PrimaryKey};
 use schemars::JsonSchema;
@@ -82,6 +84,11 @@ impl Timestamp {
         Timestamp(seconds * 1_000_000_000)
     }
 
+    /// Construct a new value from the given number of millisecond since the epoch.
+    pub fn from_millis(millis: u64) -> Self {
+        Timestamp(millis * 1_000_000)
+    }
+
     /// Add the given number of seconds to the given timestamp
     pub fn plus_seconds(self, secs: u64) -> Self {
         self + Duration::from_seconds(secs)
@@ -110,6 +117,17 @@ impl Timestamp {
                 "Invalid timestamp subtraction during. Action: {desc}. Values: {self} - {rhs}"
             )),
         }
+    }
+
+    #[cfg(feature = "chrono")]
+    /// Convert into a chrono DateTime<Utc>
+    pub fn try_into_chrono_datetime(self) -> Result<DateTime<Utc>> {
+        let secs = self.0 / 1_000_000_000;
+        let nanos = self.0 % 1_000_000_000;
+
+        Utc.timestamp_opt(secs.try_into()?, nanos.try_into()?)
+            .single()
+            .with_context(|| format!("Could not convert {self} into DateTime<Utc>"))
     }
 }
 
@@ -142,6 +160,8 @@ impl<'a> PrimaryKey<'a> for Timestamp {
 
 impl KeyDeserialize for Timestamp {
     type Output = Timestamp;
+
+    const KEY_ELEMS: u16 = 1;
 
     fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
         u64::from_vec(value).map(Timestamp)

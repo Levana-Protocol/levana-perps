@@ -1,12 +1,10 @@
 use crate::prelude::*;
 use anyhow::Result;
 use cosmwasm_std::Storage;
-use msg::contracts::market::entry::StatusResp;
+use msg::contracts::market::crank::CrankWorkInfo;
+use msg::contracts::market::{deferred_execution::DeferredExecStatus, entry::StatusResp};
 
-use super::{
-    crank::LAST_CRANK_COMPLETED, fees::all_fees, position::LIQUIDATION_PRICES_PENDING_COUNT,
-    stale::ProtocolStaleness, State,
-};
+use super::{crank::LAST_CRANK_COMPLETED, fees::all_fees, position::NEXT_LIQUIFUNDING, State};
 use crate::state::delta_neutrality_fee::DELTA_NEUTRALITY_FUND;
 
 impl State<'_> {
@@ -15,7 +13,23 @@ impl State<'_> {
         let market_type = market_id.get_market_type();
 
         let collateral = self.get_token(store)?.clone();
-        let next_crank = self.crank_work(store)?;
+        let next_crank_timestamp = self.next_crank_timestamp(store)?;
+        let next_crank = match next_crank_timestamp {
+            None => None,
+            Some(crank_price_point) => {
+                let price_point = self.current_spot_price(store)?;
+                let work_item = self.crank_work(store, crank_price_point)?;
+                if let CrankWorkInfo::Completed {} = work_item {
+                    if price_point.timestamp == crank_price_point.timestamp {
+                        None
+                    } else {
+                        Some(work_item)
+                    }
+                } else {
+                    Some(work_item)
+                }
+            }
+        };
 
         let liquidity = self.load_liquidity_stats(store)?;
 
@@ -42,7 +56,7 @@ impl State<'_> {
         let (long_usd, short_usd) = if long_notional.is_zero() && short_notional.is_zero() {
             (Usd::zero(), Usd::zero())
         } else {
-            let price_point = self.spot_price(store, None)?;
+            let price_point = self.current_spot_price(store)?;
             let long_usd = price_point.notional_to_usd(long_notional);
             let short_usd = price_point.notional_to_usd(short_notional);
             (long_usd, short_usd)
@@ -56,17 +70,38 @@ impl State<'_> {
             .may_load(store)?
             .unwrap_or(Collateral::zero());
 
-        let ProtocolStaleness {
-            stale_liquifunding,
-            old_price,
-        } = self.stale_check(store)?;
-
         let fees = all_fees(store)?;
 
         let last_crank_completed = LAST_CRANK_COMPLETED.may_load(store)?;
-        let unpend_queue_size = LIQUIDATION_PRICES_PENDING_COUNT
-            .may_load(store)?
-            .unwrap_or_default();
+
+        let next_deferred_execution = self
+            .get_next_deferred_execution(store)?
+            .map(|(_, item)| item.created);
+        let (deferred_execution_items, last_processed_deferred_exec_id, latest_deferred_id) =
+            match self.deferred_execution_latest_ids(store)? {
+                Some(latest_ids) => (
+                    latest_ids.queue_size(),
+                    latest_ids.processed,
+                    Some(latest_ids.issued),
+                ),
+                None => (0, None, None),
+            };
+        let newest_deferred_execution = match latest_deferred_id {
+            Some(id) => {
+                let deferred = self.get_deferred_exec(store, id)?;
+                match deferred.status {
+                    DeferredExecStatus::Pending => Some(deferred.created),
+                    DeferredExecStatus::Success { .. } | DeferredExecStatus::Failure { .. } => None,
+                }
+            }
+            None => None,
+        };
+
+        let next_liquifunding = NEXT_LIQUIFUNDING
+            .keys(store, None, None, Order::Ascending)
+            .next()
+            .transpose()?
+            .map(|x| x.0);
 
         Ok(StatusResp {
             market_id: market_id.clone(),
@@ -77,7 +112,7 @@ impl State<'_> {
             config: self.config.clone(),
             liquidity,
             next_crank,
-            borrow_fee: borrow_fee.total(),
+            borrow_fee: borrow_fee.total()?,
             borrow_fee_lp: borrow_fee.lp,
             borrow_fee_xlp: borrow_fee.xlp,
             long_funding,
@@ -88,12 +123,13 @@ impl State<'_> {
             short_usd,
             instant_delta_neutrality_fee_value,
             delta_neutrality_fee_fund,
-            stale_liquifunding,
-            stale_price: old_price,
             fees,
             last_crank_completed,
-            unpend_queue_size,
-            congested: unpend_queue_size >= self.config.unpend_limit,
+            next_deferred_execution,
+            deferred_execution_items,
+            last_processed_deferred_exec_id,
+            newest_deferred_execution,
+            next_liquifunding,
         })
     }
 }

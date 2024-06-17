@@ -27,10 +27,12 @@ pub(crate) fn token_init(
             }
         }
 
-        TokenInit::Native { denom } => Token::Native {
+        TokenInit::Native {
             denom,
-            // seems to be a universal rule, so we're hardcoding it
-            decimal_places: 6,
+            decimal_places,
+        } => Token::Native {
+            denom,
+            decimal_places,
         },
     };
 

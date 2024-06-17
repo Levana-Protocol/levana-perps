@@ -1,0 +1,50 @@
+name: Market Analyzer Docker Image
+
+on:
+  workflow_dispatch:
+  schedule:
+    # For cache, run at 9 AM UTC daily
+    - cron: "0 9 * * *"
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUST_BACKTRACE: short
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  market-analyzer-image:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ci-market-analyzer-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.25.2
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.75.0
+          components: rustfmt, clippy
+          targets: x86_64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+      - name: Dependencies
+        run: sudo apt install musl-tools -y
+      - name: Build market-params binary
+        run: just cargo-market-params-release
+      - name: Build image
+        run: just build-market-params-image
+      - name: Push image
+        run: just push-market-params-image
+        if: ${{ github.event_name != 'schedule' }}

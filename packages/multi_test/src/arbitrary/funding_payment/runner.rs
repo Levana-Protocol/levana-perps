@@ -85,7 +85,7 @@ impl FundingPayment {
                 .funding_fee_collateral
                 .into_number()
                 .abs()
-                .approx_eq(short.funding_fee_collateral.abs().into_number()));
+                .approx_eq(short.funding_fee_collateral.abs().into_number())?);
 
             match long_notional_size.cmp(&short_notional_size) {
                 Ordering::Greater => {

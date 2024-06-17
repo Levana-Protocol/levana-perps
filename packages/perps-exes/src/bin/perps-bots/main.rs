@@ -1,63 +1,74 @@
-use anyhow::Result;
-use app::AppBuilder;
-use axum::routing::{get, post};
+#![deny(clippy::as_conversions)]
+
+use anyhow::{Context, Result};
 use clap::Parser;
-use reqwest::{header::CONTENT_TYPE, Method};
-use tower_http::cors::CorsLayer;
+use parking_lot::deadlock;
+use pid1::Pid1Settings;
+use tokio::net::TcpListener;
 
 mod app;
 mod cli;
 pub(crate) mod config;
 mod endpoints;
 mod util;
+pub(crate) mod wallet_manager;
 pub(crate) mod watcher;
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    main_inner().await
+fn main() -> Result<()> {
+    Pid1Settings::new().enable_log(true).launch()?;
+    main_inner()
 }
 
-async fn main_inner() -> Result<()> {
+fn main_inner() -> Result<()> {
     dotenv::dotenv().ok();
 
     let opt = cli::Opt::parse();
-    opt.init_logger();
-    let mut app_builder = opt.into_app_builder().await?;
-    app_builder.launch_rest_api();
-    app_builder.load().await?;
 
-    app_builder.wait().await
-}
+    opt.init_logger()?;
 
-impl AppBuilder {
-    fn launch_rest_api(&mut self) {
-        let app = self.app.clone();
+    // Create a background thread which checks for deadlocks every 10s
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_secs(10));
+        let deadlocks = deadlock::check_deadlock();
+        if deadlocks.is_empty() {
+            continue;
+        }
+        tracing::error!("{} deadlocks detected", deadlocks.len());
+        for (i, threads) in deadlocks.iter().enumerate() {
+            tracing::error!("Deadlock #{}", i);
+            for t in threads {
+                tracing::error!("Thread Id {:#?}", t.thread_id());
+                tracing::error!("{:#?}", t.backtrace());
+            }
+        }
+    });
 
-        self.watch_background(async move {
-            let bind = app.bind;
-            let router = axum::Router::new()
-                .route("/", get(endpoints::common::homepage))
-                .route("/factory", get(endpoints::factory::factory))
-                .route("/frontend-config", get(endpoints::factory::factory))
-                .route("/healthz", get(endpoints::common::healthz))
-                .route("/build-version", get(endpoints::common::build_version))
-                .route("/api/faucet", post(endpoints::faucet::bot))
-                .route("/status", get(endpoints::status::all))
-                .route("/markets", get(endpoints::markets::markets))
-                .route("/debug/gas-usage", get(endpoints::debug::gases))
-                .with_state(app)
-                .layer(
-                    CorsLayer::new()
-                        .allow_origin(tower_http::cors::Any)
-                        .allow_methods([Method::GET, Method::HEAD, Method::POST])
-                        .allow_headers([CONTENT_TYPE]),
-                );
-            log::info!("Launching server");
+    let _guard = opt.sentry_dsn.clone().map(|sentry_dsn| {
+        sentry::init((
+            sentry_dsn,
+            sentry::ClientOptions {
+                release: sentry::release_name!(),
+                session_mode: sentry::SessionMode::Application,
+                debug: false,
+                // Have 1% sampling rate at production
+                traces_sample_rate: 0.01,
+                ..Default::default()
+            },
+        ))
+    });
 
-            axum::Server::bind(&bind)
-                .serve(router.into_make_service())
-                .await?;
-            Err(anyhow::anyhow!("Background task should never complete"))
-        });
-    }
+    // We do not use tokio macro because of this:
+    // https://docs.sentry.io/platforms/rust/#async-main-function
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(16)
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let listener = TcpListener::bind(&opt.bind).await.context(format!(
+                "Cannot launch bot HTTP service bound to {}",
+                opt.bind
+            ))?;
+            opt.into_app_builder().await?.start(listener).await
+        })
 }

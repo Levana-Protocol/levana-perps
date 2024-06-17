@@ -10,9 +10,6 @@ use serde::de::DeserializeOwned;
 
 use crate::error::{ErrorDomain, ErrorId};
 use crate::perp_anyhow;
-/// Marker trait to ensure all events are covered here
-/// by way of state.add_event()
-pub trait PerpEvent: Into<Event> {}
 
 /// Extension trait to add methods to native cosmwasm events
 pub trait CosmwasmEventExt {
@@ -58,6 +55,12 @@ pub trait CosmwasmEventExt {
         self.map_attr_result(key, |s| Timestamp::from_str(s).map_err(|x| x.into()))
     }
 
+    /// Parse a timestamp attribute, if it exists
+    fn try_timestamp_attr(&self, key: &str) -> anyhow::Result<Option<Timestamp>> {
+        self.try_map_attr(key, |s| Timestamp::from_str(s).map_err(|x| x.into()))
+            .transpose()
+    }
+
     /// Parse an unsigned decimal attribute
     fn decimal_attr<T: UnsignedDecimal>(&self, key: &str) -> anyhow::Result<T> {
         self.map_attr_result(key, |s| {
@@ -73,6 +76,15 @@ pub trait CosmwasmEventExt {
             s.parse()
                 .ok()
                 .with_context(|| format!("non_zero_attr failed on key {key} and value {s}"))
+        })
+    }
+
+    /// Parse a signed decimal attribute
+    fn signed_attr<T: UnsignedDecimal>(&self, key: &str) -> anyhow::Result<Signed<T>> {
+        self.map_attr_result(key, |s| {
+            s.parse()
+                .ok()
+                .with_context(|| format!("signed_attr failed on key {key} and value {s}"))
         })
     }
 
@@ -101,9 +113,25 @@ pub trait CosmwasmEventExt {
         .transpose()
     }
 
+    /// Parse an optional price
+    fn try_price_base_in_quote(&self, key: &str) -> anyhow::Result<Option<PriceBaseInQuote>> {
+        self.try_map_attr(key, |s| {
+            s.parse().ok().with_context(|| {
+                format!("try_price_base_in_quote failed parse on key {key} and value {s}")
+            })
+        })
+        .transpose()
+    }
+
     /// Parse a string attribute
     fn string_attr(&self, key: &str) -> anyhow::Result<String> {
         self.map_attr_ok(key, |s| s.to_string())
+    }
+
+    /// Parse a bool-as-string attribute
+    fn bool_attr(&self, key: &str) -> anyhow::Result<bool> {
+        self.string_attr(key)
+            .and_then(|s| s.parse::<bool>().map_err(|err| err.into()))
     }
 
     /// Parse an attribute with a position direction (to base)
@@ -117,13 +145,12 @@ pub trait CosmwasmEventExt {
 
     /// Parse an attribute with the absolute leverage (to base)
     fn leverage_to_base_attr(&self, key: &str) -> anyhow::Result<LeverageToBase> {
-        self.map_attr_result(key, |s| LeverageToBase::from_str(s))
+        self.map_attr_result(key, LeverageToBase::from_str)
     }
 
     /// Parse an optional attribute with the absolute leverage (to base)
     fn try_leverage_to_base_attr(&self, key: &str) -> anyhow::Result<Option<LeverageToBase>> {
-        self.try_map_attr(key, |s| LeverageToBase::from_str(s))
-            .transpose()
+        self.try_map_attr(key, LeverageToBase::from_str).transpose()
     }
 
     /// Parse an address attribute without checking validity

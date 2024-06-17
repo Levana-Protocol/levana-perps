@@ -82,7 +82,7 @@ impl State<'_> {
     ) -> Result<()> {
         // If we have no more liquidity in the system, but we still have some
         // active LP or xLP tokens. Need to ask the crank to wipe them out.
-        if stats.total_collateral().is_zero() && !stats.total_tokens().is_zero() {
+        if stats.total_collateral()?.is_zero() && !stats.total_tokens()?.is_zero() {
             let stats = LiquidityStats {
                 locked: Collateral::zero(),
                 unlocked: Collateral::zero(),
@@ -218,6 +218,7 @@ impl State<'_> {
         stats.last_accrue_key = self.latest_yield_per_token(ctx.storage)?.0;
 
         stats.unstaking = None;
+        stats.cooldown_ends = None;
         self.save_liquidity_stats_addr(ctx.storage, &addr, &stats)?;
 
         // And we're done! Move on.
@@ -242,6 +243,9 @@ impl State<'_> {
             ExecuteMsg::UpdatePositionRemoveCollateralImpactSize { .. } => true,
             ExecuteMsg::UpdatePositionLeverage { .. } => true,
             ExecuteMsg::UpdatePositionMaxGains { .. } => true,
+            ExecuteMsg::UpdatePositionTakeProfitPrice { .. } => true,
+            ExecuteMsg::UpdatePositionStopLossPrice { .. } => true,
+            #[allow(deprecated)]
             ExecuteMsg::SetTriggerOrder { .. } => true,
             ExecuteMsg::ClosePosition { .. } => true,
             ExecuteMsg::DepositLiquidity { .. } => true,
@@ -255,12 +259,13 @@ impl State<'_> {
             ExecuteMsg::Crank { .. } => false,
             ExecuteMsg::NftProxy { .. } => true,
             ExecuteMsg::LiquidityTokenProxy { .. } => true,
-            ExecuteMsg::SetPrice { .. } => false,
             ExecuteMsg::TransferDaoFees { .. } => true,
             ExecuteMsg::CloseAllPositions {} => true,
             ExecuteMsg::PlaceLimitOrder { .. } => true,
             ExecuteMsg::CancelLimitOrder { .. } => true,
             ExecuteMsg::ProvideCrankFunds {} => false,
+            ExecuteMsg::SetManualPrice { .. } => false,
+            ExecuteMsg::PerformDeferredExec { .. } => true,
         };
         if touches_liquidity && self.should_reset_lp_balances(ctx.storage)? {
             Err(anyhow::anyhow!(

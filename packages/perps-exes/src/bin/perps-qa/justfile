@@ -1,0 +1,7 @@
+# List all recipies
+default:
+	just --list --unsorted
+
+# Generate wallet report
+gen-wallet-report:
+	env COSMOS_GRPC="https://sentry.chain.grpc.injective.network" cargo run --bin perps-qa wallet-report --start-height 52263000 --total-datapoints 10000 --lookback-height-count 5000 --wallet-addr inj1aq8sknt5u54rduvqtquq0amk6adqwl34txxngp

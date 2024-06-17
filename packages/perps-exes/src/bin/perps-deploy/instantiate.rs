@@ -1,25 +1,24 @@
-use std::{collections::HashSet, str::FromStr};
+use std::collections::HashSet;
 
 use anyhow::{Context, Result};
-use cosmos::{Address, CodeId, HasAddress};
-use msg::contracts::market::entry::ExecuteOwnerMsg;
-use msg::contracts::pyth_bridge::PythMarketPriceFeeds;
+use cosmos::{Address, CodeId, ContractAdmin, Cosmos, HasAddress, Wallet};
+use msg::contracts::market::spot_price::{PythConfigInit, SpotPriceConfigInit, StrideConfigInit};
 use msg::prelude::*;
 use msg::{
     contracts::{
         cw20::Cw20Coin,
-        factory::entry::MarketInfoResponse,
         market::{config::ConfigUpdate, entry::NewMarketParams},
     },
     token::TokenInit,
 };
+use perps_exes::config::{ConfigTestnet, ConfigUpdateAndBorrowFee, MarketConfigUpdates};
+use perps_exes::contracts::{Factory, MarketInfo};
+use perps_exes::prelude::MarketContract;
 
-use crate::app::PythInfo;
-use crate::store_code::PYTH_BRIDGE;
+use crate::app::{App, PriceSourceConfig};
 use crate::{
     app::BasicApp,
     cli::Opt,
-    factory::{Factory, MarketInfo},
     faucet::Faucet,
     store_code::{FACTORY, LIQUIDITY_TOKEN, MARKET, POSITION_TOKEN},
     tracker::Tracker,
@@ -33,52 +32,92 @@ pub(crate) struct InstantiateOpt {
     /// Markets to instantiate
     #[clap(long, env = "PERPS_MARKET_ID")]
     pub(crate) market_id: Option<Vec<MarketId>>,
-    /// Is this a production deployment? Impacts labels used
-    #[clap(long)]
-    pub(crate) prod: bool,
-    /// Initial borrow fee rate
-    #[clap(long, default_value = "0.2")]
-    pub(crate) initial_borrow_fee_rate: Decimal256,
+}
+
+impl App {
+    pub(crate) fn make_instantiate_market(&self, market_id: MarketId) -> Result<InstantiateMarket> {
+        let ConfigUpdateAndBorrowFee {
+            mut config,
+            initial_borrow_fee_rate,
+        } = MarketConfigUpdates::load(&self.market_config)?
+            .markets
+            .get(&market_id)
+            .with_context(|| format!("No MarketConfigUpdate found for {market_id}"))?
+            .clone();
+
+        if self.dev_settings {
+            config.unstake_period_seconds = Some(60 * 60);
+        }
+        Ok(InstantiateMarket {
+            // TODO - maybe make this configurable via yaml files
+            collateral: match market_id.as_str() {
+                "nBTC_USD" => CollateralSource::Native {
+                    denom: "ibc/5946AD5E947FF47B521103044C74B6FC3DD242227433EE9278F2B044B2AA2DF0"
+                        .to_string(),
+                    decimal_places: 14,
+                },
+                _ => CollateralSource::Cw20(Cw20Source::Faucet(self.faucet.clone())),
+            },
+            config,
+            initial_borrow_fee_rate,
+            spot_price: match &self.price_source {
+                PriceSourceConfig::Wallet(admin) => SpotPriceConfigInit::Manual {
+                    admin: admin.get_address_string().into(),
+                },
+                PriceSourceConfig::Oracle(oracle) => {
+                    let market = oracle
+                        .markets
+                        .get(&market_id)
+                        .with_context(|| format!("No price config found for {market_id}"))?;
+                    let stride = match market.stride_contract_override {
+                        Some(stride) => Some(stride),
+                        None => oracle.stride_fallback.clone().map(|x| x.contract),
+                    };
+
+                    SpotPriceConfigInit::Oracle {
+                        pyth: oracle.pyth.as_ref().map(|pyth| PythConfigInit {
+                            contract_address: pyth.contract.get_address_string().into(),
+                            network: pyth.r#type,
+                        }),
+                        stride: stride.map(|addr| StrideConfigInit {
+                            contract_address: addr.get_address_string().into(),
+                        }),
+                        feeds: market
+                            .feeds
+                            .iter()
+                            .map(|feed| feed.clone().into())
+                            .collect(),
+                        feeds_usd: market
+                            .feeds_usd
+                            .iter()
+                            .map(|feed| feed.clone().into())
+                            .collect(),
+                        volatile_diff_seconds: None,
+                    }
+                }
+            },
+            market_id,
+        })
+    }
 }
 
 pub(crate) async fn go(opt: Opt, inst_opt: InstantiateOpt) -> Result<()> {
     let app = opt.load_app(&inst_opt.family).await?;
-    let is_prod = inst_opt.prod;
 
     instantiate(InstantiateParams {
         opt: &opt,
         basic: &app.basic,
-        code_id_source: CodeIdSource::Tracker(app.tracker),
+        config_testnet: &app.config_testnet,
         family: inst_opt.family,
         markets: inst_opt
             .market_id
             .unwrap_or_else(|| app.default_market_ids.clone())
             .into_iter()
-            .map(|market_id| InstantiateMarket {
-                price_source: app
-                    .pyth_info
-                    .as_ref()
-                    .and_then(|pyth| pyth.markets.get(&market_id))
-                    .cloned()
-                    .map_or(PriceSource::Manual, PriceSource::Pyth),
-                cw20_source: Cw20Source::Faucet(app.faucet.clone()),
-                market_id,
-            })
-            .collect(),
-        market_config_update: if app.dev_settings {
-            Some(ConfigUpdate {
-                unstake_period_seconds: Some(60 * 60),
-                ..Default::default()
-            })
-        } else {
-            None
-        },
+            .map(|market_id| app.make_instantiate_market(market_id))
+            .collect::<Result<_>>()?,
+        code_id_source: CodeIdSource::Tracker(app.tracker),
         trading_competition: app.trading_competition,
         faucet_admin: Some(app.wallet_manager),
-        price_admin: app.price_admin,
-        is_prod,
-        initial_borrow_fee_rate: inst_opt.initial_borrow_fee_rate,
-        pyth_info: app.pyth_info.clone(),
     })
     .await?;
 
@@ -95,12 +134,13 @@ pub(crate) struct InstantiateResponse {
 pub(crate) struct MarketResponse {
     pub(crate) market_id: MarketId,
     pub(crate) market_addr: Address,
-    pub(crate) cw20: Address,
+    pub(crate) collateral: CollateralResponse,
 }
 
-pub(crate) enum PriceSource {
-    Manual,
-    Pyth(PythMarketPriceFeeds),
+#[derive(serde::Serialize)]
+pub(crate) enum CollateralResponse {
+    Cw20(Address),
+    Native { denom: String, decimal_places: u8 },
 }
 
 pub(crate) enum Cw20Source {
@@ -118,54 +158,44 @@ pub(crate) struct ProtocolCodeIds {
     pub(crate) position_token_code_id: CodeId,
     pub(crate) liquidity_token_code_id: CodeId,
     pub(crate) market_code_id: CodeId,
-    pub(crate) pyth_bridge_code_id: CodeId,
 }
 
 /// Parameters to instantiate, used to avoid too many function parameters.
 pub(crate) struct InstantiateParams<'a> {
     pub(crate) opt: &'a Opt,
     pub(crate) basic: &'a BasicApp,
+    pub(crate) config_testnet: &'a ConfigTestnet,
     pub(crate) code_id_source: CodeIdSource,
     pub(crate) family: String,
     pub(crate) markets: Vec<InstantiateMarket>,
-    pub(crate) market_config_update: Option<ConfigUpdate>,
     pub(crate) trading_competition: bool,
     /// Address that should be set as a faucet admin
     pub(crate) faucet_admin: Option<Address>,
-    pub(crate) price_admin: Address,
-    /// Is this a production contract? If so, does not include the family in the label
-    pub(crate) is_prod: bool,
-    /// Initial borrow fee rate
-    pub(crate) initial_borrow_fee_rate: Decimal256,
-    pub(crate) pyth_info: Option<PythInfo>,
 }
 
 pub(crate) struct InstantiateMarket {
     pub(crate) market_id: MarketId,
-    pub(crate) cw20_source: Cw20Source,
-    pub(crate) price_source: PriceSource,
+    pub(crate) collateral: CollateralSource,
+    pub(crate) config: ConfigUpdate,
+    pub(crate) initial_borrow_fee_rate: Decimal256,
+    pub(crate) spot_price: SpotPriceConfigInit,
+}
+
+pub(crate) enum CollateralSource {
+    Cw20(Cw20Source),
+    Native { denom: String, decimal_places: u8 },
 }
 
 pub(crate) async fn instantiate(
     InstantiateParams {
         opt,
-        basic:
-            BasicApp {
-                cosmos,
-                wallet,
-                network: _,
-                chain_config: _,
-            },
+        basic,
+        config_testnet,
         code_id_source,
-        market_config_update,
         trading_competition,
         faucet_admin,
-        price_admin,
-        is_prod,
         markets,
         family,
-        initial_borrow_fee_rate,
-        pyth_info,
     }: InstantiateParams<'_>,
 ) -> Result<InstantiateResponse> {
     let (
@@ -175,7 +205,6 @@ pub(crate) async fn instantiate(
             position_token_code_id,
             liquidity_token_code_id,
             market_code_id,
-            pyth_bridge_code_id,
         },
     ) = match code_id_source {
         CodeIdSource::Tracker(tracker) => {
@@ -184,7 +213,6 @@ pub(crate) async fn instantiate(
                 position_token_code_id: tracker.require_code_by_type(opt, POSITION_TOKEN).await?,
                 liquidity_token_code_id: tracker.require_code_by_type(opt, LIQUIDITY_TOKEN).await?,
                 market_code_id: tracker.require_code_by_type(opt, MARKET).await?,
-                pyth_bridge_code_id: tracker.require_code_by_type(opt, PYTH_BRIDGE).await?,
             };
             (Some(tracker), ids)
         }
@@ -192,11 +220,10 @@ pub(crate) async fn instantiate(
     };
 
     let mut to_log: Vec<(u64, Address)> = vec![];
-    let label_suffix = if is_prod {
-        "".to_owned()
-    } else {
-        format!(" - {family}")
-    };
+    let label_suffix = format!(" - {family}");
+
+    let wallet = basic.get_wallet()?;
+    let cosmos = &basic.cosmos;
 
     let factory = factory_code_id
         .instantiate(
@@ -214,225 +241,30 @@ pub(crate) async fn instantiate(
                 wind_down: wallet.get_address_string().into(),
                 label_suffix: Some(label_suffix),
             },
+            ContractAdmin::Sender,
         )
         .await?;
+    let factory = Factory::from_contract(factory);
     log::info!("New factory deployed at {factory}");
     to_log.push((factory_code_id.get_code_id(), factory.get_address()));
 
-    let pyth_bridge = match pyth_info {
-        None => {
-            log::info!("No Pyth info provided, skipping Pyth bridge instantiation");
-            None
-        }
-        Some(pyth_info) => {
-            let pyth_bridge = pyth_bridge_code_id
-                .instantiate(
-                    wallet,
-                    "Levana Perps Pyth Bridge".to_string(),
-                    vec![],
-                    msg::contracts::pyth_bridge::entry::InstantiateMsg {
-                        factory: factory.get_address().to_string().into(),
-                        pyth: pyth_info.address.to_string().into(),
-                        update_age_tolerance_seconds: pyth_info.update_age_tolerance,
-                    },
-                )
-                .await?;
-            log::info!(
-                "New Pyth bridge deployed at {pyth_bridge} w/ update age tolerance of {}",
-                pyth_info.update_age_tolerance
-            );
-            to_log.push((pyth_bridge_code_id.get_code_id(), pyth_bridge.get_address()));
+    let mut market_res = Vec::<(MarketResponse, SpotPriceConfigInit)>::new();
 
-            Some(pyth_bridge)
-        }
-    };
-
-    let mut market_res = Vec::<MarketResponse>::new();
-
-    for InstantiateMarket {
-        market_id,
-        cw20_source,
-        price_source,
-    } in markets
-    {
-        log::info!(
-            "Finding CW20 for collateral asset {} for market {market_id}",
-            market_id.get_collateral()
-        );
-        let (cw20, trading_competition) = match cw20_source {
-            Cw20Source::Existing(address) => {
-                anyhow::ensure!(
-                    !trading_competition,
-                    "Cannot use existing CW20 with trading competition"
-                );
-                (address, None)
-            }
-            Cw20Source::Faucet(faucet) => {
-                let (cw20, trading_competition) = if trading_competition {
-                    log::info!("Trading competition, creating a fresh CW20");
-                    let index = faucet
-                        .next_trading_index(market_id.get_collateral())
-                        .await?;
-                    faucet
-                        .deploy_token(wallet, market_id.get_collateral(), Some(index))
-                        .await?;
-                    let address = faucet
-                        .get_cw20(market_id.get_collateral(), Some(index))
-                        .await?
-                        .context(
-                            "CW20 for trading competition still not available after deploying it",
-                        )?;
-                    (address, Some(index))
-                } else {
-                    let address = match faucet.get_cw20(market_id.get_collateral(), None).await? {
-                        Some(addr) => {
-                            log::info!("Using existing CW20");
-                            addr
-                        }
-                        None => {
-                            log::info!("Deploying fresh CW20");
-                            faucet
-                                .deploy_token(wallet, market_id.get_collateral(), None)
-                                .await?;
-                            faucet
-                                .get_cw20(market_id.get_collateral(), None)
-                                .await?
-                                .context("CW20 still not available after deploying it")?
-                        }
-                    };
-                    (address, None)
-                };
-
-                if let Some(new_admin) = faucet_admin {
-                    // Try adding the wallet manager address as a faucet admin. Ignore errors, it
-                    // (probably) just means we've already added that address.
-                    if faucet.is_admin(new_admin).await? {
-                        log::info!(
-                            "{new_admin} is already a faucet admin for {}",
-                            faucet.get_address()
-                        );
-                    } else {
-                        log::info!(
-                            "Trying to set {new_admin} as a faucet admin on {}",
-                            faucet.get_address()
-                        );
-                        let res = faucet.add_admin(wallet, new_admin).await?;
-                        log::info!("Admin set in {}", res.txhash);
-                    }
-                }
-
-                let res = faucet
-                    .mint(wallet, cw20, make_initial_balances(&[wallet.get_address()]))
-                    .await?;
-                log::info!("Minted in {}", res.txhash);
-                (cw20, trading_competition.map(|index| (index, faucet)))
-            }
-        };
-        log::info!("Using CW20 {cw20}");
-
-        let cw20 = cosmos.make_contract(cw20);
-
-        let price_admin = match price_source {
-            PriceSource::Pyth(market_price_feeds) => match &pyth_bridge {
-                None => {
-                    log::warn!("Market {market_id} is configured for pyth, but there is no bridge, so using manual updates instead");
-                    price_admin.to_string().into()
-                }
-                Some(pyth_bridge) => {
-                    log::info!("Setting price feed for market {market_id} to use Pyth Oracle.");
-                    log::info!(
-                        "Main price feeds: {:?}, USD price feeds: {:?}",
-                        market_price_feeds.feeds,
-                        market_price_feeds.feeds_usd
-                    );
-                    pyth_bridge
-                        .execute(
-                            wallet,
-                            vec![],
-                            msg::contracts::pyth_bridge::entry::ExecuteMsg::SetMarketPriceFeeds {
-                                market_id: market_id.clone(),
-                                market_price_feeds,
-                            },
-                        )
-                        .await?;
-
-                    pyth_bridge.get_address_string().into()
-                }
-            },
-            PriceSource::Manual => {
-                log::info!("Setting price feed for market {market_id} to use manual updates");
-                price_admin.to_string().into()
-            }
-        };
-
-        let res = factory
-            .execute(
+    for market in markets {
+        let spot_price = market.spot_price.clone();
+        let res = market
+            .add(
                 wallet,
-                vec![],
-                msg::contracts::factory::entry::ExecuteMsg::AddMarket {
-                    new_market: NewMarketParams {
-                        market_id: market_id.clone(),
-                        token: TokenInit::Cw20 {
-                            addr: cw20.get_address_string().into(),
-                        },
-                        config: market_config_update.clone(),
-                        price_admin,
-                        initial_borrow_fee_rate,
-                    },
+                cosmos,
+                config_testnet,
+                AddMarketParams {
+                    trading_competition,
+                    faucet_admin,
+                    factory: factory.clone(),
                 },
             )
             .await?;
-        log::info!("Market {market_id} added at {}", res.txhash);
-
-        let MarketInfoResponse { market_addr, .. } = factory
-            .query(msg::contracts::factory::entry::QueryMsg::MarketInfo {
-                market_id: market_id.clone(),
-            })
-            .await?;
-        log::info!("New market address for {market_id}: {market_addr}");
-        let market_addr = Address::from_str(market_addr.as_str())?;
-
-        if let Some((trading_competition_index, faucet)) = trading_competition {
-            let res = faucet
-                .set_market_address(
-                    wallet,
-                    market_id.get_collateral(),
-                    trading_competition_index,
-                    market_addr,
-                )
-                .await?;
-            log::info!(
-                "Set market on the new trading competition CW20 at {}",
-                res.txhash
-            );
-
-            let res = cosmos
-                .make_contract(market_addr)
-                .execute(
-                    wallet,
-                    vec![],
-                    msg::contracts::market::entry::ExecuteMsg::Owner(
-                        ExecuteOwnerMsg::ConfigUpdate {
-                            update: ConfigUpdate {
-                                disable_position_nft_exec: Some(true),
-                                ..Default::default()
-                            },
-                        },
-                    ),
-                )
-                .await?;
-
-            log::info!(
-                "Disabled NFT executions for new trading competition at {}",
-                res.txhash
-            );
-        }
-
-        market_res.push(MarketResponse {
-            market_id,
-            market_addr,
-            cw20: cw20.get_address(),
-        })
+        market_res.push((res, spot_price));
     }
 
     let factory_addr = factory.get_address();
@@ -442,7 +274,7 @@ pub(crate) async fn instantiate(
         position_token,
         liquidity_token_lp,
         liquidity_token_xlp,
-    } in Factory::from_contract(factory).get_markets().await?
+    } in factory.get_markets().await?
     {
         to_log.push((market_code_id.get_code_id(), market.get_address()));
         to_log.push((
@@ -464,9 +296,45 @@ pub(crate) async fn instantiate(
         log::info!("Logged new contracts in tracker at {}", res.txhash);
     }
 
+    // Sanity check the markets. Might be removed one day, but for now it's helpful to debug.
+    for (market, spot_price) in market_res.iter() {
+        match spot_price {
+            SpotPriceConfigInit::Manual { .. } => {
+                log::info!("not doing initial crank for {} because it's a manual market so an initial price must be added first", market.market_id);
+            }
+            SpotPriceConfigInit::Oracle {
+                feeds, feeds_usd, ..
+            } => {
+                if feeds.iter().chain(feeds_usd.iter()).any(|f| {
+                    matches!(
+                        f.data,
+                        msg::contracts::market::spot_price::SpotPriceFeedDataInit::Pyth { .. }
+                    )
+                }) {
+                    log::info!("not doing initial crank for {} because it contains pyth feeds which may need a publish first", market.market_id);
+                } else {
+                    log::info!("doing initial crank to sanity check that spot price oracle is working for {}", market.market_id);
+                    let contract = cosmos.make_contract(market.market_addr);
+                    contract
+                        .execute(
+                            wallet,
+                            vec![],
+                            msg::contracts::market::entry::ExecuteMsg::Crank {
+                                execs: None,
+                                rewards: None,
+                            },
+                        )
+                        .await?;
+                }
+            }
+        }
+    }
+
+    log::info!("Done!");
+
     Ok(InstantiateResponse {
         factory: factory_addr,
-        markets: market_res,
+        markets: market_res.into_iter().map(|(market, _)| market).collect(),
     })
 }
 
@@ -485,3 +353,218 @@ fn make_initial_balances(addrs: &[Address]) -> Vec<Cw20Coin> {
 }
 
 pub(crate) const INITIAL_BALANCE_AMOUNT: u128 = 1_000_000_000_000_000_000u128;
+
+pub(crate) struct AddMarketParams {
+    pub(crate) trading_competition: bool,
+    pub(crate) faucet_admin: Option<Address>,
+    pub(crate) factory: Factory,
+}
+
+impl InstantiateMarket {
+    pub(crate) async fn add(
+        self,
+        wallet: &Wallet,
+        cosmos: &Cosmos,
+        config_testnet: &ConfigTestnet,
+        AddMarketParams {
+            trading_competition,
+            faucet_admin,
+            factory,
+        }: AddMarketParams,
+    ) -> Result<MarketResponse> {
+        let InstantiateMarket {
+            market_id,
+            collateral,
+            config,
+            initial_borrow_fee_rate,
+            spot_price,
+        } = self;
+
+        let (collateral, trading_competition) = match collateral {
+            CollateralSource::Cw20(cw20_source) => {
+                log::info!(
+                    "Finding CW20 for collateral asset {} for market {market_id}",
+                    market_id.get_collateral()
+                );
+                let (cw20, trading_competition) = match cw20_source {
+                    Cw20Source::Existing(address) => {
+                        anyhow::ensure!(
+                            !trading_competition,
+                            "Cannot use existing CW20 with trading competition"
+                        );
+                        (address, None)
+                    }
+                    Cw20Source::Faucet(faucet) => {
+                        let (cw20, trading_competition) = if trading_competition {
+                            log::info!("Trading competition, creating a fresh CW20");
+                            let index = faucet
+                                .next_trading_index(market_id.get_collateral())
+                                .await?;
+                            faucet
+                                .deploy_token(wallet, market_id.get_collateral(), Some(index))
+                                .await?;
+                            let address = faucet
+                                .get_cw20(market_id.get_collateral(), Some(index))
+                                .await?
+                                .context(
+                                    "CW20 for trading competition still not available after deploying it",
+                                )?;
+                            (address, Some(index))
+                        } else {
+                            let address = match faucet
+                                .get_cw20(market_id.get_collateral(), None)
+                                .await?
+                            {
+                                Some(addr) => {
+                                    log::info!("Using existing CW20");
+                                    addr
+                                }
+                                None => {
+                                    log::info!("Deploying fresh CW20");
+                                    faucet
+                                        .deploy_token(wallet, market_id.get_collateral(), None)
+                                        .await?;
+                                    faucet
+                                        .get_cw20(market_id.get_collateral(), None)
+                                        .await?
+                                        .context("CW20 still not available after deploying it")?
+                                }
+                            };
+                            (address, None)
+                        };
+
+                        if let Some(new_admin) = faucet_admin {
+                            // Try adding the wallet manager address as a faucet admin. Ignore errors, it
+                            // (probably) just means we've already added that address.
+                            if faucet.is_admin(new_admin).await? {
+                                log::info!(
+                                    "{new_admin} is already a faucet admin for {}",
+                                    faucet.get_address()
+                                );
+                            } else {
+                                log::info!(
+                                    "Trying to set {new_admin} as a faucet admin on {}",
+                                    faucet.get_address()
+                                );
+                                let res = faucet.add_admin(wallet, new_admin).await?;
+                                log::info!("Admin set in {}", res.txhash);
+                            }
+                        }
+
+                        let res = faucet
+                            .mint(wallet, cw20, make_initial_balances(&[wallet.get_address()]))
+                            .await?;
+                        log::info!("Minted in {}", res.txhash);
+                        (cw20, trading_competition.map(|index| (index, faucet)))
+                    }
+                };
+                log::info!("Using CW20 {cw20}");
+
+                let cw20 = cosmos.make_contract(cw20);
+
+                (
+                    CollateralResponse::Cw20(cw20.get_address()),
+                    trading_competition,
+                )
+            }
+            CollateralSource::Native {
+                denom,
+                decimal_places,
+            } => {
+                log::info!("Using native denom {denom} for market {market_id}",);
+                anyhow::ensure!(
+                    !trading_competition,
+                    "Cannot use native denom with trading competition"
+                );
+                (
+                    CollateralResponse::Native {
+                        denom,
+                        decimal_places,
+                    },
+                    None,
+                )
+            }
+        };
+        let initial_price = match &spot_price {
+            SpotPriceConfigInit::Manual { .. } => Some(
+                *config_testnet
+                    .initial_prices
+                    .get(&market_id)
+                    .with_context(|| format!("No initial prices found for {market_id}"))?,
+            ),
+            SpotPriceConfigInit::Oracle { .. } => None,
+        };
+
+        let res = factory
+            .add_market(
+                wallet,
+                NewMarketParams {
+                    market_id: market_id.clone(),
+                    token: match &collateral {
+                        CollateralResponse::Cw20(addr) => TokenInit::Cw20 {
+                            addr: addr.to_string().into(),
+                        },
+                        CollateralResponse::Native {
+                            denom,
+                            decimal_places,
+                        } => TokenInit::Native {
+                            denom: denom.clone(),
+                            decimal_places: *decimal_places,
+                        },
+                    },
+                    config: Some(config),
+                    initial_borrow_fee_rate,
+                    spot_price,
+                    initial_price,
+                },
+            )
+            .await
+            .with_context(|| format!("Adding new market {market_id}"))?;
+        log::info!("Market {market_id} added at {}", res.txhash);
+
+        let MarketInfo { market, .. } = factory.get_market(market_id.clone()).await?;
+        let market_addr = market.get_address();
+        log::info!("New market address for {market_id}: {market_addr}");
+
+        if let Some((trading_competition_index, faucet)) = trading_competition {
+            let res = faucet
+                .set_market_address(
+                    wallet,
+                    market_id.get_collateral(),
+                    trading_competition_index,
+                    market_addr,
+                )
+                .await?;
+            log::info!(
+                "Set market on the new trading competition CW20 at {}",
+                res.txhash
+            );
+
+            let market = MarketContract::new(cosmos.make_contract(market_addr));
+
+            let res = market
+                .config_update(
+                    wallet,
+                    ConfigUpdate {
+                        disable_position_nft_exec: Some(true),
+                        ..Default::default()
+                    },
+                )
+                .await?;
+
+            log::info!(
+                "Disabled NFT executions for new trading competition at {}",
+                res.txhash
+            );
+
+            let res = factory.disable_trades(wallet, market_id.clone()).await?;
+            log::info!("Market shut down in {}", res.txhash);
+        }
+
+        Ok(MarketResponse {
+            market_id,
+            market_addr,
+            collateral,
+        })
+    }
+}

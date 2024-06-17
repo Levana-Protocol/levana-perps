@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use axum::async_trait;
@@ -8,26 +8,31 @@ use msg::contracts::faucet::entry::{GasAllowanceResp, TapAmountResponse};
 use msg::prelude::*;
 use msg::{
     contracts::{
-        factory::entry::{MarketInfoResponse, MarketsResp},
+        factory::entry::MarketInfoResponse,
         tracker::entry::{CodeIdResp, ContractResp},
     },
     token::Token,
 };
+use reqwest::header::{HeaderValue, REFERER};
 
-use crate::config::BotConfig;
+use crate::config::BotConfigByType;
+use crate::util::markets::{get_markets, Market};
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
 use super::{App, AppBuilder};
 
-#[derive(serde::Serialize)]
-#[serde(rename_all = "snake_case")]
 pub(crate) struct FactoryInfo {
     pub(crate) factory: Address,
-    pub(crate) faucet: Address,
     pub(crate) updated: DateTime<Utc>,
     pub(crate) is_static: bool,
+    pub(crate) markets: Vec<Market>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) struct FrontendInfoTestnet {
+    pub(crate) faucet: Address,
     pub(crate) cw20s: Vec<Cw20>,
-    pub(crate) markets: HashMap<MarketId, Address>,
     pub(crate) gitrev: Option<String>,
     pub(crate) faucet_gas_amount: Option<String>,
     pub(crate) faucet_collateral_amount: HashMap<&'static str, Decimal256>,
@@ -51,7 +56,7 @@ pub(crate) struct Cw20 {
 }
 
 impl AppBuilder {
-    pub(super) fn launch_factory_task(&mut self) -> Result<()> {
+    pub(super) fn start_factory_task(&mut self) -> Result<()> {
         self.watch_periodic(crate::watcher::TaskLabel::GetFactory, FactoryUpdate)
     }
 }
@@ -61,87 +66,134 @@ struct FactoryUpdate;
 
 #[async_trait]
 impl WatchedTask for FactoryUpdate {
-    async fn run_single(&mut self, app: &App, _heartbeat: Heartbeat) -> Result<WatchedTaskOutput> {
-        update(app).await
+    async fn run_single(
+        &mut self,
+        app: Arc<App>,
+        _heartbeat: Heartbeat,
+    ) -> Result<WatchedTaskOutput> {
+        update(&app).await
     }
 }
 
 async fn update(app: &App) -> Result<WatchedTaskOutput> {
-    let info = get_factory_info(&app.cosmos, &app.config, &app.client).await?;
-    let output = WatchedTaskOutput {
-        skip_delay: false,
-        message: format!(
-            "Successfully loaded factory address {} from tracker {}",
-            info.factory, app.config.tracker
-        ),
+    let (message, info) = match &app.config.by_type {
+        BotConfigByType::Testnet { inner } => {
+            let (message, factory_info, frontend_info_testnet) = get_factory_info_testnet(
+                &app.cosmos,
+                &app.client,
+                app.opt.referer_header.clone(),
+                inner.tracker,
+                inner.faucet,
+                &inner.contract_family,
+                &inner.rpc_nodes,
+                &app.config.ignored_markets,
+            )
+            .await?;
+            app.set_frontend_info_testnet(frontend_info_testnet).await?;
+            (message, factory_info)
+        }
+        BotConfigByType::Mainnet { inner } => {
+            get_factory_info_mainnet(&app.cosmos, inner.factory, &app.config.ignored_markets)
+                .await?
+        }
     };
-    app.set_factory_info(info);
+    let output = WatchedTaskOutput::new(message);
+    app.set_factory_info(info).await;
     Ok(output)
 }
 
-pub(crate) async fn get_factory_info(
+pub(crate) async fn get_factory_info_mainnet(
     cosmos: &Cosmos,
-    config: &BotConfig,
+    factory: Address,
+    ignored_markets: &HashSet<MarketId>,
+) -> Result<(String, FactoryInfo)> {
+    let message = format!("Using hard-coded factory address {factory}");
+
+    let markets = get_markets(cosmos, &cosmos.make_contract(factory), ignored_markets).await?;
+
+    let factory_info = FactoryInfo {
+        factory,
+        updated: Utc::now(),
+        is_static: false,
+        markets,
+    };
+    Ok((message, factory_info))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn get_factory_info_testnet(
+    cosmos: &Cosmos,
     client: &reqwest::Client,
-) -> Result<FactoryInfo> {
-    let (factory, gitrev) = get_contract(cosmos, config, "factory")
+    referer: reqwest::Url,
+    tracker: Address,
+    faucet: Address,
+    family: &str,
+    rpc_nodes: &[Arc<String>],
+    ignored_markets: &HashSet<MarketId>,
+) -> Result<(String, FactoryInfo, FrontendInfoTestnet)> {
+    let (factory, gitrev) = get_contract(cosmos, tracker, family, "factory")
         .await
         .context("Unable to get 'factory' contract")?;
-    let (cw20s, markets) = get_tokens_markets(cosmos, factory)
+    let message = format!("Successfully loaded factory address {factory} from tracker {tracker}",);
+
+    let (cw20s, markets) = get_tokens_markets(cosmos, factory, ignored_markets)
         .await
         .with_context(|| format!("Unable to get_tokens_market for factory {factory}"))?;
-    let faucet_gas_amount = match get_faucet_gas_amount(cosmos, config.faucet).await {
+    let faucet_gas_amount = match get_faucet_gas_amount(cosmos, faucet).await {
         Ok(x) => x,
         Err(e) => {
-            log::warn!("Error on get_faucet_gas_amount: {e:?}");
+            tracing::warn!("Error on get_faucet_gas_amount: {e:?}");
             None
         }
     };
-    let faucet_collateral_amount = match get_faucet_collateral_amount(cosmos, config.faucet).await {
+
+    let faucet_collateral_amount = match get_faucet_collateral_amount(cosmos, faucet).await {
         Ok(x) => x,
         Err(e) => {
-            log::warn!("Error on get_faucet_collateral_amount: {e:?}");
+            tracing::warn!("Error on get_faucet_collateral_amount: {e:?}");
             HashMap::new()
         }
     };
-    let rpc = get_rpc_info(cosmos, config, client).await?;
-    Ok(FactoryInfo {
+
+    let rpc = get_rpc_info(cosmos, client, referer, rpc_nodes).await?;
+
+    let factory_info = FactoryInfo {
         factory,
-        faucet: config.faucet,
         updated: Utc::now(),
         is_static: false,
-        cw20s,
         markets,
+    };
+    let frontend_info_testnet = FrontendInfoTestnet {
+        faucet,
+        cw20s,
         gitrev,
         faucet_gas_amount,
         faucet_collateral_amount,
         rpc,
-    })
+    };
+    Ok((message, factory_info, frontend_info_testnet))
 }
 
 pub(crate) async fn get_contract(
     cosmos: &Cosmos,
-    config: &BotConfig,
+    tracker: Address,
+    family: &str,
     contract_type: &str,
 ) -> Result<(Address, Option<String>)> {
-    let tracker = cosmos.make_contract(config.tracker);
+    let tracker = cosmos.make_contract(tracker);
     let (addr, code_id) = match tracker
         .query(msg::contracts::tracker::entry::QueryMsg::ContractByFamily {
             contract_type: contract_type.to_owned(),
-            family: config.contract_family.clone(),
+            family: family.to_owned(),
             sequence: None,
         })
         .await
         .with_context(|| {
-            format!(
-                "Calling ContractByFamily with {contract_type} and {} against {tracker}",
-                config.contract_family
-            )
+            format!("Calling ContractByFamily with {contract_type} and {family} against {tracker}",)
         })? {
-        ContractResp::NotFound {} => anyhow::bail!(
-            "No {contract_type} contract found for contract family {}",
-            config.contract_family
-        ),
+        ContractResp::NotFound {} => {
+            anyhow::bail!("No {contract_type} contract found for contract family {family}",)
+        }
         ContractResp::Found {
             address,
             current_code_id,
@@ -161,56 +213,43 @@ pub(crate) async fn get_contract(
 async fn get_tokens_markets(
     cosmos: &Cosmos,
     factory: Address,
-) -> Result<(Vec<Cw20>, HashMap<MarketId, Address>)> {
+    ignored_markets: &HashSet<MarketId>,
+) -> Result<(Vec<Cw20>, Vec<Market>)> {
     let factory = cosmos.make_contract(factory);
+    let markets = get_markets(cosmos, &factory, ignored_markets).await?;
     let mut tokens = vec![];
-    let mut markets_map = HashMap::new();
-    let mut start_after = None;
-    loop {
-        let MarketsResp { markets } = factory
-            .query(msg::contracts::factory::entry::QueryMsg::Markets {
-                start_after: start_after.take(),
-                limit: None,
+    for market in &markets {
+        let denom = market.market_id.get_collateral().to_owned();
+        let market_info: MarketInfoResponse = factory
+            .query(msg::contracts::factory::entry::QueryMsg::MarketInfo {
+                market_id: market.market_id.clone(),
             })
             .await?;
-        match markets.last() {
-            Some(x) => start_after = Some(x.clone()),
-            None => break Ok((tokens, markets_map)),
+        let market_addr = market_info.market_addr.into_string().parse()?;
+        let market = cosmos.make_contract(market_addr);
+
+        // Simplify backwards compatibility issues: only look at the field we care about
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "snake_case")]
+        struct StatusRespJustCollateral {
+            collateral: Token,
         }
-
-        for market_id in markets {
-            let denom = market_id.get_collateral().to_owned();
-            let market_info: MarketInfoResponse = factory
-                .query(msg::contracts::factory::entry::QueryMsg::MarketInfo {
-                    market_id: market_id.clone(),
-                })
-                .await?;
-            let market_addr = market_info.market_addr.into_string().parse()?;
-            markets_map.insert(market_id, market_addr);
-            let market = cosmos.make_contract(market_addr);
-
-            // Simplify backwards compatibility issues: only look at the field we care about
-            #[derive(serde::Deserialize)]
-            #[serde(rename_all = "snake_case")]
-            struct StatusRespJustCollateral {
-                collateral: Token,
-            }
-            let StatusRespJustCollateral { collateral } = market
-                .query(msg::contracts::market::entry::QueryMsg::Status {})
-                .await?;
-            match collateral {
-                msg::token::Token::Cw20 {
-                    addr,
-                    decimal_places,
-                } => tokens.push(Cw20 {
-                    address: addr.as_str().parse()?,
-                    denom,
-                    decimals: decimal_places,
-                }),
-                msg::token::Token::Native { .. } => (),
-            }
+        let StatusRespJustCollateral { collateral } = market
+            .query(msg::contracts::market::entry::QueryMsg::Status { price: None })
+            .await?;
+        match collateral {
+            msg::token::Token::Cw20 {
+                addr,
+                decimal_places,
+            } => tokens.push(Cw20 {
+                address: addr.as_str().parse()?,
+                denom,
+                decimals: decimal_places,
+            }),
+            msg::token::Token::Native { .. } => (),
         }
     }
+    Ok((tokens, markets))
 }
 
 async fn get_faucet_gas_amount(cosmos: &Cosmos, faucet: Address) -> Result<Option<String>> {
@@ -252,33 +291,38 @@ async fn get_faucet_collateral_amount(
 
 async fn get_rpc_info(
     cosmos: &Cosmos,
-    config: &BotConfig,
     client: &reqwest::Client,
+    referer: reqwest::Url,
+    rpc_nodes: &[Arc<String>],
 ) -> Result<RpcInfo> {
     let grpc = cosmos.get_latest_block_info().await?;
 
     let mut handles = vec![];
-    for node in &config.rpc_nodes {
-        handles.push(tokio::task::spawn(get_height(node.clone(), client.clone())));
+    for node in rpc_nodes {
+        handles.push(tokio::task::spawn(get_height(
+            node.clone(),
+            client.clone(),
+            referer.clone(),
+        )));
     }
 
     let mut results = vec![];
     for handle in handles {
         match handle.await {
             Ok(Ok(pair)) => results.push(pair),
-            Ok(Err(e)) => log::warn!("{e:?}"),
-            Err(e) => log::warn!("{e:?}"),
+            Ok(Err(e)) => tracing::warn!("{e:?}"),
+            Err(e) => tracing::warn!("{e:?}"),
         }
     }
 
     results.sort_by_key(|x| x.1);
-    let (endpoint, rpc_height) = match results.into_iter().rev().next() {
+    let (endpoint, rpc_height) = match results.into_iter().next_back() {
         Some(pair) => pair,
         // All nodes are broken
-        None => match config.rpc_nodes.first() {
-            Some(node) => (node.clone(), 0),
-            None => anyhow::bail!("Config includes no RPC nodes"),
-        },
+        None => {
+            let node = rpc_nodes.first().context("Config includes no RPC nodes")?;
+            (node.clone(), 0)
+        }
     };
 
     let grpc_height = grpc.height.try_into()?;
@@ -291,7 +335,11 @@ async fn get_rpc_info(
     })
 }
 
-async fn get_height(node: Arc<String>, client: reqwest::Client) -> Result<(Arc<String>, u64)> {
+pub(crate) async fn get_height(
+    node: Arc<String>,
+    client: reqwest::Client,
+    referer: reqwest::Url,
+) -> Result<(Arc<String>, u64)> {
     let node_clone = node.clone();
     tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
         let url = if node.ends_with('/') {
@@ -301,6 +349,7 @@ async fn get_height(node: Arc<String>, client: reqwest::Client) -> Result<(Arc<S
         };
         let value = client
             .get(url)
+            .header(REFERER, HeaderValue::from_str(referer.as_str())?)
             .send()
             .await?
             .error_for_status()?

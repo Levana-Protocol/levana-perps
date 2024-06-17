@@ -1,6 +1,6 @@
-use cosmos::{Address, CosmosNetwork, RawWallet};
+use cosmos::{Address, SeedPhrase};
 use msg::{contracts::market::position::PositionId, prelude::*};
-use perps_exes::{build_version, UpdatePositionCollateralImpact};
+use perps_exes::{build_version, PerpsNetwork, UpdatePositionCollateralImpact};
 
 #[derive(clap::Parser)]
 #[clap(version = build_version())]
@@ -76,6 +76,9 @@ pub(crate) enum Subcommand {
         /// Current USD Price
         #[clap(long)]
         price: PriceBaseInQuote,
+        /// Price of collateral assert in terms of USD
+        #[clap(long)]
+        price_usd: PriceCollateralInUsd,
     },
     /// Crank
     Crank {},
@@ -117,13 +120,18 @@ pub(crate) enum Subcommand {
         #[clap(flatten)]
         inner: crate::capping::Opt,
     },
+    /// Generate a CSV file with historical wallet balances
+    WalletReport {
+        #[clap(flatten)]
+        inner: crate::wallet::Opt,
+    },
 }
 
 #[derive(clap::Parser)]
 pub(crate) struct Opt {
     /// Network to use, overrides the contract family setting
     #[clap(long, env = "COSMOS_NETWORK", global = true)]
-    pub network: Option<CosmosNetwork>,
+    pub network: Option<PerpsNetwork>,
     /// Override gRPC endpoint
     #[clap(long, env = "COSMOS_GRPC", global = true)]
     pub cosmos_grpc: Option<String>,
@@ -132,7 +140,7 @@ pub(crate) struct Opt {
         long,
         env = "LEVANA_PERP_CONTRACT_FAMILY",
         global = true,
-        default_value = "dragonqa"
+        default_value = "osmoqa"
     )]
     pub contract_family: String,
     /// Perp factory contract address, overrides the contract family setting
@@ -151,7 +159,7 @@ pub(crate) struct Opt {
     pub market_id: MarketId,
     /// Mnemonic phrase for the Wallet
     #[clap(long, env = "COSMOS_WALLET")]
-    pub wallet: RawWallet,
+    pub wallet: SeedPhrase,
     /// Turn on verbose logging
     #[clap(long, short, global = true)]
     verbose: bool,

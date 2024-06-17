@@ -1,4 +1,4 @@
-{"msg_id":0,"user":"protocol-owner","msg":{"ExecMarket":{"exec_msg":{"owner":{"config_update":{"update":{"trading_fee_notional_size":null,"trading_fee_counter_collateral":null,"crank_execs":null,"max_leverage":null,"carry_leverage":null,"funding_rate_sensitivity":null,"funding_rate_max_annualized":null,"borrow_fee_rate_min_annualized":null,"borrow_fee_rate_max_annualized":null,"mute_events":null,"liquifunding_delay_seconds":null,"price_update_too_old_seconds":null,"staleness_seconds":null,"protocol_tax":null,"unstake_period_seconds":null,"target_utilization":null,"borrow_fee_sensitivity":null,"max_xlp_rewards_multiplier":null,"min_xlp_rewards_multiplier":null,"delta_neutrality_fee_sensitivity":null,"delta_neutrality_fee_cap":null,"delta_neutrality_fee_tax":null,"limit_order_fee":null,"crank_fee_charged":"0.01","crank_fee_reward":"0.001","minimum_deposit_usd":null}}}},"funds":null}}}
+{"msg_id":0,"user":"protocol-owner","msg":{"ExecMarket":{"exec_msg":{"owner":{"config_update":{"update":{"trading_fee_notional_size":null,"trading_fee_counter_collateral":null,"crank_execs":null,"max_leverage":null,"carry_leverage":null,"funding_rate_sensitivity":null,"funding_rate_max_annualized":null,"borrow_fee_rate_min_annualized":null,"borrow_fee_rate_max_annualized":null,"mute_events":null,"liquifunding_delay_seconds":null,"protocol_tax":null,"unstake_period_seconds":null,"target_utilization":null,"borrow_fee_sensitivity":null,"max_xlp_rewards_multiplier":null,"min_xlp_rewards_multiplier":null,"delta_neutrality_fee_sensitivity":null,"delta_neutrality_fee_cap":null,"delta_neutrality_fee_tax":null,"crank_fee_charged":"0.01","crank_fee_reward":"0.001","minimum_deposit_usd":null}}}},"funds":null}}}
 {"msg_id":4,"user":"user","msg":"RefreshPrice"}
 {"msg_id":6,"user":"user","msg":{"MintCollateral":{"amount":"29.41093337361588"}}}
 {"msg_id":7,"user":"user","msg":{"MintAndDepositLp":{"amount":"445.256408254400473291"}}}
@@ -22,10 +22,10 @@
 {"msg_id":39,"user":"user","msg":"RefreshPrice"}
 {"msg_id":41,"user":"user","msg":"Crank"}
 {"msg_id":43,"user":"user","msg":"Crank"}
-{"msg_id":45,"user":"price-admin","msg":{"ExecMarket":{"exec_msg":{"set_price":{"price":"1.08127609923603","price_usd":null,"execs":null,"rewards":null}},"funds":null}}}
+{"msg_id":45,"user":"protocol-owner","msg":{"ExecMarket":{"exec_msg":{"set_manual_price":{"price":"1.08127609923603","price_usd":"1"}}}}}
 {"msg_id":48,"user":"user","msg":"RefreshPrice"}
 {"msg_id":50,"user":"user","msg":"Crank"}
-{"msg_id":52,"user":"price-admin","msg":{"ExecMarket":{"exec_msg":{"set_price":{"price":"1.4255058169251327","price_usd":null,"execs":null,"rewards":null}},"funds":null}}}
+{"msg_id":45,"user":"protocol-owner","msg":{"ExecMarket":{"exec_msg":{"set_manual_price":{"price":"1.4255058169251327","price_usd":"1"}}}}}
 {"msg_id":55,"user":"user","msg":"RefreshPrice"}
 {"msg_id":57,"user":"user","msg":"Crank"}
 {"msg_id":59,"user":"user","msg":{"TimeJumpSeconds":{"seconds":46280}}}

@@ -1,4 +1,4 @@
-use cosmwasm_std::Addr;
+use cosmwasm_std::testing::MockApi;
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, response::CosmosResponseExt,
     return_unless_market_collateral_quote, PerpsApp,
@@ -9,6 +9,7 @@ use msg::contracts::market::{
     history::events::{LpActionEvent, PositionActionEvent},
 };
 use msg::prelude::*;
+use std::ops::Neg;
 
 #[test]
 fn trade_history_works() {
@@ -47,6 +48,7 @@ fn trade_history_works() {
         .unwrap();
 
     let evt: PositionActionEvent = res
+        .responses
         .event_first("history-position-action")
         .unwrap()
         .try_into()
@@ -70,6 +72,7 @@ fn trade_history_works() {
         .unwrap();
 
     let evt: PositionActionEvent = res
+        .responses
         .event_first("history-position-action")
         .unwrap()
         .try_into()
@@ -97,9 +100,10 @@ fn trade_history_works() {
 
     // CLOSE
 
-    let res = market.exec_close_position(&trader, pos_id, None).unwrap();
+    let defer_res = market.exec_close_position(&trader, pos_id, None).unwrap();
 
-    let evt: PositionActionEvent = res
+    let evt: PositionActionEvent = defer_res
+        .exec_resp()
         .event_first("history-position-action")
         .unwrap()
         .try_into()
@@ -136,7 +140,7 @@ fn trade_history_works() {
 #[test]
 fn lp_history_works() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    let lp = Addr::unchecked("new_lp");
+    let lp = MockApi::default().addr_make("new_lp");
 
     let summary = market.query_lp_info(&lp).unwrap().history;
     assert_eq!(summary.deposit_usd, Usd::zero());
@@ -276,11 +280,12 @@ fn trade_history_update_fee_792() {
         .unwrap();
 
     // no fee when updating with "impacts leverage"
-    let res = market
+    let defer_res = market
         .exec_update_position_collateral_impact_leverage(&trader, pos_id, "20".try_into().unwrap())
         .unwrap();
 
-    let evt: PositionActionEvent = res
+    let evt: PositionActionEvent = defer_res
+        .exec_resp()
         .event_first("history-position-action")
         .unwrap()
         .try_into()
@@ -290,7 +295,7 @@ fn trade_history_update_fee_792() {
     assert_eq!(evt.action.kind, PositionActionKind::Update);
 
     // yes fee when updating with "impacts size"
-    let res = market
+    let defer_res = market
         .exec_update_position_collateral_impact_size(
             &trader,
             pos_id,
@@ -299,7 +304,8 @@ fn trade_history_update_fee_792() {
         )
         .unwrap();
 
-    let evt: PositionActionEvent = res
+    let evt: PositionActionEvent = defer_res
+        .exec_resp()
         .event_first("history-position-action")
         .unwrap()
         .try_into()
@@ -366,7 +372,9 @@ fn trade_history_nft_transfer_perp_963() {
     assert_eq!(open.collateral, transfer.collateral);
 
     let old_owner_actions = market.query_trader_action_history(&trader).unwrap();
-    assert_eq!(&old_owner_actions.actions, &[open, transfer.clone()]);
+    let mut old_owner_transfer = transfer.clone();
+    old_owner_transfer.transfer_collateral = old_owner_transfer.transfer_collateral.neg();
+    assert_eq!(&old_owner_actions.actions, &[open, old_owner_transfer]);
     assert_eq!(old_owner_actions.next_start_after, None);
 
     let new_owner_actions = market.query_trader_action_history(&new_owner).unwrap();
@@ -378,17 +386,125 @@ fn trade_history_nft_transfer_perp_963() {
 fn price_history_works() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
 
-    let start_len = market.query_spot_price_history().unwrap().len();
+    let start_prices = market.query_spot_price_history(None, None, None).unwrap();
 
-    market.exec_set_price("2.0".parse().unwrap()).unwrap();
-    market.exec_set_price("3.0".parse().unwrap()).unwrap();
-    market.exec_set_price("4.0".parse().unwrap()).unwrap();
+    // there is an initial price due to liquidity deposit
+    let initial_price_len = 1;
 
-    let mut prices = market.query_spot_price_history().unwrap();
+    // sanity check to confirm
+    assert_eq!(start_prices.len(), initial_price_len);
 
-    assert_eq!(prices.len() - start_len, 3);
+    for i in initial_price_len..10 {
+        market
+            .exec_set_price(format!("{}", i).parse().unwrap())
+            .unwrap();
+    }
 
-    assert_eq!(prices.pop().unwrap().price_base, "4.0".parse().unwrap());
-    assert_eq!(prices.pop().unwrap().price_base, "3.0".parse().unwrap());
-    assert_eq!(prices.pop().unwrap().price_base, "2.0".parse().unwrap());
+    let prices = market
+        .query_spot_price_history(None, None, Some(OrderInMessage::Ascending))
+        .unwrap();
+
+    assert_eq!(prices.len(), 10);
+
+    // check just the new prices we added
+    for (i, price) in prices.iter().skip(initial_price_len).enumerate() {
+        assert_eq!(
+            price.price_base,
+            (i + initial_price_len).to_string().parse().unwrap()
+        );
+    }
+
+    let prices = market
+        .query_spot_price_history(None, None, Some(OrderInMessage::Descending))
+        .unwrap();
+
+    assert_eq!(prices.len(), 10);
+
+    // check just the new prices we added
+    for (i, price) in prices
+        .iter()
+        .rev()
+        .skip(initial_price_len)
+        .rev()
+        .enumerate()
+    {
+        assert_eq!(price.price_base, (9 - i).to_string().parse().unwrap());
+    }
+
+    let prices_desc_page_1 = market
+        .query_spot_price_history(None, Some(3), Some(OrderInMessage::Descending))
+        .unwrap();
+    let prices_desc_page_2 = market
+        .query_spot_price_history(
+            Some(prices_desc_page_1.last().unwrap().timestamp),
+            None,
+            Some(OrderInMessage::Descending),
+        )
+        .unwrap();
+    let prices_desc = prices_desc_page_1
+        .iter()
+        .chain(prices_desc_page_2.iter())
+        .map(|p| p.price_base.to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        vec!["9", "8", "7", "6", "5", "4", "3", "2", "1"],
+        prices_desc
+            .iter()
+            .rev()
+            .skip(initial_price_len)
+            .rev()
+            .collect::<Vec<_>>()
+    );
+
+    let prices_asc_page_1 = market
+        .query_spot_price_history(None, Some(3), Some(OrderInMessage::Ascending))
+        .unwrap();
+    let prices_asc_page_2 = market
+        .query_spot_price_history(
+            Some(prices_asc_page_1.last().unwrap().timestamp),
+            None,
+            Some(OrderInMessage::Ascending),
+        )
+        .unwrap();
+    let prices_asc = prices_asc_page_1
+        .iter()
+        .chain(prices_asc_page_2.iter())
+        .map(|p| p.price_base.to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        vec!["1", "2", "3", "4", "5", "6", "7", "8", "9"],
+        prices_asc
+            .iter()
+            .skip(initial_price_len)
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn lp_history_works_bidirectional() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let lp = MockApi::default().addr_make("new_lp");
+
+    let summary = market.query_lp_info(&lp).unwrap().history;
+    assert_eq!(summary.deposit_usd, Usd::zero());
+    assert_eq!(summary.yield_usd, Usd::zero());
+
+    let actions = market.query_lp_action_history(&lp).unwrap().actions;
+    assert_eq!(actions.len(), 0);
+
+    // DEPOSIT
+    for i in 1..100 {
+        market
+            .exec_mint_and_deposit_liquidity(&lp, i.to_string().parse().unwrap())
+            .unwrap();
+    }
+
+    let asc = market
+        .query_lp_action_history_full(&lp, OrderInMessage::Ascending)
+        .unwrap();
+    let mut desc = market
+        .query_lp_action_history_full(&lp, OrderInMessage::Descending)
+        .unwrap();
+    desc.reverse();
+    assert_eq!(asc, desc);
 }

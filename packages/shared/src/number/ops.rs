@@ -1,6 +1,9 @@
 use super::{Number, Signed, UnsignedDecimal};
 use anyhow::{anyhow, Result};
-use std::cmp::Ordering;
+use std::{
+    cmp::Ordering,
+    ops::{Add, Div, Mul, Sub},
+};
 
 // Intentionally keeping operations pegged to Number for now.
 //
@@ -79,99 +82,76 @@ impl Number {
     }
 
     /// equality check with allowance for precision diff
-    pub fn approx_eq(self, other: Number) -> bool {
-        (self - other).abs() < Self::EPS_E7
+    pub fn approx_eq(self, other: Number) -> Result<bool> {
+        Ok((self - other)?.abs() < Self::EPS_E7)
     }
 
     /// equality check with allowance for precision diff
-    pub fn approx_eq_eps(self, other: Number, eps: Number) -> bool {
-        (self - other).abs() < eps
+    pub fn approx_eq_eps(self, other: Number, eps: Number) -> Result<bool> {
+        Ok((self - other)?.abs() < eps)
     }
 
     /// less-than with allowance for precision diff
-    pub fn approx_lt_relaxed(self, other: Number) -> bool {
-        self < other + Self::EPS_E7
+    pub fn approx_lt_relaxed(self, other: Number) -> Result<bool> {
+        Ok(self < (other + Self::EPS_E7)?)
     }
 
     /// greater-than with allowance for precision diff
-    pub fn approx_gt_relaxed(self, other: Number) -> bool {
-        self > other - Self::EPS_E7
+    pub fn approx_gt_relaxed(self, other: Number) -> Result<bool> {
+        Ok(self > (other - Self::EPS_E7)?)
     }
 
     /// greater-than with restriction for precision diff
-    pub fn approx_gt_strict(self, other: Number) -> bool {
-        self > other + Self::EPS_E7
+    pub fn approx_gt_strict(self, other: Number) -> Result<bool> {
+        Ok(self > (other + Self::EPS_E7)?)
     }
 }
 
-impl std::ops::Mul for Number {
-    type Output = Self;
+impl Mul for Number {
+    type Output = anyhow::Result<Self>;
 
-    fn mul(self, rhs: Self) -> Self {
-        self.checked_mul(rhs).unwrap()
+    fn mul(self, rhs: Self) -> Self::Output {
+        self.checked_mul(rhs)
     }
 }
 
-impl std::ops::Mul<u64> for Number {
-    type Output = Self;
+impl Mul<u64> for Number {
+    type Output = anyhow::Result<Self>;
 
-    fn mul(self, rhs: u64) -> Self {
-        self.checked_mul(rhs.into()).unwrap()
+    fn mul(self, rhs: u64) -> Self::Output {
+        self.checked_mul(rhs.into())
     }
 }
 
-impl std::ops::Div<u64> for Number {
-    type Output = Self;
+impl Div<u64> for Number {
+    type Output = anyhow::Result<Self>;
 
-    fn div(self, rhs: u64) -> Self {
-        self.checked_div(rhs.into()).unwrap()
+    fn div(self, rhs: u64) -> Self::Output {
+        self.checked_div(rhs.into())
     }
 }
 
-impl std::ops::MulAssign for Number {
-    fn mul_assign(&mut self, rhs: Self) {
-        *self = *self * rhs;
+impl Div for Number {
+    type Output = anyhow::Result<Self>;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        self.checked_div(rhs)
     }
 }
 
-impl std::ops::Div for Number {
-    type Output = Self;
+impl<T: UnsignedDecimal> Add for Signed<T> {
+    type Output = anyhow::Result<Self>;
 
-    fn div(self, rhs: Self) -> Self {
-        self.checked_div(rhs).unwrap()
+    fn add(self, rhs: Self) -> Self::Output {
+        self.checked_add(rhs)
     }
 }
 
-impl std::ops::DivAssign for Number {
-    fn div_assign(&mut self, rhs: Self) {
-        *self = *self / rhs;
-    }
-}
+impl<T: UnsignedDecimal> Sub for Signed<T> {
+    type Output = anyhow::Result<Self>;
 
-impl<T: UnsignedDecimal> std::ops::Add for Signed<T> {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self {
-        self.checked_add(rhs).unwrap()
-    }
-}
-impl<T: UnsignedDecimal> std::ops::AddAssign for Signed<T> {
-    fn add_assign(&mut self, rhs: Self) {
-        *self = *self + rhs;
-    }
-}
-
-impl<T: UnsignedDecimal> std::ops::Sub for Signed<T> {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self {
-        self.checked_sub(rhs).unwrap()
-    }
-}
-
-impl<T: UnsignedDecimal> std::ops::SubAssign for Signed<T> {
-    fn sub_assign(&mut self, rhs: Self) {
-        *self += -rhs;
+    fn sub(self, rhs: Self) -> Self::Output {
+        self.checked_sub(rhs)
     }
 }
 

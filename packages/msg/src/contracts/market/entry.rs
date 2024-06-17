@@ -1,12 +1,19 @@
 //! Entrypoint messages for the market
+use super::deferred_execution::DeferredExecId;
 use super::order::LimitOrder;
 use super::position::{ClosedPosition, PositionId};
+use super::spot_price::SpotPriceConfigInit;
 use super::{config::ConfigUpdate, crank::CrankWorkInfo};
 use crate::contracts::market::order::OrderId;
 use crate::{contracts::liquidity_token::LiquidityTokenKind, token::TokenInit};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Binary, Decimal256, Uint128};
+use cosmwasm_std::{Binary, BlockInfo, Decimal256, Uint128};
+use pyth_sdk_cw::PriceIdentifier;
+use schemars::schema::{InstanceType, SchemaObject};
+use schemars::JsonSchema;
 use shared::prelude::*;
+use std::collections::BTreeMap;
+use std::fmt::Formatter;
 
 /// The InstantiateMsg comes from Factory only
 #[cw_serde]
@@ -15,12 +22,28 @@ pub struct InstantiateMsg {
     pub factory: RawAddr,
     /// Modifications to the default config value
     pub config: Option<ConfigUpdate>,
+    /// Mandatory spot price config
+    pub spot_price: SpotPriceConfigInit,
+    /// Initial price to use in the contract
+    ///
+    /// This is required when doing manual price updates, and prohibited for oracle based price updates. It would make more sense to include this in [SpotPriceConfigInit], but that will create more complications in config update logic.
+    pub initial_price: Option<InitialPrice>,
     /// Base, quote, and market type
     pub market_id: MarketId,
     /// The token used for collateral
     pub token: TokenInit,
     /// Initial borrow fee rate when launching the protocol, annualized
     pub initial_borrow_fee_rate: Decimal256,
+}
+
+/// Initial price when instantiating a contract
+#[cw_serde]
+#[derive(Copy)]
+pub struct InitialPrice {
+    /// Price of base in terms of quote
+    pub price: PriceBaseInQuote,
+    /// Price of collateral in terms of USD
+    pub price_usd: PriceCollateralInUsd,
 }
 
 /// Config info passed on to all sub-contracts in order to
@@ -36,11 +59,14 @@ pub struct NewMarketParams {
     /// config
     pub config: Option<ConfigUpdate>,
 
-    /// The address of the price admin for this market
-    pub price_admin: RawAddr,
+    /// mandatory spot price config
+    pub spot_price: SpotPriceConfigInit,
 
     /// Initial borrow fee rate, annualized
     pub initial_borrow_fee_rate: Decimal256,
+
+    /// Initial price, only provided for manual price updates
+    pub initial_price: Option<InitialPrice>,
 }
 
 /// There are two sources of slippage in the protocol:
@@ -86,11 +112,14 @@ pub enum ExecuteMsg {
         /// Direction of new position
         direction: DirectionToBase,
         /// Maximum gains of new position
-        max_gains: MaxGainsInQuote,
+        #[deprecated(note = "Use take_profit instead")]
+        max_gains: Option<MaxGainsInQuote>,
         /// Stop loss price of new position
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
-        take_profit_override: Option<PriceBaseInQuote>,
+        /// if max_gains is `None`, this *must* be `Some`
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<TakeProfitTrader>,
     },
 
     /// Add collateral to a position, causing leverage to decrease
@@ -148,16 +177,39 @@ pub enum ExecuteMsg {
         max_gains: MaxGainsInQuote,
     },
 
+    /// Modify the take profit price of a position
+    UpdatePositionTakeProfitPrice {
+        /// ID of position to update
+        id: PositionId,
+        /// New take profit price of the position
+        price: TakeProfitTrader,
+    },
+
+    /// Update the stop loss price of a position
+    UpdatePositionStopLossPrice {
+        /// ID of position to update
+        id: PositionId,
+        /// New stop loss price of the position, or remove
+        stop_loss: StopLoss,
+    },
+
     /// Set a stop loss or take profit override.
-    /// This msg will override any previous values.
-    /// Passing None will remove the override.
+    /// Deprecated, use UpdatePositionStopLossPrice instead
+    // not sure why this causes a warning here...
+    // #[deprecated(note = "Use UpdatePositionStopLossPrice instead")]
     SetTriggerOrder {
         /// ID of position to modify
         id: PositionId,
         /// New stop loss price of the position
+        /// Passing None will remove the override.
         stop_loss_override: Option<PriceBaseInQuote>,
-        /// New take profit price of the position
-        take_profit_override: Option<PriceBaseInQuote>,
+        /// New take profit price of the position, merely as a trigger.
+        /// Passing None will bypass changing this
+        /// This does not affect the locked up counter collateral (or borrow fees etc.).
+        /// if this override is further away than the position's take profit price, the position's will be triggered first
+        /// if you want to update the position itself, use [ExecuteMsg::UpdatePositionTakeProfitPrice]
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<TakeProfitTrader>,
     },
 
     /// Set a limit order to open a position when the price of the asset hits
@@ -169,12 +221,16 @@ pub enum ExecuteMsg {
         leverage: LeverageToBase,
         /// Direction of new position
         direction: DirectionToBase,
-        /// Max gains of new position
-        max_gains: MaxGainsInQuote,
+
+        /// Maximum gains of new position
+        #[deprecated(note = "Use take_profit instead")]
+        max_gains: Option<MaxGainsInQuote>,
         /// Stop loss price of new position
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
-        take_profit_override: Option<PriceBaseInQuote>,
+        /// if max_gains is `None`, this *must* be `Some`
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<TakeProfitTrader>,
     },
 
     /// Cancel an open limit order
@@ -192,6 +248,7 @@ pub enum ExecuteMsg {
     },
 
     /// Deposits send funds into the unlocked liquidity fund
+    /// Returns [LiquidityDepositResponseData] as response data
     DepositLiquidity {
         /// Should we stake the resulting LP tokens into xLP?
         ///
@@ -275,31 +332,6 @@ pub enum ExecuteMsg {
         msg: crate::contracts::liquidity_token::entry::ExecuteMsg,
     },
 
-    /// Updates the price of base asset in terms of quote.
-    /// This msg is permissioned.
-    SetPrice {
-        /// Price of the base asset in terms of the quote asset
-        price: PriceBaseInQuote,
-        /// Price of the collateral asset in terms of USD
-        ///
-        /// This is used by the protocol to track USD values. This field is
-        /// optional, as markets with USD as the quote asset do not need to
-        /// provide it.
-        price_usd: Option<PriceCollateralInUsd>,
-        /// How many executions of the crank to perform
-        ///
-        /// Each time a price is updated in the system, cranking is immediately
-        /// necessary to check for liquidations. As an optimization, the
-        /// protocol includes that cranking as part of price updating. The value
-        /// here represents how many turns of the crank should be performed, or
-        /// use [None] for the default.
-        execs: Option<u32>,
-        /// Which wallet receives crank rewards.
-        ///
-        /// If unspecified, sender receives the rewards.
-        rewards: Option<RawAddr>,
-    },
-
     /// Transfer all available protocol fees to the dao account
     TransferDaoFees {},
 
@@ -313,6 +345,28 @@ pub enum ExecuteMsg {
     /// The person who calls this receives no benefits. It's intended for the
     /// DAO to use to incentivize cranking.
     ProvideCrankFunds {},
+
+    /// Set manual price (mostly for testing)
+    SetManualPrice {
+        /// Price of the base asset in terms of the quote.
+        price: PriceBaseInQuote,
+        /// Price of the collateral asset in terms of USD.
+        ///
+        /// This is generally used for reporting of values like PnL and trade
+        /// volume.
+        price_usd: PriceCollateralInUsd,
+    },
+
+    /// Perform a deferred exec
+    ///
+    /// This should only ever be called from the market contract itself, any
+    /// other call is guaranteed to fail.
+    PerformDeferredExec {
+        /// Which ID to execute
+        id: DeferredExecId,
+        /// Which price point to use for this execution.
+        price_point_timestamp: Timestamp,
+    },
 }
 
 /// Owner-only messages
@@ -322,7 +376,7 @@ pub enum ExecuteOwnerMsg {
     /// Update the config
     ConfigUpdate {
         /// New configuration parameters
-        update: ConfigUpdate,
+        update: Box<ConfigUpdate>,
     },
 }
 
@@ -358,6 +412,31 @@ pub struct ClosedPositionCursor {
     pub position: PositionId,
 }
 
+/// Use this price as the current price during a query.
+#[cw_serde]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Eq, Copy)]
+pub struct PriceForQuery {
+    /// Price of the base asset in terms of quote
+    pub base: PriceBaseInQuote,
+    /// Price of the collateral asset in terms of USD
+    ///
+    /// This is optional if the notional asset is USD and required otherwise.
+    pub collateral: PriceCollateralInUsd,
+}
+
+impl PriceForQuery {
+    /// Create a PriceForQuery with a base price and USD-market, without specifying the USD price
+    pub fn from_usd_market(base: PriceBaseInQuote, market_id: &MarketId) -> Result<Self> {
+        Ok(Self {
+            base,
+            collateral: base
+                .try_into_usd(market_id)
+                .context("cannot derive price query for non-USD market")?,
+        })
+    }
+}
+
 /// Query messages on the market contract
 #[cw_serde]
 #[derive(QueryResponses)]
@@ -375,11 +454,16 @@ pub enum QueryMsg {
     ///
     /// * returns [StatusResp]
     #[returns(StatusResp)]
-    Status {},
+    Status {
+        /// Price to be used as the current price
+        price: Option<PriceForQuery>,
+    },
 
     /// * returns [shared::prelude::PricePoint]
     ///
     /// Gets the spot price, if no time is supplied, then it's current
+    /// This is the spot price as seen by the contract storage
+    /// i.e. the price that was pushed via execution messages
     #[returns(shared::prelude::PricePoint)]
     SpotPrice {
         /// Timestamp when the price should be effective.
@@ -401,6 +485,23 @@ pub enum QueryMsg {
         order: Option<OrderInMessage>,
     },
 
+    /// * returns [OraclePriceResp]
+    ///
+    /// Gets the current price from the oracle (for markets configured with an oracle)
+    ///
+    /// Also returns prices for each feed used to compose the final price
+    ///
+    /// This may be more up-to-date than the spot price which was
+    /// validated and pushed into the contract storage via execution messages
+    #[returns(OraclePriceResp)]
+    OraclePrice {
+        /// If true then it will validate the publish_time age as though it were
+        /// used to push a new spot_price update
+        /// Otherwise, it just returns the oracle price as-is, even if it's old
+        #[serde(default)]
+        validate_age: bool,
+    },
+
     /// * returns [super::position::PositionsResp]
     ///
     /// Maps the given PositionIds into Positions
@@ -409,8 +510,23 @@ pub enum QueryMsg {
         /// Positions to query.
         position_ids: Vec<PositionId>,
         /// Should we skip calculating pending fees?
-        #[serde(default)]
-        skip_calc_pending_fees: bool,
+        ///
+        /// This field is ignored if `fees` is set.
+        ///
+        /// The default for this field is `false`. The behavior of this field is:
+        ///
+        /// * `true`: the same as [PositionsQueryFeeApproach::NoFees]
+        ///
+        /// * `false`: the same as [PositionsQueryFeeApproach::AllFees] (though see note on that variant, this default will likely change in the future).
+        ///
+        /// It is recommended _not_ to use this field going forward, and to instead use `fees`.
+        skip_calc_pending_fees: Option<bool>,
+        /// How do we calculate fees for this position?
+        ///
+        /// Any value here will override the `skip_calc_pending_fees` field.
+        fees: Option<PositionsQueryFeeApproach>,
+        /// Price to be used as the current price
+        price: Option<PriceForQuery>,
     },
 
     /// * returns [LimitOrderResp]
@@ -567,6 +683,120 @@ pub enum QueryMsg {
         /// should only be supplied if querying the fee for close or update
         pos_delta_neutrality_fee_margin: Option<Collateral>,
     },
+
+    /// Check if a price update would trigger a liquidation/take profit/etc.
+    ///
+    /// * returns [PriceWouldTriggerResp]
+    #[returns(PriceWouldTriggerResp)]
+    PriceWouldTrigger {
+        /// The new price of the base asset in terms of quote
+        price: PriceBaseInQuote,
+    },
+
+    /// Enumerate deferred execution work items for the given trader.
+    ///
+    /// Always begins enumeration from the most recent.
+    ///
+    /// * returns [ListDeferredExecsResp]
+    #[returns(crate::contracts::market::deferred_execution::ListDeferredExecsResp)]
+    ListDeferredExecs {
+        /// Trader wallet address
+        addr: RawAddr,
+        /// Previously seen final ID.
+        start_after: Option<DeferredExecId>,
+        /// How many items to request per batch.
+        limit: Option<u32>,
+    },
+
+    /// Get a single deferred execution item, if available.
+    ///
+    /// * returns [GetDeferredExecResp]
+    #[returns(crate::contracts::market::deferred_execution::GetDeferredExecResp)]
+    GetDeferredExec {
+        /// ID
+        id: DeferredExecId,
+    },
+}
+
+/// Response for [QueryMsg::OraclePrice]
+#[cw_serde]
+pub struct OraclePriceResp {
+    /// A map of each pyth id used in this market to the price and publish time
+    pub pyth: BTreeMap<PriceIdentifier, OraclePriceFeedPythResp>,
+    /// A map of each sei denom used in this market to the price
+    pub sei: BTreeMap<String, OraclePriceFeedSeiResp>,
+    /// A map of each stride denom used in this market to the redemption price
+    pub stride: BTreeMap<String, OraclePriceFeedStrideResp>,
+    /// A map of each simple contract used in this market to the contract price
+    #[serde(default)]
+    pub simple: BTreeMap<RawAddr, OraclePriceFeedSimpleResp>,
+    /// The final, composed price. See [QueryMsg::OraclePrice] for more information about this value
+    pub composed_price: PricePoint,
+}
+
+/// Part of [OraclePriceResp]
+#[cw_serde]
+pub struct OraclePriceFeedPythResp {
+    /// The pyth price
+    pub price: NumberGtZero,
+    /// The pyth publish time
+    pub publish_time: Timestamp,
+    /// Is this considered a volatile feed?
+    pub volatile: bool,
+}
+
+/// Part of [OraclePriceResp]
+#[cw_serde]
+pub struct OraclePriceFeedSeiResp {
+    /// The Sei price
+    pub price: NumberGtZero,
+    /// The Sei publish time
+    pub publish_time: Timestamp,
+    /// Is this considered a volatile feed?
+    pub volatile: bool,
+}
+
+/// Part of [OraclePriceResp]
+#[cw_serde]
+pub struct OraclePriceFeedStrideResp {
+    /// The redemption rate
+    pub redemption_rate: NumberGtZero,
+    /// The redemption price publish time
+    pub publish_time: Timestamp,
+    /// Is this considered a volatile feed?
+    pub volatile: bool,
+}
+
+/// Part of [OraclePriceResp]
+#[cw_serde]
+pub struct OraclePriceFeedSimpleResp {
+    /// The price value
+    pub value: NumberGtZero,
+    /// The block info when this price was set
+    pub block_info: BlockInfo,
+    /// Optional timestamp for the price, independent of block_info.time
+    pub timestamp: Option<Timestamp>,
+    /// Is this considered a volatile feed?
+    #[serde(default)]
+    pub volatile: bool,
+}
+
+/// When querying an open position, how do we calculate PnL vis-a-vis fees?
+#[cw_serde]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Copy, Eq)]
+pub enum PositionsQueryFeeApproach {
+    /// Do not include any pending fees
+    NoFees,
+    /// Include accumulated fees (borrow and funding rates), but do not include future fees (specifically DNF).
+    Accumulated,
+    /// Include the DNF fee in addition to accumulated fees.
+    ///
+    /// This gives an idea of "what will be my PnL if I close my position right
+    /// now." To keep compatibility with previous contract APIs, this is the
+    /// default behavior. However, going forward, `Accumulated` should be
+    /// preferred, and will eventually become the default.
+    AllFees,
 }
 
 /// Placeholder migration message
@@ -616,8 +846,14 @@ pub struct PositionAction {
     pub kind: PositionActionKind,
     /// Timestamp when the action occurred
     pub timestamp: Timestamp,
+    /// Timestamp of the PricePoint used for this action, if relevant
+    pub price_timestamp: Option<Timestamp>,
     /// the amount of collateral at the time of the action
+    #[serde(alias = "active_collateral")]
     pub collateral: Collateral,
+    /// The amount of collateral transferred to or from the trader
+    #[serde(default)]
+    pub transfer_collateral: Signed<Collateral>,
     /// Leverage of the position at the time of the action, if relevant
     pub leverage: Option<LeverageToBase>,
     /// max gains in quote
@@ -630,6 +866,12 @@ pub struct PositionAction {
     pub old_owner: Option<Addr>,
     /// If this is a position transfer, the new owner.
     pub new_owner: Option<Addr>,
+    /// The take profit price set by the trader.
+    /// For historical reasons this is optional, i.e. if the trader had set max gains price instead
+    #[serde(rename = "take_profit_override")]
+    pub take_profit_trader: Option<TakeProfitTrader>,
+    /// The stop loss override, if set.
+    pub stop_loss_override: Option<PriceBaseInQuote>,
 }
 
 /// Action taken by trader for a [PositionAction]
@@ -642,7 +884,22 @@ pub enum PositionActionKind {
     /// Close a position
     Close,
     /// Position was transferred between wallets
+    //FIXME need distinct "Received Position" and "Sent Position" cases
     Transfer,
+}
+
+//todo does it make sense for PositionActionKind to impl Display
+impl Display for PositionActionKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            PositionActionKind::Open => "Open",
+            PositionActionKind::Update => "Update",
+            PositionActionKind::Close => "Close",
+            PositionActionKind::Transfer => "Transfer",
+        };
+
+        f.write_str(str)
+    }
 }
 
 /// Returned by [QueryMsg::LpInfo]
@@ -674,6 +931,17 @@ pub struct LpInfoResp {
     pub unstaking: Option<UnstakingStatus>,
     /// Historical information on LP activity
     pub history: LpHistorySummary,
+    /// Liquidity cooldown information, if active.
+    pub liquidity_cooldown: Option<LiquidityCooldown>,
+}
+
+/// When a liquidity cooldown period will end
+#[cw_serde]
+pub struct LiquidityCooldown {
+    /// Timestamp when it will end
+    pub at: Timestamp,
+    /// Number of seconds until it will end
+    pub seconds: u64,
 }
 
 /// Status of an ongoing unstaking process.
@@ -777,11 +1045,13 @@ pub struct LimitOrderResp {
     /// Direction of the new position
     pub direction: DirectionToBase,
     /// Max gains of the new position
-    pub max_gains: MaxGainsInQuote,
+    #[deprecated(note = "Use take_profit instead")]
+    pub max_gains: Option<MaxGainsInQuote>,
     /// Stop loss of the new position
     pub stop_loss_override: Option<PriceBaseInQuote>,
+    #[serde(alias = "take_profit_override")]
     /// Take profit of the new position
-    pub take_profit_override: Option<PriceBaseInQuote>,
+    pub take_profit: TakeProfitTrader,
 }
 
 /// Response for [QueryMsg::LimitOrders]
@@ -831,13 +1101,17 @@ impl QueryMsg {
         // prior art for this approach: https://github.com/rust-fuzz/arbitrary/blob/061ca86be699faf1fb584dd7a7843b3541cd5f2c/src/lib.rs#L724
         match u.int_in_range::<u8>(0..=11)? {
             0 => Ok(Self::Version {}),
-            1 => Ok(Self::Status {}),
+            1 => Ok(Self::Status {
+                price: u.arbitrary()?,
+            }),
             2 => Ok(Self::SpotPrice {
                 timestamp: u.arbitrary()?,
             }),
             3 => Ok(Self::Positions {
                 position_ids: u.arbitrary()?,
                 skip_calc_pending_fees: u.arbitrary()?,
+                fees: u.arbitrary()?,
+                price: u.arbitrary()?,
             }),
 
             4 => Ok(Self::LimitOrder {
@@ -894,18 +1168,18 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
         // only allow messages for *this* contract - no proxies or cw20 submessages
 
         // prior art for this approach: https://github.com/rust-fuzz/arbitrary/blob/061ca86be699faf1fb584dd7a7843b3541cd5f2c/src/lib.rs#L724
-        match u.int_in_range::<u8>(0..=24)? {
+        match u.int_in_range::<u8>(0..=23)? {
             //0 => Ok(ExecuteMsg::Owner(u.arbitrary()?)),
             0 => Ok(ExecuteMsg::Owner(ExecuteOwnerMsg::ConfigUpdate {
-                update: ConfigUpdate::default(),
+                update: Box::<ConfigUpdate>::default(),
             })),
             1 => Ok(ExecuteMsg::OpenPosition {
                 slippage_assert: u.arbitrary()?,
                 leverage: u.arbitrary()?,
                 direction: u.arbitrary()?,
-                max_gains: u.arbitrary()?,
+                max_gains: None,
                 stop_loss_override: u.arbitrary()?,
-                take_profit_override: u.arbitrary()?,
+                take_profit: Some(u.arbitrary()?),
             }),
             2 => Ok(ExecuteMsg::UpdatePositionAddCollateralImpactLeverage { id: u.arbitrary()? }),
             3 => Ok(ExecuteMsg::UpdatePositionAddCollateralImpactSize {
@@ -930,18 +1204,19 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
                 id: u.arbitrary()?,
                 max_gains: u.arbitrary()?,
             }),
+            #[allow(deprecated)]
             8 => Ok(ExecuteMsg::SetTriggerOrder {
                 id: u.arbitrary()?,
                 stop_loss_override: u.arbitrary()?,
-                take_profit_override: u.arbitrary()?,
+                take_profit: u.arbitrary()?,
             }),
             9 => Ok(ExecuteMsg::PlaceLimitOrder {
                 trigger_price: u.arbitrary()?,
                 leverage: u.arbitrary()?,
                 direction: u.arbitrary()?,
-                max_gains: u.arbitrary()?,
+                max_gains: None,
                 stop_loss_override: u.arbitrary()?,
-                take_profit_override: u.arbitrary()?,
+                take_profit: Some(u.arbitrary()?),
             }),
             10 => Ok(ExecuteMsg::CancelLimitOrder {
                 order_id: u.arbitrary()?,
@@ -974,17 +1249,10 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
                 rewards: None,
             }),
 
-            21 => Ok(ExecuteMsg::SetPrice {
-                price: u.arbitrary()?,
-                price_usd: u.arbitrary()?,
-                execs: u.arbitrary()?,
-                rewards: None,
-            }),
+            21 => Ok(ExecuteMsg::TransferDaoFees {}),
 
-            22 => Ok(ExecuteMsg::TransferDaoFees {}),
-
-            23 => Ok(ExecuteMsg::CloseAllPositions {}),
-            24 => Ok(ExecuteMsg::ProvideCrankFunds {}),
+            22 => Ok(ExecuteMsg::CloseAllPositions {}),
+            23 => Ok(ExecuteMsg::ProvideCrankFunds {}),
 
             _ => unreachable!(),
         }
@@ -1014,8 +1282,16 @@ pub struct StatusResp {
     pub next_crank: Option<CrankWorkInfo>,
     /// Timestamp of the last completed crank
     pub last_crank_completed: Option<Timestamp>,
-    /// Size of the unpend queue
-    pub unpend_queue_size: u32,
+    /// Earliest deferred execution price timestamp needed
+    pub next_deferred_execution: Option<Timestamp>,
+    /// Latest deferred execution price timestamp needed
+    pub newest_deferred_execution: Option<Timestamp>,
+    /// Next liquifunding work item timestamp
+    pub next_liquifunding: Option<Timestamp>,
+    /// Number of work items sitting in the deferred execution queue
+    pub deferred_execution_items: u32,
+    /// Last processed deferred execution ID, if any
+    pub last_processed_deferred_exec_id: Option<DeferredExecId>,
     /// Overall borrow fee rate (annualized), combining LP and xLP
     pub borrow_fee: Decimal256,
     /// LP component of [Self::borrow_fee]
@@ -1045,22 +1321,8 @@ pub struct StatusResp {
     /// Amount of collateral in the delta neutrality fee fund.
     pub delta_neutrality_fee_fund: Collateral,
 
-    /// Have we reached staleness of the protocol via old liquifundings? If so, contains [Option::Some], and the timestamp when that happened.
-    pub stale_liquifunding: Option<Timestamp>,
-    /// Is the last price update too old? If so, contains [Option::Some], and the timestamp when the price became too old.
-    pub stale_price: Option<Timestamp>,
-    /// Are we in the congested state where new positions cannot be opened?
-    pub congested: bool,
-
     /// Fees held by the market contract
     pub fees: Fees,
-}
-
-impl StatusResp {
-    /// Is the protocol stale from either liquifunding delay or old prices?
-    pub fn is_stale(&self) -> bool {
-        self.stale_liquifunding.is_some() || self.stale_price.is_some()
-    }
 }
 
 /// Response for [QueryMsg::LimitOrderHistory]
@@ -1105,4 +1367,137 @@ pub enum LimitOrderResult {
 pub struct SpotPriceHistoryResp {
     /// list of historical price points
     pub price_points: Vec<PricePoint>,
+}
+
+/// Would a price update trigger a liquidation/take profit/etc?
+#[cw_serde]
+pub struct PriceWouldTriggerResp {
+    /// Would a price update trigger a liquidation/take profit/etc?
+    pub would_trigger: bool,
+}
+
+/// String representation of remove.
+const REMOVE_STR: &str = "remove";
+/// Stop loss configuration
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum StopLoss {
+    /// Remove stop loss price for the position
+    Remove,
+    /// Set the stop loss price for the position
+    Price(PriceBaseInQuote),
+}
+
+impl FromStr for StopLoss {
+    type Err = PerpError;
+    fn from_str(src: &str) -> Result<StopLoss, PerpError> {
+        match src {
+            REMOVE_STR => Ok(StopLoss::Remove),
+            _ => match src.parse() {
+                Ok(number) => Ok(StopLoss::Price(number)),
+                Err(err) => Err(perp_error!(
+                    ErrorId::Conversion,
+                    ErrorDomain::Default,
+                    "error converting {} to StopLoss , {}",
+                    src,
+                    err
+                )),
+            },
+        }
+    }
+}
+
+impl TryFrom<&str> for StopLoss {
+    type Error = PerpError;
+
+    fn try_from(val: &str) -> Result<Self, Self::Error> {
+        Self::from_str(val)
+    }
+}
+
+impl serde::Serialize for StopLoss {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            StopLoss::Price(price) => price.serialize(serializer),
+            StopLoss::Remove => serializer.serialize_str(REMOVE_STR),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for StopLoss {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(StopLossVisitor)
+    }
+}
+
+impl JsonSchema for StopLoss {
+    fn schema_name() -> String {
+        "StopLoss".to_owned()
+    }
+
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        SchemaObject {
+            instance_type: Some(InstanceType::String.into()),
+            format: Some("stop-loss".to_owned()),
+            ..Default::default()
+        }
+        .into()
+    }
+}
+
+struct StopLossVisitor;
+impl<'de> serde::de::Visitor<'de> for StopLossVisitor {
+    type Value = StopLoss;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("StopLoss")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        v.parse()
+            .map_err(|_| E::custom(format!("Invalid StopLoss: {v}")))
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::MapAccess<'de>,
+    {
+        if let Some((key, value)) = map.next_entry()? {
+            match key {
+                REMOVE_STR => Ok(Self::Value::Remove),
+                "price" => Ok(Self::Value::Price(value)),
+                _ => Err(serde::de::Error::custom(format!(
+                    "Invalid StopLoss field: {key}"
+                ))),
+            }
+        } else {
+            Err(serde::de::Error::custom("Empty StopLoss Object"))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::StopLoss;
+
+    #[test]
+    fn deserialize_stop_loss() {
+        let go = serde_json::from_str::<StopLoss>;
+
+        go(r#"{"price": "2.2"}"#).unwrap();
+        go("\"remove\"").unwrap();
+        go("\"2.2\"").unwrap();
+        go("\"-2.2\"").unwrap_err();
+        go(r#"{}"#).unwrap_err();
+        go(r#"{"error-field": "2.2"}"#).unwrap_err();
+        go("").unwrap_err();
+    }
 }

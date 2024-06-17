@@ -1,3 +1,5 @@
+#![deny(clippy::as_conversions)]
+
 mod context;
 mod handler;
 
@@ -7,11 +9,10 @@ use dotenv::dotenv;
 use futures::{channel::mpsc::unbounded, future, pin_mut, StreamExt, TryStreamExt};
 use log::info;
 use multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use std::{net::SocketAddr, sync::Arc};
+use std::{cell::RefCell, net::SocketAddr, rc::Rc, sync::Arc};
 use tokio::{
     fs::OpenOptions,
     net::{TcpListener, TcpStream},
-    sync::Mutex,
 };
 use tokio_util::task::LocalPoolHandle;
 
@@ -32,7 +33,7 @@ async fn main() -> Result<()> {
         pool.spawn_pinned({
             let ctx = ctx.clone();
             move || {
-                let market = Arc::new(Mutex::new(
+                let market = Rc::new(RefCell::new(
                     PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap(),
                 ));
                 async move {
@@ -49,7 +50,7 @@ async fn main() -> Result<()> {
 
 async fn accept_connection(
     ctx: Arc<Context>,
-    market: Arc<Mutex<PerpsMarket>>,
+    market: Rc<RefCell<PerpsMarket>>,
     stream: TcpStream,
     addr: SocketAddr,
 ) -> Result<()> {

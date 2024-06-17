@@ -1,9 +1,10 @@
+.envrc
 ####### Build artifacts, logs, and third-party dependencies
 /wasm/
 /schema/
 # Node
-node_modules 
-# Generic 
+node_modules
+# Generic
 dist
 out
 cache
@@ -11,10 +12,13 @@ cache
 # CI temp directory
 .output
 
+# local temp files like shell scripts that aren't checked in
+temp-*
+
 ####### Proptest regressions - allowed :)
 # *.proptest-regressions
 
-####### Fuzz testing - denied 
+####### Fuzz testing - denied
 crash-*
 
 ####### Secrets
@@ -36,7 +40,7 @@ target
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
 
-####### IDE cruft 
+####### IDE cruft
 # VS Code
 .vscode
 *.code-workspace
@@ -76,3 +80,5 @@ $RECYCLE.BIN/
 *.msp
 *.lnk
 .vercel
+
+/source-tarballs/

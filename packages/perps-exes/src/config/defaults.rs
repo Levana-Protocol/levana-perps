@@ -1,19 +1,21 @@
-use super::TaskConfig;
+use cosmwasm_std::Decimal256;
 
-pub(super) fn min_gas() -> u128 {
-    1_000_000
+use super::{GasAmount, TaskConfig};
+
+pub(super) fn min_gas() -> GasAmount {
+    "1".parse().unwrap()
 }
 
-pub(super) fn min_gas_in_faucet() -> u128 {
-    10_000_000_000
+pub(super) fn min_gas_in_faucet() -> GasAmount {
+    "10000".parse().unwrap()
 }
 
-pub(super) fn min_gas_in_gas_wallet() -> u128 {
-    10_000_000_000
+pub(super) fn min_gas_in_gas_wallet() -> GasAmount {
+    "10000".parse().unwrap()
 }
 
 pub(super) fn retries() -> usize {
-    4
+    6
 }
 
 pub(super) fn delay_between_retries() -> u32 {
@@ -44,8 +46,12 @@ pub(super) fn track_balance() -> TaskConfig {
     super::WatcherConfig::default().track_balance
 }
 
-pub(super) fn crank() -> TaskConfig {
-    super::WatcherConfig::default().crank
+pub(super) fn crank_watch() -> TaskConfig {
+    super::WatcherConfig::default().crank_watch
+}
+
+pub(super) fn crank_run() -> TaskConfig {
+    super::WatcherConfig::default().crank_run
 }
 
 pub(super) fn get_factory() -> TaskConfig {
@@ -64,11 +70,48 @@ pub(super) fn stats() -> TaskConfig {
     super::WatcherConfig::default().stats
 }
 
+pub(super) fn stats_alert() -> TaskConfig {
+    super::WatcherConfig::default().stats_alert
+}
+
 pub(super) fn ultra_crank() -> TaskConfig {
     super::WatcherConfig::default().ultra_crank
+}
+
+pub(super) fn liquidity_transaction_alert() -> TaskConfig {
+    super::WatcherConfig::default().liquidity_transaction
+}
+
+pub(super) fn rpc_health() -> TaskConfig {
+    super::WatcherConfig::default().rpc_health
+}
+
+pub(super) fn congestion() -> TaskConfig {
+    super::WatcherConfig::default().congestion
+}
+
+pub(super) fn high_gas() -> TaskConfig {
+    super::WatcherConfig::default().high_gas
+}
+
+pub(super) fn block_lag() -> TaskConfig {
+    super::WatcherConfig::default().block_lag
 }
 
 pub(super) fn seconds_till_ultra() -> u32 {
     // 8 minutes
     60 * 8
+}
+
+pub fn max_price_age_secs() -> u32 {
+    // 1 hour
+    60 * 60
+}
+
+pub fn max_allowed_price_delta() -> Decimal256 {
+    "0.001".parse().unwrap()
+}
+
+pub fn min_gas_high_gas_wallet() -> GasAmount {
+    "500".parse().unwrap()
 }

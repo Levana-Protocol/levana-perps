@@ -1,0 +1,7 @@
+# List all recipies
+default:
+	just --list --unsorted
+
+# Run application
+run:
+	env LEVANA_BOTS_NUM_BLOCKS=40 COSMOS_NETWORK=osmosis-testnet cargo run --verbose --bin perps-bots -- testnet --deployment osmoci --hcaptcha-secret foo

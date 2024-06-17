@@ -1,8 +1,8 @@
-use cosmwasm_std::Addr;
+use cosmwasm_std::testing::MockApi;
 use levana_perpswap_multi_test::{
     market_wrapper::PerpsMarket, return_unless_market_collateral_base, time::TimeJump, PerpsApp,
 };
-use msg::prelude::*;
+use msg::{contracts::market::entry::StopLoss, prelude::*};
 
 #[test]
 fn test_infinite_max_gains_fail() {
@@ -45,9 +45,10 @@ fn infinite_max_gains_perp_481() {
     // Only works in collateral-is-base markets, since otherwise we cannot have infinite max gains.
     return_unless_market_collateral_base!(market);
     let trader = market.clone_trader(0).unwrap();
+    let mock_api = MockApi::default();
 
     market
-        .exec_mint_and_deposit_liquidity(&Addr::unchecked("provider"), 1_000_000_000u64.into())
+        .exec_mint_and_deposit_liquidity(&mock_api.addr_make("provider"), 1_000_000_000u64.into())
         .unwrap();
 
     const ORIG_PRICE: u64 = 100;
@@ -88,7 +89,7 @@ fn infinite_max_gains_perp_481() {
             )
             .unwrap();
         market
-            .exec_crank_till_finished(&Addr::unchecked("cranker"))
+            .exec_crank_till_finished(&mock_api.addr_make("cranker"))
             .unwrap();
 
         // If the position closed (from liquidation), our tests are done.
@@ -99,17 +100,22 @@ fn infinite_max_gains_perp_481() {
         // Position is still open, confirm that it's still considered infinite.
 
         let res = market.query_position(pos_id).unwrap();
+        // assert_eq!(
+        //     res.max_gains_in_quote,
+        //     MaxGainsInQuote::PosInfinity,
+        //     "Max gains is not infinite on iteration {i}, actual: {}",
+        //     res.max_gains_in_quote
+        // );
         assert_eq!(
-            res.max_gains_in_quote,
-            MaxGainsInQuote::PosInfinity,
-            "Max gains is not infinite on iteration {i}, actual: {}",
-            res.max_gains_in_quote
+            res.take_profit_trader,
+            Some(TakeProfitTrader::PosInfinity),
+            "Take profit price override is not infinite on iteration {i}, actual: {:?}",
+            res.take_profit_trader
         );
         assert_eq!(
-            res.take_profit_price_base,
-            None,
-            "Take profit price is not None on iteration {i}, actual: {}",
-            res.take_profit_price_base.unwrap()
+            res.take_profit_total_base, None,
+            "Take profit price is not infinite on iteration {i}, actual: {:?}",
+            res.take_profit_total_base
         );
     }
 }
@@ -186,6 +192,6 @@ fn update_stop_loss_inf_max_gains_perp_1071() {
     market.exec_set_price("2.0".parse().unwrap()).unwrap();
 
     market
-        .exec_set_trigger_order(&trader, pos_id, Some("0.99".parse().unwrap()), None)
+        .exec_update_position_stop_loss(&trader, pos_id, StopLoss::Price("0.99".parse().unwrap()))
         .unwrap();
 }

@@ -1,17 +1,36 @@
 use anyhow::Result;
 use cosmos::{
-    proto::cosmos::base::abci::v1beta1::TxResponse, Address, Contract, HasAddress, Wallet,
+    proto::cosmos::base::abci::v1beta1::TxResponse, Address, Contract, HasAddress, HasAddressHrp,
+    HasContract, HasCosmos, Wallet,
 };
+use cosmwasm_std::Decimal256;
 use msg::contracts::{
     cw20::Cw20Coin,
     faucet::entry::{
-        ExecuteMsg, GetTokenResponse, IsAdminResponse, NextTradingIndexResponse, OwnerMsg, QueryMsg,
+        ExecuteMsg, GetTokenResponse, IsAdminResponse, NextTradingIndexResponse, OwnerMsg,
+        QueryMsg, TapAmountResponse,
     },
 };
+use shared::storage::UnsignedDecimal;
 
 #[derive(Clone)]
 pub(crate) struct Faucet(Contract);
 
+impl HasCosmos for Faucet {
+    fn get_cosmos(&self) -> &cosmos::Cosmos {
+        self.0.get_cosmos()
+    }
+}
+impl HasContract for Faucet {
+    fn get_contract(&self) -> &Contract {
+        &self.0
+    }
+}
+impl HasAddressHrp for Faucet {
+    fn get_address_hrp(&self) -> cosmos::AddressHrp {
+        self.0.get_address_hrp()
+    }
+}
 impl HasAddress for Faucet {
     fn get_address(&self) -> Address {
         self.0.get_address()
@@ -48,29 +67,77 @@ impl Faucet {
         wallet: &Wallet,
         name: impl Into<String>,
         trading_competition_index: Option<u32>,
-    ) -> Result<TxResponse> {
+    ) -> Result<()> {
         let name = name.into();
-        let tap_amount = match name.as_str() {
-            "ATOM" => "1000",
+        let tap_amount: Decimal256 = match name.as_str() {
+            "ATOM" | "amATOM" => "1000",
+            "stATOM" => "1000",
             "USDC" => "20000",
-            "BTC" => "1",
-            // This is going to end up being ignored I think...
+            "USDT" => "20000",
+            "BTC" | "wBTC" => "1",
+            "OSMO" => "2000",
+            "stOSMO" => "2000",
+            "SEI" => "2000",
             "ETH" => "2",
+            "axlETH" => "2",
+            "EVMOS" => "10000",
+            "AKT" => "10000",
+            "DOT" => "500",
+            "AXL" => "2000",
+            "ryETH" => "2",
+            "INJ" => "1000",
+            "TIA" => "2000",
+            "milkTIA" => "2000",
+            "stDYDX" => "1000",
+            "stTIA" => "2000",
+            "DYM" => "2000",
+            "stDYM" => "2000",
+            "NTRN" => "2000",
+            "SCRT" => "2000",
             name => anyhow::bail!("Unknown collateral type: {name}"),
         }
         .parse()?;
-        self.0
+        let txres = self
+            .0
             .execute(
                 wallet,
                 vec![],
                 ExecuteMsg::OwnerMsg(OwnerMsg::DeployToken {
-                    name,
-                    tap_amount,
+                    name: name.clone(),
+                    tap_amount: tap_amount.into_signed(),
                     trading_competition_index,
                     initial_balances: vec![],
                 }),
             )
-            .await
+            .await?;
+        log::info!("Deployed new token in {}", txres.txhash);
+        let tap_amount_resp: TapAmountResponse = self
+            .0
+            .query(QueryMsg::TapAmountByName { name: name.clone() })
+            .await?;
+        match tap_amount_resp {
+            TapAmountResponse::CannotTap {} => {
+                log::info!("No tap amount set in contract for {name}, adding.");
+                let txres = self
+                    .0
+                    .execute(
+                        wallet,
+                        vec![],
+                        ExecuteMsg::OwnerMsg(OwnerMsg::SetMultitapAmount {
+                            name,
+                            amount: tap_amount,
+                        }),
+                    )
+                    .await?;
+                log::info!("Tap amount set in {}", txres.txhash);
+            }
+            TapAmountResponse::CanTap { amount } => {
+                if amount != tap_amount {
+                    log::warn!("Mismatched tap amount between code and contract. Code: {tap_amount}. Contract: {amount}.")
+                }
+            }
+        }
+        Ok(())
     }
 
     pub(crate) async fn next_trading_index(&self, name: impl Into<String>) -> Result<u32> {
@@ -86,7 +153,7 @@ impl Faucet {
         wallet: &Wallet,
         cw20: impl HasAddress,
         balances: Vec<Cw20Coin>,
-    ) -> Result<TxResponse> {
+    ) -> cosmos::Result<TxResponse> {
         self.0
             .execute(
                 wallet,
@@ -106,7 +173,7 @@ impl Faucet {
         name: impl Into<String>,
         trading_competition_index: u32,
         market: impl HasAddress,
-    ) -> Result<TxResponse> {
+    ) -> cosmos::Result<TxResponse> {
         self.0
             .execute(
                 wallet,
@@ -134,7 +201,7 @@ impl Faucet {
         &self,
         wallet: &Wallet,
         new_admin: impl HasAddress,
-    ) -> Result<TxResponse> {
+    ) -> cosmos::Result<TxResponse> {
         self.0
             .execute(
                 wallet,

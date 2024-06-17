@@ -51,6 +51,8 @@ pub enum ShutdownImpact {
     TransferDaoFees,
     /// Turning the crank
     Crank,
+    /// Setting manual price
+    SetManualPrice,
 }
 
 impl ShutdownImpact {
@@ -70,6 +72,7 @@ impl ShutdownImpact {
             (ShutdownWallet::WindDown, ShutdownImpact::SetPrice) => false,
             (ShutdownWallet::WindDown, ShutdownImpact::TransferDaoFees) => false,
             (ShutdownWallet::WindDown, ShutdownImpact::Crank) => false,
+            (ShutdownWallet::WindDown, ShutdownImpact::SetManualPrice) => false,
         }
     }
 
@@ -104,6 +107,9 @@ impl ShutdownImpact {
             ExecuteMsg::UpdatePositionRemoveCollateralImpactSize { .. } => Some(Self::NewTrades),
             ExecuteMsg::UpdatePositionLeverage { .. } => Some(Self::NewTrades),
             ExecuteMsg::UpdatePositionMaxGains { .. } => Some(Self::NewTrades),
+            ExecuteMsg::UpdatePositionTakeProfitPrice { .. } => Some(Self::NewTrades),
+            ExecuteMsg::UpdatePositionStopLossPrice { .. } => Some(Self::NewTrades),
+            #[allow(deprecated)]
             ExecuteMsg::SetTriggerOrder { .. } => Some(Self::NewTrades),
             ExecuteMsg::ClosePosition { .. } => Some(Self::ClosePositions),
             ExecuteMsg::DepositLiquidity { .. } => Some(Self::DepositLiquidity),
@@ -117,12 +123,15 @@ impl ShutdownImpact {
             ExecuteMsg::Crank { .. } => Some(Self::Crank),
             ExecuteMsg::NftProxy { .. } => Some(Self::TransferPositions),
             ExecuteMsg::LiquidityTokenProxy { .. } => Some(Self::TransferLp),
-            ExecuteMsg::SetPrice { .. } => Some(Self::SetPrice),
             ExecuteMsg::TransferDaoFees { .. } => Some(Self::TransferDaoFees),
             ExecuteMsg::CloseAllPositions {} => None,
             ExecuteMsg::PlaceLimitOrder { .. } => Some(Self::NewTrades),
             ExecuteMsg::CancelLimitOrder { .. } => Some(Self::ClosePositions),
             ExecuteMsg::ProvideCrankFunds {} => Some(Self::Crank),
+            ExecuteMsg::SetManualPrice { .. } => Some(Self::SetManualPrice),
+
+            // Since this can only be executed by the contract itself, it's safe to never block it
+            ExecuteMsg::PerformDeferredExec { .. } => None,
         }
     }
 }
@@ -168,6 +177,8 @@ impl ShutdownImpact {
 
 impl KeyDeserialize for ShutdownImpact {
     type Output = ShutdownImpact;
+
+    const KEY_ELEMS: u16 = 1;
 
     fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
         ShutdownImpact::try_from_bytes(&value)

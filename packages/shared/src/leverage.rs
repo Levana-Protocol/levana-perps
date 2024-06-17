@@ -139,16 +139,16 @@ impl SignedLeverageToBase {
     ///
     /// 2. By holding the collateral asset, the trader already has exposure to
     /// its price fluctuation, so we need to represent that by adding 1.
-    pub fn into_notional(self, market_type: MarketType) -> SignedLeverageToNotional {
-        SignedLeverageToNotional(match market_type {
+    pub fn into_notional(self, market_type: MarketType) -> Result<SignedLeverageToNotional> {
+        Ok(SignedLeverageToNotional(match market_type {
             MarketType::CollateralIsQuote => self.0,
-            MarketType::CollateralIsBase => Number::ONE - self.0,
-        })
+            MarketType::CollateralIsBase => (Number::ONE - self.0)?,
+        }))
     }
 
     /// Split up this value into the direction and absolute leverage.
     pub fn split(self) -> (DirectionToBase, LeverageToBase) {
-        let (direction, leverage) = match self.0.try_into_positive_value() {
+        let (direction, leverage) = match self.0.try_into_non_negative_value() {
             Some(x) => (DirectionToBase::Long, x),
             None => (DirectionToBase::Short, self.0.abs_unsigned()),
         };
@@ -190,7 +190,7 @@ pub struct SignedLeverageToNotional(Signed<Decimal256>);
 impl SignedLeverageToNotional {
     /// Extract the direction value
     pub fn direction(self) -> DirectionToNotional {
-        match self.0.try_into_positive_value() {
+        match self.0.try_into_non_negative_value() {
             Some(_) => DirectionToNotional::Long,
             None => DirectionToNotional::Short,
         }
@@ -216,11 +216,11 @@ impl SignedLeverageToNotional {
     }
 
     /// Convert into an [SignedLeverageToBase].
-    pub fn into_base(self, market_type: MarketType) -> SignedLeverageToBase {
-        SignedLeverageToBase(match market_type {
+    pub fn into_base(self, market_type: MarketType) -> Result<SignedLeverageToBase> {
+        Ok(SignedLeverageToBase(match market_type {
             MarketType::CollateralIsQuote => self.0,
-            MarketType::CollateralIsBase => Number::ONE - self.0,
-        })
+            MarketType::CollateralIsBase => (Number::ONE - self.0)?,
+        }))
     }
 
     /// Multiply by active collateral of a position, returning the notional size in collateral of a position.

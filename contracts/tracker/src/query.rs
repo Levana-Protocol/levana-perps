@@ -1,5 +1,5 @@
 use anyhow::Result;
-use cosmwasm_std::{entry_point, to_binary, Addr, Storage};
+use cosmwasm_std::{entry_point, to_json_binary, Addr, Storage};
 use cosmwasm_std::{Binary, Deps, Env};
 use msg::contracts::tracker::entry::{CodeIdResp, ContractResp, QueryMsg};
 
@@ -38,7 +38,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary> {
 }
 
 fn code_id_resp(store: &dyn Storage, code_id: Option<u64>) -> Result<Binary> {
-    to_binary(&match code_id {
+    to_json_binary(&match code_id {
         None => CodeIdResp::NotFound {},
         Some(code_id) => match CODE_BY_ID.may_load(store, code_id)? {
             None => CodeIdResp::NotFound {},
@@ -55,7 +55,7 @@ fn code_id_resp(store: &dyn Storage, code_id: Option<u64>) -> Result<Binary> {
 }
 
 fn contract_resp(store: &dyn Storage, address: Option<Addr>) -> Result<Binary> {
-    to_binary(&match address {
+    to_json_binary(&match address {
         None => ContractResp::NotFound {},
         Some(address) => match CONTRACT_BY_ADDR.may_load(store, &address)? {
             None => ContractResp::NotFound {},

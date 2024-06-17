@@ -42,6 +42,7 @@ impl PartialEq for MarketId {
 
 impl Eq for MarketId {}
 
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for MarketId {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.encoded.partial_cmp(&other.encoded)
@@ -193,10 +194,8 @@ impl FromStr for MarketId {
     type Err = StdError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        MarketId::parse(s).ok_or_else(|| StdError::ParseErr {
-            target_type: "MarketId".to_owned(),
-            msg: format!("Invalid market ID: {s}"),
-        })
+        MarketId::parse(s)
+            .ok_or_else(|| StdError::parse_err("MarketId", format!("Invalid market ID: {s}")))
     }
 }
 
@@ -263,27 +262,7 @@ impl<'a> PrimaryKey<'a> for MarketId {
     }
 }
 
-impl<'a> PrimaryKey<'a> for &'a MarketId {
-    type Prefix = ();
-    type SubPrefix = ();
-    type Suffix = &'a MarketId;
-    type SuperSuffix = &'a MarketId;
-
-    fn key(&self) -> Vec<Key> {
-        let key = Key::Ref(self.encoded.as_bytes());
-
-        vec![key]
-    }
-}
-
 impl<'a> Prefixer<'a> for MarketId {
-    fn prefix(&self) -> Vec<Key> {
-        let key = Key::Ref(self.encoded.as_bytes());
-        vec![key]
-    }
-}
-
-impl<'a> Prefixer<'a> for &'a MarketId {
     fn prefix(&self) -> Vec<Key> {
         let key = Key::Ref(self.encoded.as_bytes());
         vec![key]
@@ -292,6 +271,8 @@ impl<'a> Prefixer<'a> for &'a MarketId {
 
 impl KeyDeserialize for MarketId {
     type Output = MarketId;
+
+    const KEY_ELEMS: u16 = 1;
 
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         std::str::from_utf8(&value)
@@ -302,6 +283,8 @@ impl KeyDeserialize for MarketId {
 
 impl KeyDeserialize for &'_ MarketId {
     type Output = MarketId;
+
+    const KEY_ELEMS: u16 = 1;
 
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         std::str::from_utf8(&value)
@@ -432,6 +415,8 @@ mod tests {
             timestamp: Default::default(),
             is_notional_usd: market_id.is_notional_usd(),
             market_type: market_id.get_market_type(),
+            publish_time: None,
+            publish_time_usd: None,
         };
 
         let in_usd = price_point.notional_to_usd("50".parse().unwrap());

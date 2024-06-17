@@ -70,9 +70,9 @@ impl Config {
 /// Events for fees.
 pub mod events {
     use super::*;
-    use crate::constants::event_key;
     use crate::contracts::market::order::OrderId;
     use crate::contracts::market::position::PositionId;
+    use crate::{constants::event_key, contracts::market::deferred_execution::DeferredExecId};
     use cosmwasm_std::{Decimal256, Event};
 
     /// Represents either a [PositionId] or an [OrderId]
@@ -82,6 +82,8 @@ pub mod events {
         Position(PositionId),
         /// A pending limit order
         LimitOrder(OrderId),
+        /// A deferred execution item not connected to a position or order
+        Deferred(DeferredExecId),
     }
 
     /// The type of fee that was paid out
@@ -93,8 +95,6 @@ pub mod events {
         Borrow,
         /// Delta neutrality fee
         DeltaNeutrality,
-        /// Limit order fee
-        LimitOrder,
     }
 
     impl FeeSource {
@@ -103,7 +103,6 @@ pub mod events {
                 FeeSource::Trading => "trading",
                 FeeSource::Borrow => "borrow",
                 FeeSource::DeltaNeutrality => "delta-neutrality",
-                FeeSource::LimitOrder => "limit-order",
             }
         }
     }
@@ -116,7 +115,6 @@ pub mod events {
                 "trading" => Ok(FeeSource::Trading),
                 "borrow" => Ok(FeeSource::Borrow),
                 "delta-neutrality" => Ok(FeeSource::DeltaNeutrality),
-                "limit-order" => Ok(FeeSource::LimitOrder),
                 _ => Err(anyhow::anyhow!("Unknown FeeSource {s}")),
             }
         }
@@ -143,7 +141,6 @@ pub mod events {
         pub protocol_amount_usd: Usd,
     }
 
-    impl PerpEvent for FeeEvent {}
     impl From<FeeEvent> for Event {
         fn from(
             FeeEvent {
@@ -160,6 +157,7 @@ pub mod events {
             let (trade_id_key, trade_id_val) = match trade_id {
                 TradeId::Position(pos_id) => ("pos-id", pos_id.to_string()),
                 TradeId::LimitOrder(order_id) => ("order-id", order_id.to_string()),
+                TradeId::Deferred(deferred_id) => ("deferred-id", deferred_id.to_string()),
             };
 
             Event::new("fee")
@@ -179,10 +177,13 @@ pub mod events {
         fn try_from(evt: Event) -> anyhow::Result<Self> {
             let trade_id = match evt.try_u64_attr("pos-id")? {
                 Some(pos_id) => TradeId::Position(PositionId::new(pos_id)),
-                None => {
-                    let order_id = evt.u64_attr("order-id")?;
-                    TradeId::LimitOrder(OrderId::new(order_id))
-                }
+                None => match evt.try_u64_attr("order-id")? {
+                    Some(order_id) => TradeId::LimitOrder(OrderId::new(order_id)),
+                    None => {
+                        let deferred_id = evt.u64_attr("deferred-id")?;
+                        TradeId::Deferred(DeferredExecId::from_u64(deferred_id))
+                    }
+                },
             };
 
             Ok(FeeEvent {
@@ -210,14 +211,18 @@ pub mod events {
         pub direction: DirectionToBase,
     }
 
-    impl PerpEvent for FundingPaymentEvent {}
-    impl From<FundingPaymentEvent> for Event {
-        fn from(src: FundingPaymentEvent) -> Self {
+    impl From<&FundingPaymentEvent> for Event {
+        fn from(src: &FundingPaymentEvent) -> Self {
             Event::new("funding-payment")
                 .add_attribute("pos-id", src.pos_id.to_string())
                 .add_attribute("amount", src.amount.to_string())
                 .add_attribute("amount-usd", src.amount_usd.to_string())
                 .add_attribute(event_key::DIRECTION, src.direction.as_str())
+        }
+    }
+    impl From<FundingPaymentEvent> for Event {
+        fn from(src: FundingPaymentEvent) -> Self {
+            (&src).into()
         }
     }
 
@@ -244,7 +249,6 @@ pub mod events {
         pub short_rate_base: Number,
     }
 
-    impl PerpEvent for FundingRateChangeEvent {}
     impl From<FundingRateChangeEvent> for Event {
         fn from(
             FundingRateChangeEvent {
@@ -283,8 +287,6 @@ pub mod events {
         /// Amount paid to xLP holders
         pub xlp_rate: Decimal256,
     }
-
-    impl PerpEvent for BorrowFeeChangeEvent {}
 
     impl From<BorrowFeeChangeEvent> for Event {
         fn from(
@@ -330,7 +332,6 @@ pub mod events {
         pub new_balance: Collateral,
     }
 
-    impl PerpEvent for CrankFeeEvent {}
     impl From<CrankFeeEvent> for Event {
         fn from(
             CrankFeeEvent {
@@ -344,6 +345,7 @@ pub mod events {
             let (trade_id_key, trade_id_val) = match trade_id {
                 TradeId::Position(pos_id) => ("pos-id", pos_id.to_string()),
                 TradeId::LimitOrder(order_id) => ("order-id", order_id.to_string()),
+                TradeId::Deferred(deferred_id) => ("deferred-id", deferred_id.to_string()),
             };
 
             Event::new("crank-fee")
@@ -360,10 +362,13 @@ pub mod events {
         fn try_from(evt: Event) -> anyhow::Result<Self> {
             let trade_id = match evt.try_u64_attr("pos-id")? {
                 Some(pos_id) => TradeId::Position(PositionId::new(pos_id)),
-                None => {
-                    let order_id = evt.u64_attr("order-id")?;
-                    TradeId::LimitOrder(OrderId::new(order_id))
-                }
+                None => match evt.try_u64_attr("order-id")? {
+                    Some(order_id) => TradeId::LimitOrder(OrderId::new(order_id)),
+                    None => {
+                        let deferred_id = evt.u64_attr("deferred-id")?;
+                        TradeId::Deferred(DeferredExecId::from_u64(deferred_id))
+                    }
+                },
             };
 
             Ok(CrankFeeEvent {
@@ -386,7 +391,6 @@ pub mod events {
         pub amount_usd: NonZero<Usd>,
     }
 
-    impl PerpEvent for CrankFeeEarnedEvent {}
     impl From<CrankFeeEarnedEvent> for Event {
         fn from(
             CrankFeeEarnedEvent {
@@ -426,7 +430,7 @@ pub mod events {
         /// Description of what happened
         pub desc: Option<String>,
     }
-    impl From<InsufficientMarginEvent> for Event {
+    impl From<&InsufficientMarginEvent> for Event {
         fn from(
             InsufficientMarginEvent {
                 pos,
@@ -434,7 +438,7 @@ pub mod events {
                 available,
                 requested,
                 desc,
-            }: InsufficientMarginEvent,
+            }: &InsufficientMarginEvent,
         ) -> Self {
             let evt = Event::new(event_key::INSUFFICIENT_MARGIN)
                 .add_attribute(event_key::POS_ID, pos.to_string())
@@ -447,7 +451,11 @@ pub mod events {
             }
         }
     }
-    impl PerpEvent for InsufficientMarginEvent {}
+    impl From<InsufficientMarginEvent> for Event {
+        fn from(event: InsufficientMarginEvent) -> Self {
+            (&event).into()
+        }
+    }
 
     /// Fee type which can have insufficient margin available
     #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -486,6 +494,8 @@ pub mod events {
 
 #[cfg(test)]
 mod tests {
+    use crate::contracts::market::spot_price::SpotPriceConfig;
+
     use super::*;
 
     #[test]
@@ -493,7 +503,9 @@ mod tests {
         let config = Config {
             trading_fee_notional_size: "0.01".parse().unwrap(),
             trading_fee_counter_collateral: "0.02".parse().unwrap(),
-            ..Config::default()
+            ..Config::new(SpotPriceConfig::Manual {
+                admin: Addr::unchecked("foo"),
+            })
         };
         assert_eq!(
             config
@@ -508,7 +520,9 @@ mod tests {
         let config = Config {
             trading_fee_notional_size: "0.01".parse().unwrap(),
             trading_fee_counter_collateral: "0.02".parse().unwrap(),
-            ..Config::default()
+            ..Config::new(SpotPriceConfig::Manual {
+                admin: Addr::unchecked("foo"),
+            })
         };
         assert_eq!(
             config

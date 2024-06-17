@@ -7,7 +7,7 @@ use crate::contracts::{
     market::entry::ExecuteMsg as MarketExecuteMsg,
 };
 use cosmwasm_std::{
-    to_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal256, QuerierWrapper, WasmMsg,
+    to_json_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal256, QuerierWrapper, WasmMsg,
 };
 use shared::prelude::*;
 
@@ -28,13 +28,21 @@ pub enum TokenInit {
     Native {
         /// Denom used within the chain for this native coin
         denom: String,
+        /// Number of decimal points
+        decimal_places: u8,
     },
 }
 
 impl From<Token> for TokenInit {
     fn from(src: Token) -> Self {
         match src {
-            Token::Native { denom, .. } => Self::Native { denom },
+            Token::Native {
+                denom,
+                decimal_places,
+            } => Self::Native {
+                denom,
+                decimal_places,
+            },
             Token::Cw20 { addr, .. } => Self::Cw20 { addr },
         }
     }
@@ -94,7 +102,7 @@ impl Token {
     ) -> Result<Option<CosmosMsg>> {
         match self {
             Self::Native { .. } => {
-                let coin = self.into_native_coin(amount.raw())?;
+                let coin = self.into_native_coin(amount.into_number_gt_zero())?;
 
                 match coin {
                     Some(coin) => Ok(Some(CosmosMsg::Bank(BankMsg::Send {
@@ -110,7 +118,7 @@ impl Token {
 
                 match msg {
                     Some(msg) => {
-                        let msg = to_binary(&msg)?;
+                        let msg = to_json_binary(&msg)?;
 
                         Ok(Some(CosmosMsg::Wasm(WasmMsg::Execute {
                             contract_addr: addr.to_string(),
@@ -124,9 +132,20 @@ impl Token {
         }
     }
 
-    /// Get the balance - this is expressed as Number
+    /// Get the balance - this is expressed a Collateral
     /// such that it mirrors self.into_transfer_msg()
     pub fn query_balance(&self, querier: &QuerierWrapper, user_addr: &Addr) -> Result<Collateral> {
+        self.query_balance_dec(querier, user_addr)
+            .map(Collateral::from_decimal256)
+    }
+
+    /// Get the balance - this is expressed as Decimal256
+    /// such that it mirrors self.into_transfer_msg()
+    pub fn query_balance_dec(
+        &self,
+        querier: &QuerierWrapper,
+        user_addr: &Addr,
+    ) -> Result<Decimal256> {
         self.from_u128(match self {
             Self::Cw20 { addr, .. } => {
                 let resp: Cw20BalanceResponse = querier.query_wasm_smart(
@@ -143,8 +162,8 @@ impl Token {
                 coin.amount.u128()
             }
         })
-        .map(Collateral::from_decimal256)
     }
+
     /// helper function
     ///
     /// given a u128, typically via a native Coin.amount or Cw20 amount
@@ -190,7 +209,7 @@ impl Token {
     ///
     /// when we know for a fact we have a WalletSource::native
     /// we can get a Coin from a Number amount
-    pub fn into_native_coin(&self, amount: Collateral) -> Result<Option<Coin>> {
+    pub fn into_native_coin(&self, amount: NumberGtZero) -> Result<Option<Coin>> {
         match self {
             Self::Native { denom, .. } => {
                 Ok(self
@@ -227,7 +246,7 @@ impl Token {
                 self.name()
             )),
             Self::Cw20 { .. } => {
-                let msg = to_binary(submsg)?;
+                let msg = to_json_binary(submsg)?;
                 Ok(self
                     .into_u128(amount.into_decimal256())?
                     .map(|amount| Cw20ExecuteMsg::Send {
@@ -263,6 +282,7 @@ impl Token {
             })),
         }
     }
+
     /// perps-specific use-case for executing a market message with funds
     pub fn into_market_execute_msg(
         &self,
@@ -297,7 +317,7 @@ impl Token {
                 match msg {
                     Some(msg) => Ok(WasmMsg::Execute {
                         contract_addr: addr.into_string(),
-                        msg: to_binary(&msg)?,
+                        msg: to_json_binary(&msg)?,
                         funds: Vec::new(),
                     }),
                     None => {
@@ -305,31 +325,35 @@ impl Token {
                         // to the contract
                         Ok(WasmMsg::Execute {
                             contract_addr: contract_addr.to_string(),
-                            msg: to_binary(&execute_msg)?,
+                            msg: to_json_binary(&execute_msg)?,
                             funds: Vec::new(),
                         })
                     }
                 }
             }
             Self::Native { .. } => {
-                let coin = self.into_native_coin(amount).map_err(|err| {
-                    perp_anyhow!(
-                        ErrorId::Conversion,
-                        ErrorDomain::Wallet,
-                        "{} (exec inner msg: {:?})!",
-                        err.downcast_ref::<PerpError>().unwrap().description,
-                        execute_msg
-                    )
-                })?;
+                let funds = if amount.is_zero() {
+                    Vec::new()
+                } else {
+                    let amount = NumberGtZero::new(amount.into_decimal256())
+                        .context("Unable to convert amount into NumberGtZero")?;
+                    let coin = self
+                        .into_native_coin(amount)
+                        .map_err(|err| {
+                            perp_anyhow!(
+                                ErrorId::Conversion,
+                                ErrorDomain::Wallet,
+                                "{} (exec inner msg: {:?})!",
+                                err.downcast_ref::<PerpError>().unwrap().description,
+                                execute_msg
+                            )
+                        })?
+                        .unwrap();
 
-                let execute_msg = to_binary(&execute_msg)?;
-
-                let funds = match coin {
-                    Some(coin) => {
-                        vec![coin]
-                    }
-                    None => Vec::new(),
+                    vec![coin]
                 };
+
+                let execute_msg = to_json_binary(&execute_msg)?;
 
                 Ok(WasmMsg::Execute {
                     contract_addr: contract_addr.to_string(),

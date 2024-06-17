@@ -1,14 +1,17 @@
+#![deny(clippy::as_conversions)]
+
 pub mod config;
 pub mod contracts;
 pub mod discovery;
+mod network;
 pub mod prelude;
-pub mod wallet_manager;
+pub mod pyth;
 
-use chrono::{DateTime, TimeZone, Utc};
 use cosmos::{
-    proto::cosmos::base::abci::v1beta1::TxResponse, Address, Contract, Cosmos, CosmosNetwork,
-    HasAddress, HasAddressType, RawWallet, Wallet,
+    proto::cosmos::base::abci::v1beta1::TxResponse, Address, Contract, Cosmos, HasAddress, Wallet,
 };
+use cosmos::{HasAddressHrp, SeedPhrase};
+use msg::contracts::market::entry::StatusResp;
 use msg::contracts::market::position::ClosedPosition;
 use msg::prelude::*;
 use msg::{
@@ -25,6 +28,8 @@ use msg::{
 use prelude::MarketContract;
 use std::time::Duration;
 
+pub use network::PerpsNetwork;
+
 /// Get the Git SHA from GitHub Actions env vars
 pub fn build_version() -> &'static str {
     const BUILD_VERSION: Option<&str> = option_env!("GITHUB_SHA");
@@ -33,9 +38,10 @@ pub fn build_version() -> &'static str {
 
 pub struct PerpApp {
     pub wallet_address: Address,
-    pub raw_wallet: RawWallet,
+    pub raw_wallet: SeedPhrase,
     pub wallet: Wallet,
     pub market: MarketContract,
+    pub market_id: MarketId,
     faucet_contract: Option<Contract>,
     pub cosmos: Cosmos,
 }
@@ -47,31 +53,33 @@ pub struct PositionsInfo {
 
 impl PerpApp {
     pub async fn new(
-        raw_wallet: RawWallet,
+        raw_wallet: SeedPhrase,
         factory_contract_addr: Address,
         faucet_contract_addr: Option<Address>,
         market_id: MarketId,
-        network: CosmosNetwork,
+        network: PerpsNetwork,
     ) -> Result<PerpApp> {
-        let builder = network.builder();
+        let builder = network.builder().await?;
         let cosmos = builder.build().await?;
-        let factory_contract = Contract::new(cosmos.clone(), factory_contract_addr);
+        let factory_contract = cosmos.make_contract(factory_contract_addr);
 
         let market_info: MarketInfoResponse = factory_contract
-            .query(msg::contracts::factory::entry::QueryMsg::MarketInfo { market_id })
+            .query(msg::contracts::factory::entry::QueryMsg::MarketInfo {
+                market_id: market_id.clone(),
+            })
             .await?;
         let market_contract = cosmos.make_contract(market_info.market_addr.into_string().parse()?);
 
         let faucet_contract = faucet_contract_addr.map(|x| cosmos.make_contract(x));
 
-        let wallet_address = *raw_wallet.for_chain(cosmos.get_address_type()).address();
-        let address_type = cosmos.get_address_type();
-        let wallet = raw_wallet.for_chain(address_type);
+        let wallet = raw_wallet.with_hrp(cosmos.get_address_hrp())?;
+        let wallet_address = wallet.get_address();
         Ok(PerpApp {
             wallet_address,
             raw_wallet,
             wallet,
             market: MarketContract::new(market_contract),
+            market_id,
             faucet_contract,
             cosmos,
         })
@@ -85,6 +93,7 @@ impl PerpApp {
     }
 
     pub async fn all_open_positions(&self) -> Result<PositionsInfo> {
+        self.crank(None).await?;
         self.market.all_open_positions(&self.wallet).await
     }
 
@@ -99,7 +108,8 @@ impl PerpApp {
         stop_loss_override: Option<PriceBaseInQuote>,
         take_profit_override: Option<PriceBaseInQuote>,
     ) -> Result<TxResponse> {
-        self.market
+        let _ = self
+            .market
             .open_position(
                 &self.wallet,
                 &self.market.status().await?,
@@ -111,7 +121,8 @@ impl PerpApp {
                 stop_loss_override,
                 take_profit_override,
             )
-            .await
+            .await?;
+        self.crank_single(None).await
     }
 
     pub async fn deposit_liquidity(&self, collateral: NonZero<Collateral>) -> Result<TxResponse> {
@@ -120,20 +131,40 @@ impl PerpApp {
             .await
     }
 
-    pub async fn set_price(&self, price: PriceBaseInQuote) -> Result<TxResponse> {
-        self.market.set_price(&self.wallet, price).await
+    pub async fn set_price(
+        &self,
+        price: PriceBaseInQuote,
+        price_usd: PriceCollateralInUsd,
+    ) -> Result<TxResponse> {
+        self.market.set_price(&self.wallet, price, price_usd).await
     }
 
     pub async fn get_closed_positions(&self) -> Result<Vec<ClosedPosition>> {
         self.market.get_closed_positions(&self.wallet).await
     }
 
-    pub async fn close_position(&self, position_id: PositionId) -> Result<TxResponse> {
+    pub async fn close_position(
+        &self,
+        position_id: PositionId,
+    ) -> Result<TxResponse, cosmos::Error> {
         self.market.close_position(&self.wallet, position_id).await
     }
 
-    pub async fn crank(&self) -> Result<()> {
-        self.market.crank(&self.wallet).await
+    pub async fn status(&self) -> Result<StatusResp> {
+        let status = self.market.status().await?;
+        Ok(status)
+    }
+
+    pub async fn crank(&self, rewards: Option<RawAddr>) -> Result<()> {
+        self.market.crank(&self.wallet, rewards).await
+    }
+
+    pub async fn crank_single(&self, rewards: Option<RawAddr>) -> Result<TxResponse> {
+        let response = self
+            .market
+            .crank_single(&self.wallet, None, rewards)
+            .await?;
+        Ok(response)
     }
 
     pub async fn tap_faucet(&self) -> Result<TxResponse> {
@@ -157,6 +188,7 @@ impl PerpApp {
             .context("No faucet available")?
             .execute(&self.wallet, vec![], execute_msg)
             .await
+            .map_err(|e| e.into())
     }
 
     pub async fn update_max_gains(
@@ -203,9 +235,11 @@ impl PerpApp {
         impact: UpdatePositionCollateralImpact,
         slippage_assert: Option<SlippageAssert>,
     ) -> Result<TxResponse> {
-        self.market
+        let _ = self
+            .market
             .update_collateral(&self.wallet, id, collateral, impact, slippage_assert)
-            .await
+            .await?;
+        self.crank_single(None).await
     }
 }
 
@@ -227,17 +261,4 @@ impl FromStr for UpdatePositionCollateralImpact {
             )),
         }
     }
-}
-
-/// Convert from CosmWasm to chrono representation of a timestamp.
-pub fn timestamp_to_date_time(
-    timestamp: impl Into<cosmwasm_std::Timestamp>,
-) -> Result<DateTime<Utc>> {
-    let timestamp = timestamp.into();
-    Utc.timestamp_opt(
-        timestamp.seconds().try_into()?,
-        timestamp.subsec_nanos().try_into()?,
-    )
-    .single()
-    .context("Could not convert last_crank_completed into DateTime<Utc>")
 }

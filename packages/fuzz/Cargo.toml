@@ -8,8 +8,8 @@ edition = "2021"
 multi_test = {package = "levana_perpswap_multi_test", path = "../multi_test", features = ["arbitrary"] }
 msg = {package = "levana_perpswap_cosmos_msg", path = "../msg", features = ["arbitrary"] }
 libfuzzer-sys = "0.4"
-cosmwasm-std = "1.2.1"
-anyhow = "1.0.69"
+cosmwasm-std = { workspace = true, features = ["abort"] }
+anyhow = "1.0.82"
 arbitrary = { version = "1.2.0", features = ["derive"] }
 
 [package.metadata]

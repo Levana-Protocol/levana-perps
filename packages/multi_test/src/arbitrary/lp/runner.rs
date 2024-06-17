@@ -2,21 +2,22 @@ use crate::{extensions::TokenExt, time::TimeJump};
 
 use super::data::*;
 use anyhow::Result;
-use cosmwasm_std::Addr;
+use cosmwasm_std::testing::MockApi;
 use msg::prelude::*;
 
 impl LpDepositWithdraw {
     pub fn run(&self) -> Result<()> {
         let market = self.market.borrow_mut();
+        let mock_api = MockApi::default();
 
         market.exec_refresh_price()?;
-        market.exec_crank_till_finished(&Addr::unchecked("cranker"))?;
+        market.exec_crank_till_finished(&mock_api.addr_make("cranker"))?;
 
         let init_liquidity_stats = market.query_liquidity_stats().unwrap();
         let collateral = self.collateral.into_number();
         let deposit = self.deposit.into_number();
         let withdraw = self.withdraw.into_number();
-        let lp = Addr::unchecked("new-lp");
+        let lp = mock_api.addr_make("new-lp");
 
         // mint some tokens so we _can_ deposit
         market
@@ -44,21 +45,37 @@ impl LpDepositWithdraw {
 
         // Assert
         assert_eq!(balance_before_deposit, collateral);
-        assert_eq!(balance_after_deposit, collateral - deposit);
+        assert_eq!(balance_after_deposit, (collateral - deposit).unwrap());
         assert_eq!(
-            liquidity_stats_after_deposit
+            (liquidity_stats_after_deposit
                 .total_collateral()
+                .unwrap()
                 .into_number()
-                - init_liquidity_stats.total_collateral().into_number(),
+                - init_liquidity_stats
+                    .total_collateral()
+                    .unwrap()
+                    .into_number())
+            .unwrap(),
             deposit
         );
         assert_eq!(
             liquidity_stats_after_withdraw
                 .total_collateral()
+                .unwrap()
                 .into_number(),
-            init_liquidity_stats.total_collateral().into_number() + deposit - withdraw
+            ((init_liquidity_stats
+                .total_collateral()
+                .unwrap()
+                .into_number()
+                + deposit)
+                .unwrap()
+                - withdraw)
+                .unwrap()
         );
-        assert_eq!(balance_after_withdraw, (collateral - deposit) + withdraw);
+        assert_eq!(
+            balance_after_withdraw,
+            ((collateral - deposit).unwrap() + withdraw).unwrap()
+        );
 
         Ok(())
     }
@@ -68,15 +85,16 @@ impl XlpStakeUnstake {
     pub fn run(&self) -> Result<()> {
         let market = self.market.borrow_mut();
         let config = market.query_config().unwrap();
+        let mock_api = MockApi::default();
 
         market.exec_refresh_price()?;
-        market.exec_crank_till_finished(&Addr::unchecked("cranker"))?;
+        market.exec_crank_till_finished(&mock_api.addr_make("cranker"))?;
 
         let deposit = self.deposit.into_number();
         let stake = self.stake.into_number();
         let unstake = self.unstake.into_number();
 
-        let lp = Addr::unchecked("new-lp");
+        let lp = mock_api.addr_make("new-lp");
 
         // deposit LP
         market
@@ -85,12 +103,12 @@ impl XlpStakeUnstake {
 
         // try to stake more than we have - should fail
         market
-            .exec_stake_lp(&lp, Some(deposit + Number::ONE))
+            .exec_stake_lp(&lp, Some((deposit + Number::ONE).unwrap()))
             .unwrap_err();
 
         // stake should succeed
         market.exec_stake_lp(&lp, Some(stake)).unwrap();
-        let expected_stake_lp_amount = deposit - stake;
+        let expected_stake_lp_amount = (deposit - stake).unwrap();
         let expected_stake_xlp_amount = stake;
 
         let info = market.query_lp_info(&lp).unwrap();
@@ -99,13 +117,13 @@ impl XlpStakeUnstake {
 
         // unstake more than we have staked - should fail
         market
-            .exec_unstake_xlp(&lp, Some(stake + Number::ONE))
+            .exec_unstake_xlp(&lp, Some((stake + Number::ONE).unwrap()))
             .unwrap_err();
 
         // unstake should succeed
         market.exec_unstake_xlp(&lp, Some(unstake)).unwrap();
-        let expected_unstake_lp_amount = (deposit - stake) + unstake;
-        let expected_unstake_xlp_amount = stake - unstake;
+        let expected_unstake_lp_amount = ((deposit - stake).unwrap() + unstake).unwrap();
+        let expected_unstake_xlp_amount = (stake - unstake).unwrap();
 
         // jump to half the unstaking period for imprecise checks
         market
@@ -154,8 +172,9 @@ impl LpYield {
     pub fn run(&self) -> Result<()> {
         let market = &mut *self.market.borrow_mut();
         let market_config = market.query_config().unwrap();
-        let lp = Addr::unchecked("new-lp");
-        let init_lp_pool = self.pos_collateral.into_number() * market_config.max_leverage;
+        let mock_api = MockApi::default();
+        let lp = mock_api.addr_make("new-lp");
+        let init_lp_pool = (self.pos_collateral.into_number() * market_config.max_leverage)?;
         let lp_deposit = self.lp_deposit.into_number();
         let trader = market.clone_trader(0).unwrap();
         //market.automatic_time_jump_enabled = false;
@@ -163,7 +182,7 @@ impl LpYield {
         // we're starting with a market without any LP, so create the pool
         // from a different user, with enough to support trades
         market
-            .exec_mint_and_deposit_liquidity(&Addr::unchecked("prior-lp-pool"), init_lp_pool)
+            .exec_mint_and_deposit_liquidity(&mock_api.addr_make("prior-lp-pool"), init_lp_pool)
             .unwrap();
 
         // deposit our liquidity
@@ -174,7 +193,8 @@ impl LpYield {
         // // Open position
 
         market.exec_refresh_price()?;
-        market.exec_crank_till_finished(&Addr::unchecked("cranker"))?;
+        let cranker = mock_api.addr_make("cranker");
+        market.exec_crank_till_finished(&cranker)?;
 
         let (pos_id, _) = market
             .exec_open_position(
@@ -196,9 +216,7 @@ impl LpYield {
             ))
             .unwrap();
         market.exec_refresh_price().unwrap();
-        market
-            .exec_crank_till_finished(&Addr::unchecked("cranker"))
-            .unwrap();
+        market.exec_crank_till_finished(&cranker).unwrap();
 
         if self.close_position {
             market.exec_close_position(&trader, pos_id, None).unwrap();
@@ -221,10 +239,12 @@ impl LpYield {
                 let pos = market.query_position(pos_id).unwrap();
 
                 // Calculate trading fee
-                let mut trading_fee = pos.notional_size_in_collateral.abs_unsigned().into_number()
-                    * market_config.trading_fee_notional_size.into_number();
-                trading_fee += pos.counter_collateral.into_number()
-                    * market_config.trading_fee_counter_collateral.into_number();
+                let mut trading_fee =
+                    (pos.notional_size_in_collateral.abs_unsigned().into_number()
+                        * market_config.trading_fee_notional_size.into_number())?;
+                trading_fee = (trading_fee
+                    + (pos.counter_collateral.into_number()
+                        * market_config.trading_fee_counter_collateral.into_number())?)?;
 
                 assert_eq!(pos.trading_fee_collateral.into_number(), trading_fee);
 
@@ -232,19 +252,19 @@ impl LpYield {
             };
 
             // the total available yield is the sum of the trading fee and the borrow fee, minus the protocol tax
-            let total_yield = (borrow_fee + trading_fee).into_number()
-                * (Number::ONE - market_config.protocol_tax.into_number());
+            let total_yield = ((borrow_fee + trading_fee)?.into_number()
+                * (Number::ONE - market_config.protocol_tax.into_number())?)?;
 
             // our yield is the total yield, relative to our portion of the pool
-            let our_pool_portion = lp_deposit / (lp_deposit + init_lp_pool);
-            let our_yield = total_yield * our_pool_portion;
+            let our_pool_portion = (lp_deposit / (lp_deposit + init_lp_pool)?)?;
+            let our_yield = (total_yield * our_pool_portion)?;
 
             // sanity check
             let global_lp_stats = market.query_liquidity_stats().unwrap();
             let our_lp_stats = market.query_lp_info(&lp).unwrap();
             assert_eq!(
                 global_lp_stats.total_lp.into_number(),
-                lp_deposit + init_lp_pool
+                (lp_deposit + init_lp_pool)?
             );
             assert_eq!(our_lp_stats.lp_amount.into_number(), lp_deposit);
 
@@ -257,7 +277,8 @@ impl LpYield {
             let wallet_balance_after_claim = market.query_collateral_balance(&lp).unwrap();
 
             wallet_balance_after_claim - wallet_balance_before_claim
-        };
+        }
+        .unwrap();
 
         market.token.assert_eq_signed(actual_yield, expected_yield);
 

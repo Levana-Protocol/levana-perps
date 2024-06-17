@@ -1,6 +1,9 @@
 use cosmwasm_std::Addr;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, time::TimeJump, PerpsApp};
-use msg::prelude::{DirectionToBase, PriceBaseInQuote};
+use msg::{
+    contracts::market::config::ConfigUpdate,
+    prelude::{DirectionToBase, PriceBaseInQuote},
+};
 
 #[test]
 fn liquidation_edge() {
@@ -25,7 +28,8 @@ fn liquidation_edge() {
 
     let liquidation_price = position_query.liquidation_price_base.unwrap();
 
-    let above_liquidation_price = liquidation_price.into_number() + "0.01".parse().unwrap();
+    let above_liquidation_price =
+        (liquidation_price.into_number() + "0.01".parse().unwrap()).unwrap();
     let above_liquidation_price =
         PriceBaseInQuote::try_from_number(above_liquidation_price).unwrap();
 
@@ -41,7 +45,8 @@ fn liquidation_edge() {
         .query_closed_position(&trader, position_id)
         .unwrap_err();
 
-    let below_liquidation_price = liquidation_price.into_number() - "0.01".parse().unwrap();
+    let below_liquidation_price =
+        (liquidation_price.into_number() - "0.01".parse().unwrap()).unwrap();
     let below_liquidation_price =
         PriceBaseInQuote::try_from_number(below_liquidation_price).unwrap();
 
@@ -77,9 +82,10 @@ fn take_profit_edge() {
 
     let position_query = market.query_position(position_id).unwrap();
 
-    let take_profit_price = position_query.take_profit_price_base.unwrap();
+    let take_profit_price = position_query.take_profit_total_base.unwrap();
 
-    let below_take_profit_price = take_profit_price.into_number() - "0.01".parse().unwrap();
+    let below_take_profit_price =
+        (take_profit_price.into_number() - "0.01".parse().unwrap()).unwrap();
     let below_take_profit_price =
         PriceBaseInQuote::try_from_number(below_take_profit_price).unwrap();
 
@@ -95,7 +101,8 @@ fn take_profit_edge() {
         .query_closed_position(&trader, position_id)
         .unwrap_err();
 
-    let above_take_profit_price = take_profit_price.into_number() + "0.01".parse().unwrap();
+    let above_take_profit_price =
+        (take_profit_price.into_number() + "0.01".parse().unwrap()).unwrap();
     let above_take_profit_price =
         PriceBaseInQuote::try_from_number(above_take_profit_price).unwrap();
 
@@ -113,6 +120,16 @@ fn take_profit_edge() {
 #[test]
 fn insufficient_liquidation_margin() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    market
+        .exec_set_config(ConfigUpdate {
+            // The exposure amount changes in response to changes in price.
+            // Therefore, if we keep the default higher value for this parameter,
+            // we don't end up closing the position after one liquifunding.
+            // To account for that, we set a much lower exposure ratio.
+            exposure_margin_ratio: Some("0.0001".parse().unwrap()),
+            ..ConfigUpdate::default()
+        })
+        .unwrap();
 
     let trader = market.clone_trader(0).unwrap();
     // Open a position
@@ -134,7 +151,7 @@ fn insufficient_liquidation_margin() {
     let liquidation_price = position_query.liquidation_price_base.unwrap();
 
     let above_liquidation_price =
-        liquidation_price.into_number() + "0.000000000000000009".parse().unwrap();
+        (liquidation_price.into_number() + "0.000000000000000009".parse().unwrap()).unwrap();
     let above_liquidation_price =
         PriceBaseInQuote::try_from_number(above_liquidation_price).unwrap();
 
@@ -146,7 +163,9 @@ fn insufficient_liquidation_margin() {
         .unwrap();
 
     let position_query = market.query_position(position_id).unwrap();
-    assert!(position_query.active_collateral.raw() > position_query.liquidation_margin.total());
+    assert!(
+        position_query.active_collateral.raw() > position_query.liquidation_margin.total().unwrap()
+    );
 
     // Trigger liquifunding
     market.set_time(TimeJump::Liquifundings(1)).unwrap();

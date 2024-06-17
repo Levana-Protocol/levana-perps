@@ -1,12 +1,11 @@
-use std::sync::Arc;
+use axum::{extract::State, http::HeaderMap, response::IntoResponse, Json};
 
-use axum::{extract::State, http::HeaderMap, response::IntoResponse};
+use super::RestApp;
 
-use crate::app::App;
+pub(crate) async fn gas_refill(rest_app: State<RestApp>, _headers: HeaderMap) -> impl IntoResponse {
+    Json(&*rest_app.app.gas_refill.read().await).into_response()
+}
 
-pub(crate) async fn gases(app: State<Arc<App>>, _headers: HeaderMap) -> impl IntoResponse {
-    // 1000 records per address, I guess there is no need to make it pretty.
-    let gases = app.gases.read();
-    let response: String = format!("{gases:?}");
-    response.into_response()
+pub(crate) async fn fund_usage(rest_app: State<RestApp>, _headers: HeaderMap) -> impl IntoResponse {
+    Json(&*rest_app.app.funds_used.read().await).into_response()
 }

@@ -61,6 +61,12 @@ pub enum ExecuteMsg {
         owner: RawAddr,
     },
 
+    /// Change the migrationadmin
+    SetMigrationAdmin {
+        /// New migration admin
+        migration_admin: RawAddr,
+    },
+
     /// Change the dao addr
     SetDao {
         /// New DAO
@@ -77,14 +83,6 @@ pub enum ExecuteMsg {
     SetWindDown {
         /// New wind down administrator
         wind_down: RawAddr,
-    },
-
-    /// Set market price admin addr for a given market
-    SetMarketPriceAdmin {
-        /// The market contract addr whose market price can be updated by the specified admin
-        market_addr: RawAddr,
-        /// The admin addr that is allowed to update the market price for the specified market
-        admin_addr: RawAddr,
     },
 
     /// Convenience mechanism to transfer all dao fees from all markets
@@ -220,8 +218,6 @@ pub struct MarketInfoResponse {
     pub liquidity_token_lp: Addr,
     /// Address of the xLP liquidity token
     pub liquidity_token_xlp: Addr,
-    /// Address of the price admin
-    pub price_admin: Addr,
 }
 
 /// Return value from [QueryMsg::Shutdown]
@@ -240,10 +236,10 @@ impl ExecuteMsg {
             ExecuteMsg::SetPositionTokenCodeId { .. } => true,
             ExecuteMsg::SetLiquidityTokenCodeId { .. } => true,
             ExecuteMsg::SetOwner { .. } => true,
+            ExecuteMsg::SetMigrationAdmin { .. } => true,
             ExecuteMsg::SetDao { .. } => true,
             ExecuteMsg::SetKillSwitch { .. } => true,
             ExecuteMsg::SetWindDown { .. } => true,
-            ExecuteMsg::SetMarketPriceAdmin { .. } => true,
             ExecuteMsg::TransferAllDaoFees {} => true,
             // Uses its own auth mechanism internally
             ExecuteMsg::Shutdown { .. } => false,

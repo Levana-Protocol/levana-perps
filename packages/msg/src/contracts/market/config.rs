@@ -1,6 +1,11 @@
 //! Market-wide configuration
-mod defaults;
+
+pub mod defaults;
 use shared::prelude::*;
+
+use self::defaults::ConfigDefaults;
+
+use super::spot_price::{SpotPriceConfig, SpotPriceConfigInit};
 
 /// Configuration info for the vAMM
 /// Set by admin-only
@@ -34,10 +39,6 @@ pub struct Config {
     pub mute_events: bool,
     /// Delay between liquifundings, in seconds
     pub liquifunding_delay_seconds: u32,
-    /// How old must the latest price update be to trigger the protocol to lock?
-    pub price_update_too_old_seconds: u32,
-    /// How far behind must the position liquifunding process be to consider the protocol stale?
-    pub staleness_seconds: u32,
     /// The percentage of fees that are taken for the protocol
     pub protocol_tax: Decimal256,
     /// How long it takes to unstake xLP tokens into LP tokens, in seconds
@@ -57,28 +58,39 @@ pub struct Config {
     /// Minimum counterpoint to [Config::max_xlp_rewards_multiplier]
     pub min_xlp_rewards_multiplier: NumberGtZero,
     /// Delta neutrality fee sensitivity parameter.
+    ///
+    /// Higher values indicate markets with greater depth of liquidity, and allow for
+    /// larger divergence for delta neutrality in the markets.
+    ///
+    /// This value is specified in the notional asset.
     pub delta_neutrality_fee_sensitivity: NumberGtZero,
     /// Delta neutrality fee cap parameter, given as a percentage
     pub delta_neutrality_fee_cap: NumberGtZero,
     /// Proportion of delta neutrality inflows that are sent to the protocol.
     pub delta_neutrality_fee_tax: Decimal256,
-    /// The fee to set a [super::entry::ExecuteMsg::PlaceLimitOrder]
-    pub limit_order_fee: Collateral,
     /// The crank fee to be paid into the system, in collateral
     pub crank_fee_charged: Usd,
+    /// The crank surcharge charged for every 10 items in the deferred execution queue.
+    ///
+    /// This is intended to create backpressure in times of high congestion.
+    ///
+    /// For every 10 items in the deferred execution queue, this amount is added to the
+    /// crank fee charged on performing a deferred execution message.
+    ///
+    /// This is only charged while adding new items to the queue, not when performing
+    /// ongoing tasks like liquifunding or liquidations.
+    #[serde(default = "ConfigDefaults::crank_fee_surcharge")]
+    pub crank_fee_surcharge: Usd,
     /// The crank fee to be sent to crankers, in collateral
     pub crank_fee_reward: Usd,
     /// Minimum deposit collateral, given in USD
     pub minimum_deposit_usd: Usd,
-    /// How many positions can sit in "unpend" before we disable new open/update positions for congestion.
-    #[serde(default = "defaults::unpend_limit")]
-    pub unpend_limit: u32,
     /// The liquifunding delay fuzz factor, in seconds.
     ///
     /// Up to how many seconds will we perform a liquifunding early. This will
     /// be part of a semi-randomly generated value and will allow us to schedule
     /// liquifundings arbitrarily to smooth out spikes in traffic.
-    #[serde(default = "defaults::liquifunding_delay_fuzz_seconds")]
+    #[serde(default = "ConfigDefaults::liquifunding_delay_fuzz_seconds")]
     pub liquifunding_delay_fuzz_seconds: u32,
     /// The maximum amount of liquidity that can be deposited into the market.
     #[serde(default)]
@@ -87,6 +99,43 @@ pub struct Config {
     /// Even if this is true, queries will still work as usual.
     #[serde(default)]
     pub disable_position_nft_exec: bool,
+    /// The liquidity cooldown period.
+    ///
+    /// After depositing new funds into the market, liquidity providers will
+    /// have a period of time where they cannot withdraw their funds. This is
+    /// intended to prevent an MEV attack where someone can reorder transactions
+    /// to extract fees from traders without taking on any impairment risk.
+    ///
+    /// This protection is only triggered by deposit of new funds; reinvesting
+    /// existing yield does not introduce a cooldown.
+    ///
+    /// While the cooldown is in place, providers are prevented from either
+    /// withdrawing liquidity or transferring their LP and xLP tokens.
+    ///
+    /// For migration purposes, this value defaults to 0, meaning no cooldown period.
+    #[serde(default)]
+    pub liquidity_cooldown_seconds: u32,
+
+    /// Ratio of notional size used for the exposure component of the liquidation margin.
+    #[serde(default = "ConfigDefaults::exposure_margin_ratio")]
+    pub exposure_margin_ratio: Decimal256,
+
+    /// The spot price config for this market
+    pub spot_price: SpotPriceConfig,
+
+    // Fields below here are no longer used by the protocol, but kept in the data structure to ease migration.
+    /// Just for historical reasons/migrations
+    #[serde(rename = "price_update_too_old_seconds")]
+    pub _unused1: Option<u32>,
+    /// Just for historical reasons/migrations
+    #[serde(rename = "unpend_limit")]
+    pub _unused2: Option<u32>,
+    /// Just for historical reasons/migrations
+    #[serde(rename = "limit_order_fee")]
+    pub _unused3: Option<Collateral>,
+    /// Just for historical reasons/migrations
+    #[serde(rename = "staleness_seconds")]
+    pub _unused4: Option<u32>,
 }
 
 /// Maximum liquidity for deposit.
@@ -112,50 +161,48 @@ impl Default for MaxLiquidity {
     }
 }
 
-impl Default for Config {
-    fn default() -> Self {
+impl Config {
+    /// create a new config with default values and a given spot price config
+    pub fn new(spot_price: SpotPriceConfig) -> Self {
         // these unwraps are fine since we define the value
         Self {
-            trading_fee_notional_size: "0.0005".parse().unwrap(),
-            trading_fee_counter_collateral: "0.0005".parse().unwrap(),
-            crank_execs: 7,
-            max_leverage: Number::try_from("30").unwrap(),
-            carry_leverage: "29".parse().unwrap(),
-            funding_rate_max_annualized: "0.9".parse().unwrap(),
-            borrow_fee_rate_min_annualized: "0.01".parse().unwrap(),
-            borrow_fee_rate_max_annualized: "0.60".parse().unwrap(),
-            funding_rate_sensitivity: "1".parse().unwrap(),
-            mute_events: false,
-            liquifunding_delay_seconds: 60 * 60 * 24,
-            price_update_too_old_seconds: 60 * 30,
-            staleness_seconds: 60 * 60 * 2,
-            protocol_tax: "0.3".parse().unwrap(),
-            unstake_period_seconds: 60 * 60 * 24 * 45, // 45 days
-            target_utilization: "0.9".parse().unwrap(),
-            // Try to realize the bias over a 3 day period.
-            //
-            // See: https://phobosfinance.atlassian.net/browse/PERP-606
-            borrow_fee_sensitivity: (Number::ONE / Number::try_from("3").unwrap())
-                .try_into()
-                .unwrap(),
-            max_xlp_rewards_multiplier: "2".parse().unwrap(),
-            min_xlp_rewards_multiplier: "1".parse().unwrap(),
-            delta_neutrality_fee_sensitivity: "50000000".parse().unwrap(),
-            delta_neutrality_fee_cap: "0.01".parse().unwrap(),
-            delta_neutrality_fee_tax: "0.25".parse().unwrap(),
-            limit_order_fee: Collateral::from(0u64),
-            crank_fee_charged: "0.01".parse().unwrap(),
-            crank_fee_reward: "0.001".parse().unwrap(),
-            minimum_deposit_usd: "5".parse().unwrap(),
-            unpend_limit: 50,
-            liquifunding_delay_fuzz_seconds: 60 * 60 * 4,
-            max_liquidity: MaxLiquidity::Unlimited {},
-            disable_position_nft_exec: false,
+            trading_fee_notional_size: ConfigDefaults::trading_fee_notional_size(),
+            trading_fee_counter_collateral: ConfigDefaults::trading_fee_counter_collateral(),
+            crank_execs: ConfigDefaults::crank_execs(),
+            max_leverage: ConfigDefaults::max_leverage(),
+            carry_leverage: ConfigDefaults::carry_leverage(),
+            funding_rate_max_annualized: ConfigDefaults::funding_rate_max_annualized(),
+            borrow_fee_rate_min_annualized: ConfigDefaults::borrow_fee_rate_min_annualized(),
+            borrow_fee_rate_max_annualized: ConfigDefaults::borrow_fee_rate_max_annualized(),
+            funding_rate_sensitivity: ConfigDefaults::funding_rate_sensitivity(),
+            mute_events: ConfigDefaults::mute_events(),
+            liquifunding_delay_seconds: ConfigDefaults::liquifunding_delay_seconds(),
+            protocol_tax: ConfigDefaults::protocol_tax(),
+            unstake_period_seconds: ConfigDefaults::unstake_period_seconds(),
+            target_utilization: ConfigDefaults::target_utilization(),
+            borrow_fee_sensitivity: ConfigDefaults::borrow_fee_sensitivity(),
+            max_xlp_rewards_multiplier: ConfigDefaults::max_xlp_rewards_multiplier(),
+            min_xlp_rewards_multiplier: ConfigDefaults::min_xlp_rewards_multiplier(),
+            delta_neutrality_fee_sensitivity: ConfigDefaults::delta_neutrality_fee_sensitivity(),
+            delta_neutrality_fee_cap: ConfigDefaults::delta_neutrality_fee_cap(),
+            delta_neutrality_fee_tax: ConfigDefaults::delta_neutrality_fee_tax(),
+            crank_fee_charged: ConfigDefaults::crank_fee_charged(),
+            crank_fee_surcharge: ConfigDefaults::crank_fee_surcharge(),
+            crank_fee_reward: ConfigDefaults::crank_fee_reward(),
+            minimum_deposit_usd: ConfigDefaults::minimum_deposit_usd(),
+            liquifunding_delay_fuzz_seconds: ConfigDefaults::liquifunding_delay_fuzz_seconds(),
+            max_liquidity: ConfigDefaults::max_liquidity(),
+            disable_position_nft_exec: ConfigDefaults::disable_position_nft_exec(),
+            liquidity_cooldown_seconds: ConfigDefaults::liquidity_cooldown_seconds(),
+            exposure_margin_ratio: ConfigDefaults::exposure_margin_ratio(),
+            spot_price,
+            _unused1: None,
+            _unused2: None,
+            _unused3: None,
+            _unused4: None,
         }
     }
-}
 
-impl Config {
     /// Ensure that the settings within this [Config] are valid.
     pub fn validate(&self) -> Result<()> {
         // note - crank_execs_after_push and mute_events are inherently always valid
@@ -194,7 +241,7 @@ impl Config {
             );
         }
 
-        if self.carry_leverage.into_number() + Number::ONE > self.max_leverage {
+        if (self.carry_leverage.into_number() + Number::ONE)? > self.max_leverage {
             perp_bail!(
                 ErrorId::Config,
                 ErrorDomain::Market,
@@ -291,20 +338,6 @@ impl Config {
 
         Ok(())
     }
-
-    /// How long between calculation of a liquidation margin for a position and
-    /// the protocol going stale?
-    ///
-    /// When calculating liquidation margin, we set aside enough funds to cover
-    /// the liquifunding delay, plus a staleness buffer. This method returns the
-    /// sum of those two numbers. Once that amount of time has passed, and the
-    /// position has not been liquifunded or closed, the protocol is in a stale
-    /// state because we cannot guarantee liquidity of the position.
-    pub(crate) fn liquidation_margin_duration(&self) -> Duration {
-        Duration::from_seconds(
-            u64::from(self.liquifunding_delay_seconds) + u64::from(self.staleness_seconds),
-        )
-    }
 }
 
 /// Helper struct to conveniently update [Config]
@@ -326,8 +359,6 @@ pub struct ConfigUpdate {
     pub borrow_fee_rate_max_annualized: Option<NumberGtZero>,
     pub mute_events: Option<bool>,
     pub liquifunding_delay_seconds: Option<u32>,
-    pub price_update_too_old_seconds: Option<u32>,
-    pub staleness_seconds: Option<u32>,
     pub protocol_tax: Option<Decimal256>,
     pub unstake_period_seconds: Option<u32>,
     pub target_utilization: Option<NumberGtZero>,
@@ -337,14 +368,16 @@ pub struct ConfigUpdate {
     pub delta_neutrality_fee_sensitivity: Option<NumberGtZero>,
     pub delta_neutrality_fee_cap: Option<NumberGtZero>,
     pub delta_neutrality_fee_tax: Option<Decimal256>,
-    pub limit_order_fee: Option<Collateral>,
     pub crank_fee_charged: Option<Usd>,
+    pub crank_fee_surcharge: Option<Usd>,
     pub crank_fee_reward: Option<Usd>,
     pub minimum_deposit_usd: Option<Usd>,
-    pub unpend_limit: Option<u32>,
     pub liquifunding_delay_fuzz_seconds: Option<u32>,
     pub max_liquidity: Option<MaxLiquidity>,
     pub disable_position_nft_exec: Option<bool>,
+    pub liquidity_cooldown_seconds: Option<u32>,
+    pub spot_price: Option<SpotPriceConfigInit>,
+    pub exposure_margin_ratio: Option<Decimal256>,
 }
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for ConfigUpdate {
@@ -361,8 +394,6 @@ impl<'a> arbitrary::Arbitrary<'a> for ConfigUpdate {
             borrow_fee_rate_max_annualized: u.arbitrary()?,
             mute_events: u.arbitrary()?,
             liquifunding_delay_seconds: u.arbitrary()?,
-            price_update_too_old_seconds: u.arbitrary()?,
-            staleness_seconds: u.arbitrary()?,
             protocol_tax: arbitrary_decimal_256_option(u)?,
             unstake_period_seconds: u.arbitrary()?,
             target_utilization: u.arbitrary()?,
@@ -372,14 +403,16 @@ impl<'a> arbitrary::Arbitrary<'a> for ConfigUpdate {
             delta_neutrality_fee_sensitivity: u.arbitrary()?,
             delta_neutrality_fee_cap: u.arbitrary()?,
             delta_neutrality_fee_tax: arbitrary_decimal_256_option(u)?,
-            limit_order_fee: u.arbitrary()?,
             crank_fee_charged: u.arbitrary()?,
+            crank_fee_surcharge: u.arbitrary()?,
             crank_fee_reward: u.arbitrary()?,
             minimum_deposit_usd: u.arbitrary()?,
-            unpend_limit: None,
             liquifunding_delay_fuzz_seconds: None,
             max_liquidity: None,
             disable_position_nft_exec: None,
+            liquidity_cooldown_seconds: None,
+            exposure_margin_ratio: arbitrary_decimal_256_option(u)?,
+            spot_price: None,
         })
     }
 }
@@ -396,8 +429,6 @@ impl From<Config> for ConfigUpdate {
             funding_rate_max_annualized: Some(src.funding_rate_max_annualized),
             mute_events: Some(src.mute_events),
             liquifunding_delay_seconds: Some(src.liquifunding_delay_seconds),
-            price_update_too_old_seconds: Some(src.price_update_too_old_seconds),
-            staleness_seconds: Some(src.staleness_seconds),
             protocol_tax: Some(src.protocol_tax),
             unstake_period_seconds: Some(src.unstake_period_seconds),
             target_utilization: Some(src.target_utilization),
@@ -409,14 +440,16 @@ impl From<Config> for ConfigUpdate {
             delta_neutrality_fee_sensitivity: Some(src.delta_neutrality_fee_sensitivity),
             delta_neutrality_fee_cap: Some(src.delta_neutrality_fee_cap),
             delta_neutrality_fee_tax: Some(src.delta_neutrality_fee_tax),
-            limit_order_fee: Some(src.limit_order_fee),
             crank_fee_charged: Some(src.crank_fee_charged),
+            crank_fee_surcharge: Some(src.crank_fee_surcharge),
             crank_fee_reward: Some(src.crank_fee_reward),
             minimum_deposit_usd: Some(src.minimum_deposit_usd),
-            unpend_limit: Some(src.unpend_limit),
             liquifunding_delay_fuzz_seconds: Some(src.liquifunding_delay_fuzz_seconds),
             max_liquidity: Some(src.max_liquidity),
             disable_position_nft_exec: Some(src.disable_position_nft_exec),
+            liquidity_cooldown_seconds: Some(src.liquidity_cooldown_seconds),
+            exposure_margin_ratio: Some(src.exposure_margin_ratio),
+            spot_price: Some(src.spot_price.into()),
         }
     }
 }

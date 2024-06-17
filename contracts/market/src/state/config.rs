@@ -1,6 +1,13 @@
 use crate::state::*;
+use anyhow::ensure;
 use cw_storage_plus::Item;
-use msg::contracts::market::config::{Config, ConfigUpdate};
+use msg::contracts::market::{
+    config::{Config, ConfigUpdate},
+    spot_price::{
+        PythConfig, SpotPriceConfig, SpotPriceConfigInit, SpotPriceFeed, SpotPriceFeedData,
+        SpotPriceFeedDataInit, SpotPriceFeedInit, StrideConfig,
+    },
+};
 
 const CONFIG_STORAGE: Item<Config> = Item::new(namespace::CONFIG);
 
@@ -9,19 +16,27 @@ pub(crate) fn load_config(store: &dyn Storage) -> Result<Config> {
 }
 
 /// called only once, at instantiation
-pub(crate) fn config_init(store: &mut dyn Storage, config: Option<ConfigUpdate>) -> Result<()> {
+pub(crate) fn config_init(
+    api: &dyn Api,
+    store: &mut dyn Storage,
+    config: Option<ConfigUpdate>,
+    spot_price: SpotPriceConfigInit,
+) -> Result<()> {
+    let mut init_config = Config::new(convert_spot_price_init(api, spot_price)?);
+
     let update = match config {
-        None => Config::default().into(),
+        None => ConfigUpdate::default(),
         Some(update) => update,
     };
-    let mut init_config = Config::default();
-    update_config(&mut init_config, store, update)?;
+
+    update_config(&mut init_config, api, store, update)?;
 
     Ok(())
 }
 
 pub(crate) fn update_config(
     config: &mut Config,
+    api: &dyn Api,
     store: &mut dyn Storage,
     ConfigUpdate {
         trading_fee_notional_size,
@@ -33,8 +48,6 @@ pub(crate) fn update_config(
         funding_rate_max_annualized,
         mute_events,
         liquifunding_delay_seconds,
-        price_update_too_old_seconds,
-        staleness_seconds,
         protocol_tax,
         unstake_period_seconds,
         target_utilization,
@@ -46,14 +59,16 @@ pub(crate) fn update_config(
         delta_neutrality_fee_sensitivity,
         delta_neutrality_fee_cap,
         delta_neutrality_fee_tax,
-        limit_order_fee,
         crank_fee_charged,
+        crank_fee_surcharge,
         crank_fee_reward,
         minimum_deposit_usd: minimum_deposit,
-        unpend_limit,
         liquifunding_delay_fuzz_seconds,
         max_liquidity,
         disable_position_nft_exec,
+        liquidity_cooldown_seconds,
+        exposure_margin_ratio,
+        spot_price,
     }: ConfigUpdate,
 ) -> Result<()> {
     if let Some(x) = trading_fee_notional_size {
@@ -90,14 +105,6 @@ pub(crate) fn update_config(
 
     if let Some(x) = liquifunding_delay_seconds {
         config.liquifunding_delay_seconds = x;
-    }
-
-    if let Some(x) = price_update_too_old_seconds {
-        config.price_update_too_old_seconds = x;
-    }
-
-    if let Some(x) = staleness_seconds {
-        config.staleness_seconds = x;
     }
 
     if let Some(protocol_tax) = protocol_tax {
@@ -140,22 +147,17 @@ pub(crate) fn update_config(
         config.delta_neutrality_fee_tax = x;
     }
 
-    if let Some(x) = limit_order_fee {
-        config.limit_order_fee = x;
-    }
-
     if let Some(x) = crank_fee_charged {
         config.crank_fee_charged = x;
     }
-
+    if let Some(x) = crank_fee_surcharge {
+        config.crank_fee_surcharge = x;
+    }
     if let Some(x) = crank_fee_reward {
         config.crank_fee_reward = x;
     }
     if let Some(x) = minimum_deposit {
         config.minimum_deposit_usd = x;
-    }
-    if let Some(x) = unpend_limit {
-        config.unpend_limit = x;
     }
     if let Some(x) = liquifunding_delay_fuzz_seconds {
         config.liquifunding_delay_fuzz_seconds = x;
@@ -166,10 +168,110 @@ pub(crate) fn update_config(
     if let Some(x) = disable_position_nft_exec {
         config.disable_position_nft_exec = x;
     }
+    if let Some(x) = liquidity_cooldown_seconds {
+        config.liquidity_cooldown_seconds = x;
+    }
+
+    if let Some(x) = spot_price {
+        config.spot_price = convert_spot_price_init(api, x)?;
+    }
+
+    if let Some(x) = exposure_margin_ratio {
+        config.exposure_margin_ratio = x;
+    }
 
     config.validate()?;
 
     CONFIG_STORAGE.save(store, config)?;
 
     Ok(())
+}
+
+pub(crate) fn convert_spot_price_init(
+    api: &dyn Api,
+    spot_price: SpotPriceConfigInit,
+) -> Result<SpotPriceConfig> {
+    Ok(match spot_price {
+        SpotPriceConfigInit::Manual { admin } => SpotPriceConfig::Manual {
+            admin: admin.validate(api)?,
+        },
+        SpotPriceConfigInit::Oracle {
+            pyth,
+            stride,
+            feeds,
+            feeds_usd,
+            volatile_diff_seconds,
+        } => {
+            ensure!(!feeds.is_empty(), "feeds cannot be empty");
+            ensure!(!feeds_usd.is_empty(), "feeds_usd cannot be empty");
+
+            fn map_feeds(
+                api: &dyn Api,
+                feeds: Vec<SpotPriceFeedInit>,
+            ) -> Result<Vec<SpotPriceFeed>> {
+                feeds
+                    .into_iter()
+                    .map(|feed| {
+                        Ok(SpotPriceFeed {
+                            inverted: feed.inverted,
+                            volatile: feed.volatile,
+                            data: match feed.data {
+                                SpotPriceFeedDataInit::Constant { price } => {
+                                    SpotPriceFeedData::Constant { price }
+                                }
+                                SpotPriceFeedDataInit::Pyth {
+                                    id,
+                                    age_tolerance_seconds,
+                                } => SpotPriceFeedData::Pyth {
+                                    id,
+                                    age_tolerance_seconds,
+                                },
+                                SpotPriceFeedDataInit::Stride {
+                                    denom,
+                                    age_tolerance_seconds,
+                                } => SpotPriceFeedData::Stride {
+                                    denom,
+                                    age_tolerance_seconds,
+                                },
+                                SpotPriceFeedDataInit::Sei { denom } => {
+                                    SpotPriceFeedData::Sei { denom }
+                                }
+                                SpotPriceFeedDataInit::Simple {
+                                    contract,
+                                    age_tolerance_seconds,
+                                } => SpotPriceFeedData::Simple {
+                                    contract: contract.validate(api)?,
+                                    age_tolerance_seconds,
+                                },
+                            },
+                        })
+                    })
+                    .collect()
+            }
+
+            SpotPriceConfig::Oracle {
+                pyth: pyth
+                    .map(|pyth| {
+                        pyth.contract_address
+                            .validate(api)
+                            .map(|contract_address| PythConfig {
+                                contract_address,
+                                network: pyth.network,
+                            })
+                    })
+                    .transpose()?,
+                stride: stride
+                    .map(|stride| {
+                        stride
+                            .contract_address
+                            .validate(api)
+                            .map(|contract_address| StrideConfig { contract_address })
+                    })
+                    .transpose()?,
+                feeds: map_feeds(api, feeds)?,
+                feeds_usd: map_feeds(api, feeds_usd)?,
+                volatile_diff_seconds,
+            }
+        }
+    })
 }
