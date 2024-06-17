@@ -4,8 +4,6 @@ ADD --chmod=755 https://github.com/fpco/health-check/releases/download/v0.3.0/he
 
 RUN mkdir -p /app/packages/perps-exes/assets
 
-USER 1000
-
 WORKDIR /app
 
 COPY --chmod=755 --chown=1000 ./mainnet-factories.toml /app/packages/perps-exes/assets
