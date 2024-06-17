@@ -467,7 +467,7 @@ liquidity_cooldown_seconds = 86400
 initial-borrow-fee-rate = "0.2"
 
 [markets.MEME_USDC.config]
-carry_leverage = "7"
+carry_leverage = "5"
 max_leverage = "10"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.1"
@@ -614,7 +614,7 @@ exposure_margin_ratio = "0.02"
 initial-borrow-fee-rate = "0.08"
 
 [markets.SEI_USD.config]
-carry_leverage = "5"
+carry_leverage = "7"
 max_leverage = "30"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.04"
