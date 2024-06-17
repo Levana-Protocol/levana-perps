@@ -5,3 +5,7 @@ default:
 # Run top traders
 top-traders:
 	cargo run --bin perps-deploy util top-traders
+
+# Sync configuration
+sync:
+	cargo run --bin perps-deploy mainnet sync-config --factory osmo1ssw6x553kzqher0earlkwlxasfm2stnl3ms3ma2zz4tnajxyyaaqlucd45
