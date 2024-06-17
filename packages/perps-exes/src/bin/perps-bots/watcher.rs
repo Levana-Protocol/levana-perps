@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::fmt::{Display, Write};
 use std::pin::Pin;
+use std::time::Instant;
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::{Context, Result};
@@ -150,7 +151,7 @@ pub(crate) struct TaskStatus {
     out_of_date: Option<Duration>,
     /// Should we expire the status of last result ?
     #[serde(skip)]
-    expire_last_result: Option<Duration>,
+    expire_last_result: Option<(std::time::Duration, Instant)>,
     counts: TaskCounts,
 }
 
@@ -209,10 +210,8 @@ enum OutOfDateType {
 
 impl TaskStatus {
     fn is_expired(&self) -> bool {
-        if let Some(expiry_duration) = self.expire_last_result {
-            let last_run = self.last_result.updated;
-            let now = Utc::now();
-            last_run + expiry_duration <= now
+        if let Some((expiry_duration, instant)) = self.expire_last_result {
+            instant.elapsed() >= expiry_duration
         } else {
             false
         }
@@ -678,7 +677,7 @@ pub(crate) struct WatchedTaskOutput {
     message: Cow<'static, str>,
     /// Controls the stickiness of this message. After how long should
     /// we treat this as a non alert ?
-    expire_alert: Option<Duration>,
+    expire_alert: Option<(std::time::Duration, Instant)>,
     /// Is the message an error ?
     error: bool,
 }
@@ -694,8 +693,8 @@ impl WatchedTaskOutput {
         }
     }
 
-    pub(crate) fn set_expiry(mut self, expire_duration: Duration) -> Self {
-        self.expire_alert = Some(expire_duration);
+    pub(crate) fn set_expiry(mut self, expire_duration: std::time::Duration) -> Self {
+        self.expire_alert = Some((expire_duration, Instant::now()));
         self
     }
 
