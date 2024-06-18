@@ -336,23 +336,24 @@ impl State<'_> {
             },
         )?;
 
-        let price_point = match self.config.spot_price.clone() {
-            SpotPriceConfig::Manual { .. } => self.current_spot_price(ctx.storage)?,
-            SpotPriceConfig::Oracle {
-                feeds, feeds_usd, ..
-            } => {
-                let oracle_price = self.get_oracle_price(true)?;
-                let market_id = self.market_id(ctx.storage)?;
-                let price_storage =
-                    oracle_price.compose_price(market_id, &feeds, &feeds_usd, self.now())?;
+        // let price_point = match self.config.spot_price.clone() {
+        //     SpotPriceConfig::Manual { .. } => self.current_spot_price(ctx.storage)?,
+        //     SpotPriceConfig::Oracle {
+        //         feeds, feeds_usd, ..
+        //     } => {
+        //         let oracle_price = self.get_oracle_price(true)?;
+        //         let market_id = self.market_id(ctx.storage)?;
+        //         let price_storage =
+        //             oracle_price.compose_price(market_id, &feeds, &feeds_usd, self.now())?;
 
-                let oracle_publish_time = oracle_price
-                    .calculate_publish_time(self.config_volatile_time())?
-                    .context("couldn't get an oracle price (no-volatile)")?;
+        //         let oracle_publish_time = oracle_price
+        //             .calculate_publish_time(self.config_volatile_time())?
+        //             .context("couldn't get an oracle price (no-volatile)")?;
 
-                self.make_price_point(ctx.storage, oracle_publish_time, price_storage)?
-            }
-        };
+        //         self.make_price_point(ctx.storage, oracle_publish_time, price_storage)?
+        //     }
+        // };
+        let price_point = self.current_spot_price(ctx.storage)?;
         self.deferred_validate(ctx.storage, new_id, &price_point)?;
 
         match target {
