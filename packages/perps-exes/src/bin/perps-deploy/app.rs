@@ -106,7 +106,7 @@ impl Opt {
         }
         log::info!("Connecting to {}", builder.grpc_url());
 
-        builder.build().await
+        builder.build()
     }
 
     fn get_lazy_wallet(&self, network: PerpsNetwork) -> Result<LazyWallet, WalletError> {

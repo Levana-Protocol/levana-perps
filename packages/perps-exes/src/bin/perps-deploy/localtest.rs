@@ -142,7 +142,7 @@ async fn wait_till_network_is_up(
         }
 
         let builder = network.builder().await?;
-        let cosmos = builder.build().await;
+        let cosmos = builder.build();
         let cosmos = match cosmos {
             Ok(cosmos) => cosmos,
             Err(_) => {

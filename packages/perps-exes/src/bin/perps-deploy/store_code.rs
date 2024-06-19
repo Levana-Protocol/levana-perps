@@ -120,7 +120,7 @@ pub(crate) async fn store_code(
                         "sei" => {
                             let mut builder = CosmosNetwork::SeiTestnet.builder().await?;
                             builder.set_gas_estimate_multiplier(1.01);
-                            builder.build().await?
+                            builder.build()?
                         }
                         _ => cosmos.clone(),
                     };
