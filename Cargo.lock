@@ -847,7 +847,7 @@ checksum = "06ea2b9bc92be3c2baa9334a323ebca2d6f074ff852cd1d7b11064035cd3868f"
 [[package]]
 name = "cosmos"
 version = "0.1.0"
-source = "git+https://github.com/fpco/cosmos-rs.git?rev=2a13f410374094cec4368d68ca0fa0a05f8980b0#2a13f410374094cec4368d68ca0fa0a05f8980b0"
+source = "git+https://github.com/fpco/cosmos-rs.git?rev=7cd10ef84e78eca3d3c3c868040cbec1aa74f6c3#7cd10ef84e78eca3d3c3c868040cbec1aa74f6c3"
 dependencies = [
  "base64 0.22.1",
  "bech32 0.11.0",
