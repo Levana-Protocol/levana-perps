@@ -34,9 +34,10 @@ async fn check_block_lag_single(app: &App) -> Result<String> {
         .into_iter()
         .next()
         .context("Impossible! No nodes found in health report")?;
-    if report.is_healthy {
-        Ok(format!("Primary node is healthy:\n{report}"))
-    } else {
-        Err(anyhow::anyhow!("Primary node is not healthy:\n{report}"))
+    match report.node_health_level {
+        cosmos::error::NodeHealthLevel::Unblocked { error_count } if error_count < 4 => {
+            Ok(format!("Primary node is healthy:\n{report}"))
+        }
+        _ => Err(anyhow::anyhow!("Primary node is not healthy:\n{report}")),
     }
 }
