@@ -269,7 +269,9 @@ impl TaskLabel {
         }
         match self {
             TaskLabel::GetFactory => true,
-            TaskLabel::CrankRun { index: _ } => true,
+            // Do not trigger alerts here, we'll let the stale checking determine
+            // if cranks have been failing for too long.
+            TaskLabel::CrankRun { index: _ } => false,
             TaskLabel::Price => true,
             TaskLabel::TrackBalance => false,
             TaskLabel::GasCheck => false,
