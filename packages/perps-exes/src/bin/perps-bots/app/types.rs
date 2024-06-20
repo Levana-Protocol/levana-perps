@@ -194,7 +194,7 @@ impl Opt {
         }
 
         builder.set_referer_header(Some(self.referer_header.to_string()));
-        builder.build().await.map_err(|e| e.into())
+        builder.build().map_err(|e| e.into())
     }
 
     pub(crate) async fn into_app_builder(self) -> Result<AppBuilder> {
