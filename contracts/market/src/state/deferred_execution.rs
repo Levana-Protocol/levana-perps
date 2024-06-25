@@ -12,7 +12,6 @@ use msg::contracts::market::deferred_execution::{
 use msg::contracts::market::fees::events::TradeId;
 use msg::contracts::market::order::OrderId;
 use msg::contracts::market::position::PositionId;
-use msg::contracts::market::spot_price::SpotPriceConfig;
 use msg::prelude::*;
 
 use super::StateContext;
