@@ -430,12 +430,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 &info.sender,
                 AuthCheck::Addr(state.env.contract.address.clone()),
             )?;
-            println!("PerformDeferredExecPricePoint: {:?}", price_point_timestamp);
-            state.deferred_validate(
-                ctx.storage,
-                id,
-                &state.spot_price(ctx.storage, price_point_timestamp)?,
-            )?;
             state.perform_deferred_exec(&mut ctx, id, price_point_timestamp)?;
         }
     }

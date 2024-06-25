@@ -335,6 +335,9 @@ impl State<'_> {
             },
         )?;
 
+        let price_point = self.current_spot_price(ctx.storage)?;
+        self.deferred_validate(ctx.storage, new_id, &price_point)?;
+
         match target {
             DeferredExecTarget::DoesNotExist => (),
             DeferredExecTarget::Position(pos_id) => {
