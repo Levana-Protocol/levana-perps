@@ -13,6 +13,8 @@ WORKDIR /app
 
 RUN mkdir -p /app/packages/perps-exes/assets
 
+ENV NO_COLOR=1
+
 COPY --chmod=755 ./mainnet-factories.toml /app/packages/perps-exes/assets
 COPY perps-companion /usr/bin/perps-companion
 
