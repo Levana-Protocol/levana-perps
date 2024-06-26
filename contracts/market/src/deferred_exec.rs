@@ -39,10 +39,6 @@ impl State<'_> {
     ) -> Result<()> {
         let price_point = self.spot_price(ctx.storage, price_point_timestamp)?;
         debug_assert!(price_point.timestamp == price_point_timestamp);
-
-        // Validate the deferred exec message before execute them
-        self.deferred_validate(ctx.storage, id, &price_point)?;
-
         let item = self.load_deferred_exec_item(ctx.storage, id)?;
         let pos_order_id = helper_execute(self, ctx, item.clone(), price_point)?;
         self.mark_deferred_exec_success(ctx, item, pos_order_id)?;

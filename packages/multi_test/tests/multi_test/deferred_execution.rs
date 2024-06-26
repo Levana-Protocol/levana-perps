@@ -548,7 +548,7 @@ fn defer_liquidation_2856() {
 
     // check that we go from "open" to "pending close" but NOT "closed" when we push the new price
     market.query_position(pos_id).unwrap();
-    market.exec_set_price("100".parse().unwrap()).unwrap();
+    market.exec_set_price("15".parse().unwrap()).unwrap();
     market.query_position(pos_id).unwrap_err();
     market
         .query_position_pending_close(pos_id, PositionsQueryFeeApproach::Accumulated)
