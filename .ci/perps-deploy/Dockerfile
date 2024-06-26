@@ -1,6 +1,7 @@
 FROM alpine:3.19.1
 
 ADD --chmod=755 https://github.com/fpco/health-check/releases/download/v0.4.0/health-check-x86_64-unknown-linux-musl /usr/bin/health-check
+ENV NO_COLOR=1
 
 RUN mkdir -p /app/packages/perps-exes/assets
 
