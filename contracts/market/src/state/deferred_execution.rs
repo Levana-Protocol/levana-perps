@@ -345,6 +345,9 @@ impl State<'_> {
             }
         }
 
+        let price_point = self.current_spot_price(ctx.storage)?;
+        self.deferred_validate(ctx.storage, new_id, &price_point)?;
+
         ctx.response_mut().add_event(DeferredExecQueuedEvent {
             deferred_exec_id: new_id,
             target,

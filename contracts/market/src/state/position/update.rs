@@ -1012,11 +1012,21 @@ impl UpdatePositionStopLossPriceExec {
         id: PositionId,
         stop_loss: StopLoss,
         price_point: PricePoint,
+        is_pre_check: bool,
     ) -> Result<Self> {
         let mut pos = get_position(store, id)?;
         let market_type = state.market_id(store)?.get_market_type();
 
-        debug_assert!(pos.liquifunded_at == price_point.timestamp);
+        // We generally want to ensure that this invariant is met.
+        // Specifically, it ensures that we've fully liquifunded this position
+        // to the point of the currently active price point.
+        //
+        // However, this check is not appropriate when doing initial validation
+        // of a deferred execution. At that point, we know that we haven't
+        // actually performed liquifunding. So, in that case, we skip the assertion.
+        if !is_pre_check {
+            debug_assert!(pos.liquifunded_at == price_point.timestamp);
+        }
 
         match stop_loss {
             StopLoss::Remove => {
