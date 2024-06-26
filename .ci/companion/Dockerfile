@@ -1,6 +1,6 @@
 FROM alpine:3.19.1
 
-ADD --chmod=755 https://github.com/fpco/health-check/releases/download/v0.2.0/health-check-x86_64-unknown-linux-musl /usr/bin/health-check
+ADD --chmod=755 https://github.com/fpco/health-check/releases/download/v0.4.0/health-check-x86_64-unknown-linux-musl /usr/bin/health-check
 
 RUN apk update && apk add fontconfig
 
@@ -12,6 +12,8 @@ RUN fc-cache -fv
 WORKDIR /app
 
 RUN mkdir -p /app/packages/perps-exes/assets
+
+ENV NO_COLOR=1
 
 COPY --chmod=755 ./mainnet-factories.toml /app/packages/perps-exes/assets
 COPY perps-companion /usr/bin/perps-companion

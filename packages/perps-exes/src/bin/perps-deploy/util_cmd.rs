@@ -455,7 +455,7 @@ pub(crate) async fn open_position_csv(
         }
         builder.set_referer_header(Some("https://trade-history.levana.exchange/".to_owned()));
 
-        builder.build_lazy()?
+        builder.build()?
     } else {
         opt.load_app_mainnet(factory.network).await?.cosmos
     };

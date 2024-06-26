@@ -2,7 +2,7 @@ name: Test
 
 on:
   push:
-    branches: [develop]
+    branches: [main]
     tags:
       - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
   pull_request:
@@ -54,7 +54,7 @@ jobs:
           workspaces: |
             .
       - name: Cache contract builds
-        if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/develop') }}
+        if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/main') }}
         uses: actions/cache@v4
         with:
           key: contracts-${{ hashFiles('Cargo.toml') }}-${{hashFiles('Cargo.lock')}}-new${{ hashFiles('./.ci/osmolocal.Dockerfile')}}-${{ hashFiles('./.ci/contracts.sh')}} }
@@ -66,10 +66,10 @@ jobs:
       - name: Compile
         run: just cargo-compile
       # - name: Run tests (with prop tests)
-      #   if: github.ref == 'refs/heads/develop'
+      #   if: github.ref == 'refs/heads/main'
       #   run: just cargo-test-with-prop
       - name: Run tests (without prop tests)
-        # if: github.ref != 'refs/heads/develop'
+        # if: github.ref != 'refs/heads/main'
         run: just cargo-test-check
       - name: Clippy
         run: just cargo-clippy-check
@@ -80,29 +80,29 @@ jobs:
       - name: Typescript check
         run: just typescript-check
       - name: Build contracts
-        if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/develop') }}
+        if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/main') }}
         run: just build-contracts
       - name: Print contract sizes
-        if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/develop') }}
+        if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/main') }}
         run: ls -l wasm/artifacts/*.wasm
       - name: On Chain tests (Rust)
-        if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/develop') }}
+        if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/main') }}
         run: just contracts-test
       - name: Deploy to Osmosis testnet
-        if: github.ref == 'refs/heads/develop'
+        if: github.ref == 'refs/heads/main'
         run: COSMOS_WALLET="${{ secrets.DEPLOYER_PHRASE }}" just deploy-osmosis-testnet || echo "Ignoring failed deployment"
       - name: Migrate contracts (osmoci)
-        if: github.ref == 'refs/heads/develop'
+        if: github.ref == 'refs/heads/main'
         run: COSMOS_WALLET="${{ secrets.DEPLOYER_PHRASE }}" just migrate-osmoci || echo "Ignoring failed migration"
       - name: Configure AWS Credentials
-        if: github.ref == 'refs/heads/develop'
+        if: github.ref == 'refs/heads/main'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
       - name: Build and Deploy documentation
-        if: github.ref == 'refs/heads/develop'
+        if: github.ref == 'refs/heads/main'
         run: |
           just build-docs
           aws s3 sync ./.output/temp s3://levana-dev-docs/levana-perps-multichain/docs --acl public-read --delete

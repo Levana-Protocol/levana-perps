@@ -60,7 +60,7 @@ impl PerpApp {
         network: PerpsNetwork,
     ) -> Result<PerpApp> {
         let builder = network.builder().await?;
-        let cosmos = builder.build().await?;
+        let cosmos = builder.build()?;
         let factory_contract = cosmos.make_contract(factory_contract_addr);
 
         let market_info: MarketInfoResponse = factory_contract

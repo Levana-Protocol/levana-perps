@@ -58,7 +58,7 @@ impl App {
 
             builder.set_referer_header(Some("https://indexer.levana.exchange/".to_owned()));
 
-            let cosmos = builder.build_lazy()?;
+            let cosmos = builder.build()?;
             cosmos_map.insert(chain_id, cosmos);
         }
 

@@ -10,6 +10,7 @@ use perps_exes::{
     contracts::{Factory, MarketInfo},
     prelude::{MarketContract, Signed, Usd},
 };
+use shared::prelude::*;
 use shared::storage::MarketId;
 use tokio::task::JoinSet;
 
@@ -48,6 +49,7 @@ async fn go(
     #[derive(serde::Serialize)]
     struct Record<'a> {
         wallet: Address,
+        time: Timestamp,
         market: &'a MarketId,
         position: PositionId,
         status: &'static str,
@@ -145,6 +147,7 @@ async fn go(
                     let mut csv = csv.lock();
                     csv.serialize(&Record {
                         wallet,
+                        time: pos.created_at,
                         market: &market_id,
                         position: pos.id,
                         status: "open",
@@ -166,6 +169,7 @@ async fn go(
                     let mut csv = csv.lock();
                     csv.serialize(&Record {
                         wallet,
+                        time: pos.close_time,
                         market: &market_id,
                         position: pos.id,
                         status: "closed",

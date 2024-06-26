@@ -40,7 +40,7 @@ async fn main_inner() -> Result<()> {
     if let Some(grpc) = opt.cosmos_grpc {
         builder.set_grpc_url(grpc);
     }
-    let cosmos = builder.build().await?;
+    let cosmos = builder.build()?;
 
     let perp_contract = PerpApp::new(
         opt.wallet,

@@ -50,7 +50,7 @@ initial-borrow-fee-rate = "0.1"
 
 [markets.AVAX_USDC.config]
 carry_leverage = "7"
-max_leverage = "50"
+max_leverage = "30"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.05"
 target_utilization = "0.5"
@@ -467,7 +467,8 @@ liquidity_cooldown_seconds = 86400
 initial-borrow-fee-rate = "0.2"
 
 [markets.MEME_USDC.config]
-carry_leverage = "7"
+carry_leverage = "5"
+max_leverage = "10"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.1"
 target_utilization = "0.5"
@@ -613,8 +614,8 @@ exposure_margin_ratio = "0.02"
 initial-borrow-fee-rate = "0.08"
 
 [markets.SEI_USD.config]
-carry_leverage = "5"
-max_leverage = "10"
+carry_leverage = "7"
+max_leverage = "30"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.04"
 target_utilization = "0.5"
