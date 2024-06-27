@@ -486,6 +486,18 @@ impl Position {
             .checked_add_assign(amount, price_point)
     }
 
+    /// Get the price exposure for a given price movement.
+    pub fn get_price_exposure(
+        &self,
+        start_price: Price,
+        end_price: PricePoint,
+    ) -> Result<Signed<Collateral>> {
+        let price_delta = (end_price.price_notional.into_number() - start_price.into_number())?;
+        Ok(Signed::<Collateral>::from_number(
+            (price_delta * self.notional_size.into_number())?,
+        ))
+    }
+
     /// Apply a price change to this position.
     ///
     /// This will determine the exposure (positive == to trader, negative == to
@@ -497,9 +509,7 @@ impl Position {
         end_price: PricePoint,
         liquidation_margin: Collateral,
     ) -> Result<(MaybeClosedPosition, Signed<Collateral>)> {
-        let price_delta = (end_price.price_notional.into_number() - start_price.into_number())?;
-        let exposure =
-            Signed::<Collateral>::from_number((price_delta * self.notional_size.into_number())?);
+        let exposure = self.get_price_exposure(start_price, end_price)?;
         let min_exposure = liquidation_margin
             .into_signed()
             .checked_sub(self.active_collateral.into_signed())?;
@@ -542,121 +552,93 @@ impl Position {
     /// Convert a position into a query response, calculating price exposure impact.
     #[allow(clippy::too_many_arguments)]
     pub fn into_query_response_extrapolate_exposure(
-        self,
+        mut self,
         start_price: PricePoint,
         end_price: PricePoint,
         entry_price: Price,
-        config: &Config,
+        _config: &Config,
         market_type: MarketType,
-        original_direction_to_base: DirectionToBase,
         dnf_on_close_collateral: Signed<Collateral>,
     ) -> Result<PositionOrPendingClose> {
-        // We always use the current spot price for the current_price_point
-        // parameter to liquidation_margin. It's used exclusively to calculate
-        // the crank fee, and therefore does not need to be based on the
-        // liquifunding cadence.
-        let liquidation_margin = self.liquidation_margin(&start_price, config)?;
+        let exposure = self.get_price_exposure(start_price.price_notional, end_price)?;
 
-        let (settle_price_result, _exposure) = self.settle_price_exposure(
-            start_price.price_notional,
-            end_price,
-            liquidation_margin.total()?,
-        )?;
+        let is_profit = exposure.is_strictly_positive();
+        let exposure = exposure.abs_unsigned();
 
-        let result = match settle_price_result {
-            MaybeClosedPosition::Open(pos) => {
-                // PERP-996 ensure we do not flip direction, see comments in
-                // liquifunding for more details
-                let new_direction_to_base = pos
-                    .active_leverage_to_notional(&end_price)
-                    .into_base(market_type)?
-                    .split()
-                    .0;
-                if original_direction_to_base == new_direction_to_base {
-                    MaybeClosedPosition::Open(pos)
-                } else {
-                    MaybeClosedPosition::Close(ClosePositionInstructions {
-                        pos,
-                        capped_exposure: Signed::zero(),
-                        additional_losses: Collateral::zero(),
-                        settlement_price: end_price,
-                        reason: PositionCloseReason::Liquidated(LiquidationReason::MaxGains),
-                        closed_during_liquifunding: true,
-                    })
+        let is_open = if is_profit {
+            match self.counter_collateral.checked_sub(exposure) {
+                Ok(counter_collateral) => {
+                    self.counter_collateral = counter_collateral;
+                    self.active_collateral = self.active_collateral.checked_add(exposure)?;
+                    true
                 }
+                Err(_) => false,
             }
-            MaybeClosedPosition::Close(x) => MaybeClosedPosition::Close(x),
+        } else {
+            match self.active_collateral.checked_sub(exposure) {
+                Ok(active_collateral) => {
+                    self.active_collateral = active_collateral;
+                    self.counter_collateral = self.counter_collateral.checked_add(exposure)?;
+                    true
+                }
+                Err(_) => false,
+            }
         };
 
-        match result {
-            MaybeClosedPosition::Open(position) => position
-                .into_query_response(end_price, entry_price, market_type, dnf_on_close_collateral)
-                .map(|pos| PositionOrPendingClose::Open(Box::new(pos))),
-            MaybeClosedPosition::Close(ClosePositionInstructions {
-                pos,
-                capped_exposure: exposure,
-                additional_losses: _,
-                settlement_price,
-                reason,
-                closed_during_liquifunding: _,
-            }) => {
-                // Best effort closed position value
-                let direction_to_base = pos.direction().into_base(market_type);
-                let entry_price_base = entry_price.into_base_price(market_type);
+        if is_open {
+            self.into_query_response(end_price, entry_price, market_type, dnf_on_close_collateral)
+                .map(|pos| PositionOrPendingClose::Open(Box::new(pos)))
+        } else {
+            let direction_to_base = self.direction().into_base(market_type);
+            let entry_price_base = entry_price.into_base_price(market_type);
 
-                // Figure out the final active collateral.
-                let active_collateral = if exposure > pos.counter_collateral.into_signed() {
-                    // If exposure is greater than counter collateral, then take
-                    // all the counter collateral.
-                    pos.active_collateral
-                        .raw()
-                        .checked_add(pos.counter_collateral.raw())?
-                } else {
-                    // Otherwise, add in the total exposure value. If we go
-                    // negative, set active collateral to 0.
-                    pos.active_collateral
-                        .raw()
-                        .checked_add_signed(exposure)
-                        .ok()
-                        .unwrap_or_default()
-                };
-                let active_collateral_usd = end_price.collateral_to_usd(active_collateral);
-                Ok(PositionOrPendingClose::PendingClose(Box::new(
-                    ClosedPosition {
-                        owner: pos.owner,
-                        id: pos.id,
-                        direction_to_base,
-                        created_at: pos.created_at,
-                        price_point_created_at: pos.price_point_created_at,
-                        liquifunded_at: pos.liquifunded_at,
-                        trading_fee_collateral: pos.trading_fee.collateral(),
-                        trading_fee_usd: pos.trading_fee.usd(),
-                        funding_fee_collateral: pos.funding_fee.collateral(),
-                        funding_fee_usd: pos.funding_fee.usd(),
-                        borrow_fee_collateral: pos.borrow_fee.collateral(),
-                        borrow_fee_usd: pos.borrow_fee.usd(),
-                        crank_fee_collateral: pos.crank_fee.collateral(),
-                        crank_fee_usd: pos.crank_fee.usd(),
-                        deposit_collateral: pos.deposit_collateral.collateral(),
-                        deposit_collateral_usd: pos.deposit_collateral.usd(),
-                        pnl_collateral: active_collateral
-                            .into_signed()
-                            .checked_sub(pos.deposit_collateral.collateral())?,
-                        pnl_usd: active_collateral_usd
-                            .into_signed()
-                            .checked_sub(pos.deposit_collateral.usd())?,
-                        notional_size: pos.notional_size,
-                        entry_price_base,
-                        close_time: end_price.timestamp,
-                        settlement_time: settlement_price.timestamp,
-                        reason,
-                        active_collateral,
-                        delta_neutrality_fee_collateral: pos.delta_neutrality_fee.collateral(),
-                        delta_neutrality_fee_usd: pos.delta_neutrality_fee.usd(),
-                        liquidation_margin: Some(pos.liquidation_margin),
-                    },
-                )))
-            }
+            // Figure out the final active collateral.
+            let active_collateral = if is_profit {
+                self.active_collateral.raw().checked_add(exposure)?
+            } else {
+                Collateral::zero()
+            };
+
+            let active_collateral_usd = end_price.collateral_to_usd(active_collateral);
+            Ok(PositionOrPendingClose::PendingClose(Box::new(
+                ClosedPosition {
+                    owner: self.owner,
+                    id: self.id,
+                    direction_to_base,
+                    created_at: self.created_at,
+                    price_point_created_at: self.price_point_created_at,
+                    liquifunded_at: self.liquifunded_at,
+                    trading_fee_collateral: self.trading_fee.collateral(),
+                    trading_fee_usd: self.trading_fee.usd(),
+                    funding_fee_collateral: self.funding_fee.collateral(),
+                    funding_fee_usd: self.funding_fee.usd(),
+                    borrow_fee_collateral: self.borrow_fee.collateral(),
+                    borrow_fee_usd: self.borrow_fee.usd(),
+                    crank_fee_collateral: self.crank_fee.collateral(),
+                    crank_fee_usd: self.crank_fee.usd(),
+                    deposit_collateral: self.deposit_collateral.collateral(),
+                    deposit_collateral_usd: self.deposit_collateral.usd(),
+                    pnl_collateral: active_collateral
+                        .into_signed()
+                        .checked_sub(self.deposit_collateral.collateral())?,
+                    pnl_usd: active_collateral_usd
+                        .into_signed()
+                        .checked_sub(self.deposit_collateral.usd())?,
+                    notional_size: self.notional_size,
+                    entry_price_base,
+                    close_time: end_price.timestamp,
+                    settlement_time: end_price.timestamp,
+                    reason: PositionCloseReason::Liquidated(if is_profit {
+                        LiquidationReason::MaxGains
+                    } else {
+                        LiquidationReason::Liquidated
+                    }),
+                    active_collateral,
+                    delta_neutrality_fee_collateral: self.delta_neutrality_fee.collateral(),
+                    delta_neutrality_fee_usd: self.delta_neutrality_fee.usd(),
+                    liquidation_margin: Some(self.liquidation_margin),
+                },
+            )))
         }
     }
 

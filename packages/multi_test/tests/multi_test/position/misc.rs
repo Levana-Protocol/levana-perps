@@ -238,10 +238,10 @@ fn funding_payment_flips_direction() {
         MarketType::CollateralIsBase => {
             market
                 .query_position_pending_close(pos_id, PositionsQueryFeeApproach::AllFees)
-                .unwrap();
+                .unwrap_err();
             market
                 .query_position_with_pending_fees(pos_id, PositionsQueryFeeApproach::AllFees)
-                .unwrap_err();
+                .unwrap();
 
             // If we ignore the pending fees though, it should be computable
             market.query_position(pos_id).unwrap();
