@@ -192,7 +192,7 @@ pub struct ClosePositionInstructions {
 ///
 /// This can apply to liquifunding, settling price exposure, etc.
 #[must_use]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum MaybeClosedPosition {
     /// The position stayed open, here's the current status
