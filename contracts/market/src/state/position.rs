@@ -252,7 +252,6 @@ impl State<'_> {
         mut pos: Position,
         fees: PositionsQueryFeeApproach,
     ) -> Result<PositionOrPendingClose> {
-        let config = &self.config;
         let market_type = self.market_id(store)?.get_market_type();
         let entry_price =
             self.spot_price(store, pos.price_point_created_at.unwrap_or(pos.created_at))?;
@@ -343,7 +342,6 @@ impl State<'_> {
             start_price,
             spot_price,
             entry_price.price_notional,
-            config,
             market_type,
             dnf_on_close_collateral,
         )

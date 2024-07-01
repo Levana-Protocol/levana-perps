@@ -556,7 +556,6 @@ impl Position {
         start_price: PricePoint,
         end_price: PricePoint,
         entry_price: Price,
-        _config: &Config,
         market_type: MarketType,
         dnf_on_close_collateral: Signed<Collateral>,
     ) -> Result<PositionOrPendingClose> {
