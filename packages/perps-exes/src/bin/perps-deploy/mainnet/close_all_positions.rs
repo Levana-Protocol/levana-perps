@@ -15,7 +15,7 @@ pub(super) struct CloseAllPositionsOpts {
     #[clap(long)]
     factory: String,
     /// Market ID
-    #[clap(long, required = true)]
+    #[clap(long)]
     market: Vec<MarketId>,
 }
 
@@ -40,8 +40,17 @@ async fn go(
 
     let mut builder = TxBuilder::default();
     let mut msgs = vec![];
+    let market = if market.is_empty() {
+        factory.get_markets().await?
+    } else {
+        let mut market2 = vec![];
+        for market in market {
+            market2.push(factory.get_market(market).await?)
+        }
+        market2
+    };
     for market in market {
-        let market = factory.get_market(market).await?.market;
+        let market = market.market;
         let msg = CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
             contract_addr: market.get_address_string(),
             funds: vec![],
