@@ -39,21 +39,6 @@ pub(super) struct TopTradersOpt {
         value_delimiter = ','
     )]
     osmosis_mainnet_fallbacks_grpc: Vec<Url>,
-    /// Provide gRPC endpoint override for sei mainnet
-    #[clap(
-        long,
-        env = "LEVANA_TRADERS_SEI_MAINNET_PRIMARY_GRPC",
-        default_value = "https://sei-priv-grpc.kingnodes.com"
-    )]
-    sei_mainnet_primary_grpc: Url,
-    /// Provide optional gRPC fallbacks URLs for sei mainnet
-    #[clap(
-        long,
-        env = "LEVANA_TRADERS_SEI_MAINNET_FALLBACKS_GRPC",
-        default_value = "http://sei-grpc.polkachu.com:11990,https://grpc.sei-apis.com,https://sei-grpc.brocha.in",
-        value_delimiter = ','
-    )]
-    sei_mainnet_fallbacks_grpc: Vec<Url>,
     /// Provide gRPC endpoint override for injective mainnet
     #[clap(
         long,
@@ -100,8 +85,6 @@ async fn go(
         retries,
         osmosis_mainnet_primary_grpc,
         osmosis_mainnet_fallbacks_grpc,
-        sei_mainnet_primary_grpc,
-        sei_mainnet_fallbacks_grpc,
         injective_mainnet_primary_grpc,
         injective_mainnet_fallbacks_grpc,
         neutron_mainnet_primary_grpc,
@@ -123,10 +106,6 @@ async fn go(
             PerpsNetwork::Regular(CosmosNetwork::OsmosisMainnet) => (
                 osmosis_mainnet_primary_grpc.clone(),
                 osmosis_mainnet_fallbacks_grpc.clone(),
-            ),
-            PerpsNetwork::Regular(CosmosNetwork::SeiMainnet) => (
-                sei_mainnet_primary_grpc.clone(),
-                sei_mainnet_fallbacks_grpc.clone(),
             ),
             PerpsNetwork::Regular(CosmosNetwork::InjectiveMainnet) => (
                 injective_mainnet_primary_grpc.clone(),
