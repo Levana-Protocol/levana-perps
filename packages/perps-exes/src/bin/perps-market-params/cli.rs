@@ -81,7 +81,7 @@ pub(crate) struct ServeOpt {
     )]
     pub(crate) dnf_decrease_threshold: f64,
     /// Mainnet factories
-    #[clap(long, env = "LEVANA_MPARAM_MAINNET_FACTORIES", value_parser=parse_key_val::<CosmosNetwork, Address>, default_value = "osmosis-mainnet=osmo1ssw6x553kzqher0earlkwlxasfm2stnl3ms3ma2zz4tnajxyyaaqlucd45,sei-mainnet=sei18rdj3asllguwr6lnyu2sw8p8nut0shuj3sme27ndvvw4gakjnjqqper95h,injective-mainnet=inj1vdu3s39dl8t5l88tyqwuhzklsx9587adv8cnn9", use_value_delimiter=true, value_delimiter=',')]
+    #[clap(long, env = "LEVANA_MPARAM_MAINNET_FACTORIES", value_parser=parse_key_val::<CosmosNetwork, Address>, default_value = "osmosis-mainnet=osmo1ssw6x553kzqher0earlkwlxasfm2stnl3ms3ma2zz4tnajxyyaaqlucd45,injective-mainnet=inj1vdu3s39dl8t5l88tyqwuhzklsx9587adv8cnn9", use_value_delimiter=true, value_delimiter=',')]
     pub(crate) mainnet_factories: Vec<(CosmosNetwork, Address)>,
     /// Seconds to wait before hitting CMC to avoid 429
     #[arg(long, env = "LEVANA_MPARAM_CMC_WAIT_SECONDS", default_value = "10")]
