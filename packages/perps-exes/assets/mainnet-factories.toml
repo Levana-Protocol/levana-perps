@@ -48,7 +48,7 @@ instantiate-at = "2023-08-06T07:11:51.260427212Z"
 gitrev = "ed7102d64e97931986338f82663834640d14a826"
 hash = "fd9f31f2c60cdaf3d18efdea333d4286b121f7f23b322cbaf820094c556daab4"
 ident = "seimainnet1"
-canonical = true
+canonical = false
 
 [[factories]]
 address = "inj1vdu3s39dl8t5l88tyqwuhzklsx9587adv8cnn9"
