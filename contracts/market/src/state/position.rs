@@ -252,19 +252,10 @@ impl State<'_> {
         mut pos: Position,
         fees: PositionsQueryFeeApproach,
     ) -> Result<PositionOrPendingClose> {
-        let config = &self.config;
         let market_type = self.market_id(store)?.get_market_type();
         let entry_price =
             self.spot_price(store, pos.price_point_created_at.unwrap_or(pos.created_at))?;
         let spot_price = self.current_spot_price(store)?;
-
-        // PERP-996 ensure we do not flip direction, see comments in
-        // liquifunding for more details
-        let original_direction_to_base = pos
-            .active_leverage_to_notional(&spot_price)
-            .into_base(market_type)?
-            .split()
-            .0;
 
         // We calculate the DNF fee that would be applied on closing the
         // position.
@@ -351,9 +342,7 @@ impl State<'_> {
             start_price,
             spot_price,
             entry_price.price_notional,
-            config,
             market_type,
-            original_direction_to_base,
             dnf_on_close_collateral,
         )
     }
