@@ -390,6 +390,7 @@ pub struct Fees {
     /// Crank fees collected and waiting to be allocated to crankers.
     pub crank: Collateral,
     /// Referral fees collected and waiting to be allocated to crankers.
+    #[serde(default)]
     pub referral: Collateral,
 }
 
