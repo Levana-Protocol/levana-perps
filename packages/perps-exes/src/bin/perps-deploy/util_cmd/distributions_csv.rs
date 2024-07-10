@@ -17,6 +17,9 @@ pub(super) struct DistributionsCsvOpt {
     /// Directory path to contain csv files
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_BUFF_DIR")]
     pub(crate) buff_dir: PathBuf,
+    /// File name of the result csv file
+    #[clap(long, env = "LEVANA_DISTRIBUTIONS_FILENAME")]
+    pub(crate) filename: String,
     /// Factory identifier
     #[clap(long)]
     factory: String,
@@ -53,6 +56,7 @@ impl DistributionsCsvOpt {
 async fn distributions_csv(
     DistributionsCsvOpt {
         buff_dir,
+        filename,
         factory,
         workers,
         retries,
@@ -102,7 +106,8 @@ async fn distributions_csv(
         fees_pool_size,
     )?;
 
-    let mut csv = ::csv::Writer::from_path(format!("distributions_{}.csv", factory))?;
+    tracing::info!("Writing distribution data to {filename}");
+    let mut csv = ::csv::Writer::from_path(filename)?;
     for record in distributions_data.into_iter() {
         csv.serialize(&record)?;
         csv.flush()?;
