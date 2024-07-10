@@ -4,6 +4,7 @@ use crate::state::*;
 use anyhow::Context;
 use cosmwasm_std::Decimal256;
 use cw_storage_plus::Item;
+use msg::contracts::factory::entry::make_referrer_key;
 use msg::contracts::market::deferred_execution::FeesReturnedEvent;
 use msg::contracts::market::entry::Fees;
 use msg::contracts::market::fees::events::{
@@ -31,6 +32,7 @@ pub(crate) fn fees_init(store: &mut dyn Storage) -> Result<()> {
                 wallets: Collateral::zero(),
                 protocol: Collateral::zero(),
                 crank: Collateral::zero(),
+                referral: Collateral::zero(),
             },
         )
         .map_err(anyhow::Error::from)?;
@@ -163,7 +165,34 @@ impl State<'_> {
         amount: Collateral,
         price: PricePoint,
         fee_source: FeeSource,
+        owner: &Addr,
     ) -> Result<()> {
+        let amount = match self
+            .querier
+            .query_wasm_raw(&self.factory_address, make_referrer_key(owner).as_bytes())?
+        {
+            None => amount,
+            Some(referrer) => {
+                let reward = amount.checked_mul_dec(self.config.referral_reward_ratio)?;
+
+                let mut fees = ALL_FEES.load(ctx.storage)?;
+                fees.referral = fees.referral.checked_add(reward)?;
+                ALL_FEES.save(ctx.storage, &fees)?;
+
+                let referrer = RawAddr::from(String::from_utf8(referrer)?).validate(self.api)?;
+
+                let mut addr_stats =
+                    self.load_liquidity_stats_addr_default(ctx.storage, &referrer)?;
+                addr_stats.referrer_rewards = addr_stats.referrer_rewards.checked_add(reward)?;
+                self.save_liquidity_stats_addr(ctx.storage, &referrer, &addr_stats)?;
+
+                if let Some(reward) = NonZero::new(reward) {
+                    self.lp_history_add_summary_referral(ctx, &referrer, reward)?;
+                }
+
+                (amount - reward)?
+            }
+        };
         self.collect_trading_fee_inner(ctx, amount, price, TradeId::Position(pos_id), fee_source)?;
 
         Ok(())

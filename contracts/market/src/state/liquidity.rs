@@ -116,13 +116,15 @@ impl LiquidityStatsByAddr {
             && self.lp_accrued_yield.is_zero()
             && self.xlp_accrued_yield.is_zero()
             && self.crank_rewards.is_zero()
+            && self.referrer_rewards.is_zero()
     }
 
     fn total_yield(&self) -> Result<Collateral> {
         Ok(self
             .lp_accrued_yield
             .checked_add(self.xlp_accrued_yield)?
-            .checked_add(self.crank_rewards)?)
+            .checked_add(self.crank_rewards)?
+            .checked_add(self.referrer_rewards)?)
     }
 }
 
@@ -669,6 +671,7 @@ impl State<'_> {
         addr_stats.lp_accrued_yield = Collateral::zero();
         addr_stats.xlp_accrued_yield = Collateral::zero();
         addr_stats.crank_rewards = Collateral::zero();
+        addr_stats.referrer_rewards = Collateral::zero();
         self.save_liquidity_stats_addr(ctx.storage, lp_addr, &addr_stats)?;
 
         self.register_lp_claimed_yield(ctx, total_yield)?;
@@ -878,7 +881,8 @@ impl State<'_> {
         let available_yield_xlp = addr_stats.xlp_accrued_yield.checked_add(accrued.xlp)?;
         let available_yield = available_yield_lp
             .checked_add(available_yield_xlp)?
-            .checked_add(addr_stats.crank_rewards)?;
+            .checked_add(addr_stats.crank_rewards)?
+            .checked_add(addr_stats.referrer_rewards)?;
 
         let (lp_amount, xlp_amount, unstaking) = match addr_stats.unstaking {
             None => (addr_stats.lp, addr_stats.xlp, None),

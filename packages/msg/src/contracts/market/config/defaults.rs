@@ -110,4 +110,7 @@ impl ConfigDefaults {
     pub fn exposure_margin_ratio() -> Decimal256 {
         "0.005".parse().unwrap()
     }
+    pub fn referral_reward_ratio() -> Decimal256 {
+        "0.05".parse().unwrap()
+    }
 }

@@ -120,6 +120,10 @@ pub struct Config {
     #[serde(default = "ConfigDefaults::exposure_margin_ratio")]
     pub exposure_margin_ratio: Decimal256,
 
+    /// Portion of trading fees given as rewards to referrers.
+    #[serde(default = "ConfigDefaults::referral_reward_ratio")]
+    pub referral_reward_ratio: Decimal256,
+
     /// The spot price config for this market
     pub spot_price: SpotPriceConfig,
 
@@ -195,6 +199,7 @@ impl Config {
             disable_position_nft_exec: ConfigDefaults::disable_position_nft_exec(),
             liquidity_cooldown_seconds: ConfigDefaults::liquidity_cooldown_seconds(),
             exposure_margin_ratio: ConfigDefaults::exposure_margin_ratio(),
+            referral_reward_ratio: ConfigDefaults::referral_reward_ratio(),
             spot_price,
             _unused1: None,
             _unused2: None,
@@ -378,6 +383,7 @@ pub struct ConfigUpdate {
     pub liquidity_cooldown_seconds: Option<u32>,
     pub spot_price: Option<SpotPriceConfigInit>,
     pub exposure_margin_ratio: Option<Decimal256>,
+    pub referral_reward_ratio: Option<Decimal256>,
 }
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for ConfigUpdate {
@@ -412,6 +418,7 @@ impl<'a> arbitrary::Arbitrary<'a> for ConfigUpdate {
             disable_position_nft_exec: None,
             liquidity_cooldown_seconds: None,
             exposure_margin_ratio: arbitrary_decimal_256_option(u)?,
+            referral_reward_ratio: None,
             spot_price: None,
         })
     }
@@ -449,6 +456,7 @@ impl From<Config> for ConfigUpdate {
             disable_position_nft_exec: Some(src.disable_position_nft_exec),
             liquidity_cooldown_seconds: Some(src.liquidity_cooldown_seconds),
             exposure_margin_ratio: Some(src.exposure_margin_ratio),
+            referral_reward_ratio: Some(src.referral_reward_ratio),
             spot_price: Some(src.spot_price.into()),
         }
     }

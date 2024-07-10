@@ -445,6 +445,7 @@ impl UpdatePositionSizeExec {
             self.trading_fee_delta,
             self.price_point,
             FeeSource::Trading,
+            &self.pos.owner,
         )?;
 
         self.event.emit(state, ctx, &self.pos, &self.price_point)?;
@@ -616,6 +617,7 @@ impl UpdatePositionLeverageExec {
             self.trading_fee_delta,
             self.price_point,
             FeeSource::Trading,
+            &self.pos.owner,
         )?;
         self.event.emit(state, ctx, &self.pos, &self.price_point)?;
         Ok(())
@@ -716,6 +718,7 @@ impl UpdatePositionMaxGainsExec {
             self.trading_fee_delta,
             self.price_point,
             FeeSource::Trading,
+            &self.pos.owner,
         )?;
         self.event.emit(state, ctx, &self.pos, &self.price_point)?;
         Ok(())
@@ -835,6 +838,7 @@ impl UpdatePositionTakeProfitPriceExec {
             self.trading_fee_delta,
             self.price_point,
             FeeSource::Trading,
+            &self.pos.owner,
         )?;
         self.event.emit(state, ctx, &self.pos, &self.price_point)?;
         Ok(())

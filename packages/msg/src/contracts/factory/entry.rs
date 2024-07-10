@@ -311,3 +311,10 @@ pub struct ListRefereesResp {
     /// Returns `None` if we've seen all referees
     pub next_start_after: Option<String>,
 }
+
+/// Make a lookup key for the given referee
+///
+/// We don't follow the normal Map pattern to simplify raw queries.
+pub fn make_referrer_key(referee: &Addr) -> String {
+    format!("ref__{}", referee.as_str())
+}

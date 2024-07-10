@@ -221,6 +221,7 @@ impl OpenPositionExec {
             pos.trading_fee.collateral(),
             price_point,
             FeeSource::Trading,
+            &pos.owner,
         )?;
 
         delta_neutrality_fee.apply(state, ctx)?;

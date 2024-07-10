@@ -389,6 +389,8 @@ pub struct Fees {
     pub protocol: Collateral,
     /// Crank fees collected and waiting to be allocated to crankers.
     pub crank: Collateral,
+    /// Referral fees collected and waiting to be allocated to crankers.
+    pub referral: Collateral,
 }
 
 /// Return value from [QueryMsg::ClosedPositionHistory]
@@ -978,13 +980,25 @@ pub struct LpHistorySummary {
     #[serde(alias = "deposit_in_usd")]
     pub deposit_usd: Usd,
     /// Cumulative yield claimed by the provider
+    ///
+    /// Note that this field includes crank and referral rewards.
     pub r#yield: Collateral,
     /// Cumulative yield expressed in USD at time of claiming
+    ///
+    /// Note that this field includes crank and referral rewards.
     #[serde(alias = "yield_in_usd")]
     pub yield_usd: Usd,
-    /// Cumulative referrer rewards collected
+    /// Cumulative referral rewards assigned.
+    ///
+    /// Note that, unlike yield, this is counted at the time the
+    /// referee pays the trading fees, not at the time of collection.
     pub referrer: Collateral,
-    /// Cumulative referrer rewards in USD at time of claiming
+    /// Cumulative referrer rewards in USD assigned.
+    ///
+    /// Note that, unlike yield, this is counted at the time the
+    /// referee pays the trading fees, not at the time of collection.
+    /// The price at the time of trading fees being paid is used for
+    /// currency conversions.
     pub referrer_usd: Usd,
 }
 

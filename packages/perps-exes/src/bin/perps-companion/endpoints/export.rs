@@ -618,6 +618,7 @@ mod tests {
                 wallets: Default::default(),
                 protocol: Default::default(),
                 crank: Default::default(),
+                referral: Default::default(),
             },
             deferred_execution_items: 0,
             last_processed_deferred_exec_id: None,
