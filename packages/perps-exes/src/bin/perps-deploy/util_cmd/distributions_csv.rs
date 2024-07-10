@@ -6,11 +6,12 @@ use std::path::PathBuf;
 use crate::cli::Opt;
 use crate::util_cmd::{load_data_from_csv, open_position_csv, OpenPositionCsvOpt, PositionRecord};
 use anyhow::{Context, Result};
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use cosmos::Address;
+use cosmwasm_std::Decimal256;
 use itertools::Itertools;
 use reqwest::Url;
-use shared::storage::{LpToken, UnsignedDecimal, Usd};
+use shared::storage::{UnsignedDecimal, Usd};
 
 #[derive(clap::Parser)]
 pub(super) struct DistributionsCsvOpt {
@@ -20,6 +21,9 @@ pub(super) struct DistributionsCsvOpt {
     /// File name of the result csv file
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_FILENAME")]
     pub(crate) filename: String,
+    /// End of analysis period date
+    #[clap(long, env = "LEVANA_DISTRIBUTIONS_LAST_ANALYSIS_DATE")]
+    pub(crate) last_date: DateTime<Utc>,
     /// Factory identifier
     #[clap(long)]
     factory: String,
@@ -57,6 +61,7 @@ async fn distributions_csv(
     DistributionsCsvOpt {
         buff_dir,
         filename,
+        last_date,
         factory,
         workers,
         retries,
@@ -170,12 +175,10 @@ fn generate_distributions_data(
     Ok(wallet_loss_data
         .values()
         .filter_map(|value| {
-            let losses =
-                LpToken::from_decimal256(value.losses.mul(losses_ratio).unwrap().into_decimal256());
-            let fees =
-                LpToken::from_decimal256(value.fees.mul(fees_ratio).unwrap().into_decimal256());
+            let losses = value.losses.mul(losses_ratio).unwrap().into_decimal256();
+            let fees = value.fees.mul(fees_ratio).unwrap().into_decimal256();
 
-            if losses.gt(&LpToken::from(10u64)) || fees.gt(&LpToken::from(10u64)) {
+            if losses.gt(&Decimal256::raw(10u128)) || fees.gt(&Decimal256::raw(10u128)) {
                 Some(DistributionsRecord {
                     owner: value.owner,
                     losses,
@@ -198,6 +201,6 @@ pub(crate) struct WalletLossRecord {
 #[serde(rename_all = "snake_case")]
 pub(crate) struct DistributionsRecord {
     owner: Address,
-    losses: LpToken,
-    fees: LpToken,
+    losses: Decimal256,
+    fees: Decimal256,
 }
