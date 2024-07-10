@@ -12,16 +12,12 @@ use axum::{
 };
 use axum_extra::{response::Css, routing::TypedPath};
 use chrono::NaiveDate;
-use cosmos::{Address, CosmosNetwork, HasAddress};
+use cosmos::{Address, CosmosNetwork};
 use cosmwasm_std::Decimal256;
 use futures::StreamExt;
 
 use msg::contracts::market::liquidity::LiquidityStats;
-use perps_exes::{
-    contracts::{Factory, MarketInfo},
-    prelude::MarketContract,
-    PerpsNetwork,
-};
+use perps_exes::{contracts::Factory, PerpsNetwork};
 use reqwest::Client;
 use shared::storage::{LpToken, MarketId, Signed, UnsignedDecimal};
 use tokio::task::JoinSet;
@@ -138,7 +134,7 @@ fn to_percent(s: &str) -> String {
 #[derive(Debug)]
 enum Work {
     Factory(PerpsNetwork, Factory, Sender<Work>),
-    Market(PerpsNetwork, MarketInfo),
+    Market(PerpsNetwork, Box<QuerierMarket>),
 }
 
 async fn load_whale_data(app: &App, show_addresses: bool) -> Result<WhaleData> {
@@ -185,6 +181,22 @@ async fn load_whale_data(app: &App, show_addresses: bool) -> Result<WhaleData> {
     })
 }
 
+#[derive(serde::Deserialize)]
+struct QuerierMarkets {
+    markets: Vec<QuerierMarket>,
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct QuerierMarket {
+    status: StatusRelaxed,
+    info: QuerierInfo,
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct QuerierInfo {
+    market_addr: Address,
+}
+
 async fn worker(
     recv_work: Receiver<Work>,
     send_market: Sender<WhaleMarketData>,
@@ -194,13 +206,20 @@ async fn worker(
         log::info!("Work: {work:?}");
         match work {
             Work::Factory(network, factory, send_work) => {
-                let markets = factory.get_markets().await?;
+                let url = format!("https://querier-mainnet.levana.finance/v1/perps/markets?network={network}&factory={factory}");
+                let QuerierMarkets { markets } = client
+                    .get(url)
+                    .send()
+                    .await?
+                    .error_for_status()?
+                    .json()
+                    .await?;
                 for market in markets {
-                    send_work.send(Work::Market(network, market)).await?;
+                    send_work.send(Work::Market(network, market.into())).await?;
                 }
             }
             Work::Market(network, market_info) => {
-                let market_data = load_whale_market_data(network, market_info, &client).await?;
+                let market_data = load_whale_market_data(network, *market_info, &client).await?;
                 send_market.send(market_data).await?;
             }
         }
@@ -211,12 +230,13 @@ async fn worker(
 /// Overall market status information
 ///
 /// Returned from [QueryMsg::Status]
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 struct StatusRelaxed {
     long_funding: Signed<Decimal256>,
     short_funding: Signed<Decimal256>,
     liquidity: LiquidityStats,
+    market_id: MarketId,
 }
 
 #[derive(serde::Deserialize)]
@@ -228,29 +248,31 @@ struct AprDailyAvg {
 
 async fn load_whale_market_data(
     network: PerpsNetwork,
-    market_info: MarketInfo,
+    QuerierMarket {
+        status:
+            StatusRelaxed {
+                long_funding,
+                short_funding,
+                liquidity,
+                market_id,
+            },
+        info: QuerierInfo { market_addr },
+    }: QuerierMarket,
     client: &reqwest::Client,
 ) -> Result<WhaleMarketData> {
-    let market = MarketContract::new(market_info.market);
-    let StatusRelaxed {
-        long_funding,
-        short_funding,
-        liquidity,
-    } = market.status_relaxed().await?;
-
     let (lp_apr_1d, xlp_apr_1d) = get_aprs(
         client,
-        &format!("https://indexer-mainnet.levana.finance/apr_daily_avg?market={market}"),
+        &format!("https://indexer-mainnet.levana.finance/apr_daily_avg?market={market_addr}"),
     )
     .await?;
     let (lp_apr_7d, xlp_apr_7d) = get_aprs(
         client,
-        &format!("https://indexer-mainnet.levana.finance/apr?market={market}"),
+        &format!("https://indexer-mainnet.levana.finance/apr?market={market_addr}"),
     )
     .await?;
 
     Ok(WhaleMarketData {
-        address: market.get_address(),
+        address: market_addr,
         chain: match network {
             PerpsNetwork::Regular(CosmosNetwork::OsmosisMainnet) => SimpleCosmosNetwork::Osmosis,
             PerpsNetwork::Regular(CosmosNetwork::SeiMainnet) => SimpleCosmosNetwork::Sei,
@@ -260,10 +282,10 @@ async fn load_whale_market_data(
             PerpsNetwork::Regular(CosmosNetwork::NeutronMainnet) => SimpleCosmosNetwork::Neutron,
             _ => anyhow::bail!("Unsupported network: {network}"),
         },
-        market_id: match market_info.market_id.as_str() {
+        market_id: match market_id.as_str() {
             "axlETH_USD" => "ETH_USD".parse()?,
             "ryETH_USD" => "YieldETH_USD".parse()?,
-            _ => market_info.market_id,
+            _ => market_id,
         },
         long_funding: ratio_to_percent(long_funding)?,
         short_funding: ratio_to_percent(short_funding)?,
