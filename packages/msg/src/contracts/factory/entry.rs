@@ -97,6 +97,14 @@ pub enum ExecuteMsg {
         /// Are we disabling these impacts, or reenabling them?
         effect: ShutdownEffect,
     },
+
+    /// Register a referrer for the given account.
+    ///
+    /// Can only be performed once.
+    RegisterReferrer {
+        /// The wallet address of the referrer
+        addr: RawAddr,
+    },
 }
 
 /// Response from [QueryMsg::Markets]
@@ -186,6 +194,28 @@ pub enum QueryMsg {
     /// * returns [CodeIds]
     #[returns(CodeIds)]
     CodeIds {},
+
+    /// Who referred this user, if anyone?
+    ///
+    /// * returns [GetReferrerResp]
+    #[returns(GetReferrerResp)]
+    GetReferrer {
+        /// Referee address
+        addr: RawAddr,
+    },
+
+    /// Enumerated query: who was referred by this user?
+    ///
+    /// * returns [ListRefereesResp]
+    #[returns(ListRefereesResp)]
+    ListReferees {
+        /// Referrer address
+        addr: RawAddr,
+        /// How many addresses to return at once
+        limit: Option<u32>,
+        /// Taken from [ListRefereesResp::next_start_after]
+        start_after: Option<String>,
+    },
 }
 
 /// Information on owners and other protocol-wide special addresses
@@ -241,6 +271,7 @@ impl ExecuteMsg {
             ExecuteMsg::SetKillSwitch { .. } => true,
             ExecuteMsg::SetWindDown { .. } => true,
             ExecuteMsg::TransferAllDaoFees {} => true,
+            ExecuteMsg::RegisterReferrer { .. } => false,
             // Uses its own auth mechanism internally
             ExecuteMsg::Shutdown { .. } => false,
         }
@@ -256,4 +287,27 @@ pub struct CodeIds {
     pub position_token: Uint64,
     /// Liquidity token proxy code ID
     pub liquidity_token: Uint64,
+}
+
+/// Response from [QueryMsg::GetReferrer]
+#[cw_serde]
+pub enum GetReferrerResp {
+    /// No referrer registered
+    NoReferrer {},
+    /// Has a registered referrer
+    HasReferrer {
+        /// Referrer address
+        referrer: Addr,
+    },
+}
+
+/// Response from [QueryMsg::ListReferees]
+#[cw_serde]
+pub struct ListRefereesResp {
+    /// Next batch of referees
+    pub referees: Vec<Addr>,
+    /// Next value to start after
+    ///
+    /// Returns `None` if we've seen all referees
+    pub next_start_after: Option<String>,
 }

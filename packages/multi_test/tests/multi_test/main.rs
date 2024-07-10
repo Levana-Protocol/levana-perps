@@ -23,6 +23,7 @@ mod order;
 mod override_price;
 mod position;
 mod proptest;
+mod referrer;
 mod sanity;
 mod shutdown;
 mod staleness;

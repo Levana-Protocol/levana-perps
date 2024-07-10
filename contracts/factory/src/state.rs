@@ -6,6 +6,7 @@ pub(crate) mod label;
 pub(crate) mod liquidity_token;
 pub(crate) mod market;
 pub(crate) mod position_token;
+pub(crate) mod referrer;
 pub(crate) mod reply;
 pub(crate) mod shutdown;
 

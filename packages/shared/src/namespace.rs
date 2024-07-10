@@ -156,3 +156,4 @@ pub const IS_LIMIT_ORDER_CANCELING: &str = "ew";
 pub const IS_POSITION_CLOSING: &str = "ex";
 pub const CRANK_BATCH_WEIGHT_LEFT: &str = "ey";
 pub const INSTANTIATION_TIMESTAMP: &str = "ez";
+pub const REFEREES_REVERSE_MAP: &str = "fa";
