@@ -18,6 +18,9 @@ pub(super) struct DistributionsCsvOpt {
     /// Directory path to contain csv files
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_BUFF_DIR")]
     pub(crate) buff_dir: PathBuf,
+    /// Factory identifier
+    #[clap(long, default_value = "osmomainnet1")]
+    factory: String,
     /// How many separate worker tasks to create for parallel loading
     #[clap(long, default_value = "30")]
     workers: u32,
@@ -101,6 +104,7 @@ impl DistributionsCsvOpt {
 async fn go(
     DistributionsCsvOpt {
         buff_dir,
+        factory,
         workers,
         retries,
         losses_pool_size,
@@ -116,47 +120,40 @@ async fn go(
     }: DistributionsCsvOpt,
     opt: Opt,
 ) -> Result<()> {
-    let mainnet_factories = MainnetFactories::load()?.factories;
-    for factory in mainnet_factories {
-        if !factory.canonical {
-            continue;
-        }
+    let factories = MainnetFactories::load()?;
+    let network = factories.get(factory.as_str())?.network;
 
-        let ident = factory.ident.with_context(|| {
-            format!("Factory identifier does not exist for {}", factory.network)
-        })?;
-        let (factory_primary_grpc, factory_fallbacks_grpc) = match factory.network {
-            PerpsNetwork::Regular(CosmosNetwork::OsmosisMainnet) => (
-                osmosis_mainnet_primary_grpc.clone(),
-                osmosis_mainnet_fallbacks_grpc.clone(),
-            ),
-            PerpsNetwork::Regular(CosmosNetwork::SeiMainnet) => (
-                sei_mainnet_primary_grpc.clone(),
-                sei_mainnet_fallbacks_grpc.clone(),
-            ),
-            PerpsNetwork::Regular(CosmosNetwork::InjectiveMainnet) => (
-                injective_mainnet_primary_grpc.clone(),
-                injective_mainnet_fallbacks_grpc.clone(),
-            ),
-            PerpsNetwork::Regular(CosmosNetwork::NeutronMainnet) => (
-                neutron_mainnet_primary_grpc.clone(),
-                neutron_mainnet_fallbacks_grpc.clone(),
-            ),
-            _ => bail!("Unsupported network: {}", factory.network),
-        };
-        distributions_csv(
-            ident,
-            buff_dir.clone(),
-            opt.clone(),
-            workers,
-            retries,
-            losses_pool_size,
-            fees_pool_size,
-            factory_primary_grpc,
-            factory_fallbacks_grpc,
-        )
-        .await?;
-    }
+    let (factory_primary_grpc, factory_fallbacks_grpc) = match network {
+        PerpsNetwork::Regular(CosmosNetwork::OsmosisMainnet) => (
+            osmosis_mainnet_primary_grpc.clone(),
+            osmosis_mainnet_fallbacks_grpc.clone(),
+        ),
+        PerpsNetwork::Regular(CosmosNetwork::SeiMainnet) => (
+            sei_mainnet_primary_grpc.clone(),
+            sei_mainnet_fallbacks_grpc.clone(),
+        ),
+        PerpsNetwork::Regular(CosmosNetwork::InjectiveMainnet) => (
+            injective_mainnet_primary_grpc.clone(),
+            injective_mainnet_fallbacks_grpc.clone(),
+        ),
+        PerpsNetwork::Regular(CosmosNetwork::NeutronMainnet) => (
+            neutron_mainnet_primary_grpc.clone(),
+            neutron_mainnet_fallbacks_grpc.clone(),
+        ),
+        _ => bail!("Unsupported network: {}", network),
+    };
+    distributions_csv(
+        factory,
+        buff_dir.clone(),
+        opt.clone(),
+        workers,
+        retries,
+        losses_pool_size,
+        fees_pool_size,
+        factory_primary_grpc,
+        factory_fallbacks_grpc,
+    )
+    .await?;
     Ok(())
 }
 
