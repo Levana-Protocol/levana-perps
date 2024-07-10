@@ -5,11 +5,10 @@ use std::path::PathBuf;
 
 use crate::cli::Opt;
 use crate::util_cmd::{load_data_from_csv, open_position_csv, OpenPositionCsvOpt, PositionRecord};
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use chrono::{Duration, Utc};
-use cosmos::{Address, CosmosNetwork};
+use cosmos::Address;
 use itertools::Itertools;
-use perps_exes::{config::MainnetFactories, PerpsNetwork};
 use reqwest::Url;
 use shared::storage::{LpToken, UnsignedDecimal, Usd};
 
@@ -19,7 +18,7 @@ pub(super) struct DistributionsCsvOpt {
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_BUFF_DIR")]
     pub(crate) buff_dir: PathBuf,
     /// Factory identifier
-    #[clap(long, default_value = "osmomainnet1")]
+    #[clap(long)]
     factory: String,
     /// How many separate worker tasks to create for parallel loading
     #[clap(long, default_value = "30")]
@@ -33,75 +32,25 @@ pub(super) struct DistributionsCsvOpt {
     /// Size of the fees pool
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_FEES_POOL_SIZE")]
     fees_pool_size: u32,
-    /// Provide gRPC endpoint override for osmosis mainnet
+    /// Provide gRPC endpoint override for factory
+    #[clap(long, env = "LEVANA_DISTRIBUTIONS_FACTORY_PRIMARY_GRPC")]
+    factory_primary_grpc: Url,
+    /// Provide optional gRPC fallbacks URLs for factory
     #[clap(
         long,
-        env = "LEVANA_DISTRIBUTIONS_OSMOSIS_MAINNET_PRIMARY_GRPC",
-        default_value = "https://osmo-priv-grpc.kingnodes.com"
-    )]
-    osmosis_mainnet_primary_grpc: Url,
-    /// Provide optional gRPC fallbacks URLs for osmosis mainnet
-    #[clap(
-        long,
-        env = "LEVANA_DISTRIBUTIONS_OSMOSIS_MAINNET_FALLBACKS_GRPC",
-        default_value = "http://c7f58ef9-1d78-4e15-a818-d02c8f50fc67.osmosis-1.mesa-grpc.newmetric.xyz,http://146.190.0.132:9090,https://grpc.osmosis.zone,http://osmosis-grpc.polkachu.com:12590",
+        env = "LEVANA_DISTRIBUTIONS_FACTORY_FALLBACKS_GRPC",
         value_delimiter = ','
     )]
-    osmosis_mainnet_fallbacks_grpc: Vec<Url>,
-    /// Provide gRPC endpoint override for sei mainnet
-    #[clap(
-        long,
-        env = "LEVANA_DISTRIBUTIONS_SEI_MAINNET_PRIMARY_GRPC",
-        default_value = "https://sei-priv-grpc.kingnodes.com"
-    )]
-    sei_mainnet_primary_grpc: Url,
-    /// Provide optional gRPC fallbacks URLs for sei mainnet
-    #[clap(
-        long,
-        env = "LEVANA_DISTRIBUTIONS_SEI_MAINNET_FALLBACKS_GRPC",
-        default_value = "http://sei-grpc.polkachu.com:11990,https://grpc.sei-apis.com,https://sei-grpc.brocha.in",
-        value_delimiter = ','
-    )]
-    sei_mainnet_fallbacks_grpc: Vec<Url>,
-    /// Provide gRPC endpoint override for injective mainnet
-    #[clap(
-        long,
-        env = "LEVANA_DISTRIBUTIONS_INJECTIVE_MAINNET_PRIMARY_GRPC",
-        default_value = "https://inj-priv-grpc.kingnodes.com"
-    )]
-    injective_mainnet_primary_grpc: Url,
-    /// Provide optional gRPC fallbacks URLs for injective mainnet
-    #[clap(
-        long,
-        env = "LEVANA_DISTRIBUTIONS_INJECTIVE_MAINNET_FALLBACKS_GRPC",
-        default_value = "http://c7f58ef9-1d78-4e15-a818-d02c8f50fc67.injective-1.mesa-grpc.newmetric.xyz,http://injective-grpc.polkachu.com:14390",
-        value_delimiter = ','
-    )]
-    injective_mainnet_fallbacks_grpc: Vec<Url>,
-    /// Provide gRPC endpoint override for neutron mainnet
-    #[clap(
-        long,
-        env = "LEVANA_DISTRIBUTIONS_NEUTRON_MAINNET_PRIMARY_GRPC",
-        default_value = "http://c7f58ef9-1d78-4e15-a818-d02c8f50fc67.neutron-1.mesa-grpc.newmetric.xyz"
-    )]
-    neutron_mainnet_primary_grpc: Url,
-    /// Provide optional gRPC fallbacks URLs for neutron mainnet
-    #[clap(
-        long,
-        env = "LEVANA_DISTRIBUTIONS_NEUTRON_MAINNET_FALLBACKS_GRPC",
-        default_value = "http://neutron-grpc.rpc.p2p.world:3001,http://grpc-kralum.neutron-1.neutron.org",
-        value_delimiter = ','
-    )]
-    neutron_mainnet_fallbacks_grpc: Vec<Url>,
+    factory_fallbacks_grpc: Vec<Url>,
 }
 
 impl DistributionsCsvOpt {
     pub(super) async fn go(self, opt: Opt) -> Result<()> {
-        go(self, opt).await
+        distributions_csv(self, opt).await
     }
 }
 
-async fn go(
+async fn distributions_csv(
     DistributionsCsvOpt {
         buff_dir,
         factory,
@@ -109,65 +58,10 @@ async fn go(
         retries,
         losses_pool_size,
         fees_pool_size,
-        osmosis_mainnet_primary_grpc,
-        osmosis_mainnet_fallbacks_grpc,
-        sei_mainnet_primary_grpc,
-        sei_mainnet_fallbacks_grpc,
-        injective_mainnet_primary_grpc,
-        injective_mainnet_fallbacks_grpc,
-        neutron_mainnet_primary_grpc,
-        neutron_mainnet_fallbacks_grpc,
-    }: DistributionsCsvOpt,
-    opt: Opt,
-) -> Result<()> {
-    let factories = MainnetFactories::load()?;
-    let network = factories.get(factory.as_str())?.network;
-
-    let (factory_primary_grpc, factory_fallbacks_grpc) = match network {
-        PerpsNetwork::Regular(CosmosNetwork::OsmosisMainnet) => (
-            osmosis_mainnet_primary_grpc.clone(),
-            osmosis_mainnet_fallbacks_grpc.clone(),
-        ),
-        PerpsNetwork::Regular(CosmosNetwork::SeiMainnet) => (
-            sei_mainnet_primary_grpc.clone(),
-            sei_mainnet_fallbacks_grpc.clone(),
-        ),
-        PerpsNetwork::Regular(CosmosNetwork::InjectiveMainnet) => (
-            injective_mainnet_primary_grpc.clone(),
-            injective_mainnet_fallbacks_grpc.clone(),
-        ),
-        PerpsNetwork::Regular(CosmosNetwork::NeutronMainnet) => (
-            neutron_mainnet_primary_grpc.clone(),
-            neutron_mainnet_fallbacks_grpc.clone(),
-        ),
-        _ => bail!("Unsupported network: {}", network),
-    };
-    distributions_csv(
-        factory,
-        buff_dir.clone(),
-        opt.clone(),
-        workers,
-        retries,
-        losses_pool_size,
-        fees_pool_size,
         factory_primary_grpc,
         factory_fallbacks_grpc,
-    )
-    .await?;
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn distributions_csv(
-    factory: String,
-    buff_dir: PathBuf,
+    }: DistributionsCsvOpt,
     opt: Opt,
-    workers: u32,
-    retries: u32,
-    losses_pool_size: u32,
-    fees_pool_size: u32,
-    factory_primary_grpc: Url,
-    factory_fallbacks_grpc: Vec<Url>,
 ) -> Result<()> {
     let csv_filename: PathBuf = buff_dir.join(format!("{}.csv", factory.clone()));
     tracing::info!("CSV filename: {}", csv_filename.as_path().display());
