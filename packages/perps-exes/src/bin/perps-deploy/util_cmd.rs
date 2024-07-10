@@ -1,4 +1,5 @@
 mod deferred_exec;
+mod distributions_csv;
 mod list_contracts;
 mod lp_history;
 mod token_balances;
@@ -95,6 +96,11 @@ enum Sub {
         #[clap(flatten)]
         inner: top_traders::TopTradersOpt,
     },
+    /// Export a CSV with distributions
+    DistributionsCsv {
+        #[clap(flatten)]
+        inner: distributions_csv::DistributionsCsvOpt,
+    },
 }
 
 impl UtilOpt {
@@ -110,6 +116,7 @@ impl UtilOpt {
             Sub::ListContracts { inner } => inner.go().await,
             Sub::TvlReport { inner } => inner.go(opt).await,
             Sub::TopTraders { inner } => inner.go(opt).await,
+            Sub::DistributionsCsv { inner } => inner.go(opt).await,
         }
     }
 }

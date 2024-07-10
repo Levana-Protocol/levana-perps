@@ -3,10 +3,10 @@
 //! ensure that invariants are never violated.
 
 use anyhow::{Context, Result};
-use cosmwasm_std::{Decimal256, OverflowError, Uint128, Uint256};
+use cosmwasm_std::{CheckedFromRatioError, Decimal256, OverflowError, Uint128, Uint256};
 use std::{
     fmt::Display,
-    ops::{Add, Sub},
+    ops::{Add, Div, Mul, Sub},
     str::FromStr,
 };
 
@@ -240,6 +240,22 @@ macro_rules! unsigned {
 
             fn sub(self, rhs: Self) -> Self::Output {
                 Ok(Self(self.0.checked_sub(rhs.0)?))
+            }
+        }
+
+        impl Mul for $t {
+            type Output = anyhow::Result<Self, OverflowError>;
+
+            fn mul(self, rhs: Self) -> Self::Output {
+                Ok(Self(self.0.checked_mul(rhs.0)?))
+            }
+        }
+
+        impl Div for $t {
+            type Output = anyhow::Result<Self, CheckedFromRatioError>;
+
+            fn div(self, rhs: Self) -> Self::Output {
+                Ok(Self(self.0.checked_div(rhs.0)?))
             }
         }
 
