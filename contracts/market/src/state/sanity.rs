@@ -428,6 +428,7 @@ fn check_lp_info(
         available_yield_lp,
         available_yield_xlp,
         available_crank_rewards,
+        available_referrer_rewards,
         unstaking,
         history: _,
         liquidity_cooldown: _,
@@ -437,7 +438,8 @@ fn check_lp_info(
     anyhow::ensure!(xlp_amount.is_zero() == xlp_collateral.is_zero());
     anyhow::ensure!(
         *available_yield
-            == ((*available_yield_lp + *available_yield_xlp)? + *available_crank_rewards)?
+            == (((*available_yield_lp + *available_yield_xlp)? + *available_crank_rewards)?
+                + *available_referrer_rewards)?
     );
     if let Some(unstaking) = unstaking {
         let UnstakingStatus {
