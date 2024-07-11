@@ -1,5 +1,6 @@
 use cosmwasm_std::Addr;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
+use msg::prelude::*;
 
 #[test]
 fn no_initial_referrer() {
@@ -64,4 +65,18 @@ fn enumeration_works() {
     referees.sort();
 
     assert_eq!(market.query_referees(&referrer).unwrap(), referees);
+}
+
+#[test]
+fn no_initial_rewards() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let referrer = market.clone_trader(0).unwrap();
+    let referee = market.clone_trader(1).unwrap();
+
+    market.exec_register_referrer(&referee, &referrer).unwrap();
+
+    let lp_info = market.query_lp_info(&referrer).unwrap();
+    assert_eq!(lp_info.available_referrer_rewards, Collateral::zero());
+    assert_eq!(lp_info.history.referrer, Collateral::zero());
+    assert_eq!(lp_info.history.referrer_usd, Usd::zero());
 }
