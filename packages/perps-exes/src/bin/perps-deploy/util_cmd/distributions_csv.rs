@@ -160,8 +160,14 @@ fn generate_distributions_data(
         wallet_loss_data
             .entry(owner)
             .and_modify(|value| {
-                value.losses = value.losses.add(losses).unwrap();
-                value.fees = value.fees.add(fees).unwrap();
+                value.losses = value
+                    .losses
+                    .add(losses)
+                    .expect("Wallet losses calculation failed.");
+                value.fees = value
+                    .fees
+                    .add(fees)
+                    .expect("Wallet fees calculation failed.");
             })
             .or_insert_with(|| WalletLossRecord {
                 owner,
@@ -180,8 +186,16 @@ fn generate_distributions_data(
     Ok(wallet_loss_data
         .values()
         .filter_map(|value| {
-            let losses = value.losses.mul(losses_ratio).unwrap().into_decimal256();
-            let fees = value.fees.mul(fees_ratio).unwrap().into_decimal256();
+            let losses = value
+                .losses
+                .mul(losses_ratio)
+                .expect("Losses value calculation failed.")
+                .into_decimal256();
+            let fees = value
+                .fees
+                .mul(fees_ratio)
+                .expect("Fees value calculation failed.")
+                .into_decimal256();
 
             let losses = get_thresholded(losses, threshold, Decimal256::zero());
             let fees = get_thresholded(fees, threshold, Decimal256::zero());
