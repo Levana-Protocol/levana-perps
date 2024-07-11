@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ops::{Add, Div, Mul};
 use std::path::PathBuf;
@@ -6,7 +5,7 @@ use std::path::PathBuf;
 use crate::cli::Opt;
 use crate::util_cmd::{load_data_from_csv, open_position_csv, OpenPositionCsvOpt, PositionRecord};
 use anyhow::{Context, Result};
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use cosmos::Address;
 use cosmwasm_std::Decimal256;
 use itertools::Itertools;
@@ -21,9 +20,15 @@ pub(super) struct DistributionsCsvOpt {
     /// File name of the result csv file
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_FILENAME")]
     pub(crate) filename: String,
-    /// End of analysis period date
-    #[clap(long, env = "LEVANA_DISTRIBUTIONS_LAST_ANALYSIS_DATE")]
-    pub(crate) last_date: DateTime<Utc>,
+    /// Start date of analysis period
+    #[clap(long, env = "LEVANA_DISTRIBUTIONS_START_DATE")]
+    pub(crate) start_date: DateTime<Utc>,
+    /// End date of analysis period
+    #[clap(long, env = "LEVANA_DISTRIBUTIONS_END_DATE")]
+    pub(crate) end_date: DateTime<Utc>,
+    /// Rounding threshold for distributions data
+    #[clap(long, env = "LEVANA_DISTRIBUTIONS_THRESHOLD")]
+    pub(crate) threshold: Decimal256,
     /// Factory identifier
     #[clap(long)]
     factory: String,
@@ -40,15 +45,11 @@ pub(super) struct DistributionsCsvOpt {
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_FEES_POOL_SIZE")]
     fees_pool_size: u32,
     /// Provide gRPC endpoint override for factory
-    #[clap(long, env = "LEVANA_DISTRIBUTIONS_FACTORY_PRIMARY_GRPC")]
-    factory_primary_grpc: Url,
+    #[clap(long, env = "COSMOS_GRPC_PRIMARY")]
+    cosmos_grpc_primary: Url,
     /// Provide optional gRPC fallbacks URLs for factory
-    #[clap(
-        long,
-        env = "LEVANA_DISTRIBUTIONS_FACTORY_FALLBACKS_GRPC",
-        value_delimiter = ','
-    )]
-    factory_fallbacks_grpc: Vec<Url>,
+    #[clap(long, env = "COSMOS_GRPC_FALLBACKS", value_delimiter = ',')]
+    cosmos_grpc_fallbacks: Vec<Url>,
 }
 
 impl DistributionsCsvOpt {
@@ -61,14 +62,16 @@ async fn distributions_csv(
     DistributionsCsvOpt {
         buff_dir,
         filename,
-        last_date,
+        start_date,
+        end_date,
+        threshold,
         factory,
         workers,
         retries,
         losses_pool_size,
         fees_pool_size,
-        factory_primary_grpc,
-        factory_fallbacks_grpc,
+        cosmos_grpc_primary,
+        cosmos_grpc_fallbacks,
     }: DistributionsCsvOpt,
     opt: Opt,
 ) -> Result<()> {
@@ -82,8 +85,8 @@ async fn distributions_csv(
             factory: factory.clone(),
             csv: csv_filename.clone(),
             workers,
-            factory_primary_grpc: Some(factory_primary_grpc.clone()),
-            factory_fallbacks_grpc: factory_fallbacks_grpc.clone(),
+            factory_primary_grpc: Some(cosmos_grpc_primary.clone()),
+            factory_fallbacks_grpc: cosmos_grpc_fallbacks.clone(),
         },
     )
     .await
@@ -109,8 +112,9 @@ async fn distributions_csv(
         csv_data.values().collect_vec(),
         losses_pool_size,
         fees_pool_size,
-        last_date - Duration::weeks(1),
-        last_date,
+        start_date,
+        end_date,
+        threshold,
     )?;
 
     tracing::info!("Writing distribution data to {filename}");
@@ -129,6 +133,7 @@ fn generate_distributions_data(
     fees_pool_size: u32,
     former_threshold: DateTime<Utc>,
     latter_threshold: DateTime<Utc>,
+    threshold: Decimal256,
 ) -> Result<Vec<DistributionsRecord>> {
     let mut wallet_loss_data: HashMap<Address, WalletLossRecord> = HashMap::new();
     let mut total_losses = Usd::zero();
@@ -142,8 +147,7 @@ fn generate_distributions_data(
         .into_iter()
         .filter(|PositionRecord { closed_at, .. }| {
             if let Some(closed_at) = closed_at {
-                closed_at.cmp(&former_threshold) == Ordering::Greater
-                    && closed_at.cmp(&latter_threshold) == Ordering::Less
+                former_threshold <= *closed_at && *closed_at < latter_threshold
             } else {
                 false
             }
@@ -181,7 +185,6 @@ fn generate_distributions_data(
 
     let losses_ratio = Usd::from(u64::from(losses_pool_size)).div(total_losses)?;
     let fees_ratio = Usd::from(u64::from(fees_pool_size)).div(total_fees)?;
-    let threshold = Decimal256::from_ratio(10u128, 1u128);
 
     Ok(wallet_loss_data
         .values()
