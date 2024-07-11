@@ -44,9 +44,6 @@ pub(super) struct DistributionsCsvOpt {
     /// Size of the fees pool
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_FEES_POOL_SIZE")]
     fees_pool_size: u32,
-    /// Provide gRPC endpoint override for factory
-    #[clap(long, env = "COSMOS_GRPC_PRIMARY")]
-    cosmos_grpc_primary: Url,
     /// Provide optional gRPC fallbacks URLs for factory
     #[clap(long, env = "COSMOS_GRPC_FALLBACKS", value_delimiter = ',')]
     cosmos_grpc_fallbacks: Vec<Url>,
@@ -70,7 +67,6 @@ async fn distributions_csv(
         retries,
         losses_pool_size,
         fees_pool_size,
-        cosmos_grpc_primary,
         cosmos_grpc_fallbacks,
     }: DistributionsCsvOpt,
     opt: Opt,
@@ -85,7 +81,7 @@ async fn distributions_csv(
             factory: factory.clone(),
             csv: csv_filename.clone(),
             workers,
-            factory_primary_grpc: Some(cosmos_grpc_primary.clone()),
+            factory_primary_grpc: opt.cosmos_grpc.clone(),
             factory_fallbacks_grpc: cosmos_grpc_fallbacks.clone(),
         },
     )
