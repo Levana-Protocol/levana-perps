@@ -680,6 +680,10 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
             .lp_info(store, &liquidity_provider.validate(state.api)?)?
             .query_result(),
 
+        QueryMsg::ReferralStats { addr } => state
+            .referral_stats(store, &addr.validate(state.api)?)?
+            .query_result(),
+
         QueryMsg::DeltaNeutralityFee {
             notional_delta,
             pos_delta_neutrality_fee_margin,

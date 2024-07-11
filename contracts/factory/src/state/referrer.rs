@@ -2,11 +2,18 @@ use crate::state::*;
 use anyhow::Result;
 use cosmwasm_std::Addr;
 use cw_storage_plus::Map;
-use msg::contracts::factory::entry::{make_referrer_key, ListRefereesResp};
+use msg::contracts::factory::entry::{
+    make_referee_count_key, make_referrer_key, ListRefereeCountResp, ListRefereeCountStartAfter,
+    ListRefereesResp, RefereeCount,
+};
 use shared::namespace;
 
 /// Key is a tuple of (referrer, referee)
 const REFEREES_REVERSE_MAP: Map<(&Addr, &Addr), ()> = Map::new(namespace::REFEREES_REVERSE_MAP);
+
+/// Reverse count map for leaderboard.
+const REFEREE_COUNT_REVERSE_MAP: Map<(u32, &Addr), ()> =
+    Map::new(namespace::REFEREE_COUNT_REVERSE_MAP);
 
 impl State<'_> {
     /// Look up the referrer for a given address.
@@ -45,7 +52,7 @@ pub(crate) fn list_referees_for(
                 return Ok(ListRefereesResp {
                     referees,
                     next_start_after: None,
-                })
+                });
             }
             Some(res) => referees.push(res?.0),
         }
@@ -74,7 +81,65 @@ pub(crate) fn set_referrer_for(
         "Cannot register a new referrer"
     );
     store.set(key.as_bytes(), referrer.as_bytes());
-    REFEREES_REVERSE_MAP
-        .save(store, (referrer, referee), &())
-        .map_err(Into::into)
+    REFEREES_REVERSE_MAP.save(store, (referrer, referee), &())?;
+
+    // Update the count
+    let key = make_referee_count_key(referrer);
+    let count = match store.get(key.as_bytes()) {
+        None => 1,
+        Some(old_count) => {
+            let old_count = String::from_utf8(old_count)?;
+            let old_count = u32::from_str(&old_count)?;
+            REFEREE_COUNT_REVERSE_MAP.remove(store, (old_count, referrer));
+            old_count + 1
+        }
+    };
+
+    store.set(key.as_bytes(), count.to_string().as_bytes());
+    REFEREE_COUNT_REVERSE_MAP.save(store, (count, referrer), &())?;
+
+    Ok(())
+}
+
+/// List the referee "leaderboard".
+pub(crate) fn list_referee_count(
+    store: &dyn Storage,
+    limit: u32,
+    start_after: Option<RefereeCount>,
+) -> Result<ListRefereeCountResp> {
+    let start_after = start_after
+        .as_ref()
+        .map(|RefereeCount { referrer, count }| Bound::exclusive((*count, referrer)));
+    let mut iter = REFEREE_COUNT_REVERSE_MAP.range(store, None, start_after, Order::Descending);
+    let mut counts = vec![];
+    let limit = limit.try_into()?;
+    while counts.len() <= limit {
+        match iter.next() {
+            None => {
+                return Ok(ListRefereeCountResp {
+                    counts,
+                    next_start_after: None,
+                });
+            }
+            Some(res) => {
+                let (count, referrer) = res?.0;
+                counts.push(RefereeCount { referrer, count })
+            }
+        }
+    }
+    let has_more = iter.next().is_some();
+    let next_start_after = if has_more {
+        counts.last().map(
+            |RefereeCount { referrer, count }| ListRefereeCountStartAfter {
+                referrer: referrer.into(),
+                count: *count,
+            },
+        )
+    } else {
+        None
+    };
+    Ok(ListRefereeCountResp {
+        counts,
+        next_start_after,
+    })
 }
