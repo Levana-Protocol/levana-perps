@@ -190,6 +190,14 @@ impl State<'_> {
                     self.lp_history_add_summary_referral(ctx, &referrer, reward)?;
                 }
 
+                ctx.response_mut().add_event(
+                    Event::new("referral-reward")
+                        .add_attribute("referrer", referrer)
+                        .add_attribute("referee", owner)
+                        .add_attribute("collateral", reward.to_string())
+                        .add_attribute("usd", price.collateral_to_usd(reward).to_string()),
+                );
+
                 (amount - reward)?
             }
         };
