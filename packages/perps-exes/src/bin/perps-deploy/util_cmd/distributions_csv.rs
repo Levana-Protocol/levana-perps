@@ -109,6 +109,8 @@ async fn distributions_csv(
         csv_data.values().collect_vec(),
         losses_pool_size,
         fees_pool_size,
+        last_date - Duration::weeks(1),
+        last_date,
     )?;
 
     tracing::info!("Writing distribution data to {filename}");
@@ -125,8 +127,9 @@ fn generate_distributions_data(
     csv_data: Vec<&PositionRecord>,
     losses_pool_size: u32,
     fees_pool_size: u32,
+    former_threshold: DateTime<Utc>,
+    latter_threshold: DateTime<Utc>,
 ) -> Result<Vec<DistributionsRecord>> {
-    let former_threshold = Utc::now() - Duration::weeks(1);
     let mut wallet_loss_data: HashMap<Address, WalletLossRecord> = HashMap::new();
     let mut total_losses = Usd::zero();
     let mut total_fees = Usd::zero();
@@ -140,6 +143,7 @@ fn generate_distributions_data(
         .filter(|PositionRecord { closed_at, .. }| {
             if let Some(closed_at) = closed_at {
                 closed_at.cmp(&former_threshold) == Ordering::Greater
+                    && closed_at.cmp(&latter_threshold) == Ordering::Less
             } else {
                 false
             }
@@ -171,6 +175,7 @@ fn generate_distributions_data(
 
     let losses_ratio = Usd::from(u64::from(losses_pool_size)).div(total_losses)?;
     let fees_ratio = Usd::from(u64::from(fees_pool_size)).div(total_fees)?;
+    let threshold = Decimal256::from_ratio(10u128, 1u128);
 
     Ok(wallet_loss_data
         .values()
@@ -178,7 +183,10 @@ fn generate_distributions_data(
             let losses = value.losses.mul(losses_ratio).unwrap().into_decimal256();
             let fees = value.fees.mul(fees_ratio).unwrap().into_decimal256();
 
-            if losses.gt(&Decimal256::raw(10u128)) || fees.gt(&Decimal256::raw(10u128)) {
+            let losses = get_thresholded(losses, threshold, Decimal256::zero());
+            let fees = get_thresholded(fees, threshold, Decimal256::zero());
+
+            if !losses.is_zero() || !fees.is_zero() {
                 Some(DistributionsRecord {
                     owner: value.owner,
                     losses,
@@ -189,6 +197,17 @@ fn generate_distributions_data(
             }
         })
         .collect())
+}
+
+fn get_thresholded<T>(value: T, threshold: T, default: T) -> T
+where
+    T: PartialOrd,
+{
+    if value.gt(&threshold) {
+        value
+    } else {
+        default
+    }
 }
 
 pub(crate) struct WalletLossRecord {
