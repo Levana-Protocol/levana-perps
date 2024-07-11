@@ -26,7 +26,7 @@ pub(super) struct DistributionsCsvOpt {
     /// End date of analysis period
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_END_DATE")]
     pub(crate) end_date: DateTime<Utc>,
-    /// Rounding threshold for distributions data
+    /// Minimum amount of LVN to distribution as rewards
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_THRESHOLD")]
     pub(crate) threshold: Decimal256,
     /// Factory identifier
