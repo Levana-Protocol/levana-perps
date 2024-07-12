@@ -89,6 +89,15 @@ fn no_initial_rewards() {
             ..Default::default()
         }
     );
+
+    let stats = market.query_referral_stats(&referee).unwrap();
+    assert_eq!(
+        stats,
+        ReferralStatsResp {
+            referrer: Some(referrer.clone()),
+            ..Default::default()
+        }
+    );
 }
 
 #[test]
@@ -137,7 +146,13 @@ fn rewards_for_registered() {
         }
     );
     let stats = market.query_referral_stats(&referee).unwrap();
-    assert_eq!(stats, Default::default());
+    assert_eq!(
+        stats,
+        ReferralStatsResp {
+            referrer: Some(referrer.clone()),
+            ..Default::default()
+        }
+    );
 
     let (pos_id, _) = market
         .exec_open_position(

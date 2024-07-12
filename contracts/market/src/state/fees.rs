@@ -4,7 +4,6 @@ use crate::state::*;
 use anyhow::Context;
 use cosmwasm_std::Decimal256;
 use cw_storage_plus::Item;
-use msg::contracts::factory::entry::make_referrer_key;
 use msg::contracts::market::deferred_execution::FeesReturnedEvent;
 use msg::contracts::market::entry::Fees;
 use msg::contracts::market::fees::events::{
@@ -167,10 +166,7 @@ impl State<'_> {
         fee_source: FeeSource,
         owner: &Addr,
     ) -> Result<()> {
-        let amount = match self
-            .querier
-            .query_wasm_raw(&self.factory_address, make_referrer_key(owner).as_bytes())?
-        {
+        let amount = match self.get_referrer_for(owner)? {
             None => amount,
             Some(referrer) => {
                 let reward = amount.checked_mul_dec(self.config.referral_reward_ratio)?;
@@ -178,8 +174,6 @@ impl State<'_> {
                 let mut fees = ALL_FEES.load(ctx.storage)?;
                 fees.referral = fees.referral.checked_add(reward)?;
                 ALL_FEES.save(ctx.storage, &fees)?;
-
-                let referrer = RawAddr::from(String::from_utf8(referrer)?).validate(self.api)?;
 
                 let mut addr_stats =
                     self.load_liquidity_stats_addr_default(ctx.storage, &referrer)?;

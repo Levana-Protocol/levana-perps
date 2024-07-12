@@ -1,5 +1,5 @@
 use msg::contracts::{
-    factory::entry::make_referee_count_key,
+    factory::entry::{make_referee_count_key, make_referrer_key},
     market::{entry::ReferralStatsResp, position::CollateralAndUsd},
 };
 
@@ -53,6 +53,18 @@ impl State<'_> {
         Ok(())
     }
 
+    pub(crate) fn get_referrer_for(&self, referee: &Addr) -> Result<Option<Addr>> {
+        match self
+            .querier
+            .query_wasm_raw(&self.factory_address, make_referrer_key(referee).as_bytes())?
+        {
+            None => Ok(None),
+            Some(referrer) => RawAddr::from(String::from_utf8(referrer)?)
+                .validate(self.api)
+                .map(Some),
+        }
+    }
+
     pub(crate) fn referral_stats(
         &self,
         store: &dyn Storage,
@@ -81,6 +93,7 @@ impl State<'_> {
             received: received.collateral(),
             received_usd: received.usd(),
             referees,
+            referrer: self.get_referrer_for(addr)?,
         })
     }
 }

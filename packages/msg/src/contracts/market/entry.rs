@@ -967,6 +967,8 @@ pub struct ReferralStatsResp {
     /// Note that this is a factory-wide value. It will be identical
     /// across all markets for a given address.
     pub referees: u32,
+    /// Who referred this account, if anyone.
+    pub referrer: Option<Addr>,
 }
 
 /// When a liquidity cooldown period will end
