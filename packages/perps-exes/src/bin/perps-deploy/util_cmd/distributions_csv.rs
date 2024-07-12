@@ -7,7 +7,7 @@ use crate::util_cmd::{load_data_from_csv, open_position_csv, OpenPositionCsvOpt,
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use cosmos::Address;
-use cosmwasm_std::Decimal256;
+use cosmwasm_std::{Decimal256, Uint256};
 use itertools::Itertools;
 use reqwest::Url;
 use shared::storage::{UnsignedDecimal, Usd};
@@ -116,8 +116,7 @@ async fn distributions_csv(
     tracing::info!("Writing distribution data to {filename}");
     let mut csv = ::csv::Writer::from_path(filename)?;
     for record in distributions_data.into_iter() {
-        csv.serialize(&record)?;
-        csv.flush()?;
+        serialize_incentives_record(&mut csv, record, start_date, end_date)?;
     }
 
     Ok(())
@@ -130,7 +129,7 @@ fn generate_distributions_data(
     former_threshold: DateTime<Utc>,
     latter_threshold: DateTime<Utc>,
     threshold: Decimal256,
-) -> Result<Vec<DistributionsRecord>> {
+) -> Result<Vec<WalletIncentivesRecord>> {
     let mut wallet_loss_data: HashMap<Address, WalletLossRecord> = HashMap::new();
     let mut total_losses = Usd::zero();
     let mut total_fees = Usd::zero();
@@ -200,7 +199,7 @@ fn generate_distributions_data(
             let fees = get_thresholded(fees, threshold, Decimal256::zero());
 
             if !losses.is_zero() || !fees.is_zero() {
-                Some(DistributionsRecord {
+                Some(WalletIncentivesRecord {
                     owner: value.owner,
                     losses,
                     fees,
@@ -223,16 +222,64 @@ where
     }
 }
 
+fn serialize_incentives_record(
+    csv: &mut ::csv::Writer<::std::fs::File>,
+    WalletIncentivesRecord {
+        owner,
+        losses,
+        fees,
+    }: WalletIncentivesRecord,
+    start_date: DateTime<Utc>,
+    end_date: DateTime<Utc>,
+) -> Result<()> {
+    for (slogan, price) in [("everyone wins", losses), ("trading incentives", fees)] {
+        if price.is_zero() {
+            continue;
+        }
+
+        let uprice = (price * Decimal256::from_ratio(1_000_000u64, 1u64)).to_uint_floor();
+        let record = DistributionsRecord {
+            recipient: owner,
+            amount: price,
+            uamount: uprice,
+            vesting_date: end_date,
+            clawback: None,
+            can_vote: false,
+            can_receive_rewards: false,
+            title: format!(
+                "Levana’s \"{}\" campaign, {} through {}",
+                slogan,
+                start_date.format("%Y-%m-%d"),
+                end_date.format("%Y-%m-%d")
+            ),
+        };
+        csv.serialize(record)?;
+        csv.flush()?;
+    }
+    Ok(())
+}
+
 pub(crate) struct WalletLossRecord {
     owner: Address,
     losses: Usd,
     fees: Usd,
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) struct DistributionsRecord {
+pub(crate) struct WalletIncentivesRecord {
     owner: Address,
     losses: Decimal256,
     fees: Decimal256,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) struct DistributionsRecord {
+    pub(crate) recipient: Address,
+    pub(crate) amount: Decimal256,
+    pub(crate) uamount: Uint256,
+    pub(crate) vesting_date: DateTime<Utc>,
+    pub(crate) clawback: Option<String>,
+    pub(crate) can_vote: bool,
+    pub(crate) can_receive_rewards: bool,
+    pub(crate) title: String,
 }
