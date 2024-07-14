@@ -1,9 +1,9 @@
 mod deferred_exec;
-mod distributions_csv;
 mod list_contracts;
 mod lp_history;
 mod token_balances;
 mod top_traders;
+mod trading_incentives;
 mod tvl_report;
 
 use std::{
@@ -96,10 +96,10 @@ enum Sub {
         #[clap(flatten)]
         inner: top_traders::TopTradersOpt,
     },
-    /// Export a CSV with distributions
-    DistributionsCsv {
+    /// Export a CSV with trading and rekt incentives
+    TradingIncentivesCsv {
         #[clap(flatten)]
-        inner: distributions_csv::DistributionsCsvOpt,
+        inner: trading_incentives::DistributionsCsvOpt,
     },
 }
 
@@ -116,7 +116,7 @@ impl UtilOpt {
             Sub::ListContracts { inner } => inner.go().await,
             Sub::TvlReport { inner } => inner.go(opt).await,
             Sub::TopTraders { inner } => inner.go(opt).await,
-            Sub::DistributionsCsv { inner } => inner.go(opt).await,
+            Sub::TradingIncentivesCsv { inner } => inner.go(opt).await,
         }
     }
 }
@@ -645,6 +645,8 @@ pub(crate) struct PositionRecord {
     pnl_usd: Signed<Usd>,
     total_fees_collateral: Signed<Collateral>,
     total_fees_usd: Signed<Usd>,
+    trading_fee_collateral: Collateral,
+    trading_fee_usd: Usd,
 }
 
 pub(crate) fn load_data_from_csv(
@@ -705,6 +707,8 @@ impl PositionRecord {
             total_fees_collateral,
             total_fees_usd,
             active_collateral: position.active_collateral.raw(),
+            trading_fee_collateral: position.trading_fee_collateral,
+            trading_fee_usd: position.trading_fee_usd,
         })
     }
 
@@ -746,6 +750,8 @@ impl PositionRecord {
             total_fees_collateral,
             total_fees_usd,
             active_collateral: Collateral::zero(),
+            trading_fee_collateral: position.trading_fee_collateral,
+            trading_fee_usd: position.trading_fee_usd,
         })
     }
 }
