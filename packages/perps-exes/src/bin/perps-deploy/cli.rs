@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use cosmos::SeedPhrase;
 use perps_exes::build_version;
+use reqwest::Url;
 
 use crate::localtest;
 
@@ -109,7 +110,7 @@ pub(crate) enum Subcommand {
 pub(crate) struct Opt {
     /// Override gRPC endpoint
     #[clap(long, env = "COSMOS_GRPC", global = true)]
-    pub(crate) cosmos_grpc: Option<String>,
+    pub(crate) cosmos_grpc: Option<Url>,
     /// Override gas multiplier
     #[clap(long, env = "COSMOS_GAS_MULTIPLIER", global = true)]
     pub(crate) cosmos_gas_multiplier: Option<f64>,

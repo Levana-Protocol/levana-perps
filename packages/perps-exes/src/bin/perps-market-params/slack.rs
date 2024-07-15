@@ -6,7 +6,7 @@ use cosmos::{Address, CosmosNetwork};
 use reqwest::{Client, Url};
 
 use crate::{
-    coingecko::{CMCExchange, CmcExchangeInfo, Coin},
+    coingecko::{CMCExchange, CmcExchangeInfo, CmcMarketPair, Coin},
     market_param::{AssetName, MarketsConfig, NotionalAsset},
 };
 
@@ -143,7 +143,7 @@ impl HttpApp {
     pub(crate) async fn get_market_pair(
         &self,
         AssetName(base_asset): AssetName<'_>,
-    ) -> anyhow::Result<CmcExchangeInfo> {
+    ) -> anyhow::Result<Vec<CmcMarketPair>> {
         let coin: Coin = base_asset.parse()?;
         let coin = coin.to_wrapped_coin().0;
         let mut start: u32 = 1;
@@ -190,7 +190,7 @@ impl HttpApp {
                 .append(&mut exchange_info.data.market_pairs);
         }
 
-        Ok(result)
+        Ok(result.data.market_pairs)
     }
 
     pub(crate) async fn get_price_in_usd(

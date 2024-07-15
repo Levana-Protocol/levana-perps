@@ -68,7 +68,7 @@ pub(crate) fn update_config(
         disable_position_nft_exec,
         liquidity_cooldown_seconds,
         exposure_margin_ratio,
-        referral_reward_ratio: referrer_reward_ratio,
+        referral_reward_ratio,
         spot_price,
     }: ConfigUpdate,
 ) -> Result<()> {
@@ -181,7 +181,7 @@ pub(crate) fn update_config(
         config.exposure_margin_ratio = x;
     }
 
-    if let Some(x) = referrer_reward_ratio {
+    if let Some(x) = referral_reward_ratio {
         config.referral_reward_ratio = x;
     }
 
