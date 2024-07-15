@@ -9,13 +9,13 @@ pub(crate) enum ExchangeKind {
     Dex,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) struct CmcExchangeInfo {
     pub(crate) data: CmcData,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) struct CmcData {
     pub(crate) num_market_pairs: u32,
@@ -78,7 +78,7 @@ impl ExchangeId {
             | 1091 | 61 | 106 | 139 | 171 | 250 | 280 | 321 | 364 | 1371 | 369 | 997 | 96
             | 9588 | 922 | 925 | 137 | 1037 | 7893 | 605 | 9798 | 9867 | 633 | 5750 | 7680
             | 9957 | 723 | 1414 | 7699 | 9786 | 9933 | 9662 | 1100 | 9920 | 10109 | 10103
-            | 6637 | 10153 | 1222 | 3631 | 10361 => Ok(ExchangeKind::Cex),
+            | 6637 | 10153 | 1222 | 3631 | 10361 | 629 => Ok(ExchangeKind::Cex),
             1707 | 1454 | 1187 | 1530 | 1567 | 1344 | 1714 | 9244 | 1165 | 1293 | 1327 | 1395
             | 1447 | 1547 | 1551 | 1614 | 1657 | 1665 | 6255 | 6444 | 6706 | 6757 | 8915 | 9245
             | 1342 | 1426 | 1612 | 8161 | 1069 | 246 | 267 | 1062 | 1063 | 1070 | 1141 | 1206
@@ -96,7 +96,7 @@ impl ExchangeId {
             | 1699 | 5327 | 6420 | 6753 | 7392 | 503 | 7086 | 8913 | 9243 | 249 | 310 | 856
             | 983 | 1232 | 1281 | 1370 | 1378 | 1407 | 1413 | 1457 | 1480 | 1487 | 1489 | 1514
             | 1515 | 1584 | 1599 | 1685 | 1931 | 5430 | 7440 | 8003 | 8877 | 9882 | 9883 | 1577
-            | 1623 | 8964 | 7806 | 1196 | 8977 | 7791 | 6746 => Ok(ExchangeKind::Dex),
+            | 1623 | 8964 | 7806 | 1196 | 8977 | 7791 | 6746 | 10557 => Ok(ExchangeKind::Dex),
             other => Err(anyhow!("Exchange type not known for id {}", other)),
         }
     }
