@@ -86,6 +86,12 @@ pub(crate) struct ServeOpt {
     /// Seconds to wait before hitting CMC to avoid 429
     #[arg(long, env = "LEVANA_MPARAM_CMC_WAIT_SECONDS", default_value = "10")]
     pub(crate) cmc_wait_seconds: u64,
+    /// Directory to save historical data
+    #[arg(long, env = "LEVANA_MPARAM_DATA_DIR")]
+    pub(crate) cmc_data_dir: PathBuf,
+    /// Age in days till which we store data
+    #[arg(long, env = "LEVANA_MPARAM_DATA_AGE_DAYS", default_value = "7")]
+    pub(crate) cmc_data_age_days: u64,
 }
 
 /// Parse a single key-value pair
