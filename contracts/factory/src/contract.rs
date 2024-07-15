@@ -190,6 +190,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         } => shutdown(&mut ctx, &info, markets, impacts, effect)?,
         ExecuteMsg::RegisterReferrer { addr } => {
             let referrer = addr.validate(state.api)?;
+            anyhow::ensure!(
+                info.sender != referrer,
+                "You cannot set yourself as your own referrer"
+            );
             set_referrer_for(ctx.storage, &info.sender, &referrer)?;
             ctx.response.add_event(
                 Event::new("register-referrer")
