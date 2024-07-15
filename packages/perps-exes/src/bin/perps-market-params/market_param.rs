@@ -1,8 +1,8 @@
 use std::{
     cmp::{Ordering, Reverse},
     fmt::Display,
-    fs::{File, OpenOptions},
-    io::{Read, Write},
+    fs::File,
+    io::BufReader,
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
@@ -367,10 +367,10 @@ pub(crate) struct DnfRecord {
 }
 
 impl HistoricalData {
-    pub(crate) fn is_present_untill(&self, date: NaiveDate) -> bool {
+    pub(crate) fn is_present_until(&self, date: NaiveDate) -> bool {
         let data = self.data.iter();
         let mut now = Utc::now().date_naive();
-        while now != date {
+        while now > date {
             let result = data.clone().any(|item| item.date == now);
             if !result {
                 return false;
@@ -459,10 +459,9 @@ pub(crate) fn load_historical_data(
 ) -> anyhow::Result<HistoricalData> {
     let file = get_market_file_path(market_id, &data_dir);
     if file.exists() {
-        let mut file = File::open(file)?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-        let result: HistoricalData = serde_json::from_str(&contents)?;
+        let file = File::open(file)?;
+        let reader = BufReader::new(file);
+        let result = serde_json::from_reader(reader)?;
         Ok(result)
     } else {
         Ok(HistoricalData { data: vec![] })
@@ -476,10 +475,9 @@ pub(crate) fn save_historical_data(
     untill: Option<u64>,
 ) -> anyhow::Result<()> {
     let path = get_market_file_path(market_id, &data_dir);
-    let mut file = OpenOptions::new().write(true).create(true).open(path)?;
     let data = data.till_days(untill)?;
     let data = serde_json::to_string(&data)?;
-    file.write_all(data.as_bytes())?;
+    fs_err::write(path, data.as_bytes())?;
     Ok(())
 }
 
@@ -515,7 +513,7 @@ pub(crate) async fn compute_coin_dnfs(
                 "Fetched  historical data for {market_id}: {}",
                 historical_data.data.len()
             );
-            let data_present = historical_data.is_present_untill(now_minus_days);
+            let data_present = historical_data.is_present_until(now_minus_days);
             if data_present {
                 let configured_dnf = market_config
                     .get_chain_dnf(market_id)
