@@ -344,6 +344,7 @@ impl SubTotals {
             fees.protocol,
             fees.wallets,
             fees.crank,
+            fees.referral,
             *delta_neutrality_fund,
             *deferred_exec,
         ] {
@@ -419,7 +420,7 @@ fn valid_lp_info(state: &State, store: &dyn Storage) -> Result<()> {
 }
 
 fn check_lp_info(
-    LpInfoResp {
+    lp_info @ LpInfoResp {
         lp_amount,
         lp_collateral,
         xlp_amount,
@@ -439,7 +440,8 @@ fn check_lp_info(
     anyhow::ensure!(
         *available_yield
             == (((*available_yield_lp + *available_yield_xlp)? + *available_crank_rewards)?
-                + *available_referrer_rewards)?
+                + *available_referrer_rewards)?,
+        "Available yield does not match up with components: {lp_info:?}"
     );
     if let Some(unstaking) = unstaking {
         let UnstakingStatus {

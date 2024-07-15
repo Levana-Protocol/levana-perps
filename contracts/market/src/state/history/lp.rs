@@ -230,4 +230,19 @@ impl State<'_> {
 
         Ok(())
     }
+
+    pub(crate) fn lp_history_add_summary_referral(
+        &self,
+        ctx: &mut StateContext,
+        addr: &Addr,
+        referral_earned: NonZero<Collateral>,
+    ) -> Result<()> {
+        let mut summary = self.lp_history_get_summary(ctx.storage, addr)?;
+        let price = self.current_spot_price(ctx.storage)?;
+        summary.referrer = summary.referrer.checked_add(referral_earned.raw())?;
+        let referral_earned_usd = price.collateral_to_usd(referral_earned.raw());
+        summary.referrer_usd = summary.referrer_usd.checked_add(referral_earned_usd)?;
+        LP_HISTORY_SUMMARY.save(ctx.storage, addr, &summary)?;
+        Ok(())
+    }
 }

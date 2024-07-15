@@ -80,3 +80,71 @@ fn no_initial_rewards() {
     assert_eq!(lp_info.history.referrer, Collateral::zero());
     assert_eq!(lp_info.history.referrer_usd, Usd::zero());
 }
+
+#[test]
+fn rewards_for_registered() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let referrer = market.clone_trader(0).unwrap();
+    let referee = market.clone_trader(1).unwrap();
+    let other = market.clone_trader(2).unwrap();
+
+    market.exec_register_referrer(&referee, &referrer).unwrap();
+
+    let lp_info = market.query_lp_info(&referrer).unwrap();
+    assert_eq!(lp_info.available_referrer_rewards, Collateral::zero());
+    assert_eq!(lp_info.history.referrer, Collateral::zero());
+    assert_eq!(lp_info.history.referrer_usd, Usd::zero());
+
+    market
+        .exec_open_position(
+            &other,
+            "5",
+            "2.5",
+            DirectionToBase::Long,
+            "2.1",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+    let lp_info = market.query_lp_info(&referrer).unwrap();
+    assert_eq!(lp_info.available_referrer_rewards, Collateral::zero());
+    assert_eq!(lp_info.history.referrer, Collateral::zero());
+    assert_eq!(lp_info.history.referrer_usd, Usd::zero());
+
+    let (pos_id, _) = market
+        .exec_open_position(
+            &referee,
+            "5",
+            "2.5",
+            DirectionToBase::Long,
+            "2.1",
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    let pos = market.query_position(pos_id).unwrap();
+    let config = market.query_config().unwrap();
+
+    let lp_info = market.query_lp_info(&referrer).unwrap();
+    assert_eq!(
+        lp_info.available_referrer_rewards,
+        pos.trading_fee_collateral
+            .checked_mul_dec(config.referral_reward_ratio)
+            .unwrap()
+    );
+    assert_eq!(lp_info.history.referrer, lp_info.available_referrer_rewards);
+    assert_ne!(lp_info.history.referrer_usd, Usd::zero());
+
+    market.exec_claim_yield(&referrer).unwrap();
+
+    let lp_info_final = market.query_lp_info(&referrer).unwrap();
+    assert_eq!(lp_info_final.available_referrer_rewards, Collateral::zero());
+    assert_eq!(
+        lp_info_final.history.referrer,
+        lp_info.available_referrer_rewards
+    );
+    assert_ne!(lp_info_final.history.referrer_usd, Usd::zero());
+}
