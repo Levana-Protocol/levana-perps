@@ -215,3 +215,13 @@ fn referee_count() {
 
     assert_eq!(market.query_referrer_counts().unwrap(), referrers);
 }
+
+#[test]
+fn cannot_self_register() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let referrer = market.clone_trader(0).unwrap();
+
+    market
+        .exec_register_referrer(&referrer, &referrer)
+        .unwrap_err();
+}
