@@ -81,6 +81,8 @@ pub(crate) struct LiquidityStatsByAddr {
     pub(crate) lp_accrued_yield: Collateral,
     pub(crate) xlp_accrued_yield: Collateral,
     pub(crate) crank_rewards: Collateral,
+    #[serde(default)]
+    pub(crate) referrer_rewards: Collateral,
     pub(crate) unstaking: Option<UnstakingXlp>,
     /// When the liquidity cooldown period ends, if active.
     pub(crate) cooldown_ends: Option<Timestamp>,
@@ -96,6 +98,7 @@ impl LiquidityStatsByAddr {
             lp_accrued_yield: Collateral::zero(),
             xlp_accrued_yield: Collateral::zero(),
             crank_rewards: Collateral::zero(),
+            referrer_rewards: Collateral::zero(),
             unstaking: None,
             cooldown_ends: None,
         })
@@ -926,6 +929,7 @@ impl State<'_> {
             available_yield_lp,
             available_yield_xlp,
             available_crank_rewards: addr_stats.crank_rewards,
+            available_referrer_rewards: addr_stats.referrer_rewards,
             unstaking,
             history,
             liquidity_cooldown,
