@@ -9,13 +9,13 @@ pub(crate) enum ExchangeKind {
     Dex,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) struct CmcExchangeInfo {
     pub(crate) data: CmcData,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) struct CmcData {
     pub(crate) num_market_pairs: u32,
