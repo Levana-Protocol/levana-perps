@@ -100,6 +100,7 @@ pub(crate) struct DnfInUsd(pub(crate) f64);
 pub(crate) struct Dnf {
     pub(crate) dnf_in_notional: DnfInNotional,
     pub(crate) dnf_in_usd: DnfInUsd,
+    pub(crate) min_depth_liquidity: f64,
 }
 
 impl DnfInUsd {
@@ -129,13 +130,15 @@ pub(crate) async fn dnf_sensitivity(
             "Total exchanges found: {} for {market_id:?}",
             exchanges.len()
         );
-        let dnf_in_usd = compute_dnf_sensitivity(exchanges)?;
+        let dnf_result = compute_dnf_sensitivity(exchanges)?;
+        let dnf_in_usd = dnf_result.dnf;
         let dnf_in_base = dnf_in_usd
             .to_asset_amount(NotionalAsset(base_asset.0), http_app)
             .await?;
         return Ok(Dnf {
             dnf_in_notional: DnfInNotional(dnf_in_base),
             dnf_in_usd: DnfInUsd(dnf_in_usd.0),
+            min_depth_liquidity: dnf_result.min_depth_liquidity,
         });
     }
 
@@ -152,10 +155,11 @@ pub(crate) async fn dnf_sensitivity(
     } else {
         base_dnf_in_usd
     };
-    let dnf_in_base = dnf_in_usd.to_asset_amount(notional_asset, http_app).await?;
+    let dnf_in_base = dnf_in_usd.dnf.to_asset_amount(notional_asset, http_app).await?;
     Ok(Dnf {
         dnf_in_notional: DnfInNotional(dnf_in_base),
-        dnf_in_usd: DnfInUsd(dnf_in_usd.0),
+        dnf_in_usd: DnfInUsd(dnf_in_usd.dnf.0),
+        min_depth_liquidity: dnf_in_usd.min_depth_liquidity,
     })
 }
 
@@ -229,7 +233,13 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
     }
 }
 
-fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfInUsd> {
+#[derive(PartialOrd, PartialEq, Clone, serde::Serialize)]
+pub(crate) struct DnfResult {
+    pub(crate) dnf: DnfInUsd,
+    pub(crate) min_depth_liquidity: f64,
+}
+
+fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfResult> {
     // Algorithm: https://staff.levana.finance/new-market-checklist#dnf-sensitivity
     tracing::debug!("Total exchanges: {}", exchanges.len());
     let dnf_exchange = filter_invalid_exchanges(exchanges)?;
@@ -248,7 +258,11 @@ fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfI
         .depth_usd_negative_two
         .min(max_volume_exchange.depth_usd_positive_two);
     let dnf = (min_depth_liquidity / market_share) * 25.0;
-    Ok(DnfInUsd(dnf))
+    let result = DnfResult {
+        dnf: DnfInUsd(dnf),
+        min_depth_liquidity,
+    };
+    Ok(result)
 }
 
 #[derive(Clone, serde::Serialize)]
