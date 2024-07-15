@@ -683,7 +683,7 @@ mod tests {
             },
         ];
         let dnf = super::compute_dnf_sensitivity(exchanges).unwrap();
-        assert_eq!(dnf.0.round(), 268783.0, "Expected DNF");
+        assert_eq!(dnf.dnf.0.round(), 268783.0, "Expected DNF");
     }
 
     #[test]
