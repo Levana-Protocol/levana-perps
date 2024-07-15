@@ -25,8 +25,8 @@ use msg::contracts::cw20::entry::{
     BalanceResponse, ExecuteMsg as Cw20ExecuteMsg, QueryMsg as Cw20QueryMsg, TokenInfoResponse,
 };
 use msg::contracts::factory::entry::{
-    ExecuteMsg as FactoryExecuteMsg, MarketInfoResponse, QueryMsg as FactoryQueryMsg,
-    ShutdownStatus,
+    ExecuteMsg as FactoryExecuteMsg, GetReferrerResp, ListRefereesResp, MarketInfoResponse,
+    QueryMsg as FactoryQueryMsg, ShutdownStatus,
 };
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::crank::CrankWorkInfo;
@@ -1754,6 +1754,52 @@ impl PerpsMarket {
         )?;
 
         Ok(resp.tokens)
+    }
+
+    /// Get the referrer for a referee
+    pub fn query_referrer(&self, referee: &Addr) -> Result<Option<Addr>> {
+        Ok(
+            match self.query_factory(&FactoryQueryMsg::GetReferrer {
+                addr: referee.as_str().into(),
+            })? {
+                GetReferrerResp::NoReferrer {} => None,
+                GetReferrerResp::HasReferrer { referrer } => Some(referrer),
+            },
+        )
+    }
+
+    /// Register a referrer for the given referee.
+    ///
+    /// Referee comes first in argument order.
+    pub fn exec_register_referrer(&self, referee: &Addr, referrer: &Addr) -> Result<()> {
+        self.exec_factory_as(
+            referee,
+            &FactoryExecuteMsg::RegisterReferrer {
+                addr: referrer.into(),
+            },
+        )
+        .map(|_| ())
+    }
+
+    /// Get all the referees for a referrer
+    pub fn query_referees(&self, referrer: &Addr) -> Result<Vec<Addr>> {
+        let mut ret = vec![];
+        let mut start_after = None;
+        loop {
+            let ListRefereesResp {
+                mut referees,
+                next_start_after,
+            } = self.query_factory(&FactoryQueryMsg::ListReferees {
+                addr: referrer.into(),
+                limit: None,
+                start_after: start_after.take(),
+            })?;
+            ret.append(&mut referees);
+            match next_start_after {
+                None => break Ok(ret),
+                Some(next_start_after) => start_after = Some(next_start_after),
+            }
+        }
     }
 
     /// Perform a shutdown action

@@ -18,6 +18,7 @@ use crate::state::{
         position_token_addr, position_token_code_id, save_position_token_addr,
         set_position_token_code_id,
     },
+    referrer::{list_referees_for, set_referrer_for},
     reply::{
         reply_get_instantiate_market, reply_set_instantiate_market, InstantiateMarket, ReplyId,
     },
@@ -33,8 +34,8 @@ use cw2::{get_contract_version, set_contract_version};
 use msg::contracts::{
     factory::{
         entry::{
-            AddrIsContractResp, ContractType, ExecuteMsg, FactoryOwnerResp, InstantiateMsg,
-            MarketInfoResponse, MigrateMsg, QueryMsg,
+            AddrIsContractResp, ContractType, ExecuteMsg, FactoryOwnerResp, GetReferrerResp,
+            InstantiateMsg, MarketInfoResponse, MigrateMsg, QueryMsg,
         },
         events::{InstantiateEvent, NewContractKind},
     },
@@ -186,6 +187,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             impacts,
             effect,
         } => shutdown(&mut ctx, &info, markets, impacts, effect)?,
+        ExecuteMsg::RegisterReferrer { addr } => {
+            set_referrer_for(ctx.storage, &info.sender, &addr.validate(state.api)?)?
+        }
     }
 
     Ok(ctx.response.into_response())
@@ -369,6 +373,27 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<QueryResponse> {
         }
 
         QueryMsg::CodeIds {} => get_code_ids(store)?.query_result(),
+
+        QueryMsg::GetReferrer { addr } => {
+            match state.get_referrer_for(store, &addr.validate(state.api)?)? {
+                None => GetReferrerResp::NoReferrer {},
+                Some(referrer) => GetReferrerResp::HasReferrer { referrer },
+            }
+            .query_result()
+        }
+        QueryMsg::ListReferees {
+            addr,
+            limit,
+            start_after,
+        } => {
+            let referrer = addr.validate(state.api)?;
+            let start_after = start_after
+                .map(|addr| RawAddr::from(addr).validate(state.api))
+                .transpose()?;
+            const MAX_LIMIT: u32 = 30;
+            let limit = limit.map_or(MAX_LIMIT, |limit| limit.min(MAX_LIMIT));
+            list_referees_for(store, &referrer, limit, start_after.as_ref())?.query_result()
+        }
     }
 }
 

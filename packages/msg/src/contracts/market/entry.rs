@@ -914,7 +914,7 @@ pub struct LpInfoResp {
     pub xlp_amount: LpToken,
     /// Collateral backing the xLP tokens
     pub xlp_collateral: Collateral,
-    /// Total available yield, sum of the available LP, xLP, and crank rewards.
+    /// Total available yield, sum of the available LP, xLP, crank rewards, and referral rewards.
     pub available_yield: Collateral,
     /// Available yield from LP tokens
     pub available_yield_lp: Collateral,
@@ -922,6 +922,9 @@ pub struct LpInfoResp {
     pub available_yield_xlp: Collateral,
     /// Available crank rewards
     pub available_crank_rewards: Collateral,
+    #[serde(default)]
+    /// Available referrer rewards
+    pub available_referrer_rewards: Collateral,
     /// Current status of an unstaking, if under way
     ///
     /// This will return `Some` from the time the provider begins an unstaking process until either:
@@ -979,6 +982,10 @@ pub struct LpHistorySummary {
     /// Cumulative yield expressed in USD at time of claiming
     #[serde(alias = "yield_in_usd")]
     pub yield_usd: Usd,
+    /// Cumulative referrer rewards collected
+    pub referrer: Collateral,
+    /// Cumulative referrer rewards in USD at time of claiming
+    pub referrer_usd: Usd,
 }
 
 /// Response for [QueryMsg::LpActionHistory]
