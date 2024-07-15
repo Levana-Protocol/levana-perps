@@ -129,7 +129,7 @@ impl PartialOrd for MinDepthLiquidity {
 
 impl Ord for MinDepthLiquidity {
     fn cmp(&self, other: &MinDepthLiquidity) -> Ordering {
-        // We assume that it doesn't contain NAN as part of it's
+        // We assume that it doesn't contain NAN as part of its
         // domain.
         self.partial_cmp(other).unwrap()
     }
