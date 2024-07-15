@@ -59,7 +59,6 @@ async fn main_inner(opt: Opt) -> Result<()> {
             let result = http_app
                 .get_market_pair(AssetName(market_id.get_base()))
                 .await?;
-            let result = result.data.market_pairs;
             let exchanges = http_app.get_exchanges().await?;
             let mut unsupported_exchanges = vec![];
             for market in result {
@@ -160,10 +159,10 @@ async fn main_inner(opt: Opt) -> Result<()> {
                 .await?;
             tracing::info!(
                 "Total exchanges found: {} for {market_id:?}",
-                exchanges.data.market_pairs.len()
+                exchanges.len()
             );
             let mut writer = csv::Writer::from_path(out)?;
-            for exchange in exchanges.data.market_pairs {
+            for exchange in exchanges {
                 writer.serialize(exchange)?;
             }
             writer.flush()?;

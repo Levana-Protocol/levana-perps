@@ -95,7 +95,7 @@ impl Opt {
     ) -> Result<Cosmos, cosmos::error::BuilderError> {
         let mut builder = network.builder().await?;
         if let Some(grpc) = &self.cosmos_grpc {
-            builder.set_grpc_url(grpc);
+            builder.set_grpc_url(grpc.as_str());
         }
         if let Some(chain_id) = &self.cosmos_chain_id {
             builder.set_chain_id(chain_id.clone());

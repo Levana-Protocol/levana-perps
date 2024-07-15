@@ -113,6 +113,7 @@ impl DnfInUsd {
     }
 }
 
+// Compute DNF sensitivity of the current day.
 pub(crate) async fn dnf_sensitivity(
     http_app: &HttpApp,
     market_id: &MarketId,
@@ -126,9 +127,9 @@ pub(crate) async fn dnf_sensitivity(
         let exchanges = http_app.get_market_pair(base_asset).await?;
         tracing::debug!(
             "Total exchanges found: {} for {market_id:?}",
-            exchanges.data.market_pairs.len()
+            exchanges.len()
         );
-        let dnf_in_usd = compute_dnf_sensitivity(exchanges.data.market_pairs)?;
+        let dnf_in_usd = compute_dnf_sensitivity(exchanges)?;
         let dnf_in_base = dnf_in_usd
             .to_asset_amount(NotionalAsset(base_asset.0), http_app)
             .await?;
@@ -144,8 +145,8 @@ pub(crate) async fn dnf_sensitivity(
     let base_exchanges = http_app.get_market_pair(base_asset).await?;
     tracing::debug!("Fetch quote_exchanges");
     let quote_exchanges = http_app.get_market_pair(quote_asset).await?;
-    let base_dnf_in_usd = compute_dnf_sensitivity(base_exchanges.data.market_pairs)?;
-    let quote_dnf_in_usd = compute_dnf_sensitivity(quote_exchanges.data.market_pairs)?;
+    let base_dnf_in_usd = compute_dnf_sensitivity(base_exchanges)?;
+    let quote_dnf_in_usd = compute_dnf_sensitivity(quote_exchanges)?;
     let dnf_in_usd = if base_dnf_in_usd > quote_dnf_in_usd {
         quote_dnf_in_usd
     } else {

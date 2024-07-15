@@ -950,9 +950,9 @@ delta_neutrality_fee_cap = "0.0002"
 liquidity_cooldown_seconds = 86400
 
 [crank-fees.osmosis-mainnet]
-charged = "0.2"
-surcharge = "0.1"
-reward = "0.18"
+charged = "0.02"
+surcharge = "0.01"
+reward = "0.018"
 
 [crank-fees.sei-mainnet]
 charged = "0.2"
