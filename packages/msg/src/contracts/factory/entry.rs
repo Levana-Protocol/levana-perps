@@ -216,6 +216,17 @@ pub enum QueryMsg {
         /// Taken from [ListRefereesResp::next_start_after]
         start_after: Option<String>,
     },
+
+    /// Enumerated query: referee counts for all referrers.
+    ///
+    /// * returns [ListRefereeCountResp]
+    #[returns(ListRefereeCountResp)]
+    ListRefereeCount {
+        /// How many records to return at once
+        limit: Option<u32>,
+        /// Take from [ListRefereeCountResp::next_start_after]
+        start_after: Option<ListRefereeCountStartAfter>,
+    },
 }
 
 /// Information on owners and other protocol-wide special addresses
@@ -317,4 +328,40 @@ pub struct ListRefereesResp {
 /// We don't follow the normal Map pattern to simplify raw queries.
 pub fn make_referrer_key(referee: &Addr) -> String {
     format!("ref__{}", referee.as_str())
+}
+
+/// Make a lookup key for the count of referees for a referrer.
+///
+/// We don't follow the normal Map pattern to simplify raw queries.
+pub fn make_referee_count_key(referrer: &Addr) -> String {
+    format!("refcount__{}", referrer.as_str())
+}
+
+/// Response from [QueryMsg::ListRefereeCount]
+#[cw_serde]
+pub struct ListRefereeCountResp {
+    /// Counts for individual wallets
+    pub counts: Vec<RefereeCount>,
+    /// Next value to start after
+    ///
+    /// Returns `None` if we've seen all referees
+    pub next_start_after: Option<ListRefereeCountStartAfter>,
+}
+
+/// The count of referees for an individual referrer.
+#[cw_serde]
+pub struct RefereeCount {
+    /// Referrer address
+    pub referrer: Addr,
+    /// Number of referees
+    pub count: u32,
+}
+
+/// Helper for enumerated referee count queries.
+#[cw_serde]
+pub struct ListRefereeCountStartAfter {
+    /// Last referrer seen.
+    pub referrer: RawAddr,
+    /// Last count seen.
+    pub count: u32,
 }

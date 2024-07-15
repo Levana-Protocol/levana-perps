@@ -25,8 +25,8 @@ use msg::contracts::cw20::entry::{
     BalanceResponse, ExecuteMsg as Cw20ExecuteMsg, QueryMsg as Cw20QueryMsg, TokenInfoResponse,
 };
 use msg::contracts::factory::entry::{
-    ExecuteMsg as FactoryExecuteMsg, GetReferrerResp, ListRefereesResp, MarketInfoResponse,
-    QueryMsg as FactoryQueryMsg, ShutdownStatus,
+    ExecuteMsg as FactoryExecuteMsg, GetReferrerResp, ListRefereeCountResp, ListRefereesResp,
+    MarketInfoResponse, QueryMsg as FactoryQueryMsg, RefereeCount, ShutdownStatus,
 };
 use msg::contracts::liquidity_token::LiquidityTokenKind;
 use msg::contracts::market::crank::CrankWorkInfo;
@@ -38,8 +38,8 @@ use msg::contracts::market::entry::{
     ClosedPositionCursor, ClosedPositionsResp, DeltaNeutralityFeeResp, ExecuteMsg, Fees,
     InitialPrice, LimitOrderHistoryResp, LimitOrderResp, LimitOrdersResp, LpAction,
     LpActionHistoryResp, LpInfoResp, PositionActionHistoryResp, PositionsQueryFeeApproach,
-    PriceForQuery, PriceWouldTriggerResp, QueryMsg, SlippageAssert, SpotPriceHistoryResp,
-    StatusResp, StopLoss, TradeHistorySummary, TraderActionHistoryResp,
+    PriceForQuery, PriceWouldTriggerResp, QueryMsg, ReferralStatsResp, SlippageAssert,
+    SpotPriceHistoryResp, StatusResp, StopLoss, TradeHistorySummary, TraderActionHistoryResp,
 };
 use msg::contracts::market::position::{ClosedPosition, PositionsResp};
 use msg::contracts::market::spot_price::{
@@ -74,6 +74,7 @@ use rand::rngs::ThreadRng;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::cell::{RefCell, RefMut};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct PerpsMarket {
@@ -755,6 +756,10 @@ impl PerpsMarket {
             );
         }
         Ok(lp_info_resp)
+    }
+
+    pub fn query_referral_stats(&self, addr: &Addr) -> Result<ReferralStatsResp> {
+        self.query(&MarketQueryMsg::ReferralStats { addr: addr.into() })
     }
 
     pub fn query_trade_history_summary(&self, addr: &Addr) -> Result<TradeHistorySummary> {
@@ -1785,6 +1790,7 @@ impl PerpsMarket {
     pub fn query_referees(&self, referrer: &Addr) -> Result<Vec<Addr>> {
         let mut ret = vec![];
         let mut start_after = None;
+        let total = self.query_referral_stats(referrer)?.referees;
         loop {
             let ListRefereesResp {
                 mut referees,
@@ -1796,7 +1802,34 @@ impl PerpsMarket {
             })?;
             ret.append(&mut referees);
             match next_start_after {
-                None => break Ok(ret),
+                None => {
+                    anyhow::ensure!(ret.len() == usize::try_from(total)?);
+                    break Ok(ret);
+                }
+                Some(next_start_after) => start_after = Some(next_start_after),
+            }
+        }
+    }
+
+    pub fn query_referrer_counts(&self) -> Result<HashMap<Addr, u32>> {
+        let mut ret = HashMap::new();
+        let mut start_after = None;
+        loop {
+            let ListRefereeCountResp {
+                counts,
+                next_start_after,
+            } = self.query_factory(&FactoryQueryMsg::ListRefereeCount {
+                limit: None,
+                start_after: start_after.take(),
+            })?;
+            for RefereeCount { referrer, count } in counts {
+                anyhow::ensure!(!ret.contains_key(&referrer));
+                ret.insert(referrer, count);
+            }
+            match next_start_after {
+                None => {
+                    break Ok(ret);
+                }
                 Some(next_start_after) => start_after = Some(next_start_after),
             }
         }

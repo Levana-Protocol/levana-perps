@@ -157,3 +157,5 @@ pub const IS_POSITION_CLOSING: &str = "ex";
 pub const CRANK_BATCH_WEIGHT_LEFT: &str = "ey";
 pub const INSTANTIATION_TIMESTAMP: &str = "ez";
 pub const REFEREES_REVERSE_MAP: &str = "fa";
+pub const REFEREE_COUNT_REVERSE_MAP: &str = "fb";
+pub const REFERRAL_STATS_MAP: &str = "fc";
