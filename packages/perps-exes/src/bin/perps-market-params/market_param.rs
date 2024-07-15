@@ -106,7 +106,7 @@ impl DnfInNotional {
 #[derive(PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct DnfInUsd(pub(crate) f64);
 
-#[derive(PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy)]
+#[derive(PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy)]
 pub(crate) struct MinDepthLiquidity(pub(crate) f64);
 
 impl MinDepthLiquidity {
@@ -120,6 +120,12 @@ impl MinDepthLiquidity {
 }
 
 impl Eq for MinDepthLiquidity {}
+
+impl PartialOrd for MinDepthLiquidity {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 impl Ord for MinDepthLiquidity {
     fn cmp(&self, other: &MinDepthLiquidity) -> Ordering {
@@ -362,16 +368,17 @@ pub(crate) struct DnfRecord {
 
 impl HistoricalData {
     pub(crate) fn is_present_untill(&self, date: NaiveDate) -> bool {
-        // Note that this function ignores todays' data as that can be
-        // always calculated
         let data = self.data.iter();
         let mut now = Utc::now().date_naive();
         while now != date {
-            now = now - Days::new(1);
             let result = data.clone().any(|item| item.date == now);
-            if result == false {
+            if !result {
                 return false;
             }
+            now = now - Days::new(1);
+        }
+        if self.data.is_empty() {
+            return false;
         }
         true
     }
@@ -386,9 +393,13 @@ impl HistoricalData {
         dnf: Dnf,
         market_id: &MarketId,
         data_dir: PathBuf,
-        days_to_consider: u64,
+        days_to_consider: Option<u64>,
     ) -> anyhow::Result<()> {
         let now = Utc::now().date_naive();
+        if self.data.iter().any(|item| item.date == now) {
+            tracing::info!("Ignoring data insertion since it's already present");
+            return Ok(());
+        }
         let result = DnfRecord {
             date: now,
             result: dnf,
@@ -398,7 +409,7 @@ impl HistoricalData {
     }
 
     pub(crate) fn compute_dnf(&self, days_to_consider: u64) -> anyhow::Result<Dnf> {
-        let mut historical_data = self.till_days(days_to_consider)?;
+        let mut historical_data = self.till_days(Some(days_to_consider))?;
         historical_data
             .data
             .sort_by_key(|item| Reverse(item.result.min_depth_liquidity));
@@ -410,7 +421,19 @@ impl HistoricalData {
         Ok(result.result)
     }
 
-    pub(crate) fn till_days(&self, days_to_consider: u64) -> anyhow::Result<HistoricalData> {
+    pub(crate) fn till_days(
+        &self,
+        days_to_consider: Option<u64>,
+    ) -> anyhow::Result<HistoricalData> {
+        let days_to_consider = match days_to_consider {
+            Some(days) => days,
+            None => {
+                return Ok(HistoricalData {
+                    data: self.data.clone(),
+                })
+            }
+        };
+
         let data = self.data.clone().into_iter();
         let mut now = Utc::now().date_naive();
         let mut required_dates = vec![];
@@ -423,7 +446,8 @@ impl HistoricalData {
             .collect();
         ensure!(
             result.len() == days_to_consider as usize,
-            "Historical data is not matching the total days for calcuation"
+            "Historical data ({}) is not matching the total days for calcuation",
+            result.len()
         );
         Ok(HistoricalData { data: result })
     }
@@ -434,18 +458,22 @@ pub(crate) fn load_historical_data(
     data_dir: PathBuf,
 ) -> anyhow::Result<HistoricalData> {
     let file = get_market_file_path(market_id, &data_dir);
-    let mut file = File::open(file)?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
-    let result: HistoricalData = serde_json::from_str(&contents)?;
-    Ok(result)
+    if file.exists() {
+        let mut file = File::open(file)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        let result: HistoricalData = serde_json::from_str(&contents)?;
+        Ok(result)
+    } else {
+        Ok(HistoricalData { data: vec![] })
+    }
 }
 
 pub(crate) fn save_historical_data(
     market_id: &MarketId,
     data_dir: PathBuf,
     data: HistoricalData,
-    untill: u64,
+    untill: Option<u64>,
 ) -> anyhow::Result<()> {
     let path = get_market_file_path(market_id, &data_dir);
     let mut file = OpenOptions::new().write(true).create(true).open(path)?;
@@ -482,8 +510,11 @@ pub(crate) async fn compute_coin_dnfs(
             let now_minus_days = now
                 .checked_sub_days(Days::new(serve_opt.cmc_data_age_days))
                 .context("Not able to do checked subtraction on current time")?;
-            tracing::info!("Goint to fetch historical data");
-            let mut historical_data = load_historical_data(&market_id, data_dir.clone())?;
+            let mut historical_data = load_historical_data(market_id, data_dir.clone())?;
+            tracing::info!(
+                "Fetched  historical data for {market_id}: {}",
+                historical_data.data.len()
+            );
             let data_present = historical_data.is_present_untill(now_minus_days);
             if data_present {
                 let configured_dnf = market_config
@@ -519,8 +550,7 @@ pub(crate) async fn compute_coin_dnfs(
 
                 let present_today = historical_data.is_present_for_today();
                 let market_dnf = if present_today {
-                    let result = historical_data.compute_dnf(serve_opt.cmc_data_age_days)?;
-                    result
+                    historical_data.compute_dnf(serve_opt.cmc_data_age_days)?
                 } else {
                     let dnf = dnf_sensitivity(&http_app, market_id).await;
                     let dnf = match dnf {
@@ -536,12 +566,11 @@ pub(crate) async fn compute_coin_dnfs(
                     };
                     historical_data.append_and_save(
                         dnf,
-                        &market_id,
+                        market_id,
                         data_dir.clone(),
-                        serve_opt.cmc_data_age_days,
+                        Some(serve_opt.cmc_data_age_days),
                     )?;
-                    let result = historical_data.compute_dnf(serve_opt.cmc_data_age_days)?;
-                    result
+                    historical_data.compute_dnf(serve_opt.cmc_data_age_days)?
                 };
                 let dnf_notify = compute_dnf_notify(
                     market_dnf.dnf_in_notional,
@@ -599,12 +628,11 @@ pub(crate) async fn compute_coin_dnfs(
                         }
                     }
                 };
-                historical_data.append_and_save(
-                    dnf,
-                    &market_id,
-                    data_dir.clone(),
-                    serve_opt.cmc_data_age_days,
-                )?;
+                historical_data.append_and_save(dnf, market_id, data_dir.clone(), None)?;
+                tracing::info!(
+                    "Saving data for market {market_id} (Total: {})",
+                    historical_data.data.len()
+                );
             }
             if serve_opt.cmc_wait_seconds > 0 {
                 tracing::info!(
