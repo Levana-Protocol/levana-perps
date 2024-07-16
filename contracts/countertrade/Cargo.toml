@@ -16,6 +16,3 @@ semver = "1.0.15"
 anyhow = "1.0.82"
 cw-storage-plus = "2.0.0"
 serde = { version = "1.0.199", default-features = false, features = ["derive"] }
-
-[dev-dependencies]
-cw-multi-test = "0.20.0"
