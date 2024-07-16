@@ -53,7 +53,7 @@ pub fn instantiate(
         .context("Cannot save config")?;
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)
-        .context("Setting contract version")?;
+        .context("Cannot set contract version")?;
 
     Ok(Response::new())
 }
