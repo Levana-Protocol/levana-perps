@@ -16,13 +16,13 @@ impl Funds {
         }
     }
 
-    fn require_some(self, market_state: &MarketState) -> Result<NonZero<Collateral>> {
+    fn require_some(self, market: &MarketInfo) -> Result<NonZero<Collateral>> {
         match self {
             Funds::NoFunds => Err(anyhow!(
                 "Message requires attached funds, but none were provided"
             )),
             Funds::Funds { token, amount } => {
-                match (&token, &market_state.market.token) {
+                match (&token, &market.token) {
                     (
                         Token::Native(_),
                         msg::token::Token::Cw20 {
@@ -52,8 +52,7 @@ impl Funds {
                         },
                     ) => bail!("Provided CW20 funds, but market requires native funds with denom {denom}"),
                 }
-                let collateral = market_state
-                    .market
+                let collateral = market
                     .token
                     .from_u128(amount.u128())
                     .context("Error converting token amount to Collateral")?;
@@ -124,31 +123,33 @@ pub fn execute(deps: DepsMut, _env: Env, info: MessageInfo, msg: ExecuteMsg) -> 
     match msg {
         ExecuteMsg::Receive { .. } => Err(anyhow!("Cannot perform a receive within a receive")),
         ExecuteMsg::Deposit { market } => {
-            let (market_state, storage) = MarketState::load_mut(deps, market)?;
-            let funds = funds.require_some(&market_state)?;
-            deposit(storage, sender, funds, market_state)
+            let (state, storage) = State::load_mut(deps)?;
+            let market = state.load_cache_market_info(storage, &market)?;
+            let funds = funds.require_some(&market)?;
+            deposit(storage, sender, funds, &market)
         }
         ExecuteMsg::Withdraw { amount, market } => {
             funds.require_none()?;
-            let (market_state, storage) = MarketState::load_mut(deps, market)?;
-            withdraw(storage, sender, market_state, amount)
+            let (state, storage) = State::load_mut(deps)?;
+            let market = state.load_cache_market_info(storage, &market)?;
+            withdraw(storage, sender, market, amount)
         }
-        ExecuteMsg::Crank { market } => todo!(),
+        ExecuteMsg::Crank { market: _ } => todo!(),
         ExecuteMsg::AppointAdmin { admin } => {
             funds.require_none()?;
-            let state = State::load(deps.api, deps.querier, deps.storage)?;
-            let admin = admin.validate(deps.api)?;
-            appoint_admin(state, deps.storage, sender, admin)
+            let (state, storage) = State::load_mut(deps)?;
+            let admin = admin.validate(state.api)?;
+            appoint_admin(state, storage, sender, admin)
         }
         ExecuteMsg::AcceptAdmin {} => {
             funds.require_none()?;
-            let state = State::load(deps.api, deps.querier, deps.storage)?;
-            accept_admin(state, deps.storage, sender)
+            let (state, storage) = State::load_mut(deps)?;
+            accept_admin(state, storage, sender)
         }
         ExecuteMsg::UpdateConfig(config_update) => {
             funds.require_none()?;
-            let state = State::load(deps.api, deps.querier, deps.storage)?;
-            update_config(state, deps.storage, sender, config_update)
+            let (state, storage) = State::load_mut(deps)?;
+            update_config(state, storage, sender, config_update)
         }
     }
 }
@@ -157,22 +158,22 @@ fn deposit(
     storage: &mut dyn Storage,
     sender: Addr,
     funds: NonZero<Collateral>,
-    market_state: MarketState,
+    market: &MarketInfo,
 ) -> Result<Response> {
     let sender_shares = crate::state::SHARES
-        .may_load(storage, (&sender, &market_state.market.id))
+        .may_load(storage, (&sender, &market.id))
         .context("Could not load old shares")?
         .map(NonZero::raw)
         .unwrap_or_default();
     let mut totals = crate::state::TOTALS
-        .may_load(storage, &market_state.market.id)
+        .may_load(storage, &market.id)
         .context("Could not load old total shares")?
         .unwrap_or_default();
     let position_info = PositionsInfo::load();
     let new_shares = totals.add_collateral(funds, &position_info)?;
     let sender_shares = new_shares.checked_add(sender_shares)?;
-    crate::state::SHARES.save(storage, (&sender, &market_state.market.id), &sender_shares)?;
-    crate::state::TOTALS.save(storage, &market_state.market.id, &totals)?;
+    crate::state::SHARES.save(storage, (&sender, &market.id), &sender_shares)?;
+    crate::state::TOTALS.save(storage, &market.id, &totals)?;
 
     Ok(Response::new().add_event(
         Event::new("deposit")
@@ -185,11 +186,11 @@ fn deposit(
 fn withdraw(
     storage: &mut dyn Storage,
     sender: Addr,
-    market_state: MarketState,
+    market: MarketInfo,
     amount: NonZero<LpToken>,
 ) -> Result<Response> {
     let sender_shares = crate::state::SHARES
-        .may_load(storage, (&sender, &market_state.market.id))
+        .may_load(storage, (&sender, &market.id))
         .context("Could not load old shares")?
         .map(NonZero::raw)
         .unwrap_or_default();
@@ -198,26 +199,23 @@ fn withdraw(
         "Insufficient shares. You have {sender_shares}, but tried to withdraw {amount}"
     );
     let mut totals = crate::state::TOTALS
-        .may_load(storage, &market_state.market.id)
+        .may_load(storage, &market.id)
         .context("Could not load old total shares")?
         .unwrap_or_default();
     let position_info = PositionsInfo::load();
     let collateral = totals.remove_collateral(amount, &position_info)?;
     let sender_shares = sender_shares.checked_sub(amount.raw())?;
     match NonZero::new(sender_shares) {
-        None => crate::state::SHARES.remove(storage, (&sender, &market_state.market.id)),
-        Some(sender_shares) => crate::state::SHARES.save(
-            storage,
-            (&sender, &market_state.market.id),
-            &sender_shares,
-        )?,
+        None => crate::state::SHARES.remove(storage, (&sender, &market.id)),
+        Some(sender_shares) => {
+            crate::state::SHARES.save(storage, (&sender, &market.id), &sender_shares)?
+        }
     }
-    crate::state::TOTALS.save(storage, &market_state.market.id, &totals)?;
+    crate::state::TOTALS.save(storage, &market.id, &totals)?;
 
     let collateral =
         NonZero::new(collateral).context("Action would result in 0 collateral transferred")?;
-    let msg = market_state
-        .market
+    let msg = market
         .token
         .into_transfer_msg(&sender, collateral)?
         .context("Collateral amount would be less than the chain's minimum representation")?;

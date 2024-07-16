@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary> {
-    let state = crate::types::State::load(deps.api, deps.querier, deps.storage)?;
+    let (state, storage) = crate::types::State::load(deps)?;
     match msg {
         QueryMsg::Config {} => {
             to_json_binary(&state.config).context("Unable to render Config to JSON")
@@ -30,7 +30,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary> {
                     }
                     Some(res) => {
                         let (market_id, shares) = res?;
-                        let market_info = state.load_market_info(deps.storage, &market_id)?.0;
+                        let market_info = state.load_market_info(storage, &market_id)?;
                         let totals = crate::state::TOTALS
                             .may_load(deps.storage, &market_id)?
                             .with_context(|| {
@@ -68,6 +68,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary> {
             })
             .map_err(Into::into)
         }
-        QueryMsg::HasWork { market } => todo!(),
+        QueryMsg::HasWork { market: _ } => todo!(),
     }
 }

@@ -1,5 +1,3 @@
-use cosmwasm_std::{Empty, QuerierWrapper};
-
 use crate::prelude::*;
 
 /// Total LP share information for a single market.
@@ -20,11 +18,6 @@ pub(crate) struct State<'a> {
     pub(crate) api: &'a dyn Api,
     pub(crate) config: Config,
     pub(crate) querier: QuerierWrapper<'a, Empty>,
-}
-
-pub(crate) struct MarketState<'a> {
-    pub(crate) state: State<'a>,
-    pub(crate) market: MarketInfo,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]

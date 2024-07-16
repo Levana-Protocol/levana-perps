@@ -1,22 +1,44 @@
 use crate::prelude::*;
 
 impl<'a> State<'a> {
-    pub(crate) fn load(
-        api: &'a dyn Api,
-        querier: QuerierWrapper<'a, Empty>,
+    pub(crate) fn load(deps: Deps<'a>) -> Result<(Self, &'a dyn Storage)> {
+        let config = crate::state::CONFIG
+            .load(deps.storage)
+            .context("Could not load config")?;
+        Ok((
+            State {
+                config,
+                api: deps.api,
+                querier: deps.querier,
+            },
+            deps.storage,
+        ))
+    }
+
+    pub(crate) fn load_mut(deps: DepsMut<'a>) -> Result<(Self, &'a mut dyn Storage)> {
+        let config = crate::state::CONFIG
+            .load(deps.storage)
+            .context("Could not load config")?;
+        Ok((
+            State {
+                config,
+                api: deps.api,
+                querier: deps.querier,
+            },
+            deps.storage,
+        ))
+    }
+
+    pub(crate) fn load_market_info(
+        &self,
         store: &dyn Storage,
-    ) -> Result<Self> {
-        Ok(State {
-            config: crate::state::CONFIG
-                .load(store)
-                .context("Could not load config")?,
-            api,
-            querier,
-        })
+        market_id: &MarketId,
+    ) -> Result<MarketInfo> {
+        self.load_market_info_inner(store, market_id).map(|x| x.0)
     }
 
     /// Returns true if loaded from the cache.
-    pub(crate) fn load_market_info(
+    fn load_market_info_inner(
         &self,
         store: &dyn Storage,
         market_id: &MarketId,
@@ -62,27 +84,19 @@ impl<'a> State<'a> {
         };
         Ok((info, false))
     }
-}
 
-impl<'a> MarketState<'a> {
-    pub(crate) fn load(deps: Deps<'a>, market_id: MarketId) -> Result<Self> {
-        let state = State::load(deps.api, deps.querier, deps.storage)?;
-        let (market, _) = state.load_market_info(deps.storage, &market_id)?;
-        Ok(MarketState { state, market })
-    }
-
-    pub(crate) fn load_mut(
-        deps: DepsMut<'a>,
-        market_id: MarketId,
-    ) -> Result<(Self, &mut dyn Storage)> {
-        let state = State::load(deps.api, deps.querier, deps.storage)?;
-        let (market, is_cached) = state.load_market_info(deps.storage, &market_id)?;
+    pub(crate) fn load_cache_market_info(
+        &self,
+        storage: &mut dyn Storage,
+        market_id: &MarketId,
+    ) -> Result<MarketInfo> {
+        let (market, is_cached) = self.load_market_info_inner(storage, market_id)?;
         if !is_cached {
             crate::state::MARKETS
-                .save(deps.storage, &market.id, &market)
+                .save(storage, &market.id, &market)
                 .context("Could not save cached markets info")?;
         }
-        Ok((MarketState { state, market }, deps.storage))
+        Ok(market)
     }
 }
 impl Totals {
