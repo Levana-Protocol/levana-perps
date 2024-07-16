@@ -19,11 +19,6 @@ impl RawAddr {
             .with_context(|| format!("Could not parse address: {self}"))
     }
 
-    /// Validate, but return the raw cosmwasm error
-    pub fn validate_raw(&self, api: &dyn Api) -> cosmwasm_std::StdResult<Addr> {
-        api.addr_validate(&self.0)
-    }
-
     /// View the raw underlying `str`.
     pub fn as_str(&self) -> &str {
         &self.0

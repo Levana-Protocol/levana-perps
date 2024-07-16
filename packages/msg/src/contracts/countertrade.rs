@@ -5,44 +5,6 @@ use std::fmt::Display;
 use cosmwasm_std::{Addr, Binary, Decimal256, Uint128};
 use shared::storage::{Collateral, LeverageToBase, LpToken, MarketId, NonZero, RawAddr};
 
-/// Countertrade-specific errrors.
-#[derive(thiserror::Error, Debug)]
-#[allow(missing_docs)]
-pub enum Error {
-    /// Wrap up underlying errors with context
-    #[error("{context}: {source}")]
-    Context {
-        /// Underlying error, serialized to a string
-        source: Box<dyn std::error::Error>,
-        /// User-friendly contextual string
-        context: String,
-    },
-    #[error("Invalid config found: {message}")]
-    InvalidConfig {
-        /// Message to display to the user
-        message: String,
-    },
-    #[error("Invalid migration: {message}")]
-    InvalidMigration {
-        /// Message to display to the user
-        message: String,
-    },
-    /// Funds were attached with a CW20 receive
-    #[error("Cannot attach native funds when sending a CW20 receive")]
-    FundsWithCw20,
-    #[error("Cannot use a CW20 receive inside another receive")]
-    ReceiveInsideReceive,
-    #[error("Cannot accept multiple fund denoms")]
-    MultipleNativeFunds,
-    #[error("Funds were attached when not necessary: {amount}{token}")]
-    UnnecessaryFunds { token: Token, amount: Uint128 },
-    #[error("No funds were provided, this message requires attached funds")]
-    MissingRequiredFunds,
-}
-
-/// A result with the error specialized to countertrade errors.
-pub type Result<T, E = Error> = std::result::Result<T, E>;
-
 /// Message for instantiating a new countertrade contract.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -80,19 +42,20 @@ pub struct Config {
 
 impl Config {
     /// Check validity of config values
-    pub fn check(&self) -> Result<()> {
+    pub fn check(&self) -> anyhow::Result<()> {
         if self.min_funding >= self.target_funding {
-            Err("Minimum funding must be strictly less than target")
+            Err(anyhow::anyhow!(
+                "Minimum funding must be strictly less than target"
+            ))
         } else if self.target_funding >= self.max_funding {
-            Err("Target funding must be strictly less than max")
+            Err(anyhow::anyhow!(
+                "Target funding must be strictly less than max"
+            ))
         } else if self.max_leverage.into_decimal256() < Decimal256::from_ratio(2u32, 1u32) {
-            Err("Max leverage must be at least 2")
+            Err(anyhow::anyhow!("Max leverage must be at least 2"))
         } else {
             Ok(())
         }
-        .map_err(|s| Error::InvalidConfig {
-            message: s.to_owned(),
-        })
     }
 }
 
@@ -164,6 +127,8 @@ pub enum QueryMsg {
         address: RawAddr,
         /// Value from [BalanceResp::next_start_after]
         start_after: Option<MarketId>,
+        /// How many values to return
+        limit: Option<u32>,
     },
     /// Check if the given market has any work to do
     ///
@@ -184,13 +149,13 @@ pub struct BalanceResp {
     pub next_start_after: Option<MarketId>,
 }
 /// Individual market response from [QueryMsg::Balance]
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub struct MarketBalance {
     /// Market where a balance is held
     pub market: MarketId,
     /// Token for this market
-    pub token: Token,
+    pub token: crate::token::Token,
     /// Shares of the pool held by this LP
     pub shares: NonZero<LpToken>,
     /// Collateral equivalent of these shares
@@ -200,7 +165,7 @@ pub struct MarketBalance {
 }
 
 /// Either a native token or CW20 contract
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Token {
     /// Native coin and its denom

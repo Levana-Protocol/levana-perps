@@ -1,5 +1,3 @@
-use msg::contracts::cw20::entry::MarketingInfoResponse;
-
 use crate::prelude::*;
 
 impl<'a> State<'a> {
@@ -18,7 +16,7 @@ impl<'a> State<'a> {
     }
 
     /// Returns true if loaded from the cache.
-    fn load_market_info(
+    pub(crate) fn load_market_info(
         &self,
         store: &dyn Storage,
         market_id: &MarketId,
@@ -85,5 +83,58 @@ impl<'a> MarketState<'a> {
                 .context("Could not save cached markets info")?;
         }
         Ok((MarketState { state, market }, deps.storage))
+    }
+}
+impl Totals {
+    /// Convert an amount of shares into collateral.
+    pub(crate) fn shares_to_collateral(
+        &self,
+        shares: LpToken,
+        pos: &PositionsInfo,
+    ) -> Result<Collateral> {
+        let collateral = self.collateral.checked_add(pos.active_collateral())?;
+        Ok(Collateral::from_decimal256(
+            shares
+                .into_decimal256()
+                .checked_mul(collateral.into_decimal256())?
+                .checked_div(self.shares.into_decimal256())?,
+        ))
+    }
+
+    /// Returns the newly minted share amount
+    pub(crate) fn add_collateral(
+        &mut self,
+        funds: NonZero<Collateral>,
+        pos: &PositionsInfo,
+    ) -> Result<NonZero<LpToken>> {
+        let collateral = self.collateral.checked_add(pos.active_collateral())?;
+        let new_shares = if collateral.is_zero() && self.shares.is_zero() {
+            NonZero::new(LpToken::from_decimal256(funds.into_decimal256()))
+                .expect("Impossible: NonZero to NonZero produced a 0")
+        } else if collateral.is_zero() || self.shares.is_zero() {
+            bail!("Invalid collateral/shares totals: {self:?}");
+        } else {
+            let new_shares = LpToken::from_decimal256(
+                funds
+                    .into_decimal256()
+                    .checked_mul(self.shares.into_decimal256())?
+                    .checked_div(self.collateral.into_decimal256())?,
+            );
+            NonZero::new(new_shares).context("new_shares ended up 0")?
+        };
+        self.collateral = self.collateral.checked_add(funds.raw())?;
+        self.shares = self.shares.checked_add(new_shares.raw())?;
+        Ok(new_shares)
+    }
+}
+
+impl PositionsInfo {
+    pub(crate) fn load() -> Self {
+        // FIXME
+        PositionsInfo {}
+    }
+
+    pub(crate) fn active_collateral(&self) -> Collateral {
+        Collateral::zero() // FIXME
     }
 }

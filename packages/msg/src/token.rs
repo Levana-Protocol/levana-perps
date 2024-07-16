@@ -56,6 +56,7 @@ impl From<Token> for TokenInit {
 /// the same business logic as contract math
 /// and don't worry at all about conversions or addresses/denoms
 #[cw_serde]
+#[derive(Eq)]
 pub enum Token {
     /// An asset controlled by a CW20 token.
     Cw20 {

@@ -3,7 +3,7 @@ use cosmwasm_std::{Empty, QuerierWrapper};
 use crate::prelude::*;
 
 /// Total LP share information for a single market.
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Default, Debug)]
 pub(crate) struct Totals {
     /// Total collateral still in this contract.
     ///
@@ -12,6 +12,9 @@ pub(crate) struct Totals {
     /// Total LP shares
     pub(crate) shares: LpToken,
 }
+
+/// Information about positions in the market contract.
+pub(crate) struct PositionsInfo {}
 
 pub(crate) struct State<'a> {
     pub(crate) api: &'a dyn Api,

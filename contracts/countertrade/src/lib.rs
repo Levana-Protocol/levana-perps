@@ -37,12 +37,10 @@ pub fn instantiate(
     }: InstantiateMsg,
 ) -> Result<Response> {
     let config = Config {
-        admin: admin
-            .validate_raw(deps.api)
-            .context("Invalid admin provided")?,
+        admin: admin.validate(deps.api).context("Invalid admin provided")?,
         pending_admin: None,
         factory: factory
-            .validate_raw(deps.api)
+            .validate(deps.api)
             .context("Invalid factory provided")?,
         min_funding: min_funding.unwrap_or_else(|| Decimal256::from_ratio(10u32, 100u32)),
         target_funding: target_funding.unwrap_or_else(|| Decimal256::from_ratio(40u32, 100u32)),
@@ -72,14 +70,16 @@ pub fn migrate(deps: DepsMut, _env: Env, MigrateMsg {}: MigrateMsg) -> Result<Re
         .context("Couldn't parse new contract version")?;
 
     if old_cw2.contract != CONTRACT_NAME {
-        Err(format!(
+        Err(anyhow!(
             "Mismatched contract migration name (from {} to {})",
-            old_cw2.contract, CONTRACT_NAME
+            old_cw2.contract,
+            CONTRACT_NAME
         ))
     } else if old_version > new_version {
-        Err(format!(
+        Err(anyhow!(
             "Cannot migrate contract from newer to older (from {} to {})",
-            old_cw2.version, CONTRACT_VERSION
+            old_cw2.version,
+            CONTRACT_VERSION
         ))
     } else {
         set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)
@@ -92,5 +92,4 @@ pub fn migrate(deps: DepsMut, _env: Env, MigrateMsg {}: MigrateMsg) -> Result<Re
             "new_contract_version" => CONTRACT_VERSION,
         })
     }
-    .map_err(|message| Error::InvalidMigration { message })
 }

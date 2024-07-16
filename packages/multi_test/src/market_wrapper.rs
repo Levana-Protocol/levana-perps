@@ -2295,6 +2295,29 @@ impl PerpsMarket {
         self.query_countertrade(&CountertradeQueryMsg::Config {})
     }
 
+    pub fn query_countertrade_balances(
+        &self,
+        user_addr: &Addr,
+    ) -> Result<Vec<msg::contracts::countertrade::MarketBalance>> {
+        let mut start_after = None;
+        let mut res = vec![];
+        loop {
+            let msg::contracts::countertrade::BalanceResp {
+                mut markets,
+                next_start_after,
+            } = self.query_countertrade(&CountertradeQueryMsg::Balance {
+                address: user_addr.into(),
+                start_after: start_after.take(),
+                limit: None,
+            })?;
+            res.append(&mut markets);
+            match next_start_after {
+                Some(next_start_after) => start_after = Some(next_start_after),
+                None => break Ok(res),
+            }
+        }
+    }
+
     pub fn exec_countertrade_mint_and_deposit(
         &self,
         user_addr: &Addr,
