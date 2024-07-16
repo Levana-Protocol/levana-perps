@@ -765,7 +765,7 @@ impl MarketConfigUpdates {
 
             let expected_dnf_cap = match max_leverage.to_string().parse::<u32>()? {
                 4 => "0.03",
-                6 => "0.025",
+                5 | 6 => "0.025",
                 10 => "0.015",
                 30 => "0.005",
                 50 => "0.0002",
