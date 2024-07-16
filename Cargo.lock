@@ -2247,6 +2247,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "levana_perpswap_cosmos_countertrade"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cosmwasm-std",
+ "cw-storage-plus",
+ "cw2",
+ "levana_perpswap_cosmos_msg",
+ "levana_perpswap_cosmos_shared",
+ "semver",
+ "serde",
+]
+
+[[package]]
 name = "levana_perpswap_cosmos_cw20"
 version = "0.1.0-beta.15"
 dependencies = [
@@ -2358,6 +2372,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -2425,6 +2440,7 @@ dependencies = [
  "cw-storage-plus",
  "cw2",
  "dotenv",
+ "levana_perpswap_cosmos_countertrade",
  "levana_perpswap_cosmos_cw20",
  "levana_perpswap_cosmos_factory",
  "levana_perpswap_cosmos_liquidity_token",
