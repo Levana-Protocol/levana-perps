@@ -20,11 +20,14 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary> {
                 Order::Ascending,
             );
             let mut markets = vec![];
-            let mut next_start_after = None;
             let limit = limit.map_or(10, |limit| usize::try_from(limit).unwrap());
+            let mut reached_end = false;
             while markets.len() <= limit {
                 match iter.next() {
-                    None => break,
+                    None => {
+                        reached_end = true;
+                        break;
+                    }
                     Some(res) => {
                         let (market_id, shares) = res?;
                         let market_info = state.load_market_info(deps.storage, &market_id)?.0;
@@ -51,6 +54,14 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary> {
                     }
                 }
             }
+            let next_start_after = (|| {
+                if reached_end {
+                    return None;
+                };
+                let last = markets.last()?;
+                iter.next()?.ok();
+                Some(last.market.clone())
+            })();
             to_json_binary(&BalanceResp {
                 markets,
                 next_start_after,
