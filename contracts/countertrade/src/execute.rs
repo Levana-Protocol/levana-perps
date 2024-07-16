@@ -253,7 +253,8 @@ fn accept_admin(mut state: State, storage: &mut dyn Storage, sender: Addr) -> Re
         state.config.pending_admin.as_ref() == Some(&sender),
         "Cannot accept admin, you're not currently the pending admin"
     );
-    let old_admin = std::mem::replace(&mut state.config.admin, sender.clone());
+    let old_admin = state.config.admin;
+    state.config.admin = sender.clone();
     state.config.pending_admin = None;
     crate::state::CONFIG.save(storage, &state.config)?;
     Ok(Response::new().add_event(
