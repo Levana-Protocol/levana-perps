@@ -7,6 +7,9 @@ members = [
     "contracts/market",
     "contracts/position_token",
 
+    # Support of the real protocol
+    "contracts/countertrade",
+
     # Testnet support contracts
     "contracts/cw20",
     "contracts/faucet",

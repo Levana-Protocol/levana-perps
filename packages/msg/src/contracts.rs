@@ -1,4 +1,5 @@
 //! Messages for each contract which is a part of perps.
+pub mod countertrade;
 pub mod cw20;
 pub mod factory;
 pub mod faucet;
