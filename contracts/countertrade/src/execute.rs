@@ -90,7 +90,7 @@ fn handle_funds(api: &dyn Api, mut info: MessageInfo, msg: ExecuteMsg) -> Result
                 })
             } else {
                 Err(anyhow!(
-                    "Cannot attached funds when performing a CW20 receive"
+                    "Cannot attach funds when performing a CW20 receive"
                 ))
             }
         }
