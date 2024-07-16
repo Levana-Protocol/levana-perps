@@ -36,14 +36,14 @@ impl Funds {
                             denom:denom2,
                             decimal_places:_,
                         },
-                    ) => ensure!(denom1==denom2, "Wrong denom provided. You sent {denom1}, but the contract expects {denom2}"),
+                    ) => ensure!(denom1 == denom2, "Wrong denom provided. You sent {denom1}, but the contract expects {denom2}"),
                     (
-                        Token::Cw20(_),
+                        Token::Cw20(addr1),
                         msg::token::Token::Cw20 {
-                            addr,
-                            decimal_places,
+                            addr:addr2,
+                            decimal_places:_,
                         },
-                    ) => todo!(),
+                    ) => ensure!(addr1.as_str() == addr2.as_str(), "Wrong CW20 used. You used {addr1}, but the contract expects {addr2}"),
                     (
                         Token::Cw20(_),
                         msg::token::Token::Native {
@@ -133,9 +133,18 @@ pub fn execute(deps: DepsMut, _env: Env, info: MessageInfo, msg: ExecuteMsg) -> 
             let (market_state, storage) = MarketState::load_mut(deps, market)?;
             withdraw(storage, sender, market_state, amount)
         }
-        ExecuteMsg::Balance { market } => todo!(),
-        ExecuteMsg::AppointAdmin { admin } => todo!(),
-        ExecuteMsg::AcceptAdmin {} => todo!(),
+        ExecuteMsg::Crank { market } => todo!(),
+        ExecuteMsg::AppointAdmin { admin } => {
+            funds.require_none()?;
+            let state = State::load(deps.api, deps.querier, deps.storage)?;
+            let admin = admin.validate(deps.api)?;
+            appoint_admin(state, deps.storage, sender, admin)
+        }
+        ExecuteMsg::AcceptAdmin {} => {
+            funds.require_none()?;
+            let state = State::load(deps.api, deps.querier, deps.storage)?;
+            accept_admin(state, deps.storage, sender)
+        }
         ExecuteMsg::UpdateConfig(_) => todo!(),
     }
 }
@@ -217,4 +226,37 @@ fn withdraw(
                 .add_attribute("burned-shares", amount.to_string()),
         )
         .add_message(msg))
+}
+
+fn appoint_admin(
+    mut state: State,
+    storage: &mut dyn Storage,
+    sender: Addr,
+    new_admin: Addr,
+) -> Result<Response> {
+    ensure!(
+        state.config.admin == sender,
+        "You are not the admin, you cannot appoint a new admin"
+    );
+    state.config.pending_admin = Some(new_admin.clone());
+    crate::state::CONFIG.save(storage, &state.config)?;
+    Ok(
+        Response::new()
+            .add_event(Event::new("appoint_admin").add_attribute("new-admin", new_admin)),
+    )
+}
+
+fn accept_admin(mut state: State, storage: &mut dyn Storage, sender: Addr) -> Result<Response> {
+    ensure!(
+        state.config.pending_admin.as_ref() == Some(&sender),
+        "Cannot accept admin, you're not currently the pending admin"
+    );
+    let old_admin = std::mem::replace(&mut state.config.admin, sender.clone());
+    state.config.pending_admin = None;
+    crate::state::CONFIG.save(storage, &state.config)?;
+    Ok(Response::new().add_event(
+        Event::new("accept_admin")
+            .add_attribute("old-admin", old_admin)
+            .add_attribute("new-admin", sender),
+    ))
 }

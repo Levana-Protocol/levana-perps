@@ -98,7 +98,7 @@ pub enum ExecuteMsg {
         market: MarketId,
     },
     /// Perform a balancing operation on the given market
-    Balance {
+    Crank {
         /// Which markets to balance
         market: MarketId,
     },

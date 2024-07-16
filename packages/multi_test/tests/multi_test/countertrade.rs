@@ -99,3 +99,22 @@ fn withdraw_no_positions() {
     assert_eq!(collateral.to_string(), "100");
     assert_eq!(pool_size.to_string(), "150");
 }
+
+#[test]
+fn change_admin() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let lp0 = market.clone_lp(0).unwrap();
+    let lp1 = market.clone_lp(1).unwrap();
+
+    market.exec_countertrade_accept_admin(&lp0).unwrap_err();
+    market.exec_countertrade_appoint_admin(&lp0).unwrap();
+    market.exec_countertrade_accept_admin(&lp1).unwrap_err();
+    market.exec_countertrade_appoint_admin(&lp1).unwrap();
+    market.exec_countertrade_accept_admin(&lp0).unwrap_err();
+    market.exec_countertrade_accept_admin(&lp1).unwrap();
+    market.exec_countertrade_appoint_admin(&lp0).unwrap_err();
+
+    let config = market.query_countertrade_config().unwrap();
+    assert_eq!(config.admin, lp1);
+    assert_eq!(config.pending_admin, None);
+}
