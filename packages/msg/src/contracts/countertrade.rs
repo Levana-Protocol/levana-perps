@@ -94,6 +94,8 @@ pub enum ExecuteMsg {
     Withdraw {
         /// The number of LP shares to remove
         amount: NonZero<LpToken>,
+        /// Market to withdraw from
+        market: MarketId,
     },
     /// Perform a balancing operation on the given market
     Balance {

@@ -2334,6 +2334,29 @@ impl PerpsMarket {
         )?;
         self.exec_wasm_msg(user_addr, wasm_msg)
     }
+
+    fn exec_countertrade(
+        &self,
+        sender: &Addr,
+        msg: &CountertradeExecuteMsg,
+    ) -> Result<AppResponse> {
+        let contract_addr = self.app().countertrade_addr.clone();
+        let res = self
+            .app()
+            .execute_contract(sender.clone(), contract_addr, msg, &[])?;
+
+        Ok(res)
+    }
+
+    pub fn exec_countertrade_withdraw(&self, sender: &Addr, amount: &str) -> Result<AppResponse> {
+        self.exec_countertrade(
+            sender,
+            &CountertradeExecuteMsg::Withdraw {
+                amount: amount.parse()?,
+                market: self.id.clone(),
+            },
+        )
+    }
 }
 
 #[derive(Debug)]

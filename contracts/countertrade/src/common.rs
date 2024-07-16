@@ -126,6 +126,28 @@ impl Totals {
         self.shares = self.shares.checked_add(new_shares.raw())?;
         Ok(new_shares)
     }
+
+    /// Returns the collateral removed from the pool
+    pub(crate) fn remove_collateral(
+        &mut self,
+        amount: NonZero<LpToken>,
+        pos: &PositionsInfo,
+    ) -> Result<Collateral> {
+        let collateral = self.shares_to_collateral(amount.raw(), pos)?;
+        ensure!(
+            collateral <= self.collateral,
+            "Insufficient collateral for withdrawal. Requested: {collateral}. Available: {}",
+            self.collateral
+        );
+        ensure!(
+            amount.raw() <= self.shares,
+            "Insufficient shares for withdrawal. Requested: {amount}. Available: {}",
+            self.shares
+        );
+        self.collateral = self.collateral.checked_sub(collateral)?;
+        self.shares = self.shares.checked_sub(amount.raw())?;
+        Ok(collateral)
+    }
 }
 
 impl PositionsInfo {

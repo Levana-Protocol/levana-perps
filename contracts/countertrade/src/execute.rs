@@ -128,7 +128,11 @@ pub fn execute(deps: DepsMut, _env: Env, info: MessageInfo, msg: ExecuteMsg) -> 
             let funds = funds.require_some(&market_state)?;
             deposit(storage, sender, funds, market_state)
         }
-        ExecuteMsg::Withdraw { amount } => todo!(),
+        ExecuteMsg::Withdraw { amount, market } => {
+            funds.require_none()?;
+            let (market_state, storage) = MarketState::load_mut(deps, market)?;
+            withdraw(storage, sender, market_state, amount)
+        }
         ExecuteMsg::Balance { market } => todo!(),
         ExecuteMsg::AppointAdmin { admin } => todo!(),
         ExecuteMsg::AcceptAdmin {} => todo!(),
@@ -163,4 +167,54 @@ fn deposit(
             .add_attribute("collateral", funds.to_string())
             .add_attribute("new-shares", new_shares.to_string()),
     ))
+}
+
+fn withdraw(
+    storage: &mut dyn Storage,
+    sender: Addr,
+    market_state: MarketState,
+    amount: NonZero<LpToken>,
+) -> Result<Response> {
+    let sender_shares = crate::state::SHARES
+        .may_load(storage, (&sender, &market_state.market.id))
+        .context("Could not load old shares")?
+        .map(NonZero::raw)
+        .unwrap_or_default();
+    ensure!(
+        sender_shares >= amount.raw(),
+        "Insufficient shares. You have {sender_shares}, but tried to withdraw {amount}"
+    );
+    let mut totals = crate::state::TOTALS
+        .may_load(storage, &market_state.market.id)
+        .context("Could not load old total shares")?
+        .unwrap_or_default();
+    let position_info = PositionsInfo::load();
+    let collateral = totals.remove_collateral(amount, &position_info)?;
+    let sender_shares = sender_shares.checked_sub(amount.raw())?;
+    match NonZero::new(sender_shares) {
+        None => crate::state::SHARES.remove(storage, (&sender, &market_state.market.id)),
+        Some(sender_shares) => crate::state::SHARES.save(
+            storage,
+            (&sender, &market_state.market.id),
+            &sender_shares,
+        )?,
+    }
+    crate::state::TOTALS.save(storage, &market_state.market.id, &totals)?;
+
+    let collateral =
+        NonZero::new(collateral).context("Action would result in 0 collateral transferred")?;
+    let msg = market_state
+        .market
+        .token
+        .into_transfer_msg(&sender, collateral)?
+        .context("Collateral amount would be less than the chain's minimum representation")?;
+
+    Ok(Response::new()
+        .add_event(
+            Event::new("withdraw")
+                .add_attribute("lp", &sender)
+                .add_attribute("collateral", collateral.to_string())
+                .add_attribute("burned-shares", amount.to_string()),
+        )
+        .add_message(msg))
 }
