@@ -1,18 +1,16 @@
-use cosmwasm_std::Addr;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 
 #[test]
-fn sanity() {
+fn query_config() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    let referrer = market.clone_trader(0).unwrap();
-    let referee = market.clone_trader(1).unwrap();
 
-    assert_eq!(
-        market.query_referees(&referrer).unwrap(),
-        Vec::<Addr>::new()
-    );
+    market.query_countertrade_config().unwrap();
+}
 
-    assert_eq!(market.query_referrer(&referee).unwrap(), None);
+#[test]
+fn deposit() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let lp = market.clone_lp(0).unwrap();
 
-    todo!()
+    market.exec_countertrade_mint_and_deposit(&lp, "100").unwrap();
 }

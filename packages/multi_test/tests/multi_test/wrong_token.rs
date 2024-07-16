@@ -108,7 +108,7 @@ fn unrelated_native() {
     // We can only attach native funds for the market contract in non-CW20 markets.
     if let Token::Native { .. } = &market.token {
         let msg = match market
-            .make_msg_with_funds(
+            .make_market_msg_with_funds(
                 &MarketExecuteMsg::DepositLiquidity {
                     stake_to_xlp: false,
                 },

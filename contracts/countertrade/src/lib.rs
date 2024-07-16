@@ -1,5 +1,7 @@
+mod common;
 mod execute;
 mod prelude;
+mod query;
 mod state;
 mod types;
 
@@ -11,6 +13,7 @@ use semver::Version;
 use shared::storage::LeverageToBase;
 
 pub use execute::execute;
+pub use query::query;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "levana.finance:countertrade";
@@ -55,17 +58,6 @@ pub fn instantiate(
         .context("Setting contract version")?;
 
     Ok(Response::new())
-}
-
-#[entry_point]
-pub fn query(_deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary> {
-    match msg {
-        QueryMsg::Balance {
-            address,
-            start_after,
-        } => todo!(),
-        QueryMsg::NeedsBalance { market } => todo!(),
-    }
 }
 
 #[entry_point]

@@ -21,6 +21,10 @@ use cosmwasm_std::{
 };
 use cw_multi_test::{AppResponse, BankSudo, Executor, SudoMsg};
 use msg::bridge::{ClientToBridgeMsg, ClientToBridgeWrapper};
+use msg::contracts::countertrade::{
+    Config as CountertradeConfig, ExecuteMsg as CountertradeExecuteMsg,
+    QueryMsg as CountertradeQueryMsg,
+};
 use msg::contracts::cw20::entry::{
     BalanceResponse, ExecuteMsg as Cw20ExecuteMsg, QueryMsg as Cw20QueryMsg, TokenInfoResponse,
 };
@@ -444,25 +448,33 @@ impl PerpsMarket {
         self.exec_defer_wasm_msg(sender, msg)
     }
 
-    pub fn make_msg_with_funds(&self, msg: &MarketExecuteMsg, amount: Number) -> Result<WasmMsg> {
+    pub fn make_market_msg_with_funds(
+        &self,
+        msg: &MarketExecuteMsg,
+        amount: Number,
+    ) -> Result<WasmMsg> {
+        self.make_msg_with_funds(msg, amount, &self.addr)
+    }
+
+    fn make_msg_with_funds<T: Serialize + Clone + std::fmt::Debug>(
+        &self,
+        msg: &T,
+        amount: Number,
+        contract: &Addr,
+    ) -> Result<WasmMsg> {
         let amount = Collateral::from_decimal256(
             amount
                 .try_into_non_negative_value()
                 .context("funds must be positive!")?,
         );
 
-        let market_addr = self.addr.clone();
-
         Ok(match NonZero::new(amount) {
             None => WasmMsg::Execute {
-                contract_addr: market_addr.to_string(),
+                contract_addr: contract.to_string(),
                 msg: to_json_binary(msg)?,
                 funds: vec![],
             },
-            Some(amount) => {
-                self.token
-                    .into_market_execute_msg(&market_addr, amount.raw(), msg.clone())?
-            }
+            Some(amount) => self.token.into_execute_msg(contract, amount.raw(), &msg)?,
         })
     }
 
@@ -472,7 +484,7 @@ impl PerpsMarket {
         msg: &MarketExecuteMsg,
         amount: Number,
     ) -> Result<AppResponse> {
-        let wasm_msg = self.make_msg_with_funds(msg, amount)?;
+        let wasm_msg = self.make_market_msg_with_funds(msg, amount)?;
         self.exec_wasm_msg(sender, wasm_msg)
     }
 
@@ -2266,6 +2278,38 @@ impl PerpsMarket {
     pub fn exec_defer_wasm_msg(&self, sender: &Addr, msg: WasmMsg) -> Result<DeferResponse> {
         let queue_res = self.exec_defer_queue_wasm_msg(sender, msg)?;
         self.exec_defer_queue_process(sender, queue_res, None)
+    }
+
+    pub(crate) fn query_countertrade<T: DeserializeOwned>(
+        &self,
+        msg: &CountertradeQueryMsg,
+    ) -> Result<T> {
+        let contract_addr = self.app().countertrade_addr.clone();
+        self.app()
+            .wrap()
+            .query_wasm_smart(contract_addr, &msg)
+            .map_err(|err| err.into())
+    }
+
+    pub fn query_countertrade_config(&self) -> Result<CountertradeConfig> {
+        self.query_countertrade(&CountertradeQueryMsg::Config {})
+    }
+
+    pub fn exec_countertrade_mint_and_deposit(
+        &self,
+        user_addr: &Addr,
+        amount: &str,
+    ) -> Result<AppResponse> {
+        let amount: Collateral = amount.parse()?;
+        self.exec_mint_tokens(user_addr, amount.into_number())?;
+        let wasm_msg = self.make_msg_with_funds(
+            &CountertradeExecuteMsg::Deposit {
+                market: self.id.clone(),
+            },
+            amount.into_number(),
+            &self.app().countertrade_addr,
+        )?;
+        self.exec_wasm_msg(user_addr, wasm_msg)
     }
 }
 

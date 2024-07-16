@@ -14,10 +14,45 @@ impl Funds {
         }
     }
 
-    fn require_some(self, market: MarketId) -> Result<Collateral> {
+    fn require_some(self, market_state: &MarketState) -> Result<Collateral> {
         match self {
             Funds::NoFunds => Err(Error::MissingRequiredFunds),
             Funds::Funds { token, amount } => {
+                match (token, &market_state.market.token) {
+                    (
+                        Token::Native(_),
+                        msg::token::Token::Cw20 {
+                            addr,
+                            decimal_places,
+                        },
+                    ) => todo!(),
+                    (
+                        Token::Native(_),
+                        msg::token::Token::Native {
+                            denom,
+                            decimal_places,
+                        },
+                    ) => todo!(),
+                    (
+                        Token::Cw20(_),
+                        msg::token::Token::Cw20 {
+                            addr,
+                            decimal_places,
+                        },
+                    ) => todo!(),
+                    (
+                        Token::Cw20(_),
+                        msg::token::Token::Native {
+                            denom,
+                            decimal_places,
+                        },
+                    ) => todo!(),
+                }
+                let collateral = market_state
+                    .market
+                    .token
+                    .from_u128(amount.u128())
+                    .context("Error converting token amount to Collateral")?;
                 todo!()
             }
         }
@@ -81,21 +116,9 @@ pub fn execute(deps: DepsMut, _env: Env, info: MessageInfo, msg: ExecuteMsg) -> 
     match msg {
         ExecuteMsg::Receive { .. } => Err(Error::ReceiveInsideReceive),
         ExecuteMsg::Deposit { market } => {
-            // let funds = funds.require_some()?;
-            todo!()
-            // deposit(deps, sender, funds, market)
-            // let old_shares = crate::state::SHARES
-            //     .may_load(deps.storage, (&info.sender, &market))
-            //     .context("Could not load old shares")?
-            //     .map(NonZero::raw)
-            //     .unwrap_or_default();
-            // let old_total = crate::state::TOTALS
-            //     .may_load(deps.storage, &market)
-            //     .context("Could not load old total shares")?
-            //     .map(NonZero::raw)
-            //     .unwrap_or_default();
-            // todo!()
-            // // let old_collateral = COLLATERAL
+            let (market_state, storage) = MarketState::load_mut(deps, market)?;
+            let funds = funds.require_some(&market_state)?;
+            deposit(storage, sender, funds, market_state)
         }
         ExecuteMsg::Withdraw { amount } => todo!(),
         ExecuteMsg::Balance { market } => todo!(),
@@ -105,6 +128,23 @@ pub fn execute(deps: DepsMut, _env: Env, info: MessageInfo, msg: ExecuteMsg) -> 
     }
 }
 
-fn deposit(deps: DepsMut, sender: Addr, funds: Collateral, market: MarketId) -> Result<Response> {
+fn deposit(
+    storage: &mut dyn Storage,
+    sender: Addr,
+    funds: Collateral,
+    market_state: MarketState,
+) -> Result<Response> {
     todo!()
+    // let old_shares = crate::state::SHARES
+    //     .may_load(deps.storage, (&info.sender, &market))
+    //     .context("Could not load old shares")?
+    //     .map(NonZero::raw)
+    //     .unwrap_or_default();
+    // let old_total = crate::state::TOTALS
+    //     .may_load(deps.storage, &market)
+    //     .context("Could not load old total shares")?
+    //     .map(NonZero::raw)
+    //     .unwrap_or_default();
+    // todo!()
+    // // let old_collateral = COLLATERAL
 }

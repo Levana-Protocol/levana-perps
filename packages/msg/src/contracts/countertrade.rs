@@ -152,6 +152,10 @@ pub enum ExecuteMsg {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
+    /// Get the current config
+    ///
+    /// Returns [Config]
+    Config {},
     /// Check the balance of an address for all markets.
     ///
     /// Returns [BalanceResp]
@@ -161,8 +165,10 @@ pub enum QueryMsg {
         /// Value from [BalanceResp::next_start_after]
         start_after: Option<MarketId>,
     },
-    /// Check if the given market has any balancing work to do
-    NeedsBalance {
+    /// Check if the given market has any work to do
+    ///
+    /// Returns [HasWork]
+    HasWork {
         /// Which market to check
         market: MarketId,
     },
