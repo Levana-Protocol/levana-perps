@@ -1,5 +1,6 @@
+use cosmwasm_std::Decimal256;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::contracts::countertrade::MarketBalance;
+use msg::contracts::countertrade::{ConfigUpdate, MarketBalance};
 
 #[test]
 fn query_config() {
@@ -117,4 +118,44 @@ fn change_admin() {
     let config = market.query_countertrade_config().unwrap();
     assert_eq!(config.admin, lp1);
     assert_eq!(config.pending_admin, None);
+}
+
+#[test]
+fn update_config() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let lp0 = market.clone_lp(0).unwrap();
+
+    let min_funding: Decimal256 = "0.0314".parse().unwrap();
+
+    assert_ne!(
+        market.query_countertrade_config().unwrap().min_funding,
+        min_funding
+    );
+
+    market
+        .exec_countertrade_update_config(ConfigUpdate {
+            min_funding: Some(min_funding),
+            ..Default::default()
+        })
+        .unwrap();
+
+    assert_eq!(
+        market.query_countertrade_config().unwrap().min_funding,
+        min_funding
+    );
+
+    market.exec_countertrade_appoint_admin(&lp0).unwrap();
+    market.exec_countertrade_accept_admin(&lp0).unwrap();
+
+    market
+        .exec_countertrade_update_config(ConfigUpdate {
+            min_funding: Some("4".parse().unwrap()),
+            ..Default::default()
+        })
+        .unwrap_err();
+
+    assert_eq!(
+        market.query_countertrade_config().unwrap().min_funding,
+        min_funding
+    );
 }

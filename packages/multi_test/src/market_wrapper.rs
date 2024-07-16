@@ -2371,6 +2371,14 @@ impl PerpsMarket {
     pub fn exec_countertrade_accept_admin(&self, new_admin: &Addr) -> Result<AppResponse> {
         self.exec_countertrade(new_admin, &CountertradeExecuteMsg::AcceptAdmin {})
     }
+
+    pub fn exec_countertrade_update_config(
+        &self,
+        update: msg::contracts::countertrade::ConfigUpdate,
+    ) -> Result<AppResponse> {
+        let owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
+        self.exec_countertrade(&owner, &CountertradeExecuteMsg::UpdateConfig(update))
+    }
 }
 
 #[derive(Debug)]

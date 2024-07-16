@@ -145,7 +145,11 @@ pub fn execute(deps: DepsMut, _env: Env, info: MessageInfo, msg: ExecuteMsg) -> 
             let state = State::load(deps.api, deps.querier, deps.storage)?;
             accept_admin(state, deps.storage, sender)
         }
-        ExecuteMsg::UpdateConfig(_) => todo!(),
+        ExecuteMsg::UpdateConfig(config_update) => {
+            funds.require_none()?;
+            let state = State::load(deps.api, deps.querier, deps.storage)?;
+            update_config(state, deps.storage, sender, config_update)
+        }
     }
 }
 
@@ -259,4 +263,54 @@ fn accept_admin(mut state: State, storage: &mut dyn Storage, sender: Addr) -> Re
             .add_attribute("old-admin", old_admin)
             .add_attribute("new-admin", sender),
     ))
+}
+
+fn update_config(
+    mut state: State,
+    storage: &mut dyn Storage,
+    sender: Addr,
+    ConfigUpdate {
+        min_funding,
+        target_funding,
+        max_funding,
+        max_leverage,
+    }: ConfigUpdate,
+) -> Result<Response> {
+    ensure!(
+        state.config.admin == sender,
+        "You are not the admin, you cannot update the config"
+    );
+
+    let mut event = Event::new("update_config");
+
+    if let Some(min_funding) = min_funding {
+        event = event.add_attribute("old-min-funding", state.config.min_funding.to_string());
+        event = event.add_attribute("new-min-funding", min_funding.to_string());
+        state.config.min_funding = min_funding;
+    }
+
+    if let Some(target_funding) = target_funding {
+        event = event.add_attribute(
+            "old-target-funding",
+            state.config.target_funding.to_string(),
+        );
+        event = event.add_attribute("new-target-funding", target_funding.to_string());
+        state.config.target_funding = target_funding;
+    }
+
+    if let Some(max_funding) = max_funding {
+        event = event.add_attribute("old-max-funding", state.config.max_funding.to_string());
+        event = event.add_attribute("new-max-funding", max_funding.to_string());
+        state.config.max_funding = max_funding;
+    }
+
+    if let Some(max_leverage) = max_leverage {
+        event = event.add_attribute("old-max-funding", state.config.max_leverage.to_string());
+        event = event.add_attribute("new-max-funding", max_leverage.to_string());
+        state.config.max_leverage = max_leverage;
+    }
+
+    crate::state::CONFIG.save(storage, &state.config)?;
+
+    Ok(Response::new().add_event(event))
 }
