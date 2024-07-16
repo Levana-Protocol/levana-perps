@@ -1,6 +1,15 @@
-use std::{fmt::Display, sync::Arc, time::Duration};
+use std::{
+    cmp::{Ordering, Reverse},
+    fmt::Display,
+    fs::File,
+    io::BufReader,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
-use anyhow::{bail, Context};
+use anyhow::{anyhow, bail, ensure, Context};
+use chrono::{Days, NaiveDate, Utc};
 use shared::storage::MarketId;
 
 use crate::{
@@ -70,7 +79,7 @@ pub(crate) fn dnf_sensitivity_to_max_leverage(dnf_sensitivity: DnfInUsd) -> f64 
     }
 }
 
-#[derive(PartialOrd, PartialEq, Clone, serde::Serialize)]
+#[derive(PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct DnfInNotional(pub(crate) f64);
 
 impl Display for DnfInNotional {
@@ -94,12 +103,43 @@ impl DnfInNotional {
     }
 }
 
-#[derive(PartialOrd, PartialEq, Clone, serde::Serialize)]
+#[derive(PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct DnfInUsd(pub(crate) f64);
 
+#[derive(PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy)]
+pub(crate) struct MinDepthLiquidity(pub(crate) f64);
+
+impl MinDepthLiquidity {
+    pub(crate) fn new(num: f64) -> anyhow::Result<MinDepthLiquidity> {
+        if num.is_nan() {
+            Err(anyhow!("Invalid min depth liquidity"))
+        } else {
+            Ok(MinDepthLiquidity(num))
+        }
+    }
+}
+
+impl Eq for MinDepthLiquidity {}
+
+impl PartialOrd for MinDepthLiquidity {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for MinDepthLiquidity {
+    fn cmp(&self, other: &MinDepthLiquidity) -> Ordering {
+        // We assume that it doesn't contain NAN as part of its
+        // domain.
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub(crate) struct Dnf {
     pub(crate) dnf_in_notional: DnfInNotional,
     pub(crate) dnf_in_usd: DnfInUsd,
+    pub(crate) min_depth_liquidity: MinDepthLiquidity,
 }
 
 impl DnfInUsd {
@@ -129,13 +169,15 @@ pub(crate) async fn dnf_sensitivity(
             "Total exchanges found: {} for {market_id:?}",
             exchanges.len()
         );
-        let dnf_in_usd = compute_dnf_sensitivity(exchanges)?;
+        let dnf_result = compute_dnf_sensitivity(exchanges)?;
+        let dnf_in_usd = dnf_result.dnf;
         let dnf_in_base = dnf_in_usd
             .to_asset_amount(NotionalAsset(base_asset.0), http_app)
             .await?;
         return Ok(Dnf {
             dnf_in_notional: DnfInNotional(dnf_in_base),
             dnf_in_usd: DnfInUsd(dnf_in_usd.0),
+            min_depth_liquidity: MinDepthLiquidity::new(dnf_result.min_depth_liquidity)?,
         });
     }
 
@@ -152,10 +194,14 @@ pub(crate) async fn dnf_sensitivity(
     } else {
         base_dnf_in_usd
     };
-    let dnf_in_base = dnf_in_usd.to_asset_amount(notional_asset, http_app).await?;
+    let dnf_in_base = dnf_in_usd
+        .dnf
+        .to_asset_amount(notional_asset, http_app)
+        .await?;
     Ok(Dnf {
         dnf_in_notional: DnfInNotional(dnf_in_base),
-        dnf_in_usd: DnfInUsd(dnf_in_usd.0),
+        dnf_in_usd: DnfInUsd(dnf_in_usd.dnf.0),
+        min_depth_liquidity: MinDepthLiquidity::new(dnf_in_usd.min_depth_liquidity)?,
     })
 }
 
@@ -229,7 +275,13 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
     }
 }
 
-fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfInUsd> {
+#[derive(PartialOrd, PartialEq, Clone, serde::Serialize)]
+pub(crate) struct DnfResult {
+    pub(crate) dnf: DnfInUsd,
+    pub(crate) min_depth_liquidity: f64,
+}
+
+fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfResult> {
     // Algorithm: https://staff.levana.finance/new-market-checklist#dnf-sensitivity
     tracing::debug!("Total exchanges: {}", exchanges.len());
     let dnf_exchange = filter_invalid_exchanges(exchanges)?;
@@ -248,7 +300,11 @@ fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfI
         .depth_usd_negative_two
         .min(max_volume_exchange.depth_usd_positive_two);
     let dnf = (min_depth_liquidity / market_share) * 25.0;
-    Ok(DnfInUsd(dnf))
+    let result = DnfResult {
+        dnf: DnfInUsd(dnf),
+        min_depth_liquidity,
+    };
+    Ok(result)
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -294,13 +350,144 @@ pub(crate) fn compute_dnf_notify(
     }
 }
 
+fn get_market_file_path(market_id: &MarketId, data_dir: &Path) -> PathBuf {
+    let filename = format!("{market_id}_data.json");
+    data_dir.join(filename)
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub(crate) struct HistoricalData {
+    pub(crate) data: Vec<DnfRecord>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub(crate) struct DnfRecord {
+    pub(crate) date: NaiveDate,
+    pub(crate) result: Dnf,
+}
+
+impl HistoricalData {
+    pub(crate) fn is_present_until(&self, date: NaiveDate) -> bool {
+        let data = self.data.iter();
+        let mut now = Utc::now().date_naive();
+        while now > date {
+            let result = data.clone().any(|item| item.date == now);
+            if !result {
+                return false;
+            }
+            now = now - Days::new(1);
+        }
+        if self.data.is_empty() {
+            return false;
+        }
+        true
+    }
+
+    pub(crate) fn is_present_for_today(&self) -> bool {
+        let now = Utc::now().date_naive();
+        self.data.iter().any(|item| item.date == now)
+    }
+
+    pub(crate) fn append_and_save(
+        &mut self,
+        dnf: Dnf,
+        market_id: &MarketId,
+        data_dir: PathBuf,
+        days_to_consider: Option<u64>,
+    ) -> anyhow::Result<()> {
+        let now = Utc::now().date_naive();
+        if self.data.iter().any(|item| item.date == now) {
+            tracing::info!("Ignoring data insertion since it's already present");
+            return Ok(());
+        }
+        let result = DnfRecord {
+            date: now,
+            result: dnf,
+        };
+        self.data.push(result);
+        save_historical_data(market_id, data_dir, self.clone(), days_to_consider)
+    }
+
+    pub(crate) fn compute_dnf(&self, days_to_consider: u64) -> anyhow::Result<Dnf> {
+        let mut historical_data = self.till_days(Some(days_to_consider))?;
+        historical_data
+            .data
+            .sort_by_key(|item| Reverse(item.result.min_depth_liquidity));
+        let result = historical_data
+            .data
+            .into_iter()
+            .next()
+            .context("Empty historical data")?;
+        Ok(result.result)
+    }
+
+    pub(crate) fn till_days(
+        &self,
+        days_to_consider: Option<u64>,
+    ) -> anyhow::Result<HistoricalData> {
+        let days_to_consider = match days_to_consider {
+            Some(days) => days,
+            None => {
+                return Ok(HistoricalData {
+                    data: self.data.clone(),
+                })
+            }
+        };
+
+        let data = self.data.clone().into_iter();
+        let mut now = Utc::now().date_naive();
+        let mut required_dates = vec![];
+        for _ in 1..=days_to_consider {
+            required_dates.push(now);
+            now = now - Days::new(1);
+        }
+        let result: Vec<_> = data
+            .filter(|item| required_dates.contains(&item.date))
+            .collect();
+        ensure!(
+            result.len() == days_to_consider as usize,
+            "Historical data ({}) is not matching the total days for calcuation",
+            result.len()
+        );
+        Ok(HistoricalData { data: result })
+    }
+}
+
+pub(crate) fn load_historical_data(
+    market_id: &MarketId,
+    data_dir: PathBuf,
+) -> anyhow::Result<HistoricalData> {
+    let file = get_market_file_path(market_id, &data_dir);
+    if file.exists() {
+        let file = File::open(file)?;
+        let reader = BufReader::new(file);
+        let result = serde_json::from_reader(reader)?;
+        Ok(result)
+    } else {
+        Ok(HistoricalData { data: vec![] })
+    }
+}
+
+pub(crate) fn save_historical_data(
+    market_id: &MarketId,
+    data_dir: PathBuf,
+    data: HistoricalData,
+    untill: Option<u64>,
+) -> anyhow::Result<()> {
+    let path = get_market_file_path(market_id, &data_dir);
+    let data = data.till_days(untill)?;
+    let data = serde_json::to_string(&data)?;
+    fs_err::write(path, data.as_bytes())?;
+    Ok(())
+}
+
 pub(crate) async fn compute_coin_dnfs(
     app: Arc<NotifyApp>,
     serve_opt: ServeOpt,
     opt: Opt,
 ) -> anyhow::Result<()> {
     let http_app = HttpApp::new(Some(serve_opt.slack_webhook), opt.cmc_key.clone());
-
+    let data_dir = serve_opt.cmc_data_dir;
     loop {
         tracing::info!("Going to fetch market status from querier");
         let market_config = http_app
@@ -317,71 +504,97 @@ pub(crate) async fn compute_coin_dnfs(
         for market_id in &markets {
             let market_id = &market_id.status.market_id;
             tracing::info!("Going to compute DNF for {market_id:?}");
-            let configured_dnf = market_config
-                .get_chain_dnf(market_id)
-                .context(format!("No DNF configured for {market_id:?}"))?;
-            let configured_max_leverage = market_config
-                .get_chain_max_leverage(market_id)
-                .context(format!("No max_leverage configured for {market_id:?}"))?;
-            let dnf = dnf_sensitivity(&http_app, market_id).await;
-            let dnf = match dnf {
-                Ok(dnf) => dnf,
-                Err(ref error) => {
-                    if error.to_string().contains("Exchange type not known for id") {
-                        error_markets.push(market_id);
-                        continue;
-                    } else {
-                        dnf?
-                    }
-                }
-            };
-            let max_leverage = dnf_sensitivity_to_max_leverage(
-                configured_dnf
-                    .to_asset_amount(NotionalAsset(market_id.get_notional()), &http_app)
-                    .await?,
+            let now = Utc::now().date_naive();
+            let now_minus_days = now
+                .checked_sub_days(Days::new(serve_opt.cmc_data_age_days))
+                .context("Not able to do checked subtraction on current time")?;
+            let mut historical_data = load_historical_data(market_id, data_dir.clone())?;
+            tracing::info!(
+                "Fetched  historical data for {market_id}: {}",
+                historical_data.data.len()
             );
-            tracing::info!("Configured max_leverage for {market_id}: {configured_max_leverage}");
-            tracing::info!("Recommended max_leverage for {market_id}: {max_leverage}");
+            let data_present = historical_data.is_present_until(now_minus_days);
+            if data_present {
+                let configured_dnf = market_config
+                    .get_chain_dnf(market_id)
+                    .context(format!("No DNF configured for {market_id:?}"))?;
+                let configured_max_leverage = market_config
+                    .get_chain_max_leverage(market_id)
+                    .context(format!("No max_leverage configured for {market_id:?}"))?;
 
-            if configured_max_leverage != max_leverage {
-                http_app
-                    .send_notification(
-                        format!(
+                let max_leverage = dnf_sensitivity_to_max_leverage(
+                    configured_dnf
+                        .to_asset_amount(NotionalAsset(market_id.get_notional()), &http_app)
+                        .await?,
+                );
+                tracing::info!(
+                    "Configured max_leverage for {market_id}: {configured_max_leverage}"
+                );
+                tracing::info!("Recommended max_leverage for {market_id}: {max_leverage}");
+
+                if configured_max_leverage != max_leverage {
+                    http_app
+                        .send_notification(
+                            format!(
                             ":information_source: Recommended Max leverage change for {market_id}"
                         ),
-                        format!(
-                            "Configured Max leverage: *{}* \n Recommended Max leverage: *{}*",
-                            configured_max_leverage, max_leverage
-                        ),
-                    )
-                    .await?;
-            }
+                            format!(
+                                "Configured Max leverage: *{}* \n Recommended Max leverage: *{}*",
+                                configured_max_leverage, max_leverage
+                            ),
+                        )
+                        .await?;
+                }
 
-            let dnf_notify = compute_dnf_notify(
-                dnf.dnf_in_notional,
-                configured_dnf,
-                serve_opt.dnf_increase_threshold,
-                serve_opt.dnf_decrease_threshold,
-            );
-            tracing::info!(
-                "Percentage DNF deviation for {market_id}: {} %",
-                dnf_notify.percentage_diff
-            );
-            if dnf_notify.should_notify {
-                tracing::info!("Going to send Slack notification");
-                let percentage_diff = dnf_notify.percentage_diff.abs().round();
-                let (icon, status) = match dnf_notify.status {
-                    ConfiguredDnfStatus::Lenient => (
-                        ":chart_with_downwards_trend:",
-                        format!("lenient (*Decrease* it by {}%)", percentage_diff),
-                    ),
-                    ConfiguredDnfStatus::Strict => (
-                        ":chart_with_upwards_trend:",
-                        format!("strict (*Increase* it by {}%)", percentage_diff),
-                    ),
+                let present_today = historical_data.is_present_for_today();
+                let market_dnf = if present_today {
+                    historical_data.compute_dnf(serve_opt.cmc_data_age_days)?
+                } else {
+                    let dnf = dnf_sensitivity(&http_app, market_id).await;
+                    let dnf = match dnf {
+                        Ok(dnf) => dnf,
+                        Err(ref error) => {
+                            if error.to_string().contains("Exchange type not known for id") {
+                                error_markets.push(market_id);
+                                continue;
+                            } else {
+                                dnf?
+                            }
+                        }
+                    };
+                    historical_data.append_and_save(
+                        dnf,
+                        market_id,
+                        data_dir.clone(),
+                        Some(serve_opt.cmc_data_age_days),
+                    )?;
+                    historical_data.compute_dnf(serve_opt.cmc_data_age_days)?
                 };
+                let dnf_notify = compute_dnf_notify(
+                    market_dnf.dnf_in_notional,
+                    configured_dnf,
+                    serve_opt.dnf_increase_threshold,
+                    serve_opt.dnf_decrease_threshold,
+                );
+                tracing::info!(
+                    "Percentage DNF deviation for {market_id}: {} %",
+                    dnf_notify.percentage_diff
+                );
+                if dnf_notify.should_notify {
+                    tracing::info!("Going to send Slack notification");
+                    let percentage_diff = dnf_notify.percentage_diff.abs().round();
+                    let (icon, status) = match dnf_notify.status {
+                        ConfiguredDnfStatus::Lenient => (
+                            ":chart_with_downwards_trend:",
+                            format!("lenient (*Decrease* it by {}%)", percentage_diff),
+                        ),
+                        ConfiguredDnfStatus::Strict => (
+                            ":chart_with_upwards_trend:",
+                            format!("strict (*Increase* it by {}%)", percentage_diff),
+                        ),
+                    };
 
-                http_app
+                    http_app
                     .send_notification(
                         format!("{icon} Recommended DNF change for {market_id}"),
                         format!(
@@ -390,15 +603,35 @@ pub(crate) async fn compute_coin_dnfs(
                         ),
                     )
                     .await?;
+                }
+                tracing::info!(
+                    "Finished computing DNF for {market_id:?}: {} (Configured DNF: {})",
+                    dnf_notify.computed_dnf.0,
+                    dnf_notify.configured_dnf.0
+                );
+                app.market_params
+                    .write()
+                    .insert(market_id.clone(), dnf_notify);
+            } else {
+                // Compute todays data and save it
+                let dnf = dnf_sensitivity(&http_app, market_id).await;
+                let dnf = match dnf {
+                    Ok(dnf) => dnf,
+                    Err(ref error) => {
+                        if error.to_string().contains("Exchange type not known for id") {
+                            error_markets.push(market_id);
+                            continue;
+                        } else {
+                            dnf?
+                        }
+                    }
+                };
+                historical_data.append_and_save(dnf, market_id, data_dir.clone(), None)?;
+                tracing::info!(
+                    "Saving data for market {market_id} (Total: {})",
+                    historical_data.data.len()
+                );
             }
-            tracing::info!(
-                "Finished computing DNF for {market_id:?}: {} (Configured DNF: {})",
-                dnf_notify.computed_dnf.0,
-                dnf_notify.configured_dnf.0
-            );
-            app.market_params
-                .write()
-                .insert(market_id.clone(), dnf_notify);
             if serve_opt.cmc_wait_seconds > 0 {
                 tracing::info!(
                     "Going to sleep {} seconds to avoid getting rate limited",
@@ -448,7 +681,7 @@ mod tests {
             },
         ];
         let dnf = super::compute_dnf_sensitivity(exchanges).unwrap();
-        assert_eq!(dnf.0.round(), 268783.0, "Expected DNF");
+        assert_eq!(dnf.dnf.0.round(), 268783.0, "Expected DNF");
     }
 
     #[test]
