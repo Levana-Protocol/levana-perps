@@ -106,8 +106,20 @@ impl DnfInNotional {
 #[derive(PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct DnfInUsd(pub(crate) f64);
 
+impl Display for DnfInUsd {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy)]
 pub(crate) struct MinDepthLiquidity(pub(crate) f64);
+
+impl Display for MinDepthLiquidity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl MinDepthLiquidity {
     pub(crate) fn new(num: f64) -> anyhow::Result<MinDepthLiquidity> {
@@ -503,6 +515,7 @@ pub(crate) async fn compute_coin_dnfs(
 
         for market_id in &markets {
             let market_id = &market_id.status.market_id;
+            app.markets.write().insert(market_id.clone());
             tracing::info!("Going to compute DNF for {market_id:?}");
             let now = Utc::now().date_naive();
             let now_minus_days = now
