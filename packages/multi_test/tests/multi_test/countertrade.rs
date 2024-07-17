@@ -1,6 +1,9 @@
 use cosmwasm_std::Decimal256;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::contracts::countertrade::{ConfigUpdate, MarketBalance};
+use msg::{
+    contracts::countertrade::{ConfigUpdate, HasWorkResp, MarketBalance},
+    prelude::{DirectionToBase, Number, UnsignedDecimal},
+};
 
 #[test]
 fn query_config() {
@@ -157,5 +160,151 @@ fn update_config() {
     assert_eq!(
         market.query_countertrade_config().unwrap().min_funding,
         min_funding
+    );
+}
+
+#[test]
+fn has_no_work() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    let config = market.query_countertrade_config().unwrap();
+    let market_type = market.query_status().unwrap().market_type;
+
+    // Open up balanced positions
+    market
+        .exec_open_position_take_profit(
+            &trader,
+            "10",
+            // Deal with off-by-one leverage to ensure we have a balanced market
+            match market_type {
+                msg::prelude::MarketType::CollateralIsQuote => "5",
+                msg::prelude::MarketType::CollateralIsBase => "6",
+            },
+            DirectionToBase::Long,
+            None,
+            None,
+            msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+        )
+        .unwrap();
+    market
+        .exec_open_position_take_profit(
+            &trader,
+            "10",
+            match market_type {
+                msg::prelude::MarketType::CollateralIsQuote => "5",
+                msg::prelude::MarketType::CollateralIsBase => "4",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            msg::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+    let status = market.query_status().unwrap();
+    assert!(
+        status.long_funding < config.max_funding.into_signed(),
+        "Long funding rates are too high: {}. Need less than {}.",
+        status.long_funding,
+        config.max_funding
+    );
+    assert!(
+        status.short_funding < config.max_funding.into_signed(),
+        "Short funding rates are too high: {}. Need less than {}.",
+        status.short_funding,
+        config.max_funding
+    );
+    assert_eq!(status.long_funding, Number::zero());
+    assert_eq!(status.short_funding, Number::zero());
+
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+}
+
+#[test]
+fn detects_unbalanced_markets() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    // Make sure there are funds to open a position
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+
+    let config = market.query_countertrade_config().unwrap();
+    let market_type = market.query_status().unwrap().market_type;
+
+    // Open up unbalanced positions
+    market
+        .exec_open_position_take_profit(
+            &trader,
+            "10",
+            // Deal with off-by-one leverage to ensure we have a balanced market
+            match market_type {
+                msg::prelude::MarketType::CollateralIsQuote => "5",
+                msg::prelude::MarketType::CollateralIsBase => "6",
+            },
+            DirectionToBase::Long,
+            None,
+            None,
+            msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+        )
+        .unwrap();
+    market
+        .exec_open_position_take_profit(
+            &trader,
+            "10",
+            match market_type {
+                msg::prelude::MarketType::CollateralIsQuote => "3",
+                msg::prelude::MarketType::CollateralIsBase => "2",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            msg::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+    let status = market.query_status().unwrap();
+    assert!(
+        status.long_funding > config.max_funding.into_signed(),
+        "Long funding rates are not high enough: {}. Need greater than {}.",
+        status.long_funding,
+        config.max_funding
+    );
+    assert!(
+        status.short_funding < config.max_funding.into_signed(),
+        "Short funding rates are too high: {}. Need less than {}.",
+        status.short_funding,
+        config.max_funding
+    );
+
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::Work {
+            desc: msg::contracts::countertrade::WorkDescription::GoShort
+        }
     );
 }

@@ -134,7 +134,7 @@ pub enum QueryMsg {
     },
     /// Check if the given market has any work to do
     ///
-    /// Returns [HasWork]
+    /// Returns [HasWorkResp]
     HasWork {
         /// Which market to check
         market: MarketId,
@@ -183,6 +183,29 @@ impl Display for Token {
             Token::Cw20(addr) => f.write_str(addr.as_str()),
         }
     }
+}
+
+/// Whether or not there is work available.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum HasWorkResp {
+    /// No work is available
+    NoWork {},
+    /// There is work available to be done
+    Work {
+        /// A description of the work, for display and testing purposes.
+        desc: WorkDescription,
+    },
+}
+
+/// Work to be performed for a specific market.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkDescription {
+    /// Markets are too long
+    GoShort,
+    /// Markets are too short
+    GoLong,
 }
 
 /// Migration message, currently no fields needed

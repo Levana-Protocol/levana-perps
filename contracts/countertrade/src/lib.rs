@@ -4,6 +4,7 @@ mod prelude;
 mod query;
 mod state;
 mod types;
+mod work;
 
 use std::str::FromStr;
 

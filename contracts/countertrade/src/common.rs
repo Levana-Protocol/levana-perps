@@ -80,6 +80,7 @@ impl<'a> State<'a> {
 
         let info = MarketInfo {
             id: status.market_id,
+            addr: market_addr,
             token: status.collateral,
         };
         Ok((info, false))

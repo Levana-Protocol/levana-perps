@@ -23,5 +23,6 @@ pub(crate) struct State<'a> {
 #[derive(serde::Serialize, serde::Deserialize)]
 pub(crate) struct MarketInfo {
     pub(crate) id: MarketId,
+    pub(crate) addr: Addr,
     pub(crate) token: msg::token::Token,
 }

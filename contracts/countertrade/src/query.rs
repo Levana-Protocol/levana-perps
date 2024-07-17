@@ -68,6 +68,10 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary> {
             })
             .map_err(Into::into)
         }
-        QueryMsg::HasWork { market: _ } => todo!(),
+        QueryMsg::HasWork { market } => {
+            let market = state.load_market_info(storage, &market)?;
+            let work = crate::work::get_work_for(storage, &state, &market)?;
+            to_json_binary(&work).map_err(anyhow::Error::from)
+        }
     }
 }

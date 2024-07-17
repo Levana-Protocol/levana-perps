@@ -22,7 +22,7 @@ use cosmwasm_std::{
 use cw_multi_test::{AppResponse, BankSudo, Executor, SudoMsg};
 use msg::bridge::{ClientToBridgeMsg, ClientToBridgeWrapper};
 use msg::contracts::countertrade::{
-    Config as CountertradeConfig, ExecuteMsg as CountertradeExecuteMsg,
+    Config as CountertradeConfig, ExecuteMsg as CountertradeExecuteMsg, HasWorkResp,
     QueryMsg as CountertradeQueryMsg,
 };
 use msg::contracts::cw20::entry::{
@@ -2293,6 +2293,12 @@ impl PerpsMarket {
 
     pub fn query_countertrade_config(&self) -> Result<CountertradeConfig> {
         self.query_countertrade(&CountertradeQueryMsg::Config {})
+    }
+
+    pub fn query_countertrade_has_work(&self) -> Result<HasWorkResp> {
+        self.query_countertrade(&CountertradeQueryMsg::HasWork {
+            market: self.id.clone(),
+        })
     }
 
     pub fn query_countertrade_balances(
