@@ -70,7 +70,10 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary> {
         }
         QueryMsg::HasWork { market } => {
             let market = state.load_market_info(storage, &market)?;
-            let work = crate::work::get_work_for(storage, &state, &market)?;
+            let totals = crate::state::TOTALS
+                .may_load(storage, &market.id)?
+                .unwrap_or_default();
+            let work = crate::work::get_work_for(storage, &state, &market, &totals)?;
             to_json_binary(&work).map_err(anyhow::Error::from)
         }
     }
