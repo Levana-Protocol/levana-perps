@@ -159,7 +159,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                 .await
             {
                 Err(e) => log::warn!(
-                    "Unable to log tracker update for market contract {}: {e:?}",
+                    "Unable to log tracker update for market contract {}: {e}",
                     market.get_address()
                 ),
                 Ok(res) => log::info!(
@@ -191,7 +191,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                 .await
             {
                 Err(e) => {
-                    log::warn!("Unable to migrate position token contract {position_token}: {e:?}")
+                    log::warn!("Unable to migrate position token contract {position_token}: {e}")
                 }
                 Ok(res) => log::info!(
                     "Logged position token {market_id} update in tracker at: {}",
@@ -221,7 +221,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                     .await
                 {
                     Err(e) => {
-                        log::warn!("Unable to migrate {kind} liquidity token contract {lt}: {e:?}")
+                        log::warn!("Unable to migrate {kind} liquidity token contract {lt}: {e}")
                     }
                     Ok(res) => log::info!(
                         "Logged {kind} liquidity token {market_id} update in tracker at: {}",
