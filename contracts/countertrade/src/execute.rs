@@ -120,35 +120,35 @@ fn handle_funds(api: &dyn Api, mut info: MessageInfo, msg: ExecuteMsg) -> Result
 #[entry_point]
 pub fn execute(deps: DepsMut, _env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     let HandleFunds { funds, msg, sender } = handle_funds(deps.api, info, msg)?;
+    let (state, storage) = State::load_mut(deps)?;
     match msg {
         ExecuteMsg::Receive { .. } => Err(anyhow!("Cannot perform a receive within a receive")),
         ExecuteMsg::Deposit { market } => {
-            let (state, storage) = State::load_mut(deps)?;
             let market = state.load_cache_market_info(storage, &market)?;
             let funds = funds.require_some(&market)?;
             deposit(storage, sender, funds, &market)
         }
         ExecuteMsg::Withdraw { amount, market } => {
             funds.require_none()?;
-            let (state, storage) = State::load_mut(deps)?;
             let market = state.load_cache_market_info(storage, &market)?;
             withdraw(storage, sender, market, amount)
         }
-        ExecuteMsg::Crank { market: _ } => todo!(),
+        ExecuteMsg::DoWork { market } => {
+            funds.require_none()?;
+            let market = state.load_cache_market_info(storage, &market)?;
+            crate::work::execute(storage, state, market)
+        }
         ExecuteMsg::AppointAdmin { admin } => {
             funds.require_none()?;
-            let (state, storage) = State::load_mut(deps)?;
             let admin = admin.validate(state.api)?;
             appoint_admin(state, storage, sender, admin)
         }
         ExecuteMsg::AcceptAdmin {} => {
             funds.require_none()?;
-            let (state, storage) = State::load_mut(deps)?;
             accept_admin(state, storage, sender)
         }
         ExecuteMsg::UpdateConfig(config_update) => {
             funds.require_none()?;
-            let (state, storage) = State::load_mut(deps)?;
             update_config(state, storage, sender, config_update)
         }
     }

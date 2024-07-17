@@ -39,3 +39,24 @@ pub(crate) fn get_work_for(
         Ok(HasWorkResp::NoWork {})
     }
 }
+
+pub(crate) fn execute(
+    storage: &mut dyn Storage,
+    state: State,
+    market: MarketInfo,
+) -> Result<Response> {
+    let totals = crate::state::TOTALS
+        .may_load(storage, &market.id)?
+        .unwrap_or_default();
+
+    let work = get_work_for(storage, &state, &market, &totals)?;
+
+    let desc = match work {
+        HasWorkResp::NoWork {} => bail!("No work items available"),
+        HasWorkResp::Work { desc } => desc,
+    };
+
+    panic!("Cannot perform: {desc:#?}");
+
+    Ok(Response::new())
+}

@@ -2364,6 +2364,17 @@ impl PerpsMarket {
         )
     }
 
+    pub fn exec_countertrade_do_work(&self) -> Result<AppResponse> {
+        let owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
+        self.exec_countertrade(
+            // Could be anyone
+            &owner,
+            &CountertradeExecuteMsg::DoWork {
+                market: self.id.clone(),
+            },
+        )
+    }
+
     pub fn exec_countertrade_appoint_admin(&self, new_admin: &Addr) -> Result<AppResponse> {
         let owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
         self.exec_countertrade(
