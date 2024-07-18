@@ -11,3 +11,6 @@ pub(crate) const TOTALS: Map<&MarketId, Totals> = Map::new("totals");
 
 /// Local cache of markets information
 pub(crate) const MARKETS: Map<&MarketId, MarketInfo> = Map::new("markets");
+
+/// Which market is waiting for a reply
+pub(crate) const REPLY_MARKET: Item<MarketId> = Item::new("reply-market");
