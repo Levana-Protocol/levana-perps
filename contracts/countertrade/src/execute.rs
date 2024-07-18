@@ -22,36 +22,7 @@ impl Funds {
                 "Message requires attached funds, but none were provided"
             )),
             Funds::Funds { token, amount } => {
-                match (&token, &market.token) {
-                    (
-                        Token::Native(_),
-                        msg::token::Token::Cw20 {
-                            addr,
-                            ..
-                        },
-                    ) => bail!("Provided native funds, but market requires a CW20 (contract {addr})"),
-                    (
-                        Token::Native(denom1),
-                        msg::token::Token::Native {
-                            denom:denom2,
-                            decimal_places:_,
-                        },
-                    ) => ensure!(denom1 == denom2, "Wrong denom provided. You sent {denom1}, but the contract expects {denom2}"),
-                    (
-                        Token::Cw20(addr1),
-                        msg::token::Token::Cw20 {
-                            addr:addr2,
-                            decimal_places:_,
-                        },
-                    ) => ensure!(addr1.as_str() == addr2.as_str(), "Wrong CW20 used. You used {addr1}, but the contract expects {addr2}"),
-                    (
-                        Token::Cw20(_),
-                        msg::token::Token::Native {
-                            denom,
-                            ..
-                        },
-                    ) => bail!("Provided CW20 funds, but market requires native funds with denom {denom}"),
-                }
+                token.ensure_matches(&market.token)?;
                 let collateral = market
                     .token
                     .from_u128(amount.u128())

@@ -189,6 +189,49 @@ pub enum Token {
     /// CW20 contract and its address
     Cw20(Addr),
 }
+impl Token {
+    /// Ensure that the two versions of the token are compatible.
+    pub fn ensure_matches(&self, token: &crate::token::Token) -> anyhow::Result<()> {
+        match (self, token) {
+            (Token::Native(_), crate::token::Token::Cw20 { addr, .. }) => {
+                anyhow::bail!("Provided native funds, but market requires a CW20 (contract {addr})")
+            }
+            (
+                Token::Native(denom1),
+                crate::token::Token::Native {
+                    denom: denom2,
+                    decimal_places: _,
+                },
+            ) => {
+                if denom1 == denom2 {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!("Wrong denom provided. You sent {denom1}, but the contract expects {denom2}"))
+                }
+            }
+            (
+                Token::Cw20(addr1),
+                crate::token::Token::Cw20 {
+                    addr: addr2,
+                    decimal_places: _,
+                },
+            ) => {
+                if addr1.as_str() == addr2.as_str() {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Wrong CW20 used. You used {addr1}, but the contract expects {addr2}"
+                    ))
+                }
+            }
+            (Token::Cw20(_), crate::token::Token::Native { denom, .. }) => {
+                anyhow::bail!(
+                    "Provided CW20 funds, but market requires native funds with denom {denom}"
+                )
+            }
+        }
+    }
+}
 
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
