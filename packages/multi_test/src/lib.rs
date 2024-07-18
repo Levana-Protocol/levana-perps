@@ -356,13 +356,9 @@ pub(crate) fn contract_simple_oracle() -> Box<dyn Contract<Empty>> {
 
 pub(crate) fn contract_countertrade() -> Box<dyn Contract<Empty>> {
     Box::new(LocalContractWrapper::new(
-        |deps, env, info, msg| {
-            countertrade::instantiate(deps, env, info, msg).map_err(|e| anyhow::anyhow!("{e}"))
-        },
-        |deps, env, info, msg| {
-            countertrade::execute(deps, env, info, msg).map_err(|e| anyhow::anyhow!("{e}"))
-        },
-        |deps, env, msg| countertrade::query(deps, env, msg).map_err(|e| anyhow::anyhow!("{e}")),
+        countertrade::instantiate,
+        countertrade::execute,
+        countertrade::query,
     ))
 }
 

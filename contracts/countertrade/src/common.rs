@@ -1,7 +1,12 @@
+use msg::contracts::market::{
+    entry::PositionsQueryFeeApproach,
+    position::{PositionId, PositionsResp},
+};
+
 use crate::prelude::*;
 
 impl<'a> State<'a> {
-    pub(crate) fn load(deps: Deps<'a>) -> Result<(Self, &'a dyn Storage)> {
+    pub(crate) fn load(deps: Deps<'a>, env: Env) -> Result<(Self, &'a dyn Storage)> {
         let config = crate::state::CONFIG
             .load(deps.storage)
             .context("Could not load config")?;
@@ -10,12 +15,13 @@ impl<'a> State<'a> {
                 config,
                 api: deps.api,
                 querier: deps.querier,
+                my_addr: env.contract.address,
             },
             deps.storage,
         ))
     }
 
-    pub(crate) fn load_mut(deps: DepsMut<'a>) -> Result<(Self, &'a mut dyn Storage)> {
+    pub(crate) fn load_mut(deps: DepsMut<'a>, env: Env) -> Result<(Self, &'a mut dyn Storage)> {
         let config = crate::state::CONFIG
             .load(deps.storage)
             .context("Could not load config")?;
@@ -24,6 +30,7 @@ impl<'a> State<'a> {
                 config,
                 api: deps.api,
                 querier: deps.querier,
+                my_addr: env.contract.address,
             },
             deps.storage,
         ))
@@ -80,6 +87,7 @@ impl<'a> State<'a> {
 
         let info = MarketInfo {
             id: status.market_id,
+            addr: market_addr,
             token: status.collateral,
         };
         Ok((info, false))
@@ -106,7 +114,7 @@ impl Totals {
         shares: LpToken,
         pos: &PositionsInfo,
     ) -> Result<Collateral> {
-        let collateral = self.collateral.checked_add(pos.active_collateral())?;
+        let collateral = self.collateral.checked_add(pos.active_collateral()?)?;
         Ok(Collateral::from_decimal256(
             shares
                 .into_decimal256()
@@ -121,7 +129,7 @@ impl Totals {
         funds: NonZero<Collateral>,
         pos: &PositionsInfo,
     ) -> Result<NonZero<LpToken>> {
-        let collateral = self.collateral.checked_add(pos.active_collateral())?;
+        let collateral = self.collateral.checked_add(pos.active_collateral()?)?;
         let new_shares = if collateral.is_zero() && self.shares.is_zero() {
             NonZero::new(LpToken::from_decimal256(funds.into_decimal256()))
                 .expect("Impossible: NonZero to NonZero produced a 0")
@@ -165,12 +173,57 @@ impl Totals {
 }
 
 impl PositionsInfo {
-    pub(crate) fn load() -> Self {
-        // FIXME
-        PositionsInfo {}
+    pub(crate) fn load(state: &State, market: &MarketInfo) -> Result<Self> {
+        #[derive(serde::Deserialize)]
+        struct Resp {
+            tokens: Vec<PositionId>,
+        }
+        let Resp { tokens } = state.querier.query_wasm_smart(
+            &market.addr,
+            &MarketQueryMsg::NftProxy {
+                nft_msg: msg::contracts::position_token::entry::QueryMsg::Tokens {
+                    owner: state.my_addr.as_ref().into(),
+                    start_after: None,
+                    limit: None,
+                },
+            },
+        )?;
+
+        match tokens.first() {
+            None => Ok(Self::NoPositions),
+            Some(pos_id) => {
+                if tokens.len() > 1 {
+                    Ok(Self::TooManyPositions { to_close: *pos_id })
+                } else {
+                    let PositionsResp {
+                        mut positions,
+                        pending_close: _,
+                        closed: _,
+                    } = state.querier.query_wasm_smart(
+                        &market.addr,
+                        &MarketQueryMsg::Positions {
+                            position_ids: vec![*pos_id],
+                            skip_calc_pending_fees: None,
+                            fees: Some(PositionsQueryFeeApproach::Accumulated),
+                            price: None,
+                        },
+                    )?;
+                    match positions.pop() {
+                        Some(pos) => Ok(Self::OnePosition { pos:Box::new(pos)  }),
+                        None => Err(anyhow!("Our open position {pos_id} in {} is in an unhealthy state, waiting for cranks", market.id)),
+                    }
+                }
+            }
+        }
     }
 
-    pub(crate) fn active_collateral(&self) -> Collateral {
-        Collateral::zero() // FIXME
+    pub(crate) fn active_collateral(&self) -> Result<Collateral> {
+        match self {
+            PositionsInfo::TooManyPositions { to_close: _ } => bail!(
+                "Invalid state detected, multiple positions open. Perform work to close those."
+            ),
+            PositionsInfo::NoPositions => Ok(Collateral::zero()),
+            PositionsInfo::OnePosition { pos } => Ok(pos.active_collateral.raw()),
+        }
     }
 }

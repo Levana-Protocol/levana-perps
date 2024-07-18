@@ -6,6 +6,9 @@ pub(crate) use cosmwasm_std::{
 };
 pub(crate) use cw_storage_plus::{Bound, Item, Map};
 pub(crate) use msg::contracts::countertrade::*;
+pub(crate) use msg::contracts::market::entry::{
+    ExecuteMsg as MarketExecuteMsg, QueryMsg as MarketQueryMsg,
+};
 pub(crate) use shared::{
     attr_map,
     storage::{Collateral, LpToken, MarketId, NonZero, UnsignedDecimal},

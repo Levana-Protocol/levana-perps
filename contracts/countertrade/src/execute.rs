@@ -22,36 +22,7 @@ impl Funds {
                 "Message requires attached funds, but none were provided"
             )),
             Funds::Funds { token, amount } => {
-                match (&token, &market.token) {
-                    (
-                        Token::Native(_),
-                        msg::token::Token::Cw20 {
-                            addr,
-                            ..
-                        },
-                    ) => bail!("Provided native funds, but market requires a CW20 (contract {addr})"),
-                    (
-                        Token::Native(denom1),
-                        msg::token::Token::Native {
-                            denom:denom2,
-                            decimal_places:_,
-                        },
-                    ) => ensure!(denom1 == denom2, "Wrong denom provided. You sent {denom1}, but the contract expects {denom2}"),
-                    (
-                        Token::Cw20(addr1),
-                        msg::token::Token::Cw20 {
-                            addr:addr2,
-                            decimal_places:_,
-                        },
-                    ) => ensure!(addr1.as_str() == addr2.as_str(), "Wrong CW20 used. You used {addr1}, but the contract expects {addr2}"),
-                    (
-                        Token::Cw20(_),
-                        msg::token::Token::Native {
-                            denom,
-                            ..
-                        },
-                    ) => bail!("Provided CW20 funds, but market requires native funds with denom {denom}"),
-                }
+                token.ensure_matches(&market.token)?;
                 let collateral = market
                     .token
                     .from_u128(amount.u128())
@@ -118,37 +89,37 @@ fn handle_funds(api: &dyn Api, mut info: MessageInfo, msg: ExecuteMsg) -> Result
 }
 
 #[entry_point]
-pub fn execute(deps: DepsMut, _env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
+pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     let HandleFunds { funds, msg, sender } = handle_funds(deps.api, info, msg)?;
+    let (state, storage) = State::load_mut(deps, env)?;
     match msg {
         ExecuteMsg::Receive { .. } => Err(anyhow!("Cannot perform a receive within a receive")),
         ExecuteMsg::Deposit { market } => {
-            let (state, storage) = State::load_mut(deps)?;
             let market = state.load_cache_market_info(storage, &market)?;
             let funds = funds.require_some(&market)?;
-            deposit(storage, sender, funds, &market)
+            deposit(storage, state, sender, funds, market)
         }
         ExecuteMsg::Withdraw { amount, market } => {
             funds.require_none()?;
-            let (state, storage) = State::load_mut(deps)?;
             let market = state.load_cache_market_info(storage, &market)?;
-            withdraw(storage, sender, market, amount)
+            withdraw(storage, state, sender, market, amount)
         }
-        ExecuteMsg::Crank { market: _ } => todo!(),
+        ExecuteMsg::DoWork { market } => {
+            funds.require_none()?;
+            let market = state.load_cache_market_info(storage, &market)?;
+            crate::work::execute(storage, state, market)
+        }
         ExecuteMsg::AppointAdmin { admin } => {
             funds.require_none()?;
-            let (state, storage) = State::load_mut(deps)?;
             let admin = admin.validate(state.api)?;
             appoint_admin(state, storage, sender, admin)
         }
         ExecuteMsg::AcceptAdmin {} => {
             funds.require_none()?;
-            let (state, storage) = State::load_mut(deps)?;
             accept_admin(state, storage, sender)
         }
         ExecuteMsg::UpdateConfig(config_update) => {
             funds.require_none()?;
-            let (state, storage) = State::load_mut(deps)?;
             update_config(state, storage, sender, config_update)
         }
     }
@@ -156,9 +127,10 @@ pub fn execute(deps: DepsMut, _env: Env, info: MessageInfo, msg: ExecuteMsg) -> 
 
 fn deposit(
     storage: &mut dyn Storage,
+    state: State,
     sender: Addr,
     funds: NonZero<Collateral>,
-    market: &MarketInfo,
+    market: MarketInfo,
 ) -> Result<Response> {
     let sender_shares = crate::state::SHARES
         .may_load(storage, (&sender, &market.id))
@@ -169,7 +141,7 @@ fn deposit(
         .may_load(storage, &market.id)
         .context("Could not load old total shares")?
         .unwrap_or_default();
-    let position_info = PositionsInfo::load();
+    let position_info = PositionsInfo::load(&state, &market)?;
     let new_shares = totals.add_collateral(funds, &position_info)?;
     let sender_shares = new_shares.checked_add(sender_shares)?;
     crate::state::SHARES.save(storage, (&sender, &market.id), &sender_shares)?;
@@ -185,6 +157,7 @@ fn deposit(
 
 fn withdraw(
     storage: &mut dyn Storage,
+    state: State,
     sender: Addr,
     market: MarketInfo,
     amount: NonZero<LpToken>,
@@ -202,7 +175,7 @@ fn withdraw(
         .may_load(storage, &market.id)
         .context("Could not load old total shares")?
         .unwrap_or_default();
-    let position_info = PositionsInfo::load();
+    let position_info = PositionsInfo::load(&state, &market)?;
     let collateral = totals.remove_collateral(amount, &position_info)?;
     let sender_shares = sender_shares.checked_sub(amount.raw())?;
     match NonZero::new(sender_shares) {
@@ -244,7 +217,7 @@ fn appoint_admin(
     crate::state::CONFIG.save(storage, &state.config)?;
     Ok(
         Response::new()
-            .add_event(Event::new("appoint_admin").add_attribute("new-admin", new_admin)),
+            .add_event(Event::new("appoint-admin").add_attribute("new-admin", new_admin)),
     )
 }
 
@@ -258,7 +231,7 @@ fn accept_admin(mut state: State, storage: &mut dyn Storage, sender: Addr) -> Re
     state.config.pending_admin = None;
     crate::state::CONFIG.save(storage, &state.config)?;
     Ok(Response::new().add_event(
-        Event::new("accept_admin")
+        Event::new("accept-admin")
             .add_attribute("old-admin", old_admin)
             .add_attribute("new-admin", sender),
     ))
@@ -280,7 +253,7 @@ fn update_config(
         "You are not the admin, you cannot update the config"
     );
 
-    let mut event = Event::new("update_config");
+    let mut event = Event::new("update-config");
 
     if let Some(min_funding) = min_funding {
         event = event.add_attribute("old-min-funding", state.config.min_funding.to_string());

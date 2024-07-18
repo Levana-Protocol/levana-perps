@@ -3,7 +3,12 @@
 use std::fmt::Display;
 
 use cosmwasm_std::{Addr, Binary, Decimal256, Uint128};
-use shared::storage::{Collateral, LeverageToBase, LpToken, MarketId, NonZero, RawAddr};
+use shared::{
+    storage::{Collateral, LeverageToBase, LpToken, MarketId, NonZero, RawAddr},
+    time::Timestamp,
+};
+
+use super::market::position::{PositionId, PositionQueryResponse};
 
 /// Message for instantiating a new countertrade contract.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -98,7 +103,7 @@ pub enum ExecuteMsg {
         market: MarketId,
     },
     /// Perform a balancing operation on the given market
-    Crank {
+    DoWork {
         /// Which markets to balance
         market: MarketId,
     },
@@ -132,9 +137,18 @@ pub enum QueryMsg {
         /// How many values to return
         limit: Option<u32>,
     },
+    /// Check the status of a single market
+    ///
+    /// Returns [MarketsResp]
+    Markets {
+        /// Value from [MarketsResp::next_start_after]
+        start_after: Option<MarketId>,
+        /// How many values to return
+        limit: Option<u32>,
+    },
     /// Check if the given market has any work to do
     ///
-    /// Returns [HasWork]
+    /// Returns [HasWorkResp]
     HasWork {
         /// Which market to check
         market: MarketId,
@@ -175,6 +189,49 @@ pub enum Token {
     /// CW20 contract and its address
     Cw20(Addr),
 }
+impl Token {
+    /// Ensure that the two versions of the token are compatible.
+    pub fn ensure_matches(&self, token: &crate::token::Token) -> anyhow::Result<()> {
+        match (self, token) {
+            (Token::Native(_), crate::token::Token::Cw20 { addr, .. }) => {
+                anyhow::bail!("Provided native funds, but market requires a CW20 (contract {addr})")
+            }
+            (
+                Token::Native(denom1),
+                crate::token::Token::Native {
+                    denom: denom2,
+                    decimal_places: _,
+                },
+            ) => {
+                if denom1 == denom2 {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!("Wrong denom provided. You sent {denom1}, but the contract expects {denom2}"))
+                }
+            }
+            (
+                Token::Cw20(addr1),
+                crate::token::Token::Cw20 {
+                    addr: addr2,
+                    decimal_places: _,
+                },
+            ) => {
+                if addr1.as_str() == addr2.as_str() {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Wrong CW20 used. You used {addr1}, but the contract expects {addr2}"
+                    ))
+                }
+            }
+            (Token::Cw20(_), crate::token::Token::Native { denom, .. }) => {
+                anyhow::bail!(
+                    "Provided CW20 funds, but market requires native funds with denom {denom}"
+                )
+            }
+        }
+    }
+}
 
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -183,6 +240,73 @@ impl Display for Token {
             Token::Cw20(addr) => f.write_str(addr.as_str()),
         }
     }
+}
+
+/// Response from [QueryMsg::Markets]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub struct MarketsResp {
+    /// Market statuses in this batch
+    pub markets: Vec<MarketStatus>,
+    /// Next start_after value, if we have more markets
+    pub next_start_after: Option<MarketId>,
+}
+
+/// Status of a single market
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub struct MarketStatus {
+    /// Which market
+    pub id: MarketId,
+    /// Collateral held inside the contract
+    ///
+    /// Does not include active collateral of a position
+    pub collateral: Collateral,
+    /// Number of outstanding shares
+    pub shares: LpToken,
+    /// Our open position, if we have exactly one
+    pub position: Option<PositionQueryResponse>,
+    /// Do we have too many open positions?
+    pub too_many_positions: bool,
+}
+
+/// Whether or not there is work available.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum HasWorkResp {
+    /// No work is available
+    NoWork {},
+    /// There is work available to be done
+    Work {
+        /// A description of the work, for display and testing purposes.
+        desc: WorkDescription,
+    },
+}
+
+/// Work to be performed for a specific market.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkDescription {
+    /// Markets are too long
+    GoShort,
+    /// Markets are too short
+    GoLong,
+    /// Close an unnecessary position
+    ClosePosition {
+        /// Position to be closed
+        pos_id: PositionId,
+    },
+    /// Update collateral balance based on an already closed position
+    CollectClosedPosition {
+        /// Position that has already been closed
+        pos_id: PositionId,
+        /// Close time, used for constructing future cursors
+        close_time: Timestamp,
+        /// Active collateral that was sent back to our contract
+        active_collateral: Collateral,
+    },
+    /// All collateral exhausted, reset shares to 0
+    ResetShares,
 }
 
 /// Migration message, currently no fields needed

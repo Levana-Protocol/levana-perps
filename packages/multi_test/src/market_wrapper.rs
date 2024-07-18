@@ -22,7 +22,7 @@ use cosmwasm_std::{
 use cw_multi_test::{AppResponse, BankSudo, Executor, SudoMsg};
 use msg::bridge::{ClientToBridgeMsg, ClientToBridgeWrapper};
 use msg::contracts::countertrade::{
-    Config as CountertradeConfig, ExecuteMsg as CountertradeExecuteMsg,
+    Config as CountertradeConfig, ExecuteMsg as CountertradeExecuteMsg, HasWorkResp,
     QueryMsg as CountertradeQueryMsg,
 };
 use msg::contracts::cw20::entry::{
@@ -2280,6 +2280,10 @@ impl PerpsMarket {
         self.exec_defer_queue_process(sender, queue_res, None)
     }
 
+    pub fn get_countertrade_addr(&self) -> Addr {
+        self.app().countertrade_addr.clone()
+    }
+
     pub(crate) fn query_countertrade<T: DeserializeOwned>(
         &self,
         msg: &CountertradeQueryMsg,
@@ -2295,6 +2299,12 @@ impl PerpsMarket {
         self.query_countertrade(&CountertradeQueryMsg::Config {})
     }
 
+    pub fn query_countertrade_has_work(&self) -> Result<HasWorkResp> {
+        self.query_countertrade(&CountertradeQueryMsg::HasWork {
+            market: self.id.clone(),
+        })
+    }
+
     pub fn query_countertrade_balances(
         &self,
         user_addr: &Addr,
@@ -2307,6 +2317,27 @@ impl PerpsMarket {
                 next_start_after,
             } = self.query_countertrade(&CountertradeQueryMsg::Balance {
                 address: user_addr.into(),
+                start_after: start_after.take(),
+                limit: None,
+            })?;
+            res.append(&mut markets);
+            match next_start_after {
+                Some(next_start_after) => start_after = Some(next_start_after),
+                None => break Ok(res),
+            }
+        }
+    }
+
+    pub fn query_countertrade_markets(
+        &self,
+    ) -> Result<Vec<msg::contracts::countertrade::MarketStatus>> {
+        let mut start_after = None;
+        let mut res = vec![];
+        loop {
+            let msg::contracts::countertrade::MarketsResp {
+                mut markets,
+                next_start_after,
+            } = self.query_countertrade(&CountertradeQueryMsg::Markets {
                 start_after: start_after.take(),
                 limit: None,
             })?;
@@ -2353,6 +2384,17 @@ impl PerpsMarket {
             sender,
             &CountertradeExecuteMsg::Withdraw {
                 amount: amount.parse()?,
+                market: self.id.clone(),
+            },
+        )
+    }
+
+    pub fn exec_countertrade_do_work(&self) -> Result<AppResponse> {
+        let owner = Addr::unchecked(&TEST_CONFIG.protocol_owner);
+        self.exec_countertrade(
+            // Could be anyone
+            &owner,
+            &CountertradeExecuteMsg::DoWork {
                 market: self.id.clone(),
             },
         )

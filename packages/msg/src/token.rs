@@ -229,6 +229,15 @@ impl Token {
         }
     }
 
+    /// Round down to the supported precision of this token
+    pub fn round_down_to_precision(&self, amount: Collateral) -> Result<Collateral> {
+        self.from_u128(
+            self.into_u128(amount.into_decimal256())?
+                .unwrap_or_default(),
+        )
+        .map(Collateral::from_decimal256)
+    }
+
     /// helper function
     ///
     /// when we know for a fact we have a WalletSource::Cw20

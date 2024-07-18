@@ -1,1 +1,1 @@
-* Handle the 0 collateral case by wiping out balances
+* Unignore all the tests
