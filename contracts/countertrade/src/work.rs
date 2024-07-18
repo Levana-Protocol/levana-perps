@@ -1,6 +1,6 @@
 use cosmwasm_std::CosmosMsg;
 use msg::contracts::market::entry::{ClosedPositionCursor, ClosedPositionsResp, StatusResp};
-use shared::storage::PricePoint;
+use shared::storage::{DirectionToBase, PricePoint};
 
 use crate::prelude::*;
 
@@ -77,19 +77,30 @@ pub(crate) fn get_work_for(
         .query_wasm_smart(&market.addr, &MarketQueryMsg::Status { price: None })
         .context("Unable to query market status")?;
 
+    // We always close popular-side positions. Future potential optimization:
+    // reduce position size instead when possible.
+    if let Some(pos) = &pos {
+        let funding = match pos.direction_to_base {
+            DirectionToBase::Long => status.long_funding,
+            DirectionToBase::Short => status.short_funding,
+        };
+        // We close on 0 also
+        if funding.is_positive_or_zero() {
+            return Ok(HasWorkResp::Work {
+                desc: WorkDescription::ClosePosition { pos_id: pos.id },
+            });
+        }
+    }
+
     let collateral_in_usd = price.collateral_to_usd(totals.collateral);
     if collateral_in_usd < status.config.minimum_deposit_usd {
         return Ok(HasWorkResp::NoWork {});
     }
 
     if status.long_funding > state.config.max_funding.into_signed() {
-        Ok(HasWorkResp::Work {
-            desc: WorkDescription::GoShort,
-        })
+        todo!()
     } else if status.short_funding > state.config.max_funding.into_signed() {
-        Ok(HasWorkResp::Work {
-            desc: WorkDescription::GoLong,
-        })
+        todo!()
     } else {
         Ok(HasWorkResp::NoWork {})
     }
@@ -115,8 +126,12 @@ pub(crate) fn execute(
         .add_event(Event::new("work-desc").add_attribute("desc", format!("{desc:?}")));
 
     match desc {
-        WorkDescription::GoShort => todo!("go short"),
-        WorkDescription::GoLong => todo!("go long"),
+        WorkDescription::OpenPosition {
+            direction,
+            leverage,
+            collateral,
+            take_profit,
+        } => todo!("open position"),
         WorkDescription::ClosePosition { pos_id } => {
             res = res.add_event(
                 Event::new("close-position").add_attribute("position-id", pos_id.to_string()),
