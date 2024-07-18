@@ -3,7 +3,10 @@
 use std::fmt::Display;
 
 use cosmwasm_std::{Addr, Binary, Decimal256, Uint128};
-use shared::storage::{Collateral, LeverageToBase, LpToken, MarketId, NonZero, RawAddr};
+use shared::{
+    storage::{Collateral, LeverageToBase, LpToken, MarketId, NonZero, RawAddr},
+    time::Timestamp,
+};
 
 use super::market::position::{PositionId, PositionQueryResponse};
 
@@ -249,6 +252,15 @@ pub enum WorkDescription {
     ClosePosition {
         /// Position to be closed
         pos_id: PositionId,
+    },
+    /// Update collateral balance based on an already closed position
+    CollectClosedPosition {
+        /// Position that has already been closed
+        pos_id: PositionId,
+        /// Close time, used for constructing future cursors
+        close_time: Timestamp,
+        /// Active collateral that was sent back to our contract
+        active_collateral: Collateral,
     },
     /// All collateral exhausted, reset shares to 0
     ResetShares,

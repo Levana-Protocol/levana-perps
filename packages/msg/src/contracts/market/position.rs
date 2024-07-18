@@ -806,6 +806,13 @@ impl PositionId {
     pub fn u64(self) -> u64 {
         self.0.u64()
     }
+
+    /// Generate the next position ID
+    ///
+    /// Panics on overflow
+    pub fn next(self) -> Self {
+        PositionId((self.u64() + 1).into())
+    }
 }
 
 impl<'a> PrimaryKey<'a> for PositionId {

@@ -106,14 +106,6 @@ impl<'a> State<'a> {
         }
         Ok(market)
     }
-
-    /// Gets the raw balance of the tokens held in this contract.
-    ///
-    /// Does not distinguish between different markets or look at the market contract.
-    /// This is just about the countertrade holdings.
-    pub(crate) fn get_local_token_balance(&self, token: &msg::token::Token) -> Result<Collateral> {
-        token.query_balance(&self.querier, &self.my_addr)
-    }
 }
 impl Totals {
     /// Convert an amount of shares into collateral.
@@ -186,7 +178,7 @@ impl PositionsInfo {
         struct Resp {
             tokens: Vec<PositionId>,
         }
-        let Resp { mut tokens } = state.querier.query_wasm_smart(
+        let Resp { tokens } = state.querier.query_wasm_smart(
             &market.addr,
             &MarketQueryMsg::NftProxy {
                 nft_msg: msg::contracts::position_token::entry::QueryMsg::Tokens {
@@ -197,10 +189,12 @@ impl PositionsInfo {
             },
         )?;
 
-        match tokens.pop() {
+        match tokens.first() {
             None => Ok(Self::NoPositions),
             Some(pos_id) => {
-                if tokens.is_empty() {
+                if tokens.len() > 1 {
+                    Ok(Self::TooManyPositions { to_close: *pos_id })
+                } else {
                     let PositionsResp {
                         mut positions,
                         pending_close: _,
@@ -210,7 +204,7 @@ impl PositionsInfo {
                         .query_wasm_smart(
                             &market.addr,
                             &MarketQueryMsg::Positions {
-                                position_ids: vec![pos_id],
+                                position_ids: vec![*pos_id],
                                 skip_calc_pending_fees: None,
                                 fees: Some(PositionsQueryFeeApproach::Accumulated),
                                 price: None,
@@ -221,8 +215,6 @@ impl PositionsInfo {
                         Some(pos) => Ok(Self::OnePosition { pos:Box::new(pos)  }),
                         None => Err(anyhow!("Our open position {pos_id} in {} is in an unhealthy state, waiting for cranks", market.id)),
                     }
-                } else {
-                    Ok(Self::TooManyPositions { to_close: pos_id })
                 }
             }
         }

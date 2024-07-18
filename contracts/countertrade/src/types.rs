@@ -1,4 +1,7 @@
-use msg::contracts::market::position::{PositionId, PositionQueryResponse};
+use msg::contracts::market::{
+    entry::ClosedPositionCursor,
+    position::{PositionId, PositionQueryResponse},
+};
 
 use crate::prelude::*;
 
@@ -11,6 +14,8 @@ pub(crate) struct Totals {
     pub(crate) collateral: Collateral,
     /// Total LP shares
     pub(crate) shares: LpToken,
+    /// The last closed position we've collected collateral for.
+    pub(crate) last_closed: Option<ClosedPositionCursor>,
 }
 
 /// Information about positions in the market contract.
@@ -32,13 +37,4 @@ pub(crate) struct MarketInfo {
     pub(crate) id: MarketId,
     pub(crate) addr: Addr,
     pub(crate) token: msg::token::Token,
-}
-
-/// Possible reply states
-#[derive(serde::Serialize, serde::Deserialize)]
-pub(crate) enum ReplyState {
-    ClosingPositions {
-        market: MarketId,
-        previous_balance: Collateral,
-    },
 }

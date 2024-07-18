@@ -421,18 +421,51 @@ fn closes_extra_positions() {
         pos_ids.push(pos_id);
     }
 
-    for pos_id in pos_ids.into_iter().rev().take(4) {
+    for pos_id in pos_ids.into_iter().take(4) {
+        // Get the status before we close the position, for comparison below
         let market_before = market.query_countertrade_markets().unwrap().pop().unwrap();
+
+        // We should be forced to close the first open position
         assert_eq!(
             market.query_countertrade_has_work().unwrap(),
             HasWorkResp::Work {
                 desc: msg::contracts::countertrade::WorkDescription::ClosePosition { pos_id }
             }
         );
+
+        // Sends a deferred message to close the position
         market.exec_countertrade_do_work().unwrap();
+        // Execute the deferred message
         market.exec_crank_till_finished(&lp).unwrap();
+
+        // Position must be closed
+        let pos = market.query_closed_position(&countertrade, pos_id).unwrap();
+
+        // Ensure that now we want to collect the information from that closed position
+        assert_eq!(
+            market.query_countertrade_has_work().unwrap(),
+            HasWorkResp::Work {
+                desc: msg::contracts::countertrade::WorkDescription::CollectClosedPosition {
+                    pos_id,
+                    close_time: pos.close_time,
+                    active_collateral: pos.active_collateral
+                }
+            }
+        );
+
+        // Without collecting, our balances remain the same
+        let market_before_work = market.query_countertrade_markets().unwrap().pop().unwrap();
+        assert_eq!(market_before_work.collateral, market_before.collateral);
+
+        // Now collect the balances
+        market.exec_countertrade_do_work().unwrap();
+
+        // And confirm the countertrade contract saw the update
         let market_after = market.query_countertrade_markets().unwrap().pop().unwrap();
-        assert!(market_after.collateral > market_before.collateral);
+        assert_eq!(
+            Ok(market_after.collateral),
+            market_before.collateral + pos.active_collateral
+        );
     }
 
     // Nothing left to be done now
