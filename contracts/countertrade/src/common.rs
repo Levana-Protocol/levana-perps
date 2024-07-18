@@ -199,18 +199,15 @@ impl PositionsInfo {
                         mut positions,
                         pending_close: _,
                         closed: _,
-                    } = state
-                        .querier
-                        .query_wasm_smart(
-                            &market.addr,
-                            &MarketQueryMsg::Positions {
-                                position_ids: vec![*pos_id],
-                                skip_calc_pending_fees: None,
-                                fees: Some(PositionsQueryFeeApproach::Accumulated),
-                                price: None,
-                            },
-                        )
-                        .unwrap();
+                    } = state.querier.query_wasm_smart(
+                        &market.addr,
+                        &MarketQueryMsg::Positions {
+                            position_ids: vec![*pos_id],
+                            skip_calc_pending_fees: None,
+                            fees: Some(PositionsQueryFeeApproach::Accumulated),
+                            price: None,
+                        },
+                    )?;
                     match positions.pop() {
                         Some(pos) => Ok(Self::OnePosition { pos:Box::new(pos)  }),
                         None => Err(anyhow!("Our open position {pos_id} in {} is in an unhealthy state, waiting for cranks", market.id)),
