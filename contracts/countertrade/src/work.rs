@@ -2,8 +2,11 @@ use cosmwasm_std::{SubMsg, WasmMsg};
 use msg::contracts::market::{
     deferred_execution::GetDeferredExecResp,
     entry::{ClosedPositionCursor, ClosedPositionsResp, StatusResp},
+    position::PositionQueryResponse,
 };
-use shared::storage::{DirectionToBase, LeverageToBase, PricePoint};
+use shared::storage::{
+    DirectionToBase, DirectionToNotional, LeverageToBase, MarketType, PricePoint,
+};
 
 use crate::prelude::*;
 
@@ -136,44 +139,97 @@ pub(crate) fn get_work_for(
             .context("Invalid 0 max_leverage in market")?,
     ));
 
-    if status.long_funding > state.config.max_funding.into_signed() {
-        Ok(HasWorkResp::Work {
-            desc: WorkDescription::OpenPosition {
-                direction: DirectionToBase::Short,
-                leverage: max_leverage,
-                collateral,
-                take_profit: shared::storage::TakeProfitTrader::Finite(
-                    NonZero::new(
-                        price
-                            .price_base
-                            .into_non_zero()
-                            .raw()
-                            .checked_mul(Decimal256::from_ratio(11u32, 10u32))?,
-                    )
-                    .context("Impossible 0 from multiplying take profit price")?,
-                ),
-            },
-        })
-    } else if status.short_funding > state.config.max_funding.into_signed() {
-        Ok(HasWorkResp::Work {
-            desc: WorkDescription::OpenPosition {
-                direction: DirectionToBase::Long,
-                leverage: max_leverage,
-                collateral,
-                take_profit: shared::storage::TakeProfitTrader::Finite(
-                    NonZero::new(
-                        price
-                            .price_base
-                            .into_non_zero()
-                            .raw()
-                            .checked_mul(Decimal256::from_ratio(9u32, 10u32))?,
-                    )
-                    .context("Impossible 0 from multiplying take profit price")?,
-                ),
-            },
-        })
+    desired_action(state, &status, pos.as_deref()).map(|x| match x {
+        Some(desc) => HasWorkResp::Work { desc },
+        None => HasWorkResp::NoWork {},
+    })
+}
+
+fn desired_action(
+    state: &State,
+    status: &StatusResp,
+    pos: Option<&PositionQueryResponse>,
+) -> Result<Option<WorkDescription>> {
+    if status.long_funding.is_zero() || status.short_funding.is_zero() {
+        assert!(status.long_funding.is_zero());
+        assert!(status.short_funding.is_zero());
+        return Ok(None);
+    }
+
+    // Now entering the flipped zone: code below here will deal exclusively with internal direction/prices/etc.
+    let (long_funding, short_funding) = match status.market_type {
+        MarketType::CollateralIsQuote => (status.long_funding, status.short_funding),
+        MarketType::CollateralIsBase => (status.short_funding, status.long_funding),
+    };
+    let current_direction = pos.map(|pos| pos.direction_to_base.into_notional(status.market_type));
+    let min_funding = state.config.min_funding.into_signed();
+    let max_funding = state.config.max_funding.into_signed();
+    let target_funding = state.config.target_funding.into_signed();
+
+    let (popular_funding, unpop_funding, popular_direction) = if long_funding.is_strictly_positive()
+    {
+        assert!(short_funding.is_negative());
+        (long_funding, short_funding, DirectionToNotional::Long)
     } else {
-        Ok(HasWorkResp::NoWork {})
+        assert!(long_funding.is_negative());
+        (short_funding, long_funding, DirectionToNotional::Long)
+    };
+
+    if popular_funding >= min_funding && popular_funding <= max_funding {
+        Ok(None)
+    } else if popular_funding < min_funding {
+        match pos {
+            Some(pos) => Ok(Some(WorkDescription::ClosePosition { pos_id: pos.id })),
+            None => Ok(None),
+        }
+    } else {
+        // FIXME do actual calculations
+
+        // if status.long_funding > state.config.max_funding.into_signed() {
+        //     Ok(HasWorkResp::Work {
+        //         desc: WorkDescription::OpenPosition {
+        //             direction: DirectionToBase::Short,
+        //             leverage: max_leverage,
+        //             collateral,
+        //             take_profit: shared::storage::TakeProfitTrader::Finite(
+        //                 NonZero::new(
+        //                     price
+        //                         .price_base
+        //                         .into_non_zero()
+        //                         .raw()
+        //                         .checked_mul(Decimal256::from_ratio(9u32, 10u32))?,
+        //                 )
+        //                 .context("Impossible 0 from multiplying take profit price")?,
+        //             ),
+        //         },
+        //     })
+        // } else if status.short_funding > state.config.max_funding.into_signed() {
+        //     Ok(HasWorkResp::Work {
+        //         desc: WorkDescription::OpenPosition {
+        //             direction: DirectionToBase::Long,
+        //             leverage: max_leverage,
+        //             collateral,
+        //             take_profit: shared::storage::TakeProfitTrader::Finite(
+        //                 NonZero::new(
+        //                     price
+        //                         .price_base
+        //                         .into_non_zero()
+        //                         .raw()
+        //                         .checked_mul(Decimal256::from_ratio(11u32, 10u32))?,
+        //                 )
+        //                 .context("Impossible 0 from multiplying take profit price")?,
+        //             ),
+        //         },
+        //     })
+        // } else {
+        //     Ok(HasWorkResp::NoWork {})
+        // }
+        Ok(Some(WorkDescription::OpenPosition {
+            direction: todo!(),
+            leverage: todo!(),
+            collateral: todo!(),
+            take_profit: todo!(),
+        }))
     }
 }
 

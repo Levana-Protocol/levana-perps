@@ -11,5 +11,5 @@ pub(crate) use msg::contracts::market::entry::{
 };
 pub(crate) use shared::{
     attr_map,
-    storage::{Collateral, LpToken, MarketId, NonZero, UnsignedDecimal},
+    storage::{Collateral, LpToken, MarketId, NonZero, Notional, Signed, UnsignedDecimal},
 };
