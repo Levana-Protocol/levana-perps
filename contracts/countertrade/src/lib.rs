@@ -2,6 +2,7 @@ mod common;
 mod execute;
 mod prelude;
 mod query;
+mod reply;
 mod state;
 mod types;
 mod work;
@@ -15,6 +16,7 @@ use shared::storage::LeverageToBase;
 
 pub use execute::execute;
 pub use query::query;
+pub use reply::reply;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "levana.finance:countertrade";

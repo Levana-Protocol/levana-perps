@@ -398,6 +398,7 @@ fn closes_extra_positions() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let countertrade = market.get_countertrade_addr();
     let lp = market.clone_lp(0).unwrap();
+    let market_type = market.query_status().unwrap().market_type;
 
     // Do a deposit to avoid confusing the contract. As an optimization, the contract
     // won't check if there are open positions if there is no liquidity deposited.
@@ -425,6 +426,22 @@ fn closes_extra_positions() {
         pos_ids.push(pos_id);
     }
 
+    // And open a larger counterposition to make sure these positions are all unpopular
+    market
+        .exec_open_position_take_profit(
+            &lp,
+            "10.1",
+            match market_type {
+                msg::prelude::MarketType::CollateralIsQuote => "5",
+                msg::prelude::MarketType::CollateralIsBase => "3",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            msg::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
     for pos_id in pos_ids.into_iter().take(4) {
         // Get the status before we close the position, for comparison below
         let market_before = market.query_countertrade_markets().unwrap().pop().unwrap();
@@ -445,6 +462,15 @@ fn closes_extra_positions() {
 
         // Position must be closed
         let pos = market.query_closed_position(&countertrade, pos_id).unwrap();
+
+        // And clear out the deferred exec ID
+        match market.query_countertrade_has_work().unwrap() {
+            HasWorkResp::Work {
+                desc: WorkDescription::ClearDeferredExec { id: _ },
+            } => (),
+            work => panic!("Unexpected work response: {work:?}"),
+        }
+        market.exec_countertrade_do_work().unwrap();
 
         // Determine the active collateral that will actually be transferred
         let active_collateral = market
@@ -624,7 +650,6 @@ fn resets_token_balances() {
 }
 
 #[test]
-#[ignore]
 fn opens_balancing_position() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();

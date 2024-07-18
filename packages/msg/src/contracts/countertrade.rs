@@ -11,7 +11,10 @@ use shared::{
     time::Timestamp,
 };
 
-use super::market::position::{PositionId, PositionQueryResponse};
+use super::market::{
+    deferred_execution::DeferredExecId,
+    position::{PositionId, PositionQueryResponse},
+};
 
 /// Message for instantiating a new countertrade contract.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -317,6 +320,11 @@ pub enum WorkDescription {
     },
     /// All collateral exhausted, reset shares to 0
     ResetShares,
+    /// Deferred execution completed, we can continue our processing
+    ClearDeferredExec {
+        /// ID to be cleared
+        id: DeferredExecId,
+    },
 }
 
 /// Migration message, currently no fields needed
