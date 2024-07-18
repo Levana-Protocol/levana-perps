@@ -1,6 +1,9 @@
-use cosmwasm_std::CosmosMsg;
-use msg::contracts::market::entry::{ClosedPositionCursor, ClosedPositionsResp, StatusResp};
-use shared::storage::{DirectionToBase, PricePoint};
+use cosmwasm_std::{SubMsg, WasmMsg};
+use msg::contracts::market::{
+    deferred_execution::GetDeferredExecResp,
+    entry::{ClosedPositionCursor, ClosedPositionsResp, StatusResp},
+};
+use shared::storage::{DirectionToBase, LeverageToBase, PricePoint};
 
 use crate::prelude::*;
 
@@ -13,6 +16,34 @@ pub(crate) fn get_work_for(
     // Optimization: no shares, so there's no possibility of work to do
     if totals.shares.is_zero() {
         return Ok(HasWorkResp::NoWork {});
+    }
+
+    // Check if we finished executing a deferred exec item
+    if let Some(id) = totals.deferred_exec {
+        match state.querier.query_wasm_smart::<GetDeferredExecResp>(
+            &market.addr,
+            &MarketQueryMsg::GetDeferredExec { id },
+        )? {
+            GetDeferredExecResp::Found { item } => match item.status {
+                msg::contracts::market::deferred_execution::DeferredExecStatus::Pending => {
+                    return Ok(HasWorkResp::NoWork {})
+                }
+                msg::contracts::market::deferred_execution::DeferredExecStatus::Success {
+                    ..
+                }
+                | msg::contracts::market::deferred_execution::DeferredExecStatus::Failure {
+                    ..
+                } => {
+                    return Ok(HasWorkResp::Work {
+                        desc: WorkDescription::ClearDeferredExec { id },
+                    })
+                }
+            },
+            GetDeferredExecResp::NotFound {} => bail!(
+                "For market {}, cannot find expected deferred exec item {id}",
+                market.id
+            ),
+        }
     }
 
     // Check for newly closed positions to update collateral
@@ -97,10 +128,50 @@ pub(crate) fn get_work_for(
         return Ok(HasWorkResp::NoWork {});
     }
 
+    let collateral = NonZero::new(totals.collateral)
+        .context("Impossible, zero collateral after checking that we have a minimum deposit")?;
+
+    let max_leverage = state.config.max_leverage.min(LeverageToBase::from(
+        NonZero::new(status.config.max_leverage.abs_unsigned())
+            .context("Invalid 0 max_leverage in market")?,
+    ));
+
     if status.long_funding > state.config.max_funding.into_signed() {
-        todo!()
+        Ok(HasWorkResp::Work {
+            desc: WorkDescription::OpenPosition {
+                direction: DirectionToBase::Short,
+                leverage: max_leverage,
+                collateral,
+                take_profit: shared::storage::TakeProfitTrader::Finite(
+                    NonZero::new(
+                        price
+                            .price_base
+                            .into_non_zero()
+                            .raw()
+                            .checked_mul(Decimal256::from_ratio(11u32, 10u32))?,
+                    )
+                    .context("Impossible 0 from multiplying take profit price")?,
+                ),
+            },
+        })
     } else if status.short_funding > state.config.max_funding.into_signed() {
-        todo!()
+        Ok(HasWorkResp::Work {
+            desc: WorkDescription::OpenPosition {
+                direction: DirectionToBase::Long,
+                leverage: max_leverage,
+                collateral,
+                take_profit: shared::storage::TakeProfitTrader::Finite(
+                    NonZero::new(
+                        price
+                            .price_base
+                            .into_non_zero()
+                            .raw()
+                            .checked_mul(Decimal256::from_ratio(9u32, 10u32))?,
+                    )
+                    .context("Impossible 0 from multiplying take profit price")?,
+                ),
+            },
+        })
     } else {
         Ok(HasWorkResp::NoWork {})
     }
@@ -125,25 +196,57 @@ pub(crate) fn execute(
     let mut res = Response::new()
         .add_event(Event::new("work-desc").add_attribute("desc", format!("{desc:?}")));
 
+    let add_market_msg =
+        |storage: &mut dyn Storage, res: Response, msg: WasmMsg| -> Result<Response> {
+            assert!(!crate::state::REPLY_MARKET.exists(storage));
+            crate::state::REPLY_MARKET.save(storage, &market.id)?;
+            Ok(res.add_submessage(SubMsg::reply_on_success(msg, 0)))
+        };
+
     match desc {
         WorkDescription::OpenPosition {
             direction,
             leverage,
             collateral,
             take_profit,
-        } => todo!("open position"),
+        } => {
+            res = res.add_event(
+                Event::new("open-position")
+                    .add_attribute("direction", direction.as_str())
+                    .add_attribute("leverage", leverage.to_string())
+                    .add_attribute("collateral", collateral.to_string())
+                    .add_attribute("take_profit", take_profit.to_string())
+                    .add_attribute("market", market.id.as_str()),
+            );
+            let msg = market.token.into_market_execute_msg(
+                &market.addr,
+                collateral.raw(),
+                MarketExecuteMsg::OpenPosition {
+                    slippage_assert: None,
+                    leverage,
+                    direction,
+                    max_gains: None,
+                    stop_loss_override: None,
+                    take_profit: Some(take_profit),
+                },
+            )?;
+            res = add_market_msg(storage, res, msg)?;
+        }
         WorkDescription::ClosePosition { pos_id } => {
             res = res.add_event(
-                Event::new("close-position").add_attribute("position-id", pos_id.to_string()),
+                Event::new("close-position")
+                    .add_attribute("position-id", pos_id.to_string())
+                    .add_attribute("market", market.id.as_str()),
             );
-            res = res.add_message(CosmosMsg::Wasm(cosmwasm_std::WasmMsg::Execute {
+            let msg = cosmwasm_std::WasmMsg::Execute {
                 contract_addr: market.addr.into_string(),
                 msg: to_json_binary(&MarketExecuteMsg::ClosePosition {
                     id: pos_id,
                     slippage_assert: None,
                 })?,
                 funds: vec![],
-            }));
+            };
+            res = add_market_msg(storage, res, msg)?;
         }
         WorkDescription::CollectClosedPosition {
             pos_id,
@@ -159,10 +262,21 @@ pub(crate) fn execute(
             res = res.add_event(
                 Event::new("collect-closed-position")
                     .add_attribute("position-id", pos_id.to_string())
-                    .add_attribute("active-collateral", active_collateral.to_string()),
+                    .add_attribute("active-collateral", active_collateral.to_string())
+                    .add_attribute("market", market.id.as_str()),
             );
         }
         WorkDescription::ResetShares => todo!(),
+        WorkDescription::ClearDeferredExec { id } => {
+            assert_eq!(totals.deferred_exec, Some(id));
+            totals.deferred_exec = None;
+            crate::state::TOTALS.save(storage, &market.id, &totals)?;
+            res = res.add_event(
+                Event::new("clear-deferred-exec")
+                    .add_attribute("deferred-exec-id", id.to_string())
+                    .add_attribute("market", market.id.as_str()),
+            )
+        }
     }
 
     Ok(res)

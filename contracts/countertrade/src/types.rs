@@ -1,4 +1,5 @@
 use msg::contracts::market::{
+    deferred_execution::DeferredExecId,
     entry::ClosedPositionCursor,
     position::{PositionId, PositionQueryResponse},
 };
@@ -16,6 +17,8 @@ pub(crate) struct Totals {
     pub(crate) shares: LpToken,
     /// The last closed position we've collected collateral for.
     pub(crate) last_closed: Option<ClosedPositionCursor>,
+    /// The latest deferred exec item we're waiting on.
+    pub(crate) deferred_exec: Option<DeferredExecId>,
 }
 
 /// Information about positions in the market contract.
