@@ -43,7 +43,9 @@ pub(crate) fn get_work_for(
             desc: WorkDescription::CollectClosedPosition {
                 pos_id: closed.id,
                 close_time: closed.close_time,
-                active_collateral: closed.active_collateral,
+                active_collateral: market
+                    .token
+                    .round_down_to_precision(closed.active_collateral)?,
             },
         });
     }

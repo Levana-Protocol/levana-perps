@@ -424,6 +424,7 @@ fn closes_extra_positions() {
     for pos_id in pos_ids.into_iter().take(4) {
         // Get the status before we close the position, for comparison below
         let market_before = market.query_countertrade_markets().unwrap().pop().unwrap();
+        let balance_before = market.query_collateral_balance(&countertrade).unwrap();
 
         // We should be forced to close the first open position
         assert_eq!(
@@ -441,6 +442,12 @@ fn closes_extra_positions() {
         // Position must be closed
         let pos = market.query_closed_position(&countertrade, pos_id).unwrap();
 
+        // Determine the active collateral that will actually be transferred
+        let active_collateral = market
+            .token
+            .round_down_to_precision(pos.active_collateral)
+            .unwrap();
+
         // Ensure that now we want to collect the information from that closed position
         assert_eq!(
             market.query_countertrade_has_work().unwrap(),
@@ -448,7 +455,7 @@ fn closes_extra_positions() {
                 desc: msg::contracts::countertrade::WorkDescription::CollectClosedPosition {
                     pos_id,
                     close_time: pos.close_time,
-                    active_collateral: pos.active_collateral
+                    active_collateral
                 }
             }
         );
@@ -464,7 +471,14 @@ fn closes_extra_positions() {
         let market_after = market.query_countertrade_markets().unwrap().pop().unwrap();
         assert_eq!(
             Ok(market_after.collateral),
-            market_before.collateral + pos.active_collateral
+            market_before.collateral + active_collateral
+        );
+
+        // And finally confirm that the balance in the contract itself really changed
+        let balance_after = market.query_collateral_balance(&countertrade).unwrap();
+        assert_eq!(
+            balance_after,
+            (balance_before + active_collateral.into_number()).unwrap()
         );
     }
 
