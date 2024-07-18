@@ -1,8 +1,8 @@
 use cosmwasm_std::Decimal256;
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
-    contracts::countertrade::{ConfigUpdate, HasWorkResp, MarketBalance},
-    prelude::{DirectionToBase, Number, UnsignedDecimal},
+    contracts::countertrade::{ConfigUpdate, HasWorkResp, MarketBalance, WorkDescription},
+    prelude::{DirectionToBase, Number, TakeProfitTrader, UnsignedDecimal},
 };
 
 #[test]
@@ -303,12 +303,16 @@ fn detects_unbalanced_markets() {
         config.max_funding
     );
 
-    assert_eq!(
-        market.query_countertrade_has_work().unwrap(),
+    match market.query_countertrade_has_work().unwrap() {
         HasWorkResp::Work {
-            desc: msg::contracts::countertrade::WorkDescription::GoShort
-        }
-    );
+            desc:
+                WorkDescription::OpenPosition {
+                    direction: DirectionToBase::Short,
+                    ..
+                },
+        } => (),
+        has_work => panic!("Unexpected has_work: {has_work:?}"),
+    }
 }
 
 #[test]
@@ -491,6 +495,102 @@ fn closes_extra_positions() {
 }
 
 #[test]
+fn closes_popular_position_long() {
+    closes_popular_position_helper(DirectionToBase::Long, true);
+    closes_popular_position_helper(DirectionToBase::Long, false);
+}
+
+#[test]
+fn closes_popular_position_short() {
+    closes_popular_position_helper(DirectionToBase::Short, true);
+    closes_popular_position_helper(DirectionToBase::Short, false);
+}
+
+fn closes_popular_position_helper(direction: DirectionToBase, open_unpop: bool) {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let countertrade = market.get_countertrade_addr();
+    let lp = market.clone_lp(0).unwrap();
+
+    // Do a deposit to avoid confusing the contract. As an optimization, the contract
+    // won't check if there are open positions if there is no liquidity deposited.
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+
+    let (take_profit_pop, take_profit_unpop) = match direction {
+        DirectionToBase::Long => ("1.1", "0.9"),
+        DirectionToBase::Short => ("0.9", "1.1"),
+    };
+    let take_profit_pop = TakeProfitTrader::Finite(take_profit_pop.parse().unwrap());
+
+    // Open a position on behalf of the contract
+    market
+        .exec_mint_tokens(&countertrade, "1000".parse().unwrap())
+        .unwrap();
+    let (pos_id, _) = market
+        .exec_open_position_take_profit(
+            &countertrade,
+            "10",
+            "5",
+            direction,
+            None,
+            None,
+            take_profit_pop,
+        )
+        .unwrap();
+
+    // And follow it up with a position by the LP
+    market
+        .exec_open_position_take_profit(&lp, "100", "5", direction, None, None, take_profit_pop)
+        .unwrap();
+    if open_unpop {
+        // And an unpopular position to allow funding rates to be calculated.
+        market
+            .exec_open_position_take_profit(
+                &lp,
+                "5",
+                "5",
+                direction.invert(),
+                None,
+                None,
+                TakeProfitTrader::Finite(take_profit_unpop.parse().unwrap()),
+            )
+            .unwrap();
+    }
+
+    market.exec_crank_till_finished(&lp).unwrap();
+    market
+        .set_time(levana_perpswap_multi_test::time::TimeJump::Blocks(1))
+        .unwrap();
+
+    // We should need to close this position
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::Work {
+            desc: msg::contracts::countertrade::WorkDescription::ClosePosition { pos_id }
+        }
+    );
+
+    // Sends a deferred message to close the position
+    market.exec_countertrade_do_work().unwrap();
+    // Execute the deferred message
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    // Position must be closed
+    market.query_closed_position(&countertrade, pos_id).unwrap();
+
+    assert_eq!(
+        market
+            .query_countertrade_markets()
+            .unwrap()
+            .pop()
+            .unwrap()
+            .position,
+        None
+    );
+}
+
+#[test]
 #[ignore]
 #[allow(unreachable_code)]
 fn resets_token_balances() {
@@ -581,14 +681,29 @@ fn opens_balancing_position() {
         config.max_funding
     );
 
-    assert_eq!(
-        market.query_countertrade_has_work().unwrap(),
+    match market.query_countertrade_has_work().unwrap() {
         HasWorkResp::Work {
-            desc: msg::contracts::countertrade::WorkDescription::GoShort
-        }
-    );
+            desc:
+                WorkDescription::OpenPosition {
+                    direction,
+                    leverage: _,
+                    collateral: _,
+                    take_profit: _,
+                },
+        } => assert_eq!(direction, DirectionToBase::Short),
+        has_work => panic!("Unexpected has work response: {has_work:?}"),
+    }
 
     market.exec_countertrade_do_work().unwrap();
+
+    // We should no longer have any work to do, even though we haven't cranked yet.
+    // The contract is responsible for ensuring it waits until prior deferred execs
+    // complete.
+
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
 
     let status = market.query_status().unwrap();
     assert!(status
