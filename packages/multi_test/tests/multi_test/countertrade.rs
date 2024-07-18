@@ -492,6 +492,7 @@ fn closes_extra_positions() {
 
 #[test]
 #[ignore]
+#[allow(unreachable_code)]
 fn resets_token_balances() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let lp = market.clone_lp(0).unwrap();
