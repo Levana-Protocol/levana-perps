@@ -4,7 +4,10 @@ use std::fmt::Display;
 
 use cosmwasm_std::{Addr, Binary, Decimal256, Uint128};
 use shared::{
-    storage::{Collateral, LeverageToBase, LpToken, MarketId, NonZero, RawAddr},
+    storage::{
+        Collateral, DirectionToBase, LeverageToBase, LpToken, MarketId, NonZero, RawAddr,
+        TakeProfitTrader,
+    },
     time::Timestamp,
 };
 
@@ -287,10 +290,17 @@ pub enum HasWorkResp {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkDescription {
-    /// Markets are too long
-    GoShort,
-    /// Markets are too short
-    GoLong,
+    /// Open a new position
+    OpenPosition {
+        /// Direction of the new position
+        direction: DirectionToBase,
+        /// Leverage
+        leverage: LeverageToBase,
+        /// Amount of deposit collateral
+        collateral: NonZero<Collateral>,
+        /// Take profit value
+        take_profit: TakeProfitTrader,
+    },
     /// Close an unnecessary position
     ClosePosition {
         /// Position to be closed
