@@ -2280,6 +2280,10 @@ impl PerpsMarket {
         self.exec_defer_queue_process(sender, queue_res, None)
     }
 
+    pub fn get_countertrade_addr(&self) -> Addr {
+        self.app().countertrade_addr.clone()
+    }
+
     pub(crate) fn query_countertrade<T: DeserializeOwned>(
         &self,
         msg: &CountertradeQueryMsg,
@@ -2313,6 +2317,27 @@ impl PerpsMarket {
                 next_start_after,
             } = self.query_countertrade(&CountertradeQueryMsg::Balance {
                 address: user_addr.into(),
+                start_after: start_after.take(),
+                limit: None,
+            })?;
+            res.append(&mut markets);
+            match next_start_after {
+                Some(next_start_after) => start_after = Some(next_start_after),
+                None => break Ok(res),
+            }
+        }
+    }
+
+    pub fn query_countertrade_markets(
+        &self,
+    ) -> Result<Vec<msg::contracts::countertrade::MarketStatus>> {
+        let mut start_after = None;
+        let mut res = vec![];
+        loop {
+            let msg::contracts::countertrade::MarketsResp {
+                mut markets,
+                next_start_after,
+            } = self.query_countertrade(&CountertradeQueryMsg::Markets {
                 start_after: start_after.take(),
                 limit: None,
             })?;

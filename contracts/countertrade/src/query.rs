@@ -1,12 +1,10 @@
 use crate::prelude::*;
 
 #[entry_point]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary> {
-    let (state, storage) = crate::types::State::load(deps)?;
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
+    let (state, storage) = crate::types::State::load(deps, env)?;
     match msg {
-        QueryMsg::Config {} => {
-            to_json_binary(&state.config).context("Unable to render Config to JSON")
-        }
+        QueryMsg::Config {} => to_json_binary(&state.config),
         QueryMsg::Balance {
             address,
             start_after,
@@ -36,7 +34,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary> {
                             .with_context(|| {
                                 format!("No totals found for market with shares: {market_id}")
                             })?;
-                        let pos = PositionsInfo::load();
+                        let pos = PositionsInfo::load(&state, &market_info)?;
                         markets.push(MarketBalance {
                             token: market_info.token,
                             shares,
@@ -66,15 +64,76 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> Result<Binary> {
                 markets,
                 next_start_after,
             })
-            .map_err(Into::into)
         }
+        QueryMsg::Markets { start_after, limit } => to_json_binary(&markets(
+            state,
+            storage,
+            start_after,
+            limit.map_or(Ok(5), |limit| {
+                usize::try_from(limit).map(|limit| limit.min(5))
+            })?,
+        )?),
         QueryMsg::HasWork { market } => {
             let market = state.load_market_info(storage, &market)?;
             let totals = crate::state::TOTALS
                 .may_load(storage, &market.id)?
                 .unwrap_or_default();
             let work = crate::work::get_work_for(storage, &state, &market, &totals)?;
-            to_json_binary(&work).map_err(anyhow::Error::from)
+            to_json_binary(&work)
         }
     }
+    .map_err(anyhow::Error::from)
+}
+
+fn markets(
+    state: State,
+    storage: &dyn Storage,
+    start_after: Option<MarketId>,
+    limit: usize,
+) -> Result<MarketsResp> {
+    let mut iter = crate::state::TOTALS.range(
+        storage,
+        start_after.as_ref().map(Bound::exclusive),
+        None,
+        Order::Ascending,
+    );
+    let mut markets = vec![];
+    let mut reached_end = false;
+    while markets.len() <= limit {
+        match iter.next() {
+            None => {
+                reached_end = true;
+                break;
+            }
+            Some(res) => {
+                let (market_id, totals) = res?;
+                let market_info = state.load_market_info(storage, &market_id)?;
+                let pos = PositionsInfo::load(&state, &market_info)?;
+                let (pos, too_many_positions) = match pos {
+                    PositionsInfo::TooManyPositions { to_close: _ } => (None, true),
+                    PositionsInfo::NoPositions => (None, false),
+                    PositionsInfo::OnePosition { pos } => (Some(*pos), false),
+                };
+                markets.push(MarketStatus {
+                    id: market_id,
+                    collateral: totals.collateral,
+                    shares: totals.shares,
+                    position: pos,
+                    too_many_positions,
+                });
+            }
+        }
+    }
+    let next_start_after = (|| {
+        if reached_end {
+            return None;
+        };
+        let last = markets.last()?;
+        iter.next()?.ok();
+        Some(last.id.clone())
+    })();
+    Ok(MarketsResp {
+        markets,
+        next_start_after,
+    })
 }

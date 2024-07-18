@@ -5,6 +5,8 @@ use std::fmt::Display;
 use cosmwasm_std::{Addr, Binary, Decimal256, Uint128};
 use shared::storage::{Collateral, LeverageToBase, LpToken, MarketId, NonZero, RawAddr};
 
+use super::market::position::{PositionId, PositionQueryResponse};
+
 /// Message for instantiating a new countertrade contract.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -132,6 +134,15 @@ pub enum QueryMsg {
         /// How many values to return
         limit: Option<u32>,
     },
+    /// Check the status of a single market
+    ///
+    /// Returns [MarketsResp]
+    Markets {
+        /// Value from [MarketsResp::next_start_after]
+        start_after: Option<MarketId>,
+        /// How many values to return
+        limit: Option<u32>,
+    },
     /// Check if the given market has any work to do
     ///
     /// Returns [HasWorkResp]
@@ -185,6 +196,34 @@ impl Display for Token {
     }
 }
 
+/// Response from [QueryMsg::Markets]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub struct MarketsResp {
+    /// Market statuses in this batch
+    pub markets: Vec<MarketStatus>,
+    /// Next start_after value, if we have more markets
+    pub next_start_after: Option<MarketId>,
+}
+
+/// Status of a single market
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub struct MarketStatus {
+    /// Which market
+    pub id: MarketId,
+    /// Collateral held inside the contract
+    ///
+    /// Does not include active collateral of a position
+    pub collateral: Collateral,
+    /// Number of outstanding shares
+    pub shares: LpToken,
+    /// Our open position, if we have exactly one
+    pub position: Option<PositionQueryResponse>,
+    /// Do we have too many open positions?
+    pub too_many_positions: bool,
+}
+
 /// Whether or not there is work available.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -206,6 +245,13 @@ pub enum WorkDescription {
     GoShort,
     /// Markets are too short
     GoLong,
+    /// Close an unnecessary position
+    ClosePosition {
+        /// Position to be closed
+        pos_id: PositionId,
+    },
+    /// All collateral exhausted, reset shares to 0
+    ResetShares,
 }
 
 /// Migration message, currently no fields needed

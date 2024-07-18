@@ -1,3 +1,4 @@
+use cosmwasm_std::{CosmosMsg, SubMsg};
 use msg::contracts::market::entry::StatusResp;
 use shared::storage::PricePoint;
 
@@ -9,8 +10,26 @@ pub(crate) fn get_work_for(
     market: &MarketInfo,
     totals: &Totals,
 ) -> Result<HasWorkResp> {
-    if totals.collateral.is_zero() {
+    if totals.shares.is_zero() {
         return Ok(HasWorkResp::NoWork {});
+    }
+
+    let pos = PositionsInfo::load(state, market)?;
+
+    let pos = match pos {
+        PositionsInfo::TooManyPositions { to_close } => {
+            return Ok(HasWorkResp::Work {
+                desc: WorkDescription::ClosePosition { pos_id: to_close },
+            })
+        }
+        PositionsInfo::NoPositions => None,
+        PositionsInfo::OnePosition { pos } => Some(pos),
+    };
+
+    if totals.collateral.is_zero() && pos.is_none() {
+        return Ok(HasWorkResp::Work {
+            desc: WorkDescription::ResetShares,
+        });
     }
 
     let price: PricePoint = state
@@ -56,7 +75,37 @@ pub(crate) fn execute(
         HasWorkResp::Work { desc } => desc,
     };
 
-    panic!("Cannot perform: {desc:#?}");
+    let mut res = Response::new()
+        .add_event(Event::new("work-desc").add_attribute("desc", format!("{desc:?}")));
 
-    Ok(Response::new())
+    match &desc {
+        WorkDescription::GoShort => todo!("go short"),
+        WorkDescription::GoLong => todo!("go long"),
+        WorkDescription::ClosePosition { pos_id } => {
+            res = res.add_event(
+                Event::new("close-position").add_attribute("position-id", pos_id.to_string()),
+            );
+            let msg = CosmosMsg::Wasm(cosmwasm_std::WasmMsg::Execute {
+                contract_addr: market.addr.into_string(),
+                msg: to_json_binary(&MarketExecuteMsg::ClosePosition {
+                    id: *pos_id,
+                    slippage_assert: None,
+                })?,
+                funds: vec![],
+            });
+            res = res.add_submessage(SubMsg::reply_on_success(msg, 0));
+            debug_assert!(!crate::state::REPLY.exists(storage));
+            let previous_balance = state.get_local_token_balance(&market.token)?;
+            crate::state::REPLY.save(
+                storage,
+                &ReplyState::ClosingPositions {
+                    market: market.id,
+                    previous_balance,
+                },
+            )?;
+        }
+        WorkDescription::ResetShares => todo!(),
+    }
+
+    Ok(res)
 }

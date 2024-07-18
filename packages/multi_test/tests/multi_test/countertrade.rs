@@ -390,6 +390,91 @@ fn ignores_unbalanced_insufficient_liquidity() {
 }
 
 #[test]
+fn closes_extra_positions() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let countertrade = market.get_countertrade_addr();
+    let lp = market.clone_lp(0).unwrap();
+
+    // Do a deposit to avoid confusing the contract. As an optimization, the contract
+    // won't check if there are open positions if there is no liquidity deposited.
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+
+    market
+        .exec_mint_tokens(&countertrade, "1000".parse().unwrap())
+        .unwrap();
+    // Force open positions as the contract
+    let mut pos_ids = vec![];
+    for _ in 0..5 {
+        let (pos_id, _) = market
+            .exec_open_position_take_profit(
+                &countertrade,
+                "10",
+                "5",
+                DirectionToBase::Long,
+                None,
+                None,
+                msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+            )
+            .unwrap();
+        pos_ids.push(pos_id);
+    }
+
+    for pos_id in pos_ids.into_iter().rev().take(4) {
+        let market_before = market.query_countertrade_markets().unwrap().pop().unwrap();
+        assert_eq!(
+            market.query_countertrade_has_work().unwrap(),
+            HasWorkResp::Work {
+                desc: msg::contracts::countertrade::WorkDescription::ClosePosition { pos_id }
+            }
+        );
+        market.exec_countertrade_do_work().unwrap();
+        market.exec_crank_till_finished(&lp).unwrap();
+        let market_after = market.query_countertrade_markets().unwrap().pop().unwrap();
+        assert!(market_after.collateral > market_before.collateral);
+    }
+
+    // Nothing left to be done now
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+    market.exec_countertrade_do_work().unwrap_err();
+}
+
+#[test]
+fn resets_token_balances() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+    assert_ne!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
+
+    todo!("force a new position to get opened by the contract and then close it manually");
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::Work {
+            desc: msg::contracts::countertrade::WorkDescription::ResetShares
+        }
+    );
+    assert_eq!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
+    market.exec_countertrade_do_work().unwrap();
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+    market.exec_countertrade_do_work().unwrap_err();
+    assert_eq!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+    assert_ne!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
+}
+
+#[test]
 fn opens_balancing_position() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
