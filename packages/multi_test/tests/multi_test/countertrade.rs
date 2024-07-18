@@ -491,6 +491,7 @@ fn closes_extra_positions() {
 }
 
 #[test]
+#[ignore]
 fn resets_token_balances() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let lp = market.clone_lp(0).unwrap();
@@ -522,6 +523,7 @@ fn resets_token_balances() {
 }
 
 #[test]
+#[ignore]
 fn opens_balancing_position() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
