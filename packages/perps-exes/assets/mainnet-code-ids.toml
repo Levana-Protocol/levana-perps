@@ -346,3 +346,35 @@ osmosis-mainnet = 764
 sei-mainnet = 4611
 injective-mainnet = 816
 neutron-mainnet = 1194
+
+[[hashes]]
+contract-type = "factory"
+gitrev = "092eabd1d34a867a8ab42bc7f5a8c99efce484b3"
+hash = "fd4db6d899ffd66cab5e46677684ecb5d185d90e2d6799715dec26f471858c0b"
+
+[hashes.code-ids]
+neutron-mainnet = 1598
+
+[[hashes]]
+contract-type = "market"
+gitrev = "092eabd1d34a867a8ab42bc7f5a8c99efce484b3"
+hash = "e21722970ac29ae58a394044785fdd20e6701dbeff96d43c8e7f34d29e85b5f7"
+
+[hashes.code-ids]
+neutron-mainnet = 1599
+
+[[hashes]]
+contract-type = "liquidity-token"
+gitrev = "092eabd1d34a867a8ab42bc7f5a8c99efce484b3"
+hash = "cef9eacd47d0027913ed6e565e03d7c3d4c71aeaf47618ecd869a8dbcd63ca14"
+
+[hashes.code-ids]
+neutron-mainnet = 1600
+
+[[hashes]]
+contract-type = "position-token"
+gitrev = "092eabd1d34a867a8ab42bc7f5a8c99efce484b3"
+hash = "c4e896e6b71c88538425446529e2fb3fc596fd95c2db582e26dc556ce5bc57c5"
+
+[hashes.code-ids]
+neutron-mainnet = 1601
