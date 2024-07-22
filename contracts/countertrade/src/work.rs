@@ -324,12 +324,19 @@ pub(crate) fn execute(
             );
         }
         WorkDescription::ResetShares => {
-            crate::state::SHARES.remove(storage, (&sender, &market.id));
-            res = res.add_event(
-                Event::new("reset-shares")
-                    .add_attribute("market", market.id.as_str())
-                    .add_attribute("sender", sender),
-            );
+            let keys = crate::state::SHARES.keys(storage, None, None, Order::Ascending);
+            let mut to_remove = vec![];
+            for key in keys {
+                let (addr, market_id) = key?;
+                if market_id == market.id {
+                    to_remove.push(addr);
+                }
+            }
+            for item in to_remove {
+                crate::state::SHARES.remove(storage, (&item, &market.id));
+            }
+            res = res
+                .add_event(Event::new("reset-shares").add_attribute("market", market.id.as_str()));
         }
         WorkDescription::ClearDeferredExec { id } => {
             assert_eq!(totals.deferred_exec, Some(id));
