@@ -22,6 +22,7 @@ pub(crate) struct Totals {
 }
 
 /// Information about positions in the market contract.
+#[derive(Debug)]
 pub(crate) enum PositionsInfo {
     TooManyPositions { to_close: PositionId },
     NoPositions,
