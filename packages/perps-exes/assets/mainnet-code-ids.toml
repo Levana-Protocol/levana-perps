@@ -363,6 +363,7 @@ gitrev = "092eabd1d34a867a8ab42bc7f5a8c99efce484b3"
 hash = "e21722970ac29ae58a394044785fdd20e6701dbeff96d43c8e7f34d29e85b5f7"
 
 [hashes.code-ids]
+osmosis-mainnet = 940
 injective-mainnet = 1068
 neutron-mainnet = 1599
 
