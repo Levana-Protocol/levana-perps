@@ -165,29 +165,26 @@ async fn distributions_csv(
     ] {
         for (recipient, amount) in entries {
             let amount = amount * pool_size / total;
-            if amount >= min_rewards {
-                output.serialize(&DistributionsRecord {
-                    recipient,
-                    amount,
-                    clawback: None,
-                    can_vote: false,
-                    can_receive_rewards: false,
-                    title: format!(
-                        "Levana’s \"{}\" campaign, {} through {}",
-                        match cat {
-                            Category::Losses => "degens win",
-                            Category::Fees => "trading incentives",
-                        },
-                        start_date.format("%Y-%m-%d"),
-                        end_date.format("%Y-%m-%d")
-                    ),
-                    vesting_date,
-                    r#type: match cat {
-                        Category::Losses => "losses",
-                        Category::Fees => "fees",
+            serialize_record(
+                &mut output,
+                min_rewards,
+                recipient,
+                amount,
+                format!(
+                    "Levana’s \"{}\" campaign, {} through {}",
+                    match cat {
+                        Category::Losses => "degens win",
+                        Category::Fees => "trading incentives",
                     },
-                })?;
-            }
+                    start_date.format("%Y-%m-%d"),
+                    end_date.format("%Y-%m-%d")
+                ),
+                vesting_date,
+                match cat {
+                    Category::Losses => "losses",
+                    Category::Fees => "fees",
+                },
+            )?;
         }
     }
 
@@ -202,25 +199,46 @@ async fn distributions_csv(
     for wallet in referee_wallets {
         if let Some(trading_fee) = fees.entries.get(&wallet) {
             let amount = *trading_fee * Decimal256::percent(referee_rewards_percentage) / price;
-            if amount >= min_rewards {
-                output.serialize(&DistributionsRecord {
-                    recipient: wallet,
-                    amount,
-                    clawback: None,
-                    can_vote: false,
-                    can_receive_rewards: false,
-                    title: format!(
-                        "Levana's \"referee rewards\" campaign, {} through {}",
-                        start_date.format("%Y-%m-%d"),
-                        end_date.format("%Y-%m-%d")
-                    ),
-                    vesting_date,
-                    r#type: "referee rewards",
-                })?;
-            }
+            serialize_record(
+                &mut output,
+                min_rewards,
+                wallet,
+                amount,
+                format!(
+                    "Levana's \"referee rewards\" campaign, {} through {}",
+                    start_date.format("%Y-%m-%d"),
+                    end_date.format("%Y-%m-%d")
+                ),
+                vesting_date,
+                "referee rewards",
+            )?;
         }
     }
 
+    Ok(())
+}
+
+fn serialize_record(
+    output: &mut csv::Writer<std::fs::File>,
+    min_rewards: Decimal256,
+    recipient: Address,
+    amount: Decimal256,
+    title: String,
+    vesting_date: DateTime<Utc>,
+    r#type: &'static str,
+) -> anyhow::Result<()> {
+    if amount >= min_rewards {
+        output.serialize(&DistributionsRecord {
+            recipient,
+            amount,
+            clawback: None,
+            can_vote: false,
+            can_receive_rewards: false,
+            title,
+            vesting_date,
+            r#type,
+        })?;
+    }
     Ok(())
 }
 
