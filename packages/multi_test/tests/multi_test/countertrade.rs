@@ -430,10 +430,10 @@ fn closes_extra_positions() {
     market
         .exec_open_position_take_profit(
             &lp,
-            "10.1",
+            "9",
             match market_type {
                 msg::prelude::MarketType::CollateralIsQuote => "5",
-                msg::prelude::MarketType::CollateralIsBase => "3",
+                msg::prelude::MarketType::CollateralIsBase => "4",
             },
             DirectionToBase::Short,
             None,
@@ -457,6 +457,9 @@ fn closes_extra_positions() {
 
         // Sends a deferred message to close the position
         market.exec_countertrade_do_work().unwrap();
+        // Will fail if we do more work again since the deferred
+        // execution would not have finished
+        market.exec_countertrade_do_work().unwrap_err();
         // Execute the deferred message
         market.exec_crank_till_finished(&lp).unwrap();
 
