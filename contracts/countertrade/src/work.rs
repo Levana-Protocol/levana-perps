@@ -172,7 +172,7 @@ fn desired_action(
         (long_funding, short_funding, DirectionToNotional::Long)
     } else {
         assert!(long_funding.is_negative());
-        (short_funding, long_funding, DirectionToNotional::Long)
+        (short_funding, long_funding, DirectionToNotional::Short)
     };
 
     if popular_funding >= min_funding && popular_funding <= max_funding {
