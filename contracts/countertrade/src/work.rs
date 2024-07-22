@@ -237,6 +237,7 @@ pub(crate) fn execute(
     storage: &mut dyn Storage,
     state: State,
     market: MarketInfo,
+    sender: Addr,
 ) -> Result<Response> {
     let mut totals = crate::state::TOTALS
         .may_load(storage, &market.id)?
@@ -322,7 +323,14 @@ pub(crate) fn execute(
                     .add_attribute("market", market.id.as_str()),
             );
         }
-        WorkDescription::ResetShares => todo!(),
+        WorkDescription::ResetShares => {
+            crate::state::SHARES.remove(storage, (&sender, &market.id));
+            res = res.add_event(
+                Event::new("reset-shares")
+                    .add_attribute("market", market.id.as_str())
+                    .add_attribute("sender", sender),
+            );
+        }
         WorkDescription::ClearDeferredExec { id } => {
             assert_eq!(totals.deferred_exec, Some(id));
             totals.deferred_exec = None;

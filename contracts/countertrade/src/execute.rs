@@ -107,7 +107,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         ExecuteMsg::DoWork { market } => {
             funds.require_none()?;
             let market = state.load_cache_market_info(storage, &market)?;
-            crate::work::execute(storage, state, market)
+            crate::work::execute(storage, state, market, sender)
         }
         ExecuteMsg::AppointAdmin { admin } => {
             funds.require_none()?;
