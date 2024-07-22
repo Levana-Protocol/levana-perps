@@ -46,6 +46,16 @@ pub(super) struct DistributionsCsvOpt {
     /// Size of the fees pool
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_FEES_POOL_SIZE")]
     fees_pool_size: Decimal256,
+    /// Percentage of referee rewards
+    #[clap(long, env = "LEVANA_DISTRIBUTIONS_REFEREE_REWARDS_PERCENTAGE")]
+    referee_rewards_percentage: u64,
+    /// Referee wallet addresses
+    #[clap(
+        long,
+        env = "LEVANA_DISTRIBUTIONS_REFEREE_WALLETS",
+        value_delimiter = ','
+    )]
+    referee_wallets: Vec<Address>,
     /// Provide optional gRPC fallbacks URLs for factory
     #[clap(long, env = "COSMOS_GRPC_FALLBACKS", value_delimiter = ',')]
     cosmos_grpc_fallbacks: Vec<Url>,
@@ -75,6 +85,8 @@ async fn distributions_csv(
         retries,
         losses_pool_size,
         fees_pool_size,
+        referee_rewards_percentage,
+        referee_wallets,
         cosmos_grpc_fallbacks,
         vesting_date,
         skip_data_load,
@@ -149,40 +161,88 @@ async fn distributions_csv(
 
     for (cat, pool_size, TotalsTracker { total, entries }) in [
         (Category::Losses, losses_pool_size, losses),
-        (Category::Fees, fees_pool_size, fees),
+        (Category::Fees, fees_pool_size, fees.clone()),
     ] {
         for (recipient, amount) in entries {
             let amount = amount * pool_size / total;
-            if amount >= min_rewards {
-                output.serialize(&DistributionsRecord {
-                    recipient,
-                    amount,
-                    clawback: None,
-                    can_vote: false,
-                    can_receive_rewards: false,
-                    title: format!(
-                        "Levana’s \"{}\" campaign, {} through {}",
-                        match cat {
-                            Category::Losses => "degens win",
-                            Category::Fees => "trading incentives",
-                        },
-                        start_date.format("%Y-%m-%d"),
-                        end_date.format("%Y-%m-%d")
-                    ),
-                    vesting_date,
-                    r#type: match cat {
-                        Category::Losses => "losses",
-                        Category::Fees => "fees",
+            serialize_record(
+                &mut output,
+                min_rewards,
+                recipient,
+                amount,
+                format!(
+                    "Levana’s \"{}\" campaign, {} through {}",
+                    match cat {
+                        Category::Losses => "degens win",
+                        Category::Fees => "trading incentives",
                     },
-                })?;
-            }
+                    start_date.format("%Y-%m-%d"),
+                    end_date.format("%Y-%m-%d")
+                ),
+                vesting_date,
+                match cat {
+                    Category::Losses => "losses",
+                    Category::Fees => "fees",
+                },
+            )?;
+        }
+    }
+
+    let client = reqwest::Client::new();
+    let TokenPriceResp { price, .. } = client
+        .get("https://querier-testnet.levana.finance/v1/levana/token-price")
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    for wallet in referee_wallets {
+        if let Some(trading_fee) = fees.entries.get(&wallet) {
+            let amount = *trading_fee * Decimal256::percent(referee_rewards_percentage) / price;
+            serialize_record(
+                &mut output,
+                min_rewards,
+                wallet,
+                amount,
+                format!(
+                    "Levana's \"referee rewards\" campaign, {} through {}",
+                    start_date.format("%Y-%m-%d"),
+                    end_date.format("%Y-%m-%d")
+                ),
+                vesting_date,
+                "referee rewards",
+            )?;
         }
     }
 
     Ok(())
 }
 
-#[derive(Default)]
+fn serialize_record(
+    output: &mut csv::Writer<std::fs::File>,
+    min_rewards: Decimal256,
+    recipient: Address,
+    amount: Decimal256,
+    title: String,
+    vesting_date: DateTime<Utc>,
+    r#type: &'static str,
+) -> anyhow::Result<()> {
+    if amount >= min_rewards {
+        output.serialize(&DistributionsRecord {
+            recipient,
+            amount,
+            clawback: None,
+            can_vote: false,
+            can_receive_rewards: false,
+            title,
+            vesting_date,
+            r#type,
+        })?;
+    }
+    Ok(())
+}
+
+#[derive(Default, Clone)]
 struct TotalsTracker {
     total: Decimal256,
     entries: HashMap<Address, Decimal256>,
@@ -206,4 +266,9 @@ pub(crate) struct DistributionsRecord {
     pub(crate) can_receive_rewards: bool,
     pub(crate) title: String,
     pub(crate) r#type: &'static str,
+}
+
+#[derive(serde::Deserialize)]
+pub(crate) struct TokenPriceResp {
+    price: Decimal256,
 }
