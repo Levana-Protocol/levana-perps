@@ -549,6 +549,7 @@ pub(crate) async fn compute_coin_dnfs(
             }
             let present_today = historical_data.is_present_for_today();
             if present_today {
+                tracing::info!("Computing DNF using historical data");
                 let market_dnf = historical_data.compute_dnf(serve_opt.cmc_data_age_days)?;
                 let dnf_notify = check_market_status(
                     &market_config,
@@ -583,65 +584,6 @@ pub(crate) async fn compute_coin_dnfs(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use crate::coingecko::{CmcMarketPair, ExchangeId};
-
-    #[test]
-    fn sample_dnf_computation() {
-        let exchanges = vec![
-            CmcMarketPair {
-                exchange_id: crate::coingecko::ExchangeId(50),
-                exchange_name: "mexc".to_owned(),
-                market_id: "LVN_USD".to_owned(),
-                depth_usd_negative_two: 5828.0,
-                depth_usd_positive_two: 7719.0,
-                volume_24h_usd: 27304.39,
-                outlier_detected: 0.2,
-            },
-            CmcMarketPair {
-                exchange_id: ExchangeId(42),
-                exchange_name: "gate.io".to_owned(),
-                market_id: "LVN_USD".to_owned(),
-                depth_usd_negative_two: 1756.0,
-                depth_usd_positive_two: 22140.0,
-                volume_24h_usd: 23065.95,
-                outlier_detected: 0.0,
-            },
-        ];
-        let dnf = super::compute_dnf_sensitivity(exchanges).unwrap();
-        assert_eq!(dnf.dnf.0.round(), 268783.0, "Expected DNF");
-    }
-
-    #[test]
-    fn validate_for_dnf_change_which_exceeds_threshold() {
-        let dnf_notify = compute_dnf_notify(DnfInNotional(0.4), DnfInNotional(1.0), 50.0, 10.0);
-        assert_eq!(dnf_notify.percentage_diff, 60.0);
-        assert!(dnf_notify.should_notify);
-
-        let dnf_notify = compute_dnf_notify(DnfInNotional(1.2), DnfInNotional(1.0), 50.0, 10.0);
-        assert_eq!(dnf_notify.percentage_diff.round(), -20.0);
-        assert!(dnf_notify.should_notify);
-    }
-
-    #[test]
-    fn validate_for_dnf_change_for_happy_case() {
-        let dnf_notify = compute_dnf_notify(DnfInNotional(0.8), DnfInNotional(1.0), 50.0, 10.0);
-        assert_eq!(dnf_notify.percentage_diff.round(), 20.0);
-        assert!(!dnf_notify.should_notify);
-
-        let dnf_notify = compute_dnf_notify(DnfInNotional(1.05), DnfInNotional(1.0), 50.0, 10.0);
-        assert_eq!(dnf_notify.percentage_diff.round(), -5.0);
-        assert!(!dnf_notify.should_notify);
-
-        let dnf_notify = compute_dnf_notify(DnfInNotional(1.0), DnfInNotional(1.0), 50.0, 10.0);
-        assert_eq!(dnf_notify.percentage_diff, 0.0);
-        assert!(!dnf_notify.should_notify);
-    }
-}
-
 async fn check_market_status(
     market_config: &MarketsConfig,
     market_id: &MarketId,
@@ -649,6 +591,7 @@ async fn check_market_status(
     market_dnf: &Dnf,
     serve_opt: ServeOpt,
 ) -> anyhow::Result<DnfNotify> {
+    tracing::info!("Checking market status for {market_id}");
     let configured_dnf = market_config
         .get_chain_dnf(market_id)
         .context(format!("No DNF configured for {market_id:?}"))?;
@@ -715,4 +658,63 @@ async fn check_market_status(
         dnf_notify.configured_dnf.0
     );
     Ok(dnf_notify)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::coingecko::{CmcMarketPair, ExchangeId};
+
+    #[test]
+    fn sample_dnf_computation() {
+        let exchanges = vec![
+            CmcMarketPair {
+                exchange_id: crate::coingecko::ExchangeId(50),
+                exchange_name: "mexc".to_owned(),
+                market_id: "LVN_USD".to_owned(),
+                depth_usd_negative_two: 5828.0,
+                depth_usd_positive_two: 7719.0,
+                volume_24h_usd: 27304.39,
+                outlier_detected: 0.2,
+            },
+            CmcMarketPair {
+                exchange_id: ExchangeId(42),
+                exchange_name: "gate.io".to_owned(),
+                market_id: "LVN_USD".to_owned(),
+                depth_usd_negative_two: 1756.0,
+                depth_usd_positive_two: 22140.0,
+                volume_24h_usd: 23065.95,
+                outlier_detected: 0.0,
+            },
+        ];
+        let dnf = super::compute_dnf_sensitivity(exchanges).unwrap();
+        assert_eq!(dnf.dnf.0.round(), 268783.0, "Expected DNF");
+    }
+
+    #[test]
+    fn validate_for_dnf_change_which_exceeds_threshold() {
+        let dnf_notify = compute_dnf_notify(DnfInNotional(0.4), DnfInNotional(1.0), 50.0, 10.0);
+        assert_eq!(dnf_notify.percentage_diff, 60.0);
+        assert!(dnf_notify.should_notify);
+
+        let dnf_notify = compute_dnf_notify(DnfInNotional(1.2), DnfInNotional(1.0), 50.0, 10.0);
+        assert_eq!(dnf_notify.percentage_diff.round(), -20.0);
+        assert!(dnf_notify.should_notify);
+    }
+
+    #[test]
+    fn validate_for_dnf_change_for_happy_case() {
+        let dnf_notify = compute_dnf_notify(DnfInNotional(0.8), DnfInNotional(1.0), 50.0, 10.0);
+        assert_eq!(dnf_notify.percentage_diff.round(), 20.0);
+        assert!(!dnf_notify.should_notify);
+
+        let dnf_notify = compute_dnf_notify(DnfInNotional(1.05), DnfInNotional(1.0), 50.0, 10.0);
+        assert_eq!(dnf_notify.percentage_diff.round(), -5.0);
+        assert!(!dnf_notify.should_notify);
+
+        let dnf_notify = compute_dnf_notify(DnfInNotional(1.0), DnfInNotional(1.0), 50.0, 10.0);
+        assert_eq!(dnf_notify.percentage_diff, 0.0);
+        assert!(!dnf_notify.should_notify);
+    }
 }
