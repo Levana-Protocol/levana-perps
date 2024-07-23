@@ -103,7 +103,7 @@ impl DnfInNotional {
     }
 }
 
-#[derive(PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy)]
 pub(crate) struct DnfInUsd(pub(crate) f64);
 
 impl Display for DnfInUsd {
@@ -147,7 +147,7 @@ impl Ord for MinDepthLiquidity {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy)]
 pub(crate) struct Dnf {
     pub(crate) dnf_in_notional: DnfInNotional,
     pub(crate) dnf_in_usd: DnfInUsd,
@@ -372,7 +372,7 @@ pub(crate) struct HistoricalData {
     pub(crate) data: Vec<DnfRecord>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy)]
 pub(crate) struct DnfRecord {
     pub(crate) date: NaiveDate,
     pub(crate) result: Dnf,
@@ -426,12 +426,11 @@ impl HistoricalData {
         tracing::info!("compute_dnf: 1, len: {}", historical_data.data.len());
         historical_data
             .data
-            .sort_by_cached_key(|item| Reverse(item.result.min_depth_liquidity));
+            .sort_by_cached_key(|item| item.result.min_depth_liquidity);
         tracing::info!("compute_dnf: 2");
         let result = historical_data
             .data
-            .into_iter()
-            .next()
+            .last()
             .context("Empty historical data")?;
         tracing::info!("compute_dnf: 3");
         Ok(result.result)
