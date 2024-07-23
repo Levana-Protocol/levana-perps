@@ -133,17 +133,18 @@ impl MinDepthLiquidity {
 
 impl Eq for MinDepthLiquidity {}
 
-impl PartialOrd for MinDepthLiquidity {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.0.partial_cmp(&other.0)
-    }
-}
-
 impl Ord for MinDepthLiquidity {
     fn cmp(&self, other: &MinDepthLiquidity) -> Ordering {
         // We assume that it doesn't contain NAN as part of its
         // domain.
-        self.partial_cmp(other).unwrap()
+        self.0.partial_cmp(&other.0).unwrap()
+    }
+}
+
+#[allow(clippy::non_canonical_partial_ord_impl)]
+impl PartialOrd for MinDepthLiquidity {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.0.partial_cmp(&other.0)
     }
 }
 
