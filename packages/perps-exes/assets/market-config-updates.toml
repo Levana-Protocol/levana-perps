@@ -50,7 +50,7 @@ initial-borrow-fee-rate = "0.1"
 
 [markets.AVAX_USDC.config]
 carry_leverage = "7"
-max_leverage = "30"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.05"
 target_utilization = "0.5"
@@ -208,7 +208,7 @@ initial-borrow-fee-rate = "0.05"
 
 [markets.DOGE_USDC.config]
 carry_leverage = "7"
-max_leverage = "30"
+max_leverage = "50"
 funding_rate_sensitivity = "1.5"
 borrow_fee_rate_min_annualized = "0.03"
 target_utilization = "0.5"
