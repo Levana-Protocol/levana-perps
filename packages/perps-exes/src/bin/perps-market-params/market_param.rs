@@ -421,15 +421,19 @@ impl HistoricalData {
     }
 
     pub(crate) fn compute_dnf(&self, days_to_consider: u64) -> anyhow::Result<Dnf> {
+        tracing::info!("compute_dnf: 0");
         let mut historical_data = self.till_days(Some(days_to_consider))?;
+        tracing::info!("compute_dnf: 1");
         historical_data
             .data
             .sort_by_key(|item| Reverse(item.result.min_depth_liquidity));
+        tracing::info!("compute_dnf: 2");
         let result = historical_data
             .data
             .into_iter()
             .next()
             .context("Empty historical data")?;
+        tracing::info!("compute_dnf: 3");
         Ok(result.result)
     }
 
