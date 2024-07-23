@@ -721,7 +721,7 @@ mod tests {
 
     #[test]
     fn test_min_depth_sort() {
-        let mut data = vec![
+        let mut data = [
             MinDepthLiquidity(1.0),
             MinDepthLiquidity(9.0),
             MinDepthLiquidity(4.0),
