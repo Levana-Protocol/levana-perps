@@ -548,7 +548,7 @@ pub(crate) async fn compute_coin_dnfs(
                 );
             }
             let present_today = historical_data.is_present_for_today();
-            if present_today {
+            if present_today && data_present {
                 tracing::info!("Computing DNF using historical data");
                 let market_dnf = historical_data.compute_dnf(serve_opt.cmc_data_age_days)?;
                 let dnf_notify = check_market_status(
