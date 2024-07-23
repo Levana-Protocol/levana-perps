@@ -7,6 +7,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use cosmos::Address;
 use cosmwasm_std::Decimal256;
+use perps_exes::config::MainnetFactories;
 use reqwest::Url;
 use shared::storage::UnsignedDecimal;
 
@@ -49,13 +50,6 @@ pub(super) struct DistributionsCsvOpt {
     /// Percentage of referee rewards
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_REFEREE_REWARDS_PERCENTAGE")]
     referee_rewards_percentage: u64,
-    /// Referee wallet addresses
-    #[clap(
-        long,
-        env = "LEVANA_DISTRIBUTIONS_REFEREE_WALLETS",
-        value_delimiter = ','
-    )]
-    referee_wallets: Vec<Address>,
     /// Provide optional gRPC fallbacks URLs for factory
     #[clap(long, env = "COSMOS_GRPC_FALLBACKS", value_delimiter = ',')]
     cosmos_grpc_fallbacks: Vec<Url>,
@@ -86,7 +80,6 @@ async fn distributions_csv(
         losses_pool_size,
         fees_pool_size,
         referee_rewards_percentage,
-        referee_wallets,
         cosmos_grpc_fallbacks,
         vesting_date,
         skip_data_load,
@@ -190,19 +183,23 @@ async fn distributions_csv(
 
     let client = reqwest::Client::new();
     let TokenPriceResp { price, .. } = client
-        .get("https://querier-testnet.levana.finance/v1/levana/token-price")
+        .get("https://querier-mainnet.levana.finance/v1/levana/token-price")
         .send()
         .await?
         .error_for_status()?
         .json()
         .await?;
-    for wallet in referee_wallets {
-        if let Some(trading_fee) = fees.entries.get(&wallet) {
-            let amount = *trading_fee * Decimal256::percent(referee_rewards_percentage) / price;
+    let factories = MainnetFactories::load()?;
+    let factory = factories.get(&factory)?;
+    let network = factory.network.to_string();
+    let factory = factory.address;
+    for (recipient, amount) in fees.entries {
+        if validate_referee_wallet(recipient, network.clone(), factory, client.clone()).await? {
+            let amount = amount * Decimal256::percent(referee_rewards_percentage) / price;
             serialize_record(
                 &mut output,
                 min_rewards,
-                wallet,
+                recipient,
                 amount,
                 format!(
                     "Levana's \"referee rewards\" campaign, {} through {}",
@@ -242,6 +239,30 @@ fn serialize_record(
     Ok(())
 }
 
+async fn validate_referee_wallet(
+    wallet: Address,
+    network: String,
+    factory: Address,
+    client: reqwest::Client,
+) -> Result<bool> {
+    let url = reqwest::Url::parse_with_params(
+        "https://querier-mainnet.levana.finance/v1/perps/referral-stats",
+        &[
+            ("network", &network),
+            ("factory", &factory.to_string()),
+            ("wallet", &wallet.to_string()),
+        ],
+    )?;
+    let ReferralStatsResp { referrer } = client
+        .get(url)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    Ok(referrer.is_some())
+}
+
 #[derive(Default, Clone)]
 struct TotalsTracker {
     total: Decimal256,
@@ -269,6 +290,11 @@ pub(crate) struct DistributionsRecord {
 }
 
 #[derive(serde::Deserialize)]
-pub(crate) struct TokenPriceResp {
+struct TokenPriceResp {
     price: Decimal256,
+}
+
+#[derive(serde::Deserialize)]
+struct ReferralStatsResp {
+    referrer: Option<Address>,
 }
