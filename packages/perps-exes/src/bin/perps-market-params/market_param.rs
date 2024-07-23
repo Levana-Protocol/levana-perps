@@ -79,7 +79,7 @@ pub(crate) fn dnf_sensitivity_to_max_leverage(dnf_sensitivity: DnfInUsd) -> f64 
     }
 }
 
-#[derive(PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy)]
 pub(crate) struct DnfInNotional(pub(crate) f64);
 
 impl Display for DnfInNotional {
@@ -498,8 +498,8 @@ pub(crate) async fn compute_coin_dnfs(
     serve_opt: ServeOpt,
     opt: Opt,
 ) -> anyhow::Result<()> {
-    let http_app = HttpApp::new(Some(serve_opt.slack_webhook), opt.cmc_key.clone());
-    let data_dir = serve_opt.cmc_data_dir;
+    let http_app = HttpApp::new(Some(serve_opt.slack_webhook.clone()), opt.cmc_key.clone());
+    let data_dir = serve_opt.cmc_data_dir.clone();
     loop {
         tracing::info!("Going to fetch market status from querier");
         let market_config = http_app
@@ -527,105 +527,8 @@ pub(crate) async fn compute_coin_dnfs(
                 historical_data.data.len()
             );
             let data_present = historical_data.is_present_until(now_minus_days);
-            if data_present {
-                let configured_dnf = market_config
-                    .get_chain_dnf(market_id)
-                    .context(format!("No DNF configured for {market_id:?}"))?;
-                let configured_max_leverage = market_config
-                    .get_chain_max_leverage(market_id)
-                    .context(format!("No max_leverage configured for {market_id:?}"))?;
-
-                let max_leverage = dnf_sensitivity_to_max_leverage(
-                    configured_dnf
-                        .to_asset_amount(NotionalAsset(market_id.get_notional()), &http_app)
-                        .await?,
-                );
-                tracing::info!(
-                    "Configured max_leverage for {market_id}: {configured_max_leverage}"
-                );
-                tracing::info!("Recommended max_leverage for {market_id}: {max_leverage}");
-
-                if configured_max_leverage != max_leverage {
-                    http_app
-                        .send_notification(
-                            format!(
-                            ":information_source: Recommended Max leverage change for {market_id}"
-                        ),
-                            format!(
-                                "Configured Max leverage: *{}* \n Recommended Max leverage: *{}*",
-                                configured_max_leverage, max_leverage
-                            ),
-                        )
-                        .await?;
-                }
-
-                let present_today = historical_data.is_present_for_today();
-                let market_dnf = if present_today {
-                    historical_data.compute_dnf(serve_opt.cmc_data_age_days)?
-                } else {
-                    let dnf = dnf_sensitivity(&http_app, market_id).await;
-                    let dnf = match dnf {
-                        Ok(dnf) => dnf,
-                        Err(ref error) => {
-                            if error.to_string().contains("Exchange type not known for id") {
-                                error_markets.push(market_id);
-                                continue;
-                            } else {
-                                dnf?
-                            }
-                        }
-                    };
-                    historical_data.append_and_save(
-                        dnf,
-                        market_id,
-                        data_dir.clone(),
-                        Some(serve_opt.cmc_data_age_days),
-                    )?;
-                    historical_data.compute_dnf(serve_opt.cmc_data_age_days)?
-                };
-                let dnf_notify = compute_dnf_notify(
-                    market_dnf.dnf_in_notional,
-                    configured_dnf,
-                    serve_opt.dnf_increase_threshold,
-                    serve_opt.dnf_decrease_threshold,
-                );
-                tracing::info!(
-                    "Percentage DNF deviation for {market_id}: {} %",
-                    dnf_notify.percentage_diff
-                );
-                if dnf_notify.should_notify {
-                    tracing::info!("Going to send Slack notification");
-                    let percentage_diff = dnf_notify.percentage_diff.abs().round();
-                    let (icon, status) = match dnf_notify.status {
-                        ConfiguredDnfStatus::Lenient => (
-                            ":chart_with_downwards_trend:",
-                            format!("lenient (*Decrease* it by {}%)", percentage_diff),
-                        ),
-                        ConfiguredDnfStatus::Strict => (
-                            ":chart_with_upwards_trend:",
-                            format!("strict (*Increase* it by {}%)", percentage_diff),
-                        ),
-                    };
-
-                    http_app
-                    .send_notification(
-                        format!("{icon} Recommended DNF change for {market_id}"),
-                        format!(
-                            "Configured DNF is {status} \n Configured DNF: *{}* \n Recommended DNF: *{}*",
-                            dnf_notify.configured_dnf.0, dnf_notify.computed_dnf.0.round()
-                        ),
-                    )
-                    .await?;
-                }
-                tracing::info!(
-                    "Finished computing DNF for {market_id:?}: {} (Configured DNF: {})",
-                    dnf_notify.computed_dnf.0,
-                    dnf_notify.configured_dnf.0
-                );
-                app.market_params
-                    .write()
-                    .insert(market_id.clone(), dnf_notify);
-            } else {
+            tracing::info!("data present: {data_present}");
+            if !data_present {
                 // Compute todays data and save it
                 let dnf = dnf_sensitivity(&http_app, market_id).await;
                 let dnf = match dnf {
@@ -645,6 +548,22 @@ pub(crate) async fn compute_coin_dnfs(
                     historical_data.data.len()
                 );
             }
+            let present_today = historical_data.is_present_for_today();
+            if present_today {
+                let market_dnf = historical_data.compute_dnf(serve_opt.cmc_data_age_days)?;
+                let dnf_notify = check_market_status(
+                    &market_config,
+                    market_id,
+                    &http_app,
+                    &market_dnf,
+                    serve_opt.clone(),
+                )
+                .await?;
+                app.market_params
+                    .write()
+                    .insert(market_id.clone(), dnf_notify);
+            }
+
             if serve_opt.cmc_wait_seconds > 0 {
                 tracing::info!(
                     "Going to sleep {} seconds to avoid getting rate limited",
@@ -722,4 +641,79 @@ mod tests {
         assert_eq!(dnf_notify.percentage_diff, 0.0);
         assert!(!dnf_notify.should_notify);
     }
+}
+
+async fn check_market_status(
+    market_config: &MarketsConfig,
+    market_id: &MarketId,
+    http_app: &HttpApp,
+    market_dnf: &Dnf,
+    serve_opt: ServeOpt,
+) -> anyhow::Result<DnfNotify> {
+    let configured_dnf = market_config
+        .get_chain_dnf(market_id)
+        .context(format!("No DNF configured for {market_id:?}"))?;
+    let configured_max_leverage = market_config
+        .get_chain_max_leverage(market_id)
+        .context(format!("No max_leverage configured for {market_id:?}"))?;
+    let max_leverage = dnf_sensitivity_to_max_leverage(
+        configured_dnf
+            .to_asset_amount(NotionalAsset(market_id.get_notional()), http_app)
+            .await?,
+    );
+    tracing::info!("Configured max_leverage for {market_id}: {configured_max_leverage}");
+    tracing::info!("Recommended max_leverage for {market_id}: {max_leverage}");
+
+    if configured_max_leverage != max_leverage {
+        http_app
+            .send_notification(
+                format!(":information_source: Recommended Max leverage change for {market_id}"),
+                format!(
+                    "Configured Max leverage: *{}* \n Recommended Max leverage: *{}*",
+                    configured_max_leverage, max_leverage
+                ),
+            )
+            .await?;
+    }
+    let dnf_notify = compute_dnf_notify(
+        market_dnf.dnf_in_notional,
+        configured_dnf,
+        serve_opt.dnf_increase_threshold,
+        serve_opt.dnf_decrease_threshold,
+    );
+    tracing::info!(
+        "Percentage DNF deviation for {market_id}: {} %",
+        dnf_notify.percentage_diff
+    );
+    if dnf_notify.should_notify {
+        tracing::info!("Going to send Slack notification");
+        let percentage_diff = dnf_notify.percentage_diff.abs().round();
+        let (icon, status) = match dnf_notify.status {
+            ConfiguredDnfStatus::Lenient => (
+                ":chart_with_downwards_trend:",
+                format!("lenient (*Decrease* it by {}%)", percentage_diff),
+            ),
+            ConfiguredDnfStatus::Strict => (
+                ":chart_with_upwards_trend:",
+                format!("strict (*Increase* it by {}%)", percentage_diff),
+            ),
+        };
+
+        http_app
+            .send_notification(
+                format!("{icon} Recommended DNF change for {market_id}"),
+                format!(
+                    "Configured DNF is {status} \n Configured DNF: *{}* \n Recommended DNF: *{}*",
+                    dnf_notify.configured_dnf.0,
+                    dnf_notify.computed_dnf.0.round()
+                ),
+            )
+            .await?;
+    }
+    tracing::info!(
+        "Finished computing DNF for {market_id:?}: {} (Configured DNF: {})",
+        dnf_notify.computed_dnf.0,
+        dnf_notify.configured_dnf.0
+    );
+    Ok(dnf_notify)
 }
