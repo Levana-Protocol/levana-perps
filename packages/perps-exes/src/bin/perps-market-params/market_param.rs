@@ -1,5 +1,5 @@
 use std::{
-    cmp::{Ordering, Reverse},
+    cmp::Ordering,
     fmt::Display,
     fs::File,
     io::BufReader,
@@ -425,7 +425,7 @@ impl HistoricalData {
         let mut historical_data = self.till_days(Some(days_to_consider))?;
         historical_data
             .data
-            .sort_by_key(|item| Reverse(item.result.min_depth_liquidity));
+            .sort_by_key(|item| item.result.min_depth_liquidity);
         let result = historical_data
             .data
             .into_iter()
