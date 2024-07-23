@@ -112,7 +112,7 @@ impl Display for DnfInUsd {
     }
 }
 
-#[derive(PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy)]
+#[derive(PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy, Debug)]
 pub(crate) struct MinDepthLiquidity(pub(crate) f64);
 
 impl Display for MinDepthLiquidity {
@@ -133,17 +133,18 @@ impl MinDepthLiquidity {
 
 impl Eq for MinDepthLiquidity {}
 
-impl PartialOrd for MinDepthLiquidity {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
 impl Ord for MinDepthLiquidity {
     fn cmp(&self, other: &MinDepthLiquidity) -> Ordering {
         // We assume that it doesn't contain NAN as part of its
         // domain.
-        self.partial_cmp(other).unwrap()
+        self.0.partial_cmp(&other.0).unwrap()
+    }
+}
+
+#[allow(clippy::non_canonical_partial_ord_impl)]
+impl PartialOrd for MinDepthLiquidity {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.0.partial_cmp(&other.0)
     }
 }
 
@@ -716,5 +717,17 @@ mod tests {
         let dnf_notify = compute_dnf_notify(DnfInNotional(1.0), DnfInNotional(1.0), 50.0, 10.0);
         assert_eq!(dnf_notify.percentage_diff, 0.0);
         assert!(!dnf_notify.should_notify);
+    }
+
+    #[test]
+    fn test_min_depth_sort() {
+        let mut data = [
+            MinDepthLiquidity(1.0),
+            MinDepthLiquidity(9.0),
+            MinDepthLiquidity(4.0),
+        ];
+        data.sort();
+        let last = data.last().unwrap();
+        assert_eq!(*last, MinDepthLiquidity(9.0));
     }
 }
