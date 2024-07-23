@@ -128,14 +128,13 @@ async fn main_inner(opt: Opt) -> Result<()> {
                 .context("No max_leverage configured")?;
             let recommended_configured_max_leverage = dnf_sensitivity_to_max_leverage(
                 configured_dnf
-                    .to_asset_amount(NotionalAsset(market_id.get_notional()), &http_app)
+                    .as_asset_amount(NotionalAsset(market_id.get_notional()), &http_app)
                     .await?,
             );
 
             let max_leverage = dnf_sensitivity_to_max_leverage(dnf.dnf_in_usd);
 
-            let dnf_notify =
-                compute_dnf_notify(dnf.dnf_in_notional, configured_dnf.clone(), 100.0, 50.0);
+            let dnf_notify = compute_dnf_notify(dnf.dnf_in_notional, configured_dnf, 100.0, 50.0);
             tracing::info!("Computed DNF sensitivity: {}", dnf_notify.computed_dnf);
 
             if configured_dnf.0 != 0.0 {

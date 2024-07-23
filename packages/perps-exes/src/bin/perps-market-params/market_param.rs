@@ -89,7 +89,7 @@ impl Display for DnfInNotional {
 }
 
 impl DnfInNotional {
-    pub(crate) async fn to_asset_amount(
+    pub(crate) async fn as_asset_amount(
         &self,
         asset: NotionalAsset<'_>,
         http_app: &HttpApp,
@@ -658,7 +658,7 @@ async fn check_market_status(
         .context(format!("No max_leverage configured for {market_id:?}"))?;
     let max_leverage = dnf_sensitivity_to_max_leverage(
         configured_dnf
-            .to_asset_amount(NotionalAsset(market_id.get_notional()), http_app)
+            .as_asset_amount(NotionalAsset(market_id.get_notional()), http_app)
             .await?,
     );
     tracing::info!("Configured max_leverage for {market_id}: {configured_max_leverage}");
