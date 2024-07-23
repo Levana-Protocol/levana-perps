@@ -112,7 +112,7 @@ impl Display for DnfInUsd {
     }
 }
 
-#[derive(PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy)]
+#[derive(PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy, Debug)]
 pub(crate) struct MinDepthLiquidity(pub(crate) f64);
 
 impl Display for MinDepthLiquidity {
@@ -135,7 +135,7 @@ impl Eq for MinDepthLiquidity {}
 
 impl PartialOrd for MinDepthLiquidity {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+        self.0.partial_cmp(&other.0)
     }
 }
 
@@ -716,5 +716,17 @@ mod tests {
         let dnf_notify = compute_dnf_notify(DnfInNotional(1.0), DnfInNotional(1.0), 50.0, 10.0);
         assert_eq!(dnf_notify.percentage_diff, 0.0);
         assert!(!dnf_notify.should_notify);
+    }
+
+    #[test]
+    fn test_min_depth_sort() {
+        let mut data = vec![
+            MinDepthLiquidity(1.0),
+            MinDepthLiquidity(9.0),
+            MinDepthLiquidity(4.0),
+        ];
+        data.sort();
+        let last = data.last().unwrap();
+        assert_eq!(*last, MinDepthLiquidity(9.0));
     }
 }
