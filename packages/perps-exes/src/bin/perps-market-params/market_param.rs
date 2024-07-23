@@ -527,7 +527,6 @@ pub(crate) async fn compute_coin_dnfs(
                 historical_data.data.len()
             );
             let data_present = historical_data.is_present_until(now_minus_days);
-            tracing::info!("data present: {data_present}");
             if !data_present {
                 // Compute todays data and save it
                 let dnf = dnf_sensitivity(&http_app, market_id).await;
