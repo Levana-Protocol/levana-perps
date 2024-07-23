@@ -42,3 +42,20 @@ pub(crate) struct MarketInfo {
     pub(crate) addr: Addr,
     pub(crate) token: msg::token::Token,
 }
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub(crate) enum ResetSharesCursor {
+    Begin,
+    LastSaw(Addr, MarketId),
+}
+
+impl ResetSharesCursor {
+    pub(crate) fn as_bound(&self) -> Option<Bound<(&Addr, &MarketId)>> {
+        match self {
+            ResetSharesCursor::Begin => None,
+            ResetSharesCursor::LastSaw(addr, market_id) => {
+                Some(Bound::exclusive((addr, market_id)))
+            }
+        }
+    }
+}

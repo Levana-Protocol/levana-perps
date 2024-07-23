@@ -10,6 +10,8 @@ use shared::storage::{
 
 use crate::prelude::*;
 
+const DEFAULT_LIMIT: usize = 10;
+
 pub(crate) fn get_work_for(
     _storage: &dyn Storage,
     state: &State,
@@ -324,14 +326,27 @@ pub(crate) fn execute(
             );
         }
         WorkDescription::ResetShares => {
-            let keys = crate::state::SHARES.keys(storage, None, None, Order::Ascending);
+            let shares_cursor = crate::state::SHARES_CURSOR.may_load(storage)?;
+            let shares_cursor = match shares_cursor {
+                Some(ref cursor) => Some(cursor.as_bound()).flatten(),
+                None => None,
+            };
+
+            let shares = crate::state::SHARES
+                .keys(storage, shares_cursor, None, Order::Ascending)
+                .take(DEFAULT_LIMIT);
+
             let mut to_remove = vec![];
-            for key in keys {
-                let (addr, market_id) = key?;
-                if market_id == market.id {
-                    to_remove.push(addr);
+            let mut last_seen = ResetSharesCursor::Begin;
+            for key in shares {
+                let key = key?;
+                let (addr, market_id) = key;
+                if &market_id == &market.id {
+                    to_remove.push(addr.clone());
                 }
+                last_seen = ResetSharesCursor::LastSaw(addr, market_id);
             }
+            crate::state::SHARES_CURSOR.save(storage, &last_seen)?;
             for item in to_remove {
                 crate::state::SHARES.remove(storage, (&item, &market.id));
             }
