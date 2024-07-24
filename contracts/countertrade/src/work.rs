@@ -333,6 +333,7 @@ pub(crate) fn execute(
                 crate::state::SHARES.remove(storage, (&addr, &market.id));
                 crate::state::REVERSE_SHARES.remove(storage, (&market.id, &addr));
             }
+            crate::state::TOTALS.remove(storage, &market.id);
 
             res = res
                 .add_event(Event::new("reset-shares").add_attribute("market", market.id.as_str()));
