@@ -10,8 +10,6 @@ use shared::storage::{
 
 use crate::prelude::*;
 
-const DEFAULT_LIMIT: usize = 10;
-
 pub(crate) fn get_work_for(
     _storage: &dyn Storage,
     state: &State,
@@ -239,7 +237,6 @@ pub(crate) fn execute(
     storage: &mut dyn Storage,
     state: State,
     market: MarketInfo,
-    sender: Addr,
 ) -> Result<Response> {
     let mut totals = crate::state::TOTALS
         .may_load(storage, &market.id)?
@@ -326,30 +323,17 @@ pub(crate) fn execute(
             );
         }
         WorkDescription::ResetShares => {
-            let shares_cursor = crate::state::SHARES_CURSOR.may_load(storage)?;
-            let shares_cursor = match shares_cursor {
-                Some(ref cursor) => Some(cursor.as_bound()).flatten(),
-                None => None,
-            };
+            let remove_keys: Vec<_> = crate::state::REVERSE_SHARES
+                .prefix(&market.id)
+                .range(storage, None, None, Order::Ascending)
+                .collect();
 
-            let shares = crate::state::SHARES
-                .keys(storage, shares_cursor, None, Order::Ascending)
-                .take(DEFAULT_LIMIT);
+            for key in remove_keys {
+                let (addr, _) = key?;
+                crate::state::SHARES.remove(storage, (&addr, &market.id));
+                crate::state::REVERSE_SHARES.remove(storage, (&market.id, &addr));
+            }
 
-            let mut to_remove = vec![];
-            let mut last_seen = ResetSharesCursor::Begin;
-            for key in shares {
-                let key = key?;
-                let (addr, market_id) = key;
-                if &market_id == &market.id {
-                    to_remove.push(addr.clone());
-                }
-                last_seen = ResetSharesCursor::LastSaw(addr, market_id);
-            }
-            crate::state::SHARES_CURSOR.save(storage, &last_seen)?;
-            for item in to_remove {
-                crate::state::SHARES.remove(storage, (&item, &market.id));
-            }
             res = res
                 .add_event(Event::new("reset-shares").add_attribute("market", market.id.as_str()));
         }
