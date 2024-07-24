@@ -107,7 +107,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
         ExecuteMsg::DoWork { market } => {
             funds.require_none()?;
             let market = state.load_cache_market_info(storage, &market)?;
-            crate::work::execute(storage, state, market, sender)
+            crate::work::execute(storage, state, market)
         }
         ExecuteMsg::AppointAdmin { admin } => {
             funds.require_none()?;
@@ -145,6 +145,7 @@ fn deposit(
     let new_shares = totals.add_collateral(funds, &position_info)?;
     let sender_shares = new_shares.checked_add(sender_shares)?;
     crate::state::SHARES.save(storage, (&sender, &market.id), &sender_shares)?;
+    crate::state::REVERSE_SHARES.save(storage, (&market.id, &sender), &())?;
     crate::state::TOTALS.save(storage, &market.id, &totals)?;
 
     Ok(Response::new().add_event(
@@ -179,8 +180,12 @@ fn withdraw(
     let collateral = totals.remove_collateral(amount, &position_info)?;
     let sender_shares = sender_shares.checked_sub(amount.raw())?;
     match NonZero::new(sender_shares) {
-        None => crate::state::SHARES.remove(storage, (&sender, &market.id)),
+        None => {
+            crate::state::REVERSE_SHARES.remove(storage, (&market.id, &sender));
+            crate::state::SHARES.remove(storage, (&sender, &market.id))
+        }
         Some(sender_shares) => {
+            crate::state::REVERSE_SHARES.save(storage, (&market.id, &sender), &())?;
             crate::state::SHARES.save(storage, (&sender, &market.id), &sender_shares)?
         }
     }

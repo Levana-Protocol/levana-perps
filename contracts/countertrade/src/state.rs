@@ -6,7 +6,8 @@ pub(crate) const CONFIG: Item<Config> = Item::new("config");
 /// Shares held per wallet and market
 pub(crate) const SHARES: Map<(&Addr, &MarketId), NonZero<LpToken>> = Map::new("shares");
 
-pub(crate) const SHARES_CURSOR: Item<ResetSharesCursor> = Item::new("reset-shares");
+/// Reverse of SHARES
+pub(crate) const REVERSE_SHARES: Map<(&MarketId, &Addr), ()> = Map::new("reverse-shares");
 
 /// Total collateral information per market
 pub(crate) const TOTALS: Map<&MarketId, Totals> = Map::new("totals");
