@@ -91,7 +91,7 @@ pub(crate) struct ServeOpt {
     pub(crate) cmc_data_dir: PathBuf,
     /// Age in days till which we store data
     #[arg(long, env = "LEVANA_MPARAM_DATA_AGE_DAYS", default_value = "7")]
-    pub(crate) cmc_data_age_days: u64,
+    pub(crate) cmc_data_age_days: u16,
 }
 
 /// Parse a single key-value pair

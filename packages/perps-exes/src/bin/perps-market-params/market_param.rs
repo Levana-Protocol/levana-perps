@@ -396,9 +396,8 @@ impl HistoricalData {
         true
     }
 
-    pub(crate) fn is_present_for_today(&self) -> bool {
-        let now = Utc::now().date_naive();
-        self.data.iter().any(|item| item.date == now)
+    pub(crate) fn save(&self, market_id: &MarketId, data_dir: PathBuf) -> anyhow::Result<()> {
+        save_historical_data(market_id, data_dir, self.clone(), None)
     }
 
     pub(crate) fn append_and_save(
@@ -406,7 +405,7 @@ impl HistoricalData {
         dnf: Dnf,
         market_id: &MarketId,
         data_dir: PathBuf,
-        days_to_consider: Option<u64>,
+        days_to_consider: Option<u16>,
     ) -> anyhow::Result<()> {
         let now = Utc::now().date_naive();
         if self.data.iter().any(|item| item.date == now) {
@@ -421,7 +420,7 @@ impl HistoricalData {
         save_historical_data(market_id, data_dir, self.clone(), days_to_consider)
     }
 
-    pub(crate) fn compute_dnf(&self, days_to_consider: u64) -> anyhow::Result<Dnf> {
+    pub(crate) fn compute_dnf(&self, days_to_consider: u16) -> anyhow::Result<Dnf> {
         let mut historical_data = self.till_days(Some(days_to_consider))?;
         historical_data
             .data
@@ -436,7 +435,7 @@ impl HistoricalData {
 
     pub(crate) fn till_days(
         &self,
-        days_to_consider: Option<u64>,
+        days_to_consider: Option<u16>,
     ) -> anyhow::Result<HistoricalData> {
         let days_to_consider = match days_to_consider {
             Some(days) => days,
@@ -458,7 +457,7 @@ impl HistoricalData {
             .filter(|item| required_dates.contains(&item.date))
             .collect();
         ensure!(
-            result.len() == days_to_consider as usize,
+            result.len() == usize::from(days_to_consider),
             "Historical data ({}) is not matching the total days for calcuation",
             result.len()
         );
@@ -485,7 +484,7 @@ pub(crate) fn save_historical_data(
     market_id: &MarketId,
     data_dir: PathBuf,
     data: HistoricalData,
-    untill: Option<u64>,
+    untill: Option<u16>,
 ) -> anyhow::Result<()> {
     let path = get_market_file_path(market_id, &data_dir);
     let data = data.till_days(untill)?;
@@ -520,7 +519,7 @@ pub(crate) async fn compute_coin_dnfs(
             tracing::info!("Going to compute DNF for {market_id:?}");
             let now = Utc::now().date_naive();
             let now_minus_days = now
-                .checked_sub_days(Days::new(serve_opt.cmc_data_age_days))
+                .checked_sub_days(Days::new(serve_opt.cmc_data_age_days.into()))
                 .context("Not able to do checked subtraction on current time")?;
             let mut historical_data = load_historical_data(market_id, data_dir.clone())?;
             tracing::info!(
@@ -548,8 +547,7 @@ pub(crate) async fn compute_coin_dnfs(
                     historical_data.data.len()
                 );
             }
-            let present_today = historical_data.is_present_for_today();
-            if present_today && data_present {
+            if historical_data.is_present_until(now_minus_days) {
                 tracing::info!("Computing DNF using historical data");
                 let market_dnf = historical_data.compute_dnf(serve_opt.cmc_data_age_days)?;
                 let dnf_notify = check_market_status(
@@ -563,6 +561,8 @@ pub(crate) async fn compute_coin_dnfs(
                 app.market_params
                     .write()
                     .insert(market_id.clone(), dnf_notify);
+                historical_data = historical_data.till_days(Some(serve_opt.cmc_data_age_days))?;
+                historical_data.save(market_id, data_dir.clone())?;
             }
 
             if serve_opt.cmc_wait_seconds > 0 {
