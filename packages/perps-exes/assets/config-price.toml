@@ -37,6 +37,7 @@ USD_CNH = "eef52e09c878ad41f6a81803e3640fe04dceea727de894edd4ea117e2e332e66"
 WIF_USD = "4ca4beeca86f0d164160323817a4e42b10010a724c2217c6ee41b54cd4cc61fc"
 XAG_USD = "f2fb02c32b055c805e7238d628e5e9dadef274376114eb1f012337cabe93871e"
 XAU_USD = "765d2ba906dbc32ca17cc11f5310a89e9ee1f6420508c63861f2f8ba4ee34bb2"
+wstETH_USD = "6df640f3b8963d8f8358f791f352b8364513f6ab1cca5ed3f1f7b5448980e784"
 
 [pyth.edge]
 update-age-tolerance = 21
@@ -1923,6 +1924,32 @@ inverted = false
 
 [networks.neutron-testnet.amATOM_USD.feeds-usd.pyth]
 key = "ATOM_USD"
+inverted = false
+
+[[networks.neutron-testnet.BNB_USD.feeds]]
+
+[networks.neutron-testnet.BNB_USD.feeds.pyth]
+key = "BNB_USD"
+inverted = false
+
+[[networks.neutron-testnet.BNB_USD.feeds-usd]]
+
+[networks.neutron-testnet.BNB_USD.feeds-usd.pyth]
+key = "BNB_USD"
+inverted = false
+
+# This is a Neutron-style LSD market.
+# Collateral asset is an LSD, but the base asset is priced for the underlying ETH.
+[[networks.neutron-testnet.wstETH_USD.feeds]]
+
+[networks.neutron-testnet.wstETH_USD.feeds.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.neutron-testnet.wstETH_USD.feeds-usd]]
+
+[networks.neutron-testnet.wstETH_USD.feeds-usd.pyth]
+key = "wstETH_USD"
 inverted = false
 
 [[networks.dymension-testnet.DYM_USD.feeds]]

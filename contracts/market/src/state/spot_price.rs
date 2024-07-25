@@ -1,7 +1,6 @@
 use std::collections::{btree_map::Entry, BTreeMap};
 
 use crate::prelude::*;
-use anyhow::ensure;
 #[cfg(feature = "sei")]
 use cosmwasm_std::QuerierWrapper;
 use cosmwasm_std::{Binary, Order};
@@ -453,15 +452,18 @@ impl State<'_> {
             }
         }
 
-        // sanity check
-        if let Some(price_usd) = price_storage.price_base.try_into_usd(market_id) {
-            ensure!(
-                price_storage.price_usd == price_usd,
-                "Price in USD mismatch {} != {}",
-                price_storage.price_usd,
-                price_usd
-            );
-        }
+        // No longer valid sanity check. We now support markets where the base
+        // and collateral asset have different prices.
+        // This is used primarily for Liquid Staked Token (LSD) markets
+        // which are priced on the underlying asset.
+        // if let Some(price_usd) = price_storage.price_base.try_into_usd(market_id) {
+        //     ensure!(
+        //         price_storage.price_usd == price_usd,
+        //         "Price in USD mismatch {} != {}",
+        //         price_storage.price_usd,
+        //         price_usd
+        //     );
+        // }
 
         ctx.response_mut().add_event(SpotPriceEvent {
             timestamp: new_publish_time,

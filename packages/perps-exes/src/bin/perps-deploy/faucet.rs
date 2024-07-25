@@ -80,6 +80,7 @@ impl Faucet {
             "SEI" => "2000",
             "ETH" => "2",
             "axlETH" => "2",
+            "wstETH" => "2",
             "EVMOS" => "10000",
             "AKT" => "10000",
             "DOT" => "500",
@@ -94,6 +95,7 @@ impl Faucet {
             "stDYM" => "2000",
             "NTRN" => "2000",
             "SCRT" => "2000",
+            "BNB" => "10",
             name => anyhow::bail!("Unknown collateral type: {name}"),
         }
         .parse()?;

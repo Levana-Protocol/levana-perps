@@ -76,6 +76,21 @@ delta_neutrality_fee_tax = "0.5"
 liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
+[markets.BNB_USD]
+initial-borrow-fee-rate = "0.05"
+
+[markets.BNB_USD.config]
+carry_leverage = "7"
+max_leverage = "50"
+funding_rate_sensitivity = "1.5"
+borrow_fee_rate_min_annualized = "0.03"
+target_utilization = "0.5"
+borrow_fee_sensitivity = "0.3"
+delta_neutrality_fee_sensitivity = "1000000"
+delta_neutrality_fee_tax = "0.1"
+delta_neutrality_fee_cap = "0.0002"
+liquidity_cooldown_seconds = 86400
+
 [markets.BNB_USDC]
 initial-borrow-fee-rate = "0.05"
 
@@ -301,6 +316,20 @@ liquidity_cooldown_seconds = 86400
 initial-borrow-fee-rate = "0.05"
 
 [markets.ETH_USD.config]
+carry_leverage = "7"
+max_leverage = "50"
+funding_rate_sensitivity = "1.5"
+borrow_fee_rate_min_annualized = "0.03"
+target_utilization = "0.5"
+borrow_fee_sensitivity = "0.2"
+delta_neutrality_fee_sensitivity = "50000000000"
+delta_neutrality_fee_cap = "0.0002"
+liquidity_cooldown_seconds = 86400
+
+[markets.wstETH_USD]
+initial-borrow-fee-rate = "0.05"
+
+[markets.wstETH_USD.config]
 carry_leverage = "7"
 max_leverage = "50"
 funding_rate_sensitivity = "1.5"
