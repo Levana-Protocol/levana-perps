@@ -40,6 +40,12 @@ pub(crate) enum SubCommand {
         #[arg(long)]
         market_id: MarketId,
     },
+    /// Compute DNF sensitivity of current market condition
+    CurrentMarketDnf {
+        /// Market ID. Eg: ATOM_USD
+        #[arg(long)]
+        market_id: MarketId,
+    },
     /// Download market data in csv
     Market {
         /// Destination file location
