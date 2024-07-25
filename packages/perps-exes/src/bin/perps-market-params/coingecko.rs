@@ -306,7 +306,7 @@ impl Coin {
             Coin::StkAtom => ATOM_CMC_ID,
             Coin::StDym => DYM_CMC_ID,
             Coin::MilkTia => TIA_CMC_ID,
-            Coin::WstEth => ETH_CMC_ID,  // Since we are speculating on ETH
+            Coin::WstEth => ETH_CMC_ID, // Since we are speculating on ETH
         }
     }
 
