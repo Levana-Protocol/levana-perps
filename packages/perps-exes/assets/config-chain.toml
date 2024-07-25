@@ -41,6 +41,14 @@ type = "stable"
 denom = "untrn"
 decimal-places = 6
 
+[neutron-mainnet.assets.BNB]
+denom = "ibc/5CB2E12B07D0B6D8EC24A68BA6B6E6E8D5BF85B7D22091D3A480DCDD61C6AC84"
+decimal-places = 18
+
+[neutron-mainnet.assets.wstETH]
+denom = "factory/neutron1ug740qrkquxzrk2hh29qrlx3sktkfml3je7juusc2te7xmvsscns0n2wry/wstETH"
+decimal-places = 18
+
 [stargaze-testnet]
 tracker = "stars1vfa0a8846ay2l2ehmqtwxgpcxzes9m598kw6mjh50zgnqhxgwmys7fkew3"
 faucet = "stars1pnlmx33qgx7822t7tc73znu0ddkxzcg29rshpls6acdlrrr7snkst4xwq6"
