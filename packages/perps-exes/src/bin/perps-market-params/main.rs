@@ -108,6 +108,14 @@ async fn main_inner(opt: Opt) -> Result<()> {
                 tracing::info!("{}", market.status.market_id);
             }
         }
+        cli::SubCommand::CurrentMarketDnf { market_id } => {
+            let http_app = HttpApp::new(None, opt.cmc_key.clone());
+            let dnf = dnf_sensitivity(&http_app, &market_id).await?;
+            let max_leverage = dnf_sensitivity_to_max_leverage(dnf.dnf_in_usd);
+
+            tracing::info!("DNF: {}", dnf.dnf_in_notional);
+            tracing::info!("Max leverage: {max_leverage}");
+        }
         cli::SubCommand::Dnf { market_id } => {
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
             let dnf = dnf_sensitivity(&http_app, &market_id).await?;

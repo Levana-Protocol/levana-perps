@@ -12,7 +12,11 @@ download-levana-market:
 
 # Compute dnf
 compute-dnf:
-	cargo run --bin perps-market-params dnf --market-id BONK_USDC
+	cargo run --bin perps-market-params dnf --market-id wstETH_USD
+
+# Current market dnf
+current-dnf:
+	cargo run --bin perps-market-params current-market-dnf --market-id wstETH_USD
 
 # Serve web app
 serve:
