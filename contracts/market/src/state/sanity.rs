@@ -97,13 +97,8 @@ fn liquidation_prices(store: &dyn Storage, _env: &Env) -> Result<()> {
                         ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
                     }
                 }
-                match take_profit_total {
-                    Some(price) => {
-                        PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
-                    }
-                    None => {
-                        ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
-                    }
+                if let Some(price) = take_profit_total {
+                    PRICE_TRIGGER_ASC.load(store, (price.into(), posid))?;
                 }
                 match stop_loss_override {
                     Some(price) => {
@@ -139,13 +134,8 @@ fn liquidation_prices(store: &dyn Storage, _env: &Env) -> Result<()> {
                         ensure_missing(store, PRICE_TRIGGER_ASC, posid)?;
                     }
                 }
-                match take_profit_total {
-                    Some(price) => {
-                        PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
-                    }
-                    None => {
-                        ensure_missing(store, PRICE_TRIGGER_DESC, posid)?;
-                    }
+                if let Some(price) = take_profit_total {
+                    PRICE_TRIGGER_DESC.load(store, (price.into(), posid))?;
                 }
                 match stop_loss_override {
                     Some(price) => {
