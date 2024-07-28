@@ -655,7 +655,15 @@ impl Collateral {
         self.0
             .checked_mul(rhs)
             .map(Collateral)
-            .with_context(|| format!("Collateral::checked_mul_ratio failed on {self} * {rhs}"))
+            .with_context(|| format!("Collateral::checked_mul_dec failed on {self} * {rhs}"))
+    }
+
+    /// Divide by the given [Decimal256]
+    pub fn checked_div_dec(self, rhs: Decimal256) -> Result<Collateral> {
+        self.0
+            .checked_div(rhs)
+            .map(Collateral)
+            .with_context(|| format!("Collateral::checked_div_dec failed on {self} * {rhs}"))
     }
 
     /// Divide by a non-zero decimal.

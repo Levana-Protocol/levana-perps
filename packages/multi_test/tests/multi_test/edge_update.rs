@@ -79,9 +79,13 @@ fn take_profit_edge() {
                             valid: Some(TakeProfitTrader::Finite(
                                 value.checked_add(partial_value.into_decimal256()).unwrap(),
                             )),
-                            invalid: Some(TakeProfitTrader::Finite(
-                                value.checked_sub(partial_value.into_decimal256()).unwrap(),
-                            )),
+                            // This check used to assert that we would receive a counterleverage
+                            // error. However, we no longer generate those, instead
+                            // correcting the countercollateral to fit the expected range.
+                            invalid: None,
+                            // invalid: Some(TakeProfitTrader::Finite(
+                            //     value.checked_sub(partial_value.into_decimal256()).unwrap(),
+                            // )),
                         },
                         Side::Max => Self {
                             side,
@@ -89,9 +93,12 @@ fn take_profit_edge() {
                             valid: Some(TakeProfitTrader::Finite(
                                 value.checked_sub(partial_value.into_decimal256()).unwrap(),
                             )),
-                            invalid: Some(TakeProfitTrader::Finite(
-                                value.checked_add(partial_value.into_decimal256()).unwrap(),
-                            )),
+                            // This check used to assert that we would receive a counterleverage
+                            // error. However, we no longer generate those, instead
+                            // correcting the countercollateral to fit the expected range.
+                            invalid: None, // invalid: Some(TakeProfitTrader::Finite(
+                                           //     value.checked_add(partial_value.into_decimal256()).unwrap(),
+                                           // )),
                         },
                     }
                 }
@@ -104,9 +111,9 @@ fn take_profit_edge() {
                 assert!(response.is_ok());
             }
             if let Some(invalid) = self.invalid {
-                let response =
-                    market.exec_update_position_take_profit(trader, position_id, invalid);
-                assert!(response.is_err());
+                market
+                    .exec_update_position_take_profit(trader, position_id, invalid)
+                    .unwrap_err();
             }
         }
     }
