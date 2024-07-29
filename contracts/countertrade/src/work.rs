@@ -206,6 +206,9 @@ fn desired_action(
                         .checked_div(total_notional.into_decimal256())?,
                 );
 
+                let fifty_percent = Decimal256::from_ratio(50u32, 100u32).into_number();
+                let target_funding = fifty_percent.checked_sub(target_funding)?;
+
                 let work = compute_delta_notional(
                     total_notional,
                     open_interest_percentage,
@@ -235,8 +238,8 @@ fn compute_delta_notional(
         Notional::from_decimal256(total_notional.into_decimal256().checked_mul(
             Decimal256::one().checked_sub(open_interest_percentage.into_decimal256())?,
         )?);
-
     let fifty_percent = Decimal256::from_ratio(50u32, 100u32).into_number();
+
     let target_percent = fifty_percent.checked_sub(target_funding)?;
     let mut go_long = true;
 
@@ -256,12 +259,12 @@ fn compute_delta_notional(
 
     if open_interest_percentage.into_number() > fifty_percent {
         go_long = false;
-        let target_pct = target_funding.checked_add(fifty_percent)?;
+        let target_percent = target_funding.checked_add(fifty_percent)?;
         desired_notional = (total_notional
             .into_number()
-            .checked_mul(target_pct)?
+            .checked_mul(target_percent)?
             .checked_sub(open_interest_short.into_number())?)
-        .checked_div(Number::ONE.checked_sub(target_pct)?)?;
+        .checked_div(Number::ONE.checked_sub(target_percent)?)?;
     }
     let desired_notional = Notional::try_from_number(desired_notional)?;
     let direction = if go_long {
@@ -291,6 +294,7 @@ fn compute_delta_notional(
         .try_into_non_zero()
         .context("Non zero number")?;
     let leverage = LeverageToBase::from(leverage);
+
     let collateral = price.notional_to_collateral(desired_notional);
     let collateral = NonZero::new(collateral).context("collateral is zero")?;
     Ok(WorkDescription::OpenPosition {
