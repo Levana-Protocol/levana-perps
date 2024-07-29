@@ -19,6 +19,7 @@ mod liquidity;
 mod logging;
 mod lp_cw20;
 mod multi_market;
+mod neutronlsd;
 mod nft;
 mod oracle;
 mod order;
