@@ -1,10 +1,7 @@
 use std::ops::{Mul, Sub};
 
 use crate::prelude::*;
-use shared::{
-    compat::{calc_notional_size, TakeProfitFromCounterCollateral},
-    storage::PricePoint,
-};
+use shared::{compat::calc_notional_size, storage::PricePoint};
 
 pub(crate) struct TakeProfitToCounterCollateral<'a> {
     pub(crate) take_profit_trader: TakeProfitTrader,
@@ -18,9 +15,31 @@ pub(crate) struct TakeProfitToCounterCollateral<'a> {
 
 impl<'a> TakeProfitToCounterCollateral<'a> {
     pub(crate) fn calc(&self) -> Result<NonZero<Collateral>> {
-        let take_profit_price = self.capped_take_profit_price()?;
+        // minimum allowed counter-collateral
+        let min_counter_collateral = self
+            .price_point
+            .notional_to_collateral(self.notional_size()?.abs_unsigned())
+            .checked_div_dec(
+                self.config
+                    .max_leverage
+                    .try_into_non_negative_value()
+                    .context("Impossible negative max_leverage")?,
+            )?;
 
-        self.counter_collateral(take_profit_price)
+        // maximum allowed counter-collateral. We have a hard coded minimum
+        // leverage of 1, see position_validate_counter_leverage
+        let max_counter_collateral = self
+            .price_point
+            .notional_to_collateral(self.notional_size()?.abs_unsigned());
+
+        // user requested counter_collateral
+        let req_counter_collateral = self.counter_collateral(self.take_profit_trader)?;
+
+        let counter_collateral = req_counter_collateral
+            .raw()
+            .clamp(min_counter_collateral, max_counter_collateral);
+
+        NonZero::new(counter_collateral).context("Calculated counter_collateral is 0")
     }
 
     fn notional_size(&self) -> Result<Signed<Notional>> {
@@ -108,50 +127,6 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
                 NonZero::new(Collateral::try_from_number(counter_collateral).with_context(|| format!("Take profit of {take_profit_price} results in negative counter-collateral of {counter_collateral}"))?)
                     .context("counter_collateral is zero")
             }
-        }
-    }
-
-    // the take profit price is max of:
-    // 1. a calculated take profit price that would lock up the minimum counter collateral allowed
-    // 2. the user-requested take-profit price
-    pub fn capped_take_profit_price(&self) -> Result<TakeProfitTrader> {
-        let Self {
-            take_profit_trader,
-            market_type,
-            collateral,
-            leverage_to_base,
-            direction,
-            config,
-            price_point,
-        } = *self;
-
-        // minimum allowed counter-collateral
-        let min_counter_collateral = (price_point
-            .notional_to_collateral(self.notional_size()?.abs_unsigned())
-            .into_number()
-            / config.max_leverage)?;
-
-        // user requested counter_collateral
-        let req_counter_collateral = self.counter_collateral(take_profit_trader)?.into_number();
-
-        // counter_collateral at requested price is above min, use requested take_profit price
-        if req_counter_collateral > min_counter_collateral {
-            Ok(self.take_profit_trader)
-        }
-        // counter_collateral at requested price is below min, calculate take_profit price for min counter_collateral
-        else {
-            TakeProfitFromCounterCollateral {
-                market_type,
-                collateral,
-                counter_collateral: NonZero::new(Collateral::try_from_number(
-                    min_counter_collateral,
-                )?)
-                .context("cannot get non-zero")?,
-                leverage_to_base,
-                price_point,
-                direction,
-            }
-            .calc()
         }
     }
 }
