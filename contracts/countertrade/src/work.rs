@@ -1,11 +1,15 @@
+use std::str::FromStr;
+
 use cosmwasm_std::{SubMsg, WasmMsg};
 use msg::contracts::market::{
     deferred_execution::GetDeferredExecResp,
     entry::{ClosedPositionCursor, ClosedPositionsResp, StatusResp},
     position::PositionQueryResponse,
 };
-use shared::storage::{
-    DirectionToBase, DirectionToNotional, LeverageToBase, MarketType, PricePoint,
+use shared::{
+    number::Number,
+    price::{PriceBaseInQuote, TakeProfitTrader},
+    storage::{DirectionToBase, DirectionToNotional, LeverageToBase, MarketType, PricePoint},
 };
 
 use crate::prelude::*;
@@ -139,7 +143,7 @@ pub(crate) fn get_work_for(
             .context("Invalid 0 max_leverage in market")?,
     ));
 
-    desired_action(state, &status, pos.as_deref()).map(|x| match x {
+    desired_action(state, &status, &price, pos.as_deref()).map(|x| match x {
         Some(desc) => HasWorkResp::Work { desc },
         None => HasWorkResp::NoWork {},
     })
@@ -148,6 +152,7 @@ pub(crate) fn get_work_for(
 fn desired_action(
     state: &State,
     status: &StatusResp,
+    price: &PricePoint,
     pos: Option<&PositionQueryResponse>,
 ) -> Result<Option<WorkDescription>> {
     if status.long_funding.is_zero() || status.short_funding.is_zero() {
@@ -183,54 +188,117 @@ fn desired_action(
             None => Ok(None),
         }
     } else {
-        // FIXME do actual calculations
+        match pos {
+            Some(pos) => {
+                // The idea here is that we will close the existing
+                // countertrade position and open a new one later in
+                // the first version of countertrade contract.  But a
+                // better way of doing this is to update the existing
+                // position in future iteration of this contract.
+                Ok(Some(WorkDescription::ClosePosition { pos_id: pos.id }))
+            }
+            None => {
+                let total_notional = status.long_notional.checked_add(status.short_notional)?;
+                let open_interest_percentage = Notional::from_decimal256(
+                    status
+                        .long_notional
+                        .into_decimal256()
+                        .checked_div(total_notional.into_decimal256())?,
+                );
 
-        // if status.long_funding > state.config.max_funding.into_signed() {
-        //     Ok(HasWorkResp::Work {
-        //         desc: WorkDescription::OpenPosition {
-        //             direction: DirectionToBase::Short,
-        //             leverage: max_leverage,
-        //             collateral,
-        //             take_profit: shared::storage::TakeProfitTrader::Finite(
-        //                 NonZero::new(
-        //                     price
-        //                         .price_base
-        //                         .into_non_zero()
-        //                         .raw()
-        //                         .checked_mul(Decimal256::from_ratio(9u32, 10u32))?,
-        //                 )
-        //                 .context("Impossible 0 from multiplying take profit price")?,
-        //             ),
-        //         },
-        //     })
-        // } else if status.short_funding > state.config.max_funding.into_signed() {
-        //     Ok(HasWorkResp::Work {
-        //         desc: WorkDescription::OpenPosition {
-        //             direction: DirectionToBase::Long,
-        //             leverage: max_leverage,
-        //             collateral,
-        //             take_profit: shared::storage::TakeProfitTrader::Finite(
-        //                 NonZero::new(
-        //                     price
-        //                         .price_base
-        //                         .into_non_zero()
-        //                         .raw()
-        //                         .checked_mul(Decimal256::from_ratio(11u32, 10u32))?,
-        //                 )
-        //                 .context("Impossible 0 from multiplying take profit price")?,
-        //             ),
-        //         },
-        //     })
-        // } else {
-        //     Ok(HasWorkResp::NoWork {})
-        // }
-        Ok(Some(WorkDescription::OpenPosition {
-            direction: todo!(),
-            leverage: todo!(),
-            collateral: todo!(),
-            take_profit: todo!(),
-        }))
+                let work = compute_delta_notional(
+                    total_notional,
+                    open_interest_percentage,
+                    target_funding,
+                    &price,
+                    &status,
+                )?;
+                Ok(Some(work))
+            }
+        }
     }
+}
+
+fn compute_delta_notional(
+    total_notional: Notional,
+    open_interest_percentage: Notional,
+    target_funding: Signed<Decimal256>,
+    price: &PricePoint,
+    status: &StatusResp,
+) -> Result<WorkDescription> {
+    let open_interest_long = Notional::from_decimal256(
+        total_notional
+            .into_decimal256()
+            .checked_mul(open_interest_percentage.into_decimal256())?,
+    );
+    let open_interest_short =
+        Notional::from_decimal256(total_notional.into_decimal256().checked_mul(
+            Decimal256::one().checked_sub(open_interest_percentage.into_decimal256())?,
+        )?);
+
+    let fifty_percent = Decimal256::from_ratio(50u32, 100u32).into_number();
+    let target_percent = fifty_percent.checked_sub(target_funding)?;
+    let mut go_long = true;
+
+    let mut desired_notional = {
+        let mut temp = total_notional
+            .into_signed()
+            .checked_mul_number(target_percent)?
+            .into_number();
+        temp = temp.checked_sub(open_interest_long.into_number())?;
+        temp = temp.checked_div(
+            Decimal256::one()
+                .into_signed()
+                .checked_sub(target_percent)?,
+        )?;
+        temp
+    };
+
+    if open_interest_percentage.into_number() > fifty_percent {
+        go_long = false;
+        let target_pct = target_funding.checked_add(fifty_percent)?;
+        desired_notional = (total_notional
+            .into_number()
+            .checked_mul(target_pct)?
+            .checked_sub(open_interest_short.into_number())?)
+        .checked_div(Number::ONE.checked_sub(target_pct)?)?;
+    }
+    let desired_notional = Notional::try_from_number(desired_notional)?;
+    let direction = if go_long {
+        DirectionToBase::Long
+    } else {
+        DirectionToBase::Short
+    };
+    let entry_price = price.price_base;
+    let factor = Number::from_str("1.5")
+        .context("Unable to convert 1.5 to Decimal256")?
+        .into_number();
+    let take_profit = match direction {
+        DirectionToBase::Long => {
+            PriceBaseInQuote::try_from_number(entry_price.into_number().checked_mul(factor)?)?
+        }
+        DirectionToBase::Short => {
+            let factor_diff = factor
+                .checked_div(Number::from_str("100").context("Unable to convert 100 to Number")?)?;
+            let factor_diff = factor_diff.checked_mul(entry_price.into_number())?;
+            PriceBaseInQuote::try_from_number(entry_price.into_number().checked_sub(factor_diff)?)?
+        }
+    };
+
+    let leverage = Number::from_str("10")
+        .context("Unable to convert 10 to Number")?
+        .min(status.config.max_leverage)
+        .try_into_non_zero()
+        .context("Non zero number")?;
+    let leverage = LeverageToBase::from(leverage);
+    let collateral = price.notional_to_collateral(desired_notional);
+    let collateral = NonZero::new(collateral).context("collateral is zero")?;
+    Ok(WorkDescription::OpenPosition {
+        direction,
+        leverage,
+        collateral,
+        take_profit: TakeProfitTrader::from(take_profit),
+    })
 }
 
 pub(crate) fn execute(
