@@ -307,7 +307,17 @@ fn leverage_edge() {
         None,
         None,
     );
-    assert!(response.is_err());
+    // Funky test, because it's still using the legacy max gains API,
+    // we can get an error from the max gains API. However, we do not
+    // want to accept any counterleverage errors. So: this either succeeds
+    // or specifically talks about max gains.
+    assert!(
+        response.is_ok()
+            || response
+                .unwrap_err()
+                .to_string()
+                .contains("Max gains are too large")
+    )
 }
 
 #[test]
