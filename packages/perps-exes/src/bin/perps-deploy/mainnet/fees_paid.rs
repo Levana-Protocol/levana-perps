@@ -14,11 +14,16 @@ use shared::prelude::*;
 use shared::storage::MarketId;
 use tokio::task::JoinSet;
 
+use crate::app::GrpcUrl;
+
 #[derive(clap::Parser)]
 pub(super) struct FeesPaidOpts {
     /// The wallet that paid the fees
     #[clap(long)]
     wallet: Vec<Address>,
+    /// Osmosis grpc URL
+    #[clap(long, env = "LEVANA_DEPLOY_OSMOSIS_MAINNET_GRPC")]
+    osmosis_grpc_url: Option<String>,
     /// Destination file
     #[clap(long)]
     csv: PathBuf,
@@ -42,6 +47,7 @@ async fn go(
         csv,
         workers,
         paid_fees,
+        osmosis_grpc_url,
     }: FeesPaidOpts,
 ) -> Result<()> {
     let csv = ::csv::Writer::from_path(&csv)?;
@@ -79,8 +85,17 @@ async fn go(
 
         for (factory, wallets) in wallets {
             let factory = factories.get(factory)?;
+            let grpc_url = osmosis_grpc_url
+                .clone()
+                .map(|osmosis_mainnet| GrpcUrl { osmosis_mainnet });
+            let app = match grpc_url {
+                Some(grpc_url) => {
+                    opt.load_app_mainnet_with_grpc_url(factory.network, grpc_url)
+                        .await?
+                }
+                None => opt.load_app_mainnet(factory.network).await?,
+            };
 
-            let app = opt.load_app_mainnet(factory.network).await?;
             let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
             let markets = factory.get_markets().await?;
             for MarketInfo {
