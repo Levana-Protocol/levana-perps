@@ -744,3 +744,54 @@ fn opens_balancing_position() {
         HasWorkResp::NoWork {}
     );
 }
+
+#[test]
+fn balance_one_sided_market() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    let status = market.query_status().unwrap();
+    let market_type = status.market_type;
+
+    // Open up balanced positions
+    market
+        .exec_open_position_take_profit(
+            &trader,
+            "10",
+            // Deal with off-by-one leverage to ensure we have a balanced market
+            match market_type {
+                msg::prelude::MarketType::CollateralIsQuote => "5",
+                msg::prelude::MarketType::CollateralIsBase => "6",
+            },
+            DirectionToBase::Long,
+            None,
+            None,
+            msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+        )
+        .unwrap();
+
+    let status = market.query_status().unwrap();
+
+    assert_eq!(status.long_funding, Number::zero());
+    assert_eq!(status.short_funding, Number::zero());
+
+    assert_ne!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+}
