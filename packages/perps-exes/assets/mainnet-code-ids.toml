@@ -392,5 +392,5 @@ hash = "499d60d9906b7fbd12b7156487d5ed6aadc6a5e0f37394cb16846bb2340ac275"
 
 [hashes.code-ids]
 osmosis-mainnet = 951
-injective-testnet = 1080
+injective-mainnet = 1080
 neutron-mainnet = 1644
