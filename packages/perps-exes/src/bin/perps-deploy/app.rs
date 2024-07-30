@@ -112,7 +112,7 @@ impl Opt {
     pub(crate) async fn connect_with_grpc(
         &self,
         network: PerpsNetwork,
-        grpc_url: String
+        grpc_url: String,
     ) -> Result<Cosmos, cosmos::error::BuilderError> {
         let mut builder = network.builder().await?;
         builder.set_grpc_url(grpc_url);
@@ -127,7 +127,6 @@ impl Opt {
 
         builder.build()
     }
-
 
     fn get_lazy_wallet(&self, network: PerpsNetwork) -> Result<LazyWallet, WalletError> {
         LazyWallet::new(self.wallet.clone(), network.get_address_hrp())
@@ -314,27 +313,28 @@ impl Opt {
         Ok(AppMainnet { cosmos, wallet })
     }
 
-    pub(crate) async fn load_app_mainnet_with_grpc_url(&self, network: PerpsNetwork, url: GrpcUrl) -> Result<AppMainnet> {
+    pub(crate) async fn load_app_mainnet_with_grpc_url(
+        &self,
+        network: PerpsNetwork,
+        url: GrpcUrl,
+    ) -> Result<AppMainnet> {
         match network {
             PerpsNetwork::Regular(cosmos::CosmosNetwork::OsmosisMainnet) => {
                 let cosmos = self.connect_with_grpc(network, url.osmosis_mainnet).await?;
                 let wallet = self.get_lazy_wallet(network)?;
                 Ok(AppMainnet { cosmos, wallet })
-            },
+            }
             _ => {
                 let cosmos = self.connect(network).await?;
                 let wallet = self.get_lazy_wallet(network)?;
                 Ok(AppMainnet { cosmos, wallet })
             }
-
         }
-
-
     }
 }
 
 pub(crate) struct GrpcUrl {
-    pub(crate) osmosis_mainnet: String
+    pub(crate) osmosis_mainnet: String,
 }
 
 impl BasicApp {
