@@ -373,6 +373,7 @@ gitrev = "092eabd1d34a867a8ab42bc7f5a8c99efce484b3"
 hash = "cef9eacd47d0027913ed6e565e03d7c3d4c71aeaf47618ecd869a8dbcd63ca14"
 
 [hashes.code-ids]
+osmosis-mainnet = 952
 neutron-mainnet = 1600
 
 [[hashes]]
@@ -381,6 +382,7 @@ gitrev = "092eabd1d34a867a8ab42bc7f5a8c99efce484b3"
 hash = "c4e896e6b71c88538425446529e2fb3fc596fd95c2db582e26dc556ce5bc57c5"
 
 [hashes.code-ids]
+osmosis-mainnet = 953
 neutron-mainnet = 1601
 
 [[hashes]]
@@ -389,4 +391,6 @@ gitrev = "e80e7e56b9f76b379d10276c220a62f41f9d716e"
 hash = "499d60d9906b7fbd12b7156487d5ed6aadc6a5e0f37394cb16846bb2340ac275"
 
 [hashes.code-ids]
+osmosis-mainnet = 951
+injective-testnet = 1080
 neutron-mainnet = 1644
