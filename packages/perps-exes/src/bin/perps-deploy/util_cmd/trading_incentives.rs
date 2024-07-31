@@ -341,8 +341,9 @@ fn serialize_record(
     referee_rewards_usd: Usd,
 ) -> anyhow::Result<()> {
     if amount >= min_rewards {
+        let osmo_recipient = recipient.raw().with_hrp(AddressHrp::from_static("osmo"));
         output.serialize(&DistributionsRecord {
-            recipient: recipient.raw().with_hrp(AddressHrp::from_static("osmo")),
+            recipient: osmo_recipient,
             amount,
             clawback: None,
             can_vote: false,
@@ -351,7 +352,11 @@ fn serialize_record(
             vesting_date,
             r#type,
             referee_rewards_usd,
-            original_address: Some(recipient),
+            original_address: if recipient == osmo_recipient {
+                None
+            } else {
+                Some(recipient)
+            },
         })?;
     }
     Ok(())
