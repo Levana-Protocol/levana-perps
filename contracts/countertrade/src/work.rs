@@ -9,9 +9,7 @@ use msg::contracts::market::{
 use shared::{
     number::Number,
     price::{PriceBaseInQuote, TakeProfitTrader},
-    storage::{
-        DirectionToBase, DirectionToNotional, LeverageToBase, MarketType, PricePoint,
-    },
+    storage::{DirectionToBase, DirectionToNotional, LeverageToBase, MarketType, PricePoint},
 };
 
 use crate::prelude::*;
@@ -216,6 +214,75 @@ fn desired_action(
             }
         }
     }
+}
+
+fn derive_instant_funding_rate_annual(status: &StatusResp) -> Result<(Number, Number)> {
+    let config = &status.config;
+    let rf_per_annual_cap = config.funding_rate_max_annualized;
+
+    let instant_net_open_interest = status
+        .long_notional
+        .checked_sub(status.short_notional)?
+        .into_signed();
+    let instant_open_short = status.short_notional;
+    let instant_open_long = status.long_notional;
+    let funding_rate_sensitivity = config.funding_rate_sensitivity;
+
+    let total_interest = (instant_open_long + instant_open_short)?.into_decimal256();
+    let notional_high_cap = config
+        .delta_neutrality_fee_sensitivity
+        .into_decimal256()
+        .checked_mul(config.delta_neutrality_fee_cap.into_decimal256())?;
+    let funding_rate_sensitivity_from_delta_neutrality = rf_per_annual_cap
+        .checked_mul(total_interest)?
+        .checked_div(notional_high_cap)?;
+
+    let effective_funding_rate_sensitivity =
+        funding_rate_sensitivity.max(funding_rate_sensitivity_from_delta_neutrality);
+    let rf_popular = || -> Result<Decimal256> {
+        Ok(std::cmp::min(
+            effective_funding_rate_sensitivity.checked_mul(
+                instant_net_open_interest
+                    .abs_unsigned()
+                    .into_decimal256()
+                    .checked_div((instant_open_long + instant_open_short)?.into_decimal256())?,
+            )?,
+            rf_per_annual_cap,
+        ))
+    };
+
+    let rf_unpopular = || -> Result<Decimal256> {
+        match instant_open_long.cmp(&instant_open_short) {
+            std::cmp::Ordering::Greater => Ok(rf_popular()?.checked_mul(
+                instant_open_long
+                    .into_decimal256()
+                    .checked_div(instant_open_short.into_decimal256())?,
+            )?),
+            std::cmp::Ordering::Less => Ok(rf_popular()?.checked_mul(
+                instant_open_short
+                    .into_decimal256()
+                    .checked_div(instant_open_long.into_decimal256())?,
+            )?),
+            std::cmp::Ordering::Equal => Ok(Decimal256::zero()),
+        }
+    };
+
+    let (long_rate, short_rate) = if instant_open_long.is_zero() || instant_open_short.is_zero() {
+        // When all on one side, popular side has no one to pay
+        (Number::ZERO, Number::ZERO)
+    } else {
+        match instant_open_long.cmp(&instant_open_short) {
+            std::cmp::Ordering::Greater => {
+                (rf_popular()?.into_signed(), -rf_unpopular()?.into_signed())
+            }
+            std::cmp::Ordering::Less => {
+                (-rf_unpopular()?.into_signed(), rf_popular()?.into_signed())
+            }
+            std::cmp::Ordering::Equal => (Number::ZERO, Number::ZERO),
+        }
+    };
+
+    Ok((long_rate, short_rate))
 }
 
 fn compute_delta_notional(
