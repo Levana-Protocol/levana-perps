@@ -201,7 +201,6 @@ fn desired_action(
                 let fifty_percent = Decimal256::from_ratio(50u32, 100u32).into_number();
                 let target_funding = fifty_percent.checked_sub(target_funding)?;
 
-
                 let work = compute_delta_notional2(
                     status.long_notional,
                     status.short_notional,
