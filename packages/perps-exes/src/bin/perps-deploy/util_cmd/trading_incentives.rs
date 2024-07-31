@@ -1,3 +1,4 @@
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -5,9 +6,10 @@ use crate::cli::Opt;
 use crate::util_cmd::{open_position_csv, OpenPositionCsvOpt, PositionRecord};
 use anyhow::Result;
 use chrono::{DateTime, Datelike, Utc, Weekday};
-use cosmos::Address;
+use cosmos::{Address, AddressHrp};
 use cosmwasm_std::Decimal256;
-use perps_exes::config::MainnetFactories;
+use perps_exes::config::{MainnetFactories, MainnetFactory};
+use perps_exes::PerpsNetwork;
 use reqwest::Url;
 use shared::storage::{LvnToken, UnsignedDecimal, Usd};
 
@@ -38,8 +40,12 @@ pub(super) struct DistributionsCsvOpt {
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_MIN_REWARDS", default_value = "10")]
     pub(crate) min_rewards: LvnToken,
     /// Factory identifier
-    #[clap(long, default_value = "osmomainnet1")]
-    factory: String,
+    #[clap(
+        long,
+        default_value = "osmomainnet1,ntrnmainnet1",
+        value_delimiter = ','
+    )]
+    factories: Vec<String>,
     /// How many separate worker tasks to create for parallel loading
     #[clap(long, default_value = "30")]
     workers: u32,
@@ -83,7 +89,7 @@ async fn distributions_csv(
         start_date,
         end_date,
         min_rewards,
-        factory,
+        factories,
         workers,
         retries,
         losses_pool_size,
@@ -96,33 +102,52 @@ async fn distributions_csv(
     }: DistributionsCsvOpt,
     opt: Opt,
 ) -> Result<()> {
-    let csv_filename: PathBuf = cache_dir.join(format!("{}.csv", factory.clone()));
-    tracing::info!("CSV filename: {}", csv_filename.as_path().display());
-
-    if let Some(parent) = csv_filename.parent() {
-        fs_err::create_dir_all(parent)?;
+    let mainnet_factories = MainnetFactories::load()?;
+    struct Factory<'a> {
+        cache_file: PathBuf,
+        name: String,
+        factory: &'a MainnetFactory,
     }
+    let factories = factories
+        .into_iter()
+        .map(|name| {
+            let cache_file = cache_dir.join(format!("{name}.csv"));
+            let factory = mainnet_factories.get(&name)?;
+            tracing::info!("CSV filename: {}", cache_file.display());
+            anyhow::Ok(Factory {
+                cache_file,
+                name,
+                factory,
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
     if !skip_data_load {
-        let mut attempted_retries = 0;
-        while let Err(e) = open_position_csv(
-            opt.clone(),
-            OpenPositionCsvOpt {
-                factory: factory.clone(),
-                csv: csv_filename.clone(),
-                workers,
-                factory_primary_grpc: opt.cosmos_grpc.clone(),
-                factory_fallbacks_grpc: cosmos_grpc_fallbacks.clone(),
-            },
-        )
-        .await
-        {
-            if attempted_retries < retries {
-                attempted_retries += 1;
-                tracing::error!("Received error while generating csv files: {e}");
-                tracing::info!("Retrying... Attempt {attempted_retries}/{retries}");
-            } else {
-                return Err(e);
+        for factory in &factories {
+            if let Some(parent) = factory.cache_file.parent() {
+                fs_err::create_dir_all(parent)?;
+            }
+
+            let mut attempted_retries = 0;
+            while let Err(e) = open_position_csv(
+                opt.clone(),
+                OpenPositionCsvOpt {
+                    factory: factory.name.clone(),
+                    csv: factory.cache_file.clone(),
+                    workers,
+                    factory_primary_grpc: opt.cosmos_grpc.clone(),
+                    factory_fallbacks_grpc: cosmos_grpc_fallbacks.clone(),
+                },
+            )
+            .await
+            {
+                if attempted_retries < retries {
+                    attempted_retries += 1;
+                    tracing::error!("Received error while generating csv files: {e}");
+                    tracing::info!("Retrying... Attempt {attempted_retries}/{retries}");
+                } else {
+                    return Err(e);
+                }
             }
         }
     }
@@ -145,25 +170,27 @@ async fn distributions_csv(
     let mut losses = TotalsTracker::default();
     let mut fees = TotalsTracker::default();
 
-    for record in csv::Reader::from_path(&csv_filename)?.into_deserialize() {
-        let PositionRecord {
-            closed_at,
-            owner,
-            pnl_usd,
-            trading_fee_usd,
-            ..
-        } = record?;
-        let closed_at = match closed_at {
-            Some(closed_at) => closed_at,
-            None => continue,
-        };
-        if closed_at < start_date || closed_at >= end_date {
-            continue;
+    for factory in factories {
+        for record in csv::Reader::from_path(&factory.cache_file)?.into_deserialize() {
+            let PositionRecord {
+                closed_at,
+                owner,
+                pnl_usd,
+                trading_fee_usd,
+                ..
+            } = record?;
+            let closed_at = match closed_at {
+                Some(closed_at) => closed_at,
+                None => continue,
+            };
+            if closed_at < start_date || closed_at >= end_date {
+                continue;
+            }
+            if pnl_usd.is_negative() {
+                losses.add(owner, pnl_usd.abs_unsigned(), factory.factory)?;
+            }
+            fees.add(owner, trading_fee_usd, factory.factory)?;
         }
-        if pnl_usd.is_negative() {
-            losses.add(owner, pnl_usd.abs_unsigned())?;
-        }
-        fees.add(owner, trading_fee_usd)?;
     }
 
     enum Category {
@@ -212,7 +239,7 @@ async fn distributions_csv(
         (Category::Losses, losses_pool_size, losses),
         (Category::Fees, fees_pool_size, fees.clone()),
     ] {
-        for (recipient, amount) in entries {
+        for (recipient, (amount, _factory)) in entries {
             let amount = LvnToken::from_decimal256(
                 amount.into_decimal256() * pool_size.into_decimal256() / total.into_decimal256(),
             );
@@ -249,12 +276,8 @@ async fn distributions_csv(
         .json()
         .await?;
     let price = LvnPrice(price);
-    let factories = MainnetFactories::load()?;
-    let factory = factories.get(&factory)?;
-    let network = factory.network.to_string();
-    let factory = factory.address;
-    for (recipient, amount) in fees.entries {
-        if validate_referee_wallet(recipient, network.clone(), factory, client.clone()).await? {
+    for (recipient, (amount, factory)) in fees.entries {
+        if validate_referee_wallet(recipient, factory.network, factory.address, &client).await? {
             let refund_usd_uncapped = Usd::from_decimal256(
                 amount.into_decimal256() * Decimal256::percent(referee_rewards_percentage),
             );
@@ -303,7 +326,7 @@ fn serialize_record(
 ) -> anyhow::Result<()> {
     if amount >= min_rewards {
         output.serialize(&DistributionsRecord {
-            recipient,
+            recipient: recipient.raw().with_hrp(AddressHrp::from_static("osmo")),
             amount,
             clawback: None,
             can_vote: false,
@@ -312,6 +335,7 @@ fn serialize_record(
             vesting_date,
             r#type,
             referee_rewards_usd,
+            original_address: Some(recipient),
         })?;
     }
     Ok(())
@@ -319,14 +343,14 @@ fn serialize_record(
 
 async fn validate_referee_wallet(
     wallet: Address,
-    network: String,
+    network: PerpsNetwork,
     factory: Address,
-    client: reqwest::Client,
+    client: &reqwest::Client,
 ) -> Result<bool> {
     let url = reqwest::Url::parse_with_params(
         "https://querier-mainnet.levana.finance/v1/perps/referral-stats",
         &[
-            ("network", &network),
+            ("network", &network.to_string()),
             ("factory", &factory.to_string()),
             ("wallet", &wallet.to_string()),
         ],
@@ -342,16 +366,23 @@ async fn validate_referee_wallet(
 }
 
 #[derive(Default, Clone)]
-struct TotalsTracker {
+struct TotalsTracker<'a> {
     total: Usd,
-    entries: HashMap<Address, Usd>,
+    entries: HashMap<Address, (Usd, &'a MainnetFactory)>,
 }
 
-impl TotalsTracker {
-    fn add(&mut self, wallet: Address, amount: Usd) -> Result<()> {
+impl<'a> TotalsTracker<'a> {
+    fn add(&mut self, wallet: Address, amount: Usd, factory: &'a MainnetFactory) -> Result<()> {
         self.total = self.total.checked_add(amount)?;
-        let entry = self.entries.entry(wallet).or_default();
-        *entry = entry.checked_add(amount)?;
+        match self.entries.entry(wallet) {
+            Entry::Occupied(mut entry) => {
+                let entry = entry.get_mut();
+                entry.0 = entry.0.checked_add(amount)?;
+            }
+            Entry::Vacant(entry) => {
+                entry.insert((amount, factory));
+            }
+        }
         Ok(())
     }
 }
@@ -369,6 +400,7 @@ pub(crate) struct DistributionsRecord {
     pub(crate) r#type: RewardType,
     #[serde(default)]
     pub(crate) referee_rewards_usd: Usd,
+    pub(crate) original_address: Option<Address>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy)]
