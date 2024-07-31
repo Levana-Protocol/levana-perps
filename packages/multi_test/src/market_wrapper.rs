@@ -2349,6 +2349,15 @@ impl PerpsMarket {
         }
     }
 
+    pub fn query_countertrade_market_id(
+        &self,
+        market_id: MarketId
+    ) -> Result<msg::contracts::countertrade::MarketStatus> {
+        let result = self.query_countertrade_markets()?;
+        let res = result.into_iter().find(|item| item.id == market_id);
+        res.context("Market id {market_id} not found")
+    }
+
     pub fn exec_countertrade_mint_and_deposit(
         &self,
         user_addr: &Addr,

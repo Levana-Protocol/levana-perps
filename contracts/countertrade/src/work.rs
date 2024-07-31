@@ -9,7 +9,9 @@ use msg::contracts::market::{
 use shared::{
     number::Number,
     price::{PriceBaseInQuote, TakeProfitTrader},
-    storage::{DirectionToBase, DirectionToNotional, LeverageToBase, MarketType, PricePoint},
+    storage::{
+        DirectionToBase, DirectionToNotional, LeverageToBase, MarketType, PricePoint,
+    },
 };
 
 use crate::prelude::*;
@@ -143,7 +145,7 @@ pub(crate) fn get_work_for(
             .context("Invalid 0 max_leverage in market")?,
     ));
 
-    desired_action(state, &status, &price, pos.as_deref()).map(|x| match x {
+    desired_action(state, &status, &price, pos.as_deref(), collateral).map(|x| match x {
         Some(desc) => HasWorkResp::Work { desc },
         None => HasWorkResp::NoWork {},
     })
@@ -154,6 +156,7 @@ fn desired_action(
     status: &StatusResp,
     price: &PricePoint,
     pos: Option<&PositionQueryResponse>,
+    available_collateral: NonZero<Collateral>,
 ) -> Result<Option<WorkDescription>> {
     if status.long_funding.is_zero() || status.short_funding.is_zero() {
         assert!(status.long_funding.is_zero());
@@ -201,12 +204,13 @@ fn desired_action(
                 let fifty_percent = Decimal256::from_ratio(50u32, 100u32).into_number();
                 let target_funding = fifty_percent.checked_sub(target_funding)?;
 
-                let work = compute_delta_notional2(
+                let work = compute_delta_notional(
                     status.long_notional,
                     status.short_notional,
                     target_funding,
                     &price,
                     &status,
+                    available_collateral,
                 )?;
                 Ok(Some(work))
             }
@@ -214,12 +218,13 @@ fn desired_action(
     }
 }
 
-fn compute_delta_notional2(
+fn compute_delta_notional(
     open_interest_long: Notional,
     open_interest_short: Notional,
     target_funding: Signed<Decimal256>,
     price: &PricePoint,
     status: &StatusResp,
+    available_collateral: NonZero<Collateral>,
 ) -> Result<WorkDescription> {
     let current_open_interest = open_interest_long.checked_add(open_interest_short)?;
 
@@ -268,7 +273,8 @@ fn compute_delta_notional2(
         }
     };
 
-    let desired_notional = Notional::try_from_number(result.desired_notional)?;
+    println!("market_id: {}", status.market_id);
+    println!("market_type: {:?}", status.market_type);
 
     let entry_price = price.price_base;
     let factor = Number::from_str("1.5")
@@ -291,10 +297,26 @@ fn compute_delta_notional2(
         .min(status.config.max_leverage)
         .try_into_non_zero()
         .context("Non zero number")?;
+
     let leverage = LeverageToBase::from(leverage);
 
-    let collateral = price.notional_to_collateral(desired_notional);
-    let collateral = NonZero::new(collateral).context("collateral is zero")?;
+    let desired_notional = Notional::try_from_number(result.desired_notional)?;
+
+    let collateral = {
+        let collateral = price.notional_to_collateral(desired_notional);
+        let collateral = collateral.checked_div_dec(leverage.into_decimal256())?;
+        let collateral = NonZero::new(collateral).context("collateral is zero")?;
+        if collateral > available_collateral {
+            bail!("Insufficient collateral. Required {collateral}, but available {available_collateral}")
+        }
+        collateral
+    };
+
+    println!("counter trade contract recommendation:");
+    println!("collateral: {collateral}");
+    println!("leverage: {leverage}");
+    println!("direction: {:?}", result.direction);
+
     Ok(WorkDescription::OpenPosition {
         direction: result.direction,
         leverage,

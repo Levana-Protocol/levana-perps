@@ -1,4 +1,4 @@
-use cosmwasm_std::Decimal256;
+use cosmwasm_std::{Addr, Decimal256};
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
     contracts::countertrade::{ConfigUpdate, HasWorkResp, MarketBalance, WorkDescription},
@@ -455,25 +455,10 @@ fn closes_extra_positions() {
             }
         );
 
-        // Sends a deferred message to close the position
-        market.exec_countertrade_do_work().unwrap();
-        // Will fail if we do more work again since the deferred
-        // execution would not have finished
-        market.exec_countertrade_do_work().unwrap_err();
-        // Execute the deferred message
-        market.exec_crank_till_finished(&lp).unwrap();
+        do_work(&market, &lp);
 
         // Position must be closed
         let pos = market.query_closed_position(&countertrade, pos_id).unwrap();
-
-        // And clear out the deferred exec ID
-        match market.query_countertrade_has_work().unwrap() {
-            HasWorkResp::Work {
-                desc: WorkDescription::ClearDeferredExec { id: _ },
-            } => (),
-            work => panic!("Unexpected work response: {work:?}"),
-        }
-        market.exec_countertrade_do_work().unwrap();
 
         // Determine the active collateral that will actually be transferred
         let active_collateral = market
@@ -696,6 +681,7 @@ fn opens_balancing_position() {
         )
         .unwrap();
     let status = market.query_status().unwrap();
+    println!("before opening cc pos status: {status:#?}");
     assert!(
         status.long_funding > config.max_funding.into_signed(),
         "Long funding rates are not high enough: {}. Need greater than {}.",
@@ -709,24 +695,35 @@ fn opens_balancing_position() {
         config.max_funding
     );
 
+    let price_point = market.query_current_price().unwrap();
+
     match market.query_countertrade_has_work().unwrap() {
         HasWorkResp::Work {
             desc:
                 WorkDescription::OpenPosition {
                     direction,
-                    leverage: _,
-                    collateral: _,
+                    leverage,
+                    collateral,
                     take_profit: _,
                 },
-        } => assert_eq!(direction, DirectionToBase::Short),
+        } => {
+            assert_eq!(direction, DirectionToBase::Short)
+        }
         has_work => panic!("Unexpected has work response: {has_work:?}"),
     }
 
-    market.exec_countertrade_do_work().unwrap();
+    do_work(&market, &lp);
+    let status = market.query_status().unwrap();
+    println!("after opening status: {status:#?}");
 
-    // We should no longer have any work to do, even though we haven't cranked yet.
-    // The contract is responsible for ensuring it waits until prior deferred execs
-    // complete.
+    let market_status = market
+        .query_countertrade_market_id(status.market_id)
+        .unwrap();
+
+
+    let position = market_status.position.unwrap();
+
+    println!("Opened position: {position:#?}");
 
     assert_eq!(
         market.query_countertrade_has_work().unwrap(),
@@ -794,4 +791,21 @@ fn balance_one_sided_market() {
         market.query_countertrade_has_work().unwrap(),
         HasWorkResp::NoWork {}
     );
+}
+
+fn do_work(market: &PerpsMarket, lp: &Addr) {
+    market.exec_countertrade_do_work().unwrap();
+    // Will fail if we do more work again since the deferred
+    // execution would not have finished
+    market.exec_countertrade_do_work().unwrap_err();
+    // Execute the deferred message
+    market.exec_crank_till_finished(&lp).unwrap();
+    // And clear out the deferred exec ID
+    match market.query_countertrade_has_work().unwrap() {
+        HasWorkResp::Work {
+            desc: WorkDescription::ClearDeferredExec { id: _ },
+        } => (),
+        work => panic!("Unexpected work response: {work:?}"),
+    }
+    market.exec_countertrade_do_work().unwrap();
 }
