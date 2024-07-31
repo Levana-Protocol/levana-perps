@@ -89,10 +89,7 @@ impl AppMainnet {
 }
 
 impl Opt {
-    pub(crate) async fn connect(
-        &self,
-        network: PerpsNetwork,
-    ) -> Result<Cosmos, cosmos::error::BuilderError> {
+    pub(crate) async fn connect(&self, network: PerpsNetwork) -> Result<Cosmos> {
         let mut builder = network.builder().await?;
         if let Some(grpc) = &self.cosmos_grpc {
             builder.set_grpc_url(grpc.as_str());
@@ -106,14 +103,14 @@ impl Opt {
         }
         log::info!("Connecting to {}", builder.grpc_url());
 
-        builder.build()
+        builder.build().map_err(anyhow::Error::from)
     }
 
     pub(crate) async fn connect_with_grpc(
         &self,
         network: PerpsNetwork,
         grpc_url: String,
-    ) -> Result<Cosmos, cosmos::error::BuilderError> {
+    ) -> Result<Cosmos> {
         let mut builder = network.builder().await?;
         builder.set_grpc_url(grpc_url);
         if let Some(chain_id) = &self.cosmos_chain_id {
@@ -125,7 +122,7 @@ impl Opt {
         }
         log::info!("Connecting to {}", builder.grpc_url());
 
-        builder.build()
+        builder.build().map_err(anyhow::Error::from)
     }
 
     fn get_lazy_wallet(&self, network: PerpsNetwork) -> Result<LazyWallet, WalletError> {
