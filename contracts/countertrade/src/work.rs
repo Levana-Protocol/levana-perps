@@ -198,20 +198,13 @@ fn desired_action(
                 Ok(Some(WorkDescription::ClosePosition { pos_id: pos.id }))
             }
             None => {
-                let total_notional = status.long_notional.checked_add(status.short_notional)?;
-                let open_interest_percentage = Notional::from_decimal256(
-                    status
-                        .long_notional
-                        .into_decimal256()
-                        .checked_div(total_notional.into_decimal256())?,
-                );
-
                 let fifty_percent = Decimal256::from_ratio(50u32, 100u32).into_number();
                 let target_funding = fifty_percent.checked_sub(target_funding)?;
 
-                let work = compute_delta_notional(
-                    total_notional,
-                    open_interest_percentage,
+
+                let work = compute_delta_notional2(
+                    status.long_notional,
+                    status.short_notional,
                     target_funding,
                     &price,
                     &status,
@@ -222,61 +215,67 @@ fn desired_action(
     }
 }
 
-fn compute_delta_notional(
-    total_notional: Notional,
-    open_interest_percentage: Notional,
+fn compute_delta_notional2(
+    open_interest_long: Notional,
+    open_interest_short: Notional,
     target_funding: Signed<Decimal256>,
     price: &PricePoint,
     status: &StatusResp,
 ) -> Result<WorkDescription> {
-    let open_interest_long = Notional::from_decimal256(
-        total_notional
-            .into_decimal256()
-            .checked_mul(open_interest_percentage.into_decimal256())?,
-    );
-    let open_interest_short =
-        Notional::from_decimal256(total_notional.into_decimal256().checked_mul(
-            Decimal256::one().checked_sub(open_interest_percentage.into_decimal256())?,
-        )?);
-    let fifty_percent = Decimal256::from_ratio(50u32, 100u32).into_number();
+    let current_open_interest = open_interest_long.checked_add(open_interest_short)?;
 
-    let target_percent = fifty_percent.checked_sub(target_funding)?;
-    let mut go_long = true;
+    let mut delta_target_funding = target_funding;
 
-    let mut desired_notional = {
-        let mut temp = total_notional
-            .into_signed()
-            .checked_mul_number(target_percent)?
-            .into_number();
-        temp = temp.checked_sub(open_interest_long.into_number())?;
-        temp = temp.checked_div(
-            Decimal256::one()
-                .into_signed()
-                .checked_sub(target_percent)?,
-        )?;
-        temp
-    };
-
-    if open_interest_percentage.into_number() > fifty_percent {
-        go_long = false;
-        let target_percent = target_funding.checked_add(fifty_percent)?;
-        desired_notional = (total_notional
-            .into_number()
-            .checked_mul(target_percent)?
-            .checked_sub(open_interest_short.into_number())?)
-        .checked_div(Number::ONE.checked_sub(target_percent)?)?;
-    }
-    let desired_notional = Notional::try_from_number(desired_notional)?;
-    let direction = if go_long {
-        DirectionToBase::Long
+    let open_interest_ratio = if open_interest_long.is_zero() {
+        delta_target_funding = delta_target_funding.checked_mul(-Number::ONE)?;
+        Decimal256::from_ratio(15u32, 10u32)
+    } else if open_interest_long.is_zero() {
+        Decimal256::from_ratio(5u32, 10u32)
     } else {
-        DirectionToBase::Short
+        open_interest_long
+            .into_decimal256()
+            .checked_div(open_interest_short.into_decimal256())?
     };
+
+    struct Result {
+        direction: DirectionToBase,
+        desired_notional: Number,
+    }
+
+    let fifty_percent = Decimal256::from_ratio(50u32, 100u32).into_number();
+    let result = if open_interest_ratio > Decimal256::one() {
+        let target_percent = fifty_percent.checked_add(delta_target_funding)?;
+        let mut desired_notional = current_open_interest
+            .into_number()
+            .checked_mul_number(target_percent)?
+            .checked_sub(open_interest_short.into_number())?;
+        desired_notional =
+            desired_notional.checked_div(Number::ONE.checked_sub(target_percent)?)?;
+        Result {
+            direction: DirectionToBase::Short,
+            desired_notional,
+        }
+    } else {
+        let target_percent = fifty_percent.checked_sub(delta_target_funding)?;
+        let mut desired_notional = current_open_interest
+            .into_number()
+            .checked_mul_number(target_percent)?
+            .checked_sub(open_interest_long.into_number())?;
+        desired_notional =
+            desired_notional.checked_div(Number::ONE.checked_sub(target_percent)?)?;
+        Result {
+            direction: DirectionToBase::Long,
+            desired_notional,
+        }
+    };
+
+    let desired_notional = Notional::try_from_number(result.desired_notional)?;
+
     let entry_price = price.price_base;
     let factor = Number::from_str("1.5")
         .context("Unable to convert 1.5 to Decimal256")?
         .into_number();
-    let take_profit = match direction {
+    let take_profit = match result.direction {
         DirectionToBase::Long => {
             PriceBaseInQuote::try_from_number(entry_price.into_number().checked_mul(factor)?)?
         }
@@ -298,7 +297,7 @@ fn compute_delta_notional(
     let collateral = price.notional_to_collateral(desired_notional);
     let collateral = NonZero::new(collateral).context("collateral is zero")?;
     Ok(WorkDescription::OpenPosition {
-        direction,
+        direction: result.direction,
         leverage,
         collateral,
         take_profit: TakeProfitTrader::from(take_profit),
