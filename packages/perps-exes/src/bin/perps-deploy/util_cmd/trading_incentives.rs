@@ -4,12 +4,12 @@ use std::path::PathBuf;
 use crate::cli::Opt;
 use crate::util_cmd::{open_position_csv, OpenPositionCsvOpt, PositionRecord};
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Datelike, Utc, Weekday};
 use cosmos::Address;
 use cosmwasm_std::Decimal256;
 use perps_exes::config::MainnetFactories;
 use reqwest::Url;
-use shared::storage::UnsignedDecimal;
+use shared::storage::{LvnToken, UnsignedDecimal, Usd};
 
 #[derive(clap::Parser)]
 pub(super) struct DistributionsCsvOpt {
@@ -20,18 +20,23 @@ pub(super) struct DistributionsCsvOpt {
         default_value = ".cache/trading-incentives"
     )]
     pub(crate) cache_dir: PathBuf,
+    /// Directory containing all trading incentives reports
+    #[clap(long, default_value = "data/rewards")]
+    pub(crate) rewards_dir: PathBuf,
     /// File name of the result csv file
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_FILENAME")]
-    pub(crate) output: PathBuf,
+    pub(crate) output: Option<PathBuf>,
     /// Start date of analysis period
+    ///
+    /// If omitted, uses the Sunday of the previous week
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_START_DATE")]
-    pub(crate) start_date: DateTime<Utc>,
+    pub(crate) start_date: Option<DateTime<Utc>>,
     /// End date of analysis period, defaults to 7 days after start date
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_END_DATE")]
     pub(crate) end_date: Option<DateTime<Utc>>,
     /// Minimum amount of LVN to distribution as rewards
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_MIN_REWARDS", default_value = "10")]
-    pub(crate) min_rewards: Decimal256,
+    pub(crate) min_rewards: LvnToken,
     /// Factory identifier
     #[clap(long, default_value = "osmomainnet1")]
     factory: String,
@@ -43,13 +48,16 @@ pub(super) struct DistributionsCsvOpt {
     retries: u32,
     /// Size of the losses pool
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_LOSSES_POOL_SIZE")]
-    losses_pool_size: Decimal256,
+    losses_pool_size: LvnToken,
     /// Size of the fees pool
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_FEES_POOL_SIZE")]
-    fees_pool_size: Decimal256,
+    fees_pool_size: LvnToken,
     /// Percentage of referee rewards
     #[clap(long, env = "LEVANA_DISTRIBUTIONS_REFEREE_REWARDS_PERCENTAGE")]
     referee_rewards_percentage: u64,
+    /// Maximum cumulative referee rewards in USD
+    #[clap(long, default_value = "1000")]
+    max_referee_rewards: Usd,
     /// Provide optional gRPC fallbacks URLs for factory
     #[clap(long, env = "COSMOS_GRPC_FALLBACKS", value_delimiter = ',')]
     cosmos_grpc_fallbacks: Vec<Url>,
@@ -70,6 +78,7 @@ impl DistributionsCsvOpt {
 async fn distributions_csv(
     DistributionsCsvOpt {
         cache_dir,
+        rewards_dir,
         output,
         start_date,
         end_date,
@@ -83,6 +92,7 @@ async fn distributions_csv(
         cosmos_grpc_fallbacks,
         vesting_date,
         skip_data_load,
+        max_referee_rewards,
     }: DistributionsCsvOpt,
     opt: Opt,
 ) -> Result<()> {
@@ -117,6 +127,18 @@ async fn distributions_csv(
         }
     }
 
+    let start_date = start_date.unwrap_or_else(|| {
+        let mut start_date = (Utc::now() - chrono::Duration::days(7)).date_naive();
+        while start_date.weekday() != Weekday::Sun {
+            start_date -= chrono::Duration::days(1);
+        }
+
+        start_date
+            .and_hms_opt(0, 0, 0)
+            .expect("Error adding hours/minutes/seconds")
+            .and_utc()
+    });
+
     let end_date = end_date.unwrap_or_else(|| start_date + chrono::Duration::days(7));
     let vesting_date = vesting_date.unwrap_or_else(|| end_date + chrono::Duration::days(180));
 
@@ -139,9 +161,9 @@ async fn distributions_csv(
             continue;
         }
         if pnl_usd.is_negative() {
-            losses.add(owner, pnl_usd.abs_unsigned().into_decimal256());
+            losses.add(owner, pnl_usd.abs_unsigned())?;
         }
-        fees.add(owner, trading_fee_usd.into_decimal256());
+        fees.add(owner, trading_fee_usd)?;
     }
 
     enum Category {
@@ -149,7 +171,41 @@ async fn distributions_csv(
         Fees,
     }
 
-    tracing::info!("Writing distribution data to {}", output.display());
+    let output = output.unwrap_or_else(|| {
+        let mut path = rewards_dir.clone();
+        path.push(format!(
+            "{}-trading-incentives.csv",
+            start_date.date_naive()
+        ));
+        path
+    });
+    let output_canonical = if output.exists() {
+        Some(output.canonicalize()?)
+    } else {
+        None
+    };
+
+    // Load up all previous rewards info so we can ensure we don't overpay anyone.
+    let mut prev_referee_rewards = HashMap::<Address, Usd>::new();
+    for file in fs_err::read_dir(&rewards_dir)? {
+        let file = file?;
+        let file = file.path().canonicalize()?;
+        if Some(&file) == output_canonical.as_ref() {
+            println!(
+                "Skipping previous rewards for file we're generating now: {}",
+                file.display()
+            );
+            continue;
+        }
+        for record in ::csv::Reader::from_path(&file)?.into_deserialize() {
+            let record: DistributionsRecord = record?;
+            if !record.referee_rewards_usd.is_zero() {
+                let entry = prev_referee_rewards.entry(record.recipient).or_default();
+                *entry = entry.checked_add(record.referee_rewards_usd)?;
+            }
+        }
+    }
+
     let mut output = ::csv::Writer::from_path(&output)?;
 
     for (cat, pool_size, TotalsTracker { total, entries }) in [
@@ -157,7 +213,9 @@ async fn distributions_csv(
         (Category::Fees, fees_pool_size, fees.clone()),
     ] {
         for (recipient, amount) in entries {
-            let amount = amount * pool_size / total;
+            let amount = LvnToken::from_decimal256(
+                amount.into_decimal256() * pool_size.into_decimal256() / total.into_decimal256(),
+            );
             serialize_record(
                 &mut output,
                 min_rewards,
@@ -174,9 +232,10 @@ async fn distributions_csv(
                 ),
                 vesting_date,
                 match cat {
-                    Category::Losses => "losses",
-                    Category::Fees => "fees",
+                    Category::Losses => RewardType::Losses,
+                    Category::Fees => RewardType::Fees,
                 },
+                Usd::zero(),
             )?;
         }
     }
@@ -189,13 +248,28 @@ async fn distributions_csv(
         .error_for_status()?
         .json()
         .await?;
+    let price = LvnPrice(price);
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
     let network = factory.network.to_string();
     let factory = factory.address;
     for (recipient, amount) in fees.entries {
         if validate_referee_wallet(recipient, network.clone(), factory, client.clone()).await? {
-            let amount = amount * Decimal256::percent(referee_rewards_percentage) / price;
+            let refund_usd_uncapped = Usd::from_decimal256(
+                amount.into_decimal256() * Decimal256::percent(referee_rewards_percentage),
+            );
+            let available_refund = match prev_referee_rewards.get(&recipient) {
+                None => max_referee_rewards,
+                Some(prev_amount) => {
+                    if prev_amount < &max_referee_rewards {
+                        (max_referee_rewards - *prev_amount)?
+                    } else {
+                        Usd::zero()
+                    }
+                }
+            };
+            let refund_usd = refund_usd_uncapped.min(available_refund);
+            let amount = price.usd_to_lvn(refund_usd);
             serialize_record(
                 &mut output,
                 min_rewards,
@@ -207,7 +281,8 @@ async fn distributions_csv(
                     end_date.format("%Y-%m-%d")
                 ),
                 vesting_date,
-                "referee rewards",
+                RewardType::Referee,
+                refund_usd,
             )?;
         }
     }
@@ -215,14 +290,16 @@ async fn distributions_csv(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn serialize_record(
     output: &mut csv::Writer<std::fs::File>,
-    min_rewards: Decimal256,
+    min_rewards: LvnToken,
     recipient: Address,
-    amount: Decimal256,
+    amount: LvnToken,
     title: String,
     vesting_date: DateTime<Utc>,
-    r#type: &'static str,
+    r#type: RewardType,
+    referee_rewards_usd: Usd,
 ) -> anyhow::Result<()> {
     if amount >= min_rewards {
         output.serialize(&DistributionsRecord {
@@ -234,6 +311,7 @@ fn serialize_record(
             title,
             vesting_date,
             r#type,
+            referee_rewards_usd,
         })?;
     }
     Ok(())
@@ -265,14 +343,16 @@ async fn validate_referee_wallet(
 
 #[derive(Default, Clone)]
 struct TotalsTracker {
-    total: Decimal256,
-    entries: HashMap<Address, Decimal256>,
+    total: Usd,
+    entries: HashMap<Address, Usd>,
 }
 
 impl TotalsTracker {
-    fn add(&mut self, wallet: Address, amount: Decimal256) {
-        self.total += amount;
-        *self.entries.entry(wallet).or_default() += amount;
+    fn add(&mut self, wallet: Address, amount: Usd) -> Result<()> {
+        self.total = self.total.checked_add(amount)?;
+        let entry = self.entries.entry(wallet).or_default();
+        *entry = entry.checked_add(amount)?;
+        Ok(())
     }
 }
 
@@ -280,13 +360,23 @@ impl TotalsTracker {
 #[serde(rename_all = "snake_case")]
 pub(crate) struct DistributionsRecord {
     pub(crate) recipient: Address,
-    pub(crate) amount: Decimal256,
+    pub(crate) amount: LvnToken,
     pub(crate) vesting_date: DateTime<Utc>,
     pub(crate) clawback: Option<String>,
     pub(crate) can_vote: bool,
     pub(crate) can_receive_rewards: bool,
     pub(crate) title: String,
-    pub(crate) r#type: &'static str,
+    pub(crate) r#type: RewardType,
+    #[serde(default)]
+    pub(crate) referee_rewards_usd: Usd,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum RewardType {
+    Losses,
+    Fees,
+    Referee,
 }
 
 #[derive(serde::Deserialize)]
@@ -297,4 +387,12 @@ struct TokenPriceResp {
 #[derive(serde::Deserialize)]
 struct ReferralStatsResp {
     referrer: Option<Address>,
+}
+
+/// Given as USD per LVN
+struct LvnPrice(Decimal256);
+impl LvnPrice {
+    fn usd_to_lvn(&self, usd: Usd) -> LvnToken {
+        LvnToken::from_decimal256(usd.into_decimal256() / self.0)
+    }
 }
