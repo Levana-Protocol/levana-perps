@@ -1,4 +1,3 @@
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -169,8 +168,11 @@ async fn distributions_csv(
 
     let mut losses = TotalsTracker::default();
     let mut fees = TotalsTracker::default();
+    let mut referee_fees = TotalsTracker::default();
+    let client = reqwest::Client::new();
 
     for factory in factories {
+        let mut is_referee_cache = HashMap::<Address, bool>::new();
         for record in csv::Reader::from_path(&factory.cache_file)?.into_deserialize() {
             let PositionRecord {
                 closed_at,
@@ -187,9 +189,26 @@ async fn distributions_csv(
                 continue;
             }
             if pnl_usd.is_negative() {
-                losses.add(owner, pnl_usd.abs_unsigned(), factory.factory)?;
+                losses.add(owner, pnl_usd.abs_unsigned())?;
             }
-            fees.add(owner, trading_fee_usd, factory.factory)?;
+            fees.add(owner, trading_fee_usd)?;
+            let is_referee = match is_referee_cache.get(&owner) {
+                Some(x) => *x,
+                None => {
+                    let is_referee = validate_referee_wallet(
+                        owner,
+                        factory.factory.network,
+                        factory.factory.address,
+                        &client,
+                    )
+                    .await?;
+                    is_referee_cache.insert(owner, is_referee);
+                    is_referee
+                }
+            };
+            if is_referee {
+                referee_fees.add(owner, trading_fee_usd)?;
+            }
         }
     }
 
@@ -237,9 +256,9 @@ async fn distributions_csv(
 
     for (cat, pool_size, TotalsTracker { total, entries }) in [
         (Category::Losses, losses_pool_size, losses),
-        (Category::Fees, fees_pool_size, fees.clone()),
+        (Category::Fees, fees_pool_size, fees),
     ] {
-        for (recipient, (amount, _factory)) in entries {
+        for (recipient, amount) in entries {
             let amount = LvnToken::from_decimal256(
                 amount.into_decimal256() * pool_size.into_decimal256() / total.into_decimal256(),
             );
@@ -267,7 +286,6 @@ async fn distributions_csv(
         }
     }
 
-    let client = reqwest::Client::new();
     let TokenPriceResp { price, .. } = client
         .get("https://querier-mainnet.levana.finance/v1/levana/token-price")
         .send()
@@ -276,38 +294,36 @@ async fn distributions_csv(
         .json()
         .await?;
     let price = LvnPrice(price);
-    for (recipient, (amount, factory)) in fees.entries {
-        if validate_referee_wallet(recipient, factory.network, factory.address, &client).await? {
-            let refund_usd_uncapped = Usd::from_decimal256(
-                amount.into_decimal256() * Decimal256::percent(referee_rewards_percentage),
-            );
-            let available_refund = match prev_referee_rewards.get(&recipient) {
-                None => max_referee_rewards,
-                Some(prev_amount) => {
-                    if prev_amount < &max_referee_rewards {
-                        (max_referee_rewards - *prev_amount)?
-                    } else {
-                        Usd::zero()
-                    }
+    for (recipient, amount) in referee_fees.entries {
+        let refund_usd_uncapped = Usd::from_decimal256(
+            amount.into_decimal256() * Decimal256::percent(referee_rewards_percentage),
+        );
+        let available_refund = match prev_referee_rewards.get(&recipient) {
+            None => max_referee_rewards,
+            Some(prev_amount) => {
+                if prev_amount < &max_referee_rewards {
+                    (max_referee_rewards - *prev_amount)?
+                } else {
+                    Usd::zero()
                 }
-            };
-            let refund_usd = refund_usd_uncapped.min(available_refund);
-            let amount = price.usd_to_lvn(refund_usd);
-            serialize_record(
-                &mut output,
-                min_rewards,
-                recipient,
-                amount,
-                format!(
-                    "Levana's \"referee rewards\" campaign, {} through {}",
-                    start_date.format("%Y-%m-%d"),
-                    end_date.format("%Y-%m-%d")
-                ),
-                vesting_date,
-                RewardType::Referee,
-                refund_usd,
-            )?;
-        }
+            }
+        };
+        let refund_usd = refund_usd_uncapped.min(available_refund);
+        let amount = price.usd_to_lvn(refund_usd);
+        serialize_record(
+            &mut output,
+            min_rewards,
+            recipient,
+            amount,
+            format!(
+                "Levana's \"referee rewards\" campaign, {} through {}",
+                start_date.format("%Y-%m-%d"),
+                end_date.format("%Y-%m-%d")
+            ),
+            vesting_date,
+            RewardType::Referee,
+            refund_usd,
+        )?;
     }
 
     Ok(())
@@ -366,23 +382,16 @@ async fn validate_referee_wallet(
 }
 
 #[derive(Default, Clone)]
-struct TotalsTracker<'a> {
+struct TotalsTracker {
     total: Usd,
-    entries: HashMap<Address, (Usd, &'a MainnetFactory)>,
+    entries: HashMap<Address, Usd>,
 }
 
-impl<'a> TotalsTracker<'a> {
-    fn add(&mut self, wallet: Address, amount: Usd, factory: &'a MainnetFactory) -> Result<()> {
+impl TotalsTracker {
+    fn add(&mut self, wallet: Address, amount: Usd) -> Result<()> {
         self.total = self.total.checked_add(amount)?;
-        match self.entries.entry(wallet) {
-            Entry::Occupied(mut entry) => {
-                let entry = entry.get_mut();
-                entry.0 = entry.0.checked_add(amount)?;
-            }
-            Entry::Vacant(entry) => {
-                entry.insert((amount, factory));
-            }
-        }
+        let entry = self.entries.entry(wallet).or_default();
+        *entry = entry.checked_add(amount)?;
         Ok(())
     }
 }
