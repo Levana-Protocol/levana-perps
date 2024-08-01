@@ -1,6 +1,6 @@
 use std::{fmt::Display, str::FromStr};
 
-use cosmos::{error::BuilderError, AddressHrp, CosmosBuilder, CosmosNetwork, HasAddressHrp};
+use cosmos::{AddressHrp, CosmosBuilder, CosmosConfigError, CosmosNetwork, HasAddressHrp};
 
 /// Like [CosmosNetwork] but with extra perps-specific networks.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
@@ -23,9 +23,9 @@ impl FromStr for PerpsNetwork {
 }
 
 impl PerpsNetwork {
-    pub async fn builder(self) -> Result<CosmosBuilder, BuilderError> {
+    pub async fn builder(self) -> Result<CosmosBuilder, CosmosConfigError> {
         match self {
-            PerpsNetwork::Regular(network) => network.builder().await,
+            PerpsNetwork::Regular(network) => network.builder_with_config().await,
             PerpsNetwork::DymensionTestnet => Ok(CosmosBuilder::new(
                 "rollappwasm_1234-2",
                 "urax",
