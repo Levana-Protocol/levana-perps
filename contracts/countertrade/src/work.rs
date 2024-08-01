@@ -382,30 +382,15 @@ fn smart_search(
 
 fn derive_popular_funding_rate_annual(
     popular_notional: Notional,
-    desired_unpopular: Notional,
+    unpopular_notional: Notional,
     config: &msg::contracts::market::config::Config,
 ) -> Result<Decimal256> {
-    // The equations treat long and short identically, so we cheat
-    // a bit and simply pass the values into derive_instant_funding_rate_annual
-    // in the order we want them to appear.
-    let (popular, unpopular) =
-        derive_instant_funding_rate_annual(popular_notional, desired_unpopular, config)?;
-    assert!(unpopular.is_negative());
-    assert!(popular.is_strictly_positive());
-    Ok(popular.abs_unsigned())
-}
-
-fn derive_instant_funding_rate_annual(
-    long_notional: Notional,
-    short_notional: Notional,
-    config: &msg::contracts::market::config::Config,
-) -> Result<(Number, Number)> {
     let rf_per_annual_cap = config.funding_rate_max_annualized;
-    let instant_net_open_interest = long_notional
+    let instant_net_open_interest = popular_notional
         .into_number()
-        .checked_sub(short_notional.into_number())?;
-    let instant_open_short = short_notional;
-    let instant_open_long = long_notional;
+        .checked_sub(unpopular_notional.into_number())?;
+    let instant_open_short = unpopular_notional;
+    let instant_open_long = popular_notional;
     let funding_rate_sensitivity = config.funding_rate_sensitivity;
 
     let total_interest = (instant_open_long + instant_open_short)?.into_decimal256();
@@ -445,7 +430,7 @@ fn derive_instant_funding_rate_annual(
             std::cmp::Ordering::Equal => Ok(Decimal256::zero()),
         }
     };
-    let (long_rate, short_rate) = if instant_open_long.is_zero() || instant_open_short.is_zero() {
+    let (popular, unpopular) = if instant_open_long.is_zero() || instant_open_short.is_zero() {
         // When all on one side, popular side has no one to pay
         (Number::ZERO, Number::ZERO)
     } else {
@@ -459,8 +444,9 @@ fn derive_instant_funding_rate_annual(
             std::cmp::Ordering::Equal => (Number::ZERO, Number::ZERO),
         }
     };
-
-    Ok((long_rate, short_rate))
+    assert!(unpopular.is_negative());
+    assert!(popular.is_strictly_positive());
+    Ok(popular.abs_unsigned())
 }
 
 fn compute_delta_notional(
