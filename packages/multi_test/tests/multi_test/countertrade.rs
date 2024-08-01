@@ -648,6 +648,8 @@ fn opens_balancing_position() {
         .unwrap();
 
     let config = market.query_countertrade_config().unwrap();
+    println!("config: {config:#?}");
+
     let market_type = market.query_status().unwrap().market_type;
 
     // Open up unbalanced positions
@@ -720,7 +722,6 @@ fn opens_balancing_position() {
         .query_countertrade_market_id(status.market_id)
         .unwrap();
 
-
     let position = market_status.position.unwrap();
 
     println!("Opened position: {position:#?}");
@@ -731,10 +732,15 @@ fn opens_balancing_position() {
     );
 
     let status = market.query_status().unwrap();
-    assert!(status
-        .long_funding
+    assert!(
+        status
+            .long_funding
         .approx_eq(config.target_funding.into_signed())
-        .unwrap());
+            .unwrap(),
+        "Long funding {} should be close to target_funding {}",
+        status.long_funding,
+        config.target_funding
+    );
 
     assert_eq!(
         market.query_countertrade_has_work().unwrap(),

@@ -7,9 +7,13 @@ use msg::contracts::market::{
     position::PositionQueryResponse,
 };
 use shared::{
+    market_type,
     number::Number,
-    price::{PriceBaseInQuote, TakeProfitTrader},
-    storage::{DirectionToBase, DirectionToNotional, LeverageToBase, MarketType, PricePoint},
+    price::{Price, PriceBaseInQuote, TakeProfitTrader},
+    storage::{
+        DirectionToBase, DirectionToNotional, LeverageToBase, MarketType, PricePoint,
+        SignedLeverageToNotional,
+    },
 };
 
 use crate::prelude::*;
@@ -167,6 +171,12 @@ fn desired_action(
         MarketType::CollateralIsQuote => (status.long_funding, status.short_funding),
         MarketType::CollateralIsBase => (status.short_funding, status.long_funding),
     };
+
+    let (long_interest, short_interest) = match status.market_type {
+        MarketType::CollateralIsQuote => (status.long_notional, status.short_notional),
+        MarketType::CollateralIsBase => (status.short_notional, status.long_notional),
+    };
+
     let current_direction = pos.map(|pos| pos.direction_to_base.into_notional(status.market_type));
     let min_funding = state.config.min_funding.into_signed();
     let max_funding = state.config.max_funding.into_signed();
@@ -199,33 +209,213 @@ fn desired_action(
                 Ok(Some(WorkDescription::ClosePosition { pos_id: pos.id }))
             }
             None => {
-                let fifty_percent = Decimal256::from_ratio(50u32, 100u32).into_number();
-                let target_funding = fifty_percent.checked_sub(target_funding)?;
+                let hundred = Decimal256::from_str("100")?;
+                let min_funding = state.config.min_funding.checked_mul(hundred)?;
+                let target_funding = state.config.target_funding.checked_mul(hundred)?;
+                println!("Going to determine target_notional {min_funding} {target_funding}");
 
-                let work = compute_delta_notional(
-                    status.long_notional,
-                    status.short_notional,
-                    target_funding,
-                    &price,
+                let result = determine_target_notional(
+                    long_interest,
+                    short_interest,
+                    state.config.min_funding,
+                    state.config.target_funding,
                     &status,
-                    available_collateral,
                 )?;
-                Ok(Some(work))
+
+                println!("Determined target_notional");
+
+                match result {
+                    TargetNotionalResult::NoWork => Ok(None),
+                    TargetNotionalResult::Result {
+                        direction,
+                        desired_notional,
+                    } => {
+                        let result = compute_delta_notional(
+                            desired_notional,
+                            direction,
+                            price,
+                            &status,
+                            available_collateral,
+                        )?;
+                        Ok(Some(result))
+                    }
+                }
             }
         }
     }
 }
 
-fn derive_instant_funding_rate_annual(status: &StatusResp) -> Result<(Number, Number)> {
+enum TargetNotionalResult {
+    NoWork,
+    Result {
+        direction: DirectionToNotional,
+        desired_notional: Notional,
+    },
+}
+
+fn determine_target_notional(
+    long_interest: Notional,
+    short_interest: Notional,
+    min_funding: Decimal256,
+    target_funding: Decimal256,
+    status: &StatusResp,
+) -> Result<TargetNotionalResult> {
+    println!("Going to derive instant funding rate_annual");
+    let (rfl, rfs) = derive_instant_funding_rate_annual(long_interest, short_interest, status)?;
+    let total_open_interest = long_interest.checked_add(short_interest)?;
+    struct TempResult {
+        unpopular_side: DirectionToNotional,
+        starting_ratio: Number,
+        unpopular_rf: Signed<Decimal256>,
+    }
+    let result = if long_interest < short_interest {
+        TempResult {
+            unpopular_side: DirectionToNotional::Long,
+            starting_ratio: long_interest
+                .into_number()
+                .checked_div(total_open_interest.into_number())?,
+            unpopular_rf: rfl,
+        }
+    } else {
+        TempResult {
+            unpopular_side: DirectionToNotional::Short,
+            starting_ratio: short_interest
+                .into_number()
+                .checked_div(total_open_interest.into_number())?,
+            unpopular_rf: rfs,
+        }
+    };
+
+    if result.unpopular_rf > min_funding.into_number() {
+        return Ok(TargetNotionalResult::NoWork);
+    }
+
+    if result.starting_ratio > Number::from_str("1.4")? {
+        bail!("Starting_ratio should not be greater than 1.4")
+    }
+
+    let target_ratio = Number::from_str("0.44")?;
+    println!("Going to smart search");
+    let open_interest = smart_search(
+        long_interest,
+        short_interest,
+        result.unpopular_side,
+        target_funding,
+        result.starting_ratio,
+        target_ratio,
+        status,
+        0
+    )?;
+    match result.unpopular_side {
+        DirectionToNotional::Long => {
+            let desired_notional = open_interest.long.checked_sub(long_interest)?;
+            Ok(TargetNotionalResult::Result {
+                direction: result.unpopular_side,
+                desired_notional,
+            })
+        }
+        DirectionToNotional::Short => {
+            let desired_notional = open_interest.short.checked_sub(short_interest)?;
+            Ok(TargetNotionalResult::Result {
+                direction: result.unpopular_side,
+                desired_notional,
+            })
+        }
+    }
+}
+
+struct OpenInterest {
+    long: Notional,
+    short: Notional,
+}
+
+fn smart_search(
+    long_notional: Notional,
+    short_notional: Notional,
+    unpopular_side: DirectionToNotional,
+    target_funding: Decimal256,
+    starting_ratio: Number,
+    target_ratio: Number,
+    status: &StatusResp,
+    iteration: u8
+) -> Result<OpenInterest> {
+    println!("Iteration: {iteration}");
+    if iteration >= 20 {
+        bail!("Iteration limit exceeded in funding rate calculation")
+    }
+    // todo: limit iteration
+    let total_open_interest = long_notional.checked_add(short_notional)?;
+
+    let open_interest = match unpopular_side {
+        DirectionToNotional::Long => {
+            let long = total_open_interest
+                .into_number()
+                .checked_mul(target_ratio)?
+                .checked_sub(long_notional.into_number())?
+                .checked_div(target_ratio)?;
+            let long = long_notional.into_number().checked_add(long)?;
+            let long = Notional::try_from_number(long)?;
+            OpenInterest {
+                long,
+                short: short_notional,
+            }
+        }
+        DirectionToNotional::Short => {
+            let short = total_open_interest
+                .into_number()
+                .checked_mul(target_ratio)?
+                .checked_sub(short_notional.into_number())?
+                .checked_div(target_ratio)?;
+            let short = short_notional.into_number().checked_add(short)?;
+            let short = Notional::try_from_number(short)?;
+            OpenInterest {
+                long: long_notional,
+                short,
+            }
+        }
+    };
+
+    let (new_rfl, new_rfs) =
+        derive_instant_funding_rate_annual(open_interest.long, open_interest.short, &status)?;
+
+    let new_funding_rate = match unpopular_side {
+        DirectionToNotional::Long => new_rfl,
+        DirectionToNotional::Short => new_rfs,
+    };
+
+    println!("new_funding_rate: {new_funding_rate}, new_rfl {new_rfl} & new_rfs {new_rfs}");
+    println!("target_funding: {}", target_funding.into_signed());
+
+    if new_funding_rate > target_funding.into_signed() {
+        let factor = Decimal256::from_str("0.005")?;
+        let target_ratio = target_ratio.checked_sub(factor.into_number())?;
+        return smart_search(
+            long_notional,
+            short_notional,
+            unpopular_side,
+            target_funding,
+            starting_ratio,
+            target_ratio,
+            status,
+            iteration + 1
+        );
+    } else {
+        return Ok(open_interest);
+    }
+}
+
+fn derive_instant_funding_rate_annual(
+    long_notional: Notional,
+    short_notional: Notional,
+    status: &StatusResp,
+) -> Result<(Number, Number)> {
     let config = &status.config;
     let rf_per_annual_cap = config.funding_rate_max_annualized;
-
-    let instant_net_open_interest = status
-        .long_notional
-        .checked_sub(status.short_notional)?
-        .into_signed();
-    let instant_open_short = status.short_notional;
-    let instant_open_long = status.long_notional;
+    let instant_net_open_interest = long_notional
+        .into_number()
+        .checked_sub(short_notional.into_number())?;
+    let instant_open_short = short_notional;
+    let instant_open_long = long_notional;
     let funding_rate_sensitivity = config.funding_rate_sensitivity;
 
     let total_interest = (instant_open_long + instant_open_short)?.into_decimal256();
@@ -250,7 +440,6 @@ fn derive_instant_funding_rate_annual(status: &StatusResp) -> Result<(Number, Nu
             rf_per_annual_cap,
         ))
     };
-
     let rf_unpopular = || -> Result<Decimal256> {
         match instant_open_long.cmp(&instant_open_short) {
             std::cmp::Ordering::Greater => Ok(rf_popular()?.checked_mul(
@@ -266,7 +455,6 @@ fn derive_instant_funding_rate_annual(status: &StatusResp) -> Result<(Number, Nu
             std::cmp::Ordering::Equal => Ok(Decimal256::zero()),
         }
     };
-
     let (long_rate, short_rate) = if instant_open_long.is_zero() || instant_open_short.is_zero() {
         // When all on one side, popular side has no one to pay
         (Number::ZERO, Number::ZERO)
@@ -286,110 +474,100 @@ fn derive_instant_funding_rate_annual(status: &StatusResp) -> Result<(Number, Nu
 }
 
 fn compute_delta_notional(
-    open_interest_long: Notional,
-    open_interest_short: Notional,
-    target_funding: Signed<Decimal256>,
+    desired_notional: Notional,
+    direction: DirectionToNotional,
     price: &PricePoint,
     status: &StatusResp,
     available_collateral: NonZero<Collateral>,
 ) -> Result<WorkDescription> {
-    let current_open_interest = open_interest_long.checked_add(open_interest_short)?;
-
-    let mut delta_target_funding = target_funding;
-
-    let open_interest_ratio = if open_interest_long.is_zero() {
-        delta_target_funding = delta_target_funding.checked_mul(-Number::ONE)?;
-        Decimal256::from_ratio(15u32, 10u32)
-    } else if open_interest_long.is_zero() {
-        Decimal256::from_ratio(5u32, 10u32)
-    } else {
-        open_interest_long
-            .into_decimal256()
-            .checked_div(open_interest_short.into_decimal256())?
-    };
-
     struct Result {
-        direction: DirectionToBase,
-        desired_notional: Number,
+        direction: DirectionToNotional,
+        desired_notional: Notional,
     }
 
-    let fifty_percent = Decimal256::from_ratio(50u32, 100u32).into_number();
-    let result = if open_interest_ratio > Decimal256::one() {
-        let target_percent = fifty_percent.checked_add(delta_target_funding)?;
-        let mut desired_notional = current_open_interest
-            .into_number()
-            .checked_mul_number(target_percent)?
-            .checked_sub(open_interest_short.into_number())?;
-        desired_notional =
-            desired_notional.checked_div(Number::ONE.checked_sub(target_percent)?)?;
-        Result {
-            direction: DirectionToBase::Short,
-            desired_notional,
-        }
-    } else {
-        let target_percent = fifty_percent.checked_sub(delta_target_funding)?;
-        let mut desired_notional = current_open_interest
-            .into_number()
-            .checked_mul_number(target_percent)?
-            .checked_sub(open_interest_long.into_number())?;
-        desired_notional =
-            desired_notional.checked_div(Number::ONE.checked_sub(target_percent)?)?;
-        Result {
-            direction: DirectionToBase::Long,
-            desired_notional,
-        }
+    let result = Result {
+        direction,
+        desired_notional,
     };
 
     println!("market_id: {}", status.market_id);
     println!("market_type: {:?}", status.market_type);
 
-    let entry_price = price.price_base;
+    let entry_price = price.price_notional;
     let factor = Number::from_str("1.5")
         .context("Unable to convert 1.5 to Decimal256")?
         .into_number();
     let take_profit = match result.direction {
-        DirectionToBase::Long => {
-            PriceBaseInQuote::try_from_number(entry_price.into_number().checked_mul(factor)?)?
+        DirectionToNotional::Long => {
+            Price::try_from_number(entry_price.into_number().checked_mul(factor)?)?
         }
-        DirectionToBase::Short => {
+        DirectionToNotional::Short => {
             let factor_diff = factor
                 .checked_div(Number::from_str("100").context("Unable to convert 100 to Number")?)?;
             let factor_diff = factor_diff.checked_mul(entry_price.into_number())?;
-            PriceBaseInQuote::try_from_number(entry_price.into_number().checked_sub(factor_diff)?)?
+            Price::try_from_number(entry_price.into_number().checked_sub(factor_diff)?)?
         }
     };
+    let take_profit = TakeProfitTrader::from(take_profit.into_base_price(status.market_type));
 
     let leverage = Number::from_str("10")
         .context("Unable to convert 10 to Number")?
-        .min(status.config.max_leverage)
-        .try_into_non_zero()
-        .context("Non zero number")?;
+        .min(status.config.max_leverage);
 
-    let leverage = LeverageToBase::from(leverage);
-
-    let desired_notional = Notional::try_from_number(result.desired_notional)?;
-
-    let collateral = {
-        let collateral = price.notional_to_collateral(desired_notional);
-        let collateral = collateral.checked_div_dec(leverage.into_decimal256())?;
-        let collateral = NonZero::new(collateral).context("collateral is zero")?;
-        if collateral > available_collateral {
-            bail!("Insufficient collateral. Required {collateral}, but available {available_collateral}")
-        }
-        collateral
+    let leverage = match result.direction {
+        DirectionToNotional::Long => leverage,
+        DirectionToNotional::Short => leverage.checked_mul(Number::from_str("-1")?)?,
     };
+
+    let (direction, leverage) = SignedLeverageToNotional::from(leverage)
+        .into_base(status.market_type)?
+        .split();
+
+    let desired_notional = result.desired_notional;
+
+    let notional_size = price.notional_to_collateral(desired_notional);
+    println!("notional_size: {desired_notional}");
+
+    let (collateral, leverage) = optimize_capital_efficiency(notional_size, leverage)?;
+
+    let collateral = NonZero::new(collateral).context("collateral is zero")?;
+    if collateral > available_collateral {
+        bail!(
+            "Insufficient collateral. Required {collateral}, but available {available_collateral}"
+        )
+    }
 
     println!("counter trade contract recommendation:");
     println!("collateral: {collateral}");
     println!("leverage: {leverage}");
+    println!("take_profit: {take_profit}");
+    println!("entry_price: {entry_price}");
     println!("direction: {:?}", result.direction);
 
     Ok(WorkDescription::OpenPosition {
-        direction: result.direction,
+        direction,
         leverage,
         collateral,
-        take_profit: TakeProfitTrader::from(take_profit),
+        take_profit,
     })
+}
+
+fn optimize_capital_efficiency(
+    notional_size: Collateral,
+    max_leverage: LeverageToBase,
+) -> Result<(Collateral, LeverageToBase)> {
+    let collateral = notional_size.checked_div_dec(max_leverage.into_decimal256())?;
+    let five_collateral = Collateral::from_str("5")?;
+    if collateral >= five_collateral {
+        return Ok((collateral, max_leverage));
+    } else {
+        let leverage = notional_size
+            .into_decimal256()
+            .checked_div(five_collateral.into_decimal256())?;
+        let leverage = NonZero::new(leverage).context("leverage is zero")?;
+        let leverage = LeverageToBase::from(leverage);
+        return Ok((five_collateral, leverage));
+    }
 }
 
 pub(crate) fn execute(

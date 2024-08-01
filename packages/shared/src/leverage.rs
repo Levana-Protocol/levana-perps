@@ -187,6 +187,12 @@ impl FromStr for SignedLeverageToBase {
 #[derive(Clone, Copy)]
 pub struct SignedLeverageToNotional(Signed<Decimal256>);
 
+impl From<Signed<Decimal256>> for SignedLeverageToNotional {
+    fn from(value: Signed<Decimal256>) -> Self {
+        SignedLeverageToNotional(value)
+    }
+}
+
 impl SignedLeverageToNotional {
     /// Extract the direction value
     pub fn direction(self) -> DirectionToNotional {
