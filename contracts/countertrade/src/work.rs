@@ -159,11 +159,27 @@ fn desired_action(
     pos: Option<&PositionQueryResponse>,
     available_collateral: NonZero<Collateral>,
 ) -> Result<Option<WorkDescription>> {
-    if status.long_funding.is_zero() || status.short_funding.is_zero() {
+    let one_sided_market = if status.long_funding.is_zero() || status.short_funding.is_zero() {
         assert!(status.long_funding.is_zero());
         assert!(status.short_funding.is_zero());
-        return Ok(None);
-    }
+        // Handle the case where we have a one sided market
+        match (
+            status.long_notional.is_zero(),
+            status.short_notional.is_zero(),
+        ) {
+            // No positions opened at all, everything is fine
+            (true, true) => return Ok(None),
+            // Perfectly balanced positions are opened
+            (false, false) => {
+                assert!(status.long_notional == status.short_notional);
+                return Ok(None);
+            }
+            // In these cases, we have a one sided market
+            (true, false) | (false, true) => true,
+        }
+    } else {
+        false
+    };
 
     // Now entering the flipped zone: code below here will deal exclusively with internal direction/prices/etc.
     let (long_funding, short_funding) = match status.market_type {
@@ -181,21 +197,73 @@ fn desired_action(
     let max_funding = state.config.max_funding.into_signed();
     let target_funding = state.config.target_funding.into_signed();
 
-    let (popular_funding, unpop_funnding, popular_direction) =
+    let (popular_funding, unpop_funnding, popular_direction, unpopular_interest) =
         if long_funding.is_strictly_positive() {
-            assert!(short_funding.is_negative());
-            (long_funding, short_funding, DirectionToNotional::Long)
+            assert!(short_funding.is_negative() || one_sided_market);
+            (
+                long_funding,
+                short_funding,
+                DirectionToNotional::Long,
+                short_interest,
+            )
         } else {
-            assert!(long_funding.is_negative());
-            (short_funding, long_funding, DirectionToNotional::Short)
+            assert!(long_funding.is_negative() || one_sided_market);
+            (
+                short_funding,
+                long_funding,
+                DirectionToNotional::Short,
+                long_interest,
+            )
         };
 
     if popular_funding >= min_funding && popular_funding <= max_funding {
+        assert!(popular_funding.is_zero() || !one_sided_market);
+        println!("here1");
         Ok(None)
     } else if popular_funding < min_funding {
         match pos {
-            Some(pos) => Ok(Some(WorkDescription::ClosePosition { pos_id: pos.id })),
-            None => Ok(None),
+            Some(pos) => {
+                // If we have the only unpopular position, keep it open
+                if pos.notional_size.abs_unsigned() == unpopular_interest {
+                    println!("here2");
+                    Ok(None)
+                } else {
+                    Ok(Some(WorkDescription::ClosePosition { pos_id: pos.id }))
+                }
+            }
+            None => {
+                if one_sided_market {
+                    // Returns the target notional size of a newly constructed position
+                    let result = determine_target_notional(
+                        long_interest,
+                        short_interest,
+                        min_funding,
+                        target_funding,
+                        status,
+                    )?;
+
+                    match result {
+                        TargetNotionalResult::NoWork => Ok(None),
+                        TargetNotionalResult::Result {
+                            direction,
+                            desired_notional,
+                        } => {
+                            let position_notional_size = match direction {
+                                DirectionToNotional::Long => desired_notional.into_signed(),
+                                DirectionToNotional::Short => -desired_notional.into_signed(),
+                            };
+                            compute_delta_notional(
+                                position_notional_size,
+                                price,
+                                status,
+                                available_collateral,
+                            )
+                        }
+                    }
+                } else {
+                    Ok(None)
+                }
+            }
         }
     } else {
         match pos {
@@ -266,7 +334,8 @@ fn determine_target_notional(
     target_funding: Number,
     status: &StatusResp,
 ) -> Result<TargetNotionalResult> {
-    let (rfl, rfs) = derive_instant_funding_rate_annual(long_interest, short_interest, status)?;
+    let (rfl, rfs) =
+        derive_instant_funding_rate_annual(long_interest, short_interest, &status.config)?;
     let total_open_interest = long_interest.checked_add(short_interest)?;
     struct TempResult {
         unpopular_side: DirectionToNotional,
@@ -295,34 +364,21 @@ fn determine_target_notional(
         return Ok(TargetNotionalResult::NoWork);
     }
 
+    // TODO: why is this here, and how is it ever possible to have a starting ratio over 1?
     if result.starting_ratio > Number::from_str("1.4")? {
         bail!("Starting_ratio should not be greater than 1.4")
     }
 
-    let open_interest = smart_search(
-        long_interest,
-        short_interest,
-        result.unpopular_side,
-        target_funding,
-        result.starting_ratio,
-        status,
-        0,
-    )?;
+    let desired_notional = smart_search(long_interest, short_interest, target_funding, status, 0)?;
     match result.unpopular_side {
-        DirectionToNotional::Long => {
-            let desired_notional = open_interest.long.checked_sub(long_interest)?;
-            Ok(TargetNotionalResult::Result {
-                direction: result.unpopular_side,
-                desired_notional,
-            })
-        }
-        DirectionToNotional::Short => {
-            let desired_notional = open_interest.short.checked_sub(short_interest)?;
-            Ok(TargetNotionalResult::Result {
-                direction: result.unpopular_side,
-                desired_notional,
-            })
-        }
+        DirectionToNotional::Long => Ok(TargetNotionalResult::Result {
+            direction: result.unpopular_side,
+            desired_notional,
+        }),
+        DirectionToNotional::Short => Ok(TargetNotionalResult::Result {
+            direction: result.unpopular_side,
+            desired_notional,
+        }),
     }
 }
 
@@ -331,18 +387,33 @@ struct OpenInterest {
     short: Notional,
 }
 
+/// Returns the delta notional on the unpopular side.
 #[allow(clippy::too_many_arguments)]
 fn smart_search(
     long_notional: Notional,
     short_notional: Notional,
-    unpopular_side: DirectionToNotional,
     target_funding: Number,
-    starting_ratio: Number,
     status: &StatusResp,
     mut iteration: u8,
-) -> Result<OpenInterest> {
-    let mut high_ratio = Number::from_str("0.5").unwrap();
-    let mut low_ratio = starting_ratio;
+) -> Result<Notional> {
+    let (popular_notional, unpopular_notional) = if long_notional > short_notional {
+        (long_notional, short_notional)
+    } else {
+        (short_notional, long_notional)
+    };
+    // Ratio refers to what percentage of the market is unpopular.
+    // The absolute maximum we can ever achieve is 0.5, meaning a
+    // perfectly balanced market.
+    //
+    // The lowest ratio we'll potentially want is the starting ratio.
+    // The fact that we're in this function means we know we want to
+    // increase the unpopular side positions.
+    let mut high_ratio = Decimal256::from_ratio(1u8, 2u8);
+    let mut low_ratio = unpopular_notional.into_decimal256().checked_div(
+        popular_notional
+            .into_decimal256()
+            .checked_add(unpopular_notional.into_decimal256())?,
+    )?;
     loop {
         iteration += 1;
         let target_ratio = high_ratio
@@ -350,50 +421,30 @@ fn smart_search(
             .checked_div("2".parse().unwrap())?;
         let total_open_interest = long_notional.checked_add(short_notional)?;
 
-        let open_interest = match unpopular_side {
-            DirectionToNotional::Long => {
-                let long = total_open_interest
-                    .into_number()
-                    .checked_mul(target_ratio)?
-                    .checked_sub(long_notional.into_number())?
-                    .checked_div(target_ratio)?;
-                let long = long_notional.into_number().checked_add(long)?;
-                let long = Notional::try_from_number(long)?;
-                OpenInterest {
-                    long,
-                    short: short_notional,
-                }
-            }
-            DirectionToNotional::Short => {
-                let short = total_open_interest
-                    .into_number()
-                    .checked_mul(target_ratio)?
-                    .checked_sub(short_notional.into_number())?
-                    .checked_div(target_ratio)?;
-                let short = short_notional.into_number().checked_add(short)?;
-                let short = Notional::try_from_number(short)?;
-                OpenInterest {
-                    long: long_notional,
-                    short,
-                }
-            }
-        };
+        let desired_unpopular = Notional::from_decimal256(
+            target_ratio
+                .checked_mul(popular_notional.into_decimal256())?
+                .checked_div(Decimal256::one().checked_sub(target_ratio)?)?,
+        );
+        let delta_unpopular = desired_unpopular.checked_sub(unpopular_notional)?;
 
-        let (new_rfl, new_rfs) =
-            derive_instant_funding_rate_annual(open_interest.long, open_interest.short, status)?;
+        assert!(popular_notional >= desired_unpopular);
+        let new_funding_rate = derive_popular_funding_rate_annual(
+            popular_notional,
+            desired_unpopular,
+            &status.config,
+        )?;
 
-        let new_funding_rate = match unpopular_side {
-            DirectionToNotional::Long => new_rfs,
-            DirectionToNotional::Short => new_rfl,
-        };
-
-        let difference = new_funding_rate.checked_sub(target_funding)?.abs_unsigned();
+        let difference = new_funding_rate
+            .into_signed()
+            .checked_sub(target_funding)?
+            .abs_unsigned();
         let epsilon = Decimal256::from_str("0.00001").unwrap();
         if difference < epsilon {
-            break Ok(open_interest);
+            break Ok(delta_unpopular);
         } else if iteration >= 50 {
             break Err(anyhow!("Iteration limit reached without converging"));
-        } else if new_funding_rate > target_funding {
+        } else if new_funding_rate.into_signed() > target_funding {
             low_ratio = target_ratio;
         } else {
             high_ratio = target_ratio;
@@ -401,12 +452,26 @@ fn smart_search(
     }
 }
 
+fn derive_popular_funding_rate_annual(
+    popular_notional: Notional,
+    desired_unpopular: Notional,
+    config: &msg::contracts::market::config::Config,
+) -> Result<Decimal256> {
+    // The equations are treat long and short identically, so we cheat
+    // a bit and simply pass the values into derive_instant_funding_rate_annual
+    // in the order we want them to appear.
+    let (popular, unpopular) =
+        derive_instant_funding_rate_annual(popular_notional, desired_unpopular, config)?;
+    assert!(unpopular.is_negative());
+    assert!(popular.is_strictly_positive());
+    Ok(popular.abs_unsigned())
+}
+
 fn derive_instant_funding_rate_annual(
     long_notional: Notional,
     short_notional: Notional,
-    status: &StatusResp,
+    config: &msg::contracts::market::config::Config,
 ) -> Result<(Number, Number)> {
-    let config = &status.config;
     let rf_per_annual_cap = config.funding_rate_max_annualized;
     let instant_net_open_interest = long_notional
         .into_number()
