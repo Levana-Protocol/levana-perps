@@ -398,6 +398,31 @@ fn ignores_unbalanced_insufficient_liquidity() {
     market
         .exec_countertrade_mint_and_deposit(&lp, "0.005")
         .unwrap();
+    // Still wants to balance the market, but won't succeed fully
+    assert_ne!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    // Now we run the countertrade contract, which will open a small position
+    // Trying to run again will fail because we'll have 0 collateral left
+    do_work(&market, &lp);
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    // And if we try to add more liquidity and try again, it should close
+    // the old position and open a new position.
+    // This test will need to be updated once we support updating existing
+    // positions.
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "1000")
+        .unwrap();
+    // Close the old position
+    do_work(&market, &lp);
+    // Open the new position
+    do_work(&market, &lp);
     assert_eq!(
         market.query_countertrade_has_work().unwrap(),
         HasWorkResp::NoWork {}
@@ -822,18 +847,44 @@ fn balance_one_sided_market() {
 }
 
 fn do_work(market: &PerpsMarket, lp: &Addr) {
+    let work = market.query_countertrade_has_work().unwrap();
+    let (has_deferred_exec, is_close) = match work {
+        HasWorkResp::NoWork {} => panic!("do_work when no work is available"),
+        HasWorkResp::Work { desc } => match desc {
+            WorkDescription::OpenPosition { .. } => (true, false),
+            WorkDescription::ClosePosition { .. } => (true, true),
+            WorkDescription::CollectClosedPosition { .. } => {
+                panic!("CollectClosedPosition in do_work")
+            }
+            WorkDescription::ResetShares => (false, false),
+            WorkDescription::ClearDeferredExec { .. } => panic!("ClearDeferredExec in do_work"),
+        },
+    };
     market.exec_countertrade_do_work().unwrap();
     // Will fail if we do more work again since the deferred
     // execution would not have finished
     market.exec_countertrade_do_work().unwrap_err();
     // Execute the deferred message
-    market.exec_crank_till_finished(&lp).unwrap();
-    // And clear out the deferred exec ID
-    match market.query_countertrade_has_work().unwrap() {
-        HasWorkResp::Work {
-            desc: WorkDescription::ClearDeferredExec { id: _ },
-        } => (),
-        work => panic!("Unexpected work response: {work:?}"),
+    market.exec_crank_till_finished(lp).unwrap();
+    // And clear any deferred exec IDs and collect any closed positions
+
+    if has_deferred_exec {
+        match market.query_countertrade_has_work().unwrap() {
+            HasWorkResp::Work {
+                desc: WorkDescription::ClearDeferredExec { id: _ },
+            } => (),
+            work => panic!("Unexpected work response: {work:?}"),
+        }
+        market.exec_countertrade_do_work().unwrap();
     }
-    market.exec_countertrade_do_work().unwrap();
+
+    if is_close {
+        match market.query_countertrade_has_work().unwrap() {
+            HasWorkResp::Work {
+                desc: WorkDescription::CollectClosedPosition { .. },
+            } => (),
+            work => panic!("Unexpected work response: {work:?}"),
+        }
+        market.exec_countertrade_do_work().unwrap();
+    }
 }
