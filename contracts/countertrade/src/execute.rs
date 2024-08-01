@@ -251,6 +251,8 @@ fn update_config(
         target_funding,
         max_funding,
         max_leverage,
+        iterations,
+        take_profit_factor,
     }: ConfigUpdate,
 ) -> Result<Response> {
     ensure!(
@@ -285,6 +287,21 @@ fn update_config(
         event = event.add_attribute("old-max-funding", state.config.max_leverage.to_string());
         event = event.add_attribute("new-max-funding", max_leverage.to_string());
         state.config.max_leverage = max_leverage;
+    }
+
+    if let Some(iterations) = iterations {
+        event = event.add_attribute("old-iterations", state.config.iterations.to_string());
+        event = event.add_attribute("new-iterations", iterations.to_string());
+        state.config.iterations = iterations;
+    }
+
+    if let Some(take_profit_factor) = take_profit_factor {
+        event = event.add_attribute(
+            "old-take-profit-factor",
+            state.config.take_profit_factor.to_string(),
+        );
+        event = event.add_attribute("new-take-profit-factor", take_profit_factor.to_string());
+        state.config.take_profit_factor = take_profit_factor;
     }
 
     crate::state::CONFIG.save(storage, &state.config)?;

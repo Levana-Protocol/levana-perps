@@ -45,6 +45,10 @@ pub struct Config {
     pub target_funding: Decimal256,
     /// Maximum funding rate for popular side
     pub max_funding: Decimal256,
+    /// Allowed iterations to compute delta notional
+    pub iterations: u8,
+    /// Factor used to compute take profit price
+    pub take_profit_factor: Decimal256,
     /// Maximum leverage value we'll use
     ///
     /// If a market has lower max leverage, we use that instead
@@ -81,6 +85,8 @@ pub struct ConfigUpdate {
     pub target_funding: Option<Decimal256>,
     pub max_funding: Option<Decimal256>,
     pub max_leverage: Option<LeverageToBase>,
+    pub iterations: Option<u8>,
+    pub take_profit_factor: Option<Decimal256>
 }
 
 /// Executions available on the countertrade contract.
