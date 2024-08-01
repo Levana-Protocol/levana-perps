@@ -693,7 +693,6 @@ fn opens_balancing_position() {
         .unwrap();
 
     let config = market.query_countertrade_config().unwrap();
-    println!("config: {config:#?}");
 
     let market_type = market.query_status().unwrap().market_type;
 
@@ -728,7 +727,6 @@ fn opens_balancing_position() {
         )
         .unwrap();
     let status = market.query_status().unwrap();
-    println!("before opening cc pos status: {status:#?}");
     assert!(
         status.long_funding > config.max_funding.into_signed(),
         "Long funding rates are not high enough: {}. Need greater than {}.",
@@ -742,15 +740,13 @@ fn opens_balancing_position() {
         config.max_funding
     );
 
-    let price_point = market.query_current_price().unwrap();
-
     match market.query_countertrade_has_work().unwrap() {
         HasWorkResp::Work {
             desc:
                 WorkDescription::OpenPosition {
                     direction,
-                    leverage,
-                    collateral,
+                    leverage: _,
+                    collateral: _,
                     take_profit: _,
                 },
         } => {
@@ -760,16 +756,6 @@ fn opens_balancing_position() {
     }
 
     do_work(&market, &lp);
-    let status = market.query_status().unwrap();
-    println!("after opening status: {status:#?}");
-
-    let market_status = market
-        .query_countertrade_market_id(status.market_id)
-        .unwrap();
-
-    let position = market_status.position.unwrap();
-
-    println!("Opened position: {position:#?}");
 
     assert_eq!(
         market.query_countertrade_has_work().unwrap(),
