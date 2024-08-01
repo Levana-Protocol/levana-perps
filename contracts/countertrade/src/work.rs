@@ -209,16 +209,11 @@ fn desired_action(
                 Ok(Some(WorkDescription::ClosePosition { pos_id: pos.id }))
             }
             None => {
-                let hundred = Decimal256::from_str("100")?;
-                let min_funding = state.config.min_funding.checked_mul(hundred)?;
-                let target_funding = state.config.target_funding.checked_mul(hundred)?;
-                println!("Going to determine target_notional {min_funding} {target_funding}");
-
                 let result = determine_target_notional(
                     long_interest,
                     short_interest,
-                    state.config.min_funding,
-                    state.config.target_funding,
+                    min_funding,
+                    target_funding,
                     &status,
                 )?;
 
@@ -256,8 +251,8 @@ enum TargetNotionalResult {
 fn determine_target_notional(
     long_interest: Notional,
     short_interest: Notional,
-    min_funding: Decimal256,
-    target_funding: Decimal256,
+    min_funding: Number,
+    target_funding: Number,
     status: &StatusResp,
 ) -> Result<TargetNotionalResult> {
     println!("Going to derive instant funding rate_annual");
@@ -286,7 +281,7 @@ fn determine_target_notional(
         }
     };
 
-    if result.unpopular_rf > min_funding.into_number() {
+    if result.unpopular_rf > min_funding {
         return Ok(TargetNotionalResult::NoWork);
     }
 
@@ -333,7 +328,7 @@ fn smart_search(
     long_notional: Notional,
     short_notional: Notional,
     unpopular_side: DirectionToNotional,
-    target_funding: Decimal256,
+    target_funding: Number,
     starting_ratio: Number,
     target_ratio: Number,
     status: &StatusResp,
@@ -384,9 +379,9 @@ fn smart_search(
     };
 
     println!("new_funding_rate: {new_funding_rate}, new_rfl {new_rfl} & new_rfs {new_rfs}");
-    println!("target_funding: {}", target_funding.into_signed());
+    println!("target_funding: {}", target_funding);
 
-    if new_funding_rate > target_funding.into_signed() {
+    if new_funding_rate > target_funding {
         let factor = Decimal256::from_str("0.005")?;
         let target_ratio = target_ratio.checked_sub(factor.into_number())?;
         return smart_search(
