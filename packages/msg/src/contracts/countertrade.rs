@@ -86,7 +86,7 @@ pub struct ConfigUpdate {
     pub max_funding: Option<Decimal256>,
     pub max_leverage: Option<LeverageToBase>,
     pub iterations: Option<u8>,
-    pub take_profit_factor: Option<Decimal256>
+    pub take_profit_factor: Option<Decimal256>,
 }
 
 /// Executions available on the countertrade contract.

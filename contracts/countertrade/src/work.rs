@@ -216,7 +216,6 @@ fn desired_action(
                     let result = determine_target_notional(
                         long_interest,
                         short_interest,
-                        min_funding,
                         target_funding,
                         status,
                         allowed_iterations,
@@ -269,7 +268,6 @@ fn desired_action(
                 let result = determine_target_notional(
                     long_interest,
                     short_interest,
-                    min_funding,
                     target_funding,
                     status,
                     allowed_iterations,
@@ -298,24 +296,10 @@ fn desired_action(
 fn determine_target_notional(
     long_interest: Notional,
     short_interest: Notional,
-    min_funding: Number,
     target_funding: Number,
     status: &StatusResp,
     allowed_iterations: u8,
 ) -> Result<Option<Signed<Notional>>> {
-    let (rfl, rfs) =
-        derive_instant_funding_rate_annual(long_interest, short_interest, &status.config)?;
-
-    let unpopular = if long_interest < short_interest {
-        rfl
-    } else {
-        rfs
-    };
-
-    if unpopular > min_funding {
-        return Ok(None);
-    }
-
     let desired_notional = smart_search(
         long_interest,
         short_interest,
