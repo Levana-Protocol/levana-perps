@@ -468,7 +468,7 @@ fn closes_extra_positions() {
             &lp,
             "9",
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "5",
+                msg::prelude::MarketType::CollateralIsQuote => "6",
                 msg::prelude::MarketType::CollateralIsBase => "4",
             },
             DirectionToBase::Short,
