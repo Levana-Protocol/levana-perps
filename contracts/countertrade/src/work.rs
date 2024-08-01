@@ -7,9 +7,8 @@ use msg::contracts::market::{
     position::PositionQueryResponse,
 };
 use shared::{
-    market_type,
     number::Number,
-    price::{Price, PriceBaseInQuote, TakeProfitTrader},
+    price::{Price, TakeProfitTrader},
     storage::{
         DirectionToBase, DirectionToNotional, LeverageToBase, MarketType, PricePoint,
         SignedLeverageToNotional,
@@ -214,7 +213,7 @@ fn desired_action(
                     short_interest,
                     min_funding,
                     target_funding,
-                    &status,
+                    status,
                 )?;
 
                 println!("Determined target_notional");
@@ -289,7 +288,6 @@ fn determine_target_notional(
         bail!("Starting_ratio should not be greater than 1.4")
     }
 
-    let target_ratio = Number::from_str("0.44")?;
     println!("Going to smart search");
     let open_interest = smart_search(
         long_interest,
@@ -297,9 +295,8 @@ fn determine_target_notional(
         result.unpopular_side,
         target_funding,
         result.starting_ratio,
-        target_ratio,
         status,
-        0
+        0,
     )?;
     match result.unpopular_side {
         DirectionToNotional::Long => {
@@ -324,78 +321,77 @@ struct OpenInterest {
     short: Notional,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn smart_search(
     long_notional: Notional,
     short_notional: Notional,
     unpopular_side: DirectionToNotional,
     target_funding: Number,
     starting_ratio: Number,
-    target_ratio: Number,
     status: &StatusResp,
-    iteration: u8
+    mut iteration: u8,
 ) -> Result<OpenInterest> {
-    println!("Iteration: {iteration}");
-    if iteration >= 20 {
-        bail!("Iteration limit exceeded in funding rate calculation")
-    }
-    // todo: limit iteration
-    let total_open_interest = long_notional.checked_add(short_notional)?;
+    let mut high_ratio = Number::from_str("0.5").unwrap();
+    let mut low_ratio = starting_ratio;
+    loop {
+        iteration += 1;
+        let target_ratio = high_ratio
+            .checked_add(low_ratio)?
+            .checked_div("2".parse().unwrap())?;
+        println!("Iteration: {iteration}. long_notional: {long_notional}. short_notional: {short_notional}. unpopular_side: {unpopular_side:?}. target_funding: {target_funding}. starting_ratio: {starting_ratio}. high_ratio: {high_ratio}. low_ratio: {low_ratio}. target_ratio: {target_ratio}. market type: {:?}. status.long_funding: {}. status.short_funding: {}. status.long_notional: {}. status.short_notional: {}", status.market_type,status.long_funding,status.short_funding,status.long_notional,status.short_notional);
+        let total_open_interest = long_notional.checked_add(short_notional)?;
 
-    let open_interest = match unpopular_side {
-        DirectionToNotional::Long => {
-            let long = total_open_interest
-                .into_number()
-                .checked_mul(target_ratio)?
-                .checked_sub(long_notional.into_number())?
-                .checked_div(target_ratio)?;
-            let long = long_notional.into_number().checked_add(long)?;
-            let long = Notional::try_from_number(long)?;
-            OpenInterest {
-                long,
-                short: short_notional,
+        let open_interest = match unpopular_side {
+            DirectionToNotional::Long => {
+                let long = total_open_interest
+                    .into_number()
+                    .checked_mul(target_ratio)?
+                    .checked_sub(long_notional.into_number())?
+                    .checked_div(target_ratio)?;
+                let long = long_notional.into_number().checked_add(long)?;
+                let long = Notional::try_from_number(long)?;
+                OpenInterest {
+                    long,
+                    short: short_notional,
+                }
             }
-        }
-        DirectionToNotional::Short => {
-            let short = total_open_interest
-                .into_number()
-                .checked_mul(target_ratio)?
-                .checked_sub(short_notional.into_number())?
-                .checked_div(target_ratio)?;
-            let short = short_notional.into_number().checked_add(short)?;
-            let short = Notional::try_from_number(short)?;
-            OpenInterest {
-                long: long_notional,
-                short,
+            DirectionToNotional::Short => {
+                let short = total_open_interest
+                    .into_number()
+                    .checked_mul(target_ratio)?
+                    .checked_sub(short_notional.into_number())?
+                    .checked_div(target_ratio)?;
+                let short = short_notional.into_number().checked_add(short)?;
+                let short = Notional::try_from_number(short)?;
+                OpenInterest {
+                    long: long_notional,
+                    short,
+                }
             }
+        };
+
+        let (new_rfl, new_rfs) =
+            derive_instant_funding_rate_annual(open_interest.long, open_interest.short, status)?;
+
+        let new_funding_rate = match unpopular_side {
+            DirectionToNotional::Long => new_rfs,
+            DirectionToNotional::Short => new_rfl,
+        };
+
+        println!("new_funding_rate: {new_funding_rate}, new_rfl {new_rfl} & new_rfs {new_rfs}");
+        println!("target_funding: {}", target_funding);
+
+        let difference = new_funding_rate.checked_sub(target_funding)?.abs_unsigned();
+        let epsilon = Decimal256::from_str("0.001").unwrap();
+        if difference < epsilon {
+            break Ok(open_interest);
+        } else if iteration >= 20 {
+            break Err(anyhow!("Iteration limit reached without converging"));
+        } else if new_funding_rate > target_funding {
+            low_ratio = target_ratio;
+        } else {
+            high_ratio = target_ratio;
         }
-    };
-
-    let (new_rfl, new_rfs) =
-        derive_instant_funding_rate_annual(open_interest.long, open_interest.short, &status)?;
-
-    let new_funding_rate = match unpopular_side {
-        DirectionToNotional::Long => new_rfl,
-        DirectionToNotional::Short => new_rfs,
-    };
-
-    println!("new_funding_rate: {new_funding_rate}, new_rfl {new_rfl} & new_rfs {new_rfs}");
-    println!("target_funding: {}", target_funding);
-
-    if new_funding_rate > target_funding {
-        let factor = Decimal256::from_str("0.005")?;
-        let target_ratio = target_ratio.checked_sub(factor.into_number())?;
-        return smart_search(
-            long_notional,
-            short_notional,
-            unpopular_side,
-            target_funding,
-            starting_ratio,
-            target_ratio,
-            status,
-            iteration + 1
-        );
-    } else {
-        return Ok(open_interest);
     }
 }
 
