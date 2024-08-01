@@ -9,9 +9,7 @@ use msg::contracts::market::{
 use shared::{
     number::Number,
     price::{Price, TakeProfitTrader},
-    storage::{
-        DirectionToBase, DirectionToNotional, MarketType, PricePoint, SignedLeverageToNotional,
-    },
+    storage::{DirectionToBase, LeverageToBase, MarketType, PricePoint, SignedLeverageToNotional},
 };
 
 use crate::prelude::*;
@@ -213,32 +211,30 @@ fn desired_action(
             }
             None => {
                 if one_sided_market {
+                    let allowed_iterations = state.config.iterations;
                     // Returns the target notional size of a newly constructed position
                     let result = determine_target_notional(
                         long_interest,
                         short_interest,
-                        min_funding,
                         target_funding,
                         status,
+                        allowed_iterations,
                     )?;
-
                     match result {
-                        TargetNotionalResult::NoWork => Ok(None),
-                        TargetNotionalResult::Result {
-                            direction,
-                            desired_notional,
-                        } => {
-                            let position_notional_size = match direction {
-                                DirectionToNotional::Long => desired_notional.into_signed(),
-                                DirectionToNotional::Short => -desired_notional.into_signed(),
-                            };
+                        Some(position_notional_size) => {
+                            let max_leverage = state.config.max_leverage;
+                            let take_profit_factor = state.config.take_profit_factor;
                             compute_delta_notional(
                                 position_notional_size,
                                 price,
                                 status,
                                 available_collateral,
+                                max_leverage,
+                                take_profit_factor,
                             )
                         }
+
+                        None => Ok(None),
                     }
                 } else {
                     Ok(None)
@@ -267,95 +263,66 @@ fn desired_action(
                 }
             }
             None => {
+                let allowed_iterations = state.config.iterations;
                 // Returns the target notional size of a newly constructed position
                 let result = determine_target_notional(
                     long_interest,
                     short_interest,
-                    min_funding,
                     target_funding,
                     status,
+                    allowed_iterations,
                 )?;
 
                 match result {
-                    TargetNotionalResult::NoWork => Ok(None),
-                    TargetNotionalResult::Result {
-                        direction,
-                        desired_notional,
-                    } => {
-                        let position_notional_size = match direction {
-                            DirectionToNotional::Long => desired_notional.into_signed(),
-                            DirectionToNotional::Short => -desired_notional.into_signed(),
-                        };
+                    Some(position_notional_size) => {
+                        let max_leverage = state.config.max_leverage;
+                        let take_profit_factor = state.config.take_profit_factor;
                         compute_delta_notional(
                             position_notional_size,
                             price,
                             status,
                             available_collateral,
+                            max_leverage,
+                            take_profit_factor,
                         )
                     }
+                    None => Ok(None),
                 }
             }
         }
     }
 }
 
-enum TargetNotionalResult {
-    NoWork,
-    Result {
-        direction: DirectionToNotional,
-        desired_notional: Notional,
-    },
-}
-
 fn determine_target_notional(
     long_interest: Notional,
     short_interest: Notional,
-    min_funding: Number,
     target_funding: Number,
     status: &StatusResp,
-) -> Result<TargetNotionalResult> {
-    let (rfl, rfs) =
-        derive_instant_funding_rate_annual(long_interest, short_interest, &status.config)?;
-    struct TempResult {
-        unpopular_side: DirectionToNotional,
-        unpopular_rf: Signed<Decimal256>,
-    }
-    let result = if long_interest < short_interest {
-        TempResult {
-            unpopular_side: DirectionToNotional::Long,
-            unpopular_rf: rfl,
-        }
+    allowed_iterations: u8,
+) -> Result<Option<Signed<Notional>>> {
+    let desired_notional = smart_search(
+        long_interest,
+        short_interest,
+        target_funding,
+        status,
+        allowed_iterations,
+        0,
+    )?;
+    let position_notional_size = if long_interest < short_interest {
+        desired_notional.into_signed()
     } else {
-        TempResult {
-            unpopular_side: DirectionToNotional::Short,
-            unpopular_rf: rfs,
-        }
+        -desired_notional.into_signed()
     };
-
-    if result.unpopular_rf > min_funding {
-        return Ok(TargetNotionalResult::NoWork);
-    }
-
-    let desired_notional = smart_search(long_interest, short_interest, target_funding, status, 0)?;
-    match result.unpopular_side {
-        DirectionToNotional::Long => Ok(TargetNotionalResult::Result {
-            direction: result.unpopular_side,
-            desired_notional,
-        }),
-        DirectionToNotional::Short => Ok(TargetNotionalResult::Result {
-            direction: result.unpopular_side,
-            desired_notional,
-        }),
-    }
+    Ok(Some(position_notional_size))
 }
 
 /// Returns the delta notional on the unpopular side.
-#[allow(clippy::too_many_arguments)]
 fn smart_search(
     long_notional: Notional,
     short_notional: Notional,
     target_funding: Number,
     status: &StatusResp,
+    allowed_iterations: u8,
     mut iteration: u8,
 ) -> Result<Notional> {
     let (popular_notional, unpopular_notional) = if long_notional > short_notional {
@@ -403,7 +370,7 @@ fn smart_search(
         let epsilon = Decimal256::from_str("0.00001").unwrap();
         if difference < epsilon {
             break Ok(delta_unpopular);
-        } else if iteration >= 50 {
+        } else if iteration >= allowed_iterations {
             break Err(anyhow!("Iteration limit reached without converging"));
         } else if new_funding_rate.into_signed() > target_funding {
             low_ratio = target_ratio;
@@ -415,30 +382,15 @@ fn smart_search(
 
 fn derive_popular_funding_rate_annual(
     popular_notional: Notional,
-    desired_unpopular: Notional,
+    unpopular_notional: Notional,
     config: &msg::contracts::market::config::Config,
 ) -> Result<Decimal256> {
-    // The equations are treat long and short identically, so we cheat
-    // a bit and simply pass the values into derive_instant_funding_rate_annual
-    // in the order we want them to appear.
-    let (popular, unpopular) =
-        derive_instant_funding_rate_annual(popular_notional, desired_unpopular, config)?;
-    assert!(unpopular.is_negative());
-    assert!(popular.is_strictly_positive());
-    Ok(popular.abs_unsigned())
-}
-
-fn derive_instant_funding_rate_annual(
-    long_notional: Notional,
-    short_notional: Notional,
-    config: &msg::contracts::market::config::Config,
-) -> Result<(Number, Number)> {
     let rf_per_annual_cap = config.funding_rate_max_annualized;
-    let instant_net_open_interest = long_notional
+    let instant_net_open_interest = popular_notional
         .into_number()
-        .checked_sub(short_notional.into_number())?;
-    let instant_open_short = short_notional;
-    let instant_open_long = long_notional;
+        .checked_sub(unpopular_notional.into_number())?;
+    let instant_open_short = unpopular_notional;
+    let instant_open_long = popular_notional;
     let funding_rate_sensitivity = config.funding_rate_sensitivity;
 
     let total_interest = (instant_open_long + instant_open_short)?.into_decimal256();
@@ -478,7 +430,7 @@ fn derive_instant_funding_rate_annual(
             std::cmp::Ordering::Equal => Ok(Decimal256::zero()),
         }
     };
-    let (long_rate, short_rate) = if instant_open_long.is_zero() || instant_open_short.is_zero() {
+    let (popular, unpopular) = if instant_open_long.is_zero() || instant_open_short.is_zero() {
         // When all on one side, popular side has no one to pay
         (Number::ZERO, Number::ZERO)
     } else {
@@ -492,8 +444,9 @@ fn derive_instant_funding_rate_annual(
             std::cmp::Ordering::Equal => (Number::ZERO, Number::ZERO),
         }
     };
-
-    Ok((long_rate, short_rate))
+    assert!(unpopular.is_negative());
+    assert!(popular.is_strictly_positive());
+    Ok(popular.abs_unsigned())
 }
 
 fn compute_delta_notional(
@@ -501,11 +454,11 @@ fn compute_delta_notional(
     price: &PricePoint,
     status: &StatusResp,
     available_collateral: NonZero<Collateral>,
+    max_leverage: LeverageToBase,
+    take_profit_factory: Decimal256,
 ) -> Result<Option<WorkDescription>> {
     let entry_price = price.price_notional;
-    let factor = Number::from_str("1.5")
-        .context("Unable to convert 1.5 to Decimal256")?
-        .into_number();
+    let factor = take_profit_factory.into_number();
     let take_profit = if position_notional_size.is_strictly_positive() {
         Price::try_from_number(entry_price.into_number().checked_mul(factor)?)?
     } else {
@@ -516,9 +469,7 @@ fn compute_delta_notional(
     };
     let take_profit = TakeProfitTrader::from(take_profit.into_base_price(status.market_type));
 
-    let desired_leverage = Number::from_str("10")
-        .context("Unable to convert 10 to Number")?
-        .min(status.config.max_leverage);
+    let desired_leverage = max_leverage.into_number().min(status.config.max_leverage);
 
     let desired_leverage =
         SignedLeverageToNotional::from(if position_notional_size.is_strictly_positive() {
