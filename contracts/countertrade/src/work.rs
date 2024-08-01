@@ -1,11 +1,15 @@
+use std::str::FromStr;
+
 use cosmwasm_std::{SubMsg, WasmMsg};
 use msg::contracts::market::{
     deferred_execution::GetDeferredExecResp,
     entry::{ClosedPositionCursor, ClosedPositionsResp, StatusResp},
     position::PositionQueryResponse,
 };
-use shared::storage::{
-    DirectionToBase, DirectionToNotional, LeverageToBase, MarketType, PricePoint,
+use shared::{
+    number::Number,
+    price::{Price, TakeProfitTrader},
+    storage::{DirectionToBase, LeverageToBase, MarketType, PricePoint, SignedLeverageToNotional},
 };
 
 use crate::prelude::*;
@@ -134,12 +138,7 @@ pub(crate) fn get_work_for(
     let collateral = NonZero::new(totals.collateral)
         .context("Impossible, zero collateral after checking that we have a minimum deposit")?;
 
-    let max_leverage = state.config.max_leverage.min(LeverageToBase::from(
-        NonZero::new(status.config.max_leverage.abs_unsigned())
-            .context("Invalid 0 max_leverage in market")?,
-    ));
-
-    desired_action(state, &status, pos.as_deref()).map(|x| match x {
+    desired_action(state, &status, &price, pos.as_deref(), collateral).map(|x| match x {
         Some(desc) => HasWorkResp::Work { desc },
         None => HasWorkResp::NoWork {},
     })
@@ -148,89 +147,376 @@ pub(crate) fn get_work_for(
 fn desired_action(
     state: &State,
     status: &StatusResp,
+    price: &PricePoint,
     pos: Option<&PositionQueryResponse>,
+    available_collateral: NonZero<Collateral>,
 ) -> Result<Option<WorkDescription>> {
-    if status.long_funding.is_zero() || status.short_funding.is_zero() {
+    let one_sided_market = if status.long_funding.is_zero() || status.short_funding.is_zero() {
         assert!(status.long_funding.is_zero());
         assert!(status.short_funding.is_zero());
-        return Ok(None);
-    }
+        // Handle the case where we have a one sided market
+        match (
+            status.long_notional.is_zero(),
+            status.short_notional.is_zero(),
+        ) {
+            // No positions opened at all, everything is fine
+            (true, true) => return Ok(None),
+            // Perfectly balanced positions are opened
+            (false, false) => {
+                assert!(status.long_notional == status.short_notional);
+                return Ok(None);
+            }
+            // In these cases, we have a one sided market
+            (true, false) | (false, true) => true,
+        }
+    } else {
+        false
+    };
 
     // Now entering the flipped zone: code below here will deal exclusively with internal direction/prices/etc.
     let (long_funding, short_funding) = match status.market_type {
         MarketType::CollateralIsQuote => (status.long_funding, status.short_funding),
         MarketType::CollateralIsBase => (status.short_funding, status.long_funding),
     };
-    let current_direction = pos.map(|pos| pos.direction_to_base.into_notional(status.market_type));
+
+    let (long_interest, short_interest) = match status.market_type {
+        MarketType::CollateralIsQuote => (status.long_notional, status.short_notional),
+        MarketType::CollateralIsBase => (status.short_notional, status.long_notional),
+    };
+
     let min_funding = state.config.min_funding.into_signed();
     let max_funding = state.config.max_funding.into_signed();
     let target_funding = state.config.target_funding.into_signed();
 
-    let (popular_funding, unpop_funding, popular_direction) = if long_funding.is_strictly_positive()
-    {
-        assert!(short_funding.is_negative());
-        (long_funding, short_funding, DirectionToNotional::Long)
+    let (popular_funding, unpopular_interest) = if long_funding.is_strictly_positive() {
+        assert!(short_funding.is_negative() || one_sided_market);
+        (long_funding, short_interest)
     } else {
-        assert!(long_funding.is_negative());
-        (short_funding, long_funding, DirectionToNotional::Short)
+        assert!(long_funding.is_negative() || one_sided_market);
+        (short_funding, long_interest)
     };
 
     if popular_funding >= min_funding && popular_funding <= max_funding {
+        assert!(popular_funding.is_zero() || !one_sided_market);
         Ok(None)
     } else if popular_funding < min_funding {
         match pos {
-            Some(pos) => Ok(Some(WorkDescription::ClosePosition { pos_id: pos.id })),
-            None => Ok(None),
+            Some(pos) => {
+                // If we have the only unpopular position, keep it open
+                if pos.notional_size.abs_unsigned() == unpopular_interest {
+                    Ok(None)
+                } else {
+                    Ok(Some(WorkDescription::ClosePosition { pos_id: pos.id }))
+                }
+            }
+            None => {
+                if one_sided_market {
+                    let allowed_iterations = state.config.iterations;
+                    // Returns the target notional size of a newly constructed position
+                    let result = determine_target_notional(
+                        long_interest,
+                        short_interest,
+                        target_funding,
+                        status,
+                        allowed_iterations,
+                    )?;
+                    match result {
+                        Some(position_notional_size) => {
+                            let max_leverage = state.config.max_leverage;
+                            let take_profit_factor = state.config.take_profit_factor;
+                            compute_delta_notional(
+                                position_notional_size,
+                                price,
+                                status,
+                                available_collateral,
+                                max_leverage,
+                                take_profit_factor,
+                            )
+                        }
+
+                        None => Ok(None),
+                    }
+                } else {
+                    Ok(None)
+                }
+            }
         }
     } else {
-        // FIXME do actual calculations
+        match pos {
+            Some(pos) => {
+                // The idea here is that we will close the existing
+                // countertrade position and open a new one later in
+                // the first version of countertrade contract.  But a
+                // better way of doing this is to update the existing
+                // position in future iteration of this contract.
 
-        // if status.long_funding > state.config.max_funding.into_signed() {
-        //     Ok(HasWorkResp::Work {
-        //         desc: WorkDescription::OpenPosition {
-        //             direction: DirectionToBase::Short,
-        //             leverage: max_leverage,
-        //             collateral,
-        //             take_profit: shared::storage::TakeProfitTrader::Finite(
-        //                 NonZero::new(
-        //                     price
-        //                         .price_base
-        //                         .into_non_zero()
-        //                         .raw()
-        //                         .checked_mul(Decimal256::from_ratio(9u32, 10u32))?,
-        //                 )
-        //                 .context("Impossible 0 from multiplying take profit price")?,
-        //             ),
-        //         },
-        //     })
-        // } else if status.short_funding > state.config.max_funding.into_signed() {
-        //     Ok(HasWorkResp::Work {
-        //         desc: WorkDescription::OpenPosition {
-        //             direction: DirectionToBase::Long,
-        //             leverage: max_leverage,
-        //             collateral,
-        //             take_profit: shared::storage::TakeProfitTrader::Finite(
-        //                 NonZero::new(
-        //                     price
-        //                         .price_base
-        //                         .into_non_zero()
-        //                         .raw()
-        //                         .checked_mul(Decimal256::from_ratio(11u32, 10u32))?,
-        //                 )
-        //                 .context("Impossible 0 from multiplying take profit price")?,
-        //             ),
-        //         },
-        //     })
-        // } else {
-        //     Ok(HasWorkResp::NoWork {})
-        // }
-        Ok(Some(WorkDescription::OpenPosition {
-            direction: todo!(),
-            leverage: todo!(),
-            collateral: todo!(),
-            take_profit: todo!(),
-        }))
+                let delta = pos
+                    .active_collateral
+                    .into_number()
+                    .checked_sub(available_collateral.into_number())?
+                    .abs()
+                    .checked_div(available_collateral.into_number())?;
+                if delta < Decimal256::from_ratio(5u32, 10u32).into_number() {
+                    Ok(None)
+                } else {
+                    Ok(Some(WorkDescription::ClosePosition { pos_id: pos.id }))
+                }
+            }
+            None => {
+                let allowed_iterations = state.config.iterations;
+                // Returns the target notional size of a newly constructed position
+                let result = determine_target_notional(
+                    long_interest,
+                    short_interest,
+                    target_funding,
+                    status,
+                    allowed_iterations,
+                )?;
+
+                match result {
+                    Some(position_notional_size) => {
+                        let max_leverage = state.config.max_leverage;
+                        let take_profit_factor = state.config.take_profit_factor;
+                        compute_delta_notional(
+                            position_notional_size,
+                            price,
+                            status,
+                            available_collateral,
+                            max_leverage,
+                            take_profit_factor,
+                        )
+                    }
+                    None => Ok(None),
+                }
+            }
+        }
     }
+}
+
+fn determine_target_notional(
+    long_interest: Notional,
+    short_interest: Notional,
+    target_funding: Number,
+    status: &StatusResp,
+    allowed_iterations: u8,
+) -> Result<Option<Signed<Notional>>> {
+    let desired_notional = smart_search(
+        long_interest,
+        short_interest,
+        target_funding,
+        status,
+        allowed_iterations,
+        0,
+    )?;
+    let position_notional_size = if long_interest < short_interest {
+        desired_notional.into_signed()
+    } else {
+        -desired_notional.into_signed()
+    };
+    Ok(Some(position_notional_size))
+}
+
+/// Returns the delta notional on the unpopular side.
+fn smart_search(
+    long_notional: Notional,
+    short_notional: Notional,
+    target_funding: Number,
+    status: &StatusResp,
+    allowed_iterations: u8,
+    mut iteration: u8,
+) -> Result<Notional> {
+    let (popular_notional, unpopular_notional) = if long_notional > short_notional {
+        (long_notional, short_notional)
+    } else {
+        (short_notional, long_notional)
+    };
+    // Ratio refers to what percentage of the market is unpopular.
+    // The absolute maximum we can ever achieve is 0.5, meaning a
+    // perfectly balanced market.
+    //
+    // The lowest ratio we'll potentially want is the starting ratio.
+    // The fact that we're in this function means we know we want to
+    // increase the unpopular side positions.
+    let mut high_ratio = Decimal256::from_ratio(1u8, 2u8);
+    let mut low_ratio = unpopular_notional.into_decimal256().checked_div(
+        popular_notional
+            .into_decimal256()
+            .checked_add(unpopular_notional.into_decimal256())?,
+    )?;
+    loop {
+        iteration += 1;
+        let target_ratio = high_ratio
+            .checked_add(low_ratio)?
+            .checked_div("2".parse().unwrap())?;
+
+        let desired_unpopular = Notional::from_decimal256(
+            target_ratio
+                .checked_mul(popular_notional.into_decimal256())?
+                .checked_div(Decimal256::one().checked_sub(target_ratio)?)?,
+        );
+        let delta_unpopular = desired_unpopular.checked_sub(unpopular_notional)?;
+
+        assert!(popular_notional >= desired_unpopular);
+        let new_funding_rate = derive_popular_funding_rate_annual(
+            popular_notional,
+            desired_unpopular,
+            &status.config,
+        )?;
+
+        let difference = new_funding_rate
+            .into_signed()
+            .checked_sub(target_funding)?
+            .abs_unsigned();
+        let epsilon = Decimal256::from_str("0.00001").unwrap();
+        if difference < epsilon {
+            break Ok(delta_unpopular);
+        } else if iteration >= allowed_iterations {
+            break Err(anyhow!("Iteration limit reached without converging"));
+        } else if new_funding_rate.into_signed() > target_funding {
+            low_ratio = target_ratio;
+        } else {
+            high_ratio = target_ratio;
+        }
+    }
+}
+
+fn derive_popular_funding_rate_annual(
+    popular_notional: Notional,
+    unpopular_notional: Notional,
+    config: &msg::contracts::market::config::Config,
+) -> Result<Decimal256> {
+    let rf_per_annual_cap = config.funding_rate_max_annualized;
+    let instant_net_open_interest = popular_notional
+        .into_number()
+        .checked_sub(unpopular_notional.into_number())?;
+    let instant_open_short = unpopular_notional;
+    let instant_open_long = popular_notional;
+    let funding_rate_sensitivity = config.funding_rate_sensitivity;
+
+    let total_interest = (instant_open_long + instant_open_short)?.into_decimal256();
+    let notional_high_cap = config
+        .delta_neutrality_fee_sensitivity
+        .into_decimal256()
+        .checked_mul(config.delta_neutrality_fee_cap.into_decimal256())?;
+    let funding_rate_sensitivity_from_delta_neutrality = rf_per_annual_cap
+        .checked_mul(total_interest)?
+        .checked_div(notional_high_cap)?;
+
+    let effective_funding_rate_sensitivity =
+        funding_rate_sensitivity.max(funding_rate_sensitivity_from_delta_neutrality);
+    let rf_popular = || -> Result<Decimal256> {
+        Ok(std::cmp::min(
+            effective_funding_rate_sensitivity.checked_mul(
+                instant_net_open_interest
+                    .abs_unsigned()
+                    .into_decimal256()
+                    .checked_div((instant_open_long + instant_open_short)?.into_decimal256())?,
+            )?,
+            rf_per_annual_cap,
+        ))
+    };
+    let rf_unpopular = || -> Result<Decimal256> {
+        match instant_open_long.cmp(&instant_open_short) {
+            std::cmp::Ordering::Greater => Ok(rf_popular()?.checked_mul(
+                instant_open_long
+                    .into_decimal256()
+                    .checked_div(instant_open_short.into_decimal256())?,
+            )?),
+            std::cmp::Ordering::Less => Ok(rf_popular()?.checked_mul(
+                instant_open_short
+                    .into_decimal256()
+                    .checked_div(instant_open_long.into_decimal256())?,
+            )?),
+            std::cmp::Ordering::Equal => Ok(Decimal256::zero()),
+        }
+    };
+    let (popular, unpopular) = if instant_open_long.is_zero() || instant_open_short.is_zero() {
+        // When all on one side, popular side has no one to pay
+        (Number::ZERO, Number::ZERO)
+    } else {
+        match instant_open_long.cmp(&instant_open_short) {
+            std::cmp::Ordering::Greater => {
+                (rf_popular()?.into_signed(), -rf_unpopular()?.into_signed())
+            }
+            std::cmp::Ordering::Less => {
+                (-rf_unpopular()?.into_signed(), rf_popular()?.into_signed())
+            }
+            std::cmp::Ordering::Equal => (Number::ZERO, Number::ZERO),
+        }
+    };
+    assert!(unpopular.is_negative());
+    assert!(popular.is_strictly_positive());
+    Ok(popular.abs_unsigned())
+}
+
+fn compute_delta_notional(
+    position_notional_size: Signed<Notional>,
+    price: &PricePoint,
+    status: &StatusResp,
+    available_collateral: NonZero<Collateral>,
+    max_leverage: LeverageToBase,
+    take_profit_factory: Decimal256,
+) -> Result<Option<WorkDescription>> {
+    let entry_price = price.price_notional;
+    let factor = take_profit_factory.into_number();
+    let take_profit = if position_notional_size.is_strictly_positive() {
+        Price::try_from_number(entry_price.into_number().checked_mul(factor)?)?
+    } else {
+        let factor_diff = factor
+            .checked_div(Number::from_str("100").context("Unable to convert 100 to Number")?)?;
+        let factor_diff = factor_diff.checked_mul(entry_price.into_number())?;
+        Price::try_from_number(entry_price.into_number().checked_sub(factor_diff)?)?
+    };
+    let take_profit = TakeProfitTrader::from(take_profit.into_base_price(status.market_type));
+
+    let desired_leverage = max_leverage.into_number().min(status.config.max_leverage);
+
+    let desired_leverage =
+        SignedLeverageToNotional::from(if position_notional_size.is_strictly_positive() {
+            desired_leverage
+        } else {
+            -desired_leverage
+        });
+
+    let position_notional_size_in_collateral =
+        position_notional_size.map(|size| price.notional_to_collateral(size));
+
+    let (deposit_collateral, leverage) =
+        optimize_capital_efficiency(position_notional_size_in_collateral, desired_leverage)?;
+
+    let min_deposit_collateral = price.usd_to_collateral(status.config.minimum_deposit_usd);
+    if deposit_collateral < min_deposit_collateral {
+        // Market is skewed, and deserves to be balanced, but the size of the skew
+        // is tiny. Wait for the market to have more interest before intervening.
+        return Ok(None);
+    }
+
+    let deposit_collateral = NonZero::new(deposit_collateral)
+        .context("collateral is zero")?
+        .min(available_collateral);
+
+    let (direction, leverage) = leverage.into_base(status.market_type)?.split();
+
+    Ok(Some(WorkDescription::OpenPosition {
+        direction,
+        leverage,
+        collateral: deposit_collateral,
+        take_profit,
+    }))
+}
+
+/// Returns the deposit collateral and leverage value to be used for this position.
+fn optimize_capital_efficiency(
+    position_notional_size_in_collateral: Signed<Collateral>,
+    desired_leverage: SignedLeverageToNotional,
+) -> Result<(Collateral, SignedLeverageToNotional)> {
+    let deposit_collateral = position_notional_size_in_collateral
+        .into_number()
+        .checked_div(desired_leverage.into_number())?;
+    assert!(deposit_collateral.is_strictly_positive());
+    let deposit_collateral = Collateral::from_decimal256(deposit_collateral.abs_unsigned());
+
+    Ok((deposit_collateral, desired_leverage))
 }
 
 pub(crate) fn execute(

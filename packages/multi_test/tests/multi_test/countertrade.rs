@@ -1,20 +1,31 @@
-use cosmwasm_std::Decimal256;
+use cosmwasm_std::{Addr, Decimal256};
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
     contracts::countertrade::{ConfigUpdate, HasWorkResp, MarketBalance, WorkDescription},
-    prelude::{DirectionToBase, Number, TakeProfitTrader, UnsignedDecimal},
+    prelude::{DirectionToBase, Number, TakeProfitTrader, UnsignedDecimal, Usd},
 };
+
+fn make_countertrade_market() -> anyhow::Result<PerpsMarket> {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    // Remove minimum deposit so that we can open tiny balancing positions
+    market.exec_set_config(msg::contracts::market::config::ConfigUpdate {
+        minimum_deposit_usd: Some(Usd::zero()),
+        ..Default::default()
+    })?;
+    Ok(market)
+}
 
 #[test]
 fn query_config() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
 
     market.query_countertrade_config().unwrap();
 }
 
 #[test]
 fn deposit() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let lp = market.clone_lp(0).unwrap();
 
     assert_eq!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
@@ -56,7 +67,7 @@ fn deposit() {
 
 #[test]
 fn withdraw_no_positions() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let lp0 = market.clone_lp(0).unwrap();
     let lp1 = market.clone_lp(1).unwrap();
 
@@ -106,7 +117,7 @@ fn withdraw_no_positions() {
 
 #[test]
 fn change_admin() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let lp0 = market.clone_lp(0).unwrap();
     let lp1 = market.clone_lp(1).unwrap();
 
@@ -125,7 +136,7 @@ fn change_admin() {
 
 #[test]
 fn update_config() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let lp0 = market.clone_lp(0).unwrap();
 
     let min_funding: Decimal256 = "0.0314".parse().unwrap();
@@ -165,7 +176,7 @@ fn update_config() {
 
 #[test]
 fn has_no_work() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let lp = market.clone_lp(0).unwrap();
     let trader = market.clone_trader(0).unwrap();
 
@@ -242,7 +253,7 @@ fn has_no_work() {
 
 #[test]
 fn detects_unbalanced_markets() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let lp = market.clone_lp(0).unwrap();
     let trader = market.clone_trader(0).unwrap();
 
@@ -317,7 +328,7 @@ fn detects_unbalanced_markets() {
 
 #[test]
 fn ignores_unbalanced_insufficient_liquidity() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let trader = market.clone_trader(0).unwrap();
 
     assert_eq!(
@@ -387,6 +398,31 @@ fn ignores_unbalanced_insufficient_liquidity() {
     market
         .exec_countertrade_mint_and_deposit(&lp, "0.005")
         .unwrap();
+    // Still wants to balance the market, but won't succeed fully
+    assert_ne!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    // Now we run the countertrade contract, which will open a small position
+    // Trying to run again will fail because we'll have 0 collateral left
+    do_work(&market, &lp);
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    // And if we try to add more liquidity and try again, it should close
+    // the old position and open a new position.
+    // This test will need to be updated once we support updating existing
+    // positions.
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "1000")
+        .unwrap();
+    // Close the old position
+    do_work(&market, &lp);
+    // Open the new position
+    do_work(&market, &lp);
     assert_eq!(
         market.query_countertrade_has_work().unwrap(),
         HasWorkResp::NoWork {}
@@ -395,7 +431,7 @@ fn ignores_unbalanced_insufficient_liquidity() {
 
 #[test]
 fn closes_extra_positions() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let countertrade = market.get_countertrade_addr();
     let lp = market.clone_lp(0).unwrap();
     let market_type = market.query_status().unwrap().market_type;
@@ -432,7 +468,7 @@ fn closes_extra_positions() {
             &lp,
             "9",
             match market_type {
-                msg::prelude::MarketType::CollateralIsQuote => "5",
+                msg::prelude::MarketType::CollateralIsQuote => "6",
                 msg::prelude::MarketType::CollateralIsBase => "4",
             },
             DirectionToBase::Short,
@@ -455,25 +491,11 @@ fn closes_extra_positions() {
             }
         );
 
-        // Sends a deferred message to close the position
-        market.exec_countertrade_do_work().unwrap();
-        // Will fail if we do more work again since the deferred
-        // execution would not have finished
-        market.exec_countertrade_do_work().unwrap_err();
-        // Execute the deferred message
-        market.exec_crank_till_finished(&lp).unwrap();
+        // Don't collect so that we can test the intermediate states
+        do_work_optional_collect(&market, &lp, false);
 
         // Position must be closed
         let pos = market.query_closed_position(&countertrade, pos_id).unwrap();
-
-        // And clear out the deferred exec ID
-        match market.query_countertrade_has_work().unwrap() {
-            HasWorkResp::Work {
-                desc: WorkDescription::ClearDeferredExec { id: _ },
-            } => (),
-            work => panic!("Unexpected work response: {work:?}"),
-        }
-        market.exec_countertrade_do_work().unwrap();
 
         // Determine the active collateral that will actually be transferred
         let active_collateral = market
@@ -536,7 +558,7 @@ fn closes_popular_position_short() {
 }
 
 fn closes_popular_position_helper(direction: DirectionToBase, open_unpop: bool) {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let countertrade = market.get_countertrade_addr();
     let lp = market.clone_lp(0).unwrap();
 
@@ -623,7 +645,7 @@ fn closes_popular_position_helper(direction: DirectionToBase, open_unpop: bool) 
 #[ignore]
 #[allow(unreachable_code)]
 fn resets_token_balances() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let lp = market.clone_lp(0).unwrap();
 
     market
@@ -654,15 +676,24 @@ fn resets_token_balances() {
 
 #[test]
 fn opens_balancing_position() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let trader = market.clone_trader(0).unwrap();
     let lp = market.clone_lp(0).unwrap();
+
+    // Remove minimum deposit so that we can open tiny balancing positions
+    market
+        .exec_set_config(msg::contracts::market::config::ConfigUpdate {
+            minimum_deposit_usd: Some(Usd::zero()),
+            ..Default::default()
+        })
+        .unwrap();
 
     market
         .exec_countertrade_mint_and_deposit(&lp, "1000")
         .unwrap();
 
     let config = market.query_countertrade_config().unwrap();
+
     let market_type = market.query_status().unwrap().market_type;
 
     // Open up unbalanced positions
@@ -718,15 +749,13 @@ fn opens_balancing_position() {
                     collateral: _,
                     take_profit: _,
                 },
-        } => assert_eq!(direction, DirectionToBase::Short),
+        } => {
+            assert_eq!(direction, DirectionToBase::Short)
+        }
         has_work => panic!("Unexpected has work response: {has_work:?}"),
     }
 
-    market.exec_countertrade_do_work().unwrap();
-
-    // We should no longer have any work to do, even though we haven't cranked yet.
-    // The contract is responsible for ensuring it waits until prior deferred execs
-    // complete.
+    do_work(&market, &lp);
 
     assert_eq!(
         market.query_countertrade_has_work().unwrap(),
@@ -734,13 +763,121 @@ fn opens_balancing_position() {
     );
 
     let status = market.query_status().unwrap();
-    assert!(status
-        .long_funding
-        .approx_eq(config.target_funding.into_signed())
-        .unwrap());
+    assert!(
+        status
+            .long_funding
+            .approx_eq_eps(
+                config.target_funding.into_signed(),
+                "0.00001".parse().unwrap()
+            )
+            .unwrap(),
+        "Long funding {} should be close to target_funding {}",
+        status.long_funding,
+        config.target_funding
+    );
 
     assert_eq!(
         market.query_countertrade_has_work().unwrap(),
         HasWorkResp::NoWork {}
     );
+}
+
+#[test]
+fn balance_one_sided_market() {
+    let market = make_countertrade_market().unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    let status = market.query_status().unwrap();
+    let market_type = status.market_type;
+
+    // Open up balanced positions
+    market
+        .exec_open_position_take_profit(
+            &trader,
+            "10",
+            // Deal with off-by-one leverage to ensure we have a balanced market
+            match market_type {
+                msg::prelude::MarketType::CollateralIsQuote => "5",
+                msg::prelude::MarketType::CollateralIsBase => "6",
+            },
+            DirectionToBase::Long,
+            None,
+            None,
+            msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+        )
+        .unwrap();
+
+    let status = market.query_status().unwrap();
+
+    assert_eq!(status.long_funding, Number::zero());
+    assert_eq!(status.short_funding, Number::zero());
+
+    assert_ne!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+}
+
+fn do_work(market: &PerpsMarket, lp: &Addr) {
+    do_work_optional_collect(market, lp, true)
+}
+
+fn do_work_optional_collect(market: &PerpsMarket, lp: &Addr, collect_closed: bool) {
+    let work = market.query_countertrade_has_work().unwrap();
+    let (has_deferred_exec, is_close) = match work {
+        HasWorkResp::NoWork {} => panic!("do_work when no work is available"),
+        HasWorkResp::Work { desc } => match desc {
+            WorkDescription::OpenPosition { .. } => (true, false),
+            WorkDescription::ClosePosition { .. } => (true, true),
+            WorkDescription::CollectClosedPosition { .. } => {
+                panic!("CollectClosedPosition in do_work")
+            }
+            WorkDescription::ResetShares => (false, false),
+            WorkDescription::ClearDeferredExec { .. } => panic!("ClearDeferredExec in do_work"),
+        },
+    };
+    market.exec_countertrade_do_work().unwrap();
+    // Will fail if we do more work again since the deferred
+    // execution would not have finished
+    market.exec_countertrade_do_work().unwrap_err();
+    // Execute the deferred message
+    market.exec_crank_till_finished(lp).unwrap();
+    // And clear any deferred exec IDs and collect any closed positions
+
+    if has_deferred_exec {
+        match market.query_countertrade_has_work().unwrap() {
+            HasWorkResp::Work {
+                desc: WorkDescription::ClearDeferredExec { id: _ },
+            } => (),
+            work => panic!("Unexpected work response: {work:?}"),
+        }
+        market.exec_countertrade_do_work().unwrap();
+    }
+
+    if is_close {
+        match market.query_countertrade_has_work().unwrap() {
+            HasWorkResp::Work {
+                desc: WorkDescription::CollectClosedPosition { .. },
+            } => (),
+            work => panic!("Unexpected work response: {work:?}"),
+        }
+        if collect_closed {
+            market.exec_countertrade_do_work().unwrap();
+        }
+    }
 }
