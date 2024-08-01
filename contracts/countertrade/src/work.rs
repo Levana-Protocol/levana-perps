@@ -190,6 +190,8 @@ fn desired_action(
         (short_funding, long_funding, DirectionToNotional::Short)
     };
 
+    println!("pop_funding {popular_funding}, min_funding {min_funding}, max_funding {max_funding}");
+    println!("pop_funding {popular_funding}, min_funding {min_funding}, max_funding {max_funding}");
     if popular_funding >= min_funding && popular_funding <= max_funding {
         Ok(None)
     } else if popular_funding < min_funding {
@@ -205,6 +207,7 @@ fn desired_action(
                 // the first version of countertrade contract.  But a
                 // better way of doing this is to update the existing
                 // position in future iteration of this contract.
+                println!("this should not happen");
                 Ok(Some(WorkDescription::ClosePosition { pos_id: pos.id }))
             }
             None => {
@@ -510,14 +513,17 @@ fn compute_delta_notional(
         DirectionToNotional::Short => leverage.checked_mul(Number::from_str("-1")?)?,
     };
 
-    let (direction, leverage) = SignedLeverageToNotional::from(leverage)
-        .into_base(status.market_type)?
-        .split();
+    let leverage = SignedLeverageToNotional::from(leverage);
+
+    // let (direction, leverage) = SignedLeverageToNotional::from(leverage)
+    //     .into_base(status.market_type)?
+    //     .split();
 
     let desired_notional = result.desired_notional;
 
     let notional_size = price.notional_to_collateral(desired_notional);
-    println!("notional_size: {desired_notional}");
+    println!("desired_notional: {desired_notional}");
+    println!("notional_size: {notional_size}");
 
     let (collateral, leverage) = optimize_capital_efficiency(notional_size, leverage)?;
 
@@ -545,9 +551,9 @@ fn compute_delta_notional(
 
 fn optimize_capital_efficiency(
     notional_size: Collateral,
-    max_leverage: LeverageToBase,
-) -> Result<(Collateral, LeverageToBase)> {
-    let collateral = notional_size.checked_div_dec(max_leverage.into_decimal256())?;
+    max_leverage: SignedLeverageToNotional,
+) -> Result<(Collateral, SignedLeverageToNotional)> {
+    let collateral = notional_size.into_number.(max_leverage.into_number())?;
     let five_collateral = Collateral::from_str("5")?;
     if collateral >= five_collateral {
         return Ok((collateral, max_leverage));
@@ -555,8 +561,8 @@ fn optimize_capital_efficiency(
         let leverage = notional_size
             .into_decimal256()
             .checked_div(five_collateral.into_decimal256())?;
-        let leverage = NonZero::new(leverage).context("leverage is zero")?;
-        let leverage = LeverageToBase::from(leverage);
+        // let leverage = NonZero::new(leverage).context("leverage is zero")?;
+        let leverage = SignedLeverageToNotional::from(leverage.into_number());
         return Ok((five_collateral, leverage));
     }
 }
