@@ -181,14 +181,14 @@ fn desired_action(
     let max_funding = state.config.max_funding.into_signed();
     let target_funding = state.config.target_funding.into_signed();
 
-    let (popular_funding, unpop_funding, popular_direction) = if long_funding.is_strictly_positive()
-    {
-        assert!(short_funding.is_negative());
-        (long_funding, short_funding, DirectionToNotional::Long)
-    } else {
-        assert!(long_funding.is_negative());
-        (short_funding, long_funding, DirectionToNotional::Short)
-    };
+    let (popular_funding, unpop_funnding, popular_direction) =
+        if long_funding.is_strictly_positive() {
+            assert!(short_funding.is_negative());
+            (long_funding, short_funding, DirectionToNotional::Long)
+        } else {
+            assert!(long_funding.is_negative());
+            (short_funding, long_funding, DirectionToNotional::Short)
+        };
 
     if popular_funding >= min_funding && popular_funding <= max_funding {
         Ok(None)
@@ -205,7 +205,18 @@ fn desired_action(
                 // the first version of countertrade contract.  But a
                 // better way of doing this is to update the existing
                 // position in future iteration of this contract.
-                Ok(Some(WorkDescription::ClosePosition { pos_id: pos.id }))
+
+                let delta = pos
+                    .active_collateral
+                    .into_number()
+                    .checked_sub(available_collateral.into_number())?
+                    .abs()
+                    .checked_div(available_collateral.into_number())?;
+                if delta < Decimal256::from_ratio(5u32, 10u32).into_number() {
+                    Ok(None)
+                } else {
+                    Ok(Some(WorkDescription::ClosePosition { pos_id: pos.id }))
+                }
             }
             None => {
                 // Returns the target notional size of a newly constructed position
@@ -216,8 +227,6 @@ fn desired_action(
                     target_funding,
                     status,
                 )?;
-
-                println!("Determined target_notional");
 
                 match result {
                     TargetNotionalResult::NoWork => Ok(None),
@@ -257,7 +266,6 @@ fn determine_target_notional(
     target_funding: Number,
     status: &StatusResp,
 ) -> Result<TargetNotionalResult> {
-    println!("Going to derive instant funding rate_annual");
     let (rfl, rfs) = derive_instant_funding_rate_annual(long_interest, short_interest, status)?;
     let total_open_interest = long_interest.checked_add(short_interest)?;
     struct TempResult {
@@ -291,7 +299,6 @@ fn determine_target_notional(
         bail!("Starting_ratio should not be greater than 1.4")
     }
 
-    println!("Going to smart search");
     let open_interest = smart_search(
         long_interest,
         short_interest,
@@ -341,7 +348,6 @@ fn smart_search(
         let target_ratio = high_ratio
             .checked_add(low_ratio)?
             .checked_div("2".parse().unwrap())?;
-        println!("Iteration: {iteration}. long_notional: {long_notional}. short_notional: {short_notional}. unpopular_side: {unpopular_side:?}. target_funding: {target_funding}. starting_ratio: {starting_ratio}. high_ratio: {high_ratio}. low_ratio: {low_ratio}. target_ratio: {target_ratio}. market type: {:?}. status.long_funding: {}. status.short_funding: {}. status.long_notional: {}. status.short_notional: {}", status.market_type,status.long_funding,status.short_funding,status.long_notional,status.short_notional);
         let total_open_interest = long_notional.checked_add(short_notional)?;
 
         let open_interest = match unpopular_side {
@@ -380,9 +386,6 @@ fn smart_search(
             DirectionToNotional::Long => new_rfs,
             DirectionToNotional::Short => new_rfl,
         };
-
-        println!("new_funding_rate: {new_funding_rate}, new_rfl {new_rfl} & new_rfs {new_rfs}");
-        println!("target_funding: {}", target_funding);
 
         let difference = new_funding_rate.checked_sub(target_funding)?.abs_unsigned();
         let epsilon = Decimal256::from_str("0.00001").unwrap();
@@ -473,9 +476,6 @@ fn compute_delta_notional(
     status: &StatusResp,
     available_collateral: NonZero<Collateral>,
 ) -> Result<Option<WorkDescription>> {
-    println!("market_id: {}", status.market_id);
-    println!("market_type: {:?}", status.market_type);
-
     let entry_price = price.price_notional;
     let factor = Number::from_str("1.5")
         .context("Unable to convert 1.5 to Decimal256")?
@@ -519,13 +519,6 @@ fn compute_delta_notional(
         .min(available_collateral);
 
     let (direction, leverage) = leverage.into_base(status.market_type)?.split();
-
-    println!("counter trade contract recommendation:");
-    println!("collateral: {deposit_collateral}");
-    println!("leverage: {leverage}");
-    println!("take_profit: {take_profit}");
-    println!("entry_price: {entry_price}");
-    println!("direction: {:?}", direction);
 
     Ok(Some(WorkDescription::OpenPosition {
         direction,
