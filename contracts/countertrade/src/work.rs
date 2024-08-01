@@ -10,7 +10,7 @@ use shared::{
     number::Number,
     price::{Price, TakeProfitTrader},
     storage::{
-        DirectionToBase, DirectionToNotional, MarketType, PricePoint, SignedLeverageToNotional,
+        DirectionToBase, MarketType, PricePoint, SignedLeverageToNotional,
     },
 };
 
@@ -221,24 +221,14 @@ fn desired_action(
                         target_funding,
                         status,
                     )?;
-
                     match result {
-                        TargetNotionalResult::NoWork => Ok(None),
-                        TargetNotionalResult::Result {
-                            direction,
-                            desired_notional,
-                        } => {
-                            let position_notional_size = match direction {
-                                DirectionToNotional::Long => desired_notional.into_signed(),
-                                DirectionToNotional::Short => -desired_notional.into_signed(),
-                            };
-                            compute_delta_notional(
-                                position_notional_size,
-                                price,
-                                status,
-                                available_collateral,
-                            )
-                        }
+                        Some(position_notional_size) => compute_delta_notional(
+                            position_notional_size,
+                            price,
+                            status,
+                            available_collateral,
+                        ),
+                        None => Ok(None),
                     }
                 } else {
                     Ok(None)
@@ -277,34 +267,17 @@ fn desired_action(
                 )?;
 
                 match result {
-                    TargetNotionalResult::NoWork => Ok(None),
-                    TargetNotionalResult::Result {
-                        direction,
-                        desired_notional,
-                    } => {
-                        let position_notional_size = match direction {
-                            DirectionToNotional::Long => desired_notional.into_signed(),
-                            DirectionToNotional::Short => -desired_notional.into_signed(),
-                        };
-                        compute_delta_notional(
-                            position_notional_size,
-                            price,
-                            status,
-                            available_collateral,
-                        )
-                    }
+                    Some(position_notional_size) => compute_delta_notional(
+                        position_notional_size,
+                        price,
+                        status,
+                        available_collateral,
+                    ),
+                    None => Ok(None),
                 }
             }
         }
     }
-}
-
-enum TargetNotionalResult {
-    NoWork,
-    Result {
-        direction: DirectionToNotional,
-        desired_notional: Notional,
-    },
 }
 
 fn determine_target_notional(
@@ -313,44 +286,30 @@ fn determine_target_notional(
     min_funding: Number,
     target_funding: Number,
     status: &StatusResp,
-) -> Result<TargetNotionalResult> {
+) -> Result<Option<Signed<Notional>>> {
     let (rfl, rfs) =
         derive_instant_funding_rate_annual(long_interest, short_interest, &status.config)?;
-    struct TempResult {
-        unpopular_side: DirectionToNotional,
-        unpopular_rf: Signed<Decimal256>,
-    }
-    let result = if long_interest < short_interest {
-        TempResult {
-            unpopular_side: DirectionToNotional::Long,
-            unpopular_rf: rfl,
-        }
+
+    let unpopular = if long_interest < short_interest {
+        rfl
     } else {
-        TempResult {
-            unpopular_side: DirectionToNotional::Short,
-            unpopular_rf: rfs,
-        }
+        rfs
     };
 
-    if result.unpopular_rf > min_funding {
-        return Ok(TargetNotionalResult::NoWork);
+    if unpopular > min_funding {
+        return Ok(None);
     }
 
     let desired_notional = smart_search(long_interest, short_interest, target_funding, status, 0)?;
-    match result.unpopular_side {
-        DirectionToNotional::Long => Ok(TargetNotionalResult::Result {
-            direction: result.unpopular_side,
-            desired_notional,
-        }),
-        DirectionToNotional::Short => Ok(TargetNotionalResult::Result {
-            direction: result.unpopular_side,
-            desired_notional,
-        }),
-    }
+    let position_notional_size = if long_interest < short_interest {
+        desired_notional.into_signed()
+    } else {
+        -desired_notional.into_signed()
+    };
+    Ok(Some(position_notional_size))
 }
 
 /// Returns the delta notional on the unpopular side.
-#[allow(clippy::too_many_arguments)]
 fn smart_search(
     long_notional: Notional,
     short_notional: Notional,
@@ -418,7 +377,7 @@ fn derive_popular_funding_rate_annual(
     desired_unpopular: Notional,
     config: &msg::contracts::market::config::Config,
 ) -> Result<Decimal256> {
-    // The equations are treat long and short identically, so we cheat
+    // The equations treat long and short identically, so we cheat
     // a bit and simply pass the values into derive_instant_funding_rate_annual
     // in the order we want them to appear.
     let (popular, unpopular) =
