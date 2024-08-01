@@ -491,7 +491,8 @@ fn closes_extra_positions() {
             }
         );
 
-        do_work(&market, &lp);
+        // Don't collect so that we can test the intermediate states
+        do_work_optional_collect(&market, &lp, false);
 
         // Position must be closed
         let pos = market.query_closed_position(&countertrade, pos_id).unwrap();
@@ -847,6 +848,10 @@ fn balance_one_sided_market() {
 }
 
 fn do_work(market: &PerpsMarket, lp: &Addr) {
+    do_work_optional_collect(market, lp, true)
+}
+
+fn do_work_optional_collect(market: &PerpsMarket, lp: &Addr, collect_closed: bool) {
     let work = market.query_countertrade_has_work().unwrap();
     let (has_deferred_exec, is_close) = match work {
         HasWorkResp::NoWork {} => panic!("do_work when no work is available"),
@@ -885,6 +890,8 @@ fn do_work(market: &PerpsMarket, lp: &Addr) {
             } => (),
             work => panic!("Unexpected work response: {work:?}"),
         }
-        market.exec_countertrade_do_work().unwrap();
+        if collect_closed {
+            market.exec_countertrade_do_work().unwrap();
+        }
     }
 }
