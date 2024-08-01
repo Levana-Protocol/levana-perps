@@ -2,6 +2,7 @@ mod common;
 mod execute;
 mod prelude;
 mod query;
+mod reply;
 mod state;
 mod types;
 mod work;
@@ -15,6 +16,7 @@ use shared::storage::LeverageToBase;
 
 pub use execute::execute;
 pub use query::query;
+pub use reply::reply;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "levana.finance:countertrade";
@@ -34,6 +36,8 @@ pub fn instantiate(
                 target_funding,
                 max_funding,
                 max_leverage,
+                iterations,
+                take_profit_factor,
             },
     }: InstantiateMsg,
 ) -> Result<Response> {
@@ -47,6 +51,9 @@ pub fn instantiate(
         target_funding: target_funding.unwrap_or_else(|| Decimal256::from_ratio(40u32, 100u32)),
         max_funding: max_funding.unwrap_or_else(|| Decimal256::from_ratio(60u32, 100u32)),
         max_leverage: max_leverage.unwrap_or_else(|| LeverageToBase::from_str("10").unwrap()),
+        iterations: iterations.unwrap_or(50),
+        take_profit_factor: take_profit_factor
+            .unwrap_or_else(|| Decimal256::from_ratio(15u32, 10u32)),
     };
     config.check()?;
     state::CONFIG

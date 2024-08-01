@@ -355,11 +355,14 @@ pub(crate) fn contract_simple_oracle() -> Box<dyn Contract<Empty>> {
 }
 
 pub(crate) fn contract_countertrade() -> Box<dyn Contract<Empty>> {
-    Box::new(LocalContractWrapper::new(
-        countertrade::instantiate,
-        countertrade::execute,
-        countertrade::query,
-    ))
+    Box::new(
+        LocalContractWrapper::new(
+            countertrade::instantiate,
+            countertrade::execute,
+            countertrade::query,
+        )
+        .with_reply(countertrade::reply),
+    )
 }
 
 // struct to satisfy the `Contract` trait

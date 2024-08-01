@@ -4,11 +4,17 @@ use std::fmt::Display;
 
 use cosmwasm_std::{Addr, Binary, Decimal256, Uint128};
 use shared::{
-    storage::{Collateral, LeverageToBase, LpToken, MarketId, NonZero, RawAddr},
+    storage::{
+        Collateral, DirectionToBase, LeverageToBase, LpToken, MarketId, NonZero, RawAddr,
+        TakeProfitTrader,
+    },
     time::Timestamp,
 };
 
-use super::market::position::{PositionId, PositionQueryResponse};
+use super::market::{
+    deferred_execution::DeferredExecId,
+    position::{PositionId, PositionQueryResponse},
+};
 
 /// Message for instantiating a new countertrade contract.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -39,6 +45,10 @@ pub struct Config {
     pub target_funding: Decimal256,
     /// Maximum funding rate for popular side
     pub max_funding: Decimal256,
+    /// Allowed iterations to compute delta notional
+    pub iterations: u8,
+    /// Factor used to compute take profit price
+    pub take_profit_factor: Decimal256,
     /// Maximum leverage value we'll use
     ///
     /// If a market has lower max leverage, we use that instead
@@ -75,6 +85,8 @@ pub struct ConfigUpdate {
     pub target_funding: Option<Decimal256>,
     pub max_funding: Option<Decimal256>,
     pub max_leverage: Option<LeverageToBase>,
+    pub iterations: Option<u8>,
+    pub take_profit_factor: Option<Decimal256>,
 }
 
 /// Executions available on the countertrade contract.
@@ -287,10 +299,17 @@ pub enum HasWorkResp {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkDescription {
-    /// Markets are too long
-    GoShort,
-    /// Markets are too short
-    GoLong,
+    /// Open a new position
+    OpenPosition {
+        /// Direction of the new position
+        direction: DirectionToBase,
+        /// Leverage
+        leverage: LeverageToBase,
+        /// Amount of deposit collateral
+        collateral: NonZero<Collateral>,
+        /// Take profit value
+        take_profit: TakeProfitTrader,
+    },
     /// Close an unnecessary position
     ClosePosition {
         /// Position to be closed
@@ -307,6 +326,11 @@ pub enum WorkDescription {
     },
     /// All collateral exhausted, reset shares to 0
     ResetShares,
+    /// Deferred execution completed, we can continue our processing
+    ClearDeferredExec {
+        /// ID to be cleared
+        id: DeferredExecId,
+    },
 }
 
 /// Migration message, currently no fields needed

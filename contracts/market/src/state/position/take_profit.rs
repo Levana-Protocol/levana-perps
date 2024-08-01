@@ -124,7 +124,7 @@ impl<'a> TakeProfitToCounterCollateral<'a> {
                     .sub(price_point.price_notional.into_number())?
                     .mul(notional_size.into_number())?;
 
-                NonZero::new(Collateral::try_from_number(counter_collateral)?)
+                NonZero::new(Collateral::try_from_number(counter_collateral).with_context(|| format!("Take profit of {take_profit_price} results in negative counter-collateral of {counter_collateral}"))?)
                     .context("counter_collateral is zero")
             }
         }
