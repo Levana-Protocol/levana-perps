@@ -5,16 +5,27 @@ use msg::{
     prelude::{DirectionToBase, Number, TakeProfitTrader, UnsignedDecimal, Usd},
 };
 
+fn make_countertrade_market() -> anyhow::Result<PerpsMarket> {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+
+    // Remove minimum deposit so that we can open tiny balancing positions
+    market.exec_set_config(msg::contracts::market::config::ConfigUpdate {
+        minimum_deposit_usd: Some(Usd::zero()),
+        ..Default::default()
+    })?;
+    Ok(market)
+}
+
 #[test]
 fn query_config() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
 
     market.query_countertrade_config().unwrap();
 }
 
 #[test]
 fn deposit() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let lp = market.clone_lp(0).unwrap();
 
     assert_eq!(market.query_countertrade_balances(&lp).unwrap(), vec![]);
@@ -56,7 +67,7 @@ fn deposit() {
 
 #[test]
 fn withdraw_no_positions() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let lp0 = market.clone_lp(0).unwrap();
     let lp1 = market.clone_lp(1).unwrap();
 
@@ -106,7 +117,7 @@ fn withdraw_no_positions() {
 
 #[test]
 fn change_admin() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let lp0 = market.clone_lp(0).unwrap();
     let lp1 = market.clone_lp(1).unwrap();
 
@@ -125,7 +136,7 @@ fn change_admin() {
 
 #[test]
 fn update_config() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let lp0 = market.clone_lp(0).unwrap();
 
     let min_funding: Decimal256 = "0.0314".parse().unwrap();
@@ -165,7 +176,7 @@ fn update_config() {
 
 #[test]
 fn has_no_work() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let lp = market.clone_lp(0).unwrap();
     let trader = market.clone_trader(0).unwrap();
 
@@ -242,7 +253,7 @@ fn has_no_work() {
 
 #[test]
 fn detects_unbalanced_markets() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let lp = market.clone_lp(0).unwrap();
     let trader = market.clone_trader(0).unwrap();
 
@@ -317,7 +328,7 @@ fn detects_unbalanced_markets() {
 
 #[test]
 fn ignores_unbalanced_insufficient_liquidity() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let trader = market.clone_trader(0).unwrap();
 
     assert_eq!(
@@ -395,7 +406,7 @@ fn ignores_unbalanced_insufficient_liquidity() {
 
 #[test]
 fn closes_extra_positions() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let countertrade = market.get_countertrade_addr();
     let lp = market.clone_lp(0).unwrap();
     let market_type = market.query_status().unwrap().market_type;
@@ -521,7 +532,7 @@ fn closes_popular_position_short() {
 }
 
 fn closes_popular_position_helper(direction: DirectionToBase, open_unpop: bool) {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let countertrade = market.get_countertrade_addr();
     let lp = market.clone_lp(0).unwrap();
 
@@ -608,7 +619,7 @@ fn closes_popular_position_helper(direction: DirectionToBase, open_unpop: bool) 
 #[ignore]
 #[allow(unreachable_code)]
 fn resets_token_balances() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let lp = market.clone_lp(0).unwrap();
 
     market
@@ -639,7 +650,7 @@ fn resets_token_balances() {
 
 #[test]
 fn opens_balancing_position() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let trader = market.clone_trader(0).unwrap();
     let lp = market.clone_lp(0).unwrap();
 
@@ -761,7 +772,7 @@ fn opens_balancing_position() {
 
 #[test]
 fn balance_one_sided_market() {
-    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let market = make_countertrade_market().unwrap();
     let lp = market.clone_lp(0).unwrap();
     let trader = market.clone_trader(0).unwrap();
 
