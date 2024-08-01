@@ -208,6 +208,7 @@ fn desired_action(
                 Ok(Some(WorkDescription::ClosePosition { pos_id: pos.id }))
             }
             None => {
+                // Returns the target notional size of a newly constructed position
                 let result = determine_target_notional(
                     long_interest,
                     short_interest,
@@ -224,14 +225,16 @@ fn desired_action(
                         direction,
                         desired_notional,
                     } => {
-                        let result = compute_delta_notional(
-                            desired_notional,
-                            direction,
+                        let position_notional_size = match direction {
+                            DirectionToNotional::Long => desired_notional.into_signed(),
+                            DirectionToNotional::Short => -desired_notional.into_signed(),
+                        };
+                        compute_delta_notional(
+                            position_notional_size,
                             price,
-                            &status,
+                            status,
                             available_collateral,
-                        )?;
-                        Ok(Some(result))
+                        )
                     }
                 }
             }
@@ -382,10 +385,10 @@ fn smart_search(
         println!("target_funding: {}", target_funding);
 
         let difference = new_funding_rate.checked_sub(target_funding)?.abs_unsigned();
-        let epsilon = Decimal256::from_str("0.001").unwrap();
+        let epsilon = Decimal256::from_str("0.00001").unwrap();
         if difference < epsilon {
             break Ok(open_interest);
-        } else if iteration >= 20 {
+        } else if iteration >= 50 {
             break Err(anyhow!("Iteration limit reached without converging"));
         } else if new_funding_rate > target_funding {
             low_ratio = target_ratio;
@@ -465,22 +468,11 @@ fn derive_instant_funding_rate_annual(
 }
 
 fn compute_delta_notional(
-    desired_notional: Notional,
-    direction: DirectionToNotional,
+    position_notional_size: Signed<Notional>,
     price: &PricePoint,
     status: &StatusResp,
     available_collateral: NonZero<Collateral>,
-) -> Result<WorkDescription> {
-    struct Result {
-        direction: DirectionToNotional,
-        desired_notional: Notional,
-    }
-
-    let result = Result {
-        direction,
-        desired_notional,
-    };
-
+) -> Result<Option<WorkDescription>> {
     println!("market_id: {}", status.market_id);
     println!("market_type: {:?}", status.market_type);
 
@@ -488,77 +480,73 @@ fn compute_delta_notional(
     let factor = Number::from_str("1.5")
         .context("Unable to convert 1.5 to Decimal256")?
         .into_number();
-    let take_profit = match result.direction {
-        DirectionToNotional::Long => {
-            Price::try_from_number(entry_price.into_number().checked_mul(factor)?)?
-        }
-        DirectionToNotional::Short => {
-            let factor_diff = factor
-                .checked_div(Number::from_str("100").context("Unable to convert 100 to Number")?)?;
-            let factor_diff = factor_diff.checked_mul(entry_price.into_number())?;
-            Price::try_from_number(entry_price.into_number().checked_sub(factor_diff)?)?
-        }
+    let take_profit = if position_notional_size.is_strictly_positive() {
+        Price::try_from_number(entry_price.into_number().checked_mul(factor)?)?
+    } else {
+        let factor_diff = factor
+            .checked_div(Number::from_str("100").context("Unable to convert 100 to Number")?)?;
+        let factor_diff = factor_diff.checked_mul(entry_price.into_number())?;
+        Price::try_from_number(entry_price.into_number().checked_sub(factor_diff)?)?
     };
     let take_profit = TakeProfitTrader::from(take_profit.into_base_price(status.market_type));
 
-    let leverage = Number::from_str("10")
+    let desired_leverage = Number::from_str("10")
         .context("Unable to convert 10 to Number")?
         .min(status.config.max_leverage);
 
-    let leverage = match result.direction {
-        DirectionToNotional::Long => leverage,
-        DirectionToNotional::Short => leverage.checked_mul(Number::from_str("-1")?)?,
-    };
+    let desired_leverage =
+        SignedLeverageToNotional::from(if position_notional_size.is_strictly_positive() {
+            desired_leverage
+        } else {
+            -desired_leverage
+        });
 
-    let (direction, leverage) = SignedLeverageToNotional::from(leverage)
-        .into_base(status.market_type)?
-        .split();
+    let position_notional_size_in_collateral =
+        position_notional_size.map(|size| price.notional_to_collateral(size));
 
-    let desired_notional = result.desired_notional;
+    let (deposit_collateral, leverage) =
+        optimize_capital_efficiency(position_notional_size_in_collateral, desired_leverage)?;
 
-    let notional_size = price.notional_to_collateral(desired_notional);
-    println!("notional_size: {desired_notional}");
-
-    let (collateral, leverage) = optimize_capital_efficiency(notional_size, leverage)?;
-
-    let collateral = NonZero::new(collateral).context("collateral is zero")?;
-    if collateral > available_collateral {
-        bail!(
-            "Insufficient collateral. Required {collateral}, but available {available_collateral}"
-        )
+    let min_deposit_collateral = price.usd_to_collateral(status.config.minimum_deposit_usd);
+    if deposit_collateral < min_deposit_collateral {
+        // Market is skewed, and deserves to be balanced, but the size of the skew
+        // is tiny. Wait for the market to have more interest before intervening.
+        return Ok(None);
     }
 
+    let deposit_collateral = NonZero::new(deposit_collateral)
+        .context("collateral is zero")?
+        .min(available_collateral);
+
+    let (direction, leverage) = leverage.into_base(status.market_type)?.split();
+
     println!("counter trade contract recommendation:");
-    println!("collateral: {collateral}");
+    println!("collateral: {deposit_collateral}");
     println!("leverage: {leverage}");
     println!("take_profit: {take_profit}");
     println!("entry_price: {entry_price}");
-    println!("direction: {:?}", result.direction);
+    println!("direction: {:?}", direction);
 
-    Ok(WorkDescription::OpenPosition {
+    Ok(Some(WorkDescription::OpenPosition {
         direction,
         leverage,
-        collateral,
+        collateral: deposit_collateral,
         take_profit,
-    })
+    }))
 }
 
+/// Returns the deposit collateral and leverage value to be used for this position.
 fn optimize_capital_efficiency(
-    notional_size: Collateral,
-    max_leverage: LeverageToBase,
-) -> Result<(Collateral, LeverageToBase)> {
-    let collateral = notional_size.checked_div_dec(max_leverage.into_decimal256())?;
-    let five_collateral = Collateral::from_str("5")?;
-    if collateral >= five_collateral {
-        return Ok((collateral, max_leverage));
-    } else {
-        let leverage = notional_size
-            .into_decimal256()
-            .checked_div(five_collateral.into_decimal256())?;
-        let leverage = NonZero::new(leverage).context("leverage is zero")?;
-        let leverage = LeverageToBase::from(leverage);
-        return Ok((five_collateral, leverage));
-    }
+    position_notional_size_in_collateral: Signed<Collateral>,
+    desired_leverage: SignedLeverageToNotional,
+) -> Result<(Collateral, SignedLeverageToNotional)> {
+    let deposit_collateral = position_notional_size_in_collateral
+        .into_number()
+        .checked_div(desired_leverage.into_number())?;
+    assert!(deposit_collateral.is_strictly_positive());
+    let deposit_collateral = Collateral::from_decimal256(deposit_collateral.abs_unsigned());
+
+    Ok((deposit_collateral, desired_leverage))
 }
 
 pub(crate) fn execute(

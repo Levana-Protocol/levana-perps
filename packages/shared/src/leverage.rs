@@ -184,7 +184,7 @@ impl FromStr for SignedLeverageToBase {
 /// collateral from the liquidity pool). One of these values needs to be
 /// converted using a [Price], so the leverage will change
 /// over time based on exchange rate.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct SignedLeverageToNotional(Signed<Decimal256>);
 
 impl From<Signed<Decimal256>> for SignedLeverageToNotional {

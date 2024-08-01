@@ -2,7 +2,7 @@ use cosmwasm_std::{Addr, Decimal256};
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
     contracts::countertrade::{ConfigUpdate, HasWorkResp, MarketBalance, WorkDescription},
-    prelude::{DirectionToBase, Number, TakeProfitTrader, UnsignedDecimal},
+    prelude::{DirectionToBase, Number, TakeProfitTrader, UnsignedDecimal, Usd},
 };
 
 #[test]
@@ -643,6 +643,14 @@ fn opens_balancing_position() {
     let trader = market.clone_trader(0).unwrap();
     let lp = market.clone_lp(0).unwrap();
 
+    // Remove minimum deposit so that we can open tiny balancing positions
+    market
+        .exec_set_config(msg::contracts::market::config::ConfigUpdate {
+            minimum_deposit_usd: Some(Usd::zero()),
+            ..Default::default()
+        })
+        .unwrap();
+
     market
         .exec_countertrade_mint_and_deposit(&lp, "1000")
         .unwrap();
@@ -735,7 +743,10 @@ fn opens_balancing_position() {
     assert!(
         status
             .long_funding
-        .approx_eq(config.target_funding.into_signed())
+            .approx_eq_eps(
+                config.target_funding.into_signed(),
+                "0.00001".parse().unwrap()
+            )
             .unwrap(),
         "Long funding {} should be close to target_funding {}",
         status.long_funding,
