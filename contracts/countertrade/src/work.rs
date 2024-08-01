@@ -10,8 +10,7 @@ use shared::{
     number::Number,
     price::{Price, TakeProfitTrader},
     storage::{
-        DirectionToBase, DirectionToNotional, LeverageToBase, MarketType, PricePoint,
-        SignedLeverageToNotional,
+        DirectionToBase, DirectionToNotional, MarketType, PricePoint, SignedLeverageToNotional,
     },
 };
 
@@ -141,11 +140,6 @@ pub(crate) fn get_work_for(
     let collateral = NonZero::new(totals.collateral)
         .context("Impossible, zero collateral after checking that we have a minimum deposit")?;
 
-    let max_leverage = state.config.max_leverage.min(LeverageToBase::from(
-        NonZero::new(status.config.max_leverage.abs_unsigned())
-            .context("Invalid 0 max_leverage in market")?,
-    ));
-
     desired_action(state, &status, &price, pos.as_deref(), collateral).map(|x| match x {
         Some(desc) => HasWorkResp::Work { desc },
         None => HasWorkResp::NoWork {},
@@ -192,40 +186,26 @@ fn desired_action(
         MarketType::CollateralIsBase => (status.short_notional, status.long_notional),
     };
 
-    let current_direction = pos.map(|pos| pos.direction_to_base.into_notional(status.market_type));
     let min_funding = state.config.min_funding.into_signed();
     let max_funding = state.config.max_funding.into_signed();
     let target_funding = state.config.target_funding.into_signed();
 
-    let (popular_funding, unpop_funnding, popular_direction, unpopular_interest) =
-        if long_funding.is_strictly_positive() {
-            assert!(short_funding.is_negative() || one_sided_market);
-            (
-                long_funding,
-                short_funding,
-                DirectionToNotional::Long,
-                short_interest,
-            )
-        } else {
-            assert!(long_funding.is_negative() || one_sided_market);
-            (
-                short_funding,
-                long_funding,
-                DirectionToNotional::Short,
-                long_interest,
-            )
-        };
+    let (popular_funding, unpopular_interest) = if long_funding.is_strictly_positive() {
+        assert!(short_funding.is_negative() || one_sided_market);
+        (long_funding, short_interest)
+    } else {
+        assert!(long_funding.is_negative() || one_sided_market);
+        (short_funding, long_interest)
+    };
 
     if popular_funding >= min_funding && popular_funding <= max_funding {
         assert!(popular_funding.is_zero() || !one_sided_market);
-        println!("here1");
         Ok(None)
     } else if popular_funding < min_funding {
         match pos {
             Some(pos) => {
                 // If we have the only unpopular position, keep it open
                 if pos.notional_size.abs_unsigned() == unpopular_interest {
-                    println!("here2");
                     Ok(None)
                 } else {
                     Ok(Some(WorkDescription::ClosePosition { pos_id: pos.id }))
@@ -382,11 +362,6 @@ fn determine_target_notional(
     }
 }
 
-struct OpenInterest {
-    long: Notional,
-    short: Notional,
-}
-
 /// Returns the delta notional on the unpopular side.
 #[allow(clippy::too_many_arguments)]
 fn smart_search(
@@ -419,7 +394,6 @@ fn smart_search(
         let target_ratio = high_ratio
             .checked_add(low_ratio)?
             .checked_div("2".parse().unwrap())?;
-        let total_open_interest = long_notional.checked_add(short_notional)?;
 
         let desired_unpopular = Notional::from_decimal256(
             target_ratio
