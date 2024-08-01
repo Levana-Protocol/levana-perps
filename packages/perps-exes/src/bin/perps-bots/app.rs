@@ -83,7 +83,7 @@ impl AppBuilder {
                     GasCheckWallet::WalletManager,
                 )?;
 
-                if let Some(ref countertrade_wallet) = self.app.config.countertrade_wallet {
+                if let Some(ref countertrade_wallet) = self.app.config.countertrade {
                     self.start_countertrade_bot(countertrade_wallet.clone())?;
                 }
 
