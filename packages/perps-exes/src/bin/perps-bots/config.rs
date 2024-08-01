@@ -1,6 +1,7 @@
 use std::{collections::HashSet, sync::Arc};
 
 use cosmos::{Address, HasAddressHrp, Wallet};
+use msg::contracts::countertrade;
 use perps_exes::{
     config::{
         ChainConfig, ConfigTestnet, DeploymentInfo, GasAmount, GasDecimals, LiquidityConfig,
@@ -67,6 +68,8 @@ pub(crate) struct BotConfig {
     pub(crate) price_wallet: Option<Arc<Wallet>>,
     /// Wallets that are used to perform cranking
     pub(crate) crank_wallets: Vec<Wallet>,
+    /// Wallet used for countertrade contract
+    pub(crate) countertrade_wallet: Option<Arc<Wallet>>,
     /// Wallet used for very high gas situations, derived from price wallet seed
     pub(crate) high_gas_wallet: Option<Arc<Wallet>>,
     pub(crate) watcher: WatcherConfig,
@@ -197,6 +200,11 @@ impl Opt {
                 .cloned(),
         };
         let gas_wallet = Arc::new(self.get_gas_wallet(network.get_address_hrp())?);
+        let countertrade_wallet = Some(Arc::new(self.get_countertrade_wallet(
+            network.get_address_hrp(),
+            &wallet_phrase_name,
+            0,
+        )?));
         let config = BotConfig {
             by_type: BotConfigByType::Testnet {
                 inner: Arc::new(testnet),
@@ -231,6 +239,7 @@ impl Opt {
             min_gas_high_gas_wallet: partial.min_gas_high_gas_wallet,
             min_gas_in_gas_wallet: partial.min_gas_in_gas_wallet,
             gas_wallet,
+            countertrade_wallet,
             ignored_markets: self.ignored_markets.iter().cloned().collect(),
             // Never used on testnet, just setting a reasonable default
             ignore_errors_after_epoch_seconds: 300,
@@ -316,6 +325,7 @@ impl Opt {
             network: *network,
             price_wallet: Some(price_wallet.into()),
             crank_wallets,
+            countertrade_wallet: None,
             high_gas_wallet,
             watcher,
             gas_multiplier: *gas_multiplier,

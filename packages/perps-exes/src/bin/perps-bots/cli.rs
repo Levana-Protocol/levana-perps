@@ -124,6 +124,10 @@ pub(crate) struct TestnetOpt {
     /// Number of seconds before HTTP connections (especially to Pyth) will time out
     #[clap(long, env = "LEVANA_BOTS_HTTP_TIMEOUT_SECONDS", default_value_t = 10)]
     pub(crate) http_timeout_seconds: u32,
+    /// Countertrade bot
+    #[clap(long, env = "LEVANA_BOTS_COUNTERTRADE_CONTRACT")]
+    pub(crate) countertrade: Option<Address>,
+
 }
 
 #[derive(clap::Parser, Clone)]
@@ -271,6 +275,7 @@ impl Opt {
         tracing::info!("Crank bot wallet: {wallet}");
         Ok(wallet)
     }
+
     pub(crate) fn get_price_wallet(
         &self,
         address_type: AddressHrp,
@@ -284,6 +289,22 @@ impl Opt {
             .with_cosmos_numbered(index.into())
             .with_hrp(address_type)?;
         tracing::info!("Price bot wallet: {wallet}");
+        Ok(wallet)
+    }
+
+    pub(crate) fn get_countertrade_wallet(
+        &self,
+        address_type: AddressHrp,
+        wallet_phrase_name: &str,
+        index: u32,
+    ) -> Result<Wallet> {
+        let env_var = format!("LEVANA_BOTS_PHRASE_{}_COUNTERTRADE", wallet_phrase_name);
+        let phrase = get_env(&env_var)?;
+        let seed = SeedPhrase::from_str(&phrase)?;
+        let wallet = seed
+            .with_cosmos_numbered(index.into())
+            .with_hrp(address_type)?;
+        tracing::info!("Countertrade bot wallet: {wallet}");
         Ok(wallet)
     }
 }
