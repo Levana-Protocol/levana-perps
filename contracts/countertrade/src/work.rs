@@ -316,37 +316,24 @@ fn determine_target_notional(
 ) -> Result<TargetNotionalResult> {
     let (rfl, rfs) =
         derive_instant_funding_rate_annual(long_interest, short_interest, &status.config)?;
-    let total_open_interest = long_interest.checked_add(short_interest)?;
     struct TempResult {
         unpopular_side: DirectionToNotional,
-        starting_ratio: Number,
         unpopular_rf: Signed<Decimal256>,
     }
     let result = if long_interest < short_interest {
         TempResult {
             unpopular_side: DirectionToNotional::Long,
-            starting_ratio: long_interest
-                .into_number()
-                .checked_div(total_open_interest.into_number())?,
             unpopular_rf: rfl,
         }
     } else {
         TempResult {
             unpopular_side: DirectionToNotional::Short,
-            starting_ratio: short_interest
-                .into_number()
-                .checked_div(total_open_interest.into_number())?,
             unpopular_rf: rfs,
         }
     };
 
     if result.unpopular_rf > min_funding {
         return Ok(TargetNotionalResult::NoWork);
-    }
-
-    // TODO: why is this here, and how is it ever possible to have a starting ratio over 1?
-    if result.starting_ratio > Number::from_str("1.4")? {
-        bail!("Starting_ratio should not be greater than 1.4")
     }
 
     let desired_notional = smart_search(long_interest, short_interest, target_funding, status, 0)?;
