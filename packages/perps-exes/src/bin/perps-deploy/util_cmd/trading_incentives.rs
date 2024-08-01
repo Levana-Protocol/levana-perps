@@ -195,13 +195,18 @@ async fn distributions_csv(
             let is_referee = match is_referee_cache.get(&owner) {
                 Some(x) => *x,
                 None => {
-                    let is_referee = validate_referee_wallet(
-                        owner,
-                        factory.factory.network,
-                        factory.factory.address,
-                        &client,
-                    )
-                    .await?;
+                    let is_referee = if referee_rewards_percentage == 0 {
+                        // Doesn't matter, no rewards. Minor optimization for testing.
+                        false
+                    } else {
+                        validate_referee_wallet(
+                            owner,
+                            factory.factory.network,
+                            factory.factory.address,
+                            &client,
+                        )
+                        .await?
+                    };
                     is_referee_cache.insert(owner, is_referee);
                     is_referee
                 }
@@ -252,7 +257,7 @@ async fn distributions_csv(
         }
     }
 
-    let mut output = ::csv::Writer::from_path(&output)?;
+    let mut records = vec![];
 
     for (cat, pool_size, TotalsTracker { total, entries }) in [
         (Category::Losses, losses_pool_size, losses),
@@ -262,8 +267,8 @@ async fn distributions_csv(
             let amount = LvnToken::from_decimal256(
                 amount.into_decimal256() * pool_size.into_decimal256() / total.into_decimal256(),
             );
-            serialize_record(
-                &mut output,
+            add_record(
+                &mut records,
                 min_rewards,
                 recipient,
                 amount,
@@ -282,7 +287,7 @@ async fn distributions_csv(
                     Category::Fees => RewardType::Fees,
                 },
                 Usd::zero(),
-            )?;
+            );
         }
     }
 
@@ -310,8 +315,8 @@ async fn distributions_csv(
         };
         let refund_usd = refund_usd_uncapped.min(available_refund);
         let amount = price.usd_to_lvn(refund_usd);
-        serialize_record(
-            &mut output,
+        add_record(
+            &mut records,
             min_rewards,
             recipient,
             amount,
@@ -323,15 +328,21 @@ async fn distributions_csv(
             vesting_date,
             RewardType::Referee,
             refund_usd,
-        )?;
+        );
     }
+
+    records.sort_by_key(|record| (record.recipient, record.r#type));
+    let mut output = ::csv::Writer::from_path(&output)?;
+    records
+        .into_iter()
+        .try_for_each(|record| output.serialize(&record))?;
 
     Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
-fn serialize_record(
-    output: &mut csv::Writer<std::fs::File>,
+fn add_record(
+    output: &mut Vec<DistributionsRecord>,
     min_rewards: LvnToken,
     recipient: Address,
     amount: LvnToken,
@@ -339,10 +350,10 @@ fn serialize_record(
     vesting_date: DateTime<Utc>,
     r#type: RewardType,
     referee_rewards_usd: Usd,
-) -> anyhow::Result<()> {
+) {
     if amount >= min_rewards {
         let osmo_recipient = recipient.raw().with_hrp(AddressHrp::from_static("osmo"));
-        output.serialize(&DistributionsRecord {
+        output.push(DistributionsRecord {
             recipient: osmo_recipient,
             amount,
             clawback: None,
@@ -357,9 +368,8 @@ fn serialize_record(
             } else {
                 Some(recipient)
             },
-        })?;
+        });
     }
-    Ok(())
 }
 
 async fn validate_referee_wallet(
@@ -417,7 +427,9 @@ pub(crate) struct DistributionsRecord {
     pub(crate) original_address: Option<Address>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord,
+)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum RewardType {
     Losses,
