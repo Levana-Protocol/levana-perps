@@ -2351,7 +2351,7 @@ impl PerpsMarket {
 
     pub fn query_countertrade_market_id(
         &self,
-        market_id: MarketId
+        market_id: MarketId,
     ) -> Result<msg::contracts::countertrade::MarketStatus> {
         let result = self.query_countertrade_markets()?;
         let res = result.into_iter().find(|item| item.id == market_id);
