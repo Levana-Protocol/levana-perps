@@ -4,8 +4,8 @@ use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, Contract, Wallet};
 use msg::contracts::countertrade::HasWorkResp;
-use parking_lot::Mutex;
 use shared::storage::MarketId;
+use tokio::sync::Mutex;
 
 use crate::{
     config::CounterTradeBotConfig,
@@ -59,7 +59,7 @@ async fn single_market(
     match work {
         HasWorkResp::NoWork {} => Ok(WatchedTaskOutput::new("No work present")),
         HasWorkResp::Work { desc } => {
-            let wallet = bot.wallet.lock().clone();
+            let wallet = bot.wallet.lock().await;
             do_countertrade_work(&contract, market_id, &wallet, &desc).await
         }
     }
