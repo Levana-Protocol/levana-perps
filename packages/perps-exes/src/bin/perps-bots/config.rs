@@ -1,7 +1,6 @@
 use std::{collections::HashSet, sync::Arc};
 
 use cosmos::{Address, HasAddressHrp, Wallet};
-use msg::contracts::countertrade;
 use perps_exes::{
     config::{
         ChainConfig, ConfigTestnet, DeploymentInfo, GasAmount, GasDecimals, LiquidityConfig,
