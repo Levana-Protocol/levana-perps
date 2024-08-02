@@ -60,6 +60,14 @@ pub(crate) struct BotConfigMainnet {
     pub(crate) higher_very_high_max_gas_price: f64,
 }
 
+#[derive(Clone)]
+pub(crate) struct CounterTradeBotConfig {
+    /// Wallet used for countertrade contract
+    pub(crate) wallet: Arc<tokio::sync::Mutex<Wallet>>,
+    /// Contract address
+    pub(crate) contract: Address,
+}
+
 pub(crate) struct BotConfig {
     pub(crate) by_type: BotConfigByType,
     pub(crate) network: PerpsNetwork,
@@ -67,6 +75,8 @@ pub(crate) struct BotConfig {
     pub(crate) price_wallet: Option<Arc<Wallet>>,
     /// Wallets that are used to perform cranking
     pub(crate) crank_wallets: Vec<Wallet>,
+    /// Countertrade Config
+    pub(crate) countertrade: Option<CounterTradeBotConfig>,
     /// Wallet used for very high gas situations, derived from price wallet seed
     pub(crate) high_gas_wallet: Option<Arc<Wallet>>,
     pub(crate) watcher: WatcherConfig,
@@ -147,6 +157,20 @@ impl Opt {
         let faucet = faucet.with_context(|| format!("No faucet found for {network}"))?;
         let (faucet_bot, faucet_bot_runner) =
             FaucetBot::new(faucet_bot_wallet, testnet.hcaptcha_secret.clone(), faucet);
+        let countertrade = if let Some(countertrade_contract) = testnet.countertrade {
+            let wallet = Arc::new(tokio::sync::Mutex::new(self.get_countertrade_wallet(
+                network.get_address_hrp(),
+                &wallet_phrase_name,
+                0,
+            )?));
+            let config = CounterTradeBotConfig {
+                wallet,
+                contract: countertrade_contract,
+            };
+            Some(config)
+        } else {
+            None
+        };
 
         let gas_multiplier = testnet.gas_multiplier.or(gas_multiplier);
 
@@ -197,6 +221,7 @@ impl Opt {
                 .cloned(),
         };
         let gas_wallet = Arc::new(self.get_gas_wallet(network.get_address_hrp())?);
+
         let config = BotConfig {
             by_type: BotConfigByType::Testnet {
                 inner: Arc::new(testnet),
@@ -237,6 +262,7 @@ impl Opt {
             run_optional_services: !self.disable_optional_services,
             price_bot_delay: self.price_bot_delay.map(tokio::time::Duration::from_millis),
             log_requests: self.log_requests,
+            countertrade,
         };
 
         Ok((config, Some(faucet_bot_runner)))
@@ -339,6 +365,7 @@ impl Opt {
             run_optional_services: !self.disable_optional_services,
             price_bot_delay: self.price_bot_delay.map(tokio::time::Duration::from_millis),
             log_requests: self.log_requests,
+            countertrade: None,
         })
     }
 }

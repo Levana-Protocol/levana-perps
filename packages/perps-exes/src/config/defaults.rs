@@ -98,6 +98,10 @@ pub(super) fn block_lag() -> TaskConfig {
     super::WatcherConfig::default().block_lag
 }
 
+pub(super) fn counter_trade_bot() -> TaskConfig {
+    super::WatcherConfig::default().counter_trade_bot
+}
+
 pub(super) fn seconds_till_ultra() -> u32 {
     // 8 minutes
     60 * 8

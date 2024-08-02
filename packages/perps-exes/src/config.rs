@@ -526,6 +526,8 @@ pub struct WatcherConfig {
     pub high_gas: TaskConfig,
     #[serde(default = "defaults::block_lag")]
     pub block_lag: TaskConfig,
+    #[serde(default = "defaults::counter_trade_bot")]
+    pub counter_trade_bot: TaskConfig,
 }
 
 impl Default for WatcherConfig {
@@ -654,6 +656,12 @@ impl Default for WatcherConfig {
             block_lag: TaskConfig {
                 delay: Delay::Constant(20),
                 out_of_date: Some(20),
+                retries: None,
+                delay_between_retries: None,
+            },
+            counter_trade_bot: TaskConfig {
+                delay: Delay::Constant(60),
+                out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,
             },

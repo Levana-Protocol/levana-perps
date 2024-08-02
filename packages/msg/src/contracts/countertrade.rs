@@ -333,6 +333,30 @@ pub enum WorkDescription {
     },
 }
 
+impl std::fmt::Display for WorkDescription {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WorkDescription::OpenPosition {
+                direction,
+                leverage,
+                collateral,
+                ..
+            } => write!(
+                f,
+                "Open {direction:?} position with leverage {leverage} and collateral {collateral}"
+            ),
+            WorkDescription::ClosePosition { pos_id } => write!(f, "Close Position {pos_id}"),
+            WorkDescription::CollectClosedPosition { pos_id, .. } => {
+                write!(f, "Collect Closed Position Id of {}", pos_id)
+            }
+            WorkDescription::ResetShares => write!(f, "Reset Shares"),
+            WorkDescription::ClearDeferredExec { id } => {
+                write!(f, "Clear Deferred Exec Id of {id}")
+            }
+        }
+    }
+}
+
 /// Migration message, currently no fields needed
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
