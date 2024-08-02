@@ -25,7 +25,10 @@ impl AppBuilder {
             wallet: config.wallet,
             contract: config.contract,
         };
-        self.watch_periodic(crate::watcher::TaskLabel::CounterTradeBot, ParallelWatcher::new(bot))
+        self.watch_periodic(
+            crate::watcher::TaskLabel::CounterTradeBot,
+            ParallelWatcher::new(bot),
+        )
     }
 }
 
@@ -91,7 +94,7 @@ async fn do_countertrade_work(
     action: &Action,
 ) -> Result<WatchedTaskOutput> {
     let execute_msg = msg::contracts::countertrade::ExecuteMsg::DoWork { market: market_id };
-    let response = contract.execute(&wallet, vec![], execute_msg).await;
+    let response = contract.execute(wallet, vec![], execute_msg).await;
     match response {
         Ok(response) => Ok(WatchedTaskOutput::new(format!(
             "Succesfully exected {action:?} in {}",

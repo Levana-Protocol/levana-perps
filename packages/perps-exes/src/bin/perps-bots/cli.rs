@@ -127,7 +127,6 @@ pub(crate) struct TestnetOpt {
     /// Countertrade bot
     #[clap(long, env = "LEVANA_BOTS_COUNTERTRADE_CONTRACT")]
     pub(crate) countertrade: Option<Address>,
-
 }
 
 #[derive(clap::Parser, Clone)]

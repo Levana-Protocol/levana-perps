@@ -46,7 +46,7 @@ pub(crate) enum TaskLabel {
     Congestion,
     HighGas,
     BlockLag,
-    CounterTradeBot
+    CounterTradeBot,
 }
 
 impl TaskLabel {
@@ -99,7 +99,7 @@ impl TaskLabel {
             TaskLabel::Congestion => false,
             TaskLabel::HighGas => true,
             TaskLabel::BlockLag => false,
-            TaskLabel::CounterTradeBot => false
+            TaskLabel::CounterTradeBot => false,
         }
     }
 }
@@ -263,7 +263,6 @@ impl TaskLabel {
             TaskLabel::HighGas => config.high_gas,
             TaskLabel::BlockLag => config.block_lag,
             TaskLabel::CounterTradeBot => config.counter_trade_bot,
-
         }
     }
 
@@ -295,7 +294,6 @@ impl TaskLabel {
             TaskLabel::HighGas => true,
             TaskLabel::BlockLag => true,
             TaskLabel::CounterTradeBot => true,
-
         }
     }
 
