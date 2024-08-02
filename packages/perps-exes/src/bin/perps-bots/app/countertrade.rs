@@ -56,26 +56,12 @@ async fn single_market(
     };
     let contract = cosmos.make_contract(bot.contract);
     let work: HasWorkResp = contract.query(query).await?;
-    let wallet = bot.wallet.clone().lock().clone();
     match work {
         HasWorkResp::NoWork {} => Ok(WatchedTaskOutput::new("No work present")),
-        HasWorkResp::Work { desc } => match desc {
-            msg::contracts::countertrade::WorkDescription::OpenPosition { .. } => {
-                do_countertrade_work(&contract, market_id, &wallet, &desc).await
-            }
-            msg::contracts::countertrade::WorkDescription::ClosePosition { .. } => {
-                do_countertrade_work(&contract, market_id, &wallet, &desc).await
-            }
-            msg::contracts::countertrade::WorkDescription::CollectClosedPosition { .. } => {
-                do_countertrade_work(&contract, market_id, &wallet, &desc).await
-            }
-            msg::contracts::countertrade::WorkDescription::ResetShares => {
-                do_countertrade_work(&contract, market_id, &wallet, &desc).await
-            }
-            msg::contracts::countertrade::WorkDescription::ClearDeferredExec { .. } => {
-                do_countertrade_work(&contract, market_id, &wallet, &desc).await
-            }
-        },
+        HasWorkResp::Work { desc } => {
+            let wallet = bot.wallet.lock().clone();
+            do_countertrade_work(&contract, market_id, &wallet, &desc).await
+        }
     }
 }
 
