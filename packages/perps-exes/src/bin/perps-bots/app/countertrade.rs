@@ -4,6 +4,7 @@ use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, Contract, Wallet};
 use msg::contracts::countertrade::HasWorkResp;
+use parking_lot::Mutex;
 use shared::storage::MarketId;
 
 use crate::{
@@ -15,15 +16,15 @@ use crate::{
 use super::{factory::FactoryInfo, App, AppBuilder};
 
 pub(crate) struct CounterTradeBot {
-    pub(crate) wallet: Arc<Wallet>,
+    pub(crate) wallet: Arc<Mutex<Wallet>>,
     pub(crate) contract: Address,
 }
 
 impl AppBuilder {
     pub(super) fn start_countertrade_bot(&mut self, config: CounterTradeBotConfig) -> Result<()> {
         let bot = CounterTradeBot {
-            wallet: config.wallet,
             contract: config.contract,
+            wallet: config.wallet,
         };
         self.watch_periodic(
             crate::watcher::TaskLabel::CounterTradeBot,
@@ -55,53 +56,42 @@ async fn single_market(
     };
     let contract = cosmos.make_contract(bot.contract);
     let work: HasWorkResp = contract.query(query).await?;
-    let wallet = bot.wallet.clone();
+    let wallet = bot.wallet.clone().lock().clone();
     match work {
         HasWorkResp::NoWork {} => Ok(WatchedTaskOutput::new("No work present")),
         HasWorkResp::Work { desc } => match desc {
             msg::contracts::countertrade::WorkDescription::OpenPosition { .. } => {
-                do_countertrade_work(&contract, market_id, &wallet, &Action::Open).await
+                do_countertrade_work(&contract, market_id, &wallet, &desc).await
             }
             msg::contracts::countertrade::WorkDescription::ClosePosition { .. } => {
-                do_countertrade_work(&contract, market_id, &wallet, &Action::Close).await
+                do_countertrade_work(&contract, market_id, &wallet, &desc).await
             }
             msg::contracts::countertrade::WorkDescription::CollectClosedPosition { .. } => {
-                do_countertrade_work(&contract, market_id, &wallet, &Action::CollectClosed).await
+                do_countertrade_work(&contract, market_id, &wallet, &desc).await
             }
             msg::contracts::countertrade::WorkDescription::ResetShares => {
-                do_countertrade_work(&contract, market_id, &wallet, &Action::ResetShares).await
+                do_countertrade_work(&contract, market_id, &wallet, &desc).await
             }
             msg::contracts::countertrade::WorkDescription::ClearDeferredExec { .. } => {
-                do_countertrade_work(&contract, market_id, &wallet, &Action::ClearDeferred).await
+                do_countertrade_work(&contract, market_id, &wallet, &desc).await
             }
         },
     }
-}
-
-#[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd, Debug)]
-enum Action {
-    Open,
-    Close,
-    CollectClosed,
-    ResetShares,
-    ClearDeferred,
 }
 
 async fn do_countertrade_work(
     contract: &Contract,
     market_id: MarketId,
     wallet: &Wallet,
-    action: &Action,
+    work: &msg::contracts::countertrade::WorkDescription,
 ) -> Result<WatchedTaskOutput> {
     let execute_msg = msg::contracts::countertrade::ExecuteMsg::DoWork { market: market_id };
     let response = contract.execute(wallet, vec![], execute_msg).await;
     match response {
         Ok(response) => Ok(WatchedTaskOutput::new(format!(
-            "Succesfully exected {action:?} in {}",
+            "Succesfully exected {work} in {}",
             response.txhash
         ))),
-        Err(err) => {
-            Ok(WatchedTaskOutput::new(format!("Failed doing {action:?}: {err}")).set_error())
-        }
+        Err(err) => Ok(WatchedTaskOutput::new(format!("Failed doing {work:?}: {err}")).set_error()),
     }
 }

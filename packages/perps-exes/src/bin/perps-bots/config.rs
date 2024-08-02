@@ -1,6 +1,7 @@
 use std::{collections::HashSet, sync::Arc};
 
 use cosmos::{Address, HasAddressHrp, Wallet};
+use parking_lot::Mutex;
 use perps_exes::{
     config::{
         ChainConfig, ConfigTestnet, DeploymentInfo, GasAmount, GasDecimals, LiquidityConfig,
@@ -63,7 +64,7 @@ pub(crate) struct BotConfigMainnet {
 #[derive(Clone)]
 pub(crate) struct CounterTradeBotConfig {
     /// Wallet used for countertrade contract
-    pub(crate) wallet: Arc<Wallet>,
+    pub(crate) wallet: Arc<Mutex<Wallet>>,
     /// Contract address
     pub(crate) contract: Address,
 }
@@ -158,11 +159,11 @@ impl Opt {
         let (faucet_bot, faucet_bot_runner) =
             FaucetBot::new(faucet_bot_wallet, testnet.hcaptcha_secret.clone(), faucet);
         let countertrade = if let Some(countertrade_contract) = testnet.countertrade {
-            let wallet = Arc::new(self.get_countertrade_wallet(
+            let wallet = Arc::new(Mutex::new(self.get_countertrade_wallet(
                 network.get_address_hrp(),
                 &wallet_phrase_name,
                 0,
-            )?);
+            )?));
             let config = CounterTradeBotConfig {
                 wallet,
                 contract: countertrade_contract,
