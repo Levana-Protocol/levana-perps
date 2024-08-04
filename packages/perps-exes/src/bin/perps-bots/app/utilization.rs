@@ -26,7 +26,7 @@ impl AppBuilder {
         if let Some(config) = testnet.utilization_config {
             let util = Utilization {
                 app: self.app.clone(),
-                wallet: self.get_track_wallet(&testnet, ManagedWallet::Utilization)?,
+                wallet: self.get_track_wallet(ManagedWallet::Utilization)?,
                 config,
                 testnet,
             };

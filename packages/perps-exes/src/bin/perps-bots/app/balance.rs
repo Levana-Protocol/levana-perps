@@ -65,7 +65,7 @@ impl AppBuilder {
         if testnet.balance {
             let balance = Balance {
                 app: self.app.clone(),
-                wallet: self.get_track_wallet(&testnet, ManagedWallet::Balance)?,
+                wallet: self.get_track_wallet(ManagedWallet::Balance)?,
                 testnet,
             };
             self.watch_periodic(TaskLabel::Balance, balance)?;

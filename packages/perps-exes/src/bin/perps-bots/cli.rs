@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, path::PathBuf, str::FromStr};
 
 use anyhow::{Context, Result};
-use cosmos::{Address, AddressHrp, SeedPhrase, Wallet};
+use cosmos::{Address, SeedPhrase};
 use cosmwasm_std::Decimal256;
 use perps_exes::{build_version, config::GasAmount, PerpsNetwork};
 use shared::storage::MarketId;
@@ -90,6 +90,7 @@ pub(crate) struct Opt {
     pub(crate) log_requests: bool,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(clap::Parser, Clone)]
 pub(crate) enum Sub {
     Testnet {
@@ -107,6 +108,12 @@ pub(crate) struct TestnetOpt {
     /// hCaptcha secret key
     #[clap(long, env = "LEVANA_BOTS_HCAPTCHA_SECRET")]
     pub(crate) hcaptcha_secret: String,
+    /// Gas wallet, shared across all contract families on a chain.
+    #[clap(long, env = "LEVANA_BOTS_PHRASE_GAS")]
+    pub(crate) gas_phrase: SeedPhrase,
+    /// How many wallets to put in the pool
+    #[clap(long, env = "LEVANA_BOTS_POOL_WALLET_COUNT", default_value_t = 4)]
+    pub(crate) pool_wallet_count: usize,
     /// Maintenance mode to use. Empty string is treated as no maintenance mode.
     #[clap(long, env = "LEVANA_BOTS_MAINTENANCE")]
     pub(crate) maintenance: Option<String>,
@@ -135,6 +142,9 @@ pub(crate) struct MainnetOpt {
     pub(crate) factory: Address,
     #[clap(long, env = "LEVANA_BOTS_SEED_PHRASE")]
     pub(crate) seed: SeedPhrase,
+    /// How many wallets to put in the pool
+    #[clap(long, env = "LEVANA_BOTS_POOL_WALLET_COUNT", default_value_t = 4)]
+    pub(crate) pool_wallet_count: usize,
     #[clap(long, env = "COSMOS_NETWORK")]
     pub(crate) network: PerpsNetwork,
     #[clap(long, env = "COSMOS_GAS_MULTIPLIER")]
@@ -176,7 +186,7 @@ pub(crate) struct MainnetOpt {
     pub(crate) rpc_endpoint: String,
     /// How many crank wallets to use
     #[clap(long, env = "LEVANA_BOTS_CRANK_WALLETS", default_value_t = 4)]
-    pub(crate) crank_wallets: u64,
+    pub(crate) crank_wallets: usize,
     /// How many seconds to ignore errors after an epoch
     #[clap(
         long,
@@ -230,81 +240,10 @@ impl Opt {
         Ok(())
     }
 
-    pub(crate) fn get_wallet_seed(
-        &self,
-        wallet_phrase_name: &str,
-        wallet_type: &str,
-    ) -> Result<SeedPhrase> {
-        let env_var = format!("LEVANA_BOTS_PHRASE_{wallet_phrase_name}_{wallet_type}");
+    pub(crate) fn get_wallet_seed(&self, wallet_phrase_name: &str) -> Result<SeedPhrase> {
+        let env_var = format!("LEVANA_BOTS_PHRASE_{wallet_phrase_name}");
         let phrase = get_env(&env_var)?;
         SeedPhrase::from_str(&phrase).map_err(|e| e.into())
-    }
-
-    pub(crate) fn get_faucet_bot_wallet(&self, address_type: AddressHrp) -> Result<Wallet> {
-        let env_var = "LEVANA_BOTS_PHRASE_FAUCET";
-        let phrase = get_env(env_var)?;
-        let phrase = SeedPhrase::from_str(&phrase)?;
-        let wallet = phrase.with_hrp(address_type)?;
-        tracing::info!("Wallet address for faucet: {wallet}");
-        Ok(wallet)
-    }
-
-    /// One shared wallet used for refilling gas to all other wallets.
-    pub(crate) fn get_gas_wallet(&self, address_type: AddressHrp) -> Result<Wallet> {
-        let env_var = "LEVANA_BOTS_PHRASE_GAS";
-        let phrase = get_env(env_var)?;
-        let phrase = SeedPhrase::from_str(&phrase)?;
-        let wallet = phrase.with_hrp(address_type)?;
-        tracing::info!("Wallet address for gas: {wallet}");
-        Ok(wallet)
-    }
-
-    pub(crate) fn get_crank_wallet(
-        &self,
-        address_type: AddressHrp,
-        wallet_phrase_name: &str,
-        index: u32,
-    ) -> Result<Wallet> {
-        let env_var = format!("LEVANA_BOTS_PHRASE_{}_CRANK", wallet_phrase_name);
-        let phrase = get_env(&env_var)?;
-        let seed = SeedPhrase::from_str(&phrase)?;
-        let wallet = seed
-            .with_cosmos_numbered(index.into())
-            .with_hrp(address_type)?;
-        tracing::info!("Crank bot wallet: {wallet}");
-        Ok(wallet)
-    }
-
-    pub(crate) fn get_price_wallet(
-        &self,
-        address_type: AddressHrp,
-        wallet_phrase_name: &str,
-        index: u32,
-    ) -> Result<Wallet> {
-        let env_var = format!("LEVANA_BOTS_PHRASE_{}_PRICE", wallet_phrase_name);
-        let phrase = get_env(&env_var)?;
-        let seed = SeedPhrase::from_str(&phrase)?;
-        let wallet = seed
-            .with_cosmos_numbered(index.into())
-            .with_hrp(address_type)?;
-        tracing::info!("Price bot wallet: {wallet}");
-        Ok(wallet)
-    }
-
-    pub(crate) fn get_countertrade_wallet(
-        &self,
-        address_type: AddressHrp,
-        wallet_phrase_name: &str,
-        index: u32,
-    ) -> Result<Wallet> {
-        let env_var = format!("LEVANA_BOTS_PHRASE_{}_COUNTERTRADE", wallet_phrase_name);
-        let phrase = get_env(&env_var)?;
-        let seed = SeedPhrase::from_str(&phrase)?;
-        let wallet = seed
-            .with_cosmos_numbered(index.into())
-            .with_hrp(address_type)?;
-        tracing::info!("Countertrade bot wallet: {wallet}");
-        Ok(wallet)
     }
 }
 

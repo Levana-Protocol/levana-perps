@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use axum::async_trait;
 use chrono::Utc;
-use cosmos::{HasAddress, Wallet};
+use cosmos::HasAddress;
 use msg::contracts::market;
 use perps_exes::prelude::MarketContract;
 
@@ -12,12 +12,10 @@ use crate::util::markets::Market;
 use crate::watcher::{WatchedTaskOutput, WatchedTaskPerMarket};
 
 use super::factory::FactoryInfo;
-use super::gas_check::GasCheckWallet;
 use super::{App, AppBuilder};
 
 #[derive(Clone)]
 struct Worker {
-    wallet: Wallet,
     activated: bool,
     testnet: Arc<BotConfigTestnet>,
 }
@@ -25,13 +23,8 @@ struct Worker {
 /// Start the background thread to monitor and use ultra cranking.
 impl AppBuilder {
     pub(super) fn start_ultra_crank_bot(&mut self, testnet: &Arc<BotConfigTestnet>) -> Result<()> {
-        let ultra_crank_wallets = testnet.ultra_crank_wallets.clone();
-        for (index, wallet) in ultra_crank_wallets.into_iter().enumerate() {
-            // People like things that start at 1, not 0
-            let index = index + 1;
-            self.refill_gas(wallet.get_address(), GasCheckWallet::UltraCrank(index))?;
+        for index in 1..=testnet.ultra_crank_tasks {
             let worker = Worker {
-                wallet,
                 activated: false,
                 testnet: testnet.clone(),
             };
@@ -49,13 +42,8 @@ impl WatchedTaskPerMarket for Worker {
         _factory: &FactoryInfo,
         market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        app.ultra_crank(
-            &market.market,
-            &self.wallet,
-            &mut self.activated,
-            &self.testnet,
-        )
-        .await
+        app.ultra_crank(&market.market, &mut self.activated, &self.testnet)
+            .await
     }
 }
 
@@ -63,7 +51,6 @@ impl App {
     async fn ultra_crank(
         &self,
         market: &MarketContract,
-        wallet: &Wallet,
         activated: &mut bool,
         testnet: &BotConfigTestnet,
     ) -> Result<WatchedTaskOutput> {
@@ -91,7 +78,7 @@ impl App {
         }
         let res = market
             .crank_single(
-                wallet,
+                &*self.get_pool_wallet().await,
                 None,
                 self.config
                     .get_crank_rewards_wallet()

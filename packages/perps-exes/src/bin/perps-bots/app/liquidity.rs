@@ -31,7 +31,7 @@ impl AppBuilder {
             let liquidity = Liquidity {
                 app: self.app.clone(),
                 liquidity_config: liquidity_config.clone(),
-                wallet: self.get_track_wallet(&testnet, ManagedWallet::Liquidity)?,
+                wallet: self.get_track_wallet(ManagedWallet::Liquidity)?,
                 testnet,
             };
             self.watch_periodic(crate::watcher::TaskLabel::Liquidity, liquidity)?;

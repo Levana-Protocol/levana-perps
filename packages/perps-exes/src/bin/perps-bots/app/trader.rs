@@ -27,7 +27,7 @@ impl AppBuilder {
     pub(super) fn start_traders(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
         if let Some((traders, config)) = testnet.trader_config {
             for index in 1..=traders {
-                let wallet = self.get_track_wallet(&testnet, ManagedWallet::Trader(index))?;
+                let wallet = self.get_track_wallet(ManagedWallet::Trader(index))?;
                 let trader = Trader {
                     app: self.app.clone(),
                     wallet,

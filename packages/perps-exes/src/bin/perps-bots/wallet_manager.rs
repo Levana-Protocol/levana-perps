@@ -7,8 +7,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use cosmos::{
-    proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, AddressHrp, Cosmos, HasAddress,
-    SeedPhrase, TxBuilder, Wallet,
+    proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, Cosmos, HasAddress, TxBuilder, Wallet,
 };
 use msg::{
     contracts::{cw20::Cw20Coin, market::entry::StatusResp},
@@ -30,17 +29,6 @@ pub(crate) enum ManagedWallet {
     Trader(u32),
 }
 
-impl ManagedWallet {
-    fn get_index(self) -> u32 {
-        match self {
-            ManagedWallet::Balance => 1,
-            ManagedWallet::Liquidity => 2,
-            ManagedWallet::Utilization => 3,
-            ManagedWallet::Trader(x) => x + 3,
-        }
-    }
-}
-
 impl Display for ManagedWallet {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -53,8 +41,6 @@ impl Display for ManagedWallet {
 }
 
 struct Inner {
-    seed: SeedPhrase,
-    address_type: AddressHrp,
     send_request: mpsc::Sender<MintRequest>,
     minter_address: Address,
 }
@@ -80,35 +66,17 @@ impl Debug for MintRequest {
 }
 
 impl WalletManager {
-    pub(crate) fn new(seed: SeedPhrase, address_type: AddressHrp) -> Result<Self> {
-        let minter = seed
-            .clone()
-            .with_cosmos_numbered(0)
-            .with_hrp(address_type)?;
+    pub(crate) fn new(minter: Wallet) -> Result<Self> {
         tracing::info!("Wallet manager minter wallet: {minter}");
         let (send_request, recv_request) = mpsc::channel(100);
         let manager = WalletManager {
             inner: Arc::new(Inner {
-                seed,
-                address_type,
                 send_request,
                 minter_address: minter.get_address(),
             }),
         };
         tokio::task::spawn(background(recv_request, minter));
         Ok(manager)
-    }
-
-    pub(crate) fn get_wallet(&self, desc: ManagedWallet) -> Result<Wallet> {
-        let idx = desc.get_index();
-        let wallet = self
-            .inner
-            .seed
-            .clone()
-            .with_cosmos_numbered(idx.into())
-            .with_hrp(self.inner.address_type)?;
-        tracing::info!("Got fresh wallet from manager for {desc}: {wallet}",);
-        Ok(wallet)
     }
 
     pub(crate) async fn mint(
