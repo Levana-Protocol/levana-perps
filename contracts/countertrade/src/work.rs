@@ -572,6 +572,9 @@ pub(crate) fn execute(
                     take_profit: Some(take_profit),
                 },
             )?;
+            totals.collateral.checked_add(collateral.raw())?;
+            crate::state::TOTALS.save(storage, &market.id, &totals)?;
+
             res = add_market_msg(storage, res, msg)?;
         }
         WorkDescription::ClosePosition { pos_id } => {

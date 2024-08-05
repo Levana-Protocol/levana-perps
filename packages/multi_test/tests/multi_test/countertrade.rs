@@ -1,8 +1,11 @@
+use std::str::FromStr;
+
 use cosmwasm_std::{Addr, Decimal256};
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
     contracts::countertrade::{ConfigUpdate, HasWorkResp, MarketBalance, WorkDescription},
     prelude::{DirectionToBase, Number, TakeProfitTrader, UnsignedDecimal, Usd},
+    shared::number::{Collateral, NonZero},
 };
 
 fn make_countertrade_market() -> anyhow::Result<PerpsMarket> {
@@ -855,6 +858,7 @@ fn do_work_optional_collect(market: &PerpsMarket, lp: &Addr, collect_closed: boo
     // Will fail if we do more work again since the deferred
     // execution would not have finished
     market.exec_countertrade_do_work().unwrap_err();
+
     // Execute the deferred message
     market.exec_crank_till_finished(lp).unwrap();
     // And clear any deferred exec IDs and collect any closed positions
@@ -880,4 +884,96 @@ fn do_work_optional_collect(market: &PerpsMarket, lp: &Addr, collect_closed: boo
             market.exec_countertrade_do_work().unwrap();
         }
     }
+}
+
+#[test]
+fn deduct_balance() {
+    let market = make_countertrade_market().unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    // Make sure there are funds to open a position
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+
+    let market_type = market.query_status().unwrap().market_type;
+
+    // Open up unbalanced positions
+    market
+        .exec_open_position_take_profit(
+            &trader,
+            "10",
+            // Deal with off-by-one leverage to ensure we have a balanced market
+            match market_type {
+                msg::prelude::MarketType::CollateralIsQuote => "5",
+                msg::prelude::MarketType::CollateralIsBase => "6",
+            },
+            DirectionToBase::Long,
+            None,
+            None,
+            msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+        )
+        .unwrap();
+    market
+        .exec_open_position_take_profit(
+            &trader,
+            "10",
+            match market_type {
+                msg::prelude::MarketType::CollateralIsQuote => "3",
+                msg::prelude::MarketType::CollateralIsBase => "2",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            msg::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
+    let balance = market
+        .query_countertrade_balances(&lp)
+        .unwrap()
+        .pop()
+        .unwrap();
+    assert_eq!(
+        balance.collateral,
+        NonZero::new(Collateral::from_str("100").unwrap()).unwrap()
+    );
+
+    match market.query_countertrade_has_work().unwrap() {
+        HasWorkResp::Work {
+            desc:
+                WorkDescription::OpenPosition {
+                    direction: DirectionToBase::Short,
+                    collateral,
+                    ..
+                },
+        } => {
+            assert_eq!(
+                collateral.raw(),
+                Collateral::from_str("1.615376150827128342").unwrap()
+            );
+        }
+        has_work => panic!("Unexpected has_work: {has_work:?}"),
+    }
+
+    market.exec_countertrade_do_work().unwrap();
+
+    // Calculate before deffereed execution so that DNF fee doesn't
+    // influence the available total
+    let balance = market
+        .query_countertrade_balances(&lp)
+        .unwrap()
+        .pop()
+        .unwrap();
+    // 100 - 1.61 = 98.39
+    assert_eq!(balance
+        .collateral
+        .raw()
+        .diff(Collateral::from_str("98.39").unwrap()), Collateral::from_str("0.005376150827128342").unwrap());
 }
