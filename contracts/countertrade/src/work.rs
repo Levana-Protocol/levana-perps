@@ -484,16 +484,16 @@ fn compute_delta_notional(
     let (deposit_collateral, leverage) =
         optimize_capital_efficiency(position_notional_size_in_collateral, desired_leverage)?;
 
+    let deposit_collateral = NonZero::new(deposit_collateral)
+        .context("collateral is zero")?
+        .min(available_collateral);
+
     let min_deposit_collateral = price.usd_to_collateral(status.config.minimum_deposit_usd);
-    if deposit_collateral < min_deposit_collateral {
+    if deposit_collateral.into_decimal256() < min_deposit_collateral.into_decimal256() {
         // Market is skewed, and deserves to be balanced, but the size of the skew
         // is tiny. Wait for the market to have more interest before intervening.
         return Ok(None);
     }
-
-    let deposit_collateral = NonZero::new(deposit_collateral)
-        .context("collateral is zero")?
-        .min(available_collateral);
 
     let (direction, leverage) = leverage.into_base(status.market_type)?.split();
 
