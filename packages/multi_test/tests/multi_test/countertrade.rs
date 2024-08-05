@@ -410,10 +410,11 @@ fn ignores_unbalanced_insufficient_liquidity() {
     // Now we run the countertrade contract, which will open a small position
     // Trying to run again will fail because we'll have 0 collateral left
     do_work(&market, &lp);
-    assert_eq!(
-        market.query_countertrade_has_work().unwrap(),
-        HasWorkResp::NoWork {}
-    );
+    assert!(market
+        .query_countertrade_has_work()
+        .unwrap_err()
+        .to_string()
+        .contains("zero collateral after checking"),);
 
     // And if we try to add more liquidity and try again, it should close
     // the old position and open a new position.
@@ -964,7 +965,7 @@ fn deduct_balance() {
 
     market.exec_countertrade_do_work().unwrap();
 
-    // Calculate before deffereed execution so that DNF fee doesn't
+    // Calculate before deferred execution so that DNF fee doesn't
     // influence the available total
     let balance = market
         .query_countertrade_balances(&lp)
@@ -972,8 +973,11 @@ fn deduct_balance() {
         .pop()
         .unwrap();
     // 100 - 1.61 = 98.39
-    assert_eq!(balance
-        .collateral
-        .raw()
-        .diff(Collateral::from_str("98.39").unwrap()), Collateral::from_str("0.005376150827128342").unwrap());
+    assert_eq!(
+        balance
+            .collateral
+            .raw()
+            .diff(Collateral::from_str("98.39").unwrap()),
+        Collateral::from_str("0.005376150827128342").unwrap()
+    );
 }
