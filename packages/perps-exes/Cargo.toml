@@ -21,6 +21,7 @@ pyth-sdk-cw = { workspace = true }
 tokio = { version = "1.34.0", default-features = false, features = [
 	"time",
 	"rt",
+	"rt-multi-thread",
 	"macros",
 	"process",
 	"tracing",

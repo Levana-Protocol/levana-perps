@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use cosmos::{
-    proto::cosmos::base::abci::v1beta1::TxResponse, Address, Contract, HasAddress, Wallet,
-};
+use cosmos::{proto::cosmos::base::abci::v1beta1::TxResponse, Address, Contract, HasAddress};
 use msg::{
     contracts::faucet::entry::{
         ExecuteMsg, FaucetAsset, IneligibleReason, MultitapRecipient, QueryMsg, TapEligibleResponse,
@@ -11,7 +9,7 @@ use msg::{
 };
 use tokio::sync::mpsc::error::TrySendError;
 
-use super::{App, AppBuilder};
+use super::{App, AppBuilder, WalletPool};
 
 impl AppBuilder {
     pub(super) fn launch_faucet_task(&mut self, runner: FaucetBotRunner) {
@@ -21,7 +19,6 @@ impl AppBuilder {
 }
 
 pub(crate) struct FaucetBot {
-    wallet_address: Address,
     hcaptcha_secret: String,
     tx: tokio::sync::mpsc::Sender<TapRequest>,
     faucet: Address,
@@ -29,23 +26,18 @@ pub(crate) struct FaucetBot {
 
 impl FaucetBot {
     pub(crate) fn new(
-        wallet: Wallet,
         hcaptcha_secret: String,
         faucet: Address,
+        pool: WalletPool,
     ) -> (Self, FaucetBotRunner) {
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         let bot = FaucetBot {
-            wallet_address: wallet.get_address(),
             hcaptcha_secret,
             tx,
             faucet,
         };
-        let runner = FaucetBotRunner { wallet, rx, faucet };
+        let runner = FaucetBotRunner { rx, faucet, pool };
         (bot, runner)
-    }
-
-    pub(crate) fn get_wallet_address(&self) -> Address {
-        self.wallet_address
     }
 
     pub(crate) fn get_hcaptcha_secret(&self) -> &String {
@@ -142,9 +134,9 @@ pub(crate) enum FaucetTapError {
 }
 
 pub(crate) struct FaucetBotRunner {
-    wallet: Wallet,
     rx: tokio::sync::mpsc::Receiver<TapRequest>,
     faucet: Address,
+    pool: WalletPool,
 }
 
 impl FaucetBotRunner {
@@ -209,7 +201,7 @@ impl FaucetBotRunner {
     ) -> cosmos::Result<TxResponse> {
         contract
             .execute(
-                &self.wallet,
+                &*self.pool.get().await,
                 vec![],
                 ExecuteMsg::Multitap {
                     recipients: reqs.iter().map(|x| x.into()).collect(),

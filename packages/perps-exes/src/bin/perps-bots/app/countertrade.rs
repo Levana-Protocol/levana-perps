@@ -5,7 +5,6 @@ use axum::async_trait;
 use cosmos::{Address, Contract, Wallet};
 use msg::contracts::countertrade::HasWorkResp;
 use shared::storage::MarketId;
-use tokio::sync::Mutex;
 
 use crate::{
     config::CounterTradeBotConfig,
@@ -16,7 +15,6 @@ use crate::{
 use super::{factory::FactoryInfo, App, AppBuilder};
 
 pub(crate) struct CounterTradeBot {
-    pub(crate) wallet: Arc<Mutex<Wallet>>,
     pub(crate) contract: Address,
 }
 
@@ -24,7 +22,6 @@ impl AppBuilder {
     pub(super) fn start_countertrade_bot(&mut self, config: CounterTradeBotConfig) -> Result<()> {
         let bot = CounterTradeBot {
             contract: config.contract,
-            wallet: config.wallet,
         };
         self.watch_periodic(
             crate::watcher::TaskLabel::CounterTradeBot,
@@ -59,7 +56,7 @@ async fn single_market(
     match work {
         HasWorkResp::NoWork {} => Ok(WatchedTaskOutput::new("No work present")),
         HasWorkResp::Work { desc } => {
-            let wallet = bot.wallet.lock().await;
+            let wallet = app.get_pool_wallet().await;
             do_countertrade_work(&contract, market_id, &wallet, &desc).await
         }
     }

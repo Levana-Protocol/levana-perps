@@ -308,10 +308,10 @@ pub struct LiquidityBounds {
 pub struct DeploymentConfigTestnet {
     /// How many crank run wallets to set up
     #[serde(default)]
-    pub crank: u32,
+    pub crank: usize,
     /// How many ultracrank wallets to set up
     #[serde(default)]
-    pub ultra_crank: u32,
+    pub ultra_crank: usize,
     /// How many seconds behind we need to be before we kick in the ultracrank
     #[serde(default = "defaults::seconds_till_ultra")]
     pub seconds_till_ultra: u32,

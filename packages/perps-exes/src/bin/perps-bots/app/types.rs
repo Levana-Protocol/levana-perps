@@ -1,14 +1,17 @@
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Display;
+use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
+use async_channel::TrySendError;
 use bigdecimal::BigDecimal;
 use chrono::DateTime;
 use chrono::Utc;
-use cosmos::{Address, HasAddress};
+use cosmos::error::WalletError;
+use cosmos::{Address, AddressHrp, HasAddress, SeedPhrase};
 use cosmos::{Coin, Cosmos};
 use cosmos::{DynamicGasMultiplier, Wallet};
 use parking_lot::Mutex;
@@ -19,7 +22,7 @@ use tokio::sync::RwLock;
 
 use crate::app::factory::{get_factory_info_mainnet, get_factory_info_testnet};
 use crate::cli::Opt;
-use crate::config::{BotConfig, BotConfigByType, BotConfigTestnet};
+use crate::config::{BotConfig, BotConfigByType, FullBotConfig};
 use crate::wallet_manager::ManagedWallet;
 use crate::watcher::Watcher;
 
@@ -141,6 +144,7 @@ pub(crate) struct App {
     pub(crate) pyth_market_hours: PythMarketHours,
     pub(crate) opt: Opt,
     pub(crate) epoch_last_seen: Mutex<Option<Instant>>,
+    pub(crate) wallet_pool: WalletPool,
 }
 
 /// Helper data structure for building up an application.
@@ -148,6 +152,7 @@ pub(crate) struct AppBuilder {
     pub(crate) app: Arc<App>,
     pub(crate) watcher: Watcher,
     pub(crate) gas_check: GasCheckBuilder,
+    pub(crate) wallet_provider: WalletProvider,
 }
 
 impl Opt {
@@ -198,7 +203,13 @@ impl Opt {
     }
 
     pub(crate) async fn into_app_builder(self) -> Result<AppBuilder> {
-        let (config, faucet_bot_runner) = self.get_bot_config()?;
+        let FullBotConfig {
+            config,
+            faucet_bot: faucet_bot_runner,
+            provider: wallet_provider,
+            pool: wallet_pool,
+            gas_check,
+        } = self.get_bot_config()?;
         let client = Client::builder()
             .user_agent("perps-bots")
             .timeout(Duration::from_secs(config.http_timeout_seconds.into()))
@@ -272,12 +283,14 @@ impl Opt {
             pyth_market_hours: Default::default(),
             opt,
             epoch_last_seen: Mutex::new(None),
+            wallet_pool,
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {
-            gas_check: GasCheckBuilder::new(app.config.gas_wallet.clone()),
+            gas_check,
             app,
             watcher: Watcher::default(),
+            wallet_provider,
         };
         if let Some(faucet_bot_runner) = faucet_bot_runner {
             builder.launch_faucet_task(faucet_bot_runner);
@@ -320,12 +333,8 @@ impl AppBuilder {
     }
 
     /// Get a wallet from the wallet manager and track its gas funds.
-    pub(crate) fn get_track_wallet(
-        &mut self,
-        testnet: &BotConfigTestnet,
-        desc: ManagedWallet,
-    ) -> Result<Wallet> {
-        let wallet = testnet.wallet_manager.get_wallet(desc)?;
+    pub(crate) fn get_track_wallet(&mut self, desc: ManagedWallet) -> Result<Wallet> {
+        let wallet = self.wallet_provider.next()?;
         self.refill_gas(wallet.get_address(), GasCheckWallet::Managed(desc))?;
         Ok(wallet)
     }
@@ -357,6 +366,11 @@ impl App {
             .write()
             .await = Arc::new(info);
         Ok(())
+    }
+
+    /// Borrow a wallet from the shared pool of wallets.
+    pub(crate) async fn get_pool_wallet(&self) -> WalletGuard {
+        self.wallet_pool.get().await
     }
 }
 
@@ -462,5 +476,91 @@ impl Display for GasLevel {
             GasLevel::High => "high",
             GasLevel::VeryHigh => "very high",
         })
+    }
+}
+
+/// Provides a set of wallets that can be used for non-wallet-specific tasks.
+#[derive(Clone)]
+pub(crate) struct WalletPool {
+    tx: async_channel::Sender<Wallet>,
+    rx: async_channel::Receiver<Wallet>,
+}
+impl WalletPool {
+    pub(crate) async fn get(&self) -> WalletGuard {
+        let wallet = self.rx.recv().await.unwrap();
+        WalletGuard {
+            wallet,
+            tx: self.tx.clone(),
+        }
+    }
+
+    pub(crate) fn new(
+        count: usize,
+        provider: &mut WalletProvider,
+        check: &mut GasCheckBuilder,
+        min_gas: GasAmount,
+    ) -> Result<WalletPool> {
+        let (tx, rx) = async_channel::bounded(count);
+        for index in 1..=count {
+            let wallet = provider.next()?;
+            check.add(
+                wallet.get_address(),
+                GasCheckWallet::Pool(index),
+                min_gas,
+                true,
+            )?;
+            tx.try_send(wallet).unwrap();
+        }
+        Ok(WalletPool { tx, rx })
+    }
+}
+
+/// Provides numbered wallets from a seed phrase
+pub(crate) struct WalletProvider {
+    seed: SeedPhrase,
+    next_index: u64,
+    hrp: AddressHrp,
+}
+
+impl WalletProvider {
+    pub(crate) fn new(seed: SeedPhrase, hrp: AddressHrp) -> Self {
+        WalletProvider {
+            seed,
+            next_index: 0,
+            hrp,
+        }
+    }
+
+    pub(crate) fn next(&mut self) -> Result<Wallet, WalletError> {
+        let path = self.hrp.default_derivation_path_with_index(self.next_index);
+        self.next_index += 1;
+        self.seed
+            .clone()
+            .with_derivation_path(Some(path))
+            .with_hrp(self.hrp)
+    }
+}
+
+/// Smart wrapper that handles recycling of wallets.
+pub(crate) struct WalletGuard {
+    wallet: Wallet,
+    tx: async_channel::Sender<Wallet>,
+}
+
+impl Drop for WalletGuard {
+    fn drop(&mut self) {
+        match self.tx.try_send(self.wallet.clone()) {
+            Ok(()) => (),
+            Err(TrySendError::Full(_)) => unreachable!(),
+            Err(TrySendError::Closed(_)) => (),
+        }
+    }
+}
+
+impl Deref for WalletGuard {
+    type Target = Wallet;
+
+    fn deref(&self) -> &Self::Target {
+        &self.wallet
     }
 }

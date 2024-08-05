@@ -27,29 +27,23 @@ pub(crate) struct GasCheckBuilder {
 /// Description of which wallet is being tracked
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
 pub(crate) enum GasCheckWallet {
-    FaucetBot,
     FaucetContract,
     GasWallet,
     WalletManager,
-    Crank(usize),
-    Price,
     Managed(ManagedWallet),
-    UltraCrank(usize),
     HighGas,
+    Pool(usize),
 }
 
 impl Display for GasCheckWallet {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            GasCheckWallet::FaucetBot => write!(f, "Faucet bot"),
             GasCheckWallet::FaucetContract => write!(f, "Faucet contract"),
             GasCheckWallet::GasWallet => write!(f, "Gas wallet"),
             GasCheckWallet::WalletManager => write!(f, "Wallet manager"),
-            GasCheckWallet::Crank(x) => write!(f, "Crank #{x}"),
-            GasCheckWallet::Price => write!(f, "Price"),
             GasCheckWallet::Managed(x) => write!(f, "{x}"),
-            GasCheckWallet::UltraCrank(x) => write!(f, "Ultra crank #{x}"),
             GasCheckWallet::HighGas => write!(f, "High gas"),
+            GasCheckWallet::Pool(x) => write!(f, "Pool {x}"),
         }
     }
 }

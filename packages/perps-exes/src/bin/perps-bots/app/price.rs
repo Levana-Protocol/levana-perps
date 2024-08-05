@@ -37,13 +37,11 @@ use crate::{
 
 use super::{
     crank_run::TriggerCrank,
-    gas_check::GasCheckWallet,
     high_gas::{HighGasTrigger, HighGasWork},
     App, AppBuilder, CrankTriggerReason, GasLevel,
 };
 
 struct Worker {
-    wallet: Arc<Wallet>,
     stats: HashMap<MarketId, ReasonStats>,
     trigger_crank: TriggerCrank,
     high_gas_trigger: Option<HighGasTrigger>,
@@ -61,13 +59,11 @@ impl Worker {
 /// Start the background thread to keep options pools up to date.
 impl AppBuilder {
     pub(super) fn start_price(&mut self, trigger_crank: TriggerCrank) -> Result<()> {
-        if let Some(price_wallet) = self.app.config.price_wallet.clone() {
+        if self.app.config.run_price_task {
             let high_gas_trigger = self.start_high_gas()?;
-            self.refill_gas(price_wallet.get_address(), GasCheckWallet::Price)?;
             self.watch_periodic(
                 crate::watcher::TaskLabel::Price,
                 Worker {
-                    wallet: price_wallet,
                     stats: HashMap::new(),
                     trigger_crank,
                     high_gas_trigger,
@@ -235,11 +231,11 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                 trigger: markets_to_crank.to_vec(),
             };
 
-            let tx =
-                construct_multi_message(&multi_message, &worker.wallet, &app, &offchain_price_data)
-                    .await?;
+            let wallet = app.get_pool_wallet().await;
+            let tx = construct_multi_message(&multi_message, &wallet, &app, &offchain_price_data)
+                .await?;
 
-            let result = process_cosmos_tx(tx, &app, &worker.wallet).await;
+            let result = process_cosmos_tx(tx, &app, &wallet).await;
             match result {
                 Ok(res) => {
                     successes.push(res);
@@ -258,7 +254,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
 
                     let mut builder = TxBuilder::default();
                     if let Some(oracle_msg) = price_get_update_oracles_msg(
-                        &worker.wallet,
+                        &wallet,
                         &app,
                         &multi_message.markets[..],
                         &offchain_price_data,
@@ -267,7 +263,7 @@ async fn run_price_update(worker: &mut Worker, app: Arc<App>) -> Result<WatchedT
                     {
                         builder.add_message(oracle_msg);
 
-                        let result = process_cosmos_tx(builder, &app, &worker.wallet).await;
+                        let result = process_cosmos_tx(builder, &app, &wallet).await;
                         match result {
                             Ok(res) => {
                                 successes.push(res);

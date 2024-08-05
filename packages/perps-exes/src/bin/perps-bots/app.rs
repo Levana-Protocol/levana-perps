@@ -5,7 +5,7 @@ mod countertrade;
 mod crank_run;
 pub(crate) mod factory;
 pub(crate) mod faucet;
-mod gas_check;
+pub(crate) mod gas_check;
 mod high_gas;
 mod liquidity;
 mod liquidity_transaction;
@@ -68,10 +68,6 @@ impl AppBuilder {
             BotConfigByType::Testnet { inner } => {
                 // Deal with the borrow checker by not keeping a reference to self borrowed
                 let inner = inner.clone();
-
-                // Establish some gas checks
-                let faucet_bot_address = inner.faucet_bot.get_wallet_address();
-                self.refill_gas(faucet_bot_address, GasCheckWallet::FaucetBot)?;
 
                 self.alert_on_low_gas(
                     inner.faucet,

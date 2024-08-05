@@ -29,12 +29,10 @@ use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
 use self::trigger_crank::{CrankReceiver, CrankWorkItem};
 
-use super::gas_check::GasCheckWallet;
 use super::{App, AppBuilder, GasLevel};
 pub(crate) use trigger_crank::TriggerCrank;
 
 struct Worker {
-    crank_wallet: Wallet,
     recv: CrankReceiver,
 }
 pub(crate) enum RunResult {
@@ -47,25 +45,15 @@ pub(crate) enum RunResult {
 /// Start the background thread to turn the crank on the crank bots.
 impl AppBuilder {
     pub(super) fn start_crank_run(&mut self) -> Result<Option<TriggerCrank>> {
-        if self.app.config.crank_wallets.is_empty() {
+        if self.app.config.crank_tasks == 0 {
             return Ok(None);
         }
 
         let recv = CrankReceiver::new();
 
-        let crank_wallets = self.app.config.crank_wallets.clone();
-
-        for (idx, crank_wallet) in crank_wallets.into_iter().enumerate() {
-            self.refill_gas(crank_wallet.get_address(), GasCheckWallet::Crank(idx + 1))?;
-
-            let worker = Worker {
-                crank_wallet,
-                recv: recv.clone(),
-            };
-            self.watch_periodic(
-                crate::watcher::TaskLabel::CrankRun { index: idx + 1 },
-                worker,
-            )?;
+        for index in 1..=self.app.config.crank_tasks {
+            let worker = Worker { recv: recv.clone() };
+            self.watch_periodic(crate::watcher::TaskLabel::CrankRun { index }, worker)?;
         }
 
         Ok(Some(recv.trigger))
@@ -75,18 +63,14 @@ impl AppBuilder {
 #[async_trait]
 impl WatchedTask for Worker {
     async fn run_single(&mut self, app: Arc<App>, _: Heartbeat) -> Result<WatchedTaskOutput> {
-        app.crank_receive(&self.crank_wallet, &self.recv).await
+        app.crank_receive(&self.recv).await
     }
 }
 
 const CRANK_EXECS: &[u32] = &[7, 4, 1];
 
 impl App {
-    async fn crank_receive(
-        &self,
-        crank_wallet: &Wallet,
-        recv: &CrankReceiver,
-    ) -> Result<WatchedTaskOutput> {
+    async fn crank_receive(&self, recv: &CrankReceiver) -> Result<WatchedTaskOutput> {
         let CrankWorkItem {
             address: market,
             id: market_id,
@@ -97,7 +81,13 @@ impl App {
         } = recv.receive_work().await?;
         let start_crank = Instant::now();
         let run_result = self
-            .crank(crank_wallet, market, &market_id, reason, None)
+            .crank(
+                &*self.get_pool_wallet().await,
+                market,
+                &market_id,
+                reason,
+                None,
+            )
             .await?;
 
         // Successfully cranked, check if there's more work and, if so, schedule it to be started again
