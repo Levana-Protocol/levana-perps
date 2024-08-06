@@ -76,6 +76,7 @@ jobs:
       - name: Rustfmt
         run: just cargo-fmt-check
       - name: Cache docker images
+        if: ${{ (steps.contracts.outputs.contracts == 'true' || github.ref == 'refs/heads/main') }}
         run: just cache-docker-images
       - name: Typescript check
         run: just typescript-check
