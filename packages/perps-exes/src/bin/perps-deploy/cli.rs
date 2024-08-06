@@ -187,6 +187,7 @@ impl Opt {
         tracing_subscriber::registry()
             .with(
                 fmt::Layer::default()
+                    .with_writer(std::io::stderr)
                     .log_internal_errors(true)
                     .and_then(env_filter),
             )

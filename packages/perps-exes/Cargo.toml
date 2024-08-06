@@ -78,6 +78,7 @@ headers = "0.4.0"
 tower = "0.4.13"
 figment = { version = "0.10.19", features = ["env", "yaml", "toml"] }
 toml = "0.8.12"
+backon = "0.4.4"
 
 [features]
 default = []
