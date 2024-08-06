@@ -106,14 +106,16 @@ pub(crate) async fn store_code(
     contract_types: &[&str],
 ) -> Result<()> {
     let gitrev = opt.get_gitrev()?;
-    log::info!("Compiled WASM comes from gitrev {gitrev}");
+    tracing::info!("Compiled WASM comes from gitrev {gitrev}");
 
     for ct in contract_types.iter().copied() {
         let path = opt.get_contract_path(ct);
         let hash = get_hash_for_path(&path)?;
         match tracker.get_code_by_hash(hash.clone()).await? {
             CodeIdResp::NotFound {} => {
-                log::info!("Contract {ct} has SHA256 {hash} and is not on blockchain, uploading");
+                tracing::info!(
+                    "Contract {ct} has SHA256 {hash} and is not on blockchain, uploading"
+                );
                 let code_id = {
                     let cosmos = match cosmos.get_address_hrp().as_str() {
                         // Gas caps on Sei, need to use an aggressive multiplier
@@ -126,11 +128,13 @@ pub(crate) async fn store_code(
                     };
                     cosmos.store_code_path(wallet, &path).await?.get_code_id()
                 };
-                log::info!("Upload complete, new code ID is {code_id}, logging with the tracker");
+                tracing::info!(
+                    "Upload complete, new code ID is {code_id}, logging with the tracker"
+                );
                 let res = tracker
                     .store_code(wallet, ct.to_owned(), code_id, hash, gitrev.clone())
                     .await?;
-                log::info!(
+                tracing::info!(
                     "Contract stored, tracked in tracker with txhash {}",
                     res.txhash
                 );
@@ -144,7 +148,7 @@ pub(crate) async fn store_code(
             } => {
                 anyhow::ensure!(contract_type == ct);
                 anyhow::ensure!(hash == hash2);
-                log::info!("Contract {ct} with SHA256 {hash} already uploaded with code ID {code_id} at {tracked_at} (from gitrev: {gitrev:?})");
+                tracing::info!("Contract {ct} with SHA256 {hash} already uploaded with code ID {code_id} at {tracked_at} (from gitrev: {gitrev:?})");
             }
         }
     }

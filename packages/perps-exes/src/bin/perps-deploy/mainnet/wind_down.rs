@@ -74,7 +74,7 @@ async fn go(
     } else {
         factory.query_wind_down().await?
     };
-    log::info!("CW3 contract: {wind_down}");
+    tracing::info!("CW3 contract: {wind_down}");
 
     let msg = CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
         contract_addr: factory.get_address_string(),
@@ -89,7 +89,7 @@ async fn go(
             },
         })?,
     });
-    log::info!("Message: {}", serde_json::to_string(&msg)?);
+    tracing::info!("Message: {}", serde_json::to_string(&msg)?);
 
     let mut builder = TxBuilder::default();
     add_cosmos_msg(&mut builder, wind_down, &msg)?;
@@ -97,8 +97,8 @@ async fn go(
         .simulate(&app.cosmos, &[wind_down])
         .await
         .context("Error while simulating")?;
-    log::info!("Successfully simulated messages");
-    log::debug!("Simulate response: {res:?}");
+    tracing::info!("Successfully simulated messages");
+    tracing::debug!("Simulate response: {res:?}");
 
     Ok(())
 }

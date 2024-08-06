@@ -104,10 +104,10 @@ async fn go(
     let mut signers = vec![];
 
     if !factory_msgs.is_empty() {
-        log::info!("Update factory message");
+        tracing::info!("Update factory message");
         let owner = factory.query_owner().await?;
-        log::info!("CW3 contract: {owner}");
-        log::info!(
+        tracing::info!("CW3 contract: {owner}");
+        tracing::info!(
             "Message: {}",
             message_string(&factory_msgs, wrapped, &title, &desc)?
         );
@@ -183,15 +183,15 @@ async fn go(
     }
 
     if !msgs.is_empty() {
-        log::info!("Migrate existing markets");
-        log::info!("CW3 contract: {migration_admin}");
+        tracing::info!("Migrate existing markets");
+        tracing::info!("CW3 contract: {migration_admin}");
         signers.push(migration_admin);
 
         let chunks = msgs.chunks(30);
         let chunk_count = chunks.len();
         for (idx, msgs) in chunks.enumerate() {
             let idx = idx + 1;
-            log::info!(
+            tracing::info!(
                 "Message {idx}/{chunk_count}: {}",
                 message_string(msgs, wrapped, &title, &desc)?
             );
@@ -202,14 +202,14 @@ async fn go(
     }
 
     if signers.is_empty() {
-        log::info!("No messages generated");
+        tracing::info!("No messages generated");
     } else {
         let res = builder
             .simulate(&app.cosmos, &signers)
             .await
             .context("Unable to simulate CW3 messages")?;
-        log::info!("Successfully simulated messages, used {} gas", res.gas_used);
-        log::debug!("Full simulate response: {res:?}");
+        tracing::info!("Successfully simulated messages, used {} gas", res.gas_used);
+        tracing::debug!("Full simulate response: {res:?}");
     }
 
     Ok(())

@@ -4,7 +4,6 @@ use anyhow::{Context, Result};
 use bigdecimal::{BigDecimal, Zero};
 use chrono::{DateTime, Utc};
 use cosmos::{Address, Cosmos};
-use log::info;
 
 #[derive(clap::Parser)]
 pub(crate) struct Opt {
@@ -44,7 +43,7 @@ impl Opt {
         let mut csv = csv::Writer::from_path(&self.csv)?;
         let mut old_balance = BigDecimal::zero();
         for _ in 0..self.total_datapoints {
-            info!("Collecting datapoint at height {next_height}");
+            tracing::info!("Collecting datapoint at height {next_height}");
             let cosmos = cosmos.clone();
             let cosmos = cosmos.at_height(Some(next_height.try_into()?));
             let timestamp = cosmos.get_block_info(next_height).await?.timestamp;

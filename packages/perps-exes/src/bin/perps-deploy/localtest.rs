@@ -46,12 +46,12 @@ fn kill_osmo_local() {
     {
         Ok(ec) => {
             if ec.success() {
-                log::info!("Successfully killed osmolocal");
+                tracing::info!("Successfully killed osmolocal");
             } else {
-                log::info!("Killing osmolocal exited with {ec:?}");
+                tracing::info!("Killing osmolocal exited with {ec:?}");
             }
         }
-        Err(e) => log::info!("Problem killing osmolocal: {e:?}"),
+        Err(e) => tracing::info!("Problem killing osmolocal: {e:?}"),
     }
 }
 
@@ -64,7 +64,7 @@ impl Drop for OsmoLocalProcess {
 impl OsmoLocalProcess {
     fn launch() -> Result<Self> {
         kill_osmo_local();
-        log::info!("Going to spawn new osmolocal");
+        tracing::info!("Going to spawn new osmolocal");
         Ok(OsmoLocalProcess(
             Command::new("./.ci/osmolocal.sh")
                 .arg("--no-terminal")
@@ -91,11 +91,11 @@ pub(crate) async fn go(opt: Opt, opts: TestsOpt) -> Result<()> {
     let network = opts.network;
 
     if let Some(ol) = &mut ol {
-        log::info!("Waiting till Network is up");
+        tracing::info!("Waiting till Network is up");
         wait_till_network_is_up(raw_wallet.clone(), network, ol).await?;
     }
 
-    log::info!("Going to Deploy");
+    tracing::info!("Going to Deploy");
 
     let InstantiateResponse {
         factory,
@@ -134,7 +134,7 @@ async fn wait_till_network_is_up(
 
     for counter in 1..=total_counter {
         if counter % 10 == 0 {
-            log::info!("Trying to connect to the network ({counter}/{total_counter})");
+            tracing::info!("Trying to connect to the network ({counter}/{total_counter})");
         }
 
         if let Some(exit_status) = ol.0.try_wait()? {

@@ -307,7 +307,7 @@ async fn store_perps_contracts(
         anyhow::ensure!(entry.contract_type == contract_type, "Mismatched contract type for SHA256 {hash}. Expected: {contract_type:?}. Found in file: {:?}", entry.contract_type);
         match entry.code_ids.get(&network) {
             Some(code_id) => {
-                log::info!("{contract_type:?} already found under code ID {code_id}");
+                tracing::info!("{contract_type:?} already found under code ID {code_id}");
             }
             None => {
                 let code_id = match code_id {
@@ -316,11 +316,11 @@ async fn store_perps_contracts(
                             to_upload.len() == 1,
                             "Can only provide a code ID if there is exactly one to-upload value"
                         );
-                        log::info!("Using code ID from the command line: {code_id}");
+                        tracing::info!("Using code ID from the command line: {code_id}");
                         code_id
                     }
                     None => {
-                        log::info!("Storing {contract_type:?}...");
+                        tracing::info!("Storing {contract_type:?}...");
                         let code_id = match granter {
                             None => app.cosmos.store_code_path(wallet, &contract_path).await?,
                             Some(granter) => {
@@ -330,7 +330,7 @@ async fn store_perps_contracts(
                                     .1
                             }
                         };
-                        log::info!("New code ID: {code_id}");
+                        tracing::info!("New code ID: {code_id}");
                         code_id.get_code_id()
                     }
                 };
@@ -407,7 +407,7 @@ async fn instantiate_factory(
     let position = code_ids.get_simple(ContractType::PositionToken, &opt, network)?;
     let liquidity = code_ids.get_simple(ContractType::LiquidityToken, &opt, network)?;
     let factory = app.cosmos.make_code_id(factory_code_id);
-    log::info!("Instantiating a factory using code ID {factory_code_id}");
+    tracing::info!("Instantiating a factory using code ID {factory_code_id}");
     let migration_admin = migration_admin.unwrap_or(owner);
     let factory = factory
         .instantiate(
@@ -428,7 +428,7 @@ async fn instantiate_factory(
             ContractAdmin::Addr(migration_admin),
         )
         .await?;
-    log::info!("Deployed fresh factory contract to: {factory}");
+    tracing::info!("Deployed fresh factory contract to: {factory}");
 
     factories.factories.push(MainnetFactory {
         address: factory.get_address(),
@@ -539,17 +539,17 @@ async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpt
         }));
     }
 
-    log::info!("Need to make a proposal");
+    tracing::info!("Need to make a proposal");
 
-    log::info!("CW3 contract: {owner}");
-    log::info!("Message: {}", serde_json::to_string(&msgs)?);
+    tracing::info!("CW3 contract: {owner}");
+    tracing::info!("Message: {}", serde_json::to_string(&msgs)?);
 
     let simres = simtx
         .simulate(&app.cosmos, &[owner])
         .await
         .context("Could not simulate message")?;
-    log::info!("Simulation completed successfully");
-    log::debug!("Simulation response: {simres:?}");
+    tracing::info!("Simulation completed successfully");
+    tracing::debug!("Simulation response: {simres:?}");
 
     Ok(())
 }
@@ -559,7 +559,7 @@ async fn validate_spot_price_config(
     spot_price: &SpotPriceConfigInit,
     market_id: &MarketId,
 ) -> Result<()> {
-    log::info!("Validating spot price config for {market_id}");
+    tracing::info!("Validating spot price config for {market_id}");
 
     match spot_price {
         SpotPriceConfigInit::Manual { .. } => {
@@ -615,7 +615,7 @@ async fn validate_spot_price_config(
                                 format!("Could not convert {update_time} to DateTime<Utc>")
                             })?;
                         let age = Utc::now().signed_duration_since(update_time);
-                        log::info!(
+                        tracing::info!(
                             "Queried Stride contract {stride} with denom {denom}, got redemption rate of {redemption_rate} updated {update_time} (age: {age:?})"
                         );
                         anyhow::ensure!(redemption_rate >= Decimal256::one(), "Redemption rates should always be at least 1, very likely the contract has the purchase rate instead. See: https://blog.levana.finance/milktia-market-mispricing-proposed-solution-6a994e9ecdfa");
@@ -636,7 +636,7 @@ async fn validate_spot_price_config(
                         }
                         let contract = cosmos.make_contract(contract.as_str().parse()?);
                         let res: serde_json::Value = contract.query(SimpleQuery::Price {}).await?;
-                        log::info!(
+                        tracing::info!(
                             "Queried simple contract {contract}, got result {}",
                             serde_json::to_string(&res)?
                         );

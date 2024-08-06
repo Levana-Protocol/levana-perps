@@ -21,7 +21,7 @@ async fn main_inner() -> Result<()> {
     Pid1Settings::new().enable_log(true).launch()?;
     dotenv::dotenv().ok();
     let opt = Opt::parse();
-    opt.init_logger();
+    opt.init_logger()?;
     let app = App::new(opt).await?;
     app.migrate_db().await?;
     endpoints::launch(app).await

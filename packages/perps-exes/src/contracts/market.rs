@@ -454,16 +454,16 @@ impl MarketContract {
     pub async fn crank(&self, wallet: &Wallet, rewards: Option<RawAddr>) -> Result<()> {
         let mut status = self.status().await?;
         while status.next_crank.is_some() || status.deferred_execution_items != 0 {
-            log::info!("Crank started");
+            tracing::info!("Crank started");
             let execute_msg = MarketExecuteMsg::Crank {
                 execs: None,
                 rewards: rewards.clone(),
             };
             let tx = self.0.execute(wallet, vec![], execute_msg).await?;
-            log::info!("{}", tx.txhash);
+            tracing::info!("{}", tx.txhash);
             status = self.status().await?;
         }
-        log::info!("Cranking finished");
+        tracing::info!("Cranking finished");
         Ok(())
     }
 
@@ -522,7 +522,7 @@ impl MarketContract {
             bail!("No updated required since collateral is same");
         }
         if collateral.into_number() > active_collateral {
-            log::info!("Increasing the collateral");
+            tracing::info!("Increasing the collateral");
 
             let execute_msg = match impact {
                 UpdatePositionCollateralImpact::Leverage => {
@@ -543,7 +543,7 @@ impl MarketContract {
             self.exec_with_funds(wallet, &status, collateral, &execute_msg)
                 .await
         } else {
-            log::info!("Decreasing the collateral");
+            tracing::info!("Decreasing the collateral");
             let diff_collateral = active_collateral.checked_sub(collateral.into_number())?;
             let amount: NonZero<Collateral> = {
                 // for collateral removal, we need to be sure we're not hitting
@@ -561,7 +561,7 @@ impl MarketContract {
                 NonZero::new(amount).context("zero after conversion")?
             };
 
-            log::debug!("Diff collateral: {}", amount);
+            tracing::debug!("Diff collateral: {}", amount);
             let execute_msg = match impact {
                 UpdatePositionCollateralImpact::Leverage => {
                     MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { id, amount }

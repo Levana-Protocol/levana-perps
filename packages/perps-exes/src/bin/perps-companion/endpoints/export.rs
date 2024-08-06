@@ -514,7 +514,7 @@ impl PerpsContract {
                     msg: format!("{:?}", msg),
                     query_type,
                 };
-                log::error!("Attempt #{attempt}: {e}. {source:?}");
+                tracing::error!("Attempt #{attempt}: {e}. {source:?}");
                 e
             });
 
