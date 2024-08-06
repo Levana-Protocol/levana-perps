@@ -72,7 +72,7 @@ async fn do_countertrade_work(
     let response = contract.execute(wallet, vec![], execute_msg).await;
     match response {
         Ok(response) => Ok(WatchedTaskOutput::new(format!(
-            "Succesfully exected {work} in {}",
+            "Successfully executed {work} in {}",
             response.txhash
         ))),
         Err(err) => Ok(WatchedTaskOutput::new(format!("Failed doing {work:?}: {err}")).set_error()),
