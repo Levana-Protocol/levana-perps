@@ -106,16 +106,14 @@ async fn go(
                         })
                         .await?
                 }
-                None => {
-                    markets
-                        .retry(&ConstantBuilder::default())
-                        .notify(|err, dur| {
-                            tracing::error!(
-                                "Retrying dd after {dur:?}, Received error during market fetch: {err}"
-                            )
-                        })
-                        .await?
-                }
+                None => markets
+                    .retry(&ConstantBuilder::default())
+                    .notify(|err, dur| {
+                        tracing::error!(
+                            "Retrying dd after {dur:?}, Received error during market fetch: {err}"
+                        )
+                    })
+                    .await?,
             };
             for MarketInfo {
                 market_id, market, ..
