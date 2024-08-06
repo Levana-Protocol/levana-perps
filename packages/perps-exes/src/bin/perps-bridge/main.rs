@@ -13,8 +13,8 @@ use tokio::{
     fs::OpenOptions,
     net::{TcpListener, TcpStream},
 };
-use tracing_subscriber::{fmt, prelude::*, EnvFilter, Layer};
 use tokio_util::task::LocalPoolHandle;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter, Layer};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
@@ -105,26 +105,25 @@ fn init_logger(ctx: &Context) -> anyhow::Result<()> {
 
     let crate_name = env!("CARGO_CRATE_NAME");
     let env_filter = match std::env::var("RUST_LOG") {
-	Ok(_) => env_filter,
-	Err(_) => {
-	    if ctx.opts.verbose {
-		env_filter
-		    .add_directive("cosmos=debug".parse()?)
-		    .add_directive(format!("{}=debug", crate_name).parse()?)
-	    } else {
-		env_filter
-		    .add_directive(format!("{}=info", crate_name).parse()?)
-	    }
-	}
+        Ok(_) => env_filter,
+        Err(_) => {
+            if ctx.opts.verbose {
+                env_filter
+                    .add_directive("cosmos=debug".parse()?)
+                    .add_directive(format!("{}=debug", crate_name).parse()?)
+            } else {
+                env_filter.add_directive(format!("{}=info", crate_name).parse()?)
+            }
+        }
     };
 
     tracing_subscriber::registry()
-	.with(
-	    fmt::Layer::default()
-		.log_internal_errors(true)
-		.and_then(env_filter),
-	)
-	.init();
+        .with(
+            fmt::Layer::default()
+                .log_internal_errors(true)
+                .and_then(env_filter),
+        )
+        .init();
 
     tracing::debug!("Debug message!");
     Ok(())

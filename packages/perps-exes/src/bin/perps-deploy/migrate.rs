@@ -191,7 +191,9 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                 .await
             {
                 Err(e) => {
-                    tracing::warn!("Unable to migrate position token contract {position_token}: {e}")
+                    tracing::warn!(
+                        "Unable to migrate position token contract {position_token}: {e}"
+                    )
                 }
                 Ok(res) => tracing::info!(
                     "Logged position token {market_id} update in tracker at: {}",
@@ -202,7 +204,9 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
 
         for (kind, lt) in [("LP", liquidity_token_lp), ("xLP", liquidity_token_xlp)] {
             if lt.info().await?.code_id == liquidity_token_code_id.get_code_id() {
-                tracing::info!("Skipping {kind} liquidity token contract migration for {market_id}");
+                tracing::info!(
+                    "Skipping {kind} liquidity token contract migration for {market_id}"
+                );
             } else {
                 lt.migrate(
                     wallet,
@@ -221,7 +225,9 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                     .await
                 {
                     Err(e) => {
-                        tracing::warn!("Unable to migrate {kind} liquidity token contract {lt}: {e}")
+                        tracing::warn!(
+                            "Unable to migrate {kind} liquidity token contract {lt}: {e}"
+                        )
                     }
                     Ok(res) => tracing::info!(
                         "Logged {kind} liquidity token {market_id} update in tracker at: {}",

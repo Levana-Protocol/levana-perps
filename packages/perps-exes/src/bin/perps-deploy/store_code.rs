@@ -113,7 +113,9 @@ pub(crate) async fn store_code(
         let hash = get_hash_for_path(&path)?;
         match tracker.get_code_by_hash(hash.clone()).await? {
             CodeIdResp::NotFound {} => {
-                tracing::info!("Contract {ct} has SHA256 {hash} and is not on blockchain, uploading");
+                tracing::info!(
+                    "Contract {ct} has SHA256 {hash} and is not on blockchain, uploading"
+                );
                 let code_id = {
                     let cosmos = match cosmos.get_address_hrp().as_str() {
                         // Gas caps on Sei, need to use an aggressive multiplier
@@ -126,7 +128,9 @@ pub(crate) async fn store_code(
                     };
                     cosmos.store_code_path(wallet, &path).await?.get_code_id()
                 };
-                tracing::info!("Upload complete, new code ID is {code_id}, logging with the tracker");
+                tracing::info!(
+                    "Upload complete, new code ID is {code_id}, logging with the tracker"
+                );
                 let res = tracker
                     .store_code(wallet, ct.to_owned(), code_id, hash, gitrev.clone())
                     .await?;

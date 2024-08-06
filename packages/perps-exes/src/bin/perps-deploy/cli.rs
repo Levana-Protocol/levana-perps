@@ -212,5 +212,4 @@ impl Opt {
         path.push(format!("levana_perpswap_cosmos_{contract_type}.wasm"));
         path
     }
-
 }
