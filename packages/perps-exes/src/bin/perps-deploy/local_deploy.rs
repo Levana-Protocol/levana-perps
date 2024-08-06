@@ -88,7 +88,7 @@ pub(crate) async fn go(
             )
             .await?;
 
-        log::info!(
+        tracing::info!(
             "New CW20 address for {} is {cw20} with code ID {cw20_code_id}",
             market_id.get_collateral()
         );
@@ -126,7 +126,7 @@ pub(crate) async fn go(
     };
 
     // And now instantiate the contracts
-    log::info!("Instantiating contracts");
+    tracing::info!("Instantiating contracts");
     let res = crate::instantiate::instantiate(InstantiateParams {
         opt: &opt,
         basic: &basic,
@@ -161,7 +161,7 @@ pub(crate) async fn go(
             )
             .await
             .context("Unable to set price")?;
-        log::info!(
+        tracing::info!(
             "Set initial price in market {} to {initial_price} in {}",
             market_id,
             set_price.txhash
@@ -176,7 +176,7 @@ pub(crate) async fn go(
                 .await;
             match spot_price {
                 Ok(spot_price) => {
-                    log::info!("New spot price {spot_price:?} active in contract");
+                    tracing::info!("New spot price {spot_price:?} active in contract");
                     break;
                 }
                 Err(_) => {

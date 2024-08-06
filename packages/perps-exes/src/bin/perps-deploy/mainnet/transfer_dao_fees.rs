@@ -44,7 +44,7 @@ async fn go(
             .await
         {
             Ok(tx) => {
-                log::info!(
+                tracing::info!(
                     "Transferred fees from market {} to DAO: {}",
                     market.market_id,
                     tx.txhash
@@ -55,7 +55,7 @@ async fn go(
                     .to_string()
                     .contains("No DAO fees available to transfer")
                 {
-                    log::info!("No DAO fees available on {}", market.market_id);
+                    tracing::info!("No DAO fees available on {}", market.market_id);
                 } else {
                     return Err(err.into());
                 }

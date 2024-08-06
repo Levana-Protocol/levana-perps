@@ -34,15 +34,15 @@ impl DisableMarketAtOpt {
             let delta = tokio::time::Duration::from_secs(delta.num_seconds().try_into()?);
             let to_sleep = tokio::time::Duration::from_secs(to_sleep.try_into()?);
 
-            log::info!("Timestamp still in the future, sleeping for: {to_sleep:?}. Total wait time: {delta:?}.");
+            tracing::info!("Timestamp still in the future, sleeping for: {to_sleep:?}. Total wait time: {delta:?}.");
             tokio::time::sleep(to_sleep).await;
         }
 
         let markets = factory.get_markets().await?;
         for market in markets {
-            log::info!("Shutting down trades in market {}", market.market_id);
+            tracing::info!("Shutting down trades in market {}", market.market_id);
             let res = factory.disable_trades(wallet, market.market_id).await?;
-            log::info!("Trades shut down in {}", res.txhash);
+            tracing::info!("Trades shut down in {}", res.txhash);
         }
         Ok(())
     }
@@ -67,9 +67,9 @@ impl CloseAllPositionsOpt {
         } in markets
         {
             let market = MarketContract::new(market);
-            log::info!("Closing all positions for {market_id}");
+            tracing::info!("Closing all positions for {market_id}");
             let res = market.close_all_positions(wallet).await?;
-            log::info!("Closed in {}", res.txhash);
+            tracing::info!("Closed in {}", res.txhash);
         }
         Ok(())
     }

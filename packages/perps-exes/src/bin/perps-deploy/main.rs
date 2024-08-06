@@ -28,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
 async fn main_inner() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
     let Cmd { opt, subcommand } = Cmd::parse();
-    opt.init_logger();
+    opt.init_logger()?;
 
     match subcommand {
         Subcommand::LocalDeploy { inner } => {

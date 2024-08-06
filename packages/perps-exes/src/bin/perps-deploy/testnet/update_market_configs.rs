@@ -47,12 +47,12 @@ impl UpdateMarketConfigsOpt {
         }
 
         for market in markets {
-            log::info!("Updating market: {}", market.market_id);
+            tracing::info!("Updating market: {}", market.market_id);
             let market_contract = MarketContract::new(market.market);
             let res = market_contract
                 .config_update(wallet, update.clone())
                 .await?;
-            log::info!("Updated {} in {}", market.market_id, res.txhash);
+            tracing::info!("Updated {} in {}", market.market_id, res.txhash);
         }
 
         Ok(())

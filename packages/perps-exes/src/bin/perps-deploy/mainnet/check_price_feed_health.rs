@@ -37,7 +37,7 @@ async fn go(
         market, market_id, ..
     } in markets
     {
-        log::info!("Checking health of {market_id}");
+        tracing::info!("Checking health of {market_id}");
         let market = MarketContract::new(market);
         match market.status().await?.config.spot_price {
             SpotPriceConfig::Manual { .. } => {
@@ -74,9 +74,9 @@ async fn go(
                                 .expect("Invalid timestamp");
                             let now = Utc::now();
                             let age = now.signed_duration_since(timestamp);
-                            log::info!("Stride contract update age: {age}");
+                            tracing::info!("Stride contract update age: {age}");
                             if age.num_hours() > 12 {
-                                log::error!(
+                                tracing::error!(
                                     "{market_id} uses a stride contract with an old price update"
                                 );
                             }
@@ -97,9 +97,9 @@ async fn go(
                             let timestamp = timestamp.try_into_chrono_datetime()?;
                             let now = Utc::now();
                             let age = now.signed_duration_since(timestamp);
-                            log::info!("Simple contract update age: {age}");
+                            tracing::info!("Simple contract update age: {age}");
                             if age.num_hours() > 12 {
-                                log::error!(
+                                tracing::error!(
                                     "{market_id} uses a simple contract with an old price update"
                                 );
                             }

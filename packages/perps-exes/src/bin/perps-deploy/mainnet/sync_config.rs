@@ -174,8 +174,8 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
             .simulate(&app.cosmos, &[owner])
             .await
             .context("Error while simulating")?;
-        log::info!("Successfully simulated messages");
-        log::debug!("Simulate response: {res:?}");
+        tracing::info!("Successfully simulated messages");
+        tracing::debug!("Simulate response: {res:?}");
     }
 
     Ok(())

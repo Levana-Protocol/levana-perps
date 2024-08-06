@@ -45,21 +45,21 @@ async fn go(opt: crate::cli::Opt, RewardsOpts { factory, market_id }: RewardsOpt
         let lp_info = market.lp_info(wallet).await?;
 
         if lp_info.available_yield == Collateral::zero() {
-            log::info!("{market_id}: No yield available");
+            tracing::info!("{market_id}: No yield available");
         } else {
-            log::info!("{market_id}: Want to collect {}", lp_info.available_yield);
+            tracing::info!("{market_id}: Want to collect {}", lp_info.available_yield);
             to_collect.push((market_id, market.get_address()));
         }
     }
 
     for chunk in to_collect.chunks(5) {
-        log::info!("Going to collect for markets: {chunk:?}");
+        tracing::info!("Going to collect for markets: {chunk:?}");
         let mut tx = TxBuilder::default();
         for (_, addr) in chunk {
             tx.add_execute_message(addr, wallet, vec![], MarketExecuteMsg::ClaimYield {})?;
         }
         let res = tx.sign_and_broadcast(&app.cosmos, wallet).await?;
-        log::info!("Collected in: {}", res.txhash);
+        tracing::info!("Collected in: {}", res.txhash);
     }
 
     Ok(())

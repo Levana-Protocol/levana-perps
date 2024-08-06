@@ -4,6 +4,7 @@ use anyhow::Result;
 use cosmos::SeedPhrase;
 use perps_exes::build_version;
 use reqwest::Url;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter, Layer};
 
 use crate::localtest;
 
@@ -164,13 +165,35 @@ pub(crate) struct Opt {
 }
 
 impl Opt {
-    pub(crate) fn init_logger(&self) {
-        let env = env_logger::Env::default().default_filter_or(if self.verbose {
-            format!("{}=debug,cosmos=debug,info", env!("CARGO_CRATE_NAME"))
-        } else {
-            "info".to_owned()
-        });
-        env_logger::Builder::from_env(env).init();
+    pub(crate) fn init_logger(&self) -> anyhow::Result<()> {
+        let env_filter = EnvFilter::from_default_env();
+
+        let crate_name = env!("CARGO_CRATE_NAME");
+        let env_filter = match std::env::var("RUST_LOG") {
+            Ok(_) => env_filter,
+            Err(_) => {
+                if self.verbose {
+                    env_filter
+                        .add_directive("cosmos=debug".parse()?)
+                        .add_directive(format!("{}=debug", crate_name).parse()?)
+                } else {
+                    env_filter
+                        .add_directive(format!("{}=info", crate_name).parse()?)
+                        .add_directive("tower_http=info".parse()?)
+                }
+            }
+        };
+
+        tracing_subscriber::registry()
+            .with(
+                fmt::Layer::default()
+                    .log_internal_errors(true)
+                    .and_then(env_filter),
+            )
+            .init();
+
+        tracing::debug!("Debug message!");
+        Ok(())
     }
 
     /// Get the gitrev from the gitrev file in the wasmdir
@@ -189,4 +212,5 @@ impl Opt {
         path.push(format!("levana_perpswap_cosmos_{contract_type}.wasm"));
         path
     }
+
 }
