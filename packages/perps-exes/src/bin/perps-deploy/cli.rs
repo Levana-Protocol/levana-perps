@@ -76,8 +76,8 @@ pub(crate) enum TestnetSub {
     },
     /// CounterTrade utility to fill collateral for markets
     CounterTrade {
-        #[clap(flatten)]
-        inner: crate::testnet::countertrade::CounterTradeOpts,
+        #[clap(subcommand)]
+        inner: crate::testnet::countertrade::CounterTradeSub,
     },
 }
 
