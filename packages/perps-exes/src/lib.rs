@@ -94,7 +94,7 @@ impl PerpApp {
 
     pub async fn all_open_positions(&self) -> Result<PositionsInfo> {
         self.crank(None).await?;
-        self.market.all_open_positions(&self.wallet).await
+        self.market.all_open_positions(&self.wallet, None).await
     }
 
     #[allow(clippy::too_many_arguments)]

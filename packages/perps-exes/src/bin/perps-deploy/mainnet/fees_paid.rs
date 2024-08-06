@@ -1,6 +1,7 @@
 use std::{collections::HashMap, ops::Add, path::PathBuf, sync::Arc};
 
 use anyhow::Result;
+use backon::{ConstantBuilder, Retryable};
 use cosmos::Address;
 use cosmwasm_std::OverflowError;
 use msg::contracts::market::position::PositionId;
@@ -14,16 +15,11 @@ use shared::prelude::*;
 use shared::storage::MarketId;
 use tokio::task::JoinSet;
 
-use crate::app::GrpcUrl;
-
 #[derive(clap::Parser)]
 pub(super) struct FeesPaidOpts {
     /// The wallet that paid the fees
     #[clap(long)]
     wallet: Vec<Address>,
-    /// Osmosis grpc URL
-    #[clap(long, env = "LEVANA_DEPLOY_OSMOSIS_MAINNET_GRPC")]
-    osmosis_grpc_url: Option<String>,
     /// Destination file
     #[clap(long)]
     csv: PathBuf,
@@ -33,6 +29,9 @@ pub(super) struct FeesPaidOpts {
     /// Feeds paid so far
     #[clap(long)]
     paid_fees: Option<Usd>,
+    /// Retry delay in milliseconds
+    #[clap(long, env = "LEVANA_FEES_PAID_DELAY_MS")]
+    retry_delay_ms: Option<u64>,
 }
 impl FeesPaidOpts {
     pub(super) async fn go(self, opt: crate::cli::Opt) -> Result<()> {
@@ -47,7 +46,7 @@ async fn go(
         csv,
         workers,
         paid_fees,
-        osmosis_grpc_url,
+        retry_delay_ms,
     }: FeesPaidOpts,
 ) -> Result<()> {
     let csv = ::csv::Writer::from_path(&csv)?;
@@ -80,24 +79,44 @@ async fn go(
         wallets.entry(factory).or_default().push(wallet);
     }
 
+    let retry_policy = retry_delay_ms.map(|item| {
+        ConstantBuilder::default()
+            .with_delay(std::time::Duration::from_millis(item))
+            .with_max_times(3)
+    });
+
     let rx = {
         let (tx, rx) = async_channel::unbounded();
 
         for (factory, wallets) in wallets {
             let factory = factories.get(factory)?;
-            let grpc_url = osmosis_grpc_url
-                .clone()
-                .map(|osmosis_mainnet| GrpcUrl { osmosis_mainnet });
-            let app = match grpc_url {
-                Some(grpc_url) => {
-                    opt.load_app_mainnet_with_grpc_url(factory.network, grpc_url)
+            let app = opt.load_app_mainnet(factory.network).await?;
+            let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
+
+            let markets = || async { factory.get_markets().await };
+
+            let markets = match retry_policy.as_ref() {
+                Some(retry_builder) => {
+                    markets
+                        .retry(retry_builder)
+                        .notify(|err, dur| {
+                            tracing::error!(
+                                "Retrying after {dur:?}, Received error during market fetch: {err}"
+                            )
+                        })
                         .await?
                 }
-                None => opt.load_app_mainnet(factory.network).await?,
+                None => {
+                    markets
+                        .retry(&ConstantBuilder::default())
+                        .notify(|err, dur| {
+                            tracing::error!(
+                            "Retrying dd after {dur:?}, Received error during market fetch: {err}"
+                        )
+                        })
+                        .await?
+                }
             };
-
-            let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
-            let markets = factory.get_markets().await?;
             for MarketInfo {
                 market_id, market, ..
             } in markets
@@ -156,9 +175,19 @@ async fn go(
                     Ok(tuple) => tuple,
                     Err(_) => break anyhow::Ok(fees),
                 };
+                let retry_policy = retry_delay_ms.map(|item| {
+                    ConstantBuilder::default()
+                        .with_delay(std::time::Duration::from_millis(item))
+                        .with_max_times(3)
+                });
+
                 tracing::info!("Processing {market_id}/{wallet}");
 
-                for pos in market.all_open_positions(wallet).await?.info {
+                for pos in market
+                    .all_open_positions(wallet, retry_policy.as_ref())
+                    .await?
+                    .info
+                {
                     let mut csv = csv.lock();
                     csv.serialize(&Record {
                         wallet,
@@ -180,7 +209,10 @@ async fn go(
                         })?;
                     csv.flush()?;
                 }
-                for pos in market.all_closed_positions(wallet).await? {
+                for pos in market
+                    .all_closed_positions(wallet, retry_policy.as_ref())
+                    .await?
+                {
                     let mut csv = csv.lock();
                     csv.serialize(&Record {
                         wallet,
@@ -205,7 +237,6 @@ async fn go(
             }
         });
     }
-
     std::mem::drop(rx);
 
     let mut stats = FeeStats::new();
@@ -213,10 +244,12 @@ async fn go(
         match res {
             Ok(Ok(fees)) => stats = (stats + fees)?,
             Ok(Err(e)) => {
+                tracing::error!("Failed while joining: {e}");
                 set.abort_all();
                 return Err(e);
             }
             Err(e) => {
+                tracing::error!("Failed while joining: {e}");
                 set.abort_all();
                 return Err(e.into());
             }

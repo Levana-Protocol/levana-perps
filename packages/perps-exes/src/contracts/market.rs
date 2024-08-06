@@ -3,6 +3,7 @@ use cosmos::{
     Address, Contract, HasAddress, HasAddressHrp, HasContract, HasCosmos, TxBuilder, Wallet,
 };
 
+use backon::{ConstantBuilder, Retryable};
 use cosmwasm_std::to_json_binary;
 use msg::{
     contracts::{
@@ -308,7 +309,11 @@ impl MarketContract {
         Ok(response.count)
     }
 
-    pub async fn all_open_positions(&self, owner: impl HasAddress) -> Result<PositionsInfo> {
+    pub async fn all_open_positions(
+        &self,
+        owner: impl HasAddress,
+        constant_builder: Option<&ConstantBuilder>,
+    ) -> Result<PositionsInfo> {
         let mut start_after = None;
         let mut tokens = vec![];
         loop {
@@ -319,7 +324,20 @@ impl MarketContract {
                     limit: None,
                 },
             };
-            let mut response: TokensResponse = self.0.query(query).await?;
+            let request = || async { self.0.query(query.clone()).await };
+            let mut response: TokensResponse = match constant_builder {
+                Some(constant_builder) => {
+                    tracing::info!("doesn not work");
+                    let response = request
+                        .retry(constant_builder)
+                        .notify(|err, dur| {
+                            tracing::error!("Retrying after {dur:?}. Received error: {err}")
+                        })
+                        .await;
+                    response?
+                }
+                None => request().await?,
+            };
             match response.tokens.last() {
                 Some(last_token) => start_after = Some(last_token.clone()),
                 None => break,
@@ -340,11 +358,15 @@ impl MarketContract {
             fees: None,
             price: None,
         };
+        let request = || async { self.0.query(query.clone()).await };
         let PositionsResp {
             positions: response,
             pending_close: _,
             closed: _,
-        } = self.0.query(query).await?;
+        } = match constant_builder {
+            Some(retry) => request.retry(retry).await?,
+            None => request().await?,
+        };
         assert_eq!(tokens.len(), response.len());
         let position_response = PositionsInfo {
             ids: positions,
@@ -356,22 +378,34 @@ impl MarketContract {
     pub async fn all_closed_positions(
         &self,
         owner: impl HasAddress,
+        retry: Option<&ConstantBuilder>,
     ) -> Result<Vec<ClosedPosition>> {
         let mut cursor = None;
         let mut res = vec![];
         loop {
+            let query_msg = MarketQueryMsg::ClosedPositionHistory {
+                owner: owner.get_address_string().into(),
+                cursor: cursor.take(),
+                limit: None,
+                order: None,
+            };
+
+            let request = || async { self.0.query(query_msg.clone()).await };
+
             let ClosedPositionsResp {
                 mut positions,
                 cursor: new_cursor,
-            } = self
-                .0
-                .query(MarketQueryMsg::ClosedPositionHistory {
-                    owner: owner.get_address_string().into(),
-                    cursor: cursor.take(),
-                    limit: None,
-                    order: None,
-                })
-                .await?;
+            } = match retry {
+                Some(retry) => {
+                    request
+                        .retry(retry)
+                        .notify(|err, dur| {
+                            tracing::error!("Retrying after {dur:?}. Received error: {err}")
+                        })
+                        .await?
+                }
+                None => request().await?,
+            };
             res.append(&mut positions);
             match new_cursor {
                 Some(new_cursor) => cursor = Some(new_cursor),
