@@ -1,4 +1,5 @@
 mod deferred_exec;
+mod gov_distribute;
 mod list_contracts;
 mod lp_history;
 mod token_balances;
@@ -101,6 +102,11 @@ enum Sub {
         #[clap(flatten)]
         inner: trading_incentives::DistributionsCsvOpt,
     },
+    /// Distribute vesting tokens on the governance contract
+    GovDistribute {
+        #[clap(flatten)]
+        inner: gov_distribute::GovDistributeOpt,
+    },
 }
 
 impl UtilOpt {
@@ -117,6 +123,7 @@ impl UtilOpt {
             Sub::TvlReport { inner } => inner.go(opt).await,
             Sub::TopTraders { inner } => inner.go(opt).await,
             Sub::TradingIncentivesCsv { inner } => inner.go(opt).await,
+            Sub::GovDistribute { inner } => inner.go(opt).await,
         }
     }
 }
