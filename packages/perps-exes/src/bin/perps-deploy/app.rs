@@ -101,7 +101,7 @@ impl Opt {
         if let Some(x) = self.cosmos_gas_multiplier {
             builder.set_gas_estimate_multiplier(x);
         }
-        log::info!("Connecting to {}", builder.grpc_url());
+        tracing::info!("Connecting to {}", builder.grpc_url());
 
         builder.build().map_err(anyhow::Error::from)
     }
@@ -120,7 +120,7 @@ impl Opt {
         if let Some(x) = self.cosmos_gas_multiplier {
             builder.set_gas_estimate_multiplier(x);
         }
-        log::info!("Connecting to {}", builder.grpc_url());
+        tracing::info!("Connecting to {}", builder.grpc_url());
 
         builder.build().map_err(anyhow::Error::from)
     }

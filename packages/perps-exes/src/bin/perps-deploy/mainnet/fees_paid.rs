@@ -156,7 +156,7 @@ async fn go(
                     Ok(tuple) => tuple,
                     Err(_) => break anyhow::Ok(fees),
                 };
-                log::info!("Processing {market_id}/{wallet}");
+                tracing::info!("Processing {market_id}/{wallet}");
 
                 for pos in market.all_open_positions(wallet).await?.info {
                     let mut csv = csv.lock();
@@ -223,15 +223,15 @@ async fn go(
         }
     }
 
-    log::info!("Total Trading USD: {}", stats.trading);
-    log::info!("Total Borrow USD: {}", stats.borrow);
-    log::info!("Crank Crank USD: {}", stats.crank);
+    tracing::info!("Total Trading USD: {}", stats.trading);
+    tracing::info!("Total Borrow USD: {}", stats.borrow);
+    tracing::info!("Crank Crank USD: {}", stats.crank);
 
     let total_fees = ((stats.trading + stats.borrow)? + stats.crank)?;
-    log::info!("Total fees: {total_fees}");
+    tracing::info!("Total fees: {total_fees}");
     if let Some(paid_fees) = paid_fees {
         let to_pay = (total_fees - paid_fees)?;
-        log::info!("Fees to be paid: {to_pay}");
+        tracing::info!("Fees to be paid: {to_pay}");
     }
 
     Ok(())

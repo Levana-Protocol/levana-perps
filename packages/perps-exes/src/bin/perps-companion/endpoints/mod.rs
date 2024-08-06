@@ -156,7 +156,7 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .layer(service_builder)
         .layer(from_fn(error_response_handler));
 
-    log::info!("Launching server");
+    tracing::info!("Launching server");
     let listener = TcpListener::bind(&bind).await?;
     axum::serve(listener, router.into_make_service())
         .await

@@ -50,7 +50,7 @@ pub(super) async fn whales(
     match whales_inner(&app, show_addresses, &headers).await {
         Ok(res) => res,
         Err(e) => {
-            log::error!("Error loading whales page: {e:?}");
+            tracing::error!("Error loading whales page: {e:?}");
             let mut res = format!("{e:?}").into_response();
             *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
             res
@@ -203,7 +203,7 @@ async fn worker(
     client: reqwest::Client,
 ) -> Result<()> {
     while let Ok(work) = recv_work.recv().await {
-        log::info!("Work: {work:?}");
+        tracing::info!("Work: {work:?}");
         match work {
             Work::Factory(network, factory, send_work) => {
                 let url = format!("https://querier-mainnet.levana.finance/v1/perps/markets?network={network}&factory={factory}");

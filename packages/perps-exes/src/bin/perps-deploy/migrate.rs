@@ -52,7 +52,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         .code_id
         == factory_code_id.get_code_id()
     {
-        log::info!(
+        tracing::info!(
             "Factory's instantiated code ID is already {}, skipping",
             factory_code_id
         );
@@ -64,12 +64,12 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                 msg::contracts::factory::entry::MigrateMsg {},
             )
             .await?;
-        log::info!("Migrated the factory itself to {}", factory_code_id);
+        tracing::info!("Migrated the factory itself to {}", factory_code_id);
         let res = app
             .tracker
             .migrate(wallet, factory_code_id.get_code_id(), &factory)
             .await?;
-        log::info!("Tracked factory migration in: {}", res.txhash);
+        tracing::info!("Tracked factory migration in: {}", res.txhash);
     }
 
     let code_ids: CodeIds = factory
@@ -77,7 +77,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         .await?;
 
     if code_ids.liquidity_token.u64() == liquidity_token_code_id.get_code_id() {
-        log::info!(
+        tracing::info!(
             "Liquidity token code ID in factory is already {}, skipping",
             liquidity_token_code_id
         );
@@ -91,11 +91,11 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                 },
             )
             .await?;
-        log::info!("Update liquidity token ID in factory: {}", res.txhash);
+        tracing::info!("Update liquidity token ID in factory: {}", res.txhash);
     }
 
     if code_ids.market.u64() == market_code_id.get_code_id() {
-        log::info!(
+        tracing::info!(
             "Market code ID in factory is already {}, skipping",
             market_code_id
         );
@@ -109,11 +109,11 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                 },
             )
             .await?;
-        log::info!("Update market ID in factory: {}", res.txhash);
+        tracing::info!("Update market ID in factory: {}", res.txhash);
     }
 
     if code_ids.position_token.u64() == position_token_code_id.get_code_id() {
-        log::info!(
+        tracing::info!(
             "Position token code ID in factory is already {}, skipping",
             position_token_code_id
         );
@@ -127,7 +127,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                 },
             )
             .await?;
-        log::info!("Update position token ID in factory: {}", res.txhash);
+        tracing::info!("Update position token ID in factory: {}", res.txhash);
     }
 
     let factory = Factory::from_contract(factory);
@@ -140,10 +140,10 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         liquidity_token_xlp,
     } in factory.get_markets().await?
     {
-        log::info!("Performing migrations for market {market_id}");
+        tracing::info!("Performing migrations for market {market_id}");
         let current_market_code_id = market.info().await?.code_id;
         if current_market_code_id == market_code_id.get_code_id() {
-            log::info!("Skipping market contract migration");
+            tracing::info!("Skipping market contract migration");
         } else {
             market
                 .migrate(
@@ -152,17 +152,17 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                     msg::contracts::market::entry::MigrateMsg {},
                 )
                 .await?;
-            log::info!("Market contract for {market_id} migrated");
+            tracing::info!("Market contract for {market_id} migrated");
             match app
                 .tracker
                 .migrate(wallet, market_code_id.get_code_id(), market.get_address())
                 .await
             {
-                Err(e) => log::warn!(
+                Err(e) => tracing::warn!(
                     "Unable to log tracker update for market contract {}: {e}",
                     market.get_address()
                 ),
-                Ok(res) => log::info!(
+                Ok(res) => tracing::info!(
                     "Logged market {market_id} update in tracker at: {}",
                     res.txhash
                 ),
@@ -171,7 +171,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
 
         let current_position_code_id = position_token.info().await?.code_id;
         if current_position_code_id == position_token_code_id.get_code_id() {
-            log::info!("Skipping migration of position token contract");
+            tracing::info!("Skipping migration of position token contract");
         } else {
             position_token
                 .migrate(
@@ -180,7 +180,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                     msg::contracts::position_token::entry::MigrateMsg {},
                 )
                 .await?;
-            log::info!("Position token contract for {market_id} migrated");
+            tracing::info!("Position token contract for {market_id} migrated");
             match app
                 .tracker
                 .migrate(
@@ -191,9 +191,11 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                 .await
             {
                 Err(e) => {
-                    log::warn!("Unable to migrate position token contract {position_token}: {e}")
+                    tracing::warn!(
+                        "Unable to migrate position token contract {position_token}: {e}"
+                    )
                 }
-                Ok(res) => log::info!(
+                Ok(res) => tracing::info!(
                     "Logged position token {market_id} update in tracker at: {}",
                     res.txhash
                 ),
@@ -202,7 +204,9 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
 
         for (kind, lt) in [("LP", liquidity_token_lp), ("xLP", liquidity_token_xlp)] {
             if lt.info().await?.code_id == liquidity_token_code_id.get_code_id() {
-                log::info!("Skipping {kind} liquidity token contract migration for {market_id}");
+                tracing::info!(
+                    "Skipping {kind} liquidity token contract migration for {market_id}"
+                );
             } else {
                 lt.migrate(
                     wallet,
@@ -210,7 +214,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                     msg::contracts::position_token::entry::MigrateMsg {},
                 )
                 .await?;
-                log::info!("{kind} liquidity token contract for {market_id} migrated");
+                tracing::info!("{kind} liquidity token contract for {market_id} migrated");
                 match app
                     .tracker
                     .migrate(
@@ -221,9 +225,11 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
                     .await
                 {
                     Err(e) => {
-                        log::warn!("Unable to migrate {kind} liquidity token contract {lt}: {e}")
+                        tracing::warn!(
+                            "Unable to migrate {kind} liquidity token contract {lt}: {e}"
+                        )
                     }
-                    Ok(res) => log::info!(
+                    Ok(res) => tracing::info!(
                         "Logged {kind} liquidity token {market_id} update in tracker at: {}",
                         res.txhash
                     ),
@@ -235,8 +241,8 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         // let price_admin = app.basic.cosmos.make_contract(price_admin);
         // match price_admin.info().await {
         //     Err(e) => {
-        //         log::info!("Received error when querying contract info for price admin {price_admin}: {e:?}");
-        //         log::info!("Ignoring, assuming we're not using pyth_bridge");
+        //         tracing::info!("Received error when querying contract info for price admin {price_admin}: {e:?}");
+        //         tracing::info!("Ignoring, assuming we're not using pyth_bridge");
         //     }
         //     Ok(info) => {
         //         // Check if this is a new Hermes Pyth bridge. If the config call
@@ -247,9 +253,9 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         //             .await;
         //         match config_res {
         //             Ok(_) => {
-        //                 log::info!("Already on a Hermes Pyth bridge, will test migrating");
+        //                 tracing::info!("Already on a Hermes Pyth bridge, will test migrating");
         //                 if info.code_id == pyth_bridge_code_id.get_code_id() {
-        //                     log::info!(
+        //                     tracing::info!(
         //                 "Price admin {price_admin} is already using current Pyth bridge code ID {}",
         //                 info.code_id
         //             );
@@ -261,7 +267,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         //                             msg::contracts::pyth_bridge::entry::MigrateMsg {},
         //                         )
         //                         .await?;
-        //                     log::info!("pyth_bridge price admin contract for {market_id} migrated");
+        //                     tracing::info!("pyth_bridge price admin contract for {market_id} migrated");
         //                     match app
         //                         .tracker
         //                         .migrate(
@@ -272,9 +278,9 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         //                         .await
         //                         {
         //                             Err(e) => {
-        //                                 log::warn!("Unable to migrate pyth_bridge price admin contract: {e:?}")
+        //                                 tracing::warn!("Unable to migrate pyth_bridge price admin contract: {e:?}")
         //                             }
-        //                             Ok(res) => log::info!(
+        //                             Ok(res) => tracing::info!(
         //                                 "Logged pyth_bridge price admin contract for {market_id}, update in tracker at: {}",
         //                                 res.txhash
         //                             ),
@@ -282,7 +288,7 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         //                 }
         //             }
         //             Err(_) => {
-        //                 log::info!("Not on a Hermes Pyth bridge yet, need to instantiate a new bridge and set the owner.");
+        //                 tracing::info!("Not on a Hermes Pyth bridge yet, need to instantiate a new bridge and set the owner.");
         //                 let pyth_info = match &app.price_source {
         //                     crate::app::PriceSourceConfig::Pyth(pyth_info) => pyth_info,
         //                     crate::app::PriceSourceConfig::Wallet(_) => anyhow::bail!("Cannot instantiate new Hermes Pyth bridge, PriceSourceConfig is Wallet"),
@@ -295,11 +301,11 @@ pub(crate) async fn go(opt: Opt, MigrateOpt { family, sequence }: MigrateOpt) ->
         //                         market_id,
         //                     )
         //                     .await?;
-        //                 log::info!("Deployed fresh Pyth bridge contract: {pyth_bridge}");
+        //                 tracing::info!("Deployed fresh Pyth bridge contract: {pyth_bridge}");
         //                 let tx = factory
         //                     .set_price_admin(&app.basic.wallet, &market, &pyth_bridge)
         //                     .await?;
-        //                 log::info!("Updated price admin in transaction {}", tx.txhash);
+        //                 tracing::info!("Updated price admin in transaction {}", tx.txhash);
         //             }
         //         }
         //     }

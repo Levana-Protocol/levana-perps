@@ -126,7 +126,7 @@ async fn go(
         };
 
         let balances = cosmos.all_balances(record.wallet).await?;
-        log::info!("{}: {balances:?}", record.wallet);
+        tracing::info!("{}: {balances:?}", record.wallet);
         if let Some(coin) = balances.into_iter().find(|coin| coin.denom == denom) {
             let amount = Collateral::from_decimal256(Decimal256::from_ratio(
                 coin.amount.parse::<u128>()?,

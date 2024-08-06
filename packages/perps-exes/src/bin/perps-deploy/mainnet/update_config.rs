@@ -70,7 +70,7 @@ async fn go(
     };
 
     let owner = factory.query_owner().await?;
-    log::info!("CW3 contract: {owner}");
+    tracing::info!("CW3 contract: {owner}");
 
     let msgs = markets
         .into_iter()
@@ -90,7 +90,7 @@ async fn go(
             }))
         })
         .collect::<Result<Vec<_>>>()?;
-    log::info!("Message: {}", serde_json::to_string(&msgs)?);
+    tracing::info!("Message: {}", serde_json::to_string(&msgs)?);
 
     Ok(())
 }

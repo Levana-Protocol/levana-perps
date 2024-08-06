@@ -195,12 +195,12 @@ impl Context {
                     }
                 }
                 Err(e) => {
-                    log::warn!("unable to parse message: {}", e);
+                    tracing::warn!("unable to parse message: {}", e);
                     Ok(())
                 }
             }
         } else {
-            log::info!("got a non-text message");
+            tracing::info!("got a non-text message");
             Ok(())
         }
     }

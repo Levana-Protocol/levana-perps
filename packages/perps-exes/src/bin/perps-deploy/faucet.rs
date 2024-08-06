@@ -112,14 +112,14 @@ impl Faucet {
                 }),
             )
             .await?;
-        log::info!("Deployed new token in {}", txres.txhash);
+        tracing::info!("Deployed new token in {}", txres.txhash);
         let tap_amount_resp: TapAmountResponse = self
             .0
             .query(QueryMsg::TapAmountByName { name: name.clone() })
             .await?;
         match tap_amount_resp {
             TapAmountResponse::CannotTap {} => {
-                log::info!("No tap amount set in contract for {name}, adding.");
+                tracing::info!("No tap amount set in contract for {name}, adding.");
                 let txres = self
                     .0
                     .execute(
@@ -131,11 +131,11 @@ impl Faucet {
                         }),
                     )
                     .await?;
-                log::info!("Tap amount set in {}", txres.txhash);
+                tracing::info!("Tap amount set in {}", txres.txhash);
             }
             TapAmountResponse::CanTap { amount } => {
                 if amount != tap_amount {
-                    log::warn!("Mismatched tap amount between code and contract. Code: {tap_amount}. Contract: {amount}.")
+                    tracing::warn!("Mismatched tap amount between code and contract. Code: {tap_amount}. Contract: {amount}.")
                 }
             }
         }

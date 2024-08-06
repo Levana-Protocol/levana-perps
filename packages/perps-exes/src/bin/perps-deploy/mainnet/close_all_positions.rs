@@ -36,7 +36,7 @@ async fn go(
     let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
 
     let wind_down = factory.query_wind_down().await?;
-    log::info!("CW3 contract: {wind_down}");
+    tracing::info!("CW3 contract: {wind_down}");
 
     let mut builder = TxBuilder::default();
     let mut msgs = vec![];
@@ -60,14 +60,14 @@ async fn go(
         msgs.push(msg);
     }
 
-    log::info!("Message: {}", serde_json::to_string(&msgs)?);
+    tracing::info!("Message: {}", serde_json::to_string(&msgs)?);
 
     let res = builder
         .simulate(&app.cosmos, &[wind_down])
         .await
         .context("Error while simulating")?;
-    log::info!("Successfully simulated messages");
-    log::debug!("Simulate response: {res:?}");
+    tracing::info!("Successfully simulated messages");
+    tracing::debug!("Simulate response: {res:?}");
 
     Ok(())
 }
