@@ -27,7 +27,7 @@ impl LazyWallet {
             .map(LazyWallet)
     }
 
-    fn get(&self) -> Result<&Wallet> {
+    pub(crate) fn get(&self) -> Result<&Wallet> {
         self.0.as_ref().context("No wallet provided on CLI")
     }
 }
@@ -125,7 +125,7 @@ impl Opt {
         builder.build().map_err(anyhow::Error::from)
     }
 
-    fn get_lazy_wallet(&self, network: PerpsNetwork) -> Result<LazyWallet, WalletError> {
+    pub(crate) fn get_lazy_wallet(&self, network: PerpsNetwork) -> Result<LazyWallet, WalletError> {
         LazyWallet::new(self.wallet.clone(), network.get_address_hrp())
     }
 
