@@ -74,6 +74,11 @@ pub(crate) enum TestnetSub {
         #[clap(flatten)]
         inner: crate::testnet::sync_config::SyncConfigOpts,
     },
+    /// CounterTrade utility to fill collateral for markets
+    CounterTrade {
+        #[clap(flatten)]
+        inner: crate::testnet::countertrade::CounterTradeOpts,
+    },
 }
 
 #[derive(clap::Parser)]
