@@ -122,6 +122,12 @@
           {% endif %}
 	</div>
 	{% endfor %}
-    </div
+	<div class="shadow pt-3 border-bottom border-secondary-subtle border-5">
+	  <p class="fs-4 text-primary mb-1">Pyth Feed Age</p>
+	  {% for line in pyth_feed_age %}
+	  <p class="text-break">{{ line }}</p>
+	  {% endfor %}
+	</div>
+    </div>
   </body>
 </html>

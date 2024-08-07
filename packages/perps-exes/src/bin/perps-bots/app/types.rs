@@ -23,6 +23,7 @@ use tokio::sync::RwLock;
 use crate::app::factory::{get_factory_info_mainnet, get_factory_info_testnet};
 use crate::cli::Opt;
 use crate::config::{BotConfig, BotConfigByType, FullBotConfig};
+use crate::util::oracle::PythPriceStats;
 use crate::wallet_manager::ManagedWallet;
 use crate::watcher::Watcher;
 
@@ -145,6 +146,7 @@ pub(crate) struct App {
     pub(crate) opt: Opt,
     pub(crate) epoch_last_seen: Mutex<Option<Instant>>,
     pub(crate) wallet_pool: WalletPool,
+    pub(crate) pyth_stats: PythPriceStats,
 }
 
 /// Helper data structure for building up an application.
@@ -284,6 +286,7 @@ impl Opt {
             opt,
             epoch_last_seen: Mutex::new(None),
             wallet_pool,
+            pyth_stats: PythPriceStats::default(),
         };
         let app = Arc::new(app);
         let mut builder = AppBuilder {

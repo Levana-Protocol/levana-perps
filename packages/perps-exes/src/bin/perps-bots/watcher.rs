@@ -1255,6 +1255,7 @@ struct StatusTemplate<'a> {
     gas_multiplier_gas_check: f64,
     max_gas_prices: Option<MaxGasPrices>,
     gas_price: f64,
+    pyth_feed_age: Vec<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -1311,6 +1312,7 @@ impl TaskStatuses {
             gas_multiplier_gas_check: app.cosmos_gas_check.get_current_gas_multiplier(),
             max_gas_prices,
             gas_price: app.cosmos.get_base_gas_price().await,
+            pyth_feed_age: app.pyth_stats.get_status(),
         }
     }
 }
