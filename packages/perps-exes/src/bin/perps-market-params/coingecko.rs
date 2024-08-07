@@ -96,7 +96,7 @@ impl ExchangeId {
             | 1699 | 5327 | 6420 | 6753 | 7392 | 503 | 7086 | 8913 | 9243 | 249 | 310 | 856
             | 983 | 1232 | 1281 | 1370 | 1378 | 1407 | 1413 | 1457 | 1480 | 1487 | 1489 | 1514
             | 1515 | 1584 | 1599 | 1685 | 1931 | 5430 | 7440 | 8003 | 8877 | 9882 | 9883 | 1577
-            | 1623 | 8964 | 7806 | 1196 | 8977 | 7791 | 6746 | 10557 | 1675 => {
+            | 1623 | 8964 | 7806 | 1196 | 8977 | 7791 | 6746 | 10557 | 1675 | 10403 => {
                 Ok(ExchangeKind::Dex)
             }
             other => Err(anyhow!("Exchange type not known for id {}", other)),
@@ -199,6 +199,7 @@ pub(crate) enum Coin {
     StDym,
     MilkTia,
     WstEth,
+    Maga,
 }
 
 impl FromStr for Coin {
@@ -248,6 +249,7 @@ impl FromStr for Coin {
             "stDYM" => Ok(Coin::StDym),
             "milkTIA" => Ok(Coin::MilkTia),
             "wstETH" => Ok(Coin::WstEth),
+            "MAGA" => Ok(Coin::Maga),
             other => Err(anyhow!("Unsupported coin {other}")),
         }
     }
@@ -307,6 +309,7 @@ impl Coin {
             Coin::StDym => DYM_CMC_ID,
             Coin::MilkTia => TIA_CMC_ID,
             Coin::WstEth => ETH_CMC_ID, // Since we are speculating on ETH
+            Coin::Maga => 27872,
         }
     }
 
@@ -354,6 +357,7 @@ impl Coin {
             Coin::StDym => WrappedCoin(Coin::Dym),
             Coin::MilkTia => WrappedCoin(Coin::Tia),
             Coin::WstEth => WrappedCoin(Coin::Eth),
+            Coin::Maga => WrappedCoin(Coin::Maga),
         }
     }
 }

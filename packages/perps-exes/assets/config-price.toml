@@ -38,6 +38,7 @@ WIF_USD = "4ca4beeca86f0d164160323817a4e42b10010a724c2217c6ee41b54cd4cc61fc"
 XAG_USD = "f2fb02c32b055c805e7238d628e5e9dadef274376114eb1f012337cabe93871e"
 XAU_USD = "765d2ba906dbc32ca17cc11f5310a89e9ee1f6420508c63861f2f8ba4ee34bb2"
 wstETH_USD = "6df640f3b8963d8f8358f791f352b8364513f6ab1cca5ed3f1f7b5448980e784"
+MAGA_USD = "a80e97f70f6a4a8a0273822fb86d51b2bdb9a16ce0edb7ea8c8b84cbaecb5ce5"
 
 [pyth.edge]
 update-age-tolerance = 21
@@ -740,6 +741,18 @@ inverted = false
 key = "BTC_USD"
 inverted = false
 
+[[networks.osmosis-mainnet.MAGA_USDC.feeds]]
+
+[networks.osmosis-mainnet.MAGA_USDC.feeds.pyth]
+key = "MAGA_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.MAGA_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.MAGA_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
 [[networks.osmosis-testnet.AKT_USD.feeds]]
 
 [networks.osmosis-testnet.AKT_USD.feeds.pyth]
@@ -1376,6 +1389,18 @@ inverted = false
 
 [networks.osmosis-testnet.wBTC_USD.feeds-usd.pyth]
 key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-testnet.MAGA_USDC.feeds]]
+
+[networks.osmosis-testnet.MAGA_USDC.feeds.pyth]
+key = "MAGA_USD"
+inverted = false
+
+[[networks.osmosis-testnet.MAGA_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.MAGA_USDC.feeds-usd.constant]
+price = "1"
 inverted = false
 
 [[networks.sei-mainnet.BTC_SEI.feeds]]
