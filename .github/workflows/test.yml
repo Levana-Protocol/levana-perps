@@ -103,10 +103,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
       - name: Build and Deploy documentation
-        if: github.ref == 'refs/heads/main'
+        # if: github.ref == 'refs/heads/main'
         run: |
           just build-docs
-          aws s3 sync ./.output/temp s3://levana-dev-docs/levana-perps-multichain/docs --acl public-read --delete
+          aws s3 sync ./.output/temp s3://levana-dev-docs/levana-perps-multichain/docs --size-only --acl public-read --delete
 
   macos-binary:
     runs-on: macos-latest
