@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use anyhow::Context;
 use cosmos::Address;
-use cosmwasm_std::Binary;
+use cosmwasm_std::{Binary, Uint128};
 use msg::contracts::market::entry::StatusResp;
 use perps_exes::contracts::Factory;
 use shared::storage::{MarketId, RawAddr};
@@ -19,6 +19,9 @@ pub(crate) enum CounterTradeSub {
         /// Which market to deposit collateral for
         #[clap(long)]
         market_id: MarketId,
+        /// How much amount to deposit
+        #[clap(long)]
+        amount: Option<Uint128>,
         /// Flag to actually execute
         #[clap(long)]
         do_it: bool,
@@ -44,7 +47,8 @@ async fn go(opt: crate::cli::Opt, sub: CounterTradeSub) -> anyhow::Result<()> {
             family,
             market_id,
             do_it,
-        } => deposit_collateral(opt, contract, family, market_id, do_it).await?,
+            amount,
+        } => deposit_collateral(opt, contract, family, market_id, do_it, amount).await?,
         CounterTradeSub::Stats { family } => {
             let app = opt.load_app(&family).await?;
             let factory = app.tracker.get_factory(&family).await?.into_contract();
@@ -86,6 +90,7 @@ async fn deposit_collateral(
     family: String,
     market_id: MarketId,
     do_it: bool,
+    amount: Option<Uint128>,
 ) -> anyhow::Result<()> {
     let app = opt.load_app(&family).await?;
     let factory = app.tracker.get_factory(&family).await?.into_contract();
@@ -104,6 +109,11 @@ async fn deposit_collateral(
     let market_status = msg::contracts::market::entry::QueryMsg::Status { price: None };
     let response: StatusResp = market.query(market_status).await?;
 
+    let amount = match amount {
+        Some(amount) => amount,
+        None => Uint128::from(1000000000u128),
+    };
+
     match response.collateral {
         msg::token::Token::Cw20 { addr, .. } => {
             println!("Cw20 Contract: {addr}");
@@ -112,9 +122,7 @@ async fn deposit_collateral(
             let deposit_msg = Binary::new(serde_json::to_vec(&deposit_msg)?);
             let cw20_execute_msg = msg::contracts::cw20::entry::ExecuteMsg::Send {
                 contract: RawAddr::from(contract.to_string()),
-                amount: "1000000000"
-                    .parse()
-                    .context("Error converting 1000000000 into Uint128")?,
+                amount,
                 msg: deposit_msg,
             };
             let cw20_execute_msg_str = serde_json::to_string(&cw20_execute_msg)?;
@@ -138,11 +146,15 @@ async fn deposit_collateral(
             if do_it {
                 tracing::info!("Executing");
                 let countertrade = cosmos.make_contract(contract);
-                let amount = "1000000000"
-                    .parse()
-                    .context("Error convert 1000000000 into Uint128")?;
                 let response = countertrade
-                    .execute(wallet, vec![cosmos::Coin { denom, amount }], deposit_msg)
+                    .execute(
+                        wallet,
+                        vec![cosmos::Coin {
+                            denom,
+                            amount: amount.to_string(),
+                        }],
+                        deposit_msg,
+                    )
                     .await?;
                 println!("Txhash: {}", response.txhash);
             }
