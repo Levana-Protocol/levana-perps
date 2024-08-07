@@ -41,7 +41,7 @@ async fn go(
     let balances = app.cosmos.all_balances(treasury).await?;
 
     if balances.is_empty() {
-        log::info!("No funds in treasury wallet {treasury}");
+        tracing::info!("No funds in treasury wallet {treasury}");
         return Ok(());
     }
 
@@ -89,8 +89,8 @@ async fn go(
         .simulate(&app.cosmos, &[treasury])
         .await
         .context("Error while simulating")?;
-    log::info!("Successfully simulated messages");
-    log::debug!("Simulate response: {res:?}");
+    tracing::info!("Successfully simulated messages");
+    tracing::debug!("Simulate response: {res:?}");
 
     Ok(())
 }

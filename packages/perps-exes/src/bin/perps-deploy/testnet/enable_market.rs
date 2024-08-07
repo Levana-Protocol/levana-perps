@@ -27,9 +27,9 @@ impl EnableMarketOpt {
             }
         };
         let res = factory.enable_all(wallet).await?;
-        log::info!("Enabled market in {}", res.txhash);
+        tracing::info!("Enabled market in {}", res.txhash);
 
-        log::info!("Don't forget to deposit liquidity into the contract!");
+        tracing::info!("Don't forget to deposit liquidity into the contract!");
         Ok(())
     }
 }

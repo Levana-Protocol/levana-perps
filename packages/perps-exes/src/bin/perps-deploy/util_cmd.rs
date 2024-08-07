@@ -1,4 +1,5 @@
 mod deferred_exec;
+mod gov_distribute;
 mod list_contracts;
 mod lp_history;
 mod token_balances;
@@ -101,6 +102,11 @@ enum Sub {
         #[clap(flatten)]
         inner: trading_incentives::DistributionsCsvOpt,
     },
+    /// Distribute vesting tokens on the governance contract
+    GovDistribute {
+        #[clap(flatten)]
+        inner: gov_distribute::GovDistributeOpt,
+    },
 }
 
 impl UtilOpt {
@@ -117,6 +123,7 @@ impl UtilOpt {
             Sub::TvlReport { inner } => inner.go(opt).await,
             Sub::TopTraders { inner } => inner.go(opt).await,
             Sub::TradingIncentivesCsv { inner } => inner.go(opt).await,
+            Sub::GovDistribute { inner } => inner.go(opt).await,
         }
     }
 }
@@ -190,13 +197,13 @@ async fn update_pyth(
             .add_message(msg)
             .sign_and_broadcast(&basic.cosmos, wallet)
             .await?;
-        log::info!("Price set in: {}", res.txhash);
+        tracing::info!("Price set in: {}", res.txhash);
         anyhow::Ok(())
     };
     if keep_going {
         loop {
             if let Err(e) = single_update().await {
-                log::error!("Unable to update price: {e:?}");
+                tracing::error!("Unable to update price: {e:?}");
             }
         }
     } else {
@@ -239,10 +246,10 @@ async fn deploy_pyth_opt(
     let wallet = basic.get_wallet()?;
 
     let wormhole = basic.cosmos.store_code_path(wallet, &wormhole).await?;
-    log::info!("Uploaded wormhole contract: {wormhole}");
+    tracing::info!("Uploaded wormhole contract: {wormhole}");
 
     let pyth_oracle = basic.cosmos.store_code_path(wallet, &pyth_oracle).await?;
-    log::info!("Uploaded Pyth oracle contract: {pyth_oracle}");
+    tracing::info!("Uploaded Pyth oracle contract: {pyth_oracle}");
 
     let gas_denom = basic.cosmos.get_cosmos_builder().gas_coin();
 
@@ -270,7 +277,7 @@ async fn deploy_pyth_opt(
             cosmos::ContractAdmin::Sender,
         )
         .await?;
-    log::info!("Deployed new wormhole contract: {wormhole}");
+    tracing::info!("Deployed new wormhole contract: {wormhole}");
 
     let mut builder = TxBuilder::default();
     builder.add_execute_message(&wormhole, wallet, vec![], json!({
@@ -289,7 +296,7 @@ async fn deploy_pyth_opt(
         }
     }))?;
     let res = builder.sign_and_broadcast(&basic.cosmos, wallet).await?;
-    log::info!("VAAs set on wormhole in {}", res.txhash);
+    tracing::info!("VAAs set on wormhole in {}", res.txhash);
 
     let wormhole = wormhole.get_address_string();
 
@@ -327,7 +334,7 @@ async fn deploy_pyth_opt(
             cosmos::ContractAdmin::Sender,
         )
         .await?;
-    log::info!("Deployed new Pyth oracle contract: {pyth_oracle}");
+    tracing::info!("Deployed new Pyth oracle contract: {pyth_oracle}");
 
     Ok(())
 }
@@ -384,14 +391,14 @@ async fn trade_volume(
                 next_position_id = (next_position_id.u64() + 1).to_string().parse()?;
             }
             Err(e) => {
-                log::warn!("Make sure this says that the position isn't found: {e:?}");
+                tracing::warn!("Make sure this says that the position isn't found: {e:?}");
                 break;
             }
         }
     }
 
-    log::info!("Last position checked: {next_position_id}");
-    log::info!("Total traders: {}", traders.len());
+    tracing::info!("Last position checked: {next_position_id}");
+    tracing::info!("Total traders: {}", traders.len());
 
     let mut total_trade_volume = Usd::zero();
     let mut total_realized_pnl = Signed::<Usd>::zero();
@@ -405,8 +412,8 @@ async fn trade_volume(
         total_realized_pnl = total_realized_pnl.checked_add(realized_pnl)?;
     }
 
-    log::info!("Total trade volume: {total_trade_volume}");
-    log::info!("Total realized PnL: {total_realized_pnl}");
+    tracing::info!("Total trade volume: {total_trade_volume}");
+    tracing::info!("Total realized PnL: {total_realized_pnl}");
     Ok(())
 }
 

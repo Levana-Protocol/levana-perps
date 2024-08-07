@@ -187,7 +187,7 @@ pub(crate) async fn carry_inner(
             MarketType::CollateralIsBase => (status.base.as_str(), status.quote.as_str()),
         };
 
-        let positions: PositionsInfo = market.all_open_positions(cc_addr).await?;
+        let positions: PositionsInfo = market.all_open_positions(cc_addr, None).await?;
         let mut total_notional_size = Decimal256::zero().into_signed();
         let mut has_long = false;
         let mut has_short = false;

@@ -133,7 +133,7 @@ impl TriggerCrank {
                     "trigger_crank: send failed because channel closed, which should be impossible"
                 ),
                 Err(TrySendError::Full(())) => {
-                    log::warn!("Highly unlikely trigger_crank with full channel. It's not necessarily a bug, but almost certainly is.")
+                    tracing::warn!("Highly unlikely trigger_crank with full channel. It's not necessarily a bug, but almost certainly is.")
                 }
             }
         }
@@ -187,7 +187,7 @@ impl CrankReceiver {
                                     unreachable!("Resending on empty channel encountered closed")
                                 }
                                 Err(TrySendError::Full(())) => {
-                                    log::warn!("Highly suspect, resending on empty channel encountered full")
+                                    tracing::warn!("Highly suspect, resending on empty channel encountered full")
                                 }
                             }
                         }

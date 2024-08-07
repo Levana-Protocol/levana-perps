@@ -160,7 +160,7 @@ impl MarketContract {
                     msg: msg.clone(),
                     query_type,
                 };
-                log::error!("Attempt #{attempt}: {e}. {source:?}");
+                tracing::error!("Attempt #{attempt}: {e}. {source:?}");
                 e
             });
             match res {
@@ -437,7 +437,7 @@ impl IntoResponse for Error {
                 },
                 Error::Path { msg: _ } => http::status::StatusCode::BAD_REQUEST,
                 Error::Database { msg } => {
-                    log::error!("Database serror: {msg}");
+                    tracing::error!("Database serror: {msg}");
                     http::status::StatusCode::INTERNAL_SERVER_ERROR
                 }
                 Error::InvalidPage => http::status::StatusCode::NOT_FOUND,

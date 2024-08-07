@@ -7,7 +7,7 @@ use multi_test::response::CosmosResponseExt;
 use perps_exes::{PerpApp, UpdatePositionCollateralImpact::Leverage};
 
 pub async fn test_funding_market(perp_app: &PerpApp) -> Result<()> {
-    log::info!("Testing that we can fund the market");
+    tracing::info!("Testing that we can fund the market");
 
     async fn open_test_position(perp_app: &PerpApp) -> Result<()> {
         let tx = perp_app
@@ -53,7 +53,7 @@ pub async fn test_funding_market(perp_app: &PerpApp) -> Result<()> {
 }
 
 pub async fn test_wallet_balance_decrease(perp_app: &PerpApp) -> Result<()> {
-    log::info!("Testing that wallet balance decreases");
+    tracing::info!("Testing that wallet balance decreases");
 
     // Open position
     let collateral = NonZero::<Collateral>::from_str("100")?;
@@ -85,7 +85,7 @@ pub async fn test_wallet_balance_decrease(perp_app: &PerpApp) -> Result<()> {
 
     let positions = perp_app.all_open_positions().await?;
 
-    log::info!("Found open positions: {}", positions.ids.len());
+    tracing::info!("Found open positions: {}", positions.ids.len());
     ensure!(
         positions.ids.len() == 1,
         "Only one position currently opened"
@@ -107,7 +107,7 @@ pub async fn test_wallet_balance_decrease(perp_app: &PerpApp) -> Result<()> {
 }
 
 pub async fn test_update_collateral(perp_app: &PerpApp) -> Result<()> {
-    log::info!("Testing collateral updates");
+    tracing::info!("Testing collateral updates");
 
     // Open position
     let collateral = NonZero::<Collateral>::from_str("100")?;
@@ -149,7 +149,7 @@ pub async fn test_update_collateral(perp_app: &PerpApp) -> Result<()> {
     let _tx = perp_app
         .update_collateral(position, new_collateral, Leverage, None)
         .await?;
-    log::info!("Updated collateral (Increase)");
+    tracing::info!("Updated collateral (Increase)");
 
     let current_balance = perp_app.cw20_balance().await?;
     ensure!(
@@ -186,7 +186,7 @@ pub async fn test_update_collateral(perp_app: &PerpApp) -> Result<()> {
     let _tx = perp_app
         .update_collateral(position, new_collateral, Leverage, None)
         .await?;
-    log::info!("Updated collateral (Decrease)");
+    tracing::info!("Updated collateral (Decrease)");
 
     let incr_balance = perp_app.cw20_balance().await?;
 
@@ -225,7 +225,7 @@ pub async fn test_update_collateral(perp_app: &PerpApp) -> Result<()> {
 }
 
 pub async fn test_set_and_fetch_price(perp_app: &PerpApp) -> Result<()> {
-    log::info!("Set and fetch price");
+    tracing::info!("Set and fetch price");
 
     let new_price = PriceBaseInQuote::from_str("9.433493300000000079")?;
 
@@ -244,7 +244,7 @@ pub async fn test_set_and_fetch_price(perp_app: &PerpApp) -> Result<()> {
 }
 
 pub async fn test_update_leverage(perp_app: &PerpApp) -> Result<()> {
-    log::info!("Test updating leverage");
+    tracing::info!("Test updating leverage");
 
     // Open position
     let collateral = "100".parse()?;
@@ -298,7 +298,7 @@ pub async fn test_update_leverage(perp_app: &PerpApp) -> Result<()> {
 }
 
 pub async fn test_update_max_gains(perp_app: &PerpApp) -> Result<()> {
-    log::info!("Test updating Max Gains");
+    tracing::info!("Test updating Max Gains");
 
     // Open position
     let collateral = "100".parse()?;
@@ -374,7 +374,7 @@ fn threshold_range(n1: Collateral, n2: Collateral, threshold: Collateral) -> Res
 }
 
 pub(crate) async fn test_pnl_on_liquidation(perp_app: &PerpApp) -> Result<()> {
-    log::info!("Test PnL on liquidation");
+    tracing::info!("Test PnL on liquidation");
 
     // Open position
     let collateral = "100".parse()?;
@@ -407,7 +407,7 @@ pub(crate) async fn test_pnl_on_liquidation(perp_app: &PerpApp) -> Result<()> {
     let res = perp_app.set_price(new_price, price_usd).await?;
     perp_app.crank(None).await?;
 
-    log::info!("Price set to force liquidation in: {}", res.txhash);
+    tracing::info!("Price set to force liquidation in: {}", res.txhash);
 
     let closed = perp_app
         .get_closed_positions()

@@ -30,16 +30,16 @@ impl DepositOpt {
                 anyhow::bail!("No factory found")
             }
             msg::contracts::tracker::entry::ContractResp::Found { address, .. } => {
-                log::info!("Found factory address {address}");
+                tracing::info!("Found factory address {address}");
                 Factory::from_contract(app.basic.cosmos.make_contract(address.parse()?))
             }
         };
         let market = factory.get_market(self.market).await?;
-        log::info!("Found market address {}", market.market);
+        tracing::info!("Found market address {}", market.market);
         let market = MarketContract::new(market.market);
         let status = market.status().await?;
         let res = market.deposit(wallet, &status, self.amount).await?;
-        log::info!("Deposited collateral in {}", res.txhash);
+        tracing::info!("Deposited collateral in {}", res.txhash);
 
         Ok(())
     }

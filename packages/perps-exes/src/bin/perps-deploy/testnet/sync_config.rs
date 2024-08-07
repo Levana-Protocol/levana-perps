@@ -128,9 +128,9 @@ async fn go(
         }
 
         if needed_update.is_empty() {
-            log::info!("No updates needed for {}", market_id);
+            tracing::info!("No updates needed for {}", market_id);
         } else {
-            log::info!(
+            tracing::info!(
                 "Need to update {market_id} with:\n{}",
                 serde_json::to_string_pretty(&needed_update)?
             );
@@ -138,7 +138,7 @@ async fn go(
                 let update = serde_json::Value::Object(needed_update);
                 let update: ConfigUpdate = serde_json::from_value(update)?;
                 let res = market.config_update(wallet, update).await?;
-                log::info!("Updated {market_id} in {}", res.txhash);
+                tracing::info!("Updated {market_id} in {}", res.txhash);
             }
         }
     }

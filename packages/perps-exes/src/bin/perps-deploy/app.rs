@@ -27,7 +27,7 @@ impl LazyWallet {
             .map(LazyWallet)
     }
 
-    fn get(&self) -> Result<&Wallet> {
+    pub(crate) fn get(&self) -> Result<&Wallet> {
         self.0.as_ref().context("No wallet provided on CLI")
     }
 }
@@ -101,31 +101,12 @@ impl Opt {
         if let Some(x) = self.cosmos_gas_multiplier {
             builder.set_gas_estimate_multiplier(x);
         }
-        log::info!("Connecting to {}", builder.grpc_url());
+        tracing::info!("Connecting to {}", builder.grpc_url());
 
         builder.build().map_err(anyhow::Error::from)
     }
 
-    pub(crate) async fn connect_with_grpc(
-        &self,
-        network: PerpsNetwork,
-        grpc_url: String,
-    ) -> Result<Cosmos> {
-        let mut builder = network.builder().await?;
-        builder.set_grpc_url(grpc_url);
-        if let Some(chain_id) = &self.cosmos_chain_id {
-            builder.set_chain_id(chain_id.clone());
-        }
-        builder.set_referer_header(Some("https://querier.levana.finance".to_owned()));
-        if let Some(x) = self.cosmos_gas_multiplier {
-            builder.set_gas_estimate_multiplier(x);
-        }
-        log::info!("Connecting to {}", builder.grpc_url());
-
-        builder.build().map_err(anyhow::Error::from)
-    }
-
-    fn get_lazy_wallet(&self, network: PerpsNetwork) -> Result<LazyWallet, WalletError> {
+    pub(crate) fn get_lazy_wallet(&self, network: PerpsNetwork) -> Result<LazyWallet, WalletError> {
         LazyWallet::new(self.wallet.clone(), network.get_address_hrp())
     }
 
@@ -309,29 +290,6 @@ impl Opt {
 
         Ok(AppMainnet { cosmos, wallet })
     }
-
-    pub(crate) async fn load_app_mainnet_with_grpc_url(
-        &self,
-        network: PerpsNetwork,
-        url: GrpcUrl,
-    ) -> Result<AppMainnet> {
-        match network {
-            PerpsNetwork::Regular(cosmos::CosmosNetwork::OsmosisMainnet) => {
-                let cosmos = self.connect_with_grpc(network, url.osmosis_mainnet).await?;
-                let wallet = self.get_lazy_wallet(network)?;
-                Ok(AppMainnet { cosmos, wallet })
-            }
-            _ => {
-                let cosmos = self.connect(network).await?;
-                let wallet = self.get_lazy_wallet(network)?;
-                Ok(AppMainnet { cosmos, wallet })
-            }
-        }
-    }
-}
-
-pub(crate) struct GrpcUrl {
-    pub(crate) osmosis_mainnet: String,
 }
 
 impl BasicApp {

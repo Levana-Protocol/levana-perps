@@ -7,7 +7,6 @@ use anyhow::{Context as AnyhowContext, Result};
 use context::*;
 use dotenv::dotenv;
 use futures::{channel::mpsc::unbounded, future, pin_mut, StreamExt, TryStreamExt};
-use log::info;
 use multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use std::{cell::RefCell, net::SocketAddr, rc::Rc, sync::Arc};
 use tokio::{
@@ -15,17 +14,18 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 use tokio_util::task::LocalPoolHandle;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter, Layer};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     dotenv().ok();
     let ctx = Context::new().await;
-    init_logger(&ctx);
+    init_logger(&ctx)?;
 
     // Create the event loop and TCP listener we'll accept connections on.
     let try_socket = TcpListener::bind(&ctx.listen_addr()).await;
     let listener = try_socket.expect("Failed to bind");
-    info!("Listening on: {}", ctx.listen_addr());
+    tracing::info!("Listening on: {}", ctx.listen_addr());
 
     let pool = LocalPoolHandle::new(5);
 
@@ -58,7 +58,7 @@ async fn accept_connection(
         .await
         .context("Error during the websocket handshake occurred")?;
 
-    info!("New WebSocket connection: {}", addr);
+    tracing::info!("New WebSocket connection: {}", addr);
 
     // Insert the write part of this peer to the peer map.
     let (tx, rx) = unbounded();
@@ -100,11 +100,31 @@ async fn accept_connection(
     Ok(())
 }
 
-fn init_logger(ctx: &Context) {
-    let env = env_logger::Env::default().default_filter_or(if ctx.opts.verbose {
-        format!("{}=debug,cosmos=debug,info", env!("CARGO_CRATE_NAME"))
-    } else {
-        "info".to_owned()
-    });
-    env_logger::Builder::from_env(env).init();
+fn init_logger(ctx: &Context) -> anyhow::Result<()> {
+    let env_filter = EnvFilter::from_default_env();
+
+    let crate_name = env!("CARGO_CRATE_NAME");
+    let env_filter = match std::env::var("RUST_LOG") {
+        Ok(_) => env_filter,
+        Err(_) => {
+            if ctx.opts.verbose {
+                env_filter
+                    .add_directive("cosmos=debug".parse()?)
+                    .add_directive(format!("{}=debug", crate_name).parse()?)
+            } else {
+                env_filter.add_directive(format!("{}=info", crate_name).parse()?)
+            }
+        }
+    };
+
+    tracing_subscriber::registry()
+        .with(
+            fmt::Layer::default()
+                .log_internal_errors(true)
+                .and_then(env_filter),
+        )
+        .init();
+
+    tracing::debug!("Debug message!");
+    Ok(())
 }

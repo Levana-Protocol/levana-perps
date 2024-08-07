@@ -30,7 +30,7 @@ impl Opt {
 
         while samples > 0 {
             samples -= 1;
-            log::info!("Querying {next_height}");
+            tracing::info!("Querying {next_height}");
 
             let status: StatusResp = app
                 .market
