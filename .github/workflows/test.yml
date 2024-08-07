@@ -26,18 +26,6 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: just@1.25.2
-      - name: Configure AWS Credentials
-        # if: github.ref == 'refs/heads/main'
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-2
-      - name: Build and Deploy documentation
-        # if: github.ref == 'refs/heads/main'
-        run: |
-          just build-docs
-          aws s3 sync ./.output/temp s3://levana-dev-docs/levana-perps-multichain/docs --size-only --acl public-read --delete
       - uses: dorny/paths-filter@v3
         id: contracts
         with:
@@ -107,6 +95,18 @@ jobs:
       - name: Migrate contracts (osmoci)
         if: github.ref == 'refs/heads/main'
         run: COSMOS_WALLET="${{ secrets.DEPLOYER_PHRASE }}" just migrate-osmoci || echo "Ignoring failed migration"
+      - name: Configure AWS Credentials
+        if: github.ref == 'refs/heads/main'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-2
+      - name: Build and Deploy documentation
+        if: github.ref == 'refs/heads/main'
+        run: |
+          just build-docs
+          aws s3 sync ./.output/temp s3://levana-dev-docs/levana-perps-multichain/docs --size-only --acl public-read --delete
 
   macos-binary:
     runs-on: macos-latest
