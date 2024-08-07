@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 use cosmos::{Address, Contract};
@@ -10,6 +10,7 @@ use msg::{
     },
     prelude::*,
 };
+use parking_lot::RwLock;
 use perps_exes::pyth::fetch_json_with_retry;
 use pyth_sdk_cw::PriceIdentifier;
 
@@ -82,6 +83,7 @@ impl OffchainPriceData {
             &stable_feeds,
             &mut values,
             &mut oldest_publish_time,
+            &app.pyth_stats,
         )
         .await?;
         fetch_pyth_prices(
@@ -90,6 +92,7 @@ impl OffchainPriceData {
             &edge_feeds,
             &mut values,
             &mut oldest_publish_time,
+            &app.pyth_stats,
         )
         .await?;
 
@@ -399,6 +402,57 @@ fn compose_oracle_feeds(
     })
 }
 
+/// Statistics on the age of Pyth prices when queried.
+#[derive(Default)]
+pub(crate) struct PythPriceStats {
+    pub(crate) feeds: RwLock<HashMap<PriceIdentifier, PythPriceStatsSingle>>,
+}
+impl PythPriceStats {
+    pub(crate) fn get_status(&self) -> Vec<String> {
+        let mut lines = vec![];
+        for (
+            id,
+            PythPriceStatsSingle {
+                last_age,
+                total_ages,
+                count_ages,
+            },
+        ) in self.feeds.read().iter()
+        {
+            assert!(*count_ages > 0);
+            let average = Decimal256::from_ratio(*total_ages, *count_ages);
+            lines.push(format!(
+                "{id}: last age {last_age}, average age {average}, data points: {count_ages}"
+            ));
+        }
+        lines.sort();
+        lines
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct PythPriceStatsSingle {
+    pub(crate) last_age: u64,
+    pub(crate) total_ages: u64,
+    pub(crate) count_ages: u64,
+}
+
+impl PythPriceStatsSingle {
+    fn new(age: u64) -> Self {
+        Self {
+            last_age: age,
+            total_ages: age,
+            count_ages: 1,
+        }
+    }
+
+    fn add_age(&mut self, age: u64) {
+        self.last_age = age;
+        self.total_ages += age;
+        self.count_ages += 1;
+    }
+}
+
 #[tracing::instrument(skip_all)]
 async fn fetch_pyth_prices(
     client: &reqwest::Client,
@@ -406,6 +460,7 @@ async fn fetch_pyth_prices(
     ids: &HashSet<PriceIdentifier>,
     values: &mut HashMap<PriceIdentifier, (NonZero<Decimal256>, DateTime<Utc>)>,
     oldest_publish_time: &mut Option<DateTime<Utc>>,
+    stats: &PythPriceStats,
 ) -> Result<()> {
     #[derive(serde::Deserialize)]
     struct PythRecord {
@@ -429,6 +484,7 @@ async fn fetch_pyth_prices(
 
     let records: Vec<PythRecord> = fetch_json_with_retry(|| client.get(url.clone())).await?;
 
+    let now = Utc::now();
     for PythRecord {
         id,
         price: PythPrice {
@@ -448,11 +504,20 @@ async fn fetch_pyth_prices(
                         }
                     }
                 }
+                let age = now - publish_time;
+                if let Ok(age) = u64::try_from(age.num_seconds()) {
+                    match stats.feeds.write().entry(id) {
+                        Entry::Occupied(mut x) => x.get_mut().add_age(age),
+                        Entry::Vacant(x) => {
+                            x.insert(PythPriceStatsSingle::new(age));
+                        }
+                    }
+                }
                 publish_time
             }
             None => {
                 tracing::error!("Could not convert Pyth publish time to NaiveDateTime, ignoring");
-                Utc::now()
+                now
             }
         };
 
