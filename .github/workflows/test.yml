@@ -106,7 +106,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           just build-docs
-          aws s3 sync ./.output/temp s3://levana-dev-docs/levana-perps-multichain/docs --acl public-read --delete
+          aws s3 sync ./.output/temp s3://levana-dev-docs/levana-perps-multichain/docs --size-only --acl public-read --delete
 
   macos-binary:
     runs-on: macos-latest
