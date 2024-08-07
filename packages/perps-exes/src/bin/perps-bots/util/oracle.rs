@@ -228,7 +228,7 @@ impl Display for FeedType {
 
 fn compose_oracle_feeds(
     oracle_price: &OraclePriceResp,
-    pyth_prices: &HashMap<PriceIdentifier, (NumberGtZero, DateTime<Utc>)>,
+    offchain_pyth_prices: &HashMap<PriceIdentifier, (NumberGtZero, DateTime<Utc>)>,
     feeds: &[SpotPriceFeed],
     volatile_diff_seconds: u32,
 ) -> Result<ComposedOracleFeed> {
@@ -257,7 +257,7 @@ fn compose_oracle_feeds(
                 // We perform two age checks. First: make sure that the
                 // off-chain price is new enough to satisfy age tolerance. If not, we don't want to
                 // interact with this market at all.
-                let (price, off_chain_pyth_update) = pyth_prices
+                let (price, off_chain_pyth_update) = offchain_pyth_prices
                     .get(id)
                     .with_context(|| format!("Missing pyth price for ID {}", id))?;
                 let off_chain_pyth_update = *off_chain_pyth_update;
