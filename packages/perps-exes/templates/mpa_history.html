@@ -29,13 +29,13 @@
 		            {{ record.date }}
               </td>
               <td class="table-light">
-                {{ record.result.dnf_in_usd|fmt("{:.2}") }}
+                {{ record.dnf.dnf_in_usd|fmt("{:.2}") }}
               </td>
               <td class="table-light">
-                {{ record.result.dnf_in_notional }}
+                {{ record.dnf.dnf_in_notional }}
               </td>
               <td class="table-light">
-                {{ record.result.min_depth_liquidity|fmt("{:.2}") }}
+                {{ record.dnf.min_depth_liquidity|fmt("{:.2}") }}
               </td>
             </tr>
             {% endfor %}

@@ -393,7 +393,7 @@ pub(crate) struct HistoricalData {
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub(crate) struct DnfRecord {
     pub(crate) date: NaiveDate,
-    pub(crate) result: Dnf,
+    pub(crate) dnf: Dnf,
     pub(crate) max_leverage: MaxLeverage,
 }
 
@@ -426,7 +426,7 @@ impl HistoricalData {
         }
         let result = DnfRecord {
             date: now,
-            result: dnf,
+            dnf,
             max_leverage,
         };
         self.data.push(result);
@@ -455,13 +455,13 @@ impl HistoricalData {
         let mut historical_data = self.till_days(Some(days_to_consider))?;
         historical_data
             .data
-            .sort_by_key(|item| item.result.min_depth_liquidity);
+            .sort_by_key(|item| item.dnf.min_depth_liquidity);
         let result = historical_data
             .data
             .into_iter()
             .next()
             .context("Empty historical data")?;
-        Ok(result.result)
+        Ok(result.dnf)
     }
 
     pub(crate) fn till_days(
@@ -781,12 +781,12 @@ mod tests {
             data: vec![
                 DnfRecord {
                     date,
-                    result: result.clone(),
+                    dnf: result.clone(),
                     max_leverage: MaxLeverage::new(1.0),
                 },
                 DnfRecord {
                     date,
-                    result,
+                    dnf,
                     max_leverage: MaxLeverage::new(5.0),
                 },
             ],
