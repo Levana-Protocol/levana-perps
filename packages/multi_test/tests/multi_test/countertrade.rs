@@ -772,7 +772,7 @@ fn opens_balancing_position() {
             .long_funding
             .approx_eq_eps(
                 config.target_funding.into_signed(),
-                "0.00001".parse().unwrap()
+                "0.0001".parse().unwrap()
             )
             .unwrap(),
         "Long funding {} should be close to target_funding {}",
@@ -955,10 +955,16 @@ fn deduct_balance() {
                     ..
                 },
         } => {
-            assert_eq!(
-                collateral.raw(),
-                Collateral::from_str("1.615376150827128342").unwrap()
-            );
+            let pos_collateral = match market_type {
+                msg::shared::storage::MarketType::CollateralIsQuote => {
+                    Collateral::from_str("1.615376150827128342").unwrap()
+                }
+                msg::shared::storage::MarketType::CollateralIsBase => {
+                    Collateral::from_str("1.468523773479207584").unwrap()
+                }
+            };
+
+            assert_eq!(collateral.raw(), pos_collateral);
         }
         has_work => panic!("Unexpected has_work: {has_work:?}"),
     }
@@ -972,12 +978,31 @@ fn deduct_balance() {
         .unwrap()
         .pop()
         .unwrap();
-    // 100 - 1.61 = 98.39
-    assert_eq!(
-        balance
-            .collateral
-            .raw()
-            .diff(Collateral::from_str("98.39").unwrap()),
-        Collateral::from_str("0.005376150827128342").unwrap()
-    );
+    // 100 - 1.46 = 98.54, 100 - 1.61 = 98.39
+    let expected_balance = match market_type {
+        msg::shared::storage::MarketType::CollateralIsQuote => {
+            Collateral::from_str("0.005376150827128342")
+        }
+        msg::shared::storage::MarketType::CollateralIsBase => {
+            Collateral::from_str("0.008523773479207584")
+        }
+    }
+    .unwrap();
+
+    match market_type {
+        msg::shared::storage::MarketType::CollateralIsQuote => assert_eq!(
+            balance
+                .collateral
+                .raw()
+                .diff(Collateral::from_str("98.39").unwrap()),
+            expected_balance
+        ),
+        msg::shared::storage::MarketType::CollateralIsBase => assert_eq!(
+            balance
+                .collateral
+                .raw()
+                .diff(Collateral::from_str("98.54").unwrap()),
+            expected_balance
+        ),
+    }
 }

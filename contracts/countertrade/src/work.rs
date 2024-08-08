@@ -9,7 +9,10 @@ use msg::contracts::market::{
 use shared::{
     number::Number,
     price::{Price, TakeProfitTrader},
-    storage::{DirectionToBase, LeverageToBase, MarketType, PricePoint, SignedLeverageToNotional},
+    storage::{
+        DirectionToBase, DirectionToNotional, LeverageToBase, MarketType, PricePoint,
+        SignedLeverageToNotional,
+    },
 };
 
 use crate::prelude::*;
@@ -469,14 +472,26 @@ fn compute_delta_notional(
     };
     let take_profit = TakeProfitTrader::from(take_profit.into_base_price(status.market_type));
 
-    let desired_leverage = max_leverage.into_number().min(status.config.max_leverage);
+    let market_max_leverage = status.config.max_leverage;
+    let market_max_leverage = LeverageToBase::from(
+        NonZero::new(
+            market_max_leverage
+                .try_into_non_negative_value()
+                .context("Market max_leverage is negative")?,
+        )
+        .context("Market max_leverage is zero")?,
+    );
+    let desired_leverage = max_leverage.min(market_max_leverage);
 
-    let desired_leverage =
-        SignedLeverageToNotional::from(if position_notional_size.is_strictly_positive() {
-            desired_leverage
-        } else {
-            -desired_leverage
-        });
+    let notional_direction = if position_notional_size.is_strictly_positive() {
+        DirectionToNotional::Long
+    } else {
+        DirectionToNotional::Short
+    };
+    let base_direction = notional_direction.into_base(status.market_type);
+
+    let desired_leverage = desired_leverage.into_signed(base_direction);
+    let desired_leverage = desired_leverage.into_notional(status.market_type)?;
 
     let position_notional_size_in_collateral =
         position_notional_size.map(|size| price.notional_to_collateral(size));
