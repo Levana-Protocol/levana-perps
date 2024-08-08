@@ -786,7 +786,7 @@ mod tests {
         let data = HistoricalData {
             data: vec![
                 DnfRecord {
-                    date: date,
+                    date,
                     dnf: result.clone(),
                     max_leverage: MaxLeverage::new(2.0),
                 },
