@@ -781,19 +781,24 @@ mod tests {
 
     #[test]
     fn max_leverage_test() {
-        let date = Utc::now().date_naive();
         let result = Dnf::default();
+        let date = Utc::now().date_naive();
         let data = HistoricalData {
             data: vec![
                 DnfRecord {
-                    date,
+                    date: date,
+                    dnf: result.clone(),
+                    max_leverage: MaxLeverage::new(2.0),
+                },
+                DnfRecord {
+                    date: date.checked_sub_days(Days::new(1)).unwrap(),
                     dnf: result.clone(),
                     max_leverage: MaxLeverage::new(1.0),
                 },
                 DnfRecord {
-                    date,
-                    dnf,
-                    max_leverage: MaxLeverage::new(5.0),
+                    date: date.checked_sub_days(Days::new(5)).unwrap(),
+                    dnf: result.clone(),
+                    max_leverage: MaxLeverage::new(-5.0),
                 },
             ],
         };
