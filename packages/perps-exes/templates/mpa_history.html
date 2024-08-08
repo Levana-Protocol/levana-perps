@@ -21,12 +21,13 @@
             <th>Computed DNF in USD</th>
             <th>Computed DNF in Notional</th>
             <th>Min depth liquidity</th>
+            <th>Max leverage</th>
           </thead>
           <tbody>
             {% for record in historical_records %}
             <tr>
               <td class="table-light">
-		            {{ record.date }}
+		{{ record.date }}
               </td>
               <td class="table-light">
                 {{ record.dnf.dnf_in_usd|fmt("{:.2}") }}
@@ -36,6 +37,9 @@
               </td>
               <td class="table-light">
                 {{ record.dnf.min_depth_liquidity|fmt("{:.2}") }}
+              </td>
+              <td class="table-light">
+                {{ record.max_leverage|fmt("{:.2}") }}
               </td>
             </tr>
             {% endfor %}

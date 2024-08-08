@@ -327,6 +327,12 @@ fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfR
 #[derive(Debug, Clone, serde::Serialize, Copy, PartialEq, serde::Deserialize, PartialOrd)]
 pub(crate) struct MaxLeverage(f64);
 
+impl Display for MaxLeverage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl MaxLeverage {
     pub(crate) fn new(leverage: f64) -> Self {
         Self(leverage)
