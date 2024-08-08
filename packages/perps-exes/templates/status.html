@@ -95,6 +95,14 @@
               </td>
             </tr>
             {% endfor %}
+	    <tr>
+              <td class="table-light">
+                <a class="link-info" href="#pyth-feeds">Pyth Feeds</a>
+              </td>
+              <td class="table-light">
+                INFO
+              </td>
+	    </tr>
           </tbody>
 	</table>
       </div>
@@ -122,7 +130,7 @@
           {% endif %}
 	</div>
 	{% endfor %}
-	<div class="shadow pt-3 border-bottom border-secondary-subtle border-5">
+	<div id="pyth-feeds" class="shadow pt-3 border-bottom border-secondary-subtle border-5">
 	  <p class="fs-4 text-primary mb-1">Pyth Feed Age</p>
 	  {% for line in pyth_feed_age %}
 	  <p class="text-break">{{ line }}</p>
