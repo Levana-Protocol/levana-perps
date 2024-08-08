@@ -114,7 +114,7 @@ async fn main_inner(opt: Opt) -> Result<()> {
             let max_leverage = dnf_sensitivity_to_max_leverage(dnf.dnf_in_usd);
 
             tracing::info!("DNF: {}", dnf.dnf_in_notional);
-            tracing::info!("Max leverage: {max_leverage}");
+            tracing::info!("Max leverage: {max_leverage:?}");
         }
         cli::SubCommand::Dnf { market_id } => {
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
@@ -152,11 +152,11 @@ async fn main_inner(opt: Opt) -> Result<()> {
                 );
             }
 
-            tracing::info!("Configured max_leverage: {actual_configured_max_leverage}");
+            tracing::info!("Configured max_leverage: {actual_configured_max_leverage:?}");
             tracing::info!(
-                "Recommended configured max_leverage: {recommended_configured_max_leverage}"
+                "Recommended max_leverage (based on configured DNF): {recommended_configured_max_leverage:?}"
             );
-            tracing::info!("Recommended max_leverage (based on new DNF): {max_leverage}");
+            tracing::info!("Recommended max_leverage (based on computed current day market DNF): {max_leverage:?}");
         }
         cli::SubCommand::Serve { opt: serve_opt } => axum_main(serve_opt, opt).await?,
         cli::SubCommand::Market { out, market_id } => {
