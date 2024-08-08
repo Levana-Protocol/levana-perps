@@ -53,22 +53,25 @@ impl MarketsConfig {
         Ok(DnfInNotional(result))
     }
 
-    pub(crate) fn get_chain_max_leverage(&self, market_id: &MarketId) -> anyhow::Result<f64> {
+    pub(crate) fn get_chain_max_leverage(
+        &self,
+        market_id: &MarketId,
+    ) -> anyhow::Result<MaxLeverage> {
         let result = self
             .markets
             .iter()
             .find(|item| item.status.market_id == *market_id)
             .map(|item| item.status.config.max_leverage.clone())
             .context("No max_leverage found")?;
-        let result = result.parse()?;
-        Ok(result)
+        let leverage = result.parse()?;
+        Ok(MaxLeverage::new(leverage))
     }
 }
 
-pub(crate) fn dnf_sensitivity_to_max_leverage(dnf_sensitivity: DnfInUsd) -> f64 {
+pub(crate) fn dnf_sensitivity_to_max_leverage(dnf_sensitivity: DnfInUsd) -> MaxLeverage {
     let dnf_sensitivity = dnf_sensitivity.0;
     let million = 1000000.0;
-    if dnf_sensitivity < (2.0 * million) {
+    let leverage = if dnf_sensitivity < (2.0 * million) {
         4.0
     } else if dnf_sensitivity >= (2.0 * million) && dnf_sensitivity < (50.0 * million) {
         10.0
@@ -76,10 +79,11 @@ pub(crate) fn dnf_sensitivity_to_max_leverage(dnf_sensitivity: DnfInUsd) -> f64 
         30.0
     } else {
         50.0
-    }
+    };
+    MaxLeverage::new(leverage)
 }
 
-#[derive(PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy)]
+#[derive(PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy, Default)]
 pub(crate) struct DnfInNotional(pub(crate) f64);
 
 impl Display for DnfInNotional {
@@ -103,7 +107,7 @@ impl DnfInNotional {
     }
 }
 
-#[derive(PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(PartialOrd, PartialEq, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub(crate) struct DnfInUsd(pub(crate) f64);
 
 impl Display for DnfInUsd {
@@ -112,7 +116,7 @@ impl Display for DnfInUsd {
     }
 }
 
-#[derive(PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy, Debug)]
+#[derive(PartialEq, Clone, serde::Serialize, serde::Deserialize, Copy, Debug, Default)]
 pub(crate) struct MinDepthLiquidity(pub(crate) f64);
 
 impl Display for MinDepthLiquidity {
@@ -148,7 +152,7 @@ impl PartialOrd for MinDepthLiquidity {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Default)]
 pub(crate) struct Dnf {
     pub(crate) dnf_in_notional: DnfInNotional,
     pub(crate) dnf_in_usd: DnfInUsd,
@@ -320,6 +324,25 @@ fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfR
     Ok(result)
 }
 
+#[derive(Debug, Clone, serde::Serialize, Copy, PartialEq, serde::Deserialize, PartialOrd)]
+pub(crate) struct MaxLeverage(f64);
+
+impl Display for MaxLeverage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl MaxLeverage {
+    pub(crate) fn new(leverage: f64) -> Self {
+        Self(leverage)
+    }
+
+    pub(crate) fn raw(&self) -> f64 {
+        self.0
+    }
+}
+
 #[derive(Clone, serde::Serialize)]
 pub(crate) struct DnfNotify {
     pub(crate) configured_dnf: DnfInNotional,
@@ -376,7 +399,8 @@ pub(crate) struct HistoricalData {
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub(crate) struct DnfRecord {
     pub(crate) date: NaiveDate,
-    pub(crate) result: Dnf,
+    pub(crate) dnf: Dnf,
+    pub(crate) max_leverage: MaxLeverage,
 }
 
 impl HistoricalData {
@@ -400,13 +424,7 @@ impl HistoricalData {
         save_historical_data(market_id, data_dir, self.clone(), None)
     }
 
-    pub(crate) fn append_and_save(
-        &mut self,
-        dnf: Dnf,
-        market_id: &MarketId,
-        data_dir: PathBuf,
-        days_to_consider: Option<u16>,
-    ) -> anyhow::Result<()> {
+    pub(crate) fn append(&mut self, dnf: Dnf, max_leverage: MaxLeverage) -> anyhow::Result<()> {
         let now = Utc::now().date_naive();
         if self.data.iter().any(|item| item.date == now) {
             tracing::info!("Ignoring data insertion since it's already present");
@@ -414,23 +432,42 @@ impl HistoricalData {
         }
         let result = DnfRecord {
             date: now,
-            result: dnf,
+            dnf,
+            max_leverage,
         };
         self.data.push(result);
-        save_historical_data(market_id, data_dir, self.clone(), days_to_consider)
+        Ok(())
+    }
+
+    pub(crate) fn compute_max_leverage(
+        &self,
+        days_to_consider: u16,
+    ) -> anyhow::Result<MaxLeverage> {
+        let historical_data = self.till_days(Some(days_to_consider))?;
+        let leverage = historical_data
+            .data
+            .iter()
+            .min_by(|x, y| {
+                x.max_leverage
+                    .raw()
+                    .partial_cmp(&y.max_leverage.raw())
+                    .expect("max_leverage comparison failed")
+            })
+            .context("Historical data doesn't have a single max_leverage")?;
+        Ok(leverage.max_leverage)
     }
 
     pub(crate) fn compute_dnf(&self, days_to_consider: u16) -> anyhow::Result<Dnf> {
         let mut historical_data = self.till_days(Some(days_to_consider))?;
         historical_data
             .data
-            .sort_by_key(|item| item.result.min_depth_liquidity);
+            .sort_by_key(|item| item.dnf.min_depth_liquidity);
         let result = historical_data
             .data
             .into_iter()
             .next()
             .context("Empty historical data")?;
-        Ok(result.result)
+        Ok(result.dnf)
     }
 
     pub(crate) fn till_days(
@@ -530,40 +567,51 @@ pub(crate) async fn compute_coin_dnfs(
             if !data_present {
                 // Compute todays data and save it
                 let dnf = dnf_sensitivity(&http_app, market_id).await;
-                let dnf = match dnf {
-                    Ok(dnf) => dnf,
-                    Err(ref error) => {
-                        if error.to_string().contains("Exchange type not known for id") {
-                            error_markets.push(market_id);
-                            continue;
-                        } else {
-                            dnf?
+                let (dnf, max_leverage) = {
+                    let dnf = match dnf {
+                        Ok(dnf) => dnf,
+                        Err(ref error) => {
+                            if error.to_string().contains("Exchange type not known for id") {
+                                error_markets.push(market_id);
+                                continue;
+                            } else {
+                                dnf?
+                            }
                         }
-                    }
+                    };
+                    let configured_dnf = market_config
+                        .get_chain_dnf(market_id)
+                        .context(format!("No DNF configured for {market_id:?}"))?;
+                    let max_leverage = dnf_sensitivity_to_max_leverage(
+                        configured_dnf
+                            .as_asset_amount(NotionalAsset(market_id.get_notional()), &http_app)
+                            .await?,
+                    );
+                    (dnf, max_leverage)
                 };
-                historical_data.append_and_save(dnf, market_id, data_dir.clone(), None)?;
-                tracing::info!(
-                    "Saving data for market {market_id} (Total: {})",
-                    historical_data.data.len()
-                );
+                historical_data.append(dnf, max_leverage)?;
             }
             if historical_data.is_present_until(now_minus_days) {
                 tracing::info!("Computing DNF using historical data");
-                let market_dnf = historical_data.compute_dnf(serve_opt.cmc_data_age_days)?;
+                let historical_market_dnf =
+                    historical_data.compute_dnf(serve_opt.cmc_data_age_days)?;
+                let historical_max_leverage =
+                    historical_data.compute_max_leverage(serve_opt.cmc_data_age_days)?;
                 let dnf_notify = check_market_status(
                     &market_config,
                     market_id,
                     &http_app,
-                    &market_dnf,
+                    &historical_market_dnf,
                     serve_opt.clone(),
+                    historical_max_leverage,
                 )
                 .await?;
                 app.market_params
                     .write()
                     .insert(market_id.clone(), dnf_notify);
                 historical_data = historical_data.till_days(Some(serve_opt.cmc_data_age_days))?;
-                historical_data.save(market_id, data_dir.clone())?;
             }
+            historical_data.save(market_id, data_dir.clone())?;
 
             if serve_opt.cmc_wait_seconds > 0 {
                 tracing::info!(
@@ -589,8 +637,9 @@ async fn check_market_status(
     market_config: &MarketsConfig,
     market_id: &MarketId,
     http_app: &HttpApp,
-    market_dnf: &Dnf,
+    historical_market_dnf: &Dnf,
     serve_opt: ServeOpt,
+    historical_max_leverage: MaxLeverage,
 ) -> anyhow::Result<DnfNotify> {
     tracing::info!("Checking market status for {market_id}");
     let configured_dnf = market_config
@@ -599,27 +648,26 @@ async fn check_market_status(
     let configured_max_leverage = market_config
         .get_chain_max_leverage(market_id)
         .context(format!("No max_leverage configured for {market_id:?}"))?;
-    let max_leverage = dnf_sensitivity_to_max_leverage(
-        configured_dnf
-            .as_asset_amount(NotionalAsset(market_id.get_notional()), http_app)
-            .await?,
-    );
-    tracing::info!("Configured max_leverage for {market_id}: {configured_max_leverage}");
-    tracing::info!("Recommended max_leverage for {market_id}: {max_leverage}");
 
-    if configured_max_leverage != max_leverage {
+    tracing::info!("Configured max_leverage for {market_id}: {configured_max_leverage:?}");
+    tracing::info!(
+        "Recommended max_leverage based on historical data for {market_id}: {historical_max_leverage:?}"
+    );
+
+    if configured_max_leverage != historical_max_leverage {
         http_app
             .send_notification(
                 format!(":information_source: Recommended Max leverage change for {market_id}"),
                 format!(
-                    "Configured Max leverage: *{}* \n Recommended Max leverage: *{}*",
-                    configured_max_leverage, max_leverage
+                    "Configured Max leverage: *{configured_max_leverage:?}* \n Recommended Max leverage: *{historical_max_leverage:?}*",
+
                 ),
             )
             .await?;
     }
+
     let dnf_notify = compute_dnf_notify(
-        market_dnf.dnf_in_notional,
+        historical_market_dnf.dnf_in_notional,
         configured_dnf,
         serve_opt.dnf_increase_threshold,
         serve_opt.dnf_decrease_threshold,
@@ -729,5 +777,32 @@ mod tests {
         data.sort();
         let last = data.last().unwrap();
         assert_eq!(*last, MinDepthLiquidity(9.0));
+    }
+
+    #[test]
+    fn max_leverage_test() {
+        let result = Dnf::default();
+        let date = Utc::now().date_naive();
+        let data = HistoricalData {
+            data: vec![
+                DnfRecord {
+                    date,
+                    dnf: result.clone(),
+                    max_leverage: MaxLeverage::new(2.0),
+                },
+                DnfRecord {
+                    date: date.checked_sub_days(Days::new(1)).unwrap(),
+                    dnf: result.clone(),
+                    max_leverage: MaxLeverage::new(1.0),
+                },
+                DnfRecord {
+                    date: date.checked_sub_days(Days::new(5)).unwrap(),
+                    dnf: result.clone(),
+                    max_leverage: MaxLeverage::new(-5.0),
+                },
+            ],
+        };
+        let max_leverage = data.compute_max_leverage(2).unwrap();
+        assert_eq!(max_leverage.raw(), 1.0);
     }
 }
