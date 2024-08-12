@@ -21,14 +21,12 @@ max_leverage = "4"
 carry_leverage = "2"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.06"
-borrow_fee_rate_max_annualized = "0.6"
 liquifunding_delay_seconds = 21600
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "448000"
 delta_neutrality_fee_cap = "0.03"
 delta_neutrality_fee_tax = "0.5"
-liquifunding_delay_fuzz_seconds = 3600
 liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 
@@ -36,6 +34,19 @@ exposure_margin_ratio = "0.02"
 initial-borrow-fee-rate = "0.2"
 
 [markets.ATOM_USD.config]
+carry_leverage = "7"
+funding_rate_sensitivity = "2"
+borrow_fee_rate_min_annualized = "0.1"
+target_utilization = "0.5"
+borrow_fee_sensitivity = "0.3"
+delta_neutrality_fee_sensitivity = "100000000"
+delta_neutrality_fee_tax = "0.25"
+liquidity_cooldown_seconds = 86400
+
+[markets.dATOM_USD]
+initial-borrow-fee-rate = "0.2"
+
+[markets.dATOM_USD.config]
 carry_leverage = "7"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.1"
@@ -644,7 +655,6 @@ initial-borrow-fee-rate = "0.08"
 
 [markets.SEI_USD.config]
 carry_leverage = "7"
-max_leverage = "30"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.04"
 target_utilization = "0.5"
@@ -988,14 +998,12 @@ max_leverage = "4"
 carry_leverage = "2"
 funding_rate_sensitivity = "2"
 borrow_fee_rate_min_annualized = "0.06"
-borrow_fee_rate_max_annualized = "0.6"
 liquifunding_delay_seconds = 21600
 target_utilization = "0.5"
 borrow_fee_sensitivity = "0.3"
 delta_neutrality_fee_sensitivity = "76249"
 delta_neutrality_fee_cap = "0.03"
 delta_neutrality_fee_tax = "0.5"
-liquifunding_delay_fuzz_seconds = 3600
 liquidity_cooldown_seconds = 86400
 exposure_margin_ratio = "0.02"
 

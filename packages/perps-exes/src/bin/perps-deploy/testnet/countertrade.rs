@@ -1,9 +1,13 @@
 use std::str::FromStr;
 
 use anyhow::Context;
+use comfy_table::{presets::UTF8_FULL, Cell, Table};
 use cosmos::Address;
 use cosmwasm_std::{Binary, Uint128};
-use msg::contracts::market::entry::StatusResp;
+use msg::contracts::{
+    countertrade::{MarketStatus, MarketsResp},
+    market::entry::StatusResp,
+};
 use perps_exes::contracts::Factory;
 use shared::storage::{MarketId, RawAddr};
 
@@ -26,8 +30,17 @@ pub(crate) enum CounterTradeSub {
         #[clap(long)]
         do_it: bool,
     },
-    // Check if market is balanced
+    /// Check if market is balanced
     Stats {
+        /// Family name for these contracts
+        #[clap(long, env = "PERPS_FAMILY")]
+        family: String,
+    },
+    /// Collateral and shares details
+    Shares {
+        /// Countertrade contract Address
+        #[clap(long, env = "COUNTERTRADE_CONTRACT_ADDRESS")]
+        contract: Address,
         /// Family name for these contracts
         #[clap(long, env = "PERPS_FAMILY")]
         family: String,
@@ -61,7 +74,56 @@ async fn go(opt: crate::cli::Opt, sub: CounterTradeSub) -> anyhow::Result<()> {
                 basic_market_analysis(&market.market_id, &status)?;
             }
         }
+        CounterTradeSub::Shares { contract, family } => {
+            let app = opt.load_app(&family).await?;
+            let cosmos = app.basic.cosmos;
+            let mut msg = msg::contracts::countertrade::QueryMsg::Markets {
+                start_after: None,
+                limit: None,
+            };
+            let mut result = vec![];
+            loop {
+                let contract = cosmos.make_contract(contract);
+                let mut response: MarketsResp = contract.query(msg.clone()).await?;
+                result.append(&mut response.markets);
+                if response.next_start_after.is_none() {
+                    break;
+                } else {
+                    msg = msg::contracts::countertrade::QueryMsg::Markets {
+                        start_after: response.next_start_after,
+                        limit: None,
+                    };
+                }
+            }
+            shares_analysis(result)?;
+        }
     }
+    Ok(())
+}
+
+fn shares_analysis(status: Vec<MarketStatus>) -> anyhow::Result<()> {
+    let mut table = Table::new();
+    table
+        .load_preset(UTF8_FULL)
+        .set_content_arrangement(comfy_table::ContentArrangement::Dynamic)
+        .set_width(80)
+        .set_header(vec![
+            Cell::new("Market ID"),
+            Cell::new("Collateral"),
+            Cell::new("Shares"),
+            Cell::new("Position collateral"),
+        ]);
+    for item in status {
+        table.add_row(vec![
+            item.id.to_string(),
+            item.collateral.to_string(),
+            item.shares.to_string(),
+            item.position
+                .map(|item| item.active_collateral.to_string())
+                .unwrap_or("NA".to_owned()),
+        ]);
+    }
+    println!("{table}");
     Ok(())
 }
 

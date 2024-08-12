@@ -1953,6 +1953,25 @@ inverted = false
 key = "wstETH_USD"
 inverted = false
 
+# This is a Neutron-style LSD market.
+# Collateral asset is an LSD, but the base asset is priced for the underlying ATOM.
+[[networks.neutron-mainnet.dATOM_USD.feeds]]
+
+[networks.neutron-mainnet.dATOM_USD.feeds.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.neutron-mainnet.dATOM_USD.feeds-usd]]
+
+# Note that, in the future, we'll want to update
+# the config to reflect changes in redemption rate.
+# Without that change, the market will continue to price
+# things correctly, but calculations in USD will underrepresent
+# the value of the collateral.
+[networks.neutron-mainnet.dATOM_USD.feeds-usd.pyth]
+key = "ATOM_USD"
+inverted = false
+
 [[networks.neutron-testnet.NTRN_USD.feeds]]
 
 [networks.neutron-testnet.NTRN_USD.feeds.pyth]
@@ -2001,6 +2020,25 @@ inverted = false
 
 [networks.neutron-testnet.wstETH_USD.feeds-usd.pyth]
 key = "wstETH_USD"
+inverted = false
+
+# This is a Neutron-style LSD market.
+# Collateral asset is an LSD, but the base asset is priced for the underlying ATOM.
+[[networks.neutron-testnet.dATOM_USD.feeds]]
+
+[networks.neutron-testnet.dATOM_USD.feeds.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.neutron-testnet.dATOM_USD.feeds-usd]]
+
+# Note that, in the future, we'll want to update
+# the config to reflect changes in redemption rate.
+# Without that change, the market will continue to price
+# things correctly, but calculations in USD will underrepresent
+# the value of the collateral.
+[networks.neutron-testnet.dATOM_USD.feeds-usd.pyth]
+key = "ATOM_USD"
 inverted = false
 
 [[networks.dymension-testnet.DYM_USD.feeds]]
