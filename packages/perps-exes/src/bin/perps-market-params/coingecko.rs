@@ -200,7 +200,7 @@ pub(crate) enum Coin {
     MilkTia,
     WstEth,
     Maga,
-    Datom
+    Datom,
 }
 
 impl FromStr for Coin {
