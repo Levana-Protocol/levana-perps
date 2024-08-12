@@ -200,6 +200,7 @@ pub(crate) enum Coin {
     MilkTia,
     WstEth,
     Maga,
+    Datom,
 }
 
 impl FromStr for Coin {
@@ -250,6 +251,7 @@ impl FromStr for Coin {
             "milkTIA" => Ok(Coin::MilkTia),
             "wstETH" => Ok(Coin::WstEth),
             "MAGA" => Ok(Coin::Maga),
+            "dATOM" => Ok(Coin::Datom),
             other => Err(anyhow!("Unsupported coin {other}")),
         }
     }
@@ -310,6 +312,7 @@ impl Coin {
             Coin::MilkTia => TIA_CMC_ID,
             Coin::WstEth => ETH_CMC_ID, // Since we are speculating on ETH
             Coin::Maga => 27872,
+            Coin::Datom => ATOM_CMC_ID, // Since we are speculating on ATOM
         }
     }
 
@@ -358,6 +361,7 @@ impl Coin {
             Coin::MilkTia => WrappedCoin(Coin::Tia),
             Coin::WstEth => WrappedCoin(Coin::Eth),
             Coin::Maga => WrappedCoin(Coin::Maga),
+            Coin::Datom => WrappedCoin(Coin::Atom),
         }
     }
 }

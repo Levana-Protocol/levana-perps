@@ -16,7 +16,7 @@ compute-dnf:
 
 # Current market dnf
 current-dnf:
-	cargo run --bin perps-market-params current-market-dnf --market-id wstETH_USD
+	cargo run --bin perps-market-params current-market-dnf --market-id dATOM_USD
 
 # Serve web app
 serve:
