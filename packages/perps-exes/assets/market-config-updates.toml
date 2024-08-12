@@ -45,6 +45,19 @@ delta_neutrality_fee_sensitivity = "100000000"
 delta_neutrality_fee_tax = "0.25"
 liquidity_cooldown_seconds = 86400
 
+[markets.dATOM_USD]
+initial-borrow-fee-rate = "0.2"
+
+[markets.dATOM_USD.config]
+carry_leverage = "7"
+funding_rate_sensitivity = "2"
+borrow_fee_rate_min_annualized = "0.1"
+target_utilization = "0.5"
+borrow_fee_sensitivity = "0.3"
+delta_neutrality_fee_sensitivity = "100000000"
+delta_neutrality_fee_tax = "0.25"
+liquidity_cooldown_seconds = 86400
+
 [markets.AVAX_USDC]
 initial-borrow-fee-rate = "0.1"
 
