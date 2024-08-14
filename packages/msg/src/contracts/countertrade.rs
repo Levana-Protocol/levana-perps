@@ -4,10 +4,12 @@ use std::fmt::Display;
 
 use cosmwasm_std::{Addr, Binary, Decimal256, Uint128};
 use shared::{
-    price::PriceBaseInQuote, storage::{
+    price::PriceBaseInQuote,
+    storage::{
         Collateral, DirectionToBase, LeverageToBase, LpToken, MarketId, NonZero, RawAddr,
         TakeProfitTrader,
-    }, time::Timestamp
+    },
+    time::Timestamp,
 };
 
 use super::market::{
