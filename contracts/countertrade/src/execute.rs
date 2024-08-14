@@ -253,6 +253,7 @@ fn update_config(
         max_leverage,
         iterations,
         take_profit_factor,
+        stop_loss_factor,
     }: ConfigUpdate,
 ) -> Result<Response> {
     ensure!(
@@ -302,6 +303,15 @@ fn update_config(
         );
         event = event.add_attribute("new-take-profit-factor", take_profit_factor.to_string());
         state.config.take_profit_factor = take_profit_factor;
+    }
+
+    if let Some(stop_loss_factor) = stop_loss_factor {
+        event = event.add_attribute(
+            "old-stop-loss-factor",
+            state.config.stop_loss_factor.to_string(),
+        );
+        event = event.add_attribute("new-stop-loss-factor", stop_loss_factor.to_string());
+        state.config.stop_loss_factor = stop_loss_factor;
     }
 
     crate::state::CONFIG.save(storage, &state.config)?;
