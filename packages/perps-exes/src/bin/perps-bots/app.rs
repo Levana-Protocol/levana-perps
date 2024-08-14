@@ -63,6 +63,10 @@ impl AppBuilder {
             self.app.config.min_gas_in_gas_wallet,
         )?;
 
+        if let Some(ref countertrade_wallet) = self.app.config.countertrade {
+            self.start_countertrade_bot(countertrade_wallet.clone())?;
+        }
+
         match &self.app.config.by_type {
             // Run tasks that can only run in testnet.
             BotConfigByType::Testnet { inner } => {
@@ -78,10 +82,6 @@ impl AppBuilder {
                     inner.wallet_manager.get_minter_address(),
                     GasCheckWallet::WalletManager,
                 )?;
-
-                if let Some(ref countertrade_wallet) = self.app.config.countertrade {
-                    self.start_countertrade_bot(countertrade_wallet.clone())?;
-                }
 
                 if self.app.config.run_optional_services {
                     // Launch testnet tasks
