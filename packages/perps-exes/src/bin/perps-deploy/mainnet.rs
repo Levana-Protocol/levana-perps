@@ -228,10 +228,11 @@ enum ContractType {
     Market,
     LiquidityToken,
     PositionToken,
+    Countertrade,
 }
 
 impl ContractType {
-    fn all() -> [ContractType; 4] {
+    fn all_required() -> [ContractType; 4] {
         use ContractType::*;
         [Factory, Market, LiquidityToken, PositionToken]
     }
@@ -242,6 +243,7 @@ impl ContractType {
             ContractType::Market => "market",
             ContractType::LiquidityToken => "liquidity_token",
             ContractType::PositionToken => "position_token",
+            ContractType::Countertrade => "countertrade",
         }
     }
 }
@@ -255,6 +257,7 @@ impl FromStr for ContractType {
             "market" => Ok(ContractType::Market),
             "liquidity_token" => Ok(ContractType::LiquidityToken),
             "position_token" => Ok(ContractType::PositionToken),
+            "countertrade" => Ok(ContractType::Countertrade),
             _ => Err(anyhow::anyhow!("Invalid contract type: {s}")),
         }
     }
@@ -282,7 +285,7 @@ async fn store_perps_contracts(
     let mut code_ids = CodeIds::load()?;
     let gitrev = opt.get_gitrev()?;
 
-    let all_contracts = ContractType::all();
+    let all_contracts = ContractType::all_required();
     let to_upload = if to_upload.is_empty() {
         all_contracts.as_slice()
     } else {

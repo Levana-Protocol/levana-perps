@@ -394,3 +394,11 @@ hash = "499d60d9906b7fbd12b7156487d5ed6aadc6a5e0f37394cb16846bb2340ac275"
 osmosis-mainnet = 951
 injective-mainnet = 1080
 neutron-mainnet = 1644
+
+[[hashes]]
+contract-type = "countertrade"
+gitrev = "cc91c10de4eee676e38500601b19a162d215de0e"
+hash = "f2ebd47e22891c0db01eefc9cbd6a2db1209d039626692f55ae5aea1307a4171"
+
+[hashes.code-ids]
+osmosis-mainnet = 995
