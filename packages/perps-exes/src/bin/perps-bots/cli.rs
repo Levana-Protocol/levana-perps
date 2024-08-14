@@ -88,6 +88,9 @@ pub(crate) struct Opt {
     /// Log every query made by the system?
     #[clap(long, env = "LEVANA_BOTS_LOG_REQUESTS")]
     pub(crate) log_requests: bool,
+    /// Countertrade bot
+    #[clap(long, env = "LEVANA_BOTS_COUNTERTRADE_CONTRACT", global = true)]
+    pub(crate) countertrade: Option<Address>,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -131,9 +134,6 @@ pub(crate) struct TestnetOpt {
     /// Number of seconds before HTTP connections (especially to Pyth) will time out
     #[clap(long, env = "LEVANA_BOTS_HTTP_TIMEOUT_SECONDS", default_value_t = 10)]
     pub(crate) http_timeout_seconds: u32,
-    /// Countertrade bot
-    #[clap(long, env = "LEVANA_BOTS_COUNTERTRADE_CONTRACT")]
-    pub(crate) countertrade: Option<Address>,
 }
 
 #[derive(clap::Parser, Clone)]

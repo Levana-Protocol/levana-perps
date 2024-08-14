@@ -172,7 +172,7 @@ impl Opt {
         )?;
         let (faucet_bot, faucet_bot_runner) =
             FaucetBot::new(testnet.hcaptcha_secret.clone(), faucet, wallet_pool.clone());
-        let countertrade = if let Some(countertrade_contract) = testnet.countertrade {
+        let countertrade = if let Some(countertrade_contract) = self.countertrade {
             let config = CounterTradeBotConfig {
                 contract: countertrade_contract,
             };
@@ -352,7 +352,9 @@ impl Opt {
             run_optional_services: !self.disable_optional_services,
             price_bot_delay: self.price_bot_delay.map(tokio::time::Duration::from_millis),
             log_requests: self.log_requests,
-            countertrade: None,
+            countertrade: self
+                .countertrade
+                .map(|contract| CounterTradeBotConfig { contract }),
         };
         Ok(FullBotConfig {
             config,
