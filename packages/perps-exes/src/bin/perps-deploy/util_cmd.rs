@@ -1,3 +1,4 @@
+mod countertrade;
 mod deferred_exec;
 mod gov_distribute;
 mod list_contracts;
@@ -107,6 +108,11 @@ enum Sub {
         #[clap(flatten)]
         inner: gov_distribute::GovDistributeOpt,
     },
+    /// Countertrade Utilities
+    CounterTrade {
+        #[clap(subcommand)]
+        inner: countertrade::CounterTradeSub,
+    },
 }
 
 impl UtilOpt {
@@ -124,6 +130,7 @@ impl UtilOpt {
             Sub::TopTraders { inner } => inner.go(opt).await,
             Sub::TradingIncentivesCsv { inner } => inner.go(opt).await,
             Sub::GovDistribute { inner } => inner.go(opt).await,
+            Sub::CounterTrade { inner } => inner.go(opt).await,
         }
     }
 }

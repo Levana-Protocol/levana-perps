@@ -8,7 +8,7 @@ use msg::contracts::{
     countertrade::{MarketStatus, MarketsResp},
     market::entry::StatusResp,
 };
-use perps_exes::contracts::Factory;
+use perps_exes::{contracts::Factory, PerpsNetwork};
 use shared::{
     number::Number,
     storage::{MarketId, RawAddr},
@@ -36,17 +36,20 @@ pub(crate) enum CounterTradeSub {
     /// Check if market is balanced
     Stats {
         /// Family name for these contracts
-        #[clap(long, env = "PERPS_FAMILY")]
-        family: String,
+        #[clap(long)]
+        factory: Address,
+        /// Cosmos network to use
+        #[clap(long, env = "COSMOS_NETWORK")]
+        cosmos_network: PerpsNetwork,
     },
     /// Collateral and shares details
     Shares {
         /// Countertrade contract Address
         #[clap(long, env = "COUNTERTRADE_CONTRACT_ADDRESS")]
         contract: Address,
-        /// Family name for these contracts
-        #[clap(long, env = "PERPS_FAMILY")]
-        family: String,
+        /// Cosmos network to use
+        #[clap(long, env = "COSMOS_NETWORK")]
+        cosmos_network: PerpsNetwork,
     },
 }
 
@@ -65,9 +68,12 @@ async fn go(opt: crate::cli::Opt, sub: CounterTradeSub) -> anyhow::Result<()> {
             do_it,
             amount,
         } => deposit_collateral(opt, contract, family, market_id, do_it, amount).await?,
-        CounterTradeSub::Stats { family } => {
-            let app = opt.load_app(&family).await?;
-            let factory = app.tracker.get_factory(&family).await?.into_contract();
+        CounterTradeSub::Stats {
+            factory,
+            cosmos_network,
+        } => {
+            let cosmos = opt.connect(cosmos_network).await?;
+            let factory = cosmos.make_contract(factory);
             let factory = Factory::from_contract(factory);
             let markets = factory.get_markets().await?;
             struct FundingResult {
@@ -99,9 +105,11 @@ async fn go(opt: crate::cli::Opt, sub: CounterTradeSub) -> anyhow::Result<()> {
             }
             println!("{table}");
         }
-        CounterTradeSub::Shares { contract, family } => {
-            let app = opt.load_app(&family).await?;
-            let cosmos = app.basic.cosmos;
+        CounterTradeSub::Shares {
+            contract,
+            cosmos_network,
+        } => {
+            let cosmos = opt.connect(cosmos_network).await?;
             let mut msg = msg::contracts::countertrade::QueryMsg::Markets {
                 start_after: None,
                 limit: None,
