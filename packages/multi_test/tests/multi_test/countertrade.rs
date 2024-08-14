@@ -752,6 +752,7 @@ fn opens_balancing_position() {
                     leverage: _,
                     collateral: _,
                     take_profit: _,
+                    stop_loss_override: _,
                 },
         } => {
             assert_eq!(direction, DirectionToBase::Short)

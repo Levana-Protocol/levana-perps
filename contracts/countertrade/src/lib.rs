@@ -38,6 +38,7 @@ pub fn instantiate(
                 max_leverage,
                 iterations,
                 take_profit_factor,
+                stop_loss_factor,
             },
     }: InstantiateMsg,
 ) -> Result<Response> {
@@ -54,6 +55,7 @@ pub fn instantiate(
         iterations: iterations.unwrap_or(50),
         take_profit_factor: take_profit_factor
             .unwrap_or_else(|| Decimal256::from_ratio(15u32, 10u32)),
+        stop_loss_factor: stop_loss_factor.unwrap_or_else(Decimal256::one),
     };
     config.check()?;
     state::CONFIG

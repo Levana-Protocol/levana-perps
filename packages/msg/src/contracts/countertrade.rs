@@ -4,6 +4,7 @@ use std::fmt::Display;
 
 use cosmwasm_std::{Addr, Binary, Decimal256, Uint128};
 use shared::{
+    price::PriceBaseInQuote,
     storage::{
         Collateral, DirectionToBase, LeverageToBase, LpToken, MarketId, NonZero, RawAddr,
         TakeProfitTrader,
@@ -49,6 +50,8 @@ pub struct Config {
     pub iterations: u8,
     /// Factor used to compute take profit price
     pub take_profit_factor: Decimal256,
+    /// Factor used to compute stop loss price
+    pub stop_loss_factor: Decimal256,
     /// Maximum leverage value we'll use
     ///
     /// If a market has lower max leverage, we use that instead
@@ -87,6 +90,7 @@ pub struct ConfigUpdate {
     pub max_leverage: Option<LeverageToBase>,
     pub iterations: Option<u8>,
     pub take_profit_factor: Option<Decimal256>,
+    pub stop_loss_factor: Option<Decimal256>,
 }
 
 /// Executions available on the countertrade contract.
@@ -309,6 +313,8 @@ pub enum WorkDescription {
         collateral: NonZero<Collateral>,
         /// Take profit value
         take_profit: TakeProfitTrader,
+        /// Stop loss price of new position
+        stop_loss_override: Option<PriceBaseInQuote>,
     },
     /// Close an unnecessary position
     ClosePosition {

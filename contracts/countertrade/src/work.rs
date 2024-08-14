@@ -227,6 +227,7 @@ fn desired_action(
                         Some(position_notional_size) => {
                             let max_leverage = state.config.max_leverage;
                             let take_profit_factor = state.config.take_profit_factor;
+                            let stop_loss_factor = state.config.stop_loss_factor;
                             compute_delta_notional(
                                 position_notional_size,
                                 price,
@@ -234,6 +235,7 @@ fn desired_action(
                                 available_collateral,
                                 max_leverage,
                                 take_profit_factor,
+                                stop_loss_factor,
                             )
                         }
 
@@ -280,6 +282,7 @@ fn desired_action(
                     Some(position_notional_size) => {
                         let max_leverage = state.config.max_leverage;
                         let take_profit_factor = state.config.take_profit_factor;
+                        let stop_loss_factor = state.config.stop_loss_factor;
                         compute_delta_notional(
                             position_notional_size,
                             price,
@@ -287,6 +290,7 @@ fn desired_action(
                             available_collateral,
                             max_leverage,
                             take_profit_factor,
+                            stop_loss_factor,
                         )
                     }
                     None => Ok(None),
@@ -458,19 +462,43 @@ fn compute_delta_notional(
     status: &StatusResp,
     available_collateral: NonZero<Collateral>,
     max_leverage: LeverageToBase,
-    take_profit_factory: Decimal256,
+    take_profit_factor: Decimal256,
+    stop_loss_factor: Decimal256,
 ) -> Result<Option<WorkDescription>> {
     let entry_price = price.price_notional;
-    let factor = take_profit_factory.into_number();
+    let hundred = Number::from_str("100").context("Unable to convert 100 to Number")?;
+    let take_profit_factor_diff = take_profit_factor
+        .into_number()
+        .checked_mul(entry_price.into_number())?
+        .checked_div(hundred)?;
     let take_profit = if position_notional_size.is_strictly_positive() {
-        Price::try_from_number(entry_price.into_number().checked_mul(factor)?)?
+        entry_price
+            .into_number()
+            .checked_add(take_profit_factor_diff)?
     } else {
-        let factor_diff = factor
-            .checked_div(Number::from_str("100").context("Unable to convert 100 to Number")?)?;
-        let factor_diff = factor_diff.checked_mul(entry_price.into_number())?;
-        Price::try_from_number(entry_price.into_number().checked_sub(factor_diff)?)?
+        entry_price
+            .into_number()
+            .checked_sub(take_profit_factor_diff)?
     };
+    let take_profit = Price::try_from_number(take_profit)?;
     let take_profit = TakeProfitTrader::from(take_profit.into_base_price(status.market_type));
+
+    let stop_loss_factor_diff = stop_loss_factor
+        .into_number()
+        .checked_mul(entry_price.into_number())?
+        .checked_div(hundred)?;
+    let stop_loss = if position_notional_size.is_strictly_positive() {
+        entry_price
+            .into_number()
+            .checked_sub(stop_loss_factor_diff)?
+    } else {
+        entry_price
+            .into_number()
+            .checked_add(stop_loss_factor_diff)?
+    };
+
+    let stop_loss_override =
+        Some(Price::try_from_number(stop_loss)?.into_base_price(status.market_type));
 
     let market_max_leverage = status.config.max_leverage;
     let market_max_leverage = LeverageToBase::from(
@@ -517,6 +545,7 @@ fn compute_delta_notional(
         leverage,
         collateral: deposit_collateral,
         take_profit,
+        stop_loss_override,
     }))
 }
 
@@ -566,15 +595,20 @@ pub(crate) fn execute(
             leverage,
             collateral,
             take_profit,
+            stop_loss_override,
         } => {
-            res = res.add_event(
-                Event::new("open-position")
-                    .add_attribute("direction", direction.as_str())
-                    .add_attribute("leverage", leverage.to_string())
-                    .add_attribute("collateral", collateral.to_string())
-                    .add_attribute("take_profit", take_profit.to_string())
-                    .add_attribute("market", market.id.as_str()),
-            );
+            let event = Event::new("open-position")
+                .add_attribute("direction", direction.as_str())
+                .add_attribute("leverage", leverage.to_string())
+                .add_attribute("collateral", collateral.to_string())
+                .add_attribute("take_profit", take_profit.to_string())
+                .add_attribute("market", market.id.as_str());
+            let event = if let Some(stop_loss_override) = stop_loss_override {
+                event.add_attribute("stop_loss_override", stop_loss_override.to_string())
+            } else {
+                event
+            };
+            res = res.add_event(event);
             let msg = market.token.into_market_execute_msg(
                 &market.addr,
                 collateral.raw(),
@@ -583,7 +617,7 @@ pub(crate) fn execute(
                     leverage,
                     direction,
                     max_gains: None,
-                    stop_loss_override: None,
+                    stop_loss_override,
                     take_profit: Some(take_profit),
                 },
             )?;
