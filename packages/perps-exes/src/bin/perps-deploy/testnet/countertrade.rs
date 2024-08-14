@@ -9,7 +9,10 @@ use msg::contracts::{
     market::entry::StatusResp,
 };
 use perps_exes::contracts::Factory;
-use shared::storage::{MarketId, RawAddr};
+use shared::{
+    number::Number,
+    storage::{MarketId, RawAddr},
+};
 
 #[derive(clap::Subcommand)]
 pub(crate) enum CounterTradeSub {
@@ -67,12 +70,34 @@ async fn go(opt: crate::cli::Opt, sub: CounterTradeSub) -> anyhow::Result<()> {
             let factory = app.tracker.get_factory(&family).await?.into_contract();
             let factory = Factory::from_contract(factory);
             let markets = factory.get_markets().await?;
+            struct FundingResult {
+                popular_funding: Number,
+                market_id: MarketId,
+            }
+            let mut results = vec![];
             for market in markets {
                 let status = msg::contracts::market::entry::QueryMsg::Status { price: None };
                 let market_contract = market.market;
                 let status: StatusResp = market_contract.query(status).await?;
-                basic_market_analysis(&market.market_id, &status)?;
+                let popular_funding = basic_market_analysis(&status)?;
+                results.push(FundingResult {
+                    popular_funding,
+                    market_id: market.market_id,
+                });
             }
+            let mut table = Table::new();
+            table
+                .load_preset(UTF8_FULL)
+                .set_content_arrangement(comfy_table::ContentArrangement::Dynamic)
+                .set_width(80)
+                .set_header(vec![Cell::new("Market ID"), Cell::new("Popular Funding")]);
+            for item in results {
+                table.add_row(vec![
+                    item.market_id.to_string(),
+                    item.popular_funding.to_string(),
+                ]);
+            }
+            println!("{table}");
         }
         CounterTradeSub::Shares { contract, family } => {
             let app = opt.load_app(&family).await?;
@@ -127,7 +152,7 @@ fn shares_analysis(status: Vec<MarketStatus>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn basic_market_analysis(market_id: &MarketId, status: &StatusResp) -> anyhow::Result<()> {
+fn basic_market_analysis(status: &StatusResp) -> anyhow::Result<Number> {
     let (long_funding, short_funding) = match status.market_type {
         shared::storage::MarketType::CollateralIsQuote => {
             (status.long_funding, status.short_funding)
@@ -141,9 +166,7 @@ fn basic_market_analysis(market_id: &MarketId, status: &StatusResp) -> anyhow::R
     } else {
         short_funding
     };
-    // Todo: Fetch min_funding and max_funding on-chain
-    println!("{market_id}: min_funding: 0.1, popular_funding: {popular_funding}, max_funding: 0.6",);
-    Ok(())
+    Ok(popular_funding)
 }
 
 async fn deposit_collateral(
