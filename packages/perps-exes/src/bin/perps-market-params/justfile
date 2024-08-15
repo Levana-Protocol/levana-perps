@@ -12,7 +12,7 @@ download-levana-market:
 
 # Compute dnf
 compute-dnf:
-	cargo run --bin perps-market-params dnf --market-id BNB_USD
+	cargo run --bin perps-market-params dnf --market-id BNB_USDC
 
 # Current market dnf
 current-dnf:

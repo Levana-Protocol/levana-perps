@@ -248,6 +248,10 @@ struct DnfExchanges {
 }
 
 fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfExchanges> {
+    // todo: check if any top_tier is present. If not, compute with
+    // what you have.
+    // todo: handle error
+
     let exchanges = exchanges.into_iter().filter(|exchange| {
         exchange.exchange_name.to_lowercase() != "htx" && exchange.outlier_detected < 0.3
     });
