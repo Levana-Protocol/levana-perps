@@ -147,6 +147,7 @@ impl HttpApp {
         let coin: Coin = base_asset.parse()?;
         let coin = coin.to_wrapped_coin().0;
         let mut start: u32 = 1;
+        tracing::debug!("coin id: {}", coin.cmc_id());
         // https://coinmarketcap.com/api/documentation/v1/#operation/getV1ExchangeListingsLatest
         let limit = 5000;
         let uri = |start: u32| {

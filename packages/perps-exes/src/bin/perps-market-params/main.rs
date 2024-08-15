@@ -114,6 +114,7 @@ async fn main_inner(opt: Opt) -> Result<()> {
             let max_leverage = dnf_sensitivity_to_max_leverage(dnf.dnf_in_usd);
 
             tracing::info!("DNF: {}", dnf.dnf_in_notional);
+            tracing::info!("Min depth liquidity: {}", dnf.min_depth_liquidity);
             tracing::info!("Max leverage: {max_leverage:?}");
         }
         cli::SubCommand::Dnf { market_id } => {

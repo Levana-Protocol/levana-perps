@@ -16,7 +16,7 @@ compute-dnf:
 
 # Current market dnf
 current-dnf:
-	cargo run --bin perps-market-params current-market-dnf --market-id dATOM_USD
+	cargo run --bin perps-market-params current-market-dnf --market-id BNB_USDC
 
 # Serve web app
 serve:
@@ -28,7 +28,7 @@ markets:
 
 # Download market.csv data
 download-market-csv:
-	cargo run --bin perps-market-params market --market-id ETH_USD
+	cargo run --bin perps-market-params market --market-id BTC_USD
 
 # List unsupported exchanges
 exchanges:

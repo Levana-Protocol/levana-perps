@@ -14,7 +14,7 @@ use shared::storage::MarketId;
 
 use crate::{
     cli::{Opt, ServeOpt},
-    coingecko::{CmcMarketPair, ExchangeKind},
+    coingecko::{CmcMarketPair, ExchangeId, ExchangeKind},
     slack::HttpApp,
     web::NotifyApp,
 };
@@ -248,9 +248,9 @@ struct DnfExchanges {
 }
 
 fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfExchanges> {
-    let exchanges = exchanges.into_iter().filter(|exchange| {
-        exchange.exchange_name.to_lowercase() != "htx" && exchange.outlier_detected < 0.3
-    });
+    let exchanges = exchanges
+        .into_iter()
+        .filter(|exchange| exchange.exchange_id.is_top_tier());
 
     let exchanges = exchanges
         .map(|exchange| {
@@ -268,7 +268,10 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
 
     let max_volume_exchange = exchanges
         .clone()
-        .max_by(|a, b| a.volume_24h_usd.total_cmp(&b.volume_24h_usd))
+        .max_by(|a, b| {
+            a.depth_usd_positive_two
+                .total_cmp(&b.depth_usd_positive_two)
+        })
         .context("No max value found")?;
 
     if max_volume_exchange.depth_usd_negative_two == 0.0

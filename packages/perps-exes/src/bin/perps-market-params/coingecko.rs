@@ -102,6 +102,11 @@ impl ExchangeId {
             other => Err(anyhow!("Exchange type not known for id {}", other)),
         }
     }
+
+    /// Check if exchange is top tier: Binance, Coinbase, Kraken, OKX
+    pub(crate) fn is_top_tier(&self) -> bool {
+        self.0 == 270 || self.0 == 89 || self.0 == 24 || self.0 == 294
+    }
 }
 
 impl<'de> Deserialize<'de> for CmcMarketPair {
