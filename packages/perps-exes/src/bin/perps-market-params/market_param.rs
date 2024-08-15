@@ -14,7 +14,7 @@ use shared::storage::MarketId;
 
 use crate::{
     cli::{Opt, ServeOpt},
-    coingecko::{CmcMarketPair, ExchangeId, ExchangeKind},
+    coingecko::{CmcMarketPair, ExchangeKind},
     slack::HttpApp,
     web::NotifyApp,
 };
@@ -247,26 +247,48 @@ struct DnfExchanges {
     max_exchange: CmcMarketPair,
 }
 
-fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfExchanges> {
-    let exchanges = exchanges
-        .into_iter()
-        .filter(|exchange| exchange.exchange_id.is_top_tier());
-
+// For markets like MAGA_USDC which the top tier exchanges don't
+// support.
+fn fallback_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<CmcMarketPair> {
+    let exchanges = exchanges.into_iter().filter(|exchange| {
+        exchange.exchange_name.to_lowercase() != "htx" && exchange.outlier_detected < 0.3
+    });
     let exchanges = exchanges
         .map(|exchange| {
             let exchange_type = exchange.exchange_id.exchange_type();
             exchange_type.map(|exchange_kind| (exchange, exchange_kind))
         })
         .collect::<anyhow::Result<Vec<_>>>();
-
     let exchanges = exchanges?
         .into_iter()
         .filter_map(|(exchange, exchange_type)| match exchange_type {
             ExchangeKind::Cex => Some(exchange),
             ExchangeKind::Dex => None,
         });
+    let result = exchanges
+        .max_by(|a, b| a.volume_24h_usd.total_cmp(&b.volume_24h_usd))
+        .context("No fallback exchange found")?;
+    Ok(result)
+}
 
-    let max_volume_exchange = exchanges
+fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfExchanges> {
+    let top_tier_exchanges: Vec<_> = exchanges
+        .clone()
+        .into_iter()
+        .filter(|exchange| exchange.exchange_id.is_top_tier())
+        .collect();
+
+    let top_tier_exchanges = {
+        if top_tier_exchanges.is_empty() {
+            let exchange = fallback_exchanges(exchanges.clone())?;
+            tracing::info!("Found fallback exchange");
+            vec![exchange].into_iter()
+        } else {
+            top_tier_exchanges.into_iter()
+        }
+    };
+
+    let max_volume_exchange = top_tier_exchanges
         .clone()
         .max_by(|a, b| {
             a.depth_usd_positive_two
@@ -278,7 +300,7 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
         || max_volume_exchange.depth_usd_positive_two == 0.0
     {
         // Skip this exchange
-        let exchanges: Vec<_> = exchanges
+        let exchanges: Vec<_> = top_tier_exchanges
             .into_iter()
             .filter(|item| *item != max_volume_exchange)
             .collect();
@@ -289,7 +311,7 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
         }
     } else {
         Ok(DnfExchanges {
-            exchanges: exchanges.collect(),
+            exchanges: top_tier_exchanges.collect(),
             max_exchange: max_volume_exchange,
         })
     }
