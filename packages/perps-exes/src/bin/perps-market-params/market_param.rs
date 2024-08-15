@@ -249,7 +249,7 @@ struct DnfExchanges {
 
 // For markets like MAGA_USDC which the top tier exchanges don't
 // support.
-fn fallback_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<CmcMarketPair> {
+fn fallback_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Vec<CmcMarketPair>> {
     let exchanges = exchanges.into_iter().filter(|exchange| {
         exchange.exchange_name.to_lowercase() != "htx" && exchange.outlier_detected < 0.3
     });
@@ -265,10 +265,8 @@ fn fallback_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<CmcMarket
             ExchangeKind::Cex => Some(exchange),
             ExchangeKind::Dex => None,
         });
-    let result = exchanges
-        .max_by(|a, b| a.volume_24h_usd.total_cmp(&b.volume_24h_usd))
-        .context("No fallback exchange found")?;
-    Ok(result)
+
+    Ok(exchanges.collect())
 }
 
 fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfExchanges> {
@@ -280,9 +278,9 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
 
     let top_tier_exchanges = {
         if top_tier_exchanges.is_empty() {
-            let exchange = fallback_exchanges(exchanges.clone())?;
+            let exchanges = fallback_exchanges(exchanges.clone())?;
             tracing::info!("Found fallback exchange");
-            vec![exchange].into_iter()
+            exchanges.into_iter()
         } else {
             top_tier_exchanges.into_iter()
         }
