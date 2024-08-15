@@ -248,8 +248,13 @@ struct DnfExchanges {
 }
 
 fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfExchanges> {
-    // todo: check if any top_tier is present. If not, compute with
-    // what you have.
+    // Check if top tier exchange is present so that we can filter
+    // accordingly.
+    let has_top_tier = exchanges
+        .clone()
+        .iter()
+        .find(|item| item.exchange_id.is_top_tier())
+        .is_some();
 
     let exchanges = exchanges.into_iter().filter(|exchange| {
         exchange.exchange_name.to_lowercase() != "htx" && exchange.outlier_detected < 0.3
@@ -277,9 +282,15 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
         })
         .context("No max value found")?;
 
+    let should_filter_top_tier = if has_top_tier {
+        !max_volume_exchange.exchange_id.is_top_tier()
+    } else {
+        false
+    };
+
     if max_volume_exchange.depth_usd_negative_two == 0.0
         || max_volume_exchange.depth_usd_positive_two == 0.0
-        || !max_volume_exchange.exchange_id.is_top_tier()
+        || should_filter_top_tier
     {
         tracing::debug!(
             "Skipping exchange id {:?} with liqudity depth of {}",
