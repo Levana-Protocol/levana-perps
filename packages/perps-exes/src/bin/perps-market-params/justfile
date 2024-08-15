@@ -12,11 +12,11 @@ download-levana-market:
 
 # Compute dnf
 compute-dnf:
-	cargo run --bin perps-market-params dnf --market-id wstETH_USD
+	cargo run --bin perps-market-params dnf --market-id OSMO_USD
 
 # Current market dnf
 current-dnf:
-	cargo run --bin perps-market-params current-market-dnf --market-id dATOM_USD
+	cargo run --bin perps-market-params current-market-dnf --market-id BNB_USDC
 
 # Serve web app
 serve:
@@ -28,7 +28,7 @@ markets:
 
 # Download market.csv data
 download-market-csv:
-	cargo run --bin perps-market-params market --market-id ETH_USD
+	cargo run --bin perps-market-params market --cex-only --market-id OSMO_USD
 
 # List unsupported exchanges
 exchanges:

@@ -6,6 +6,7 @@ use web::axum_main;
 
 use crate::{
     cli::Opt,
+    coingecko::ExchangeKind,
     market_param::{
         compute_dnf_notify, dnf_sensitivity, dnf_sensitivity_to_max_leverage, DnfInNotional,
         NotionalAsset,
@@ -114,6 +115,7 @@ async fn main_inner(opt: Opt) -> Result<()> {
             let max_leverage = dnf_sensitivity_to_max_leverage(dnf.dnf_in_usd);
 
             tracing::info!("DNF: {}", dnf.dnf_in_notional);
+            tracing::info!("Min depth liquidity: {}", dnf.min_depth_liquidity);
             tracing::info!("Max leverage: {max_leverage:?}");
         }
         cli::SubCommand::Dnf { market_id } => {
@@ -140,6 +142,8 @@ async fn main_inner(opt: Opt) -> Result<()> {
                     .await?,
             );
 
+            tracing::info!("Notional asset: {}", market_id.get_notional());
+
             let max_leverage = dnf_sensitivity_to_max_leverage(dnf.dnf_in_usd);
 
             let dnf_notify = compute_dnf_notify(dnf.dnf_in_notional, configured_dnf, 100.0, 50.0);
@@ -159,13 +163,33 @@ async fn main_inner(opt: Opt) -> Result<()> {
             tracing::info!("Recommended max_leverage (based on computed current day market DNF): {max_leverage:?}");
         }
         cli::SubCommand::Serve { opt: serve_opt } => axum_main(serve_opt, opt).await?,
-        cli::SubCommand::Market { out, market_id } => {
+        cli::SubCommand::Market {
+            out,
+            market_id,
+            cex_only,
+        } => {
             let http_app = HttpApp::new(None, opt.cmc_key.clone());
             let exchanges = http_app
                 .get_market_pair(AssetName(market_id.get_base()))
                 .await?;
+            tracing::info!("All exchanges for {market_id:?}: {}", exchanges.len());
+
+            let exchanges: Vec<_> = exchanges
+                .into_iter()
+                .filter_map(|item| {
+                    let exchange_type = item
+                        .exchange_id
+                        .exchange_type()
+                        .is_ok_and(|exchange| exchange == ExchangeKind::Cex);
+                    if cex_only == exchange_type {
+                        Some(item)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
             tracing::info!(
-                "Total exchanges found: {} for {market_id:?}",
+                "Total exchanges found: {} for {market_id:?} (Only Cex {cex_only})",
                 exchanges.len()
             );
             let mut writer = csv::Writer::from_path(out)?;

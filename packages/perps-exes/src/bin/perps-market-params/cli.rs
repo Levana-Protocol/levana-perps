@@ -54,6 +54,9 @@ pub(crate) enum SubCommand {
         /// Market ID. Eg: ATOM_USD
         #[arg(long)]
         market_id: MarketId,
+        /// Only CEX exchanges
+        #[arg(long)]
+        cex_only: bool,
     },
     /// Serve web application
     Serve {

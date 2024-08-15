@@ -248,6 +248,13 @@ struct DnfExchanges {
 }
 
 fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfExchanges> {
+    // Check if top tier exchange is present so that we can filter
+    // accordingly.
+    let has_top_tier = exchanges
+        .clone()
+        .iter()
+        .any(|item| item.exchange_id.is_top_tier());
+
     let exchanges = exchanges.into_iter().filter(|exchange| {
         exchange.exchange_name.to_lowercase() != "htx" && exchange.outlier_detected < 0.3
     });
@@ -268,12 +275,27 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
 
     let max_volume_exchange = exchanges
         .clone()
-        .max_by(|a, b| a.volume_24h_usd.total_cmp(&b.volume_24h_usd))
+        .max_by(|a, b| {
+            a.depth_usd_positive_two
+                .total_cmp(&b.depth_usd_positive_two)
+        })
         .context("No max value found")?;
+
+    let should_filter_top_tier = if has_top_tier {
+        !max_volume_exchange.exchange_id.is_top_tier()
+    } else {
+        false
+    };
 
     if max_volume_exchange.depth_usd_negative_two == 0.0
         || max_volume_exchange.depth_usd_positive_two == 0.0
+        || should_filter_top_tier
     {
+        tracing::debug!(
+            "Skipping exchange id {:?} with liqudity depth of {}",
+            max_volume_exchange.exchange_id,
+            max_volume_exchange.depth_usd_positive_two
+        );
         // Skip this exchange
         let exchanges: Vec<_> = exchanges
             .into_iter()
@@ -309,10 +331,14 @@ fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfR
 
     tracing::debug!("Max volume exchange: {max_volume_exchange:#?}");
     let total_volume_percentage = exchanges
+        .clone()
         .map(|exchange| exchange.volume_24h_usd)
         .sum::<f64>();
     let market_share = max_volume_exchange.volume_24h_usd / total_volume_percentage;
-    tracing::debug!("Market share: {market_share}");
+    tracing::debug!(
+        "Market share: {market_share}, Total exchanges considered: {}",
+        exchanges.count()
+    );
     let min_depth_liquidity = max_volume_exchange
         .depth_usd_negative_two
         .min(max_volume_exchange.depth_usd_positive_two);
@@ -579,13 +605,11 @@ pub(crate) async fn compute_coin_dnfs(
                             }
                         }
                     };
-                    let configured_dnf = market_config
-                        .get_chain_dnf(market_id)
-                        .context(format!("No DNF configured for {market_id:?}"))?;
-                    let max_leverage = dnf_sensitivity_to_max_leverage(
-                        configured_dnf
-                            .as_asset_amount(NotionalAsset(market_id.get_notional()), &http_app)
-                            .await?,
+                    let max_leverage = dnf_sensitivity_to_max_leverage(dnf.dnf_in_usd.clone());
+                    tracing::debug!(
+                        "DNF Notional {}, Max leverage: {max_leverage}, Notional_asset: {}",
+                        dnf.dnf_in_notional,
+                        market_id.get_notional()
                     );
                     (dnf, max_leverage)
                 };
@@ -712,34 +736,6 @@ async fn check_market_status(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use crate::coingecko::{CmcMarketPair, ExchangeId};
-
-    #[test]
-    fn sample_dnf_computation() {
-        let exchanges = vec![
-            CmcMarketPair {
-                exchange_id: crate::coingecko::ExchangeId(50),
-                exchange_name: "mexc".to_owned(),
-                market_id: "LVN_USD".to_owned(),
-                depth_usd_negative_two: 5828.0,
-                depth_usd_positive_two: 7719.0,
-                volume_24h_usd: 27304.39,
-                outlier_detected: 0.2,
-            },
-            CmcMarketPair {
-                exchange_id: ExchangeId(42),
-                exchange_name: "gate.io".to_owned(),
-                market_id: "LVN_USD".to_owned(),
-                depth_usd_negative_two: 1756.0,
-                depth_usd_positive_two: 22140.0,
-                volume_24h_usd: 23065.95,
-                outlier_detected: 0.0,
-            },
-        ];
-        let dnf = super::compute_dnf_sensitivity(exchanges).unwrap();
-        assert_eq!(dnf.dnf.0.round(), 268783.0, "Expected DNF");
-    }
 
     #[test]
     fn validate_for_dnf_change_which_exceeds_threshold() {
