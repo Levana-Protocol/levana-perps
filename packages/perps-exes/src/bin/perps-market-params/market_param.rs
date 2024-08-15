@@ -250,7 +250,6 @@ struct DnfExchanges {
 fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfExchanges> {
     // todo: check if any top_tier is present. If not, compute with
     // what you have.
-    // todo: handle error
 
     let exchanges = exchanges.into_iter().filter(|exchange| {
         exchange.exchange_name.to_lowercase() != "htx" && exchange.outlier_detected < 0.3
@@ -270,12 +269,7 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
             ExchangeKind::Dex => None,
         });
 
-    let top_tier_exchanges = exchanges
-        .clone()
-        .into_iter()
-        .filter(|exchange| exchange.exchange_id.is_top_tier());
-
-    let max_volume_exchange = top_tier_exchanges
+    let max_volume_exchange = exchanges
         .clone()
         .max_by(|a, b| {
             a.depth_usd_positive_two
@@ -287,8 +281,13 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
         || max_volume_exchange.depth_usd_positive_two == 0.0
         || !max_volume_exchange.exchange_id.is_top_tier()
     {
+        tracing::debug!(
+            "Skipping exchange id {:?} with liqudity depth of {}",
+            max_volume_exchange.exchange_id,
+            max_volume_exchange.depth_usd_positive_two
+        );
         // Skip this exchange
-        let exchanges: Vec<_> = top_tier_exchanges
+        let exchanges: Vec<_> = exchanges
             .into_iter()
             .filter(|item| *item != max_volume_exchange)
             .collect();
@@ -299,7 +298,7 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
         }
     } else {
         Ok(DnfExchanges {
-            exchanges: top_tier_exchanges.collect(),
+            exchanges: exchanges.collect(),
             max_exchange: max_volume_exchange,
         })
     }
@@ -322,10 +321,14 @@ fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfR
 
     tracing::debug!("Max volume exchange: {max_volume_exchange:#?}");
     let total_volume_percentage = exchanges
+        .clone()
         .map(|exchange| exchange.volume_24h_usd)
         .sum::<f64>();
     let market_share = max_volume_exchange.volume_24h_usd / total_volume_percentage;
-    tracing::debug!("Market share: {market_share}");
+    tracing::debug!(
+        "Market share: {market_share}, Total exchanges considered: {}",
+        exchanges.count()
+    );
     let min_depth_liquidity = max_volume_exchange
         .depth_usd_negative_two
         .min(max_volume_exchange.depth_usd_positive_two);
