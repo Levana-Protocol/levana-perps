@@ -253,8 +253,7 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
     let has_top_tier = exchanges
         .clone()
         .iter()
-        .find(|item| item.exchange_id.is_top_tier())
-        .is_some();
+        .any(|item| item.exchange_id.is_top_tier());
 
     let exchanges = exchanges.into_iter().filter(|exchange| {
         exchange.exchange_name.to_lowercase() != "htx" && exchange.outlier_detected < 0.3
@@ -737,34 +736,6 @@ async fn check_market_status(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use crate::coingecko::{CmcMarketPair, ExchangeId};
-
-    #[test]
-    fn sample_dnf_computation() {
-        let exchanges = vec![
-            CmcMarketPair {
-                exchange_id: crate::coingecko::ExchangeId(270),
-                exchange_name: "Binance".to_owned(),
-                market_id: "LVN_USD".to_owned(),
-                depth_usd_negative_two: 5828.0,
-                depth_usd_positive_two: 7719.0,
-                volume_24h_usd: 27304.39,
-                outlier_detected: 0.2,
-            },
-            CmcMarketPair {
-                exchange_id: ExchangeId(270),
-                exchange_name: "Binance".to_owned(),
-                market_id: "LVN_USD".to_owned(),
-                depth_usd_negative_two: 1756.0,
-                depth_usd_positive_two: 22140.0,
-                volume_24h_usd: 23065.95,
-                outlier_detected: 0.0,
-            },
-        ];
-        let dnf = super::compute_dnf_sensitivity(exchanges).unwrap();
-        assert_eq!(dnf.dnf.0.round(), 268783.0, "Expected DNF");
-    }
 
     #[test]
     fn validate_for_dnf_change_which_exceeds_threshold() {

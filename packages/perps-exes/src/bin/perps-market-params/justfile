@@ -12,7 +12,7 @@ download-levana-market:
 
 # Compute dnf
 compute-dnf:
-	cargo run --bin perps-market-params dnf --market-id BNB_USDC
+	cargo run --bin perps-market-params dnf --market-id OSMO_USD
 
 # Current market dnf
 current-dnf:
@@ -28,7 +28,7 @@ markets:
 
 # Download market.csv data
 download-market-csv:
-	cargo run --bin perps-market-params market --market-id MAGA_USDC
+	cargo run --bin perps-market-params market --cex-only --market-id OSMO_USD
 
 # List unsupported exchanges
 exchanges:
