@@ -247,18 +247,18 @@ struct DnfExchanges {
     max_exchange: CmcMarketPair,
 }
 
-// For markets like MAGA_USDC which the top tier exchanges don't
-// support.
-fn fallback_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Vec<CmcMarketPair>> {
+fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfExchanges> {
     let exchanges = exchanges.into_iter().filter(|exchange| {
         exchange.exchange_name.to_lowercase() != "htx" && exchange.outlier_detected < 0.3
     });
+
     let exchanges = exchanges
         .map(|exchange| {
             let exchange_type = exchange.exchange_id.exchange_type();
             exchange_type.map(|exchange_kind| (exchange, exchange_kind))
         })
         .collect::<anyhow::Result<Vec<_>>>();
+
     let exchanges = exchanges?
         .into_iter()
         .filter_map(|(exchange, exchange_type)| match exchange_type {
@@ -266,25 +266,10 @@ fn fallback_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Vec<CmcMa
             ExchangeKind::Dex => None,
         });
 
-    Ok(exchanges.collect())
-}
-
-fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfExchanges> {
-    let top_tier_exchanges: Vec<_> = exchanges
+    let top_tier_exchanges = exchanges
         .clone()
         .into_iter()
-        .filter(|exchange| exchange.exchange_id.is_top_tier())
-        .collect();
-
-    let top_tier_exchanges = {
-        if top_tier_exchanges.is_empty() {
-            let exchanges = fallback_exchanges(exchanges.clone())?;
-            tracing::info!("Found fallback exchange");
-            exchanges.into_iter()
-        } else {
-            top_tier_exchanges.into_iter()
-        }
-    };
+        .filter(|exchange| exchange.exchange_id.is_top_tier());
 
     let max_volume_exchange = top_tier_exchanges
         .clone()
@@ -296,6 +281,7 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
 
     if max_volume_exchange.depth_usd_negative_two == 0.0
         || max_volume_exchange.depth_usd_positive_two == 0.0
+        || !max_volume_exchange.exchange_id.is_top_tier()
     {
         // Skip this exchange
         let exchanges: Vec<_> = top_tier_exchanges
@@ -740,8 +726,8 @@ mod tests {
     fn sample_dnf_computation() {
         let exchanges = vec![
             CmcMarketPair {
-                exchange_id: crate::coingecko::ExchangeId(50),
-                exchange_name: "mexc".to_owned(),
+                exchange_id: crate::coingecko::ExchangeId(270),
+                exchange_name: "Binance".to_owned(),
                 market_id: "LVN_USD".to_owned(),
                 depth_usd_negative_two: 5828.0,
                 depth_usd_positive_two: 7719.0,
@@ -749,8 +735,8 @@ mod tests {
                 outlier_detected: 0.2,
             },
             CmcMarketPair {
-                exchange_id: ExchangeId(42),
-                exchange_name: "gate.io".to_owned(),
+                exchange_id: ExchangeId(270),
+                exchange_name: "Binance".to_owned(),
                 market_id: "LVN_USD".to_owned(),
                 depth_usd_negative_two: 1756.0,
                 depth_usd_positive_two: 22140.0,
