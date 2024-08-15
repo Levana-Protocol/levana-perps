@@ -604,13 +604,11 @@ pub(crate) async fn compute_coin_dnfs(
                             }
                         }
                     };
-                    let configured_dnf = market_config
-                        .get_chain_dnf(market_id)
-                        .context(format!("No DNF configured for {market_id:?}"))?;
-                    let max_leverage = dnf_sensitivity_to_max_leverage(
-                        configured_dnf
-                            .as_asset_amount(NotionalAsset(market_id.get_notional()), &http_app)
-                            .await?,
+                    let max_leverage = dnf_sensitivity_to_max_leverage(dnf.dnf_in_usd.clone());
+                    tracing::debug!(
+                        "DNF Notional {}, Max leverage: {max_leverage}, Notional_asset: {}",
+                        dnf.dnf_in_notional,
+                        market_id.get_notional()
                     );
                     (dnf, max_leverage)
                 };
