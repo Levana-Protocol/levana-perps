@@ -45,14 +45,26 @@ async fn get_wormhole_proofs(
         !ids.is_empty(),
         "Cannot get wormhole proofs with no price IDs"
     );
-    // pyth uses this format for array params: https://github.com/axios/axios/blob/9588fcdec8aca45c3ba2f7968988a5d03f23168c/test/specs/helpers/buildURL.spec.js#L31
+    #[derive(serde::Deserialize)]
+    struct PythResponse {
+        binary: PythData,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct PythData {
+        data: Vec<String>,
+    }
+
     let url_params = ids.iter().map(|id| ("ids[]", id.to_hex()));
-    let url = endpoint.join("api/latest_vaas")?;
+    let url_params = url_params.chain([
+        ("parsed", "false".to_owned()),
+        ("encoding", "base64".to_owned()),
+    ]);
+    let url = endpoint.join("v2/updates/price/latest")?;
     let url = reqwest::Url::parse_with_params(url.as_str(), url_params)?;
 
-    let vaas: Vec<String> = fetch_json_with_retry(|| client.get(url.clone())).await?;
-
-    Ok(vaas)
+    let response: PythResponse = fetch_json_with_retry(|| client.get(url.clone())).await?;
+    Ok(response.binary.data)
 }
 
 pub async fn fetch_json_with_retry<T, F>(make_req: F) -> Result<T>

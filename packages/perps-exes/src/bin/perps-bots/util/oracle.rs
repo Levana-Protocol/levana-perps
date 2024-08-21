@@ -463,6 +463,11 @@ async fn fetch_pyth_prices(
     stats: &PythPriceStats,
 ) -> Result<()> {
     #[derive(serde::Deserialize)]
+    struct PythPriceResponse {
+        parsed: Vec<PythRecord>,
+    }
+
+    #[derive(serde::Deserialize)]
     struct PythRecord {
         id: PriceIdentifier,
         price: PythPrice,
@@ -478,11 +483,13 @@ async fn fetch_pyth_prices(
         return Ok(());
     }
 
-    let base = endpoint.join("api/latest_price_feeds")?;
+    let base = endpoint.join("v2/updates/price/latest")?;
     let ids_iter = ids.iter().map(|feed| ("ids[]", feed.to_hex()));
+    let ids_iter = ids_iter.chain([("parsed", "true".to_owned())]);
     let url = reqwest::Url::parse_with_params(base.as_str(), ids_iter)?;
 
-    let records: Vec<PythRecord> = fetch_json_with_retry(|| client.get(url.clone())).await?;
+    let records: PythPriceResponse = fetch_json_with_retry(|| client.get(url.clone())).await?;
+    let records = records.parsed;
 
     let now = Utc::now();
     for PythRecord {
