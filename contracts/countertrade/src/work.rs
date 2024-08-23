@@ -1,10 +1,13 @@
 use std::{ops::Neg, str::FromStr};
 
 use cosmwasm_std::{SubMsg, WasmMsg};
-use msg::contracts::market::{
-    deferred_execution::GetDeferredExecResp,
-    entry::{ClosedPositionCursor, ClosedPositionsResp, StatusResp},
-    position::{PositionId, PositionQueryResponse},
+use msg::contracts::{
+    countertrade,
+    market::{
+        deferred_execution::GetDeferredExecResp,
+        entry::{ClosedPositionCursor, ClosedPositionsResp, StatusResp},
+        position::{PositionId, PositionQueryResponse},
+    },
 };
 use shared::{
     number::Number,
@@ -222,6 +225,7 @@ fn desired_action(
                         target_funding,
                         status,
                         allowed_iterations,
+                        None,
                     )?;
                     match result {
                         Some(position_notional_size) => {
@@ -266,6 +270,7 @@ fn desired_action(
                         target_funding,
                         status,
                         allowed_iterations,
+                        Some(pos.clone()),
                     )?;
                     match result {
                         Some(position_notional_size) => {
@@ -295,6 +300,7 @@ fn desired_action(
                     target_funding,
                     status,
                     allowed_iterations,
+                    None,
                 )?;
 
                 match result {
@@ -326,15 +332,43 @@ fn determine_target_notional(
     target_funding: Number,
     status: &StatusResp,
     allowed_iterations: u8,
+    countertrade_position: Option<PositionQueryResponse>,
 ) -> Result<Option<Signed<Notional>>> {
-    let desired_notional = smart_search(
-        long_interest,
-        short_interest,
-        target_funding,
-        status,
-        allowed_iterations,
-        0,
-    )?;
+    let desired_notional = match countertrade_position {
+        Some(countertrade_position) => {
+            let direction = countertrade_position
+                .direction_to_base
+                .into_notional(status.market_type);
+            let (pos_long_interest, pos_short_interest) = match direction {
+                DirectionToNotional::Long => (
+                    countertrade_position.notional_size.abs().abs_unsigned(),
+                    Notional::zero(),
+                ),
+                DirectionToNotional::Short => (
+                    Notional::zero(),
+                    countertrade_position.notional_size.abs().abs_unsigned(),
+                ),
+            };
+            let long_interest = long_interest.checked_sub(pos_long_interest)?;
+            let short_interest = short_interest.checked_sub(pos_short_interest)?;
+            smart_search(
+                long_interest,
+                short_interest,
+                target_funding,
+                status,
+                allowed_iterations,
+                0,
+            )?
+        }
+        None => smart_search(
+            long_interest,
+            short_interest,
+            target_funding,
+            status,
+            allowed_iterations,
+            0,
+        )?,
+    };
 
     let position_notional_size = if long_interest < short_interest {
         desired_notional.into_signed()
