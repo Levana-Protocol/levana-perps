@@ -1,14 +1,13 @@
 use std::{ops::Neg, str::FromStr};
 
 use cosmwasm_std::{SubMsg, WasmMsg};
-use msg::contracts::{
-    countertrade,
+use msg::contracts::
     market::{
         deferred_execution::GetDeferredExecResp,
         entry::{ClosedPositionCursor, ClosedPositionsResp, StatusResp},
         position::{PositionId, PositionQueryResponse},
-    },
-};
+    }
+;
 use shared::{
     number::Number,
     price::{Price, TakeProfitTrader},
@@ -581,6 +580,7 @@ fn compute_delta_notional(
         position_notional_size.map(|size| price.notional_to_collateral(size));
 
     let capital = optimize_capital_efficiency(
+        available_collateral,
         position_notional_size_in_collateral,
         desired_leverage,
         countertrade_position,
@@ -650,6 +650,7 @@ enum Capital {
 
 /// Returns the deposit collateral and leverage value to be used for this position.
 fn optimize_capital_efficiency(
+    available_collateral: NonZero<Collateral>,
     position_notional_size_in_collateral: Signed<Collateral>,
     desired_leverage: SignedLeverageToNotional,
     countertrade_position: Option<PositionQueryResponse>,
@@ -666,23 +667,42 @@ fn optimize_capital_efficiency(
                 .checked_sub(countertrade_position.deposit_collateral)?;
             if diff.is_strictly_positive() {
                 // We should add more collateral
+                let collateral = diff.abs_unsigned();
+                let collateral = if collateral > available_collateral.raw() {
+                    available_collateral.raw()
+                } else {
+                    collateral
+                };
                 Some(Capital::AddCollateral {
-                    collateral: diff.abs_unsigned(),
+                    collateral,
                     pos_id: countertrade_position.id,
                 })
             } else if diff.is_zero() {
                 None
             } else {
+                let collateral = diff.neg().abs_unsigned();
+                let collateral = if collateral > available_collateral.raw() {
+                    available_collateral.raw()
+                } else {
+                    collateral
+                };
                 Some(Capital::RemoveCollateral {
-                    collateral: diff.neg().abs_unsigned(),
+                    collateral,
                     pos_id: countertrade_position.id,
                 })
             }
         }
-        None => Some(Capital::New {
-            deposit_collateral,
-            leverage: desired_leverage,
-        }),
+        None => {
+            let deposit_collateral = if deposit_collateral > available_collateral.raw() {
+                available_collateral.raw()
+            } else {
+                deposit_collateral
+            };
+            Some(Capital::New {
+                deposit_collateral,
+                leverage: desired_leverage,
+            })
+        }
     };
 
     Ok(result)
