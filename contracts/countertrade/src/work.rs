@@ -4,7 +4,7 @@ use cosmwasm_std::{SubMsg, WasmMsg};
 use msg::contracts::market::{
     deferred_execution::GetDeferredExecResp,
     entry::{ClosedPositionCursor, ClosedPositionsResp, StatusResp},
-    position::{self, PositionId, PositionQueryResponse},
+    position::{PositionId, PositionQueryResponse},
 };
 use shared::{
     number::Number,
@@ -123,7 +123,7 @@ pub(crate) fn get_work_for(
 
     // We always close popular-side positions. Future potential optimization:
     // reduce position size instead when possible.
-    if let Some(ref pos) = pos {
+    if let Some(pos) = &pos {
         let funding = match pos.direction_to_base {
             DirectionToBase::Long => status.long_funding,
             DirectionToBase::Short => status.short_funding,
@@ -371,12 +371,12 @@ fn determine_target_notional(
                 .into_notional(status.market_type);
             let (pos_long_interest, pos_short_interest) = match direction {
                 DirectionToNotional::Long => (
-                    countertrade_position.notional_size.abs().abs_unsigned(),
+                    countertrade_position.notional_size.abs_unsigned(),
                     Notional::zero(),
                 ),
                 DirectionToNotional::Short => (
                     Notional::zero(),
-                    countertrade_position.notional_size.abs().abs_unsigned(),
+                    countertrade_position.notional_size.abs_unsigned(),
                 ),
             };
             let long_interest = long_interest.checked_sub(pos_long_interest)?;
@@ -541,6 +541,7 @@ fn derive_popular_funding_rate_annual(
     Ok(popular.abs_unsigned())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn compute_delta_notional(
     position_notional_size: Signed<Notional>,
     price: &PricePoint,

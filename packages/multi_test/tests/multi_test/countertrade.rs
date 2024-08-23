@@ -1324,7 +1324,7 @@ fn do_not_mutate_countertrade_position() {
     match work {
         HasWorkResp::NoWork {} => panic!("impossible: expected work"),
         HasWorkResp::Work { ref desc } => match desc {
-            WorkDescription::ClosePosition { pos_id  } => {
+            WorkDescription::ClosePosition { pos_id } => {
                 assert_eq!(countertrade_position.id, pos_id.clone());
             }
             desc => panic!("Got invalid work: {desc}"),
