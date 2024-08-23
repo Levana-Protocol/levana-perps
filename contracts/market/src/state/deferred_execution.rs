@@ -346,7 +346,12 @@ impl State<'_> {
         }
 
         let price_point = self.current_spot_price(ctx.storage)?;
-        self.deferred_validate(ctx.storage, new_id, &price_point)?;
+        self.deferred_validate(
+            ctx.storage,
+            new_id,
+            &price_point,
+            crate::deferred_exec::SlippageCheckStatus::NoSlippageCheck,
+        )?;
 
         ctx.response_mut().add_event(DeferredExecQueuedEvent {
             deferred_exec_id: new_id,
@@ -467,10 +472,15 @@ impl State<'_> {
                 let price_point = self.next_crank_timestamp(ctx.storage)?;
                 // Replace empty error from the submessage with validation error.
                 let e = if let Some(price_point) = price_point {
-                    self.deferred_validate(ctx.storage, id, &price_point)
-                        .err()
-                        .map(|e| e.to_string())
-                        .unwrap_or(e)
+                    self.deferred_validate(
+                        ctx.storage,
+                        id,
+                        &price_point,
+                        crate::deferred_exec::SlippageCheckStatus::SlippageCheck,
+                    )
+                    .err()
+                    .map(|e| e.to_string())
+                    .unwrap_or(e)
                 } else {
                     e
                 };

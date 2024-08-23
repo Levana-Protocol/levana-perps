@@ -50,10 +50,16 @@ impl State<'_> {
         store: &dyn Storage,
         id: DeferredExecId,
         price_point: &PricePoint,
+        slippage_check: SlippageCheckStatus,
     ) -> Result<()> {
         let item = self.load_deferred_exec_item(store, id)?;
-        helper_validate(self, store, item, price_point)
+        helper_validate(self, store, item, price_point, slippage_check)
     }
+}
+
+pub enum SlippageCheckStatus {
+    SlippageCheck,
+    NoSlippageCheck,
 }
 
 fn helper_execute(
@@ -402,6 +408,7 @@ fn helper_validate(
     store: &dyn Storage,
     item: DeferredExecWithStatus,
     price_point: &PricePoint,
+    slippage_check: SlippageCheckStatus,
 ) -> Result<()> {
     match item.item {
         // TODO: remove this once the deprecated fields are fully removed
@@ -417,6 +424,11 @@ fn helper_validate(
             crank_fee,
             crank_fee_usd,
         } => {
+            // if the status of DeferredExecItem is Pending, avoid validating for slippage_assert
+            let slippage_assert = match slippage_check {
+                SlippageCheckStatus::SlippageCheck => slippage_assert,
+                SlippageCheckStatus::NoSlippageCheck => None,
+            };
             // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
             let take_profit_trader = match (take_profit, max_gains) {
                 (None, None) => {
@@ -485,6 +497,11 @@ fn helper_validate(
             amount,
         } => {
             let funds = amount.into_signed();
+            // if the status of DeferredExecItem is Pending, avoid validating for slippage_assert
+            let slippage_assert = match slippage_check {
+                SlippageCheckStatus::SlippageCheck => slippage_assert,
+                SlippageCheckStatus::NoSlippageCheck => None,
+            };
 
             let notional_size = state.update_size_new_notional_size(store, id, funds)?;
             let liquifund = validate_slippage_assert_and_liquifund(
@@ -526,6 +543,12 @@ fn helper_validate(
         } => {
             let funds = -amount.into_signed();
             let notional_size = state.update_size_new_notional_size(store, id, funds)?;
+            // if the status of DeferredExecItem is Pending, avoid validating for slippage_assert
+            let slippage_assert = match slippage_check {
+                SlippageCheckStatus::SlippageCheck => slippage_assert,
+                SlippageCheckStatus::NoSlippageCheck => None,
+            };
+
             let liquifund = validate_slippage_assert_and_liquifund(
                 state,
                 store,
@@ -549,6 +572,12 @@ fn helper_validate(
             leverage,
             slippage_assert,
         } => {
+            // if the status of DeferredExecItem is Pending, avoid validating for slippage_assert
+            let slippage_assert = match slippage_check {
+                SlippageCheckStatus::SlippageCheck => slippage_assert,
+                SlippageCheckStatus::NoSlippageCheck => None,
+            };
+
             let liquifund = validate_slippage_assert_and_liquifund(
                 state,
                 store,
@@ -620,6 +649,12 @@ fn helper_validate(
             id,
             slippage_assert,
         } => {
+            // if the status of DeferredExecItem is Pending, avoid validating for slippage_assert
+            let slippage_assert = match slippage_check {
+                SlippageCheckStatus::SlippageCheck => slippage_assert,
+                SlippageCheckStatus::NoSlippageCheck => None,
+            };
+
             helper_close_position(state, store, id, slippage_assert, *price_point)?.discard();
             Ok(())
         }
