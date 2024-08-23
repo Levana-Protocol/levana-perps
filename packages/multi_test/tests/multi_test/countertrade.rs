@@ -1093,6 +1093,13 @@ fn update_position_scenario_add_collateral() {
         },
     }
     do_work(&market, &lp);
+    let updated_position = market
+        .query_countertrade_market_id(status.market_id)
+        .unwrap()
+        .position
+        .unwrap();
+    assert!(countertrade_position.deposit_collateral < updated_position.deposit_collateral);
+
     let status = market.query_status().unwrap();
     assert!(status
         .long_funding
@@ -1102,3 +1109,127 @@ fn update_position_scenario_add_collateral() {
         )
         .unwrap());
 }
+
+#[test]
+fn update_position_scenario_remove_collateral() {
+    let market = make_countertrade_market().unwrap();
+    // Set minimum_deposit_usd so that countertrade countract tries to
+    // reduce the collateral instead of closing the position.
+    market
+        .exec_set_config(msg::contracts::market::config::ConfigUpdate {
+            minimum_deposit_usd: Some("5".parse().unwrap()),
+            ..Default::default()
+        })
+        .unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    // Make sure there are funds to open a position
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "100")
+        .unwrap();
+
+    let market_type = market.query_status().unwrap().market_type;
+
+    // Open up unbalanced positions
+    market
+        .exec_open_position_take_profit(
+            &trader,
+            "10",
+            // Deal with off-by-one leverage to ensure we have a balanced market
+            match market_type {
+                msg::prelude::MarketType::CollateralIsQuote => "7",
+                msg::prelude::MarketType::CollateralIsBase => "7",
+            },
+            DirectionToBase::Long,
+            None,
+            None,
+            msg::prelude::TakeProfitTrader::Finite("1.1".parse().unwrap()),
+        )
+        .unwrap();
+
+    // Execute the deferred message
+    market.exec_crank_till_finished(&lp).unwrap();
+
+    do_work(&market, &lp);
+
+    let status = market.query_status().unwrap();
+
+    let countertrade_position = market
+        .query_countertrade_market_id(status.market_id)
+        .unwrap()
+        .position
+        .unwrap();
+    assert_eq!(
+        countertrade_position.direction_to_base,
+        DirectionToBase::Short
+    );
+    let status = market.query_status().unwrap();
+    // Popular position is still long_funding
+    assert!(status.long_funding.is_strictly_positive());
+
+    // This flip the popular side from Long to Short
+    market
+        .exec_open_position_take_profit(
+            &trader,
+            "10",
+            // Deal with off-by-one leverage to ensure we have a balanced market
+            match market_type {
+                msg::prelude::MarketType::CollateralIsQuote => "3",
+                msg::prelude::MarketType::CollateralIsBase => "1",
+            },
+            DirectionToBase::Short,
+            None,
+            None,
+            msg::prelude::TakeProfitTrader::Finite("0.9".parse().unwrap()),
+        )
+        .unwrap();
+
+    market.exec_crank_till_finished(&lp).unwrap();
+    let status = market.query_status().unwrap();
+
+    // Short position is the popular one
+    assert!(status.short_funding.is_strictly_positive());
+
+    let work = market.query_countertrade_has_work().unwrap();
+    match work {
+        HasWorkResp::NoWork {} => panic!("impossible: expected work"),
+        HasWorkResp::Work { ref desc } => match desc {
+            WorkDescription::UpdatePositionRemoveCollateralImpactSize { pos_id, .. } => {
+                assert_eq!(countertrade_position.id, pos_id.clone());
+            }
+            desc => panic!("Got invalid work: {desc}"),
+        },
+    };
+    do_work(&market, &lp);
+    let status = market.query_status().unwrap();
+    let updated_position = market
+        .query_countertrade_market_id(status.market_id)
+        .unwrap()
+        .position
+        .unwrap();
+
+    // Short position is still the popular one
+    assert!(status.short_funding.is_strictly_positive());
+    // Collateral has reduced for the countertrade position
+    assert!(updated_position.deposit_collateral < countertrade_position.deposit_collateral);
+
+    let work = market.query_countertrade_has_work().unwrap();
+    match work {
+        HasWorkResp::NoWork {} => panic!("impossible: expected work"),
+        HasWorkResp::Work { ref desc } => match desc {
+            WorkDescription::ClosePosition { pos_id } => {
+                assert_eq!(countertrade_position.id, *pos_id);
+            }
+            desc => panic!("Got invalid work: {desc}"),
+        },
+    };
+    do_work(&market, &lp);
+}
+
+// todo: Write test so that it closes positing without trying to remove

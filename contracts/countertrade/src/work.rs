@@ -1,13 +1,11 @@
 use std::{ops::Neg, str::FromStr};
 
 use cosmwasm_std::{SubMsg, WasmMsg};
-use msg::contracts::
-    market::{
-        deferred_execution::GetDeferredExecResp,
-        entry::{ClosedPositionCursor, ClosedPositionsResp, StatusResp},
-        position::{PositionId, PositionQueryResponse},
-    }
-;
+use msg::contracts::market::{
+    deferred_execution::GetDeferredExecResp,
+    entry::{ClosedPositionCursor, ClosedPositionsResp, StatusResp},
+    position::{self, PositionId, PositionQueryResponse},
+};
 use shared::{
     number::Number,
     price::{Price, TakeProfitTrader},
@@ -120,18 +118,54 @@ pub(crate) fn get_work_for(
         .query_wasm_smart(&market.addr, &MarketQueryMsg::Status { price: None })
         .context("Unable to query market status")?;
 
+    let available_collateral = NonZero::new(totals.collateral)
+        .context("Impossible, zero collateral after checking that we have a minimum deposit")?;
+
     // We always close popular-side positions. Future potential optimization:
     // reduce position size instead when possible.
-    if let Some(pos) = &pos {
+    if let Some(ref pos) = pos {
         let funding = match pos.direction_to_base {
             DirectionToBase::Long => status.long_funding,
             DirectionToBase::Short => status.short_funding,
         };
-        // We close on 0 also
         if funding.is_positive_or_zero() {
-            return Ok(HasWorkResp::Work {
-                desc: WorkDescription::ClosePosition { pos_id: pos.id },
-            });
+            let notional_diff = match pos.direction_to_base {
+                DirectionToBase::Long => status.long_notional.checked_sub(status.short_notional)?,
+                DirectionToBase::Short => {
+                    status.short_notional.checked_sub(status.long_notional)?
+                }
+            };
+            if pos.notional_size.abs_unsigned() < notional_diff {
+                // This means that closing this position won't make
+                // the countertrade direction unpopular. So we have to
+                // close it, to make countertrade contract open it in
+                // opposite direction eventually.
+                return Ok(HasWorkResp::Work {
+                    desc: WorkDescription::ClosePosition { pos_id: pos.id },
+                });
+            } else {
+                // Trying to reduce it to min_deposit_collateral
+                let min_deposit_collateral =
+                    price.usd_to_collateral(status.config.minimum_deposit_usd);
+                if pos.deposit_collateral <= min_deposit_collateral.into_signed() {
+                    return Ok(HasWorkResp::Work {
+                        desc: WorkDescription::ClosePosition { pos_id: pos.id },
+                    });
+                } else {
+                    let to_remove = pos
+                        .deposit_collateral
+                        .checked_sub(min_deposit_collateral.into_signed())?
+                        .try_into_non_zero()
+                        .context("to_remove collateral is zero")?;
+                    return Ok(HasWorkResp::Work {
+                        desc: WorkDescription::UpdatePositionRemoveCollateralImpactSize {
+                            pos_id: pos.id,
+                            amount: to_remove,
+                            slippage_assert: None,
+                        },
+                    });
+                }
+            }
         }
     }
 
@@ -140,10 +174,7 @@ pub(crate) fn get_work_for(
         return Ok(HasWorkResp::NoWork {});
     }
 
-    let collateral = NonZero::new(totals.collateral)
-        .context("Impossible, zero collateral after checking that we have a minimum deposit")?;
-
-    desired_action(state, &status, &price, pos.as_deref(), collateral).map(|x| match x {
+    desired_action(state, &status, &price, pos.as_deref(), available_collateral).map(|x| match x {
         Some(desc) => HasWorkResp::Work { desc },
         None => HasWorkResp::NoWork {},
     })
@@ -660,6 +691,7 @@ fn optimize_capital_efficiency(
         .checked_div(desired_leverage.into_number())?;
     assert!(deposit_collateral.is_strictly_positive());
     let deposit_collateral = Collateral::from_decimal256(deposit_collateral.abs_unsigned());
+
     let result = match countertrade_position {
         Some(countertrade_position) => {
             let diff = deposit_collateral
@@ -882,14 +914,18 @@ pub(crate) fn execute(
                 event
             };
             res = res.add_event(event);
-            let msg = market.token.into_market_execute_msg(
-                &market.addr,
-                amount.raw(),
-                MarketExecuteMsg::UpdatePositionAddCollateralImpactSize {
-                    id: pos_id,
-                    slippage_assert,
-                },
-            )?;
+            let msg = cosmwasm_std::WasmMsg::Execute {
+                contract_addr: market.addr.into_string(),
+                msg: to_json_binary(
+                    &MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
+                        id: pos_id,
+                        amount,
+                        slippage_assert: None,
+                    },
+                )?,
+                funds: vec![],
+            };
+
             totals.collateral = totals.collateral.checked_add(amount.raw())?;
             crate::state::TOTALS.save(storage, &market.id, &totals)?;
 
