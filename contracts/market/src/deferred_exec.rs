@@ -417,6 +417,14 @@ fn helper_validate(
             crank_fee,
             crank_fee_usd,
         } => {
+            // if the status of DeferredExecItem is Pending, avoid validating for slippage_assert
+            let slippage_assert = if item.status
+                == msg::contracts::market::deferred_execution::DeferredExecStatus::Pending
+            {
+                None
+            } else {
+                slippage_assert
+            };
             // eventually this will be deprecated - see BackwardsCompatTakeProfit notes for details
             let take_profit_trader = match (take_profit, max_gains) {
                 (None, None) => {
@@ -485,6 +493,14 @@ fn helper_validate(
             amount,
         } => {
             let funds = amount.into_signed();
+            // if the status of DeferredExecItem is Pending, avoid validating for slippage_assert
+            let slippage_assert = if item.status
+                == msg::contracts::market::deferred_execution::DeferredExecStatus::Pending
+            {
+                None
+            } else {
+                slippage_assert
+            };
 
             let notional_size = state.update_size_new_notional_size(store, id, funds)?;
             let liquifund = validate_slippage_assert_and_liquifund(
@@ -526,6 +542,15 @@ fn helper_validate(
         } => {
             let funds = -amount.into_signed();
             let notional_size = state.update_size_new_notional_size(store, id, funds)?;
+            // if the status of DeferredExecItem is Pending, avoid validating for slippage_assert
+            let slippage_assert = if item.status
+                == msg::contracts::market::deferred_execution::DeferredExecStatus::Pending
+            {
+                None
+            } else {
+                slippage_assert
+            };
+
             let liquifund = validate_slippage_assert_and_liquifund(
                 state,
                 store,
@@ -549,6 +574,15 @@ fn helper_validate(
             leverage,
             slippage_assert,
         } => {
+            // if the status of DeferredExecItem is Pending, avoid validating for slippage_assert
+            let slippage_assert = if item.status
+                == msg::contracts::market::deferred_execution::DeferredExecStatus::Pending
+            {
+                None
+            } else {
+                slippage_assert
+            };
+
             let liquifund = validate_slippage_assert_and_liquifund(
                 state,
                 store,
@@ -620,6 +654,15 @@ fn helper_validate(
             id,
             slippage_assert,
         } => {
+            // if the status of DeferredExecItem is Pending, avoid validating for slippage_assert
+            let slippage_assert = if item.status
+                == msg::contracts::market::deferred_execution::DeferredExecStatus::Pending
+            {
+                None
+            } else {
+                slippage_assert
+            };
+
             helper_close_position(state, store, id, slippage_assert, *price_point)?.discard();
             Ok(())
         }
