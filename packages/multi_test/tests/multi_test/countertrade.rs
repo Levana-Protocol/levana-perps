@@ -1080,7 +1080,7 @@ fn update_position_scenario_add_collateral() {
 
     assert!(status
         .long_funding
-        .approx_eq_eps("0.9".parse().unwrap(), "0.1".parse().unwrap())
+        .approx_eq_eps("0.9".parse().unwrap(), "0.05".parse().unwrap())
         .unwrap());
 
     let work = market.query_countertrade_has_work().unwrap();
