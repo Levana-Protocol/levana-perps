@@ -16,7 +16,7 @@ compute-dnf:
 
 # Current market dnf
 current-dnf:
-	cargo run --bin perps-market-params current-market-dnf --market-id BNB_USDC
+	cargo run --bin perps-market-params current-market-dnf --market-id stDYDX_USDC
 
 # Serve web app
 serve:

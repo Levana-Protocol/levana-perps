@@ -273,13 +273,31 @@ fn filter_invalid_exchanges(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<Dnf
             ExchangeKind::Dex => None,
         });
 
-    let max_volume_exchange = exchanges
-        .clone()
-        .max_by(|a, b| {
-            a.depth_usd_positive_two
-                .total_cmp(&b.depth_usd_positive_two)
-        })
-        .context("No max value found")?;
+    let max_volume_exchange = if has_top_tier {
+        exchanges
+            .clone()
+            .max_by(|a, b| {
+                a.depth_usd_positive_two
+                    .min(a.depth_usd_negative_two)
+                    .total_cmp(&b.depth_usd_positive_two.min(b.depth_usd_negative_two))
+            })
+            .context("No max value found")?
+    } else {
+        // This condition is specifically for handling market like
+        // MAGA_USDC which isn't supported by top tier markets.  CMC
+        // API has outlier field which is useless in their API. It
+        // doesn't flag an exchange like B2Z Exchange even though in
+        // their UI it shows that it has low confidence on that
+        // exchange.
+        //
+        // So for these cases, we use 24 hour volume data as that
+        // seems to filter out these exchanges and instead choses a
+        // exchange with a better confidence.
+        exchanges
+            .clone()
+            .max_by(|a, b| a.volume_24h_usd.total_cmp(&b.volume_24h_usd))
+            .context("No max value found")?
+    };
 
     let should_filter_top_tier = if has_top_tier {
         !max_volume_exchange.exchange_id.is_top_tier()
