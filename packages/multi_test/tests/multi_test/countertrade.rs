@@ -1046,9 +1046,20 @@ fn update_position_scenario_add_collateral() {
     // Execute the deferred message
     market.exec_crank_till_finished(&lp).unwrap();
 
+    let status = market.query_status().unwrap();
+    println!("0 long_notional: {}", status.long_notional);
+    println!("0 short_notional: {}", status.short_notional);
+    println!("0 long_funding: {}", status.long_funding);
+    println!("0 short_funding: {}", status.short_funding);
+
     do_work(&market, &lp);
 
     let status = market.query_status().unwrap();
+    println!("1 long_notional: {}", status.long_notional);
+    println!("1 short_notional: {}", status.short_notional);
+    println!("1 long_funding: {}", status.long_funding);
+    println!("1 short_funding: {}", status.short_funding);
+
     let countertrade_position = market
         .query_countertrade_market_id(status.market_id)
         .unwrap()
@@ -1058,7 +1069,6 @@ fn update_position_scenario_add_collateral() {
         countertrade_position.direction_to_base,
         DirectionToBase::Short
     );
-
     market
         .exec_open_position_take_profit(
             &trader,
@@ -1082,6 +1092,14 @@ fn update_position_scenario_add_collateral() {
         .long_funding
         .approx_eq_eps("0.9".parse().unwrap(), "0.1".parse().unwrap())
         .unwrap());
+    println!("ct notional_size: {}", countertrade_position.notional_size);
+    println!("ct deposit_collateral {}", countertrade_position.deposit_collateral);
+    println!("ct dir {:?}", countertrade_position.direction_to_base);
+    println!("2 long_notional: {}", status.long_notional);
+    println!("2 short_notional: {}", status.short_notional);
+    println!("2 long_funding: {}", status.long_funding);
+    println!("2 short_funding: {}", status.short_funding);
+
     let work = market.query_countertrade_has_work().unwrap();
     match work {
         HasWorkResp::NoWork {} => panic!("impossible: expected work"),
@@ -1092,6 +1110,7 @@ fn update_position_scenario_add_collateral() {
             desc => panic!("Got invalid work: {desc}"),
         },
     }
+
     do_work(&market, &lp);
     let updated_position = market
         .query_countertrade_market_id(status.market_id)
@@ -1108,6 +1127,10 @@ fn update_position_scenario_add_collateral() {
             "0.1".parse().unwrap()
         )
         .unwrap());
+    println!("3 long_notional: {}", status.long_notional);
+    println!("3 short_notional: {}", status.short_notional);
+    println!("3 long_funding: {}", status.long_funding);
+    println!("3 short_funding: {}", status.short_funding);
 }
 
 #[test]
@@ -1155,16 +1178,34 @@ fn update_position_scenario_remove_collateral() {
 
     // Execute the deferred message
     market.exec_crank_till_finished(&lp).unwrap();
+    let status = market.query_status().unwrap();
+    let foo = DirectionToBase::Long.into_notional(status.market_type);
+    println!("long_funding: {}", status.long_funding);
+    println!("short_funding: {}", status.short_funding);
+    println!("long_notional: {}", status.long_notional);
+    println!("short_notional: {}", status.short_notional);
+
 
     do_work(&market, &lp);
 
     let status = market.query_status().unwrap();
+
 
     let countertrade_position = market
         .query_countertrade_market_id(status.market_id)
         .unwrap()
         .position
         .unwrap();
+    println!("m long_funding: {}", status.long_funding);
+    println!("m short_funding: {}", status.short_funding);
+    println!("m long_notional: {}", status.long_notional);
+    println!("m short_notional: {}", status.short_notional);
+    println!("m ct deposit_collateral: {}", countertrade_position.deposit_collateral);
+    println!("m ct active_collateral: {}", countertrade_position.active_collateral);
+    println!("m ct leverage: {}", countertrade_position.leverage);
+    println!("m ct direction: {:?}", countertrade_position.direction_to_base);
+    println!("m ct notional size: {:?}", countertrade_position.notional_size);
+
     assert_eq!(
         countertrade_position.direction_to_base,
         DirectionToBase::Short
@@ -1193,6 +1234,12 @@ fn update_position_scenario_remove_collateral() {
     market.exec_crank_till_finished(&lp).unwrap();
     let status = market.query_status().unwrap();
 
+    println!("m1 long_funding: {}", status.long_funding);
+    println!("m1 short_funding: {}", status.short_funding);
+    println!("m1 long_notional: {}", status.long_notional);
+    println!("m1 short_notional: {}", status.short_notional);
+
+
     // Short position is the popular one
     assert!(status.short_funding.is_strictly_positive());
 
@@ -1218,8 +1265,14 @@ fn update_position_scenario_remove_collateral() {
     assert!(status.short_funding.is_strictly_positive());
     // Collateral has reduced for the countertrade position
     assert!(updated_position.deposit_collateral < countertrade_position.deposit_collateral);
+    println!("m2 long_funding: {}", status.long_funding);
+    println!("m2 short_funding: {}", status.short_funding);
+    println!("m2 long_notional: {}", status.long_notional);
+    println!("m2 short_notional: {}", status.short_notional);
+
 
     let work = market.query_countertrade_has_work().unwrap();
+
     match work {
         HasWorkResp::NoWork {} => panic!("impossible: expected work"),
         HasWorkResp::Work { ref desc } => match desc {

@@ -118,8 +118,14 @@ pub(crate) fn get_work_for(
         .query_wasm_smart(&market.addr, &MarketQueryMsg::Status { price: None })
         .context("Unable to query market status")?;
 
+    let (long_interest, short_interest) = match status.market_type {
+        MarketType::CollateralIsQuote => (status.long_notional, status.short_notional),
+        MarketType::CollateralIsBase => (status.short_notional, status.long_notional),
+    };
+
     let available_collateral = NonZero::new(totals.collateral)
         .context("Impossible, zero collateral after checking that we have a minimum deposit")?;
+    let minimum_position_collateral = price.usd_to_collateral(status.config.minimum_deposit_usd);
 
     // We always close popular-side positions. Future potential optimization:
     // reduce position size instead when possible.
@@ -128,6 +134,7 @@ pub(crate) fn get_work_for(
             DirectionToBase::Long => status.long_funding,
             DirectionToBase::Short => status.short_funding,
         };
+
         if funding.is_positive_or_zero() {
             let notional_diff = match pos.direction_to_base {
                 DirectionToBase::Long => status.long_notional.checked_sub(status.short_notional)?,
@@ -135,7 +142,10 @@ pub(crate) fn get_work_for(
                     status.short_notional.checked_sub(status.long_notional)?
                 }
             };
-            if pos.notional_size.abs_unsigned() < notional_diff {
+
+            if pos.notional_size.abs_unsigned() < notional_diff
+                || pos.deposit_collateral <= minimum_position_collateral.into_signed()
+            {
                 // This means that closing this position won't make
                 // the countertrade direction unpopular. So we have to
                 // close it, to make countertrade contract open it in
@@ -144,26 +154,36 @@ pub(crate) fn get_work_for(
                     desc: WorkDescription::ClosePosition { pos_id: pos.id },
                 });
             } else {
-                // Trying to reduce it to min_deposit_collateral
-                let min_deposit_collateral =
-                    price.usd_to_collateral(status.config.minimum_deposit_usd);
-                if pos.deposit_collateral <= min_deposit_collateral.into_signed() {
-                    return Ok(HasWorkResp::Work {
-                        desc: WorkDescription::ClosePosition { pos_id: pos.id },
-                    });
-                } else {
-                    let to_remove = pos
-                        .deposit_collateral
-                        .checked_sub(min_deposit_collateral.into_signed())?
-                        .try_into_non_zero()
-                        .context("to_remove collateral is zero")?;
-                    return Ok(HasWorkResp::Work {
-                        desc: WorkDescription::UpdatePositionRemoveCollateralImpactSize {
-                            pos_id: pos.id,
-                            amount: to_remove,
-                            slippage_assert: None,
-                        },
-                    });
+                // Update the existing position to target_funding rate
+                let result = determine_target_notional(
+                    long_interest,
+                    short_interest,
+                    state.config.target_funding.into_number(),
+                    &status,
+                    state.config.iterations,
+                    Some(*pos.clone()),
+                )?;
+                match result {
+                    Some(position_notional_size) => {
+                        let max_leverage = state.config.max_leverage;
+                        let take_profit_factor = state.config.take_profit_factor;
+                        let stop_loss_factor = state.config.stop_loss_factor;
+                        let result = compute_delta_notional(
+                            position_notional_size,
+                            &price,
+                            &status,
+                            available_collateral,
+                            max_leverage,
+                            take_profit_factor,
+                            stop_loss_factor,
+                            Some(*pos.clone()),
+                        )?;
+                        match result {
+                            Some(work) => return Ok(HasWorkResp::Work { desc: work }),
+                            None => return Ok(HasWorkResp::NoWork {}),
+                        }
+                    }
+                    None => return Ok(HasWorkResp::NoWork {}),
                 }
             }
         }
@@ -356,6 +376,7 @@ fn desired_action(
     }
 }
 
+/// Deterimine target notional on the unpopoular side
 fn determine_target_notional(
     long_interest: Notional,
     short_interest: Notional,
@@ -364,48 +385,58 @@ fn determine_target_notional(
     allowed_iterations: u8,
     countertrade_position: Option<PositionQueryResponse>,
 ) -> Result<Option<Signed<Notional>>> {
-    let desired_notional = match countertrade_position {
+    match countertrade_position {
         Some(countertrade_position) => {
-            let direction = countertrade_position
-                .direction_to_base
-                .into_notional(status.market_type);
-            let (pos_long_interest, pos_short_interest) = match direction {
-                DirectionToNotional::Long => (
-                    countertrade_position.notional_size.abs_unsigned(),
-                    Notional::zero(),
-                ),
-                DirectionToNotional::Short => (
-                    Notional::zero(),
-                    countertrade_position.notional_size.abs_unsigned(),
-                ),
+            let (pos_long_interest, pos_short_interest) = {
+                let direction = countertrade_position
+                    .direction_to_base
+                    .into_notional(status.market_type);
+                match direction {
+                    DirectionToNotional::Long => (
+                        countertrade_position.notional_size.abs_unsigned(),
+                        Notional::zero(),
+                    ),
+                    DirectionToNotional::Short => (
+                        Notional::zero(),
+                        countertrade_position.notional_size.abs_unsigned(),
+                    ),
+                }
             };
             let long_interest = long_interest.checked_sub(pos_long_interest)?;
             let short_interest = short_interest.checked_sub(pos_short_interest)?;
-            smart_search(
+            let desired_notional = smart_search(
                 long_interest,
                 short_interest,
                 target_funding,
                 status,
                 allowed_iterations,
                 0,
-            )?
-        }
-        None => smart_search(
-            long_interest,
-            short_interest,
-            target_funding,
-            status,
-            allowed_iterations,
-            0,
-        )?,
-    };
+            )?;
+            let position_notional_size = if long_interest < short_interest {
+                desired_notional.into_signed()
+            } else {
+                -desired_notional.into_signed()
+            };
 
-    let position_notional_size = if long_interest < short_interest {
-        desired_notional.into_signed()
-    } else {
-        -desired_notional.into_signed()
-    };
-    Ok(Some(position_notional_size))
+            Ok(Some(position_notional_size))
+        }
+        None => {
+            let desired_notional = smart_search(
+                long_interest,
+                short_interest,
+                target_funding,
+                status,
+                allowed_iterations,
+                0,
+            )?;
+            let position_notional_size = if long_interest < short_interest {
+                desired_notional.into_signed()
+            } else {
+                -desired_notional.into_signed()
+            };
+            Ok(Some(position_notional_size))
+        }
+    }
 }
 
 /// Returns the delta notional on the unpopular side.
@@ -604,18 +635,21 @@ fn compute_delta_notional(
         DirectionToNotional::Short
     };
     let base_direction = notional_direction.into_base(status.market_type);
-
     let desired_leverage = desired_leverage.into_signed(base_direction);
     let desired_leverage = desired_leverage.into_notional(status.market_type)?;
 
     let position_notional_size_in_collateral =
         position_notional_size.map(|size| price.notional_to_collateral(size));
 
+    let min_deposit_collateral = price.usd_to_collateral(status.config.minimum_deposit_usd);
+
     let capital = optimize_capital_efficiency(
         available_collateral,
         position_notional_size_in_collateral,
         desired_leverage,
-        countertrade_position,
+        countertrade_position.clone(),
+        status.market_type,
+        min_deposit_collateral,
     )?;
 
     let work = match capital {
@@ -625,11 +659,9 @@ fn compute_delta_notional(
                 leverage,
             } => {
                 let deposit_collateral = NonZero::new(deposit_collateral)
-                    .context("collateral is zero")?
+                    .context("deposit_collateral is zero")?
                     .min(available_collateral);
 
-                let min_deposit_collateral =
-                    price.usd_to_collateral(status.config.minimum_deposit_usd);
                 if deposit_collateral.into_decimal256() < min_deposit_collateral.into_decimal256() {
                     // Market is skewed, and deserves to be balanced, but the size of the skew
                     // is tiny. Wait for the market to have more interest before intervening.
@@ -649,14 +681,14 @@ fn compute_delta_notional(
                 WorkDescription::UpdatePositionAddCollateralImpactSize {
                     pos_id,
                     slippage_assert: None,
-                    amount: NonZero::new(collateral).context("collateral is zero")?,
+                    amount: NonZero::new(collateral).context("add_collateral is zero")?,
                 }
             }
             Capital::RemoveCollateral { collateral, pos_id } => {
                 WorkDescription::UpdatePositionRemoveCollateralImpactSize {
                     pos_id,
                     slippage_assert: None,
-                    amount: NonZero::new(collateral).context("collateral is zero")?,
+                    amount: NonZero::new(collateral).context("remove_collateral is zero")?,
                 }
             }
         },
@@ -686,15 +718,20 @@ fn optimize_capital_efficiency(
     position_notional_size_in_collateral: Signed<Collateral>,
     desired_leverage: SignedLeverageToNotional,
     countertrade_position: Option<PositionQueryResponse>,
+    market_type: MarketType,
+    min_deposit_collateral: Collateral,
 ) -> Result<Option<Capital>> {
-    let deposit_collateral = position_notional_size_in_collateral
-        .into_number()
-        .checked_div(desired_leverage.into_number())?;
-    assert!(deposit_collateral.is_strictly_positive());
-    let deposit_collateral = Collateral::from_decimal256(deposit_collateral.abs_unsigned());
-
     let result = match countertrade_position {
         Some(countertrade_position) => {
+            let ct_position_leverage = countertrade_position
+                .leverage
+                .into_signed(countertrade_position.direction_to_base)
+                .into_notional(market_type)?;
+            let deposit_collateral = position_notional_size_in_collateral
+                .into_number()
+                .checked_div(ct_position_leverage.into_number())?;
+            let deposit_collateral = Collateral::from_decimal256(deposit_collateral.abs_unsigned());
+
             let diff = deposit_collateral
                 .into_signed()
                 .checked_sub(countertrade_position.deposit_collateral)?;
@@ -713,19 +750,33 @@ fn optimize_capital_efficiency(
             } else if diff.is_zero() {
                 None
             } else {
-                let collateral = diff.neg().abs_unsigned();
-                let collateral = if collateral > available_collateral.raw() {
-                    available_collateral.raw()
-                } else {
+                let collateral = diff.abs_unsigned();
+                let countertrade_final_deposit_collateral = countertrade_position
+                    .deposit_collateral
+                    .checked_sub(collateral.into_signed())?;
+                let max_deduct = if countertrade_final_deposit_collateral
+                    >= min_deposit_collateral.into_signed()
+                {
                     collateral
+                } else {
+                    let result = countertrade_position
+                        .deposit_collateral
+                        .checked_sub(min_deposit_collateral.into_signed())?;
+                    result.abs_unsigned()
                 };
                 Some(Capital::RemoveCollateral {
-                    collateral,
+                    collateral: max_deduct,
                     pos_id: countertrade_position.id,
                 })
             }
         }
         None => {
+            let deposit_collateral = position_notional_size_in_collateral
+                .into_number()
+                .checked_div(desired_leverage.into_number())?;
+            assert!(deposit_collateral.is_strictly_positive());
+            let deposit_collateral = Collateral::from_decimal256(deposit_collateral.abs_unsigned());
+
             let deposit_collateral = if deposit_collateral > available_collateral.raw() {
                 available_collateral.raw()
             } else {
@@ -915,19 +966,20 @@ pub(crate) fn execute(
                 event
             };
             res = res.add_event(event);
+            let amount = market.token.round_down_to_precision(amount.raw())?;
             let msg = cosmwasm_std::WasmMsg::Execute {
                 contract_addr: market.addr.into_string(),
                 msg: to_json_binary(
                     &MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
                         id: pos_id,
-                        amount,
+                        amount: NonZero::new(amount).context("amount is zero")?,
                         slippage_assert: None,
                     },
                 )?,
                 funds: vec![],
             };
 
-            totals.collateral = totals.collateral.checked_add(amount.raw())?;
+            totals.collateral = totals.collateral.checked_add(amount)?;
             crate::state::TOTALS.save(storage, &market.id, &totals)?;
 
             res = add_market_msg(storage, res, msg)?;

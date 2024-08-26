@@ -30,6 +30,13 @@ cargo-test-check:
 	# just market-test base cw20
 	just market-test quote cw20
 
+# cargo tests check
+cargo-test-check-local:
+	just market-test base native
+	just market-test quote native
+	just market-test base cw20
+	just market-test quote cw20
+
 # Property tests
 cargo-test-with-prop:
 	just prop-test-run base native
