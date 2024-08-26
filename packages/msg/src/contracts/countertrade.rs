@@ -337,6 +337,20 @@ pub enum WorkDescription {
         /// ID to be cleared
         id: DeferredExecId,
     },
+    /// Add collateral to a position, causing notional size to increase
+    UpdatePositionAddCollateralImpactSize {
+        /// ID of position to update
+        pos_id: PositionId,
+        /// Amount of funds to add to the position
+        amount: NonZero<Collateral>,
+    },
+    /// Remove collateral from a position, causing notional size to decrease
+    UpdatePositionRemoveCollateralImpactSize {
+        /// ID of position to update
+        pos_id: PositionId,
+        /// Amount of funds to remove from the position
+        amount: NonZero<Collateral>,
+    },
 }
 
 impl std::fmt::Display for WorkDescription {
@@ -359,6 +373,16 @@ impl std::fmt::Display for WorkDescription {
             WorkDescription::ClearDeferredExec { id } => {
                 write!(f, "Clear Deferred Exec Id of {id}")
             }
+            WorkDescription::UpdatePositionAddCollateralImpactSize { pos_id, amount } => {
+                write!(
+                    f,
+                    "Add {amount} Collateral to Position Id of {pos_id} impacting size"
+                )
+            }
+            WorkDescription::UpdatePositionRemoveCollateralImpactSize { pos_id, amount } => write!(
+                f,
+                "Remove {amount} Collateral to Position Id of {pos_id} impacting size"
+            ),
         }
     }
 }

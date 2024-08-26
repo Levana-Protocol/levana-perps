@@ -75,6 +75,7 @@ pub struct NewMarketParams {
 /// Slippage assert tolerance is the tolerance to the sum of the two sources of slippage.
 #[cw_serde]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Eq)]
 pub struct SlippageAssert {
     /// Expected effective price from the sender. To incorporate tolerance on delta neutrality fee,
     /// the expected price should be modified by expected fee rate:
