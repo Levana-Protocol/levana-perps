@@ -1,4 +1,4 @@
-use std::{ops::Neg, str::FromStr};
+use std::str::FromStr;
 
 use cosmwasm_std::{SubMsg, WasmMsg};
 use msg::contracts::market::{
@@ -680,14 +680,12 @@ fn compute_delta_notional(
             Capital::AddCollateral { collateral, pos_id } => {
                 WorkDescription::UpdatePositionAddCollateralImpactSize {
                     pos_id,
-                    slippage_assert: None,
                     amount: NonZero::new(collateral).context("add_collateral is zero")?,
                 }
             }
             Capital::RemoveCollateral { collateral, pos_id } => {
                 WorkDescription::UpdatePositionRemoveCollateralImpactSize {
                     pos_id,
-                    slippage_assert: None,
                     amount: NonZero::new(collateral).context("remove_collateral is zero")?,
                 }
             }
@@ -915,31 +913,17 @@ pub(crate) fn execute(
                     .add_attribute("market", market.id.as_str()),
             )
         }
-        WorkDescription::UpdatePositionAddCollateralImpactSize {
-            pos_id,
-            slippage_assert,
-            amount,
-        } => {
+        WorkDescription::UpdatePositionAddCollateralImpactSize { pos_id, amount } => {
             let event = Event::new("update-position-add-collateral-impact-size")
                 .add_attribute("position-id", pos_id.to_string())
                 .add_attribute("amount", amount.to_string());
-            let event = if let Some(ref slippage_assert) = slippage_assert {
-                let event =
-                    event.add_attribute("slippage-assert-price", slippage_assert.price.to_string());
-                event.add_attribute(
-                    "slippage-assert-tolerance",
-                    slippage_assert.tolerance.to_string(),
-                )
-            } else {
-                event
-            };
             res = res.add_event(event);
             let msg = market.token.into_market_execute_msg(
                 &market.addr,
                 amount.raw(),
                 MarketExecuteMsg::UpdatePositionAddCollateralImpactSize {
                     id: pos_id,
-                    slippage_assert,
+                    slippage_assert: None,
                 },
             )?;
             totals.collateral = totals.collateral.checked_sub(amount.raw())?;
@@ -947,24 +931,10 @@ pub(crate) fn execute(
 
             res = add_market_msg(storage, res, msg)?;
         }
-        WorkDescription::UpdatePositionRemoveCollateralImpactSize {
-            pos_id,
-            amount,
-            slippage_assert,
-        } => {
+        WorkDescription::UpdatePositionRemoveCollateralImpactSize { pos_id, amount } => {
             let event = Event::new("update-position-remove-collateral-impact-size")
                 .add_attribute("position-id", pos_id.to_string())
                 .add_attribute("amount", amount.to_string());
-            let event = if let Some(ref slippage_assert) = slippage_assert {
-                let event =
-                    event.add_attribute("slippage-assert-price", slippage_assert.price.to_string());
-                event.add_attribute(
-                    "slippage-assert-tolerance",
-                    slippage_assert.tolerance.to_string(),
-                )
-            } else {
-                event
-            };
             res = res.add_event(event);
             let amount = market.token.round_down_to_precision(amount.raw())?;
             let msg = cosmwasm_std::WasmMsg::Execute {

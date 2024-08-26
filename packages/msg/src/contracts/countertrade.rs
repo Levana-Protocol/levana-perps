@@ -14,7 +14,6 @@ use shared::{
 
 use super::market::{
     deferred_execution::DeferredExecId,
-    entry::SlippageAssert,
     position::{PositionId, PositionQueryResponse},
 };
 
@@ -342,8 +341,6 @@ pub enum WorkDescription {
     UpdatePositionAddCollateralImpactSize {
         /// ID of position to update
         pos_id: PositionId,
-        /// Assertion that the price has not moved too far
-        slippage_assert: Option<SlippageAssert>,
         /// Amount of funds to add to the position
         amount: NonZero<Collateral>,
     },
@@ -353,8 +350,6 @@ pub enum WorkDescription {
         pos_id: PositionId,
         /// Amount of funds to remove from the position
         amount: NonZero<Collateral>,
-        /// Assertion that the price has not moved too far
-        slippage_assert: Option<SlippageAssert>,
     },
 }
 
@@ -378,15 +373,13 @@ impl std::fmt::Display for WorkDescription {
             WorkDescription::ClearDeferredExec { id } => {
                 write!(f, "Clear Deferred Exec Id of {id}")
             }
-            WorkDescription::UpdatePositionAddCollateralImpactSize { pos_id, amount, .. } => {
+            WorkDescription::UpdatePositionAddCollateralImpactSize { pos_id, amount } => {
                 write!(
                     f,
                     "Add {amount} Collateral to Position Id of {pos_id} impacting size"
                 )
             }
-            WorkDescription::UpdatePositionRemoveCollateralImpactSize {
-                pos_id, amount, ..
-            } => write!(
+            WorkDescription::UpdatePositionRemoveCollateralImpactSize { pos_id, amount } => write!(
                 f,
                 "Remove {amount} Collateral to Position Id of {pos_id} impacting size"
             ),
