@@ -818,16 +818,19 @@ mod tests {
                     date,
                     dnf: result.clone(),
                     max_leverage: MaxLeverage::new(2.0),
+                    last_updated: Utc::now(),
                 },
                 DnfRecord {
                     date: date.checked_sub_days(Days::new(1)).unwrap(),
                     dnf: result.clone(),
                     max_leverage: MaxLeverage::new(1.0),
+                    last_updated: Utc::now(),
                 },
                 DnfRecord {
                     date: date.checked_sub_days(Days::new(5)).unwrap(),
                     dnf: result.clone(),
                     max_leverage: MaxLeverage::new(-5.0),
+                    last_updated: Utc::now(),
                 },
             ],
         };
