@@ -1,6 +1,7 @@
 mod common;
 mod export;
 pub(crate) mod pnl;
+pub(crate) mod proposal;
 mod whales;
 
 use std::sync::Arc;
@@ -46,6 +47,10 @@ pub(crate) struct BuildVersionRoute;
 pub(crate) struct PnlCssRoute;
 
 #[derive(TypedPath)]
+#[typed_path("/proposal.css")]
+pub(crate) struct ProposalCssRoute;
+
+#[derive(TypedPath)]
 #[typed_path("/whale.css")]
 pub(crate) struct WhaleCssRoute;
 
@@ -70,11 +75,26 @@ pub(crate) struct PnlUrl;
 pub(crate) struct PnlHtml {
     pub(crate) pnl_id: i64,
 }
-
 #[derive(TypedPath, Deserialize)]
 #[typed_path("/pnl/:pnl_id/image.png", rejection(pnl::Error))]
 pub(crate) struct PnlImage {
     pub(crate) pnl_id: i64,
+}
+
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/proposal-url")]
+pub(crate) struct ProposalUrl;
+
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/proposal/:proposal_id", rejection(proposal::Error))]
+pub(crate) struct ProposalHtml {
+    pub(crate) proposal_id: i64,
+}
+
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/proposal/:proposal_id/image.png", rejection(proposal::Error))]
+pub(crate) struct ProposalImage {
+    pub(crate) proposal_id: i64,
 }
 
 impl From<PathRejection> for pnl::Error {
@@ -108,6 +128,10 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .typed_put(pnl::pnl_url)
         .typed_get(pnl::pnl_html)
         .typed_get(pnl::pnl_image)
+        .typed_post(proposal::proposal_url)
+        .typed_put(proposal::proposal_url)
+        .typed_get(proposal::proposal_html)
+        .typed_get(proposal::proposal_image)
         .typed_get(export::history)
         .typed_get(whales::whales)
         .typed_get(whales::whale_css)

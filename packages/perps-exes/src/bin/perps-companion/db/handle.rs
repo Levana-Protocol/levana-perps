@@ -6,7 +6,7 @@ use sqlx::{query_as, query_scalar, PgPool};
 use crate::types::*;
 
 use super::super::endpoints::pnl::PositionInfo;
-use super::models::{PositionInfoFromDb, PositionInfoToDb};
+use super::models::{PositionInfoFromDb, PositionInfoToDb, ProposalInfoFromDb, ProposalInfoToDb };
 
 #[derive(Clone)]
 pub(crate) struct Db {
@@ -110,6 +110,56 @@ impl Db {
                     chain as "chain: ChainId"
                 FROM position_detail INNER JOIN market
                 ON position_detail.market = market.id
+                WHERE url_id=$1
+            "#,
+            url_id
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| e.into())
+    }
+
+    pub(crate) async fn insert_proposal_detail(
+        &self,
+        ProposalInfoToDb {
+            proposal_id,
+            title,
+            chain,
+            environment,
+        }: ProposalInfoToDb,
+    ) -> Result<i64> {
+        let proposal_u64 = proposal_id.u64();
+        let proposal_id =
+            i64::try_from(proposal_u64).context("Error converting {proposal_u64} to i64 type")?;
+        let url_id = query_scalar!(
+            r#"
+                INSERT INTO proposal_detail
+                (proposal_id, title, direction, entry_price, exit_price, leverage, pnl_type)
+                VALUES($1, $2, $3, $4, $5, $6, $7, $8)
+                RETURNING url_id
+            "#,
+            proposal_id,
+            pnl,
+            direction as i32,
+            TwoDecimalPoints(entry_price.into_number()).to_string(),
+            TwoDecimalPoints(exit_price.into_number()).to_string(),
+            leverage,
+            pnl_type as i32,
+        )
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(url_id)
+    }
+
+    pub(crate) async fn get_proposal_detail(&self, url_id: u64) -> Result<Option<ProposalInfoFromDb>> {
+        query_as!(
+            PositionInfoFromDb,
+            r#"
+                SELECT
+                    title,
+                    environment as "environment: ContractEnvironment",
+                    chain as "chain: ChainId"
+                FROM proposal_detail
                 WHERE url_id=$1
             "#,
             url_id

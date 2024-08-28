@@ -18,6 +18,7 @@ serde_yaml = "0.9.2"
 log = "0.4.17"
 cosmos = { git = "https://github.com/Levana-Protocol/levana-cosmos-rs.git", rev = "f24ab3a07d58d91088a2e3bc05aa7e26f290c5ac" }
 cosmwasm-std = "1.1.9"
+cosmwasm-schema = "1.1.9"
 tokio = { version = "1.33.0", default-features = false, features = [
 	"time",
 	"rt",
