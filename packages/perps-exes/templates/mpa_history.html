@@ -22,6 +22,7 @@
             <th>Computed DNF in Notional</th>
             <th>Min depth liquidity</th>
             <th>Max leverage</th>
+            <th>Last updated</th>
           </thead>
           <tbody>
             {% for record in historical_records %}
@@ -40,6 +41,9 @@
               </td>
               <td class="table-light">
                 {{ record.max_leverage|fmt("{:.2}") }}
+              </td>
+              <td class="table-light">
+                {{ record.last_updated }}
               </td>
             </tr>
             {% endfor %}
