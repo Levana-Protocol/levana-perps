@@ -109,6 +109,13 @@ pub(crate) fn get_work_for(
         });
     }
 
+    /// We have zero collateral available, so we have no work to
+    /// perform. We do this below, so that we ResetShares
+    /// appropriately.
+    if totals.collateral.is_zero() {
+        return Ok(HasWorkResp::NoWork {});
+    }
+
     let price: PricePoint = state
         .querier
         .query_wasm_smart(&market.addr, &MarketQueryMsg::SpotPrice { timestamp: None })
@@ -127,8 +134,7 @@ pub(crate) fn get_work_for(
         .context("Impossible, zero collateral after checking that we have a minimum deposit")?;
     let minimum_position_collateral = price.usd_to_collateral(status.config.minimum_deposit_usd);
 
-    // We always close popular-side positions. Future potential optimization:
-    // reduce position size instead when possible.
+    // We try to close popular-side positions.
     if let Some(pos) = &pos {
         let funding = match pos.direction_to_base {
             DirectionToBase::Long => status.long_funding,
