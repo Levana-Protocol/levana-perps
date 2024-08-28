@@ -101,6 +101,12 @@ pub(crate) struct ServeOpt {
     /// Age in days till which we store data
     #[arg(long, env = "LEVANA_MPARAM_DATA_AGE_DAYS", default_value = "7")]
     pub(crate) cmc_data_age_days: u16,
+    /// Run calcuations after specified seconds
+    #[arg(long, env = "LEVANA_MPARAM_RECALC_FREQ_SECONDS", default_value = "3600")]
+    pub(crate) recalcuation_frequency_in_seconds: u64,
+    /// Required runs before sending a slack alert
+    #[arg(long, env = "LEVANA_MPARAM_MIN_RUNS_SLACK_ALERT", default_value = "6")]
+    pub(crate) required_runs_slack_alert: u16,
 }
 
 /// Parse a single key-value pair

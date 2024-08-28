@@ -9,7 +9,7 @@ use std::{
 };
 
 use anyhow::{anyhow, bail, ensure, Context};
-use chrono::{Days, NaiveDate, Utc};
+use chrono::{DateTime, Days, NaiveDate, Utc};
 use shared::storage::MarketId;
 
 use crate::{
@@ -445,41 +445,55 @@ pub(crate) struct DnfRecord {
     pub(crate) date: NaiveDate,
     pub(crate) dnf: Dnf,
     pub(crate) max_leverage: MaxLeverage,
+    pub(crate) last_updated: DateTime<Utc>,
 }
 
 impl HistoricalData {
-    pub(crate) fn is_present_until(&self, date: NaiveDate) -> bool {
-        let data = self.data.iter();
-        let mut now = Utc::now().date_naive();
-        while now > date {
-            let result = data.clone().any(|item| item.date == now);
-            if !result {
-                return false;
-            }
-            now = now - Days::new(1);
-        }
-        if self.data.is_empty() {
-            return false;
-        }
-        true
-    }
-
     pub(crate) fn save(&self, market_id: &MarketId, data_dir: PathBuf) -> anyhow::Result<()> {
         save_historical_data(market_id, data_dir, self.clone(), None)
     }
 
-    pub(crate) fn append(&mut self, dnf: Dnf, max_leverage: MaxLeverage) -> anyhow::Result<()> {
-        let now = Utc::now().date_naive();
-        if self.data.iter().any(|item| item.date == now) {
-            tracing::info!("Ignoring data insertion since it's already present");
-            return Ok(());
-        }
+    pub(crate) fn append(
+        &mut self,
+        dnf: Dnf,
+        max_leverage: MaxLeverage,
+        last_updated: DateTime<Utc>,
+    ) -> anyhow::Result<()> {
+        let now = last_updated.date_naive();
         let result = DnfRecord {
             date: now,
-            dnf,
+            dnf: dnf.clone(),
             max_leverage,
+            last_updated,
         };
-        self.data.push(result);
+        let mut changed_historical_data = false;
+        let mut had_today_data = false;
+        let new_historical_data = self
+            .data
+            .clone()
+            .into_iter()
+            .map(|item| {
+                if item.date == now {
+                    had_today_data = true;
+                    if dnf.min_depth_liquidity < item.dnf.min_depth_liquidity {
+                        tracing::info!("Updating data since lower liquidity depth was found");
+                        changed_historical_data = true;
+                        result.clone()
+                    } else {
+                        item
+                    }
+                } else {
+                    item
+                }
+            })
+            .collect();
+        if changed_historical_data {
+            self.data = new_historical_data;
+        } else {
+            if !had_today_data {
+                self.data.push(result);
+            }
+        }
         Ok(())
     }
 
@@ -581,6 +595,7 @@ pub(crate) async fn compute_coin_dnfs(
 ) -> anyhow::Result<()> {
     let http_app = HttpApp::new(Some(serve_opt.slack_webhook.clone()), opt.cmc_key.clone());
     let data_dir = serve_opt.cmc_data_dir.clone();
+    let mut market_analysis_counter = 0;
     loop {
         tracing::info!("Going to fetch market status from querier");
         let market_config = http_app
@@ -598,42 +613,39 @@ pub(crate) async fn compute_coin_dnfs(
             let market_id = &market_id.status.market_id;
             app.markets.write().insert(market_id.clone());
             tracing::info!("Going to compute DNF for {market_id:?}");
-            let now = Utc::now().date_naive();
-            let now_minus_days = now
-                .checked_sub_days(Days::new(serve_opt.cmc_data_age_days.into()))
-                .context("Not able to do checked subtraction on current time")?;
             let mut historical_data = load_historical_data(market_id, data_dir.clone())?;
             tracing::info!(
                 "Fetched  historical data for {market_id}: {}",
                 historical_data.data.len()
             );
-            let data_present = historical_data.is_present_until(now_minus_days);
-            if !data_present {
-                // Compute todays data and save it
-                let dnf = dnf_sensitivity(&http_app, market_id).await;
-                let (dnf, max_leverage) = {
-                    let dnf = match dnf {
-                        Ok(dnf) => dnf,
-                        Err(ref error) => {
-                            if error.to_string().contains("Exchange type not known for id") {
-                                error_markets.push(market_id);
-                                continue;
-                            } else {
-                                dnf?
-                            }
+            // Compute todays data and save it
+            let now = Utc::now();
+            let dnf = dnf_sensitivity(&http_app, market_id).await;
+            let (dnf, max_leverage) = {
+                let dnf = match dnf {
+                    Ok(dnf) => dnf,
+                    Err(ref error) => {
+                        if error.to_string().contains("Exchange type not known for id") {
+                            error_markets.push(market_id);
+                            continue;
+                        } else {
+                            dnf?
                         }
-                    };
-                    let max_leverage = dnf_sensitivity_to_max_leverage(dnf.dnf_in_usd.clone());
-                    tracing::debug!(
-                        "DNF Notional {}, Max leverage: {max_leverage}, Notional_asset: {}",
-                        dnf.dnf_in_notional,
-                        market_id.get_notional()
-                    );
-                    (dnf, max_leverage)
+                    }
                 };
-                historical_data.append(dnf, max_leverage)?;
-            }
-            if historical_data.is_present_until(now_minus_days) {
+                let max_leverage = dnf_sensitivity_to_max_leverage(dnf.dnf_in_usd.clone());
+                tracing::debug!(
+                    "DNF Notional {}, Max leverage: {max_leverage}, Notional_asset: {}",
+                    dnf.dnf_in_notional,
+                    market_id.get_notional()
+                );
+                (dnf, max_leverage)
+            };
+            historical_data.append(dnf, max_leverage, now)?;
+            let new_historical_data = historical_data.till_days(Some(serve_opt.cmc_data_age_days));
+            if (market_analysis_counter == serve_opt.required_runs_slack_alert)
+                && new_historical_data.is_ok()
+            {
                 tracing::info!("Computing DNF using historical data");
                 let historical_market_dnf =
                     historical_data.compute_dnf(serve_opt.cmc_data_age_days)?;
@@ -651,7 +663,7 @@ pub(crate) async fn compute_coin_dnfs(
                 app.market_params
                     .write()
                     .insert(market_id.clone(), dnf_notify);
-                historical_data = historical_data.till_days(Some(serve_opt.cmc_data_age_days))?;
+                historical_data = new_historical_data?;
             }
             historical_data.save(market_id, data_dir.clone())?;
 
@@ -670,8 +682,10 @@ pub(crate) async fn compute_coin_dnfs(
                 .await?;
         }
 
-        tracing::info!("Going to sleep 24 hours");
-        tokio::time::sleep(Duration::from_secs(60 * 60 * 24)).await;
+        market_analysis_counter += 1;
+        let duration = Duration::from_secs(serve_opt.recalcuation_frequency_in_seconds);
+        tracing::info!("Completed market analysis, Going to sleep {duration:?}");
+        tokio::time::sleep(duration).await;
     }
 }
 

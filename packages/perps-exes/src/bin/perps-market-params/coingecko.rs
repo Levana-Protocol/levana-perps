@@ -157,8 +157,6 @@ impl<'de> Deserialize<'de> for CmcMarketPair {
     }
 }
 
-// todo: put convert = usd
-
 #[derive(Debug, Copy, Clone, serde::Serialize, Hash, PartialEq, Eq)]
 pub(crate) enum Coin {
     Atom,
