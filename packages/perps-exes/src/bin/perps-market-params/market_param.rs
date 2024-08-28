@@ -489,10 +489,8 @@ impl HistoricalData {
             .collect();
         if changed_historical_data {
             self.data = new_historical_data;
-        } else {
-            if !had_today_data {
-                self.data.push(result);
-            }
+        } else if !had_today_data {
+            self.data.push(result);
         }
         Ok(())
     }
