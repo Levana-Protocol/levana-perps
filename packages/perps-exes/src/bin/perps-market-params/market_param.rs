@@ -644,6 +644,9 @@ pub(crate) async fn compute_coin_dnfs(
             if (market_analysis_counter == serve_opt.required_runs_slack_alert)
                 && new_historical_data.is_ok()
             {
+                // Reset market_analysis counter to zero so that we
+                // can get future slack alerts!
+                market_analysis_counter = 0;
                 tracing::info!("Computing DNF using historical data");
                 let historical_market_dnf =
                     historical_data.compute_dnf(serve_opt.cmc_data_age_days)?;
