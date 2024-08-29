@@ -109,9 +109,8 @@ pub(crate) fn get_work_for(
         });
     }
 
-    /// We have zero collateral available, so we have no work to
-    /// perform. We do this below, so that we ResetShares
-    /// appropriately.
+    // If we have zero collateral available, we have no work to
+    // perform.
     if totals.collateral.is_zero() {
         return Ok(HasWorkResp::NoWork {});
     }
