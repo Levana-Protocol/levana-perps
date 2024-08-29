@@ -7,3 +7,4 @@ pub mod liquidity_token;
 pub mod market;
 pub mod position_token;
 pub mod tracker;
+pub mod copy_trading;

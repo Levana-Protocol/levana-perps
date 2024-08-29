@@ -2280,6 +2280,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "levana_perpswap_copy_trading_liquidity_pool"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cosmwasm-std",
+ "cw-storage-plus",
+ "cw2",
+ "levana_perpswap_cosmos_msg",
+ "levana_perpswap_cosmos_shared",
+ "semver",
+ "serde",
+]
+
+[[package]]
 name = "levana_perpswap_cosmos_countertrade"
 version = "0.1.0"
 dependencies = [
