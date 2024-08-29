@@ -351,9 +351,9 @@ pub enum DeferredExecTarget {
 #[cw_serde]
 #[derive(Copy)]
 pub enum DeferredExecCompleteTarget {
-    /// Modifying an existing position
+    /// Create or Modify an existing position
     Position(PositionId),
-    /// Modifying an existing limit order
+    /// Create or Modify an existing limit order
     Order(OrderId),
 }
 
