@@ -4,20 +4,17 @@ use anyhow::{Context, Result};
 use askama::Template;
 use axum::{
     extract::State,
-    headers::Host,
     http::HeaderValue,
     response::{Html, IntoResponse, Response},
-    Json, TypedHeader,
+    Json,
 };
+use headers::Host;
 use axum_extra::response::Css;
 use axum_extra::routing::TypedPath;
+use axum_extra::TypedHeader;
 use cosmos::{Address, Contract};
 use cosmwasm_std::Uint64;
-use reqwest::{
-    header::{CACHE_CONTROL, CONTENT_TYPE},
-    StatusCode,
-};
-use resvg::usvg::{TreeParsing, TreeTextToPath};
+use resvg::usvg::{fontdb::Database, TreeParsing, TreeTextToPath};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -28,7 +25,7 @@ use crate::{
     db::models::{ProposalInfoFromDb, ProposalInfoToDb}, types::{ChainId, ContractEnvironment},
 };
 
-use super::{ErrorPage, ProposalCssRoute, ProposalHtml, ProposalImage, ProposalUrl};
+use super::{ErrorPage, ProposalCssRoute, ProposalHtml, ProposalImage, ProposalImageSvg, ProposalUrl};
 
 #[derive(askama::Template)]
 #[template(path = "proposal.html")]
@@ -43,7 +40,6 @@ struct ProposalInfo {
     amplitude_key: &'static str,
     address: Address,
 }
-
 
 pub(super) async fn proposal_url(
     _: ProposalUrl,
@@ -103,13 +99,22 @@ pub(super) async fn proposal_image(
 ) -> Result<Response, Error> {
     ProposalInfo::load_from_database(&app, proposal_id, &host)
         .await
-        .map(ProposalInfo::image)
+        .map(|info| info.image(&app.fontdb))
+}
+
+pub(super) async fn proposal_image_svg(
+    ProposalImageSvg { proposal_id }: ProposalImageSvg,
+    TypedHeader(host): TypedHeader<Host>,
+    State(app): State<Arc<App>>,
+) -> Result<Response, Error> {
+    ProposalInfo::load_from_database(&app, proposal_id, &host)
+        .await
+        .map(ProposalInfo::image_svg)
 }
 
 pub(super) async fn proposal_css(_: ProposalCssRoute) -> Css<&'static str> {
     Css(include_str!("../../../../static/proposal.css"))
 }
-
 
 struct GovContract(Contract);
 
@@ -149,7 +154,7 @@ impl ProposalInfo {
             chain,
             address, .. } = &self;
         let cosmos = app.cosmos.get(chain).ok_or(Error::UnknownChainId)?;
-        let label = match cosmos.contract_info(*address).await {
+        let label = match cosmos.make_contract(*address).info().await {
             Ok(info) => Cow::Owned(info.label),
             Err(_) => "unknown contract".into(),
         };
@@ -181,31 +186,49 @@ impl ProposalInfo {
     }
 
     fn html(self) -> Response {
-        Html(self.render().unwrap()).into_response()
+        let mut res = Html(self.render().unwrap()).into_response();
+        res.headers_mut().insert(
+            http::header::CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=300"),
+        );
+        res
     }
 
-    fn image(self) -> Response {
-        match self.image_inner() {
+    fn image(self, fontsdb: &Database) -> Response {
+        match self.image_inner(fontsdb) {
             Ok(res) => res,
             Err(e) => {
                 let mut res = format!("Error while rendering SVG: {e:?}").into_response();
-                *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+                *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
                 res
             }
         }
     }
 
-    fn image_inner(&self) -> Result<Response> {
+    fn image_svg(self) -> Response {
+        // Generate the raw SVG text by rendering the template
+        let svg = ProposalSvg { info: &self }.render().unwrap();
+
+        let mut res = svg.into_response();
+        res.headers_mut().insert(
+            http::header::CONTENT_TYPE,
+            HeaderValue::from_static("image/svg+xml"),
+        );
+        res.headers_mut().insert(
+            http::header::CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=86400"),
+        );
+        res
+    }
+
+    fn image_inner(&self, fontsdb: &Database) -> Result<Response> {
         // Generate the raw SVG text by rendering the template
         let svg = ProposalSvg { info: self }.render().unwrap();
 
         // Convert the SVG into a usvg tree using default settings
         let mut tree = resvg::usvg::Tree::from_str(&svg, &resvg::usvg::Options::default())?;
 
-        // Load up the fonts and convert text values
-        let mut fontdb = resvg::usvg::fontdb::Database::new();
-        fontdb.load_system_fonts();
-        tree.convert_text(&fontdb);
+        tree.convert_text(fontsdb);
 
         // Now that our usvg tree has text converted, convert into an resvg tree
         let rtree = resvg::Tree::from_usvg(&tree);
@@ -221,10 +244,12 @@ impl ProposalInfo {
         // Take the binary PNG output and return is as a response
         let png = pixmap.encode_png()?;
         let mut res = png.into_response();
-        res.headers_mut()
-            .insert(CONTENT_TYPE, HeaderValue::from_static("image/png"));
         res.headers_mut().insert(
-            CACHE_CONTROL,
+            http::header::CONTENT_TYPE,
+            HeaderValue::from_static("image/png"),
+        );
+        res.headers_mut().insert(
+            http::header::CACHE_CONTROL,
             HeaderValue::from_static("public, max-age=86400"),
         );
         Ok(res)
@@ -288,17 +313,17 @@ impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let mut response = ErrorPage {
             code: match &self {
-                Error::ProposalNotFound => StatusCode::BAD_REQUEST,
+                Error::ProposalNotFound => http::status::StatusCode::BAD_REQUEST,
                 Error::FailedToQueryContract { query_type, msg: _ } => match query_type {
-                    QueryType::Proposals => StatusCode::INTERNAL_SERVER_ERROR,
+                    QueryType::Proposals => http::status::StatusCode::INTERNAL_SERVER_ERROR,
                 },
-                Error::Path { msg: _ } => StatusCode::BAD_REQUEST,
+                Error::Path { msg: _ } => http::status::StatusCode::BAD_REQUEST,
                 Error::Database { msg } => {
                     log::error!("Database serror: {msg}");
-                    StatusCode::INTERNAL_SERVER_ERROR
+                    http::status::StatusCode::INTERNAL_SERVER_ERROR
                 }
-                Error::InvalidPage => StatusCode::NOT_FOUND,
-                Error::UnknownChainId => StatusCode::BAD_REQUEST,
+                Error::InvalidPage => http::status::StatusCode::NOT_FOUND,
+                Error::UnknownChainId => http::status::StatusCode::BAD_REQUEST,
             },
             error: self.clone(),
         }

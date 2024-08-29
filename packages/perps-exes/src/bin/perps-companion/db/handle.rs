@@ -137,8 +137,6 @@ impl Db {
         }: ProposalInfoToDb,
     ) -> Result<u64> {
         let proposal_u64 = proposal_id.u64();
-        let proposal_id =
-            i64::try_from(proposal_u64).context("Error converting {proposal_u64} to i64 type")?;
         let url_id = query_scalar!(
             r#"
                 INSERT INTO proposal_detail
@@ -146,7 +144,7 @@ impl Db {
                 VALUES($1, $2, $3, $4, $5)
                 RETURNING url_id
             "#,
-            proposal_id,
+            proposal_u64,
             title,
             chain,
             environment,

@@ -89,6 +89,7 @@ pub(crate) struct PnlImage {
     pub(crate) pnl_id: i64,
 }
 
+#[derive(TypedPath, Deserialize)]
 #[typed_path("/pnl/:pnl_id/image.svg", rejection(pnl::Error))]
 pub(crate) struct PnlImageSvg {
     pub(crate) pnl_id: i64,
@@ -107,6 +108,12 @@ pub(crate) struct ProposalHtml {
 #[derive(TypedPath, Deserialize)]
 #[typed_path("/proposal/:proposal_id/image.png", rejection(proposal::Error))]
 pub(crate) struct ProposalImage {
+    pub(crate) proposal_id: u64,
+}
+
+#[derive(TypedPath, Deserialize)]
+#[typed_path("/proposal/:proposal_id/image.svg", rejection(proposal::Error))]
+pub(crate) struct ProposalImageSvg {
     pub(crate) proposal_id: u64,
 }
 
@@ -179,6 +186,7 @@ pub(crate) async fn launch(app: App) -> Result<()> {
         .typed_put(proposal::proposal_url)
         .typed_get(proposal::proposal_html)
         .typed_get(proposal::proposal_image)
+        .typed_get(proposal::proposal_image_svg)
         .typed_get(export::history)
         .typed_get(whales::whales)
         .typed_get(whales::whale_css)
