@@ -111,7 +111,7 @@ pub(crate) fn get_work_for(
 
     // If we have zero collateral available, we have no work to
     // perform.
-    if totals.collateral.is_zero() {
+    if totals.collateral.is_zero() && pos.is_some() {
         return Ok(HasWorkResp::NoWork {});
     }
 
