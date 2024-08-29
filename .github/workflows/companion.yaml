@@ -2,6 +2,9 @@ name: Perps Companion Docker Image
 
 on:
   workflow_dispatch:
+  schedule:
+    # For cache, run at 9 AM UTC every 5th day of month
+    - cron: "0 9 */5 * *"
 
 env:
   CARGO_TERM_COLOR: always
@@ -13,25 +16,26 @@ env:
 jobs:
   companion-image:
     runs-on: ubuntu-latest
+    concurrency:
+      group: ci-companion-${{ github.ref }}
+      cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v3
-      - uses: extractions/setup-just@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
         with:
-          just-version: 1.8.0
+          tool: just@1.25.2
       - name: Log in to the Container registry
-        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.70.0
+          toolchain: 1.75.0
           components: rustfmt, clippy
           targets: x86_64-unknown-linux-musl
-      - uses: Swatinem/rust-cache@v2.5.1
+      - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
             .
@@ -43,3 +47,4 @@ jobs:
         run: just build-companion-image
       - name: Push image
         run: just push-companion-image
+        if: ${{ github.event_name != 'schedule' }}

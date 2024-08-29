@@ -1,19 +1,21 @@
-use cosmwasm_std::to_binary;
+use cosmwasm_std::{testing::MockApi, to_json_binary};
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{contracts::liquidity_token::LiquidityTokenKind, prelude::*, token::Token};
 
 #[test]
 fn directly_call_receive() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    let addr = Addr::unchecked("notacw20");
-    let fakesender = Addr::unchecked("fakesender");
+    let mock_api = MockApi::default();
+
+    let addr = mock_api.addr_make("notacw20");
+    let fakesender = mock_api.addr_make("fakesender");
     let err: PerpError = market
         .exec(
             &addr,
             &MarketExecuteMsg::Receive {
                 sender: fakesender.into(),
                 amount: 1000000000u128.into(),
-                msg: to_binary(&MarketExecuteMsg::DepositLiquidity {
+                msg: to_json_binary(&MarketExecuteMsg::DepositLiquidity {
                     stake_to_xlp: false,
                 })
                 .unwrap(),
@@ -28,8 +30,9 @@ fn directly_call_receive() {
 #[test]
 fn deposit_lp_token() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    let lp = Addr::unchecked("provider");
-    let other_address = Addr::unchecked("other-address");
+    let mock_api = MockApi::default();
+    let lp = mock_api.addr_make("provider");
+    let other_address = mock_api.addr_make("other-address");
 
     market
         .exec_mint_and_deposit_liquidity(&lp, "1000000".parse().unwrap())
@@ -105,7 +108,7 @@ fn unrelated_native() {
     // We can only attach native funds for the market contract in non-CW20 markets.
     if let Token::Native { .. } = &market.token {
         let msg = match market
-            .make_msg_with_funds(
+            .make_market_msg_with_funds(
                 &MarketExecuteMsg::DepositLiquidity {
                     stake_to_xlp: false,
                 },

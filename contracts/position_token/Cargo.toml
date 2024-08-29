@@ -1,6 +1,6 @@
 [package]
 name = "levana_perpswap_cosmos_position_token"
-version = "0.1.0-beta.15"
+version = "0.1.1"
 authors = ["Levana Team"]
 edition = "2021"
 
@@ -16,24 +16,22 @@ exclude = [
 crate-type = ["cdylib", "rlib"]
 
 [features]
-# for more explicit tests, cargo test --features=backtraces
-backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
 
 [dependencies]
 msg = {package = "levana_perpswap_cosmos_msg", path = "../../packages/msg" }
 shared = {package = "levana_perpswap_cosmos_shared", path = "../../packages/shared" }
-cosmwasm-std = { version = "1.1.9", features = ["abort"] }
-cw2 = "1.0.0"
-cw-storage-plus = "1.0.1"
-schemars = "0.8.11"
-serde = { version = "1.0.151", default-features = false, features = ["derive"] }
+cosmwasm-std = { workspace = true, features = ["abort"] }
+cw2 = "2.0.0"
+cw-storage-plus = "2.0.0"
+schemars = "0.8.17"
+serde = { version = "1.0.199", default-features = false, features = ["derive"] }
 thiserror = "1.0.38"
 semver = "1.0.15"
-anyhow = "1.0.67"
-cw-utils = "1.0.1"
+anyhow = "1.0.82"
+cw-utils = "2.0.0"
 serde-json-wasm = "0.5"
 
 [dev-dependencies]
-cosmwasm-schema = "1.1.9"
+cosmwasm-schema = { workspace = true, features=["allow-unknown-fields"] }

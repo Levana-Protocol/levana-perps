@@ -86,21 +86,36 @@ pub(super) fn rpc_health() -> TaskConfig {
     super::WatcherConfig::default().rpc_health
 }
 
+pub(super) fn congestion() -> TaskConfig {
+    super::WatcherConfig::default().congestion
+}
+
+pub(super) fn high_gas() -> TaskConfig {
+    super::WatcherConfig::default().high_gas
+}
+
+pub(super) fn block_lag() -> TaskConfig {
+    super::WatcherConfig::default().block_lag
+}
+
+pub(super) fn counter_trade_bot() -> TaskConfig {
+    super::WatcherConfig::default().counter_trade_bot
+}
+
 pub(super) fn seconds_till_ultra() -> u32 {
     // 8 minutes
     60 * 8
 }
 
 pub fn max_price_age_secs() -> u32 {
-    // 2 minutes
-    60 * 2
-}
-
-pub fn min_price_age_secs() -> u32 {
-    // 30 seconds
-    30
+    // 1 hour
+    60 * 60
 }
 
 pub fn max_allowed_price_delta() -> Decimal256 {
-    "0.0005".parse().unwrap()
+    "0.001".parse().unwrap()
+}
+
+pub fn min_gas_high_gas_wallet() -> GasAmount {
+    "500".parse().unwrap()
 }

@@ -2,9 +2,12 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::async_trait;
-use cosmos::{Address, Wallet};
+use cosmos::{Address, HasAddress, Wallet};
 use cosmwasm_std::Fraction;
-use perps_exes::{config::LiquidityConfig, prelude::*};
+use perps_exes::{
+    config::{LiquidityBounds, LiquidityConfig},
+    prelude::*,
+};
 
 use crate::{
     config::BotConfigTestnet,
@@ -28,7 +31,7 @@ impl AppBuilder {
             let liquidity = Liquidity {
                 app: self.app.clone(),
                 liquidity_config: liquidity_config.clone(),
-                wallet: self.get_track_wallet(&testnet, ManagedWallet::Liquidity)?,
+                wallet: self.get_track_wallet(ManagedWallet::Liquidity)?,
                 testnet,
             };
             self.watch_periodic(crate::watcher::TaskLabel::Liquidity, liquidity)?;
@@ -62,12 +65,16 @@ async fn single_market(
     faucet: Address,
 ) -> Result<WatchedTaskOutput> {
     let status = market.status().await?;
-    let total = status.liquidity.total_collateral();
+    let total = status.liquidity.total_collateral()?;
     let bounds = worker
         .liquidity_config
         .markets
         .get(market_id)
-        .with_context(|| format!("No bounds available for market {market_id}"))?;
+        .copied()
+        .unwrap_or_else(|| LiquidityBounds {
+            min: "1000000".parse().unwrap(),
+            max: "100000000".parse().unwrap(),
+        });
     let min_liquidity = bounds.min;
     let max_liquidity = bounds.max;
     let util = if total.is_zero() {
@@ -114,11 +121,11 @@ async fn single_market(
         .ok()
         .and_then(NonZero::new)
     {
-        Action::Deposit(missing.raw() + Collateral::one())
+        Action::Deposit((missing.raw() + Collateral::one())?)
     } else if util < low_util {
         Action::Withdraw(total.checked_sub(target_liquidity)?)
     } else if util > high_util {
-        Action::Deposit(target_liquidity - total)
+        Action::Deposit((target_liquidity - total)?)
     } else {
         Action::None
     };
@@ -149,7 +156,7 @@ async fn single_market(
                 .wallet_manager
                 .mint(
                     worker.app.cosmos.clone(),
-                    *worker.wallet.address(),
+                    worker.wallet.get_address(),
                     to_deposit,
                     &status,
                     cw20,
@@ -171,8 +178,8 @@ async fn single_market(
                     WatchedTaskOutput::new("Won't withdraw less than 1 liquidity")
                 } else {
                     let lp_tokens = to_withdraw.into_decimal256()
-                        * status.liquidity.total_tokens().into_decimal256()
-                        / status.liquidity.total_collateral().into_decimal256();
+                        * status.liquidity.total_tokens()?.into_decimal256()
+                        / status.liquidity.total_collateral()?.into_decimal256();
                     let lp_tokens = NonZero::new(LpToken::from_decimal256(lp_tokens))
                         .context("Somehow got 0 to withdraw")?;
                     market.withdraw(&worker.wallet, lp_tokens).await?;

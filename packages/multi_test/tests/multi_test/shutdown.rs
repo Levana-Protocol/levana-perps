@@ -144,6 +144,11 @@ fn shutdown_close_all_positions() {
     market.exec_close_all_positions(&trader).unwrap_err();
     market.exec_close_all_positions(&wind_down).unwrap();
 
+    // Since deferred execution, we will only close all positions as part of the
+    // normal crank process, which means adding in one more price point after starting
+    // the close of all positions.
+    market.exec_refresh_price().unwrap();
+
     market
         .exec_crank_till_finished(&Addr::unchecked("crank"))
         .unwrap();

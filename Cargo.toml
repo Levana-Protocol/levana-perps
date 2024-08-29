@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
     # Real protocol, mainnet contracts
     "contracts/factory",
@@ -6,11 +7,8 @@ members = [
     "contracts/market",
     "contracts/position_token",
 
-    # Non-perps, mainnet contracts (i.e. gamification, governance, LVN, etc.)
-    "contracts/hatching",
-    "contracts/rewards",
-    "contracts/ibc_execute_proxy",
-    "contracts/farming",
+    # Support of the real protocol
+    "contracts/countertrade",
 
     # Testnet support contracts
     "contracts/cw20",
@@ -25,12 +23,21 @@ members = [
     "packages/multi_test",
     "packages/fuzz",
 
-    # Diagnostics gui 
-    "packages/diagnostics",
-    
     # Helper executables for testing, deploying, and running bots
     "packages/perps-exes",
 ]
+
+[workspace.dependencies]
+cosmwasm-std = { version = "2.0.2" }
+cosmwasm-schema = { version = "2.0.2" }
+cw-multi-test = "2.0.1"
+pyth-sdk-cw = { git = "https://github.com/lvn-hasky-dragon/pyth-crosschain.git", rev = "f6ede9803d07f63c8d146fb4ea3a8c1c1445fb57"}
+cosmos = { git = "https://github.com/fpco/cosmos-rs.git", rev = "65cd387ad03e26e2d1405d7e7f07895fc0e90ce0", features = ["config"] }
+
+[patch.crates-io]
+cosmwasm-std = { git = "https://github.com/Levana-Protocol/cosmwasm.git", rev = "6e1fbb12982d02f8ff3f1a291de60d423143c7f1" }
+cosmwasm-schema = { git = "https://github.com/Levana-Protocol/cosmwasm.git", rev = "6e1fbb12982d02f8ff3f1a291de60d423143c7f1" }
+cw-multi-test = { git = "https://github.com/lvn-hasky-dragon/cw-multi-test.git", rev = "fdc53afe6f71e9aed07bc69315d4ec7b24286615"}
 
 [profile.release]
 opt-level = 'z'

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::async_trait;
-use cosmos::{Address, Wallet};
+use cosmos::{Address, HasAddress, Wallet};
 use msg::prelude::*;
 use perps_exes::contracts::MarketContract;
 use rand::Rng;
@@ -42,8 +42,8 @@ impl WatchedTaskPerMarket for TrackBalance {
 
 async fn check_balance_single(market: &MarketContract) -> Result<()> {
     let status = market.status().await?;
-    let net_notional = status.long_notional.into_number() - status.short_notional.into_number();
-    let instant = net_notional / status.config.delta_neutrality_fee_sensitivity.into_signed();
+    let net_notional = (status.long_notional.into_number() - status.short_notional.into_number())?;
+    let instant = (net_notional / status.config.delta_neutrality_fee_sensitivity.into_signed())?;
     let instant_abs = instant.abs_unsigned();
     if instant_abs <= status.config.delta_neutrality_fee_cap.raw() {
         Ok(())
@@ -65,7 +65,7 @@ impl AppBuilder {
         if testnet.balance {
             let balance = Balance {
                 app: self.app.clone(),
-                wallet: self.get_track_wallet(&testnet, ManagedWallet::Balance)?,
+                wallet: self.get_track_wallet(ManagedWallet::Balance)?,
                 testnet,
             };
             self.watch_periodic(TaskLabel::Balance, balance)?;
@@ -94,8 +94,8 @@ async fn single_market(
     let market_id = &market.market_id;
     let market = &market.market;
     let status = market.status().await?;
-    let net_notional = status.long_notional.into_number() - status.short_notional.into_number();
-    let instant = net_notional / status.config.delta_neutrality_fee_sensitivity.into_signed();
+    let net_notional = (status.long_notional.into_number() - status.short_notional.into_number())?;
+    let instant = (net_notional / status.config.delta_neutrality_fee_sensitivity.into_signed())?;
     let instant_abs = instant.abs_unsigned();
 
     // Ensure the protocol stays within a 1/3 portion of the cap
@@ -114,7 +114,10 @@ async fn single_market(
     };
 
     // Check if we have a position to close.
-    if let Some(pos) = market.get_first_position(*worker.wallet.address()).await? {
+    if let Some(pos) = market
+        .get_first_position(worker.wallet.get_address())
+        .await?
+    {
         let pos = market.query_position(pos).await?;
         if pos.direction_to_base != direction {
             tracing::info!(
@@ -129,7 +132,7 @@ async fn single_market(
 
     // If utilization ratio is too high, back off
     if status.liquidity.locked.into_decimal256()
-        / (status.liquidity.total_collateral()).into_decimal256()
+        / (status.liquidity.total_collateral()?).into_decimal256()
         > "0.99".parse().unwrap()
     {
         anyhow::bail!("Cannot balance {market_id}, utilization ratio is too high");
@@ -151,7 +154,7 @@ async fn single_market(
     // into notional leverage and then getting its absolute value.
     let leverage_divider = leverage
         .into_signed(direction)
-        .into_notional(market_id.get_market_type())
+        .into_notional(market_id.get_market_type())?
         .into_number()
         .abs_unsigned();
 

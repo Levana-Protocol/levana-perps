@@ -7,7 +7,8 @@ pub mod max_leverage;
 pub mod minimum_size;
 pub mod misc;
 pub mod open;
-pub mod pending_fees;
 pub mod pnl;
 pub mod take_profit;
+// still failing
+pub mod pending_fees;
 pub mod update;

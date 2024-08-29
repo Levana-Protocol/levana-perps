@@ -6,10 +6,6 @@ GIT_SHA := `git rev-parse HEAD`
 default:
 	just --list --unsorted
 
-# Build localosmosis
-build-localosmosis:
-	cd ./.ci && docker image build . -f osmolocal.Dockerfile -t localosmo
-
 # Run localosmo
 run-localosmo:
 	./.ci/osmolocal.sh
@@ -32,6 +28,13 @@ cargo-test-check:
 	# Commenting these tests to save time
 	# just market-test quote native
 	# just market-test base cw20
+	just market-test quote cw20
+
+# cargo tests check
+cargo-test-check-local:
+	just market-test base native
+	just market-test quote native
+	just market-test base cw20
 	just market-test quote cw20
 
 # Property tests
@@ -109,8 +112,8 @@ contracts-test-wasmd:
 # Cache docker images by saving it under wasm
 cache-docker-images:
 	mkdir -p wasm/images
-	-docker load -i ./wasm/images/workspace_0.14.0.tar
-	-[ -f wasm/images/workspace_0.14.0.tar ] || docker pull cosmwasm/workspace-optimizer:0.14.0 && docker save cosmwasm/workspace-optimizer:0.14.0 > wasm/images/workspace_0.14.0.tar
+	-docker load -i ./wasm/images/workspace_0.15.1.tar
+	-[ -f wasm/images/workspace_0.15.1.tar ] || docker pull cosmwasm/workspace-optimizer:0.15.1 && docker save cosmwasm/workspace-optimizer:0.15.1 > wasm/images/workspace_0.15.1.tar
 
 # Typescript check for CI which needs deps installed
 typescript-check:
@@ -137,6 +140,8 @@ cargo-bots-release:
 
 # Build bots docker image
 build-bots-image:
+	rm -rf .ci/bots/etc
+	cp -r packages/perps-exes/assets .ci/bots/etc
 	cp target/x86_64-unknown-linux-musl/release/perps-bots .ci/bots
 	cd .ci/bots && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/bots:{{GIT_SHA}}
 
@@ -150,17 +155,13 @@ cargo-companion-release:
 
 # Build companion docker image
 build-companion-image:
+	cp ./packages/perps-exes/assets/mainnet-factories.toml .ci/companion/
 	cp target/x86_64-unknown-linux-musl/release/perps-companion .ci/companion
 	cd .ci/companion && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/companion:{{GIT_SHA}}
 
 # Push bots docker image
 push-companion-image:
 	docker push ghcr.io/levana-protocol/levana-perps/companion:{{GIT_SHA}}
-
-# Download health-check binary
-download-health-check:
-	env GH_TOKEN="$LEVANA_DEVOPS_REPO_PAT" gh release download v0.4 --repo https://github.com/Levana-Protocol/devops/
-	cp health-check ./.ci/bots
 
 # Run companion
 run-companion:
@@ -221,13 +222,6 @@ off-chain-term-coverage:
 fuzz:
 	cargo +nightly fuzz run market --fuzz-dir packages/fuzz
 
-# For right now, justfiles to not support parallel execution
-# so use npm-run-all to kick things off
-# build-type: release or dev
-# exec-type: sanity or performance
-diagnostics-gui build-type exec-type:
-	cd ./packages/diagnostics && yarn serve:{{build-type}}:{{exec-type}}
-
 # Run bots directly (for dev purposes, not for production)
 bots:
 	cargo run --bin perps-bots
@@ -275,3 +269,37 @@ create-nft-mint-relayer-channel path-name juno-port stargaze-port:
 	rly transact channel {{path-name}} --src-port {{juno-port}} --dst-port {{stargaze-port}} --order unordered --version nft-mint-001 --debug --override
 create-lvn-grant-relayer-channel path-name juno-port osmosis-port:
 	rly transact channel {{path-name}} --src-port {{juno-port}} --dst-port {{osmosis-port}} --order unordered --version lvn-grant-001 --debug --override
+
+# Check commits
+check-commits:
+	git fetch origin main --depth=1
+	git log --pretty=format:"%ae" $(git branch --show-current)...origin/main > email
+	awk -f ./.ci/commit-check.awk email
+
+# Build perps-market-params binary in release mode
+cargo-market-params-release:
+    cargo build --bin perps-market-params --release --target x86_64-unknown-linux-musl
+
+# Build perps-market-params docker image
+build-market-params-image:
+	cp ./packages/perps-exes/assets/mainnet-factories.toml .ci/market-analyzer/
+	cp target/x86_64-unknown-linux-musl/release/perps-market-params .ci/market-analyzer/
+	cd .ci/market-analyzer && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/perps-market-params:{{GIT_SHA}}
+
+# Push perps-market-params docker image
+push-market-params-image:
+	docker push ghcr.io/levana-protocol/levana-perps/perps-market-params:{{GIT_SHA}}
+
+# Build perps-deploy binary in release mode
+cargo-perps-deploy-release:
+    cargo build --bin perps-deploy --release --target x86_64-unknown-linux-musl
+
+# Build perps-deploy docker image
+build-perps-deploy-image:
+	cp ./packages/perps-exes/assets/mainnet-factories.toml .ci/perps-deploy/
+	cp target/x86_64-unknown-linux-musl/release/perps-deploy .ci/perps-deploy/
+	cd .ci/perps-deploy && docker image build . -f Dockerfile -t ghcr.io/levana-protocol/levana-perps/perps-deploy:{{GIT_SHA}}
+
+# Push perps-deploy docker image
+push-perps-deploy-image:
+	docker push ghcr.io/levana-protocol/levana-perps/perps-deploy:{{GIT_SHA}}

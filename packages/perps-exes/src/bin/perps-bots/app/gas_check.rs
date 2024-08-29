@@ -13,6 +13,7 @@ use cosmos::{
 };
 use cosmwasm_std::Decimal256;
 use perps_exes::config::{GasAmount, GasDecimals};
+use serde::Serialize;
 
 use super::{AppBuilder, GasRecords};
 
@@ -24,29 +25,25 @@ pub(crate) struct GasCheckBuilder {
 }
 
 /// Description of which wallet is being tracked
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
 pub(crate) enum GasCheckWallet {
-    FaucetBot,
     FaucetContract,
     GasWallet,
     WalletManager,
-    Crank(usize),
-    Price,
     Managed(ManagedWallet),
-    UltraCrank(usize),
+    HighGas,
+    Pool(usize),
 }
 
 impl Display for GasCheckWallet {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            GasCheckWallet::FaucetBot => write!(f, "Faucet bot"),
             GasCheckWallet::FaucetContract => write!(f, "Faucet contract"),
             GasCheckWallet::GasWallet => write!(f, "Gas wallet"),
             GasCheckWallet::WalletManager => write!(f, "Wallet manager"),
-            GasCheckWallet::Crank(x) => write!(f, "Crank #{x}"),
-            GasCheckWallet::Price => write!(f, "Price"),
             GasCheckWallet::Managed(x) => write!(f, "{x}"),
-            GasCheckWallet::UltraCrank(x) => write!(f, "Ultra crank #{x}"),
+            GasCheckWallet::HighGas => write!(f, "High gas"),
+            GasCheckWallet::Pool(x) => write!(f, "Pool {x}"),
         }
     }
 }
@@ -124,6 +121,8 @@ impl GasCheck {
         let mut to_refill = vec![];
         let mut skip_delay = false;
         let now = Utc::now();
+        let cosmos = &app.cosmos_gas_check;
+        let mut total = GasAmount(Decimal256::zero());
         for Tracked {
             name,
             address,
@@ -131,16 +130,14 @@ impl GasCheck {
             should_refill,
         } in &self.to_track
         {
-            let gas =
-                match get_gas_balance(&self.app.cosmos, *address, self.app.config.gas_decimals)
-                    .await
-                {
-                    Ok(gas) => gas,
-                    Err(e) => {
-                        errors.push(format!("Unable to query gas balance for {address}: {e:?}"));
-                        continue;
-                    }
-                };
+            let gas = match get_gas_balance(cosmos, *address, self.app.config.gas_decimals).await {
+                Ok(gas) => gas,
+                Err(e) => {
+                    errors.push(format!("Unable to query gas balance for {address}: {e:?}"));
+                    continue;
+                }
+            };
+            total += gas;
             if gas >= *min_gas {
                 balances.push(format!(
                     "Sufficient gas in {name} ({address}). Found: {gas}. Minimum: {min_gas}."
@@ -149,7 +146,7 @@ impl GasCheck {
             }
 
             if *should_refill {
-                to_refill.push((*address, *min_gas));
+                to_refill.push((*address, *min_gas, *name));
                 balances.push(format!(
                     "Topping off gas in {name} ({address}). Found: {gas}. Wanted: {min_gas}."
                 ));
@@ -164,51 +161,41 @@ impl GasCheck {
                 ));
             }
         }
+        balances.push(format!("Total gas in all wallets: {total}"));
         if !to_refill.is_empty() {
             let mut builder = TxBuilder::default();
-            let denom = self.app.cosmos.get_gas_coin();
+            let denom = cosmos.get_cosmos_builder().gas_coin();
             let gas_wallet = self.gas_wallet.clone();
             {
-                for (address, amount) in &to_refill {
-                    builder.add_message_mut(MsgSend {
+                for (address, amount, _) in &to_refill {
+                    builder.add_message(MsgSend {
                         from_address: gas_wallet.get_address_string(),
                         to_address: address.get_address_string(),
                         amount: vec![Coin {
-                            denom: denom.clone(),
+                            denom: denom.to_owned(),
                             amount: app.config.gas_decimals.to_u128(*amount)?.to_string(),
                         }],
                     });
                 }
             }
 
-            let res = async {
-                let simres = builder
-                    .simulate(&self.app.cosmos, &[gas_wallet.get_address()])
-                    .await?;
-
-                // There's a bug in Cosmos where simulating gas for transfering
-                // funds is always underestimated. We override the gas
-                // multiplier here in particular to avoid bumping the gas costs
-                // for the rest of the bot system.
-                let gas_to_request = simres.gas_used * 16 / 10;
-                builder
-                    .sign_and_broadcast_with_gas(&self.app.cosmos, &gas_wallet, gas_to_request)
-                    .await
-            }
-            .await;
-
-            match res {
+            match builder.sign_and_broadcast(cosmos, &gas_wallet).await {
                 Err(e) => {
                     tracing::error!("Error filling up gas: {e:?}");
                     errors.push(format!("{e:?}"))
                 }
                 Ok(tx) => {
                     tracing::info!("Filled up gas in {}", tx.txhash);
-                    let mut gases = app.gases.write().await;
-                    for (address, amount) in to_refill {
+                    let mut gases = app.gas_refill.write().await;
+                    for (address, amount, name) in to_refill {
                         gases
                             .entry(address)
-                            .or_insert_with(GasRecords::default)
+                            .or_insert_with(|| GasRecords {
+                                total: Default::default(),
+                                entries: Default::default(),
+                                wallet_type: name,
+                                usage_per_hour: Default::default(),
+                            })
                             .add_entry(now, amount);
                     }
                 }
@@ -244,7 +231,7 @@ async fn get_gas_balance(
 ) -> Result<GasAmount> {
     let coins = cosmos.all_balances(address).await?;
     for Coin { denom, amount } in coins {
-        if &denom == cosmos.get_gas_coin() {
+        if denom == cosmos.get_cosmos_builder().gas_coin() {
             let raw = amount
                 .parse()
                 .with_context(|| format!("Invalid gas coin amount {amount:?}"))?;

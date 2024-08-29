@@ -2,8 +2,16 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::routing::{get, post};
-use reqwest::{header::CONTENT_TYPE, Method};
-use tower_http::cors::CorsLayer;
+
+use tokio::net::TcpListener;
+use tower::ServiceBuilder;
+use tower_http::{
+    cors::CorsLayer,
+    limit::RequestBodyLimitLayer,
+    timeout::TimeoutLayer,
+    trace::{self, TraceLayer},
+};
+use tracing::Level;
 
 use crate::{app::App, watcher::TaskStatuses};
 
@@ -24,29 +32,48 @@ pub(crate) struct RestApp {
 pub(crate) async fn start_rest_api(
     app: Arc<App>,
     statuses: TaskStatuses,
-    server: hyper::server::Builder<hyper::server::conn::AddrIncoming>,
+    listener: TcpListener,
 ) -> Result<()> {
+    let service_builder = ServiceBuilder::new()
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
+                .on_request(trace::DefaultOnRequest::new().level(Level::INFO))
+                .on_response(trace::DefaultOnResponse::new().level(Level::INFO)),
+        )
+        .layer(RequestBodyLimitLayer::new(app.opt.request_body_limit_bytes))
+        .layer(TimeoutLayer::new(std::time::Duration::from_secs(
+            app.opt.request_timeout_seconds,
+        )))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(tower_http::cors::Any)
+                .allow_methods([
+                    http::method::Method::GET,
+                    http::method::Method::HEAD,
+                    http::method::Method::POST,
+                ])
+                .allow_headers([http::header::CONTENT_TYPE]),
+        );
+
     let router = axum::Router::new()
         .route("/", get(common::homepage))
         .route("/factory", get(factory::factory))
         .route("/frontend-config", get(factory::factory))
-        .route("/healthz", get(common::healthz))
         .route("/build-version", get(common::build_version))
         .route("/api/faucet", post(faucet::bot))
-        .route("/status", get(status::all))
         .route("/carry", get(carry::carry))
         .route("/status/:label", get(status::single))
         .route("/markets", get(markets::markets))
-        .route("/debug/gas-usage", get(debug::gases))
-        .with_state(RestApp { app, statuses })
-        .layer(
-            CorsLayer::new()
-                .allow_origin(tower_http::cors::Any)
-                .allow_methods([Method::GET, Method::HEAD, Method::POST])
-                .allow_headers([CONTENT_TYPE]),
-        );
+        .route("/debug/gas-refill", get(debug::gas_refill))
+        .route("/debug/fund-usage", get(debug::fund_usage))
+        .layer(service_builder)
+        .route("/healthz", get(common::healthz))
+        .route("/status", get(status::all))
+        .with_state(RestApp { app, statuses });
+
     tracing::info!("Launching server");
 
-    server.serve(router.into_make_service()).await?;
+    axum::serve(listener, router.into_make_service()).await?;
     Err(anyhow::anyhow!("Background task should never complete"))
 }

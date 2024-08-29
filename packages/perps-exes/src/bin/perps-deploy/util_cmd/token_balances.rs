@@ -1,8 +1,9 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use cosmos::{Address, CosmosNetwork};
+use cosmos::Address;
 use itertools::Itertools;
 use msg::prelude::*;
+use perps_exes::PerpsNetwork;
 
 use crate::cli::Opt;
 
@@ -19,7 +20,7 @@ pub(crate) struct TokenBalancesOpt {
     output_csv: PathBuf,
     /// Network to use.
     #[clap(long, env = "COSMOS_NETWORK")]
-    network: CosmosNetwork,
+    network: PerpsNetwork,
 }
 
 impl TokenBalancesOpt {
@@ -86,7 +87,7 @@ async fn go(
                 lp_collateral: Collateral::zero(),
                 wallet_collateral: Collateral::zero(),
             });
-        record.trader_collateral += active_collateral;
+        record.trader_collateral = (record.trader_collateral + active_collateral)?;
     }
     for LpRecord {
         market_id,
@@ -104,7 +105,7 @@ async fn go(
                 lp_collateral: Collateral::zero(),
                 wallet_collateral: Collateral::zero(),
             });
-        record.lp_collateral += collateral_remaining + yield_pending;
+        record.lp_collateral = ((record.lp_collateral + collateral_remaining)? + yield_pending)?;
     }
 
     let cosmos = opt.connect(network).await?;
@@ -125,12 +126,14 @@ async fn go(
         };
 
         let balances = cosmos.all_balances(record.wallet).await?;
-        log::info!("{}: {balances:?}", record.wallet);
+        tracing::info!("{}: {balances:?}", record.wallet);
         if let Some(coin) = balances.into_iter().find(|coin| coin.denom == denom) {
-            record.wallet_collateral += Collateral::from_decimal256(Decimal256::from_ratio(
+            let amount = Collateral::from_decimal256(Decimal256::from_ratio(
                 coin.amount.parse::<u128>()?,
                 denominator,
             ));
+
+            record.wallet_collateral = (record.wallet_collateral + amount)?;
         }
     }
 

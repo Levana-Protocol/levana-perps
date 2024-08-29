@@ -1,7 +1,4 @@
-// FIXME - started fixing up warnings for the sake of this PR
-// but at a certain point it just seemed too much work for a temporary situation
-// this should be brought back as the deploy code is refactored
-#![allow(warnings)]
+#![deny(clippy::as_conversions)]
 
 use clap::Parser;
 use cli::{Cmd, Subcommand, TestnetSub};
@@ -12,12 +9,10 @@ mod cli;
 mod faucet;
 mod init_chain;
 mod instantiate;
-mod instantiate_rewards;
 mod local_deploy;
 mod localtest;
 mod mainnet;
 mod migrate;
-mod migrate_rewards;
 mod spot_price_config;
 mod store_code;
 mod testnet;
@@ -33,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
 async fn main_inner() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
     let Cmd { opt, subcommand } = Cmd::parse();
-    opt.init_logger();
+    opt.init_logger()?;
 
     match subcommand {
         Subcommand::LocalDeploy { inner } => {
@@ -45,14 +40,13 @@ async fn main_inner() -> anyhow::Result<()> {
             TestnetSub::Instantiate { inner } => instantiate::go(opt, inner).await?,
             TestnetSub::Migrate { inner } => migrate::go(opt, inner).await?,
             TestnetSub::InitChain { inner } => init_chain::go(opt, inner).await?,
-            TestnetSub::InstantiateRewards { inner } => instantiate_rewards::go(opt, inner).await?,
-            TestnetSub::MigrateRewards { inner } => migrate_rewards::go(opt, inner).await?,
             TestnetSub::Deposit { inner } => inner.go(opt).await?,
             TestnetSub::EnableMarket { inner } => inner.go(opt).await?,
             TestnetSub::DisableMarketAt { inner } => inner.go(opt).await?,
             TestnetSub::CloseAllPositions { inner } => inner.go(opt).await?,
             TestnetSub::AddMarket { inner } => inner.go(opt).await?,
             TestnetSub::UpdateMarketConfigs { inner } => inner.go(opt).await?,
+            TestnetSub::SyncConfig { inner } => inner.go(opt).await?,
         },
         Subcommand::Mainnet { inner } => mainnet::go(opt, inner).await?,
         Subcommand::Util { inner } => inner.go(opt).await?,

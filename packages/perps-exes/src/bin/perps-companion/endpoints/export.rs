@@ -19,8 +19,7 @@ use msg::prelude::{
     DirectionToBase, FactoryQueryMsg, MarketQueryMsg, OrderInMessage, RawAddr, Signed,
 };
 use perps_exes::prelude::{Collateral, UnsignedDecimal};
-use reqwest::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
-use reqwest::StatusCode;
+
 use serde::Serialize;
 use shared::storage::MarketId;
 use std::collections::HashMap;
@@ -49,11 +48,11 @@ pub(crate) async fn history(
         let disposition = format!("attachment; filename=levana-history-{wallet}.csv");
 
         res.headers_mut().insert(
-            CONTENT_TYPE,
+            http::header::CONTENT_TYPE,
             HeaderValue::from_static(mime::TEXT_CSV.as_ref()),
         );
         res.headers_mut().insert(
-            CONTENT_DISPOSITION,
+            http::header::CONTENT_DISPOSITION,
             HeaderValue::from_str(&disposition).unwrap(),
         );
 
@@ -515,7 +514,7 @@ impl PerpsContract {
                     msg: format!("{:?}", msg),
                     query_type,
                 };
-                log::error!("Attempt #{attempt}: {e}. {source:?}");
+                tracing::error!("Attempt #{attempt}: {e}. {source:?}");
                 e
             });
 
@@ -549,17 +548,19 @@ impl IntoResponse for Error {
     fn into_response(self) -> Response {
         ErrorPage {
             code: match &self {
-                Error::UnknownChainId => StatusCode::BAD_REQUEST,
+                Error::UnknownChainId => http::status::StatusCode::BAD_REQUEST,
                 Error::FailedToQueryContract { query_type, msg: _ } => match query_type {
-                    QueryType::Status => StatusCode::BAD_REQUEST,
-                    QueryType::TraderActionHistory => StatusCode::INTERNAL_SERVER_ERROR,
-                    QueryType::LpActionHistory => StatusCode::INTERNAL_SERVER_ERROR,
-                    QueryType::Positions => StatusCode::INTERNAL_SERVER_ERROR,
-                    QueryType::Markets => StatusCode::BAD_REQUEST,
-                    QueryType::MarketInfo => StatusCode::INTERNAL_SERVER_ERROR,
+                    QueryType::Status => http::status::StatusCode::BAD_REQUEST,
+                    QueryType::TraderActionHistory => {
+                        http::status::StatusCode::INTERNAL_SERVER_ERROR
+                    }
+                    QueryType::LpActionHistory => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                    QueryType::Positions => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                    QueryType::Markets => http::status::StatusCode::BAD_REQUEST,
+                    QueryType::MarketInfo => http::status::StatusCode::INTERNAL_SERVER_ERROR,
                 },
-                Error::FailedToGenerateCsv => StatusCode::INTERNAL_SERVER_ERROR,
-                Error::Generic { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+                Error::FailedToGenerateCsv => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                Error::Generic { .. } => http::status::StatusCode::INTERNAL_SERVER_ERROR,
             },
             error: self,
         }
@@ -601,7 +602,7 @@ mod tests {
             liquidity: Default::default(),
             next_crank: None,
             last_crank_completed: None,
-            unpend_queue_size: 0,
+            next_deferred_execution: None,
             borrow_fee: Default::default(),
             borrow_fee_lp: Default::default(),
             borrow_fee_xlp: Default::default(),
@@ -613,14 +614,16 @@ mod tests {
             short_usd: Default::default(),
             instant_delta_neutrality_fee_value: Default::default(),
             delta_neutrality_fee_fund: Default::default(),
-            stale_liquifunding: None,
-            stale_price: None,
-            congested: false,
             fees: Fees {
                 wallets: Default::default(),
                 protocol: Default::default(),
                 crank: Default::default(),
+                referral: Default::default(),
             },
+            deferred_execution_items: 0,
+            last_processed_deferred_exec_id: None,
+            newest_deferred_execution: None,
+            next_liquifunding: None,
         }
     }
 
@@ -638,6 +641,7 @@ mod tests {
             id: Some(PositionId::new(id)),
             kind,
             timestamp: Timestamp::from_seconds(timestamp),
+            price_timestamp: None,
             collateral: Default::default(),
             transfer_collateral: Signed::<Collateral>::from_str(transfer_collateral).unwrap(),
             leverage: None,
@@ -646,7 +650,7 @@ mod tests {
             delta_neutrality_fee: None,
             old_owner,
             new_owner,
-            take_profit_override: None,
+            take_profit_trader: None,
             stop_loss_override: None,
         }
     }

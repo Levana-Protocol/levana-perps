@@ -4,6 +4,7 @@
 //! perps, and handles trading, liquidity providing, history, and more.
 pub mod config;
 pub mod crank;
+pub mod deferred_execution;
 pub mod delta_neutrality_fee;
 pub mod entry;
 pub mod fees;

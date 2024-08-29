@@ -107,6 +107,9 @@ impl ShutdownImpact {
             ExecuteMsg::UpdatePositionRemoveCollateralImpactSize { .. } => Some(Self::NewTrades),
             ExecuteMsg::UpdatePositionLeverage { .. } => Some(Self::NewTrades),
             ExecuteMsg::UpdatePositionMaxGains { .. } => Some(Self::NewTrades),
+            ExecuteMsg::UpdatePositionTakeProfitPrice { .. } => Some(Self::NewTrades),
+            ExecuteMsg::UpdatePositionStopLossPrice { .. } => Some(Self::NewTrades),
+            #[allow(deprecated)]
             ExecuteMsg::SetTriggerOrder { .. } => Some(Self::NewTrades),
             ExecuteMsg::ClosePosition { .. } => Some(Self::ClosePositions),
             ExecuteMsg::DepositLiquidity { .. } => Some(Self::DepositLiquidity),
@@ -126,6 +129,9 @@ impl ShutdownImpact {
             ExecuteMsg::CancelLimitOrder { .. } => Some(Self::ClosePositions),
             ExecuteMsg::ProvideCrankFunds {} => Some(Self::Crank),
             ExecuteMsg::SetManualPrice { .. } => Some(Self::SetManualPrice),
+
+            // Since this can only be executed by the contract itself, it's safe to never block it
+            ExecuteMsg::PerformDeferredExec { .. } => None,
         }
     }
 }
@@ -171,6 +177,8 @@ impl ShutdownImpact {
 
 impl KeyDeserialize for ShutdownImpact {
     type Output = ShutdownImpact;
+
+    const KEY_ELEMS: u16 = 1;
 
     fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
         ShutdownImpact::try_from_bytes(&value)

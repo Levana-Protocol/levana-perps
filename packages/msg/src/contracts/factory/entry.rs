@@ -97,6 +97,14 @@ pub enum ExecuteMsg {
         /// Are we disabling these impacts, or reenabling them?
         effect: ShutdownEffect,
     },
+
+    /// Register a referrer for the given account.
+    ///
+    /// Can only be performed once.
+    RegisterReferrer {
+        /// The wallet address of the referrer
+        addr: RawAddr,
+    },
 }
 
 /// Response from [QueryMsg::Markets]
@@ -186,6 +194,39 @@ pub enum QueryMsg {
     /// * returns [CodeIds]
     #[returns(CodeIds)]
     CodeIds {},
+
+    /// Who referred this user, if anyone?
+    ///
+    /// * returns [GetReferrerResp]
+    #[returns(GetReferrerResp)]
+    GetReferrer {
+        /// Referee address
+        addr: RawAddr,
+    },
+
+    /// Enumerated query: who was referred by this user?
+    ///
+    /// * returns [ListRefereesResp]
+    #[returns(ListRefereesResp)]
+    ListReferees {
+        /// Referrer address
+        addr: RawAddr,
+        /// How many addresses to return at once
+        limit: Option<u32>,
+        /// Taken from [ListRefereesResp::next_start_after]
+        start_after: Option<String>,
+    },
+
+    /// Enumerated query: referee counts for all referrers.
+    ///
+    /// * returns [ListRefereeCountResp]
+    #[returns(ListRefereeCountResp)]
+    ListRefereeCount {
+        /// How many records to return at once
+        limit: Option<u32>,
+        /// Take from [ListRefereeCountResp::next_start_after]
+        start_after: Option<ListRefereeCountStartAfter>,
+    },
 }
 
 /// Information on owners and other protocol-wide special addresses
@@ -241,6 +282,7 @@ impl ExecuteMsg {
             ExecuteMsg::SetKillSwitch { .. } => true,
             ExecuteMsg::SetWindDown { .. } => true,
             ExecuteMsg::TransferAllDaoFees {} => true,
+            ExecuteMsg::RegisterReferrer { .. } => false,
             // Uses its own auth mechanism internally
             ExecuteMsg::Shutdown { .. } => false,
         }
@@ -256,4 +298,70 @@ pub struct CodeIds {
     pub position_token: Uint64,
     /// Liquidity token proxy code ID
     pub liquidity_token: Uint64,
+}
+
+/// Response from [QueryMsg::GetReferrer]
+#[cw_serde]
+pub enum GetReferrerResp {
+    /// No referrer registered
+    NoReferrer {},
+    /// Has a registered referrer
+    HasReferrer {
+        /// Referrer address
+        referrer: Addr,
+    },
+}
+
+/// Response from [QueryMsg::ListReferees]
+#[cw_serde]
+pub struct ListRefereesResp {
+    /// Next batch of referees
+    pub referees: Vec<Addr>,
+    /// Next value to start after
+    ///
+    /// Returns `None` if we've seen all referees
+    pub next_start_after: Option<String>,
+}
+
+/// Make a lookup key for the given referee
+///
+/// We don't follow the normal Map pattern to simplify raw queries.
+pub fn make_referrer_key(referee: &Addr) -> String {
+    format!("ref__{}", referee.as_str())
+}
+
+/// Make a lookup key for the count of referees for a referrer.
+///
+/// We don't follow the normal Map pattern to simplify raw queries.
+pub fn make_referee_count_key(referrer: &Addr) -> String {
+    format!("refcount__{}", referrer.as_str())
+}
+
+/// Response from [QueryMsg::ListRefereeCount]
+#[cw_serde]
+pub struct ListRefereeCountResp {
+    /// Counts for individual wallets
+    pub counts: Vec<RefereeCount>,
+    /// Next value to start after
+    ///
+    /// Returns `None` if we've seen all referees
+    pub next_start_after: Option<ListRefereeCountStartAfter>,
+}
+
+/// The count of referees for an individual referrer.
+#[cw_serde]
+pub struct RefereeCount {
+    /// Referrer address
+    pub referrer: Addr,
+    /// Number of referees
+    pub count: u32,
+}
+
+/// Helper for enumerated referee count queries.
+#[cw_serde]
+pub struct ListRefereeCountStartAfter {
+    /// Last referrer seen.
+    pub referrer: RawAddr,
+    /// Last count seen.
+    pub count: u32,
 }

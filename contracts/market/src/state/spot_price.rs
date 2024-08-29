@@ -1,14 +1,13 @@
 use std::collections::{btree_map::Entry, BTreeMap};
 
 use crate::prelude::*;
-use anyhow::ensure;
 #[cfg(feature = "sei")]
 use cosmwasm_std::QuerierWrapper;
 use cosmwasm_std::{Binary, Order};
 use msg::contracts::market::{
     entry::{
-        OraclePriceFeedPythResp, OraclePriceFeedSimpleResp, OraclePriceFeedStrideResp,
-        PriceForQuery,
+        OraclePriceFeedPythResp, OraclePriceFeedSeiResp, OraclePriceFeedSimpleResp,
+        OraclePriceFeedStrideResp, PriceForQuery,
     },
     spot_price::{events::SpotPriceEvent, SpotPriceConfig, SpotPriceFeed, SpotPriceFeedData},
 };
@@ -29,38 +28,101 @@ const MANUAL_SPOT_PRICE: Item<PriceStorage> = Item::new(namespace::MANUAL_SPOT_P
 /// The price components that are stored in [PRICES].
 #[derive(serde::Serialize, serde::Deserialize)]
 pub(crate) struct PriceStorage {
-    price: Price,
+    pub(crate) price: Price,
     price_usd: PriceCollateralInUsd,
     /// Store the original incoming price in base to avoid rounding errors.
     price_base: PriceBaseInQuote,
     /// Latest price publish time for the feeds composing the price, if available
+    ///
+    /// Note that since deferred execution, these values will always be None.
     publish_time: Option<Timestamp>,
     /// Latest price publish time for the feeds composing the price_usd, if available
+    ///
+    /// Note that since deferred execution, these values will always be None.
     publish_time_usd: Option<Timestamp>,
+    /// The timestamp of the block where this price point was added.
+    ///
+    /// Note that this only started being populated after deferred execution.
+    block_time: Option<Timestamp>,
 }
 
 /// internal struct for satisfying both OraclePrice queries and spot price storage
 pub(crate) struct OraclePriceInternal {
     /// A map of each pyth id used in this market to the price and publish time
-    pub pyth: BTreeMap<PriceIdentifier, OraclePriceFeedPythResp>,
+    pub(crate) pyth: BTreeMap<PriceIdentifier, OraclePriceFeedPythResp>,
     /// A map of each sei denom used in this market to the price
-    pub sei: BTreeMap<String, NumberGtZero>,
+    pub(crate) sei: BTreeMap<String, OraclePriceFeedSeiResp>,
     /// A map of each stride denom used in this market to the redemption price
-    pub stride: BTreeMap<String, OraclePriceFeedStrideResp>,
+    pub(crate) stride: BTreeMap<String, OraclePriceFeedStrideResp>,
     /// A map of each simple contract used in this market to the redemption price
-    pub simple: BTreeMap<Addr, OraclePriceFeedSimpleResp>,
+    pub(crate) simple: BTreeMap<Addr, OraclePriceFeedSimpleResp>,
 }
 
 impl OraclePriceInternal {
-    pub fn compose_price(
+    /// Calculate the publish time for this feed, ensuring we don't violate the volitile diff rule.
+    ///
+    /// Returns `Ok(None)` if there are no volatile feeds with a publish time.
+    pub(crate) fn calculate_publish_time(
+        &self,
+        volatile_diff_seconds: u32,
+    ) -> Result<Option<Timestamp>> {
+        let mut oldest_newest = None::<(Timestamp, Timestamp)>;
+
+        let mut add_new_timestamp = |timestamp| {
+            oldest_newest = Some(match oldest_newest {
+                None => (timestamp, timestamp),
+                Some((oldest, newest)) => (oldest.min(timestamp), newest.max(timestamp)),
+            });
+        };
+
+        for pyth in self.pyth.values() {
+            if pyth.volatile {
+                add_new_timestamp(pyth.publish_time);
+            }
+        }
+        for sei in self.sei.values() {
+            if sei.volatile {
+                add_new_timestamp(sei.publish_time);
+            }
+        }
+        for stride in self.stride.values() {
+            if stride.volatile {
+                add_new_timestamp(stride.publish_time);
+            }
+        }
+        for simple in self.simple.values() {
+            if simple.volatile {
+                if let Some(timestamp) = simple.timestamp {
+                    add_new_timestamp(timestamp);
+                }
+            }
+        }
+
+        match oldest_newest {
+            Some((oldest, newest)) => {
+                debug_assert!(oldest <= newest);
+                let diff = newest.checked_sub(oldest, "calculate_publish_time")?;
+                let allowed = Duration::from_seconds(volatile_diff_seconds.into());
+                if diff <= allowed {
+                    Ok(Some(oldest))
+                } else {
+                    Err(MarketError::VolatilePriceFeedTimeDelta { oldest, newest }.into_anyhow())
+                }
+            }
+            None => Ok(None),
+        }
+    }
+
+    pub(crate) fn compose_price(
         &self,
         market_id: &MarketId,
         feeds: &[SpotPriceFeed],
         feeds_usd: &[SpotPriceFeed],
+        block_time: Timestamp,
     ) -> Result<PriceStorage> {
-        let (price_amount, publish_time) = self.compose_price_feeds(feeds)?;
+        let price_amount = self.compose_price_feeds(feeds)?;
 
-        let (price_amount_usd, publish_time_usd) = self.compose_price_feeds(feeds_usd)?;
+        let price_amount_usd = self.compose_price_feeds(feeds_usd)?;
 
         let market_type = market_id.get_market_type();
         let price_base = PriceBaseInQuote::from_non_zero(price_amount);
@@ -71,63 +133,62 @@ impl OraclePriceInternal {
             price,
             price_usd,
             price_base,
-            publish_time,
-            publish_time_usd,
+            publish_time: None,
+            publish_time_usd: None,
+            block_time: Some(block_time),
         })
     }
 
     // given a list of feeds, compose them into a single price and publish_time (if available)
-    pub fn compose_price_feeds(
-        &self,
-        feeds: &[SpotPriceFeed],
-    ) -> Result<(NumberGtZero, Option<Timestamp>)> {
-        let mut acc_price: Option<(Number, Option<Timestamp>)> = None;
+    pub(crate) fn compose_price_feeds(&self, feeds: &[SpotPriceFeed]) -> Result<NumberGtZero> {
+        let mut acc_price: Option<Number> = None;
 
-        for SpotPriceFeed { data, inverted } in feeds {
-            let (price, publish_time) = match data {
+        for SpotPriceFeed {
+            data,
+            inverted,
+            volatile: _,
+        } in feeds
+        {
+            let price = match data {
                 SpotPriceFeedData::Pyth { id, .. } => self
                     .pyth
                     .get(id)
-                    .map(|x| (x.price, Some(x.publish_time)))
+                    .map(|x| x.price)
                     .with_context(|| format!("no pyth price for id {}", id))?,
                 SpotPriceFeedData::Sei { denom } => self
                     .sei
                     .get(denom)
-                    .map(|x| (*x, None))
+                    .map(|x| x.price)
                     .with_context(|| format!("no sei price for denom {}", denom))?,
                 SpotPriceFeedData::Stride { denom, .. } => self
                     .stride
                     .get(denom)
-                    .map(|x| (x.redemption_rate, Some(x.publish_time)))
+                    .map(|x| x.redemption_rate)
                     .with_context(|| format!("no stride redemption rate for denom {}", denom))?,
-                SpotPriceFeedData::Constant { price } => (*price, None),
+                SpotPriceFeedData::Constant { price } => *price,
                 SpotPriceFeedData::Simple { contract, .. } => self
                     .simple
                     .get(contract)
-                    .map(|x| (x.value, x.timestamp))
+                    .map(|x| x.value)
                     .with_context(|| format!("no simple price for contract {}", contract))?,
             };
 
             let price = if *inverted {
-                Number::ONE / price.into_number()
+                (Number::ONE / price.into_number())?
             } else {
                 price.into_number()
             };
 
             acc_price = match acc_price {
-                None => Some((price, publish_time)),
-                Some((prev_price, prev_publish_time)) => {
-                    let publish_time = publish_time.max(prev_publish_time);
-                    let next_price = prev_price * price;
-                    Some((next_price, publish_time))
-                }
+                None => Some(price),
+                Some(prev_price) => Some((prev_price * price)?),
             }
         }
 
         match acc_price {
-            Some((price, publish_time)) => {
+            Some(price) => {
                 let price = NumberGtZero::try_from(price)?;
-                Ok((price, publish_time))
+                Ok(price)
             }
             None => anyhow::bail!("No price feeds provided"),
         }
@@ -145,6 +206,7 @@ impl State<'_> {
             price_base,
             publish_time,
             publish_time_usd,
+            block_time: _,
         }: PriceStorage,
     ) -> Result<PricePoint> {
         let market_id = self.market_id(store)?;
@@ -161,7 +223,14 @@ impl State<'_> {
             publish_time_usd,
         })
     }
-    fn spot_price_inner(&self, store: &dyn Storage, timestamp: Timestamp) -> Result<PricePoint> {
+
+    /// Returns the spot price for the provided timestamp.
+    /// If no timestamp is provided, it returns the latest spot price.
+    pub(crate) fn spot_price(
+        &self,
+        store: &dyn Storage,
+        timestamp: Timestamp,
+    ) -> Result<PricePoint> {
         self.spot_price_inner_opt(store, timestamp)?.ok_or_else(|| {
             perp_error!(
                 ErrorId::PriceNotFound,
@@ -214,6 +283,7 @@ impl State<'_> {
                 price_notional: price,
                 price_usd: collateral,
                 price_base: base,
+                // Only used for simulating new prices not in the contract, so self.now() is OK
                 timestamp: self.now(),
                 is_notional_usd: market_id.is_notional_usd(),
                 market_type,
@@ -228,20 +298,11 @@ impl State<'_> {
         Ok(())
     }
 
-    /// Returns the spot price for the provided timestamp.
-    /// If no timestamp is provided, it returns the latest spot price.
-    pub(crate) fn spot_price(
-        &self,
-        store: &dyn Storage,
-        time: Option<Timestamp>,
-    ) -> Result<PricePoint> {
-        match time {
-            None => self
-                .spot_price_cache
-                .get_or_try_init(|| self.spot_price_inner(store, self.now()))
-                .copied(),
-            Some(time) => self.spot_price_inner(store, time),
-        }
+    /// Get the current spot price
+    pub(crate) fn current_spot_price(&self, store: &dyn Storage) -> Result<PricePoint> {
+        self.spot_price_cache
+            .get_or_try_init(|| self.spot_price(store, self.now()))
+            .copied()
     }
 
     pub(crate) fn historical_spot_prices(
@@ -270,28 +331,16 @@ impl State<'_> {
                 self.make_price_point(store, timestamp, price_storage)
             });
 
-        let prices = match limit {
-            None => iter.collect::<Result<Vec<_>>>()?,
-            Some(limit) => iter.take(limit).collect::<Result<Vec<_>>>()?,
-        };
+        const DEFAULT_LIMIT: usize = 20;
+        let prices = iter
+            .take(
+                limit
+                    .unwrap_or(DEFAULT_LIMIT)
+                    .min(usize::try_from(QUERY_MAX_LIMIT)?),
+            )
+            .collect::<Result<Vec<_>>>()?;
 
         Ok(prices)
-    }
-
-    /// Get the latest spot price, if one is set.
-    pub(crate) fn spot_price_latest_opt(&self, store: &dyn Storage) -> Result<Option<PricePoint>> {
-        if let Some(x) = self.spot_price_cache.get() {
-            return Ok(Some(*x));
-        }
-
-        match self.spot_price_inner_opt(store, self.now()) {
-            Ok(Some(x)) => {
-                self.spot_price_cache.set(x).ok();
-                Ok(Some(x))
-            }
-            Ok(None) => Ok(None),
-            Err(e) => Err(e),
-        }
     }
 
     /// Get the next price point after the given minimum bound.
@@ -331,47 +380,93 @@ impl State<'_> {
                     price_base,
                     publish_time: None,
                     publish_time_usd: None,
+                    // Acceptable to use self.now() for manual price updates, no real publish time
+                    block_time: Some(self.now()),
                 },
             )
             .map_err(|err| err.into())
     }
 
-    pub(crate) fn spot_price_append(&self, ctx: &mut StateContext) -> Result<()> {
-        let timestamp = self.now();
+    // the config `volatile_diff_seconds` value is optional for the sake of backwards-compatability
+    // if we ever migrate the storage such that it's always present, we can remove this function
+    pub(crate) fn config_volatile_time(&self) -> u32 {
+        const DEFAULT_VOLATILE_DIFF_SECONDS: u32 = 5;
 
-        if PRICES.has(ctx.storage, timestamp) {
-            // if price changes within the same block, we don't care - first come first serve
-            return Ok(());
+        match self.config.spot_price {
+            SpotPriceConfig::Manual { .. } => None,
+            SpotPriceConfig::Oracle {
+                volatile_diff_seconds,
+                ..
+            } => volatile_diff_seconds,
         }
+        .unwrap_or(DEFAULT_VOLATILE_DIFF_SECONDS)
+    }
 
+    pub(crate) fn spot_price_append(&self, ctx: &mut StateContext) -> Result<()> {
         let market_id = self.market_id(ctx.storage)?;
 
-        let price_storage = match self.config.spot_price.clone() {
-            SpotPriceConfig::Manual { .. } => MANUAL_SPOT_PRICE.may_load(ctx.storage)?.context(
-                "This contract has manual price updates, and no price has been set yet.",
-            )?,
+        let (new_publish_time, price_storage) = match self.config.spot_price.clone() {
+            SpotPriceConfig::Manual { .. } => (
+                self.now(),
+                MANUAL_SPOT_PRICE.may_load(ctx.storage)?.context(
+                    "This contract has manual price updates, and no price has been set yet.",
+                )?,
+            ),
             SpotPriceConfig::Oracle {
                 pyth: _,
                 stride: _,
                 feeds,
                 feeds_usd,
-            } => self
-                .get_oracle_price(true)?
-                .compose_price(market_id, &feeds, &feeds_usd)?,
+                volatile_diff_seconds: _,
+            } => {
+                let internal = self.get_oracle_price(true)?;
+                let new_publish_time = internal
+                    .calculate_publish_time(self.config_volatile_time())?
+                    .ok_or(MarketError::NoPricePublishTimeFound.into_anyhow())?;
+                // self.now() usage is OK, it's explicitly for saving the block time in storage
+                let price_storage =
+                    internal.compose_price(market_id, &feeds, &feeds_usd, self.now())?;
+                (new_publish_time, price_storage)
+            }
         };
 
-        // sanity check
-        if let Some(price_usd) = price_storage.price_base.try_into_usd(market_id) {
-            ensure!(
-                price_storage.price_usd == price_usd,
-                "Price in USD mismatch {} != {}",
-                price_storage.price_usd,
-                price_usd
-            );
+        // Ensure strictly monotonically increasing publish price timestamps. Find the most recently published timestamp and make sure our new publish time is greater than it.
+        match PRICES
+            .keys(ctx.storage, None, None, Order::Descending)
+            .next()
+        {
+            // No prices published yet, so we're allowed to use this timestamp
+            None => {
+                // niche case of the first oracle price point being earlier than our instantiation time
+                // we need to wait for the oracle price to move further into the future
+                // because that time is used in initialize_borrow_fee_rate() (as now())
+                if new_publish_time < self.instantiation_time(ctx.storage)? {
+                    bail!("Cannot use a spot price publish time earlier than the contract instantiation time");
+                }
+            }
+            Some(last_published) => {
+                if last_published? >= new_publish_time {
+                    // New publish time is not newer that the last published time, do not add a new spot price
+                    return Ok(());
+                }
+            }
         }
 
+        // No longer valid sanity check. We now support markets where the base
+        // and collateral asset have different prices.
+        // This is used primarily for Liquid Staked Token (LSD) markets
+        // which are priced on the underlying asset.
+        // if let Some(price_usd) = price_storage.price_base.try_into_usd(market_id) {
+        //     ensure!(
+        //         price_storage.price_usd == price_usd,
+        //         "Price in USD mismatch {} != {}",
+        //         price_storage.price_usd,
+        //         price_usd
+        //     );
+        // }
+
         ctx.response_mut().add_event(SpotPriceEvent {
-            timestamp,
+            timestamp: new_publish_time,
             price_usd: price_storage.price_usd,
             price_notional: price_storage.price,
             price_base: price_storage.price_base,
@@ -380,7 +475,7 @@ impl State<'_> {
         });
 
         PRICES
-            .save(ctx.storage, timestamp, &price_storage)
+            .save(ctx.storage, new_publish_time, &price_storage)
             .map_err(|err| err.into())
     }
 
@@ -394,6 +489,7 @@ impl State<'_> {
                 stride: stride_config,
                 feeds,
                 feeds_usd,
+                volatile_diff_seconds: _,
             } => {
                 let mut pyth = BTreeMap::new();
                 let mut stride = BTreeMap::new();
@@ -457,6 +553,8 @@ impl State<'_> {
                                 entry.insert(OraclePriceFeedPythResp {
                                     price,
                                     publish_time,
+                                    // Pyth feeds default to being volatile unless otherwise overridden
+                                    volatile: feed.volatile.unwrap_or(true),
                                 });
                             }
                         }
@@ -481,7 +579,16 @@ impl State<'_> {
                                     let price = NumberGtZero::try_from(price)
                                         .context("price must be > 0")?;
 
-                                    entry.insert(price);
+                                    let publish_time = Timestamp::from_millis(
+                                        pair.oracle_exchange_rate.last_update_timestamp,
+                                    );
+
+                                    entry.insert(OraclePriceFeedSeiResp {
+                                        price,
+                                        publish_time,
+                                        // Sei feeds default to being volatile unless otherwise overridden
+                                        volatile: feed.volatile.unwrap_or(true),
+                                    });
                                 }
                             }
                             #[cfg(not(feature = "sei"))]
@@ -514,9 +621,9 @@ impl State<'_> {
 
                                 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
                                 #[serde(rename_all = "snake_case")]
-                                pub struct RedemptionRateResponse {
-                                    pub redemption_rate: Decimal256,
-                                    pub update_time: u64,
+                                struct RedemptionRateResponse {
+                                    redemption_rate: Decimal256,
+                                    update_time: u64,
                                 }
 
                                 let resp: RedemptionRateResponse = self.querier.query_wasm_smart(
@@ -548,13 +655,15 @@ impl State<'_> {
                                 }
 
                                 let publish_time = Timestamp::from_seconds(resp.update_time);
-                                let redemption_rate = Number::try_from(resp.redemption_rate)?;
+                                let redemption_rate = Number::from(resp.redemption_rate);
                                 let redemption_rate = NumberGtZero::try_from(redemption_rate)
                                     .context("redemption_rate must be > 0")?;
 
                                 entry.insert(OraclePriceFeedStrideResp {
                                     redemption_rate,
                                     publish_time,
+                                    // Stride feeds default to being non-volatile unless otherwise overridden
+                                    volatile: feed.volatile.unwrap_or_default(),
                                 });
                             }
                         }
@@ -638,47 +747,12 @@ mod tests {
 
         let eth = Number::try_from(eth_usd).unwrap();
         let btc = Number::try_from(btc_usd).unwrap();
-        let btc = Number::ONE / btc;
+        let btc = (Number::ONE / btc).unwrap();
         let eth_btc = eth * btc;
 
-        assert_eq!(eth_btc, Number::try_from("0.062758112133468261").unwrap());
-    }
-}
-
-pub fn requires_spot_price_append(msg: &ExecuteMsg) -> bool {
-    // explicitly listed to avoid accidentally handling new messages
-    // Receive is checked via the deserialized inner message
-    match msg {
-        // these require a spot_price_append
-        ExecuteMsg::OpenPosition { .. } => true,
-        ExecuteMsg::ClosePosition { .. } => true,
-        ExecuteMsg::CloseAllPositions { .. } => true,
-        ExecuteMsg::UpdatePositionAddCollateralImpactLeverage { .. } => true,
-        ExecuteMsg::UpdatePositionAddCollateralImpactSize { .. } => true,
-        ExecuteMsg::UpdatePositionLeverage { .. } => true,
-        ExecuteMsg::UpdatePositionMaxGains { .. } => true,
-        ExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { .. } => true,
-        ExecuteMsg::UpdatePositionRemoveCollateralImpactSize { .. } => true,
-        ExecuteMsg::DepositLiquidity { .. } => true,
-        ExecuteMsg::WithdrawLiquidity { .. } => true,
-        ExecuteMsg::ReinvestYield { .. } => true,
-        ExecuteMsg::Crank { .. } => true,
-        ExecuteMsg::PlaceLimitOrder { .. } => true,
-        ExecuteMsg::SetTriggerOrder { .. } => true,
-        // These do not require a spot_price_append
-        ExecuteMsg::CancelLimitOrder { .. } => false,
-        ExecuteMsg::ClaimYield { .. } => false,
-        ExecuteMsg::CollectUnstakedLp { .. } => false,
-        ExecuteMsg::LiquidityTokenProxy { .. } => false,
-        ExecuteMsg::NftProxy { .. } => false,
-        ExecuteMsg::Owner { .. } => false,
-        ExecuteMsg::ProvideCrankFunds { .. } => false,
-        ExecuteMsg::Receive { .. } => false,
-        ExecuteMsg::StakeLp { .. } => false,
-        ExecuteMsg::StopUnstakingXlp { .. } => false,
-        ExecuteMsg::TransferDaoFees { .. } => false,
-        ExecuteMsg::UnstakeXlp { .. } => false,
-        // Does do a spot_price_append, but it's handled internally after the price is set
-        ExecuteMsg::SetManualPrice { .. } => false,
+        assert_eq!(
+            eth_btc.unwrap(),
+            Number::try_from("0.062758112133468261").unwrap()
+        );
     }
 }

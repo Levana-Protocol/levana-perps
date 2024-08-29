@@ -22,11 +22,21 @@ pub struct LimitOrder {
     /// Direction of the position
     pub direction: DirectionToNotional,
     /// Maximum gains
-    pub max_gains: MaxGainsInQuote,
+    #[deprecated(note = "Use take_profit instead")]
+    pub max_gains: Option<MaxGainsInQuote>,
     /// Stop loss price
     pub stop_loss_override: Option<PriceBaseInQuote>,
     /// Take profit price
-    pub take_profit_override: Option<PriceBaseInQuote>,
+    // TODO - this should eventually become non-optional, but that would require a migration
+    // it is, however, non-optional in LimitOrderResp
+    #[serde(alias = "take_profit_override")]
+    pub take_profit: Option<TakeProfitTrader>,
+    /// Crank fee charged during deferred execution and placing the limit order
+    #[serde(default)]
+    pub crank_fee_collateral: Collateral,
+    /// Same as [Self::crank_fee_collateral] but cost-basis expressed in USD.
+    #[serde(default)]
+    pub crank_fee_usd: Usd,
 }
 
 /// A unique numeric ID for each order in the protocol.
@@ -80,6 +90,8 @@ impl<'a> Prefixer<'a> for OrderId {
 impl KeyDeserialize for OrderId {
     type Output = OrderId;
 
+    const KEY_ELEMS: u16 = 1;
+
     #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         u64::from_vec(value).map(|x| OrderId(Uint64::new(x)))
@@ -126,14 +138,14 @@ pub mod events {
         /// Direction of the position
         pub direction: DirectionToBase,
         /// Maximum gains
-        pub max_gains: MaxGainsInQuote,
+        #[deprecated(note = "Use take_profit_override instead")]
+        pub max_gains: Option<MaxGainsInQuote>,
         /// Stop loss price
         pub stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price
-        pub take_profit_override: Option<PriceBaseInQuote>,
+        pub take_profit_override: Option<TakeProfitTrader>,
     }
 
-    impl PerpEvent for PlaceLimitOrderEvent {}
     impl From<PlaceLimitOrderEvent> for Event {
         fn from(src: PlaceLimitOrderEvent) -> Self {
             let mut event = Event::new(event_key::PLACE_LIMIT_ORDER)
@@ -153,8 +165,7 @@ pub mod events {
                     src.collateral_usd.to_string(),
                 )
                 .add_attribute(event_key::LEVERAGE_TO_BASE, src.leverage.to_string())
-                .add_attribute(event_key::DIRECTION, src.direction.as_str())
-                .add_attribute(event_key::MAX_GAINS, src.max_gains.to_string());
+                .add_attribute(event_key::DIRECTION, src.direction.as_str());
 
             if let Some(stop_loss_override) = src.stop_loss_override {
                 event = event.add_attribute(
@@ -169,6 +180,10 @@ pub mod events {
                     take_profit_override.to_string(),
                 );
             }
+            #[allow(deprecated)]
+            if let Some(max_gains) = src.max_gains {
+                event = event.add_attribute(event_key::MAX_GAINS, max_gains.to_string());
+            }
 
             event
         }
@@ -177,6 +192,7 @@ pub mod events {
         type Error = anyhow::Error;
 
         fn try_from(evt: Event) -> Result<Self, Self::Error> {
+            #[allow(deprecated)]
             Ok(Self {
                 market_type: evt.map_attr_result(event_key::MARKET_TYPE, |s| match s {
                     event_val::NOTIONAL_BASE => Ok(CollateralIsQuote),
@@ -195,7 +211,6 @@ pub mod events {
                     &(evt.string_attr(event_key::LEVERAGE_TO_BASE)?),
                 )?,
                 direction: evt.direction_attr(event_key::DIRECTION)?,
-                max_gains: MaxGainsInQuote::from_str(&(evt.string_attr(event_key::MAX_GAINS)?))?,
                 order_id: OrderId::new(evt.u64_attr(event_key::ORDER_ID)?),
                 owner: evt.unchecked_addr_attr(event_key::POS_OWNER)?,
                 trigger_price: PriceBaseInQuote::try_from_number(
@@ -207,12 +222,15 @@ pub mod events {
                         Some(PriceBaseInQuote::try_from_number(stop_loss_override)?)
                     }
                 },
-                take_profit_override: match evt.try_number_attr(event_key::TAKE_PROFIT_OVERRIDE)? {
-                    None => None,
-                    Some(take_profit_override) => {
-                        Some(PriceBaseInQuote::try_from_number(take_profit_override)?)
-                    }
-                },
+                take_profit_override: evt
+                    .try_map_attr(event_key::TAKE_PROFIT_OVERRIDE, |s| {
+                        TakeProfitTrader::try_from(s)
+                    })
+                    .transpose()?,
+
+                max_gains: evt
+                    .try_map_attr(event_key::MAX_GAINS, MaxGainsInQuote::from_str)
+                    .transpose()?,
             })
         }
     }
@@ -223,7 +241,6 @@ pub mod events {
         pub order_id: OrderId,
     }
 
-    impl PerpEvent for CancelLimitOrderEvent {}
     impl From<CancelLimitOrderEvent> for Event {
         fn from(src: CancelLimitOrderEvent) -> Self {
             Event::new(event_key::PLACE_LIMIT_ORDER)
@@ -250,7 +267,6 @@ pub mod events {
         pub error: Option<String>,
     }
 
-    impl PerpEvent for ExecuteLimitOrderEvent {}
     impl From<ExecuteLimitOrderEvent> for Event {
         fn from(src: ExecuteLimitOrderEvent) -> Self {
             let mut event = Event::new(event_key::EXECUTE_LIMIT_ORDER)

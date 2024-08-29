@@ -72,7 +72,7 @@ mod tests {
 
     quickcheck! {
         fn number_over_zero_roundtrip(num: u128) -> bool {
-            let number = Number::from(num) + Number::ONE;
+            let number = (Number::from(num) + Number::ONE).unwrap();
             let number_over_zero = NumberGtZero::try_from(number).unwrap();
             let number2 = Number::from(number_over_zero);
             assert_eq!(number, number2);

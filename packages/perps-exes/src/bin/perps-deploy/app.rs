@@ -2,16 +2,18 @@ use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::{Context, Result};
 use cosmos::{
-    Address, AddressType, Cosmos, CosmosNetwork, HasAddress, HasAddressType, RawWallet, Wallet,
+    error::WalletError, Address, AddressHrp, Cosmos, HasAddress, HasAddressHrp, SeedPhrase, Wallet,
 };
 use msg::{
     contracts::market::spot_price::{PythPriceServiceNetwork, SpotPriceFeed, SpotPriceFeedData},
     prelude::*,
 };
-use once_cell::sync::OnceCell;
-use perps_exes::config::{
-    ChainConfig, ChainPythConfig, ChainStrideConfig, ConfigTestnet, DeploymentConfigTestnet,
-    MarketPriceFeedConfig, PriceConfig,
+use perps_exes::{
+    config::{
+        ChainConfig, ChainPythConfig, ChainStrideConfig, ConfigTestnet, DeploymentConfigTestnet,
+        MarketPriceFeedConfig, PriceConfig,
+    },
+    PerpsNetwork,
 };
 
 use crate::{cli::Opt, faucet::Faucet, tracker::Tracker};
@@ -19,13 +21,13 @@ use crate::{cli::Opt, faucet::Faucet, tracker::Tracker};
 pub(crate) struct LazyWallet(Option<Wallet>);
 
 impl LazyWallet {
-    fn new(raw: Option<RawWallet>, address_type: AddressType) -> Result<Self> {
-        raw.map(|raw| raw.for_chain(address_type))
+    fn new(raw: Option<SeedPhrase>, address_type: AddressHrp) -> Result<Self, WalletError> {
+        raw.map(|raw| raw.with_hrp(address_type))
             .transpose()
             .map(LazyWallet)
     }
 
-    fn get(&self) -> Result<&Wallet> {
+    pub(crate) fn get(&self) -> Result<&Wallet> {
         self.0.as_ref().context("No wallet provided on CLI")
     }
 }
@@ -36,7 +38,7 @@ pub(crate) struct BasicApp {
     wallet: LazyWallet,
     pub(crate) chain_config: ChainConfig,
     pub(crate) price_config: PriceConfig,
-    pub(crate) network: CosmosNetwork,
+    pub(crate) network: PerpsNetwork,
 }
 
 /// Complete app for talking to a testnet with a specific contract family
@@ -62,7 +64,8 @@ pub(crate) enum PriceSourceConfig {
 #[derive(Clone, Debug)]
 pub(crate) struct OracleInfo {
     pub pyth: Option<ChainPythConfig>,
-    pub stride: Option<ChainStrideConfig>,
+    /// Fallback config if not overridden by a market
+    pub stride_fallback: Option<ChainStrideConfig>,
     pub markets: HashMap<MarketId, OracleMarketPriceFeeds>,
 }
 
@@ -70,6 +73,7 @@ pub(crate) struct OracleInfo {
 pub(crate) struct OracleMarketPriceFeeds {
     pub feeds: Vec<SpotPriceFeed>,
     pub feeds_usd: Vec<SpotPriceFeed>,
+    pub stride_contract_override: Option<Address>,
 }
 
 /// Complete app for mainnet
@@ -85,31 +89,32 @@ impl AppMainnet {
 }
 
 impl Opt {
-    pub(crate) async fn connect(&self, network: CosmosNetwork) -> Result<Cosmos> {
+    pub(crate) async fn connect(&self, network: PerpsNetwork) -> Result<Cosmos> {
         let mut builder = network.builder().await?;
         if let Some(grpc) = &self.cosmos_grpc {
-            builder.grpc_url = grpc.clone();
+            builder.set_grpc_url(grpc.as_str());
         }
         if let Some(chain_id) = &self.cosmos_chain_id {
-            builder.chain_id = chain_id.clone();
+            builder.set_chain_id(chain_id.clone());
         }
-        if let Some(gas_multiplier) = self.cosmos_gas_multiplier {
-            builder.config.gas_estimate_multiplier = gas_multiplier;
+        builder.set_referer_header(Some("https://querier.levana.finance".to_owned()));
+        if let Some(x) = self.cosmos_gas_multiplier {
+            builder.set_gas_estimate_multiplier(x);
         }
-        log::info!("Connecting to {}", builder.grpc_url);
+        tracing::info!("Connecting to {}", builder.grpc_url());
 
-        builder.build().await
+        builder.build().map_err(anyhow::Error::from)
     }
 
-    fn get_lazy_wallet(&self, network: CosmosNetwork) -> Result<LazyWallet> {
-        LazyWallet::new(self.wallet.clone(), network.get_address_type())
+    pub(crate) fn get_lazy_wallet(&self, network: PerpsNetwork) -> Result<LazyWallet, WalletError> {
+        LazyWallet::new(self.wallet.clone(), network.get_address_hrp())
     }
 
-    pub(crate) async fn load_basic_app(&self, network: CosmosNetwork) -> Result<BasicApp> {
+    pub(crate) async fn load_basic_app(&self, network: PerpsNetwork) -> Result<BasicApp> {
         let cosmos = self.connect(network).await?;
         let wallet = self.get_lazy_wallet(network)?;
-        let chain_config = ChainConfig::load(self.config_chain.as_ref(), network)?;
-        let price_config = PriceConfig::load(self.config_price.as_ref())?;
+        let chain_config = ChainConfig::load_from_opt(self.config_chain.as_deref(), network)?;
+        let price_config = PriceConfig::load_from_opt(self.config_price.as_deref())?;
 
         Ok(BasicApp {
             cosmos,
@@ -121,8 +126,7 @@ impl Opt {
     }
 
     pub(crate) async fn load_app(&self, family: &str) -> Result<App> {
-        let config = ConfigTestnet::load(self.config_testnet.as_ref())?;
-        let price_config = PriceConfig::load(self.config_price.as_ref())?;
+        let config = ConfigTestnet::load_from_opt(self.config_testnet.as_deref())?;
         let partial = config.get_deployment_info(family)?;
         let basic = self.load_basic_app(partial.network).await?;
 
@@ -139,11 +143,7 @@ impl Opt {
 
         // only create pyth_info (with markets etc.) if we have a pyth address and do not specify
         let price_source = if qa_price_updates {
-            PriceSourceConfig::Wallet(
-                config
-                    .qa_wallet
-                    .for_chain(partial.network.get_address_type()),
-            )
+            PriceSourceConfig::Wallet(config.qa_wallet.with_hrp(partial.network.get_address_hrp()))
         } else {
             PriceSourceConfig::Oracle(self.get_oracle_info(
                 &basic.chain_config,
@@ -153,7 +153,7 @@ impl Opt {
         };
 
         Ok(App {
-            wallet_manager: wallet_manager_address.for_chain(partial.network.get_address_type()),
+            wallet_manager: wallet_manager_address.with_hrp(partial.network.get_address_hrp()),
             trading_competition,
             dev_settings,
             tracker,
@@ -170,7 +170,7 @@ impl Opt {
         &self,
         chain_config: &ChainConfig,
         global_price_config: &PriceConfig,
-        network: CosmosNetwork,
+        network: PerpsNetwork,
     ) -> Result<OracleInfo> {
         let chain_spot_price_config = chain_config
             .spot_price
@@ -187,12 +187,14 @@ impl Opt {
                         feeds.push(SpotPriceFeed {
                             data: SpotPriceFeedData::Constant { price },
                             inverted,
+                            volatile: None,
                         });
                     }
                     MarketPriceFeedConfig::Sei { denom, inverted } => {
                         feeds.push(SpotPriceFeed {
                             data: SpotPriceFeedData::Sei { denom },
                             inverted,
+                            volatile: None,
                         });
                     }
                     MarketPriceFeedConfig::Stride {
@@ -206,6 +208,7 @@ impl Opt {
                                 age_tolerance_seconds: age_tolerance,
                             },
                             inverted,
+                            volatile: None,
                         });
                     }
                     MarketPriceFeedConfig::Pyth { key, inverted } => {
@@ -219,20 +222,19 @@ impl Opt {
                             PythPriceServiceNetwork::Stable => &global_price_config.pyth.stable,
                         };
 
-                        let id = pyth_config
-                            .feed_ids
-                            .get(&key)
-                            .with_context(|| {
-                                format!("No pyth config found for {} on {:?}", key, network)
-                            })?
-                            .clone();
+                        let id = pyth_config.feed_ids.get(&key).with_context(|| {
+                            format!("No pyth config found for {} on {:?}", key, network)
+                        })?;
 
                         feeds.push(SpotPriceFeed {
                             data: SpotPriceFeedData::Pyth {
-                                id,
-                                age_tolerance_seconds: pyth_config.update_age_tolerance,
+                                id: *id,
+                                age_tolerance_seconds: chain_config
+                                    .age_tolerance_seconds
+                                    .unwrap_or(pyth_config.update_age_tolerance),
                             },
                             inverted,
+                            volatile: None,
                         });
                     }
                     MarketPriceFeedConfig::Simple {
@@ -244,12 +246,14 @@ impl Opt {
                             data: SpotPriceFeedData::Simple {
                                 contract: Addr::unchecked(
                                     contract
-                                        .for_chain(network.get_address_type())
+                                        .raw()
+                                        .with_hrp(network.get_address_hrp())
                                         .get_address_string(),
                                 ),
                                 age_tolerance_seconds: age_tolerance,
                             },
                             inverted,
+                            volatile: None,
                         });
                     }
                 }
@@ -269,19 +273,18 @@ impl Opt {
                 OracleMarketPriceFeeds {
                     feeds: map_feeds(&price_feed_configs.feeds)?,
                     feeds_usd: map_feeds(&price_feed_configs.feeds_usd)?,
+                    stride_contract_override: price_feed_configs.stride_contract,
                 },
             );
         }
         Ok(OracleInfo {
             pyth: chain_spot_price_config.pyth.clone(),
-            stride: chain_spot_price_config.stride.clone(),
+            stride_fallback: chain_spot_price_config.stride.clone(),
             markets,
         })
     }
 
-    pub(crate) async fn load_app_mainnet(&self, network: CosmosNetwork) -> Result<AppMainnet> {
-        let price_config = PriceConfig::load(self.config_price.as_ref())?;
-        let chain_config = ChainConfig::load(self.config_chain.as_ref(), network)?;
+    pub(crate) async fn load_app_mainnet(&self, network: PerpsNetwork) -> Result<AppMainnet> {
         let cosmos = self.connect(network).await?;
         let wallet = self.get_lazy_wallet(network)?;
 
@@ -299,8 +302,8 @@ impl BasicApp {
             .chain_config
             .faucet
             .with_context(|| format!("No faucet found for {}", self.network))?;
-        anyhow::ensure!(tracker.get_address_type() == self.network.get_address_type());
-        anyhow::ensure!(faucet.get_address_type() == self.network.get_address_type());
+        anyhow::ensure!(tracker.get_address_hrp() == self.network.get_address_hrp());
+        anyhow::ensure!(faucet.get_address_hrp() == self.network.get_address_hrp());
         Ok((
             Tracker::from_contract(self.cosmos.make_contract(tracker)),
             Faucet::from_contract(self.cosmos.make_contract(faucet)),

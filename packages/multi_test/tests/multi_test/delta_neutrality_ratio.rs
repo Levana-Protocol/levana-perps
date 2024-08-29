@@ -8,7 +8,7 @@ fn delta_neutrality_ratio_event() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
 
-    let (pos_id, res) = market
+    let (pos_id, defer_res) = market
         .exec_open_position(
             &trader,
             "10",
@@ -21,6 +21,7 @@ fn delta_neutrality_ratio_event() {
         )
         .unwrap();
 
+    let res = defer_res.exec_resp();
     DeltaNeutralityRatioEvent::try_from(res.event_first("delta-neutrality-ratio").unwrap())
         .unwrap();
 
@@ -30,11 +31,16 @@ fn delta_neutrality_ratio_event() {
     DeltaNeutralityRatioEvent::try_from(res.event_first("delta-neutrality-ratio").unwrap())
         .unwrap();
 
-    let res = market
+    let defer_res = market
         .exec_update_position_collateral_impact_size(&trader, pos_id, "50".parse().unwrap(), None)
         .unwrap();
-    DeltaNeutralityRatioEvent::try_from(res.event_first("delta-neutrality-ratio").unwrap())
-        .unwrap();
+    DeltaNeutralityRatioEvent::try_from(
+        defer_res
+            .exec_resp()
+            .event_first("delta-neutrality-ratio")
+            .unwrap(),
+    )
+    .unwrap();
 
     let res = market.exec_reinvest_yield(&trader, None, true).unwrap();
     DeltaNeutralityRatioEvent::try_from(res.event_first("delta-neutrality-ratio").unwrap())
@@ -46,7 +52,12 @@ fn delta_neutrality_ratio_event() {
     DeltaNeutralityRatioEvent::try_from(res.event_first("delta-neutrality-ratio").unwrap())
         .unwrap();
 
-    let res = market.exec_close_position(&trader, pos_id, None).unwrap();
-    DeltaNeutralityRatioEvent::try_from(res.event_first("delta-neutrality-ratio").unwrap())
-        .unwrap();
+    let defer_res = market.exec_close_position(&trader, pos_id, None).unwrap();
+    DeltaNeutralityRatioEvent::try_from(
+        defer_res
+            .exec_resp()
+            .event_first("delta-neutrality-ratio")
+            .unwrap(),
+    )
+    .unwrap();
 }

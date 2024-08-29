@@ -21,7 +21,7 @@ pub(crate) fn add_cosmos_msg(
     match msg {
         CosmosMsg::Bank(bank) => match bank {
             BankMsg::Send { to_address, amount } => {
-                builder.add_message_mut(MsgSend {
+                builder.add_message(MsgSend {
                     from_address: sender.get_address_string(),
                     to_address: to_address.clone(),
                     amount: amount
@@ -34,12 +34,13 @@ pub(crate) fn add_cosmos_msg(
                 });
                 Ok(())
             }
-            BankMsg::Burn { amount } => anyhow::bail!("No support for burn"),
+            BankMsg::Burn { amount: _ } => anyhow::bail!("No support for burn"),
             _ => anyhow::bail!("Unknown BankMsg variant"),
         },
         CosmosMsg::Custom(_) => anyhow::bail!("No support for custom"),
         CosmosMsg::Staking(_) => anyhow::bail!("No support for staking"),
         CosmosMsg::Distribution(_) => anyhow::bail!("No support for distribution"),
+        #[allow(deprecated)]
         CosmosMsg::Stargate { .. } => anyhow::bail!("No support for stargate"),
         CosmosMsg::Ibc(_) => anyhow::bail!("No support for IBC"),
         CosmosMsg::Wasm(wasm) => match wasm {
@@ -47,25 +48,31 @@ pub(crate) fn add_cosmos_msg(
                 contract_addr,
                 msg,
                 funds,
-            } => builder.add_execute_message_mut(
-                contract_addr.parse::<Address>()?,
-                sender,
-                convert_funds(funds),
-                convert_msg(msg)?,
-            ),
+            } => builder
+                .add_execute_message(
+                    contract_addr.parse::<Address>()?,
+                    sender,
+                    convert_funds(funds),
+                    convert_msg(msg)?,
+                )
+                .map_err(|e| e.into())
+                .map(|_| ()),
             WasmMsg::Instantiate { .. } => anyhow::bail!("No support for Instantiate"),
             WasmMsg::Migrate {
                 contract_addr,
                 new_code_id,
                 msg,
-            } => builder.add_migrate_message_mut(
-                contract_addr.parse::<Address>()?,
-                sender,
-                *new_code_id,
-                convert_msg(msg)?,
-            ),
+            } => builder
+                .add_migrate_message(
+                    contract_addr.parse::<Address>()?,
+                    sender,
+                    *new_code_id,
+                    convert_msg(msg)?,
+                )
+                .map(|_| ())
+                .map_err(|e| e.into()),
             WasmMsg::UpdateAdmin { .. } => anyhow::bail!("No support for UpdateAdmin"),
-            WasmMsg::ClearAdmin { contract_addr } => anyhow::bail!("No support for ClearAdmin"),
+            WasmMsg::ClearAdmin { contract_addr: _ } => anyhow::bail!("No support for ClearAdmin"),
             _ => anyhow::bail!("Unknown Wasm variant"),
         },
         CosmosMsg::Gov(_) => anyhow::bail!("No support for gov"),
@@ -74,7 +81,7 @@ pub(crate) fn add_cosmos_msg(
 }
 
 fn convert_msg(msg: &cosmwasm_std::Binary) -> Result<serde_json::Value> {
-    serde_json::from_slice(&msg.0).context("Unable to convert binary to JSON value")
+    serde_json::from_slice(msg.as_slice()).context("Unable to convert binary to JSON value")
 }
 
 fn convert_funds(funds: &[cosmwasm_std::Coin]) -> Vec<cosmos::Coin> {

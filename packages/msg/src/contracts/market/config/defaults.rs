@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 use super::MaxLiquidity;
 use cosmwasm_std::Decimal256;
-use shared::storage::{Collateral, NonZero, Number, NumberGtZero, Usd};
+use shared::storage::{NonZero, Number, NumberGtZero, Usd};
 
 pub struct ConfigDefaults {}
 
@@ -38,13 +38,7 @@ impl ConfigDefaults {
         false
     }
     pub const fn liquifunding_delay_seconds() -> u32 {
-        60 * 60 * 6
-    }
-    pub const fn price_update_too_old_seconds() -> u32 {
-        60 * 30
-    }
-    pub const fn staleness_seconds() -> u32 {
-        60 * 60 * 2
+        60 * 60 * 24
     }
     pub fn protocol_tax() -> Decimal256 {
         "0.3".parse().unwrap()
@@ -65,7 +59,7 @@ impl ConfigDefaults {
         // Spreadsheet calculated this value:
         //
         // https://docs.google.com/spreadsheets/d/15EG3I6XnaUKI20ja7XiCqLOjFS80QhKdnoL-PsjzJ-0/edit#gid=0
-        NumberGtZero::try_from(Number::ONE / Number::try_from("12").unwrap()).unwrap()
+        NumberGtZero::try_from((Number::ONE / Number::try_from("12").unwrap()).unwrap()).unwrap()
     }
 
     pub fn max_xlp_rewards_multiplier() -> NumberGtZero {
@@ -83,20 +77,17 @@ impl ConfigDefaults {
     pub fn delta_neutrality_fee_tax() -> Decimal256 {
         "0.05".parse().unwrap()
     }
-    pub fn limit_order_fee() -> Collateral {
-        Collateral::from(0u64)
-    }
     pub fn crank_fee_charged() -> Usd {
-        "0.01".parse().unwrap()
+        "0.1".parse().unwrap()
+    }
+    pub fn crank_fee_surcharge() -> Usd {
+        "0.08".parse().unwrap()
     }
     pub fn crank_fee_reward() -> Usd {
-        "0.001".parse().unwrap()
+        "0.09".parse().unwrap()
     }
     pub fn minimum_deposit_usd() -> Usd {
         "5".parse().unwrap()
-    }
-    pub const fn unpend_limit() -> u32 {
-        500
     }
 
     pub const fn liquifunding_delay_fuzz_seconds() -> u32 {
@@ -115,5 +106,11 @@ impl ConfigDefaults {
 
         // Default to 1 hour
         60 * 60
+    }
+    pub fn exposure_margin_ratio() -> Decimal256 {
+        "0.005".parse().unwrap()
+    }
+    pub fn referral_reward_ratio() -> Decimal256 {
+        "0.05".parse().unwrap()
     }
 }

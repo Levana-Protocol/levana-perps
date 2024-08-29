@@ -1,4 +1,5 @@
 //! Entrypoint messages for the market
+use super::deferred_execution::DeferredExecId;
 use super::order::LimitOrder;
 use super::position::{ClosedPosition, PositionId};
 use super::spot_price::SpotPriceConfigInit;
@@ -8,6 +9,8 @@ use crate::{contracts::liquidity_token::LiquidityTokenKind, token::TokenInit};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Binary, BlockInfo, Decimal256, Uint128};
 use pyth_sdk_cw::PriceIdentifier;
+use schemars::schema::{InstanceType, SchemaObject};
+use schemars::JsonSchema;
 use shared::prelude::*;
 use std::collections::BTreeMap;
 use std::fmt::Formatter;
@@ -72,6 +75,7 @@ pub struct NewMarketParams {
 /// Slippage assert tolerance is the tolerance to the sum of the two sources of slippage.
 #[cw_serde]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Eq)]
 pub struct SlippageAssert {
     /// Expected effective price from the sender. To incorporate tolerance on delta neutrality fee,
     /// the expected price should be modified by expected fee rate:
@@ -109,11 +113,14 @@ pub enum ExecuteMsg {
         /// Direction of new position
         direction: DirectionToBase,
         /// Maximum gains of new position
-        max_gains: MaxGainsInQuote,
+        #[deprecated(note = "Use take_profit instead")]
+        max_gains: Option<MaxGainsInQuote>,
         /// Stop loss price of new position
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
-        take_profit_override: Option<PriceBaseInQuote>,
+        /// if max_gains is `None`, this *must* be `Some`
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<TakeProfitTrader>,
     },
 
     /// Add collateral to a position, causing leverage to decrease
@@ -171,16 +178,39 @@ pub enum ExecuteMsg {
         max_gains: MaxGainsInQuote,
     },
 
+    /// Modify the take profit price of a position
+    UpdatePositionTakeProfitPrice {
+        /// ID of position to update
+        id: PositionId,
+        /// New take profit price of the position
+        price: TakeProfitTrader,
+    },
+
+    /// Update the stop loss price of a position
+    UpdatePositionStopLossPrice {
+        /// ID of position to update
+        id: PositionId,
+        /// New stop loss price of the position, or remove
+        stop_loss: StopLoss,
+    },
+
     /// Set a stop loss or take profit override.
-    /// This msg will override any previous values.
-    /// Passing None will remove the override.
+    /// Deprecated, use UpdatePositionStopLossPrice instead
+    // not sure why this causes a warning here...
+    // #[deprecated(note = "Use UpdatePositionStopLossPrice instead")]
     SetTriggerOrder {
         /// ID of position to modify
         id: PositionId,
         /// New stop loss price of the position
+        /// Passing None will remove the override.
         stop_loss_override: Option<PriceBaseInQuote>,
-        /// New take profit price of the position
-        take_profit_override: Option<PriceBaseInQuote>,
+        /// New take profit price of the position, merely as a trigger.
+        /// Passing None will bypass changing this
+        /// This does not affect the locked up counter collateral (or borrow fees etc.).
+        /// if this override is further away than the position's take profit price, the position's will be triggered first
+        /// if you want to update the position itself, use [ExecuteMsg::UpdatePositionTakeProfitPrice]
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<TakeProfitTrader>,
     },
 
     /// Set a limit order to open a position when the price of the asset hits
@@ -192,12 +222,16 @@ pub enum ExecuteMsg {
         leverage: LeverageToBase,
         /// Direction of new position
         direction: DirectionToBase,
-        /// Max gains of new position
-        max_gains: MaxGainsInQuote,
+
+        /// Maximum gains of new position
+        #[deprecated(note = "Use take_profit instead")]
+        max_gains: Option<MaxGainsInQuote>,
         /// Stop loss price of new position
         stop_loss_override: Option<PriceBaseInQuote>,
         /// Take profit price of new position
-        take_profit_override: Option<PriceBaseInQuote>,
+        /// if max_gains is `None`, this *must* be `Some`
+        #[serde(alias = "take_profit_override")]
+        take_profit: Option<TakeProfitTrader>,
     },
 
     /// Cancel an open limit order
@@ -323,6 +357,17 @@ pub enum ExecuteMsg {
         /// volume.
         price_usd: PriceCollateralInUsd,
     },
+
+    /// Perform a deferred exec
+    ///
+    /// This should only ever be called from the market contract itself, any
+    /// other call is guaranteed to fail.
+    PerformDeferredExec {
+        /// Which ID to execute
+        id: DeferredExecId,
+        /// Which price point to use for this execution.
+        price_point_timestamp: Timestamp,
+    },
 }
 
 /// Owner-only messages
@@ -345,6 +390,9 @@ pub struct Fees {
     pub protocol: Collateral,
     /// Crank fees collected and waiting to be allocated to crankers.
     pub crank: Collateral,
+    /// Referral fees collected and waiting to be allocated to crankers.
+    #[serde(default)]
+    pub referral: Collateral,
 }
 
 /// Return value from [QueryMsg::ClosedPositionHistory]
@@ -450,7 +498,13 @@ pub enum QueryMsg {
     /// This may be more up-to-date than the spot price which was
     /// validated and pushed into the contract storage via execution messages
     #[returns(OraclePriceResp)]
-    OraclePrice {},
+    OraclePrice {
+        /// If true then it will validate the publish_time age as though it were
+        /// used to push a new spot_price update
+        /// Otherwise, it just returns the oracle price as-is, even if it's old
+        #[serde(default)]
+        validate_age: bool,
+    },
 
     /// * returns [super::position::PositionsResp]
     ///
@@ -621,6 +675,15 @@ pub enum QueryMsg {
         liquidity_provider: RawAddr,
     },
 
+    /// * returns [ReferralStatsResp]
+    ///
+    /// Returns the referral rewards generated and received by this wallet.
+    #[returns(ReferralStatsResp)]
+    ReferralStats {
+        /// Which address to check
+        addr: RawAddr,
+    },
+
     /// * returns [DeltaNeutralityFeeResp]
     ///
     /// Gets the delta neutrality fee
@@ -642,6 +705,30 @@ pub enum QueryMsg {
         /// The new price of the base asset in terms of quote
         price: PriceBaseInQuote,
     },
+
+    /// Enumerate deferred execution work items for the given trader.
+    ///
+    /// Always begins enumeration from the most recent.
+    ///
+    /// * returns [ListDeferredExecsResp]
+    #[returns(crate::contracts::market::deferred_execution::ListDeferredExecsResp)]
+    ListDeferredExecs {
+        /// Trader wallet address
+        addr: RawAddr,
+        /// Previously seen final ID.
+        start_after: Option<DeferredExecId>,
+        /// How many items to request per batch.
+        limit: Option<u32>,
+    },
+
+    /// Get a single deferred execution item, if available.
+    ///
+    /// * returns [GetDeferredExecResp]
+    #[returns(crate::contracts::market::deferred_execution::GetDeferredExecResp)]
+    GetDeferredExec {
+        /// ID
+        id: DeferredExecId,
+    },
 }
 
 /// Response for [QueryMsg::OraclePrice]
@@ -650,7 +737,7 @@ pub struct OraclePriceResp {
     /// A map of each pyth id used in this market to the price and publish time
     pub pyth: BTreeMap<PriceIdentifier, OraclePriceFeedPythResp>,
     /// A map of each sei denom used in this market to the price
-    pub sei: BTreeMap<String, NumberGtZero>,
+    pub sei: BTreeMap<String, OraclePriceFeedSeiResp>,
     /// A map of each stride denom used in this market to the redemption price
     pub stride: BTreeMap<String, OraclePriceFeedStrideResp>,
     /// A map of each simple contract used in this market to the contract price
@@ -667,6 +754,19 @@ pub struct OraclePriceFeedPythResp {
     pub price: NumberGtZero,
     /// The pyth publish time
     pub publish_time: Timestamp,
+    /// Is this considered a volatile feed?
+    pub volatile: bool,
+}
+
+/// Part of [OraclePriceResp]
+#[cw_serde]
+pub struct OraclePriceFeedSeiResp {
+    /// The Sei price
+    pub price: NumberGtZero,
+    /// The Sei publish time
+    pub publish_time: Timestamp,
+    /// Is this considered a volatile feed?
+    pub volatile: bool,
 }
 
 /// Part of [OraclePriceResp]
@@ -676,6 +776,8 @@ pub struct OraclePriceFeedStrideResp {
     pub redemption_rate: NumberGtZero,
     /// The redemption price publish time
     pub publish_time: Timestamp,
+    /// Is this considered a volatile feed?
+    pub volatile: bool,
 }
 
 /// Part of [OraclePriceResp]
@@ -687,6 +789,9 @@ pub struct OraclePriceFeedSimpleResp {
     pub block_info: BlockInfo,
     /// Optional timestamp for the price, independent of block_info.time
     pub timestamp: Option<Timestamp>,
+    /// Is this considered a volatile feed?
+    #[serde(default)]
+    pub volatile: bool,
 }
 
 /// When querying an open position, how do we calculate PnL vis-a-vis fees?
@@ -754,6 +859,8 @@ pub struct PositionAction {
     pub kind: PositionActionKind,
     /// Timestamp when the action occurred
     pub timestamp: Timestamp,
+    /// Timestamp of the PricePoint used for this action, if relevant
+    pub price_timestamp: Option<Timestamp>,
     /// the amount of collateral at the time of the action
     #[serde(alias = "active_collateral")]
     pub collateral: Collateral,
@@ -772,8 +879,10 @@ pub struct PositionAction {
     pub old_owner: Option<Addr>,
     /// If this is a position transfer, the new owner.
     pub new_owner: Option<Addr>,
-    /// The take profit override, if set.
-    pub take_profit_override: Option<PriceBaseInQuote>,
+    /// The take profit price set by the trader.
+    /// For historical reasons this is optional, i.e. if the trader had set max gains price instead
+    #[serde(rename = "take_profit_override")]
+    pub take_profit_trader: Option<TakeProfitTrader>,
     /// The stop loss override, if set.
     pub stop_loss_override: Option<PriceBaseInQuote>,
 }
@@ -818,7 +927,7 @@ pub struct LpInfoResp {
     pub xlp_amount: LpToken,
     /// Collateral backing the xLP tokens
     pub xlp_collateral: Collateral,
-    /// Total available yield, sum of the available LP, xLP, and crank rewards.
+    /// Total available yield, sum of the available LP, xLP, crank rewards, and referral rewards.
     pub available_yield: Collateral,
     /// Available yield from LP tokens
     pub available_yield_lp: Collateral,
@@ -826,6 +935,9 @@ pub struct LpInfoResp {
     pub available_yield_xlp: Collateral,
     /// Available crank rewards
     pub available_crank_rewards: Collateral,
+    #[serde(default)]
+    /// Available referrer rewards
+    pub available_referrer_rewards: Collateral,
     /// Current status of an unstaking, if under way
     ///
     /// This will return `Some` from the time the provider begins an unstaking process until either:
@@ -837,6 +949,27 @@ pub struct LpInfoResp {
     pub history: LpHistorySummary,
     /// Liquidity cooldown information, if active.
     pub liquidity_cooldown: Option<LiquidityCooldown>,
+}
+
+/// Returned by [QueryMsg::ReferralStats]
+#[cw_serde]
+#[derive(Default)]
+pub struct ReferralStatsResp {
+    /// Rewards generated by this wallet, in collateral.
+    pub generated: Collateral,
+    /// Rewards generated by this wallet, converted to USD at time of generation.
+    pub generated_usd: Usd,
+    /// Rewards received by this wallet, in collateral.
+    pub received: Collateral,
+    /// Rewards received by this wallet, converted to USD at time of generation.
+    pub received_usd: Usd,
+    /// Total number of referees associated with this wallet.
+    ///
+    /// Note that this is a factory-wide value. It will be identical
+    /// across all markets for a given address.
+    pub referees: u32,
+    /// Who referred this account, if anyone.
+    pub referrer: Option<Addr>,
 }
 
 /// When a liquidity cooldown period will end
@@ -879,8 +1012,12 @@ pub struct LpHistorySummary {
     #[serde(alias = "deposit_in_usd")]
     pub deposit_usd: Usd,
     /// Cumulative yield claimed by the provider
+    ///
+    /// Note that this field includes crank and referral rewards.
     pub r#yield: Collateral,
     /// Cumulative yield expressed in USD at time of claiming
+    ///
+    /// Note that this field includes crank and referral rewards.
     #[serde(alias = "yield_in_usd")]
     pub yield_usd: Usd,
 }
@@ -949,11 +1086,13 @@ pub struct LimitOrderResp {
     /// Direction of the new position
     pub direction: DirectionToBase,
     /// Max gains of the new position
-    pub max_gains: MaxGainsInQuote,
+    #[deprecated(note = "Use take_profit instead")]
+    pub max_gains: Option<MaxGainsInQuote>,
     /// Stop loss of the new position
     pub stop_loss_override: Option<PriceBaseInQuote>,
+    #[serde(alias = "take_profit_override")]
     /// Take profit of the new position
-    pub take_profit_override: Option<PriceBaseInQuote>,
+    pub take_profit: TakeProfitTrader,
 }
 
 /// Response for [QueryMsg::LimitOrders]
@@ -1079,9 +1218,9 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
                 slippage_assert: u.arbitrary()?,
                 leverage: u.arbitrary()?,
                 direction: u.arbitrary()?,
-                max_gains: u.arbitrary()?,
+                max_gains: None,
                 stop_loss_override: u.arbitrary()?,
-                take_profit_override: u.arbitrary()?,
+                take_profit: Some(u.arbitrary()?),
             }),
             2 => Ok(ExecuteMsg::UpdatePositionAddCollateralImpactLeverage { id: u.arbitrary()? }),
             3 => Ok(ExecuteMsg::UpdatePositionAddCollateralImpactSize {
@@ -1106,18 +1245,19 @@ impl<'a> arbitrary::Arbitrary<'a> for ExecuteMsg {
                 id: u.arbitrary()?,
                 max_gains: u.arbitrary()?,
             }),
+            #[allow(deprecated)]
             8 => Ok(ExecuteMsg::SetTriggerOrder {
                 id: u.arbitrary()?,
                 stop_loss_override: u.arbitrary()?,
-                take_profit_override: u.arbitrary()?,
+                take_profit: u.arbitrary()?,
             }),
             9 => Ok(ExecuteMsg::PlaceLimitOrder {
                 trigger_price: u.arbitrary()?,
                 leverage: u.arbitrary()?,
                 direction: u.arbitrary()?,
-                max_gains: u.arbitrary()?,
+                max_gains: None,
                 stop_loss_override: u.arbitrary()?,
-                take_profit_override: u.arbitrary()?,
+                take_profit: Some(u.arbitrary()?),
             }),
             10 => Ok(ExecuteMsg::CancelLimitOrder {
                 order_id: u.arbitrary()?,
@@ -1183,8 +1323,16 @@ pub struct StatusResp {
     pub next_crank: Option<CrankWorkInfo>,
     /// Timestamp of the last completed crank
     pub last_crank_completed: Option<Timestamp>,
-    /// Size of the unpend queue
-    pub unpend_queue_size: u32,
+    /// Earliest deferred execution price timestamp needed
+    pub next_deferred_execution: Option<Timestamp>,
+    /// Latest deferred execution price timestamp needed
+    pub newest_deferred_execution: Option<Timestamp>,
+    /// Next liquifunding work item timestamp
+    pub next_liquifunding: Option<Timestamp>,
+    /// Number of work items sitting in the deferred execution queue
+    pub deferred_execution_items: u32,
+    /// Last processed deferred execution ID, if any
+    pub last_processed_deferred_exec_id: Option<DeferredExecId>,
     /// Overall borrow fee rate (annualized), combining LP and xLP
     pub borrow_fee: Decimal256,
     /// LP component of [Self::borrow_fee]
@@ -1214,22 +1362,8 @@ pub struct StatusResp {
     /// Amount of collateral in the delta neutrality fee fund.
     pub delta_neutrality_fee_fund: Collateral,
 
-    /// Have we reached staleness of the protocol via old liquifundings? If so, contains [Option::Some], and the timestamp when that happened.
-    pub stale_liquifunding: Option<Timestamp>,
-    /// Is the last price update too old? If so, contains [Option::Some], and the timestamp when the price became too old.
-    pub stale_price: Option<Timestamp>,
-    /// Are we in the congested state where new positions cannot be opened?
-    pub congested: bool,
-
     /// Fees held by the market contract
     pub fees: Fees,
-}
-
-impl StatusResp {
-    /// Is the protocol stale from either liquifunding delay or old prices?
-    pub fn is_stale(&self) -> bool {
-        self.stale_liquifunding.is_some() || self.stale_price.is_some()
-    }
 }
 
 /// Response for [QueryMsg::LimitOrderHistory]
@@ -1281,4 +1415,130 @@ pub struct SpotPriceHistoryResp {
 pub struct PriceWouldTriggerResp {
     /// Would a price update trigger a liquidation/take profit/etc?
     pub would_trigger: bool,
+}
+
+/// String representation of remove.
+const REMOVE_STR: &str = "remove";
+/// Stop loss configuration
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum StopLoss {
+    /// Remove stop loss price for the position
+    Remove,
+    /// Set the stop loss price for the position
+    Price(PriceBaseInQuote),
+}
+
+impl FromStr for StopLoss {
+    type Err = PerpError;
+    fn from_str(src: &str) -> Result<StopLoss, PerpError> {
+        match src {
+            REMOVE_STR => Ok(StopLoss::Remove),
+            _ => match src.parse() {
+                Ok(number) => Ok(StopLoss::Price(number)),
+                Err(err) => Err(perp_error!(
+                    ErrorId::Conversion,
+                    ErrorDomain::Default,
+                    "error converting {} to StopLoss , {}",
+                    src,
+                    err
+                )),
+            },
+        }
+    }
+}
+
+impl TryFrom<&str> for StopLoss {
+    type Error = PerpError;
+
+    fn try_from(val: &str) -> Result<Self, Self::Error> {
+        Self::from_str(val)
+    }
+}
+
+impl serde::Serialize for StopLoss {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            StopLoss::Price(price) => price.serialize(serializer),
+            StopLoss::Remove => serializer.serialize_str(REMOVE_STR),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for StopLoss {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(StopLossVisitor)
+    }
+}
+
+impl JsonSchema for StopLoss {
+    fn schema_name() -> String {
+        "StopLoss".to_owned()
+    }
+
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        SchemaObject {
+            instance_type: Some(InstanceType::String.into()),
+            format: Some("stop-loss".to_owned()),
+            ..Default::default()
+        }
+        .into()
+    }
+}
+
+struct StopLossVisitor;
+impl<'de> serde::de::Visitor<'de> for StopLossVisitor {
+    type Value = StopLoss;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("StopLoss")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        v.parse()
+            .map_err(|_| E::custom(format!("Invalid StopLoss: {v}")))
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::MapAccess<'de>,
+    {
+        if let Some((key, value)) = map.next_entry()? {
+            match key {
+                REMOVE_STR => Ok(Self::Value::Remove),
+                "price" => Ok(Self::Value::Price(value)),
+                _ => Err(serde::de::Error::custom(format!(
+                    "Invalid StopLoss field: {key}"
+                ))),
+            }
+        } else {
+            Err(serde::de::Error::custom("Empty StopLoss Object"))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::StopLoss;
+
+    #[test]
+    fn deserialize_stop_loss() {
+        let go = serde_json::from_str::<StopLoss>;
+
+        go(r#"{"price": "2.2"}"#).unwrap();
+        go("\"remove\"").unwrap();
+        go("\"2.2\"").unwrap();
+        go("\"-2.2\"").unwrap_err();
+        go(r#"{}"#).unwrap_err();
+        go(r#"{"error-field": "2.2"}"#).unwrap_err();
+        go("").unwrap_err();
+    }
 }

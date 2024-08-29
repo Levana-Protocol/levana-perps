@@ -1,8 +1,12 @@
+// The types must be represented with repr statement which is using as conversion internally.
+#![allow(clippy::as_conversions)]
+
 use std::fmt::Display;
 
 use anyhow::Result;
 use cosmos::CosmosNetwork;
 use cosmwasm_std::Decimal256;
+use perps_exes::PerpsNetwork;
 use shared::storage::{DirectionToBase, Signed};
 
 /// Chains supported by this server.
@@ -33,6 +37,30 @@ pub(crate) enum ChainId {
     Injective1 = 10,
     #[serde(rename = "injective-888")]
     Injective888 = 11,
+    #[serde(rename = "neutron-1")]
+    Neutron1 = 12,
+    #[serde(rename = "pion-1")]
+    Pion1 = 13,
+}
+
+impl From<ChainId> for i32 {
+    fn from(value: ChainId) -> Self {
+        match value {
+            ChainId::Atlantic2 => 1,
+            ChainId::Dragonfire4 => 2,
+            ChainId::Elgafar1 => 3,
+            ChainId::Juno1 => 4,
+            ChainId::OsmoTest5 => 5,
+            ChainId::Osmosis1 => 6,
+            ChainId::Stargaze1 => 7,
+            ChainId::Uni6 => 8,
+            ChainId::Pacific1 => 9,
+            ChainId::Injective1 => 10,
+            ChainId::Injective888 => 11,
+            ChainId::Neutron1 => 12,
+            ChainId::Pion1 => 13,
+        }
+    }
 }
 
 impl TryFrom<&str> for ChainId {
@@ -50,6 +78,8 @@ impl TryFrom<&str> for ChainId {
             "stargaze-1" => Ok(ChainId::Stargaze1),
             "uni-6" => Ok(ChainId::Uni6),
             "pacific-1" => Ok(ChainId::Pacific1),
+            "neutron-1" => Ok(ChainId::Neutron1),
+            "pion-1" => Ok(ChainId::Pion1),
             _ => Err(anyhow::anyhow!("Unknown chain ID: {value}")),
         }
     }
@@ -70,6 +100,8 @@ impl Display for ChainId {
             ChainId::Pacific1 => "pacific-1",
             ChainId::Injective1 => "injective-1",
             ChainId::Injective888 => "injective-888",
+            ChainId::Neutron1 => "neutron-1",
+            ChainId::Pion1 => "pion-1",
         })
     }
 }
@@ -83,7 +115,7 @@ impl TryFrom<String> for ChainId {
 }
 
 impl ChainId {
-    pub(crate) fn all() -> [ChainId; 9] {
+    pub(crate) fn all() -> [ChainId; 12] {
         [
             ChainId::Atlantic2,
             ChainId::Elgafar1,
@@ -94,6 +126,9 @@ impl ChainId {
             ChainId::Uni6,
             ChainId::Pacific1,
             ChainId::Injective1,
+            ChainId::Injective888,
+            ChainId::Neutron1,
+            ChainId::Pion1,
         ]
     }
 
@@ -113,10 +148,24 @@ impl ChainId {
             ChainId::Pacific1 => CosmosNetwork::SeiMainnet,
             ChainId::Injective1 => CosmosNetwork::InjectiveMainnet,
             ChainId::Injective888 => CosmosNetwork::InjectiveTestnet,
+            ChainId::Neutron1 => CosmosNetwork::NeutronMainnet,
+            ChainId::Pion1 => CosmosNetwork::NeutronTestnet,
         })
     }
 
-    pub(crate) fn from_cosmos_network(network: CosmosNetwork) -> Result<Self> {
+    pub(crate) fn from_perps_network(network: PerpsNetwork) -> Result<Self> {
+        match network {
+            PerpsNetwork::Regular(network) => Self::from_cosmos_network(network),
+            PerpsNetwork::DymensionTestnet => Err(anyhow::anyhow!(
+                "Cannot run companion server for Dymension testnet"
+            )),
+            PerpsNetwork::NibiruTestnet => Err(anyhow::anyhow!(
+                "Cannot run companion server for Nibiru testnet"
+            )),
+        }
+    }
+
+    fn from_cosmos_network(network: CosmosNetwork) -> Result<Self> {
         match network {
             CosmosNetwork::JunoTestnet => Ok(ChainId::Uni6),
             CosmosNetwork::JunoMainnet => Ok(ChainId::Juno1),
@@ -128,6 +177,8 @@ impl ChainId {
             CosmosNetwork::StargazeMainnet => Ok(ChainId::Stargaze1),
             CosmosNetwork::InjectiveMainnet => Ok(ChainId::Injective1),
             CosmosNetwork::InjectiveTestnet => Ok(ChainId::Injective888),
+            CosmosNetwork::NeutronMainnet => Ok(ChainId::Neutron1),
+            CosmosNetwork::NeutronTestnet => Ok(ChainId::Pion1),
             _ => Err(anyhow::anyhow!("Unsupported network: {network}")),
         }
     }
@@ -145,6 +196,8 @@ impl ChainId {
             ChainId::Pacific1 => true,
             ChainId::Injective1 => true,
             ChainId::Injective888 => false,
+            ChainId::Neutron1 => true,
+            ChainId::Pion1 => false,
         }
     }
 }
@@ -156,6 +209,16 @@ pub(crate) enum ContractEnvironment {
     Mainnet = 1,
     Beta = 2,
     Dev = 3,
+}
+
+impl From<ContractEnvironment> for i32 {
+    fn from(value: ContractEnvironment) -> Self {
+        match value {
+            ContractEnvironment::Mainnet => 1,
+            ContractEnvironment::Beta => 2,
+            ContractEnvironment::Dev => 3,
+        }
+    }
 }
 
 impl ContractEnvironment {
@@ -190,6 +253,15 @@ pub(crate) enum DirectionForDb {
     Short = 2,
 }
 
+impl From<DirectionForDb> for i32 {
+    fn from(value: DirectionForDb) -> Self {
+        match value {
+            DirectionForDb::Long => 1,
+            DirectionForDb::Short => 2,
+        }
+    }
+}
+
 impl From<DirectionToBase> for DirectionForDb {
     fn from(src: DirectionToBase) -> Self {
         match src {
@@ -214,6 +286,7 @@ impl Display for DirectionForDb {
 pub(crate) enum PnlType {
     Usd = 1,
     Percent = 2,
+    Both = 3,
 }
 
 impl From<PnlType> for String {
@@ -221,6 +294,17 @@ impl From<PnlType> for String {
         match val {
             PnlType::Usd => "Usd".into(),
             PnlType::Percent => "Percent".into(),
+            PnlType::Both => "Both".into(),
+        }
+    }
+}
+
+impl From<PnlType> for i32 {
+    fn from(value: PnlType) -> Self {
+        match value {
+            PnlType::Usd => 1,
+            PnlType::Percent => 2,
+            PnlType::Both => 3,
         }
     }
 }

@@ -1,24 +1,27 @@
-use std::path::PathBuf;
-
 use anyhow::{Context, Result};
 use cosmos::{HasAddress, TxBuilder};
-use cosmwasm_std::{to_binary, Addr, CosmosMsg, Empty, WasmMsg};
+use cosmwasm_std::{to_json_binary, Addr, CosmosMsg, Empty, WasmMsg};
 use msg::{
     contracts::market::{
         config::{Config, ConfigUpdate},
         entry::ExecuteOwnerMsg,
+        spot_price::{SpotPriceConfig, SpotPriceFeedData},
     },
     prelude::MarketExecuteMsg,
 };
 use perps_exes::{
     config::{
-        ChainConfig, ConfigUpdateAndBorrowFee, MainnetFactories, MarketConfigUpdates, PriceConfig,
+        ChainConfig, ConfigUpdateAndBorrowFee, CrankFeeConfig, MainnetFactories,
+        MarketConfigUpdates, PriceConfig,
     },
     contracts::{Factory, MarketInfo},
     prelude::MarketContract,
 };
 
-use crate::{mainnet::strip_nulls, spot_price_config::get_spot_price_config, util::add_cosmos_msg};
+use crate::{
+    mainnet::strip_nulls, spot_price_config::get_spot_price_config,
+    testnet::sync_config::is_unused_key, util::add_cosmos_msg,
+};
 
 #[derive(clap::Parser)]
 pub(super) struct SyncConfigOpts {
@@ -35,10 +38,11 @@ impl SyncConfigOpts {
 async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) -> Result<()> {
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
+    let network = factory.network;
 
-    let chain_config = ChainConfig::load(None::<PathBuf>, factory.network)?;
-    let price_config = PriceConfig::load(None::<PathBuf>)?;
-    let oracle = opt.get_oracle_info(&chain_config, &price_config, factory.network)?;
+    let chain_config = ChainConfig::load(factory.network)?;
+    let price_config = PriceConfig::load()?;
+    let oracle = opt.get_oracle_info(&chain_config, &price_config, network)?;
 
     let app = opt.load_app_mainnet(factory.network).await?;
     let factory = Factory::from_contract(app.cosmos.make_contract(factory.address));
@@ -53,7 +57,7 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
     } in markets
     {
         let market = MarketContract::new(market);
-        let actual_config = market.status().await?.config;
+        let actual_config = market.config().await?;
         let ConfigUpdateAndBorrowFee {
             config: expected_config,
             initial_borrow_fee_rate: _,
@@ -61,6 +65,14 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
             .markets
             .get(&market_id)
             .with_context(|| format!("No market config update found for {market_id}"))?;
+        let CrankFeeConfig {
+            charged,
+            surcharge,
+            reward,
+        } = market_config_updates
+            .crank_fees
+            .get(&network)
+            .with_context(|| format!("No crank fee config found for network {network}"))?;
         let default_config = Config::new(
             msg::contracts::market::spot_price::SpotPriceConfig::Manual {
                 admin: Addr::unchecked("ignored"),
@@ -89,14 +101,24 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
 
         for (key, default_value) in default_config {
             let expected = if key == "spot_price" {
-                let spot_price_config = get_spot_price_config(&oracle, &price_config, &market_id)?;
+                let spot_price_config = get_spot_price_config(&oracle, &market_id)?;
                 serde_json::to_value(spot_price_config)?
+            } else if is_unused_key(&key) {
+                continue;
             } else {
                 let expected_value = expected_config
                     .remove(&key)
                     .with_context(|| format!("Missing key in expected_config: {key}"))?;
                 if expected_value.is_null() {
-                    default_value
+                    if key == "crank_fee_charged" {
+                        serde_json::to_value(charged)?
+                    } else if key == "crank_fee_surcharge" {
+                        serde_json::to_value(surcharge)?
+                    } else if key == "crank_fee_reward" {
+                        serde_json::to_value(reward)?
+                    } else {
+                        default_value
+                    }
                 } else {
                     if default_value == expected_value {
                         println!("Unnecessary config update {key} for market {market_id}");
@@ -107,9 +129,15 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
             let actual = actual_config.remove(&key).with_context(|| {
                 format!("Missing actual config value {key} for market {}", market_id)
             })?;
-            if actual != expected {
+
+            let matches = if key == "spot_price" {
+                do_spot_prices_match_enough(actual.clone(), expected.clone())
+            } else {
+                actual == expected
+            };
+            if !matches {
                 println!(
-                    "Mismatched paramter for {market_id}: {key}. Actual: {}. Expected: {}.",
+                    "Mismatched paramter for {market_id}: {key}.\nActual  : {}\nExpected: {}\n\n",
                     serde_json::to_string(&actual)?,
                     serde_json::to_string(&expected)?
                 );
@@ -122,7 +150,7 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
             let update: ConfigUpdate = serde_json::from_value(update)?;
             updates.push(CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
                 contract_addr: market.get_address_string(),
-                msg: to_binary(&strip_nulls(MarketExecuteMsg::Owner(
+                msg: to_json_binary(&strip_nulls(MarketExecuteMsg::Owner(
                     ExecuteOwnerMsg::ConfigUpdate {
                         update: Box::new(update),
                     },
@@ -146,9 +174,51 @@ async fn go(opt: crate::cli::Opt, SyncConfigOpts { factory }: SyncConfigOpts) ->
             .simulate(&app.cosmos, &[owner])
             .await
             .context("Error while simulating")?;
-        log::info!("Successfully simulated messages");
-        log::debug!("Simulate response: {res:?}");
+        tracing::info!("Successfully simulated messages");
+        tracing::debug!("Simulate response: {res:?}");
     }
 
     Ok(())
+}
+
+fn do_spot_prices_match_enough(actual: serde_json::Value, expected: serde_json::Value) -> bool {
+    (|| {
+        let mut actual: SpotPriceConfig = serde_json::from_value(actual)?;
+        let mut expected: SpotPriceConfig = serde_json::from_value(expected)?;
+        strip_unneeded(&mut actual);
+        strip_unneeded(&mut expected);
+        anyhow::Ok(actual == expected)
+    })()
+    .unwrap_or(false)
+}
+
+fn strip_unneeded(spot_price: &mut SpotPriceConfig) {
+    match spot_price {
+        SpotPriceConfig::Manual { admin: _ } => (),
+        SpotPriceConfig::Oracle {
+            pyth,
+            stride,
+            feeds,
+            feeds_usd,
+            volatile_diff_seconds: _,
+        } => {
+            let mut has_pyth = false;
+            let mut has_stride = false;
+            for feed in feeds.iter().chain(feeds_usd.iter()) {
+                match feed.data {
+                    SpotPriceFeedData::Constant { .. } => (),
+                    SpotPriceFeedData::Pyth { .. } => has_pyth = true,
+                    SpotPriceFeedData::Stride { .. } => has_stride = true,
+                    SpotPriceFeedData::Sei { .. } => (),
+                    SpotPriceFeedData::Simple { .. } => (),
+                }
+            }
+            if !has_pyth {
+                *pyth = None;
+            }
+            if !has_stride {
+                *stride = None;
+            }
+        }
+    }
 }

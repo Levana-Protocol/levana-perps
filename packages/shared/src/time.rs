@@ -84,6 +84,11 @@ impl Timestamp {
         Timestamp(seconds * 1_000_000_000)
     }
 
+    /// Construct a new value from the given number of millisecond since the epoch.
+    pub fn from_millis(millis: u64) -> Self {
+        Timestamp(millis * 1_000_000)
+    }
+
     /// Add the given number of seconds to the given timestamp
     pub fn plus_seconds(self, secs: u64) -> Self {
         self + Duration::from_seconds(secs)
@@ -122,7 +127,7 @@ impl Timestamp {
 
         Utc.timestamp_opt(secs.try_into()?, nanos.try_into()?)
             .single()
-            .context("Could not convert {self} into DateTime<Utc>")
+            .with_context(|| format!("Could not convert {self} into DateTime<Utc>"))
     }
 }
 
@@ -155,6 +160,8 @@ impl<'a> PrimaryKey<'a> for Timestamp {
 
 impl KeyDeserialize for Timestamp {
     type Output = Timestamp;
+
+    const KEY_ELEMS: u16 = 1;
 
     fn from_vec(value: Vec<u8>) -> cosmwasm_std::StdResult<Self::Output> {
         u64::from_vec(value).map(Timestamp)

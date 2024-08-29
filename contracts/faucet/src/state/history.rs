@@ -2,7 +2,7 @@ use msg::{contracts::faucet::entry::FaucetAsset, prelude::*};
 
 use super::{State, StateContext};
 
-type History<'a> = Map<'a, (&'a str, Timestamp), Decimal256>;
+type History<'a> = Map<(&'a str, Timestamp), Decimal256>;
 
 const HISTORY_CW20: History = Map::new("HISTORY_CW20");
 const HISTORY_NATIVE: History = Map::new("HISTORY_NATIVE");

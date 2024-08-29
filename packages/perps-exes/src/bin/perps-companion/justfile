@@ -6,7 +6,7 @@ default:
 
 # Run postgres via docker
 postgres:
-    docker run --name price_api_pg --net=host --rm -it -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:14.1-alpine -c log_statement=all
+    docker run --name price_api_pg --net=host --rm -it -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:15.3-alpine -c log_statement=all
 
 # psql to docker
 psql:
@@ -28,7 +28,14 @@ run:
 pg-terminate-conn:
 	psql -U postgres -h localhost -c "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = 'companion' AND pid <> pg_backend_pid();"
 
-# Tests
-test:
-	curl --header "Accept: application/json" --header "Content-Type: application/json" http://localhost:3000/pnl/1003
-	curl --header "Accept: application/json" --header "Content-Type: application/json" --request POST --data '{"address":"sei1vc9zsrma0gezczzfqcps8gvned5s5nq9p7yw7nu68spcvj4lngwqau4rln","chain":"atlantic-2","position_id":"1","pnl_type":"usd"}' http://localhost:3000/pnl-url
+# Test by posting data
+post-test:
+	curl --verbose --header "Accept: application/json" --header "Content-Type: application/json" --request POST --data '{"address":"neutron1awkajw4ltv0uw3jhqg5gx2lwkwl0nyg4krq54dg8x5w7qawcymyqenzcnk","chain":"neutron-1","position_id":"1","pnl_type":"usd"}' http://localhost:3000/pnl-url
+
+# Test by fetching html of above post
+get-test:
+	curl --verbose http://localhost:3000/pnl/1000
+
+# Run image
+run-remote-image:
+	docker run --name comp --net=host -p 3000:3000 --rm -it ghcr.io/levana-protocol/levana-perps/companion:023e218903f69b079bbb8812ab18c4da732c410e --app-environment test --app-version test perps-companion uri -- --postgres-uri postgresql://postgres:postgres@localhost/companion

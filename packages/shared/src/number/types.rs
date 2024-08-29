@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use cosmwasm_std::{Decimal256, OverflowError, Uint128, Uint256};
 use std::{
     fmt::Display,
-    ops::{Add, AddAssign, Sub, SubAssign},
+    ops::{Add, Sub},
     str::FromStr,
 };
 
@@ -63,7 +63,7 @@ pub trait UnsignedDecimal:
     fn checked_add_signed(self, rhs: Signed<Self>) -> Result<Self> {
         self.into_signed()
             .checked_add(rhs)?
-            .try_into_positive_value()
+            .try_into_non_negative_value()
             .with_context(|| format!("{self} + {rhs}"))
     }
 
@@ -228,30 +228,18 @@ macro_rules! unsigned {
         }
 
         impl Add for $t {
-            type Output = Self;
+            type Output = anyhow::Result<Self, OverflowError>;
 
             fn add(self, rhs: Self) -> Self::Output {
-                Self(self.0 + rhs.0)
-            }
-        }
-
-        impl AddAssign for $t {
-            fn add_assign(&mut self, rhs: Self) {
-                self.0 += rhs.0;
+                Ok(Self(self.0.checked_add(rhs.0)?))
             }
         }
 
         impl Sub for $t {
-            type Output = Self;
+            type Output = anyhow::Result<Self, OverflowError>;
 
             fn sub(self, rhs: Self) -> Self::Output {
-                Self(self.0 - rhs.0)
-            }
-        }
-
-        impl SubAssign for $t {
-            fn sub_assign(&mut self, rhs: Self) {
-                self.0 -= rhs.0;
+                Ok(Self(self.0.checked_sub(rhs.0)?))
             }
         }
 
@@ -370,7 +358,7 @@ impl<T: UnsignedDecimal> Signed<T> {
     }
 
     /// If the value is positive or zero, return the inner `T`. Otherwise return `None`.
-    pub fn try_into_positive_value(self) -> Option<T> {
+    pub fn try_into_non_negative_value(self) -> Option<T> {
         if self.is_negative() {
             None
         } else {
@@ -380,7 +368,7 @@ impl<T: UnsignedDecimal> Signed<T> {
 
     /// Try to convert into a non-zero value
     pub fn try_into_non_zero(self) -> Option<NonZero<T>> {
-        self.try_into_positive_value().and_then(NonZero::new)
+        self.try_into_non_negative_value().and_then(NonZero::new)
     }
 }
 
@@ -594,7 +582,7 @@ impl<T: UnsignedDecimal> NonZero<T> {
 
     /// Try to convert a signed value into a non-zero.
     pub fn try_from_signed(src: Signed<T>) -> Result<Self> {
-        src.try_into_positive_value()
+        src.try_into_non_negative_value()
             .and_then(NonZero::new)
             .with_context(|| format!("Could not converted signed value {src} into NonZero"))
     }
@@ -667,7 +655,15 @@ impl Collateral {
         self.0
             .checked_mul(rhs)
             .map(Collateral)
-            .with_context(|| format!("Collateral::checked_mul_ratio failed on {self} * {rhs}"))
+            .with_context(|| format!("Collateral::checked_mul_dec failed on {self} * {rhs}"))
+    }
+
+    /// Divide by the given [Decimal256]
+    pub fn checked_div_dec(self, rhs: Decimal256) -> Result<Collateral> {
+        self.0
+            .checked_div(rhs)
+            .map(Collateral)
+            .with_context(|| format!("Collateral::checked_div_dec failed on {self} * {rhs}"))
     }
 
     /// Divide by a non-zero decimal.

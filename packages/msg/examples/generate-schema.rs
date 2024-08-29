@@ -90,17 +90,8 @@ fn main() {
     write_factory();
     finalize("factory");
 
-    write_farming();
-    finalize("farming");
-
     write_faucet();
     finalize("faucet");
-
-    write_hatching();
-    finalize("hatching");
-
-    write_ibc_execute_proxy();
-    finalize("ibc_execute_proxy");
 
     write_liquidity_token();
     finalize("liquidity_token");
@@ -192,48 +183,6 @@ fn write_faucet() {
 
     write_api!(
     name: "faucet",
-    instantiate: InstantiateMsg,
-    execute: ExecuteMsg,
-    query: QueryMsg,
-    migrate: MigrateMsg,
-    );
-}
-
-fn write_farming() {
-    use levana_perpswap_cosmos_msg::contracts::farming::entry::{
-        ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
-    };
-
-    write_api!(
-    name: "farming",
-    instantiate: InstantiateMsg,
-    execute: ExecuteMsg,
-    query: QueryMsg,
-    migrate: MigrateMsg,
-    );
-}
-
-fn write_hatching() {
-    use levana_perpswap_cosmos_msg::contracts::hatching::entry::{
-        ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
-    };
-
-    write_api!(
-    name: "hatching",
-    instantiate: InstantiateMsg,
-    execute: ExecuteMsg,
-    query: QueryMsg,
-    migrate: MigrateMsg,
-    );
-}
-
-fn write_ibc_execute_proxy() {
-    use levana_perpswap_cosmos_msg::contracts::ibc_execute_proxy::entry::{
-        ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg,
-    };
-
-    write_api!(
-    name: "ibc_execute_proxy",
     instantiate: InstantiateMsg,
     execute: ExecuteMsg,
     query: QueryMsg,

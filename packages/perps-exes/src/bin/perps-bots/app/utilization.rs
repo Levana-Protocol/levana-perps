@@ -3,7 +3,6 @@ use std::sync::Arc;
 use anyhow::Result;
 use axum::async_trait;
 use cosmos::{Address, HasAddress, Wallet};
-use msg::contracts::market::entry::StatusResp;
 use perps_exes::{config::UtilizationConfig, prelude::*};
 
 use crate::{
@@ -27,7 +26,7 @@ impl AppBuilder {
         if let Some(config) = testnet.utilization_config {
             let util = Utilization {
                 app: self.app.clone(),
-                wallet: self.get_track_wallet(&testnet, ManagedWallet::Utilization)?,
+                wallet: self.get_track_wallet(ManagedWallet::Utilization)?,
                 config,
                 testnet,
             };
@@ -45,7 +44,7 @@ impl WatchedTaskPerMarket for Utilization {
         _factory: &FactoryInfo,
         market: &Market,
     ) -> Result<WatchedTaskOutput> {
-        single_market(self, &market.market, self.testnet.faucet, &market.status).await
+        single_market(self, &market.market, self.testnet.faucet).await
     }
 }
 
@@ -53,15 +52,9 @@ async fn single_market(
     worker: &Utilization,
     market: &MarketContract,
     faucet: Address,
-    status: &StatusResp,
 ) -> Result<WatchedTaskOutput> {
-    if status.is_stale() {
-        return Ok(WatchedTaskOutput::new(
-            "Protocol is currently stale, skipping",
-        ));
-    }
-
-    let total = status.liquidity.total_collateral();
+    let status = market.status().await?;
+    let total = status.liquidity.total_collateral()?;
     if total.is_zero() {
         return Ok(WatchedTaskOutput::new("No deposited collateral"));
     }
@@ -83,7 +76,7 @@ async fn single_market(
 
     if util > max_util {
         let positions = market
-            .get_some_positions(worker.wallet.get_address(), Some(20))
+            .get_some_positions(worker.wallet.get_address(), Some(5))
             .await?;
         if positions.is_empty() {
             Ok(WatchedTaskOutput::new(
@@ -100,7 +93,7 @@ async fn single_market(
         tracing::info!("Low utilization ratio, opening positions.");
 
         let balance = market
-            .get_collateral_balance(status, worker.wallet.get_address())
+            .get_collateral_balance(&status, worker.wallet.get_address())
             .await?;
         let cw20 = match &status.collateral {
             msg::token::Token::Cw20 {
@@ -124,7 +117,7 @@ async fn single_market(
                     worker.app.cosmos.clone(),
                     worker.wallet.get_address(),
                     "200000".parse().unwrap(),
-                    status,
+                    &status,
                     cw20,
                     faucet,
                 )
@@ -176,17 +169,17 @@ async fn single_market(
         );
         // Since we're opening an unpopular position: add the high cap with the
         // absolute value of net notional.
-        let largest_notional_size_abs = notional_high_cap
+        let largest_notional_size_abs = (notional_high_cap
             + match direction {
-                DirectionToBase::Long => status.short_notional - status.long_notional,
-                DirectionToBase::Short => status.long_notional - status.short_notional,
-            };
+                DirectionToBase::Long => (status.short_notional - status.long_notional)?,
+                DirectionToBase::Short => (status.long_notional - status.short_notional)?,
+            })?;
         let largest_deposit_collateral = price
             .notional_to_collateral(Notional::from_decimal256(
                 largest_notional_size_abs.into_decimal256().checked_div(
                     leverage
                         .into_signed(direction)
-                        .into_notional(status.market_type)
+                        .into_notional(status.market_type)?
                         .into_number()
                         .abs_unsigned(),
                 )?,
@@ -202,7 +195,7 @@ async fn single_market(
         let res = market
             .open_position(
                 &worker.wallet,
-                status,
+                &status,
                 deposit_collateral,
                 direction,
                 leverage,
@@ -243,7 +236,8 @@ fn counter_to_deposit(
                     anyhow::bail!("Infinite max gains are only allowed on Long positions");
                 }
 
-                let leverage_notional = leverage.into_signed(direction).into_notional(market_type);
+                let leverage_notional =
+                    leverage.into_signed(direction).into_notional(market_type)?;
 
                 NonZero::new(Collateral::from_decimal256(
                     counter
@@ -253,16 +247,17 @@ fn counter_to_deposit(
                 .context("counter_to_deposit: got a 0 deposit collateral")?
             }
             MaxGainsInQuote::Finite(max_gains_in_notional) => {
-                let leverage_notional = leverage.into_signed(direction).into_notional(market_type);
-                let max_gains_multiple = Number::ONE
-                    - (max_gains_in_notional.into_number() + Number::ONE)
-                        .checked_div(leverage_notional.into_number().abs())?;
+                let leverage_notional =
+                    leverage.into_signed(direction).into_notional(market_type)?;
+                let max_gains_multiple = (Number::ONE
+                    - (max_gains_in_notional.into_number() + Number::ONE)?
+                        .checked_div(leverage_notional.into_number().abs())?)?;
 
-                if max_gains_multiple.approx_lt_relaxed(Number::ZERO) {
+                if max_gains_multiple.approx_lt_relaxed(Number::ZERO)? {
                     return Err(MarketError::MaxGainsTooLarge {}.into());
                 }
 
-                let deposit = (counter.into_number() * max_gains_multiple)
+                let deposit = (counter.into_number() * max_gains_multiple)?
                     .checked_div(max_gains_in_notional.into_number())?;
 
                 NonZero::<Collateral>::try_from_number(deposit).with_context(|| {

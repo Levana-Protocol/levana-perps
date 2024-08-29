@@ -1,7 +1,6 @@
 // re-exporting
 mod cw20;
 mod trading_competition;
-pub use trading_competition::*;
 
 use cosmwasm_std::{Api, Deps, DepsMut, Env, Storage};
 use msg::prelude::*;

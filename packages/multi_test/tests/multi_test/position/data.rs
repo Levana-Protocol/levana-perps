@@ -30,6 +30,7 @@ fn position_data_long() {
         notional_size: "1".parse().unwrap(),
         //direction: Direction::Long,
         created_at: Default::default(),
+        price_point_created_at: Default::default(),
         trading_fee: Default::default(),
         funding_fee: Default::default(),
         borrow_fee: Default::default(),
@@ -37,14 +38,13 @@ fn position_data_long() {
         delta_neutrality_fee: Default::default(),
         liquifunded_at: Default::default(),
         next_liquifunding: Default::default(),
-        stale_at: Default::default(),
         stop_loss_override: None,
-        take_profit_override: None,
+        take_profit_trader: None,
         liquidation_margin: Default::default(),
         liquidation_price: None,
-        take_profit_price: None,
+        take_profit_total: None,
         stop_loss_override_notional: None,
-        take_profit_override_notional: None,
+        take_profit_trader_notional: None,
     };
 
     let liquidation_price =
@@ -54,6 +54,7 @@ fn position_data_long() {
     assert_eq!(
         pos.active_leverage_to_notional(&price_point)
             .into_base(market_type)
+            .unwrap()
             .split()
             .1
             .raw(),
@@ -66,7 +67,7 @@ fn position_data_long() {
         Number::from(90u64)
     );
     assert_eq!(
-        pos.take_profit_price(&price_point, MarketType::CollateralIsQuote)
+        pos.take_profit_price_total(&price_point, MarketType::CollateralIsQuote)
             .unwrap()
             .unwrap()
             .into_number(),
@@ -99,6 +100,7 @@ fn position_data_short() {
         counter_collateral: "500".parse().unwrap(),
         notional_size: "-20000".parse().unwrap(),
         created_at: Default::default(),
+        price_point_created_at: Default::default(),
         trading_fee: Default::default(),
         funding_fee: Default::default(),
         borrow_fee: Default::default(),
@@ -106,14 +108,13 @@ fn position_data_short() {
         delta_neutrality_fee: Default::default(),
         liquifunded_at: Default::default(),
         next_liquifunding: Default::default(),
-        stale_at: Default::default(),
         stop_loss_override: None,
-        take_profit_override: None,
+        take_profit_trader: None,
         liquidation_margin: Default::default(),
         liquidation_price: None,
-        take_profit_price: None,
+        take_profit_total: None,
         stop_loss_override_notional: None,
-        take_profit_override_notional: None,
+        take_profit_trader_notional: None,
     };
 
     let liquidation_price =
@@ -123,6 +124,7 @@ fn position_data_short() {
     assert_eq!(
         pos.active_leverage_to_notional(&price_point)
             .into_base(market_type)
+            .unwrap()
             .split()
             .1
             .into_number(),
@@ -135,7 +137,7 @@ fn position_data_short() {
         Number::from_ratio_u256(15u64, 100u64)
     );
     assert_eq!(
-        pos.take_profit_price(&price_point, MarketType::CollateralIsQuote)
+        pos.take_profit_price_total(&price_point, MarketType::CollateralIsQuote)
             .unwrap()
             .unwrap()
             .into_number(),
@@ -167,6 +169,7 @@ fn position_data_infinite_max_gains() {
         counter_collateral: "2000".parse().unwrap(),
         notional_size: "-20000".parse().unwrap(),
         created_at: Default::default(),
+        price_point_created_at: Default::default(),
         trading_fee: Default::default(),
         funding_fee: Default::default(),
         borrow_fee: Default::default(),
@@ -174,19 +177,18 @@ fn position_data_infinite_max_gains() {
         delta_neutrality_fee: Default::default(),
         liquifunded_at: Default::default(),
         next_liquifunding: Default::default(),
-        stale_at: Default::default(),
         stop_loss_override: None,
-        take_profit_override: None,
+        take_profit_trader: None,
         liquidation_margin: Default::default(),
         liquidation_price: None,
-        take_profit_price: None,
+        take_profit_total: None,
         stop_loss_override_notional: None,
-        take_profit_override_notional: None,
+        take_profit_trader_notional: None,
     };
 
     // infinity max gains in notional asset
     assert_eq!(
-        pos.take_profit_price(&price_point, MarketType::CollateralIsBase)
+        pos.take_profit_price_total(&price_point, MarketType::CollateralIsBase)
             .unwrap(),
         None
     );
@@ -202,6 +204,7 @@ fn position_data_open_flip_short() {
         counter_collateral: "200".parse().unwrap(),
         notional_size: "-2".parse().unwrap(),
         created_at: Default::default(),
+        price_point_created_at: Default::default(),
         trading_fee: Default::default(),
         funding_fee: Default::default(),
         borrow_fee: Default::default(),
@@ -209,14 +212,13 @@ fn position_data_open_flip_short() {
         delta_neutrality_fee: Default::default(),
         liquifunded_at: Default::default(),
         next_liquifunding: Default::default(),
-        stale_at: Default::default(),
         stop_loss_override: None,
-        take_profit_override: None,
+        take_profit_trader: None,
         liquidation_margin: Default::default(),
         liquidation_price: None,
-        take_profit_price: None,
+        take_profit_total: None,
         stop_loss_override_notional: None,
-        take_profit_override_notional: None,
+        take_profit_trader_notional: None,
     };
 
     let price = Price::try_from_number(Number::from(300u64)).unwrap();
@@ -245,14 +247,19 @@ fn position_data_open_flip_short() {
     let expected_notional_size: Number = "-2".parse().unwrap();
     let expected_counter_collateral: Number = "200".parse().unwrap();
     assert!(
-        (expected_notional_size - pos_data.notional_size.into_number()).approx_eq(Number::ZERO),
+        (expected_notional_size - pos_data.notional_size.into_number())
+            .unwrap()
+            .approx_eq(Number::ZERO)
+            .unwrap(),
         "{} != {}",
         expected_notional_size,
         pos_data.notional_size
     );
     assert!(
         (expected_counter_collateral - pos_data.counter_collateral.into_number())
-            .approx_eq(Number::ZERO),
+            .unwrap()
+            .approx_eq(Number::ZERO)
+            .unwrap(),
         "{} != {}",
         expected_counter_collateral,
         pos_data.counter_collateral
@@ -270,6 +277,7 @@ fn position_data_open_flip_long() {
         notional_size: "2".parse().unwrap(),
         //direction: Direction::Long,
         created_at: Default::default(),
+        price_point_created_at: Default::default(),
         trading_fee: Default::default(),
         funding_fee: Default::default(),
         borrow_fee: Default::default(),
@@ -277,14 +285,13 @@ fn position_data_open_flip_long() {
         delta_neutrality_fee: Default::default(),
         liquifunded_at: Default::default(),
         next_liquifunding: Default::default(),
-        stale_at: Default::default(),
         stop_loss_override: None,
-        take_profit_override: None,
+        take_profit_trader: None,
         liquidation_margin: Default::default(),
         liquidation_price: None,
-        take_profit_price: None,
+        take_profit_total: None,
         stop_loss_override_notional: None,
-        take_profit_override_notional: None,
+        take_profit_trader_notional: None,
     };
 
     let price = Price::try_from_number(Number::from(300u64)).unwrap();
@@ -313,14 +320,19 @@ fn position_data_open_flip_long() {
     let expected_notional_size: Number = "2".parse().unwrap();
     let expected_counter_collateral: Number = "200".parse().unwrap();
     assert!(
-        (expected_notional_size - pos_data.notional_size.into_number()).approx_eq(Number::ZERO),
+        (expected_notional_size - pos_data.notional_size.into_number())
+            .unwrap()
+            .approx_eq(Number::ZERO)
+            .unwrap(),
         "{} != {}",
         expected_notional_size,
         pos_data.notional_size
     );
     assert!(
         (expected_counter_collateral - pos_data.counter_collateral.into_number())
-            .approx_eq(Number::ZERO),
+            .unwrap()
+            .approx_eq(Number::ZERO)
+            .unwrap(),
         "{} != {}",
         expected_counter_collateral,
         pos_data.counter_collateral

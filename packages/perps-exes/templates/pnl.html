@@ -17,7 +17,7 @@
     <meta property="og:title" content="Levana Perps PnL">
     <meta property="og:type" content="website">
     <meta property="og:description" content="Trade on Levana Perps, the safest, lowest-cost decentralized perpetual swaps platform.">
-    <meta property="og:image" content="https://{{ host }}{{ image_url }}">
+    <meta property="og:image" content="https://{{ host }}{{ image_url }}?v={{ cache_bust_param }}">
     <meta property="og:url" content="https://{{ host }}{{ html_url }}">
     <meta property="og:site_property" content="Levana Well-Funded Perps PnL Celebration">
 
@@ -31,7 +31,14 @@
     <div class="content">
       <img src="https://static.levana.finance/images/logo.svg" alt="Levana Logo" class="logo">
       <div class="pnl">
-        {{ pnl_display }}
+        {% match pnl %}
+          {% when PnlDetails::Usd with (usd) %}
+            {{ usd }}
+          {% when PnlDetails::Percentage with (percentage) %}
+            {{ percentage }}
+          {% when PnlDetails::Both with { usd, percentage } %}
+            {{ usd }} / {{ percentage }}
+        {% endmatch %}
       </div>
       <div class="market-info">
         {{ market_id }} - {{ direction }}
@@ -77,7 +84,7 @@
 
       var API_KEY = '{{ amplitude_key }}'
 
-      var pnl = '{{ pnl_display }}'
+      var pnl = '{{ pnl }}'
       var direction = '{{ direction }}'
       var market = '{{ market_id }}'
       var chain = '{{ chain }}'

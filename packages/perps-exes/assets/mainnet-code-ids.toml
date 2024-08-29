@@ -1,0 +1,414 @@
+[[hashes]]
+contract-type = "factory"
+gitrev = "b22ecd5d91ba6e6adc8aafdd627eea7a925d69a0"
+hash = "b11cf50cd0c625036c733e956ba41967e46649cfc45b4c3f2abb905dbc10f2c4"
+
+[hashes.code-ids]
+sei-mainnet = 36
+
+[[hashes]]
+contract-type = "liquidity-token"
+gitrev = "b22ecd5d91ba6e6adc8aafdd627eea7a925d69a0"
+hash = "798955b7d5d4858649be5ede0ad722662fb5eff73068eaaac4e17e6d6686be7b"
+
+[hashes.code-ids]
+sei-mainnet = 38
+
+[[hashes]]
+contract-type = "position-token"
+gitrev = "a0ba2217bed8f847a604ff890a05e640406bf63f"
+hash = "3b459e401a652d8b06f7ad2759ed5c330716180c57e54278a9ab19f77be12212"
+
+[hashes.code-ids]
+osmosis-testnet = 406
+
+[[hashes]]
+contract-type = "market"
+gitrev = "a0ba2217bed8f847a604ff890a05e640406bf63f"
+hash = "6bfe13a253f0c203f5bc96d3469c8c9e1b89c291210187a0b2384179d8d18b59"
+
+[hashes.code-ids]
+osmosis-testnet = 404
+
+[[hashes]]
+contract-type = "liquidity-token"
+gitrev = "a0ba2217bed8f847a604ff890a05e640406bf63f"
+hash = "8a4dd095c208d921af69e0804ee80db9a937dbff8ae594dc3c1312b081cf1ed4"
+
+[hashes.code-ids]
+osmosis-testnet = 405
+
+[[hashes]]
+contract-type = "market"
+gitrev = "b22ecd5d91ba6e6adc8aafdd627eea7a925d69a0"
+hash = "6c7a2c604a26cf8cd91b6389e2b1b69f31813d727292c6da5439dfff68302435"
+
+[hashes.code-ids]
+sei-mainnet = 37
+
+[[hashes]]
+contract-type = "factory"
+gitrev = "a0ba2217bed8f847a604ff890a05e640406bf63f"
+hash = "0f59e244069271be6b584ee59e4c22b61ecfb4b474b41526ded627e81bbbda79"
+
+[hashes.code-ids]
+osmosis-testnet = 403
+
+[[hashes]]
+contract-type = "position-token"
+gitrev = "b22ecd5d91ba6e6adc8aafdd627eea7a925d69a0"
+hash = "425fb3d887760170383b880857e3eca43484f8dd5f2c8cfe938bab4d72eb03c6"
+
+[hashes.code-ids]
+sei-mainnet = 39
+
+[[hashes]]
+contract-type = "factory"
+gitrev = "c4857a2ea087dc47a008c292a8f242c42dfa4ae7"
+hash = "a51dc3e96751e5099a439d1df99cebfefac2726d022aa35920a80a3f37542568"
+
+[hashes.code-ids]
+osmosis-mainnet = 91
+
+[[hashes]]
+contract-type = "market"
+gitrev = "c4857a2ea087dc47a008c292a8f242c42dfa4ae7"
+hash = "dba09d86f2af80efe327110e22c44a36a933f7065d9b0c8a07036aaadaa362ab"
+
+[hashes.code-ids]
+osmosis-mainnet = 93
+
+[[hashes]]
+contract-type = "liquidity-token"
+gitrev = "c4857a2ea087dc47a008c292a8f242c42dfa4ae7"
+hash = "c37b15f84dd7a6a88e142587260667a383b433fec840b1eb6606a895ee79a84d"
+
+[hashes.code-ids]
+osmosis-mainnet = 97
+
+[[hashes]]
+contract-type = "position-token"
+gitrev = "c4857a2ea087dc47a008c292a8f242c42dfa4ae7"
+hash = "078c35f11d15c17a80bb5aaf87a3cdde1e978df366c870599d1bade5c7cc57bc"
+
+[hashes.code-ids]
+osmosis-mainnet = 98
+
+[[hashes]]
+contract-type = "factory"
+gitrev = "ed7102d64e97931986338f82663834640d14a826"
+hash = "fd9f31f2c60cdaf3d18efdea333d4286b121f7f23b322cbaf820094c556daab4"
+
+[hashes.code-ids]
+osmosis-mainnet = 129
+sei-mainnet = 48
+
+[[hashes]]
+contract-type = "market"
+gitrev = "ed7102d64e97931986338f82663834640d14a826"
+hash = "755eb65ef2eabef7290d1edb6318772321daf28c7d8a0d9090cb452d1c4da65e"
+
+[hashes.code-ids]
+osmosis-mainnet = 130
+
+[[hashes]]
+contract-type = "market"
+gitrev = "6d6c9eeca52fce4e5c482a724796c481fc374537"
+hash = "a96d4b1b2ae08096474fe95a69447d3c552920656033bfdb36652897c34b9b54"
+
+[hashes.code-ids]
+osmosis-mainnet = 141
+sei-mainnet = 49
+
+[[hashes]]
+contract-type = "liquidity-token"
+gitrev = "6d6c9eeca52fce4e5c482a724796c481fc374537"
+hash = "c0bcc4af03488a0ef9943d1b49c1e8d48d2267b530cc0418ecae25ead2bbb2b0"
+
+[hashes.code-ids]
+sei-mainnet = 50
+
+[[hashes]]
+contract-type = "position-token"
+gitrev = "6d6c9eeca52fce4e5c482a724796c481fc374537"
+hash = "56b565c5fade7e13de437fa1af0c9b7d178b3d86b9ebd31aa8e03c3e479d2dc7"
+
+[hashes.code-ids]
+sei-mainnet = 51
+
+[[hashes]]
+contract-type = "market"
+gitrev = "faa2881b21575d6859113229544046b9df878385"
+hash = "03461a038e41d3245aba36542df619619a4f876b3527b969f60f529d25b9e42d"
+
+[hashes.code-ids]
+osmosis-mainnet = 186
+injective-mainnet = 122
+
+[[hashes]]
+contract-type = "factory"
+gitrev = "faa2881b21575d6859113229544046b9df878385"
+hash = "5e3660570dbc1c8129f97f496027ce8895cd11604334a65bc5b3403691456b10"
+
+[hashes.code-ids]
+osmosis-mainnet = 185
+sei-mainnet = 353
+injective-mainnet = 120
+
+[[hashes]]
+contract-type = "liquidity-token"
+gitrev = "faa2881b21575d6859113229544046b9df878385"
+hash = "1a0bfffeea8b67ae0c7809dfc613ef8fff59d0ec01bbfdea2e138649a90fda28"
+
+[hashes.code-ids]
+osmosis-mainnet = 188
+sei-mainnet = 354
+injective-mainnet = 121
+
+[[hashes]]
+contract-type = "position-token"
+gitrev = "faa2881b21575d6859113229544046b9df878385"
+hash = "2499ca74b8e97ed72377c4c921d5a07d99e5ac9480e29e8fae0909617d395c8c"
+
+[hashes.code-ids]
+osmosis-mainnet = 189
+sei-mainnet = 355
+injective-mainnet = 123
+
+[[hashes]]
+contract-type = "market"
+gitrev = "11efe8e91e37774db3c1b5935c69a4e725cd2620"
+hash = "25bc01f62af342769a25e0cff6c9034178670403f9f3bf9735b369f07ef1e68a"
+
+[hashes.code-ids]
+osmosis-mainnet = 190
+
+[[hashes]]
+contract-type = "market"
+gitrev = "11efe8e91e37774db3c1b5935c69a4e725cd2620"
+hash = "6a1d8189454b1af9bc8c4ed427e2e4134e9700ba97ffb0d4f6dc7f27462f47fe"
+
+[hashes.code-ids]
+sei-mainnet = 352
+
+[[hashes]]
+contract-type = "factory"
+gitrev = "532f6673aeb398ac46847214a913148d4e09495c"
+hash = "f9156a492636cfc4fd3cf878e03098cd6305c1ab5afdb445266de9bf5cd0b998"
+
+[hashes.code-ids]
+osmosis-mainnet = 226
+sei-mainnet = 376
+injective-mainnet = 136
+
+[[hashes]]
+contract-type = "market"
+gitrev = "532f6673aeb398ac46847214a913148d4e09495c"
+hash = "26e397af48ee2a2f002549e3a9485d4bb64405fbf3339eafd5b20f0bec42a82e"
+
+[hashes.code-ids]
+sei-mainnet = 377
+
+[[hashes]]
+contract-type = "market"
+gitrev = "532f6673aeb398ac46847214a913148d4e09495c"
+hash = "0eeb000780267d576b00882fa01cd26d585b558596fd4b7d17e033c1aab2c204"
+
+[hashes.code-ids]
+osmosis-mainnet = 227
+injective-mainnet = 137
+
+[[hashes]]
+contract-type = "factory"
+gitrev = "0be391bc72848aa186f1f1cfd8e499c5b34835ec"
+hash = "9bc41de0ad9e49a5013a9faf4fd635f540afc4392f4d71684621db711d0eb081"
+
+[hashes.code-ids]
+osmosis-mainnet = 257
+
+[[hashes]]
+contract-type = "market"
+gitrev = "0be391bc72848aa186f1f1cfd8e499c5b34835ec"
+hash = "98541d38a592953d95a80a9c59fe0a2c7f6c83d8e03e39c5329f89cfe5e1c252"
+
+[hashes.code-ids]
+osmosis-mainnet = 258
+
+[[hashes]]
+contract-type = "market"
+gitrev = "ce86c8758b2d4f4e66a1e92dd2be08be5349060a"
+hash = "515a58e82ccd1bf7a683d45e4095ac4ad38d1d2cb482da36e137330d8eb1a44c"
+
+[hashes.code-ids]
+osmosis-mainnet = 319
+
+[[hashes]]
+contract-type = "factory"
+gitrev = "d2f81083b19c1cad899b4072daea25b5e989d733"
+hash = "358425993997964c646774516908fb543540f066b7a4e6b5e79e15ca5a1b845e"
+
+[hashes.code-ids]
+osmosis-mainnet = 399
+sei-mainnet = 890
+injective-mainnet = 327
+
+[[hashes]]
+contract-type = "market"
+gitrev = "d2f81083b19c1cad899b4072daea25b5e989d733"
+hash = "0d53f72d9c0ebba8be6c416e5bfbb4770da919bc91fa482a5d5bb461fb632848"
+
+[hashes.code-ids]
+osmosis-mainnet = 400
+sei-mainnet = 891
+injective-mainnet = 326
+
+[[hashes]]
+contract-type = "liquidity-token"
+gitrev = "d2f81083b19c1cad899b4072daea25b5e989d733"
+hash = "5aedf5e7ad58ebdfbd826d0c8dddf73cd3629542888ef6c41b04ee994bf52b4e"
+
+[hashes.code-ids]
+sei-mainnet = 892
+
+[[hashes]]
+contract-type = "position-token"
+gitrev = "d2f81083b19c1cad899b4072daea25b5e989d733"
+hash = "8fb10aa5e47135d8558b79908687a67a4d2ee1c723583f6b22b54f4fdd8a872d"
+
+[hashes.code-ids]
+sei-mainnet = 893
+
+[[hashes]]
+contract-type = "market"
+gitrev = "2d2d3fdb0c176a950d2220ca09da4397824c4cf5"
+hash = "fa2284c758270af3f546606b0240cc4da7ab1453d8a6aa541e9f08e65877b55c"
+
+[hashes.code-ids]
+sei-mainnet = 1419
+
+[[hashes]]
+contract-type = "market"
+gitrev = "1346f54ba2f2517f8b10b584f72e7929b38bb2d8"
+hash = "0063cd1b6104b91f83be95177eaa5f319cdad27930c0f21e00e471b6e4668af0"
+
+[hashes.code-ids]
+sei-mainnet = 3989
+
+[[hashes]]
+contract-type = "market"
+gitrev = "bc5b5cddd3251668f627174a6e0c2bf78da2bc6c"
+hash = "0ed657e06e10763f2775f534d2bb2bf2f341bcf07d77b4fac108a68a12ef959c"
+
+[hashes.code-ids]
+osmosis-mainnet = 636
+sei-mainnet = 3997
+
+[[hashes]]
+contract-type = "factory"
+gitrev = "ab41b7d1bf6507cb5880ce267298d31ecd04c980"
+hash = "3259db9d8932efbf53de7a5d39819c2cb3baffa21384e3270e3aa2b5d8bbc03e"
+
+[hashes.code-ids]
+osmosis-mainnet = 755
+sei-mainnet = 4608
+injective-mainnet = 813
+neutron-mainnet = 1191
+
+[[hashes]]
+contract-type = "market"
+gitrev = "ab41b7d1bf6507cb5880ce267298d31ecd04c980"
+hash = "16ce2dd835653939b9c30df21477b5d69b1114b3f06a31d9e6fc4583da1af9b1"
+
+[hashes.code-ids]
+osmosis-mainnet = 762
+sei-mainnet = 4609
+injective-mainnet = 815
+neutron-mainnet = 1192
+
+[[hashes]]
+contract-type = "liquidity-token"
+gitrev = "ab41b7d1bf6507cb5880ce267298d31ecd04c980"
+hash = "648eee0d61f9468dc3eedbb4601dac917886fa6cb5420d6ef6f6a70eba4e897f"
+
+[hashes.code-ids]
+osmosis-mainnet = 763
+sei-mainnet = 4610
+injective-mainnet = 814
+neutron-mainnet = 1193
+
+[[hashes]]
+contract-type = "position-token"
+gitrev = "ab41b7d1bf6507cb5880ce267298d31ecd04c980"
+hash = "818d610405110e8ad8472eb491ad9e0278df747703a58faa72c368e64b9286de"
+
+[hashes.code-ids]
+osmosis-mainnet = 764
+sei-mainnet = 4611
+injective-mainnet = 816
+neutron-mainnet = 1194
+
+[[hashes]]
+contract-type = "factory"
+gitrev = "092eabd1d34a867a8ab42bc7f5a8c99efce484b3"
+hash = "fd4db6d899ffd66cab5e46677684ecb5d185d90e2d6799715dec26f471858c0b"
+
+[hashes.code-ids]
+osmosis-mainnet = 939
+injective-mainnet = 1069
+neutron-mainnet = 1598
+
+[[hashes]]
+contract-type = "market"
+gitrev = "092eabd1d34a867a8ab42bc7f5a8c99efce484b3"
+hash = "e21722970ac29ae58a394044785fdd20e6701dbeff96d43c8e7f34d29e85b5f7"
+
+[hashes.code-ids]
+osmosis-mainnet = 940
+injective-mainnet = 1068
+neutron-mainnet = 1599
+
+[[hashes]]
+contract-type = "liquidity-token"
+gitrev = "092eabd1d34a867a8ab42bc7f5a8c99efce484b3"
+hash = "cef9eacd47d0027913ed6e565e03d7c3d4c71aeaf47618ecd869a8dbcd63ca14"
+
+[hashes.code-ids]
+osmosis-mainnet = 952
+neutron-mainnet = 1600
+
+[[hashes]]
+contract-type = "position-token"
+gitrev = "092eabd1d34a867a8ab42bc7f5a8c99efce484b3"
+hash = "c4e896e6b71c88538425446529e2fb3fc596fd95c2db582e26dc556ce5bc57c5"
+
+[hashes.code-ids]
+osmosis-mainnet = 953
+neutron-mainnet = 1601
+
+[[hashes]]
+contract-type = "market"
+gitrev = "e80e7e56b9f76b379d10276c220a62f41f9d716e"
+hash = "499d60d9906b7fbd12b7156487d5ed6aadc6a5e0f37394cb16846bb2340ac275"
+
+[hashes.code-ids]
+osmosis-mainnet = 951
+injective-mainnet = 1080
+neutron-mainnet = 1644
+
+[[hashes]]
+contract-type = "countertrade"
+gitrev = "cc91c10de4eee676e38500601b19a162d215de0e"
+hash = "f2ebd47e22891c0db01eefc9cbd6a2db1209d039626692f55ae5aea1307a4171"
+
+[hashes.code-ids]
+osmosis-mainnet = 995
+
+[[hashes]]
+contract-type = "market"
+gitrev = "96f0afaea94db8a66cf20c103ee4d780c01ee3eb"
+hash = "63af2fbb3e8f2bca901bc7b2e6233307a7e9332095c5fa5427eb0663e5ca3306"
+
+[hashes.code-ids]
+osmosis-mainnet = 1040
+injective-mainnet = 1094
+neutron-mainnet = 1826

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::async_trait;
+use chrono::Utc;
 
 use crate::{
     app::factory::get_height,
@@ -35,17 +36,53 @@ impl WatchedTask for RpcHealth {
 }
 
 async fn check(app: &App, endpoint: Arc<String>) -> Result<WatchedTaskOutput> {
-    let (endpoint, rpc_height) = get_height(endpoint, app.client.clone()).await?;
+    let (endpoint, rpc_height) =
+        get_height(endpoint, app.client.clone(), app.opt.referer_header.clone()).await?;
     let rpc_height: i64 = rpc_height.try_into()?;
-    let grpc_height = app.cosmos.get_latest_block_info().await?.height;
+    let grpc_latest = app.cosmos.get_latest_block_info().await?;
+    let grpc_height = grpc_latest.height;
+    let mut has_error = false;
+
+    let mut msgs = vec![
+        format!("RPC endpoint {endpoint} is showing block height {rpc_height}"),
+        format!(
+            "gRPC endpoint {} is showing block height {grpc_height}",
+            app.cosmos.get_cosmos_builder().grpc_url()
+        ),
+    ];
 
     const ALLOWED_DELTA: u64 = 20;
-
     let delta = rpc_height.abs_diff(grpc_height);
-
-    if delta < ALLOWED_DELTA {
-        Ok(WatchedTaskOutput::new(format!("RPC endpoint {endpoint} looks healthy. Delta: {delta}. RPC height: {rpc_height}. gRPC height: {grpc_height}.")))
+    if delta <= ALLOWED_DELTA {
+        msgs.push(format!(
+            "Height delta {delta} is within allowed tolerance {ALLOWED_DELTA}"
+        ));
     } else {
-        Err(anyhow::anyhow!("RPC endpoint {endpoint} has too high a block height delta {delta}. RPC height: {rpc_height}. gRPC height: {grpc_height}."))
+        has_error = true;
+        msgs.push(format!(
+            "Height delta {delta} is outside allowed tolerance {ALLOWED_DELTA}"
+        ))
+    }
+
+    let age = Utc::now()
+        .signed_duration_since(grpc_latest.timestamp)
+        .num_seconds();
+    const ALLOWED_AGE_SECONDS: i64 = 300;
+    if age <= ALLOWED_AGE_SECONDS {
+        msgs.push(format!(
+            "Block age of {age} seconds is within allowed tolerance {ALLOWED_AGE_SECONDS}"
+        ));
+    } else {
+        has_error = true;
+        msgs.push(format!(
+            "Block age of {age} seconds is outside allowed tolerance {ALLOWED_AGE_SECONDS}"
+        ));
+    }
+
+    let msg = msgs.join("\n");
+    if has_error {
+        Err(anyhow::anyhow!("{msg}"))
+    } else {
+        Ok(WatchedTaskOutput::new(msg))
     }
 }

@@ -1,0 +1,35 @@
+# List all recipes
+default:
+	just --list --unsorted
+
+# Run application
+run:
+	cargo run --bin perps-market-params -- help
+
+# Download levana marketd data
+download-levana-market:
+	cargo run --bin perps-market-params market --market-id LEVANA_USD
+
+# Compute dnf
+compute-dnf:
+	cargo run --bin perps-market-params dnf --market-id OSMO_USD
+
+# Current market dnf
+current-dnf:
+	cargo run --bin perps-market-params current-market-dnf --market-id stDYDX_USDC
+
+# Serve web app
+serve:
+	cargo run --bin perps-market-params serve
+
+# List levana's markets
+markets:
+	cargo run --bin perps-market-params markets
+
+# Download market.csv data
+download-market-csv:
+	cargo run --bin perps-market-params market --cex-only --market-id OSMO_USD
+
+# List unsupported exchanges
+exchanges:
+	cargo run --bin perps-market-params exchanges --market-id DOGE_USDC

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use cosmos::proto::cosmos::base::abci::v1beta1::TxResponse;
-use cosmos::{Address, CodeId, Contract, HasAddress, HasCosmos, Wallet};
+use cosmos::{Address, CodeId, Contract, HasAddress, HasAddressHrp, HasCosmos, Wallet};
 use msg::contracts::factory::entry::{CodeIds, FactoryOwnerResp, MarketsResp, QueryMsg};
 use msg::contracts::market::entry::NewMarketParams;
 use msg::prelude::*;
@@ -130,6 +130,14 @@ impl Factory {
             })
     }
 
+    pub async fn query_kill_switch(&self) -> Result<Address> {
+        let FactoryOwnerResp { kill_switch, .. } = self.0.query(QueryMsg::FactoryOwner {}).await?;
+        kill_switch
+            .into_string()
+            .parse()
+            .with_context(|| format!("Invalid kill switch found for factory {}", self.0))
+    }
+
     pub async fn query_wind_down(&self) -> Result<Address> {
         let FactoryOwnerResp { wind_down, .. } = self.0.query(QueryMsg::FactoryOwner {}).await?;
         wind_down
@@ -152,11 +160,15 @@ impl Factory {
             })
     }
 
-    pub async fn query_owners(&self) -> Result<FactoryOwnerResp> {
+    pub async fn query_owners(&self) -> Result<FactoryOwnerResp, cosmos::Error> {
         self.0.query(QueryMsg::FactoryOwner {}).await
     }
 
-    pub async fn disable_trades(&self, wallet: &Wallet, market: MarketId) -> Result<TxResponse> {
+    pub async fn disable_trades(
+        &self,
+        wallet: &Wallet,
+        market: MarketId,
+    ) -> Result<TxResponse, cosmos::Error> {
         self.0
             .execute(
                 wallet,
@@ -170,7 +182,7 @@ impl Factory {
             .await
     }
 
-    pub async fn enable_all(&self, wallet: &Wallet) -> Result<TxResponse> {
+    pub async fn enable_all(&self, wallet: &Wallet) -> Result<TxResponse, cosmos::Error> {
         self.0
             .execute(
                 wallet,
@@ -205,7 +217,7 @@ impl Factory {
         &self,
         wallet: &Wallet,
         new_market: NewMarketParams,
-    ) -> Result<TxResponse> {
+    ) -> Result<TxResponse, cosmos::Error> {
         self.0
             .execute(
                 wallet,
@@ -216,6 +228,11 @@ impl Factory {
     }
 }
 
+impl HasAddressHrp for Factory {
+    fn get_address_hrp(&self) -> cosmos::AddressHrp {
+        self.0.get_address_hrp()
+    }
+}
 impl HasAddress for Factory {
     fn get_address(&self) -> Address {
         self.0.get_address()

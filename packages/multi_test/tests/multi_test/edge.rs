@@ -1,5 +1,5 @@
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
-use msg::prelude::*;
+use msg::{prelude::*, shared::compat::BackwardsCompatTakeProfit};
 
 #[derive(Debug)]
 struct OpenParam {
@@ -99,19 +99,98 @@ fn max_gain_edge() {
         },
     };
 
-    // Going lower thatn the lowest max gain will always result in
-    // failure
-    let response = market.exec_open_position_raw(
-        &trader,
-        low_param_fail.collateral,
-        None,
-        low_param_fail.leverage,
-        DirectionToBase::Long,
-        low_param_fail.max_gains,
-        None,
-        None,
-    );
-    assert!(response.is_err());
+    // Going lower than the lowest max gain will result in the position opening with a higher take profit price
+    let (pos_id, _) = market
+        .exec_open_position_raw(
+            &trader,
+            low_param_fail.collateral,
+            None,
+            low_param_fail.leverage,
+            DirectionToBase::Long,
+            low_param_fail.max_gains,
+            None,
+            None,
+        )
+        .unwrap();
+
+    let price = market.query_current_price().unwrap();
+    let take_profit_price_requested = BackwardsCompatTakeProfit {
+        leverage: low_param_fail.leverage,
+        direction: DirectionToBase::Long,
+        collateral: NonZero::new(Collateral::try_from_number(low_param_fail.collateral).unwrap())
+            .unwrap(),
+        market_type,
+        max_gains: low_param_fail.max_gains,
+        take_profit: None,
+        price_point: &price,
+    }
+    .calc()
+    .unwrap();
+
+    let take_profit_price_requested = match take_profit_price_requested {
+        TakeProfitTrader::Finite(value) => value,
+        TakeProfitTrader::PosInfinity => panic!("expected finite take profit price"),
+    }
+    .into_number();
+
+    let pos = market.query_position(pos_id).unwrap();
+
+    let take_profit_trader = pos
+        .take_profit_trader
+        .unwrap()
+        .as_finite()
+        .unwrap()
+        .into_number();
+
+    let take_profit_price_position = pos.take_profit_total_base.unwrap().into_number();
+    assert!(take_profit_price_requested < take_profit_price_position);
+    assert_eq!(take_profit_price_requested, take_profit_trader);
+
+    // sanity check that this wasn't accidental
+    let (pos_id, _) = market
+        .exec_open_position_raw(
+            &trader,
+            low_param.collateral,
+            None,
+            low_param.leverage,
+            DirectionToBase::Long,
+            low_param.max_gains,
+            None,
+            None,
+        )
+        .unwrap();
+
+    let price = market.query_current_price().unwrap();
+    let take_profit_price_requested = BackwardsCompatTakeProfit {
+        leverage: low_param.leverage,
+        direction: DirectionToBase::Long,
+        collateral: NonZero::new(Collateral::try_from_number(low_param.collateral).unwrap())
+            .unwrap(),
+        market_type,
+        max_gains: low_param.max_gains,
+        take_profit: None,
+        price_point: &price,
+    }
+    .calc()
+    .unwrap();
+
+    let take_profit_price_requested = match take_profit_price_requested {
+        TakeProfitTrader::Finite(value) => value,
+        TakeProfitTrader::PosInfinity => panic!("expected finite take profit price"),
+    }
+    .into_number();
+
+    let pos = market.query_position(pos_id).unwrap();
+    let take_profit_trader = pos
+        .take_profit_trader
+        .unwrap()
+        .as_finite()
+        .unwrap()
+        .into_number();
+
+    let take_profit_price_position = pos.take_profit_total_base.unwrap().into_number();
+    assert_eq!(take_profit_price_requested, take_profit_price_position);
+    assert_eq!(take_profit_price_requested, take_profit_trader);
 }
 
 #[test]
@@ -124,8 +203,8 @@ fn leverage_edge() {
     let high_param = match market_type {
         MarketType::CollateralIsQuote => OpenParam {
             collateral: "10".parse().unwrap(),
-            leverage: "5".parse().unwrap(),
-            max_gains: "0.17".parse().unwrap(),
+            leverage: "30".parse().unwrap(),
+            max_gains: "1.0".parse().unwrap(),
         },
         MarketType::CollateralIsBase => OpenParam {
             collateral: "10".parse().unwrap(),
@@ -152,8 +231,8 @@ fn leverage_edge() {
     let high_param_fail = match market_type {
         MarketType::CollateralIsQuote => OpenParam {
             collateral: "10".parse().unwrap(),
-            leverage: "6".parse().unwrap(),
-            max_gains: "0.17".parse().unwrap(),
+            leverage: "31".parse().unwrap(),
+            max_gains: "1.0".parse().unwrap(),
         },
         MarketType::CollateralIsBase => OpenParam {
             collateral: "10".parse().unwrap(),
@@ -228,7 +307,17 @@ fn leverage_edge() {
         None,
         None,
     );
-    assert!(response.is_err());
+    // Funky test, because it's still using the legacy max gains API,
+    // we can get an error from the max gains API. However, we do not
+    // want to accept any counterleverage errors. So: this either succeeds
+    // or specifically talks about max gains.
+    assert!(
+        response.is_ok()
+            || response
+                .unwrap_err()
+                .to_string()
+                .contains("Max gains are too large")
+    )
 }
 
 #[test]

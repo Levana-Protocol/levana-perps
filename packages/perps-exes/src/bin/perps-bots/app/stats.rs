@@ -39,25 +39,31 @@ struct MarketStats {
 impl Display for MarketStats {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let MarketStats { status } = self;
+        let total_collateral = status.liquidity.total_collateral();
         writeln!(f)?;
         writeln!(f, "Total locked   liquidity: {}", status.liquidity.locked)?;
         writeln!(f, "Total unlocked liquidity: {}", status.liquidity.unlocked)?;
         writeln!(
             f,
             "Total          liquidity: {}",
-            status.liquidity.total_collateral()
+            match status.liquidity.total_collateral() {
+                Ok(value) => value.to_string(),
+                Err(_) => "overflow".into(),
+            }
         )?;
-        writeln!(
-            f,
-            "Utilization ratio: {}",
-            status
-                .liquidity
-                .locked
-                .into_decimal256()
-                .checked_div(status.liquidity.total_collateral().into_decimal256())
-                .ok()
-                .unwrap_or_default()
-        )?;
+        writeln!(f, "Utilization ratio: {}", {
+            match total_collateral {
+                Ok(value) => status
+                    .liquidity
+                    .locked
+                    .into_decimal256()
+                    .checked_div(value.into_decimal256())
+                    .ok()
+                    .unwrap_or_default()
+                    .to_string(),
+                Err(_) => "overflow".into(),
+            }
+        })?;
 
         writeln!(f, "Total long  interest (in USD): {}", status.long_usd)?;
         writeln!(f, "Total short interest (in USD): {}", status.short_usd)?;

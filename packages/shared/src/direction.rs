@@ -4,6 +4,7 @@
 //! [MarketType]s supported by perps we need to distinguish between the
 //! direction to the base asset versus the notional asset.
 use std::array::TryFromSliceError;
+use std::convert::From;
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{StdError, StdResult};
@@ -89,6 +90,15 @@ impl DirectionToNotional {
     }
 }
 
+impl From<DirectionToNotional> for u8 {
+    fn from(value: DirectionToNotional) -> Self {
+        match value {
+            DirectionToNotional::Long => 0,
+            DirectionToNotional::Short => 1,
+        }
+    }
+}
+
 impl From<&str> for DirectionToNotional {
     fn from(s: &str) -> Self {
         match s {
@@ -106,7 +116,7 @@ impl<'a> PrimaryKey<'a> for DirectionToNotional {
     type SuperSuffix = Self;
 
     fn key(&self) -> Vec<Key> {
-        let val: u8 = *self as u8;
+        let val: u8 = u8::from(*self);
         let key = Key::Val8(val.to_cw_bytes());
 
         vec![key]
@@ -115,7 +125,7 @@ impl<'a> PrimaryKey<'a> for DirectionToNotional {
 
 impl<'a> Prefixer<'a> for DirectionToNotional {
     fn prefix(&self) -> Vec<Key> {
-        let val: u8 = *self as u8;
+        let val: u8 = u8::from(*self);
         let key = Key::Val8(val.to_cw_bytes());
         vec![key]
     }
@@ -123,6 +133,8 @@ impl<'a> Prefixer<'a> for DirectionToNotional {
 
 impl KeyDeserialize for DirectionToNotional {
     type Output = u8;
+
+    const KEY_ELEMS: u16 = 1;
 
     #[inline(always)]
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {

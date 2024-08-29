@@ -1,0 +1,2054 @@
+[pyth.stable]
+update-age-tolerance = 21
+
+[pyth.stable.feed-ids]
+AKT_USD = "4ea5bb4d2f5900cc2e97ba534240950740b4d3b89fe712a94a7304fd2fd92702"
+ATOM_USD = "b00b60f88b03a6a625a8d1c048c3f66653edf217439983d037e7222c4e612819"
+AVAX_USD = "93da3352f9f1d105fdfe4971cfa80e9dd777bfc5d0f683ebb6e1294b92137bb7"
+AXL_USD = "60144b1d5c9e9851732ad1d9760e3485ef80be39b984f6bf60f82b28a2b7f126"
+BNB_USD = "2f95862b045670cd22bee3114c39763a4a08beeb663b145d283c31d7d1101c4f"
+BONK_USD = "72b021217ca3fe68922a19aaf990109cb9d84e9ad004b4d2025ad6f529314419"
+BTC_USD = "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43"
+COIN_USD = "fee33f2a978bf32dd6b662b65ba8083c6773b494f8401194ec1870c640860245"
+DOGE_USD = "dcef50dd0a4cd2dcc17e45df1676dcb336a11a61c69df7a0299b0150c672d25c"
+DOT_USD = "ca3eed9b267293f6595901c734c7525ce8ef49adafe8284606ceb307afa2ca5b"
+DYDX_USD = "6489800bb8974169adfe35937bf6736507097d13c190d760c557108c7e93a81b"
+DYM_USD = "a9f3b2a89c6f85a6c20a9518abde39b944e839ca49a0c92307c65974d3f14a57"
+ETH_USD = "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace"
+EUR_USD = "a995d00bb36a63cef7fd2c287dc105fc8f3d93779f062f09551b0af3e81ec30b"
+EVMOS_USD = "c19405e4c8bdcbf2a66c37ae05a27d385c8309e9d648ed20dc6ee717e7d30e17"
+FLOKI_USD = "6b1381ce7e874dc5410b197ac8348162c0dd6c0d4c9cd6322672d6c2b1d58293"
+GBP_USD = "84c2dde9633d93d1bcad84e7dc41c9d56578b7ec52fabedc1f335d673df0a7c1"
+INJ_USD = "7a5bc1d2b56ad029048cd63964b3ad2776eadf812edc1a43a31406cb54bff592"
+LINK_USD = "8ac0c70fff57e9aefdf5edf44b51d62c2d433653cbb2cf5cc06bb115af04d221"
+LUNA_USD = "e6ccd3f878cf338e6732bf59f60943e8ca2c28402fc4d9c258503b2edbe74a31"
+MEME_USD = "cd2cee36951a571e035db0dfad138e6ecdb06b517cc3373cd7db5d3609b7927c"
+NTRN_USD = "a8e6517966a52cb1df864b2764f3629fde3f21d2b640b5c572fcd654cbccd65e"
+OSMO_USD = "5867f5683c757393a0670ef0f701490950fe93fdb006d181c8265a831ac0c5c6"
+PEPE_USD = "d69731a2e74ac1ce884fc3890f7ee324b6deb66147055249568869ed700882e4"
+PYTH_USD = "0bbf28e9a841a1cc788f6a361b17ca072d0ea3098a1e5df1c3922d06719579ff"
+RUNE_USD = "5fcf71143bb70d41af4fa9aa1287e2efd3c5911cee59f909f915c9f61baacb1e"
+SCRT_USD = "ac5a498aa407c3642257dc8bd8b92efda656e708b22be9b96febcb77878d6bfa"
+SEI_USD = "53614f1cb0c031d4af66c04cb9c756234adad0e1cee85303795091499a4084eb"
+SHIB_USD = "f0d57deca57b3da2fe63a493f4c25925fdfd8edf834b20f93e1f84dbd1504d4a"
+SOL_USD = "ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d"
+TIA_USD = "09f7c1d7dfbb7df2b8fe3d3d87ee94a2259d212da4f30c1f0540d066dfa44723"
+USD_CNH = "eef52e09c878ad41f6a81803e3640fe04dceea727de894edd4ea117e2e332e66"
+WIF_USD = "4ca4beeca86f0d164160323817a4e42b10010a724c2217c6ee41b54cd4cc61fc"
+XAG_USD = "f2fb02c32b055c805e7238d628e5e9dadef274376114eb1f012337cabe93871e"
+XAU_USD = "765d2ba906dbc32ca17cc11f5310a89e9ee1f6420508c63861f2f8ba4ee34bb2"
+wstETH_USD = "6df640f3b8963d8f8358f791f352b8364513f6ab1cca5ed3f1f7b5448980e784"
+MAGA_USD = "a80e97f70f6a4a8a0273822fb86d51b2bdb9a16ce0edb7ea8c8b84cbaecb5ce5"
+
+[pyth.edge]
+update-age-tolerance = 21
+
+[pyth.edge.feed-ids]
+ATOM_USD = "61226d39beea19d334f17c2febce27e12646d84675924ebb02b9cdaea68727e3"
+AXL_USD = "72fe21b4ba5661f194b5f17bfadcc59eddd3e0e53198d040e5091c6dfb558108"
+BNB_USD = "ecf553770d9b10965f8fb64771e93f5690a182edc32be4a3236e0caaa6e0581a"
+BTC_USD = "f9c0172ba10dfa4d19088d94f5bf61d3b54d5bd7483a322a982e1373ee8ea31b"
+ETH_USD = "ca80ba6dc32e08d06f1aa886011eed1d77c77be9eb761cc10d72b7d0a2fd57a6"
+INJ_USD = "2d9315a88f3019f8efa88dfe9c0f0843712da0bac814461e27733f6b83eb51b3"
+LINK_USD = "83be4ed61dd8a3518d198098ce37240c494710a7b9d85e35d9fceac21df08994"
+SOL_USD = "fe650f0367d4a7ef9815a593ea15d36593f0643aaaf0149bb04be67ab851decd"
+
+[[networks.osmosis-mainnet.AKT_USD.feeds]]
+
+[networks.osmosis-mainnet.AKT_USD.feeds.pyth]
+key = "AKT_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.AKT_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.AKT_USD.feeds-usd.pyth]
+key = "AKT_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.ATOM_USD.feeds]]
+
+[networks.osmosis-mainnet.ATOM_USD.feeds.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.ATOM_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.ATOM_USD.feeds-usd.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.AVAX_USDC.feeds]]
+
+[networks.osmosis-mainnet.AVAX_USDC.feeds.pyth]
+key = "AVAX_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.AVAX_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.AVAX_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.AXL_USD.feeds]]
+
+[networks.osmosis-mainnet.AXL_USD.feeds.pyth]
+key = "AXL_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.AXL_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.AXL_USD.feeds-usd.pyth]
+key = "AXL_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.BNB_USDC.feeds]]
+
+[networks.osmosis-mainnet.BNB_USDC.feeds.pyth]
+key = "BNB_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.BNB_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.BNB_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.BONK_USDC.feeds]]
+
+[networks.osmosis-mainnet.BONK_USDC.feeds.pyth]
+key = "BONK_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.BONK_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.BONK_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.BTC_USD.feeds]]
+
+[networks.osmosis-mainnet.BTC_USD.feeds.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.BTC_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.BTC_USD.feeds-usd.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.CNH_USDC.feeds]]
+
+[networks.osmosis-mainnet.CNH_USDC.feeds.pyth]
+key = "USD_CNH"
+inverted = true
+
+[[networks.osmosis-mainnet.CNH_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.CNH_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.DOGE_USDC.feeds]]
+
+[networks.osmosis-mainnet.DOGE_USDC.feeds.pyth]
+key = "DOGE_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.DOGE_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.DOGE_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.DOT_USD.feeds]]
+
+[networks.osmosis-mainnet.DOT_USD.feeds.pyth]
+key = "DOT_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.DOT_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.DOT_USD.feeds-usd.pyth]
+key = "DOT_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.DOT_USDC.feeds]]
+
+[networks.osmosis-mainnet.DOT_USDC.feeds.pyth]
+key = "DOT_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.DOT_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.DOT_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.DYDX_USDC.feeds]]
+
+[networks.osmosis-mainnet.DYDX_USDC.feeds.pyth]
+key = "DYDX_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.DYDX_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.DYDX_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.DYM_USD.feeds]]
+
+[networks.osmosis-mainnet.DYM_USD.feeds.pyth]
+key = "DYM_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.DYM_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.DYM_USD.feeds-usd.pyth]
+key = "DYM_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.ETH_BTC.feeds]]
+
+[networks.osmosis-mainnet.ETH_BTC.feeds.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.ETH_BTC.feeds]]
+
+[networks.osmosis-mainnet.ETH_BTC.feeds.pyth]
+key = "BTC_USD"
+inverted = true
+
+[[networks.osmosis-mainnet.ETH_BTC.feeds-usd]]
+
+[networks.osmosis-mainnet.ETH_BTC.feeds-usd.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.ETH_USD.feeds]]
+
+[networks.osmosis-mainnet.ETH_USD.feeds.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.ETH_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.ETH_USD.feeds-usd.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.EUR_USDC.feeds]]
+
+[networks.osmosis-mainnet.EUR_USDC.feeds.pyth]
+key = "EUR_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.EUR_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.EUR_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.EVMOS_USD.feeds]]
+
+[networks.osmosis-mainnet.EVMOS_USD.feeds.pyth]
+key = "EVMOS_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.EVMOS_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.EVMOS_USD.feeds-usd.pyth]
+key = "EVMOS_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.FLOKI_USDC.feeds]]
+
+[networks.osmosis-mainnet.FLOKI_USDC.feeds.pyth]
+key = "FLOKI_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.FLOKI_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.FLOKI_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.GBP_USDC.feeds]]
+
+[networks.osmosis-mainnet.GBP_USDC.feeds.pyth]
+key = "GBP_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.GBP_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.GBP_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.GOLD_USDC.feeds]]
+
+[networks.osmosis-mainnet.GOLD_USDC.feeds.pyth]
+key = "XAU_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.GOLD_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.GOLD_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.INJ_USDC.feeds]]
+
+[networks.osmosis-mainnet.INJ_USDC.feeds.pyth]
+key = "INJ_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.INJ_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.INJ_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.LINK_USDC.feeds]]
+
+[networks.osmosis-mainnet.LINK_USDC.feeds.pyth]
+key = "LINK_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.LINK_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.LINK_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.LUNA_USDC.feeds]]
+
+[networks.osmosis-mainnet.LUNA_USDC.feeds.pyth]
+key = "LUNA_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.LUNA_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.LUNA_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.MEME_USDC.feeds]]
+
+[networks.osmosis-mainnet.MEME_USDC.feeds.pyth]
+key = "MEME_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.MEME_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.MEME_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.NTRN_USDC.feeds]]
+
+[networks.osmosis-mainnet.NTRN_USDC.feeds.pyth]
+key = "NTRN_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.NTRN_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.NTRN_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.OSMO_USD.feeds]]
+
+[networks.osmosis-mainnet.OSMO_USD.feeds.pyth]
+key = "OSMO_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.OSMO_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.OSMO_USD.feeds-usd.pyth]
+key = "OSMO_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.OSMO_USDC.feeds]]
+
+[networks.osmosis-mainnet.OSMO_USDC.feeds.pyth]
+key = "OSMO_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.OSMO_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.OSMO_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.PEPE_USDC.feeds]]
+
+[networks.osmosis-mainnet.PEPE_USDC.feeds.pyth]
+key = "PEPE_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.PEPE_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.PEPE_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.PYTH_USDC.feeds]]
+
+[networks.osmosis-mainnet.PYTH_USDC.feeds.pyth]
+key = "PYTH_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.PYTH_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.PYTH_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.RUNE_USDC.feeds]]
+
+[networks.osmosis-mainnet.RUNE_USDC.feeds.pyth]
+key = "RUNE_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.RUNE_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.RUNE_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.SEI_USD.feeds]]
+
+[networks.osmosis-mainnet.SEI_USD.feeds.pyth]
+key = "SEI_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.SEI_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.SEI_USD.feeds-usd.pyth]
+key = "SEI_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.SHIB_USDC.feeds]]
+
+[networks.osmosis-mainnet.SHIB_USDC.feeds.pyth]
+key = "SHIB_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.SHIB_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.SHIB_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.SILVER_USDC.feeds]]
+
+[networks.osmosis-mainnet.SILVER_USDC.feeds.pyth]
+key = "XAG_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.SILVER_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.SILVER_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.SOL_USDC.feeds]]
+
+[networks.osmosis-mainnet.SOL_USDC.feeds.pyth]
+key = "SOL_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.SOL_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.SOL_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.TIA_USD.feeds]]
+
+[networks.osmosis-mainnet.TIA_USD.feeds.pyth]
+key = "TIA_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.TIA_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.TIA_USD.feeds-usd.pyth]
+key = "TIA_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.WIF_USDC.feeds]]
+
+[networks.osmosis-mainnet.WIF_USDC.feeds.pyth]
+key = "WIF_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.WIF_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.WIF_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-mainnet.axlETH_USD.feeds]]
+
+[networks.osmosis-mainnet.axlETH_USD.feeds.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.axlETH_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.axlETH_USD.feeds-usd.pyth]
+key = "ETH_USD"
+inverted = false
+
+[networks.osmosis-mainnet.milkTIA_USD]
+stride-contract = "osmo1atjchsl64ewkapy0p4a7h0pvprhpt0jwelem2es0jrd4fqwx7kgslxsvvl"
+
+[[networks.osmosis-mainnet.milkTIA_USD.feeds]]
+
+[networks.osmosis-mainnet.milkTIA_USD.feeds.pyth]
+key = "TIA_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.milkTIA_USD.feeds]]
+
+[networks.osmosis-mainnet.milkTIA_USD.feeds.stride]
+denom = "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA"
+inverted = false
+age_tolerance = 43200
+
+[[networks.osmosis-mainnet.milkTIA_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.milkTIA_USD.feeds-usd.pyth]
+key = "TIA_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.milkTIA_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.milkTIA_USD.feeds-usd.stride]
+denom = "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA"
+inverted = false
+age_tolerance = 43200
+
+[[networks.osmosis-mainnet.nBTC_USD.feeds]]
+
+[networks.osmosis-mainnet.nBTC_USD.feeds.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.nBTC_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.nBTC_USD.feeds-usd.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.ryETH_USD.feeds]]
+
+[networks.osmosis-mainnet.ryETH_USD.feeds.simple]
+contract = "osmo1556egspjm44k54mdqrwkatfrk6e4mzdeum3q32fp3d2lr95rh5cq0g2hcg"
+inverted = false
+age_tolerance = 43200
+
+[[networks.osmosis-mainnet.ryETH_USD.feeds]]
+
+[networks.osmosis-mainnet.ryETH_USD.feeds.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.ryETH_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.ryETH_USD.feeds-usd.simple]
+contract = "osmo1556egspjm44k54mdqrwkatfrk6e4mzdeum3q32fp3d2lr95rh5cq0g2hcg"
+inverted = false
+age_tolerance = 43200
+
+[[networks.osmosis-mainnet.ryETH_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.ryETH_USD.feeds-usd.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.stATOM_USD.feeds]]
+
+[networks.osmosis-mainnet.stATOM_USD.feeds.stride]
+denom = "ibc/C140AFD542AE77BD7DCC83F13FDD8C5E5BB8C4929785E6EC2F4C636F98F17901"
+inverted = false
+age_tolerance = 43200
+
+[[networks.osmosis-mainnet.stATOM_USD.feeds]]
+
+[networks.osmosis-mainnet.stATOM_USD.feeds.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.stATOM_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.stATOM_USD.feeds-usd.stride]
+denom = "ibc/C140AFD542AE77BD7DCC83F13FDD8C5E5BB8C4929785E6EC2F4C636F98F17901"
+inverted = false
+age_tolerance = 43200
+
+[[networks.osmosis-mainnet.stATOM_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.stATOM_USD.feeds-usd.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.stDYDX_USD.feeds]]
+
+[networks.osmosis-mainnet.stDYDX_USD.feeds.stride]
+denom = "ibc/980E82A9F8E7CA8CD480F4577E73682A6D3855A267D1831485D7EBEF0E7A6C2C"
+inverted = false
+age_tolerance = 43200
+
+[[networks.osmosis-mainnet.stDYDX_USD.feeds]]
+
+[networks.osmosis-mainnet.stDYDX_USD.feeds.pyth]
+key = "DYDX_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.stDYDX_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.stDYDX_USD.feeds-usd.stride]
+denom = "ibc/980E82A9F8E7CA8CD480F4577E73682A6D3855A267D1831485D7EBEF0E7A6C2C"
+inverted = false
+age_tolerance = 43200
+
+[[networks.osmosis-mainnet.stDYDX_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.stDYDX_USD.feeds-usd.pyth]
+key = "DYDX_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.stDYM_USD.feeds]]
+
+[networks.osmosis-mainnet.stDYM_USD.feeds.stride]
+denom = "ibc/D53E785DC9C5C2CA50CADB1EFE4DE5D0C30418BE0E9C6F2AF9F092A247E8BC22"
+inverted = false
+age_tolerance = 172800
+
+[[networks.osmosis-mainnet.stDYM_USD.feeds]]
+
+[networks.osmosis-mainnet.stDYM_USD.feeds.pyth]
+key = "DYM_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.stDYM_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.stDYM_USD.feeds-usd.stride]
+denom = "ibc/D53E785DC9C5C2CA50CADB1EFE4DE5D0C30418BE0E9C6F2AF9F092A247E8BC22"
+inverted = false
+age_tolerance = 172800
+
+[[networks.osmosis-mainnet.stDYM_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.stDYM_USD.feeds-usd.pyth]
+key = "DYM_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.stOSMO_USD.feeds]]
+
+[networks.osmosis-mainnet.stOSMO_USD.feeds.stride]
+denom = "ibc/D176154B0C63D1F9C6DCFB4F70349EBF2E2B5A87A05902F57A6AE92B863E9AEC"
+inverted = false
+age_tolerance = 43200
+
+[[networks.osmosis-mainnet.stOSMO_USD.feeds]]
+
+[networks.osmosis-mainnet.stOSMO_USD.feeds.pyth]
+key = "OSMO_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.stOSMO_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.stOSMO_USD.feeds-usd.stride]
+denom = "ibc/D176154B0C63D1F9C6DCFB4F70349EBF2E2B5A87A05902F57A6AE92B863E9AEC"
+inverted = false
+age_tolerance = 43200
+
+[[networks.osmosis-mainnet.stOSMO_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.stOSMO_USD.feeds-usd.pyth]
+key = "OSMO_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.stTIA_USD.feeds]]
+
+[networks.osmosis-mainnet.stTIA_USD.feeds.stride]
+denom = "ibc/698350B8A61D575025F3ED13E9AC9C0F45C89DEFE92F76D5838F1D3C1A7FF7C9"
+inverted = false
+age_tolerance = 172800
+
+[[networks.osmosis-mainnet.stTIA_USD.feeds]]
+
+[networks.osmosis-mainnet.stTIA_USD.feeds.pyth]
+key = "TIA_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.stTIA_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.stTIA_USD.feeds-usd.stride]
+denom = "ibc/698350B8A61D575025F3ED13E9AC9C0F45C89DEFE92F76D5838F1D3C1A7FF7C9"
+inverted = false
+age_tolerance = 172800
+
+[[networks.osmosis-mainnet.stTIA_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.stTIA_USD.feeds-usd.pyth]
+key = "TIA_USD"
+inverted = false
+
+[networks.osmosis-mainnet.stkATOM_USD]
+stride-contract = "osmo1v8yvkng3p9gcdw7ssxpp79k34fyk7ch0dqvjuqvhd8cpwytv2kjsggeadm"
+
+[[networks.osmosis-mainnet.stkATOM_USD.feeds]]
+
+[networks.osmosis-mainnet.stkATOM_USD.feeds.stride]
+denom = "ibc/CAA179E40F0266B0B29FB5EAA288FB9212E628822265D4141EBD1C47C3CBFCBC"
+inverted = false
+age_tolerance = 43200
+
+[[networks.osmosis-mainnet.stkATOM_USD.feeds]]
+
+[networks.osmosis-mainnet.stkATOM_USD.feeds.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.stkATOM_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.stkATOM_USD.feeds-usd.stride]
+denom = "ibc/CAA179E40F0266B0B29FB5EAA288FB9212E628822265D4141EBD1C47C3CBFCBC"
+inverted = false
+age_tolerance = 43200
+
+[[networks.osmosis-mainnet.stkATOM_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.stkATOM_USD.feeds-usd.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.wBTC_USD.feeds]]
+
+[networks.osmosis-mainnet.wBTC_USD.feeds.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.wBTC_USD.feeds-usd]]
+
+[networks.osmosis-mainnet.wBTC_USD.feeds-usd.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.MAGA_USDC.feeds]]
+
+[networks.osmosis-mainnet.MAGA_USDC.feeds.pyth]
+key = "MAGA_USD"
+inverted = false
+
+[[networks.osmosis-mainnet.MAGA_USDC.feeds-usd]]
+
+[networks.osmosis-mainnet.MAGA_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.AKT_USD.feeds]]
+
+[networks.osmosis-testnet.AKT_USD.feeds.pyth]
+key = "AKT_USD"
+inverted = false
+
+[[networks.osmosis-testnet.AKT_USD.feeds-usd]]
+
+[networks.osmosis-testnet.AKT_USD.feeds-usd.pyth]
+key = "AKT_USD"
+inverted = false
+
+[[networks.osmosis-testnet.ATOM_USD.feeds]]
+
+[networks.osmosis-testnet.ATOM_USD.feeds.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.osmosis-testnet.ATOM_USD.feeds-usd]]
+
+[networks.osmosis-testnet.ATOM_USD.feeds-usd.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.osmosis-testnet.AVAX_USDC.feeds]]
+
+[networks.osmosis-testnet.AVAX_USDC.feeds.pyth]
+key = "AVAX_USD"
+inverted = false
+
+[[networks.osmosis-testnet.AVAX_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.AVAX_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.BNB_USDC.feeds]]
+
+[networks.osmosis-testnet.BNB_USDC.feeds.pyth]
+key = "BNB_USD"
+inverted = false
+
+[[networks.osmosis-testnet.BNB_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.BNB_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.BONK_USDC.feeds]]
+
+[networks.osmosis-testnet.BONK_USDC.feeds.pyth]
+key = "BONK_USD"
+inverted = false
+
+[[networks.osmosis-testnet.BONK_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.BONK_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.BTC_INJ.feeds]]
+
+[networks.osmosis-testnet.BTC_INJ.feeds.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-testnet.BTC_INJ.feeds]]
+
+[networks.osmosis-testnet.BTC_INJ.feeds.pyth]
+key = "INJ_USD"
+inverted = true
+
+[[networks.osmosis-testnet.BTC_INJ.feeds-usd]]
+
+[networks.osmosis-testnet.BTC_INJ.feeds-usd.pyth]
+key = "INJ_USD"
+inverted = false
+
+[[networks.osmosis-testnet.BTC_USD.feeds]]
+
+[networks.osmosis-testnet.BTC_USD.feeds.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-testnet.BTC_USD.feeds-usd]]
+
+[networks.osmosis-testnet.BTC_USD.feeds-usd.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-testnet.CNH_USDC.feeds]]
+
+[networks.osmosis-testnet.CNH_USDC.feeds.pyth]
+key = "USD_CNH"
+inverted = true
+
+[[networks.osmosis-testnet.CNH_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.CNH_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.COIN_USDC.feeds]]
+
+[networks.osmosis-testnet.COIN_USDC.feeds.pyth]
+key = "COIN_USD"
+inverted = false
+
+[[networks.osmosis-testnet.COIN_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.COIN_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.DOGE_USDC.feeds]]
+
+[networks.osmosis-testnet.DOGE_USDC.feeds.pyth]
+key = "DOGE_USD"
+inverted = false
+
+[[networks.osmosis-testnet.DOGE_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.DOGE_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.DOT_USD.feeds]]
+
+[networks.osmosis-testnet.DOT_USD.feeds.pyth]
+key = "DOT_USD"
+inverted = false
+
+[[networks.osmosis-testnet.DOT_USD.feeds-usd]]
+
+[networks.osmosis-testnet.DOT_USD.feeds-usd.pyth]
+key = "DOT_USD"
+inverted = false
+
+[[networks.osmosis-testnet.DOT_USDC.feeds]]
+
+[networks.osmosis-testnet.DOT_USDC.feeds.pyth]
+key = "DOT_USD"
+inverted = false
+
+[[networks.osmosis-testnet.DOT_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.DOT_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.DYM_USD.feeds]]
+
+[networks.osmosis-testnet.DYM_USD.feeds.pyth]
+key = "DYM_USD"
+inverted = false
+
+[[networks.osmosis-testnet.DYM_USD.feeds-usd]]
+
+[networks.osmosis-testnet.DYM_USD.feeds-usd.pyth]
+key = "DYM_USD"
+inverted = false
+
+[[networks.osmosis-testnet.ETH_BTC.feeds]]
+
+[networks.osmosis-testnet.ETH_BTC.feeds.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.osmosis-testnet.ETH_BTC.feeds]]
+
+[networks.osmosis-testnet.ETH_BTC.feeds.pyth]
+key = "BTC_USD"
+inverted = true
+
+[[networks.osmosis-testnet.ETH_BTC.feeds-usd]]
+
+[networks.osmosis-testnet.ETH_BTC.feeds-usd.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-testnet.ETH_USD.feeds]]
+
+[networks.osmosis-testnet.ETH_USD.feeds.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.osmosis-testnet.ETH_USD.feeds-usd]]
+
+[networks.osmosis-testnet.ETH_USD.feeds-usd.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.osmosis-testnet.EUR_USDC.feeds]]
+
+[networks.osmosis-testnet.EUR_USDC.feeds.pyth]
+key = "EUR_USD"
+inverted = false
+
+[[networks.osmosis-testnet.EUR_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.EUR_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.FLOKI_USDC.feeds]]
+
+[networks.osmosis-testnet.FLOKI_USDC.feeds.pyth]
+key = "FLOKI_USD"
+inverted = false
+
+[[networks.osmosis-testnet.FLOKI_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.FLOKI_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.GBP_USDC.feeds]]
+
+[networks.osmosis-testnet.GBP_USDC.feeds.pyth]
+key = "GBP_USD"
+inverted = false
+
+[[networks.osmosis-testnet.GBP_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.GBP_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.GOLD_USDC.feeds]]
+
+[networks.osmosis-testnet.GOLD_USDC.feeds.pyth]
+key = "XAU_USD"
+inverted = false
+
+[[networks.osmosis-testnet.GOLD_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.GOLD_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.INJ_USDC.feeds]]
+
+[networks.osmosis-testnet.INJ_USDC.feeds.pyth]
+key = "INJ_USD"
+inverted = false
+
+[[networks.osmosis-testnet.INJ_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.INJ_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.LUNA_USDC.feeds]]
+
+[networks.osmosis-testnet.LUNA_USDC.feeds.pyth]
+key = "LUNA_USD"
+inverted = false
+
+[[networks.osmosis-testnet.LUNA_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.LUNA_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.MEME_USDC.feeds]]
+
+[networks.osmosis-testnet.MEME_USDC.feeds.pyth]
+key = "MEME_USD"
+inverted = false
+
+[[networks.osmosis-testnet.MEME_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.MEME_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.OSMO_USD.feeds]]
+
+[networks.osmosis-testnet.OSMO_USD.feeds.pyth]
+key = "OSMO_USD"
+inverted = false
+
+[[networks.osmosis-testnet.OSMO_USD.feeds-usd]]
+
+[networks.osmosis-testnet.OSMO_USD.feeds-usd.pyth]
+key = "OSMO_USD"
+inverted = false
+
+[[networks.osmosis-testnet.OSMO_USDC.feeds]]
+
+[networks.osmosis-testnet.OSMO_USDC.feeds.pyth]
+key = "OSMO_USD"
+inverted = false
+
+[[networks.osmosis-testnet.OSMO_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.OSMO_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.PEPE_USDC.feeds]]
+
+[networks.osmosis-testnet.PEPE_USDC.feeds.pyth]
+key = "PEPE_USD"
+inverted = false
+
+[[networks.osmosis-testnet.PEPE_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.PEPE_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.PYTH_USDC.feeds]]
+
+[networks.osmosis-testnet.PYTH_USDC.feeds.pyth]
+key = "PYTH_USD"
+inverted = false
+
+[[networks.osmosis-testnet.PYTH_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.PYTH_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.SCRT_USD.feeds]]
+
+[networks.osmosis-testnet.SCRT_USD.feeds.pyth]
+key = "SCRT_USD"
+inverted = false
+
+[[networks.osmosis-testnet.SCRT_USD.feeds-usd]]
+
+[networks.osmosis-testnet.SCRT_USD.feeds-usd.pyth]
+key = "SCRT_USD"
+inverted = false
+
+[[networks.osmosis-testnet.SEI_USD.feeds]]
+
+[networks.osmosis-testnet.SEI_USD.feeds.pyth]
+key = "SEI_USD"
+inverted = false
+
+[[networks.osmosis-testnet.SEI_USD.feeds-usd]]
+
+[networks.osmosis-testnet.SEI_USD.feeds-usd.pyth]
+key = "SEI_USD"
+inverted = false
+
+[[networks.osmosis-testnet.SHIB_USDC.feeds]]
+
+[networks.osmosis-testnet.SHIB_USDC.feeds.pyth]
+key = "SHIB_USD"
+inverted = false
+
+[[networks.osmosis-testnet.SHIB_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.SHIB_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.SILVER_USDC.feeds]]
+
+[networks.osmosis-testnet.SILVER_USDC.feeds.pyth]
+key = "XAG_USD"
+inverted = false
+
+[[networks.osmosis-testnet.SILVER_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.SILVER_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.SOL_USDC.feeds]]
+
+[networks.osmosis-testnet.SOL_USDC.feeds.pyth]
+key = "SOL_USD"
+inverted = false
+
+[[networks.osmosis-testnet.SOL_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.SOL_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.TIA_USD.feeds]]
+
+[networks.osmosis-testnet.TIA_USD.feeds.pyth]
+key = "TIA_USD"
+inverted = false
+
+[[networks.osmosis-testnet.TIA_USD.feeds-usd]]
+
+[networks.osmosis-testnet.TIA_USD.feeds-usd.pyth]
+key = "TIA_USD"
+inverted = false
+
+[[networks.osmosis-testnet.WIF_USDC.feeds]]
+
+[networks.osmosis-testnet.WIF_USDC.feeds.pyth]
+key = "WIF_USD"
+inverted = false
+
+[[networks.osmosis-testnet.WIF_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.WIF_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.osmosis-testnet.axlETH_USD.feeds]]
+
+[networks.osmosis-testnet.axlETH_USD.feeds.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.osmosis-testnet.axlETH_USD.feeds-usd]]
+
+[networks.osmosis-testnet.axlETH_USD.feeds-usd.pyth]
+key = "ETH_USD"
+inverted = false
+
+[networks.osmosis-testnet.milkTIA_USD]
+stride-contract = "osmo1qemh23s4qwymxyzqs0puhle60djhtytjhvv4ghdfdf0x9tgkapss6q6sj8"
+
+[[networks.osmosis-testnet.milkTIA_USD.feeds]]
+
+[networks.osmosis-testnet.milkTIA_USD.feeds.pyth]
+key = "TIA_USD"
+inverted = false
+
+[[networks.osmosis-testnet.milkTIA_USD.feeds]]
+
+[networks.osmosis-testnet.milkTIA_USD.feeds.stride]
+denom = "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA"
+inverted = false
+age_tolerance = 31536000
+
+[[networks.osmosis-testnet.milkTIA_USD.feeds-usd]]
+
+[networks.osmosis-testnet.milkTIA_USD.feeds-usd.pyth]
+key = "TIA_USD"
+inverted = false
+
+[[networks.osmosis-testnet.milkTIA_USD.feeds-usd]]
+
+[networks.osmosis-testnet.milkTIA_USD.feeds-usd.stride]
+denom = "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA"
+inverted = false
+age_tolerance = 31536000
+
+[[networks.osmosis-testnet.nBTC_USD.feeds]]
+
+[networks.osmosis-testnet.nBTC_USD.feeds.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-testnet.nBTC_USD.feeds-usd]]
+
+[networks.osmosis-testnet.nBTC_USD.feeds-usd.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-testnet.ryETH_USD.feeds]]
+
+[networks.osmosis-testnet.ryETH_USD.feeds.simple]
+contract = "osmo10y2xkd5ep6lctmdtcvx6yssfzcafqjkplchfafh7dpxtljn4gz2sdzzhur"
+inverted = false
+age_tolerance = 604800
+
+[[networks.osmosis-testnet.ryETH_USD.feeds]]
+
+[networks.osmosis-testnet.ryETH_USD.feeds.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.osmosis-testnet.ryETH_USD.feeds-usd]]
+
+[networks.osmosis-testnet.ryETH_USD.feeds-usd.simple]
+contract = "osmo10y2xkd5ep6lctmdtcvx6yssfzcafqjkplchfafh7dpxtljn4gz2sdzzhur"
+inverted = false
+age_tolerance = 604800
+
+[[networks.osmosis-testnet.ryETH_USD.feeds-usd]]
+
+[networks.osmosis-testnet.ryETH_USD.feeds-usd.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.osmosis-testnet.stATOM_USD.feeds]]
+
+[networks.osmosis-testnet.stATOM_USD.feeds.stride]
+denom = "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590"
+inverted = false
+age_tolerance = 604800
+
+[[networks.osmosis-testnet.stATOM_USD.feeds]]
+
+[networks.osmosis-testnet.stATOM_USD.feeds.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.osmosis-testnet.stATOM_USD.feeds-usd]]
+
+[networks.osmosis-testnet.stATOM_USD.feeds-usd.stride]
+denom = "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590"
+inverted = false
+age_tolerance = 604800
+
+[[networks.osmosis-testnet.stATOM_USD.feeds-usd]]
+
+[networks.osmosis-testnet.stATOM_USD.feeds-usd.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[networks.osmosis-testnet.stDYDX_USD]
+stride-contract = "osmo1jlm7dglrwfk073r2mgta66sf27htceaklx0qprlm0pupfv632p6s3mzckj"
+
+[[networks.osmosis-testnet.stDYDX_USD.feeds]]
+
+[networks.osmosis-testnet.stDYDX_USD.feeds.stride]
+denom = "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA"
+inverted = false
+age_tolerance = 31536000
+
+[[networks.osmosis-testnet.stDYDX_USD.feeds]]
+
+[networks.osmosis-testnet.stDYDX_USD.feeds.pyth]
+key = "DYDX_USD"
+inverted = false
+
+[[networks.osmosis-testnet.stDYDX_USD.feeds-usd]]
+
+[networks.osmosis-testnet.stDYDX_USD.feeds-usd.stride]
+denom = "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA"
+inverted = false
+age_tolerance = 31536000
+
+[[networks.osmosis-testnet.stDYDX_USD.feeds-usd]]
+
+[networks.osmosis-testnet.stDYDX_USD.feeds-usd.pyth]
+key = "DYDX_USD"
+inverted = false
+
+[networks.osmosis-testnet.stDYM_USD]
+stride-contract = "osmo1jlm7dglrwfk073r2mgta66sf27htceaklx0qprlm0pupfv632p6s3mzckj"
+
+[[networks.osmosis-testnet.stDYM_USD.feeds]]
+
+[networks.osmosis-testnet.stDYM_USD.feeds.stride]
+denom = "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA"
+inverted = false
+age_tolerance = 31536000
+
+[[networks.osmosis-testnet.stDYM_USD.feeds]]
+
+[networks.osmosis-testnet.stDYM_USD.feeds.pyth]
+key = "DYM_USD"
+inverted = false
+
+[[networks.osmosis-testnet.stDYM_USD.feeds-usd]]
+
+[networks.osmosis-testnet.stDYM_USD.feeds-usd.stride]
+denom = "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA"
+inverted = false
+age_tolerance = 31536000
+
+[[networks.osmosis-testnet.stDYM_USD.feeds-usd]]
+
+[networks.osmosis-testnet.stDYM_USD.feeds-usd.pyth]
+key = "DYM_USD"
+inverted = false
+
+[[networks.osmosis-testnet.stOSMO_USD.feeds]]
+
+[networks.osmosis-testnet.stOSMO_USD.feeds.stride]
+denom = "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590"
+inverted = false
+age_tolerance = 31536000
+
+[[networks.osmosis-testnet.stOSMO_USD.feeds]]
+
+[networks.osmosis-testnet.stOSMO_USD.feeds.pyth]
+key = "OSMO_USD"
+inverted = false
+
+[[networks.osmosis-testnet.stOSMO_USD.feeds-usd]]
+
+[networks.osmosis-testnet.stOSMO_USD.feeds-usd.stride]
+denom = "ibc/FE41A73457712D192810690BC19D8915EF3608579D684B27BC68FC1021996590"
+inverted = false
+age_tolerance = 31536000
+
+[[networks.osmosis-testnet.stOSMO_USD.feeds-usd]]
+
+[networks.osmosis-testnet.stOSMO_USD.feeds-usd.pyth]
+key = "OSMO_USD"
+inverted = false
+
+[networks.osmosis-testnet.stTIA_USD]
+stride-contract = "osmo1jlm7dglrwfk073r2mgta66sf27htceaklx0qprlm0pupfv632p6s3mzckj"
+
+[[networks.osmosis-testnet.stTIA_USD.feeds]]
+
+[networks.osmosis-testnet.stTIA_USD.feeds.stride]
+denom = "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA"
+inverted = false
+age_tolerance = 31536000
+
+[[networks.osmosis-testnet.stTIA_USD.feeds]]
+
+[networks.osmosis-testnet.stTIA_USD.feeds.pyth]
+key = "TIA_USD"
+inverted = false
+
+[[networks.osmosis-testnet.stTIA_USD.feeds-usd]]
+
+[networks.osmosis-testnet.stTIA_USD.feeds-usd.stride]
+denom = "factory/osmo1f5vfcph2dvfeqcqkhetwv75fda69z7e5c2dldm3kvgj23crkv6wqcn47a0/umilkTIA"
+inverted = false
+age_tolerance = 31536000
+
+[[networks.osmosis-testnet.stTIA_USD.feeds-usd]]
+
+[networks.osmosis-testnet.stTIA_USD.feeds-usd.pyth]
+key = "TIA_USD"
+inverted = false
+
+[[networks.osmosis-testnet.wBTC_USD.feeds]]
+
+[networks.osmosis-testnet.wBTC_USD.feeds.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-testnet.wBTC_USD.feeds-usd]]
+
+[networks.osmosis-testnet.wBTC_USD.feeds-usd.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.osmosis-testnet.MAGA_USDC.feeds]]
+
+[networks.osmosis-testnet.MAGA_USDC.feeds.pyth]
+key = "MAGA_USD"
+inverted = false
+
+[[networks.osmosis-testnet.MAGA_USDC.feeds-usd]]
+
+[networks.osmosis-testnet.MAGA_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.sei-mainnet.BTC_SEI.feeds]]
+
+[networks.sei-mainnet.BTC_SEI.feeds.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.sei-mainnet.BTC_SEI.feeds]]
+
+[networks.sei-mainnet.BTC_SEI.feeds.pyth]
+key = "SEI_USD"
+inverted = true
+
+[[networks.sei-mainnet.BTC_SEI.feeds-usd]]
+
+[networks.sei-mainnet.BTC_SEI.feeds-usd.pyth]
+key = "SEI_USD"
+inverted = false
+
+[[networks.sei-mainnet.ETH_SEI.feeds]]
+
+[networks.sei-mainnet.ETH_SEI.feeds.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.sei-mainnet.ETH_SEI.feeds]]
+
+[networks.sei-mainnet.ETH_SEI.feeds.pyth]
+key = "SEI_USD"
+inverted = true
+
+[[networks.sei-mainnet.ETH_SEI.feeds-usd]]
+
+[networks.sei-mainnet.ETH_SEI.feeds-usd.pyth]
+key = "SEI_USD"
+inverted = false
+
+[[networks.sei-mainnet.ETH_USD.feeds]]
+
+[networks.sei-mainnet.ETH_USD.feeds.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.sei-mainnet.ETH_USD.feeds-usd]]
+
+[networks.sei-mainnet.ETH_USD.feeds-usd.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.sei-mainnet.SEI_USD.feeds]]
+
+[networks.sei-mainnet.SEI_USD.feeds.pyth]
+key = "SEI_USD"
+inverted = false
+
+[[networks.sei-mainnet.SEI_USD.feeds-usd]]
+
+[networks.sei-mainnet.SEI_USD.feeds-usd.pyth]
+key = "SEI_USD"
+inverted = false
+
+[[networks.sei-mainnet.SOL_SEI.feeds]]
+
+[networks.sei-mainnet.SOL_SEI.feeds.pyth]
+key = "SOL_USD"
+inverted = false
+
+[[networks.sei-mainnet.SOL_SEI.feeds]]
+
+[networks.sei-mainnet.SOL_SEI.feeds.pyth]
+key = "SEI_USD"
+inverted = true
+
+[[networks.sei-mainnet.SOL_SEI.feeds-usd]]
+
+[networks.sei-mainnet.SOL_SEI.feeds-usd.pyth]
+key = "SEI_USD"
+inverted = false
+
+[[networks.sei-testnet.ATOM_USD.feeds]]
+
+[networks.sei-testnet.ATOM_USD.feeds.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.sei-testnet.ATOM_USD.feeds-usd]]
+
+[networks.sei-testnet.ATOM_USD.feeds-usd.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.sei-testnet.BONK_USDC.feeds]]
+
+[networks.sei-testnet.BONK_USDC.feeds.pyth]
+key = "BONK_USD"
+inverted = false
+
+[[networks.sei-testnet.BONK_USDC.feeds-usd]]
+
+[networks.sei-testnet.BONK_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.sei-testnet.BTC_SEI.feeds]]
+
+[networks.sei-testnet.BTC_SEI.feeds.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.sei-testnet.BTC_SEI.feeds]]
+
+[networks.sei-testnet.BTC_SEI.feeds.pyth]
+key = "SEI_USD"
+inverted = true
+
+[[networks.sei-testnet.BTC_SEI.feeds-usd]]
+
+[networks.sei-testnet.BTC_SEI.feeds-usd.pyth]
+key = "SEI_USD"
+inverted = false
+
+[[networks.sei-testnet.BTC_USD.feeds]]
+
+[networks.sei-testnet.BTC_USD.feeds.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.sei-testnet.BTC_USD.feeds-usd]]
+
+[networks.sei-testnet.BTC_USD.feeds-usd.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.sei-testnet.ETH_BTC.feeds]]
+
+[networks.sei-testnet.ETH_BTC.feeds.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.sei-testnet.ETH_BTC.feeds]]
+
+[networks.sei-testnet.ETH_BTC.feeds.pyth]
+key = "BTC_USD"
+inverted = true
+
+[[networks.sei-testnet.ETH_BTC.feeds-usd]]
+
+[networks.sei-testnet.ETH_BTC.feeds-usd.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.sei-testnet.ETH_SEI.feeds]]
+
+[networks.sei-testnet.ETH_SEI.feeds.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.sei-testnet.ETH_SEI.feeds]]
+
+[networks.sei-testnet.ETH_SEI.feeds.pyth]
+key = "SEI_USD"
+inverted = true
+
+[[networks.sei-testnet.ETH_SEI.feeds-usd]]
+
+[networks.sei-testnet.ETH_SEI.feeds-usd.pyth]
+key = "SEI_USD"
+inverted = false
+
+[[networks.sei-testnet.ETH_USD.feeds]]
+
+[networks.sei-testnet.ETH_USD.feeds.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.sei-testnet.ETH_USD.feeds-usd]]
+
+[networks.sei-testnet.ETH_USD.feeds-usd.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.sei-testnet.FLOKI_USDC.feeds]]
+
+[networks.sei-testnet.FLOKI_USDC.feeds.pyth]
+key = "FLOKI_USD"
+inverted = false
+
+[[networks.sei-testnet.FLOKI_USDC.feeds-usd]]
+
+[networks.sei-testnet.FLOKI_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.sei-testnet.MEME_USDC.feeds]]
+
+[networks.sei-testnet.MEME_USDC.feeds.pyth]
+key = "MEME_USD"
+inverted = false
+
+[[networks.sei-testnet.MEME_USDC.feeds-usd]]
+
+[networks.sei-testnet.MEME_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.sei-testnet.NTRN_USDC.feeds]]
+
+[networks.sei-testnet.NTRN_USDC.feeds.pyth]
+key = "NTRN_USD"
+inverted = false
+
+[[networks.sei-testnet.NTRN_USDC.feeds-usd]]
+
+[networks.sei-testnet.NTRN_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.sei-testnet.OSMO_USD.feeds]]
+
+[networks.sei-testnet.OSMO_USD.feeds.pyth]
+key = "OSMO_USD"
+inverted = false
+
+[[networks.sei-testnet.OSMO_USD.feeds-usd]]
+
+[networks.sei-testnet.OSMO_USD.feeds-usd.pyth]
+key = "OSMO_USD"
+inverted = false
+
+[[networks.sei-testnet.OSMO_USDC.feeds]]
+
+[networks.sei-testnet.OSMO_USDC.feeds.pyth]
+key = "OSMO_USD"
+inverted = false
+
+[[networks.sei-testnet.OSMO_USDC.feeds-usd]]
+
+[networks.sei-testnet.OSMO_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.sei-testnet.PEPE_USDC.feeds]]
+
+[networks.sei-testnet.PEPE_USDC.feeds.pyth]
+key = "PEPE_USD"
+inverted = false
+
+[[networks.sei-testnet.PEPE_USDC.feeds-usd]]
+
+[networks.sei-testnet.PEPE_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.sei-testnet.SHIB_USDC.feeds]]
+
+[networks.sei-testnet.SHIB_USDC.feeds.pyth]
+key = "SHIB_USD"
+inverted = false
+
+[[networks.sei-testnet.SHIB_USDC.feeds-usd]]
+
+[networks.sei-testnet.SHIB_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.sei-testnet.SOL_SEI.feeds]]
+
+[networks.sei-testnet.SOL_SEI.feeds.pyth]
+key = "SOL_USD"
+inverted = false
+
+[[networks.sei-testnet.SOL_SEI.feeds]]
+
+[networks.sei-testnet.SOL_SEI.feeds.pyth]
+key = "SEI_USD"
+inverted = true
+
+[[networks.sei-testnet.SOL_SEI.feeds-usd]]
+
+[networks.sei-testnet.SOL_SEI.feeds-usd.pyth]
+key = "SEI_USD"
+inverted = false
+
+[[networks.sei-testnet.WIF_USDC.feeds]]
+
+[networks.sei-testnet.WIF_USDC.feeds.pyth]
+key = "WIF_USD"
+inverted = false
+
+[[networks.sei-testnet.WIF_USDC.feeds-usd]]
+
+[networks.sei-testnet.WIF_USDC.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.injective-testnet.AXL_USD.feeds]]
+
+[networks.injective-testnet.AXL_USD.feeds.pyth]
+key = "AXL_USD"
+inverted = false
+
+[[networks.injective-testnet.AXL_USD.feeds-usd]]
+
+[networks.injective-testnet.AXL_USD.feeds-usd.pyth]
+key = "AXL_USD"
+inverted = false
+
+[[networks.injective-testnet.BNB_USDT.feeds]]
+
+[networks.injective-testnet.BNB_USDT.feeds.pyth]
+key = "BNB_USD"
+inverted = false
+
+[[networks.injective-testnet.BNB_USDT.feeds-usd]]
+
+[networks.injective-testnet.BNB_USDT.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.injective-testnet.BTC_INJ.feeds]]
+
+[networks.injective-testnet.BTC_INJ.feeds.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.injective-testnet.BTC_INJ.feeds]]
+
+[networks.injective-testnet.BTC_INJ.feeds.pyth]
+key = "INJ_USD"
+inverted = true
+
+[[networks.injective-testnet.BTC_INJ.feeds-usd]]
+
+[networks.injective-testnet.BTC_INJ.feeds-usd.pyth]
+key = "INJ_USD"
+inverted = false
+
+[[networks.injective-testnet.BTC_USD.feeds]]
+
+[networks.injective-testnet.BTC_USD.feeds.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.injective-testnet.BTC_USD.feeds-usd]]
+
+[networks.injective-testnet.BTC_USD.feeds-usd.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.injective-testnet.BTC_USDT.feeds]]
+
+[networks.injective-testnet.BTC_USDT.feeds.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.injective-testnet.BTC_USDT.feeds-usd]]
+
+[networks.injective-testnet.BTC_USDT.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.injective-testnet.ETH_USD.feeds]]
+
+[networks.injective-testnet.ETH_USD.feeds.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.injective-testnet.ETH_USD.feeds-usd]]
+
+[networks.injective-testnet.ETH_USD.feeds-usd.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.injective-testnet.INJ_USD.feeds]]
+
+[networks.injective-testnet.INJ_USD.feeds.pyth]
+key = "INJ_USD"
+inverted = false
+
+[[networks.injective-testnet.INJ_USD.feeds-usd]]
+
+[networks.injective-testnet.INJ_USD.feeds-usd.pyth]
+key = "INJ_USD"
+inverted = false
+
+[[networks.injective-testnet.LINK_USDT.feeds]]
+
+[networks.injective-testnet.LINK_USDT.feeds.pyth]
+key = "LINK_USD"
+inverted = false
+
+[[networks.injective-testnet.LINK_USDT.feeds-usd]]
+
+[networks.injective-testnet.LINK_USDT.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.injective-testnet.SOL_USDT.feeds]]
+
+[networks.injective-testnet.SOL_USDT.feeds.pyth]
+key = "SOL_USD"
+inverted = false
+
+[[networks.injective-testnet.SOL_USDT.feeds-usd]]
+
+[networks.injective-testnet.SOL_USDT.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.injective-mainnet.BNB_USDT.feeds]]
+
+[networks.injective-mainnet.BNB_USDT.feeds.pyth]
+key = "BNB_USD"
+inverted = false
+
+[[networks.injective-mainnet.BNB_USDT.feeds-usd]]
+
+[networks.injective-mainnet.BNB_USDT.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.injective-mainnet.BTC_INJ.feeds]]
+
+[networks.injective-mainnet.BTC_INJ.feeds.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.injective-mainnet.BTC_INJ.feeds]]
+
+[networks.injective-mainnet.BTC_INJ.feeds.pyth]
+key = "INJ_USD"
+inverted = true
+
+[[networks.injective-mainnet.BTC_INJ.feeds-usd]]
+
+[networks.injective-mainnet.BTC_INJ.feeds-usd.pyth]
+key = "INJ_USD"
+inverted = false
+
+[[networks.injective-mainnet.BTC_USDT.feeds]]
+
+[networks.injective-mainnet.BTC_USDT.feeds.pyth]
+key = "BTC_USD"
+inverted = false
+
+[[networks.injective-mainnet.BTC_USDT.feeds-usd]]
+
+[networks.injective-mainnet.BTC_USDT.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.injective-mainnet.INJ_USD.feeds]]
+
+[networks.injective-mainnet.INJ_USD.feeds.pyth]
+key = "INJ_USD"
+inverted = false
+
+[[networks.injective-mainnet.INJ_USD.feeds-usd]]
+
+[networks.injective-mainnet.INJ_USD.feeds-usd.pyth]
+key = "INJ_USD"
+inverted = false
+
+[[networks.injective-mainnet.LINK_USDT.feeds]]
+
+[networks.injective-mainnet.LINK_USDT.feeds.pyth]
+key = "LINK_USD"
+inverted = false
+
+[[networks.injective-mainnet.LINK_USDT.feeds-usd]]
+
+[networks.injective-mainnet.LINK_USDT.feeds-usd.constant]
+price = "1"
+inverted = false
+
+[[networks.injective-mainnet.stINJ_USD.feeds]]
+
+[networks.injective-mainnet.stINJ_USD.feeds.pyth]
+key = "INJ_USD"
+inverted = false
+
+[[networks.injective-mainnet.stINJ_USD.feeds]]
+
+[networks.injective-mainnet.stINJ_USD.feeds.stride]
+denom = "ibc/AC87717EA002B0123B10A05063E69BCA274BA2C44D842AEEB41558D2856DCE93"
+inverted = false
+age_tolerance = 172800
+
+[[networks.injective-mainnet.stINJ_USD.feeds-usd]]
+
+[networks.injective-mainnet.stINJ_USD.feeds-usd.pyth]
+key = "INJ_USD"
+inverted = false
+
+[[networks.injective-mainnet.stINJ_USD.feeds-usd]]
+
+[networks.injective-mainnet.stINJ_USD.feeds-usd.stride]
+denom = "ibc/AC87717EA002B0123B10A05063E69BCA274BA2C44D842AEEB41558D2856DCE93"
+inverted = false
+age_tolerance = 172800
+
+[[networks.neutron-mainnet.NTRN_USD.feeds]]
+
+[networks.neutron-mainnet.NTRN_USD.feeds.pyth]
+key = "NTRN_USD"
+inverted = false
+
+[[networks.neutron-mainnet.NTRN_USD.feeds-usd]]
+
+[networks.neutron-mainnet.NTRN_USD.feeds-usd.pyth]
+key = "NTRN_USD"
+inverted = false
+
+[[networks.neutron-mainnet.amATOM_USD.feeds]]
+
+[networks.neutron-mainnet.amATOM_USD.feeds.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.neutron-mainnet.amATOM_USD.feeds-usd]]
+
+[networks.neutron-mainnet.amATOM_USD.feeds-usd.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.neutron-mainnet.BNB_USD.feeds]]
+
+[networks.neutron-mainnet.BNB_USD.feeds.pyth]
+key = "BNB_USD"
+inverted = false
+
+[[networks.neutron-mainnet.BNB_USD.feeds-usd]]
+
+[networks.neutron-mainnet.BNB_USD.feeds-usd.pyth]
+key = "BNB_USD"
+inverted = false
+
+# This is a Neutron-style LSD market.
+# Collateral asset is an LSD, but the base asset is priced for the underlying ETH.
+[[networks.neutron-mainnet.wstETH_USD.feeds]]
+
+[networks.neutron-mainnet.wstETH_USD.feeds.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.neutron-mainnet.wstETH_USD.feeds-usd]]
+
+[networks.neutron-mainnet.wstETH_USD.feeds-usd.pyth]
+key = "wstETH_USD"
+inverted = false
+
+# This is a Neutron-style LSD market.
+# Collateral asset is an LSD, but the base asset is priced for the underlying ATOM.
+[[networks.neutron-mainnet.dATOM_USD.feeds]]
+
+[networks.neutron-mainnet.dATOM_USD.feeds.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.neutron-mainnet.dATOM_USD.feeds-usd]]
+
+# Note that, in the future, we'll want to update
+# the config to reflect changes in redemption rate.
+# Without that change, the market will continue to price
+# things correctly, but calculations in USD will underrepresent
+# the value of the collateral.
+[networks.neutron-mainnet.dATOM_USD.feeds-usd.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.neutron-testnet.NTRN_USD.feeds]]
+
+[networks.neutron-testnet.NTRN_USD.feeds.pyth]
+key = "NTRN_USD"
+inverted = false
+
+[[networks.neutron-testnet.NTRN_USD.feeds-usd]]
+
+[networks.neutron-testnet.NTRN_USD.feeds-usd.pyth]
+key = "NTRN_USD"
+inverted = false
+
+[[networks.neutron-testnet.amATOM_USD.feeds]]
+
+[networks.neutron-testnet.amATOM_USD.feeds.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.neutron-testnet.amATOM_USD.feeds-usd]]
+
+[networks.neutron-testnet.amATOM_USD.feeds-usd.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.neutron-testnet.BNB_USD.feeds]]
+
+[networks.neutron-testnet.BNB_USD.feeds.pyth]
+key = "BNB_USD"
+inverted = false
+
+[[networks.neutron-testnet.BNB_USD.feeds-usd]]
+
+[networks.neutron-testnet.BNB_USD.feeds-usd.pyth]
+key = "BNB_USD"
+inverted = false
+
+# This is a Neutron-style LSD market.
+# Collateral asset is an LSD, but the base asset is priced for the underlying ETH.
+[[networks.neutron-testnet.wstETH_USD.feeds]]
+
+[networks.neutron-testnet.wstETH_USD.feeds.pyth]
+key = "ETH_USD"
+inverted = false
+
+[[networks.neutron-testnet.wstETH_USD.feeds-usd]]
+
+[networks.neutron-testnet.wstETH_USD.feeds-usd.pyth]
+key = "wstETH_USD"
+inverted = false
+
+# This is a Neutron-style LSD market.
+# Collateral asset is an LSD, but the base asset is priced for the underlying ATOM.
+[[networks.neutron-testnet.dATOM_USD.feeds]]
+
+[networks.neutron-testnet.dATOM_USD.feeds.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.neutron-testnet.dATOM_USD.feeds-usd]]
+
+# Note that, in the future, we'll want to update
+# the config to reflect changes in redemption rate.
+# Without that change, the market will continue to price
+# things correctly, but calculations in USD will underrepresent
+# the value of the collateral.
+[networks.neutron-testnet.dATOM_USD.feeds-usd.pyth]
+key = "ATOM_USD"
+inverted = false
+
+[[networks.dymension-testnet.DYM_USD.feeds]]
+
+[networks.dymension-testnet.DYM_USD.feeds.pyth]
+key = "DYM_USD"
+inverted = false
+
+[[networks.dymension-testnet.DYM_USD.feeds-usd]]
+
+[networks.dymension-testnet.DYM_USD.feeds-usd.pyth]
+key = "DYM_USD"
+inverted = false

@@ -1,4 +1,5 @@
 //! Data types and events for cranking.
+use super::deferred_execution::{DeferredExecId, DeferredExecTarget};
 use super::position::PositionId;
 use crate::contracts::market::order::OrderId;
 use crate::contracts::market::position::LiquidationReason;
@@ -19,11 +20,6 @@ pub enum CrankWorkInfo {
         /// Next position to be liquifunded
         position: PositionId,
     },
-    /// Adding liquidation prices to the primary data structures
-    UnpendLiquidationPrices {
-        /// Which position to process next
-        position: PositionId,
-    },
     /// Liquidate a position.
     ///
     /// Includes max gains, take profit, and stop loss.
@@ -32,8 +28,13 @@ pub enum CrankWorkInfo {
         position: PositionId,
         /// Reason for the liquidation
         liquidation_reason: LiquidationReason,
-        /// price point that triggered the liquidation
-        price_point: PricePoint,
+    },
+    /// Deferred execution (open/update/closed) can be executed.
+    DeferredExec {
+        /// ID to be processed
+        deferred_exec_id: DeferredExecId,
+        /// Target of the action
+        target: DeferredExecTarget,
     },
     /// Limit order can be opened
     LimitOrder {
@@ -41,10 +42,29 @@ pub enum CrankWorkInfo {
         order_id: OrderId,
     },
     /// Finished all processing for a given price update
-    Completed {
-        /// Timestamp of the price update
-        price_point_timestamp: Timestamp,
-    },
+    Completed {},
+}
+
+impl CrankWorkInfo {
+    /// Should a cranker receive rewards for performing this action?
+    ///
+    /// We generally want to give out rewards for actions that are directly
+    /// user initiated and will be receiving a crank fee paid into the system. Actions
+    /// which are overall protocol maintenance without a specific user action may be
+    /// unfunded. A simple "attack" we want to avoid is a cranker flooding the system
+    /// with unnecessary price updates + cranks to continue making a profit off of
+    /// "Completed" items.
+    pub fn receives_crank_rewards(&self) -> bool {
+        match self {
+            CrankWorkInfo::CloseAllPositions { .. }
+            | CrankWorkInfo::ResetLpBalances {}
+            | CrankWorkInfo::Completed { .. } => false,
+            CrankWorkInfo::Liquifunding { .. }
+            | CrankWorkInfo::Liquidation { .. }
+            | CrankWorkInfo::DeferredExec { .. }
+            | CrankWorkInfo::LimitOrder { .. } => true,
+        }
+    }
 }
 
 /// Events related to the crank
@@ -58,31 +78,26 @@ pub mod events {
     pub struct CrankExecBatchEvent {
         /// How many cranks were requested
         pub requested: u64,
+        /// How many paying cranks were processed
+        pub paying: u64,
         /// How many cranks were actually processed
-        pub actual: Vec<CrankWorkInfo>,
-        /// Size of unpend queue at start
-        pub starting_unpend: u32,
-        /// Size of unpend queue at end
-        pub ending_unpend: u32,
+        pub actual: Vec<(CrankWorkInfo, PricePoint)>,
     }
 
-    impl PerpEvent for CrankExecBatchEvent {}
     impl From<CrankExecBatchEvent> for Event {
         fn from(
             CrankExecBatchEvent {
                 requested,
+                paying,
                 actual,
-                starting_unpend,
-                ending_unpend,
             }: CrankExecBatchEvent,
         ) -> Self {
             let mut event = Event::new("crank-batch-exec")
                 .add_attribute("requested", requested.to_string())
                 .add_attribute("actual", actual.len().to_string())
-                .add_attribute("starting-unpend", starting_unpend.to_string())
-                .add_attribute("ending-unpend", ending_unpend.to_string());
+                .add_attribute("paying", paying.to_string());
 
-            for (idx, work) in actual.into_iter().enumerate() {
+            for (idx, (work, price_point)) in actual.into_iter().enumerate() {
                 event = event.add_attribute(
                     format!("work-{}", idx + 1),
                     match work {
@@ -90,21 +105,21 @@ pub mod events {
                             Cow::Borrowed("close-all-positions")
                         }
                         CrankWorkInfo::ResetLpBalances {} => "reset-lp-balances".into(),
-                        CrankWorkInfo::Liquifunding { position } => {
+                        CrankWorkInfo::Liquifunding { position, .. } => {
                             format!("liquifund {position}").into()
-                        }
-                        CrankWorkInfo::UnpendLiquidationPrices { position } => {
-                            format!("unpend {position}").into()
                         }
                         CrankWorkInfo::Liquidation { position, .. } => {
                             format!("liquidation {position}").into()
                         }
-                        CrankWorkInfo::LimitOrder { order_id } => {
+                        CrankWorkInfo::DeferredExec {
+                            deferred_exec_id, ..
+                        } => format!("deferred exec {deferred_exec_id}").into(),
+                        CrankWorkInfo::LimitOrder { order_id, .. } => {
                             format!("limit order {order_id}").into()
                         }
-                        CrankWorkInfo::Completed {
-                            price_point_timestamp,
-                        } => format!("completed {price_point_timestamp}").into(),
+                        CrankWorkInfo::Completed {} => {
+                            format!("completed {}", price_point.timestamp).into()
+                        }
                     },
                 )
             }
@@ -113,55 +128,81 @@ pub mod events {
         }
     }
 
-    impl PerpEvent for CrankWorkInfo {}
-    impl From<CrankWorkInfo> for Event {
-        fn from(src: CrankWorkInfo) -> Self {
-            let mut event = Event::new("crank-work").add_attribute(
-                "kind",
-                match src {
-                    CrankWorkInfo::CloseAllPositions { .. } => "close-all-positions",
-                    CrankWorkInfo::ResetLpBalances { .. } => "reset-lp-balances",
-                    CrankWorkInfo::Completed { .. } => "completed",
-                    CrankWorkInfo::Liquidation { .. } => "liquidation",
-                    CrankWorkInfo::Liquifunding { .. } => "liquifunding",
-                    CrankWorkInfo::UnpendLiquidationPrices { .. } => "unpend-liquidation-prices",
-                    CrankWorkInfo::LimitOrder { .. } => "limit-order",
-                },
-            );
+    /// CrankWorkInfo with a given price point
+    pub struct CrankWorkInfoEvent {
+        /// The work info itself
+        pub work_info: CrankWorkInfo,
+        /// A price point, i.e. the price point that triggered the work
+        pub price_point: PricePoint,
+    }
 
-            let (position_id, order_id, price_point_timestamp) = match src {
-                CrankWorkInfo::CloseAllPositions { position } => (Some(position), None, None),
-                CrankWorkInfo::ResetLpBalances {} => (None, None, None),
-                CrankWorkInfo::Completed {
-                    price_point_timestamp,
-                } => (None, None, Some(price_point_timestamp)),
+    impl From<CrankWorkInfoEvent> for Event {
+        fn from(
+            CrankWorkInfoEvent {
+                work_info,
+                price_point,
+            }: CrankWorkInfoEvent,
+        ) -> Self {
+            let mut event = Event::new("crank-work")
+                .add_attribute(
+                    "kind",
+                    match work_info {
+                        CrankWorkInfo::CloseAllPositions { .. } => "close-all-positions",
+                        CrankWorkInfo::ResetLpBalances { .. } => "reset-lp-balances",
+                        CrankWorkInfo::Completed { .. } => "completed",
+                        CrankWorkInfo::Liquidation { .. } => "liquidation",
+                        CrankWorkInfo::Liquifunding { .. } => "liquifunding",
+                        CrankWorkInfo::DeferredExec { .. } => "deferred-exec",
+                        CrankWorkInfo::LimitOrder { .. } => "limit-order",
+                    },
+                )
+                // Keeping this for backwards-compat with indexer, though it should be deprecated
+                // and deserialized from price-point itself
+                .add_attribute("price-point-timestamp", price_point.timestamp.to_string())
+                .add_attribute("price-point", serde_json::to_string(&price_point).unwrap());
+
+            let (position_id, order_id) = match work_info {
+                CrankWorkInfo::CloseAllPositions { position } => (Some(position), None),
+                CrankWorkInfo::ResetLpBalances {} => (None, None),
+                CrankWorkInfo::Completed {} => (None, None),
                 CrankWorkInfo::Liquidation {
                     position,
                     liquidation_reason: _,
-                    price_point,
-                } => (Some(position), None, Some(price_point.timestamp)),
-                CrankWorkInfo::Liquifunding { position } => (Some(position), None, None),
-                CrankWorkInfo::UnpendLiquidationPrices { position } => (Some(position), None, None),
-                CrankWorkInfo::LimitOrder { order_id } => (None, Some(order_id), None),
+                } => (Some(position), None),
+                CrankWorkInfo::Liquifunding { position } => (Some(position), None),
+                CrankWorkInfo::DeferredExec {
+                    deferred_exec_id: _,
+                    target,
+                } => (target.position_id(), target.order_id()),
+                CrankWorkInfo::LimitOrder { order_id } => (None, Some(order_id)),
             };
 
             if let Some(position_id) = position_id {
                 event = event.add_attribute("pos-id", position_id.to_string());
             }
-            if let Some(price_point_timestamp) = price_point_timestamp {
-                event =
-                    event.add_attribute("price-point-timestamp", price_point_timestamp.to_string());
-            }
 
             if let CrankWorkInfo::Liquidation {
-                price_point,
-                liquidation_reason,
-                ..
-            } = src
+                liquidation_reason, ..
+            } = work_info
+            {
+                event = event.add_attribute("liquidation-reason", liquidation_reason.to_string());
+            }
+
+            if let CrankWorkInfo::DeferredExec {
+                deferred_exec_id,
+                target,
+            } = work_info
             {
                 event = event
-                    .add_attribute("price-point", serde_json::to_string(&price_point).unwrap())
-                    .add_attribute("liquidation-reason", liquidation_reason.to_string());
+                    .add_attribute("deferred-exec-id", deferred_exec_id.to_string())
+                    .add_attribute(
+                        "deferred-exec-target",
+                        match target {
+                            DeferredExecTarget::DoesNotExist => "not-exist",
+                            DeferredExecTarget::Position { .. } => "position",
+                            DeferredExecTarget::Order { .. } => "order",
+                        },
+                    );
             }
 
             if let Some(order_id) = order_id {
@@ -172,44 +213,70 @@ pub mod events {
         }
     }
 
-    impl TryFrom<Event> for CrankWorkInfo {
+    impl TryFrom<Event> for CrankWorkInfoEvent {
         type Error = anyhow::Error;
 
         fn try_from(evt: Event) -> anyhow::Result<Self> {
             let get_position_id =
                 || -> anyhow::Result<PositionId> { Ok(PositionId::new(evt.u64_attr("pos-id")?)) };
-
-            let get_price_point_timestamp = || evt.timestamp_attr("price-point-timestamp");
-            let get_price_point = || evt.json_attr("price-point");
+            let get_order_id =
+                || -> anyhow::Result<OrderId> { Ok(OrderId::new(evt.u64_attr("order-id")?)) };
 
             let get_liquidation_reason = || -> anyhow::Result<LiquidationReason> {
                 match evt.string_attr("liquidation-reason")?.as_str() {
                     "liquidated" => Ok(LiquidationReason::Liquidated),
-                    "take-profit" => Ok(LiquidationReason::MaxGains),
+                    "take-profit" => Ok(LiquidationReason::TakeProfit),
                     _ => Err(PerpError::unimplemented().into()),
                 }
             };
 
-            evt.map_attr_result("kind", |s| match s {
-                "completed" => Ok(CrankWorkInfo::Completed {
-                    price_point_timestamp: get_price_point_timestamp()?,
-                }),
+            let work_info = evt.map_attr_result("kind", |s| match s {
+                "completed" => Ok(CrankWorkInfo::Completed {}),
                 "liquifunding" => Ok(CrankWorkInfo::Liquifunding {
                     position: get_position_id()?,
                 }),
                 "liquidation" => Ok(CrankWorkInfo::Liquidation {
                     position: get_position_id()?,
                     liquidation_reason: get_liquidation_reason()?,
-                    price_point: get_price_point()?,
-                }),
-                "unpend-liquidation-prices" => Ok(CrankWorkInfo::UnpendLiquidationPrices {
-                    position: get_position_id()?,
                 }),
                 "limit-order" => Ok(CrankWorkInfo::LimitOrder {
-                    order_id: OrderId::new(evt.u64_attr("order-id")?),
+                    order_id: get_order_id()?,
                 }),
+                "close-all-positions" => Ok(CrankWorkInfo::CloseAllPositions {
+                    position: get_position_id()?,
+                }),
+                "reset-lp-balances" => Ok(CrankWorkInfo::ResetLpBalances {}),
+                "deferred-exec" => Ok(CrankWorkInfo::DeferredExec {
+                    deferred_exec_id: DeferredExecId::from_u64(evt.u64_attr("deferred-exec-id")?),
+                    target: evt.map_attr_result(
+                        "deferred-exec-target",
+                        |x| -> Result<DeferredExecTarget> {
+                            match x {
+                                "not-exist" => Ok(DeferredExecTarget::DoesNotExist),
+                                "position" => get_position_id().map(DeferredExecTarget::Position),
+                                "order" => get_order_id().map(DeferredExecTarget::Order),
+                                _ => Err(PerpError::unimplemented().into()),
+                            }
+                        },
+                    )?,
+                }),
+
                 _ => Err(PerpError::unimplemented().into()),
+            })?;
+
+            Ok(Self {
+                work_info,
+                price_point: evt.json_attr("price-point")?,
             })
+        }
+    }
+
+    // Not sure if this is needed anymore, but keeping it in for backwards compat at least
+    impl TryFrom<Event> for CrankWorkInfo {
+        type Error = anyhow::Error;
+
+        fn try_from(evt: Event) -> anyhow::Result<Self> {
+            CrankWorkInfoEvent::try_from(evt).map(|x| x.work_info)
         }
     }
 }

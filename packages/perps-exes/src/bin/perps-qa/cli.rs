@@ -1,6 +1,7 @@
-use cosmos::{Address, CosmosNetwork, RawWallet};
+use cosmos::{Address, SeedPhrase};
 use msg::{contracts::market::position::PositionId, prelude::*};
-use perps_exes::{build_version, UpdatePositionCollateralImpact};
+use perps_exes::{build_version, PerpsNetwork, UpdatePositionCollateralImpact};
+use tracing_subscriber::{fmt, prelude::*, EnvFilter, Layer};
 
 #[derive(clap::Parser)]
 #[clap(version = build_version())]
@@ -120,13 +121,18 @@ pub(crate) enum Subcommand {
         #[clap(flatten)]
         inner: crate::capping::Opt,
     },
+    /// Generate a CSV file with historical wallet balances
+    WalletReport {
+        #[clap(flatten)]
+        inner: crate::wallet::Opt,
+    },
 }
 
 #[derive(clap::Parser)]
 pub(crate) struct Opt {
     /// Network to use, overrides the contract family setting
     #[clap(long, env = "COSMOS_NETWORK", global = true)]
-    pub network: Option<CosmosNetwork>,
+    pub network: Option<PerpsNetwork>,
     /// Override gRPC endpoint
     #[clap(long, env = "COSMOS_GRPC", global = true)]
     pub cosmos_grpc: Option<String>,
@@ -154,19 +160,39 @@ pub(crate) struct Opt {
     pub market_id: MarketId,
     /// Mnemonic phrase for the Wallet
     #[clap(long, env = "COSMOS_WALLET")]
-    pub wallet: RawWallet,
+    pub wallet: SeedPhrase,
     /// Turn on verbose logging
     #[clap(long, short, global = true)]
     verbose: bool,
 }
 
 impl Opt {
-    pub(crate) fn init_logger(&self) {
-        let env = env_logger::Env::default().default_filter_or(if self.verbose {
-            format!("{}=debug,cosmos=debug,info", env!("CARGO_CRATE_NAME"))
-        } else {
-            "info".to_owned()
-        });
-        env_logger::Builder::from_env(env).init();
+    pub(crate) fn init_logger(&self) -> anyhow::Result<()> {
+        let env_filter = EnvFilter::from_default_env();
+
+        let crate_name = env!("CARGO_CRATE_NAME");
+        let env_filter = match std::env::var("RUST_LOG") {
+            Ok(_) => env_filter,
+            Err(_) => {
+                if self.verbose {
+                    env_filter
+                        .add_directive("cosmos=debug".parse()?)
+                        .add_directive(format!("{}=debug", crate_name).parse()?)
+                } else {
+                    env_filter.add_directive(format!("{}=info", crate_name).parse()?)
+                }
+            }
+        };
+
+        tracing_subscriber::registry()
+            .with(
+                fmt::Layer::default()
+                    .log_internal_errors(true)
+                    .and_then(env_filter),
+            )
+            .init();
+
+        tracing::debug!("Debug message!");
+        Ok(())
     }
 }

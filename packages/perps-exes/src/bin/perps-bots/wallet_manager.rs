@@ -7,13 +7,13 @@ use std::{
 
 use anyhow::{Context, Result};
 use cosmos::{
-    proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, AddressType, Cosmos, HasAddress,
-    SeedPhrase, TxBuilder, Wallet,
+    proto::cosmwasm::wasm::v1::MsgExecuteContract, Address, Cosmos, HasAddress, TxBuilder, Wallet,
 };
 use msg::{
     contracts::{cw20::Cw20Coin, market::entry::StatusResp},
     prelude::{Collateral, UnsignedDecimal},
 };
+use serde::Serialize;
 use tokio::sync::{mpsc, oneshot};
 
 #[derive(Clone)]
@@ -21,23 +21,12 @@ pub(crate) struct WalletManager {
     inner: Arc<Inner>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Serialize)]
 pub(crate) enum ManagedWallet {
     Balance,
     Liquidity,
     Utilization,
     Trader(u32),
-}
-
-impl ManagedWallet {
-    fn get_index(self) -> u32 {
-        match self {
-            ManagedWallet::Balance => 1,
-            ManagedWallet::Liquidity => 2,
-            ManagedWallet::Utilization => 3,
-            ManagedWallet::Trader(x) => x + 3,
-        }
-    }
 }
 
 impl Display for ManagedWallet {
@@ -52,8 +41,6 @@ impl Display for ManagedWallet {
 }
 
 struct Inner {
-    seed: SeedPhrase,
-    address_type: AddressType,
     send_request: mpsc::Sender<MintRequest>,
     minter_address: Address,
 }
@@ -79,31 +66,17 @@ impl Debug for MintRequest {
 }
 
 impl WalletManager {
-    pub(crate) fn new(seed: SeedPhrase, address_type: AddressType) -> Result<Self> {
-        let minter = seed.derive_cosmos_numbered(0).for_chain(address_type)?;
+    pub(crate) fn new(minter: Wallet) -> Result<Self> {
         tracing::info!("Wallet manager minter wallet: {minter}");
         let (send_request, recv_request) = mpsc::channel(100);
         let manager = WalletManager {
             inner: Arc::new(Inner {
-                seed,
-                address_type,
                 send_request,
-                minter_address: *minter.address(),
+                minter_address: minter.get_address(),
             }),
         };
         tokio::task::spawn(background(recv_request, minter));
         Ok(manager)
-    }
-
-    pub(crate) fn get_wallet(&self, desc: ManagedWallet) -> Result<Wallet> {
-        let idx = desc.get_index();
-        let wallet = self
-            .inner
-            .seed
-            .derive_cosmos_numbered(idx.into())
-            .for_chain(self.inner.address_type)?;
-        tracing::info!("Got fresh wallet from manager for {desc}: {wallet}",);
-        Ok(wallet)
     }
 
     pub(crate) async fn mint(
@@ -178,7 +151,7 @@ async fn process_requests(
 ) -> Result<()> {
     let mut tx_builder = TxBuilder::default();
     for req in requests {
-        tx_builder.add_message_mut(MsgExecuteContract {
+        tx_builder.add_message(MsgExecuteContract {
             sender: minter.get_address_string(),
             contract: req.faucet.get_address_string(),
             msg: serde_json::to_vec(&msg::contracts::faucet::entry::ExecuteMsg::OwnerMsg(

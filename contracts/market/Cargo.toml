@@ -1,6 +1,6 @@
 [package]
 name = "levana_perpswap_cosmos_market"
-version = "0.1.0-beta.15"
+version = "0.1.2"
 authors = ["Levana Team"]
 edition = "2021"
 
@@ -16,8 +16,6 @@ exclude = [
 crate-type = ["cdylib", "rlib"]
 
 [features]
-# for more explicit tests, cargo test --features=backtraces
-backtraces = ["cosmwasm-std/backtraces"]
 # use library feature to disable all instantiate/execute/query exports
 library = []
 sanity = []
@@ -27,19 +25,19 @@ sei = ["sei-cosmwasm"]
 [dependencies]
 msg = {package = "levana_perpswap_cosmos_msg", path = "../../packages/msg" }
 shared = {package = "levana_perpswap_cosmos_shared", path = "../../packages/shared" }
-cosmwasm-std = { version = "1.1.9", features = ["abort"] }
-cw2 = "1.0.0"
-cw-storage-plus = "1.0.1"
-serde = { version = "1.0.151", default-features = false, features = ["derive"] }
+cosmwasm-std = { workspace = true, features = ["abort"] }
+cw2 = "2.0.0"
+cw-storage-plus = "2.0.0"
+serde = { version = "1.0.199", default-features = false, features = ["derive"] }
 semver = "1.0.15"
-anyhow = "1.0.67"
-cw-utils = "1.0.1"
+anyhow = "1.0.82"
+cw-utils = "2.0.0"
 once_cell = "1"
 indoc = "1.0.8"
-pyth-sdk-cw = "1.2.0"
-sei-cosmwasm = { version = "0.4.10", optional = true }
+pyth-sdk-cw = { workspace = true}
+sei-cosmwasm = { git = "https://github.com/lvn-hasky-dragon/sei-cosmwasm.git", rev = "8d2e75bd8ec967515f4666113153de37d7e08375", optional = true }
 
 [dev-dependencies]
-cosmwasm-schema = "1.1.9"
+cosmwasm-schema = { workspace = true, features=["allow-unknown-fields"] }
 shared = {package = "levana_perpswap_cosmos_shared", path = "../../packages/shared", features = ["debug_log"] }
 proptest = "1.0.0"

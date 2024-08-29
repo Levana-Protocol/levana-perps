@@ -30,7 +30,7 @@ impl Opt {
 
         while samples > 0 {
             samples -= 1;
-            log::info!("Querying {next_height}");
+            tracing::info!("Querying {next_height}");
 
             let status: StatusResp = app
                 .market
@@ -46,7 +46,7 @@ impl Opt {
                 .timestamp;
 
             let net_notional =
-                status.long_notional.into_signed() - status.short_notional.into_signed();
+                (status.long_notional.into_signed() - status.short_notional.into_signed())?;
 
             let largest_net_abs = Notional::from_decimal256(
                 status.config.delta_neutrality_fee_sensitivity.raw()

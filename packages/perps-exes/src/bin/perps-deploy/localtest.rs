@@ -1,6 +1,6 @@
-use cosmos::{CosmosNetwork, HasAddress, HasAddressType, RawWallet};
+use cosmos::{HasAddress, HasAddressHrp, SeedPhrase};
 use msg::prelude::*;
-use perps_exes::PerpApp;
+use perps_exes::{PerpApp, PerpsNetwork};
 
 use std::{
     process::{Child, Command, Stdio},
@@ -22,7 +22,7 @@ use crate::{
 pub(crate) struct TestsOpt {
     /// Network to use. Either this or family must be provided.
     #[clap(long, env = "COSMOS_NETWORK")]
-    pub(crate) network: CosmosNetwork,
+    pub(crate) network: PerpsNetwork,
     /// Skip initialization
     #[clap(long)]
     skip_init: bool,
@@ -46,12 +46,12 @@ fn kill_osmo_local() {
     {
         Ok(ec) => {
             if ec.success() {
-                log::info!("Successfully killed osmolocal");
+                tracing::info!("Successfully killed osmolocal");
             } else {
-                log::info!("Killing osmolocal exited with {ec:?}");
+                tracing::info!("Killing osmolocal exited with {ec:?}");
             }
         }
-        Err(e) => log::info!("Problem killing junolocal: {e:?}"),
+        Err(e) => tracing::info!("Problem killing osmolocal: {e:?}"),
     }
 }
 
@@ -64,9 +64,10 @@ impl Drop for OsmoLocalProcess {
 impl OsmoLocalProcess {
     fn launch() -> Result<Self> {
         kill_osmo_local();
-        log::info!("Going to spawn new osmolocal");
+        tracing::info!("Going to spawn new osmolocal");
         Ok(OsmoLocalProcess(
             Command::new("./.ci/osmolocal.sh")
+                .arg("--no-terminal")
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
@@ -90,11 +91,11 @@ pub(crate) async fn go(opt: Opt, opts: TestsOpt) -> Result<()> {
     let network = opts.network;
 
     if let Some(ol) = &mut ol {
-        log::info!("Waiting till Network is up");
+        tracing::info!("Waiting till Network is up");
         wait_till_network_is_up(raw_wallet.clone(), network, ol).await?;
     }
 
-    log::info!("Going to Deploy");
+    tracing::info!("Going to Deploy");
 
     let InstantiateResponse {
         factory,
@@ -123,8 +124,8 @@ pub(crate) async fn go(opt: Opt, opts: TestsOpt) -> Result<()> {
 }
 
 async fn wait_till_network_is_up(
-    wallet: RawWallet,
-    network: CosmosNetwork,
+    wallet: SeedPhrase,
+    network: PerpsNetwork,
     ol: &mut OsmoLocalProcess,
 ) -> Result<()> {
     let total_estimated_seconds = Duration::from_secs(15);
@@ -133,7 +134,7 @@ async fn wait_till_network_is_up(
 
     for counter in 1..=total_counter {
         if counter % 10 == 0 {
-            log::info!("Trying to connect to the network ({counter}/{total_counter})");
+            tracing::info!("Trying to connect to the network ({counter}/{total_counter})");
         }
 
         if let Some(exit_status) = ol.0.try_wait()? {
@@ -141,7 +142,7 @@ async fn wait_till_network_is_up(
         }
 
         let builder = network.builder().await?;
-        let cosmos = builder.build().await;
+        let cosmos = builder.build();
         let cosmos = match cosmos {
             Ok(cosmos) => cosmos,
             Err(_) => {
@@ -149,10 +150,10 @@ async fn wait_till_network_is_up(
                 continue;
             }
         };
-        let address_type = cosmos.get_address_type();
-        let wallet = wallet.for_chain(address_type)?;
+        let address_type = cosmos.get_address_hrp();
+        let wallet = wallet.with_hrp(address_type)?;
 
-        let balances = cosmos.all_balances(wallet.get_address_string()).await;
+        let balances = cosmos.all_balances(wallet.get_address()).await;
         if balances.is_ok() {
             return Ok(());
         } else {

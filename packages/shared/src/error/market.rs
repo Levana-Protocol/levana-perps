@@ -28,6 +28,13 @@ pub enum MarketError {
         market_type: MarketType,
         direction: DirectionToBase,
     },
+    #[error(
+        "Infinite take profit price can only be used on long positions for collateral-is-base markets"
+    )]
+    InvalidInfiniteTakeProfitPrice {
+        market_type: MarketType,
+        direction: DirectionToBase,
+    },
     #[error("Max gains are too large")]
     MaxGainsTooLarge {},
     #[error("Unable to withdraw {requested}. Only {available} LP tokens held.")]
@@ -126,19 +133,49 @@ pub enum MarketError {
         net_notional_before: Signed<Notional>,
         net_notional_after: Signed<Notional>,
     },
-    #[error(
-        "Specified {trigger_type} trigger price of '{specified}' must be {must_be} than '{bound}'."
-    )]
-    InvalidTriggerPrice {
-        must_be: TriggerPriceMustBe,
-        trigger_type: TriggerType,
-        specified: PriceBaseInQuote,
-        bound: PriceBaseInQuote,
-    },
     #[error("Liquidity cooldown in effect, will end in {seconds_remaining} seconds.")]
     LiquidityCooldown {
         ends_at: Timestamp,
         seconds_remaining: u64,
+    },
+    #[error("Cannot perform the given action while a pending action is waiting for the position")]
+    PendingDeferredExec {},
+    #[error("The difference between oldest and newest publish timestamp is too large. Oldest: {oldest}. Newest: {newest}.")]
+    VolatilePriceFeedTimeDelta {
+        oldest: Timestamp,
+        newest: Timestamp,
+    },
+    #[error("Limit order {order_id} is already canceling")]
+    LimitOrderAlreadyCanceling { order_id: Uint64 },
+    #[error("Position {position_id} is already closing")]
+    PositionAlreadyClosing { position_id: Uint64 },
+    #[error(
+        "No price publish time found, there is likely a spot price config error for this market"
+    )]
+    NoPricePublishTimeFound,
+    #[error("Cannot close position {id}, it was already closed at {close_time}. Close reason: {reason}.")]
+    PositionAlreadyClosed {
+        id: Uint64,
+        close_time: Timestamp,
+        reason: String,
+    },
+    #[error("Insufficient locked liquidity in protocol to perform the given unlock. Requested: {requested}. Total locked: {total_locked}.")]
+    InsufficientLiquidityForUnlock {
+        requested: NonZero<Collateral>,
+        total_locked: Collateral,
+    },
+    #[error("Insufficient unlocked liquidity in the protocol. Requested: {requested}. Total available: {total_unlocked}. Total allowed with carry leverage restrictions: {allowed}.")]
+    Liquidity {
+        /// Total amount of liquidity requested to take from unlocked pool.
+        requested: NonZero<Collateral>,
+        /// Total amount of liquidity available in the unlocked pool.
+        total_unlocked: Collateral,
+        /// Liquidity allowed to be taken for this action.
+        ///
+        /// In particular, carry leverage may restrict the total amount of
+        /// liquidity that can be used to ensure sufficient funds for cash-and-carry
+        /// balancing operations.
+        allowed: Collateral,
     },
 }
 
@@ -169,8 +206,6 @@ impl Display for TriggerPriceMustBe {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TriggerType {
-    /// A limit order
-    LimitOrder,
     /// A stop loss
     StopLoss,
     /// A take profit
@@ -183,7 +218,6 @@ impl Display for TriggerType {
             f,
             "{}",
             match self {
-                TriggerType::LimitOrder => "limit order",
                 TriggerType::StopLoss => "stop loss",
                 TriggerType::TakeProfit => "take profit",
             }
@@ -243,6 +277,9 @@ impl MarketError {
     fn get_error_id(&self) -> ErrorId {
         match self {
             MarketError::InvalidInfiniteMaxGains { .. } => ErrorId::InvalidInfiniteMaxGains,
+            MarketError::InvalidInfiniteTakeProfitPrice { .. } => {
+                ErrorId::InvalidInfiniteTakeProfitPrice
+            }
             MarketError::MaxGainsTooLarge {} => ErrorId::MaxGainsTooLarge,
             MarketError::WithdrawTooMuch { .. } => ErrorId::WithdrawTooMuch,
             MarketError::InsufficientLiquidityForWithdrawal { .. } => {
@@ -270,8 +307,17 @@ impl MarketError {
             MarketError::DeltaNeutralityFeeShortToLong { .. } => {
                 ErrorId::DeltaNeutralityFeeShortToLong
             }
-            MarketError::InvalidTriggerPrice { .. } => ErrorId::InvalidTriggerPrice,
             MarketError::LiquidityCooldown { .. } => ErrorId::LiquidityCooldown,
+            MarketError::PendingDeferredExec {} => ErrorId::PendingDeferredExec,
+            MarketError::VolatilePriceFeedTimeDelta { .. } => ErrorId::VolatilePriceFeedTimeDelta,
+            MarketError::LimitOrderAlreadyCanceling { .. } => ErrorId::LimitOrderAlreadyCanceling,
+            MarketError::PositionAlreadyClosing { .. } => ErrorId::PositionAlreadyClosing,
+            MarketError::NoPricePublishTimeFound => ErrorId::NoPricePublishTimeFound,
+            MarketError::PositionAlreadyClosed { .. } => ErrorId::PositionAlreadyClosed,
+            MarketError::InsufficientLiquidityForUnlock { .. } => {
+                ErrorId::InsufficientLiquidityForUnlock
+            }
+            MarketError::Liquidity { .. } => ErrorId::Liquidity,
         }
     }
 }

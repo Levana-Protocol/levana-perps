@@ -2,8 +2,6 @@
 default:
 	just --list --unsorted
 
-LEVANA_BOTS_FACTORY := "osmo1aakfpghcanxtc45gpqlx8j3rq0zcpyf49qmhm9mdjrfx036h4z5skyrywg"
-
 # Run application
 run:
-	env LEVANA_BOTS_FACTORY={{LEVANA_BOTS_FACTORY}} LEVANA_BOTS_NUM_BLOCKS=40 COSMOS_NETWORK=osmosis-local LEVANA_BOTS_SEED_PHRASE="bottom loan skill merry east cradle onion journey palm apology verb edit desert impose absurd oil bubble sweet glove shallow size build burst effort"  cargo run --verbose --bin perps-bots -- mainnet --crank-rewards {{LEVANA_BOTS_FACTORY}} --rpc-endpoint http://localhost:1317 --min-gas 1 --min-gas-refill 1
+	env LEVANA_BOTS_NUM_BLOCKS=40 COSMOS_NETWORK=osmosis-testnet cargo run --verbose --bin perps-bots -- testnet --deployment osmodev --hcaptcha-secret foo --

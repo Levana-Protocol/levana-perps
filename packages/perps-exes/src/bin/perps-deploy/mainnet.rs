@@ -1,44 +1,41 @@
+mod check_price_feed_health;
+mod close_all_positions;
+mod contracts_csv;
+mod fees_paid;
 mod migrate;
+mod rewards;
 mod send_treasury;
 mod sync_config;
 mod transfer_dao_fees;
 mod update_config;
 mod wind_down;
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    path::PathBuf,
-};
+use std::collections::BTreeMap;
 
-use chrono::{DateTime, Utc};
-use cosmos::{Address, ContractAdmin, CosmosNetwork, HasAddress, TxBuilder};
-use cosmwasm_std::{to_binary, CosmosMsg, Empty};
-use msg::{
-    contracts::market::{
-        entry::NewMarketParams,
-        spot_price::{
-            PythConfigInit, PythPriceServiceNetwork, SpotPriceConfigInit, StrideConfigInit,
-        },
-    },
-    token::TokenInit,
+use chrono::{TimeZone, Utc};
+use cosmos::{Address, ContractAdmin, Cosmos, HasAddress, TxBuilder};
+use cosmwasm_std::{to_json_binary, CosmosMsg, Empty};
+use msg::contracts::market::{
+    entry::NewMarketParams,
+    spot_price::{SpotPriceConfigInit, SpotPriceFeedDataInit},
 };
 use perps_exes::{
     config::{
-        ChainConfig, ConfigUpdateAndBorrowFee, MainnetFactories, MainnetFactory,
-        MarketConfigUpdates, NativeAsset, PriceConfig,
+        load_toml, save_toml, ChainConfig, ConfigUpdateAndBorrowFee, CrankFeeConfig,
+        MainnetFactories, MainnetFactory, MarketConfigUpdates, PriceConfig,
     },
     contracts::Factory,
     prelude::*,
+    PerpsNetwork,
 };
 
-use crate::{
-    app::OracleInfo, cli::Opt, spot_price_config::get_spot_price_config, util::get_hash_for_path,
-};
+use crate::{cli::Opt, spot_price_config::get_spot_price_config, util::get_hash_for_path};
 
 use self::{
-    migrate::MigrateOpts, send_treasury::SendTreasuryOpts, sync_config::SyncConfigOpts,
-    transfer_dao_fees::TransferDaoFeesOpts, update_config::UpdateConfigOpts,
-    wind_down::WindDownOpts,
+    check_price_feed_health::CheckPriceFeedHealthOpts, close_all_positions::CloseAllPositionsOpts,
+    contracts_csv::ContractsCsvOpts, migrate::MigrateOpts, send_treasury::SendTreasuryOpts,
+    sync_config::SyncConfigOpts, transfer_dao_fees::TransferDaoFeesOpts,
+    update_config::UpdateConfigOpts, wind_down::WindDownOpts,
 };
 
 #[derive(clap::Parser)]
@@ -48,12 +45,13 @@ pub(crate) struct MainnetOpt {
 }
 
 #[derive(clap::Parser)]
+#[allow(clippy::large_enum_variant)]
 enum Sub {
     /// Store all perps contracts on chain
     StorePerpsContracts {
         /// Network to use.
         #[clap(long, env = "COSMOS_NETWORK")]
-        network: CosmosNetwork,
+        network: PerpsNetwork,
         /// Override the code ID, only works if to-upload is specified and has a single value
         #[clap(long)]
         code_id: Option<u64>,
@@ -104,6 +102,31 @@ enum Sub {
         #[clap(flatten)]
         inner: WindDownOpts,
     },
+    /// Exports all contract addresses for a factory to a CSV file
+    ContractsCsv {
+        #[clap(flatten)]
+        inner: ContractsCsvOpts,
+    },
+    /// Check the health of all the price feeds for a factory
+    CheckPriceFeedHealth {
+        #[clap(flatten)]
+        inner: CheckPriceFeedHealthOpts,
+    },
+    /// Create a CW3 message to close all positions in a market
+    CloseAllPositions {
+        #[clap(flatten)]
+        inner: CloseAllPositionsOpts,
+    },
+    /// Collect rewards in all markets in a mainnet factory
+    Rewards {
+        #[clap(flatten)]
+        inner: rewards::RewardsOpts,
+    },
+    /// Produce a report on fees paid by a wallet across a factory
+    FeesPaid {
+        #[clap(flatten)]
+        inner: fees_paid::FeesPaidOpts,
+    },
 }
 
 pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
@@ -126,6 +149,11 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
         Sub::SendTreasury { inner } => inner.go(opt).await?,
         Sub::TransferDaoFees { inner } => inner.go(opt).await?,
         Sub::WindDown { inner } => inner.go(opt).await?,
+        Sub::ContractsCsv { inner } => inner.go(opt).await?,
+        Sub::CheckPriceFeedHealth { inner } => inner.go(opt).await?,
+        Sub::CloseAllPositions { inner } => inner.go(opt).await?,
+        Sub::Rewards { inner } => inner.go(opt).await?,
+        Sub::FeesPaid { inner } => inner.go(opt).await?,
     }
     Ok(())
 }
@@ -133,24 +161,20 @@ pub(crate) async fn go(opt: Opt, inner: MainnetOpt) -> Result<()> {
 /// Stores code ID by the SHA256 hash of the contract.
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
-struct CodeIds {
+pub(crate) struct CodeIds {
     /// Uses a Vec instead of a HashMap to keep consistent ordering and avoid large diffs.
     hashes: Vec<StoredContract>,
 }
 
 impl CodeIds {
-    const PATH: &str = "packages/perps-exes/assets/mainnet-code-ids.yaml";
+    const PATH: &'static str = "packages/perps-exes/assets/mainnet-code-ids.toml";
 
-    fn load() -> Result<Self> {
-        let mut file = fs_err::File::open(Self::PATH)?;
-        serde_yaml::from_reader(&mut file)
-            .with_context(|| format!("Error loading CodeIds from {}", Self::PATH))
+    pub(crate) fn load() -> Result<Self> {
+        load_toml(Self::PATH, "LEVANA_CODE_IDS_", "code IDs")
     }
 
     fn save(&self) -> Result<()> {
-        let mut file = fs_err::File::create(Self::PATH)?;
-        serde_yaml::to_writer(&mut file, self)
-            .with_context(|| format!("Error saving CodeIds to {}", Self::PATH))
+        save_toml(Self::PATH, self)
     }
 
     fn get_mut_by_hash(&mut self, hash: &str) -> Option<&mut StoredContract> {
@@ -161,7 +185,7 @@ impl CodeIds {
         &self,
         contract_type: ContractType,
         opt: &Opt,
-        network: CosmosNetwork,
+        network: PerpsNetwork,
     ) -> Result<StoredCodeId> {
         let contract_path = opt.get_contract_path(contract_type.as_str());
         let hash = get_hash_for_path(&contract_path)?;
@@ -185,30 +209,9 @@ impl CodeIds {
         &self,
         contract_type: ContractType,
         opt: &Opt,
-        network: CosmosNetwork,
+        network: PerpsNetwork,
     ) -> Result<u64> {
         self.get(contract_type, opt, network).map(|x| x.code_id)
-    }
-
-    fn get_by_gitrev(
-        &self,
-        contract_type: ContractType,
-        network: CosmosNetwork,
-        gitrev: &str,
-    ) -> Result<u64> {
-        let mut iter = self
-            .hashes
-            .iter()
-            .filter(|x| x.gitrev == gitrev && x.contract_type == contract_type)
-            .flat_map(|x| x.code_ids.get(&network).copied());
-        let first = iter
-            .next()
-            .with_context(|| format!("No {contract_type:?} contract found for gitrev {gitrev}"))?;
-        anyhow::ensure!(
-            iter.next().is_none(),
-            "Found multiple {contract_type:?} contracts for gitrev {gitrev}"
-        );
-        Ok(first)
     }
 }
 
@@ -225,10 +228,11 @@ enum ContractType {
     Market,
     LiquidityToken,
     PositionToken,
+    Countertrade,
 }
 
 impl ContractType {
-    fn all() -> [ContractType; 4] {
+    fn all_required() -> [ContractType; 4] {
         use ContractType::*;
         [Factory, Market, LiquidityToken, PositionToken]
     }
@@ -239,6 +243,7 @@ impl ContractType {
             ContractType::Market => "market",
             ContractType::LiquidityToken => "liquidity_token",
             ContractType::PositionToken => "position_token",
+            ContractType::Countertrade => "countertrade",
         }
     }
 }
@@ -252,6 +257,7 @@ impl FromStr for ContractType {
             "market" => Ok(ContractType::Market),
             "liquidity_token" => Ok(ContractType::LiquidityToken),
             "position_token" => Ok(ContractType::PositionToken),
+            "countertrade" => Ok(ContractType::Countertrade),
             _ => Err(anyhow::anyhow!("Invalid contract type: {s}")),
         }
     }
@@ -263,13 +269,13 @@ impl FromStr for ContractType {
 struct StoredContract {
     contract_type: ContractType,
     gitrev: String,
-    code_ids: BTreeMap<CosmosNetwork, u64>,
+    code_ids: BTreeMap<PerpsNetwork, u64>,
     hash: String,
 }
 
 async fn store_perps_contracts(
     opt: Opt,
-    network: CosmosNetwork,
+    network: PerpsNetwork,
     code_id: Option<u64>,
     granter: Option<Address>,
     to_upload: &[ContractType],
@@ -279,7 +285,7 @@ async fn store_perps_contracts(
     let mut code_ids = CodeIds::load()?;
     let gitrev = opt.get_gitrev()?;
 
-    let all_contracts = ContractType::all();
+    let all_contracts = ContractType::all_required();
     let to_upload = if to_upload.is_empty() {
         all_contracts.as_slice()
     } else {
@@ -304,7 +310,7 @@ async fn store_perps_contracts(
         anyhow::ensure!(entry.contract_type == contract_type, "Mismatched contract type for SHA256 {hash}. Expected: {contract_type:?}. Found in file: {:?}", entry.contract_type);
         match entry.code_ids.get(&network) {
             Some(code_id) => {
-                log::info!("{contract_type:?} already found under code ID {code_id}");
+                tracing::info!("{contract_type:?} already found under code ID {code_id}");
             }
             None => {
                 let code_id = match code_id {
@@ -313,11 +319,11 @@ async fn store_perps_contracts(
                             to_upload.len() == 1,
                             "Can only provide a code ID if there is exactly one to-upload value"
                         );
-                        log::info!("Using code ID from the command line: {code_id}");
+                        tracing::info!("Using code ID from the command line: {code_id}");
                         code_id
                     }
                     None => {
-                        log::info!("Storing {contract_type:?}...");
+                        tracing::info!("Storing {contract_type:?}...");
                         let code_id = match granter {
                             None => app.cosmos.store_code_path(wallet, &contract_path).await?,
                             Some(granter) => {
@@ -327,7 +333,7 @@ async fn store_perps_contracts(
                                     .1
                             }
                         };
-                        log::info!("New code ID: {code_id}");
+                        tracing::info!("New code ID: {code_id}");
                         code_id.get_code_id()
                     }
                 };
@@ -344,7 +350,7 @@ async fn store_perps_contracts(
 struct InstantiateFactoryOpts {
     /// Network to use.
     #[clap(long, env = "COSMOS_NETWORK")]
-    network: CosmosNetwork,
+    network: PerpsNetwork,
     /// On-chain label for the factory contract
     #[clap(long)]
     factory_label: String,
@@ -404,7 +410,7 @@ async fn instantiate_factory(
     let position = code_ids.get_simple(ContractType::PositionToken, &opt, network)?;
     let liquidity = code_ids.get_simple(ContractType::LiquidityToken, &opt, network)?;
     let factory = app.cosmos.make_code_id(factory_code_id);
-    log::info!("Instantiating a factory using code ID {factory_code_id}");
+    tracing::info!("Instantiating a factory using code ID {factory_code_id}");
     let migration_admin = migration_admin.unwrap_or(owner);
     let factory = factory
         .instantiate(
@@ -425,7 +431,7 @@ async fn instantiate_factory(
             ContractAdmin::Addr(migration_admin),
         )
         .await?;
-    log::info!("Deployed fresh factory contract to: {factory}");
+    tracing::info!("Deployed fresh factory contract to: {factory}");
 
     factories.factories.push(MainnetFactory {
         address: factory.get_address(),
@@ -459,80 +465,193 @@ struct AddMarketOpts {
     #[clap(long)]
     factory: String,
     /// New market ID to add
-    #[clap(long)]
-    market_id: MarketId,
+    #[clap(long, required = true)]
+    market_id: Vec<MarketId>,
 }
 
 async fn add_market(opt: Opt, AddMarketOpts { factory, market_id }: AddMarketOpts) -> Result<()> {
-    let ConfigUpdateAndBorrowFee {
-        config: market_config_update,
-        initial_borrow_fee_rate,
-    } = {
-        let mut market_config_updates = MarketConfigUpdates::load(&opt.market_config)?;
-        market_config_updates
-            .markets
-            .remove(&market_id)
-            .with_context(|| format!("No config update found for market ID: {market_id}"))?
-    };
+    let market_config_updates = MarketConfigUpdates::load(&opt.market_config)?;
 
     let factories = MainnetFactories::load()?;
     let factory = factories.get(&factory)?;
     let app = opt.load_app_mainnet(factory.network).await?;
-    let chain_config = ChainConfig::load(None::<PathBuf>, factory.network)?;
-    let price_config = PriceConfig::load(None::<PathBuf>)?;
+    let chain_config = ChainConfig::load(factory.network)?;
+    let price_config = PriceConfig::load()?;
     let oracle = opt.get_oracle_info(&chain_config, &price_config, factory.network)?;
 
-    let collateral_name = market_id.get_collateral();
-    let token = chain_config
-        .assets
-        .get(collateral_name)
-        .with_context(|| {
-            format!(
-                "No definition for asset {collateral_name} for network {}",
-                factory.network
-            )
-        })?
-        .into();
+    let mut simtx = TxBuilder::default();
+    let mut msgs = vec![];
 
-    let msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
-        new_market: NewMarketParams {
-            spot_price: get_spot_price_config(&oracle, &price_config, &market_id)?,
-            market_id,
-            token,
-            config: Some(market_config_update),
-            initial_borrow_fee_rate,
-            initial_price: None,
-        },
-    };
-    let msg = strip_nulls(msg)?;
+    let network = factory.network;
     let factory = app.cosmos.make_contract(factory.address);
-
     let factory = Factory::from_contract(factory);
-    log::info!("Need to make a proposal");
-
     let owner = factory.query_owner().await?;
-    log::info!("CW3 contract: {owner}");
-    log::info!(
-        "Message: {}",
-        serde_json::to_string(&CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
-            contract_addr: factory.to_string(),
-            msg: to_binary(&msg)?,
-            funds: vec![]
-        }))?
-    );
 
-    let simres = TxBuilder::default()
-        .add_execute_message(factory, owner, vec![], &msg)?
+    for market_id in market_id {
+        let ConfigUpdateAndBorrowFee {
+            config: mut market_config_update,
+            initial_borrow_fee_rate,
+        } = {
+            market_config_updates
+                .markets
+                .get(&market_id)
+                .cloned()
+                .with_context(|| format!("No config update found for market ID: {market_id}"))?
+        };
+        let CrankFeeConfig {
+            charged,
+            surcharge,
+            reward,
+        } = market_config_updates
+            .crank_fees
+            .get(&network)
+            .with_context(|| format!("No crank fee config found for network {network}"))?;
+        market_config_update.crank_fee_charged = Some(*charged);
+        market_config_update.crank_fee_surcharge = Some(*surcharge);
+        market_config_update.crank_fee_reward = Some(*reward);
+
+        let collateral_name = market_id.get_collateral();
+        let token = chain_config
+            .assets
+            .get(collateral_name)
+            .with_context(|| {
+                format!("No definition for asset {collateral_name} for network {network}",)
+            })?
+            .into();
+
+        let spot_price = get_spot_price_config(&oracle, &market_id)?;
+        validate_spot_price_config(&app.cosmos, &spot_price, &market_id).await?;
+
+        let msg = msg::contracts::factory::entry::ExecuteMsg::AddMarket {
+            new_market: NewMarketParams {
+                spot_price,
+                market_id,
+                token,
+                config: Some(market_config_update),
+                initial_borrow_fee_rate,
+                initial_price: None,
+            },
+        };
+        let msg = strip_nulls(msg)?;
+
+        simtx.add_execute_message(&factory, owner, vec![], &msg)?;
+        msgs.push(CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
+            contract_addr: factory.to_string(),
+            msg: to_json_binary(&msg)?,
+            funds: vec![],
+        }));
+    }
+
+    tracing::info!("Need to make a proposal");
+
+    tracing::info!("CW3 contract: {owner}");
+    tracing::info!("Message: {}", serde_json::to_string(&msgs)?);
+
+    let simres = simtx
         .simulate(&app.cosmos, &[owner])
         .await
         .context("Could not simulate message")?;
-    log::info!("Simulation completed successfully");
-    log::debug!("Simulation response: {simres:?}");
+    tracing::info!("Simulation completed successfully");
+    tracing::debug!("Simulation response: {simres:?}");
 
     Ok(())
 }
 
-fn strip_nulls<T: serde::Serialize>(x: T) -> Result<serde_json::Value> {
+async fn validate_spot_price_config(
+    cosmos: &Cosmos,
+    spot_price: &SpotPriceConfigInit,
+    market_id: &MarketId,
+) -> Result<()> {
+    tracing::info!("Validating spot price config for {market_id}");
+
+    match spot_price {
+        SpotPriceConfigInit::Manual { .. } => {
+            anyhow::bail!("Unsupported manual price config for {market_id}")
+        }
+        SpotPriceConfigInit::Oracle {
+            pyth: _,
+            stride,
+            feeds,
+            feeds_usd,
+            volatile_diff_seconds: _,
+        } => {
+            for feed in feeds.iter().chain(feeds_usd.iter()) {
+                match &feed.data {
+                    // No need to check the constant feed
+                    SpotPriceFeedDataInit::Constant { price: _ } => (),
+                    SpotPriceFeedDataInit::Pyth {
+                        id: _,
+                        age_tolerance_seconds: _,
+                    } => {
+                        // In theory could do some sanity checking of the Pyth
+                        // feeds here, but that's usually well handled via testnet testing. Skipping for
+                        // now.
+                    }
+                    SpotPriceFeedDataInit::Stride {
+                        denom,
+                        age_tolerance_seconds,
+                    } => {
+                        #[derive(serde::Serialize)]
+                        #[serde(rename_all = "snake_case")]
+                        enum StrideQuery<'a> {
+                            RedemptionRate { denom: &'a str },
+                        }
+
+                        let stride = stride.as_ref().with_context(|| format!("Using a Stride feed with denom {denom}, but no Stride contract configured"))?;
+                        let stride =
+                            cosmos.make_contract(stride.contract_address.as_str().parse()?);
+
+                        #[derive(serde::Deserialize)]
+                        #[serde(rename_all = "snake_case")]
+                        struct RedemptionRateResp {
+                            redemption_rate: Decimal256,
+                            update_time: u64,
+                        }
+                        let RedemptionRateResp {
+                            redemption_rate,
+                            update_time,
+                        } = stride.query(StrideQuery::RedemptionRate { denom }).await?;
+                        let update_time = Utc
+                            .timestamp_opt(update_time.try_into()?, 0)
+                            .single()
+                            .with_context(|| {
+                                format!("Could not convert {update_time} to DateTime<Utc>")
+                            })?;
+                        let age = Utc::now().signed_duration_since(update_time);
+                        tracing::info!(
+                            "Queried Stride contract {stride} with denom {denom}, got redemption rate of {redemption_rate} updated {update_time} (age: {age:?})"
+                        );
+                        anyhow::ensure!(redemption_rate >= Decimal256::one(), "Redemption rates should always be at least 1, very likely the contract has the purchase rate instead. See: https://blog.levana.finance/milktia-market-mispricing-proposed-solution-6a994e9ecdfa");
+                        let tolerance = chrono::Duration::seconds((*age_tolerance_seconds).into());
+                        anyhow::ensure!(age < tolerance, "Stride update is too old. Expected age is less than {tolerance:?}, but got {age:?}");
+                    }
+                    SpotPriceFeedDataInit::Sei { denom } => anyhow::bail!(
+                        "No longer supporting Sei native oracle, provided denom is: {denom}"
+                    ),
+                    SpotPriceFeedDataInit::Simple {
+                        contract,
+                        age_tolerance_seconds: _,
+                    } => {
+                        #[derive(serde::Serialize)]
+                        #[serde(rename_all = "snake_case")]
+                        enum SimpleQuery {
+                            Price {},
+                        }
+                        let contract = cosmos.make_contract(contract.as_str().parse()?);
+                        let res: serde_json::Value = contract.query(SimpleQuery::Price {}).await?;
+                        tracing::info!(
+                            "Queried simple contract {contract}, got result {}",
+                            serde_json::to_string(&res)?
+                        );
+                    }
+                }
+            }
+            Ok(())
+        }
+    }
+}
+
+pub(crate) fn strip_nulls<T: serde::Serialize>(x: T) -> Result<serde_json::Value> {
     use serde_json::Value;
     let value = serde_json::to_value(x)?;
     fn inner(value: Value) -> Value {

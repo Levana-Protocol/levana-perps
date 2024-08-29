@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::fmt::{Display, Write};
 use std::pin::Pin;
+use std::time::Instant;
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::{Context, Result};
@@ -8,12 +9,12 @@ use axum::http::HeaderValue;
 use axum::response::IntoResponse;
 use axum::{async_trait, Json};
 use chrono::{DateTime, Duration, Utc};
-use hyper::server::conn::AddrIncoming;
+
 use perps_exes::build_version;
 use perps_exes::config::{TaskConfig, WatcherConfig};
 use rand::Rng;
-use reqwest::header::CONTENT_TYPE;
-use reqwest::StatusCode;
+
+use tokio::net::TcpListener;
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 
@@ -28,7 +29,6 @@ use crate::util::markets::Market;
 pub(crate) enum TaskLabel {
     GetFactory,
     Stale,
-    CrankWatch,
     CrankRun { index: usize },
     Price,
     TrackBalance,
@@ -43,6 +43,10 @@ pub(crate) enum TaskLabel {
     LiqudityTransactionAlert,
     TotalDepositAlert,
     RpcHealth,
+    Congestion,
+    HighGas,
+    BlockLag,
+    CounterTradeBot,
 }
 
 impl TaskLabel {
@@ -50,7 +54,6 @@ impl TaskLabel {
         match s {
             "get-factory" => Some(TaskLabel::GetFactory),
             "stale" => Some(TaskLabel::Stale),
-            "crank-watch" => Some(TaskLabel::CrankWatch),
             "price" => Some(TaskLabel::Price),
             "track-balance" => Some(TaskLabel::TrackBalance),
             "stats" => Some(TaskLabel::Stats),
@@ -62,6 +65,10 @@ impl TaskLabel {
             "liquidity-transaction-alert" => Some(TaskLabel::LiqudityTransactionAlert),
             "total-deposit-alert" => Some(TaskLabel::TotalDepositAlert),
             "rpc-health" => Some(TaskLabel::RpcHealth),
+            "congestion" => Some(TaskLabel::Congestion),
+            "high-gas" => Some(TaskLabel::HighGas),
+            "block-lag" => Some(TaskLabel::BlockLag),
+            "counter-trade-bot" => Some(TaskLabel::CounterTradeBot),
             _ => {
                 // Being lazy, skipping UltraCrank and Trader, they aren't needed
                 let index = s.strip_prefix("crank-run-")?;
@@ -75,7 +82,6 @@ impl TaskLabel {
         match self {
             TaskLabel::GetFactory => false,
             TaskLabel::Stale => false,
-            TaskLabel::CrankWatch => true,
             TaskLabel::CrankRun { index: _ } => true,
             TaskLabel::Price => true,
             TaskLabel::TrackBalance => false,
@@ -90,6 +96,10 @@ impl TaskLabel {
             TaskLabel::LiqudityTransactionAlert => false,
             TaskLabel::TotalDepositAlert => false,
             TaskLabel::RpcHealth => false,
+            TaskLabel::Congestion => false,
+            TaskLabel::HighGas => true,
+            TaskLabel::BlockLag => false,
+            TaskLabel::CounterTradeBot => false,
         }
     }
 }
@@ -133,18 +143,22 @@ pub(crate) struct TaskStatuses {
     statuses: Arc<StatusMap>,
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct TaskStatus {
     last_result: TaskResult,
     last_retry_error: Option<TaskError>,
     current_run_started: Option<DateTime<Utc>>,
+    /// Is the last_result out of date ?
     #[serde(skip)]
-    out_of_date: Duration,
+    out_of_date: Option<Duration>,
+    /// Should we expire the status of last result ?
+    #[serde(skip)]
+    expire_last_result: Option<(std::time::Duration, Instant)>,
     counts: TaskCounts,
 }
 
-#[derive(Clone, Copy, Default, serde::Serialize)]
+#[derive(Clone, Copy, Default, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct TaskCounts {
     pub(crate) successes: usize,
@@ -157,14 +171,14 @@ impl TaskCounts {
     }
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct TaskResult {
     pub(crate) value: Arc<TaskResultValue>,
     pub(crate) updated: DateTime<Utc>,
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum TaskResultValue {
     Ok(Cow<'static, str>),
@@ -184,7 +198,7 @@ impl TaskResultValue {
     }
 }
 
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct TaskError {
     pub(crate) value: Arc<String>,
@@ -198,18 +212,29 @@ enum OutOfDateType {
 }
 
 impl TaskStatus {
+    fn is_expired(&self) -> bool {
+        if let Some((expiry_duration, instant)) = self.expire_last_result {
+            instant.elapsed() >= expiry_duration
+        } else {
+            false
+        }
+    }
+
     fn is_out_of_date(&self) -> OutOfDateType {
         match self.current_run_started {
-            Some(started) => {
-                let now = Utc::now();
-                if started + Duration::seconds(300) <= now {
-                    OutOfDateType::Very
-                } else if started + self.out_of_date <= now {
-                    OutOfDateType::Slightly
-                } else {
-                    OutOfDateType::Not
+            Some(started) => match self.out_of_date {
+                Some(out_of_date) => {
+                    let now = Utc::now();
+                    if started + Duration::seconds(300) <= now {
+                        OutOfDateType::Very
+                    } else if started + out_of_date <= now {
+                        OutOfDateType::Slightly
+                    } else {
+                        OutOfDateType::Not
+                    }
                 }
-            }
+                None => OutOfDateType::Not,
+            },
             None => OutOfDateType::Not,
         }
     }
@@ -226,7 +251,6 @@ impl TaskLabel {
             TaskLabel::Trader { index: _ } => config.trader,
             TaskLabel::Utilization => config.utilization,
             TaskLabel::TrackBalance => config.track_balance,
-            TaskLabel::CrankWatch => config.crank_watch,
             TaskLabel::CrankRun { index: _ } => config.crank_run,
             TaskLabel::GetFactory => config.get_factory,
             TaskLabel::Price => config.price,
@@ -235,6 +259,10 @@ impl TaskLabel {
             TaskLabel::LiqudityTransactionAlert => config.liquidity_transaction,
             TaskLabel::TotalDepositAlert => config.liquidity_transaction,
             TaskLabel::RpcHealth => config.rpc_health,
+            TaskLabel::Congestion => config.congestion,
+            TaskLabel::HighGas => config.high_gas,
+            TaskLabel::BlockLag => config.block_lag,
+            TaskLabel::CounterTradeBot => config.counter_trade_bot,
         }
     }
 
@@ -245,8 +273,9 @@ impl TaskLabel {
         }
         match self {
             TaskLabel::GetFactory => true,
-            TaskLabel::CrankWatch => true,
-            TaskLabel::CrankRun { index: _ } => true,
+            // Do not trigger alerts here, we'll let the stale checking determine
+            // if cranks have been failing for too long.
+            TaskLabel::CrankRun { index: _ } => false,
             TaskLabel::Price => true,
             TaskLabel::TrackBalance => false,
             TaskLabel::GasCheck => false,
@@ -261,13 +290,16 @@ impl TaskLabel {
             TaskLabel::LiqudityTransactionAlert => false,
             TaskLabel::TotalDepositAlert => false,
             TaskLabel::RpcHealth => false,
+            TaskLabel::Congestion => false,
+            TaskLabel::HighGas => true,
+            TaskLabel::BlockLag => true,
+            TaskLabel::CounterTradeBot => true,
         }
     }
 
     fn ident(self) -> Cow<'static, str> {
         match self {
             TaskLabel::GetFactory => "get-factory".into(),
-            TaskLabel::CrankWatch => "crank-watch".into(),
             TaskLabel::CrankRun { index } => format!("crank-run-{index}").into(),
             TaskLabel::Price => "price".into(),
             TaskLabel::TrackBalance => "track-balance".into(),
@@ -283,23 +315,30 @@ impl TaskLabel {
             TaskLabel::LiqudityTransactionAlert => "liquidity-transaction-alert".into(),
             TaskLabel::TotalDepositAlert => "total-deposit-alert".into(),
             TaskLabel::RpcHealth => "rpc-health".into(),
+            TaskLabel::Congestion => "congestion".into(),
+            TaskLabel::HighGas => "high-gas".into(),
+            TaskLabel::BlockLag => "block-lag".into(),
+            TaskLabel::CounterTradeBot => "counter-trade-bot".into(),
         }
     }
 }
 
 impl Watcher {
-    pub(crate) async fn wait(
-        mut self,
-        app: Arc<App>,
-        server: hyper::server::Builder<AddrIncoming>,
-    ) -> Result<()> {
+    pub(crate) async fn wait(mut self, app: Arc<App>, listener: TcpListener) -> Result<()> {
         self.set.spawn(start_rest_api(
             app,
             TaskStatuses {
                 statuses: Arc::new(self.statuses),
             },
-            server,
+            listener,
         ));
+        self.set.spawn(async move {
+            loop {
+                let now = Utc::now();
+                println!("Heartbeat check: {now}");
+                tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+            }
+        });
         for ToSpawn { future, label } in self.to_spawn {
             self.set.spawn(async move {
                 future
@@ -333,7 +372,9 @@ impl AppBuilder {
         T: WatchedTask,
     {
         let config = label.task_config_for(&self.app.config.watcher);
-        let out_of_date = chrono::Duration::seconds(config.out_of_date.into());
+        let out_of_date = config
+            .out_of_date
+            .map(|item| chrono::Duration::seconds(item.into()));
         let task_status = Arc::new(RwLock::new(TaskStatus {
             last_result: TaskResult {
                 value: TaskResultValue::NotYetRun.into(),
@@ -343,6 +384,7 @@ impl AppBuilder {
             current_run_started: None,
             out_of_date,
             counts: Default::default(),
+            expire_last_result: None,
         }));
         {
             let old = self.watcher.statuses.insert(label, task_status.clone());
@@ -352,6 +394,7 @@ impl AppBuilder {
         }
         let app = self.app.clone();
         let future = Box::pin(async move {
+            let mut last_seen_block_height = 0;
             let mut retries = 0;
             loop {
                 let old_counts = {
@@ -363,23 +406,42 @@ impl AppBuilder {
                         current_run_started: Some(Utc::now()),
                         out_of_date,
                         counts: old.counts,
+                        expire_last_result: old.expire_last_result,
                     };
                     guard.counts
                 };
-                let before = tokio::time::Instant::now();
                 let res = task
                     .run_single_with_timeout(
                         app.clone(),
                         Heartbeat {
                             task_status: task_status.clone(),
                         },
+                        out_of_date.is_some(),
                     )
                     .await;
+                let res = match res {
+                    Ok(x) => Ok(x),
+                    Err(err) => {
+                        if app.cosmos.is_chain_paused() {
+                            Ok(WatchedTaskOutput {
+                            skip_delay: false,
+                            suppress: false,
+                            message: format!("Ignoring an error because the chain appears to be paused (Osmosis epoch). Error was:\n{err:?}").into(),
+                                expire_alert: None,
+				error: false
+                        })
+                        } else {
+                            Err(err)
+                        }
+                    }
+                };
                 match res {
                     Ok(WatchedTaskOutput {
                         skip_delay,
                         message,
                         suppress,
+                        expire_alert,
+                        error,
                     }) => {
                         if label.show_output() {
                             tracing::info!("{label}: Success! {message}");
@@ -392,8 +454,20 @@ impl AppBuilder {
                             let title = label.to_string();
                             if label.triggers_alert(None) {
                                 match &*old.last_result.value {
-                                    // Was a success, still a success, do nothing
-                                    TaskResultValue::Ok(_) => (),
+                                    TaskResultValue::Ok(_) => {
+                                        if error {
+                                            // Was a success, but not a success now
+                                            sentry::with_scope(
+                                                |scope| scope.set_tag("part-name", title.clone()),
+                                                || {
+                                                    sentry::capture_message(
+                                                        &format!("{title}: {message}"),
+                                                        sentry::Level::Error,
+                                                    )
+                                                },
+                                            );
+                                        }
+                                    }
                                     TaskResultValue::Err(err) => {
                                         sentry::with_scope(
                                             |scope| scope.set_tag("part-name", title.clone()),
@@ -423,6 +497,8 @@ impl AppBuilder {
                                 last_result: TaskResult {
                                     value: if suppress {
                                         guard.last_result.value.clone()
+                                    } else if error {
+                                        TaskResultValue::Err(message.into()).into()
                                     } else {
                                         TaskResultValue::Ok(message).into()
                                     },
@@ -432,14 +508,25 @@ impl AppBuilder {
                                 current_run_started: None,
                                 out_of_date,
                                 counts: TaskCounts {
-                                    successes: old_counts.successes + 1,
+                                    successes: if error {
+                                        old_counts.successes
+                                    } else {
+                                        old_counts.successes + 1
+                                    },
+                                    errors: if error {
+                                        old_counts.errors + 1
+                                    } else {
+                                        old_counts.errors
+                                    },
                                     ..old_counts
                                 },
+                                expire_last_result: expire_alert,
                             };
                         }
                         retries = 0;
                         if !skip_delay {
                             match config.delay {
+                                perps_exes::config::Delay::NoDelay => (),
                                 perps_exes::config::Delay::Constant(secs) => {
                                     tokio::time::sleep(tokio::time::Duration::from_secs(secs))
                                         .await;
@@ -449,11 +536,28 @@ impl AppBuilder {
                                     tokio::time::sleep(tokio::time::Duration::from_secs(secs))
                                         .await;
                                 }
-                                perps_exes::config::Delay::Interval(secs) => {
-                                    if let Some(after) =
-                                        before.checked_add(tokio::time::Duration::from_secs(secs))
-                                    {
-                                        tokio::time::sleep_until(after).await;
+                                perps_exes::config::Delay::NewBlock => {
+                                    if let Some(duration) = app.config.price_bot_delay {
+                                        tokio::time::sleep(duration).await;
+                                    }
+
+                                    // Wait for a new block to appear
+                                    loop {
+                                        match app.cosmos.get_latest_block_info().await {
+                                            Ok(latest) => {
+                                                if last_seen_block_height < latest.height {
+                                                    last_seen_block_height = latest.height;
+                                                    break;
+                                                }
+                                            }
+                                            Err(e) => {
+                                                tracing::error!(
+                                                    "Unable to query latest block info: {e}"
+                                                );
+                                            }
+                                        }
+                                        tokio::time::sleep(tokio::time::Duration::from_millis(200))
+                                            .await;
                                     }
                                 }
                             };
@@ -531,6 +635,7 @@ impl AppBuilder {
                                     errors: old_counts.errors + 1,
                                     ..old_counts
                                 },
+                                expire_last_result: None,
                             };
                         } else {
                             {
@@ -548,6 +653,7 @@ impl AppBuilder {
                                         retries: old_counts.retries + 1,
                                         ..old_counts
                                     },
+                                    expire_last_result: None,
                                 };
                             }
                         }
@@ -570,9 +676,18 @@ impl AppBuilder {
 
 #[derive(Debug)]
 pub(crate) struct WatchedTaskOutput {
+    /// Should we skip delay between tasks ? If yes, then we dont
+    /// sleep once the task gets completed.
     skip_delay: bool,
+    /// Should we supress the output ? If we supress, the new output
+    /// won't be reflected. The last_result value will be used instead.
     suppress: bool,
     message: Cow<'static, str>,
+    /// Controls the stickiness of this message. After how long should
+    /// we treat this as a non alert ?
+    expire_alert: Option<(std::time::Duration, Instant)>,
+    /// Is the message an error ?
+    error: bool,
 }
 
 impl WatchedTaskOutput {
@@ -581,7 +696,14 @@ impl WatchedTaskOutput {
             skip_delay: false,
             suppress: false,
             message: message.into(),
+            expire_alert: None,
+            error: false,
         }
+    }
+
+    pub(crate) fn set_expiry(mut self, expire_duration: std::time::Duration) -> Self {
+        self.expire_alert = Some((expire_duration, Instant::now()));
+        self
     }
 
     pub(crate) fn skip_delay(mut self) -> Self {
@@ -589,8 +711,8 @@ impl WatchedTaskOutput {
         self
     }
 
-    pub(crate) fn suppress(mut self) -> Self {
-        self.suppress = true;
+    pub(crate) fn set_error(mut self) -> Self {
+        self.error = true;
         self
     }
 }
@@ -606,17 +728,22 @@ pub(crate) trait WatchedTask: Send + Sync + 'static {
         &mut self,
         app: Arc<App>,
         heartbeat: Heartbeat,
+        should_timeout: bool,
     ) -> Result<WatchedTaskOutput> {
-        match tokio::time::timeout(
-            tokio::time::Duration::from_secs(MAX_TASK_SECONDS),
-            self.run_single(app, heartbeat),
-        )
-        .await
-        {
-            Ok(x) => x,
-            Err(e) => Err(anyhow::anyhow!(
-                "Running a single task took too long, killing. Elapsed time: {e}"
-            )),
+        if should_timeout {
+            match tokio::time::timeout(
+                tokio::time::Duration::from_secs(MAX_TASK_SECONDS),
+                self.run_single(app, heartbeat),
+            )
+            .await
+            {
+                Ok(x) => x,
+                Err(e) => Err(anyhow::anyhow!(
+                    "Running a single task took too long, killing. Elapsed time: {e}"
+                )),
+            }
+        } else {
+            self.run_single(app, heartbeat).await
         }
     }
 }
@@ -637,6 +764,7 @@ impl Heartbeat {
             current_run_started: Some(Utc::now()),
             out_of_date: old.out_of_date,
             counts: old.counts,
+            expire_last_result: old.expire_last_result,
         };
     }
 }
@@ -672,15 +800,21 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
                     skip_delay,
                     message,
                     suppress,
+                    expire_alert: _,
+                    error,
                 }) => {
                     if suppress {
                         errors.push(format!("Found a 'suppress' which is not supported for per-market updates: {message}"));
                     }
-                    successes.push(format!(
-                        "{market} {addr}: {message}",
-                        market = market.market_id,
-                        addr = market.market
-                    ));
+                    if error {
+                        errors.push(message.into_owned());
+                    } else {
+                        successes.push(format!(
+                            "{market} {addr}: {message}",
+                            market = market.market_id,
+                            addr = market.market
+                        ));
+                    }
                     total_skip_delay = skip_delay || total_skip_delay;
                 }
                 Err(e) => errors.push(format!(
@@ -696,6 +830,8 @@ impl<T: WatchedTaskPerMarket> WatchedTask for T {
                 skip_delay: total_skip_delay,
                 message: successes.join("\n").into(),
                 suppress: false,
+                expire_alert: None,
+                error: false,
             })
         } else {
             let mut msg = String::new();
@@ -756,15 +892,21 @@ impl<T: WatchedTaskPerMarketParallel> WatchedTask for ParallelWatcher<T> {
                         skip_delay,
                         message,
                         suppress,
+                        expire_alert: _,
+                        error,
                     }) => {
                         if suppress {
                             errors.push(format!("Found a 'suppress' which is not supported for per-market updates: {message}"));
                         }
-                        successes.push(format!(
-                            "{market} {addr}: {message}",
-                            market = market.market_id,
-                            addr = market.market
-                        ));
+                        if error {
+                            errors.push(message.into_owned());
+                        } else {
+                            successes.push(format!(
+                                "{market} {addr}: {message}",
+                                market = market.market_id,
+                                addr = market.market
+                            ));
+                        }
                         total_skip_delay = skip_delay || total_skip_delay;
                     }
                     Err(e) => errors.push(format!(
@@ -783,6 +925,8 @@ impl<T: WatchedTaskPerMarketParallel> WatchedTask for ParallelWatcher<T> {
                 skip_delay: total_skip_delay,
                 message: successes.join("\n").into(),
                 suppress: false,
+                expire_alert: None,
+                error: false,
             })
         } else {
             let mut msg = String::new();
@@ -795,7 +939,7 @@ impl<T: WatchedTaskPerMarketParallel> WatchedTask for ParallelWatcher<T> {
     }
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 struct RenderedStatus {
     label: TaskLabel,
@@ -835,13 +979,19 @@ impl TaskStatuses {
     ) -> axum::response::Response {
         let template = self.to_template(app, label).await;
         let mut res = template.render().unwrap().into_response();
-        res.headers_mut().append(
-            CONTENT_TYPE,
+        res.headers_mut().insert(
+            http::header::CONTENT_TYPE,
             HeaderValue::from_static("text/html; charset=utf-8"),
         );
 
         if template.alert {
-            *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+            let failure_status = template
+                .statuses
+                .iter()
+                .filter(|x| x.short.alert())
+                .collect::<Vec<_>>();
+            tracing::error!("Status failure: {:#?}", failure_status);
+            *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
         }
 
         res
@@ -857,36 +1007,54 @@ impl TaskStatuses {
         let mut res = Json(&template).into_response();
 
         if template.alert {
-            *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+            let failure_status = template
+                .statuses
+                .iter()
+                .filter(|x| x.short.alert())
+                .collect::<Vec<_>>();
+            tracing::error!("Status failure: {:#?}", failure_status);
+            *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
         }
 
         res
     }
 
-    pub(crate) async fn statuses_text(&self, label: Option<TaskLabel>) -> axum::response::Response {
-        let mut response_builder = ResponseBuilder::default();
+    pub(crate) async fn statuses_text(
+        &self,
+        app: &App,
+        label: Option<TaskLabel>,
+    ) -> axum::response::Response {
+        let mut response_builder = ResponseBuilder {
+            buffer: format!("{}\n\n", app.cosmos.node_health_report()),
+            any_errors: false,
+        };
         let statuses = self.statuses(label).await;
         let alert = statuses.iter().any(|x| x.short.alert());
+
         statuses
-            .into_iter()
-            .for_each(|rendered| response_builder.add(rendered).unwrap());
+            .iter()
+            .for_each(|rendered| response_builder.add(rendered.clone()).unwrap());
         let mut res = response_builder.into_response();
 
         if alert {
-            *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+            let failure_status = statuses
+                .iter()
+                .filter(|x| x.short.alert())
+                .collect::<Vec<_>>();
+            tracing::error!("Status failure: {:#?}", failure_status);
+            *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
         }
 
         res
     }
 }
 
-#[derive(Default)]
 struct ResponseBuilder {
     buffer: String,
     any_errors: bool,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 enum ShortStatus {
     Error,
@@ -911,7 +1079,11 @@ impl TaskStatus {
             }
             TaskResultValue::Err(_) => {
                 if label.triggers_alert(selected_label) {
-                    ShortStatus::Error
+                    if self.is_expired() {
+                        ShortStatus::ErrorNoAlert
+                    } else {
+                        ShortStatus::Error
+                    }
                 } else {
                     ShortStatus::ErrorNoAlert
                 }
@@ -948,13 +1120,13 @@ impl ShortStatus {
 
     fn css_class(self) -> &'static str {
         match self {
-            ShortStatus::Error => "error",
-            ShortStatus::OutOfDateError => "error",
-            ShortStatus::OutOfDate => "out-of-date",
-            ShortStatus::ErrorNoAlert => "error-no-alert",
-            ShortStatus::OutOfDateNoAlert => "out-of-date-no-alert",
-            ShortStatus::Success => "success",
-            ShortStatus::NotYetRun => "not-yet-run",
+            ShortStatus::Error => "link-danger",
+            ShortStatus::OutOfDateError => "link-danger",
+            ShortStatus::OutOfDate => "text-red-400",
+            ShortStatus::ErrorNoAlert => "text-red-400",
+            ShortStatus::OutOfDateNoAlert => "text-red-300",
+            ShortStatus::Success => "link-success",
+            ShortStatus::NotYetRun => "link-primary",
         }
     }
 }
@@ -971,11 +1143,12 @@ impl ResponseBuilder {
                     current_run_started,
                     out_of_date: _,
                     counts: _,
+                    expire_last_result: _,
                 },
             short,
         }: RenderedStatus,
     ) -> std::fmt::Result {
-        writeln!(&mut self.buffer, "# {label:?}. Status: {}", short.as_str())?;
+        writeln!(&mut self.buffer, "# {label}. Status: {}", short.as_str())?;
 
         if let Some(started) = current_run_started {
             writeln!(&mut self.buffer, "Currently running, started at {started}")?;
@@ -987,7 +1160,7 @@ impl ResponseBuilder {
                 writeln!(&mut self.buffer, "{msg}")?;
             }
             TaskResultValue::Err(err) => {
-                writeln!(&mut self.buffer, "{err:?}")?;
+                writeln!(&mut self.buffer, "{err}")?;
             }
             TaskResultValue::NotYetRun => writeln!(&mut self.buffer, "{}", NOT_YET_RUN_MESSAGE)?,
         }
@@ -1010,7 +1183,7 @@ impl ResponseBuilder {
     fn into_response(self) -> axum::response::Response {
         let mut res = self.buffer.into_response();
         if self.any_errors {
-            *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+            *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
         }
         res
     }
@@ -1077,6 +1250,21 @@ struct StatusTemplate<'a> {
     live_since: DateTime<Utc>,
     now: DateTime<Utc>,
     alert: bool,
+    node_health: Vec<String>,
+    gas_multiplier: f64,
+    gas_multiplier_gas_check: f64,
+    max_gas_prices: Option<MaxGasPrices>,
+    gas_price: f64,
+    pyth_feed_age: Vec<String>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+struct MaxGasPrices {
+    alert_congested: f64,
+    max_price: f64,
+    high_max_price: f64,
+    very_high_max_price: f64,
 }
 
 impl TaskStatuses {
@@ -1088,6 +1276,15 @@ impl TaskStatuses {
         let statuses = self.statuses(label).await;
         let alert = statuses.iter().any(|x| x.short.alert());
         let frontend_info_testnet = app.get_frontend_info_testnet().await;
+        let max_gas_prices = match &app.config.by_type {
+            crate::config::BotConfigByType::Testnet { .. } => None,
+            crate::config::BotConfigByType::Mainnet { inner } => Some(MaxGasPrices {
+                alert_congested: inner.gas_price_congested,
+                max_price: inner.max_gas_price,
+                high_max_price: inner.higher_max_gas_price,
+                very_high_max_price: inner.higher_very_high_max_gas_price,
+            }),
+        };
         StatusTemplate {
             statuses,
             family: match &app.config.by_type {
@@ -1099,11 +1296,23 @@ impl TaskStatuses {
                 }
             },
             build_version: build_version(),
-            grpc: app.cosmos.get_first_builder().grpc_url.clone(),
+            grpc: app.cosmos.get_cosmos_builder().grpc_url().to_owned(),
             frontend_info_testnet,
             live_since: app.live_since,
             now: Utc::now(),
             alert,
+            node_health: app
+                .cosmos
+                .node_health_report()
+                .nodes
+                .into_iter()
+                .map(|item| item.to_string())
+                .collect(),
+            gas_multiplier: app.cosmos.get_current_gas_multiplier(),
+            gas_multiplier_gas_check: app.cosmos_gas_check.get_current_gas_multiplier(),
+            max_gas_prices,
+            gas_price: app.cosmos.get_base_gas_price().await,
+            pyth_feed_age: app.pyth_stats.get_status(),
         }
     }
 }

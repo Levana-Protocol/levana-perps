@@ -27,7 +27,7 @@ impl AppBuilder {
     pub(super) fn start_traders(&mut self, testnet: Arc<BotConfigTestnet>) -> Result<()> {
         if let Some((traders, config)) = testnet.trader_config {
             for index in 1..=traders {
-                let wallet = self.get_track_wallet(&testnet, ManagedWallet::Trader(index))?;
+                let wallet = self.get_track_wallet(ManagedWallet::Trader(index))?;
                 let trader = Trader {
                     app: self.app.clone(),
                     wallet,
@@ -116,7 +116,7 @@ async fn single_market(
     .run()
     .await?;
 
-    let total = status.liquidity.total_collateral();
+    let total = status.liquidity.total_collateral()?;
     if total.is_zero() {
         return Ok(WatchedTaskOutput::new("No liquidity available".to_owned()));
     }
@@ -124,7 +124,7 @@ async fn single_market(
         .liquidity
         .locked
         .into_decimal256()
-        .checked_div(status.liquidity.total_collateral().into_decimal256())?;
+        .checked_div(status.liquidity.total_collateral()?.into_decimal256())?;
 
     enum Action {
         Open,
@@ -193,7 +193,7 @@ async fn single_market(
             }
         }
         Action::Open => {
-            let denominator = (status.long_notional + status.short_notional).into_decimal256();
+            let denominator = (status.long_notional + status.short_notional)?.into_decimal256();
             let short_likelihood = if denominator.is_zero() {
                 0.5
             } else {

@@ -4,7 +4,7 @@ use shared::prelude::*;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-use super::{Position, PositionId, PositionQueryResponse};
+use super::{LiquidationMargin, Position, PositionId, PositionQueryResponse};
 
 /// Information on a closed position
 #[cw_serde]
@@ -15,8 +15,10 @@ pub struct ClosedPosition {
     pub id: PositionId,
     /// Direction (to base) of the position
     pub direction_to_base: DirectionToBase,
-    /// Timestamp the position was created
+    /// Timestamp the position was created, block time.
     pub created_at: Timestamp,
+    /// Timestamp of the price point used for creating this position.
+    pub price_point_created_at: Option<Timestamp>,
     /// Timestamp of the last liquifunding
     pub liquifunded_at: Timestamp,
 
@@ -85,8 +87,10 @@ pub struct ClosedPosition {
     pub entry_price_base: PriceBaseInQuote,
 
     /// the time at which the position is actually closed
-    /// if by user: time they sent the message
-    /// if by liquidation: liquifunding time
+    ///
+    /// This will always be the block time when the crank closed the position,
+    /// whether via liquidation, deferred execution of a ClosePosition call, or
+    /// liquifunding.
     pub close_time: Timestamp,
     /// needed for calculating final settlement amounts
     /// if by user: same as close time
@@ -95,6 +99,10 @@ pub struct ClosedPosition {
 
     /// the reason the position is closed
     pub reason: PositionCloseReason,
+
+    /// liquidation margin at the time of close
+    /// Optional for the sake of backwards-compatibility
+    pub liquidation_margin: Option<LiquidationMargin>,
 }
 
 /// Reason the position was closed
@@ -105,6 +113,15 @@ pub enum PositionCloseReason {
     Liquidated(LiquidationReason),
     /// The trader directly chose to close the position
     Direct,
+}
+
+impl Display for PositionCloseReason {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            PositionCloseReason::Liquidated(reason) => write!(f, "{reason}"),
+            PositionCloseReason::Direct => f.write_str("Manual close"),
+        }
+    }
 }
 
 /// Reason why a position was liquidated
@@ -141,25 +158,34 @@ impl Display for LiquidationReason {
 /// profit), insufficient margin... the point of this data structure is to
 /// capture all the information needed by the close position actions to do final
 /// settlement on a position and move it to the closed position data structures.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ClosePositionInstructions {
     /// The position in its current state
     pub pos: Position,
-    /// Any additional fund transfers that need to be reflected.
+    /// The capped exposure amount after taking liquidation margin into account.
     ///
     /// Positive value means a transfer from counter collateral to active
     /// collateral. Negative means active to counter collateral. This is not
     /// reflected in the position itself, since Position requires non-zero
     /// active and counter collateral, and it's entirely possible we will
     /// consume the entirety of one of those fields.
-    pub exposure: Signed<Collateral>,
+    pub capped_exposure: Signed<Collateral>,
+    /// Additional losses that the trader experienced that cut into liquidation margin.
+    ///
+    /// If the trader
+    /// experienced max gains, then this value is 0. In the case where the trader
+    /// experienced a liquidation event and capped_exposure did not fully represent
+    /// losses due to liquidation margin, this value contains additional losses we would
+    /// like to take away from the trader after paying all pending fees.
+    pub additional_losses: Collateral,
 
-    /// See [ClosedPosition::close_time]
-    pub close_time: Timestamp,
-    /// See [ClosedPosition::settlement_time]
-    pub settlement_time: Timestamp,
+    /// The price point used for settling this position.
+    pub settlement_price: PricePoint,
     /// See [ClosedPosition::reason]
     pub reason: PositionCloseReason,
+
+    /// Did this occur because the position was closed during liquifunding?
+    pub closed_during_liquifunding: bool,
 }
 
 /// Outcome of operations which might require closing a position.
@@ -167,11 +193,21 @@ pub struct ClosePositionInstructions {
 /// This can apply to liquifunding, settling price exposure, etc.
 #[must_use]
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum MaybeClosedPosition {
     /// The position stayed open, here's the current status
     Open(Position),
     /// We need to close the position
     Close(ClosePositionInstructions),
+}
+
+impl From<MaybeClosedPosition> for Position {
+    fn from(maybe_closed: MaybeClosedPosition) -> Self {
+        match maybe_closed {
+            MaybeClosedPosition::Open(pos) => pos,
+            MaybeClosedPosition::Close(instructions) => instructions.pos,
+        }
+    }
 }
 
 /// Query response intermediate value on a position.
@@ -185,4 +221,24 @@ pub enum PositionOrPendingClose {
     Open(Box<PositionQueryResponse>),
     /// The value stored here may change after actual close occurs due to pending payments.
     PendingClose(Box<ClosedPosition>),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ser_de_position_close_reason() {
+        for value in [
+            PositionCloseReason::Direct,
+            PositionCloseReason::Liquidated(LiquidationReason::Liquidated),
+            PositionCloseReason::Liquidated(LiquidationReason::MaxGains),
+            PositionCloseReason::Liquidated(LiquidationReason::StopLoss),
+            PositionCloseReason::Liquidated(LiquidationReason::TakeProfit),
+        ] {
+            let json = serde_json::to_string(&value).unwrap();
+            let parsed = serde_json::from_str(&json).unwrap();
+            assert_eq!(value, parsed);
+        }
+    }
 }

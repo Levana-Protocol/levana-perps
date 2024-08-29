@@ -1,24 +1,32 @@
 pub mod defaults;
 
-use std::{collections::HashMap, path::Path};
+use std::{collections::BTreeMap, fmt::Write, iter::Sum, ops::AddAssign, path::Path};
 
 use chrono::{DateTime, Utc};
 use cosmos::{Address, CosmosNetwork, RawAddress};
 use cosmwasm_std::{Uint128, Uint256};
+use figment::{
+    providers::{Env, Format, Toml},
+    Figment,
+};
 use msg::{
     contracts::market::{
-        config::ConfigUpdate, entry::InitialPrice, spot_price::PythPriceServiceNetwork,
+        config::{defaults::ConfigDefaults, ConfigUpdate},
+        entry::InitialPrice,
+        spot_price::PythPriceServiceNetwork,
     },
     prelude::*,
     token::TokenInit,
 };
 use pyth_sdk_cw::PriceIdentifier;
 
+use crate::PerpsNetwork;
+
 /// Configuration for chainwide data.
 ///
 /// This contains information which would be valid for multiple different
 /// contract deployments on a single chain.
-#[derive(serde::Deserialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ChainConfig {
     pub tracker: Option<Address>,
@@ -33,10 +41,11 @@ pub struct ChainConfig {
     /// Number of decimals in the gas coin
     pub gas_decimals: GasDecimals,
     #[serde(default)]
-    pub assets: HashMap<String, NativeAsset>,
+    pub assets: BTreeMap<String, NativeAsset>,
+    pub age_tolerance_seconds: Option<u32>,
 }
 
-#[derive(serde::Deserialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct NativeAsset {
     pub denom: String,
@@ -58,7 +67,7 @@ impl From<&NativeAsset> for TokenInit {
 }
 
 /// Spot price config for a given chain
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ChainSpotPriceConfig {
     /// Pyth configuration, required on chains that use pyth feeds
@@ -68,7 +77,7 @@ pub struct ChainSpotPriceConfig {
 }
 
 /// Configuration for pyth
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ChainPythConfig {
     /// The address of the pyth oracle contract
@@ -80,7 +89,7 @@ pub struct ChainPythConfig {
 }
 
 /// Configuration for stride
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ChainStrideConfig {
     /// The address of the redemption rate contract
@@ -88,16 +97,16 @@ pub struct ChainStrideConfig {
 }
 
 /// Overall configuration of prices, for information valid across all chains.
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PriceConfig {
     pub pyth: PythPriceConfig,
-    /// Mappings from a key to price feed  
-    pub networks: HashMap<CosmosNetwork, HashMap<MarketId, MarketPriceFeedConfigs>>,
+    /// Mappings from a key to price feed
+    pub networks: BTreeMap<PerpsNetwork, BTreeMap<MarketId, MarketPriceFeedConfigs>>,
 }
 
 /// Overall configuration of Pyth, for information valid across all chains.
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PythPriceConfig {
     /// Configuration for stable feeds
@@ -107,24 +116,26 @@ pub struct PythPriceConfig {
 }
 
 /// Overall configuration of Pyth, for information valid across all chains.
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct PythPriceServiceConfig {
     /// How old a price to allow, in seconds
     pub update_age_tolerance: u32,
     /// Mappings from a key to price feed  id
-    pub feed_ids: HashMap<String, PriceIdentifier>,
+    pub feed_ids: BTreeMap<String, PriceIdentifier>,
 }
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MarketPriceFeedConfigs {
     /// feed of the base asset in terms of the quote asset
     pub feeds: Vec<MarketPriceFeedConfig>,
     /// feed of the collateral asset in terms of USD
     pub feeds_usd: Vec<MarketPriceFeedConfig>,
+    /// Override the Stride contract address for this market
+    pub stride_contract: Option<Address>,
 }
 
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum MarketPriceFeedConfig {
     Pyth {
@@ -152,7 +163,9 @@ pub enum MarketPriceFeedConfig {
 }
 
 /// Number of decimals in the gas coin
-#[derive(serde::Deserialize, Clone, Debug, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    serde::Deserialize, serde::Serialize, Clone, Debug, Copy, PartialEq, Eq, PartialOrd, Ord,
+)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct GasDecimals(pub u8);
 impl GasDecimals {
@@ -192,6 +205,19 @@ impl FromStr for GasDecimals {
 )]
 pub struct GasAmount(pub Decimal256);
 
+impl Sum<GasAmount> for GasAmount {
+    fn sum<I: Iterator<Item = GasAmount>>(iter: I) -> Self {
+        let total = iter.fold(Decimal256::zero(), |acc, x| acc + x.0);
+        GasAmount(total)
+    }
+}
+
+impl AddAssign for GasAmount {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
+    }
+}
+
 impl FromStr for GasAmount {
     type Err = anyhow::Error;
 
@@ -215,22 +241,22 @@ impl std::fmt::Debug for GasAmount {
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct ConfigTestnet {
-    deployments: HashMap<String, DeploymentConfigTestnet>,
-    overrides: HashMap<String, DeploymentConfigTestnet>,
+    deployments: BTreeMap<String, DeploymentConfigTestnet>,
+    overrides: BTreeMap<String, DeploymentConfigTestnet>,
     pub price_api: String,
     pub liquidity: LiquidityConfig,
     pub utilization: UtilizationConfig,
     pub trader: TraderConfig,
     /// QA wallet used for price updates
     pub qa_wallet: RawAddress,
-    pub initial_prices: HashMap<MarketId, InitialPrice>,
+    pub initial_prices: BTreeMap<MarketId, InitialPrice>,
 }
 
-#[derive(serde::Deserialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct LiquidityConfig {
     /// Min and max per different markets
-    pub markets: HashMap<MarketId, LiquidityBounds>,
+    pub markets: BTreeMap<MarketId, LiquidityBounds>,
     /// Lower bound of util ratio, at which point we would withdraw liquidity
     pub min_util_delta: Signed<Decimal256>,
     /// Upper bound of util ratio, at which point we would deposit liquidity
@@ -250,7 +276,7 @@ pub struct LiquidityTransactionConfig {
     pub total_deposits_percentage: Decimal256,
 }
 
-#[derive(serde::Deserialize, Clone, Copy, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct UtilizationConfig {
     /// Lower bound of util ratio, at which point we would open a position
@@ -259,7 +285,7 @@ pub struct UtilizationConfig {
     pub max_util_delta: Signed<Decimal256>,
 }
 
-#[derive(serde::Deserialize, Clone, Copy, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct TraderConfig {
     /// Upper bound of util ratio, at which point we always close a position
@@ -270,7 +296,7 @@ pub struct TraderConfig {
     pub max_borrow_fee: Decimal256,
 }
 
-#[derive(serde::Deserialize, Clone, Copy, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct LiquidityBounds {
     pub min: Collateral,
@@ -282,10 +308,10 @@ pub struct LiquidityBounds {
 pub struct DeploymentConfigTestnet {
     /// How many crank run wallets to set up
     #[serde(default)]
-    pub crank: u32,
+    pub crank: usize,
     /// How many ultracrank wallets to set up
     #[serde(default)]
-    pub ultra_crank: u32,
+    pub ultra_crank: usize,
     /// How many seconds behind we need to be before we kick in the ultracrank
     #[serde(default = "defaults::seconds_till_ultra")]
     pub seconds_till_ultra: u32,
@@ -313,6 +339,9 @@ pub struct DeploymentConfigTestnet {
     /// Minimum gas required in wallet managed by perps bots
     #[serde(default = "defaults::min_gas")]
     pub min_gas: GasAmount,
+    /// Minimum gas required in very high gas wallet managed by perps bots
+    #[serde(default = "defaults::min_gas_high_gas_wallet")]
+    pub min_gas_high_gas_wallet: GasAmount,
     /// Minimum gas required in the faucet contract
     #[serde(default = "defaults::min_gas_in_faucet")]
     pub min_gas_in_faucet: GasAmount,
@@ -322,8 +351,6 @@ pub struct DeploymentConfigTestnet {
     /// Number of seconds before a price update is forced
     #[serde(default = "defaults::max_price_age_secs")]
     pub max_price_age_secs: u32,
-    #[serde(default = "defaults::min_price_age_secs")]
-    pub min_price_age_secs: u32,
     /// Maximum the price can move before we push a price update, e.g. 0.01 means 1%.
     #[serde(default = "defaults::max_allowed_price_delta")]
     pub max_allowed_price_delta: Decimal256,
@@ -332,30 +359,25 @@ pub struct DeploymentConfigTestnet {
     pub qa_price_updates: bool,
 }
 
-fn load_yaml<T: serde::de::DeserializeOwned>(
-    static_path: &str,
-    static_contents: &[u8],
-    runtime_path: Option<impl AsRef<Path>>,
-) -> Result<T> {
-    match runtime_path {
-        Some(path) => {
-            let path = path.as_ref();
-            let mut file = fs_err::File::open(path)?;
-            serde_yaml::from_reader(&mut file)
-                .with_context(|| format!("Parse error reading from YAML file {}", path.display()))
-        }
-        None => serde_yaml::from_slice(static_contents).with_context(|| {
-            format!("Parse error reading from compiled-in YAML file {static_path}")
-        }),
-    }
-}
-
 impl ChainConfig {
-    pub fn load(config_file: Option<impl AsRef<Path>>, network: CosmosNetwork) -> Result<Self> {
-        load_yaml::<HashMap<CosmosNetwork, Self>>(
-            "config-chain.yaml",
-            include_bytes!("../assets/config-chain.yaml"),
+    const PATH: &'static str = "packages/perps-exes/assets/config-chain.toml";
+
+    pub fn load(network: PerpsNetwork) -> Result<Self> {
+        Self::load_from(Self::PATH, network)
+    }
+
+    pub fn load_from_opt(config_file: Option<&Path>, network: PerpsNetwork) -> Result<Self> {
+        match config_file {
+            Some(config_file) => Self::load_from(config_file, network),
+            None => Self::load(network),
+        }
+    }
+
+    pub fn load_from(config_file: impl AsRef<Path>, network: PerpsNetwork) -> Result<Self> {
+        load_toml::<_, BTreeMap<PerpsNetwork, Self>>(
             config_file,
+            "LEVANA_CHAIN_CONFIG_",
+            "chain config",
         )?
         .remove(&network)
         .with_context(|| format!("No chain config found for {network}"))
@@ -363,12 +385,21 @@ impl ChainConfig {
 }
 
 impl ConfigTestnet {
-    pub fn load(config_file: Option<impl AsRef<Path>>) -> Result<Self> {
-        load_yaml(
-            "config-testnet.yaml",
-            include_bytes!("../assets/config-testnet.yaml"),
-            config_file,
-        )
+    const PATH: &'static str = "packages/perps-exes/assets/config-testnet.toml";
+
+    pub fn load() -> Result<Self> {
+        Self::load_from(Self::PATH)
+    }
+
+    pub fn load_from_opt(config_file: Option<&Path>) -> Result<Self> {
+        match config_file {
+            Some(config_file) => Self::load_from(config_file),
+            None => Self::load(),
+        }
+    }
+
+    pub fn load_from(config_file: impl AsRef<Path>) -> Result<Self> {
+        load_toml(config_file, "LEVANA_TESTNET_", "testnet config")
     }
 
     /// Provide the deployment name, such as osmodev, dragonqa, or seibeta
@@ -400,27 +431,42 @@ impl ConfigTestnet {
 }
 
 impl PriceConfig {
-    pub fn load(config_file: Option<impl AsRef<Path>>) -> Result<Self> {
-        load_yaml(
-            "config-price.yaml",
-            include_bytes!("../assets/config-price.yaml"),
-            config_file,
-        )
+    const PATH: &'static str = "packages/perps-exes/assets/config-price.toml";
+
+    pub fn load() -> Result<Self> {
+        Self::load_from(Self::PATH)
+    }
+
+    pub fn load_from_opt(config_file: Option<&Path>) -> Result<Self> {
+        match config_file {
+            Some(config_file) => Self::load_from(config_file),
+            None => Self::load(),
+        }
+    }
+
+    pub fn load_from(config_file: impl AsRef<Path>) -> Result<Self> {
+        load_toml(config_file, "LEVANA_PRICE_", "price config")
     }
 }
 
 pub struct DeploymentInfo {
     pub config: DeploymentConfigTestnet,
-    pub network: CosmosNetwork,
+    pub network: PerpsNetwork,
     pub wallet_phrase_name: String,
 }
 
 /// Parse a deployment name (like osmobeta) into network and family (like osmosis-testnet and beta).
-pub fn parse_deployment(deployment: &str) -> Result<(CosmosNetwork, &str)> {
-    const NETWORKS: &[(CosmosNetwork, &str)] = &[
-        (CosmosNetwork::OsmosisTestnet, "osmo"),
-        (CosmosNetwork::SeiTestnet, "sei"),
-        (CosmosNetwork::InjectiveTestnet, "inj"),
+pub fn parse_deployment(deployment: &str) -> Result<(PerpsNetwork, &str)> {
+    const NETWORKS: &[(PerpsNetwork, &str)] = &[
+        (PerpsNetwork::Regular(CosmosNetwork::OsmosisTestnet), "osmo"),
+        (PerpsNetwork::Regular(CosmosNetwork::SeiTestnet), "sei"),
+        (
+            PerpsNetwork::Regular(CosmosNetwork::InjectiveTestnet),
+            "inj",
+        ),
+        (PerpsNetwork::DymensionTestnet, "dym"),
+        (PerpsNetwork::Regular(CosmosNetwork::NeutronTestnet), "ntrn"),
+        (PerpsNetwork::NibiruTestnet, "nibi"),
     ];
     for (network, prefix) in NETWORKS {
         if let Some(suffix) = deployment.strip_prefix(prefix) {
@@ -433,7 +479,7 @@ pub fn parse_deployment(deployment: &str) -> Result<(CosmosNetwork, &str)> {
     ))
 }
 
-#[derive(serde::Deserialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct WatcherConfig {
     /// How many times to retry before giving up
@@ -474,6 +520,14 @@ pub struct WatcherConfig {
     pub liquidity_transaction: TaskConfig,
     #[serde(default = "defaults::rpc_health")]
     pub rpc_health: TaskConfig,
+    #[serde(default = "defaults::congestion")]
+    pub congestion: TaskConfig,
+    #[serde(default = "defaults::high_gas")]
+    pub high_gas: TaskConfig,
+    #[serde(default = "defaults::block_lag")]
+    pub block_lag: TaskConfig,
+    #[serde(default = "defaults::counter_trade_bot")]
+    pub counter_trade_bot: TaskConfig,
 }
 
 impl Default for WatcherConfig {
@@ -483,19 +537,19 @@ impl Default for WatcherConfig {
             delay_between_retries: defaults::delay_between_retries(),
             balance: TaskConfig {
                 delay: Delay::Constant(20),
-                out_of_date: 180,
+                out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,
             },
             gas_check: TaskConfig {
                 delay: Delay::Constant(60),
-                out_of_date: 180,
+                out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,
             },
             liquidity: TaskConfig {
                 delay: Delay::Constant(120),
-                out_of_date: 180,
+                out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,
             },
@@ -504,44 +558,44 @@ impl Default for WatcherConfig {
                     low: 120,
                     high: 1200,
                 },
-                out_of_date: 180,
+                out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,
             },
             utilization: TaskConfig {
                 delay: Delay::Constant(120),
-                out_of_date: 120,
+                out_of_date: Some(120),
                 retries: None,
                 delay_between_retries: None,
             },
             track_balance: TaskConfig {
                 delay: Delay::Constant(60),
-                out_of_date: 60,
+                out_of_date: Some(60),
                 retries: None,
                 delay_between_retries: None,
             },
             crank_watch: TaskConfig {
                 delay: Delay::Constant(30),
-                out_of_date: 60,
+                out_of_date: Some(60),
                 retries: None,
                 delay_between_retries: None,
             },
             crank_run: TaskConfig {
                 // We block internally within the crank run service
-                delay: Delay::Constant(0),
-                out_of_date: 60,
+                delay: Delay::NoDelay,
+                out_of_date: None,
                 retries: None,
                 delay_between_retries: None,
             },
             get_factory: TaskConfig {
                 delay: Delay::Constant(60),
-                out_of_date: 180,
-                retries: None,
-                delay_between_retries: None,
+                out_of_date: Some(180),
+                retries: Some(5),
+                delay_between_retries: Some(30),
             },
             price: TaskConfig {
-                delay: Delay::Interval(3),
-                out_of_date: 30,
+                delay: Delay::NewBlock,
+                out_of_date: Some(30),
                 // Intentionally using different defaults to make sure price
                 // updates come through quickly. We increase our retries to
                 // compensate for the shorter delay.
@@ -550,37 +604,64 @@ impl Default for WatcherConfig {
             },
             stale: TaskConfig {
                 delay: Delay::Constant(30),
-                out_of_date: 180,
-                retries: None,
-                delay_between_retries: None,
+                out_of_date: Some(180),
+                retries: Some(5),
+                delay_between_retries: Some(20),
             },
             stats: TaskConfig {
                 delay: Delay::Constant(30),
-                out_of_date: 180,
+                out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,
             },
             stats_alert: TaskConfig {
                 delay: Delay::Constant(30),
-                out_of_date: 180,
+                out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,
             },
             ultra_crank: TaskConfig {
                 delay: Delay::Constant(120),
-                out_of_date: 180,
+                out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,
             },
             liquidity_transaction: TaskConfig {
                 delay: Delay::Constant(120),
-                out_of_date: 180,
+                out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,
             },
             rpc_health: TaskConfig {
                 delay: Delay::Constant(300),
-                out_of_date: 500,
+                out_of_date: Some(500),
+                retries: None,
+                delay_between_retries: None,
+            },
+            congestion: TaskConfig {
+                // OK to be fast on this, we use cached data
+                delay: Delay::Constant(2),
+                out_of_date: Some(2),
+                retries: None,
+                delay_between_retries: None,
+            },
+            high_gas: TaskConfig {
+                // We block internally within this service
+                // and use a channel to signal when it should be woken up
+                delay: Delay::NoDelay,
+                out_of_date: None,
+                retries: None,
+                delay_between_retries: None,
+            },
+            block_lag: TaskConfig {
+                delay: Delay::Constant(20),
+                out_of_date: Some(20),
+                retries: None,
+                delay_between_retries: None,
+            },
+            counter_trade_bot: TaskConfig {
+                delay: Delay::Constant(60),
+                out_of_date: Some(180),
                 retries: None,
                 delay_between_retries: None,
             },
@@ -588,7 +669,7 @@ impl Default for WatcherConfig {
     }
 }
 
-#[derive(serde::Deserialize, Clone, Copy, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct TaskConfig {
     /// Seconds to delay between runs
@@ -596,7 +677,7 @@ pub struct TaskConfig {
     /// How many seconds before we should consider the result out of date
     ///
     /// This does not include the delay time
-    pub out_of_date: u32,
+    pub out_of_date: Option<u32>,
     /// How many times to retry before giving up, overriding the general watcher
     /// config
     pub retries: Option<usize>,
@@ -605,21 +686,31 @@ pub struct TaskConfig {
     pub delay_between_retries: Option<u32>,
 }
 
-#[derive(serde::Deserialize, Clone, Copy, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub enum Delay {
+    NoDelay,
     Constant(u64),
-    Interval(u64),
+    NewBlock,
     Random { low: u64, high: u64 },
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MarketConfigUpdates {
-    pub markets: HashMap<MarketId, ConfigUpdateAndBorrowFee>,
+    pub markets: BTreeMap<MarketId, ConfigUpdateAndBorrowFee>,
+    pub crank_fees: BTreeMap<PerpsNetwork, CrankFeeConfig>,
 }
 
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct CrankFeeConfig {
+    pub charged: Usd,
+    pub surcharge: Usd,
+    pub reward: Usd,
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct ConfigUpdateAndBorrowFee {
     pub config: ConfigUpdate,
@@ -629,9 +720,110 @@ pub struct ConfigUpdateAndBorrowFee {
 impl MarketConfigUpdates {
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
-        let mut file = fs_err::File::open(path)?;
-        serde_yaml::from_reader(&mut file)
-            .with_context(|| format!("Error loading MarketConfigUpdates from {}", path.display()))
+        let config: Self = load_toml(path, "LEVANA_MARKETS_", "markets config")?;
+
+        config.validate().with_context(|| {
+            format!(
+                "Unable to parse MarketConfigUpdates from {}",
+                path.display()
+            )
+        })?;
+        Ok(config)
+    }
+
+    fn validate(&self) -> Result<()> {
+        enum Mismatch<'a> {
+            CarryLeverage {
+                market: &'a MarketId,
+                configured: Decimal256,
+                expected: Decimal256,
+            },
+            DnfCap {
+                market: &'a MarketId,
+                configured: NonZero<Decimal256>,
+                expected: NonZero<Decimal256>,
+            },
+        }
+        let mut mismatches: Vec<Mismatch> = vec![];
+
+        let default_max_leverage = ConfigDefaults::max_leverage();
+        let default_carry_leverage = ConfigDefaults::carry_leverage();
+        let default_dnf_cap = ConfigDefaults::delta_neutrality_fee_cap();
+        let seven: Decimal256 = "7".parse()?;
+        let two: Decimal256 = "2".parse()?;
+        for (market_id, update) in &self.markets {
+            let max_leverage = update
+                .config
+                .max_leverage
+                .unwrap_or(default_max_leverage)
+                .abs_unsigned();
+            let expected_carry_leverage = seven.min(max_leverage / two);
+            let configured_carry_leverage = update
+                .config
+                .carry_leverage
+                .unwrap_or(default_carry_leverage);
+
+            if expected_carry_leverage != configured_carry_leverage {
+                mismatches.push(Mismatch::CarryLeverage {
+                    market: market_id,
+                    configured: configured_carry_leverage,
+                    expected: expected_carry_leverage,
+                })
+            }
+
+            let expected_dnf_cap = match max_leverage.to_string().parse::<u32>()? {
+                4 => "0.03",
+                6 => "0.025",
+                10 => "0.015",
+                30 => "0.005",
+                50 => "0.0002",
+                max_leverage => anyhow::bail!("Unexpected max leverage value: {max_leverage}"),
+            }
+            .parse()?;
+            let dnf_cap = update
+                .config
+                .delta_neutrality_fee_cap
+                .unwrap_or(default_dnf_cap);
+            // For now we're ignoring caps which are too low
+            if dnf_cap > expected_dnf_cap {
+                mismatches.push(Mismatch::DnfCap {
+                    market: market_id,
+                    configured: dnf_cap,
+                    expected: expected_dnf_cap,
+                })
+            }
+        }
+
+        if mismatches.is_empty() {
+            Ok(())
+        } else {
+            let mut msg = "Unexpected config values provided:\n".to_owned();
+            for mismatch in mismatches {
+                match mismatch {
+                    Mismatch::CarryLeverage {
+                        market,
+                        configured,
+                        expected,
+                    } => {
+                        writeln!(
+                            &mut msg,
+                            "{market} carry leverage: Expected: {expected}. Found: {configured}"
+                        )?;
+                    }
+                    Mismatch::DnfCap {
+                        market,
+                        configured,
+                        expected,
+                    } => {
+                        writeln!(
+                            &mut msg,
+                            "{market} DNF cap: Expected: {expected}. Found: {configured}"
+                        )?;
+                    }
+                }
+            }
+            Err(anyhow::anyhow!("{msg}"))
+        }
     }
 }
 
@@ -668,7 +860,7 @@ impl MainnetFactories {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct MainnetFactory {
     pub address: Address,
-    pub network: CosmosNetwork,
+    pub network: PerpsNetwork,
     pub label: String,
     pub instantiate_code_id: u64,
     pub instantiate_at: DateTime<Utc>,
@@ -682,23 +874,38 @@ pub struct MainnetFactory {
 }
 
 impl MainnetFactories {
-    const PATH: &str = "packages/perps-exes/assets/mainnet-factories.yaml";
-
-    pub fn load_hard_coded() -> Result<Self> {
-        serde_yaml::from_slice(include_bytes!("../assets/mainnet-factories.yaml")).context(
-            "Error loading MainnetFactories from compile-time ../assets/mainnet-factories.yaml",
-        )
-    }
+    const PATH: &'static str = "packages/perps-exes/assets/mainnet-factories.toml";
 
     pub fn load() -> Result<Self> {
-        let mut file = fs_err::File::open(Self::PATH)?;
-        serde_yaml::from_reader(&mut file)
-            .with_context(|| format!("Error loading MainnetFactories from {}", Self::PATH))
+        load_toml(Self::PATH, "LEVANA_MAINNET_FACTORIES_", "mainnet factories")
     }
 
     pub fn save(&self) -> Result<()> {
-        let mut file = fs_err::File::create(Self::PATH)?;
-        serde_yaml::to_writer(&mut file, self)
-            .with_context(|| format!("Error saving MainnetFactories to {}", Self::PATH))
+        save_toml(Self::PATH, self)
     }
+}
+
+pub fn load_toml<P, T>(path: P, env_prefix: &str, config_desc: &str) -> Result<T>
+where
+    P: AsRef<Path>,
+    T: serde::de::DeserializeOwned + std::fmt::Debug,
+{
+    let path = path.as_ref();
+    let config = Figment::new()
+        .merge(Toml::file(path))
+        .merge(Env::prefixed(env_prefix))
+        .extract()
+        .with_context(|| format!("Unable to load {config_desc} from {}", path.display()))?;
+    tracing::debug!("Loaded {config_desc}: {config:#?}");
+    Ok(config)
+}
+
+pub fn save_toml<P, T>(path: P, value: &T) -> Result<()>
+where
+    P: AsRef<Path>,
+    T: serde::Serialize,
+{
+    let path = path.as_ref();
+    (|| fs_err::write(path, toml::to_string_pretty(value)?).map_err(anyhow::Error::from))()
+        .with_context(|| format!("Unable to save TOML file {}", path.display()))
 }

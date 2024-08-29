@@ -1,12 +1,17 @@
+use std::{fmt::Write, sync::Arc};
+
 use axum::{
+    extract::State,
     http::HeaderValue,
     response::{IntoResponse, Response},
 };
 use axum_extra::response::Css;
-use reqwest::{header::CONTENT_TYPE, StatusCode};
+
+use crate::app::App;
 
 use super::{
-    BuildVersionRoute, ErrorCssRoute, ErrorPage, Favicon, HealthRoute, HomeRoute, RobotRoute,
+    BuildVersionRoute, ErrorCssRoute, ErrorPage, Favicon, GrpcHealthRoute, HealthRoute, HomeRoute,
+    RobotRoute,
 };
 
 pub(crate) async fn homepage(_: HomeRoute) -> &'static str {
@@ -18,7 +23,16 @@ Better luck next time."#
 }
 
 pub(crate) async fn healthz(_: HealthRoute) -> &'static str {
-    "Yup, I'm alive"
+    "healthy"
+}
+
+pub(crate) async fn grpc_health(_: GrpcHealthRoute, app: State<Arc<App>>) -> String {
+    let mut res = "Yup, I'm alive. gRPC node health check\n\n".to_owned();
+    for (chain_id, cosmos) in &app.cosmos {
+        writeln!(&mut res, "{chain_id}:").unwrap();
+        writeln!(&mut res, "{}", cosmos.node_health_report()).unwrap();
+    }
+    res
 }
 
 pub(crate) async fn build_version(_: BuildVersionRoute) -> &'static str {
@@ -27,22 +41,26 @@ pub(crate) async fn build_version(_: BuildVersionRoute) -> &'static str {
 
 pub(crate) async fn favicon(_: Favicon) -> Response {
     let mut res = include_bytes!("../../../../static/favicon.ico").into_response();
-    res.headers_mut()
-        .insert(CONTENT_TYPE, HeaderValue::from_static("image/x-icon"));
+    res.headers_mut().insert(
+        http::header::CONTENT_TYPE,
+        HeaderValue::from_static("image/x-icon"),
+    );
     res
 }
 
 pub(crate) async fn robots_txt(_: RobotRoute) -> Response {
     let mut res = include_str!("../../../../static/robots.txt").into_response();
-    res.headers_mut()
-        .insert(CONTENT_TYPE, HeaderValue::from_static("text/plain"));
+    res.headers_mut().insert(
+        http::header::CONTENT_TYPE,
+        HeaderValue::from_static("text/plain"),
+    );
     res
 }
 
 pub(crate) async fn not_found() -> ErrorPage<&'static str> {
     ErrorPage {
         error: "Page not found",
-        code: StatusCode::NOT_FOUND,
+        code: http::status::StatusCode::NOT_FOUND,
     }
 }
 

@@ -13,55 +13,47 @@ mod trigger_crank;
 
 use std::borrow::Cow;
 use std::sync::Arc;
+use std::time::Instant;
 
 use anyhow::{Context, Result};
 use axum::async_trait;
+
 use cosmos::proto::cosmos::base::abci::v1beta1::TxResponse;
 use cosmos::{Address, HasAddress, TxBuilder, Wallet};
-use msg::contracts::market::spot_price::{
-    PythPriceServiceNetwork, SpotPriceConfig, SpotPriceFeedData,
-};
 use msg::prelude::MarketExecuteMsg;
-use perps_exes::prelude::MarketContract;
-use perps_exes::pyth::get_oracle_update_msg;
-use shared::storage::RawAddr;
+use perps_exes::prelude::{MarketContract, MarketId};
 
-use crate::util::oracle::OffchainPriceData;
+use crate::app::CrankTriggerReason;
+use crate::util::misc::track_tx_fees;
 use crate::watcher::{Heartbeat, WatchedTask, WatchedTaskOutput};
 
-use self::trigger_crank::CrankReceiver;
+use self::trigger_crank::{CrankReceiver, CrankWorkItem};
 
-use super::gas_check::GasCheckWallet;
-use super::{App, AppBuilder};
+use super::{App, AppBuilder, GasLevel};
 pub(crate) use trigger_crank::TriggerCrank;
 
 struct Worker {
-    crank_wallet: Wallet,
     recv: CrankReceiver,
+}
+pub(crate) enum RunResult {
+    NormalRun(TxResponse),
+    OutOfGas,
+    OsmosisEpoch(anyhow::Error),
+    OsmosisCongested(anyhow::Error),
 }
 
 /// Start the background thread to turn the crank on the crank bots.
 impl AppBuilder {
     pub(super) fn start_crank_run(&mut self) -> Result<Option<TriggerCrank>> {
-        if self.app.config.crank_wallets.is_empty() {
+        if self.app.config.crank_tasks == 0 {
             return Ok(None);
         }
 
         let recv = CrankReceiver::new();
 
-        let crank_wallets = self.app.config.crank_wallets.clone();
-
-        for (idx, crank_wallet) in crank_wallets.into_iter().enumerate() {
-            self.refill_gas(crank_wallet.get_address(), GasCheckWallet::Crank(idx + 1))?;
-
-            let worker = Worker {
-                crank_wallet,
-                recv: recv.clone(),
-            };
-            self.watch_periodic(
-                crate::watcher::TaskLabel::CrankRun { index: idx + 1 },
-                worker,
-            )?;
+        for index in 1..=self.app.config.crank_tasks {
+            let worker = Worker { recv: recv.clone() };
+            self.watch_periodic(crate::watcher::TaskLabel::CrankRun { index }, worker)?;
         }
 
         Ok(Some(recv.trigger))
@@ -71,24 +63,94 @@ impl AppBuilder {
 #[async_trait]
 impl WatchedTask for Worker {
     async fn run_single(&mut self, app: Arc<App>, _: Heartbeat) -> Result<WatchedTaskOutput> {
-        app.crank(&self.crank_wallet, &self.recv).await
+        app.crank_receive(&self.recv).await
     }
 }
 
-const CRANK_EXECS: &[u32] = &[20, 7, 4, 1];
+const CRANK_EXECS: &[u32] = &[7, 4, 1];
 
 impl App {
-    async fn crank(
+    async fn crank_receive(&self, recv: &CrankReceiver) -> Result<WatchedTaskOutput> {
+        let CrankWorkItem {
+            address: market,
+            id: market_id,
+            guard: crank_guard,
+            reason,
+            queued,
+            received,
+        } = recv.receive_work().await?;
+        let start_crank = Instant::now();
+        let run_result = self
+            .crank(
+                &*self.get_pool_wallet().await,
+                market,
+                &market_id,
+                reason,
+                None,
+            )
+            .await?;
+
+        // Successfully cranked, check if there's more work and, if so, schedule it to be started again
+        std::mem::drop(crank_guard);
+
+        let more_work = match MarketContract::new(self.cosmos.make_contract(market))
+            .status()
+            .await
+        {
+            Ok(status) => match status.next_crank {
+                None => Cow::Borrowed("No additional work found waiting."),
+                Some(work) => {
+                    recv.trigger
+                        .trigger_crank(market, market_id, CrankTriggerReason::MoreWorkFound)
+                        .await;
+                    format!("Found additional work, scheduling next crank: {work:?}").into()
+                }
+            },
+            Err(e) => format!("Failed getting status to check for new crank work: {e:?}.").into(),
+        };
+
+        let output = match run_result {
+            RunResult::NormalRun(txres) => {
+                let message =
+                format!(
+                    "Successfully turned the crank for market {market} in transaction {}. {}. Queued delay: {:?}, Elapsed since starting to crank: {:?}",
+                    txres.txhash, more_work, received.saturating_duration_since(queued), start_crank.elapsed(),
+                );
+                WatchedTaskOutput::new(message)
+            }
+            RunResult::OutOfGas => {
+                let message =
+                    format!("Got an 'out of gas' code 11 when trying to crank. {more_work}");
+                WatchedTaskOutput::new(message)
+                    .set_expiry(std::time::Duration::from_secs(10))
+                    .set_error()
+            }
+            RunResult::OsmosisEpoch(e) => {
+                let message = format!("Ignoring crank run error since we think we're in the Osmosis epoch, error: {e:?}");
+                WatchedTaskOutput::new(message)
+            }
+            RunResult::OsmosisCongested(e) => {
+                let message = format!("Ignoring crank run error since we think the Osmosis chain is overly congested, error: {e:?}");
+                WatchedTaskOutput::new(message)
+            }
+        };
+
+        Ok(output.skip_delay())
+    }
+
+    pub(crate) async fn crank(
         &self,
         crank_wallet: &Wallet,
-        recv: &CrankReceiver,
-    ) -> Result<WatchedTaskOutput> {
-        // Wait for up to 20 seconds for new work to appear. If it doesn't, update our status message that no cranking was needed.
-        let (market, crank_guard) = match recv.receive_with_timeout().await {
-            None => {
-                return Ok(WatchedTaskOutput::new("No crank work needed").suppress());
-            }
-            Some(crank_needed) => crank_needed,
+        market: Address,
+        market_id: &MarketId,
+        reason: CrankTriggerReason,
+        // an array of N execs to try with fallbacks
+        execs: Option<&[u32]>,
+    ) -> Result<RunResult> {
+        let cosmos = match reason.gas_level() {
+            GasLevel::Normal => &self.cosmos,
+            // we won't use the very high gas wallet in cranking, that's reserved for the high gas task
+            GasLevel::High | GasLevel::VeryHigh => &self.cosmos_high_gas,
         };
 
         let rewards = self
@@ -99,7 +161,7 @@ impl App {
         let mut actual_execs = None;
 
         // Simulate decreasing numbers of execs until we find one that looks like it will pass.
-        for execs in CRANK_EXECS {
+        for execs in execs.unwrap_or(CRANK_EXECS) {
             match TxBuilder::default()
                 .add_execute_message(
                     market,
@@ -110,7 +172,7 @@ impl App {
                         rewards: rewards.clone(),
                     },
                 )?
-                .simulate(&self.cosmos, &[crank_wallet.get_address()])
+                .simulate(cosmos, &[crank_wallet.get_address()])
                 .await
             {
                 Ok(_) => {
@@ -118,7 +180,9 @@ impl App {
                     break;
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to simulate crank against market {market} with execs {execs}: {e:?}")
+                    tracing::warn!(
+                        "Failed to simulate crank against market {market} with execs {execs}: {e}"
+                    )
                 }
             }
         }
@@ -129,7 +193,7 @@ impl App {
         // so during Osmosis epochs we can safely ignore just the broadcasting.
         let mut builder = TxBuilder::default();
 
-        builder.add_execute_message_mut(
+        builder.add_execute_message(
             market,
             crank_wallet,
             vec![],
@@ -138,165 +202,40 @@ impl App {
                 rewards: rewards.clone(),
             },
         )?;
+        builder.set_memo(reason.to_string());
 
-        enum RunResult {
-            NormalRun(TxResponse),
-            RunWithOracle(TxResponse),
-            OutOfGas,
-        }
-
-        let run_result = match builder
-            .sign_and_broadcast(&self.cosmos, crank_wallet)
+        match builder
+            .sign_and_broadcast_cosmos_tx(cosmos, crank_wallet)
             .await
-            .with_context(|| format!("Unable to turn crank for market {market}"))
+            .with_context(|| format!("Unable to turn crank for market {market_id} ({market})"))
         {
-            Ok(txres) => RunResult::NormalRun(txres),
+            Ok(txres) => {
+                track_tx_fees(self, crank_wallet.get_address(), &txres).await;
+                Ok(RunResult::NormalRun(txres.response))
+            }
             Err(e) => {
                 if self.is_osmosis_epoch() {
-                    return Ok(WatchedTaskOutput::new(format!("Ignoring crank run error since we think we're in the Osmosis epoch, error: {e:?}")));
-                }
-
-                let error_as_str = format!("{e:?}");
-
-                // If we got an "out of gas" code 11 error, we want to ignore
-                // it. This usually happens when new work comes in. The logic
-                // below to check if new work is available will cause a new
-                // crank run to be scheduled, if one is needed.
-                if error_as_str.contains("out of gas") || error_as_str.contains("code 11") {
-                    RunResult::OutOfGas
-                }
-                // Check if we hit price_too_old and, if so, try again with a transaction that includes an oracle update.
-                else if format!("{e:?}").contains("price_too_old") {
-                    match self
-                        .try_crank_with_oracle(market, crank_wallet, rewards)
-                        .await
-                        .with_context(|| {
-                            format!("Unable to update oracle and turn crank for market {market}")
-                        }) {
-                        Ok(txres) => RunResult::RunWithOracle(txres),
-                        Err(e2) => {
-                            log::error!(
-                                "Got price_too_old and cranking with oracle failed too: {e2:?}"
-                            );
-                            return Err(e2);
-                        }
-                    }
+                    Ok(RunResult::OsmosisEpoch(e))
+                } else if self.get_congested_info().await.is_congested() {
+                    Ok(RunResult::OsmosisCongested(e))
                 } else {
-                    return Err(e);
+                    let error_as_str = format!("{e:?}");
+
+                    // If we got an "out of gas" code 11 error, we want to ignore
+                    // it. This usually happens when new work comes in. The logic
+                    // below to check if new work is available will cause a new
+                    // crank run to be scheduled, if one is needed.
+                    if error_as_str.contains("out of gas") || error_as_str.contains("code 11") {
+                        Ok(RunResult::OutOfGas)
+                    }
+                    // We previously checked here for a price_too_old error message.
+                    // However, with the new price logic from deferred execution, that should never
+                    // happen. So now we'll simply allow such an error message to bubble up.
+                    else {
+                        Err(e)
+                    }
                 }
             }
-        };
-
-        // Successfully cranked, check if there's more work and, if so, schedule it to be started again
-        std::mem::drop(crank_guard);
-        let more_work = match MarketContract::new(self.cosmos.make_contract(market))
-            .status()
-            .await
-        {
-            Ok(status) => match status.next_crank {
-                None => Cow::Borrowed("No additional work found waiting."),
-                Some(work) => {
-                    recv.trigger.trigger_crank(market).await;
-                    format!("Found additional work, scheduling next crank: {work:?}").into()
-                }
-            },
-            Err(e) => format!("Failed getting status to check for new crank work: {e:?}.").into(),
-        };
-
-        Ok(WatchedTaskOutput::new(
-            match run_result {
-                RunResult::NormalRun(txres) => format!(
-                    "Successfully turned the crank for market {market} in transaction {}. {}",
-                    txres.txhash, more_work
-                ),
-                RunResult::RunWithOracle(txres) => format!(
-                    "Successfully updated oracles and turned the crank for market {market} in transaction {}. {}",
-                    txres.txhash, more_work
-                ),
-                RunResult::OutOfGas => format!(
-                    "Got an 'out of gas' code 11 when trying to crank. {more_work}"
-                )
-            }).skip_delay()
-        )
-    }
-
-    async fn try_crank_with_oracle(
-        &self,
-        market: Address,
-        crank_wallet: &Wallet,
-        rewards: Option<RawAddr>,
-    ) -> Result<TxResponse> {
-        let market_contract = MarketContract::new(self.cosmos.make_contract(market));
-        let status = market_contract.status().await?;
-        let (pyth_network, pyth_oracle) = get_pyth_network(&status.config.spot_price)?;
-
-        let mut builder = TxBuilder::default();
-
-        let factory = self.get_factory_info().await;
-        let offchain_price_data = OffchainPriceData::load(self, &factory.markets).await?;
-        let update_msg = get_oracle_update_msg(
-            match pyth_network {
-                PythPriceServiceNetwork::Stable => &offchain_price_data.stable_ids,
-                PythPriceServiceNetwork::Edge => &offchain_price_data.edge_ids,
-            },
-            crank_wallet,
-            match pyth_network {
-                PythPriceServiceNetwork::Stable => &self.endpoint_stable,
-                PythPriceServiceNetwork::Edge => &self.endpoint_edge,
-            },
-            &self.client,
-            &self.cosmos.make_contract(pyth_oracle),
-        )
-        .await?;
-        builder.add_message_mut(update_msg);
-
-        // Do 0 execs, consider this an extreme case where we simply want to make sure some price gets added immediately
-        builder.add_execute_message_mut(
-            market,
-            crank_wallet,
-            vec![],
-            MarketExecuteMsg::Crank {
-                execs: Some(0),
-                rewards,
-            },
-        )?;
-
-        builder
-            .sign_and_broadcast(&self.cosmos, crank_wallet)
-            .await
-            .with_context(|| format!("Unable to update oracle and turn crank for market {market}"))
-    }
-}
-
-fn get_pyth_network(spot_price: &SpotPriceConfig) -> Result<(PythPriceServiceNetwork, Address)> {
-    let (pyth, feeds, feeds_usd) = match spot_price {
-        SpotPriceConfig::Manual { .. } => {
-            anyhow::bail!("Manual oracle used, no Pyth updates possible")
         }
-        SpotPriceConfig::Oracle {
-            pyth,
-            feeds,
-            feeds_usd,
-            ..
-        } => (pyth, feeds, feeds_usd),
-    };
-
-    let uses_pyth = feeds
-        .iter()
-        .chain(feeds_usd.iter())
-        .any(|feed| match &feed.data {
-            SpotPriceFeedData::Constant { .. } => false,
-            SpotPriceFeedData::Pyth { .. } => true,
-            SpotPriceFeedData::Stride { .. } => false,
-            SpotPriceFeedData::Sei { .. } => false,
-            SpotPriceFeedData::Simple { .. } => false,
-        });
-
-    anyhow::ensure!(uses_pyth, "This market doesn't use Pyth");
-
-    let pyth = pyth
-        .as_ref()
-        .context("Pyth feeds found but no pyth config found")?;
-
-    Ok((pyth.network, pyth.contract_address.as_str().parse()?))
+    }
 }

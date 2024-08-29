@@ -1,0 +1,73 @@
+[[factories]]
+address = "osmo1sf0xectg6pvzk27pkpk74px0r7kjjh82cek6t22dsh4nkq794q7qea7g8y"
+network = "osmosis-testnet"
+label = "Pretend mainnet 2"
+instantiate-code-id = 403
+instantiate-at = "2023-05-30T12:13:09.930256077Z"
+gitrev = "a0ba2217bed8f847a604ff890a05e640406bf63f"
+hash = "0f59e244069271be6b584ee59e4c22b61ecfb4b474b41526ded627e81bbbda79"
+canonical = false
+
+[[factories]]
+address = "sei1qfk0prkalfdmlkm9nudj2xuax4hdr4nfpw9vczdeeul57r2k2jhs08fm64"
+network = "sei-mainnet"
+label = "Levana Perps Mainnet Test 1"
+instantiate-code-id = 36
+instantiate-at = "2023-05-31T05:43:10.210099422Z"
+gitrev = "b22ecd5d91ba6e6adc8aafdd627eea7a925d69a0"
+hash = "b11cf50cd0c625036c733e956ba41967e46649cfc45b4c3f2abb905dbc10f2c4"
+canonical = false
+
+[[factories]]
+address = "osmo1a72syw9cga75k0wcp2n56gkeufptpsk355r9kwv0sg0k6sjug8esxnat82"
+network = "osmosis-mainnet"
+label = "Levana Test Deploy"
+instantiate-code-id = 91
+instantiate-at = "2023-07-05T15:09:36.511698173Z"
+gitrev = "c4857a2ea087dc47a008c292a8f242c42dfa4ae7"
+hash = "a51dc3e96751e5099a439d1df99cebfefac2726d022aa35920a80a3f37542568"
+canonical = false
+
+[[factories]]
+address = "osmo1ssw6x553kzqher0earlkwlxasfm2stnl3ms3ma2zz4tnajxyyaaqlucd45"
+network = "osmosis-mainnet"
+label = "Levana Perpetual Swaps"
+instantiate-code-id = 91
+instantiate-at = "2023-07-06T04:26:04.273238619Z"
+gitrev = "c4857a2ea087dc47a008c292a8f242c42dfa4ae7"
+hash = "a51dc3e96751e5099a439d1df99cebfefac2726d022aa35920a80a3f37542568"
+ident = "osmomainnet1"
+canonical = true
+
+[[factories]]
+address = "sei18rdj3asllguwr6lnyu2sw8p8nut0shuj3sme27ndvvw4gakjnjqqper95h"
+network = "sei-mainnet"
+label = "Levana Perpetual Swaps"
+instantiate-code-id = 48
+instantiate-at = "2023-08-06T07:11:51.260427212Z"
+gitrev = "ed7102d64e97931986338f82663834640d14a826"
+hash = "fd9f31f2c60cdaf3d18efdea333d4286b121f7f23b322cbaf820094c556daab4"
+ident = "seimainnet1"
+canonical = false
+
+[[factories]]
+address = "inj1vdu3s39dl8t5l88tyqwuhzklsx9587adv8cnn9"
+network = "injective-mainnet"
+label = "Levana Perpetual Swaps"
+instantiate-code-id = 120
+instantiate-at = "2023-09-26T11:31:28.333339055Z"
+gitrev = "faa2881b21575d6859113229544046b9df878385"
+hash = "5e3660570dbc1c8129f97f496027ce8895cd11604334a65bc5b3403691456b10"
+ident = "injmainnet1"
+canonical = true
+
+[[factories]]
+address = "neutron1an8ls6d57c4qcvjq0jmm27jtrpk65twewfjqzdn7annefv7gadqsjs7uc3"
+network = "neutron-mainnet"
+label = "Levana Perpetual Swaps"
+instantiate-code-id = 1191
+instantiate-at = "2024-05-08T08:34:06.958506311Z"
+gitrev = "ab41b7d1bf6507cb5880ce267298d31ecd04c980"
+hash = "3259db9d8932efbf53de7a5d39819c2cb3baffa21384e3270e3aa2b5d8bbc03e"
+ident = "ntrnmainnet1"
+canonical = true

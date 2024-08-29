@@ -18,6 +18,7 @@ pub fn max_gains_strategy(
     let leverage_notional: f32 = leverage_base
         .into_signed(direction)
         .into_notional(market_type)
+        .unwrap()
         .into_number()
         .to_string()
         .parse::<f32>()
@@ -27,6 +28,7 @@ pub fn max_gains_strategy(
     let max_leverage_notional: f32 = max_leverage_base
         .into_signed(direction)
         .into_notional(market_type)
+        .unwrap()
         .into_number()
         .to_string()
         .parse::<f32>()

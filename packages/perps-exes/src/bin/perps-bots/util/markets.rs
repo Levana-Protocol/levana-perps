@@ -1,6 +1,6 @@
 use cosmos::{Contract, Cosmos, HasAddress};
 use msg::contracts::factory::entry::{MarketInfoResponse, MarketsResp};
-use msg::contracts::market::entry::StatusResp;
+use msg::contracts::market::config::Config;
 use msg::prelude::*;
 use perps_exes::prelude::MarketContract;
 use std::collections::HashSet;
@@ -16,7 +16,7 @@ pub(crate) struct Market {
     #[allow(dead_code)]
     pub(crate) liquidity_token_xlp: Contract,
     pub(crate) market_id: MarketId,
-    pub(crate) status: StatusResp,
+    pub(crate) config: Config,
 }
 
 impl Debug for Market {
@@ -64,15 +64,18 @@ pub(crate) async fn get_markets(
                 .await?;
             let market =
                 MarketContract::new(cosmos.make_contract(market_addr.into_string().parse()?));
-            res.push(Market {
-                status: market.status().await?,
-                market,
-                position_token: cosmos.make_contract(position_token.into_string().parse()?),
-                liquidity_token_lp: cosmos.make_contract(liquidity_token_lp.into_string().parse()?),
-                liquidity_token_xlp: cosmos
-                    .make_contract(liquidity_token_xlp.into_string().parse()?),
-                market_id,
-            });
+            if !market.is_wound_down().await? {
+                res.push(Market {
+                    config: market.status().await?.config,
+                    market,
+                    position_token: cosmos.make_contract(position_token.into_string().parse()?),
+                    liquidity_token_lp: cosmos
+                        .make_contract(liquidity_token_lp.into_string().parse()?),
+                    liquidity_token_xlp: cosmos
+                        .make_contract(liquidity_token_xlp.into_string().parse()?),
+                    market_id,
+                });
+            }
         }
     }
     Ok(res)

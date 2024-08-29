@@ -1,6 +1,8 @@
 use crate::prelude::*;
 use crate::state::delta_neutrality_fee::ChargeDeltaNeutralityFeeResult;
 use crate::state::history::trade::trade_volume_usd;
+use crate::state::liquidity::LiquidityLock;
+use crate::state::position::take_profit::TakeProfitToCounterCollateral;
 use msg::contracts::market::delta_neutrality_fee::DeltaNeutralityFeeReason;
 use msg::contracts::market::entry::{PositionActionKind, SlippageAssert};
 use msg::contracts::market::fees::events::FeeSource;
@@ -12,7 +14,7 @@ use msg::contracts::market::position::{
     CollateralAndUsd, LiquidationMargin, SignedCollateralAndUsd,
 };
 
-use super::{AdjustOpenInterestResult, LAST_POSITION_ID};
+use super::{AdjustOpenInterest, LAST_POSITION_ID};
 
 /// Information on a validated position we would like to open.
 ///
@@ -21,122 +23,124 @@ use super::{AdjustOpenInterestResult, LAST_POSITION_ID};
 /// 1. Read only validation, which returns a value of this data type
 ///
 /// 2. Writing that data to storage
-pub(crate) struct ValidatedPosition {
+#[must_use]
+pub(crate) struct OpenPositionExec {
     pos: Position,
     trade_volume_usd: Usd,
     price_point: PricePoint,
     delta_neutrality_fee: ChargeDeltaNeutralityFeeResult,
-    open_interest: AdjustOpenInterestResult,
+    open_interest: AdjustOpenInterest,
+    liquidity: LiquidityLock,
 }
 
-/// Parameters for opening a new position
-pub(crate) struct OpenPositionParams {
-    pub(crate) owner: Addr,
-    pub(crate) collateral: NonZero<Collateral>,
-    pub(crate) leverage: LeverageToBase,
-    pub(crate) direction: DirectionToBase,
-    pub(crate) max_gains_in_quote: MaxGainsInQuote,
-    pub(crate) slippage_assert: Option<SlippageAssert>,
-    pub(crate) stop_loss_override: Option<PriceBaseInQuote>,
-    pub(crate) take_profit_override: Option<PriceBaseInQuote>,
-}
-
-impl State<'_> {
-    /// Try to validate a new position.
-    pub(crate) fn validate_new_position(
-        &self,
+impl OpenPositionExec {
+    pub(crate) fn new(
+        state: &State,
         store: &dyn Storage,
         OpenPositionParams {
             owner,
             collateral,
+            crank_fee,
             leverage,
             direction,
-            max_gains_in_quote,
             slippage_assert,
             stop_loss_override,
-            take_profit_override,
+            take_profit_trader,
         }: OpenPositionParams,
-    ) -> Result<ValidatedPosition> {
-        let price_point = self.spot_price(store, None)?;
-
-        let market_type = self.market_id(store)?.get_market_type();
+        price_point: &PricePoint,
+    ) -> Result<Self> {
+        let market_type = state.market_id(store)?.get_market_type();
 
         let leverage_to_base = leverage.into_signed(direction);
 
-        let leverage_to_notional = leverage_to_base.into_notional(market_type);
+        let leverage_to_notional = leverage_to_base.into_notional(market_type)?;
 
         let notional_size_in_collateral =
             leverage_to_notional.checked_mul_collateral(collateral)?;
         let notional_size =
             notional_size_in_collateral.map(|x| price_point.collateral_to_notional(x));
         if let Some(slippage_assert) = slippage_assert {
-            self.do_slippage_assert(store, slippage_assert, notional_size, market_type, None)?;
+            state.do_slippage_assert(
+                store,
+                slippage_assert,
+                notional_size,
+                market_type,
+                None,
+                price_point,
+            )?;
         }
 
-        let counter_collateral = max_gains_in_quote.calculate_counter_collateral(
+        let counter_collateral = TakeProfitToCounterCollateral {
+            take_profit_trader,
             market_type,
             collateral,
-            notional_size_in_collateral,
-            leverage_to_notional,
-        )?;
+            leverage_to_base: leverage,
+            direction,
+            config: &state.config,
+            price_point,
+        }
+        .calc()?;
 
         // FEES
         // https://www.notion.so/levana-protocol/Levana-Well-funded-Perpetuals-Whitepaper-9805a6eba56d429b839f5551dbb65c40#75bb26a1439c4a81894c2aa399471263
 
-        let config = &self.config;
+        let config = &state.config;
 
         // create the position
         let last_pos_id = LAST_POSITION_ID.load(store)?;
         let pos_id = PositionId::new(last_pos_id.u64() + 1);
 
-        let liquifunded_at = self.now();
-        let next_liquifunding =
-            liquifunded_at.plus_seconds(config.liquifunding_delay_seconds.into());
-        let stale_at = next_liquifunding.plus_seconds(config.staleness_seconds.into());
+        let liquifunded_at = price_point.timestamp;
 
         // Initial position, before taking out any trading fees
         let mut pos = Position {
             owner,
             id: pos_id,
             active_collateral: collateral,
-            deposit_collateral: SignedCollateralAndUsd::new(collateral.into_signed(), &price_point),
+            deposit_collateral: SignedCollateralAndUsd::new(
+                collateral
+                    .checked_add(crank_fee.collateral())?
+                    .into_signed(),
+                price_point,
+            ),
             trading_fee: CollateralAndUsd::default(),
             funding_fee: SignedCollateralAndUsd::default(),
             borrow_fee: CollateralAndUsd::default(),
-            crank_fee: CollateralAndUsd::default(),
+            crank_fee,
             delta_neutrality_fee: SignedCollateralAndUsd::default(),
             counter_collateral,
             notional_size,
-            created_at: self.now(),
+            created_at: state.now(),
+            price_point_created_at: Some(price_point.timestamp),
             liquifunded_at,
-            next_liquifunding,
-            stale_at,
+            // just temporarily setting _something_ here, it will be overwritten right away in `set_next_liquifunding`
+            next_liquifunding: liquifunded_at,
             stop_loss_override,
-            take_profit_override,
             liquidation_margin: LiquidationMargin::default(),
             liquidation_price: None,
-            take_profit_price: None,
+            // We temporarily fill in a value of None. Later, during position save, we will calculate the correct value from the actual counter collateral amount.
+            take_profit_total: None,
+            take_profit_trader: Some(take_profit_trader),
+            take_profit_trader_notional: take_profit_trader.into_notional(market_type),
             stop_loss_override_notional: stop_loss_override
-                .map(|x| x.into_notional_price(market_type)),
-            take_profit_override_notional: take_profit_override
                 .map(|x| x.into_notional_price(market_type)),
         };
 
-        self.set_next_liquifunding_and_stale_at(&mut pos, liquifunded_at);
+        state.set_next_liquifunding(&mut pos, liquifunded_at);
 
         let trade_volume_usd = trade_volume_usd(&pos, price_point, market_type)?;
 
         // Validate leverage before removing trading fees from active collateral
-        self.position_validate_leverage_data(market_type, &pos, &price_point, None)?;
+        state.position_validate_leverage_data(market_type, &pos, price_point, None)?;
 
         // Validate that we have sufficient deposit collateral
-        self.validate_minimum_deposit_collateral(store, collateral.raw())?;
+        state.validate_minimum_deposit_collateral(collateral.raw(), price_point)?;
 
         // Now charge the trading fee
         pos.trading_fee.checked_add_assign(
             config
                 .calculate_trade_fee_open(notional_size_in_collateral, counter_collateral.raw())?,
-            &price_point,
+            price_point,
         )?;
 
         pos.active_collateral = pos
@@ -145,7 +149,7 @@ impl State<'_> {
 
         // VALIDATION
 
-        let delta_neutrality_fee = self.charge_delta_neutrality_fee(
+        let delta_neutrality_fee = state.charge_delta_neutrality_fee(
             store,
             &mut pos,
             notional_size,
@@ -153,14 +157,21 @@ impl State<'_> {
             DeltaNeutralityFeeReason::PositionOpen,
         )?;
 
-        self.check_unlocked_liquidity(store, pos.counter_collateral, Some(pos.notional_size))?;
+        let liquidity = LiquidityLock::new(
+            state,
+            store,
+            pos.counter_collateral,
+            *price_point,
+            Some(pos.notional_size),
+            None,
+            None,
+        )?;
 
-        pos.liquidation_margin =
-            pos.liquidation_margin(price_point.price_notional, &price_point, &self.config)?;
+        pos.liquidation_margin = pos.liquidation_margin(price_point, config)?;
 
         // Check for sufficient margin
         perp_ensure!(
-            pos.active_collateral.raw() >= pos.liquidation_margin.total(),
+            pos.active_collateral.raw() >= pos.liquidation_margin.total()?,
             ErrorId::InsufficientMargin,
             ErrorDomain::Market,
             "insufficient margin, active collateral: {}, liquidation_margin: {:?}",
@@ -169,74 +180,63 @@ impl State<'_> {
         );
 
         let open_interest =
-            self.check_adjust_net_open_interest(store, pos.notional_size, pos.direction(), true)?;
+            AdjustOpenInterest::new(state, store, pos.notional_size, pos.direction(), true)?;
 
-        // Now that we know the liquidation and max gains, confirm that the user
-        // specified trigger orders are valid
-        self.position_validate_trigger_orders(&pos, market_type, price_point)?;
-
-        Ok(ValidatedPosition {
+        Ok(Self {
             pos,
             trade_volume_usd,
-            price_point,
+            price_point: *price_point,
             delta_neutrality_fee,
             open_interest,
+            liquidity,
         })
     }
 
-    /// Write a validated position to storage.
-    pub(crate) fn open_validated_position(
-        &self,
+    // This is a no-op, but it's more expressive to call discard() or apply()
+    // rather than to just assign it to a throwaway variable.
+    pub(crate) fn discard(self) {}
+
+    pub(crate) fn apply(
+        self,
+        state: &State,
         ctx: &mut StateContext,
-        ValidatedPosition {
+        save_reason: PositionSaveReason,
+    ) -> Result<PositionId> {
+        let Self {
             mut pos,
             trade_volume_usd,
             price_point,
             delta_neutrality_fee,
             open_interest,
-        }: ValidatedPosition,
-        is_market: bool,
-    ) -> Result<PositionId> {
-        self.trade_history_add_volume(ctx, &pos.owner, trade_volume_usd)?;
-        open_interest.store(ctx)?;
+            liquidity,
+        } = self;
+        state.trade_history_add_volume(ctx, &pos.owner, trade_volume_usd)?;
 
-        // derive the new funding rate
-        let funding_timestamp = self.funding_valid_until(ctx.storage)?;
-        self.accumulate_funding_rate(ctx, funding_timestamp)?;
+        open_interest.apply(ctx)?;
 
         // collect trading fees
-        self.collect_trading_fee(
+        state.collect_trading_fee(
             ctx,
             pos.id,
             pos.trading_fee.collateral(),
             price_point,
             FeeSource::Trading,
+            &pos.owner,
         )?;
 
-        delta_neutrality_fee.store(self, ctx)?;
+        delta_neutrality_fee.apply(state, ctx)?;
 
         // Note that in the validity check we've already confirmed there is sufficient liquidity
-        self.liquidity_lock(ctx, pos.counter_collateral)?;
+        liquidity.apply(state, ctx)?;
 
         // Save the position, setting liquidation margin and prices
-        self.position_save(
-            ctx,
-            &mut pos,
-            &price_point,
-            false,
-            true,
-            if is_market {
-                PositionSaveReason::OpenMarket
-            } else {
-                PositionSaveReason::ExecuteLimitOrder
-            },
-        )?;
+        state.position_save(ctx, &mut pos, &price_point, false, true, save_reason)?;
 
         // mint the nft
-        self.nft_mint(ctx, pos.owner.clone(), pos.id.to_string())?;
+        state.nft_mint(ctx, pos.owner.clone(), pos.id.to_string())?;
         LAST_POSITION_ID.save(ctx.storage, &pos.id)?;
 
-        let market_id = self.market_id(ctx.storage)?;
+        let market_id = state.market_id(ctx.storage)?;
         let market_type = market_id.get_market_type();
         let collaterals = calculate_position_collaterals(&pos)?;
         let trading_fee = pos.trading_fee.collateral();
@@ -247,14 +247,14 @@ impl State<'_> {
 
         let (direction, leverage) = pos
             .active_leverage_to_notional(&price_point)
-            .into_base(market_type)
+            .into_base(market_type)?
             .split();
         let (_, counter_leverage) = pos
             .counter_leverage_to_notional(&price_point)
-            .into_base(market_type)
+            .into_base(market_type)?
             .split();
 
-        self.position_history_add_action(
+        state.position_history_add_open_update_action(
             ctx,
             &pos,
             PositionActionKind::Open,
@@ -282,42 +282,25 @@ impl State<'_> {
                 leverage,
                 counter_leverage,
                 stop_loss_override: pos.stop_loss_override,
-                take_profit_override: pos.take_profit_override,
+                take_profit_trader: pos.take_profit_trader,
             },
             created_at: pos.created_at,
+            price_point_created_at: price_point.timestamp,
         });
 
         Ok(pos.id)
     }
+}
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn handle_position_open(
-        &self,
-        ctx: &mut StateContext,
-        sender: Addr,
-        collateral: NonZero<Collateral>,
-        leverage: LeverageToBase,
-        direction: DirectionToBase,
-        max_gains_in_quote: MaxGainsInQuote,
-        slippage_assert: Option<SlippageAssert>,
-        stop_loss_override: Option<PriceBaseInQuote>,
-        take_profit_override: Option<PriceBaseInQuote>,
-    ) -> Result<PositionId> {
-        self.ensure_not_stale(ctx.storage)?;
-        let validated_position = self.validate_new_position(
-            ctx.storage,
-            OpenPositionParams {
-                owner: sender,
-                collateral,
-                leverage,
-                direction,
-                max_gains_in_quote,
-                slippage_assert,
-                stop_loss_override,
-                take_profit_override,
-            },
-        )?;
-
-        self.open_validated_position(ctx, validated_position, true)
-    }
+/// Parameters for opening a new position
+pub(crate) struct OpenPositionParams {
+    pub(crate) owner: Addr,
+    pub(crate) collateral: NonZero<Collateral>,
+    /// Crank fee already charged by the deferred execution system.
+    pub(crate) crank_fee: CollateralAndUsd,
+    pub(crate) leverage: LeverageToBase,
+    pub(crate) direction: DirectionToBase,
+    pub(crate) slippage_assert: Option<SlippageAssert>,
+    pub(crate) stop_loss_override: Option<PriceBaseInQuote>,
+    pub(crate) take_profit_trader: TakeProfitTrader,
 }

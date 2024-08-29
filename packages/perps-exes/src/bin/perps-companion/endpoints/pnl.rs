@@ -4,15 +4,16 @@ use anyhow::{Context, Result};
 use askama::Template;
 use axum::{
     extract::State,
-    headers::Host,
     http::HeaderValue,
     response::{Html, IntoResponse, Response},
-    Json, TypedHeader,
+    Json,
 };
 use axum_extra::response::Css;
 use axum_extra::routing::TypedPath;
+use axum_extra::TypedHeader;
 use cosmos::{Address, Contract};
 use cosmwasm_std::{Decimal256, Uint256};
+use headers::Host;
 use msg::{
     contracts::market::{
         entry::QueryMsg,
@@ -20,11 +21,8 @@ use msg::{
     },
     prelude::{NonZero, PricePoint, Signed, SignedLeverageToNotional, UnsignedDecimal, Usd},
 };
-use reqwest::{
-    header::{CACHE_CONTROL, CONTENT_TYPE},
-    StatusCode,
-};
-use resvg::usvg::{TreeParsing, TreeTextToPath};
+
+use resvg::usvg::{fontdb::Database, TreeParsing, TreeTextToPath};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use shared::storage::{MarketId, MarketType};
@@ -35,7 +33,7 @@ use crate::{
     types::{ChainId, ContractEnvironment, DirectionForDb, PnlType, TwoDecimalPoints},
 };
 
-use super::{ErrorPage, PnlCssRoute, PnlHtml, PnlImage, PnlUrl};
+use super::{ErrorPage, PnlCssRoute, PnlHtml, PnlImage, PnlImageSvg, PnlUrl};
 
 pub(super) async fn pnl_url(
     _: PnlUrl,
@@ -57,21 +55,37 @@ impl PnlInfo {
         let PositionInfoFromDb {
             market_id,
             environment,
-            pnl,
+            pnl_usd,
+            pnl_percentage,
             direction,
             entry_price,
             exit_price,
             leverage,
             chain,
+            wallet,
         } = app
             .db
             .get_url_detail(pnl_id)
             .await
             .map_err(|e| Error::Database { msg: e.to_string() })?
             .ok_or(Error::InvalidPage)?;
+
+        let quote_currency = market_id
+            .split_once('/')
+            .map_or("", |(_, quote_currency)| quote_currency)
+            .to_owned();
+
         Ok(PnlInfo {
-            pnl_display: pnl,
-            host: host.hostname().to_owned(),
+            pnl: match (pnl_usd, pnl_percentage) {
+                (None, None) => return Err(Error::PnlValueMissing),
+                (None, Some(pnl_percentage)) => PnlDetails::Percentage(pnl_percentage),
+                (Some(pnl_usd), None) => PnlDetails::Usd(pnl_usd),
+                (Some(pnl_usd), Some(pnl_percentage)) => PnlDetails::Both {
+                    usd: pnl_usd,
+                    percentage: pnl_percentage,
+                },
+            },
+            host: host.to_string(),
             image_url: PnlImage { pnl_id }.to_uri().to_string(),
             html_url: PnlHtml { pnl_id }.to_uri().to_string(),
             market_id,
@@ -81,6 +95,9 @@ impl PnlInfo {
             leverage,
             amplitude_key: environment.amplitude_key(),
             chain: chain.to_string(),
+            wallet,
+            quote_currency,
+            cache_bust_param: app.opt.cache_bust,
         })
     }
 }
@@ -102,7 +119,17 @@ pub(super) async fn pnl_image(
 ) -> Result<Response, Error> {
     PnlInfo::load_from_database(&app, pnl_id, &host)
         .await
-        .map(PnlInfo::image)
+        .map(|info| info.image(&app.fontdb))
+}
+
+pub(super) async fn pnl_image_svg(
+    PnlImageSvg { pnl_id }: PnlImageSvg,
+    TypedHeader(host): TypedHeader<Host>,
+    State(app): State<Arc<App>>,
+) -> Result<Response, Error> {
+    PnlInfo::load_from_database(&app, pnl_id, &host)
+        .await
+        .map(PnlInfo::image_svg)
 }
 
 pub(super) async fn pnl_css(_: PnlCssRoute) -> Css<&'static str> {
@@ -115,6 +142,8 @@ pub(crate) struct PositionInfo {
     pub(crate) chain: ChainId,
     pub(crate) position_id: PositionId,
     pub(crate) pnl_type: PnlType,
+    #[serde(default)]
+    pub(crate) display_wallet: bool,
 }
 
 struct MarketContract(Contract);
@@ -131,7 +160,7 @@ impl MarketContract {
                     msg: msg.clone(),
                     query_type,
                 };
-                log::error!("Attempt #{attempt}: {e}. {source:?}");
+                tracing::error!("Attempt #{attempt}: {e}. {source:?}");
                 e
             });
             match res {
@@ -155,11 +184,12 @@ impl PositionInfo {
             address,
             position_id,
             pnl_type,
+            display_wallet,
         } = &self;
         let cosmos = app.cosmos.get(chain).ok_or(Error::UnknownChainId)?;
 
         // TODO check the database first to see if we need to insert this at all.
-        let label = match cosmos.contract_info(*address).await {
+        let label = match cosmos.make_contract(*address).info().await {
             Ok(info) => Cow::Owned(info.label),
             Err(_) => "unknown contract".into(),
         };
@@ -244,6 +274,7 @@ impl PositionInfo {
                         active_collateral,
                     )
                     .into_base(status.market_type)
+                    .map_err(|_| Error::MathOverflow)?
                     .split()
                     .1
                     .into_number(),
@@ -251,17 +282,30 @@ impl PositionInfo {
             }
             .to_string(),
             environment: ContractEnvironment::from_market(*chain, &label),
-            pnl: match pnl_type {
-                PnlType::Usd => UsdDisplay(pos.pnl_usd).to_string(),
-                PnlType::Percent => match deposit_collateral_usd.try_into_positive_value() {
-                    None => "Negative collateral".to_owned(),
+            pnl_usd: match pnl_type {
+                PnlType::Percent => None,
+                _ => Some(UsdDisplay(pos.pnl_usd).to_string()),
+            },
+            pnl_percentage: match pnl_type {
+                PnlType::Usd => None,
+                _ => match deposit_collateral_usd.try_into_non_negative_value() {
+                    None => None,
                     Some(deposit) => {
-                        let percent = pos.pnl_usd.into_number() / deposit.into_number()
-                            * Decimal256::from_ratio(100u32, 1u32).into_signed();
+                        let percent = (
+                            // We check for 0 above.
+                            (pos.pnl_usd.into_number() / deposit.into_number()).unwrap()
+                                * Decimal256::from_ratio(100u32, 1u32).into_signed()
+                        )
+                        .map_err(|_| Error::MathOverflow)?;
                         let plus = if percent.is_negative() { "" } else { "+" };
-                        format!("{plus}{}%", TwoDecimalPoints(percent))
+                        Some(format!("{plus}{}%", TwoDecimalPoints(percent)))
                     }
                 },
+            },
+            wallet: if *display_wallet {
+                Some(pos.owner.to_string())
+            } else {
+                None
             },
             info: self,
         })
@@ -270,31 +314,49 @@ impl PositionInfo {
 
 impl PnlInfo {
     fn html(self) -> Response {
-        Html(self.render().unwrap()).into_response()
+        let mut res = Html(self.render().unwrap()).into_response();
+        res.headers_mut().insert(
+            http::header::CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=300"),
+        );
+        res
     }
 
-    fn image(self) -> Response {
-        match self.image_inner() {
+    fn image(self, fontsdb: &Database) -> Response {
+        match self.image_inner(fontsdb) {
             Ok(res) => res,
             Err(e) => {
                 let mut res = format!("Error while rendering SVG: {e:?}").into_response();
-                *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+                *res.status_mut() = http::status::StatusCode::INTERNAL_SERVER_ERROR;
                 res
             }
         }
     }
 
-    fn image_inner(&self) -> Result<Response> {
+    fn image_svg(self) -> Response {
+        // Generate the raw SVG text by rendering the template
+        let svg = PnlSvg { info: &self }.render().unwrap();
+
+        let mut res = svg.into_response();
+        res.headers_mut().insert(
+            http::header::CONTENT_TYPE,
+            HeaderValue::from_static("image/svg+xml"),
+        );
+        res.headers_mut().insert(
+            http::header::CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=86400"),
+        );
+        res
+    }
+
+    fn image_inner(&self, fontsdb: &Database) -> Result<Response> {
         // Generate the raw SVG text by rendering the template
         let svg = PnlSvg { info: self }.render().unwrap();
 
         // Convert the SVG into a usvg tree using default settings
         let mut tree = resvg::usvg::Tree::from_str(&svg, &resvg::usvg::Options::default())?;
 
-        // Load up the fonts and convert text values
-        let mut fontdb = resvg::usvg::fontdb::Database::new();
-        fontdb.load_system_fonts();
-        tree.convert_text(&fontdb);
+        tree.convert_text(fontsdb);
 
         // Now that our usvg tree has text converted, convert into an resvg tree
         let rtree = resvg::Tree::from_usvg(&tree);
@@ -310,10 +372,12 @@ impl PnlInfo {
         // Take the binary PNG output and return is as a response
         let png = pixmap.encode_png()?;
         let mut res = png.into_response();
-        res.headers_mut()
-            .insert(CONTENT_TYPE, HeaderValue::from_static("image/png"));
         res.headers_mut().insert(
-            CACHE_CONTROL,
+            http::header::CONTENT_TYPE,
+            HeaderValue::from_static("image/png"),
+        );
+        res.headers_mut().insert(
+            http::header::CACHE_CONTROL,
             HeaderValue::from_static("public, max-age=86400"),
         );
         Ok(res)
@@ -352,27 +416,33 @@ pub(crate) enum Error {
     Database { msg: String },
     #[error("Page not found")]
     InvalidPage,
+    #[error("Missing PnL values")]
+    PnlValueMissing,
+    #[error("Math operation overflowed")]
+    MathOverflow,
 }
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let mut response = ErrorPage {
             code: match &self {
-                Error::UnknownChainId => StatusCode::BAD_REQUEST,
-                Error::PositionNotFound => StatusCode::BAD_REQUEST,
-                Error::PositionStillOpen => StatusCode::BAD_REQUEST,
+                Error::UnknownChainId => http::status::StatusCode::BAD_REQUEST,
+                Error::PositionNotFound => http::status::StatusCode::BAD_REQUEST,
+                Error::PositionStillOpen => http::status::StatusCode::BAD_REQUEST,
                 Error::FailedToQueryContract { query_type, msg: _ } => match query_type {
-                    QueryType::Status => StatusCode::BAD_REQUEST,
-                    QueryType::EntryPrice => StatusCode::INTERNAL_SERVER_ERROR,
-                    QueryType::ExitPrice => StatusCode::INTERNAL_SERVER_ERROR,
-                    QueryType::Positions => StatusCode::INTERNAL_SERVER_ERROR,
+                    QueryType::Status => http::status::StatusCode::BAD_REQUEST,
+                    QueryType::EntryPrice => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                    QueryType::ExitPrice => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                    QueryType::Positions => http::status::StatusCode::INTERNAL_SERVER_ERROR,
                 },
-                Error::Path { msg: _ } => StatusCode::BAD_REQUEST,
+                Error::Path { msg: _ } => http::status::StatusCode::BAD_REQUEST,
                 Error::Database { msg } => {
-                    log::error!("Database serror: {msg}");
-                    StatusCode::INTERNAL_SERVER_ERROR
+                    tracing::error!("Database serror: {msg}");
+                    http::status::StatusCode::INTERNAL_SERVER_ERROR
                 }
-                Error::InvalidPage => StatusCode::NOT_FOUND,
+                Error::InvalidPage => http::status::StatusCode::NOT_FOUND,
+                Error::PnlValueMissing => http::status::StatusCode::INTERNAL_SERVER_ERROR,
+                Error::MathOverflow => http::status::StatusCode::INTERNAL_SERVER_ERROR,
             },
             error: self.clone(),
         }
@@ -389,7 +459,6 @@ impl IntoResponse for Error {
 #[template(path = "pnl.html")]
 struct PnlInfo {
     amplitude_key: &'static str,
-    pnl_display: String,
     host: String,
     chain: String,
     image_url: String,
@@ -399,6 +468,26 @@ struct PnlInfo {
     entry_price: String,
     exit_price: String,
     leverage: String,
+    wallet: Option<String>,
+    pnl: PnlDetails,
+    quote_currency: String,
+    cache_bust_param: u32,
+}
+
+enum PnlDetails {
+    Usd(String),
+    Percentage(String),
+    Both { usd: String, percentage: String },
+}
+
+impl Display for PnlDetails {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            PnlDetails::Usd(usd) => write!(f, "{usd}"),
+            PnlDetails::Percentage(percentage) => write!(f, "{percentage}"),
+            PnlDetails::Both { usd, percentage } => write!(f, "{usd} / {percentage}"),
+        }
+    }
 }
 
 struct UsdDisplay(Signed<Usd>);

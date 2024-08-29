@@ -1,21 +1,17 @@
-mod liquifund;
+pub(crate) mod liquifund;
 
 use cosmwasm_std::Order;
-pub use liquifund::*;
 mod open;
 use msg::contracts::market::{
     entry::{ClosedPositionCursor, ClosedPositionsResp, PositionsQueryFeeApproach},
     position::events::{PositionSaveEvent, PositionSaveReason},
 };
 pub(crate) use open::*;
-mod close;
-pub use close::*;
-mod update;
-pub use update::*;
-mod validate;
-pub use validate::*;
+pub(crate) mod close;
 mod cw721;
-pub use cw721::*;
+pub(crate) mod take_profit;
+pub(crate) mod update;
+mod validate;
 
 use crate::constants::DEFAULT_CLOSED_POSITION_HISTORY_LIMIT;
 use crate::prelude::*;
@@ -31,9 +27,9 @@ pub(super) const OPEN_NOTIONAL_LONG_INTEREST: Item<Notional> =
 pub(super) const OPEN_NOTIONAL_SHORT_INTEREST: Item<Notional> =
     Item::new(namespace::OPEN_NOTIONAL_SHORT_INTEREST);
 
-pub struct LiquidatablePosition {
-    pub id: PositionId,
-    pub reason: LiquidationReason,
+pub(crate) struct LiquidatablePosition {
+    pub(crate) id: PositionId,
+    pub(crate) reason: LiquidationReason,
 }
 // liquidation price tracking
 
@@ -47,30 +43,6 @@ pub(super) const PRICE_TRIGGER_DESC: Map<(PriceKey, PositionId), LiquidationReas
 /// This is used for short liquidations and long max gains.
 pub(super) const PRICE_TRIGGER_ASC: Map<(PriceKey, PositionId), LiquidationReason> =
     Map::new(namespace::PRICE_TRIGGER_ASC);
-
-/// Positions which need to be added to the liquidation/take profit price maps when cranking.
-///
-/// These are deferred to ensure that we don't liquidate a position if the crank
-/// is falling behind. It's possible that an old price may trigger
-/// liquidation/take profit. Instead, we only insert into the maps above once
-/// the entry price timestamp has been hit.
-///
-/// Key is the timestamp of the last time the liquidation prices were set (see
-/// [LIQUIDATION_PRICES_PENDING_REVERSE]) and position ID.
-pub(super) const LIQUIDATION_PRICES_PENDING: Map<(Timestamp, PositionId), ()> =
-    Map::new(namespace::LIQUIDATION_PRICES_PENDING);
-
-/// How many positions are sitting in the pending queue.
-///
-/// Note that during migration of data, this field may start off empty. The rest
-/// of the code needs to account for that possibility, and if trying to subtract
-/// from 0, should simply provide 0 as the value here.
-pub(super) const LIQUIDATION_PRICES_PENDING_COUNT: Item<u32> =
-    Item::new(namespace::LIQUIDATION_PRICES_PENDING_COUNT);
-
-/// Timestamp of the last time the liquidation prices were set.
-pub(super) const LIQUIDATION_PRICES_PENDING_REVERSE: Map<PositionId, Timestamp> =
-    Map::new(namespace::LIQUIDATION_PRICES_PENDING_REVERSE);
 
 // history
 pub(super) const CLOSED_POSITION_HISTORY: Map<(&Addr, (Timestamp, PositionId)), ClosedPosition> =
@@ -87,20 +59,6 @@ const CLOSED_POSITIONS: Map<PositionId, ClosedPosition> = Map::new(namespace::CL
 pub(super) const NEXT_LIQUIFUNDING: Map<(Timestamp, PositionId), ()> =
     Map::new(namespace::NEXT_LIQUIFUNDING);
 
-/// Tracks when the protocol will next be stale vis-a-vis pending liquifunding.
-///
-/// It would seem like we could check that by using [NEXT_LIQUIFUNDING] and
-/// adding in the staleness duration. However, if the staleness period
-/// configuration changes after liquifunding, that calculation will no longer
-/// guarantee well-fundedness. Instead, we track "when will we go stale" when
-/// setting up liquidation margin initially.
-pub(super) const NEXT_STALE: Map<(Timestamp, PositionId), ()> = Map::new(namespace::NEXT_STALE);
-
-pub enum PositionOrId {
-    Id(PositionId),
-    Pos(Box<Position>),
-}
-
 /// Gets a full position by id
 pub(crate) fn get_position(store: &dyn Storage, id: PositionId) -> Result<Position> {
     #[derive(serde::Serialize)]
@@ -111,15 +69,6 @@ pub(crate) fn get_position(store: &dyn Storage, id: PositionId) -> Result<Positi
         .may_load(store, id)
         .map_err(|e| anyhow!("Could not parse position {id}: {e:?}"))?
         .ok_or_else(|| MarketError::MissingPosition { id: id.to_string() }.into_anyhow())
-}
-
-impl PositionOrId {
-    pub(crate) fn extract(self, store: &dyn Storage) -> Result<Position> {
-        match self {
-            PositionOrId::Id(id) => get_position(store, id),
-            PositionOrId::Pos(pos) => Ok(*pos),
-        }
-    }
 }
 
 fn already(
@@ -218,6 +167,7 @@ impl State<'_> {
         let order = order.unwrap_or(OrderInMessage::Descending);
         let limit: usize = limit
             .unwrap_or(DEFAULT_CLOSED_POSITION_HISTORY_LIMIT)
+            .min(QUERY_MAX_LIMIT)
             .try_into()?;
 
         let (min, max) = match (cursor, order) {
@@ -267,16 +217,507 @@ impl State<'_> {
         })
     }
 
-    /// Validate that we can perform the net open interest adjustment described
-    pub(crate) fn check_adjust_net_open_interest(
+    pub(crate) fn open_long_interest(&self, store: &dyn Storage) -> Result<Notional> {
+        OPEN_NOTIONAL_LONG_INTEREST
+            .load(store)
+            .map_err(|err| err.into())
+    }
+
+    pub(crate) fn open_short_interest(&self, store: &dyn Storage) -> Result<Notional> {
+        OPEN_NOTIONAL_SHORT_INTEREST
+            .load(store)
+            .map_err(|err| err.into())
+    }
+
+    pub(crate) fn positions_net_open_interest(
         &self,
+        store: &dyn Storage,
+    ) -> Result<Signed<Notional>> {
+        self.open_long_interest(store)?.into_signed()
+            - self.open_short_interest(store)?.into_signed()
+    }
+
+    pub(crate) fn position_token_addr(&self, store: &dyn Storage) -> Result<Addr> {
+        load_external_map(
+            &self.querier,
+            &self.factory_address,
+            namespace::POSITION_TOKEN_ADDRS,
+            self.market_id(store)?,
+        )
+    }
+
+    pub(crate) fn pos_snapshot_for_open(
+        &self,
+        store: &dyn Storage,
+        mut pos: Position,
+        fees: PositionsQueryFeeApproach,
+    ) -> Result<PositionOrPendingClose> {
+        let market_type = self.market_id(store)?.get_market_type();
+        let entry_price =
+            self.spot_price(store, pos.price_point_created_at.unwrap_or(pos.created_at))?;
+        let spot_price = self.current_spot_price(store)?;
+
+        // We calculate the DNF fee that would be applied on closing the
+        // position.
+        let dnf_on_close_collateral = self.calc_delta_neutrality_fee(
+            store,
+            -pos.notional_size,
+            &spot_price,
+            Some(pos.liquidation_margin.delta_neutrality),
+        )?;
+
+        let (calc_pending_fees, include_dnf) = match fees {
+            PositionsQueryFeeApproach::NoFees => (false, false),
+            PositionsQueryFeeApproach::Accumulated => (true, false),
+            PositionsQueryFeeApproach::AllFees => (true, true),
+        };
+
+        if calc_pending_fees {
+            // Calculate pending fees
+
+            // Even though the usage of self.now() looks incorrect below, this is only used for
+            // querying positions, and therefore calculating till now without a liquifunding
+            // or precise price point is a best estimate of fees.
+            let (borrow_fees, _) =
+                self.calc_capped_borrow_fee_payment(store, &pos, pos.liquifunded_at, self.now())?;
+            let borrow_fees = borrow_fees.lp.checked_add(borrow_fees.xlp)?;
+            let (funding_payments, _) = self.calc_capped_funding_payment(
+                store,
+                &pos,
+                pos.liquifunded_at,
+                self.now(),
+                true,
+            )?;
+            let delta_neutrality_fee = if include_dnf {
+                dnf_on_close_collateral
+            } else {
+                Signed::zero()
+            };
+            pos.borrow_fee
+                .checked_add_assign(borrow_fees, &spot_price)?;
+            pos.funding_fee
+                .checked_add_assign(funding_payments, &spot_price)?;
+            pos.delta_neutrality_fee
+                .checked_add_assign(delta_neutrality_fee, &spot_price)?;
+
+            pos.liquidation_margin.borrow = pos
+                .liquidation_margin
+                .borrow
+                .checked_sub(borrow_fees)
+                .ok()
+                .unwrap_or_default();
+            pos.liquidation_margin.funding = pos
+                .liquidation_margin
+                .funding
+                .checked_add_signed(-funding_payments)
+                .ok()
+                .unwrap_or_default();
+            pos.liquidation_margin
+                .delta_neutrality
+                .checked_add_signed(-delta_neutrality_fee)
+                .ok()
+                .unwrap_or_default();
+
+            let active_collateral = pos
+                .active_collateral
+                .into_signed()
+                .checked_sub(borrow_fees.into_signed())?
+                .checked_sub(funding_payments)?
+                .checked_sub(delta_neutrality_fee)?;
+            pos.active_collateral = match active_collateral.try_into_non_zero() {
+                Some(x) => x,
+                // This should never happen, since it would mean we have
+                // insufficient liquidation margin. But if we do end up in that case
+                // in production, just use a small value, it will be picked up by
+                // the extrapolate step below.
+                None => {
+                    debug_assert!(false, "Impossible situation encountered, active collateral would go zero or negative in query");
+                    "0.00001".parse().unwrap()
+                }
+            };
+        };
+
+        let start_price = self.spot_price(store, pos.liquifunded_at)?;
+        pos.into_query_response_extrapolate_exposure(
+            start_price,
+            spot_price,
+            entry_price.price_notional,
+            market_type,
+            dnf_on_close_collateral,
+        )
+    }
+
+    pub(crate) fn position_assert_owner(
+        &self,
+        store: &dyn Storage,
+        pos_id: PositionId,
+        addr: &Addr,
+    ) -> Result<()> {
+        match get_position(store, pos_id) {
+            Err(_) => Err(perp_anyhow!(
+                ErrorId::Auth,
+                ErrorDomain::Market,
+                "position owner does not exist",
+            )),
+            Ok(pos) => {
+                if pos.owner != *addr {
+                    Err(perp_anyhow!(
+                        ErrorId::Auth,
+                        ErrorDomain::Market,
+                        "position owner is {} not {}",
+                        pos.owner,
+                        addr
+                    ))
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    pub(crate) fn liquidatable_position(
+        &self,
+        store: &dyn Storage,
+        price: Price,
+    ) -> Result<Option<LiquidatablePosition>> {
+        // let's say spot price = 10
+        // and our long position liquidation prices are 10,11,12
+        // then we liquidate these
+        // if our long position prices were 7,8,9
+        // then we would not liquidate
+        if let Some(res) = PRICE_TRIGGER_DESC
+            .prefix_range(
+                store,
+                Some(PrefixBound::inclusive(price)),
+                None,
+                Order::Descending,
+            )
+            .next()
+        {
+            let ((_, id), reason) = res?;
+            return Ok(Some(LiquidatablePosition { id, reason }));
+        }
+
+        if let Some(res) = PRICE_TRIGGER_ASC
+            .prefix_range(
+                store,
+                None,
+                Some(PrefixBound::inclusive(price)),
+                Order::Ascending,
+            )
+            .next()
+        {
+            let ((_, id), reason) = res?;
+            return Ok(Some(LiquidatablePosition { id, reason }));
+        }
+
+        Ok(None)
+    }
+
+    /// Would the given new price cause a position to be liquidatable?
+    pub(crate) fn newly_liquidatable_position(
+        &self,
+        store: &dyn Storage,
+        oracle_price: Price,
+        new_price: Price,
+    ) -> bool {
+        PRICE_TRIGGER_DESC
+            .prefix_range(
+                store,
+                Some(PrefixBound::inclusive(new_price)),
+                Some(PrefixBound::exclusive(oracle_price)),
+                Order::Descending,
+            )
+            .next()
+            .is_some()
+            || PRICE_TRIGGER_ASC
+                .prefix_range(
+                    store,
+                    Some(PrefixBound::exclusive(oracle_price)),
+                    Some(PrefixBound::inclusive(new_price)),
+                    Order::Ascending,
+                )
+                .next()
+                .is_some()
+    }
+}
+
+pub(crate) fn positions_init(store: &mut dyn Storage) -> Result<()> {
+    LAST_POSITION_ID.save(store, &PositionId::new(0))?;
+    OPEN_NOTIONAL_SHORT_INTEREST.save(store, &Notional::zero())?;
+    OPEN_NOTIONAL_LONG_INTEREST.save(store, &Notional::zero())?;
+    Ok(())
+}
+
+impl State<'_> {
+    /// Remove old entries for a position. This should provide the [Position]
+    /// value loaded directly from storage without modifications.
+    fn position_remove(&self, ctx: &mut StateContext, pos_id: PositionId) -> Result<()> {
+        // Load up the original position, since we need the exact price points
+        // stored there for managing other data structures like the liquidation
+        // prices.
+        let position = get_position(ctx.storage, pos_id)?;
+
+        debug_assert!(OPEN_POSITIONS.has(ctx.storage, position.id));
+        debug_assert!(NEXT_LIQUIFUNDING.has(ctx.storage, (position.next_liquifunding, position.id)));
+
+        OPEN_POSITIONS.remove(ctx.storage, position.id);
+        NEXT_LIQUIFUNDING.remove(ctx.storage, (position.next_liquifunding, position.id));
+
+        self.remove_liquidation_prices(ctx, &position)?;
+        self.decrease_total_funding_margin(ctx, position.liquidation_margin.funding)?;
+
+        Ok(())
+    }
+
+    /// A version of [State::position_save] that does not recalculate any values.
+    ///
+    /// This is intended for when a code path needs to make minor modifications
+    /// to the [Position] value and then store it again.
+    pub(crate) fn position_save_no_recalc(
+        &self,
+        ctx: &mut StateContext,
+        position: &Position,
+    ) -> Result<()> {
+        debug_assert!(OPEN_POSITIONS.has(ctx.storage, position.id));
+        OPEN_POSITIONS
+            .save(ctx.storage, position.id, position)
+            .map_err(|e| e.into())
+    }
+
+    /// Save an open position into the [OPEN_POSITIONS] data structure.
+    ///
+    /// This function will recalculate a number of fields on the [Position]
+    /// value, such as liquidation margin, liquidation prices, etc.
+    pub(crate) fn position_save(
+        &self,
+        ctx: &mut StateContext,
+        pos: &mut Position,
+        price_point: &PricePoint,
+        is_update: bool,
+        recalc_liquidation_margin: bool,
+        reason: PositionSaveReason,
+    ) -> Result<()> {
+        if is_update {
+            self.position_remove(ctx, pos.id)?;
+        } else {
+            debug_assert!(!OPEN_POSITIONS.has(ctx.storage, pos.id));
+        }
+
+        if recalc_liquidation_margin {
+            debug_assert_eq!(price_point.timestamp, pos.liquifunded_at);
+            pos.liquidation_margin = pos.liquidation_margin(price_point, &self.config)?;
+        } else {
+            debug_assert_eq!(
+                pos.liquidation_margin,
+                pos.liquidation_margin(price_point, &self.config)?
+            );
+        }
+
+        perp_ensure!(
+            pos.active_collateral.raw() >= pos.liquidation_margin.total()?,
+            ErrorId::InsufficientMargin,
+            ErrorDomain::Market,
+            "Active collateral cannot be less than liquidation margin: {} vs {:?}",
+            pos.active_collateral,
+            pos.liquidation_margin
+        );
+
+        pos.liquidation_price = pos.liquidation_price(
+            price_point.price_notional,
+            pos.active_collateral,
+            &pos.liquidation_margin,
+        );
+        let market_type = self.market_type(ctx.storage)?;
+        pos.take_profit_total = pos.take_profit_price_total(price_point, market_type)?;
+
+        debug_assert!(pos.liquifunded_at < pos.next_liquifunding);
+
+        OPEN_POSITIONS.save(ctx.storage, pos.id, pos)?;
+        NEXT_LIQUIFUNDING.save(ctx.storage, (pos.next_liquifunding, pos.id), &())?;
+        self.store_liquidation_prices(ctx, pos)?;
+
+        self.increase_total_funding_margin(ctx, pos.liquidation_margin.funding)?;
+
+        ctx.response
+            .add_event(PositionSaveEvent { id: pos.id, reason });
+
+        Ok(())
+    }
+
+    /// Removes a position's liquidation price and take profit prices
+    fn remove_liquidation_prices(&self, ctx: &mut StateContext, pos: &Position) -> Result<()> {
+        match pos.direction() {
+            DirectionToNotional::Long => {
+                if let Some(liquidation_price) = pos.liquidation_price {
+                    PRICE_TRIGGER_DESC.remove(ctx.storage, (liquidation_price.into(), pos.id));
+                }
+
+                if let Some(take_profit_total) = pos.take_profit_total {
+                    PRICE_TRIGGER_ASC.remove(ctx.storage, (take_profit_total.into(), pos.id));
+                }
+
+                if let Some(stop_loss_override) = pos.stop_loss_override_notional {
+                    PRICE_TRIGGER_DESC.remove(ctx.storage, (stop_loss_override.into(), pos.id));
+                }
+
+                if let Some(take_profit_trader_notional) = pos.take_profit_trader_notional {
+                    PRICE_TRIGGER_ASC
+                        .remove(ctx.storage, (take_profit_trader_notional.into(), pos.id));
+                }
+            }
+            DirectionToNotional::Short => {
+                if let Some(liquidation_price) = pos.liquidation_price {
+                    PRICE_TRIGGER_ASC.remove(ctx.storage, (liquidation_price.into(), pos.id));
+                }
+
+                if let Some(take_profit_total) = pos.take_profit_total {
+                    PRICE_TRIGGER_DESC.remove(ctx.storage, (take_profit_total.into(), pos.id));
+                }
+
+                if let Some(stop_loss_override) = pos.stop_loss_override_notional {
+                    PRICE_TRIGGER_ASC.remove(ctx.storage, (stop_loss_override.into(), pos.id));
+                }
+
+                if let Some(take_profit_trader_notional) = pos.take_profit_trader_notional {
+                    PRICE_TRIGGER_DESC
+                        .remove(ctx.storage, (take_profit_trader_notional.into(), pos.id));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Only used for migration, make sure this no-longer-needed data structure is empty.
+    pub(crate) fn ensure_liquidation_prices_pending_empty(
+        &self,
+        store: &dyn Storage,
+    ) -> Result<()> {
+        const LIQUIDATION_PRICES_PENDING: Map<(Timestamp, PositionId), ()> =
+            Map::new(namespace::LIQUIDATION_PRICES_PENDING);
+        const LIQUIDATION_PRICES_PENDING_REVERSE: Map<PositionId, Timestamp> =
+            Map::new(namespace::LIQUIDATION_PRICES_PENDING_REVERSE);
+        const LIQUIDATION_PRICES_PENDING_COUNT: Item<u32> =
+            Item::new(namespace::LIQUIDATION_PRICES_PENDING_COUNT);
+
+        anyhow::ensure!(LIQUIDATION_PRICES_PENDING
+            .keys(store, None, None, Order::Ascending)
+            .next()
+            .is_none());
+        anyhow::ensure!(LIQUIDATION_PRICES_PENDING_REVERSE
+            .keys(store, None, None, Order::Ascending)
+            .next()
+            .is_none());
+        anyhow::ensure!(
+            LIQUIDATION_PRICES_PENDING_COUNT
+                .may_load(store)?
+                .unwrap_or_default()
+                == 0
+        );
+
+        Ok(())
+    }
+
+    /// Actually store the liquidation prices
+    ///
+    /// This can either happen because we tried to store new prices and the
+    /// protocol's crank was up to date, _or_ because the protocol was lagging
+    /// behind on the crank and we're now unpending a queued liquidation price.
+    fn store_liquidation_prices(&self, ctx: &mut StateContext, pos: &Position) -> Result<()> {
+        match pos.direction() {
+            DirectionToNotional::Long => {
+                if let Some(liquidation_price) = pos.liquidation_price {
+                    PRICE_TRIGGER_DESC.save(
+                        ctx.storage,
+                        (liquidation_price.into(), pos.id),
+                        &LiquidationReason::Liquidated,
+                    )?;
+                }
+
+                if let Some(take_profit_total) = pos.take_profit_total {
+                    PRICE_TRIGGER_ASC.save(
+                        ctx.storage,
+                        (take_profit_total.into(), pos.id),
+                        &LiquidationReason::MaxGains,
+                    )?;
+                }
+
+                if let Some(stop_loss_override) = pos.stop_loss_override_notional {
+                    PRICE_TRIGGER_DESC.save(
+                        ctx.storage,
+                        (stop_loss_override.into(), pos.id),
+                        &LiquidationReason::StopLoss,
+                    )?;
+                }
+
+                if let Some(take_profit_trader_notional) = pos.take_profit_trader_notional {
+                    PRICE_TRIGGER_ASC.save(
+                        ctx.storage,
+                        (take_profit_trader_notional.into(), pos.id),
+                        &LiquidationReason::TakeProfit,
+                    )?;
+                }
+            }
+            DirectionToNotional::Short => {
+                if let Some(liquidation_price) = pos.liquidation_price {
+                    PRICE_TRIGGER_ASC.save(
+                        ctx.storage,
+                        (liquidation_price.into(), pos.id),
+                        &LiquidationReason::Liquidated,
+                    )?;
+                }
+
+                if let Some(take_profit_total) = pos.take_profit_total {
+                    PRICE_TRIGGER_DESC.save(
+                        ctx.storage,
+                        (take_profit_total.into(), pos.id),
+                        &LiquidationReason::MaxGains,
+                    )?;
+                }
+
+                if let Some(stop_loss_override) = pos.stop_loss_override_notional {
+                    PRICE_TRIGGER_ASC.save(
+                        ctx.storage,
+                        (stop_loss_override.into(), pos.id),
+                        &LiquidationReason::StopLoss,
+                    )?;
+                }
+
+                if let Some(take_profit_trader_notional) = pos.take_profit_trader_notional {
+                    PRICE_TRIGGER_DESC.save(
+                        ctx.storage,
+                        (take_profit_trader_notional.into(), pos.id),
+                        &LiquidationReason::TakeProfit,
+                    )?;
+                }
+            }
+        };
+
+        Ok(())
+    }
+}
+
+/// Result of checking if we can adjust net open interest
+#[must_use]
+pub(crate) enum AdjustOpenInterest {
+    /// Set the long interest to this value
+    Long(Notional),
+    /// Set the short interest to this value
+    Short(Notional),
+}
+
+impl AdjustOpenInterest {
+    /// Validate that we can perform the net open interest adjustment described
+    pub(crate) fn new(
+        state: &State,
         store: &dyn Storage,
         notional_size_diff: Signed<Notional>,
         dir: DirectionToNotional,
         assert_delta_neutrality_fee_cap: bool,
-    ) -> Result<AdjustOpenInterestResult> {
-        let long_before = self.open_long_interest(store)?;
-        let short_before = self.open_short_interest(store)?;
+    ) -> Result<Self> {
+        let long_before = state.open_long_interest(store)?;
+        let short_before = state.open_short_interest(store)?;
 
         let long_after;
         let short_after;
@@ -287,14 +728,14 @@ impl State<'_> {
                     .checked_add_signed(notional_size_diff)
                     .context("adjust_net_open_interest: long interest would be negative")?;
                 short_after = short_before;
-                adjust_res = AdjustOpenInterestResult::Long(long_after);
+                adjust_res = Self::Long(long_after);
             }
             DirectionToNotional::Short => {
                 long_after = long_before;
                 short_after = short_before
                     .checked_add_signed(-notional_size_diff)
                     .context("adjust_net_open_interest: short interest would be negative")?;
-                adjust_res = AdjustOpenInterestResult::Short(short_after);
+                adjust_res = Self::Short(short_after);
             }
         };
 
@@ -306,16 +747,16 @@ impl State<'_> {
                 .into_signed()
                 .checked_sub(short_after.into_signed())?;
 
-            let cap: Number = self.config.delta_neutrality_fee_cap.into();
-            let sensitivity: Number = self.config.delta_neutrality_fee_sensitivity.into();
+            let cap: Number = state.config.delta_neutrality_fee_cap.into();
+            let sensitivity: Number = state.config.delta_neutrality_fee_sensitivity.into();
 
             let is_capped_low = |x| x <= -cap;
             let is_capped_high = |x| x >= cap;
 
             let instant_delta_neutrality_before_uncapped =
-                net_notional_before.into_number() / sensitivity;
+                (net_notional_before.into_number() / sensitivity)?;
             let instant_delta_neutrality_after_uncapped =
-                net_notional_after.into_number() / sensitivity;
+                (net_notional_after.into_number() / sensitivity)?;
 
             let is_capped_low_before = is_capped_low(instant_delta_neutrality_before_uncapped);
             let is_capped_high_before = is_capped_high(instant_delta_neutrality_before_uncapped);
@@ -324,7 +765,7 @@ impl State<'_> {
 
             // these strings are just to make error messages easier to understand
             // since the UX is in terms of DirectionToBase, not DirectionToNotional
-            let market_type = self.market_type(store)?;
+            let market_type = state.market_type(store)?;
             // May be different from dir, since updating/closing a position can
             // cause a notional size diff which is opposite to the position
             // direction.
@@ -420,632 +861,24 @@ impl State<'_> {
             Ok(adjust_res)
         }
     }
-
-    pub(crate) fn adjust_net_open_interest(
+    pub(crate) fn net_notional(
         &self,
-        ctx: &mut StateContext,
-        notional_size_diff: Signed<Notional>,
-        dir: DirectionToNotional,
-        assert_delta_neutrality_fee_cap: bool,
-    ) -> Result<()> {
-        self.check_adjust_net_open_interest(
-            ctx.storage,
-            notional_size_diff,
-            dir,
-            assert_delta_neutrality_fee_cap,
-        )?
-        .store(ctx)?;
-
-        Ok(())
-    }
-
-    pub(crate) fn open_long_interest(&self, store: &dyn Storage) -> Result<Notional> {
-        OPEN_NOTIONAL_LONG_INTEREST
-            .load(store)
-            .map_err(|err| err.into())
-    }
-
-    pub(crate) fn open_short_interest(&self, store: &dyn Storage) -> Result<Notional> {
-        OPEN_NOTIONAL_SHORT_INTEREST
-            .load(store)
-            .map_err(|err| err.into())
-    }
-
-    pub(crate) fn positions_net_open_interest(
-        &self,
+        state: &State,
         store: &dyn Storage,
     ) -> Result<Signed<Notional>> {
-        Ok(self.open_long_interest(store)?.into_signed()
-            - self.open_short_interest(store)?.into_signed())
-    }
-
-    pub(crate) fn position_token_addr(&self, store: &dyn Storage) -> Result<Addr> {
-        load_external_map(
-            &self.querier,
-            &self.factory_address,
-            namespace::POSITION_TOKEN_ADDRS,
-            self.market_id(store)?,
-        )
-    }
-
-    pub(crate) fn pos_snapshot_for_open(
-        &self,
-        store: &dyn Storage,
-        mut pos: Position,
-        fees: PositionsQueryFeeApproach,
-    ) -> Result<PositionOrPendingClose> {
-        let config = &self.config;
-        let market_type = self.market_id(store)?.get_market_type();
-        let entry_price = match self.spot_price(store, Some(pos.created_at)) {
-            Ok(entry_price) => entry_price,
-            Err(err) => return Err(err),
-        };
-        let spot_price = self.spot_price(store, None)?;
-
-        // PERP-996 ensure we do not flip direction, see comments in
-        // liquifunding for more details
-        let original_direction_to_base = pos
-            .active_leverage_to_notional(&spot_price)
-            .into_base(market_type)
-            .split()
-            .0;
-
-        // We calculate the DNF fee that would be applied on closing the
-        // position.
-        let dnf_on_close_collateral = self.calc_delta_neutrality_fee(
-            store,
-            -pos.notional_size,
-            spot_price,
-            Some(pos.liquidation_margin.delta_neutrality),
-        )?;
-
-        let (calc_pending_fees, include_dnf) = match fees {
-            PositionsQueryFeeApproach::NoFees => (false, false),
-            PositionsQueryFeeApproach::Accumulated => (true, false),
-            PositionsQueryFeeApproach::AllFees => (true, true),
-        };
-
-        if calc_pending_fees {
-            // Calculate pending fees
-            let (borrow_fees, _) =
-                self.calc_capped_borrow_fee_payment(store, &pos, pos.liquifunded_at, self.now())?;
-            let borrow_fees = borrow_fees.lp.checked_add(borrow_fees.xlp)?;
-            let (funding_payments, _) =
-                self.calc_capped_funding_payment(store, &pos, pos.liquifunded_at, self.now())?;
-            let delta_neutrality_fee = if include_dnf {
-                dnf_on_close_collateral
-            } else {
-                Signed::zero()
-            };
-            pos.borrow_fee
-                .checked_add_assign(borrow_fees, &spot_price)?;
-            pos.funding_fee
-                .checked_add_assign(funding_payments, &spot_price)?;
-            pos.delta_neutrality_fee
-                .checked_add_assign(delta_neutrality_fee, &spot_price)?;
-
-            pos.liquidation_margin.borrow = pos
-                .liquidation_margin
-                .borrow
-                .checked_sub(borrow_fees)
-                .ok()
-                .unwrap_or_default();
-            pos.liquidation_margin.funding = pos
-                .liquidation_margin
-                .funding
-                .checked_add_signed(-funding_payments)
-                .ok()
-                .unwrap_or_default();
-            pos.liquidation_margin
-                .delta_neutrality
-                .checked_add_signed(-delta_neutrality_fee)
-                .ok()
-                .unwrap_or_default();
-
-            let active_collateral = pos
-                .active_collateral
-                .into_signed()
-                .checked_sub(borrow_fees.into_signed())?
-                .checked_sub(funding_payments)?
-                .checked_sub(delta_neutrality_fee)?;
-            pos.active_collateral = match active_collateral.try_into_non_zero() {
-                Some(x) => x,
-                // This should never happen, since it would mean we have
-                // insufficient liquidation margin. But if we do end up in that case
-                // in production, just use a small value, it will be picked up by
-                // the extrapolate step below.
-                None => {
-                    debug_assert!(false, "Impossible situation encountered, active collateral would go zero or negative in query");
-                    "0.00001".parse().unwrap()
-                }
-            };
-        };
-
-        let start_price = self.spot_price(store, Some(pos.liquifunded_at))?;
-        pos.into_query_response_extrapolate_exposure(
-            start_price.price_notional,
-            spot_price,
-            entry_price.price_notional,
-            &spot_price,
-            config,
-            market_type,
-            original_direction_to_base,
-            dnf_on_close_collateral,
-        )
-    }
-
-    pub(crate) fn position_assert_owner(
-        &self,
-        store: &dyn Storage,
-        pos_or_id: PositionOrId,
-        addr: &Addr,
-    ) -> Result<()> {
-        match pos_or_id.extract(store) {
-            Err(_) => Err(perp_anyhow!(
-                ErrorId::Auth,
-                ErrorDomain::Market,
-                "position owner does not exist",
-            )),
-            Ok(pos) => {
-                if pos.owner != *addr {
-                    Err(perp_anyhow!(
-                        ErrorId::Auth,
-                        ErrorDomain::Market,
-                        "position owner is {} not {}",
-                        pos.owner,
-                        addr
-                    ))
-                } else {
-                    Ok(())
-                }
-            }
-        }
-    }
-
-    pub(crate) fn liquidatable_position(
-        &self,
-        store: &dyn Storage,
-        price: Price,
-    ) -> Result<Option<LiquidatablePosition>> {
-        // let's say spot price = 10
-        // and our long position liquidation prices are 10,11,12
-        // then we liquidate these
-        // if our long position prices were 7,8,9
-        // then we would not liquidate
-        if let Some(res) = PRICE_TRIGGER_DESC
-            .prefix_range(
-                store,
-                Some(PrefixBound::inclusive(price)),
-                None,
-                Order::Descending,
-            )
-            .next()
-        {
-            let ((_, id), reason) = res?;
-            return Ok(Some(LiquidatablePosition { id, reason }));
-        }
-
-        if let Some(res) = PRICE_TRIGGER_ASC
-            .prefix_range(
-                store,
-                None,
-                Some(PrefixBound::inclusive(price)),
-                Order::Ascending,
-            )
-            .next()
-        {
-            let ((_, id), reason) = res?;
-            return Ok(Some(LiquidatablePosition { id, reason }));
-        }
-
-        Ok(None)
-    }
-
-    /// Check if there is a pending liquidation price that can be added to the real data structures.
-    pub(crate) fn pending_liquidation_prices(
-        &self,
-        store: &dyn Storage,
-        price_point_timestamp: Timestamp,
-    ) -> Result<Option<PositionId>> {
-        Ok(LIQUIDATION_PRICES_PENDING
-            .keys(store, None, None, Order::Ascending)
-            .next()
-            .transpose()?
-            .and_then(|(updated_at, pos)| {
-                if updated_at <= price_point_timestamp {
-                    Some(pos)
-                } else {
-                    None
-                }
-            }))
-    }
-
-    /// Decrement the pending position count by one.
-    fn decrement_pending_count(&self, ctx: &mut StateContext) -> Result<()> {
-        let new = LIQUIDATION_PRICES_PENDING_COUNT
-            .may_load(ctx.storage)?
-            .unwrap_or_default()
-            .checked_sub(1)
-            .unwrap_or_default();
-        LIQUIDATION_PRICES_PENDING_COUNT.save(ctx.storage, &new)?;
-        Ok(())
-    }
-
-    /// Increment the pending count
-    ///
-    /// If this is a user driven action (like open or update), we block this
-    /// action if we've already hit our congestion limit. For automated actions
-    /// like cranked liquifundings, we always let the unpending occur.
-    fn increment_pending_count(
-        &self,
-        ctx: &mut StateContext,
-        reason: PositionSaveReason,
-    ) -> Result<()> {
-        let old = LIQUIDATION_PRICES_PENDING_COUNT
-            .may_load(ctx.storage)?
-            .unwrap_or_default();
-
-        if old >= self.config.unpend_limit {
-            if let Some(reason) = reason.into_congestion_reason() {
-                return Err(MarketError::Congestion {
-                    current_queue: old,
-                    max_size: self.config.unpend_limit,
-                    reason,
-                }
-                .into_anyhow());
-            }
-        }
-
-        // If we hit the numeric overflow, then (1) that's insane and (2) just keep the old value, we're allowed to undercount this.
-        if let Some(new) = old.checked_add(1) {
-            LIQUIDATION_PRICES_PENDING_COUNT.save(ctx.storage, &new)?;
-        }
-        Ok(())
-    }
-
-    /// Ensure that we're not in a congested state.
-    ///
-    /// This is used to prevent users from placing more limit orders while the
-    /// market is congested. Placing additional limit orders can open a spam
-    /// attack vector when the market is in the congested state.
-    pub(crate) fn ensure_not_congested(
-        &self,
-        store: &dyn Storage,
-        reason: CongestionReason,
-    ) -> Result<()> {
-        let count = LIQUIDATION_PRICES_PENDING_COUNT
-            .may_load(store)?
-            .unwrap_or_default();
-
-        if count >= self.config.unpend_limit {
-            Err(MarketError::Congestion {
-                current_queue: count,
-                max_size: self.config.unpend_limit,
-                reason,
-            }
-            .into_anyhow())
-        } else {
-            Ok(())
-        }
-    }
-}
-
-pub(crate) fn positions_init(store: &mut dyn Storage) -> Result<()> {
-    LAST_POSITION_ID.save(store, &PositionId::new(0))?;
-    OPEN_NOTIONAL_SHORT_INTEREST.save(store, &Notional::zero())?;
-    OPEN_NOTIONAL_LONG_INTEREST.save(store, &Notional::zero())?;
-    Ok(())
-}
-
-impl State<'_> {
-    /// Remove old entries for a position. This should provide the [Position]
-    /// value loaded directly from storage without modifications.
-    fn position_remove(&self, ctx: &mut StateContext, pos_id: PositionId) -> Result<()> {
-        // Load up the original position, since we need the exact price points
-        // stored there for managing other data structures like the liquidation
-        // prices.
-        let position = get_position(ctx.storage, pos_id)?;
-
-        debug_assert!(OPEN_POSITIONS.has(ctx.storage, position.id));
-        debug_assert!(NEXT_LIQUIFUNDING.has(ctx.storage, (position.next_liquifunding, position.id)));
-        debug_assert!(NEXT_STALE.has(ctx.storage, (position.stale_at, position.id)));
-
-        OPEN_POSITIONS.remove(ctx.storage, position.id);
-        NEXT_LIQUIFUNDING.remove(ctx.storage, (position.next_liquifunding, position.id));
-        NEXT_STALE.remove(ctx.storage, (position.stale_at, position.id));
-
-        self.remove_liquidation_prices(ctx, &position)?;
-        self.decrease_total_funding_margin(ctx, position.liquidation_margin.funding)?;
-
-        Ok(())
-    }
-
-    /// A version of [State::position_save] that does not recalculate any values.
-    ///
-    /// This is intended for when a code path needs to make minor modifications
-    /// to the [Position] value and then store it again.
-    pub(crate) fn position_save_no_recalc(
-        &self,
-        ctx: &mut StateContext,
-        position: &Position,
-    ) -> Result<()> {
-        debug_assert!(OPEN_POSITIONS.has(ctx.storage, position.id));
-        OPEN_POSITIONS
-            .save(ctx.storage, position.id, position)
-            .map_err(|e| e.into())
-    }
-
-    /// Save an open position into the [OPEN_POSITIONS] data structure.
-    ///
-    /// This function will recalculate a number of fields on the [Position]
-    /// value, such as liquidation margin, liquidation prices, etc.
-    pub(crate) fn position_save(
-        &self,
-        ctx: &mut StateContext,
-        pos: &mut Position,
-        price_point: &PricePoint,
-        is_update: bool,
-        recalc_liquidation_margin: bool,
-        reason: PositionSaveReason,
-    ) -> Result<()> {
-        if is_update {
-            self.position_remove(ctx, pos.id)?;
-        } else {
-            debug_assert!(!OPEN_POSITIONS.has(ctx.storage, pos.id));
-        }
-
-        if recalc_liquidation_margin {
-            pos.liquidation_margin = pos.liquidation_margin(
-                price_point.price_notional,
-                &self.spot_price(ctx.storage, None)?,
-                &self.config,
-            )?;
-        } else {
-            debug_assert_eq!(
-                pos.liquidation_margin,
-                pos.liquidation_margin(
-                    price_point.price_notional,
-                    &self.spot_price(ctx.storage, None)?,
-                    &self.config
-                )?
-            );
-        }
-
-        perp_ensure!(
-            pos.active_collateral.raw() >= pos.liquidation_margin.total(),
-            ErrorId::InsufficientMargin,
-            ErrorDomain::Market,
-            "Active collateral cannot be less than liquidation margin: {} vs {:?}",
-            pos.active_collateral,
-            pos.liquidation_margin
-        );
-
-        pos.liquidation_price = pos.liquidation_price(
-            price_point.price_notional,
-            pos.active_collateral,
-            &pos.liquidation_margin,
-        );
-        let market_type = self.market_type(ctx.storage)?;
-        pos.take_profit_price = pos.take_profit_price(price_point, market_type)?;
-
-        debug_assert!(pos.liquifunded_at < pos.next_liquifunding);
-        debug_assert!(pos.next_liquifunding < pos.stale_at);
-
-        OPEN_POSITIONS.save(ctx.storage, pos.id, pos)?;
-        NEXT_LIQUIFUNDING.save(ctx.storage, (pos.next_liquifunding, pos.id), &())?;
-        NEXT_STALE.save(ctx.storage, (pos.stale_at, pos.id), &())?;
-        let used_pending_queue = self.store_liquidation_prices(ctx, pos, reason)?;
-
-        self.increase_total_funding_margin(ctx, pos.liquidation_margin.funding)?;
-
-        ctx.response.add_event(PositionSaveEvent {
-            id: pos.id,
-            reason,
-            used_pending_queue,
-        });
-
-        Ok(())
-    }
-
-    /// Removes a position's liquidation price and take profit prices
-    fn remove_liquidation_prices(&self, ctx: &mut StateContext, pos: &Position) -> Result<()> {
-        if let Some(updated_at) =
-            LIQUIDATION_PRICES_PENDING_REVERSE.may_load(ctx.storage, pos.id)?
-        {
-            if LIQUIDATION_PRICES_PENDING.has(ctx.storage, (updated_at, pos.id)) {
-                self.decrement_pending_count(ctx)?;
-                LIQUIDATION_PRICES_PENDING_REVERSE.remove(ctx.storage, pos.id);
-                LIQUIDATION_PRICES_PENDING.remove(ctx.storage, (updated_at, pos.id));
-            } else {
-                debug_assert!(!LIQUIDATION_PRICES_PENDING_REVERSE.has(ctx.storage, pos.id))
-            }
-        }
-
-        match pos.direction() {
-            DirectionToNotional::Long => {
-                if let Some(liquidation_price) = pos.liquidation_price {
-                    PRICE_TRIGGER_DESC.remove(ctx.storage, (liquidation_price.into(), pos.id));
-                }
-
-                if let Some(take_profit_price) = pos.take_profit_price {
-                    PRICE_TRIGGER_ASC.remove(ctx.storage, (take_profit_price.into(), pos.id));
-                }
-
-                if let Some(stop_loss_override) = pos.stop_loss_override_notional {
-                    PRICE_TRIGGER_DESC.remove(ctx.storage, (stop_loss_override.into(), pos.id));
-                }
-
-                if let Some(take_profit_override) = pos.take_profit_override_notional {
-                    PRICE_TRIGGER_ASC.remove(ctx.storage, (take_profit_override.into(), pos.id));
-                }
-            }
-            DirectionToNotional::Short => {
-                if let Some(liquidation_price) = pos.liquidation_price {
-                    PRICE_TRIGGER_ASC.remove(ctx.storage, (liquidation_price.into(), pos.id));
-                }
-
-                if let Some(take_profit_price) = pos.take_profit_price {
-                    PRICE_TRIGGER_DESC.remove(ctx.storage, (take_profit_price.into(), pos.id));
-                }
-
-                if let Some(stop_loss_override) = pos.stop_loss_override_notional {
-                    PRICE_TRIGGER_ASC.remove(ctx.storage, (stop_loss_override.into(), pos.id));
-                }
-
-                if let Some(take_profit_override) = pos.take_profit_override_notional {
-                    PRICE_TRIGGER_DESC.remove(ctx.storage, (take_profit_override.into(), pos.id));
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Stores a position's liquidation price and take profit prices for easy processing.
-    /// Implicitly removes existing liquidation prices for the specified position.
-    ///
-    /// Param `spot_price` represents the spot price at the timestamp for which the liquidation prices should
-    /// be calculated. For example, for newly open positions, this is the timestamp at which the position was
-    /// opened.
-    ///
-    /// If the crank is currently up to date, this function will immediately
-    /// store the liquidation prices for price trigger processing. However, if
-    /// the crank is lagging behind, we instead put the prices on the on the
-    /// [LIQUIDATION_PRICES_PENDING] queue so that historical price updates
-    /// can't trigger liquidation/take profit.  Actually adding them will then
-    /// occur in the crank.
-    ///
-    /// Returns [true] if we used the unpend queue, [false] otherwise.
-    fn store_liquidation_prices(
-        &self,
-        ctx: &mut StateContext,
-        pos: &Position,
-        reason: PositionSaveReason,
-    ) -> Result<bool> {
-        if self.is_crank_up_to_date(ctx.storage)? {
-            self.store_liquidation_prices_inner(ctx, pos)?;
-            Ok(false)
-        } else {
-            let now = self.now();
-            LIQUIDATION_PRICES_PENDING_REVERSE.save(ctx.storage, pos.id, &now)?;
-            LIQUIDATION_PRICES_PENDING.save(ctx.storage, (now, pos.id), &())?;
-            self.increment_pending_count(ctx, reason)?;
-            Ok(true)
-        }
-    }
-
-    /// Take a single position from [LIQUIDATION_PRICES_PENDING] and moves it to the real data structures.
-    pub(super) fn unpend_liquidation_prices(
-        &self,
-        ctx: &mut StateContext,
-        posid: PositionId,
-    ) -> Result<()> {
-        let updated_at = LIQUIDATION_PRICES_PENDING_REVERSE.load(ctx.storage, posid)?;
-        LIQUIDATION_PRICES_PENDING_REVERSE.remove(ctx.storage, posid);
-        LIQUIDATION_PRICES_PENDING.remove(ctx.storage, (updated_at, posid));
-        self.decrement_pending_count(ctx)?;
-
-        let pos = OPEN_POSITIONS.load(ctx.storage, posid)?;
-        self.store_liquidation_prices_inner(ctx, &pos)
-    }
-
-    /// Actually store the liquidation prices
-    ///
-    /// This can either happen because we tried to store new prices and the
-    /// protocol's crank was up to date, _or_ because the protocol was lagging
-    /// behind on the crank and we're now unpending a queued liquidation price.
-    fn store_liquidation_prices_inner(&self, ctx: &mut StateContext, pos: &Position) -> Result<()> {
-        match pos.direction() {
-            DirectionToNotional::Long => {
-                if let Some(liquidation_price) = pos.liquidation_price {
-                    PRICE_TRIGGER_DESC.save(
-                        ctx.storage,
-                        (liquidation_price.into(), pos.id),
-                        &LiquidationReason::Liquidated,
-                    )?;
-                }
-
-                if let Some(take_profit) = pos.take_profit_price {
-                    PRICE_TRIGGER_ASC.save(
-                        ctx.storage,
-                        (take_profit.into(), pos.id),
-                        &LiquidationReason::MaxGains,
-                    )?;
-                }
-
-                if let Some(stop_loss_override) = pos.stop_loss_override_notional {
-                    PRICE_TRIGGER_DESC.save(
-                        ctx.storage,
-                        (stop_loss_override.into(), pos.id),
-                        &LiquidationReason::StopLoss,
-                    )?;
-                }
-
-                if let Some(take_profit_override) = pos.take_profit_override_notional {
-                    PRICE_TRIGGER_ASC.save(
-                        ctx.storage,
-                        (take_profit_override.into(), pos.id),
-                        &LiquidationReason::TakeProfit,
-                    )?;
-                }
-            }
-            DirectionToNotional::Short => {
-                if let Some(liquidation_price) = pos.liquidation_price {
-                    PRICE_TRIGGER_ASC.save(
-                        ctx.storage,
-                        (liquidation_price.into(), pos.id),
-                        &LiquidationReason::Liquidated,
-                    )?;
-                }
-
-                if let Some(take_profit_price) = pos.take_profit_price {
-                    PRICE_TRIGGER_DESC.save(
-                        ctx.storage,
-                        (take_profit_price.into(), pos.id),
-                        &LiquidationReason::MaxGains,
-                    )?;
-                }
-
-                if let Some(stop_loss_override) = pos.stop_loss_override_notional {
-                    PRICE_TRIGGER_ASC.save(
-                        ctx.storage,
-                        (stop_loss_override.into(), pos.id),
-                        &LiquidationReason::StopLoss,
-                    )?;
-                }
-
-                if let Some(take_profit_override) = pos.take_profit_override_notional {
-                    PRICE_TRIGGER_DESC.save(
-                        ctx.storage,
-                        (take_profit_override.into(), pos.id),
-                        &LiquidationReason::TakeProfit,
-                    )?;
-                }
-            }
-        };
-
-        Ok(())
-    }
-}
-
-/// Result of checking if we can adjust net open interest
-#[must_use]
-pub(crate) enum AdjustOpenInterestResult {
-    /// Set the long interest to this value
-    Long(Notional),
-    /// Set the short interest to this value
-    Short(Notional),
-}
-
-impl AdjustOpenInterestResult {
-    pub(crate) fn store(self, ctx: &mut StateContext) -> Result<()> {
         match self {
-            AdjustOpenInterestResult::Long(long) => {
-                OPEN_NOTIONAL_LONG_INTEREST.save(ctx.storage, &long)?
+            Self::Long(long) => {
+                long.into_signed() - state.open_short_interest(store)?.into_signed()
             }
-            AdjustOpenInterestResult::Short(short) => {
-                OPEN_NOTIONAL_SHORT_INTEREST.save(ctx.storage, &short)?
+            Self::Short(short) => {
+                state.open_long_interest(store)?.into_signed() - short.into_signed()
             }
+        }
+    }
+    pub(crate) fn apply(self, ctx: &mut StateContext) -> Result<()> {
+        match self {
+            Self::Long(long) => OPEN_NOTIONAL_LONG_INTEREST.save(ctx.storage, &long)?,
+            Self::Short(short) => OPEN_NOTIONAL_SHORT_INTEREST.save(ctx.storage, &short)?,
         }
         Ok(())
     }

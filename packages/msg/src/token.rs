@@ -7,7 +7,7 @@ use crate::contracts::{
     market::entry::ExecuteMsg as MarketExecuteMsg,
 };
 use cosmwasm_std::{
-    to_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal256, QuerierWrapper, WasmMsg,
+    to_json_binary, Addr, BankMsg, Coin, CosmosMsg, Decimal256, QuerierWrapper, WasmMsg,
 };
 use shared::prelude::*;
 
@@ -56,6 +56,7 @@ impl From<Token> for TokenInit {
 /// the same business logic as contract math
 /// and don't worry at all about conversions or addresses/denoms
 #[cw_serde]
+#[derive(Eq)]
 pub enum Token {
     /// An asset controlled by a CW20 token.
     Cw20 {
@@ -118,7 +119,7 @@ impl Token {
 
                 match msg {
                     Some(msg) => {
-                        let msg = to_binary(&msg)?;
+                        let msg = to_json_binary(&msg)?;
 
                         Ok(Some(CosmosMsg::Wasm(WasmMsg::Execute {
                             contract_addr: addr.to_string(),
@@ -228,6 +229,15 @@ impl Token {
         }
     }
 
+    /// Round down to the supported precision of this token
+    pub fn round_down_to_precision(&self, amount: Collateral) -> Result<Collateral> {
+        self.from_u128(
+            self.into_u128(amount.into_decimal256())?
+                .unwrap_or_default(),
+        )
+        .map(Collateral::from_decimal256)
+    }
+
     /// helper function
     ///
     /// when we know for a fact we have a WalletSource::Cw20
@@ -246,7 +256,7 @@ impl Token {
                 self.name()
             )),
             Self::Cw20 { .. } => {
-                let msg = to_binary(submsg)?;
+                let msg = to_json_binary(submsg)?;
                 Ok(self
                     .into_u128(amount.into_decimal256())?
                     .map(|amount| Cw20ExecuteMsg::Send {
@@ -317,7 +327,7 @@ impl Token {
                 match msg {
                     Some(msg) => Ok(WasmMsg::Execute {
                         contract_addr: addr.into_string(),
-                        msg: to_binary(&msg)?,
+                        msg: to_json_binary(&msg)?,
                         funds: Vec::new(),
                     }),
                     None => {
@@ -325,7 +335,7 @@ impl Token {
                         // to the contract
                         Ok(WasmMsg::Execute {
                             contract_addr: contract_addr.to_string(),
-                            msg: to_binary(&execute_msg)?,
+                            msg: to_json_binary(&execute_msg)?,
                             funds: Vec::new(),
                         })
                     }
@@ -353,7 +363,7 @@ impl Token {
                     vec![coin]
                 };
 
-                let execute_msg = to_binary(&execute_msg)?;
+                let execute_msg = to_json_binary(&execute_msg)?;
 
                 Ok(WasmMsg::Execute {
                     contract_addr: contract_addr.to_string(),

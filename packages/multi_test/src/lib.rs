@@ -10,18 +10,18 @@ pub mod response;
 //pub mod test_strategies;
 pub mod arbitrary;
 pub mod contracts;
-pub mod rewards_helpers;
+pub mod simple_oracle;
 pub mod time;
 
 use anyhow::{anyhow, bail, Context, Result};
 use config::TEST_CONFIG;
+use cosmwasm_std::testing::MockApi;
 use cosmwasm_std::{
-    from_slice, Addr, Binary, Deps, DepsMut, Empty, Env, MessageInfo, QuerierWrapper,
-    QueryResponse, Reply, Response,
+    from_json, Addr, Binary, Deps, DepsMut, Empty, Env, MessageInfo, QuerierWrapper, QueryResponse,
+    Reply, Response,
 };
 use cw_multi_test::{App, AppResponse, BankSudo, Contract, Executor, SudoMsg};
 use dotenv::dotenv;
-use msg::contracts::rewards::entry::ConfigUpdate;
 use msg::prelude::*;
 use msg::token::Token;
 use rand::rngs::ThreadRng;
@@ -45,7 +45,9 @@ pub struct PerpsApp {
     pub users: HashSet<Addr>,
     pub factory_addr: Addr,
     pub log_block_time_changes: bool,
-    pub rewards_addr: Addr,
+    pub simple_oracle_addr: Addr,
+    pub simple_oracle_usd_addr: Addr,
+    pub countertrade_addr: Addr,
 }
 
 impl Deref for PerpsApp {
@@ -71,8 +73,8 @@ pub(crate) enum PerpsContract {
     PositionToken,
     LiquidityToken,
     Cw20,
-    Rewards,
-    Farming,
+    SimpleOracle,
+    Countertrade,
 }
 
 impl PerpsApp {
@@ -89,8 +91,8 @@ impl PerpsApp {
         let cw20_code_id = app.store_code(contract_cw20());
         let position_token_code_id = app.store_code(contract_position_token());
         let liquidity_token_code_id = app.store_code(contract_liquidity_token());
-        let rewards_code_id = app.store_code(contract_rewards());
-        let farming_code_id = app.store_code(contract_farming());
+        let simple_oracle_code_id = app.store_code(contract_simple_oracle());
+        let countertrade_code_id = app.store_code(contract_countertrade());
 
         let factory_addr = app.instantiate_contract(
             factory_code_id,
@@ -111,19 +113,37 @@ impl PerpsApp {
             Some(TEST_CONFIG.migration_admin.clone()),
         )?;
 
-        let rewards_addr = app.instantiate_contract(
-            rewards_code_id,
+        let simple_oracle_addr = app.instantiate_contract(
+            simple_oracle_code_id,
             Addr::unchecked(&TEST_CONFIG.protocol_owner),
-            &msg::contracts::rewards::entry::InstantiateMsg {
-                config: ConfigUpdate {
-                    immediately_transferable: Decimal256::from_str("0.25")?,
-                    token_denom: TEST_CONFIG.rewards_token_denom.clone(),
-                    unlock_duration_seconds: 60,
-                    factory_addr: factory_addr.clone().into_string(),
-                },
+            &simple_oracle::InstantiateMsg {
+                owner: TEST_CONFIG.protocol_owner.clone().into(),
             },
             &[],
             "rewards",
+            Some(TEST_CONFIG.migration_admin.clone()),
+        )?;
+        let simple_oracle_usd_addr = app.instantiate_contract(
+            simple_oracle_code_id,
+            Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &simple_oracle::InstantiateMsg {
+                owner: TEST_CONFIG.protocol_owner.clone().into(),
+            },
+            &[],
+            "rewards",
+            Some(TEST_CONFIG.migration_admin.clone()),
+        )?;
+
+        let countertrade_addr = app.instantiate_contract(
+            countertrade_code_id,
+            Addr::unchecked(&TEST_CONFIG.protocol_owner),
+            &msg::contracts::countertrade::InstantiateMsg {
+                factory: factory_addr.as_ref().into(),
+                admin: TEST_CONFIG.protocol_owner.clone().into(),
+                config: msg::contracts::countertrade::ConfigUpdate::default(),
+            },
+            &[],
+            "countertrade",
             Some(TEST_CONFIG.migration_admin.clone()),
         )?;
 
@@ -134,8 +154,8 @@ impl PerpsApp {
                 (PerpsContract::Cw20, cw20_code_id),
                 (PerpsContract::PositionToken, position_token_code_id),
                 (PerpsContract::LiquidityToken, liquidity_token_code_id),
-                (PerpsContract::Rewards, rewards_code_id),
-                (PerpsContract::Farming, farming_code_id),
+                (PerpsContract::SimpleOracle, simple_oracle_code_id),
+                (PerpsContract::Countertrade, countertrade_code_id),
             ]
             .into(),
             app,
@@ -144,7 +164,9 @@ impl PerpsApp {
             rng: rand::thread_rng(),
             users: HashSet::new(),
             log_block_time_changes: false,
-            rewards_addr,
+            simple_oracle_addr,
+            simple_oracle_usd_addr,
+            countertrade_addr,
         };
 
         Ok(_self)
@@ -152,6 +174,7 @@ impl PerpsApp {
 
     // returned bool is true iff it's a newly created user
     pub fn get_user(&mut self, name: &str, token: &Token, funds: Number) -> Result<(Addr, bool)> {
+        let name = MockApi::default().addr_make(name);
         let addr = Addr::unchecked(name);
         if self.users.contains(&addr) {
             Ok((addr, false))
@@ -302,11 +325,14 @@ pub(crate) fn contract_cw20() -> Box<dyn Contract<Empty>> {
 }
 
 pub(crate) fn contract_market() -> Box<dyn Contract<Empty>> {
-    Box::new(LocalContractWrapper::new(
-        market::contract::instantiate,
-        market::contract::execute,
-        market::contract::query,
-    ))
+    Box::new(
+        LocalContractWrapper::new(
+            market::contract::instantiate,
+            market::contract::execute,
+            market::contract::query,
+        )
+        .with_reply(market::contract::reply),
+    )
 }
 
 pub(crate) fn contract_factory() -> Box<dyn Contract<Empty>> {
@@ -320,22 +346,22 @@ pub(crate) fn contract_factory() -> Box<dyn Contract<Empty>> {
     )
 }
 
-pub(crate) fn contract_rewards() -> Box<dyn Contract<Empty>> {
+pub(crate) fn contract_simple_oracle() -> Box<dyn Contract<Empty>> {
     Box::new(LocalContractWrapper::new(
-        rewards::contract::instantiate,
-        rewards::contract::execute,
-        rewards::contract::query,
+        simple_oracle::instantiate,
+        simple_oracle::execute,
+        simple_oracle::query,
     ))
 }
 
-pub(crate) fn contract_farming() -> Box<dyn Contract<Empty>> {
+pub(crate) fn contract_countertrade() -> Box<dyn Contract<Empty>> {
     Box::new(
         LocalContractWrapper::new(
-            farming::lifecycle::instantiate,
-            farming::execute::execute,
-            farming::query::query,
+            countertrade::instantiate,
+            countertrade::execute,
+            countertrade::query,
         )
-        .with_reply(farming::execute::reply),
+        .with_reply(countertrade::reply),
     )
 }
 
@@ -421,7 +447,7 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<Response<Empty>> {
-        let msg: ExecuteMsg = from_slice(&msg)?;
+        let msg: ExecuteMsg = from_json(msg)?;
         (self.execute)(deps, env, info, msg)
     }
 
@@ -432,12 +458,12 @@ where
         info: MessageInfo,
         msg: Vec<u8>,
     ) -> Result<Response<Empty>> {
-        let msg: InstantiateMsg = from_slice(&msg)?;
+        let msg: InstantiateMsg = from_json(msg)?;
         (self.instantiate)(deps, env, info, msg)
     }
 
     fn query(&self, deps: Deps<Empty>, env: Env, msg: Vec<u8>) -> Result<Binary> {
-        let msg: QueryMsg = from_slice(&msg)?;
+        let msg: QueryMsg = from_json(msg)?;
         (self.query)(deps, env, msg)
     }
 

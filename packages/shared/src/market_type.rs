@@ -42,6 +42,7 @@ impl PartialEq for MarketId {
 
 impl Eq for MarketId {}
 
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for MarketId {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.encoded.partial_cmp(&other.encoded)
@@ -193,10 +194,8 @@ impl FromStr for MarketId {
     type Err = StdError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        MarketId::parse(s).ok_or_else(|| StdError::ParseErr {
-            target_type: "MarketId".to_owned(),
-            msg: format!("Invalid market ID: {s}"),
-        })
+        MarketId::parse(s)
+            .ok_or_else(|| StdError::parse_err("MarketId", format!("Invalid market ID: {s}")))
     }
 }
 
@@ -273,6 +272,8 @@ impl<'a> Prefixer<'a> for MarketId {
 impl KeyDeserialize for MarketId {
     type Output = MarketId;
 
+    const KEY_ELEMS: u16 = 1;
+
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         std::str::from_utf8(&value)
             .map_err(StdError::invalid_utf8)
@@ -282,6 +283,8 @@ impl KeyDeserialize for MarketId {
 
 impl KeyDeserialize for &'_ MarketId {
     type Output = MarketId;
+
+    const KEY_ELEMS: u16 = 1;
 
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         std::str::from_utf8(&value)

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Historical data</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.min.css">
+  </head>
+  <body class="bg-light bg-gradient">
+    <div class="container mt-5">
+      <div class="row">
+	<p class="fs-4 fw-bold text-center" style="letter-spacing: -0.05em">Historical Data for Market {{ market_id }}</p>
+      </div>
+      <div class="row m-5">
+	<table class="table table-secondary shadow rounded overflow-hidden">
+          <thead>
+            <th>Date</th>
+            <th>Computed DNF in USD</th>
+            <th>Computed DNF in Notional</th>
+            <th>Min depth liquidity</th>
+            <th>Max leverage</th>
+            <th>Last updated</th>
+          </thead>
+          <tbody>
+            {% for record in historical_records %}
+            <tr>
+              <td class="table-light">
+		{{ record.date }}
+              </td>
+              <td class="table-light">
+                {{ record.dnf.dnf_in_usd|fmt("{:.2}") }}
+              </td>
+              <td class="table-light">
+                {{ record.dnf.dnf_in_notional }}
+              </td>
+              <td class="table-light">
+                {{ record.dnf.min_depth_liquidity|fmt("{:.2}") }}
+              </td>
+              <td class="table-light">
+                {{ record.max_leverage|fmt("{:.2}") }}
+              </td>
+              <td class="table-light">
+                {{ record.last_updated }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+	</table>
+      </div>
+  </body>
+</html>

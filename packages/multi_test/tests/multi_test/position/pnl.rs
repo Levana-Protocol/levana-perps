@@ -7,7 +7,9 @@ use levana_perpswap_multi_test::{
     time::TimeJump,
     PerpsApp,
 };
-use msg::contracts::market::{config::ConfigUpdate, entry::PositionsQueryFeeApproach};
+use msg::contracts::market::{
+    config::ConfigUpdate, entry::PositionsQueryFeeApproach, position::PositionId,
+};
 use msg::prelude::*;
 
 // this is currently a known issue, working around it in the meantime
@@ -18,8 +20,7 @@ const SKIP_CHECK_LARGE_PNL_IS_TAKE_PROFIT: bool = true;
 
 #[test]
 fn position_pnl_close_no_change() {
-    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
-    market.automatic_time_jump_enabled = false;
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
 
     // open/close with no price movement, pnl should be 0
@@ -44,14 +45,16 @@ fn position_pnl_close_no_change() {
         start_pnl_in_collateral > "-3.0".parse().unwrap() && start_pnl_in_collateral.is_negative()
     );
 
-    let res = market.exec_close_position(&trader, pos_id, None).unwrap();
-    let delta_neutrality_fee_close = res.first_delta_neutrality_fee_amount();
+    let defer_res = market.exec_close_position(&trader, pos_id, None).unwrap();
+    let delta_neutrality_fee_close = defer_res.exec_resp().first_delta_neutrality_fee_amount();
 
     let pos = market.query_closed_position(&trader, pos_id).unwrap();
 
     assert_eq!(
         pos.pnl_collateral.into_number(),
-        start_pnl_in_collateral.into_number() - delta_neutrality_fee_close
+        (start_pnl_in_collateral.into_number()
+            - (delta_neutrality_fee_close + pos.borrow_fee_collateral.into_number()).unwrap())
+        .unwrap()
     );
 }
 
@@ -177,12 +180,13 @@ fn position_pnl_close_profit() {
     );
 
     // price went up a bit
-    let new_price = market
+    let new_price = (market
         .query_current_price()
         .unwrap()
         .price_base
         .into_number()
-        * Number::try_from("1.02").unwrap();
+        * Number::try_from("1.02").unwrap())
+    .unwrap();
 
     market
         .exec_set_price(PriceBaseInQuote::try_from_number(new_price).unwrap())
@@ -226,12 +230,13 @@ fn position_pnl_close_loss() {
     );
 
     // price went down a bit
-    let new_price = market
+    let new_price = (market
         .query_current_price()
         .unwrap()
         .price_base
         .into_number()
-        * Number::try_from("0.98").unwrap();
+        * Number::try_from("0.98").unwrap())
+    .unwrap();
     market
         .exec_set_price(PriceBaseInQuote::try_from_number(new_price).unwrap())
         .unwrap();
@@ -248,7 +253,8 @@ fn position_pnl_close_loss() {
 
 #[test]
 fn position_pnl_long_and_short_precise() {
-    let mut market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let app = PerpsApp::new_cell().unwrap();
+    let mut market = PerpsMarket::new(app.clone()).unwrap();
     return_unless_market_collateral_quote!(market);
     let trader = market.clone_trader(0).unwrap();
     let cranker = market.clone_trader(1).unwrap();
@@ -266,10 +272,8 @@ fn position_pnl_long_and_short_precise() {
         })
         .unwrap();
 
-    // open all the positions in the same block
-    market.automatic_time_jump_enabled = false;
     market
-        .exec_open_position(
+        .exec_open_position_queue_only(
             &trader,
             "100",
             "10",
@@ -282,7 +286,7 @@ fn position_pnl_long_and_short_precise() {
         .unwrap();
 
     market
-        .exec_open_position(
+        .exec_open_position_queue_only(
             &trader,
             "100",
             "10",
@@ -294,8 +298,8 @@ fn position_pnl_long_and_short_precise() {
         )
         .unwrap();
 
-    let (short_pos_id, res) = market
-        .exec_open_position(
+    market
+        .exec_open_position_queue_only(
             &trader,
             "100",
             "10",
@@ -307,10 +311,8 @@ fn position_pnl_long_and_short_precise() {
         )
         .unwrap();
 
-    let short_slippage_fee = res.first_delta_neutrality_fee_amount();
-
-    let (long_pos_id, res) = market
-        .exec_open_position(
+    market
+        .exec_open_position_queue_only(
             &trader,
             "200",
             "10",
@@ -322,7 +324,22 @@ fn position_pnl_long_and_short_precise() {
         )
         .unwrap();
 
-    let long_slippage_fee = res.first_delta_neutrality_fee_amount();
+    let short_pos_id = PositionId::new(3);
+    let long_pos_id = PositionId::new(4);
+
+    market.exec_refresh_price().unwrap();
+    market.exec_crank_n(&cranker, 100).unwrap();
+
+    let short_slippage_fee = market
+        .query_position(short_pos_id)
+        .unwrap()
+        .delta_neutrality_fee_collateral
+        .into_number();
+    let long_slippage_fee = market
+        .query_position(long_pos_id)
+        .unwrap()
+        .delta_neutrality_fee_collateral
+        .into_number();
 
     // Long interest > short interest
     let rates = market.query_status().unwrap();
@@ -334,31 +351,41 @@ fn position_pnl_long_and_short_precise() {
 
     let long_before_epoch = market.query_position(long_pos_id).unwrap();
     let config = market.query_config().unwrap();
-    let mut total_long_pnl = -long_before_epoch.notional_size.abs().into_number()
-        * config.trading_fee_notional_size.into_number()
-        - long_before_epoch.counter_collateral.into_number()
-            * config.trading_fee_counter_collateral.into_number();
+    let mut total_long_pnl = ((-long_before_epoch.notional_size.abs().into_number()
+        * config.trading_fee_notional_size.into_number())
+    .unwrap()
+        - (long_before_epoch.counter_collateral.into_number()
+            * config.trading_fee_counter_collateral.into_number())
+        .unwrap())
+    .unwrap();
 
     let short_before_epoch = market.query_position(short_pos_id).unwrap();
-    let mut total_short_pnl = -short_before_epoch.notional_size.abs().into_number()
-        * config.trading_fee_notional_size.into_number()
-        - short_before_epoch.counter_collateral.into_number()
-            * config.trading_fee_counter_collateral.into_number();
+    let mut total_short_pnl = ((-short_before_epoch.notional_size.abs().into_number()
+        * config.trading_fee_notional_size.into_number())
+    .unwrap()
+        - (short_before_epoch.counter_collateral.into_number()
+            * config.trading_fee_counter_collateral.into_number())
+        .unwrap())
+    .unwrap();
 
     assert_eq!(
-        long_before_epoch.pnl_collateral.into_number() + long_slippage_fee,
+        (long_before_epoch.pnl_collateral.into_number() + long_slippage_fee).unwrap(),
         total_long_pnl
     );
     assert_eq!(
-        short_before_epoch.pnl_collateral.into_number() + short_slippage_fee,
+        (short_before_epoch.pnl_collateral.into_number() + short_slippage_fee).unwrap(),
         total_short_pnl
     );
     assert_eq!(
-        long_before_epoch.deposit_collateral.into_number() + total_long_pnl - long_slippage_fee,
+        ((long_before_epoch.deposit_collateral.into_number() + total_long_pnl).unwrap()
+            - long_slippage_fee)
+            .unwrap(),
         long_before_epoch.active_collateral.into_number()
     );
     assert_eq!(
-        short_before_epoch.deposit_collateral.into_number() + total_short_pnl - short_slippage_fee,
+        ((short_before_epoch.deposit_collateral.into_number() + total_short_pnl).unwrap()
+            - short_slippage_fee)
+            .unwrap(),
         short_before_epoch.active_collateral.into_number()
     );
 
@@ -368,11 +395,13 @@ fn position_pnl_long_and_short_precise() {
     assert_eq!(short_before_epoch.counter_collateral.to_string(), "100");
 
     // We want to force liquifunding to happen at exactly one hour
+    // Jump one block back to make sure that manual set price happens
+    // exactly at liquifunding time.
     market.set_time(TimeJump::Hours(1)).unwrap();
-    market.exec_crank_till_finished(&cranker).unwrap();
+    market.set_time(TimeJump::Blocks(-1)).unwrap();
 
     market.exec_set_price("0.98".try_into().unwrap()).unwrap();
-    market.exec_crank_till_finished(&cranker).unwrap();
+    market.exec_crank_n(&cranker, 100).unwrap();
 
     let long_after_epoch_1 = market.query_position(long_pos_id).unwrap();
     let short_after_epoch_1 = market.query_position(short_pos_id).unwrap();
@@ -382,41 +411,59 @@ fn position_pnl_long_and_short_precise() {
     assert_eq!(long_after_epoch_1.counter_collateral.to_string(), "240");
     assert_eq!(short_after_epoch_1.counter_collateral.to_string(), "80");
 
-    let funding_estimate_long_1 = -long_before_epoch.notional_size.abs().into_number()
-        * rates.long_funding
-        / Number::from(365u64 * 24u64);
-    let cost_of_capital_estimate_long_1 = -long_before_epoch.counter_collateral.into_number()
-        * rates.borrow_fee.into_number()
-        / Number::from(365u64 * 24u64);
-    let funding_estimate_short_1 = -short_before_epoch.notional_size.abs().into_number()
-        * rates.short_funding
-        / Number::from(365u64 * 24u64);
-    let cost_of_capital_estimate_short_1 = -short_before_epoch.counter_collateral.into_number()
-        * rates.borrow_fee.into_number()
-        / Number::from(365u64 * 24u64);
-    let long_price_pnl =
-        Number::try_from("-0.02").unwrap() * long_before_epoch.notional_size.into_number();
-    let short_price_pnl =
-        Number::try_from("-0.02").unwrap() * short_before_epoch.notional_size.into_number();
+    let funding_estimate_long_1 =
+        ((-long_before_epoch.notional_size.abs().into_number() * rates.long_funding).unwrap()
+            / Number::from(365u64 * 24u64))
+        .unwrap();
+    let cost_of_capital_estimate_long_1 = ((-long_before_epoch.counter_collateral.into_number()
+        * rates.borrow_fee.into_number())
+    .unwrap()
+        / Number::from(365u64 * 24u64))
+    .unwrap();
+    let funding_estimate_short_1 =
+        ((-short_before_epoch.notional_size.abs().into_number() * rates.short_funding).unwrap()
+            / Number::from(365u64 * 24u64))
+        .unwrap();
+    let cost_of_capital_estimate_short_1 = ((-short_before_epoch.counter_collateral.into_number()
+        * rates.borrow_fee.into_number())
+    .unwrap()
+        / Number::from(365u64 * 24u64))
+    .unwrap();
+    let long_price_pnl = (Number::try_from("-0.02").unwrap()
+        * long_before_epoch.notional_size.into_number())
+    .unwrap();
+    let short_price_pnl = (Number::try_from("-0.02").unwrap()
+        * short_before_epoch.notional_size.into_number())
+    .unwrap();
 
-    total_long_pnl += long_price_pnl + funding_estimate_long_1 + cost_of_capital_estimate_long_1;
-    total_short_pnl +=
-        short_price_pnl + funding_estimate_short_1 + cost_of_capital_estimate_short_1;
+    total_long_pnl = (((total_long_pnl + long_price_pnl).unwrap() + funding_estimate_long_1)
+        .unwrap()
+        + cost_of_capital_estimate_long_1)
+        .unwrap();
+
+    total_short_pnl = (((total_short_pnl + short_price_pnl).unwrap() + funding_estimate_short_1)
+        .unwrap()
+        + cost_of_capital_estimate_short_1)
+        .unwrap();
 
     assert_eq!(
-        long_after_epoch_1.pnl_collateral.into_number() + long_slippage_fee,
+        (long_after_epoch_1.pnl_collateral.into_number() + long_slippage_fee).unwrap(),
         total_long_pnl
     );
     assert_eq!(
-        short_after_epoch_1.pnl_collateral.into_number() + short_slippage_fee,
+        (short_after_epoch_1.pnl_collateral.into_number() + short_slippage_fee).unwrap(),
         total_short_pnl
     );
     assert_eq!(
-        long_after_epoch_1.deposit_collateral.into_number() + total_long_pnl - long_slippage_fee,
+        ((long_after_epoch_1.deposit_collateral.into_number() + total_long_pnl).unwrap()
+            - long_slippage_fee)
+            .unwrap(),
         long_after_epoch_1.active_collateral.into_number()
     );
     assert_eq!(
-        short_after_epoch_1.deposit_collateral.into_number() + total_short_pnl - short_slippage_fee,
+        ((short_after_epoch_1.deposit_collateral.into_number() + total_short_pnl).unwrap()
+            - short_slippage_fee)
+            .unwrap(),
         short_after_epoch_1.active_collateral.into_number()
     );
 
@@ -426,55 +473,72 @@ fn position_pnl_long_and_short_precise() {
 
     market
         .set_time(TimeJump::PreciseTime(desired_crank_time.into()))
+        //.set_time(TimeJump::Hours(1))
         .unwrap();
-    market.exec_refresh_price().unwrap();
-    market.exec_crank_till_finished(&trader).unwrap();
+
+    market.exec_crank_n(&cranker, 100).unwrap();
 
     let long_after_epoch_2 = market.query_position(long_pos_id).unwrap();
     let short_after_epoch_2 = market.query_position(short_pos_id).unwrap();
 
     // TODO: fix long/short_before_epoch -> long/short_after_epoch_1 after cost of capital payment
     //       calculation is made to reflect intra-epoch price changes.
-    let funding_estimate_long_2 = -long_after_epoch_1.notional_size.abs().into_number()
-        * rates.long_funding
-        * market
-            .query_current_price()
+    let funding_estimate_long_2 =
+        (((-long_after_epoch_1.notional_size.abs().into_number() * rates.long_funding).unwrap()
+            * market
+                .query_current_price()
+                .unwrap()
+                .price_notional
+                .into_number())
+        .unwrap()
+            / Number::from(365u64 * 24u64))
+        .unwrap();
+    let cost_of_capital_estimate_long_2 = ((-long_after_epoch_1.counter_collateral.into_number()
+        * rates.borrow_fee.into_number())
+    .unwrap()
+        / Number::from(365u64 * 24u64))
+    .unwrap();
+    let funding_estimate_short_2 =
+        (((-short_after_epoch_1.notional_size.abs().into_number() * rates.short_funding).unwrap()
+            * market
+                .query_current_price()
+                .unwrap()
+                .price_notional
+                .into_number())
+        .unwrap()
+            / Number::from(365u64 * 24u64))
+        .unwrap();
+    let cost_of_capital_estimate_short_2 =
+        ((-short_after_epoch_1.counter_collateral.into_number() * rates.borrow_fee.into_number())
             .unwrap()
-            .price_notional
-            .into_number()
-        / Number::from(365u64 * 24u64);
-    let cost_of_capital_estimate_long_2 = -long_after_epoch_1.counter_collateral.into_number()
-        * rates.borrow_fee.into_number()
-        / Number::from(365u64 * 24u64);
-    let funding_estimate_short_2 = -short_after_epoch_1.notional_size.abs().into_number()
-        * rates.short_funding
-        * market
-            .query_current_price()
-            .unwrap()
-            .price_notional
-            .into_number()
-        / Number::from(365u64 * 24u64);
-    let cost_of_capital_estimate_short_2 = -short_after_epoch_1.counter_collateral.into_number()
-        * rates.borrow_fee.into_number()
-        / Number::from(365u64 * 24u64);
+            / Number::from(365u64 * 24u64))
+        .unwrap();
 
-    total_long_pnl += funding_estimate_long_2 + cost_of_capital_estimate_long_2;
-    total_short_pnl += funding_estimate_short_2 + cost_of_capital_estimate_short_2;
+    total_long_pnl = ((total_long_pnl + funding_estimate_long_2).unwrap()
+        + cost_of_capital_estimate_long_2)
+        .unwrap();
+    total_short_pnl = ((total_short_pnl + funding_estimate_short_2).unwrap()
+        + cost_of_capital_estimate_short_2)
+        .unwrap();
 
     assert_eq!(
-        long_after_epoch_2.pnl_collateral.into_number() + long_slippage_fee,
+        (long_after_epoch_2.pnl_collateral.into_number() + long_slippage_fee).unwrap(),
         total_long_pnl
     );
     assert_eq!(
-        short_after_epoch_2.pnl_collateral.into_number() + short_slippage_fee,
+        (short_after_epoch_2.pnl_collateral.into_number() + short_slippage_fee).unwrap(),
         total_short_pnl
     );
     assert_eq!(
-        long_after_epoch_2.deposit_collateral.into_number() + total_long_pnl - long_slippage_fee,
+        ((long_after_epoch_2.deposit_collateral.into_number() + total_long_pnl).unwrap()
+            - long_slippage_fee)
+            .unwrap(),
         long_after_epoch_2.active_collateral.into_number()
     );
     assert_eq!(
-        short_after_epoch_2.deposit_collateral.into_number() + total_short_pnl - short_slippage_fee,
+        ((short_after_epoch_2.deposit_collateral.into_number() + total_short_pnl).unwrap()
+            - short_slippage_fee)
+            .unwrap(),
         short_after_epoch_2.active_collateral.into_number()
     );
 
@@ -506,12 +570,13 @@ fn position_pnl_usd() {
     let start_pos = market.query_position(pos_id).unwrap();
 
     // price went down a bit
-    let new_price = market
+    let new_price = (market
         .query_current_price()
         .unwrap()
         .price_base
         .into_number()
-        * Number::try_from("0.98").unwrap();
+        * Number::try_from("0.98").unwrap())
+    .unwrap();
 
     market
         .exec_set_price(PriceBaseInQuote::try_from_number(new_price).unwrap())

@@ -21,4 +21,4 @@ CREATE TABLE "position_detail"(
 );
 
 -- The urls need to start with 1000
-ALTER SEQUENCE public."position_detail_url_id_seq" RESTART WITH 1000;
+ALTER SEQUENCE "position_detail_url_id_seq" RESTART WITH 1000;

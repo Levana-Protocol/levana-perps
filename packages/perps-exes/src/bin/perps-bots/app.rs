@@ -1,9 +1,12 @@
 mod balance;
+mod block_lag;
+mod congested;
+mod countertrade;
 mod crank_run;
-mod crank_watch;
 pub(crate) mod factory;
 pub(crate) mod faucet;
-mod gas_check;
+pub(crate) mod gas_check;
+mod high_gas;
 mod liquidity;
 mod liquidity_transaction;
 mod price;
@@ -18,7 +21,10 @@ mod ultra_crank;
 mod utilization;
 
 use anyhow::Result;
-use hyper::server::conn::AddrIncoming;
+use cosmos::HasAddressHrp;
+
+use tokio::net::TcpListener;
+
 pub(crate) use types::*;
 
 use crate::config::BotConfigByType;
@@ -26,10 +32,7 @@ use crate::config::BotConfigByType;
 use self::gas_check::GasCheckWallet;
 
 impl AppBuilder {
-    pub(crate) async fn start(
-        mut self,
-        server: hyper::server::Builder<AddrIncoming>,
-    ) -> Result<()> {
+    pub(crate) async fn start(mut self, listener: TcpListener) -> Result<()> {
         let family = match &self.app.config.by_type {
             crate::config::BotConfigByType::Testnet { inner } => inner.contract_family.clone(),
             crate::config::BotConfigByType::Mainnet { inner } => {
@@ -41,14 +44,17 @@ impl AppBuilder {
         // Start the tasks that run on all deployments
         self.start_factory_task()?;
         self.track_stale()?;
-        self.track_stats()?;
-        self.track_balance()?;
+        self.track_block_lag()?;
 
-        // These three services are tied together closely, see docs on the
+        if self.app.config.run_optional_services {
+            self.track_stats()?;
+            self.track_balance()?;
+        }
+
+        // These services are tied together closely, see docs on the
         // crank_run module for more explanation.
         if let Some(trigger_crank) = self.start_crank_run()? {
             self.start_price(trigger_crank.clone())?;
-            self.start_crank_watch(trigger_crank)?;
         }
 
         self.alert_on_low_gas(
@@ -57,15 +63,15 @@ impl AppBuilder {
             self.app.config.min_gas_in_gas_wallet,
         )?;
 
+        if let Some(ref countertrade_wallet) = self.app.config.countertrade {
+            self.start_countertrade_bot(countertrade_wallet.clone())?;
+        }
+
         match &self.app.config.by_type {
             // Run tasks that can only run in testnet.
             BotConfigByType::Testnet { inner } => {
                 // Deal with the borrow checker by not keeping a reference to self borrowed
                 let inner = inner.clone();
-
-                // Establish some gas checks
-                let faucet_bot_address = inner.faucet_bot.get_wallet_address();
-                self.refill_gas(faucet_bot_address, GasCheckWallet::FaucetBot)?;
 
                 self.alert_on_low_gas(
                     inner.faucet,
@@ -77,27 +83,32 @@ impl AppBuilder {
                     GasCheckWallet::WalletManager,
                 )?;
 
-                // Launch testnet tasks
-                self.start_balance(inner.clone())?;
-                self.start_liquidity(inner.clone())?;
-                self.start_utilization(inner.clone())?;
-                self.start_traders(inner.clone())?;
-                self.start_ultra_crank_bot(&inner)?;
+                if self.app.config.run_optional_services {
+                    // Launch testnet tasks
+                    self.start_utilization(inner.clone())?;
+                    self.start_ultra_crank_bot(&inner)?;
+                    self.start_traders(inner.clone())?;
+                    self.start_liquidity(inner.clone())?;
+                    self.start_balance(inner.clone())?;
+                }
             }
             BotConfigByType::Mainnet { inner } => {
                 // Launch mainnet tasks
                 let mainnet = inner.clone();
-                self.start_stats_alert(mainnet.clone())?;
-                self.start_rpc_health(mainnet.clone())?;
 
-                // Bug in Osmosis, don't run there
-                match self.app.cosmos.get_network() {
-                    cosmos::CosmosNetwork::OsmosisMainnet
-                    | cosmos::CosmosNetwork::OsmosisTestnet
-                    | cosmos::CosmosNetwork::OsmosisLocal => (),
+                if self.app.config.run_optional_services {
+                    self.start_stats_alert(mainnet.clone())?;
+                    self.start_rpc_health(mainnet.clone())?;
+                }
+
+                match self.app.cosmos.get_address_hrp().as_str() {
+                    "osmo" => self.start_congestion_alert()?,
+                    // Bug in Osmosis, don't run there
                     _ => {
-                        self.start_liquidity_transaction_alert(mainnet.clone())?;
-                        self.start_total_deposits_alert(mainnet)?;
+                        if self.app.config.run_optional_services {
+                            self.start_liquidity_transaction_alert(mainnet.clone())?;
+                            self.start_total_deposits_alert(mainnet)?;
+                        }
                     }
                 }
             }
@@ -109,6 +120,6 @@ impl AppBuilder {
 
         // Start waiting on all tasks. This function internally is responsible
         // for launching the final task: the REST API
-        self.watcher.wait(self.app, server).await
+        self.watcher.wait(self.app, listener).await
     }
 }

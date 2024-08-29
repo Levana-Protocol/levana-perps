@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO position_detail\n                (market, position_id, pnl_usd, pnl_percentage, direction, entry_price, exit_price, leverage, pnl_type, wallet)\n                VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n                RETURNING url_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "url_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Varchar",
+        "Varchar",
+        "Int4",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Int4",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "86ecae9a9163bdd28eeb4494deb45b0fd9252cf567f5d7527a18acf05e8dd9c7"
+}

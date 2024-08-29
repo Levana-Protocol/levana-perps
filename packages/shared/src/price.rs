@@ -1,10 +1,13 @@
 //! Data types and conversion functions for different price representations.
+use schemars::{
+    schema::{InstanceType, SchemaObject},
+    JsonSchema,
+};
 use std::{fmt::Display, str::FromStr};
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Decimal256, StdError, StdResult};
 use cw_storage_plus::{Key, KeyDeserialize, Prefixer, PrimaryKey};
-use schemars::JsonSchema;
 
 use crate::prelude::*;
 
@@ -27,7 +30,11 @@ pub struct PricePoint {
     pub price_usd: PriceCollateralInUsd,
     /// Price of the base asset in terms of the quote.
     pub price_base: PriceBaseInQuote,
-    /// Timestamp of when this price was entered into the system.
+    /// Publish time of this price point.
+    ///
+    /// Before deferred execution, this was the block time when the field was
+    /// added. Since deferred execution, this is a calculated value based on the publish
+    /// times of individual feeds.
     pub timestamp: Timestamp,
     /// Is the notional asset USD?
     ///
@@ -41,8 +48,12 @@ pub struct PricePoint {
     /// price conversions.
     pub market_type: MarketType,
     /// Latest price publish time for the feeds composing the price, if available
+    ///
+    /// This field will always be empty since implementation of deferred execution.
     pub publish_time: Option<Timestamp>,
     /// Latest price publish time for the feeds composing the price_usd, if available
+    ///
+    /// This field will always be empty since implementation of deferred execution.
     pub publish_time_usd: Option<Timestamp>,
 }
 
@@ -406,6 +417,8 @@ impl<'a> Prefixer<'a> for PriceKey {
 impl KeyDeserialize for PriceKey {
     type Output = Price;
 
+    const KEY_ELEMS: u16 = 1;
+
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
         value
             .try_into()
@@ -426,11 +439,11 @@ impl TryFrom<pyth_sdk_cw::Price> for Number {
     fn try_from(price: pyth_sdk_cw::Price) -> Result<Self, Self::Error> {
         let n: Number = price.price.to_string().parse()?;
 
-        Ok(match price.expo.cmp(&0) {
-            std::cmp::Ordering::Equal => n,
+        match price.expo.cmp(&0) {
+            std::cmp::Ordering::Equal => Ok(n),
             std::cmp::Ordering::Greater => n * Number::from(10u128.pow(price.expo.unsigned_abs())),
             std::cmp::Ordering::Less => n / Number::from(10u128.pow(price.expo.unsigned_abs())),
-        })
+        }
     }
 }
 
@@ -445,7 +458,7 @@ impl Number {
         let s = self.to_string();
         let (integer, decimal) = s.split_once('.').unwrap_or((&s, ""));
         let price: i64 = format!("{}{}", integer, decimal).parse()?;
-        let mut expo: i32 = decimal.len() as i32;
+        let mut expo: i32 = decimal.len().try_into()?;
         if expo > 0 {
             expo = -expo;
         }
@@ -472,6 +485,138 @@ impl TryFrom<pyth_sdk_cw::Price> for PriceCollateralInUsd {
 
     fn try_from(value: pyth_sdk_cw::Price) -> Result<Self, Self::Error> {
         Self::try_from_number(value.try_into()?)
+    }
+}
+
+/// String representation of positive infinity.
+const POS_INF_STR: &str = "+Inf";
+
+/// The take profit price for a position, as supplied by client messsages (in terms of BaseInQuote).
+///
+/// Infinite take profit price is possible. However, this is an error in the case of
+/// short positions or collateral-is-quote markets.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub enum TakeProfitTrader {
+    /// Finite take profit price
+    Finite(NonZero<Decimal256>),
+    /// Infinite take profit price
+    PosInfinity,
+}
+
+impl TakeProfitTrader {
+    /// helper to extract the inner value if it is finite
+    pub fn as_finite(&self) -> Option<NonZero<Decimal256>> {
+        match self {
+            TakeProfitTrader::Finite(val) => Some(*val),
+            TakeProfitTrader::PosInfinity => None,
+        }
+    }
+
+    /// Convert to the internal price representation used by our system, as `collateral / notional`.
+    pub fn into_notional(&self, market_type: MarketType) -> Option<Price> {
+        match self {
+            TakeProfitTrader::PosInfinity => None,
+            TakeProfitTrader::Finite(x) => {
+                Some(PriceBaseInQuote::from_non_zero(*x).into_notional_price(market_type))
+            }
+        }
+    }
+}
+
+impl Display for TakeProfitTrader {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            TakeProfitTrader::Finite(val) => val.fmt(f),
+            TakeProfitTrader::PosInfinity => write!(f, "{}", POS_INF_STR),
+        }
+    }
+}
+
+impl FromStr for TakeProfitTrader {
+    type Err = PerpError;
+    fn from_str(src: &str) -> Result<Self, PerpError> {
+        match src {
+            POS_INF_STR => Ok(TakeProfitTrader::PosInfinity),
+            _ => match src.parse() {
+                Ok(number) => Ok(TakeProfitTrader::Finite(number)),
+                Err(err) => Err(perp_error!(
+                    ErrorId::Conversion,
+                    ErrorDomain::Default,
+                    "error converting {} to TakeProfitPrice , {}",
+                    src,
+                    err
+                )),
+            },
+        }
+    }
+}
+
+impl TryFrom<&str> for TakeProfitTrader {
+    type Error = anyhow::Error;
+
+    fn try_from(val: &str) -> Result<Self, Self::Error> {
+        Self::from_str(val).map_err(|err| err.into())
+    }
+}
+
+impl From<PriceBaseInQuote> for TakeProfitTrader {
+    fn from(val: PriceBaseInQuote) -> Self {
+        TakeProfitTrader::Finite(val.into_non_zero())
+    }
+}
+
+impl serde::Serialize for TakeProfitTrader {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            TakeProfitTrader::Finite(number) => number.serialize(serializer),
+            TakeProfitTrader::PosInfinity => serializer.serialize_str(POS_INF_STR),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for TakeProfitTrader {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_str(TakeProfitPriceVisitor)
+    }
+}
+
+impl JsonSchema for TakeProfitTrader {
+    fn schema_name() -> String {
+        "TakeProfitPrice".to_owned()
+    }
+
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        SchemaObject {
+            instance_type: Some(InstanceType::String.into()),
+            format: Some("take-profit".to_owned()),
+            ..Default::default()
+        }
+        .into()
+    }
+}
+
+struct TakeProfitPriceVisitor;
+
+impl<'de> serde::de::Visitor<'de> for TakeProfitPriceVisitor {
+    type Value = TakeProfitTrader;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("TakeProfitPrice")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        v.parse()
+            .map_err(|_| E::custom(format!("Invalid TakeProfitPrice: {v}")))
     }
 }
 
@@ -550,5 +695,18 @@ mod tests {
         go(-123456789, 3, "-123456789000.0");
         go(12345600789, -5, "123456.00789");
         go(1234560078900, -7, "123456.00789");
+    }
+
+    #[test]
+    fn take_profit_price() {
+        fn go(s: &str, expected: TakeProfitTrader) {
+            let deserialized = serde_json::from_str::<TakeProfitTrader>(s).unwrap();
+            assert_eq!(deserialized, expected);
+            let serialized = serde_json::to_string(&expected).unwrap();
+            assert_eq!(serialized, s);
+        }
+
+        go("\"1.2\"", TakeProfitTrader::Finite("1.2".parse().unwrap()));
+        go("\"+Inf\"", TakeProfitTrader::PosInfinity);
     }
 }

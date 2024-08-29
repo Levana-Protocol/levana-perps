@@ -1,14 +1,16 @@
 use cosmos::{
     proto::{cosmos::base::abci::v1beta1::TxResponse, cosmwasm::wasm::v1::MsgExecuteContract},
-    Address, Contract, HasAddress, HasCosmos, TxBuilder, Wallet,
+    Address, Contract, HasAddress, HasAddressHrp, HasContract, HasCosmos, TxBuilder, Wallet,
 };
 
-use cosmwasm_std::to_binary;
+use backon::{ConstantBuilder, Retryable};
+use cosmwasm_std::to_json_binary;
 use msg::{
     contracts::{
         cw20::entry::BalanceResponse,
         market::{
-            config::ConfigUpdate,
+            config::{Config, ConfigUpdate},
+            deferred_execution::{DeferredExecId, GetDeferredExecResp},
             entry::{
                 ClosedPositionsResp, ExecuteOwnerMsg, LpAction, LpActionHistoryResp, LpInfoResp,
                 OraclePriceResp, PositionAction, PositionActionHistoryResp, PriceWouldTriggerResp,
@@ -20,7 +22,7 @@ use msg::{
     },
     prelude::*,
 };
-use shared::namespace::LAST_POSITION_ID;
+use shared::namespace::{CLOSE_ALL_POSITIONS, LAST_POSITION_ID};
 
 use crate::{PositionsInfo, UpdatePositionCollateralImpact};
 
@@ -33,9 +35,24 @@ impl Display for MarketContract {
     }
 }
 
+impl HasAddressHrp for MarketContract {
+    fn get_address_hrp(&self) -> cosmos::AddressHrp {
+        self.0.get_address_hrp()
+    }
+}
 impl HasAddress for MarketContract {
     fn get_address(&self) -> Address {
         self.0.get_address()
+    }
+}
+impl HasContract for MarketContract {
+    fn get_contract(&self) -> &Contract {
+        &self.0
+    }
+}
+impl HasCosmos for MarketContract {
+    fn get_cosmos(&self) -> &cosmos::Cosmos {
+        self.0.get_cosmos()
     }
 }
 
@@ -44,24 +61,38 @@ impl MarketContract {
         MarketContract(contract)
     }
 
-    pub async fn status(&self) -> Result<StatusResp> {
+    pub async fn status(&self) -> Result<StatusResp, cosmos::Error> {
         self.status_relaxed().await
     }
 
     /// Like status, but doesn't insist on the result being StatusResp.
     ///
     /// Useful for working around the overly aggressive cw_serde deny_unknown_fields.
-    pub async fn status_relaxed<T: serde::de::DeserializeOwned>(&self) -> Result<T> {
+    pub async fn status_relaxed<T: serde::de::DeserializeOwned>(&self) -> Result<T, cosmos::Error> {
         self.0.query(MarketQueryMsg::Status { price: None }).await
     }
 
-    pub async fn status_at_height(&self, height: u64) -> Result<StatusResp> {
-        self.0
-            .query_at_height(MarketQueryMsg::Status { price: None }, height)
+    /// Get just the config out of the status
+    pub async fn config(&self) -> Result<Config> {
+        #[derive(serde::Deserialize)]
+        struct SimpleStatus {
+            config: Config,
+        }
+        let SimpleStatus { config } = self.status_relaxed().await?;
+        Ok(config)
+    }
+
+    pub async fn status_at_height(&self, height: u64) -> Result<StatusResp, cosmos::Error> {
+        // Maybe worth an improvement to cosmos-rs to make this nicer
+        self.get_cosmos()
+            .clone()
+            .at_height(Some(height))
+            .make_contract(self.0.get_address())
+            .query(MarketQueryMsg::Status { price: None })
             .await
     }
 
-    pub async fn current_price(&self) -> Result<PricePoint> {
+    pub async fn current_price(&self) -> Result<PricePoint, cosmos::Error> {
         self.0
             .query(MarketQueryMsg::SpotPrice { timestamp: None })
             .await
@@ -92,10 +123,11 @@ impl MarketContract {
             msg::contracts::cw20::entry::ExecuteMsg::Send {
                 contract: self.0.get_address_string().into(),
                 amount: funds.into(),
-                msg: to_binary(msg)?,
+                msg: to_json_binary(msg)?,
             },
         )
         .await
+        .map_err(|e| e.into())
     }
 
     pub async fn deposit(
@@ -119,7 +151,7 @@ impl MarketContract {
         &self,
         wallet: &Wallet,
         lp_tokens: NonZero<LpToken>,
-    ) -> Result<TxResponse> {
+    ) -> Result<TxResponse, cosmos::Error> {
         self.0
             .execute(
                 wallet,
@@ -172,9 +204,9 @@ impl MarketContract {
             slippage_assert,
             leverage,
             direction,
-            max_gains,
+            max_gains: Some(max_gains),
             stop_loss_override,
-            take_profit_override,
+            take_profit: take_profit_override.map(|x| TakeProfitTrader::Finite(x.into_non_zero())),
         };
         self.exec_with_funds(wallet, status, deposit, &msg)
             .await
@@ -225,7 +257,11 @@ impl MarketContract {
             .with_context(|| format!("Could not query position #{pos_id}"))
     }
 
-    pub async fn close_position(&self, wallet: &Wallet, pos: PositionId) -> Result<TxResponse> {
+    pub async fn close_position(
+        &self,
+        wallet: &Wallet,
+        pos: PositionId,
+    ) -> Result<TxResponse, cosmos::Error> {
         self.0
             .execute(
                 wallet,
@@ -238,7 +274,7 @@ impl MarketContract {
             .await
     }
 
-    pub async fn lp_info(&self, addr: impl HasAddress) -> Result<LpInfoResp> {
+    pub async fn lp_info(&self, addr: impl HasAddress) -> Result<LpInfoResp, cosmos::Error> {
         self.0
             .query(MarketQueryMsg::LpInfo {
                 liquidity_provider: addr.get_address_string().into(),
@@ -249,7 +285,7 @@ impl MarketContract {
     pub async fn close_positions(&self, wallet: &Wallet, positions: Vec<PositionId>) -> Result<()> {
         let mut builder = TxBuilder::default();
         for pos in positions {
-            builder.add_message_mut(MsgExecuteContract {
+            builder.add_message(MsgExecuteContract {
                 sender: wallet.get_address_string(),
                 contract: self.0.get_address_string(),
                 msg: serde_json::to_vec(&MarketExecuteMsg::ClosePosition {
@@ -257,7 +293,7 @@ impl MarketContract {
                     slippage_assert: None,
                 })?,
                 funds: vec![],
-            })
+            });
         }
         builder
             .sign_and_broadcast(self.0.get_cosmos(), wallet)
@@ -273,7 +309,11 @@ impl MarketContract {
         Ok(response.count)
     }
 
-    pub async fn all_open_positions(&self, owner: impl HasAddress) -> Result<PositionsInfo> {
+    pub async fn all_open_positions(
+        &self,
+        owner: impl HasAddress,
+        constant_builder: Option<&ConstantBuilder>,
+    ) -> Result<PositionsInfo> {
         let mut start_after = None;
         let mut tokens = vec![];
         loop {
@@ -284,7 +324,20 @@ impl MarketContract {
                     limit: None,
                 },
             };
-            let mut response: TokensResponse = self.0.query(query).await?;
+            let request = || async { self.0.query(query.clone()).await };
+            let mut response: TokensResponse = match constant_builder {
+                Some(constant_builder) => {
+                    tracing::info!("doesn not work");
+                    let response = request
+                        .retry(constant_builder)
+                        .notify(|err, dur| {
+                            tracing::error!("Retrying after {dur:?}. Received error: {err}")
+                        })
+                        .await;
+                    response?
+                }
+                None => request().await?,
+            };
             match response.tokens.last() {
                 Some(last_token) => start_after = Some(last_token.clone()),
                 None => break,
@@ -305,11 +358,15 @@ impl MarketContract {
             fees: None,
             price: None,
         };
+        let request = || async { self.0.query(query.clone()).await };
         let PositionsResp {
             positions: response,
             pending_close: _,
             closed: _,
-        } = self.0.query(query).await?;
+        } = match constant_builder {
+            Some(retry) => request.retry(retry).await?,
+            None => request().await?,
+        };
         assert_eq!(tokens.len(), response.len());
         let position_response = PositionsInfo {
             ids: positions,
@@ -318,10 +375,49 @@ impl MarketContract {
         Ok(position_response)
     }
 
+    pub async fn all_closed_positions(
+        &self,
+        owner: impl HasAddress,
+        retry: Option<&ConstantBuilder>,
+    ) -> Result<Vec<ClosedPosition>> {
+        let mut cursor = None;
+        let mut res = vec![];
+        loop {
+            let query_msg = MarketQueryMsg::ClosedPositionHistory {
+                owner: owner.get_address_string().into(),
+                cursor: cursor.take(),
+                limit: None,
+                order: None,
+            };
+
+            let request = || async { self.0.query(query_msg.clone()).await };
+
+            let ClosedPositionsResp {
+                mut positions,
+                cursor: new_cursor,
+            } = match retry {
+                Some(retry) => {
+                    request
+                        .retry(retry)
+                        .notify(|err, dur| {
+                            tracing::error!("Retrying after {dur:?}. Received error: {err}")
+                        })
+                        .await?
+                }
+                None => request().await?,
+            };
+            res.append(&mut positions);
+            match new_cursor {
+                Some(new_cursor) => cursor = Some(new_cursor),
+                None => break Ok(res),
+            }
+        }
+    }
+
     pub async fn raw_query_positions(
         &self,
         position_ids: Vec<PositionId>,
-    ) -> Result<PositionsResp> {
+    ) -> Result<PositionsResp, cosmos::Error> {
         self.0
             .query(MarketQueryMsg::Positions {
                 position_ids,
@@ -390,16 +486,18 @@ impl MarketContract {
     }
 
     pub async fn crank(&self, wallet: &Wallet, rewards: Option<RawAddr>) -> Result<()> {
-        while self.status().await?.next_crank.is_some() {
-            log::info!("Crank started");
+        let mut status = self.status().await?;
+        while status.next_crank.is_some() || status.deferred_execution_items != 0 {
+            tracing::info!("Crank started");
             let execute_msg = MarketExecuteMsg::Crank {
                 execs: None,
                 rewards: rewards.clone(),
             };
             let tx = self.0.execute(wallet, vec![], execute_msg).await?;
-            log::info!("{}", tx.txhash);
+            tracing::info!("{}", tx.txhash);
+            status = self.status().await?;
         }
-        log::info!("Cranking finished");
+        tracing::info!("Cranking finished");
         Ok(())
     }
 
@@ -408,7 +506,7 @@ impl MarketContract {
         wallet: &Wallet,
         execs: Option<u32>,
         rewards: Option<RawAddr>,
-    ) -> Result<TxResponse> {
+    ) -> Result<TxResponse, cosmos::Error> {
         self.0
             .execute(wallet, vec![], MarketExecuteMsg::Crank { execs, rewards })
             .await
@@ -421,8 +519,9 @@ impl MarketContract {
         max_gains: MaxGainsInQuote,
     ) -> Result<TxResponse> {
         let execute_msg = MarketExecuteMsg::UpdatePositionMaxGains { id, max_gains };
-        let response = self.0.execute(wallet, vec![], execute_msg).await?;
-        Ok(response)
+        let status = self.status().await?;
+        self.exec_with_crank_fee(wallet, &status, &execute_msg)
+            .await
     }
 
     pub async fn update_leverage(
@@ -437,8 +536,9 @@ impl MarketContract {
             leverage,
             slippage_assert,
         };
-        let response = self.0.execute(wallet, vec![], execute_msg).await?;
-        Ok(response)
+        let status = self.status().await?;
+        self.exec_with_crank_fee(wallet, &status, &execute_msg)
+            .await
     }
 
     pub async fn update_collateral(
@@ -456,7 +556,7 @@ impl MarketContract {
             bail!("No updated required since collateral is same");
         }
         if collateral.into_number() > active_collateral {
-            log::info!("Increasing the collateral");
+            tracing::info!("Increasing the collateral");
 
             let execute_msg = match impact {
                 UpdatePositionCollateralImpact::Leverage => {
@@ -477,7 +577,7 @@ impl MarketContract {
             self.exec_with_funds(wallet, &status, collateral, &execute_msg)
                 .await
         } else {
-            log::info!("Decreasing the collateral");
+            tracing::info!("Decreasing the collateral");
             let diff_collateral = active_collateral.checked_sub(collateral.into_number())?;
             let amount: NonZero<Collateral> = {
                 // for collateral removal, we need to be sure we're not hitting
@@ -495,7 +595,7 @@ impl MarketContract {
                 NonZero::new(amount).context("zero after conversion")?
             };
 
-            log::debug!("Diff collateral: {}", amount);
+            tracing::debug!("Diff collateral: {}", amount);
             let execute_msg = match impact {
                 UpdatePositionCollateralImpact::Leverage => {
                     MarketExecuteMsg::UpdatePositionRemoveCollateralImpactLeverage { id, amount }
@@ -508,7 +608,44 @@ impl MarketContract {
                     }
                 }
             };
-            self.0.execute(wallet, vec![], execute_msg).await
+            self.exec_with_crank_fee(wallet, &status, &execute_msg)
+                .await
+        }
+    }
+
+    async fn exec_with_crank_fee(
+        &self,
+        wallet: &Wallet,
+        status: &StatusResp,
+        msg: &MarketExecuteMsg,
+    ) -> Result<TxResponse> {
+        let price = self.current_price().await?;
+        let crank_fee_usd = {
+            let crank_fee_surcharge =
+                status
+                    .config
+                    .crank_fee_surcharge
+                    .checked_mul_dec(Decimal256::from_ratio(
+                        status.deferred_execution_items / 10,
+                        1u32,
+                    ))?;
+
+            crank_fee_surcharge + status.config.crank_fee_charged
+        }?;
+
+        let crank_fee = price.usd_to_collateral(crank_fee_usd);
+
+        // Add a small multiplier to account for rounding errors. In real life
+        // we'd use a larger multiplier to deal with price fluctuations too.
+        let crank_fee = crank_fee.checked_mul_dec("1.01".parse().unwrap())?;
+
+        match NonZero::new(crank_fee) {
+            None => self
+                .0
+                .execute(wallet, vec![], msg)
+                .await
+                .map_err(|e| e.into()),
+            Some(crank_fee) => self.exec_with_funds(wallet, status, crank_fee, msg).await,
         }
     }
 
@@ -520,7 +657,11 @@ impl MarketContract {
         Ok(would_trigger)
     }
 
-    pub async fn config_update(&self, wallet: &Wallet, update: ConfigUpdate) -> Result<TxResponse> {
+    pub async fn config_update(
+        &self,
+        wallet: &Wallet,
+        update: ConfigUpdate,
+    ) -> Result<TxResponse, cosmos::Error> {
         self.0
             .execute(
                 wallet,
@@ -532,13 +673,16 @@ impl MarketContract {
             .await
     }
 
-    pub async fn close_all_positions(&self, wallet: &Wallet) -> Result<TxResponse> {
+    pub async fn close_all_positions(&self, wallet: &Wallet) -> Result<TxResponse, cosmos::Error> {
         self.0
             .execute(wallet, vec![], MarketExecuteMsg::CloseAllPositions {})
             .await
     }
 
-    pub async fn trade_history_summary(&self, trader: Address) -> Result<TradeHistorySummary> {
+    pub async fn trade_history_summary(
+        &self,
+        trader: Address,
+    ) -> Result<TradeHistorySummary, cosmos::Error> {
         self.0
             .query(MarketQueryMsg::TradeHistorySummary {
                 addr: trader.to_string().into(),
@@ -565,11 +709,7 @@ impl MarketContract {
 
     pub async fn get_highest_position_id(&self) -> Result<PositionId> {
         // This should really be a proper query or part of StatusResp
-        let bytes = self
-            .0
-            .get_cosmos()
-            .wasm_raw_query(self.0.get_address(), LAST_POSITION_ID)
-            .await?;
+        let bytes = self.0.query_raw(LAST_POSITION_ID).await?;
         serde_json::from_slice(&bytes).context("Invalid position ID")
     }
 
@@ -598,7 +738,26 @@ impl MarketContract {
         }
     }
 
-    pub async fn get_oracle_price(&self) -> Result<OraclePriceResp> {
-        self.0.query(MarketQueryMsg::OraclePrice {}).await
+    pub async fn get_oracle_price(
+        &self,
+        validate_age: bool,
+    ) -> Result<OraclePriceResp, cosmos::Error> {
+        self.0
+            .query(MarketQueryMsg::OraclePrice { validate_age })
+            .await
+    }
+
+    pub async fn is_wound_down(&self) -> Result<bool, cosmos::Error> {
+        self.0
+            .query_raw(CLOSE_ALL_POSITIONS)
+            .await
+            .map(|v| !v.is_empty())
+    }
+
+    pub async fn get_deferred_exec(&self, id: DeferredExecId) -> Result<GetDeferredExecResp> {
+        self.0
+            .query(MarketQueryMsg::GetDeferredExec { id })
+            .await
+            .map_err(|e| e.into())
     }
 }

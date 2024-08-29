@@ -1,5 +1,8 @@
+#![deny(clippy::as_conversions)]
+
 mod capping;
 mod cli;
+mod wallet;
 
 use crate::cli::Cmd;
 use anyhow::Result;
@@ -16,7 +19,7 @@ async fn main() -> Result<()> {
 
 async fn main_inner() -> Result<()> {
     let Cmd { opt, subcommand }: Cmd = Cmd::parse();
-    opt.init_logger();
+    opt.init_logger()?;
     let client = reqwest::Client::new();
     let ConnectionInfo {
         network,
@@ -31,13 +34,13 @@ async fn main_inner() -> Result<()> {
     )
     .await?;
 
-    log::debug!("Factory address: {}", factory_address);
+    tracing::debug!("Factory address: {}", factory_address);
 
     let mut builder = network.builder().await?;
     if let Some(grpc) = opt.cosmos_grpc {
-        builder.grpc_url = grpc;
+        builder.set_grpc_url(grpc);
     }
-    let cosmos = builder.build().await?;
+    let cosmos = builder.build()?;
 
     let perp_contract = PerpApp::new(
         opt.wallet,
@@ -115,17 +118,17 @@ async fn main_inner() -> Result<()> {
                 ),
                 MaxGainsInQuote::PosInfinity => MaxGainsInQuote::PosInfinity,
             };
-            log::debug!("Collateral: {collateral}");
-            log::debug!("Max gains: {:?}", max_gain);
-            log::debug!("Leverage: {:?}", leverage);
-            log::debug!("Direction: {:?}", direction);
+            tracing::debug!("Collateral: {collateral}");
+            tracing::debug!("Max gains: {:?}", max_gain);
+            tracing::debug!("Leverage: {:?}", leverage);
+            tracing::debug!("Direction: {:?}", direction);
 
             let slippage_assert = match (current_price, max_slippage) {
                 (None, None) => None,
                 (Some(current_price), Some(max_slippage)) => {
-                    let tolerance = max_slippage / 100;
-                    log::debug!("Current price: {}", current_price);
-                    log::debug!("Tolerance: {}", tolerance);
+                    let tolerance = (max_slippage / 100)?;
+                    tracing::debug!("Current price: {}", current_price);
+                    tracing::debug!("Tolerance: {}", tolerance);
                     Some(SlippageAssert {
                         price: current_price,
                         tolerance,
@@ -147,7 +150,7 @@ async fn main_inner() -> Result<()> {
                 )
                 .await?;
             println!("Transaction hash: {}", tx.txhash);
-            log::debug!("Raw log: {}", tx.raw_log);
+            tracing::debug!("Raw log: {}", tx.raw_log);
         }
         cli::Subcommand::FetchPrice {} => {
             let price = perp_contract.market.current_price().await?;
@@ -163,12 +166,12 @@ async fn main_inner() -> Result<()> {
         cli::Subcommand::SetPrice { price, price_usd } => {
             let tx = perp_contract.set_price(price, price_usd).await?;
             println!("Transaction hash: {}", tx.txhash);
-            log::debug!("Raw log: {}", tx.raw_log);
+            tracing::debug!("Raw log: {}", tx.raw_log);
         }
         cli::Subcommand::ClosePosition { position_id } => {
             let tx = perp_contract.close_position(position_id).await?;
             println!("Transaction hash: {}", tx.txhash);
-            log::debug!("Raw log: {}", tx.raw_log);
+            tracing::debug!("Raw log: {}", tx.raw_log);
         }
         cli::Subcommand::Crank {} => {
             perp_contract.crank(None).await?;
@@ -184,7 +187,7 @@ async fn main_inner() -> Result<()> {
                 .liquidation_price_base
                 .map_or("No price found".to_owned(), |item| item.to_string());
             let take_profit_price = position
-                .take_profit_price_base
+                .take_profit_total_base
                 .map_or("No price found".to_owned(), |item| item.to_string());
             println!("Collateral: {}", position.deposit_collateral);
             println!("Active Collateral: {}", position.active_collateral);
@@ -196,14 +199,13 @@ async fn main_inner() -> Result<()> {
                 }
             );
             println!("Leverage: {}", position.leverage);
-            println!("Max gains: {}", position.max_gains_in_quote);
             println!("Liquidation Price: {}", liquidation_price);
             println!("Profit price: {}", take_profit_price);
         }
         cli::Subcommand::TapFaucet {} => {
             let tx = perp_contract.tap_faucet().await?;
             println!("Transaction hash: {}", tx.txhash);
-            log::debug!("Raw log: {}", tx.raw_log);
+            tracing::debug!("Raw log: {}", tx.raw_log);
         }
         cli::Subcommand::UpdateMaxGains {
             position_id,
@@ -213,7 +215,7 @@ async fn main_inner() -> Result<()> {
                 .update_max_gains(position_id, max_gains)
                 .await?;
             println!("Transaction hash: {}", tx.txhash);
-            log::debug!("Raw log: {}", tx.raw_log);
+            tracing::debug!("Raw log: {}", tx.raw_log);
         }
         cli::Subcommand::UpdateCollateral {
             position_id,
@@ -222,13 +224,13 @@ async fn main_inner() -> Result<()> {
             max_slippage,
             impact,
         } => {
-            log::debug!("Collateral: {}", collateral);
+            tracing::debug!("Collateral: {}", collateral);
             let slippage_assert = slippage_assert(current_price, max_slippage);
             let tx = perp_contract
                 .update_collateral(position_id, collateral, impact, slippage_assert)
                 .await?;
             println!("Transaction hash: {}", tx.txhash);
-            log::debug!("Raw log: {}", tx.raw_log);
+            tracing::debug!("Raw log: {}", tx.raw_log);
         }
         cli::Subcommand::UpdateLeverage {
             position_id,
@@ -241,7 +243,7 @@ async fn main_inner() -> Result<()> {
                 .update_leverage(position_id, leverage, slippage_assert)
                 .await?;
             println!("Transaction hash: {}", tx.txhash);
-            log::debug!("Raw log: {}", tx.raw_log);
+            tracing::debug!("Raw log: {}", tx.raw_log);
         }
         cli::Subcommand::Stats {} => {
             let StatusResp {
@@ -268,18 +270,18 @@ async fn main_inner() -> Result<()> {
             println!("Open short interest (in notional): {short_notional}");
             println!(
                 "Total interest (in notional): {}",
-                long_notional + short_notional
+                (long_notional + short_notional)?
             );
             println!(
                 "Net interest (in notional): {}",
-                long_notional.into_signed() - short_notional.into_signed()
+                (long_notional.into_signed() - short_notional.into_signed())?
             );
             println!("Open long interest (in USD): {long_usd}");
             println!("Open short interest (in USD): {short_usd}");
-            println!("Total interest (in USD): {}", long_usd + short_usd);
+            println!("Total interest (in USD): {}", (long_usd + short_usd)?);
             println!(
                 "Net interest (in USD): {}",
-                long_usd.into_signed() - short_usd.into_signed()
+                (long_usd.into_signed() - short_usd.into_signed())?
             );
             println!(
                 "Instant delta neutrality: {}",
@@ -293,9 +295,10 @@ async fn main_inner() -> Result<()> {
         cli::Subcommand::DepositLiquidity { fund } => {
             let tx = perp_contract.deposit_liquidity(fund).await?;
             println!("Transaction hash: {}", tx.txhash);
-            log::debug!("Raw log: {}", tx.raw_log);
+            tracing::debug!("Raw log: {}", tx.raw_log);
         }
         cli::Subcommand::CappingReport { inner } => inner.go(perp_contract).await?,
+        cli::Subcommand::WalletReport { inner } => inner.run(cosmos).await?,
     }
     Ok(())
 }

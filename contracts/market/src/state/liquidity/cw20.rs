@@ -42,7 +42,6 @@ const XLP_ALLOWANCES_SPENDER: Map<(&Addr, &Addr), AllowanceResponse> =
     Map::new(namespace::XLP_ALLOWANCES_SPENDER);
 
 // settings for pagination
-const MAX_LIMIT: u32 = 30;
 const DEFAULT_LIMIT: u32 = 10;
 const DECIMAL_PLACES: u8 = 6;
 
@@ -180,7 +179,7 @@ impl State<'_> {
         limit: Option<u32>,
         kind: LiquidityTokenKind,
     ) -> Result<AllAllowancesResponse> {
-        let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+        let limit = usize::try_from(limit.unwrap_or(DEFAULT_LIMIT).min(QUERY_MAX_LIMIT))?;
         let start: Option<Bound<&Addr>> = start_after.as_ref().map(Bound::exclusive);
 
         let allowances = allowances_map(kind)
@@ -208,7 +207,7 @@ impl State<'_> {
         limit: Option<u32>,
         kind: LiquidityTokenKind,
     ) -> Result<AllSpenderAllowancesResponse> {
-        let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+        let limit = usize::try_from(limit.unwrap_or(DEFAULT_LIMIT).min(QUERY_MAX_LIMIT))?;
         let start: Option<Bound<&Addr>> = start_after.as_ref().map(Bound::exclusive);
 
         let allowances = allowances_spender_map(kind)
@@ -233,7 +232,7 @@ impl State<'_> {
         start_after: Option<Addr>,
         limit: Option<u32>,
     ) -> Result<AllAccountsResponse> {
-        let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
+        let limit = usize::try_from(limit.unwrap_or(DEFAULT_LIMIT).min(QUERY_MAX_LIMIT))?;
 
         let accounts = self.liquidity_providers(store, start_after.as_ref(), limit)?;
 
@@ -608,7 +607,7 @@ impl State<'_> {
             LiquidityTokenKind::Xlp => &mut addr_stats.xlp,
         };
         let new_balance = Signed::from(*m).checked_add(delta)?;
-        *m = match new_balance.try_into_positive_value() {
+        *m = match new_balance.try_into_non_negative_value() {
             None => {
                 return Err(perp_anyhow!(
                     ErrorId::Cw20Funds,
@@ -648,7 +647,7 @@ fn uint_128_into_lp_token(amount: u128) -> Result<LpToken> {
 
 fn allowances_map(
     kind: LiquidityTokenKind,
-) -> Map<'static, (&'static Addr, &'static Addr), AllowanceResponse> {
+) -> Map<(&'static Addr, &'static Addr), AllowanceResponse> {
     match kind {
         LiquidityTokenKind::Lp => LP_ALLOWANCES,
         LiquidityTokenKind::Xlp => XLP_ALLOWANCES,
@@ -656,7 +655,7 @@ fn allowances_map(
 }
 fn allowances_spender_map(
     kind: LiquidityTokenKind,
-) -> Map<'static, (&'static Addr, &'static Addr), AllowanceResponse> {
+) -> Map<(&'static Addr, &'static Addr), AllowanceResponse> {
     match kind {
         LiquidityTokenKind::Lp => LP_ALLOWANCES_SPENDER,
         LiquidityTokenKind::Xlp => XLP_ALLOWANCES_SPENDER,

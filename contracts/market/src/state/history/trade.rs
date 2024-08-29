@@ -23,20 +23,21 @@ const TRADE_HISTORY_BY_ADDRESS: Map<(&Addr, u64), PositionAction> =
 /// have different leverage numbers due to the 1-leverage conversion between
 /// base and notional. This calculation is intended to convert back to the
 /// user-facing leverage (in base) numbers.
-pub fn trade_volume_usd(
+pub(crate) fn trade_volume_usd(
     pos: &Position,
-    price_point: PricePoint,
+    price_point: &PricePoint,
     market_type: MarketType,
 ) -> Result<Usd> {
     let leverage = pos
-        .active_leverage_to_notional(&price_point)
-        .into_base(market_type)
+        .active_leverage_to_notional(price_point)
+        .into_base(market_type)?
         .split()
         .1;
     let trade_volume_collateral = pos
         .active_collateral
         .raw()
         .checked_mul_dec(leverage.raw().into_decimal256())?;
+
     Ok(price_point.collateral_to_usd(trade_volume_collateral))
 }
 
@@ -53,7 +54,7 @@ fn trade_volume_usd_from_closed(pos: &ClosedPosition, price_point: &PricePoint) 
                 .into_signed(),
         },
     };
-    let trade_volume_notional = pos.notional_size + collateral_factor;
+    let trade_volume_notional = (pos.notional_size + collateral_factor)?;
     Ok(price_point.notional_to_usd(trade_volume_notional.abs_unsigned()))
 }
 
@@ -92,6 +93,7 @@ impl State<'_> {
             id: Some(pos.id),
             kind: PositionActionKind::Transfer,
             timestamp: self.now(),
+            price_timestamp: None,
             collateral: pos.active_collateral.raw(),
             transfer_collateral: pos.active_collateral.into_signed(),
             leverage: None,
@@ -100,7 +102,7 @@ impl State<'_> {
             delta_neutrality_fee: None,
             old_owner: Some(old_owner.clone()),
             new_owner: Some(pos.owner.clone()),
-            take_profit_override: pos.take_profit_override,
+            take_profit_trader: pos.take_profit_trader,
             stop_loss_override: pos.stop_loss_override,
         };
         let old_owner_action = PositionAction {
@@ -149,7 +151,7 @@ impl State<'_> {
 
     pub(crate) fn get_history_helper<'a, K, T>(
         &self,
-        map: Map<'a, (K, u64), T>,
+        map: Map<(K, u64), T>,
         store: &dyn Storage,
         id: K,
         start_after: Option<u64>,
@@ -166,8 +168,11 @@ impl State<'_> {
             Order::Descending => (None, start_after.map(Bound::exclusive)),
         };
         let mut iter = map.prefix(id).range(store, min, max, order);
-        const MAX_LIMIT: u32 = 20;
-        let limit = limit.unwrap_or(MAX_LIMIT).min(MAX_LIMIT).try_into()?;
+        const HISTORY_DEFAULT_LIMIT: u32 = 20;
+        let limit = limit
+            .unwrap_or(HISTORY_DEFAULT_LIMIT)
+            .min(QUERY_MAX_LIMIT)
+            .try_into()?;
         let mut actions = Vec::with_capacity(limit);
         let mut next_start_after = None;
         for _ in 0..limit {
@@ -235,7 +240,7 @@ impl State<'_> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn position_history_add_action(
+    pub(crate) fn position_history_add_open_update_action(
         &self,
         ctx: &mut StateContext,
         pos: &Position,
@@ -248,7 +253,7 @@ impl State<'_> {
         let market_type = self.market_type(ctx.storage)?;
         let leverage = pos
             .active_leverage_to_notional(&price_point)
-            .into_base(market_type)
+            .into_base(market_type)?
             .split()
             .1;
         let trade_fee_usd = trading_fee.map(|x| price_point.collateral_to_usd(x));
@@ -257,16 +262,17 @@ impl State<'_> {
             id: Some(pos.id),
             kind,
             timestamp: self.now(),
+            price_timestamp: Some(price_point.timestamp),
             collateral: pos.active_collateral.raw(),
             transfer_collateral: deposit_collateral_delta,
             leverage: Some(leverage),
-            max_gains: Some(pos.max_gains_in_quote(market_type, price_point)?),
+            max_gains: Some(pos.max_gains_in_quote(market_type, &price_point)?),
             trade_fee: trade_fee_usd,
             delta_neutrality_fee: delta_neutrality_fee
                 .map(|x| x.map(|x| price_point.collateral_to_usd(x))),
             old_owner: None,
             new_owner: None,
-            take_profit_override: pos.take_profit_override,
+            take_profit_trader: pos.take_profit_trader,
             stop_loss_override: pos.stop_loss_override,
         };
 
@@ -298,6 +304,7 @@ impl State<'_> {
             id: Some(pos.id),
             kind: PositionActionKind::Close,
             timestamp: self.now(),
+            price_timestamp: Some(price_point.timestamp),
             collateral: active_collateral,
             transfer_collateral: active_collateral.into_signed(),
             leverage: None,
@@ -308,7 +315,7 @@ impl State<'_> {
             ),
             old_owner: None,
             new_owner: None,
-            take_profit_override: None,
+            take_profit_trader: None,
             stop_loss_override: None,
         };
 
@@ -353,7 +360,7 @@ impl State<'_> {
     ) -> Result<()> {
         let mut summary = self.trade_history_get_summary(ctx.storage, addr)?;
 
-        summary.realized_pnl += pnl_usd;
+        summary.realized_pnl = (summary.realized_pnl + pnl_usd)?;
         TRADE_HISTORY_SUMMARY.save(ctx.storage, addr, &summary)?;
 
         ctx.response.add_event(PnlEvent { pnl, pnl_usd });

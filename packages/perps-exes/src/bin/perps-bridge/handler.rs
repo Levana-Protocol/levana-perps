@@ -1,6 +1,6 @@
 use crate::{context::LogFlag, future::Future};
 use anyhow::{Context as AnyhowContext, Result};
-use tokio::{io::AsyncWriteExt, sync::Mutex};
+use tokio::io::AsyncWriteExt;
 use tokio_tungstenite::tungstenite::Message;
 
 use super::context::Context;
@@ -13,8 +13,7 @@ use msg::{
     shared::prelude::*,
 };
 use multi_test::{market_wrapper::PerpsMarket, time::TimeJump};
-use std::net::SocketAddr;
-use std::sync::Arc;
+use std::{cell::RefCell, net::SocketAddr, rc::Rc};
 
 impl Context {
     async fn handle_app_response(
@@ -49,13 +48,14 @@ impl Context {
         let start = std::time::Instant::now();
         let res = f().await;
         let elapsed = start.elapsed();
+        #[allow(clippy::as_conversions)]
         let elapsed = elapsed.as_secs() as f64 + (elapsed.subsec_nanos() as f64 / 1_000_000_000.0);
         (elapsed, res)
     }
 
     pub async fn handle_msg(
         &self,
-        market: Arc<Mutex<PerpsMarket>>,
+        market: Rc<RefCell<PerpsMarket>>,
         client_addr: &SocketAddr,
         msg: Message,
     ) -> Result<()> {
@@ -93,8 +93,7 @@ impl Context {
                             let (elapsed, resp) = self
                                 .with_timing(|| async {
                                     market
-                                        .lock()
-                                        .await
+                                        .borrow()
                                         .exec_mint_tokens(&wrapper.user, amount.into_number())
                                 })
                                 .await;
@@ -105,7 +104,7 @@ impl Context {
                         ClientToBridgeMsg::MintAndDepositLp { amount } => {
                             let (elapsed, resp) = self
                                 .with_timing(|| async {
-                                    market.lock().await.exec_mint_and_deposit_liquidity(
+                                    market.borrow().exec_mint_and_deposit_liquidity(
                                         &wrapper.user,
                                         amount.into_number(),
                                     )
@@ -118,18 +117,21 @@ impl Context {
 
                         ClientToBridgeMsg::RefreshPrice => {
                             let (elapsed, resp) = self
-                                .with_timing(|| async { market.lock().await.exec_refresh_price() })
+                                .with_timing(|| async { market.borrow().exec_refresh_price() })
                                 .await;
-                            self.handle_app_response(client_addr, elapsed, &wrapper, resp)
-                                .await?;
+                            self.handle_app_response(
+                                client_addr,
+                                elapsed,
+                                &wrapper,
+                                resp.map(|res| res.base),
+                            )
+                            .await?;
                             Ok(())
                         }
 
                         ClientToBridgeMsg::Crank => {
                             let (elapsed, resp) = self
-                                .with_timing(|| async {
-                                    market.lock().await.exec_crank(&wrapper.user)
-                                })
+                                .with_timing(|| async { market.borrow().exec_crank(&wrapper.user) })
                                 .await;
                             self.handle_app_response(client_addr, elapsed, &wrapper, resp)
                                 .await?;
@@ -140,7 +142,7 @@ impl Context {
                             let (elapsed, resp) = match funds {
                                 Some(funds) => {
                                     self.with_timing(|| async {
-                                        market.lock().await.exec_funds(
+                                        market.borrow().exec_funds(
                                             &wrapper.user,
                                             exec_msg,
                                             funds.into_number(),
@@ -150,7 +152,7 @@ impl Context {
                                 }
                                 None => {
                                     self.with_timing(|| async {
-                                        market.lock().await.exec(&wrapper.user, exec_msg)
+                                        market.borrow().exec(&wrapper.user, exec_msg)
                                     })
                                     .await
                                 }
@@ -162,7 +164,7 @@ impl Context {
                         }
                         ClientToBridgeMsg::QueryMarket { query_msg } => {
                             let (elapsed, resp) = self
-                                .with_timing(|| async { market.lock().await.raw_query(query_msg) })
+                                .with_timing(|| async { market.borrow().raw_query(query_msg) })
                                 .await;
                             let resp = resp?;
                             self.send_to_peer(
@@ -177,7 +179,7 @@ impl Context {
                         ClientToBridgeMsg::TimeJumpSeconds { seconds } => {
                             let (elapsed, resp) = self
                                 .with_timing(|| async {
-                                    market.lock().await.set_time(TimeJump::Seconds(*seconds))
+                                    market.borrow().set_time(TimeJump::Seconds(*seconds))
                                 })
                                 .await;
                             resp?;
@@ -193,12 +195,12 @@ impl Context {
                     }
                 }
                 Err(e) => {
-                    log::warn!("unable to parse message: {}", e);
+                    tracing::warn!("unable to parse message: {}", e);
                     Ok(())
                 }
             }
         } else {
-            log::info!("got a non-text message");
+            tracing::info!("got a non-text message");
             Ok(())
         }
     }

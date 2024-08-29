@@ -32,8 +32,8 @@ impl ListContractsOpt {
 
 async fn go(factory: &MainnetFactory, csv: &mut Writer<File>) -> Result<()> {
     let builder = factory.network.builder().await?;
-    let chain_id = builder.chain_id.clone();
-    let cosmos = builder.build().await?;
+    let chain_id = builder.chain_id().to_owned();
+    let cosmos = builder.build()?;
     let factory = Factory::from_contract(cosmos.make_contract(factory.address));
     for market in factory.get_markets().await? {
         csv.serialize(Record {

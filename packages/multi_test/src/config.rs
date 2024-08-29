@@ -1,3 +1,4 @@
+use cosmwasm_std::testing::MockApi;
 use msg::prelude::*;
 use once_cell::sync::Lazy;
 use std::env;
@@ -19,11 +20,18 @@ pub struct TestConfig {
 
 pub static TEST_CONFIG: Lazy<TestConfig> = Lazy::new(|| TestConfig {
     native_denom: env::var("NATIVE_DENOM").unwrap_or_else(|_| "native-usd".to_string()),
-    protocol_owner: env::var("PROTOCOL_OWNER").unwrap_or_else(|_| "protocol-owner".to_string()),
-    migration_admin: env::var("MIGRATION_ADMIN").unwrap_or_else(|_| "migration-admin".to_string()),
-    dao: env::var("DAO").unwrap_or_else(|_| "dao".to_string()),
-    kill_switch: env::var("KILL_SWITCH").unwrap_or_else(|_| "kill-switch".to_string()),
-    wind_down: env::var("WIND_DOWN").unwrap_or_else(|_| "wind-down".to_string()),
+    protocol_owner: env::var("PROTOCOL_OWNER")
+        .unwrap_or_else(|_| MockApi::default().addr_make("protocol-owner").into_string()),
+    migration_admin: env::var("MIGRATION_ADMIN").unwrap_or_else(|_| {
+        MockApi::default()
+            .addr_make("migration-admin")
+            .into_string()
+    }),
+    dao: env::var("DAO").unwrap_or_else(|_| MockApi::default().addr_make("dao").into_string()),
+    kill_switch: env::var("KILL_SWITCH")
+        .unwrap_or_else(|_| MockApi::default().addr_make("kill-switch").into_string()),
+    wind_down: env::var("WIND_DOWN")
+        .unwrap_or_else(|_| MockApi::default().addr_make("wind-down").into_string()),
     cw20_decimals: env::var("CW20_DECIMALS")
         .unwrap_or_else(|_| "6".to_string())
         .parse()
@@ -33,8 +41,11 @@ pub static TEST_CONFIG: Lazy<TestConfig> = Lazy::new(|| TestConfig {
         .try_into()
         .unwrap(),
     rewards_token_denom: "REWARDS_DENOM".to_string(),
-    manual_price_owner: env::var("MANUAL_PRICE_OWNER")
-        .unwrap_or_else(|_| "manual-price-owner".to_string()),
+    manual_price_owner: env::var("MANUAL_PRICE_OWNER").unwrap_or_else(|_| {
+        MockApi::default()
+            .addr_make("manual-price-owner")
+            .into_string()
+    }),
 });
 
 // Config/defaults for the typical scenario of creating a single market at a time
@@ -47,6 +58,7 @@ pub struct DefaultMarket {
     pub bootstrap_lp_addr: Addr,
     pub bootstrap_lp_deposit: Number,
     pub collateral_type: MarketType,
+    pub spot_price: SpotPriceKind,
 }
 
 impl DefaultMarket {
@@ -66,6 +78,11 @@ impl DefaultMarket {
 pub enum TokenKind {
     Cw20,
     Native,
+}
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum SpotPriceKind {
+    Manual,
+    Oracle,
 }
 
 pub static DEFAULT_MARKET: Lazy<DefaultMarket> = Lazy::new(|| {
@@ -92,7 +109,8 @@ pub static DEFAULT_MARKET: Lazy<DefaultMarket> = Lazy::new(|| {
             token_kind
         },
         bootstrap_lp_addr: Addr::unchecked(
-            env::var("BOOTSTRAP_LP_ADDR").unwrap_or_else(|_| "bootstrap-lp".to_string()),
+            env::var("BOOTSTRAP_LP_ADDR")
+                .unwrap_or_else(|_| MockApi::default().addr_make("bootstrap-lp").to_string()),
         ),
         // tests are tuned to require exactly this amount. don't change it!
         bootstrap_lp_deposit: env::var("BOOTSTRAP_LP_DEPOSIT")
@@ -103,6 +121,13 @@ pub static DEFAULT_MARKET: Lazy<DefaultMarket> = Lazy::new(|| {
             let market_type = DefaultMarket::market_type();
             println!("MARKET_COLLATERAL_TYPE: {:?}", market_type);
             market_type
+        },
+        spot_price: {
+            let kind = env::var("SPOT_PRICE_KIND").unwrap_or_else(|_| "manual".to_string());
+            match kind.as_str() {
+                "oracle" => SpotPriceKind::Oracle,
+                _ => SpotPriceKind::Manual,
+            }
         },
     }
 });

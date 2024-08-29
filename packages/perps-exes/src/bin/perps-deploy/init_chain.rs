@@ -1,6 +1,7 @@
 use anyhow::Result;
-use cosmos::{ContractAdmin, CosmosNetwork};
+use cosmos::ContractAdmin;
 use msg::contracts::faucet::entry::GasAllowance;
+use perps_exes::PerpsNetwork;
 
 use crate::cli::Opt;
 use crate::store_code::CW20;
@@ -9,7 +10,7 @@ use crate::store_code::CW20;
 pub(crate) struct InitChainOpt {
     /// Network to use.
     #[clap(long, env = "COSMOS_NETWORK")]
-    network: CosmosNetwork,
+    network: PerpsNetwork,
     /// Number of seconds to limit taps to
     #[clap(long, default_value = "300")]
     tap_limit: u32,
@@ -34,27 +35,27 @@ pub(crate) async fn go(
     }: InitChainOpt,
 ) -> Result<()> {
     let app = opt.load_basic_app(network).await?;
-    let gas_coin = app.cosmos.get_gas_coin().clone();
+    let gas_coin = app.cosmos.get_cosmos_builder().gas_coin().to_owned();
 
-    log::info!("Storing code...");
+    tracing::info!("Storing code...");
     let wallet = app.get_wallet()?;
     let cw20_code_id = app
         .cosmos
         .store_code_path(wallet, opt.get_contract_path(CW20))
         .await?;
-    log::info!("CW20: {cw20_code_id}");
+    tracing::info!("CW20: {cw20_code_id}");
     let faucet_code_id = app
         .cosmos
         .store_code_path(wallet, opt.get_contract_path(FAUCET))
         .await?;
-    log::info!("Faucet: {faucet_code_id}");
+    tracing::info!("Faucet: {faucet_code_id}");
     let tracker_code_id = app
         .cosmos
         .store_code_path(wallet, opt.get_contract_path(TRACKER))
         .await?;
-    log::info!("Tracker: {tracker_code_id}");
+    tracing::info!("Tracker: {tracker_code_id}");
 
-    log::info!("Instantiating tracker");
+    tracing::info!("Instantiating tracker");
 
     let tracker = tracker_code_id
         .instantiate(
@@ -65,7 +66,7 @@ pub(crate) async fn go(
             ContractAdmin::Sender,
         )
         .await?;
-    log::info!("New tracker contract: {tracker}");
+    tracing::info!("New tracker contract: {tracker}");
 
     let faucet = faucet_code_id
         .instantiate(
@@ -83,15 +84,15 @@ pub(crate) async fn go(
             ContractAdmin::Sender,
         )
         .await?;
-    log::info!("New faucet contract: {faucet}");
+    tracing::info!("New faucet contract: {faucet}");
 
-    log::info!("Sending gas funds to faucet");
+    tracing::info!("Sending gas funds to faucet");
     let res = wallet
         .send_gas_coin(&app.cosmos, &faucet, gas_to_send * 1_000_000)
         .await?;
-    log::info!("Gas sent in {}", res.txhash);
+    tracing::info!("Gas sent in {}", res.txhash);
 
-    log::info!("Please remember to update assets/config.yaml with the new addresses!");
+    tracing::info!("Please remember to update assets/config-chain.yaml with the new addresses!");
 
     // In the future, do we want to automatically add admins?
 

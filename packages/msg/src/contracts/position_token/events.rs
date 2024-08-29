@@ -12,7 +12,6 @@ pub struct MintEvent {
     pub owner: Addr,
 }
 
-impl PerpEvent for MintEvent {}
 impl From<MintEvent> for Event {
     fn from(src: MintEvent) -> Self {
         Event::new("mint").add_attributes(vec![
@@ -40,7 +39,6 @@ pub struct BurnEvent {
     pub token_id: String,
 }
 
-impl PerpEvent for BurnEvent {}
 impl From<BurnEvent> for Event {
     fn from(src: BurnEvent) -> Self {
         Event::new("burn").add_attributes(vec![("token_id", src.token_id)])
@@ -71,7 +69,6 @@ pub struct ApprovalEvent {
     pub expires: Expiration,
 }
 
-impl PerpEvent for ApprovalEvent {}
 impl From<ApprovalEvent> for Event {
     fn from(src: ApprovalEvent) -> Self {
         Event::new("approval").add_attributes(vec![
@@ -91,7 +88,6 @@ pub struct RevokeEvent {
     pub spender: Addr,
 }
 
-impl PerpEvent for RevokeEvent {}
 impl From<RevokeEvent> for Event {
     fn from(src: RevokeEvent) -> Self {
         Event::new("revoke").add_attributes(vec![
@@ -110,7 +106,6 @@ pub struct ApproveAllEvent {
     pub expires: Expiration,
 }
 
-impl PerpEvent for ApproveAllEvent {}
 impl From<ApproveAllEvent> for Event {
     fn from(src: ApproveAllEvent) -> Self {
         Event::new("approve-all").add_attributes(vec![
@@ -127,7 +122,6 @@ pub struct RevokeAllEvent {
     pub operator: Addr,
 }
 
-impl PerpEvent for RevokeAllEvent {}
 impl From<RevokeAllEvent> for Event {
     fn from(src: RevokeAllEvent) -> Self {
         Event::new("revoke-all").add_attributes(vec![("operator", src.operator.to_string())])
@@ -143,7 +137,6 @@ pub struct TransferEvent {
     pub token_id: String,
 }
 
-impl PerpEvent for TransferEvent {}
 impl From<TransferEvent> for Event {
     fn from(src: TransferEvent) -> Self {
         Event::new("transfer").add_attributes(vec![

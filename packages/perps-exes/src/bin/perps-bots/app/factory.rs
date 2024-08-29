@@ -13,6 +13,7 @@ use msg::{
     },
     token::Token,
 };
+use reqwest::header::{HeaderValue, REFERER};
 
 use crate::config::BotConfigByType;
 use crate::util::markets::{get_markets, Market};
@@ -80,6 +81,7 @@ async fn update(app: &App) -> Result<WatchedTaskOutput> {
             let (message, factory_info, frontend_info_testnet) = get_factory_info_testnet(
                 &app.cosmos,
                 &app.client,
+                app.opt.referer_header.clone(),
                 inner.tracker,
                 inner.faucet,
                 &inner.contract_family,
@@ -118,9 +120,11 @@ pub(crate) async fn get_factory_info_mainnet(
     Ok((message, factory_info))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn get_factory_info_testnet(
     cosmos: &Cosmos,
     client: &reqwest::Client,
+    referer: reqwest::Url,
     tracker: Address,
     faucet: Address,
     family: &str,
@@ -151,7 +155,7 @@ pub(crate) async fn get_factory_info_testnet(
         }
     };
 
-    let rpc = get_rpc_info(cosmos, client, rpc_nodes).await?;
+    let rpc = get_rpc_info(cosmos, client, referer, rpc_nodes).await?;
 
     let factory_info = FactoryInfo {
         factory,
@@ -288,13 +292,18 @@ async fn get_faucet_collateral_amount(
 async fn get_rpc_info(
     cosmos: &Cosmos,
     client: &reqwest::Client,
+    referer: reqwest::Url,
     rpc_nodes: &[Arc<String>],
 ) -> Result<RpcInfo> {
     let grpc = cosmos.get_latest_block_info().await?;
 
     let mut handles = vec![];
     for node in rpc_nodes {
-        handles.push(tokio::task::spawn(get_height(node.clone(), client.clone())));
+        handles.push(tokio::task::spawn(get_height(
+            node.clone(),
+            client.clone(),
+            referer.clone(),
+        )));
     }
 
     let mut results = vec![];
@@ -307,7 +316,7 @@ async fn get_rpc_info(
     }
 
     results.sort_by_key(|x| x.1);
-    let (endpoint, rpc_height) = match results.into_iter().rev().next() {
+    let (endpoint, rpc_height) = match results.into_iter().next_back() {
         Some(pair) => pair,
         // All nodes are broken
         None => {
@@ -329,6 +338,7 @@ async fn get_rpc_info(
 pub(crate) async fn get_height(
     node: Arc<String>,
     client: reqwest::Client,
+    referer: reqwest::Url,
 ) -> Result<(Arc<String>, u64)> {
     let node_clone = node.clone();
     tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
@@ -339,6 +349,7 @@ pub(crate) async fn get_height(
         };
         let value = client
             .get(url)
+            .header(REFERER, HeaderValue::from_str(referer.as_str())?)
             .send()
             .await?
             .error_for_status()?

@@ -4,15 +4,10 @@ use anyhow::{Context, Result};
 use cosmos::{ContractAdmin, CosmosNetwork, HasAddress};
 use msg::contracts::{
     cw20::{entry::InstantiateMinter, Cw20Coin},
-    farming::entry::OwnerExecuteMsg,
-    market::{
-        config::ConfigUpdate,
-        entry::ExecuteOwnerMsg,
-        spot_price::{SpotPriceConfig, SpotPriceConfigInit},
-    },
+    market::{config::ConfigUpdate, spot_price::SpotPriceConfigInit},
 };
 use msg::prelude::*;
-use perps_exes::config::ConfigTestnet;
+use perps_exes::{config::ConfigTestnet, PerpsNetwork};
 
 use crate::{
     cli::Opt,
@@ -27,7 +22,7 @@ use crate::{
 pub(crate) struct LocalDeployOpt {
     /// Network to use. Either this or family must be provided.
     #[clap(long, env = "COSMOS_NETWORK")]
-    pub(crate) network: CosmosNetwork,
+    pub(crate) network: PerpsNetwork,
     /// Initial price to set the market to.
     ///
     /// Provided as a convenience to make local testing easier.
@@ -48,10 +43,12 @@ pub(crate) async fn go(
 ) -> Result<InstantiateResponse> {
     let basic = opt.load_basic_app(network).await?;
     let wallet = basic.get_wallet()?;
-    let config_testnet = ConfigTestnet::load(opt.config_testnet.as_ref())?;
+    let config_testnet = ConfigTestnet::load_from_opt(opt.config_testnet.as_deref())?;
 
     match network {
-        CosmosNetwork::JunoLocal | CosmosNetwork::OsmosisLocal | CosmosNetwork::WasmdLocal => (),
+        PerpsNetwork::Regular(
+            CosmosNetwork::JunoLocal | CosmosNetwork::OsmosisLocal | CosmosNetwork::WasmdLocal,
+        ) => (),
         _ => anyhow::bail!("Please only use local deploy for a local --network"),
     }
 
@@ -91,7 +88,7 @@ pub(crate) async fn go(
             )
             .await?;
 
-        log::info!(
+        tracing::info!(
             "New CW20 address for {} is {cw20} with code ID {cw20_code_id}",
             market_id.get_collateral()
         );
@@ -101,12 +98,7 @@ pub(crate) async fn go(
             collateral: crate::instantiate::CollateralSource::Cw20(
                 crate::instantiate::Cw20Source::Existing(cw20.get_address()),
             ),
-            config: ConfigUpdate {
-                // https://phobosfinance.atlassian.net/browse/PERP-710
-                staleness_seconds: Some(60 * 60 * 24 * 7),
-                price_update_too_old_seconds: Some(60 * 60 * 24 * 5),
-                ..ConfigUpdate::default()
-            },
+            config: ConfigUpdate::default(),
             initial_borrow_fee_rate: "0.01".parse().unwrap(),
             spot_price: SpotPriceConfigInit::Manual {
                 admin: wallet.get_address_string().into(),
@@ -134,7 +126,7 @@ pub(crate) async fn go(
     };
 
     // And now instantiate the contracts
-    log::info!("Instantiating contracts");
+    tracing::info!("Instantiating contracts");
     let res = crate::instantiate::instantiate(InstantiateParams {
         opt: &opt,
         basic: &basic,
@@ -144,7 +136,6 @@ pub(crate) async fn go(
         markets,
         trading_competition: false,
         faucet_admin: None,
-        price_source: crate::app::PriceSourceConfig::Wallet(wallet.get_address()),
     })
     .await?;
 
@@ -164,13 +155,13 @@ pub(crate) async fn go(
                 msg::contracts::market::entry::ExecuteMsg::SetManualPrice {
                     price: initial_price,
                     price_usd: initial_price
-                        .try_into_usd(&market_id)
+                        .try_into_usd(market_id)
                         .unwrap_or(collateral_price),
                 },
             )
             .await
             .context("Unable to set price")?;
-        log::info!(
+        tracing::info!(
             "Set initial price in market {} to {initial_price} in {}",
             market_id,
             set_price.txhash
@@ -178,14 +169,14 @@ pub(crate) async fn go(
 
         // Wait until the new price is in the system
         for _ in 0..100 {
-            let spot_price: Result<PricePoint> = basic
+            let spot_price: Result<PricePoint, _> = basic
                 .cosmos
                 .make_contract(*market_addr)
                 .query(msg::contracts::market::entry::QueryMsg::SpotPrice { timestamp: None })
                 .await;
             match spot_price {
                 Ok(spot_price) => {
-                    log::info!("New spot price {spot_price:?} active in contract");
+                    tracing::info!("New spot price {spot_price:?} active in contract");
                     break;
                 }
                 Err(_) => {

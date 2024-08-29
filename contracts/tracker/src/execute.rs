@@ -17,8 +17,7 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
                 .querier
                 .query_wasm_contract_info(env.contract.address)?
                 .admin
-                .as_deref()
-                == Some(info.sender.as_str()),
+                == Some(info.sender),
         "Not in the admin list"
     );
     Ok(match msg {

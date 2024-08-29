@@ -1,7 +1,8 @@
 // re-exporting
 pub(crate) mod config;
 pub(crate) mod crank;
-pub mod data_series;
+pub(crate) mod data_series;
+pub(crate) mod deferred_execution;
 pub(crate) mod delta_neutrality_fee;
 pub(crate) mod fees;
 pub(crate) mod funding;
@@ -10,11 +11,11 @@ pub(crate) mod liquidity;
 pub(crate) mod meta;
 pub(crate) mod order;
 pub(crate) mod position;
+pub(crate) mod referral;
 #[cfg(feature = "sanity")]
 pub(crate) mod sanity;
 pub(crate) mod shutdown;
 pub(crate) mod spot_price;
-pub(crate) mod stale;
 pub(crate) mod status;
 pub(crate) mod token;
 

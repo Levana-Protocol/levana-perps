@@ -1,8 +1,10 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use cosmos::RawWallet;
+use cosmos::SeedPhrase;
 use perps_exes::build_version;
+use reqwest::Url;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter, Layer};
 
 use crate::localtest;
 
@@ -33,20 +35,10 @@ pub(crate) enum TestnetSub {
         #[clap(flatten)]
         inner: crate::testnet::add_market::AddMarketOpt,
     },
-    /// Instantiate rewards contracts
-    InstantiateRewards {
-        #[clap(flatten)]
-        inner: crate::instantiate_rewards::InstantiateRewardsOpt,
-    },
     /// Migrate existing contracts
     Migrate {
         #[clap(flatten)]
         inner: crate::migrate::MigrateOpt,
-    },
-    /// Migrate rewards contracts
-    MigrateRewards {
-        #[clap(flatten)]
-        inner: crate::migrate_rewards::MigrateRewardsOpt,
     },
     /// Instantiate chain-wide contracts as a one time setup
     InitChain {
@@ -78,9 +70,15 @@ pub(crate) enum TestnetSub {
         #[clap(flatten)]
         inner: crate::testnet::update_market_configs::UpdateMarketConfigsOpt,
     },
+    /// Sync config against the local config
+    SyncConfig {
+        #[clap(flatten)]
+        inner: crate::testnet::sync_config::SyncConfigOpts,
+    },
 }
 
 #[derive(clap::Parser)]
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum Subcommand {
     /// Do a complete local deployment
     LocalDeploy {
@@ -113,7 +111,7 @@ pub(crate) enum Subcommand {
 pub(crate) struct Opt {
     /// Override gRPC endpoint
     #[clap(long, env = "COSMOS_GRPC", global = true)]
-    pub(crate) cosmos_grpc: Option<String>,
+    pub(crate) cosmos_grpc: Option<Url>,
     /// Override gas multiplier
     #[clap(long, env = "COSMOS_GAS_MULTIPLIER", global = true)]
     pub(crate) cosmos_gas_multiplier: Option<f64>,
@@ -122,7 +120,7 @@ pub(crate) struct Opt {
     pub(crate) cosmos_chain_id: Option<String>,
     /// Mnemonic phrase for the Wallet
     #[clap(long, env = "COSMOS_WALLET")]
-    pub(crate) wallet: Option<RawWallet>,
+    pub(crate) wallet: Option<SeedPhrase>,
     /// Turn on verbose logging
     #[clap(long, short, global = true)]
     verbose: bool,
@@ -142,7 +140,7 @@ pub(crate) struct Opt {
     #[clap(
         long,
         env = "LEVANA_BOTS_MARKET_CONFIG_UPDATE",
-        default_value = "packages/perps-exes/assets/market-config-updates.yaml"
+        default_value = "packages/perps-exes/assets/market-config-updates.toml"
     )]
     pub(crate) market_config: PathBuf,
     /// The stable Pyth endpoint
@@ -151,24 +149,47 @@ pub(crate) struct Opt {
         env = "LEVANA_BOTS_PYTH_ENDPOINT_STABLE",
         default_value = "https://hermes.pyth.network/"
     )]
-    pub(crate) pyth_endpoint_stable: String,
+    pub(crate) pyth_endpoint_stable: reqwest::Url,
     /// The edge Pyth endpoint
     #[clap(
         long,
         env = "LEVANA_BOTS_PYTH_ENDPOINT_EDGE",
         default_value = "https://hermes-beta.pyth.network/"
     )]
-    pub(crate) pyth_endpoint_edge: String,
+    pub(crate) pyth_endpoint_edge: reqwest::Url,
 }
 
 impl Opt {
-    pub(crate) fn init_logger(&self) {
-        let env = env_logger::Env::default().default_filter_or(if self.verbose {
-            format!("{}=debug,cosmos=debug,info", env!("CARGO_CRATE_NAME"))
-        } else {
-            "info".to_owned()
-        });
-        env_logger::Builder::from_env(env).init();
+    pub(crate) fn init_logger(&self) -> anyhow::Result<()> {
+        let env_filter = EnvFilter::from_default_env();
+
+        let crate_name = env!("CARGO_CRATE_NAME");
+        let env_filter = match std::env::var("RUST_LOG") {
+            Ok(_) => env_filter,
+            Err(_) => {
+                if self.verbose {
+                    env_filter
+                        .add_directive("cosmos=debug".parse()?)
+                        .add_directive(format!("{}=debug", crate_name).parse()?)
+                } else {
+                    env_filter
+                        .add_directive(format!("{}=info", crate_name).parse()?)
+                        .add_directive("tower_http=info".parse()?)
+                }
+            }
+        };
+
+        tracing_subscriber::registry()
+            .with(
+                fmt::Layer::default()
+                    .with_writer(std::io::stderr)
+                    .log_internal_errors(true)
+                    .and_then(env_filter),
+            )
+            .init();
+
+        tracing::debug!("Debug message!");
+        Ok(())
     }
 
     /// Get the gitrev from the gitrev file in the wasmdir

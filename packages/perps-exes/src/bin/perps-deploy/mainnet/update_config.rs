@@ -1,8 +1,6 @@
-use std::path::PathBuf;
-
 use anyhow::{Context, Result};
 use cosmos::HasAddress;
-use cosmwasm_std::{to_binary, CosmosMsg, Empty, WasmMsg};
+use cosmwasm_std::{to_json_binary, CosmosMsg, Empty, WasmMsg};
 use msg::{
     contracts::market::{config::ConfigUpdate, entry::ExecuteOwnerMsg},
     prelude::MarketExecuteMsg,
@@ -55,10 +53,10 @@ async fn go(
 
     let spot_price_helper = if spot_price {
         Some({
-            let chain_config = ChainConfig::load(None::<PathBuf>, factory.network)?;
-            let price_config = PriceConfig::load(None::<PathBuf>)?;
+            let chain_config = ChainConfig::load(factory.network)?;
+            let price_config = PriceConfig::load()?;
             let oracle = opt.get_oracle_info(&chain_config, &price_config, factory.network)?;
-            move |market_id| get_spot_price_config(&oracle, &price_config, &market_id)
+            move |market_id| get_spot_price_config(&oracle, &market_id)
         })
     } else {
         None
@@ -72,7 +70,7 @@ async fn go(
     };
 
     let owner = factory.query_owner().await?;
-    log::info!("CW3 contract: {owner}");
+    tracing::info!("CW3 contract: {owner}");
 
     let msgs = markets
         .into_iter()
@@ -83,7 +81,7 @@ async fn go(
             }
             anyhow::Ok(CosmosMsg::<Empty>::Wasm(WasmMsg::Execute {
                 contract_addr: market.market.get_address_string(),
-                msg: to_binary(&strip_nulls(MarketExecuteMsg::Owner(
+                msg: to_json_binary(&strip_nulls(MarketExecuteMsg::Owner(
                     ExecuteOwnerMsg::ConfigUpdate {
                         update: Box::new(update),
                     },
@@ -92,7 +90,7 @@ async fn go(
             }))
         })
         .collect::<Result<Vec<_>>>()?;
-    log::info!("Message: {}", serde_json::to_string(&msgs)?);
+    tracing::info!("Message: {}", serde_json::to_string(&msgs)?);
 
     Ok(())
 }

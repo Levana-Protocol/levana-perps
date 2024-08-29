@@ -10,9 +10,6 @@ use serde::de::DeserializeOwned;
 
 use crate::error::{ErrorDomain, ErrorId};
 use crate::perp_anyhow;
-/// Marker trait to ensure all events are covered here
-/// by way of state.add_event()
-pub trait PerpEvent: Into<Event> {}
 
 /// Extension trait to add methods to native cosmwasm events
 pub trait CosmwasmEventExt {
@@ -131,6 +128,12 @@ pub trait CosmwasmEventExt {
         self.map_attr_ok(key, |s| s.to_string())
     }
 
+    /// Parse a bool-as-string attribute
+    fn bool_attr(&self, key: &str) -> anyhow::Result<bool> {
+        self.string_attr(key)
+            .and_then(|s| s.parse::<bool>().map_err(|err| err.into()))
+    }
+
     /// Parse an attribute with a position direction (to base)
     fn direction_attr(&self, key: &str) -> anyhow::Result<DirectionToBase> {
         self.map_attr_result(key, |s| match s {
@@ -142,13 +145,12 @@ pub trait CosmwasmEventExt {
 
     /// Parse an attribute with the absolute leverage (to base)
     fn leverage_to_base_attr(&self, key: &str) -> anyhow::Result<LeverageToBase> {
-        self.map_attr_result(key, |s| LeverageToBase::from_str(s))
+        self.map_attr_result(key, LeverageToBase::from_str)
     }
 
     /// Parse an optional attribute with the absolute leverage (to base)
     fn try_leverage_to_base_attr(&self, key: &str) -> anyhow::Result<Option<LeverageToBase>> {
-        self.try_map_attr(key, |s| LeverageToBase::from_str(s))
-            .transpose()
+        self.try_map_attr(key, LeverageToBase::from_str).transpose()
     }
 
     /// Parse an address attribute without checking validity
