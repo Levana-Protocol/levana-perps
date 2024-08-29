@@ -1,3 +1,4 @@
+use cosmos::Address;
 use cosmwasm_std::Uint64;
 use shared::storage::{MarketId, PriceBaseInQuote};
 
@@ -37,12 +38,14 @@ pub(crate) struct ProposalInfoFromDb {
     pub(crate) title: String,
     pub(crate) environment: ContractEnvironment,
     pub(crate) chain: ChainId,
+    pub(crate) address: Address,
 }
 
 /// Information sent to the database to insert a new proposal.
 pub(crate) struct ProposalInfoToDb {
-    pub(crate) proposal_id: u64,
+    pub(crate) proposal_id: Uint64,
     pub(crate) title: String,
     pub(crate) environment: ContractEnvironment,
     pub(crate) chain: ChainId,
+    pub(crate) address: Address,
 }

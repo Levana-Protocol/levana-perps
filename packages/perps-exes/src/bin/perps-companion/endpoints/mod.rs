@@ -88,16 +88,24 @@ pub(crate) struct ProposalUrl;
 #[derive(TypedPath, Deserialize)]
 #[typed_path("/proposal/:proposal_id", rejection(proposal::Error))]
 pub(crate) struct ProposalHtml {
-    pub(crate) proposal_id: i64,
+    pub(crate) proposal_id: u64,
 }
 
 #[derive(TypedPath, Deserialize)]
 #[typed_path("/proposal/:proposal_id/image.png", rejection(proposal::Error))]
 pub(crate) struct ProposalImage {
-    pub(crate) proposal_id: i64,
+    pub(crate) proposal_id: u64,
 }
 
 impl From<PathRejection> for pnl::Error {
+    fn from(rejection: PathRejection) -> Self {
+        Self::Path {
+            msg: rejection.to_string(),
+        }
+    }
+}
+
+impl From<PathRejection> for proposal::Error {
     fn from(rejection: PathRejection) -> Self {
         Self::Path {
             msg: rejection.to_string(),

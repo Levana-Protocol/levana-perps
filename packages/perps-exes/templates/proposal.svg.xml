@@ -80,11 +80,10 @@
 
 
 <text class="pnl" x="540" y="197">
-  {{ info.pnl_display }}
+  {{ info.title }}
 </text>
 
 <text class="market-info" x="540" y="304">
-  {{ info.market_id }} - {{ info.direction }}
 </text>
 
 <g class="param-names">
@@ -101,13 +100,10 @@
 
 <g class="param-values">
   <text x="823" y="364">
-    {{ info.entry_price }} USD
   </text>
   <text x="823" y="416">
-    {{ info.exit_price }} USD
   </text>
   <text x="823" y="466">
-    {{ info.leverage }}x
   </text>
 </g>
 

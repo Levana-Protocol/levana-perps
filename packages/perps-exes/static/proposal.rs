@@ -1,4 +1,4 @@
-use std::{borrow::Cow, sync::Arc};
+use std::{borrow::Cow, fmt::Display, sync::Arc};
 
 use anyhow::{Context, Result};
 use askama::Template;
@@ -29,21 +29,6 @@ use crate::{
 };
 
 use super::{ErrorPage, ProposalCssRoute, ProposalHtml, ProposalImage, ProposalUrl};
-
-#[derive(askama::Template)]
-#[template(path = "proposal.html")]
-#[derive(Clone, PartialEq, Eq, Debug, Deserialize)]
-struct ProposalInfo {
-    proposal_id: Uint64,
-    title: String,
-    image_url: String,
-    html_url: String,
-    host: String,
-    chain: ChainId,
-    amplitude_key: &'static str,
-    address: Address,
-}
-
 
 pub(super) async fn proposal_url(
     _: ProposalUrl,
@@ -140,6 +125,19 @@ impl GovContract {
             }
         }
     }
+}
+
+#[derive(askama::Template)]
+#[template(path = "proposal.html")]
+struct ProposalInfo {
+    proposal_id: Uint64,
+    title: String,
+    image_url: String,
+    html_url: String,
+    host: String,
+    chain: ChainId,
+    amplitude_key: &'static str,
+    address: Address,
 }
 
 impl ProposalInfo {
