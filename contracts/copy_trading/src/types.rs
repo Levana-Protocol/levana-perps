@@ -33,7 +33,7 @@ pub(crate) struct Totals {
 /// Total LP share information per market
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub(crate) struct MarketTotals {
-    /// Collateral used by active positions in the collateral
+    /// Collateral used by active positions in the market.
     pub(crate) collateral: Collateral,
     /// Total LP shares represented by the locked collateral
     pub(crate) shares: LpToken,

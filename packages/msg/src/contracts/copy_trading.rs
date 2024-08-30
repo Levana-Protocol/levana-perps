@@ -40,7 +40,7 @@ pub struct Config {
     pub leader: Addr,
     /// Name given to this copy_trading pool
     pub name: String,
-    /// Token accepted by the collateral
+    /// Token accepted by the contract
     pub token: crate::token::Token,
     /// Commission rate for the leader. Only paid when trade is
     /// profitable.
@@ -49,6 +49,8 @@ pub struct Config {
     pub min_balance: NonZero<Collateral>,
     /// Is the contract closed ?
     pub is_closed: bool,
+    /// Is the contract being wind down ?
+    pub is_winddown: bool,
 }
 
 /// Updates to configuration values.
@@ -106,7 +108,12 @@ pub enum ExecuteMsg {
     WithdrawLocked {
         /// Address of the locked LpToken holder
         address: RawAddr,
-    }, // todo: Do work ?
+    },
+    /// Wind down the contract
+    WindDown {},
+    /// Shut down the contract
+    ShutDown {}
+    // todo: Do work ?
 }
 
 /// Queries that can be performed on the copy contract.

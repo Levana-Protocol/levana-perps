@@ -17,9 +17,6 @@ pub(crate) const MARKET_TOTALS: Map<&MarketId, MarketTotals> = Map::new("market-
 /// Local cache of markets information
 pub(crate) const MARKETS: Map<&MarketId, MarketInfo> = Map::new("markets");
 
-/// Which market is waiting for a reply
-pub(crate) const REPLY_MARKET: Item<MarketId> = Item::new("reply-market");
-
 /// Lock LpToken for withdrawal when available
 pub(crate) const LOCKED_SHARES: Map<&Addr, Vec<WalletFund>> = Map::new("locked-share");
 
