@@ -1,9 +1,11 @@
 //! Copy trading contract
 
+use std::fmt::Display;
+
 use cosmwasm_std::{Addr, Binary, Decimal256, Uint128, Uint64};
 use shared::{
     number::{Collateral, LpToken, NonZero, Signed},
-    storage::RawAddr, time::Timestamp,
+    storage::{MarketId, RawAddr}, time::Timestamp,
 };
 
 use super::market::position::{PositionId, PositionQueryResponse};
@@ -37,13 +39,15 @@ pub struct Config {
     pub leader: Addr,
     /// Name given to this copy_trading pool
     pub name: String,
-    /// Kind of token accepted by this liqudity pool
+    /// Token accepted by the collateral
     pub token: crate::token::Token,
     /// Commission rate for the leader. Only paid when trade is
     /// profitable.
     pub commission_rate: Decimal256,
     /// Minimum balance that the leader needs to maintain at all time
-    pub min_balance: NonZero<Collateral>
+    pub min_balance: NonZero<Collateral>,
+    /// Is the contract closed ?
+    pub is_closed: bool
 }
 
 /// Updates to configuration values.
@@ -72,10 +76,8 @@ pub enum ExecuteMsg {
         /// Must parse to a [ExecuteMsg]
         msg: Binary,
     },
-    /// Deposit funds for this liqudity pool
+    /// Deposit funds to the contract
     Deposit {
-        /// Which pool id should the deposit go to
-        pool_id: PoolId,
     },
     /// Withdraw funds from a given market
     Withdraw {
@@ -91,11 +93,13 @@ pub enum ExecuteMsg {
     AcceptAdmin {},
     /// Update configuration values
     UpdateConfig(ConfigUpdate),
+    /// Perform a shutdown on the markets
+    Shutdown{},
     /// Open position etc
     OpenPosition {
 
     }
-    /// Do work ?
+    // todo: Do work ?
 }
 
 /// Queries that can be performed on the copy contract.
@@ -113,31 +117,24 @@ pub enum QueryMsg {
         /// Address of the token holder
         address: RawAddr,
         /// Value from [BalanceResp::next_start_after]
-        start_after: Option<PoolId>,
+        start_after: Option<MarketId>,
         /// How many values to return
         limit: Option<u32>,
     },
-    /// Check the status of all pools
+    /// Check the status of the copy trading contract for all the
+    /// markets that it's trading on
     ///
-    /// Returns [PoolResp]
-    PoolStatus {
-        /// Value from [MarketsResp::next_start_after]
-        start_after: Option<PoolId>,
-        /// Include closed pool ? By default they are not included.
-        include_closed: Option<bool>,
+    /// Returns [StatusResp]
+    Status {
+        /// Value from [BalanceResp::next_start_after]
+        start_after: Option<MarketId>,
         /// How many values to return
         limit: Option<u32>,
     },
-    /// Returns all the leaders for the current token
-    ///
-    /// Returns [LeadersResp]
-    Leaders {},
     /// Returns all the open positions
     ///
     /// Returns [OpenPositionsResp]
     OpenPositions {
-        /// Pool id
-        id: PoolId,
         /// Value from [OpenPositionResp::next_start_after]
         start_after: Option<PositionId>,
         /// How many values to return
@@ -155,55 +152,35 @@ pub struct OpenPositionsResp {
     pub next_start_after: Option<PositionId>
 }
 
-/// Response from [QueryMsg::Leaders]
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-#[serde(rename_all = "snake_case")]
-pub struct LeadersResp {
-    /// Market balances in this batch
-    pub leader: Vec<LeaderInfo>,
-    /// Next start_after value, if we have more leaders
-    pub next_start_after: Option<Addr>,
-}
-
-/// Pool Id
-#[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize)]
-pub struct PoolId(Uint64);
-
 /// Individual market response from [QueryMsg::Leaders]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
-pub struct LeaderInfo {
-    /// Leader address
-    pub leader: Addr,
+pub struct StatusResp {
+    /// Market id
+    pub market_id: MarketId,
     /// Shares helds by the leader
     pub shares: NonZero<LpToken>,
     /// Collateral equivalent of these shares
     pub collateral: NonZero<Collateral>,
     /// Size of the pool managed by the leader
     pub pool_size: NonZero<LpToken>,
-    /// Pool id managed by the leader
-    pub pool_id: PoolId,
-    /// Pool name set by the leader
-    pub pool_name: String,
-    /// Is the pool closed ?
-    pub pool_closed: bool,
 }
 
 /// Response from [QueryMsg::Balance]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct BalanceResp {
-    /// Pool balances in this batch
-    pub markets: Vec<PoolBalance>,
+    /// Balances in this batch
+    pub markets: Vec<MarketBalance>,
     /// Next start_after value, if we have more balances
     pub next_start_after: Option<crate::token::Token>,
 }
 /// Individual market response from [QueryMsg::Balance]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
-pub struct PoolBalance {
-    /// Pool id
-    pub id: PoolId,
+pub struct MarketBalance {
+    /// Market id
+    pub id: MarketId,
     /// Shares of the pool held by the wallet
     pub shares: NonZero<LpToken>,
     /// Collateral equivalent of these shares
@@ -212,40 +189,65 @@ pub struct PoolBalance {
     pub pool_size: NonZero<LpToken>,
 }
 
-/// Response from [QueryMsg::PoolStatus]
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+/// Token accepted by the contract
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub struct PoolResp {
-    /// Token statuses in this batch
-    pub tokens: Vec<PoolStatus>,
-    /// Next start_after value, if we have more tokens
-    pub next_start_after: Option<crate::token::Token>,
+pub enum Token {
+    /// Native coin and its denom
+    Native(String),
+    /// CW20 contract and its address
+    Cw20(Addr),
 }
 
-/// Status of a single pool
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-#[serde(rename_all = "snake_case")]
-pub struct PoolStatus {
-    /// Pool id
-    pub id: PoolId,
-    /// Pool name
-    pub name: String,
-    /// Leader's wallet
-    pub leader: Addr,
-    /// Pool creation time
-    pub created_at: Timestamp,
-    /// Commission rate for the leader
-    pub commission_rate: Decimal256,
-    /// Collateral held inside the contract
-    ///
-    /// Does not include active collateral of positions
-    pub collateral: Collateral,
-    /// Number of outstanding shares
-    pub shares: LpToken,
-    /// Our open position collateral
-    pub position_collateral: Signed<Collateral>,
-    /// Realized profit and loss
-    pub realized_pnl: Signed<Collateral>,
-    /// Total trade volume
-    pub total_traded_volume: Signed<Collateral>
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Token::Native(denom) => f.write_str(denom),
+            Token::Cw20(addr) => f.write_str(addr.as_str()),
+        }
+    }
+}
+
+impl Token {
+    /// Ensure that the two versions of the token are compatible.
+    pub fn ensure_matches(&self, token: &crate::token::Token) -> anyhow::Result<()> {
+        match (self, token) {
+            (Token::Native(_), crate::token::Token::Cw20 { addr, .. }) => {
+                anyhow::bail!("Provided native funds, but market requires a CW20 (contract {addr})")
+            }
+            (
+                Token::Native(denom1),
+                crate::token::Token::Native {
+                    denom: denom2,
+                    decimal_places: _,
+                },
+            ) => {
+                if denom1 == denom2 {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!("Wrong denom provided. You sent {denom1}, but the contract expects {denom2}"))
+                }
+            }
+            (
+                Token::Cw20(addr1),
+                crate::token::Token::Cw20 {
+                    addr: addr2,
+                    decimal_places: _,
+                },
+            ) => {
+                if addr1.as_str() == addr2.as_str() {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Wrong CW20 used. You used {addr1}, but the contract expects {addr2}"
+                    ))
+                }
+            }
+            (Token::Cw20(_), crate::token::Token::Native { denom, .. }) => {
+                anyhow::bail!(
+                    "Provided CW20 funds, but market requires native funds with denom {denom}"
+                )
+            }
+        }
+    }
 }

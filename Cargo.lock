@@ -2280,7 +2280,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "levana_perpswap_copy_trading_liquidity_pool"
+name = "levana_perpswap_copy_trading"
 version = "0.1.0"
 dependencies = [
  "anyhow",
