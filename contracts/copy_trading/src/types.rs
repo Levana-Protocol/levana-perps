@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use msg::contracts::market::{deferred_execution::DeferredExecId, position::PositionId};
-use shared::number::Usd;
+use shared::{number::Usd, time::Timestamp};
 
 use crate::prelude::*;
 
@@ -65,4 +65,15 @@ pub(crate) struct PositionInfo {
     pub(crate) pnl_collateral: Signed<Collateral>,
     /// Unrealized PnL on this position, in USD, using cost-basis analysis.
     pub(crate) pnl_usd: Signed<Usd>
+}
+
+/// Specific wallet fund
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub(crate) struct WalletFund {
+    /// LP Shares that is locked
+    pub(crate) share: NonZero<LpToken>,
+    /// Equivalent collateral amount for the LpToken
+    pub(crate) collateral: NonZero<Collateral>,
+    /// Timestamp locked at
+    pub(crate) locked_at: Timestamp
 }

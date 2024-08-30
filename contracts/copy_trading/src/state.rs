@@ -1,6 +1,6 @@
 use msg::contracts::market::position::PositionId;
 
-use crate::{prelude::*, types::{MarketInfo, MarketTotals, Totals}};
+use crate::{prelude::*, types::{MarketInfo, MarketTotals, Totals, WalletFund}};
 
 /// Overall config
 pub(crate) const CONFIG: Item<Config> = Item::new("config");
@@ -19,3 +19,9 @@ pub(crate) const MARKETS: Map<&MarketId, MarketInfo> = Map::new("markets");
 
 /// Which market is waiting for a reply
 pub(crate) const REPLY_MARKET: Item<MarketId> = Item::new("reply-market");
+
+/// Lock LpToken for withdrawal when available
+pub(crate) const LOCKED_SHARES: Map<&Addr, Vec<WalletFund>> = Map::new("locked-share");
+
+/// Outstanding funds separated for withdrawal
+pub(crate) const OUTSTANDING_FUNDS: Item<Totals> = Item::new("outstanding-funds");

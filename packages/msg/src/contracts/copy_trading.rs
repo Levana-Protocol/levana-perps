@@ -5,7 +5,8 @@ use std::fmt::Display;
 use cosmwasm_std::{Addr, Binary, Decimal256, Uint128, Uint64};
 use shared::{
     number::{Collateral, LpToken, NonZero, Signed},
-    storage::{MarketId, RawAddr}, time::Timestamp,
+    storage::{MarketId, RawAddr},
+    time::Timestamp,
 };
 
 use super::market::position::{PositionId, PositionQueryResponse};
@@ -47,7 +48,7 @@ pub struct Config {
     /// Minimum balance that the leader needs to maintain at all time
     pub min_balance: NonZero<Collateral>,
     /// Is the contract closed ?
-    pub is_closed: bool
+    pub is_closed: bool,
 }
 
 /// Updates to configuration values.
@@ -60,7 +61,7 @@ pub struct ConfigUpdate {
     pub name: String,
     pub token: crate::token::Token,
     pub commission_rate: Decimal256,
-    pub min_balance: NonZero<Collateral>
+    pub min_balance: NonZero<Collateral>,
 }
 
 /// Executions available on the copy trading contract.
@@ -77,8 +78,7 @@ pub enum ExecuteMsg {
         msg: Binary,
     },
     /// Deposit funds to the contract
-    Deposit {
-    },
+    Deposit {},
     /// Withdraw funds from a given market
     Withdraw {
         /// The number of LP shares to remove
@@ -94,12 +94,19 @@ pub enum ExecuteMsg {
     /// Update configuration values
     UpdateConfig(ConfigUpdate),
     /// Perform a shutdown on the markets
-    Shutdown{},
+    Shutdown {},
     /// Open position etc
-    OpenPosition {
-
-    }
-    // todo: Do work ?
+    OpenPosition {},
+    /// Lock LpToken to allow future withdrawal
+    LockLpToken {
+        /// The number of LP shares to lock
+        amount: NonZero<LpToken>,
+    },
+    /// Withdraw locked collateral if available
+    WithdrawLocked {
+        /// Address of the locked LpToken holder
+        address: RawAddr,
+    }, // todo: Do work ?
 }
 
 /// Queries that can be performed on the copy contract.
@@ -110,16 +117,12 @@ pub enum QueryMsg {
     ///
     /// Returns [Config]
     Config {},
-    /// Check the balance of an address for all pools.
+    /// Check the balance of an address
     ///
     /// Returns [BalanceResp]
     Balance {
         /// Address of the token holder
         address: RawAddr,
-        /// Value from [BalanceResp::next_start_after]
-        start_after: Option<MarketId>,
-        /// How many values to return
-        limit: Option<u32>,
     },
     /// Check the status of the copy trading contract for all the
     /// markets that it's trading on
@@ -139,7 +142,7 @@ pub enum QueryMsg {
         start_after: Option<PositionId>,
         /// How many values to return
         limit: Option<u32>,
-    }
+    },
 }
 // todo: Also implement query for open orders, closed orders etc.
 
@@ -149,7 +152,7 @@ pub struct OpenPositionsResp {
     /// Market balances in this batch
     pub positions: Vec<PositionQueryResponse>,
     /// Next start_after value, if we have more leaders
-    pub next_start_after: Option<PositionId>
+    pub next_start_after: Option<PositionId>,
 }
 
 /// Individual market response from [QueryMsg::Leaders]
@@ -158,35 +161,26 @@ pub struct OpenPositionsResp {
 pub struct StatusResp {
     /// Market id
     pub market_id: MarketId,
-    /// Shares helds by the leader
+    /// Shares helds on this market
     pub shares: NonZero<LpToken>,
     /// Collateral equivalent of these shares
     pub collateral: NonZero<Collateral>,
-    /// Size of the pool managed by the leader
-    pub pool_size: NonZero<LpToken>,
+    /// Total LP shares
+    pub total_shares: NonZero<LpToken>,
 }
 
-/// Response from [QueryMsg::Balance]
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-#[serde(rename_all = "snake_case")]
-pub struct BalanceResp {
-    /// Balances in this batch
-    pub markets: Vec<MarketBalance>,
-    /// Next start_after value, if we have more balances
-    pub next_start_after: Option<crate::token::Token>,
-}
 /// Individual market response from [QueryMsg::Balance]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
-pub struct MarketBalance {
-    /// Market id
-    pub id: MarketId,
-    /// Shares of the pool held by the wallet
-    pub shares: NonZero<LpToken>,
-    /// Collateral equivalent of these shares
-    pub collateral: NonZero<Collateral>,
-    /// Size of the entire pool, in LP tokens
-    pub pool_size: NonZero<LpToken>,
+pub struct BalanceResp {
+    /// Unlocked Shares of the pool held by the wallet
+    pub unlocked_shares: NonZero<LpToken>,
+    /// Unlocked Collateral equivalent of these shares
+    pub unlocked_collateral: NonZero<Collateral>,
+    /// Locked Shares of the pool held by the wallet
+    pub locked_shares: NonZero<LpToken>,
+    /// Locked Collateral equivalent of these shares
+    pub locked_collateral: NonZero<Collateral>,
 }
 
 /// Token accepted by the contract
