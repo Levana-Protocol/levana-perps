@@ -1119,6 +1119,8 @@ fn update_position_scenario_remove_collateral() {
     market
         .exec_set_config(msg::contracts::market::config::ConfigUpdate {
             minimum_deposit_usd: Some("5".parse().unwrap()),
+            // crank_fee_surcharge: Some("1".parse().unwrap()),
+            // crank_fee_charged: Some("0.1".parse().unwrap()),
             ..Default::default()
         })
         .unwrap();

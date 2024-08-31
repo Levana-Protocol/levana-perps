@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use cosmwasm_std::{CosmosMsg, SubMsg, WasmMsg};
+use cosmwasm_std::{SubMsg, WasmMsg};
 use msg::contracts::market::{
     deferred_execution::GetDeferredExecResp,
     entry::{ClosedPositionCursor, ClosedPositionsResp, StatusResp},
@@ -16,11 +16,6 @@ use shared::{
 };
 
 use crate::prelude::*;
-
-enum ContractMsg {
-    Cosmos { msg: CosmosMsg },
-    Wasm { msg: WasmMsg },
-}
 
 pub(crate) fn get_work_for(
     _storage: &dyn Storage,
@@ -820,14 +815,10 @@ pub(crate) fn execute(
         .add_event(Event::new("work-desc").add_attribute("desc", format!("{desc:?}")));
 
     let add_market_msg =
-        |storage: &mut dyn Storage, res: Response, msg: ContractMsg| -> Result<Response> {
+        |storage: &mut dyn Storage, res: Response, msg: WasmMsg| -> Result<Response> {
             assert!(!crate::state::REPLY_MARKET.exists(storage));
             crate::state::REPLY_MARKET.save(storage, &market.id)?;
-            let msg = match msg {
-                ContractMsg::Cosmos { msg } => SubMsg::reply_on_success(msg, 0),
-                ContractMsg::Wasm { msg } => SubMsg::reply_on_success(msg, 0),
-            };
-            Ok(res.add_submessage(msg))
+            Ok(res.add_submessage(SubMsg::reply_on_success(msg, 0)))
         };
 
     match desc {
@@ -865,7 +856,7 @@ pub(crate) fn execute(
             totals.collateral = totals.collateral.checked_sub(collateral.raw())?;
             crate::state::TOTALS.save(storage, &market.id, &totals)?;
 
-            res = add_market_msg(storage, res, ContractMsg::Wasm { msg })?;
+            res = add_market_msg(storage, res, msg)?;
         }
         WorkDescription::ClosePosition { pos_id } => {
             res = res.add_event(
@@ -881,7 +872,7 @@ pub(crate) fn execute(
                 })?,
                 funds: vec![],
             };
-            res = add_market_msg(storage, res, ContractMsg::Wasm { msg })?;
+            res = add_market_msg(storage, res, msg)?;
         }
         WorkDescription::CollectClosedPosition {
             pos_id,
@@ -943,20 +934,27 @@ pub(crate) fn execute(
             totals.collateral = totals.collateral.checked_sub(amount.raw())?;
             crate::state::TOTALS.save(storage, &market.id, &totals)?;
 
-            res = add_market_msg(storage, res, ContractMsg::Wasm { msg })?;
+            res = add_market_msg(storage, res, msg)?;
         }
         WorkDescription::UpdatePositionRemoveCollateralImpactSize { pos_id, amount } => {
             let event = Event::new("update-position-remove-collateral-impact-size")
                 .add_attribute("position-id", pos_id.to_string())
                 .add_attribute("amount", amount.to_string());
             res = res.add_event(event);
-            let msg = market
-                .token
-                .into_transfer_msg(&state.my_addr, amount)?
-                .context("Invalid transfer message")?;
+
+            let market_msg = MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
+                id: pos_id,
+                amount,
+                slippage_assert: None,
+            };
+            let msg =
+                market
+                    .token
+                    .into_market_execute_msg(&market.addr, amount.raw(), market_msg)?;
+
             totals.collateral = totals.collateral.checked_add(amount.raw())?;
             crate::state::TOTALS.save(storage, &market.id, &totals)?;
-            res = add_market_msg(storage, res, ContractMsg::Cosmos { msg })?;
+            res = add_market_msg(storage, res, msg)?;
         }
     }
 
