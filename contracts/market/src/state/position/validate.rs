@@ -131,12 +131,11 @@ impl State<'_> {
                 // checks. Skipping is essential because if not it
                 // would throw validation error for already changed
                 // position which should not be the case.
-                let notional_changed =
-                    !(current_position.notional_size == new_position.notional_size);
+                let notional_changed = current_position.notional_size != new_position.notional_size;
                 let ac_changed =
-                    !(current_position.active_collateral == new_position.active_collateral);
+                    current_position.active_collateral != new_position.active_collateral;
                 let cc_changed =
-                    !(current_position.counter_collateral == new_position.counter_collateral);
+                    current_position.counter_collateral != new_position.counter_collateral;
 
                 if notional_changed {
                     self.position_validate_trader_leverage(
