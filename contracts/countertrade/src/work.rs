@@ -791,8 +791,6 @@ fn optimize_capital_efficiency(
                         .checked_sub(min_deposit_collateral.into_signed())?;
                     result.abs_unsigned()
                 };
-                println!("estimated_crank_fee: {estimated_crank_fee}");
-                println!("max_deduct: {max_deduct}");
                 if estimated_crank_fee > max_deduct {
                     // If crank_fee is more than the amount it's going
                     // to be reduce, it's not worth performing this
