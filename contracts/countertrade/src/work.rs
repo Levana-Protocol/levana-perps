@@ -182,7 +182,7 @@ pub(crate) fn get_work_for(
                             take_profit_factor,
                             stop_loss_factor,
                             Some(*pos.clone()),
-                            &market,
+                            market,
                         )?;
                         match result {
                             Some(work) => return Ok(HasWorkResp::Work { desc: work }),
@@ -208,7 +208,7 @@ pub(crate) fn get_work_for(
         &price,
         pos.as_deref(),
         available_collateral,
-        &market,
+        market,
     )
     .map(|x| match x {
         Some(desc) => HasWorkResp::Work { desc },
@@ -738,6 +738,7 @@ enum Capital {
 }
 
 /// Returns the deposit collateral and leverage value to be used for this position.
+#[allow(clippy::too_many_arguments)]
 fn optimize_capital_efficiency(
     available_collateral: NonZero<Collateral>,
     position_notional_size_in_collateral: Signed<Collateral>,
