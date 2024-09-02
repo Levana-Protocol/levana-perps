@@ -119,15 +119,60 @@ impl State<'_> {
             );
         }
 
-        self.position_validate_trader_leverage(
-            market_type,
-            new_position.active_leverage_to_notional(price_point),
-            current_position.map(|p| p.active_leverage_to_notional(price_point)),
-        )?;
-        self.position_validate_counter_leverage(
-            new_position.counter_leverage_to_notional(price_point),
-            current_position.map(|p| p.counter_leverage_to_notional(price_point)),
-        )?;
+        match current_position {
+            Some(current_position) => {
+                // The method position_validate_trader_leverage
+                // depends on these parameters for validation:
+                // notional_size, active_collateral. Similary the
+                // method position_validate_counter_leverage depends
+                // on these positon parameters: notional size and
+                // counter_collateral So we do these checks only if
+                // they are changed. If not, we skip those
+                // checks. Skipping is essential because if not it
+                // would throw validation error for already changed
+                // position which should not be the case.
+                let notional_changed =
+                    !(current_position.notional_size == new_position.notional_size);
+                let ac_changed =
+                    !(current_position.active_collateral == new_position.active_collateral);
+                let cc_changed =
+                    !(current_position.counter_collateral == new_position.counter_collateral);
+
+                if notional_changed {
+                    self.position_validate_trader_leverage(
+                        market_type,
+                        new_position.active_leverage_to_notional(price_point),
+                        Some(current_position.active_leverage_to_notional(price_point)),
+                    )?;
+                    self.position_validate_counter_leverage(
+                        new_position.counter_leverage_to_notional(price_point),
+                        Some(current_position.counter_leverage_to_notional(price_point)),
+                    )?;
+                } else if ac_changed {
+                    self.position_validate_trader_leverage(
+                        market_type,
+                        new_position.active_leverage_to_notional(price_point),
+                        Some(current_position.active_leverage_to_notional(price_point)),
+                    )?;
+                } else if cc_changed {
+                    self.position_validate_counter_leverage(
+                        new_position.counter_leverage_to_notional(price_point),
+                        Some(current_position.counter_leverage_to_notional(price_point)),
+                    )?;
+                }
+            }
+            None => {
+                self.position_validate_trader_leverage(
+                    market_type,
+                    new_position.active_leverage_to_notional(price_point),
+                    current_position.map(|p| p.active_leverage_to_notional(price_point)),
+                )?;
+                self.position_validate_counter_leverage(
+                    new_position.counter_leverage_to_notional(price_point),
+                    current_position.map(|p| p.counter_leverage_to_notional(price_point)),
+                )?;
+            }
+        }
 
         Ok(())
     }
