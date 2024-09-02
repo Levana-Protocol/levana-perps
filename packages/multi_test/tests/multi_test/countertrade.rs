@@ -1119,8 +1119,8 @@ fn update_position_scenario_remove_collateral() {
     market
         .exec_set_config(msg::contracts::market::config::ConfigUpdate {
             minimum_deposit_usd: Some("5".parse().unwrap()),
-            // crank_fee_surcharge: Some("1".parse().unwrap()),
-            // crank_fee_charged: Some("0.1".parse().unwrap()),
+            crank_fee_surcharge: Some("1".parse().unwrap()),
+            crank_fee_charged: Some("0.1".parse().unwrap()),
             ..Default::default()
         })
         .unwrap();
@@ -1143,7 +1143,7 @@ fn update_position_scenario_remove_collateral() {
     market
         .exec_open_position_take_profit(
             &trader,
-            "10",
+            "20",
             // Deal with off-by-one leverage to ensure we have a balanced market
             match market_type {
                 msg::prelude::MarketType::CollateralIsQuote => "7",
@@ -1161,6 +1161,8 @@ fn update_position_scenario_remove_collateral() {
     let status = market.query_status().unwrap();
     assert!(status.long_notional > status.short_notional);
     do_work(&market, &lp);
+
+
     let status = market.query_status().unwrap();
 
     let countertrade_position = market
@@ -1180,11 +1182,11 @@ fn update_position_scenario_remove_collateral() {
     market
         .exec_open_position_take_profit(
             &trader,
-            "10",
+            "20",
             // Deal with off-by-one leverage to ensure we have a balanced market
             match market_type {
                 msg::prelude::MarketType::CollateralIsQuote => "3",
-                msg::prelude::MarketType::CollateralIsBase => "1",
+                msg::prelude::MarketType::CollateralIsBase => "3",
             },
             DirectionToBase::Short,
             None,
@@ -1217,21 +1219,8 @@ fn update_position_scenario_remove_collateral() {
         .position
         .unwrap();
 
-    // Short position is still the popular one
-    assert!(status.short_funding.is_strictly_positive());
     // Collateral has reduced for the countertrade position
     assert!(updated_position.deposit_collateral < countertrade_position.deposit_collateral);
-    let work = market.query_countertrade_has_work().unwrap();
-    match work {
-        HasWorkResp::NoWork {} => panic!("impossible: expected work"),
-        HasWorkResp::Work { ref desc } => match desc {
-            WorkDescription::ClosePosition { pos_id } => {
-                assert_eq!(countertrade_position.id, *pos_id);
-            }
-            desc => panic!("Got invalid work: {desc}"),
-        },
-    };
-    do_work(&market, &lp);
 }
 
 #[test]

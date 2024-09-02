@@ -43,5 +43,5 @@ pub(crate) struct MarketInfo {
     pub(crate) addr: Addr,
     pub(crate) token: msg::token::Token,
     pub(crate) crank_fee_surcharge: Usd,
-    pub(crate) crank_fee_charged: Usd
+    pub(crate) crank_fee_charged: Usd,
 }

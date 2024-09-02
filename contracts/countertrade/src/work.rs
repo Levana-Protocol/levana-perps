@@ -36,7 +36,7 @@ pub(crate) fn get_work_for(
         )? {
             GetDeferredExecResp::Found { item } => match item.status {
                 msg::contracts::market::deferred_execution::DeferredExecStatus::Pending => {
-                    return Ok(HasWorkResp::NoWork {})
+                    return Ok(HasWorkResp::NoWork {});
                 }
                 msg::contracts::market::deferred_execution::DeferredExecStatus::Success {
                     ..
@@ -189,7 +189,9 @@ pub(crate) fn get_work_for(
                             None => return Ok(HasWorkResp::NoWork {}),
                         }
                     }
-                    None => return Ok(HasWorkResp::NoWork {}),
+                    None => {
+                        return Ok(HasWorkResp::NoWork {});
+                    }
                 }
             }
         }
@@ -988,10 +990,9 @@ pub(crate) fn execute(
                 amount,
                 slippage_assert: None,
             };
-            let msg =
-                market
-                    .token
-                    .into_market_execute_msg(&market.addr, crank_fee, market_msg)?;
+            let msg = market
+                .token
+                .into_market_execute_msg(&market.addr, crank_fee, market_msg)?;
 
             totals.collateral = totals.collateral.checked_add(amount.raw())?;
             totals.collateral = totals.collateral.checked_sub(crank_fee)?;
