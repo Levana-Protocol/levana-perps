@@ -183,6 +183,7 @@ pub(crate) fn get_work_for(
                             stop_loss_factor,
                             Some(*pos.clone()),
                             market,
+                            state,
                         )?;
                         match result {
                             Some(work) => return Ok(HasWorkResp::Work { desc: work }),
@@ -309,6 +310,7 @@ fn desired_action(
                                 stop_loss_factor,
                                 None,
                                 market_info,
+                                state,
                             )
                         }
 
@@ -355,6 +357,7 @@ fn desired_action(
                                 stop_loss_factor,
                                 Some(pos.clone()),
                                 market_info,
+                                state,
                             )
                         }
                         None => Ok(None),
@@ -387,6 +390,7 @@ fn desired_action(
                             stop_loss_factor,
                             None,
                             market_info,
+                            state,
                         )
                     }
                     None => Ok(None),
@@ -603,6 +607,7 @@ fn compute_delta_notional(
     stop_loss_factor: Decimal256,
     countertrade_position: Option<PositionQueryResponse>,
     market_info: &MarketInfo,
+    state: &State,
 ) -> Result<Option<WorkDescription>> {
     let entry_price = price.price_notional;
     let hundred = Number::from_str("100").context("Unable to convert 100 to Number")?;
@@ -673,6 +678,7 @@ fn compute_delta_notional(
         min_deposit_collateral,
         market_info,
         price,
+        state,
     )?;
 
     let work = match capital {
@@ -748,6 +754,7 @@ fn optimize_capital_efficiency(
     min_deposit_collateral: Collateral,
     market_info: &MarketInfo,
     price: &PricePoint,
+    state: &State,
 ) -> Result<Option<Capital>> {
     let result = match countertrade_position {
         Some(countertrade_position) => {
@@ -779,7 +786,7 @@ fn optimize_capital_efficiency(
                 None
             } else {
                 // We should reduce collateral
-                let estimated_crank_fee = estimate_crank_fee(market_info, price)?;
+                let estimated_crank_fee = estimate_crank_fee(state, market_info, price)?;
                 let collateral = diff.abs_unsigned();
                 let countertrade_final_deposit_collateral = countertrade_position
                     .deposit_collateral
@@ -1005,13 +1012,25 @@ pub(crate) fn execute(
     Ok(res)
 }
 
-fn estimate_crank_fee(market: &MarketInfo, price: &PricePoint) -> Result<Collateral> {
-    // Calculated from deferred_execution logic
+fn estimate_crank_fee(
+    state: &State,
+    market: &MarketInfo,
+    price: &PricePoint,
+) -> Result<Collateral> {
+    // Loginc taken from from deferred_execution part of the code.
+    let status: msg::contracts::market::entry::StatusResp = state
+        .querier
+        .query_wasm_smart(
+            &market.addr,
+            &msg::contracts::market::entry::QueryMsg::Status { price: None },
+        )
+        .with_context(|| format!("Unable to load market status from contract {}", market.addr))?;
+    let crank_fee_surcharge = status.config.crank_fee_surcharge;
+    let crank_fee_charged = status.config.crank_fee_charged;
     let estimated_queue_size = 5u32;
-    let fees = market
-        .crank_fee_surcharge
-        .checked_mul_dec(Decimal256::from_ratio(estimated_queue_size, 10u32))?;
-    let fees = fees.checked_add(market.crank_fee_charged)?;
+    let fees =
+        crank_fee_surcharge.checked_mul_dec(Decimal256::from_ratio(estimated_queue_size, 10u32))?;
+    let fees = fees.checked_add(crank_fee_charged)?;
     let fees = price.usd_to_collateral(fees);
     Ok(fees)
 }

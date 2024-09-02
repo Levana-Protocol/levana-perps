@@ -3,7 +3,6 @@ use msg::contracts::market::{
     entry::ClosedPositionCursor,
     position::{PositionId, PositionQueryResponse},
 };
-use shared::number::Usd;
 
 use crate::prelude::*;
 
@@ -42,6 +41,4 @@ pub(crate) struct MarketInfo {
     pub(crate) id: MarketId,
     pub(crate) addr: Addr,
     pub(crate) token: msg::token::Token,
-    pub(crate) crank_fee_surcharge: Usd,
-    pub(crate) crank_fee_charged: Usd,
 }

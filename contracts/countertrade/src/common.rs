@@ -89,8 +89,6 @@ impl<'a> State<'a> {
             id: status.market_id,
             addr: market_addr,
             token: status.collateral,
-            crank_fee_surcharge: status.config.crank_fee_surcharge,
-            crank_fee_charged: status.config.crank_fee_charged,
         };
         Ok((info, false))
     }
