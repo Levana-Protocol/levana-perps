@@ -1162,7 +1162,6 @@ fn update_position_scenario_remove_collateral() {
     assert!(status.long_notional > status.short_notional);
     do_work(&market, &lp);
 
-
     let status = market.query_status().unwrap();
 
     let countertrade_position = market
