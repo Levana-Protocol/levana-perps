@@ -150,6 +150,10 @@ pub enum QueryMsg {
         /// How many values to return
         limit: Option<u32>,
     },
+    /// Does it has any pending work ?
+    ///
+    /// Returns [WorkResp]
+    HasWork {}
 }
 // todo: Also implement query for open orders, closed orders etc.
 
@@ -252,3 +256,26 @@ impl Token {
         }
     }
 }
+
+/// Work response
+pub enum WorkResp {
+    /// No work found
+    NoWork,
+    /// Has some work
+    HasWork {
+        /// Work description
+        work_description: WorkDescription
+    }
+}
+
+/// Work Description
+pub enum WorkDescription {
+    /// Update market information
+    UpdateMarketInformation {
+        /// Market id to operation on
+        market_id: MarketId
+    }
+}
+
+/// Queue position number
+pub struct QueuePositionId(Uint64);
