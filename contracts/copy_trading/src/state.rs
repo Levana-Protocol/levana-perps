@@ -46,7 +46,7 @@ pub(crate) const MARKET_ACTIVE_COLLATERALS: Map<&MarketId, Collateral> =
 /// LpToken Value
 pub(crate) const LP_TOKEN_VALUE: Item<LpTokenValue> = Item::new("lp-token-value");
 
-/// Work iterm information per market
+/// Work item information per market
 pub(crate) const MARKET_WORK_INFO: Map<&MarketId, MarketWorkInfo> = Map::new("market-work-info");
 
 /// Local cache of markets information
