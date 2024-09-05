@@ -3,7 +3,7 @@ use msg::contracts::market::{deferred_execution::DeferredExecId, position::Posit
 use crate::{
     prelude::*,
     types::{
-        LpTokenValue, MarketInfo, MarketWorkInfo, PauseStatus, PositionInfo, QueuePosition, Totals, WalletFund
+        EarmarkedItem, LpTokenStatus, LpTokenValue, MarketInfo, MarketWorkInfo, PauseStatus, PositionInfo, QueuePosition, Totals, WalletFund
     },
 };
 
@@ -21,7 +21,7 @@ pub(crate) const PENDING_QUEUE_ITEMS: Map<&QueuePositionId, QueuePosition> =
     Map::new("pending-queue-items");
 
 /// Pending earmarked items that needs to be processed for withdrawal
-pub(crate) const PENDING_EARMARKED_ITEMS: Map<&EarmarkId, (&Addr, NonZero<LpToken>)> =
+pub(crate) const PENDING_EARMARKED_ITEMS: Map<&EarmarkId, EarmarkedItem> =
     Map::new("pending-earmarked-items");
 
 /// Last processed queue id
@@ -39,10 +39,6 @@ pub(crate) const LAST_PROCESSED_DEFERRED_EXEC_ID: Item<Option<&DeferredExecId>> 
 /// Total collateral information
 pub(crate) const TOTALS: Item<Totals> = Item::new("totals");
 
-/// Tracks active collateral for each market
-pub(crate) const MARKET_ACTIVE_COLLATERALS: Map<&MarketId, Collateral> =
-    Map::new("market-active-collaterals");
-
 /// LpToken Value
 pub(crate) const LP_TOKEN_VALUE: Item<LpTokenValue> = Item::new("lp-token-value");
 
@@ -51,15 +47,3 @@ pub(crate) const MARKET_WORK_INFO: Map<&MarketId, MarketWorkInfo> = Map::new("ma
 
 /// Local cache of markets information
 pub(crate) const MARKETS: Map<&MarketId, MarketInfo> = Map::new("markets");
-
-/// Open position ids for the market
-pub(crate) const MARKET_OPEN_POSITION_IDS: Map<(&MarketId, &PositionId), ()> =
-    Map::new("market-open-position-ids");
-
-/// Pending open positions, that needs to be processed
-pub(crate) const MARKET_QUEUE_OPEN: Map<(&MarketId, &DeferredExecId), ()> =
-    Map::new("market-queue-open");
-
-/// Pending closed positions, that needs to be processed
-pub(crate) const MARKET_QUEUE_CLOSE: Map<(&MarketId, &DeferredExecId), ()> =
-    Map::new("market-queue-close");

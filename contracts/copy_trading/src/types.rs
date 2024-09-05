@@ -42,23 +42,28 @@ pub(crate) struct MarketWorkInfo {
     pub(crate) closed_recently: bool,
     /// Open issued via the contract
     pub(crate) open_recently: bool,
-    /// The last closed position we've collected collateral for.
+    /// The last seen position id. Should be passed to [msg::contracts::position_token::entry::QueryMsg::Tokens]
+    pub(crate) last_seen_position: Option<PositionId>,
+    /// The last closed position we've collected collateral for. (Do not reset this!)
     pub(crate) last_closed: Option<ClosedPositionCursor>,
     /// The latest deferred exec item we're waiting on.
     pub(crate) deferred_exec: Option<DeferredExecId>,
+    /// Total active collateral seen so far the open positions
+    pub(crate) total_active_collateral: Collateral,
+    /// Status of the Work information for processing open positions
+    pub(crate) open_status: MarketWorkStatus,
+    /// Status of the Work information for processing open positions
+    pub(crate) close_status: MarketWorkStatus
 }
 
-/// Market positions tracked by the contract
-#[derive(serde::Serialize, serde::Deserialize, Default, Debug)]
-pub(crate) struct MarketPositions {
-    /// Open positions that have been processed
-    pub(crate) open_positions: Vec<PositionInfo>,
-    /// Open positions that needs to be processed
-    pub(crate) pending_open_positions: Vec<PositionId>,
-    /// Positons that were updated and that needs to be processed
-    pub(crate) pending_updated_positions: Vec<PositionId>,
-    /// Closed position that are pending and needs to be processed
-    pub(crate) pending_closed_positions: Vec<PositionId>,
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub(crate) enum MarketWorkStatus {
+    /// Still pending
+    Pending,
+    /// Finished
+    Finished,
+    /// Not started
+    NotStarted
 }
 
 /// Specific position information
@@ -118,8 +123,6 @@ pub(crate) enum QueueItem {
     Deposit { funds: NonZero<Collateral> },
     /// Withdraw via LpToken
     Withdrawal { tokens: NonZero<LpToken> },
-    /// Withdrawal has been earmarke
-    EarMarked { id: EarmarkId },
 }
 
 /// Checks if the pause is status
@@ -130,4 +133,16 @@ pub(crate) enum PauseStatus {
     PauseReasonEarmarking,
     /// Not paused
     NotPaused,
+}
+
+/// Earmarked item
+pub(crate) struct EarmarkedItem {
+    /// Wallet
+    wallet: Addr,
+    /// Tokens that have been earmarked
+    tokens: NonZero<LpToken>,
+    /// Required collateral when last time [LpTokenStatus] was
+    /// valid. We try updating the LpTokenStatus only if
+    /// require_collateral is less than current available collateral.
+    outdated_required_collateral: Collateral
 }
