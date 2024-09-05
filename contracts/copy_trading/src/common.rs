@@ -1,6 +1,6 @@
 use crate::{
     prelude::*,
-    types::{MarketInfo, MarketTotals, PositionInfo, State},
+    types::{MarketInfo, MarketInfo, PositionInfo, State},
 };
 use anyhow::{Context, Result};
 use msg::contracts::market::{
@@ -41,7 +41,7 @@ impl<'a> State<'a> {
 }
 
 
-impl MarketTotals {
+impl MarketInfo {
 fn process_open_positions(
     &mut self,
     state: &State,

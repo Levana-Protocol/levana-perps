@@ -112,8 +112,7 @@ pub enum ExecuteMsg {
     /// Wind down the contract
     WindDown {},
     /// Shut down the contract
-    ShutDown {}
-    // todo: Do work ?
+    ShutDown {}, // todo: Do work ?
 }
 
 /// Queries that can be performed on the copy contract.
@@ -153,7 +152,7 @@ pub enum QueryMsg {
     /// Does it has any pending work ?
     ///
     /// Returns [WorkResp]
-    HasWork {}
+    HasWork {},
 }
 // todo: Also implement query for open orders, closed orders etc.
 
@@ -264,18 +263,28 @@ pub enum WorkResp {
     /// Has some work
     HasWork {
         /// Work description
-        work_description: WorkDescription
-    }
+        work_description: WorkDescription,
+    },
 }
 
 /// Work Description
 pub enum WorkDescription {
-    /// Update market information
-    UpdateMarketInformation {
-        /// Market id to operation on
-        market_id: MarketId
-    }
+    /// Calculate LP token value
+    ComputeLpTokenValue {},
+    /// Process Queue item
+    ProcessQueueItem {
+        /// Id to process
+        id: QueuePositionId,
+    },
+    /// Process Earmark item for withdrawals
+    ProcessEarmarkItem {
+        /// Id to process
+        id: EarmarkId,
+    },
 }
 
 /// Queue position number
 pub struct QueuePositionId(Uint64);
+
+/// Earmark Id
+pub struct EarmarkId(Uint64);

@@ -1,14 +1,19 @@
 use std::fmt::Display;
 
-use msg::contracts::market::{deferred_execution::DeferredExecId, position::PositionId};
+use msg::contracts::market::{
+    deferred_execution::DeferredExecId, entry::ClosedPositionCursor, position::PositionId,
+};
 use shared::{number::Usd, time::Timestamp};
 
 use crate::prelude::*;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub(crate) struct MarketInfo {
+    /// Market id
     pub(crate) id: MarketId,
+    /// Market address
     pub(crate) addr: Addr,
+    /// Token used by the market
     pub(crate) token: msg::token::Token,
 }
 
@@ -30,15 +35,17 @@ pub(crate) struct Totals {
     pub(crate) shares: LpToken,
 }
 
-/// Total LP share information per market
+/// Market information related to the work performed
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
-pub(crate) struct MarketTotals {
-    /// Collateral used by active positions in the market.
-    pub(crate) collateral: Collateral,
-    /// Total LP shares represented by the locked collateral
-    pub(crate) shares: LpToken,
-    /// Positions associated with this market
-    pub(crate) positions: MarketPositions
+pub(crate) struct MarketWorkInfo {
+    /// Close issued via the contract
+    pub(crate) closed_recently: bool,
+    /// Open issued via the contract
+    pub(crate) open_recently: bool,
+    /// The last closed position we've collected collateral for.
+    pub(crate) last_closed: Option<ClosedPositionCursor>,
+    /// The latest deferred exec item we're waiting on.
+    pub(crate) deferred_exec: Option<DeferredExecId>,
 }
 
 /// Market positions tracked by the contract
@@ -51,7 +58,7 @@ pub(crate) struct MarketPositions {
     /// Positons that were updated and that needs to be processed
     pub(crate) pending_updated_positions: Vec<PositionId>,
     /// Closed position that are pending and needs to be processed
-    pub(crate) pending_closed_positions: Vec<PositionId>
+    pub(crate) pending_closed_positions: Vec<PositionId>,
 }
 
 /// Specific position information
@@ -64,7 +71,7 @@ pub(crate) struct PositionInfo {
     /// Unrealized PnL on this position, in terms of collateral.
     pub(crate) pnl_collateral: Signed<Collateral>,
     /// Unrealized PnL on this position, in USD, using cost-basis analysis.
-    pub(crate) pnl_usd: Signed<Usd>
+    pub(crate) pnl_usd: Signed<Usd>,
 }
 
 /// Specific wallet fund
@@ -75,5 +82,52 @@ pub(crate) struct WalletFund {
     /// Equivalent collateral amount for the LpToken
     pub(crate) collateral: NonZero<Collateral>,
     /// Timestamp locked at
-    pub(crate) locked_at: Timestamp
+    pub(crate) locked_at: Timestamp,
+}
+
+/// LpToken Value
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub(crate) struct LpTokenValue {
+    /// Value of one LpToken
+    pub(crate) value: NonZero<Collateral>,
+    /// Status of the value
+    pub(crate) status: LpTokenStatus,
+}
+
+/// Status of [LpTokenValue]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub(crate) enum LpTokenStatus {
+    /// Recently computed and valid for other computations
+    Valid,
+    ////Outdated because of open positions etc. Need to be computed
+    /// again.
+    Outdated,
+}
+
+/// Queue position
+pub(crate) struct QueuePosition {
+    /// Queue item that needs to be processed
+    item: QueueItem,
+    /// Wallet that initiated the specific item action
+    wallet: Addr,
+}
+
+/// Queue item that needs to be processed
+pub(crate) enum QueueItem {
+    /// Deposit the fund and get some [LpToken]
+    Deposit { funds: NonZero<Collateral> },
+    /// Withdraw via LpToken
+    Withdrawal { tokens: NonZero<LpToken> },
+    /// Withdrawal has been earmarke
+    EarMarked { id: EarmarkId },
+}
+
+/// Checks if the pause is status
+pub(crate) enum PauseStatus {
+    /// Paused because queue items are processed
+    PauseQueueProcessed,
+    /// Paused because of earmarking
+    PauseReasonEarmarking,
+    /// Not paused
+    NotPaused,
 }
