@@ -594,6 +594,11 @@ pub(crate) async fn compute_coin_dnfs(
     let http_app = HttpApp::new(Some(serve_opt.slack_webhook.clone()), opt.cmc_key.clone());
     let data_dir = serve_opt.cmc_data_dir.clone();
     let mut market_analysis_counter = 0;
+    let mut last_notified_date = Utc::now()
+        .date_naive()
+        // Use some random number for this to make last_notified_date be prior to the current date
+        .checked_sub_days(Days::new(1))
+        .context("Not able to do checked substraction on current time")?;
     loop {
         tracing::info!("Going to fetch market status from querier");
         let market_config = http_app
@@ -643,6 +648,7 @@ pub(crate) async fn compute_coin_dnfs(
             let new_historical_data = historical_data.till_days(Some(serve_opt.cmc_data_age_days));
             if (market_analysis_counter >= serve_opt.required_runs_slack_alert)
                 && new_historical_data.is_ok()
+                && now.date_naive() != last_notified_date
             {
                 // Reset market_analysis counter to zero so that we
                 // can get future slack alerts!
@@ -665,6 +671,7 @@ pub(crate) async fn compute_coin_dnfs(
                     .write()
                     .insert(market_id.clone(), dnf_notify);
                 historical_data = new_historical_data?;
+                last_notified_date = now.date_naive();
             }
             historical_data.save(market_id, data_dir.clone())?;
 
