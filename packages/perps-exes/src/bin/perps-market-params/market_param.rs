@@ -641,7 +641,7 @@ pub(crate) async fn compute_coin_dnfs(
             };
             historical_data.append(dnf, max_leverage, now)?;
             let new_historical_data = historical_data.till_days(Some(serve_opt.cmc_data_age_days));
-            if (market_analysis_counter == serve_opt.required_runs_slack_alert)
+            if (market_analysis_counter >= serve_opt.required_runs_slack_alert)
                 && new_historical_data.is_ok()
             {
                 // Reset market_analysis counter to zero so that we
