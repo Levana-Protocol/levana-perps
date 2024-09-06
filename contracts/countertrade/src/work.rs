@@ -36,7 +36,7 @@ pub(crate) fn get_work_for(
         )? {
             GetDeferredExecResp::Found { item } => match item.status {
                 msg::contracts::market::deferred_execution::DeferredExecStatus::Pending => {
-                    return Ok(HasWorkResp::NoWork {})
+                    return Ok(HasWorkResp::NoWork {});
                 }
                 msg::contracts::market::deferred_execution::DeferredExecStatus::Success {
                     ..
@@ -182,13 +182,17 @@ pub(crate) fn get_work_for(
                             take_profit_factor,
                             stop_loss_factor,
                             Some(*pos.clone()),
+                            market,
+                            state,
                         )?;
                         match result {
                             Some(work) => return Ok(HasWorkResp::Work { desc: work }),
                             None => return Ok(HasWorkResp::NoWork {}),
                         }
                     }
-                    None => return Ok(HasWorkResp::NoWork {}),
+                    None => {
+                        return Ok(HasWorkResp::NoWork {});
+                    }
                 }
             }
         }
@@ -199,7 +203,15 @@ pub(crate) fn get_work_for(
         return Ok(HasWorkResp::NoWork {});
     }
 
-    desired_action(state, &status, &price, pos.as_deref(), available_collateral).map(|x| match x {
+    desired_action(
+        state,
+        &status,
+        &price,
+        pos.as_deref(),
+        available_collateral,
+        market,
+    )
+    .map(|x| match x {
         Some(desc) => HasWorkResp::Work { desc },
         None => HasWorkResp::NoWork {},
     })
@@ -211,6 +223,7 @@ fn desired_action(
     price: &PricePoint,
     pos: Option<&PositionQueryResponse>,
     available_collateral: NonZero<Collateral>,
+    market_info: &MarketInfo,
 ) -> Result<Option<WorkDescription>> {
     let one_sided_market = if status.long_funding.is_zero() || status.short_funding.is_zero() {
         assert!(status.long_funding.is_zero());
@@ -296,6 +309,8 @@ fn desired_action(
                                 take_profit_factor,
                                 stop_loss_factor,
                                 None,
+                                market_info,
+                                state,
                             )
                         }
 
@@ -341,6 +356,8 @@ fn desired_action(
                                 take_profit_factor,
                                 stop_loss_factor,
                                 Some(pos.clone()),
+                                market_info,
+                                state,
                             )
                         }
                         None => Ok(None),
@@ -372,6 +389,8 @@ fn desired_action(
                             take_profit_factor,
                             stop_loss_factor,
                             None,
+                            market_info,
+                            state,
                         )
                     }
                     None => Ok(None),
@@ -587,6 +606,8 @@ fn compute_delta_notional(
     take_profit_factor: Decimal256,
     stop_loss_factor: Decimal256,
     countertrade_position: Option<PositionQueryResponse>,
+    market_info: &MarketInfo,
+    state: &State,
 ) -> Result<Option<WorkDescription>> {
     let entry_price = price.price_notional;
     let hundred = Number::from_str("100").context("Unable to convert 100 to Number")?;
@@ -655,6 +676,9 @@ fn compute_delta_notional(
         countertrade_position.clone(),
         status.market_type,
         min_deposit_collateral,
+        market_info,
+        price,
+        state,
     )?;
 
     let work = match capital {
@@ -688,12 +712,15 @@ fn compute_delta_notional(
                     amount: NonZero::new(collateral).context("add_collateral is zero")?,
                 }
             }
-            Capital::RemoveCollateral { collateral, pos_id } => {
-                WorkDescription::UpdatePositionRemoveCollateralImpactSize {
-                    pos_id,
-                    amount: NonZero::new(collateral).context("remove_collateral is zero")?,
-                }
-            }
+            Capital::RemoveCollateral {
+                collateral,
+                pos_id,
+                crank_fee,
+            } => WorkDescription::UpdatePositionRemoveCollateralImpactSize {
+                pos_id,
+                amount: NonZero::new(collateral).context("remove_collateral is zero")?,
+                crank_fee,
+            },
         },
         None => return Ok(None),
     };
@@ -712,10 +739,12 @@ enum Capital {
     RemoveCollateral {
         collateral: Collateral,
         pos_id: PositionId,
+        crank_fee: Collateral,
     },
 }
 
 /// Returns the deposit collateral and leverage value to be used for this position.
+#[allow(clippy::too_many_arguments)]
 fn optimize_capital_efficiency(
     available_collateral: NonZero<Collateral>,
     position_notional_size_in_collateral: Signed<Collateral>,
@@ -723,6 +752,9 @@ fn optimize_capital_efficiency(
     countertrade_position: Option<PositionQueryResponse>,
     market_type: MarketType,
     min_deposit_collateral: Collateral,
+    market_info: &MarketInfo,
+    price: &PricePoint,
+    state: &State,
 ) -> Result<Option<Capital>> {
     let result = match countertrade_position {
         Some(countertrade_position) => {
@@ -753,6 +785,8 @@ fn optimize_capital_efficiency(
             } else if diff.is_zero() {
                 None
             } else {
+                // We should reduce collateral
+                let estimated_crank_fee = estimate_crank_fee(state, market_info, price)?;
                 let collateral = diff.abs_unsigned();
                 let countertrade_final_deposit_collateral = countertrade_position
                     .deposit_collateral
@@ -767,10 +801,18 @@ fn optimize_capital_efficiency(
                         .checked_sub(min_deposit_collateral.into_signed())?;
                     result.abs_unsigned()
                 };
-                Some(Capital::RemoveCollateral {
-                    collateral: max_deduct,
-                    pos_id: countertrade_position.id,
-                })
+                if estimated_crank_fee > max_deduct {
+                    // If crank_fee is more than the amount it's going
+                    // to be reduce, it's not worth performing this
+                    // action
+                    None
+                } else {
+                    Some(Capital::RemoveCollateral {
+                        collateral: max_deduct,
+                        pos_id: countertrade_position.id,
+                        crank_fee: estimated_crank_fee,
+                    })
+                }
             }
         }
         None => {
@@ -923,6 +965,7 @@ pub(crate) fn execute(
                 .add_attribute("position-id", pos_id.to_string())
                 .add_attribute("amount", amount.to_string());
             res = res.add_event(event);
+
             let msg = market.token.into_market_execute_msg(
                 &market.addr,
                 amount.raw(),
@@ -936,30 +979,58 @@ pub(crate) fn execute(
 
             res = add_market_msg(storage, res, msg)?;
         }
-        WorkDescription::UpdatePositionRemoveCollateralImpactSize { pos_id, amount } => {
+        WorkDescription::UpdatePositionRemoveCollateralImpactSize {
+            pos_id,
+            amount,
+            crank_fee,
+        } => {
             let event = Event::new("update-position-remove-collateral-impact-size")
                 .add_attribute("position-id", pos_id.to_string())
+                .add_attribute("crank-fee", crank_fee.to_string())
                 .add_attribute("amount", amount.to_string());
             res = res.add_event(event);
+
             let amount = market.token.round_down_to_precision(amount.raw())?;
-            let msg = cosmwasm_std::WasmMsg::Execute {
-                contract_addr: market.addr.into_string(),
-                msg: to_json_binary(
-                    &MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
-                        id: pos_id,
-                        amount: NonZero::new(amount).context("amount is zero")?,
-                        slippage_assert: None,
-                    },
-                )?,
-                funds: vec![],
+            let amount = NonZero::new(amount).context("Remove amount is zero")?;
+
+            let market_msg = MarketExecuteMsg::UpdatePositionRemoveCollateralImpactSize {
+                id: pos_id,
+                amount,
+                slippage_assert: None,
             };
+            let msg = market
+                .token
+                .into_market_execute_msg(&market.addr, crank_fee, market_msg)?;
 
-            totals.collateral = totals.collateral.checked_add(amount)?;
+            totals.collateral = totals.collateral.checked_add(amount.raw())?;
+            totals.collateral = totals.collateral.checked_sub(crank_fee)?;
             crate::state::TOTALS.save(storage, &market.id, &totals)?;
-
             res = add_market_msg(storage, res, msg)?;
         }
     }
 
     Ok(res)
+}
+
+fn estimate_crank_fee(
+    state: &State,
+    market: &MarketInfo,
+    price: &PricePoint,
+) -> Result<Collateral> {
+    // Loginc taken from from deferred_execution part of the code.
+    let status: msg::contracts::market::entry::StatusResp = state
+        .querier
+        .query_wasm_smart(
+            &market.addr,
+            &msg::contracts::market::entry::QueryMsg::Status { price: None },
+        )
+        .with_context(|| format!("Unable to load market status from contract {}", market.addr))?;
+    let crank_fee_surcharge = status.config.crank_fee_surcharge;
+    let crank_fee_charged = status.config.crank_fee_charged;
+    let estimated_queue_size = 5u32;
+    let fees =
+        crank_fee_surcharge.checked_mul_dec(Decimal256::from_ratio(estimated_queue_size, 10u32))?;
+    let fees = fees.checked_add(crank_fee_charged)?;
+    let fees = price.usd_to_collateral(fees);
+    Ok(fees)
 }

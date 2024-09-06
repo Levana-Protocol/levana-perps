@@ -350,6 +350,8 @@ pub enum WorkDescription {
         pos_id: PositionId,
         /// Amount of funds to remove from the position
         amount: NonZero<Collateral>,
+        /// Crank fee to be paid
+        crank_fee: Collateral,
     },
 }
 
@@ -379,7 +381,9 @@ impl std::fmt::Display for WorkDescription {
                     "Add {amount} Collateral to Position Id of {pos_id} impacting size"
                 )
             }
-            WorkDescription::UpdatePositionRemoveCollateralImpactSize { pos_id, amount } => write!(
+            WorkDescription::UpdatePositionRemoveCollateralImpactSize {
+                pos_id, amount, ..
+            } => write!(
                 f,
                 "Remove {amount} Collateral to Position Id of {pos_id} impacting size"
             ),

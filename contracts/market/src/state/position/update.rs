@@ -294,6 +294,34 @@ pub(crate) struct UpdatePositionSizeExec {
     event: PositionUpdateEvent,
 }
 
+/// Clamp the counter collateral between allowed high and low values.
+fn clamp_counter_collateral(
+    requested_counter_collateral: NonZero<Collateral>,
+    notional_size: Signed<Notional>,
+    config: &Config,
+    price_point: &PricePoint,
+) -> Result<NonZero<Collateral>> {
+    // minimum allowed counter-collateral
+    let min_counter_collateral = price_point
+        .notional_to_collateral(notional_size.abs_unsigned())
+        .checked_div_dec(
+            config
+                .max_leverage
+                .try_into_non_negative_value()
+                .context("Impossible negative max_leverage")?,
+        )?;
+
+    // maximum allowed counter-collateral. We have a hard coded minimum
+    // leverage of 1, see position_validate_counter_leverage
+    let max_counter_collateral = price_point.notional_to_collateral(notional_size.abs_unsigned());
+
+    let counter_collateral = requested_counter_collateral
+        .raw()
+        .clamp(min_counter_collateral, max_counter_collateral);
+
+    NonZero::new(counter_collateral).context("Calculated counter_collateral is 0")
+}
+
 impl UpdatePositionSizeExec {
     pub(crate) fn new(
         state: &State,
@@ -336,6 +364,12 @@ impl UpdatePositionSizeExec {
 
         let old_counter_collateral = pos.counter_collateral.raw();
         let new_counter_collateral = pos.counter_collateral.checked_mul_non_zero(scale_factor)?;
+        let new_counter_collateral = clamp_counter_collateral(
+            new_counter_collateral,
+            pos.notional_size,
+            &state.config,
+            price_point,
+        )?;
         let counter_collateral_delta =
             (new_counter_collateral.into_signed() - old_counter_collateral.into_signed())?;
         pos.counter_collateral = new_counter_collateral;
@@ -514,6 +548,12 @@ impl UpdatePositionLeverageExec {
                 .checked_mul_dec(old_counter_ratio_of_notional_size_in_collateral.raw())?,
         )
         .context("new_counter_collateral is zero")?;
+        let new_counter_collateral = clamp_counter_collateral(
+            new_counter_collateral,
+            pos.notional_size,
+            &state.config,
+            price_point,
+        )?;
         let counter_collateral_delta =
             (new_counter_collateral.into_signed() - old_counter_collateral.into_signed())?;
         pos.counter_collateral = new_counter_collateral;
@@ -648,11 +688,16 @@ impl UpdatePositionMaxGainsExec {
         let mut pos = pos;
         let original_pos = pos.clone();
 
-        let counter_collateral =
+        let new_counter_collateral =
             state.update_max_gains_new_counter_collateral(store, pos.id, max_gains, price_point)?;
+        let new_counter_collateral = clamp_counter_collateral(
+            new_counter_collateral,
+            pos.notional_size,
+            &state.config,
+            price_point,
+        )?;
 
         let old_counter_collateral = pos.counter_collateral;
-        let new_counter_collateral = counter_collateral;
         let counter_collateral_delta =
             (new_counter_collateral.into_signed() - old_counter_collateral.into_signed())?;
         pos.counter_collateral = new_counter_collateral;
@@ -757,6 +802,7 @@ impl UpdatePositionTakeProfitPriceExec {
             .split()
             .1;
 
+        // No need to clamp here, TakeProfitToCounterCollateral does that for us.
         let counter_collateral = TakeProfitToCounterCollateral {
             take_profit_trader,
             market_type,
