@@ -4,7 +4,7 @@ use std::fmt::Display;
 
 use cosmwasm_std::{Addr, Binary, Decimal256, Uint128, Uint64};
 use shared::{
-    number::{Collateral, LpToken, NonZero, Signed},
+    number::{Collateral, LpToken, NonZero, Signed, Usd},
     storage::{MarketId, RawAddr},
     time::Timestamp,
 };
@@ -95,24 +95,13 @@ pub enum ExecuteMsg {
     AcceptAdmin {},
     /// Update configuration values
     UpdateConfig(ConfigUpdate),
-    /// Perform a shutdown on the markets
+    /// Wind down the contract which prevents opening any new
+    /// positions, or depositos or collateral.
+    WindDown {},
+    /// Shutdown the contract by closing all the open positions etc.
     Shutdown {},
     /// Open position etc
     OpenPosition {},
-    /// Lock LpToken to allow future withdrawal
-    LockLpToken {
-        /// The number of LP shares to lock
-        amount: NonZero<LpToken>,
-    },
-    /// Withdraw locked collateral if available
-    WithdrawLocked {
-        /// Address of the locked LpToken holder
-        address: RawAddr,
-    },
-    /// Wind down the contract
-    WindDown {},
-    /// Shut down the contract
-    ShutDown {}, // todo: Do work ?
 }
 
 /// Queries that can be performed on the copy contract.
@@ -123,7 +112,7 @@ pub enum QueryMsg {
     ///
     /// Returns [Config]
     Config {},
-    /// Check the balance of an address
+    /// Returns the share held by the wallet
     ///
     /// Returns [BalanceResp]
     Balance {
@@ -165,32 +154,28 @@ pub struct OpenPositionsResp {
     pub next_start_after: Option<PositionId>,
 }
 
-/// Individual market response from [QueryMsg::Leaders]
+/// Individual market response from [QueryMsg::Status]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct StatusResp {
     /// Market id
     pub market_id: MarketId,
-    /// Shares helds on this market
-    pub shares: NonZero<LpToken>,
-    /// Collateral equivalent of these shares
-    pub collateral: NonZero<Collateral>,
-    /// Total LP shares
-    pub total_shares: NonZero<LpToken>,
+    /// Sum of deposit collateral of all open positions
+    pub tvl_open_positions_usd: Usd,
+    /// Sum of deposit collateral of all closed positions
+    pub tvl_closed_positions_usd: Usd,
+    /// Total profit so far in the closed positions
+    pub profit_in_usd: Usd,
+    /// Total loss so far in the closed postions
+    pub loss_in_usd: Usd,
 }
 
 /// Individual market response from [QueryMsg::Balance]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 pub struct BalanceResp {
-    /// Unlocked Shares of the pool held by the wallet
-    pub unlocked_shares: NonZero<LpToken>,
-    /// Unlocked Collateral equivalent of these shares
-    pub unlocked_collateral: NonZero<Collateral>,
-    /// Locked Shares of the pool held by the wallet
-    pub locked_shares: NonZero<LpToken>,
-    /// Locked Collateral equivalent of these shares
-    pub locked_collateral: NonZero<Collateral>,
+    /// Shares of the pool held by the wallet
+    pub shares: NonZero<LpToken>,
 }
 
 /// Token accepted by the contract
@@ -271,6 +256,11 @@ pub enum WorkResp {
 pub enum WorkDescription {
     /// Calculate LP token value
     ComputeLpTokenValue {},
+    /// Process market
+    ProcessMarket {
+        /// Market id
+        id: MarketId
+    },
     /// Process Queue item
     ProcessQueueItem {
         /// Id to process
@@ -281,6 +271,8 @@ pub enum WorkDescription {
         /// Id to process
         id: EarmarkId,
     },
+    /// Reset market specific statistics
+    RestStats {}
 }
 
 /// Queue position number

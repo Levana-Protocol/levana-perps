@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use msg::contracts::market::{
-    deferred_execution::DeferredExecId, entry::ClosedPositionCursor, position::PositionId,
+    deferred_execution::DeferredExecId, entry::ClosedPositionCursor, order::OrderId, position::PositionId
 };
 use shared::{number::Usd, time::Timestamp};
 
@@ -38,22 +38,48 @@ pub(crate) struct Totals {
 /// Market information related to the work performed
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub(crate) struct MarketWorkInfo {
-    /// Close issued via the contract
-    pub(crate) closed_recently: bool,
-    /// Open issued via the contract
-    pub(crate) open_recently: bool,
-    /// The last seen position id. Should be passed to [msg::contracts::position_token::entry::QueryMsg::Tokens]
-    pub(crate) last_seen_position: Option<PositionId>,
-    /// The last closed position we've collected collateral for. (Do not reset this!)
-    pub(crate) last_closed: Option<ClosedPositionCursor>,
-    /// The latest deferred exec item we're waiting on.
-    pub(crate) deferred_exec: Option<DeferredExecId>,
+    /// The last seen position id. Should be passed to
+    /// [msg::contracts::position_token::entry::QueryMsg::Tokens]
+    pub(crate) tokens_start_after: Option<String>,
+    /// The last closed position cursor. Should be passed to
+    /// [msg::contracts::market::entry::QueryMsg::ClosedPositionHistory]
+    pub(crate) last_closed_cursor: Option<ClosedPositionCursor>,
+    /// The latest deferred exec item we're waiting on. Should be
+    /// passed to
+    /// [msg::contracts::market::entry::QueryMsg::ListDeferredExecs]
+    pub(crate) deferred_exec_start_after: Option<DeferredExecId>,
+    /// Last seen limit order. Should be passed to
+    /// [msg::contracts::market::entry::QueryMsg::LimitOrders]
+    pub(crate) limit_order_start_after: Option<OrderId>,
+    /// Last seen limit order. Should be passed to
+    /// [msg::contracts::market::entry::QueryMsg::LimitOrderHistory]
+    pub(crate) limit_order_history_next_start_after: Option<String>,
+    /// Total deposit collateral locked on orders
+    pub(crate) total_orders_collateral: Collateral,
     /// Total active collateral seen so far the open positions
     pub(crate) total_active_collateral: Collateral,
     /// Status of the Work information for processing open positions
     pub(crate) open_status: MarketWorkStatus,
     /// Status of the Work information for processing open positions
-    pub(crate) close_status: MarketWorkStatus
+    pub(crate) close_status: MarketWorkStatus,
+    /// Status of the Work information for processing orders
+    pub(crate) order_status: MarketWorkStatus,
+    /// Status of the Work information for deferred order items
+    pub(crate) deferred_exec_status: MarketWorkStatus,
+    /// Stats of this Market
+    pub(crate) stats: MarketStats
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub(crate) struct MarketStats {
+    /// Total profit so far in the closed positions
+    profit_in_usd: Usd,
+    /// Total loss so far in the closed postions
+    loss_in_usd: Usd,
+    /// Sum of deposit collateral of all open positions
+    tvl_open_positions_usd: Usd,
+    /// Sum of deposit collateral of all closed positions
+    tvl_closed_positions_usd: Usd
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -97,6 +123,8 @@ pub(crate) struct LpTokenValue {
     pub(crate) value: NonZero<Collateral>,
     /// Status of the value
     pub(crate) status: LpTokenStatus,
+    /// Timestamp the value was last computed
+    pub(crate) timestamp: Timestamp,
 }
 
 /// Status of [LpTokenValue]
@@ -128,9 +156,15 @@ pub(crate) enum QueueItem {
 /// Checks if the pause is status
 pub(crate) enum PauseStatus {
     /// Paused because queue items are processed
-    PauseQueueProcessed,
+    PauseQueueProcessed {
+        /// Does a stats reset required ?
+        reset_required: bool
+    },
     /// Paused because of earmarking
-    PauseReasonEarmarking,
+    PauseReasonEarmarking {
+        /// Does a stats reset required ?
+        reset_required: bool
+    },
     /// Not paused
     NotPaused,
 }
