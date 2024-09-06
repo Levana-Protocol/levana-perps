@@ -1,6 +1,6 @@
 use crate::{
     prelude::*,
-    types::{MarketInfo, MarketInfo, PositionInfo, State},
+    types::{MarketInfo, PositionInfo, State},
 };
 use anyhow::{Context, Result};
 use msg::contracts::market::{
