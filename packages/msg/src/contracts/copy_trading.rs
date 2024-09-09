@@ -51,6 +51,8 @@ pub struct Config {
     pub is_closed: bool,
     /// Is the contract being wind down ?
     pub is_winddown: bool,
+    /// Creation time of contract
+    pub created_at: Timestamp
 }
 
 /// Updates to configuration values.
@@ -96,11 +98,11 @@ pub enum ExecuteMsg {
     /// Update configuration values
     UpdateConfig(ConfigUpdate),
     /// Wind down the contract which prevents opening any new
-    /// positions, or depositos or collateral.
+    /// positions, or deposits or collateral.
     WindDown {},
     /// Shutdown the contract by closing all the open positions etc.
     Shutdown {},
-    /// Open position etc
+    /// Open position and various other messages
     OpenPosition {},
 }
 

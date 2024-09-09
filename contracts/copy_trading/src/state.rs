@@ -32,10 +32,6 @@ pub(crate) const LAST_PROCESSED_QUEUE_ID: Item<Option<&QueuePositionId>> =
 pub(crate) const LAST_PROCESSED_EARMARK_ID: Item<Option<&EarmarkId>> =
     Item::new("last-processed-earmark-id");
 
-/// Last processed deferred exec id
-pub(crate) const LAST_PROCESSED_DEFERRED_EXEC_ID: Item<Option<&DeferredExecId>> =
-    Item::new("last-processed-deferred-exec-id");
-
 /// Total collateral information
 pub(crate) const TOTALS: Item<Totals> = Item::new("totals");
 
