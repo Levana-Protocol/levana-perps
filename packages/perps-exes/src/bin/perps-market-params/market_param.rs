@@ -601,6 +601,7 @@ pub(crate) async fn compute_coin_dnfs(
         .context("Not able to do checked substraction on current time")?;
     loop {
         tracing::info!("Going to fetch market status from querier");
+        market_analysis_counter += 1;
         let market_config = http_app
             .fetch_market_status(&serve_opt.mainnet_factories[..])
             .await?;
@@ -646,13 +647,10 @@ pub(crate) async fn compute_coin_dnfs(
             };
             historical_data.append(dnf, max_leverage, now)?;
             let new_historical_data = historical_data.till_days(Some(serve_opt.cmc_data_age_days));
-            if (market_analysis_counter >= serve_opt.required_runs_slack_alert)
+            if (market_analysis_counter == serve_opt.required_runs_slack_alert)
                 && new_historical_data.is_ok()
                 && now.date_naive() != last_notified_date
             {
-                // Reset market_analysis counter to zero so that we
-                // can get future slack alerts!
-                market_analysis_counter = 0;
                 tracing::info!("Computing DNF using historical data");
                 let historical_market_dnf =
                     historical_data.compute_dnf(serve_opt.cmc_data_age_days)?;
@@ -690,7 +688,7 @@ pub(crate) async fn compute_coin_dnfs(
                 .await?;
         }
 
-        market_analysis_counter += 1;
+        market_analysis_counter %= serve_opt.required_runs_slack_alert;
         let duration = Duration::from_secs(serve_opt.recalcuation_frequency_in_seconds);
         tracing::info!("Completed market analysis, Going to sleep {duration:?}");
         tokio::time::sleep(duration).await;
