@@ -1,7 +1,8 @@
 use std::fmt::Display;
 
 use msg::contracts::market::{
-    deferred_execution::DeferredExecId, entry::ClosedPositionCursor, order::OrderId, position::PositionId
+    deferred_execution::DeferredExecId, entry::ClosedPositionCursor, order::OrderId,
+    position::PositionId,
 };
 use shared::{number::Usd, time::Timestamp};
 
@@ -35,40 +36,40 @@ pub(crate) struct Totals {
     pub(crate) shares: LpToken,
 }
 
+///
+
 /// Market information related to the work performed
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub(crate) struct MarketWorkInfo {
-    /// The last seen position id. Should be passed to
-    /// [msg::contracts::position_token::entry::QueryMsg::Tokens]
-    pub(crate) tokens_start_after: Option<String>,
-    /// The last closed position cursor. Should be passed to
-    /// [msg::contracts::market::entry::QueryMsg::ClosedPositionHistory]
-    pub(crate) last_closed_cursor: Option<ClosedPositionCursor>,
-    /// The latest deferred exec item we're waiting on. Should be
-    /// passed to
-    /// [msg::contracts::market::entry::QueryMsg::ListDeferredExecs]
-    pub(crate) deferred_exec_start_after: Option<DeferredExecId>,
-    /// Last seen limit order. Should be passed to
-    /// [msg::contracts::market::entry::QueryMsg::LimitOrders]
-    pub(crate) limit_order_start_after: Option<OrderId>,
-    /// Last seen limit order. Should be passed to
-    /// [msg::contracts::market::entry::QueryMsg::LimitOrderHistory]
-    pub(crate) limit_order_history_next_start_after: Option<String>,
-    /// Total deposit collateral locked on orders
-    pub(crate) total_orders_collateral: Collateral,
-    /// Total active collateral seen so far the open positions
-    pub(crate) total_active_collateral: Collateral,
-    /// Status of the Work information for processing open positions
-    pub(crate) open_status: MarketWorkStatus,
-    /// Status of the Work information for processing open positions
-    pub(crate) close_status: MarketWorkStatus,
-    /// Status of the Work information for processing orders
-    pub(crate) order_status: MarketWorkStatus,
-    /// Status of the Work information for deferred order items
-    pub(crate) deferred_exec_status: MarketWorkStatus,
-    /// Stats of this Market
-    pub(crate) stats: MarketStats
+    pub(crate) processing_status: ProcessingStatus,
+    /// Total active collateral in all open positions and pending limit orders.
+    pub(crate) active_collateral: Collateral,
 }
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub enum ProcessingStatus {
+    OpenPositions(Option<String>),
+    Deferred(Option<DeferredExecId>),
+    LimitOrder(Option<OrderId>),
+    LimitOrderHistory(Option<String>),
+}
+
+// /// The last seen position id. Should be passed to
+// /// [msg::contracts::position_token::entry::QueryMsg::Tokens]
+// pub(crate) tokens_start_after: Option<String>,
+// /// The last closed position cursor. Should be passed to
+// /// [msg::contracts::market::entry::QueryMsg::ClosedPositionHistory]
+// pub(crate) last_closed_cursor: Option<ClosedPositionCursor>,
+// /// The latest deferred exec item we're waiting on. Should be
+// /// passed to
+// /// [msg::contracts::market::entry::QueryMsg::ListDeferredExecs]
+// pub(crate) deferred_exec_start_after: Option<DeferredExecId>,
+// /// Last seen limit order. Should be passed to
+// /// [msg::contracts::market::entry::QueryMsg::LimitOrders]
+// pub(crate) limit_order_start_after: Option<OrderId>,
+// /// Last seen limit order. Should be passed to
+// /// [msg::contracts::market::entry::QueryMsg::LimitOrderHistory]
+// pub(crate) limit_order_history_next_start_after: Option<String>,
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub(crate) struct MarketStats {
