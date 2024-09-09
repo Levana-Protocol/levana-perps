@@ -32,7 +32,8 @@ pub struct InstantiateMsg {
 pub struct Config {
     /// Factory we will allow trading on
     pub factory: Addr,
-    /// Administrator of the contract, allowed to make config updates
+    /// Administrator of the contract. Should be the factory contract
+    /// which initializes this as that will migrate this contract.
     pub admin: Addr,
     /// Pending administrator, ready to be accepted, if any.
     pub pending_admin: Option<Addr>,
@@ -40,17 +41,12 @@ pub struct Config {
     pub leader: Addr,
     /// Name given to this copy_trading pool
     pub name: String,
-    /// Token accepted by the contract
-    pub token: crate::token::Token,
+    /// Description of the copy_trading pool. Not more than 128
+    /// characters.
+    pub description: String,
     /// Commission rate for the leader. Only paid when trade is
     /// profitable.
     pub commission_rate: Decimal256,
-    /// Minimum balance that the leader needs to maintain at all time
-    pub min_balance: NonZero<Collateral>,
-    /// Is the contract closed ?
-    pub is_closed: bool,
-    /// Is the contract being wind down ?
-    pub is_winddown: bool,
     /// Creation time of contract
     pub created_at: Timestamp
 }
@@ -63,7 +59,7 @@ pub struct Config {
 #[allow(missing_docs)]
 pub struct ConfigUpdate {
     pub name: String,
-    pub token: crate::token::Token,
+    pub description: String,
     pub commission_rate: Decimal256,
     pub min_balance: NonZero<Collateral>,
 }
@@ -82,7 +78,10 @@ pub enum ExecuteMsg {
         msg: Binary,
     },
     /// Deposit funds to the contract
-    Deposit {},
+    Deposit {
+        /// Token being deposited
+        token: crate::token::Token
+    },
     /// Withdraw funds from a given market
     Withdraw {
         /// The number of LP shares to remove

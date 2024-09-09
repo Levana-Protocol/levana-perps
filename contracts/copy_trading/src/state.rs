@@ -11,7 +11,7 @@ use crate::{
 pub(crate) const CONFIG: Item<Config> = Item::new("config");
 
 /// Shares held per wallet
-pub(crate) const SHARES: Map<&Addr, NonZero<LpToken>> = Map::new("shares");
+pub(crate) const SHARES: Map<(&Token, &Addr), NonZero<LpToken>> = Map::new("shares");
 
 /// The current pause status
 pub(crate) const PAUSE_STATUS: Item<PauseStatus> = Item::new("pause-status");
@@ -33,7 +33,7 @@ pub(crate) const LAST_PROCESSED_EARMARK_ID: Item<Option<&EarmarkId>> =
     Item::new("last-processed-earmark-id");
 
 /// Total collateral information
-pub(crate) const TOTALS: Item<Totals> = Item::new("totals");
+pub(crate) const TOTALS: Map<&Token, Totals> = Map::new("totals");
 
 /// LpToken Value
 pub(crate) const LP_TOKEN_VALUE: Item<LpTokenValue> = Item::new("lp-token-value");
@@ -43,3 +43,5 @@ pub(crate) const MARKET_WORK_INFO: Map<&MarketId, MarketWorkInfo> = Map::new("ma
 
 /// Local cache of markets information
 pub(crate) const MARKETS: Map<&MarketId, MarketInfo> = Map::new("markets");
+
+// todo:Probably deposit leaders shares separately since it's always going to be accessed whenever someone deposit

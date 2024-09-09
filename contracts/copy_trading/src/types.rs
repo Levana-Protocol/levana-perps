@@ -74,7 +74,7 @@ pub(crate) struct MarketWorkInfo {
 pub(crate) struct MarketStats {
     /// Total profit so far in the closed positions
     profit_in_usd: Usd,
-    /// Total loss so far in the closed postions
+    /// Total loss so far in the closed positions
     loss_in_usd: Usd,
     /// Sum of deposit collateral of all open positions
     tvl_open_positions_usd: Usd,
@@ -151,6 +151,8 @@ pub(crate) enum QueueItem {
     Deposit { funds: NonZero<Collateral> },
     /// Withdraw via LpToken
     Withdrawal { tokens: NonZero<LpToken> },
+    /// Open Position etc. etc.
+    OpenPosition {}
 }
 
 /// Checks if the pause is status

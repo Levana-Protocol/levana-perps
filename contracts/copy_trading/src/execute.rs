@@ -98,8 +98,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     let (state, storage) = State::load_mut(deps, env)?;
     match msg {
         ExecuteMsg::Receive { .. } => Err(anyhow!("Cannot perform a receive within a receive")),
-        ExecuteMsg::Deposit {  } => {
-            let funds = funds.require_some(&state.config.token)?;
+        ExecuteMsg::Deposit {
+            token
+        } => {
+            let funds = funds.require_some(&token)?;
             deposit(storage, state, sender, funds)
          }
         _ => panic!("Not implemented yet"),
@@ -112,15 +114,15 @@ fn deposit(
     sender: Addr,
     funds: NonZero<Collateral>,
  ) -> Result<Response> {
-    let sender_shares = crate::state::SHARES
-        .may_load(storage, &sender)
-        .context("Could not load old shares")?
-        .map(NonZero::raw)
-        .unwrap_or_default();
-    let mut totals = crate::state::TOTALS
-        .may_load(storage)
-        .context("Could not load old total shares")?
-        .unwrap_or_default();
+    // let sender_shares = crate::state::SHARES
+    //     .may_load(storage, &sender)
+    //     .context("Could not load old shares")?
+    //     .map(NonZero::raw)
+    //     .unwrap_or_default();
+    // let mut totals = crate::state::TOTALS
+    //     .may_load(storage)
+    //     .context("Could not load old total shares")?
+    //     .unwrap_or_default();
     // let position_info = PositionsInfo::load(&state, &market)?;
     // let new_shares = totals.add_collateral(funds, &position_info)?;
     // let sender_shares = new_shares.checked_add(sender_shares)?;
