@@ -143,6 +143,7 @@ fn compute_lp_token_value(
     state: State,
     token: Token,
 ) -> Result<Response> {
+    // todo: track operations
     let token_value = crate::state::LP_TOKEN_VALUE
         .may_load(storage, &token)
         .context("Could not load LP_TOKEN_VALE")?
@@ -152,10 +153,32 @@ fn compute_lp_token_value(
         return Ok(Response::new());
     }
     let all_markets = state.load_all_market_ids()?;
+    let market_ids = state.load_market_ids_with_token(storage, token)?;
     for market_id in &all_markets {
-        let market_info = state.load_cache_market_info(storage, market_id)?;
-
+        process_single_market(storage, &state, market_id);
     }
+    validate_all_markets(storage, &state, &all_markets)?;
+    // Calculate LP token value and update it
+    todo!()
+}
 
+fn validate_all_markets(
+    storage: &mut dyn Storage,
+    state: &State<'_>,
+    all_markets: &Vec<MarketId>,
+) -> Result<()> {
+    // Fetch all open position and validate that traked open positions isn't changed
+    // Fetch all limit orders and validae that it isn't changed
+    // If it changes, return error
+    todo!()
+}
+
+fn process_single_market(
+    storage: &mut dyn Storage,
+    state: &State<'_>,
+    market_id: &MarketId,
+) -> Result<()> {
+    // Fetch all open positions, track total open positions
+    // Fetch all limit orders, track total limit order
     todo!()
 }
