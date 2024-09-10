@@ -190,6 +190,31 @@ pub enum Token {
     Cw20(Addr),
 }
 
+impl Token {
+    /// Is it same as market token ?
+    pub fn is_same(&self, token: &crate::token::Token) -> bool {
+        match token {
+            crate::token::Token::Cw20 {
+                addr,
+                decimal_places,
+            } => match self {
+                Token::Native(_) => false,
+                Token::Cw20(cw20_addr) => {
+                    let cw20_addr: &RawAddr = &cw20_addr.into();
+                    cw20_addr == addr
+                }
+            },
+            crate::token::Token::Native {
+                denom,
+                decimal_places,
+            } => match self {
+                Token::Native(native_denom) => *native_denom == *denom,
+                Token::Cw20(_) => false,
+            },
+        }
+    }
+}
+
 impl<'a> PrimaryKey<'a> for Token {
     type Prefix = ();
     type SubPrefix = ();

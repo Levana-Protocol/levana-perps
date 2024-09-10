@@ -111,7 +111,6 @@ impl<'a> State<'a> {
         Ok((info, false))
     }
 
-
     pub(crate) fn load_cache_market_info(
         &self,
         storage: &mut dyn Storage,
@@ -124,6 +123,22 @@ impl<'a> State<'a> {
                 .context("Could not save cached markets info")?;
         }
         Ok(market)
+    }
+
+    pub(crate) fn load_market_ids_with_token(
+        &self,
+        storage: &mut dyn Storage,
+        token: Token,
+    ) -> Result<Vec<MarketId>> {
+        let markets = self.load_all_market_ids()?;
+        let mut result = vec![];
+        for market_id in markets {
+            let market_info = self.load_cache_market_info(storage, &market_id)?;
+            if token.is_same(&market_info.token) {
+                result.push(market_id);
+            }
+        }
+        Ok(result)
     }
 }
 
