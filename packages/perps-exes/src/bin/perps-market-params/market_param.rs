@@ -1,5 +1,6 @@
 use std::{
     cmp::Ordering,
+    collections::HashMap,
     fmt::Display,
     fs::File,
     io::BufReader,
@@ -594,11 +595,7 @@ pub(crate) async fn compute_coin_dnfs(
     let http_app = HttpApp::new(Some(serve_opt.slack_webhook.clone()), opt.cmc_key.clone());
     let data_dir = serve_opt.cmc_data_dir.clone();
     let mut market_analysis_counter = 0;
-    let mut last_notified_date = Utc::now()
-        .date_naive()
-        // Use some random number for this to make last_notified_date be prior to the current date
-        .checked_sub_days(Days::new(1))
-        .context("Not able to do checked substraction on current time")?;
+    let mut last_notified_dates: HashMap<MarketId, NaiveDate> = HashMap::new();
     loop {
         tracing::info!("Going to fetch market status from querier");
         market_analysis_counter += 1;
@@ -647,9 +644,9 @@ pub(crate) async fn compute_coin_dnfs(
             };
             historical_data.append(dnf, max_leverage, now)?;
             let new_historical_data = historical_data.till_days(Some(serve_opt.cmc_data_age_days));
-            if (market_analysis_counter == serve_opt.required_runs_slack_alert)
+            if (market_analysis_counter >= serve_opt.required_runs_slack_alert)
                 && new_historical_data.is_ok()
-                && now.date_naive() != last_notified_date
+                && Some(&now.date_naive()) != last_notified_dates.get(market_id)
             {
                 tracing::info!("Computing DNF using historical data");
                 let historical_market_dnf =
@@ -669,7 +666,9 @@ pub(crate) async fn compute_coin_dnfs(
                     .write()
                     .insert(market_id.clone(), dnf_notify);
                 historical_data = new_historical_data?;
-                last_notified_date = now.date_naive();
+
+                let entry = last_notified_dates.entry(market_id.to_owned()).or_default();
+                *entry = now.date_naive();
             }
             historical_data.save(market_id, data_dir.clone())?;
 
