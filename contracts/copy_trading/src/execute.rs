@@ -98,12 +98,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     let (state, storage) = State::load_mut(deps, env)?;
     match msg {
         ExecuteMsg::Receive { .. } => Err(anyhow!("Cannot perform a receive within a receive")),
-        ExecuteMsg::Deposit {
-            token
-        } => {
+        ExecuteMsg::Deposit { token } => {
             let funds = funds.require_some(&token)?;
             deposit(storage, state, sender, funds)
-         }
+        }
         _ => panic!("Not implemented yet"),
     }
 }
@@ -113,7 +111,7 @@ fn deposit(
     state: State,
     sender: Addr,
     funds: NonZero<Collateral>,
- ) -> Result<Response> {
+) -> Result<Response> {
     // let sender_shares = crate::state::SHARES
     //     .may_load(storage, &sender)
     //     .context("Could not load old shares")?
@@ -136,5 +134,21 @@ fn deposit(
     //         .add_attribute("collateral", funds.to_string())
     //         .add_attribute("new-shares", new_shares.to_string()),
     // ))
-     todo!()
+    todo!()
+}
+
+fn compute_lp_token_value(
+    storage: &mut dyn Storage,
+    state: State,
+    token: Token,
+) -> Result<Response> {
+    let token_value = crate::state::LP_TOKEN_VALUE
+        .may_load(storage, &token)
+        .context("Could not load LP_TOKEN_VALE")?.unwrap_or_default();
+    let token_valid = token_value.status.valid();
+    if token_valid {
+        return Ok(Response::new())
+    }
+
+    todo!()
 }

@@ -2,7 +2,8 @@
 
 use std::fmt::Display;
 
-use cosmwasm_std::{Addr, Binary, Decimal256, Uint128, Uint64};
+use cosmwasm_std::{Addr, Binary, Decimal256, StdError, StdResult, Uint128, Uint64};
+use cw_storage_plus::{Key, KeyDeserialize, PrimaryKey};
 use shared::{
     number::{Collateral, LpToken, NonZero, Signed, Usd},
     storage::{MarketId, RawAddr},
@@ -48,7 +49,7 @@ pub struct Config {
     /// profitable.
     pub commission_rate: Decimal256,
     /// Creation time of contract
-    pub created_at: Timestamp
+    pub created_at: Timestamp,
 }
 
 /// Updates to configuration values.
@@ -80,7 +81,7 @@ pub enum ExecuteMsg {
     /// Deposit funds to the contract
     Deposit {
         /// Token being deposited
-        token: crate::token::Token
+        token: crate::token::Token,
     },
     /// Withdraw funds from a given market
     Withdraw {
@@ -189,6 +190,33 @@ pub enum Token {
     Cw20(Addr),
 }
 
+impl<'a> PrimaryKey<'a> for Token {
+    type Prefix = ();
+    type SubPrefix = ();
+    type Suffix = Self;
+    type SuperSuffix = Self;
+
+    fn key(&self) -> Vec<Key> {
+        let bytes = match self {
+            Token::Native(native) => native.as_bytes(),
+            Token::Cw20(cw20) => cw20.as_bytes(),
+        };
+        let key = Key::Ref(bytes);
+
+        vec![key]
+    }
+}
+
+impl KeyDeserialize for Token {
+    type Output = Token;
+
+    const KEY_ELEMS: u16 = 1;
+
+    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
+        todo!()
+    }
+}
+
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -256,11 +284,14 @@ pub enum WorkResp {
 /// Work Description
 pub enum WorkDescription {
     /// Calculate LP token value
-    ComputeLpTokenValue {},
+    ComputeLpTokenValue {
+        /// Token
+        token: Token,
+    },
     /// Process market
     ProcessMarket {
         /// Market id
-        id: MarketId
+        id: MarketId,
     },
     /// Process Queue item
     ProcessQueueItem {
@@ -273,7 +304,7 @@ pub enum WorkDescription {
         id: EarmarkId,
     },
     /// Reset market specific statistics
-    RestStats {}
+    RestStats {},
 }
 
 /// Queue position number
