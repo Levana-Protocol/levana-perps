@@ -1,4 +1,5 @@
 use anyhow::{anyhow, ensure, Context, Result};
+use msg::contracts::factory::entry::MarketsResp;
 
 use crate::{prelude::*, types::State};
 
@@ -144,10 +145,16 @@ fn compute_lp_token_value(
 ) -> Result<Response> {
     let token_value = crate::state::LP_TOKEN_VALUE
         .may_load(storage, &token)
-        .context("Could not load LP_TOKEN_VALE")?.unwrap_or_default();
+        .context("Could not load LP_TOKEN_VALE")?
+        .unwrap_or_default();
     let token_valid = token_value.status.valid();
     if token_valid {
-        return Ok(Response::new())
+        return Ok(Response::new());
+    }
+    let all_markets = state.load_all_market_ids()?;
+    for market_id in &all_markets {
+        let market_info = state.load_cache_market_info(storage, market_id)?;
+
     }
 
     todo!()
