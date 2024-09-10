@@ -72,10 +72,7 @@ fn balance(
                 markets.push(MarketBalance {
                     token: market_info.token,
                     shares,
-                    collateral: NonZero::new(totals.shares_to_collateral(shares.raw(), &pos)?)
-                        .with_context(|| {
-                            format!("Ended up with 0 collateral for market {market_id}")
-                        })?,
+                    collateral: totals.shares_to_collateral(shares.raw(), &pos)?,
                     pool_size: NonZero::new(totals.shares).with_context(|| {
                         format!("No shares found for pool with share entries: {market_id}")
                     })?,

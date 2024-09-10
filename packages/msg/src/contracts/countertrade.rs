@@ -190,8 +190,10 @@ pub struct MarketBalance {
     pub token: crate::token::Token,
     /// Shares of the pool held by this LP
     pub shares: NonZero<LpToken>,
-    /// Collateral equivalent of these shares
-    pub collateral: NonZero<Collateral>,
+    /// Collateral equivalent of these shares. This can be zero if
+    /// countertrade contract loses all the money for that specific
+    /// market.
+    pub collateral: Collateral,
     /// Size of the entire pool, in LP tokens
     pub pool_size: NonZero<LpToken>,
 }
