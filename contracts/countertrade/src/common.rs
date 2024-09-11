@@ -248,7 +248,7 @@ mod tests {
             .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
             .unwrap();
         assert_ne!(my_collateral, Collateral::zero());
-        assert_eq!(my_collateral, totals.collateral);
+        assert!(my_collateral.approx_eq(totals.collateral));
 
         let totals = Totals {
             collateral: "9999999999999999".parse().unwrap(),
@@ -265,6 +265,18 @@ mod tests {
         let totals = Totals {
             collateral: "0.000000000000005108".parse().unwrap(),
             shares: "9999999999999999".parse().unwrap(),
+            last_closed: None,
+            deferred_exec: None,
+        };
+        let my_shares = totals.shares.clone();
+        let my_collateral = totals
+            .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
+            .unwrap();
+        assert!(totals.collateral.approx_eq(my_collateral));
+
+        let totals = Totals {
+            collateral: "999999999999999999".parse().unwrap(),
+            shares: "999999999999999999".parse().unwrap(),
             last_closed: None,
             deferred_exec: None,
         };

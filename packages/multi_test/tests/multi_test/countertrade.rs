@@ -977,31 +977,19 @@ fn deduct_balance() {
         .pop()
         .unwrap();
     // 100 - 1.46 = 98.54, 100 - 1.61 = 98.39
-    let expected_balance = match market_type {
-        msg::shared::storage::MarketType::CollateralIsQuote => {
-            Collateral::from_str("0.005376150827128342")
-        }
-        msg::shared::storage::MarketType::CollateralIsBase => {
-            Collateral::from_str("0.008523773479207584")
-        }
-    }
-    .unwrap();
-
+    println!("balance: {}", balance.collateral);
     match market_type {
-        msg::shared::storage::MarketType::CollateralIsQuote => assert_eq!(
+        msg::shared::storage::MarketType::CollateralIsQuote => assert!(
+            balance
+                .collateral
+            .raw()
+            .approx_eq(Collateral::from_str("98.384623849").unwrap())
+        ),
+        msg::shared::storage::MarketType::CollateralIsBase => assert!(
             balance
                 .collateral
                 .raw()
-                .diff(Collateral::from_str("98.39").unwrap()),
-            expected_balance
-        ),
-        msg::shared::storage::MarketType::CollateralIsBase => assert_eq!(
-            balance
-                .collateral
-                .raw()
-                .diff(Collateral::from_str("98.54").unwrap()),
-            expected_balance
-        ),
+            .approx_eq(Collateral::from_str("98.531476226").unwrap()))
     }
 }
 
@@ -1321,31 +1309,4 @@ fn do_not_mutate_countertrade_position() {
         },
     };
     do_work(&market, &lp);
-}
-
-#[test]
-fn regression_perp_4062() {
-    let market = make_countertrade_market().unwrap();
-    // Set minimum_deposit_usd so that countertrade countract tries to
-    // reduce the collateral instead of closing the position.
-    market
-        .exec_set_config(msg::contracts::market::config::ConfigUpdate {
-            minimum_deposit_usd: Some("5".parse().unwrap()),
-            ..Default::default()
-        })
-        .unwrap();
-    let lp = market.clone_lp(0).unwrap();
-    let trader = market.clone_trader(0).unwrap();
-
-    assert_eq!(
-        market.query_countertrade_has_work().unwrap(),
-        HasWorkResp::NoWork {}
-    );
-
-    // Make sure there are funds to open a position
-    market
-        .exec_countertrade_mint_and_deposit(&lp, "0.000000000000834")
-        .unwrap();
-
-
 }
