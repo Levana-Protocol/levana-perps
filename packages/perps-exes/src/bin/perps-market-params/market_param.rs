@@ -72,9 +72,9 @@ impl MarketsConfig {
 pub(crate) fn dnf_sensitivity_to_max_leverage(dnf_sensitivity: DnfInUsd) -> MaxLeverage {
     let dnf_sensitivity = dnf_sensitivity.0;
     let million = 1000000.0;
-    let leverage = if dnf_sensitivity < (2.0 * million) {
+    let leverage = if dnf_sensitivity < (20.0 * million) {
         4.0
-    } else if dnf_sensitivity >= (2.0 * million) && dnf_sensitivity < (50.0 * million) {
+    } else if dnf_sensitivity >= (20.0 * million) && dnf_sensitivity < (50.0 * million) {
         10.0
     } else if dnf_sensitivity >= (50.0 * million) && dnf_sensitivity < (200.0 * million) {
         30.0
@@ -450,8 +450,13 @@ pub(crate) struct DnfRecord {
 }
 
 impl HistoricalData {
-    pub(crate) fn save(&self, market_id: &MarketId, data_dir: PathBuf) -> anyhow::Result<()> {
-        save_historical_data(market_id, data_dir, self.clone(), None)
+    pub(crate) fn save(
+        &self,
+        market_id: &MarketId,
+        data_dir: PathBuf,
+        until: Option<u16>,
+    ) -> anyhow::Result<()> {
+        save_historical_data(market_id, data_dir, self.clone(), until)
     }
 
     pub(crate) fn append(
@@ -670,7 +675,11 @@ pub(crate) async fn compute_coin_dnfs(
                 let entry = last_notified_dates.entry(market_id.to_owned()).or_default();
                 *entry = now.date_naive();
             }
-            historical_data.save(market_id, data_dir.clone())?;
+            historical_data.save(
+                market_id,
+                data_dir.clone(),
+                Some(serve_opt.cmc_data_age_days),
+            )?;
 
             if serve_opt.cmc_wait_seconds > 0 {
                 tracing::info!(
@@ -689,7 +698,7 @@ pub(crate) async fn compute_coin_dnfs(
 
         market_analysis_counter %= serve_opt.required_runs_slack_alert;
         let duration = Duration::from_secs(serve_opt.recalcuation_frequency_in_seconds);
-        tracing::info!("Completed market analysis, Going to sleep {duration:?}");
+        tracing::info!("Completed market analysis (Round: {market_analysis_counter}), Going to sleep {duration:?}");
         tokio::time::sleep(duration).await;
     }
 }
