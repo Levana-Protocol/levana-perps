@@ -1,5 +1,6 @@
 use std::{
     cmp::Ordering,
+    collections::HashMap,
     fmt::Display,
     fs::File,
     io::BufReader,
@@ -594,8 +595,10 @@ pub(crate) async fn compute_coin_dnfs(
     let http_app = HttpApp::new(Some(serve_opt.slack_webhook.clone()), opt.cmc_key.clone());
     let data_dir = serve_opt.cmc_data_dir.clone();
     let mut market_analysis_counter = 0;
+    let mut last_notified_dates: HashMap<MarketId, NaiveDate> = HashMap::new();
     loop {
         tracing::info!("Going to fetch market status from querier");
+        market_analysis_counter += 1;
         let market_config = http_app
             .fetch_market_status(&serve_opt.mainnet_factories[..])
             .await?;
@@ -641,12 +644,10 @@ pub(crate) async fn compute_coin_dnfs(
             };
             historical_data.append(dnf, max_leverage, now)?;
             let new_historical_data = historical_data.till_days(Some(serve_opt.cmc_data_age_days));
-            if (market_analysis_counter == serve_opt.required_runs_slack_alert)
+            if (market_analysis_counter >= serve_opt.required_runs_slack_alert)
                 && new_historical_data.is_ok()
+                && Some(&now.date_naive()) != last_notified_dates.get(market_id)
             {
-                // Reset market_analysis counter to zero so that we
-                // can get future slack alerts!
-                market_analysis_counter = 0;
                 tracing::info!("Computing DNF using historical data");
                 let historical_market_dnf =
                     historical_data.compute_dnf(serve_opt.cmc_data_age_days)?;
@@ -665,6 +666,9 @@ pub(crate) async fn compute_coin_dnfs(
                     .write()
                     .insert(market_id.clone(), dnf_notify);
                 historical_data = new_historical_data?;
+
+                let entry = last_notified_dates.entry(market_id.to_owned()).or_default();
+                *entry = now.date_naive();
             }
             historical_data.save(market_id, data_dir.clone())?;
 
@@ -683,7 +687,7 @@ pub(crate) async fn compute_coin_dnfs(
                 .await?;
         }
 
-        market_analysis_counter += 1;
+        market_analysis_counter %= serve_opt.required_runs_slack_alert;
         let duration = Duration::from_secs(serve_opt.recalcuation_frequency_in_seconds);
         tracing::info!("Completed market analysis, Going to sleep {duration:?}");
         tokio::time::sleep(duration).await;
