@@ -1,4 +1,5 @@
 use anyhow::{anyhow, ensure, Context, Result};
+use msg::contracts::factory::entry::MarketsResp;
 
 use crate::{prelude::*, types::State};
 
@@ -98,12 +99,10 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     let (state, storage) = State::load_mut(deps, env)?;
     match msg {
         ExecuteMsg::Receive { .. } => Err(anyhow!("Cannot perform a receive within a receive")),
-        ExecuteMsg::Deposit {
-            token
-        } => {
+        ExecuteMsg::Deposit { token } => {
             let funds = funds.require_some(&token)?;
             deposit(storage, state, sender, funds)
-         }
+        }
         _ => panic!("Not implemented yet"),
     }
 }
@@ -113,7 +112,7 @@ fn deposit(
     state: State,
     sender: Addr,
     funds: NonZero<Collateral>,
- ) -> Result<Response> {
+) -> Result<Response> {
     // let sender_shares = crate::state::SHARES
     //     .may_load(storage, &sender)
     //     .context("Could not load old shares")?
@@ -136,5 +135,50 @@ fn deposit(
     //         .add_attribute("collateral", funds.to_string())
     //         .add_attribute("new-shares", new_shares.to_string()),
     // ))
-     todo!()
+    todo!()
+}
+
+fn compute_lp_token_value(
+    storage: &mut dyn Storage,
+    state: State,
+    token: Token,
+) -> Result<Response> {
+    // todo: track operations
+    let token_value = crate::state::LP_TOKEN_VALUE
+        .may_load(storage, &token)
+        .context("Could not load LP_TOKEN_VALE")?
+        .unwrap_or_default();
+    let token_valid = token_value.status.valid();
+    if token_valid {
+        return Ok(Response::new());
+    }
+    let all_markets = state.load_all_market_ids()?;
+    let market_ids = state.load_market_ids_with_token(storage, token)?;
+    for market_id in &all_markets {
+        process_single_market(storage, &state, market_id);
+    }
+    validate_all_markets(storage, &state, &all_markets)?;
+    // Calculate LP token value and update it
+    todo!()
+}
+
+fn validate_all_markets(
+    storage: &mut dyn Storage,
+    state: &State<'_>,
+    all_markets: &Vec<MarketId>,
+) -> Result<()> {
+    // Fetch all open position and validate that traked open positions isn't changed
+    // Fetch all limit orders and validae that it isn't changed
+    // If it changes, return error
+    todo!()
+}
+
+fn process_single_market(
+    storage: &mut dyn Storage,
+    state: &State<'_>,
+    market_id: &MarketId,
+) -> Result<()> {
+    // Fetch all open positions, track total open positions
+    // Fetch all limit orders, track total limit order
+    todo!()
 }

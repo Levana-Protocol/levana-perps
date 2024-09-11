@@ -1,7 +1,8 @@
 use std::fmt::Display;
 
 use msg::contracts::market::{
-    deferred_execution::DeferredExecId, entry::ClosedPositionCursor, order::OrderId, position::PositionId
+    deferred_execution::DeferredExecId, entry::ClosedPositionCursor, order::OrderId,
+    position::PositionId,
 };
 use shared::{number::Usd, time::Timestamp};
 
@@ -38,58 +39,27 @@ pub(crate) struct Totals {
 /// Market information related to the work performed
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub(crate) struct MarketWorkInfo {
+    pub(crate) processing_status: ProcessingStatus,
+    /// Total active collateral in all open positions and pending limit orders.
+    pub(crate) active_collateral: Collateral,
+}
+
+/// Processing Status
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub enum ProcessingStatus {
     /// The last seen position id. Should be passed to
     /// [msg::contracts::position_token::entry::QueryMsg::Tokens]
-    pub(crate) tokens_start_after: Option<String>,
-    /// The last closed position cursor. Should be passed to
-    /// [msg::contracts::market::entry::QueryMsg::ClosedPositionHistory]
-    pub(crate) last_closed_cursor: Option<ClosedPositionCursor>,
+    OpenPositions(Option<String>),
     /// The latest deferred exec item we're waiting on. Should be
     /// passed to
     /// [msg::contracts::market::entry::QueryMsg::ListDeferredExecs]
-    pub(crate) deferred_exec_start_after: Option<DeferredExecId>,
+    Deferred(Option<DeferredExecId>),
     /// Last seen limit order. Should be passed to
     /// [msg::contracts::market::entry::QueryMsg::LimitOrders]
-    pub(crate) limit_order_start_after: Option<OrderId>,
+    LimitOrder(Option<OrderId>),
     /// Last seen limit order. Should be passed to
     /// [msg::contracts::market::entry::QueryMsg::LimitOrderHistory]
-    pub(crate) limit_order_history_next_start_after: Option<String>,
-    /// Total deposit collateral locked on orders
-    pub(crate) total_orders_collateral: Collateral,
-    /// Total active collateral seen so far the open positions
-    pub(crate) total_active_collateral: Collateral,
-    /// Status of the Work information for processing open positions
-    pub(crate) open_status: MarketWorkStatus,
-    /// Status of the Work information for processing open positions
-    pub(crate) close_status: MarketWorkStatus,
-    /// Status of the Work information for processing orders
-    pub(crate) order_status: MarketWorkStatus,
-    /// Status of the Work information for deferred order items
-    pub(crate) deferred_exec_status: MarketWorkStatus,
-    /// Stats of this Market
-    pub(crate) stats: MarketStats
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-pub(crate) struct MarketStats {
-    /// Total profit so far in the closed positions
-    profit_in_usd: Usd,
-    /// Total loss so far in the closed positions
-    loss_in_usd: Usd,
-    /// Sum of deposit collateral of all open positions
-    tvl_open_positions_usd: Usd,
-    /// Sum of deposit collateral of all closed positions
-    tvl_closed_positions_usd: Usd
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-pub(crate) enum MarketWorkStatus {
-    /// Still pending
-    Pending,
-    /// Finished
-    Finished,
-    /// Not started
-    NotStarted
+    LimitOrderHistory(Option<String>),
 }
 
 /// Specific position information
@@ -117,24 +87,40 @@ pub(crate) struct WalletFund {
 }
 
 /// LpToken Value
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Default)]
 pub(crate) struct LpTokenValue {
     /// Value of one LpToken
-    pub(crate) value: NonZero<Collateral>,
+    pub(crate) value: Collateral,
     /// Status of the value
     pub(crate) status: LpTokenStatus,
-    /// Timestamp the value was last computed
-    pub(crate) timestamp: Timestamp,
 }
 
 /// Status of [LpTokenValue]
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub(crate) enum LpTokenStatus {
     /// Recently computed and valid for other computations
-    Valid,
+    Valid {
+        /// Timestamp the value was last computed
+        timestamp: Timestamp
+    },
     ////Outdated because of open positions etc. Need to be computed
     /// again.
     Outdated,
+}
+
+impl Default for LpTokenStatus {
+    fn default() -> Self {
+        LpTokenStatus::Outdated
+    }
+}
+
+impl LpTokenStatus {
+    pub(crate) fn valid(&self) -> bool {
+        match self {
+            LpTokenStatus::Valid { .. } => true,
+            LpTokenStatus::Outdated => false,
+        }
+    }
 }
 
 /// Queue position
