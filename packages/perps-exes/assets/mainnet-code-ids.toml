@@ -412,3 +412,11 @@ hash = "63af2fbb3e8f2bca901bc7b2e6233307a7e9332095c5fa5427eb0663e5ca3306"
 osmosis-mainnet = 1040
 injective-mainnet = 1094
 neutron-mainnet = 1826
+
+[[hashes]]
+contract-type = "market"
+gitrev = "0ec575544cc971c6c2d80e571f441409895482af"
+hash = "caeff1ecb9318fbffb0c49bf4436beaccec8ead2d187a40602951029fcfa102b"
+
+[hashes.code-ids]
+osmosis-mainnet = 1064

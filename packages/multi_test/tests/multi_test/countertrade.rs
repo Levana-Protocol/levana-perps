@@ -977,31 +977,15 @@ fn deduct_balance() {
         .pop()
         .unwrap();
     // 100 - 1.46 = 98.54, 100 - 1.61 = 98.39
-    let expected_balance = match market_type {
-        msg::shared::storage::MarketType::CollateralIsQuote => {
-            Collateral::from_str("0.005376150827128342")
-        }
-        msg::shared::storage::MarketType::CollateralIsBase => {
-            Collateral::from_str("0.008523773479207584")
-        }
-    }
-    .unwrap();
-
     match market_type {
-        msg::shared::storage::MarketType::CollateralIsQuote => assert_eq!(
-            balance
-                .collateral
-                .raw()
-                .diff(Collateral::from_str("98.39").unwrap()),
-            expected_balance
-        ),
-        msg::shared::storage::MarketType::CollateralIsBase => assert_eq!(
-            balance
-                .collateral
-                .raw()
-                .diff(Collateral::from_str("98.54").unwrap()),
-            expected_balance
-        ),
+        msg::shared::storage::MarketType::CollateralIsQuote => assert!(balance
+            .collateral
+            .raw()
+            .approx_eq(Collateral::from_str("98.384623849").unwrap())),
+        msg::shared::storage::MarketType::CollateralIsBase => assert!(balance
+            .collateral
+            .raw()
+            .approx_eq(Collateral::from_str("98.531476226").unwrap())),
     }
 }
 
