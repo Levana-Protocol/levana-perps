@@ -243,7 +243,7 @@ mod tests {
             last_closed: None,
             deferred_exec: None,
         };
-        let my_shares = totals.shares.clone();
+        let my_shares = totals.shares;
         let my_collateral = totals
             .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
             .unwrap();
@@ -256,7 +256,7 @@ mod tests {
             last_closed: None,
             deferred_exec: None,
         };
-        let my_shares = totals.shares.clone();
+        let my_shares = totals.shares;
         let my_collateral = totals
             .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
             .unwrap();
@@ -268,7 +268,7 @@ mod tests {
             last_closed: None,
             deferred_exec: None,
         };
-        let my_shares = totals.shares.clone();
+        let my_shares = totals.shares;
         let my_collateral = totals
             .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
             .unwrap();
@@ -280,7 +280,7 @@ mod tests {
             last_closed: None,
             deferred_exec: None,
         };
-        let my_shares = totals.shares.clone();
+        let my_shares = totals.shares;
         let my_collateral = totals
             .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
             .unwrap();
