@@ -107,6 +107,7 @@ impl<'a> State<'a> {
         Ok(market)
     }
 }
+
 impl Totals {
     /// Convert an amount of shares into collateral.
     pub(crate) fn shares_to_collateral(
@@ -114,13 +115,12 @@ impl Totals {
         shares: LpToken,
         pos: &PositionsInfo,
     ) -> Result<Collateral> {
-        let collateral = self.collateral.checked_add(pos.active_collateral()?)?;
-        Ok(Collateral::from_decimal256(
-            shares
-                .into_decimal256()
-                .checked_mul(collateral.into_decimal256())?
-                .checked_div(self.shares.into_decimal256())?,
-        ))
+        let total_collateral = self.collateral.checked_add(pos.active_collateral()?)?;
+        let one_share_value = total_collateral
+            .into_decimal256()
+            .checked_div(self.shares.into_decimal256())?;
+        let share_collateral = shares.into_decimal256().checked_mul(one_share_value)?;
+        Ok(Collateral::from_decimal256(share_collateral))
     }
 
     /// Returns the newly minted share amount
@@ -226,5 +226,64 @@ impl PositionsInfo {
             PositionsInfo::NoPositions => Ok(Collateral::zero()),
             PositionsInfo::OnePosition { pos } => Ok(pos.active_collateral.raw()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use shared::number::{Collateral, UnsignedDecimal};
+
+    use crate::{PositionsInfo, Totals};
+
+    #[test]
+    fn regression_perp_4062() {
+        let totals = Totals {
+            collateral: "0.000000000000005108".parse().unwrap(),
+            shares: "0.000000000000005108".parse().unwrap(),
+            last_closed: None,
+            deferred_exec: None,
+        };
+        let my_shares = totals.shares;
+        let my_collateral = totals
+            .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
+            .unwrap();
+        assert_ne!(my_collateral, Collateral::zero());
+        assert!(my_collateral.approx_eq(totals.collateral));
+
+        let totals = Totals {
+            collateral: "9999999999999999".parse().unwrap(),
+            shares: "0.000000000000005108".parse().unwrap(),
+            last_closed: None,
+            deferred_exec: None,
+        };
+        let my_shares = totals.shares;
+        let my_collateral = totals
+            .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
+            .unwrap();
+        assert!(totals.collateral.approx_eq(my_collateral));
+
+        let totals = Totals {
+            collateral: "0.000000000000005108".parse().unwrap(),
+            shares: "9999999999999999".parse().unwrap(),
+            last_closed: None,
+            deferred_exec: None,
+        };
+        let my_shares = totals.shares;
+        let my_collateral = totals
+            .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
+            .unwrap();
+        assert!(totals.collateral.approx_eq(my_collateral));
+
+        let totals = Totals {
+            collateral: "999999999999999999".parse().unwrap(),
+            shares: "999999999999999999".parse().unwrap(),
+            last_closed: None,
+            deferred_exec: None,
+        };
+        let my_shares = totals.shares;
+        let my_collateral = totals
+            .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
+            .unwrap();
+        assert!(totals.collateral.approx_eq(my_collateral));
     }
 }
