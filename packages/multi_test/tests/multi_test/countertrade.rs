@@ -1322,3 +1322,30 @@ fn do_not_mutate_countertrade_position() {
     };
     do_work(&market, &lp);
 }
+
+#[test]
+fn regression_perp_4062() {
+    let market = make_countertrade_market().unwrap();
+    // Set minimum_deposit_usd so that countertrade countract tries to
+    // reduce the collateral instead of closing the position.
+    market
+        .exec_set_config(msg::contracts::market::config::ConfigUpdate {
+            minimum_deposit_usd: Some("5".parse().unwrap()),
+            ..Default::default()
+        })
+        .unwrap();
+    let lp = market.clone_lp(0).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    assert_eq!(
+        market.query_countertrade_has_work().unwrap(),
+        HasWorkResp::NoWork {}
+    );
+
+    // Make sure there are funds to open a position
+    market
+        .exec_countertrade_mint_and_deposit(&lp, "0.000000000000834")
+        .unwrap();
+
+
+}
