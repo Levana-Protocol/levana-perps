@@ -977,19 +977,15 @@ fn deduct_balance() {
         .pop()
         .unwrap();
     // 100 - 1.46 = 98.54, 100 - 1.61 = 98.39
-    println!("balance: {}", balance.collateral);
     match market_type {
-        msg::shared::storage::MarketType::CollateralIsQuote => assert!(
-            balance
-                .collateral
+        msg::shared::storage::MarketType::CollateralIsQuote => assert!(balance
+            .collateral
             .raw()
-            .approx_eq(Collateral::from_str("98.384623849").unwrap())
-        ),
-        msg::shared::storage::MarketType::CollateralIsBase => assert!(
-            balance
-                .collateral
-                .raw()
-            .approx_eq(Collateral::from_str("98.531476226").unwrap()))
+            .approx_eq(Collateral::from_str("98.384623849").unwrap())),
+        msg::shared::storage::MarketType::CollateralIsBase => assert!(balance
+            .collateral
+            .raw()
+            .approx_eq(Collateral::from_str("98.531476226").unwrap())),
     }
 }
 
