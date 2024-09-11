@@ -42,11 +42,34 @@ pub(crate) struct MarketWorkInfo {
     pub(crate) processing_status: ProcessingStatus,
     /// Total active collateral in all open positions and pending limit orders.
     pub(crate) active_collateral: Collateral,
+    /// Total open positions
+    pub(crate) count_open_positions: u64,
+    /// Total open orders
+    pub(crate) count_orders: u64
+}
+
+impl Default for MarketWorkInfo {
+    fn default() -> Self {
+        Self {
+            processing_status: ProcessingStatus::NotStarted,
+            active_collateral: Default::default(),
+            count_open_positions: Default::default(),
+            count_orders: Default::default(),
+        }
+    }
+}
+
+impl MarketWorkInfo {
+    pub(crate) fn increment_open_position(&mut self) {
+        self.count_open_positions += 1
+    }
 }
 
 /// Processing Status
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub enum ProcessingStatus {
+    /// Not started Yet
+    NotStarted,
     /// The last seen position id. Should be passed to
     /// [msg::contracts::position_token::entry::QueryMsg::Tokens]
     OpenPositions(Option<String>),
@@ -101,7 +124,7 @@ pub(crate) enum LpTokenStatus {
     /// Recently computed and valid for other computations
     Valid {
         /// Timestamp the value was last computed
-        timestamp: Timestamp
+        timestamp: Timestamp,
     },
     ////Outdated because of open positions etc. Need to be computed
     /// again.
@@ -138,7 +161,7 @@ pub(crate) enum QueueItem {
     /// Withdraw via LpToken
     Withdrawal { tokens: NonZero<LpToken> },
     /// Open Position etc. etc.
-    OpenPosition {}
+    OpenPosition {},
 }
 
 /// Checks if the pause is status
@@ -146,12 +169,12 @@ pub(crate) enum PauseStatus {
     /// Paused because queue items are processed
     PauseQueueProcessed {
         /// Does a stats reset required ?
-        reset_required: bool
+        reset_required: bool,
     },
     /// Paused because of earmarking
     PauseReasonEarmarking {
         /// Does a stats reset required ?
-        reset_required: bool
+        reset_required: bool,
     },
     /// Not paused
     NotPaused,
@@ -166,7 +189,7 @@ pub(crate) struct EarmarkedItem {
     /// Required collateral when last time [LpTokenStatus] was
     /// valid. We try updating the LpTokenStatus only if
     /// require_collateral is less than current available collateral.
-    outdated_required_collateral: Collateral
+    outdated_required_collateral: Collateral,
 }
 
 /// Token Response
@@ -174,5 +197,5 @@ pub(crate) struct TokenResp {
     /// Fetched tokens
     pub(crate) tokens: Vec<PositionId>,
     /// Start after that should be passed for next iteration
-    pub(crate) start_after: Option<String>
+    pub(crate) start_after: Option<String>,
 }

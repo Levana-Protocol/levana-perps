@@ -130,13 +130,13 @@ impl<'a> State<'a> {
         &self,
         storage: &mut dyn Storage,
         token: Token,
-    ) -> Result<Vec<MarketId>> {
+    ) -> Result<Vec<MarketInfo>> {
         let markets = self.load_all_market_ids()?;
         let mut result = vec![];
         for market_id in markets {
             let market_info = self.load_cache_market_info(storage, &market_id)?;
             if token.is_same(&market_info.token) {
-                result.push(market_id);
+                result.push(market_info);
             }
         }
         Ok(result)
@@ -146,7 +146,7 @@ impl<'a> State<'a> {
     /// used to find all open positions.
     pub(crate) fn load_tokens(
         &self,
-        market_addr: Addr,
+        market_addr: &Addr,
         start_after: Option<String>,
     ) -> Result<TokenResp> {
         #[derive(serde::Deserialize)]
@@ -173,7 +173,7 @@ impl<'a> State<'a> {
     /// Load open positions
     pub(crate) fn load_positions(
         &self,
-        market_addr: Addr,
+        market_addr: &Addr,
         position_ids: Vec<PositionId>,
     ) -> Result<Vec<PositionQueryResponse>> {
         let PositionsResp {

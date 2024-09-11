@@ -1,7 +1,10 @@
 use anyhow::{anyhow, ensure, Context, Result};
 use msg::contracts::factory::entry::MarketsResp;
 
-use crate::{prelude::*, types::State};
+use crate::{
+    prelude::*,
+    types::{MarketInfo, State},
+};
 
 #[must_use]
 enum Funds {
@@ -130,12 +133,11 @@ fn compute_lp_token_value(
     if token_valid {
         return Ok(Response::new());
     }
-    let all_markets = state.load_all_market_ids()?;
-    let market_ids = state.load_market_ids_with_token(storage, token)?;
-    for market_id in &all_markets {
-        process_single_market(storage, &state, market_id);
+    let markets = state.load_market_ids_with_token(storage, token)?;
+    for market in &markets {
+        process_single_market(storage, &state, market)?;
     }
-    validate_all_markets(storage, &state, &all_markets)?;
+    validate_all_markets(storage, &state, &markets)?;
     // Calculate LP token value and update it
     todo!()
 }
@@ -143,7 +145,7 @@ fn compute_lp_token_value(
 fn validate_all_markets(
     storage: &mut dyn Storage,
     state: &State<'_>,
-    all_markets: &Vec<MarketId>,
+    all_markets: &Vec<MarketInfo>,
 ) -> Result<()> {
     // Fetch all open position and validate that traked open positions isn't changed
     // Fetch all limit orders and validae that it isn't changed
@@ -154,10 +156,33 @@ fn validate_all_markets(
 fn process_single_market(
     storage: &mut dyn Storage,
     state: &State<'_>,
-    market_id: &MarketId,
+    market: &MarketInfo,
 ) -> Result<()> {
-
-    // Fetch all open positions, track total open positions
+    // todo: track count of query operations!
+    let mut market_work = crate::state::MARKET_WORK_INFO
+        .may_load(storage, &market.id)
+        .context("Could not load MARKET_WORK_INFO")?
+        .unwrap_or_default();
+    loop {
+        let mut tokens_start_after = None;
+        let tokens = state.load_tokens(&market.addr, tokens_start_after)?;
+        tokens_start_after = tokens.start_after;
+        // todo: optimize if empty tokens
+        let positions = state.load_positions(&market.addr, tokens.tokens)?;
+        let mut total_collateral = Collateral::zero();
+        for position in positions {
+            total_collateral = total_collateral.checked_add(position.active_collateral.raw())?;
+            market_work.increment_open_position();
+        }
+        market_work.active_collateral = market_work
+            .active_collateral
+            .checked_add(total_collateral)?;
+        if tokens_start_after.is_none() {
+            break;
+        }
+        // Todo: Also break if query count exeeds!
+    }
+    crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work);
     // Fetch all limit orders, track total limit order
     todo!()
 }
