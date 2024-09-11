@@ -97,13 +97,23 @@ pub enum ExecuteMsg {
     AcceptAdmin {},
     /// Update configuration values
     UpdateConfig(ConfigUpdate),
-    /// Wind down the contract which prevents opening any new
-    /// positions, or deposits or collateral.
-    WindDown {},
-    /// Shutdown the contract by closing all the open positions etc.
-    Shutdown {},
+    /// Leader specific execute messages
+    LeaderMsg {
+        /// Market id that message is for
+        market_id: MarketId,
+        /// Message
+        message: LeaderExecuteMsg
+    }
+}
+
+/// Market specific execution for Leader
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum LeaderExecuteMsg {
     /// Open position and various other messages
     OpenPosition {},
+    /// Close position etc
+    ClosePosition {}
 }
 
 /// Queries that can be performed on the copy contract.

@@ -113,28 +113,6 @@ fn deposit(
     sender: Addr,
     funds: NonZero<Collateral>,
 ) -> Result<Response> {
-    // let sender_shares = crate::state::SHARES
-    //     .may_load(storage, &sender)
-    //     .context("Could not load old shares")?
-    //     .map(NonZero::raw)
-    //     .unwrap_or_default();
-    // let mut totals = crate::state::TOTALS
-    //     .may_load(storage)
-    //     .context("Could not load old total shares")?
-    //     .unwrap_or_default();
-    // let position_info = PositionsInfo::load(&state, &market)?;
-    // let new_shares = totals.add_collateral(funds, &position_info)?;
-    // let sender_shares = new_shares.checked_add(sender_shares)?;
-    // crate::state::SHARES.save(storage, (&sender, &market.id), &sender_shares)?;
-    // crate::state::REVERSE_SHARES.save(storage, (&market.id, &sender), &())?;
-    // crate::state::TOTALS.save(storage, &market.id, &totals)?;
-
-    // Ok(Response::new().add_event(
-    //     Event::new("deposit")
-    //         .add_attribute("lp", &sender)
-    //         .add_attribute("collateral", funds.to_string())
-    //         .add_attribute("new-shares", new_shares.to_string()),
-    // ))
     todo!()
 }
 
@@ -178,6 +156,7 @@ fn process_single_market(
     state: &State<'_>,
     market_id: &MarketId,
 ) -> Result<()> {
+
     // Fetch all open positions, track total open positions
     // Fetch all limit orders, track total limit order
     todo!()

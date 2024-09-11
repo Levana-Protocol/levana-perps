@@ -1,13 +1,14 @@
 use crate::{
     prelude::*,
-    types::{MarketInfo, PositionInfo, State},
+    types::{MarketInfo, PositionInfo, State, TokenResp},
 };
 use anyhow::{Context, Result};
 use msg::contracts::{
     factory::entry::MarketsResp,
     market::{
-        entry::PositionsQueryFeeApproach,
-        position::{PositionId, PositionsResp},
+        entry::{LimitOrdersResp, PositionsQueryFeeApproach},
+        order::OrderId,
+        position::{PositionId, PositionQueryResponse, PositionsResp},
     },
 };
 
@@ -138,6 +139,75 @@ impl<'a> State<'a> {
                 result.push(market_id);
             }
         }
+        Ok(result)
+    }
+
+    /// Load position ID tokens belonging to this contract. Typically
+    /// used to find all open positions.
+    pub(crate) fn load_tokens(
+        &self,
+        market_addr: Addr,
+        start_after: Option<String>,
+    ) -> Result<TokenResp> {
+        #[derive(serde::Deserialize)]
+        struct Resp {
+            tokens: Vec<PositionId>,
+        }
+        let Resp { tokens } = self.querier.query_wasm_smart(
+            market_addr,
+            &MarketQueryMsg::NftProxy {
+                nft_msg: msg::contracts::position_token::entry::QueryMsg::Tokens {
+                    owner: self.my_addr.as_ref().into(),
+                    start_after,
+                    limit: None,
+                },
+            },
+        )?;
+        let start_after = tokens.last().map(|item| item.to_string());
+        Ok(TokenResp {
+            tokens,
+            start_after,
+        })
+    }
+
+    /// Load open positions
+    pub(crate) fn load_positions(
+        &self,
+        market_addr: Addr,
+        position_ids: Vec<PositionId>,
+    ) -> Result<Vec<PositionQueryResponse>> {
+        let PositionsResp {
+            positions,
+            pending_close,
+            closed: _,
+        } = self.querier.query_wasm_smart(
+            market_addr,
+            &MarketQueryMsg::Positions {
+                position_ids,
+                skip_calc_pending_fees: None,
+                fees: Some(PositionsQueryFeeApproach::Accumulated),
+                price: None,
+            },
+        )?;
+        // todo: Change this to Error
+        assert!(pending_close.len() == 0);
+        Ok(positions)
+    }
+
+    pub(crate) fn load_orders(
+        &self,
+        market_addr: Addr,
+        start_after: Option<OrderId>,
+    ) -> Result<LimitOrdersResp> {
+        let result = self.querier.query_wasm_smart(
+            market_addr,
+            &MarketQueryMsg::LimitOrders {
+                owner: self.my_addr.as_ref().into(),
+                start_after,
+                limit: None,
+                order: None,
+            },
+        )?;
         Ok(result)
     }
 }

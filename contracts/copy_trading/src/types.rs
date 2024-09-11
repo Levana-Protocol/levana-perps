@@ -168,3 +168,11 @@ pub(crate) struct EarmarkedItem {
     /// require_collateral is less than current available collateral.
     outdated_required_collateral: Collateral
 }
+
+/// Token Response
+pub(crate) struct TokenResp {
+    /// Fetched tokens
+    pub(crate) tokens: Vec<PositionId>,
+    /// Start after that should be passed for next iteration
+    pub(crate) start_after: Option<String>
+}
