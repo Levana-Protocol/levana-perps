@@ -3,7 +3,7 @@ use msg::contracts::factory::entry::MarketsResp;
 
 use crate::{
     prelude::*,
-    types::{MarketInfo, ProcessingStatus, State},
+    types::{MarketInfo, MarketWorkInfo, ProcessingStatus, State},
 };
 
 #[must_use]
@@ -131,23 +131,37 @@ fn compute_lp_token_value(
         .unwrap_or_default();
     let token_valid = token_value.status.valid();
     if token_valid {
+        // todo: add events
         return Ok(Response::new());
     }
     let markets = state.load_market_ids_with_token(storage, token)?;
     for market in &markets {
         process_single_market(storage, &state, market)?;
     }
+    let mut total_collateral = Collateral::zero();
     for market in &markets {
-        validate_single_market(storage, &state, &market)?;
+        let validation = validate_single_market(storage, &state, &market)?;
+        match validation {
+            ValidationStatus::Failed => {
+                // todo: add events
+                return Ok(Response::new());
+            },
+            ValidationStatus::Success { market } => {
+                total_collateral = market.active_collateral;
+            },
+        }
     }
-
     // Calculate LP token value and update it
+    // step 1: Find current contract balance for this token. Update Totals.
+    // step 2: Add it with market_total_collateral
+    // step 3: Divided it with total share so far
+    // step 4: Update store LP_TOKEN_VALUE
     todo!()
 }
 
 enum ValidationStatus {
     Failed,
-    Success,
+    Success { market: MarketWorkInfo },
 }
 
 /// Validates market to check if the total open positions and open
@@ -199,7 +213,9 @@ fn validate_single_market(
         market_work.processing_status = ProcessingStatus::Validated;
     }
     crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work);
-    Ok(ValidationStatus::Success)
+    Ok(ValidationStatus::Success {
+        market: market_work,
+    })
 }
 
 fn process_single_market(
