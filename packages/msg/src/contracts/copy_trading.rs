@@ -102,8 +102,8 @@ pub enum ExecuteMsg {
         /// Market id that message is for
         market_id: MarketId,
         /// Message
-        message: LeaderExecuteMsg
-    }
+        message: LeaderExecuteMsg,
+    },
 }
 
 /// Market specific execution for Leader
@@ -113,7 +113,7 @@ pub enum LeaderExecuteMsg {
     /// Open position and various other messages
     OpenPosition {},
     /// Close position etc
-    ClosePosition {}
+    ClosePosition {},
 }
 
 /// Queries that can be performed on the copy contract.
@@ -321,7 +321,10 @@ pub enum WorkDescription {
         id: EarmarkId,
     },
     /// Reset market specific statistics
-    RestStats {},
+    ResetStats {},
+    /// Rebalance for case when someone sends collateral directly to
+    /// the contract without getting LpTokens
+    Rebalance {},
 }
 
 /// Queue position number
