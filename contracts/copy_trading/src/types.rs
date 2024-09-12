@@ -147,6 +147,7 @@ impl LpTokenStatus {
 }
 
 /// Queue position
+#[derive(serde::Serialize, serde::Deserialize)]
 pub(crate) struct QueuePosition {
     /// Queue item that needs to be processed
     pub(crate) item: QueueItem,
@@ -155,6 +156,7 @@ pub(crate) struct QueuePosition {
 }
 
 /// Queue item that needs to be processed
+#[derive(serde::Serialize, serde::Deserialize)]
 pub(crate) enum QueueItem {
     /// Deposit the fund and get some [LpToken]
     Deposit { funds: NonZero<Collateral> },
