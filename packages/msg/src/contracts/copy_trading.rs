@@ -141,30 +141,12 @@ pub enum QueryMsg {
         /// How many values to return
         limit: Option<u32>,
     },
-    /// Returns all the open positions
-    ///
-    /// Returns [OpenPositionsResp]
-    OpenPositions {
-        /// Value from [OpenPositionResp::next_start_after]
-        start_after: Option<PositionId>,
-        /// How many values to return
-        limit: Option<u32>,
-    },
     /// Does it has any pending work ?
     ///
     /// Returns [WorkResp]
     HasWork {},
 }
 // todo: Also implement query for open orders, closed orders etc.
-
-/// Response from [QueryMsg::OpenPositionsResp]
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct OpenPositionsResp {
-    /// Market balances in this batch
-    pub positions: Vec<PositionQueryResponse>,
-    /// Next start_after value, if we have more leaders
-    pub next_start_after: Option<PositionId>,
-}
 
 /// Individual market response from [QueryMsg::Status]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]

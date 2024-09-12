@@ -1,6 +1,6 @@
 use crate::{
     prelude::*,
-    types::{MarketInfo, PositionInfo, State, TokenResp},
+    types::{MarketInfo, OpenPositionsResp, PositionInfo, State, TokenResp},
 };
 use anyhow::{Context, Result};
 use msg::contracts::{
@@ -175,7 +175,7 @@ impl<'a> State<'a> {
         &self,
         market_addr: &Addr,
         position_ids: Vec<PositionId>,
-    ) -> Result<Vec<PositionQueryResponse>> {
+    ) -> Result<OpenPositionsResp> {
         let PositionsResp {
             positions,
             pending_close,
@@ -191,12 +191,16 @@ impl<'a> State<'a> {
         )?;
         // todo: Change this to Error
         assert!(pending_close.len() == 0);
-        Ok(positions)
+        let start_after = positions.last().cloned().map(|item| item.id);
+        Ok(OpenPositionsResp {
+            positions,
+            start_after,
+        })
     }
 
     pub(crate) fn load_orders(
         &self,
-        market_addr: Addr,
+        market_addr: &Addr,
         start_after: Option<OrderId>,
     ) -> Result<LimitOrdersResp> {
         let result = self.querier.query_wasm_smart(

@@ -1,8 +1,10 @@
 use std::fmt::Display;
 
 use msg::contracts::market::{
-    deferred_execution::DeferredExecId, entry::ClosedPositionCursor, order::OrderId,
-    position::PositionId,
+    deferred_execution::DeferredExecId,
+    entry::ClosedPositionCursor,
+    order::OrderId,
+    position::{PositionId, PositionQueryResponse},
 };
 use shared::{number::Usd, time::Timestamp};
 
@@ -45,7 +47,7 @@ pub(crate) struct MarketWorkInfo {
     /// Total open positions
     pub(crate) count_open_positions: u64,
     /// Total open orders
-    pub(crate) count_orders: u64
+    pub(crate) count_orders: u64,
 }
 
 impl Default for MarketWorkInfo {
@@ -56,12 +58,6 @@ impl Default for MarketWorkInfo {
             count_open_positions: Default::default(),
             count_orders: Default::default(),
         }
-    }
-}
-
-impl MarketWorkInfo {
-    pub(crate) fn increment_open_position(&mut self) {
-        self.count_open_positions += 1
     }
 }
 
@@ -83,6 +79,10 @@ pub enum ProcessingStatus {
     /// Last seen limit order. Should be passed to
     /// [msg::contracts::market::entry::QueryMsg::LimitOrderHistory]
     LimitOrderHistory(Option<String>),
+    /// Calculation reset required because a position was opened
+    ResetRequired,
+    /// Validated that there has been no change in positions
+    Validated,
 }
 
 /// Specific position information
@@ -126,7 +126,7 @@ pub(crate) enum LpTokenStatus {
         /// Timestamp the value was last computed
         timestamp: Timestamp,
     },
-    ////Outdated because of open positions etc. Need to be computed
+    /// Outdated because of open positions etc. Need to be computed
     /// again.
     Outdated,
 }
@@ -198,4 +198,12 @@ pub(crate) struct TokenResp {
     pub(crate) tokens: Vec<PositionId>,
     /// Start after that should be passed for next iteration
     pub(crate) start_after: Option<String>,
+}
+
+/// Open Positions Response
+pub(crate) struct OpenPositionsResp {
+    /// Fetched tokens
+    pub(crate) positions: Vec<PositionQueryResponse>,
+    /// Start after that should be passed for next iteration
+    pub(crate) start_after: Option<PositionId>,
 }

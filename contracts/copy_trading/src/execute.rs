@@ -3,7 +3,7 @@ use msg::contracts::factory::entry::MarketsResp;
 
 use crate::{
     prelude::*,
-    types::{MarketInfo, State},
+    types::{MarketInfo, ProcessingStatus, State},
 };
 
 #[must_use]
@@ -137,20 +137,69 @@ fn compute_lp_token_value(
     for market in &markets {
         process_single_market(storage, &state, market)?;
     }
-    validate_all_markets(storage, &state, &markets)?;
+    for market in &markets {
+        validate_single_market(storage, &state, &market)?;
+    }
+
     // Calculate LP token value and update it
     todo!()
 }
 
-fn validate_all_markets(
+enum ValidationStatus {
+    Failed,
+    Success,
+}
+
+/// Validates market to check if the total open positions and open
+/// limits haven't changed
+fn validate_single_market(
     storage: &mut dyn Storage,
     state: &State<'_>,
-    all_markets: &Vec<MarketInfo>,
-) -> Result<()> {
-    // Fetch all open position and validate that traked open positions isn't changed
-    // Fetch all limit orders and validae that it isn't changed
-    // If it changes, return error
-    todo!()
+    market: &MarketInfo,
+) -> Result<ValidationStatus> {
+    let mut market_work = crate::state::MARKET_WORK_INFO
+        .may_load(storage, &market.id)
+        .context("Could not load MARKET_WORK_INFO")?
+        .unwrap_or_default();
+    let mut total_open_positions = 0u64;
+    let mut total_orders = 0u64;
+    // todo: need to break if query limit exeeded
+    loop {
+        let mut tokens_start_after = None;
+        let tokens = state.load_tokens(&market.addr, tokens_start_after)?;
+        tokens_start_after = tokens.start_after;
+        // todo: optimize if empty tokens
+        let positions = state.load_positions(&market.addr, tokens.tokens)?;
+        let total_positions = u64::try_from(positions.positions.len())?;
+        total_open_positions += total_positions;
+        if tokens_start_after.is_none() {
+            break;
+        }
+    }
+    if total_open_positions != market_work.count_open_positions {
+        market_work.processing_status = ProcessingStatus::ResetRequired;
+        crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work);
+        return Ok(ValidationStatus::Failed);
+    }
+    loop {
+        let mut orders_start_after = None;
+        let orders = state.load_orders(&market.addr, orders_start_after)?;
+        orders_start_after = orders.next_start_after;
+        // todo: optimize if empty orders
+        total_orders += u64::try_from(orders.orders.len())?;
+        if orders_start_after.is_none() {
+            break;
+        }
+    }
+    if total_orders != market_work.count_orders {
+        market_work.processing_status = ProcessingStatus::ResetRequired;
+        crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work);
+        return Ok(ValidationStatus::Failed);
+    } else {
+        market_work.processing_status = ProcessingStatus::Validated;
+    }
+    crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work);
+    Ok(ValidationStatus::Success)
 }
 
 fn process_single_market(
@@ -170,9 +219,9 @@ fn process_single_market(
         // todo: optimize if empty tokens
         let positions = state.load_positions(&market.addr, tokens.tokens)?;
         let mut total_collateral = Collateral::zero();
-        for position in positions {
+        for position in positions.positions {
             total_collateral = total_collateral.checked_add(position.active_collateral.raw())?;
-            market_work.increment_open_position();
+            market_work.count_open_positions += 1;
         }
         market_work.active_collateral = market_work
             .active_collateral
@@ -182,7 +231,26 @@ fn process_single_market(
         }
         // Todo: Also break if query count exeeds!
     }
+    // todo: do not save here, if we are saving below
     crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work);
-    // Fetch all limit orders, track total limit order
-    todo!()
+    loop {
+        let mut orders_start_after = None;
+        let orders = state.load_orders(&market.addr, orders_start_after)?;
+        orders_start_after = orders.next_start_after;
+        // todo: optimize if empty orders
+        let mut total_collateral = Collateral::zero();
+        for order in orders.orders {
+            total_collateral = total_collateral.checked_add(order.collateral.raw())?;
+            market_work.count_orders += 1;
+        }
+        market_work.active_collateral = market_work
+            .active_collateral
+            .checked_add(total_collateral)?;
+        if orders_start_after.is_none() {
+            break;
+        }
+        // todo: Also break if query count exceeds
+    }
+    crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work);
+    Ok(())
 }
