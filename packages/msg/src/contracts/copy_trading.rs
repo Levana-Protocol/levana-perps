@@ -1,9 +1,9 @@
 //! Copy trading contract
 
-use std::fmt::Display;
+use std::{fmt::Display, num::ParseIntError, str::FromStr};
 
 use cosmwasm_std::{Addr, Binary, Decimal256, StdError, StdResult, Uint128, Uint64};
-use cw_storage_plus::{Key, KeyDeserialize, PrimaryKey};
+use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
 use shared::{
     number::{Collateral, LpToken, NonZero, Signed, Usd},
     storage::{MarketId, RawAddr},
@@ -328,7 +328,69 @@ pub enum WorkDescription {
 }
 
 /// Queue position number
+#[derive(Copy, PartialOrd, Ord, Eq, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct QueuePositionId(Uint64);
+
+impl QueuePositionId {
+    /// Construct a new value from a [u64].
+    pub fn new(x: u64) -> Self {
+        QueuePositionId(x.into())
+    }
+
+    /// The underlying `u64` representation.
+    pub fn u64(self) -> u64 {
+        self.0.u64()
+    }
+
+    /// Generate the next position ID
+    ///
+    /// Panics on overflow
+    pub fn next(self) -> Self {
+        QueuePositionId((self.u64() + 1).into())
+    }
+}
+
+impl<'a> PrimaryKey<'a> for QueuePositionId {
+    type Prefix = ();
+    type SubPrefix = ();
+    type Suffix = Self;
+    type SuperSuffix = Self;
+
+    fn key(&self) -> Vec<Key> {
+        vec![Key::Val64(self.0.u64().to_cw_bytes())]
+    }
+}
+
+impl<'a> Prefixer<'a> for QueuePositionId {
+    fn prefix(&self) -> Vec<Key> {
+        vec![Key::Val64(self.0.u64().to_cw_bytes())]
+    }
+}
+
+impl KeyDeserialize for QueuePositionId {
+    type Output = QueuePositionId;
+
+    const KEY_ELEMS: u16 = 1;
+
+    #[inline(always)]
+    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
+        u64::from_vec(value).map(|x| QueuePositionId(Uint64::new(x)))
+    }
+}
+
+impl std::fmt::Display for QueuePositionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl FromStr for QueuePositionId {
+    type Err = ParseIntError;
+    fn from_str(src: &str) -> Result<Self, ParseIntError> {
+        src.parse().map(|x| QueuePositionId(Uint64::new(x)))
+    }
+}
+
 
 /// Earmark Id
 pub struct EarmarkId(Uint64);

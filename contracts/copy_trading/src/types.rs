@@ -149,9 +149,9 @@ impl LpTokenStatus {
 /// Queue position
 pub(crate) struct QueuePosition {
     /// Queue item that needs to be processed
-    item: QueueItem,
+    pub(crate) item: QueueItem,
     /// Wallet that initiated the specific item action
-    wallet: Addr,
+    pub(crate) wallet: Addr,
 }
 
 /// Queue item that needs to be processed

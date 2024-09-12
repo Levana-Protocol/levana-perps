@@ -22,7 +22,7 @@ pub(crate) const PENDING_QUEUE_ITEMS: Map<&QueuePositionId, QueuePosition> =
     Map::new("pending-queue-items");
 
 /// Last processed queue id
-pub(crate) const LAST_PROCESSED_QUEUE_ID: Item<Option<&QueuePositionId>> =
+pub(crate) const LAST_PROCESSED_QUEUE_ID: Item<QueuePositionId> =
     Item::new("last-processed-queue-id");
 
 /// Total collateral information

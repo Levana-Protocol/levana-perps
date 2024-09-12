@@ -4,7 +4,7 @@ use shared::time::Timestamp;
 
 use crate::{
     prelude::*,
-    types::{LpTokenValue, MarketInfo, MarketWorkInfo, ProcessingStatus, State},
+    types::{LpTokenValue, MarketInfo, MarketWorkInfo, ProcessingStatus, QueuePosition, State},
 };
 
 #[must_use]
@@ -117,6 +117,23 @@ fn deposit(
     sender: Addr,
     funds: NonZero<Collateral>,
 ) -> Result<Response> {
+    let queue_id = crate::state::LAST_PROCESSED_QUEUE_ID
+        .may_load(storage)
+        .context("Could not load LAST_PROCESSED_QUEUE_ID")?;
+    let queue_id = match queue_id {
+        Some(queue_id) => {
+            queue_id.next()
+        },
+        None => {
+            QueuePositionId::new(0)
+        },
+    };
+    let queue_position = QueuePosition {
+        item: crate::types::QueueItem::Deposit { funds },
+        wallet: sender,
+    };
+    crate::state::LAST_PROCESSED_QUEUE_ID.save(storage, &queue_id);
+    // crate::state::PENDING_QUEUE_ITEMS.save(storage, queue_position);
     todo!()
 }
 
