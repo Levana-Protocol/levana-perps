@@ -1,8 +1,8 @@
 use crate::{
     prelude::*,
-    types::{MarketInfo, OpenPositionsResp, PositionInfo, State, TokenResp},
+    types::{MarketInfo, OpenPositionsResp, PositionCollateral, PositionInfo, State, TokenResp, Totals},
 };
-use anyhow::{Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 use msg::contracts::{
     factory::entry::MarketsResp,
     market::{
@@ -129,7 +129,7 @@ impl<'a> State<'a> {
     pub(crate) fn load_market_ids_with_token(
         &self,
         storage: &mut dyn Storage,
-        token: Token,
+        token: &Token,
     ) -> Result<Vec<MarketInfo>> {
         let markets = self.load_all_market_ids()?;
         let mut result = vec![];
@@ -216,32 +216,67 @@ impl<'a> State<'a> {
     }
 }
 
-impl MarketInfo {
-    fn process_open_positions(
+impl Totals {
+    /// Convert an amount of shares into collateral.
+    pub(crate) fn shares_to_collateral(
+        &self,
+        shares: LpToken,
+        pos: &PositionCollateral,
+    ) -> Result<Collateral> {
+        let total_collateral = self.collateral.checked_add(pos.0)?;
+        let one_share_value = total_collateral
+            .into_decimal256()
+            .checked_div(self.shares.into_decimal256())?;
+        let share_collateral = shares.into_decimal256().checked_mul(one_share_value)?;
+        Ok(Collateral::from_decimal256(share_collateral))
+    }
+
+    /// Returns the newly minted share amount
+    pub(crate) fn add_collateral(
         &mut self,
-        state: &State,
-        market: &MarketInfo,
-        unprocessed_open_positions: Vec<PositionId>,
-    ) -> Result<()> {
-        // todo: this needs to be split
-        let resp: PositionsResp = state.querier.query_wasm_smart(
-            &market.addr,
-            &MarketQueryMsg::Positions {
-                position_ids: unprocessed_open_positions,
-                skip_calc_pending_fees: None,
-                fees: Some(PositionsQueryFeeApproach::Accumulated),
-                price: None,
-            },
-        )?;
-        let open_positions = resp.positions.into_iter().map(|position| PositionInfo {
-            id: position.id,
-            active_collateral: position.active_collateral,
-            pnl_collateral: position.pnl_collateral,
-            pnl_usd: position.pnl_usd,
-        });
-        // todo: Push resp.closed into pending_closed_positions todo: Push
-        // resp.pending_close into pending_close position. The reason
-        // being you have do another smart query using the same api which will give pending_closed anyway.
-        todo!()
+        funds: NonZero<Collateral>,
+        pos: &PositionCollateral,
+    ) -> Result<NonZero<LpToken>> {
+        let collateral = self.collateral.checked_add(pos.0)?;
+        let new_shares =
+            if (collateral.is_zero() && self.shares.is_zero()) || self.collateral.is_zero() {
+                NonZero::new(LpToken::from_decimal256(funds.into_decimal256()))
+                    .expect("Impossible: NonZero to NonZero produced a 0")
+            } else if collateral.is_zero() || self.shares.is_zero() {
+                bail!("Invalid collateral/shares totals: {self:?}");
+            } else {
+                let new_shares = LpToken::from_decimal256(
+                    funds
+                        .into_decimal256()
+                        .checked_mul(self.shares.into_decimal256())?
+                        .checked_div(self.collateral.into_decimal256())?,
+                );
+                NonZero::new(new_shares).context("new_shares ended up 0")?
+            };
+        self.collateral = self.collateral.checked_add(funds.raw())?;
+        self.shares = self.shares.checked_add(new_shares.raw())?;
+        Ok(new_shares)
+    }
+
+    /// Returns the collateral removed from the pool
+    pub(crate) fn remove_collateral(
+        &mut self,
+        amount: NonZero<LpToken>,
+        pos: &PositionCollateral,
+    ) -> Result<Collateral> {
+        let collateral = self.shares_to_collateral(amount.raw(), pos)?;
+        ensure!(
+            collateral <= self.collateral,
+            "Insufficient collateral for withdrawal. Requested: {collateral}. Available: {}",
+            self.collateral
+        );
+        ensure!(
+            amount.raw() <= self.shares,
+            "Insufficient shares for withdrawal. Requested: {amount}. Available: {}",
+            self.shares
+        );
+        self.collateral = self.collateral.checked_sub(collateral)?;
+        self.shares = self.shares.checked_sub(amount.raw())?;
+        Ok(collateral)
     }
 }

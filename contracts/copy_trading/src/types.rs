@@ -207,3 +207,6 @@ pub(crate) struct OpenPositionsResp {
     /// Start after that should be passed for next iteration
     pub(crate) start_after: Option<PositionId>,
 }
+
+/// Represents total active collateral of open positions in a market
+pub(crate) struct PositionCollateral(pub Collateral);

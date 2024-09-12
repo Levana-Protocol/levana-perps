@@ -1,9 +1,10 @@
 use anyhow::{anyhow, ensure, Context, Result};
 use msg::contracts::factory::entry::MarketsResp;
+use shared::time::Timestamp;
 
 use crate::{
     prelude::*,
-    types::{MarketInfo, MarketWorkInfo, ProcessingStatus, State},
+    types::{LpTokenValue, MarketInfo, MarketWorkInfo, ProcessingStatus, State},
 };
 
 #[must_use]
@@ -123,6 +124,7 @@ fn compute_lp_token_value(
     storage: &mut dyn Storage,
     state: State,
     token: Token,
+    env: &Env,
 ) -> Result<Response> {
     // todo: track operations
     let token_value = crate::state::LP_TOKEN_VALUE
@@ -134,29 +136,41 @@ fn compute_lp_token_value(
         // todo: add events
         return Ok(Response::new());
     }
-    let markets = state.load_market_ids_with_token(storage, token)?;
+    let markets = state.load_market_ids_with_token(storage, &token)?;
     for market in &markets {
         process_single_market(storage, &state, market)?;
     }
-    let mut total_collateral = Collateral::zero();
+    let mut total_open_position_collateral = Collateral::zero();
     for market in &markets {
         let validation = validate_single_market(storage, &state, &market)?;
         match validation {
             ValidationStatus::Failed => {
                 // todo: add events
                 return Ok(Response::new());
-            },
+            }
             ValidationStatus::Success { market } => {
-                total_collateral = market.active_collateral;
-            },
+                total_open_position_collateral = market.active_collateral;
+            }
         }
     }
-    // Calculate LP token value and update it
-    // step 1: Find current contract balance for this token. Update Totals.
-    // step 2: Add it with market_total_collateral
-    // step 3: Divided it with total share so far
-    // step 4: Update store LP_TOKEN_VALUE
-    todo!()
+    let totals = crate::state::TOTALS
+        .may_load(storage, &token)
+        .context("Could not load TOTALS")?
+        .unwrap_or_default();
+    let total_collateral = totals
+        .collateral
+        .checked_add(total_open_position_collateral)?;
+    let shares = totals.shares;
+    let one_share_value = total_collateral.checked_div_dec(shares.into_decimal256())?;
+    let token_value = LpTokenValue {
+        value: one_share_value,
+        status: crate::types::LpTokenStatus::Valid {
+            timestamp: Timestamp::from(env.block.time),
+        },
+    };
+    crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value);
+    // todo: add events
+    Ok(Response::new())
 }
 
 enum ValidationStatus {
