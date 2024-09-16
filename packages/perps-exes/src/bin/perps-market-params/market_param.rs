@@ -649,6 +649,10 @@ pub(crate) async fn compute_coin_dnfs(
             };
             historical_data.append(dnf, max_leverage, now)?;
             let new_historical_data = historical_data.till_days(Some(serve_opt.cmc_data_age_days));
+            let until_days = match new_historical_data.is_ok() {
+                true => Some(serve_opt.cmc_data_age_days),
+                false => None,
+            };
             if (market_analysis_counter >= serve_opt.required_runs_slack_alert)
                 && new_historical_data.is_ok()
                 && Some(&now.date_naive()) != last_notified_dates.get(market_id)
@@ -675,12 +679,7 @@ pub(crate) async fn compute_coin_dnfs(
                 let entry = last_notified_dates.entry(market_id.to_owned()).or_default();
                 *entry = now.date_naive();
             }
-            historical_data.save(
-                market_id,
-                data_dir.clone(),
-                Some(serve_opt.cmc_data_age_days),
-            )?;
-
+            historical_data.save(market_id, data_dir.clone(), until_days)?;
             if serve_opt.cmc_wait_seconds > 0 {
                 tracing::info!(
                     "Going to sleep {} seconds to avoid getting rate limited",
