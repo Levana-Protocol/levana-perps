@@ -2487,6 +2487,7 @@ dependencies = [
  "cw-storage-plus",
  "cw2",
  "dotenv",
+ "levana_perpswap_copy_trading",
  "levana_perpswap_cosmos_countertrade",
  "levana_perpswap_cosmos_cw20",
  "levana_perpswap_cosmos_factory",

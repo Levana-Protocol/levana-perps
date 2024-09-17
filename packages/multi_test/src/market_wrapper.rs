@@ -21,6 +21,10 @@ use cosmwasm_std::{
 };
 use cw_multi_test::{AppResponse, BankSudo, Executor, SudoMsg};
 use msg::bridge::{ClientToBridgeMsg, ClientToBridgeWrapper};
+use msg::contracts::copy_trading::{
+    Config as CopyTradingConfig, ExecuteMsg as CopyTradingExecuteMsg,
+    QueryMsg as CopyTradingQueryMsg,
+};
 use msg::contracts::countertrade::{
     Config as CountertradeConfig, ExecuteMsg as CountertradeExecuteMsg, HasWorkResp,
     QueryMsg as CountertradeQueryMsg,
@@ -2293,6 +2297,21 @@ impl PerpsMarket {
             .wrap()
             .query_wasm_smart(contract_addr, &msg)
             .map_err(|err| err.into())
+    }
+
+    pub(crate) fn query_copy_trading<T: DeserializeOwned>(
+        &self,
+        msg: &CopyTradingQueryMsg,
+    ) -> Result<T> {
+        let contract_addr = self.app().copy_trading_addr.clone();
+        self.app()
+            .wrap()
+            .query_wasm_smart(contract_addr, &msg)
+            .map_err(|err| err.into())
+    }
+
+    pub fn query_copy_trading_config(&self) -> Result<CopyTradingConfig> {
+        self.query_copy_trading(&CopyTradingQueryMsg::Config {})
     }
 
     pub fn query_countertrade_config(&self) -> Result<CountertradeConfig> {

@@ -72,14 +72,13 @@ impl Config {
 /// Updates to configuration values.
 ///
 /// See [Config] for field meanings.
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "snake_case")]
 #[allow(missing_docs)]
 pub struct ConfigUpdate {
-    pub name: String,
-    pub description: String,
-    pub commission_rate: Decimal256,
-    pub min_balance: NonZero<Collateral>,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub commission_rate: Option<Decimal256>,
 }
 
 /// Executions available on the copy trading contract.

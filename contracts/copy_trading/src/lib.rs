@@ -6,9 +6,9 @@ use semver::Version;
 mod common;
 mod execute;
 mod prelude;
+mod query;
 mod state;
 mod types;
-mod query;
 
 pub use execute::execute;
 pub use query::query;
@@ -31,7 +31,6 @@ pub fn instantiate(
                 name,
                 description,
                 commission_rate,
-                min_balance,
             },
     }: InstantiateMsg,
 ) -> Result<Response> {
@@ -41,10 +40,12 @@ pub fn instantiate(
         factory: factory
             .validate(deps.api)
             .context("Invalid factory provided")?,
-        leader: leader.validate(deps.api).context("Invalid leader provided")?,
-        name,
-        description,
-        commission_rate,
+        leader: leader
+            .validate(deps.api)
+            .context("Invalid leader provided")?,
+        name: name.unwrap_or_else(|| "Name".to_owned()),
+        description: description.unwrap_or_else(|| "Description".to_owned()),
+        commission_rate: commission_rate.unwrap_or_else(|| Decimal256::from_ratio(10u32, 100u32)),
         created_at: env.block.time.into(),
     };
     config.check()?;
