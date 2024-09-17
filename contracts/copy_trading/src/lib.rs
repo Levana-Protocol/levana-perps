@@ -8,6 +8,7 @@ mod execute;
 mod prelude;
 mod state;
 mod types;
+mod query;
 
 // version info for migration info
 const CONTRACT_NAME: &str = "levana.finance:copy_trading";
