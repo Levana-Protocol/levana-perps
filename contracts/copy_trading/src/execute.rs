@@ -131,7 +131,11 @@ fn deposit(
     crate::state::LAST_PROCESSED_QUEUE_ID.save(storage, &queue_id);
     crate::state::PENDING_QUEUE_ITEMS.save(storage, &queue_id, &queue_position);
     // todo: add events
-    Ok(Response::new())
+    Ok(Response::new().add_event(
+        Event::new("deposit")
+            .add_attribute("collateral", funds.to_string())
+            .add_attribute("queue-id", queue_id.to_string()),
+    ))
 }
 
 fn compute_lp_token_value(

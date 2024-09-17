@@ -2,6 +2,7 @@
 
 use std::{fmt::Display, num::ParseIntError, str::FromStr};
 
+use anyhow::anyhow;
 use cosmwasm_std::{Addr, Binary, Decimal256, StdError, StdResult, Uint128, Uint64};
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
 use shared::{
@@ -21,7 +22,7 @@ pub struct InstantiateMsg {
     /// Address of the administrator of the contract
     pub admin: RawAddr,
     /// Leader of the contract
-    pub leader: Addr,
+    pub leader: RawAddr,
     /// Initial configuration values
     pub config: ConfigUpdate,
 }
@@ -45,11 +46,27 @@ pub struct Config {
     /// Description of the copy_trading pool. Not more than 128
     /// characters.
     pub description: String,
-    /// Commission rate for the leader. Only paid when trade is
-    /// profitable.
+    /// Commission rate for the leader. Should be within 1-30%.
     pub commission_rate: Decimal256,
     /// Creation time of contract
     pub created_at: Timestamp,
+}
+
+impl Config {
+    /// Check validity of config values
+    pub fn check(&self) -> anyhow::Result<()> {
+        if self.name.len() > 128 {
+            Err(anyhow!(
+                "Description should not be more than 128 characters"
+            ))
+        } else if self.commission_rate < Decimal256::from_ratio(1u32, 100u32) {
+            Err(anyhow!("Commission rate less than 1 percent"))
+        } else if self.commission_rate > Decimal256::from_ratio(30u32, 100u32) {
+            Err(anyhow!("Commission rate greater than 1 percent"))
+        } else {
+            Ok(())
+        }
+    }
 }
 
 /// Updates to configuration values.
@@ -390,7 +407,6 @@ impl FromStr for QueuePositionId {
         src.parse().map(|x| QueuePositionId(Uint64::new(x)))
     }
 }
-
 
 /// Earmark Id
 pub struct EarmarkId(Uint64);
