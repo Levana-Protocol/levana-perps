@@ -410,3 +410,8 @@ impl FromStr for QueuePositionId {
 
 /// Earmark Id
 pub struct EarmarkId(Uint64);
+
+/// Migration message, currently no fields needed
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+pub struct MigrateMsg {}

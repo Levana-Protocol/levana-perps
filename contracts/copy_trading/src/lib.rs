@@ -1,6 +1,7 @@
 use anyhow::Context;
-use cw2::set_contract_version;
+use cw2::{get_contract_version, set_contract_version};
 use prelude::*;
+use semver::Version;
 
 mod common;
 mod execute;
@@ -53,38 +54,38 @@ pub fn instantiate(
     Ok(Response::new())
 }
 
-// #[entry_point]
-// pub fn migrate(deps: DepsMut, _env: Env, MigrateMsg {}: MigrateMsg) -> Result<Response> {
-//     let old_cw2 = get_contract_version(deps.storage).context("Could not load contract version")?;
-//     let old_version: Version = old_cw2
-//         .version
-//         .parse()
-//         .context("Couldn't parse old contract version")?;
-//     let new_version: Version = CONTRACT_VERSION
-//         .parse()
-//         .context("Couldn't parse new contract version")?;
+#[entry_point]
+pub fn migrate(deps: DepsMut, _env: Env, MigrateMsg {}: MigrateMsg) -> Result<Response> {
+    let old_cw2 = get_contract_version(deps.storage).context("Could not load contract version")?;
+    let old_version: Version = old_cw2
+        .version
+        .parse()
+        .context("Couldn't parse old contract version")?;
+    let new_version: Version = CONTRACT_VERSION
+        .parse()
+        .context("Couldn't parse new contract version")?;
 
-//     if old_cw2.contract != CONTRACT_NAME {
-//         Err(anyhow!(
-//             "Mismatched contract migration name (from {} to {})",
-//             old_cw2.contract,
-//             CONTRACT_NAME
-//         ))
-//     } else if old_version > new_version {
-//         Err(anyhow!(
-//             "Cannot migrate contract from newer to older (from {} to {})",
-//             old_cw2.version,
-//             CONTRACT_VERSION
-//         ))
-//     } else {
-//         set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)
-//             .context("Could not set contract version during migration")?;
+    if old_cw2.contract != CONTRACT_NAME {
+        Err(anyhow!(
+            "Mismatched contract migration name (from {} to {})",
+            old_cw2.contract,
+            CONTRACT_NAME
+        ))
+    } else if old_version > new_version {
+        Err(anyhow!(
+            "Cannot migrate contract from newer to older (from {} to {})",
+            old_cw2.version,
+            CONTRACT_VERSION
+        ))
+    } else {
+        set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)
+            .context("Could not set contract version during migration")?;
 
-//         Ok(attr_map! {
-//             "old_contract_name" => old_cw2.contract,
-//             "old_contract_version" => old_cw2.version,
-//             "new_contract_name" => CONTRACT_NAME,
-//             "new_contract_version" => CONTRACT_VERSION,
-//         })
-//     }
-// }
+        Ok(attr_map! {
+            "old_contract_name" => old_cw2.contract,
+            "old_contract_version" => old_cw2.version,
+            "new_contract_name" => CONTRACT_NAME,
+            "new_contract_version" => CONTRACT_VERSION,
+        })
+    }
+}
