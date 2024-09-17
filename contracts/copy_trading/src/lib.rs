@@ -10,6 +10,9 @@ mod state;
 mod types;
 mod query;
 
+pub use execute::execute;
+pub use query::query;
+
 // version info for migration info
 const CONTRACT_NAME: &str = "levana.finance:copy_trading";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
