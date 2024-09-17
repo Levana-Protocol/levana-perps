@@ -12,4 +12,3 @@ pub(crate) use cosmwasm_std::{
 pub(crate) use msg::contracts::market::entry::{
     ExecuteMsg as MarketExecuteMsg, QueryMsg as MarketQueryMsg,
 };
-pub(crate) use msg::contracts::copy_trading::*;

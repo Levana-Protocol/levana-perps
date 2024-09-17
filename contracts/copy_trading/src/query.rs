@@ -8,6 +8,10 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
         QueryMsg::Balance { address } => todo!(),
         QueryMsg::Status { start_after, limit } => todo!(),
         QueryMsg::HasWork {} => todo!(),
+        QueryMsg::QueueStatus {
+            address,
+            start_after,
+        } => todo!(),
     }
     .map_err(anyhow::Error::from)
 }

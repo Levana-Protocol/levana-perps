@@ -17,9 +17,16 @@ pub(crate) const SHARES: Map<(&Token, &Addr), NonZero<LpToken>> = Map::new("shar
 /// The current pause status
 pub(crate) const PAUSE_STATUS: Item<PauseStatus> = Item::new("pause-status");
 
+/// Pending queued items for a wallet
+pub(crate) const WALLET_QUEUE_ITEMS: Map<(&Addr, QueuePositionId), ()> = Map::new("wallet-queue-items");
+
 /// Pending queue items that needs to be processed
 pub(crate) const PENDING_QUEUE_ITEMS: Map<&QueuePositionId, QueuePosition> =
     Map::new("pending-queue-items");
+
+/// Last inserted queue id
+pub(crate) const LAST_INSERTED_QUEUE_ID: Item<QueuePositionId> =
+    Item::new("last-inserted-queue-id");
 
 /// Last processed queue id
 pub(crate) const LAST_PROCESSED_QUEUE_ID: Item<QueuePositionId> =

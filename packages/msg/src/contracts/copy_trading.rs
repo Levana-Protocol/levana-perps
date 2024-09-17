@@ -140,6 +140,15 @@ pub enum QueryMsg {
     ///
     /// Returns [Config]
     Config {},
+    /// Get the queue status of a particular wallet
+    ///
+    /// Returns [QueueResp]
+    QueueStatus {
+        /// Address of the wallet
+        address: RawAddr,
+        /// Value from []
+        start_after: Option<QueuePositionId>
+    },
     /// Returns the share held by the wallet
     ///
     /// Returns [BalanceResp]
@@ -162,7 +171,41 @@ pub enum QueryMsg {
     /// Returns [WorkResp]
     HasWork {},
 }
-// todo: Also implement query for open orders, closed orders etc.
+
+/// Individual response from [QueryMsg::QueueStatus]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct QueueResp {
+    /// Items in queue for the wallet
+    pub items: Vec<QueueRespItem>,
+    /// Last processed [QueuePositionId]
+    pub processed_till: Option<QueuePositionId>
+}
+
+/// Queue Item
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct QueueRespItem {
+    /// Queue position id
+    pub id: QueuePositionId,
+    /// Item in the queue corresponding to the [QueuePositionId]
+    pub item: QueueItem
+}
+
+/// Queue item that needs to be processed
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub enum QueueItem {
+    /// Deposit the fund and get some [LpToken]
+    Deposit {
+        /// Funds to be deposited
+        funds: NonZero<Collateral>
+    },
+    /// Withdraw via LpToken
+    Withdrawal {
+        /// Tokens to be withdrawn
+        tokens: NonZero<LpToken>
+    },
+    /// Open Position etc. etc.
+    OpenPosition {},
+}
 
 /// Individual market response from [QueryMsg::Status]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -344,7 +387,7 @@ pub enum WorkDescription {
 }
 
 /// Queue position number
-#[derive(Copy, PartialOrd, Ord, Eq, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Copy, PartialOrd, Ord, Eq, Clone, PartialEq, serde::Serialize, serde::Deserialize, Debug)]
 pub struct QueuePositionId(Uint64);
 
 impl QueuePositionId {

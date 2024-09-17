@@ -1,5 +1,5 @@
 use anyhow::{anyhow, ensure, Context, Result};
-use msg::contracts::factory::entry::MarketsResp;
+use msg::contracts::{copy_trading, factory::entry::MarketsResp};
 use shared::time::Timestamp;
 
 use crate::{
@@ -117,18 +117,19 @@ fn deposit(
     sender: Addr,
     funds: NonZero<Collateral>,
 ) -> Result<Response> {
-    let queue_id = crate::state::LAST_PROCESSED_QUEUE_ID
+    let queue_id = crate::state::LAST_INSERTED_QUEUE_ID
         .may_load(storage)
         .context("Could not load LAST_PROCESSED_QUEUE_ID")?;
     let queue_id = match queue_id {
         Some(queue_id) => queue_id.next(),
         None => QueuePositionId::new(0),
     };
+    crate::state::WALLET_QUEUE_ITEMS.save(storage, (&sender, queue_id), &());
     let queue_position = QueuePosition {
-        item: crate::types::QueueItem::Deposit { funds },
+        item: copy_trading::QueueItem::Deposit { funds },
         wallet: sender,
     };
-    crate::state::LAST_PROCESSED_QUEUE_ID.save(storage, &queue_id);
+    crate::state::LAST_INSERTED_QUEUE_ID.save(storage, &queue_id);
     crate::state::PENDING_QUEUE_ITEMS.save(storage, &queue_id, &queue_position);
     // todo: add events
     Ok(Response::new().add_event(

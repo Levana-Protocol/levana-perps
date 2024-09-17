@@ -155,17 +155,6 @@ pub(crate) struct QueuePosition {
     pub(crate) wallet: Addr,
 }
 
-/// Queue item that needs to be processed
-#[derive(serde::Serialize, serde::Deserialize)]
-pub(crate) enum QueueItem {
-    /// Deposit the fund and get some [LpToken]
-    Deposit { funds: NonZero<Collateral> },
-    /// Withdraw via LpToken
-    Withdrawal { tokens: NonZero<LpToken> },
-    /// Open Position etc. etc.
-    OpenPosition {},
-}
-
 /// Checks if the pause is status
 pub(crate) enum PauseStatus {
     /// Paused because queue items are processed
