@@ -716,10 +716,26 @@ fn compute_delta_notional(
                 collateral,
                 pos_id,
                 crank_fee,
-            } => WorkDescription::UpdatePositionRemoveCollateralImpactSize {
-                pos_id,
-                amount: NonZero::new(collateral).context("remove_collateral is zero")?,
-                crank_fee,
+            } => match countertrade_position {
+                Some(countertrade_position) => {
+                    if collateral >= countertrade_position.active_collateral.raw() {
+                        WorkDescription::ClosePosition {
+                            pos_id: countertrade_position.id,
+                        }
+                    } else {
+                        WorkDescription::UpdatePositionRemoveCollateralImpactSize {
+                            pos_id,
+                            amount: NonZero::new(collateral)
+                                .context("remove_collateral is zero")?,
+                            crank_fee,
+                        }
+                    }
+                }
+                None => WorkDescription::UpdatePositionRemoveCollateralImpactSize {
+                    pos_id,
+                    amount: NonZero::new(collateral).context("remove_collateral is zero")?,
+                    crank_fee,
+                },
             },
         },
         None => return Ok(None),
