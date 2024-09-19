@@ -464,7 +464,7 @@ fn determine_target_notional(
 }
 
 /// Returns the delta notional on the unpopular side.
-fn smart_search(
+pub(crate) fn smart_search(
     long_notional: Notional,
     short_notional: Notional,
     target_funding: Number,
@@ -490,6 +490,7 @@ fn smart_search(
             .into_decimal256()
             .checked_add(unpopular_notional.into_decimal256())?,
     )?;
+    let epsilon = Decimal256::from_str("0.00001").unwrap();
     loop {
         iteration += 1;
         let target_ratio = high_ratio
@@ -514,7 +515,6 @@ fn smart_search(
             .into_signed()
             .checked_sub(target_funding)?
             .abs_unsigned();
-        let epsilon = Decimal256::from_str("0.00001").unwrap();
         if difference < epsilon {
             break Ok(delta_unpopular);
         } else if iteration >= allowed_iterations {

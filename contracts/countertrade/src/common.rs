@@ -231,9 +231,23 @@ impl PositionsInfo {
 
 #[cfg(test)]
 mod tests {
-    use shared::number::{Collateral, UnsignedDecimal};
+    use std::str::FromStr;
 
-    use crate::{PositionsInfo, Totals};
+    use cosmwasm_std::{Addr, Decimal256};
+    use msg::{
+        contracts::market::{
+            config::{Config, MaxLiquidity},
+            entry::{Fees, StatusResp},
+            liquidity::LiquidityStats,
+        },
+        token::Token,
+    };
+    use shared::{
+        number::{Collateral, Notional, Number, UnsignedDecimal},
+        storage::{MarketId, MarketType},
+    };
+
+    use crate::{work::smart_search, PositionsInfo, Totals};
 
     #[test]
     fn regression_perp_4062() {
@@ -285,5 +299,101 @@ mod tests {
             .shares_to_collateral(my_shares, &PositionsInfo::NoPositions)
             .unwrap();
         assert!(totals.collateral.approx_eq(my_collateral));
+    }
+
+    #[test]
+    fn regression_perp_4098() {
+        let status = StatusResp {
+            market_id: MarketId::new("INJ", "USDC", MarketType::CollateralIsQuote),
+            base: "INJ".to_owned(),
+            quote: "USDC".to_owned(),
+            market_type: MarketType::CollateralIsQuote,
+            collateral: Token::Native {
+                denom: "ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4"
+                    .to_owned(),
+                decimal_places: 6,
+            },
+            config: Config {
+                trading_fee_notional_size: "0.001".parse().unwrap(),
+                trading_fee_counter_collateral: "0.001".parse().unwrap(),
+                crank_execs: 7,
+                max_leverage: "10".parse().unwrap(),
+                funding_rate_sensitivity: "2".parse().unwrap(),
+                funding_rate_max_annualized: "0.9".parse().unwrap(),
+                borrow_fee_rate_min_annualized: "0.08".parse().unwrap(),
+                borrow_fee_rate_max_annualized: "0.6".parse().unwrap(),
+                carry_leverage: "5".parse().unwrap(),
+                mute_events: false,
+                liquifunding_delay_seconds: 86400,
+                protocol_tax: "0.3".parse().unwrap(),
+                unstake_period_seconds: 3888000,
+                target_utilization: "0.5".parse().unwrap(),
+                borrow_fee_sensitivity: "0.3".parse().unwrap(),
+                max_xlp_rewards_multiplier: "2".parse().unwrap(),
+                min_xlp_rewards_multiplier: "1".parse().unwrap(),
+                delta_neutrality_fee_sensitivity: "1000000".parse().unwrap(),
+                delta_neutrality_fee_cap: "0.005".parse().unwrap(),
+                delta_neutrality_fee_tax: "0.25".parse().unwrap(),
+                crank_fee_charged: "0.02".parse().unwrap(),
+                crank_fee_surcharge: "0.01".parse().unwrap(),
+                crank_fee_reward: "0.018".parse().unwrap(),
+                minimum_deposit_usd: "5".parse().unwrap(),
+                liquifunding_delay_fuzz_seconds: 3600,
+                max_liquidity: MaxLiquidity::Unlimited {},
+                disable_position_nft_exec: false,
+                liquidity_cooldown_seconds: 86400,
+                exposure_margin_ratio: "0.005".parse().unwrap(),
+                referral_reward_ratio: "0.05".parse().unwrap(),
+                spot_price: msg::contracts::market::spot_price::SpotPriceConfig::Manual {
+                    admin: Addr::unchecked("admin"),
+                },
+                _unused1: None,
+                _unused2: None,
+                _unused3: None,
+                _unused4: None,
+            },
+            liquidity: LiquidityStats::default(),
+            next_crank: None,
+            last_crank_completed: None,
+            next_deferred_execution: None,
+            newest_deferred_execution: None,
+            next_liquifunding: None,
+            deferred_execution_items: 0,
+            last_processed_deferred_exec_id: None,
+            borrow_fee: "0.08".parse().unwrap(),
+            borrow_fee_lp: "0.041384622370943865".parse().unwrap(),
+            borrow_fee_xlp: "0.038615377629056135".parse().unwrap(),
+            long_funding: Number::from_str("0.142902225796709546").unwrap(),
+            short_funding: Number::from_str("-0.164894655512925805").unwrap(),
+            long_notional: Notional::from_str("68.116739816667650139").unwrap(),
+            short_notional: Notional::from_str("59.031832799784842895").unwrap(),
+            long_usd: "1318.484645076373203003".parse().unwrap(),
+            short_usd: "1142.634913630835365286".parse().unwrap(),
+            instant_delta_neutrality_fee_value: "0.000009084907016882".parse().unwrap(),
+            delta_neutrality_fee_fund: "0.000801830464723314".parse().unwrap(),
+            fees: Fees {
+                wallets: "1926.179500580295401611".parse().unwrap(),
+                protocol: "39.611714585701583531".parse().unwrap(),
+                crank: "0.016".parse().unwrap(),
+                referral: "0.329530977743406304".parse().unwrap(),
+            },
+        };
+        let target_funding = Number::from(Decimal256::from_ratio(40u32, 100u32));
+        let long_notional = Notional::from_str("68.116739816667650139").unwrap();
+        let short_notional = Notional::from_str("59.031832799784842895").unwrap();
+        let long_notional = long_notional
+            .checked_sub("13.677338545852927893".parse().unwrap())
+            .unwrap();
+        let notional = crate::work::smart_search(
+            long_notional,
+            short_notional,
+            target_funding,
+            &status,
+            150,
+            0,
+        )
+        .unwrap();
+        println!("{notional}");
+        assert_eq!(2, 3);
     }
 }
