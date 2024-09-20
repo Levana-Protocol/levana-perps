@@ -401,7 +401,7 @@ fn desired_action(
 }
 
 /// Deterimine target notional on the unpopoular side
-fn determine_target_notional(
+pub(crate) fn determine_target_notional(
     long_interest: Notional,
     short_interest: Notional,
     target_funding: Number,

@@ -239,15 +239,20 @@ mod tests {
             config::{Config, MaxLiquidity},
             entry::{Fees, StatusResp},
             liquidity::LiquidityStats,
+            position::{LiquidationMargin, PositionId, PositionQueryResponse},
         },
         token::Token,
     };
     use shared::{
-        number::{Collateral, Notional, Number, UnsignedDecimal},
-        storage::{MarketId, MarketType},
+        number::{Collateral, NonZero, Notional, Number, UnsignedDecimal, Usd},
+        storage::{LeverageToBase, MarketId, MarketType},
+        time::Timestamp,
     };
 
-    use crate::{work::smart_search, PositionsInfo, Totals};
+    use crate::{
+        work::{determine_target_notional, smart_search},
+        PositionsInfo, Totals,
+    };
 
     #[test]
     fn regression_perp_4062() {
@@ -301,8 +306,149 @@ mod tests {
         assert!(totals.collateral.approx_eq(my_collateral));
     }
 
+    // #[test]
+    // fn regression_perp_4098() {
+    //     let status = StatusResp {
+    //         market_id: MarketId::new("INJ", "USDC", MarketType::CollateralIsQuote),
+    //         base: "INJ".to_owned(),
+    //         quote: "USDC".to_owned(),
+    //         market_type: MarketType::CollateralIsQuote,
+    //         collateral: Token::Native {
+    //             denom: "ibc/498A0751C798A0D9A389AA3691123DADA57DAA4FE165D5C75894505B876BA6E4"
+    //                 .to_owned(),
+    //             decimal_places: 6,
+    //         },
+    //         config: Config {
+    //             trading_fee_notional_size: "0.001".parse().unwrap(),
+    //             trading_fee_counter_collateral: "0.001".parse().unwrap(),
+    //             crank_execs: 7,
+    //             max_leverage: "10".parse().unwrap(),
+    //             funding_rate_sensitivity: "2".parse().unwrap(),
+    //             funding_rate_max_annualized: "0.9".parse().unwrap(),
+    //             borrow_fee_rate_min_annualized: "0.08".parse().unwrap(),
+    //             borrow_fee_rate_max_annualized: "0.6".parse().unwrap(),
+    //             carry_leverage: "5".parse().unwrap(),
+    //             mute_events: false,
+    //             liquifunding_delay_seconds: 86400,
+    //             protocol_tax: "0.3".parse().unwrap(),
+    //             unstake_period_seconds: 3888000,
+    //             target_utilization: "0.5".parse().unwrap(),
+    //             borrow_fee_sensitivity: "0.3".parse().unwrap(),
+    //             max_xlp_rewards_multiplier: "2".parse().unwrap(),
+    //             min_xlp_rewards_multiplier: "1".parse().unwrap(),
+    //             delta_neutrality_fee_sensitivity: "1000000".parse().unwrap(),
+    //             delta_neutrality_fee_cap: "0.005".parse().unwrap(),
+    //             delta_neutrality_fee_tax: "0.25".parse().unwrap(),
+    //             crank_fee_charged: "0.02".parse().unwrap(),
+    //             crank_fee_surcharge: "0.01".parse().unwrap(),
+    //             crank_fee_reward: "0.018".parse().unwrap(),
+    //             minimum_deposit_usd: "5".parse().unwrap(),
+    //             liquifunding_delay_fuzz_seconds: 3600,
+    //             max_liquidity: MaxLiquidity::Unlimited {},
+    //             disable_position_nft_exec: false,
+    //             liquidity_cooldown_seconds: 86400,
+    //             exposure_margin_ratio: "0.005".parse().unwrap(),
+    //             referral_reward_ratio: "0.05".parse().unwrap(),
+    //             spot_price: msg::contracts::market::spot_price::SpotPriceConfig::Manual {
+    //                 admin: Addr::unchecked("admin"),
+    //             },
+    //             _unused1: None,
+    //             _unused2: None,
+    //             _unused3: None,
+    //             _unused4: None,
+    //         },
+    //         liquidity: LiquidityStats::default(),
+    //         next_crank: None,
+    //         last_crank_completed: None,
+    //         next_deferred_execution: None,
+    //         newest_deferred_execution: None,
+    //         next_liquifunding: None,
+    //         deferred_execution_items: 0,
+    //         last_processed_deferred_exec_id: None,
+    //         borrow_fee: "0.08".parse().unwrap(),
+    //         borrow_fee_lp: "0.041384622370943865".parse().unwrap(),
+    //         borrow_fee_xlp: "0.038615377629056135".parse().unwrap(),
+    //         long_funding: Number::from_str("0.142902225796709546").unwrap(),
+    //         short_funding: Number::from_str("-0.164894655512925805").unwrap(),
+    //         long_notional: Notional::from_str("68.116739816667650139").unwrap(),
+    //         short_notional: Notional::from_str("59.031832799784842895").unwrap(),
+    //         long_usd: "1318.484645076373203003".parse().unwrap(),
+    //         short_usd: "1142.634913630835365286".parse().unwrap(),
+    //         instant_delta_neutrality_fee_value: "0.000009084907016882".parse().unwrap(),
+    //         delta_neutrality_fee_fund: "0.000801830464723314".parse().unwrap(),
+    //         fees: Fees {
+    //             wallets: "1926.179500580295401611".parse().unwrap(),
+    //             protocol: "39.611714585701583531".parse().unwrap(),
+    //             crank: "0.016".parse().unwrap(),
+    //             referral: "0.329530977743406304".parse().unwrap(),
+    //         },
+    //     };
+    //     let target_funding = Number::from(Decimal256::from_ratio(40u32, 100u32));
+    //     let long_notional = Notional::from_str("68.116739816667650139").unwrap();
+    //     let short_notional = Notional::from_str("59.031832799784842895").unwrap();
+    //     let long_notional = long_notional
+    //         .checked_sub("13.677338545852927893".parse().unwrap())
+    //         .unwrap();
+    //     let notional = crate::work::smart_search(
+    //         long_notional,
+    //         short_notional,
+    //         target_funding,
+    //         &status,
+    //         150,
+    //         0,
+    //     )
+    //     .unwrap();
+    //     println!("{notional}");
+    //     assert_eq!(2, 3);
+    // }
+
     #[test]
-    fn regression_perp_4098() {
+    fn regression_perp_4098_v2() {
+        let temp = Collateral::from_str("0.290043082999999999").unwrap();
+        let temp_usd = Usd::from_str("0.2").unwrap();
+        let foo = PositionQueryResponse {
+            owner: Addr::unchecked(
+                "osmo1vgchzuc5069srzpvdjg90acnfs49w0d6wg2kuzkcf9dxx7nceyyq836uur",
+            ),
+            id: PositionId::new(8053),
+            direction_to_base: shared::storage::DirectionToBase::Long,
+            leverage: LeverageToBase::from_str("10.108083193336615967").unwrap(),
+            counter_leverage: LeverageToBase::from_str("10.108083193336615967").unwrap(),
+            created_at: Timestamp::from_nanos(100000),
+            price_point_created_at: None,
+            liquifunded_at: Timestamp::from_nanos(100000),
+            trading_fee_collateral: temp.clone(),
+            trading_fee_usd: temp_usd.clone(),
+            funding_fee_collateral: temp.clone().into_signed(),
+            funding_fee_usd: temp_usd.clone().into_signed(),
+            borrow_fee_collateral: temp.clone(),
+            borrow_fee_usd: temp_usd.clone(),
+            crank_fee_collateral: temp.clone(),
+            crank_fee_usd: temp_usd.clone(),
+            delta_neutrality_fee_collateral: temp.clone().into_signed(),
+            delta_neutrality_fee_usd: temp_usd.clone().into_signed(),
+            deposit_collateral: "26.387553".parse().unwrap(),
+            deposit_collateral_usd: "26.387553".parse().unwrap(),
+            active_collateral: "14.076992075248684257".parse().unwrap(),
+            active_collateral_usd: "14.076992075248684257".parse().unwrap(),
+            counter_collateral: NonZero::new(temp.clone()).unwrap(),
+            pnl_collateral: temp.clone().into_signed(),
+            pnl_usd: temp_usd.clone().into_signed(),
+            dnf_on_close_collateral: temp.clone().into_signed(),
+            notional_size: "13.677338545852927893".parse().unwrap(),
+            notional_size_in_collateral: "13.677338545852927893".parse().unwrap(),
+            position_size_base: "13.677338545852927893".parse().unwrap(),
+            position_size_usd: "13.677338545852927893".parse().unwrap(),
+            liquidation_price_base: None,
+            liquidation_margin: LiquidationMargin::default(),
+            max_gains_in_quote: None,
+            entry_price_base: "1".parse().unwrap(),
+            next_liquifunding: Timestamp::from_nanos(100000),
+            stop_loss_override: None,
+            take_profit_trader: None,
+            take_profit_total_base: None,
+        };
+
         let status = StatusResp {
             market_id: MarketId::new("INJ", "USDC", MarketType::CollateralIsQuote),
             base: "INJ".to_owned(),
@@ -378,22 +524,21 @@ mod tests {
                 referral: "0.329530977743406304".parse().unwrap(),
             },
         };
+
         let target_funding = Number::from(Decimal256::from_ratio(40u32, 100u32));
         let long_notional = Notional::from_str("68.116739816667650139").unwrap();
         let short_notional = Notional::from_str("59.031832799784842895").unwrap();
-        let long_notional = long_notional
-            .checked_sub("13.677338545852927893".parse().unwrap())
-            .unwrap();
-        let notional = crate::work::smart_search(
+
+        let result = determine_target_notional(
             long_notional,
             short_notional,
             target_funding,
             &status,
             150,
-            0,
+            Some(foo),
         )
         .unwrap();
-        println!("{notional}");
+
         assert_eq!(2, 3);
     }
 }
