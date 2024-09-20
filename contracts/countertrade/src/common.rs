@@ -538,7 +538,5 @@ mod tests {
             Some(foo),
         )
         .unwrap();
-
-        assert_eq!(2, 3);
     }
 }
