@@ -147,7 +147,9 @@ pub enum QueryMsg {
         /// Address of the wallet
         address: RawAddr,
         /// Value from []
-        start_after: Option<QueuePositionId>
+        start_after: Option<QueuePositionId>,
+        /// How many values to return
+        limit: Option<u32>,
     },
     /// Returns the share held by the wallet
     ///

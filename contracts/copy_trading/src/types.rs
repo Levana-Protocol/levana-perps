@@ -155,6 +155,15 @@ pub(crate) struct QueuePosition {
     pub(crate) wallet: Addr,
 }
 
+impl QueuePosition {
+    pub fn into_queue_resp_item(self, id: QueuePositionId) -> QueueRespItem {
+        QueueRespItem {
+            id,
+            item: self.item,
+        }
+    }
+}
+
 /// Checks if the pause is status
 pub(crate) enum PauseStatus {
     /// Paused because queue items are processed

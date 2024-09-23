@@ -2310,6 +2310,19 @@ impl PerpsMarket {
             .map_err(|err| err.into())
     }
 
+    pub fn query_copy_trading_queue_status(
+        &self,
+        wallet: RawAddr,
+        start_after: Option<msg::contracts::copy_trading::QueuePositionId>,
+        limit: Option<u32>,
+    ) -> Result<msg::contracts::copy_trading::QueueResp> {
+        self.query_copy_trading(&CopyTradingQueryMsg::QueueStatus {
+            address: wallet,
+            start_after,
+            limit,
+        })
+    }
+
     pub fn query_copy_trading_config(&self) -> Result<CopyTradingConfig> {
         self.query_copy_trading(&CopyTradingQueryMsg::Config {})
     }
@@ -2405,6 +2418,25 @@ impl PerpsMarket {
             .execute_contract(sender.clone(), contract_addr, msg, &[])?;
 
         Ok(res)
+    }
+
+    pub fn exec_copytrading_mint_and_deposit(
+        &self,
+        sender: &Addr,
+        amount: &str,
+    ) -> Result<AppResponse> {
+        let amount: Collateral = amount.parse()?;
+        self.exec_mint_tokens(sender, amount.into_number())?;
+        let token = msg::token::Token::Native {
+            denom: TEST_CONFIG.native_denom.clone(),
+            decimal_places: 6,
+        };
+        let wasm_msg = self.make_msg_with_funds(
+            &CopyTradingExecuteMsg::Deposit { token },
+            amount.into_number(),
+            &self.app().copy_trading_addr,
+        )?;
+        self.exec_wasm_msg(sender, wasm_msg)
     }
 
     pub fn exec_countertrade_withdraw(&self, sender: &Addr, amount: &str) -> Result<AppResponse> {

@@ -14,3 +14,18 @@ fn query_config() {
 
     market.query_copy_trading_config().unwrap();
 }
+
+#[test]
+fn deposit() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    market
+        .exec_copytrading_mint_and_deposit(&trader, "100")
+        .unwrap();
+
+    let response = market
+        .query_copy_trading_queue_status(trader.into(), None, None)
+        .unwrap();
+    assert_eq!(response.items.len(), 1);
+}
