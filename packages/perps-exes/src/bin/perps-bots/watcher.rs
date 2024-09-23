@@ -293,7 +293,7 @@ impl TaskLabel {
             TaskLabel::Congestion => false,
             TaskLabel::HighGas => true,
             TaskLabel::BlockLag => true,
-            TaskLabel::CounterTradeBot => true,
+            TaskLabel::CounterTradeBot => false,
         }
     }
 
