@@ -395,6 +395,8 @@ impl Token {
 }
 
 /// Work response
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
 pub enum WorkResp {
     /// No work found
     NoWork,
@@ -406,6 +408,8 @@ pub enum WorkResp {
 }
 
 /// Work Description
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
 pub enum WorkDescription {
     /// Calculate LP token value
     ComputeLpTokenValue {
@@ -421,11 +425,6 @@ pub enum WorkDescription {
     ProcessQueueItem {
         /// Id to process
         id: QueuePositionId,
-    },
-    /// Process Earmark item for withdrawals
-    ProcessEarmarkItem {
-        /// Id to process
-        id: EarmarkId,
     },
     /// Reset market specific statistics
     ResetStats {},
@@ -499,9 +498,6 @@ impl FromStr for QueuePositionId {
         src.parse().map(|x| QueuePositionId(Uint64::new(x)))
     }
 }
-
-/// Earmark Id
-pub struct EarmarkId(Uint64);
 
 /// Migration message, currently no fields needed
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
