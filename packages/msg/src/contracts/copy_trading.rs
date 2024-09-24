@@ -6,12 +6,10 @@ use anyhow::anyhow;
 use cosmwasm_std::{Addr, Binary, Decimal256, StdError, StdResult, Uint128, Uint64};
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
 use shared::{
-    number::{Collateral, LpToken, NonZero, Signed, Usd},
+    number::{Collateral, LpToken, NonZero, Usd},
     storage::{MarketId, RawAddr},
     time::Timestamp,
 };
-
-use super::market::position::{PositionId, PositionQueryResponse};
 
 /// Message for instantiating a new copy trading contract.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -180,7 +178,7 @@ pub struct QueueResp {
     /// Items in queue for the wallet
     pub items: Vec<QueueRespItem>,
     /// Last processed [QueuePositionId]
-    pub processed_till: Option<QueuePositionId>
+    pub processed_till: Option<QueuePositionId>,
 }
 
 /// Queue Item
@@ -189,21 +187,21 @@ pub struct QueueRespItem {
     /// Queue position id
     pub id: QueuePositionId,
     /// Item in the queue corresponding to the [QueuePositionId]
-    pub item: QueueItem
+    pub item: QueueItem,
 }
 
 /// Queue item that needs to be processed
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub enum QueueItem {
     /// Deposit the fund and get some [LpToken]
     Deposit {
         /// Funds to be deposited
-        funds: NonZero<Collateral>
+        funds: NonZero<Collateral>,
     },
     /// Withdraw via LpToken
     Withdrawal {
         /// Tokens to be withdrawn
-        tokens: NonZero<LpToken>
+        tokens: NonZero<LpToken>,
     },
     /// Open Position etc. etc.
     OpenPosition {},
@@ -247,20 +245,14 @@ impl Token {
     /// Is it same as market token ?
     pub fn is_same(&self, token: &crate::token::Token) -> bool {
         match token {
-            crate::token::Token::Cw20 {
-                addr,
-                decimal_places,
-            } => match self {
+            crate::token::Token::Cw20 { addr, .. } => match self {
                 Token::Native(_) => false,
                 Token::Cw20(cw20_addr) => {
                     let cw20_addr: &RawAddr = &cw20_addr.into();
                     cw20_addr == addr
                 }
             },
-            crate::token::Token::Native {
-                denom,
-                decimal_places,
-            } => match self {
+            crate::token::Token::Native { denom, .. } => match self {
                 Token::Native(native_denom) => *native_denom == *denom,
                 Token::Cw20(_) => false,
             },
@@ -275,23 +267,50 @@ impl<'a> PrimaryKey<'a> for Token {
     type SuperSuffix = Self;
 
     fn key(&self) -> Vec<Key> {
-        let bytes = match self {
-            Token::Native(native) => native.as_bytes(),
-            Token::Cw20(cw20) => cw20.as_bytes(),
+        let (token_type, bytes) = match self {
+            Token::Native(native) => (0u8, native.as_bytes()),
+            Token::Cw20(cw20) => (1u8, cw20.as_bytes()),
         };
+        let token_type = Key::Val8([token_type]);
         let key = Key::Ref(bytes);
 
-        vec![key]
+        vec![token_type, key]
     }
 }
 
 impl KeyDeserialize for Token {
     type Output = Token;
 
-    const KEY_ELEMS: u16 = 1;
+    const KEY_ELEMS: u16 = 2;
 
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
-        todo!()
+        let keys = value.key();
+        if keys.len() != 2 {
+            return Err(StdError::serialize_err("Token", "Token len is not two"));
+        }
+        let token_type = &keys[0];
+        let token = keys[1].as_ref();
+        let token_type = match token_type {
+            Key::Val8([token_type]) => token_type,
+            _ => return Err(StdError::serialize_err("Token", "Invalid token type")),
+        };
+        let token = match token_type {
+            0 => {
+                let native_token = String::from_slice(token)?;
+                Token::Native(native_token)
+            }
+            1 => {
+                let cw20_token = Addr::from_slice(token)?;
+                Token::Cw20(cw20_token)
+            }
+            _ => {
+                return Err(StdError::serialize_err(
+                    "Token",
+                    "Invalid number in token_type",
+                ))
+            }
+        };
+        Ok(token)
     }
 }
 
@@ -389,7 +408,9 @@ pub enum WorkDescription {
 }
 
 /// Queue position number
-#[derive(Copy, PartialOrd, Ord, Eq, Clone, PartialEq, serde::Serialize, serde::Deserialize, Debug)]
+#[derive(
+    Copy, PartialOrd, Ord, Eq, Clone, PartialEq, serde::Serialize, serde::Deserialize, Debug,
+)]
 pub struct QueuePositionId(Uint64);
 
 impl QueuePositionId {

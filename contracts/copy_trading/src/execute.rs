@@ -1,5 +1,5 @@
 use anyhow::{anyhow, ensure, Context, Result};
-use msg::contracts::{copy_trading, factory::entry::MarketsResp};
+use msg::contracts::copy_trading;
 use shared::time::Timestamp;
 
 use crate::{
@@ -14,6 +14,7 @@ enum Funds {
 }
 
 impl Funds {
+    #[allow(dead_code)]
     fn require_none(self) -> Result<()> {
         match self {
             Funds::NoFunds => Ok(()),
@@ -100,12 +101,12 @@ fn handle_funds(api: &dyn Api, mut info: MessageInfo, msg: ExecuteMsg) -> Result
 #[entry_point]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     let HandleFunds { funds, msg, sender } = handle_funds(deps.api, info, msg)?;
-    let (state, storage) = State::load_mut(deps, env)?;
+    let (_state, storage) = State::load_mut(deps, env)?;
     match msg {
         ExecuteMsg::Receive { .. } => Err(anyhow!("Cannot perform a receive within a receive")),
         ExecuteMsg::Deposit { token } => {
             let funds = funds.require_some(&token)?;
-            deposit(storage, state, sender, funds)
+            deposit(storage, sender, funds)
         }
         _ => panic!("Not implemented yet"),
     }
@@ -113,7 +114,6 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
 
 fn deposit(
     storage: &mut dyn Storage,
-    state: State,
     sender: Addr,
     funds: NonZero<Collateral>,
 ) -> Result<Response> {
@@ -124,14 +124,13 @@ fn deposit(
         Some(queue_id) => queue_id.next(),
         None => QueuePositionId::new(0),
     };
-    crate::state::WALLET_QUEUE_ITEMS.save(storage, (&sender, queue_id), &());
+    crate::state::WALLET_QUEUE_ITEMS.save(storage, (&sender, queue_id), &())?;
     let queue_position = QueuePosition {
         item: copy_trading::QueueItem::Deposit { funds },
         wallet: sender,
     };
-    crate::state::LAST_INSERTED_QUEUE_ID.save(storage, &queue_id);
-    crate::state::PENDING_QUEUE_ITEMS.save(storage, &queue_id, &queue_position);
-    // todo: add events
+    crate::state::LAST_INSERTED_QUEUE_ID.save(storage, &queue_id)?;
+    crate::state::PENDING_QUEUE_ITEMS.save(storage, &queue_id, &queue_position)?;
     Ok(Response::new().add_event(
         Event::new("deposit")
             .add_attribute("collateral", funds.to_string())
@@ -139,6 +138,7 @@ fn deposit(
     ))
 }
 
+#[allow(dead_code)]
 fn compute_lp_token_value(
     storage: &mut dyn Storage,
     state: State,
@@ -150,10 +150,10 @@ fn compute_lp_token_value(
         .may_load(storage, &token)
         .context("Could not load LP_TOKEN_VALE")?
         .unwrap_or_default();
-    let token_valid = token_value.status.valid();
-    if token_valid {
-        // todo: add events
-        return Ok(Response::new());
+    if token_value.status.valid() {
+        return Ok(Response::new().add_event(
+            Event::new("lp-token").add_attribute("value", token_value.value.to_string()),
+        ));
     }
     let markets = state.load_market_ids_with_token(storage, &token)?;
     for market in &markets {
@@ -187,7 +187,7 @@ fn compute_lp_token_value(
             timestamp: Timestamp::from(env.block.time),
         },
     };
-    crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value);
+    crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
     // todo: add events
     Ok(Response::new())
 }
@@ -225,7 +225,7 @@ fn validate_single_market(
     }
     if total_open_positions != market_work.count_open_positions {
         market_work.processing_status = ProcessingStatus::ResetRequired;
-        crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work);
+        crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work)?;
         return Ok(ValidationStatus::Failed);
     }
     loop {
@@ -240,12 +240,12 @@ fn validate_single_market(
     }
     if total_orders != market_work.count_orders {
         market_work.processing_status = ProcessingStatus::ResetRequired;
-        crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work);
+        crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work)?;
         return Ok(ValidationStatus::Failed);
     } else {
         market_work.processing_status = ProcessingStatus::Validated;
     }
-    crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work);
+    crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work)?;
     Ok(ValidationStatus::Success {
         market: market_work,
     })
@@ -281,7 +281,7 @@ fn process_single_market(
         // Todo: Also break if query count exeeds!
     }
     // todo: do not save here, if we are saving below
-    crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work);
+    crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work)?;
     loop {
         let mut orders_start_after = None;
         let orders = state.load_orders(&market.addr, orders_start_after)?;
@@ -300,6 +300,6 @@ fn process_single_market(
         }
         // todo: Also break if query count exceeds
     }
-    crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work);
+    crate::state::MARKET_WORK_INFO.save(storage, &market.id, &market_work)?;
     Ok(())
 }

@@ -1,10 +1,9 @@
-use msg::contracts::market::{deferred_execution::DeferredExecId, position::PositionId};
 
 use crate::{
     prelude::*,
     types::{
-        EarmarkedItem, LpTokenStatus, LpTokenValue, MarketInfo, MarketWorkInfo, PauseStatus,
-        PositionInfo, QueuePosition, Totals, WalletFund,
+        LpTokenValue, MarketInfo, MarketWorkInfo,
+        QueuePosition, Totals,
     },
 };
 
@@ -13,9 +12,6 @@ pub(crate) const CONFIG: Item<Config> = Item::new("config");
 
 /// Shares held per wallet
 pub(crate) const SHARES: Map<(&Token, &Addr), NonZero<LpToken>> = Map::new("shares");
-
-/// The current pause status
-pub(crate) const PAUSE_STATUS: Item<PauseStatus> = Item::new("pause-status");
 
 /// Pending queued items for a wallet
 pub(crate) const WALLET_QUEUE_ITEMS: Map<(&Addr, QueuePositionId), ()> = Map::new("wallet-queue-items");

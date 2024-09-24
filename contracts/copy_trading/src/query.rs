@@ -1,15 +1,15 @@
-use crate::{
-    prelude::*,
-    types::{QueuePosition, State},
-};
+use crate::prelude::*;
 
 #[entry_point]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
     let (state, storage) = crate::types::State::load(deps, env)?;
     match msg {
         QueryMsg::Config {} => to_json_binary(&state.config),
-        QueryMsg::Balance { address } => todo!(),
-        QueryMsg::Status { start_after, limit } => todo!(),
+        QueryMsg::Balance { address: _ } => todo!(),
+        QueryMsg::Status {
+            start_after: _,
+            limit: _,
+        } => todo!(),
         QueryMsg::HasWork {} => todo!(),
         QueryMsg::QueueStatus {
             address,
@@ -17,7 +17,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
             limit,
         } => {
             let wallet = address.validate(state.api)?;
-            let response = queue_status(state, storage, wallet, start_after, limit)?;
+            let response = queue_status(storage, wallet, start_after, limit)?;
             to_json_binary(&response)
         }
     }
@@ -27,7 +27,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
 const DEFAULT_QUERY_LIMIT: u32 = 10;
 
 fn queue_status(
-    state: State,
     storage: &dyn Storage,
     wallet: Addr,
     start_after: Option<QueuePositionId>,

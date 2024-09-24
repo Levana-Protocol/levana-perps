@@ -1,6 +1,6 @@
 use crate::{
     prelude::*,
-    types::{MarketInfo, OpenPositionsResp, PositionCollateral, PositionInfo, State, TokenResp, Totals},
+    types::{MarketInfo, OpenPositionsResp, PositionCollateral, State, TokenResp, Totals},
 };
 use anyhow::{bail, ensure, Context, Result};
 use msg::contracts::{
@@ -8,7 +8,7 @@ use msg::contracts::{
     market::{
         entry::{LimitOrdersResp, PositionsQueryFeeApproach},
         order::OrderId,
-        position::{PositionId, PositionQueryResponse, PositionsResp},
+        position::{PositionId, PositionsResp},
     },
 };
 
@@ -46,8 +46,8 @@ impl<'a> State<'a> {
     pub(crate) fn load_all_market_ids(&self) -> Result<Vec<MarketId>> {
         let factory = &self.config.factory;
         let mut all_markets = vec![];
+        let mut start_after = None;
         loop {
-            let mut start_after = None;
             let MarketsResp { mut markets } = self.querier.query_wasm_smart(
                 factory.clone(),
                 &msg::contracts::factory::entry::QueryMsg::Markets {

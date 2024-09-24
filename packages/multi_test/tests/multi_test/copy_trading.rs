@@ -1,10 +1,8 @@
 use std::str::FromStr;
 
-use cosmwasm_std::{Addr, Decimal256};
 use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
-    contracts::countertrade::{ConfigUpdate, HasWorkResp, MarketBalance, WorkDescription},
-    prelude::{DirectionToBase, Number, TakeProfitTrader, UnsignedDecimal, Usd},
+    contracts::copy_trading::QueueItem,
     shared::number::{Collateral, NonZero},
 };
 
@@ -28,4 +26,12 @@ fn deposit() {
         .query_copy_trading_queue_status(trader.into(), None, None)
         .unwrap();
     assert_eq!(response.items.len(), 1);
+    let item = &response.items[0].item;
+    assert_eq!(
+        item,
+        &QueueItem::Deposit {
+            funds: NonZero::new(Collateral::from_str("100").unwrap()).unwrap()
+        }
+    );
+    assert!(response.processed_till.is_none())
 }

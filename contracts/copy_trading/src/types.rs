@@ -1,8 +1,5 @@
-use std::fmt::Display;
-
 use msg::contracts::market::{
     deferred_execution::DeferredExecId,
-    entry::ClosedPositionCursor,
     order::OrderId,
     position::{PositionId, PositionQueryResponse},
 };
@@ -162,34 +159,6 @@ impl QueuePosition {
             item: self.item,
         }
     }
-}
-
-/// Checks if the pause is status
-pub(crate) enum PauseStatus {
-    /// Paused because queue items are processed
-    PauseQueueProcessed {
-        /// Does a stats reset required ?
-        reset_required: bool,
-    },
-    /// Paused because of earmarking
-    PauseReasonEarmarking {
-        /// Does a stats reset required ?
-        reset_required: bool,
-    },
-    /// Not paused
-    NotPaused,
-}
-
-/// Earmarked item
-pub(crate) struct EarmarkedItem {
-    /// Wallet
-    wallet: Addr,
-    /// Tokens that have been earmarked
-    tokens: NonZero<LpToken>,
-    /// Required collateral when last time [LpTokenStatus] was
-    /// valid. We try updating the LpTokenStatus only if
-    /// require_collateral is less than current available collateral.
-    outdated_required_collateral: Collateral,
 }
 
 /// Token Response
