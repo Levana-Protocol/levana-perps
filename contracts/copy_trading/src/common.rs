@@ -70,7 +70,7 @@ impl<'a> State<'a> {
             if markets.is_empty() {
                 return Ok(all_markets);
             }
-            start_after = markets.last().clone().cloned();
+            start_after = markets.last().cloned();
             all_markets.append(&mut markets);
         }
     }
@@ -202,7 +202,7 @@ impl<'a> State<'a> {
             },
         )?;
         // todo: Change this to Error
-        assert!(pending_close.len() == 0);
+        assert!(pending_close.is_empty());
         let start_after = positions.last().cloned().map(|item| item.id);
         Ok(OpenPositionsResp {
             positions,
@@ -231,7 +231,7 @@ impl<'a> State<'a> {
         &self,
         market_addr: &Addr,
         start_after: Option<DeferredExecId>,
-        limit: Option<u32>
+        limit: Option<u32>,
     ) -> Result<ListDeferredExecsResp> {
         let result = self.querier.query_wasm_smart(
             market_addr,
@@ -247,6 +247,7 @@ impl<'a> State<'a> {
 
 impl Totals {
     /// Convert an amount of shares into collateral.
+    #[allow(dead_code)]
     pub(crate) fn shares_to_collateral(
         &self,
         shares: LpToken,
@@ -288,6 +289,7 @@ impl Totals {
     }
 
     /// Returns the collateral removed from the pool
+    #[allow(dead_code)]
     pub(crate) fn remove_collateral(
         &mut self,
         amount: NonZero<LpToken>,

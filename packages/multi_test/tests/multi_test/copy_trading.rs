@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use levana_perpswap_multi_test::{config::TEST_CONFIG, market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
-    contracts::copy_trading::{QueueItem, QueuePositionId, WorkResp},
+    contracts::copy_trading::{QueueItem, QueuePositionId, Token, WorkResp},
     shared::number::{Collateral, NonZero},
 };
 
@@ -74,6 +74,44 @@ fn do_actual_deposit() {
         .exec_copytrading_mint_and_deposit(&trader, "100")
         .unwrap();
 
-    // Process queue item
+    // Process queue item: do the actual deposit
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    // Should not find any work now
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork)
+}
+
+#[test]
+fn detect_compute_lp_token_work() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    market
+        .exec_copytrading_mint_and_deposit(&trader, "100")
+        .unwrap();
+
+    // Process queue item: do the actual deposit
+    market.exec_copytrading_do_work(&trader).unwrap();
+
+    // Should not find any work now
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(work, WorkResp::NoWork);
+
+    // Now let's do another deposit, so that it has to compute lp token value
+    market
+        .exec_copytrading_mint_and_deposit(&trader, "100")
+        .unwrap();
+
+    let work = market.query_copy_trading_work().unwrap();
+    assert_eq!(
+        work,
+        WorkResp::HasWork {
+            work_description: msg::contracts::copy_trading::WorkDescription::ComputeLpTokenValue {
+                token: Token::Native(TEST_CONFIG.native_denom.clone())
+            }
+        }
+    );
+    // Process queue item: compute lp token value
     market.exec_copytrading_do_work(&trader).unwrap();
 }

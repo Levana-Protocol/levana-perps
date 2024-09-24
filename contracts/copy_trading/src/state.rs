@@ -1,10 +1,6 @@
-
 use crate::{
     prelude::*,
-    types::{
-        LpTokenValue, MarketInfo, MarketWorkInfo,
-        QueuePosition, Totals, WalletInfo
-    },
+    types::{LpTokenValue, MarketInfo, MarketWorkInfo, QueuePosition, Totals, WalletInfo},
 };
 
 /// Overall config
@@ -14,7 +10,8 @@ pub(crate) const CONFIG: Item<Config> = Item::new("config");
 pub(crate) const SHARES: Map<&WalletInfo, NonZero<LpToken>> = Map::new("shares");
 
 /// Pending queued items for a wallet
-pub(crate) const WALLET_QUEUE_ITEMS: Map<(&Addr, QueuePositionId), ()> = Map::new("wallet-queue-items");
+pub(crate) const WALLET_QUEUE_ITEMS: Map<(&Addr, QueuePositionId), ()> =
+    Map::new("wallet-queue-items");
 
 /// Pending queue items that needs to be processed
 pub(crate) const PENDING_QUEUE_ITEMS: Map<&QueuePositionId, QueuePosition> =

@@ -145,7 +145,7 @@ pub(crate) struct LpTokenValue {
 }
 
 /// Status of [LpTokenValue]
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Default)]
 pub(crate) enum LpTokenStatus {
     /// Recently computed and valid for other computations
     Valid {
@@ -154,13 +154,8 @@ pub(crate) enum LpTokenStatus {
     },
     /// Outdated because of open positions etc. Need to be computed
     /// again.
+    #[default]
     Outdated,
-}
-
-impl Default for LpTokenStatus {
-    fn default() -> Self {
-        LpTokenStatus::Outdated
-    }
 }
 
 impl LpTokenStatus {
@@ -199,6 +194,7 @@ pub(crate) struct TokenResp {
 }
 
 /// Open Positions Response
+#[allow(dead_code)]
 pub(crate) struct OpenPositionsResp {
     /// Fetched tokens
     pub(crate) positions: Vec<PositionQueryResponse>,
