@@ -2394,6 +2394,33 @@ impl PerpsMarket {
         res.context("Market id {market_id} not found")
     }
 
+    pub fn get_copytrading_token(&self) -> Result<msg::contracts::copy_trading::Token> {
+        let token = self.token.clone();
+        match token {
+            Token::Cw20 { addr, .. } => {
+                let cw20 = addr.validate(self.app().api())?;
+                Ok(msg::contracts::copy_trading::Token::Cw20(cw20))
+            }
+            Token::Native { denom, .. } => Ok(msg::contracts::copy_trading::Token::Native(denom)),
+        }
+    }
+
+    pub fn exec_copytrading_mint_and_deposit(
+        &self,
+        sender: &Addr,
+        amount: &str,
+    ) -> Result<AppResponse> {
+        let amount: Collateral = amount.parse()?;
+        self.exec_mint_tokens(sender, amount.into_number())?;
+        let token = self.token.clone();
+        let wasm_msg = self.make_msg_with_funds(
+            &CopyTradingExecuteMsg::Deposit { token },
+            amount.into_number(),
+            &self.app().copy_trading_addr,
+        )?;
+        self.exec_wasm_msg(sender, wasm_msg)
+    }
+
     pub fn exec_countertrade_mint_and_deposit(
         &self,
         user_addr: &Addr,
@@ -2424,25 +2451,6 @@ impl PerpsMarket {
         Ok(res)
     }
 
-    pub fn exec_copytrading_mint_and_deposit(
-        &self,
-        sender: &Addr,
-        amount: &str,
-    ) -> Result<AppResponse> {
-        let amount: Collateral = amount.parse()?;
-        self.exec_mint_tokens(sender, amount.into_number())?;
-        let token = msg::token::Token::Native {
-            denom: TEST_CONFIG.native_denom.clone(),
-            decimal_places: 6,
-        };
-        let wasm_msg = self.make_msg_with_funds(
-            &CopyTradingExecuteMsg::Deposit { token },
-            amount.into_number(),
-            &self.app().copy_trading_addr,
-        )?;
-        self.exec_wasm_msg(sender, wasm_msg)
-    }
-
     pub fn exec_copytrading(
         &self,
         sender: &Addr,
@@ -2457,7 +2465,7 @@ impl PerpsMarket {
     }
 
     pub fn exec_copytrading_do_work(&self, sender: &Addr) -> Result<AppResponse> {
-        self.exec_copytrading(sender, &CopyTradingExecuteMsg::DoWork {  })
+        self.exec_copytrading(sender, &CopyTradingExecuteMsg::DoWork {})
     }
 
     pub fn exec_countertrade_withdraw(&self, sender: &Addr, amount: &str) -> Result<AppResponse> {

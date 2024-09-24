@@ -16,6 +16,8 @@ fn query_config() {
 #[test]
 fn deposit() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let token = market.get_copytrading_token().unwrap();
+
     let trader = market.clone_trader(0).unwrap();
 
     market
@@ -27,11 +29,12 @@ fn deposit() {
         .unwrap();
     assert_eq!(response.items.len(), 1);
     let item = &response.items[0].item;
+
     assert_eq!(
         item,
         &QueueItem::Deposit {
             funds: NonZero::new(Collateral::from_str("100").unwrap()).unwrap(),
-            token: msg::contracts::copy_trading::Token::Native(TEST_CONFIG.native_denom.clone())
+            token
         }
     );
     assert!(response.processed_till.is_none())
@@ -85,6 +88,7 @@ fn do_actual_deposit() {
 #[test]
 fn detect_compute_lp_token_work() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let token = market.get_copytrading_token().unwrap();
     let trader = market.clone_trader(0).unwrap();
 
     market
@@ -108,7 +112,7 @@ fn detect_compute_lp_token_work() {
         work,
         WorkResp::HasWork {
             work_description: msg::contracts::copy_trading::WorkDescription::ComputeLpTokenValue {
-                token: Token::Native(TEST_CONFIG.native_denom.clone())
+                token
             }
         }
     );
