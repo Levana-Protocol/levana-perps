@@ -1,6 +1,9 @@
 use crate::{
     prelude::*,
-    types::{LpTokenValue, MarketInfo, MarketWorkInfo, ProcessingStatus, QueuePosition, State},
+    types::{
+        LpTokenValue, MarketInfo, MarketWorkInfo, PositionCollateral, ProcessingStatus,
+        QueuePosition, State, WalletInfo,
+    },
     work::get_work,
 };
 use anyhow::bail;
@@ -131,7 +134,38 @@ fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Respons
             compute_lp_token_value(storage, &state, token, &env)?
         }
         WorkDescription::ProcessMarket { id } => todo!(),
-        WorkDescription::ProcessQueueItem { id } => todo!(),
+        WorkDescription::ProcessQueueItem { id } => {
+            let queue_item = crate::state::PENDING_QUEUE_ITEMS.key(&id).load(storage)?;
+            match queue_item.item {
+                QueueItem::Deposit { funds, token } => {
+                    let mut totals = crate::state::TOTALS
+                        .may_load(storage, &token)
+                        .context("Could not load TOTALS")?
+                        .unwrap_or_default();
+                    let new_shares =
+                        totals.add_collateral(funds, &PositionCollateral(Collateral::zero()))?;
+                    crate::state::TOTALS.save(storage, &token, &totals)?;
+                    let wallet_info = WalletInfo {
+                        token,
+                        wallet: queue_item.wallet,
+                    };
+                    let shares = crate::state::SHARES
+                        .key(&wallet_info)
+                        .may_load(storage)
+                        .context("Issue loading SHARES")?;
+                    let new_shares = match shares {
+                        Some(shares) => shares.checked_add(new_shares.raw())?,
+                        None => new_shares,
+                    };
+                    crate::state::SHARES.save(storage, &wallet_info, &new_shares)?;
+                    Event::new("deposit")
+                        .add_attribute("funds", funds.to_string())
+                        .add_attribute("shares", new_shares.to_string())
+                }
+                QueueItem::Withdrawal { tokens, token } => todo!(),
+                QueueItem::OpenPosition {} => todo!(),
+            }
+        }
         WorkDescription::ResetStats {} => todo!(),
         WorkDescription::Rebalance {} => todo!(),
     };
@@ -172,6 +206,8 @@ fn compute_lp_token_value(
     token: Token,
     env: &Env,
 ) -> Result<Event> {
+    println!("0: clp");
+
     let token_value = crate::state::LP_TOKEN_VALUE
         .may_load(storage, &token)
         .context("Could not load LP_TOKEN_VALE")?
@@ -179,11 +215,13 @@ fn compute_lp_token_value(
     if token_value.status.valid() {
         return Ok(Event::new("lp-token").add_attribute("value", token_value.value.to_string()));
     }
+    println!("1: clp");
     // todo: track operations
     let markets = state.load_market_ids_with_token(storage, &token)?;
     for market in &markets {
         process_single_market(storage, &state, market)?;
     }
+    println!("2: clp");
     let mut total_open_position_collateral = Collateral::zero();
     for market in &markets {
         let validation = validate_single_market(storage, &state, &market)?;
@@ -199,6 +237,7 @@ fn compute_lp_token_value(
             }
         }
     }
+    println!("3: clp");
     let totals = crate::state::TOTALS
         .may_load(storage, &token)
         .context("Could not load TOTALS")?
@@ -206,14 +245,18 @@ fn compute_lp_token_value(
     let total_collateral = totals
         .collateral
         .checked_add(total_open_position_collateral)?;
-    let shares = totals.shares;
-    let one_share_value = total_collateral.checked_div_dec(shares.into_decimal256())?;
+    println!("4: clp");
+    println!("4.1: total_collateral {total_collateral}");
+    let total_shares = totals.shares;
+    println!("4.2: shares {total_shares}");
+    let one_share_value = total_collateral.checked_div_dec(total_shares.into_decimal256())?;
     let token_value = LpTokenValue {
         value: one_share_value,
         status: crate::types::LpTokenStatus::Valid {
             timestamp: Timestamp::from(env.block.time),
         },
     };
+    println!("5: clp");
     crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
     let event = Event::new("lp-token")
         .add_attribute("validation", "success".to_string())

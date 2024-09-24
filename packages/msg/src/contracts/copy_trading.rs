@@ -119,8 +119,7 @@ pub enum ExecuteMsg {
         message: LeaderExecuteMsg,
     },
     /// Perform queue work
-    DoWork {
-    }
+    DoWork {},
 }
 
 /// Market specific execution for Leader
@@ -222,8 +221,7 @@ pub enum RequiresToken {
         token: Token,
     },
     /// Token not requird
-    NoToken {
-    },
+    NoToken {},
 }
 
 impl QueueItem {
@@ -232,7 +230,7 @@ impl QueueItem {
         match self {
             QueueItem::Deposit { token, .. } => RequiresToken::Token { token },
             QueueItem::Withdrawal { token, .. } => RequiresToken::Token { token },
-            QueueItem::OpenPosition {} => RequiresToken::NoToken {  },
+            QueueItem::OpenPosition {} => RequiresToken::NoToken {},
         }
     }
 }
@@ -304,6 +302,18 @@ impl<'a> PrimaryKey<'a> for Token {
         let token_type = Key::Val8([token_type]);
         let key = Key::Ref(bytes);
 
+        vec![token_type, key]
+    }
+}
+
+impl<'a> Prefixer<'a> for Token {
+    fn prefix(&self) -> Vec<Key> {
+        let (token_type, bytes) = match self {
+            Token::Native(native) => (0u8, native.as_bytes()),
+            Token::Cw20(cw20) => (1u8, cw20.as_bytes()),
+        };
+        let token_type = Key::Val8([token_type]);
+        let key = Key::Ref(bytes);
         vec![token_type, key]
     }
 }

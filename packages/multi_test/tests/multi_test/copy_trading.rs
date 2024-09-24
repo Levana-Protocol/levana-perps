@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use levana_perpswap_multi_test::{config::TEST_CONFIG, market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
-    contracts::copy_trading::{QueueItem, WorkResp},
+    contracts::copy_trading::{QueueItem, QueuePositionId, WorkResp},
     shared::number::{Collateral, NonZero},
 };
 
@@ -46,7 +46,7 @@ fn initial_no_work() {
 }
 
 #[test]
-fn compute_lp_token_work() {
+fn detect_process_queue_item_work() {
     let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
     let trader = market.clone_trader(0).unwrap();
 
@@ -58,11 +58,22 @@ fn compute_lp_token_work() {
     assert_eq!(
         work,
         WorkResp::HasWork {
-            work_description: msg::contracts::copy_trading::WorkDescription::ComputeLpTokenValue {
-                token: msg::contracts::copy_trading::Token::Native(
-                    TEST_CONFIG.native_denom.clone()
-                )
+            work_description: msg::contracts::copy_trading::WorkDescription::ProcessQueueItem {
+                id: QueuePositionId::new(0)
             }
         }
     )
+}
+
+#[test]
+fn do_actual_deposit() {
+    let market = PerpsMarket::new(PerpsApp::new_cell().unwrap()).unwrap();
+    let trader = market.clone_trader(0).unwrap();
+
+    market
+        .exec_copytrading_mint_and_deposit(&trader, "100")
+        .unwrap();
+
+    // Process queue item
+    market.exec_copytrading_do_work(&trader).unwrap();
 }

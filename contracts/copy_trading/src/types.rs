@@ -1,3 +1,6 @@
+use cosmwasm_std::{StdError, StdResult};
+use cw_storage_plus::Key;
+use cw_storage_plus::{KeyDeserialize, PrimaryKey};
 use msg::contracts::market::{
     deferred_execution::DeferredExecId,
     order::OrderId,
@@ -205,3 +208,66 @@ pub(crate) struct OpenPositionsResp {
 
 /// Represents total active collateral of open positions in a market
 pub(crate) struct PositionCollateral(pub Collateral);
+
+/// Wallet information
+#[derive(Clone, Debug)]
+pub(crate) struct WalletInfo {
+    /// Wallet with this specific token
+    pub(crate) token: Token,
+    /// Wallet address
+    pub(crate) wallet: Addr,
+}
+
+impl<'a> PrimaryKey<'a> for WalletInfo {
+    type Prefix = Token;
+    type SubPrefix = ();
+    type Suffix = Addr;
+    type SuperSuffix = Self;
+
+    fn key(&self) -> Vec<Key> {
+        let mut keys = self.token.key();
+        keys.extend(self.wallet.key());
+        keys
+    }
+}
+
+impl KeyDeserialize for WalletInfo {
+    type Output = WalletInfo;
+
+    const KEY_ELEMS: u16 = 3;
+
+    fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
+        let keys = value.key();
+        if keys.len() != 3 {
+            return Err(StdError::serialize_err(
+                "WalletInfo",
+                "WalletInfo keys len is not three",
+            ));
+        }
+        let token_type = &keys[0];
+        let token = keys[1].as_ref();
+        let token_type = match token_type {
+            Key::Val8([token_type]) => token_type,
+            _ => return Err(StdError::serialize_err("WalletInfo", "Invalid token type")),
+        };
+        let token = match token_type {
+            0 => {
+                let native_token = String::from_slice(token)?;
+                Token::Native(native_token)
+            }
+            1 => {
+                let cw20_token = Addr::from_slice(token)?;
+                Token::Cw20(cw20_token)
+            }
+            _ => {
+                return Err(StdError::serialize_err(
+                    "Token",
+                    "Invalid number in token_type",
+                ))
+            }
+        };
+        let wallet = keys[3].as_ref();
+        let wallet = Addr::from_slice(wallet)?;
+        Ok(WalletInfo { token, wallet })
+    }
+}
