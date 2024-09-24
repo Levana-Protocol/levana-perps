@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
+use levana_perpswap_multi_test::{config::TEST_CONFIG, market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
     contracts::copy_trading::QueueItem,
     shared::number::{Collateral, NonZero},
@@ -30,7 +30,8 @@ fn deposit() {
     assert_eq!(
         item,
         &QueueItem::Deposit {
-            funds: NonZero::new(Collateral::from_str("100").unwrap()).unwrap()
+            funds: NonZero::new(Collateral::from_str("100").unwrap()).unwrap(),
+            token: msg::contracts::copy_trading::Token::Native(TEST_CONFIG.native_denom.clone())
         }
     );
     assert!(response.processed_till.is_none())
