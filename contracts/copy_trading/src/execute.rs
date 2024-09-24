@@ -1,7 +1,9 @@
 use crate::{
     prelude::*,
     types::{LpTokenValue, MarketInfo, MarketWorkInfo, ProcessingStatus, QueuePosition, State},
+    work::get_work,
 };
+use anyhow::bail;
 use msg::contracts::copy_trading;
 use shared::time::Timestamp;
 
@@ -99,7 +101,7 @@ fn handle_funds(api: &dyn Api, mut info: MessageInfo, msg: ExecuteMsg) -> Result
 #[entry_point]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     let HandleFunds { funds, msg, sender } = handle_funds(deps.api, info, msg)?;
-    let (state, storage) = State::load_mut(deps, env)?;
+    let (state, storage) = State::load_mut(deps, &env)?;
     match msg {
         ExecuteMsg::Receive { .. } => Err(anyhow!("Cannot perform a receive within a receive")),
         ExecuteMsg::Deposit { token } => {
@@ -107,15 +109,40 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
             let token = state.to_token(&token)?;
             deposit(storage, sender, funds, token)
         }
+        ExecuteMsg::DoWork {} => {
+            funds.require_none()?;
+            do_work(state, storage, &env)
+        }
         _ => panic!("Not implemented yet"),
     }
+}
+
+fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Response> {
+    let work = get_work(&state, storage)?;
+    let desc = match work {
+        WorkResp::NoWork => bail!("No work items available"),
+        WorkResp::HasWork { work_description } => work_description,
+    };
+    let res = Response::new()
+        .add_event(Event::new("work-desc").add_attribute("desc", format!("{desc:?}")));
+
+    let event = match desc {
+        WorkDescription::ComputeLpTokenValue { token } => {
+            compute_lp_token_value(storage, &state, token, &env)?
+        }
+        WorkDescription::ProcessMarket { id } => todo!(),
+        WorkDescription::ProcessQueueItem { id } => todo!(),
+        WorkDescription::ResetStats {} => todo!(),
+        WorkDescription::Rebalance {} => todo!(),
+    };
+    Ok(res.add_event(event))
 }
 
 fn deposit(
     storage: &mut dyn Storage,
     sender: Addr,
     funds: NonZero<Collateral>,
-    token: Token
+    token: Token,
 ) -> Result<Response> {
     let queue_id = crate::state::LAST_INSERTED_QUEUE_ID
         .may_load(storage)
@@ -126,7 +153,7 @@ fn deposit(
     };
     crate::state::WALLET_QUEUE_ITEMS.save(storage, (&sender, queue_id), &())?;
     let queue_position = QueuePosition {
-        item: copy_trading::QueueItem::Deposit { funds, token  },
+        item: copy_trading::QueueItem::Deposit { funds, token },
         wallet: sender,
     };
     crate::state::LAST_INSERTED_QUEUE_ID.save(storage, &queue_id)?;
@@ -141,18 +168,16 @@ fn deposit(
 #[allow(dead_code)]
 fn compute_lp_token_value(
     storage: &mut dyn Storage,
-    state: State,
+    state: &State,
     token: Token,
     env: &Env,
-) -> Result<Response> {
+) -> Result<Event> {
     let token_value = crate::state::LP_TOKEN_VALUE
         .may_load(storage, &token)
         .context("Could not load LP_TOKEN_VALE")?
         .unwrap_or_default();
     if token_value.status.valid() {
-        return Ok(Response::new().add_event(
-            Event::new("lp-token").add_attribute("value", token_value.value.to_string()),
-        ));
+        return Ok(Event::new("lp-token").add_attribute("value", token_value.value.to_string()));
     }
     // todo: track operations
     let markets = state.load_market_ids_with_token(storage, &token)?;
@@ -164,11 +189,9 @@ fn compute_lp_token_value(
         let validation = validate_single_market(storage, &state, &market)?;
         match validation {
             ValidationStatus::Failed => {
-                return Ok(Response::new().add_event(
-                    Event::new("lp-token")
-                        .add_attribute("validation", "failed".to_string())
-                        .add_attribute("market-id", market.id.to_string()),
-                ));
+                return Ok(Event::new("lp-token")
+                    .add_attribute("validation", "failed".to_string())
+                    .add_attribute("market-id", market.id.to_string()));
             }
             ValidationStatus::Success { market } => {
                 total_open_position_collateral =
@@ -195,7 +218,7 @@ fn compute_lp_token_value(
     let event = Event::new("lp-token")
         .add_attribute("validation", "success".to_string())
         .add_attribute("value", token_value.value.to_string());
-    Ok(Response::new().add_event(event))
+    Ok(event)
 }
 
 enum ValidationStatus {

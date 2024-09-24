@@ -2323,10 +2323,8 @@ impl PerpsMarket {
         })
     }
 
-    pub fn query_copy_trading_work(
-        &self,
-    ) -> Result<msg::contracts::copy_trading::WorkResp> {
-        self.query_copy_trading(&CopyTradingQueryMsg::HasWork {  })
+    pub fn query_copy_trading_work(&self) -> Result<msg::contracts::copy_trading::WorkResp> {
+        self.query_copy_trading(&CopyTradingQueryMsg::HasWork {})
     }
 
     pub fn query_copy_trading_config(&self) -> Result<CopyTradingConfig> {
@@ -2443,6 +2441,23 @@ impl PerpsMarket {
             &self.app().copy_trading_addr,
         )?;
         self.exec_wasm_msg(sender, wasm_msg)
+    }
+
+    pub fn exec_copytrading(
+        &self,
+        sender: &Addr,
+        msg: &CopyTradingExecuteMsg,
+    ) -> Result<AppResponse> {
+        let contract_addr = self.app().copy_trading_addr.clone();
+        let res = self
+            .app()
+            .execute_contract(sender.clone(), contract_addr, msg, &[])?;
+
+        Ok(res)
+    }
+
+    pub fn exec_copytrading_do_work(&self, sender: &Addr) -> Result<AppResponse> {
+        self.exec_copytrading(sender, &CopyTradingExecuteMsg::DoWork {  })
     }
 
     pub fn exec_countertrade_withdraw(&self, sender: &Addr, amount: &str) -> Result<AppResponse> {

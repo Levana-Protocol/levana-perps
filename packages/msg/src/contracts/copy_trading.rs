@@ -118,6 +118,9 @@ pub enum ExecuteMsg {
         /// Message
         message: LeaderExecuteMsg,
     },
+    /// Perform queue work
+    DoWork {
+    }
 }
 
 /// Market specific execution for Leader

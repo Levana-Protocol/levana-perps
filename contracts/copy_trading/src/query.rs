@@ -11,7 +11,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
             limit: _,
         } => todo!(),
         QueryMsg::HasWork {} => {
-            let work = get_work(state, storage)?;
+            let work = get_work(&state, storage)?;
             to_json_binary(&work)
         }
         QueryMsg::QueueStatus {

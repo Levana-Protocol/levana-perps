@@ -40,7 +40,7 @@ impl<'a> State<'a> {
         ))
     }
 
-    pub(crate) fn load_mut(deps: DepsMut<'a>, env: Env) -> Result<(Self, &'a mut dyn Storage)> {
+    pub(crate) fn load_mut(deps: DepsMut<'a>, env: &Env) -> Result<(Self, &'a mut dyn Storage)> {
         let config = crate::state::CONFIG
             .load(deps.storage)
             .context("Could not load config")?;
@@ -49,7 +49,7 @@ impl<'a> State<'a> {
                 config,
                 api: deps.api,
                 querier: deps.querier,
-                my_addr: env.contract.address,
+                my_addr: env.contract.address.clone(),
             },
             deps.storage,
         ))
