@@ -1,3 +1,4 @@
+mod copy_trading;
 mod counterleverage;
 mod countertrade;
 mod crank_fee;
@@ -31,4 +32,3 @@ mod sanity;
 mod shutdown;
 mod staleness;
 mod wrong_token;
-mod copy_trading;

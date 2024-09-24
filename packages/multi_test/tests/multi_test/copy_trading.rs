@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
-use levana_perpswap_multi_test::{config::TEST_CONFIG, market_wrapper::PerpsMarket, PerpsApp};
+use levana_perpswap_multi_test::{market_wrapper::PerpsMarket, PerpsApp};
 use msg::{
-    contracts::copy_trading::{QueueItem, QueuePositionId, Token, WorkResp},
+    contracts::copy_trading::{QueueItem, QueuePositionId, WorkResp},
     shared::number::{Collateral, NonZero},
 };
 
