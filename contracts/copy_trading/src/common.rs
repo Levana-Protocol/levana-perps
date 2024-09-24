@@ -6,6 +6,7 @@ use anyhow::{bail, ensure, Context, Result};
 use msg::contracts::{
     factory::entry::MarketsResp,
     market::{
+        deferred_execution::{DeferredExecId, ListDeferredExecsResp},
         entry::{LimitOrdersResp, PositionsQueryFeeApproach},
         order::OrderId,
         position::{PositionId, PositionsResp},
@@ -13,6 +14,17 @@ use msg::contracts::{
 };
 
 impl<'a> State<'a> {
+    pub(crate) fn to_token(&self, token: &msg::token::Token) -> Result<Token> {
+        let token = match token {
+            msg::token::Token::Cw20 { addr, .. } => {
+                let addr = addr.validate(self.api)?;
+                Token::Cw20(addr)
+            }
+            msg::token::Token::Native { denom, .. } => Token::Native(denom.clone()),
+        };
+        Ok(token)
+    }
+
     pub(crate) fn load(deps: Deps<'a>, env: Env) -> Result<(Self, &'a dyn Storage)> {
         let config = crate::state::CONFIG
             .load(deps.storage)
@@ -49,7 +61,7 @@ impl<'a> State<'a> {
         let mut start_after = None;
         loop {
             let MarketsResp { mut markets } = self.querier.query_wasm_smart(
-                factory.clone(),
+                factory,
                 &msg::contracts::factory::entry::QueryMsg::Markets {
                     start_after,
                     limit: None,
@@ -210,6 +222,23 @@ impl<'a> State<'a> {
                 start_after,
                 limit: None,
                 order: None,
+            },
+        )?;
+        Ok(result)
+    }
+
+    pub(crate) fn load_deferred_execs(
+        &self,
+        market_addr: &Addr,
+        start_after: Option<DeferredExecId>,
+        limit: Option<u32>
+    ) -> Result<ListDeferredExecsResp> {
+        let result = self.querier.query_wasm_smart(
+            market_addr,
+            &MarketQueryMsg::ListDeferredExecs {
+                addr: self.my_addr.as_ref().into(),
+                start_after,
+                limit,
             },
         )?;
         Ok(result)

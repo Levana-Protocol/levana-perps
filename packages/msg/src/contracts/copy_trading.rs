@@ -197,14 +197,41 @@ pub enum QueueItem {
     Deposit {
         /// Funds to be deposited
         funds: NonZero<Collateral>,
+        /// Token
+        token: Token,
     },
     /// Withdraw via LpToken
     Withdrawal {
         /// Tokens to be withdrawn
         tokens: NonZero<LpToken>,
+        /// Token type
+        token: Token,
     },
     /// Open Position etc. etc.
     OpenPosition {},
+}
+
+/// Token required for the queue item
+pub enum RequiresToken {
+    /// Token required
+    Token {
+        /// Token
+        token: Token,
+    },
+    /// Token not requird
+    NoToken {
+    },
+}
+
+impl QueueItem {
+    /// Does this queue item require computation of LP token value
+    pub fn requires_token(self) -> RequiresToken {
+        match self {
+            QueueItem::Deposit { token, .. } => RequiresToken::Token { token },
+            QueueItem::Withdrawal { token, .. } => RequiresToken::Token { token },
+            QueueItem::OpenPosition {} => RequiresToken::NoToken {  },
+        }
+    }
 }
 
 /// Individual market response from [QueryMsg::Status]

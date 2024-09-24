@@ -1,11 +1,9 @@
-use anyhow::{anyhow, ensure, Context, Result};
-use msg::contracts::copy_trading;
-use shared::time::Timestamp;
-
 use crate::{
     prelude::*,
     types::{LpTokenValue, MarketInfo, MarketWorkInfo, ProcessingStatus, QueuePosition, State},
 };
+use msg::contracts::copy_trading;
+use shared::time::Timestamp;
 
 #[must_use]
 enum Funds {
@@ -101,12 +99,13 @@ fn handle_funds(api: &dyn Api, mut info: MessageInfo, msg: ExecuteMsg) -> Result
 #[entry_point]
 pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> Result<Response> {
     let HandleFunds { funds, msg, sender } = handle_funds(deps.api, info, msg)?;
-    let (_state, storage) = State::load_mut(deps, env)?;
+    let (state, storage) = State::load_mut(deps, env)?;
     match msg {
         ExecuteMsg::Receive { .. } => Err(anyhow!("Cannot perform a receive within a receive")),
         ExecuteMsg::Deposit { token } => {
             let funds = funds.require_some(&token)?;
-            deposit(storage, sender, funds)
+            let token = state.to_token(&token)?;
+            deposit(storage, sender, funds, token)
         }
         _ => panic!("Not implemented yet"),
     }
@@ -116,6 +115,7 @@ fn deposit(
     storage: &mut dyn Storage,
     sender: Addr,
     funds: NonZero<Collateral>,
+    token: Token
 ) -> Result<Response> {
     let queue_id = crate::state::LAST_INSERTED_QUEUE_ID
         .may_load(storage)
@@ -126,7 +126,7 @@ fn deposit(
     };
     crate::state::WALLET_QUEUE_ITEMS.save(storage, (&sender, queue_id), &())?;
     let queue_position = QueuePosition {
-        item: copy_trading::QueueItem::Deposit { funds },
+        item: copy_trading::QueueItem::Deposit { funds, token  },
         wallet: sender,
     };
     crate::state::LAST_INSERTED_QUEUE_ID.save(storage, &queue_id)?;
@@ -145,7 +145,6 @@ fn compute_lp_token_value(
     token: Token,
     env: &Env,
 ) -> Result<Response> {
-    // todo: track operations
     let token_value = crate::state::LP_TOKEN_VALUE
         .may_load(storage, &token)
         .context("Could not load LP_TOKEN_VALE")?
@@ -155,6 +154,7 @@ fn compute_lp_token_value(
             Event::new("lp-token").add_attribute("value", token_value.value.to_string()),
         ));
     }
+    // todo: track operations
     let markets = state.load_market_ids_with_token(storage, &token)?;
     for market in &markets {
         process_single_market(storage, &state, market)?;
@@ -164,11 +164,15 @@ fn compute_lp_token_value(
         let validation = validate_single_market(storage, &state, &market)?;
         match validation {
             ValidationStatus::Failed => {
-                // todo: add events
-                return Ok(Response::new());
+                return Ok(Response::new().add_event(
+                    Event::new("lp-token")
+                        .add_attribute("validation", "failed".to_string())
+                        .add_attribute("market-id", market.id.to_string()),
+                ));
             }
             ValidationStatus::Success { market } => {
-                total_open_position_collateral = market.active_collateral;
+                total_open_position_collateral =
+                    total_open_position_collateral.checked_add(market.active_collateral)?;
             }
         }
     }
@@ -188,8 +192,10 @@ fn compute_lp_token_value(
         },
     };
     crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
-    // todo: add events
-    Ok(Response::new())
+    let event = Event::new("lp-token")
+        .add_attribute("validation", "success".to_string())
+        .add_attribute("value", token_value.value.to_string());
+    Ok(Response::new().add_event(event))
 }
 
 enum ValidationStatus {
@@ -212,6 +218,8 @@ fn validate_single_market(
     let mut total_orders = 0u64;
     // todo: need to break if query limit exeeded
     loop {
+        // We have to iterate again entirely, because a position can
+        // close.
         let mut tokens_start_after = None;
         let tokens = state.load_tokens(&market.addr, tokens_start_after)?;
         tokens_start_after = tokens.start_after;
@@ -251,6 +259,7 @@ fn validate_single_market(
     })
 }
 
+/// Process open positions and orders for a single market.
 fn process_single_market(
     storage: &mut dyn Storage,
     state: &State<'_>,

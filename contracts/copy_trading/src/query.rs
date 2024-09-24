@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, work::get_work};
 
 #[entry_point]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
@@ -10,7 +10,10 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> Result<Binary> {
             start_after: _,
             limit: _,
         } => todo!(),
-        QueryMsg::HasWork {} => todo!(),
+        QueryMsg::HasWork {} => {
+            let work = get_work(state, storage);
+            todo!()
+        }
         QueryMsg::QueueStatus {
             address,
             start_after,

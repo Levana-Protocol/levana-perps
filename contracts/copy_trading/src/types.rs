@@ -82,6 +82,32 @@ pub enum ProcessingStatus {
     Validated,
 }
 
+impl ProcessingStatus {
+    pub fn reset_required(&self) -> bool {
+        match self {
+            ProcessingStatus::NotStarted => false,
+            ProcessingStatus::OpenPositions(_) => false,
+            ProcessingStatus::Deferred(_) => false,
+            ProcessingStatus::LimitOrder(_) => false,
+            ProcessingStatus::LimitOrderHistory(_) => false,
+            ProcessingStatus::ResetRequired => true,
+            ProcessingStatus::Validated => false,
+        }
+    }
+
+    pub fn is_validated(&self) -> bool {
+        match self {
+            ProcessingStatus::NotStarted => false,
+            ProcessingStatus::OpenPositions(_) => false,
+            ProcessingStatus::Deferred(_) => false,
+            ProcessingStatus::LimitOrder(_) => false,
+            ProcessingStatus::LimitOrderHistory(_) => false,
+            ProcessingStatus::ResetRequired => false,
+            ProcessingStatus::Validated => true,
+        }
+    }
+}
+
 /// Specific position information
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub(crate) struct PositionInfo {

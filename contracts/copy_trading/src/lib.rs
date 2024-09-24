@@ -9,6 +9,7 @@ mod prelude;
 mod query;
 mod state;
 mod types;
+mod work;
 
 pub use execute::execute;
 pub use query::query;

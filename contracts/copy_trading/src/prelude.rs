@@ -1,6 +1,6 @@
 pub(crate) use msg::contracts::copy_trading::*;
 pub(crate) use cw_storage_plus::{Bound, Item, Map};
-pub(crate) use anyhow::{anyhow, Result};
+pub(crate) use anyhow::{anyhow, ensure, Context, Result};
 pub(crate) use shared::{
     attr_map,
     storage::{Collateral, LpToken, MarketId, NonZero, Signed, UnsignedDecimal},
