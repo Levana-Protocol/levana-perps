@@ -395,7 +395,7 @@ impl Token {
 }
 
 /// Work response
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkResp {
     /// No work found
@@ -408,7 +408,7 @@ pub enum WorkResp {
 }
 
 /// Work Description
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkDescription {
     /// Calculate LP token value

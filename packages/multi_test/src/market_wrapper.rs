@@ -2323,6 +2323,12 @@ impl PerpsMarket {
         })
     }
 
+    pub fn query_copy_trading_work(
+        &self,
+    ) -> Result<msg::contracts::copy_trading::WorkResp> {
+        self.query_copy_trading(&CopyTradingQueryMsg::HasWork {  })
+    }
+
     pub fn query_copy_trading_config(&self) -> Result<CopyTradingConfig> {
         self.query_copy_trading(&CopyTradingQueryMsg::Config {})
     }
