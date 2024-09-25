@@ -721,6 +721,7 @@ fn compute_delta_notional(
                 amount: NonZero::new(collateral).context("remove_collateral is zero")?,
                 crank_fee,
             },
+            Capital::Close { pos_id } => WorkDescription::ClosePosition { pos_id },
         },
         None => return Ok(None),
     };
@@ -740,6 +741,9 @@ enum Capital {
         collateral: Collateral,
         pos_id: PositionId,
         crank_fee: Collateral,
+    },
+    Close {
+        pos_id: PositionId,
     },
 }
 
@@ -806,6 +810,10 @@ fn optimize_capital_efficiency(
                     // to be reduce, it's not worth performing this
                     // action
                     None
+                } else if max_deduct >= countertrade_position.active_collateral.raw() {
+                    Some(Capital::Close {
+                        pos_id: countertrade_position.id,
+                    })
                 } else {
                     Some(Capital::RemoveCollateral {
                         collateral: max_deduct,
