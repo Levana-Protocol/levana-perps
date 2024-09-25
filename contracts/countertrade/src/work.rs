@@ -591,8 +591,14 @@ fn derive_popular_funding_rate_annual(
             std::cmp::Ordering::Equal => (Number::ZERO, Number::ZERO),
         }
     };
-    assert!(unpopular.is_negative());
-    assert!(popular.is_strictly_positive());
+
+    if instant_open_long.is_zero() || instant_open_short.is_zero() {
+        assert!(unpopular.is_zero());
+        assert!(popular.is_zero());
+    } else {
+        assert!(unpopular.is_negative());
+        assert!(popular.is_strictly_positive());
+    }
     Ok(popular.abs_unsigned())
 }
 
