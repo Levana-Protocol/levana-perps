@@ -42,7 +42,7 @@ pub(crate) struct ProposalInfoFromDb {
     pub(crate) title: String,
     pub(crate) environment: ContractEnvironment,
     pub(crate) chain: ChainId,
-    pub(crate) address: Address,
+    pub(crate) address: String,
 }
 
 /// Information sent to the database to insert a new proposal.

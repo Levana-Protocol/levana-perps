@@ -24,6 +24,9 @@ db-reset:
 run:
 	cargo run --bin perps-companion uri --postgres-uri postgresql://postgres:postgres@localhost/companion
 
+prepare:
+	cd ../../.. && cargo sqlx prepare
+
 # Postgres terminate connection
 pg-terminate-conn:
 	psql -U postgres -h localhost -c "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = 'companion' AND pid <> pg_backend_pid();"

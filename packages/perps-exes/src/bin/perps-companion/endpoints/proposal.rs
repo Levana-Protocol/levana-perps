@@ -1,4 +1,4 @@
-use std::{borrow::Cow, sync::Arc};
+use std::{borrow::Cow, str::FromStr, sync::Arc};
 
 use anyhow::{Context, Result};
 use askama::Template;
@@ -12,7 +12,7 @@ use headers::Host;
 use axum_extra::response::Css;
 use axum_extra::routing::TypedPath;
 use axum_extra::TypedHeader;
-use cosmos::{Address, Contract};
+use cosmos::{error::AddressError, Address, Contract};
 use cosmwasm_std::Uint64;
 use resvg::usvg::{fontdb::Database, TreeParsing, TreeTextToPath};
 use serde::Deserialize;
@@ -77,7 +77,7 @@ impl ProposalInfo {
             host: host.hostname().to_owned(),
             amplitude_key: environment.amplitude_key(),
             chain,
-            address,
+            address: Address::from_str(&address).map_err(|source| { Error::InvalidAddress{source} })?,
         })
     }
 }
@@ -307,6 +307,10 @@ pub(crate) enum Error {
     Database { msg: String },
     #[error("Page not found")]
     InvalidPage,
+    #[error("Invalid address: {source}")]
+    InvalidAddress {
+        source: AddressError,
+    },
 }
 
 impl IntoResponse for Error {
@@ -324,6 +328,7 @@ impl IntoResponse for Error {
                 }
                 Error::InvalidPage => http::status::StatusCode::NOT_FOUND,
                 Error::UnknownChainId => http::status::StatusCode::BAD_REQUEST,
+                Error::InvalidAddress { source: _ } => http::status::StatusCode::BAD_REQUEST,
             },
             error: self.clone(),
         }

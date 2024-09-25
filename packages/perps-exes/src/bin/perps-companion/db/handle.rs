@@ -140,34 +140,34 @@ impl Db {
         let url_id = query_scalar!(
             r#"
                 INSERT INTO proposal_detail
-                (proposal_id, title, chain, environment, address)
+                (id, title, chain, environment, address)
                 VALUES($1, $2, $3, $4, $5)
                 RETURNING url_id
             "#,
-            proposal_u64,
+            proposal_u64 as i64,
             title,
-            chain,
-            environment,
-            address,
+            chain as i32,
+            environment as i32,
+            address.to_string(),
         )
         .fetch_one(&self.pool)
         .await?;
-        Ok(url_id)
+        Ok(url_id as u64)
     }
 
     pub(crate) async fn get_proposal_detail(&self, url_id: u64) -> Result<Option<ProposalInfoFromDb>> {
         query_as!(
-            PositionInfoFromDb,
+            ProposalInfoFromDb,
             r#"
                 SELECT
                     title,
                     chain as "chain: ChainId",
                     environment as "environment: ContractEnvironment",
-                    address as "address: Address",
+                    address
                 FROM proposal_detail
                 WHERE url_id=$1
             "#,
-            url_id
+            url_id as i64
         )
         .fetch_optional(&self.pool)
         .await
