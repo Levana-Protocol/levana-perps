@@ -18,8 +18,6 @@ use shared::{
 pub struct InstantiateMsg {
     /// Factory contract that trading will be performed on
     pub factory: RawAddr,
-    /// Address of the administrator of the contract
-    pub admin: RawAddr,
     /// Leader of the contract
     pub leader: RawAddr,
     /// Initial configuration values
