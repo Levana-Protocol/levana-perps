@@ -2,6 +2,7 @@
 
 use std::{fmt::Display, num::ParseIntError, str::FromStr};
 
+use super::market::entry::ExecuteMsg as MarketExecuteMsg;
 use anyhow::anyhow;
 use cosmwasm_std::{Addr, Binary, Decimal256, StdError, StdResult, Uint128, Uint64};
 use cw_storage_plus::{IntKey, Key, KeyDeserialize, Prefixer, PrimaryKey};
@@ -113,20 +114,10 @@ pub enum ExecuteMsg {
         /// Market id that message is for
         market_id: MarketId,
         /// Message
-        message: LeaderExecuteMsg,
+        message: MarketExecuteMsg,
     },
     /// Perform queue work
     DoWork {},
-}
-
-/// Market specific execution for Leader
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum LeaderExecuteMsg {
-    /// Open position and various other messages
-    OpenPosition {},
-    /// Close position etc
-    ClosePosition {},
 }
 
 /// Queries that can be performed on the copy contract.
