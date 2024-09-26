@@ -145,7 +145,9 @@ fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Respons
         }
         WorkDescription::ProcessMarket { .. } => todo!(),
         WorkDescription::ProcessQueueItem { id } => {
-            let queue_item = crate::state::PENDING_QUEUE_ITEMS.may_load(storage, &id)?;
+            let queue_item = crate::state::PENDING_QUEUE_ITEMS
+                .may_load(storage, &id)?
+                .context("PENDING_QUEUE_ITEMS load failed")?;
             match queue_item.item {
                 QueueItem::Deposit { funds, token } => {
                     let mut totals = crate::state::TOTALS
