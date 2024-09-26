@@ -25,16 +25,17 @@ pub fn instantiate(
     _info: MessageInfo,
     InstantiateMsg {
         factory,
-        admin,
         leader,
         config:
             ConfigUpdate {
                 name,
                 description,
                 commission_rate,
+                admin,
             },
     }: InstantiateMsg,
 ) -> Result<Response> {
+    let admin = admin.context("Admin not provided")?;
     let config = Config {
         admin: admin.validate(deps.api).context("Invalid admin provided")?,
         pending_admin: None,

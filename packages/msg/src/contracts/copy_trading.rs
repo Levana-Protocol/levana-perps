@@ -76,6 +76,7 @@ pub struct ConfigUpdate {
     pub name: Option<String>,
     pub description: Option<String>,
     pub commission_rate: Option<Decimal256>,
+    pub admin: Option<RawAddr>
 }
 
 /// Executions available on the copy trading contract.
