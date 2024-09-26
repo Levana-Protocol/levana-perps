@@ -37,15 +37,14 @@ impl Funds {
         }
     }
 
-    fn require_some(self, market: &MarketInfo) -> Result<NonZero<Collateral>> {
+    fn require_some(self, market_token: &msg::token::Token) -> Result<NonZero<Collateral>> {
         match self {
             Funds::NoFunds => Err(anyhow!(
                 "Message requires attached funds, but none were provided"
             )),
             Funds::Funds { token, amount } => {
-                token.ensure_matches(&market.token)?;
-                let collateral = market
-                    .token
+                token.ensure_matches(market_token)?;
+                let collateral = market_token
                     .from_u128(amount.u128())
                     .context("Error converting token amount to Collateral")?;
                 NonZero::new(Collateral::from_decimal256(collateral))

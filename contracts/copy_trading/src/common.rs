@@ -157,16 +157,16 @@ impl<'a> State<'a> {
         Ok(market)
     }
 
-    pub(crate) fn get_first_market_with_token(
+    pub(crate) fn get_full_token_info(
         &self,
         storage: &mut dyn Storage,
         token: &Token,
-    ) -> Result<MarketInfo> {
+    ) -> Result<msg::token::Token> {
         let markets = self.load_all_market_ids()?;
         for market_id in markets {
             let market_info = self.load_cache_market_info(storage, &market_id)?;
             if token.is_same(&market_info.token) {
-                return Ok(market_info);
+                return Ok(market_info.token);
             }
         }
         Err(anyhow!("{token} not supported by factory"))
