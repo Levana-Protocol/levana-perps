@@ -312,23 +312,14 @@ impl KeyDeserialize for Token {
     const KEY_ELEMS: u16 = 2;
 
     fn from_vec(value: Vec<u8>) -> StdResult<Self::Output> {
-        let keys = value.key();
-        if keys.len() != 2 {
-            return Err(StdError::serialize_err("Token", "Token len is not two"));
-        }
-        let token_type = &keys[0];
-        let token = keys[1].as_ref();
-        let token_type = match token_type {
-            Key::Val8([token_type]) => token_type,
-            _ => return Err(StdError::serialize_err("Token", "Invalid token type")),
-        };
+        let (token_type, token) = <(u8, Vec<u8>) as KeyDeserialize>::from_vec(value)?;
         let token = match token_type {
             0 => {
-                let native_token = String::from_slice(token)?;
+                let native_token = String::from_slice(&token)?;
                 Token::Native(native_token)
             }
             1 => {
-                let cw20_token = Addr::from_slice(token)?;
+                let cw20_token = Addr::from_slice(&token)?;
                 Token::Cw20(cw20_token)
             }
             _ => {
