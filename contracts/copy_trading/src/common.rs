@@ -5,7 +5,7 @@ use crate::{
         Totals,
     },
 };
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use msg::contracts::{
     factory::entry::MarketsResp,
     market::{
@@ -135,10 +135,7 @@ impl<'a> State<'a> {
         let lp_token_value = crate::state::LP_TOKEN_VALUE.key(token).may_load(storage)?;
         let result = match lp_token_value {
             Some(lp_token_value) => lp_token_value.value,
-            // Token value is one if it's not computed yet. The only
-            // reason it's not computed yet, is because there would
-            // have been no deposit yet.
-            None => OneLpTokenValue(Collateral::one()),
+            None => bail!("LP_TOKEN_VALUE not computed yet"),
         };
         Ok(result)
     }
