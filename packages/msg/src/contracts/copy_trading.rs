@@ -45,7 +45,7 @@ pub struct Config {
     /// Description of the copy_trading pool. Not more than 128
     /// characters.
     pub description: String,
-    /// Commission rate for the leader. Should be within 1-30%.
+    /// Commission rate for the leader. Must be within 1-30%.
     pub commission_rate: Decimal256,
     /// Creation time of contract
     pub created_at: Timestamp,
