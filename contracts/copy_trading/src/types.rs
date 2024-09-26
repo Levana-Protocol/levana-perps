@@ -141,9 +141,25 @@ pub(crate) struct WalletFund {
 #[derive(serde::Serialize, serde::Deserialize, Debug, Default)]
 pub(crate) struct OneLpTokenValue(pub(crate) Collateral);
 
+impl OneLpTokenValue {
+    pub(crate) fn collateral_to_shares(
+        &self,
+        funds: NonZero<Collateral>,
+    ) -> Result<NonZero<LpToken>> {
+        // Todo: Write property test for understanding rounding errors
+        let new_shares = LpToken::from_decimal256(
+            funds
+                .raw()
+                .checked_div_dec(token_value.0.into_decimal256())?
+                .into_decimal256(),
+        );
+        NonZero::new(new_shares).context("tokens is zero in add_collateral")
+    }
+}
+
 impl Display for OneLpTokenValue {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        self.0.fmt(f)
     }
 }
 

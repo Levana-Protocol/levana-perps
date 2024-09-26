@@ -301,14 +301,8 @@ impl Totals {
         funds: NonZero<Collateral>,
         token_value: OneLpTokenValue,
     ) -> Result<NonZero<LpToken>> {
-        let one_collateral_value =
-            Collateral::one().checked_div_dec(token_value.0.into_decimal256())?;
-        let new_shares = LpToken::from_decimal256(
-            one_collateral_value
-                .checked_mul_dec(funds.into_decimal256())?
-                .into_decimal256(),
-        );
-        let new_shares = NonZero::new(new_shares).context("tokens is zero in add_collateral")?;
+        let new_shares = token_value.collateral_to_shares(funds)?;
+
         self.collateral = self.collateral.checked_add(funds.raw())?;
         self.shares = self.shares.checked_add(new_shares.raw())?;
         Ok(new_shares)
