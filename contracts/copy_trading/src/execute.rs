@@ -145,7 +145,7 @@ fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Respons
         }
         WorkDescription::ProcessMarket { .. } => todo!(),
         WorkDescription::ProcessQueueItem { id } => {
-            let queue_item = crate::state::PENDING_QUEUE_ITEMS.key(&id).load(storage)?;
+            let queue_item = crate::state::PENDING_QUEUE_ITEMS.may_load(storage, &id)?;
             match queue_item.item {
                 QueueItem::Deposit { funds, token } => {
                     let mut totals = crate::state::TOTALS
@@ -159,7 +159,7 @@ fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Respons
                         token,
                         wallet: queue_item.wallet,
                     };
-                    let shares = crate::state::SHARES.key(&wallet_info).may_load(storage)?;
+                    let shares = crate::state::SHARES.may_load(storage, &wallet_info)?;
                     let new_shares = match shares {
                         Some(shares) => shares.checked_add(new_shares.raw())?,
                         None => new_shares,
