@@ -114,7 +114,7 @@ pub enum ExecuteMsg {
         /// Market id that message is for
         market_id: MarketId,
         /// Message
-        message: MarketExecuteMsg,
+        message: Box<MarketExecuteMsg>,
     },
     /// Perform queue work
     DoWork {},
