@@ -2413,7 +2413,7 @@ impl PerpsMarket {
         let amount: Collateral = amount.parse()?;
         self.exec_mint_tokens(sender, amount.into_number())?;
         let wasm_msg = self.make_msg_with_funds(
-            &CopyTradingExecuteMsg::Deposit { },
+            &CopyTradingExecuteMsg::Deposit {},
             amount.into_number(),
             &self.app().copy_trading_addr,
         )?;
