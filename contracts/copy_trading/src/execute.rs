@@ -1,4 +1,5 @@
 use crate::{
+    common::get_next_queue_id,
     prelude::*,
     types::{
         LpTokenValue, MarketInfo, MarketWorkInfo, PositionCollateral, ProcessingStatus,
@@ -149,10 +150,7 @@ fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Respons
                         token,
                         wallet: queue_item.wallet,
                     };
-                    let shares = crate::state::SHARES
-                        .key(&wallet_info)
-                        .may_load(storage)
-                        .context("Issue loading SHARES")?;
+                    let shares = crate::state::SHARES.key(&wallet_info).may_load(storage)?;
                     let new_shares = match shares {
                         Some(shares) => shares.checked_add(new_shares.raw())?,
                         None => new_shares,
@@ -179,19 +177,12 @@ fn deposit(
     funds: NonZero<Collateral>,
     token: Token,
 ) -> Result<Response> {
-    let queue_id = crate::state::LAST_INSERTED_QUEUE_ID
-        .may_load(storage)
-        .context("Could not load LAST_PROCESSED_QUEUE_ID")?;
-    let queue_id = match queue_id {
-        Some(queue_id) => queue_id.next(),
-        None => QueuePositionId::new(0),
-    };
+    let queue_id = get_next_queue_id(storage)?;
     crate::state::WALLET_QUEUE_ITEMS.save(storage, (&sender, queue_id), &())?;
     let queue_position = QueuePosition {
         item: copy_trading::QueueItem::Deposit { funds, token },
         wallet: sender,
     };
-    crate::state::LAST_INSERTED_QUEUE_ID.save(storage, &queue_id)?;
     crate::state::PENDING_QUEUE_ITEMS.save(storage, &queue_id, &queue_position)?;
     Ok(Response::new().add_event(
         Event::new("deposit")

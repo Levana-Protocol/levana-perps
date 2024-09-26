@@ -311,3 +311,15 @@ impl Totals {
         Ok(collateral)
     }
 }
+
+pub(crate) fn get_next_queue_id(storage: &mut dyn Storage) -> Result<QueuePositionId> {
+    let queue_id = crate::state::LAST_INSERTED_QUEUE_ID
+        .may_load(storage)
+        .context("Could not load LAST_PROCESSED_QUEUE_ID")?;
+    let queue_id = match queue_id {
+        Some(queue_id) => queue_id.next(),
+        None => QueuePositionId::new(0),
+    };
+    crate::state::LAST_INSERTED_QUEUE_ID.save(storage, &queue_id)?;
+    Ok(queue_id)
+}
