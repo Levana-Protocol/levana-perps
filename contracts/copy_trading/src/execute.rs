@@ -209,8 +209,24 @@ fn compute_lp_token_value(
 ) -> Result<Event> {
     let token_value = crate::state::LP_TOKEN_VALUE
         .may_load(storage, &token)
-        .context("Could not load LP_TOKEN_VALE")?
-        .unwrap_or_default();
+        .context("Could not load LP_TOKEN_VALE")?;
+    let token_value = match token_value {
+        Some(token_value) => token_value,
+        None => {
+            // The value is not yet stored which means no deposit has
+            // happened yet. In this case, the initial value of the
+            // token would be one.
+            let token_value = LpTokenValue {
+                value: OneLpTokenValue(Collateral::one()),
+                status: crate::types::LpTokenStatus::Valid {
+                    timestamp: env.block.time.into(),
+                },
+            };
+            crate::state::LP_TOKEN_VALUE.save(storage, &token, &token_value)?;
+            return Ok(Event::new("lp-token").add_attribute("value", token_value.value.to_string()));
+        }
+    };
+
     if token_value.status.valid() {
         return Ok(Event::new("lp-token").add_attribute("value", token_value.value.to_string()));
     }
