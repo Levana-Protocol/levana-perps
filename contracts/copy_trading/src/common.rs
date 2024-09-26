@@ -138,6 +138,21 @@ impl<'a> State<'a> {
         Ok(market)
     }
 
+    pub(crate) fn has_market_ids_with_token(
+        &self,
+        storage: &mut dyn Storage,
+        token: &Token,
+    ) -> Result<MarketInfo> {
+        let markets = self.load_all_market_ids()?;
+        for market_id in markets {
+            let market_info = self.load_cache_market_info(storage, &market_id)?;
+            if token.is_same(&market_info.token) {
+                return Ok(market_info);
+            }
+        }
+        Err(anyhow!("{token} not supported by factory"))
+    }
+
     pub(crate) fn load_market_ids_with_token(
         &self,
         storage: &mut dyn Storage,

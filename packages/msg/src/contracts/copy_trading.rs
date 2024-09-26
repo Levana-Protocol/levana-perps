@@ -93,10 +93,7 @@ pub enum ExecuteMsg {
         msg: Binary,
     },
     /// Deposit funds to the contract
-    Deposit {
-        /// Token being deposited
-        token: crate::token::Token,
-    },
+    Deposit {},
     /// Withdraw funds from a given market
     Withdraw {
         /// The number of LP shares to remove

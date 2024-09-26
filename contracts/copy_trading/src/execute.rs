@@ -28,17 +28,24 @@ impl Funds {
         }
     }
 
-    fn require_some(self, token: &msg::token::Token) -> Result<NonZero<Collateral>> {
+    fn require_token(&self) -> Result<&Token> {
         match self {
             Funds::NoFunds => Err(anyhow!(
                 "Message requires attached funds, but none were provided"
             )),
-            Funds::Funds {
-                token: fund_token,
-                amount,
-            } => {
-                fund_token.ensure_matches(token)?;
-                let collateral = token
+            Funds::Funds { token, .. } => Ok(token),
+        }
+    }
+
+    fn require_some(self, market: &MarketInfo) -> Result<NonZero<Collateral>> {
+        match self {
+            Funds::NoFunds => Err(anyhow!(
+                "Message requires attached funds, but none were provided"
+            )),
+            Funds::Funds { token, amount } => {
+                token.ensure_matches(&market.token)?;
+                let collateral = market
+                    .token
                     .from_u128(amount.u128())
                     .context("Error converting token amount to Collateral")?;
                 NonZero::new(Collateral::from_decimal256(collateral))
@@ -108,9 +115,11 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> R
     let (state, storage) = State::load_mut(deps, &env)?;
     match msg {
         ExecuteMsg::Receive { .. } => Err(anyhow!("Cannot perform a receive within a receive")),
-        ExecuteMsg::Deposit { token } => {
-            let funds = funds.require_some(&token)?;
-            let token = state.to_token(&token)?;
+        ExecuteMsg::Deposit {} => {
+            let token = funds.require_token()?;
+            let market_info = state.has_market_ids_with_token(storage, token)?;
+            let token = token.clone();
+            let funds = funds.require_some(&market_info)?;
             deposit(storage, sender, funds, token)
         }
         ExecuteMsg::DoWork {} => {
