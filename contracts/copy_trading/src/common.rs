@@ -157,7 +157,7 @@ impl<'a> State<'a> {
         Ok(market)
     }
 
-    pub(crate) fn has_market_ids_with_token(
+    pub(crate) fn get_first_market_with_token(
         &self,
         storage: &mut dyn Storage,
         token: &Token,
