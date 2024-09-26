@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use cosmwasm_std::{StdError, StdResult};
 use cw_storage_plus::Key;
 use cw_storage_plus::{KeyDeserialize, PrimaryKey};
@@ -135,11 +137,21 @@ pub(crate) struct WalletFund {
     pub(crate) locked_at: Timestamp,
 }
 
+/// Value of one LPToken
+#[derive(serde::Serialize, serde::Deserialize, Debug, Default)]
+pub(crate) struct OneLpTokenValue(pub(crate) Collateral);
+
+impl Display for OneLpTokenValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 /// LpToken Value
 #[derive(serde::Serialize, serde::Deserialize, Debug, Default)]
 pub(crate) struct LpTokenValue {
     /// Value of one LpToken
-    pub(crate) value: Collateral,
+    pub(crate) value: OneLpTokenValue,
     /// Status of the value
     pub(crate) status: LpTokenStatus,
 }

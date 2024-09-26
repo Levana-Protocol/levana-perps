@@ -2,8 +2,8 @@ use crate::{
     common::get_next_queue_id,
     prelude::*,
     types::{
-        LpTokenValue, MarketInfo, MarketWorkInfo, PositionCollateral, ProcessingStatus,
-        QueuePosition, State, WalletInfo,
+        LpTokenValue, MarketInfo, MarketWorkInfo, OneLpTokenValue, ProcessingStatus, QueuePosition,
+        State, WalletInfo,
     },
     work::get_work,
 };
@@ -152,8 +152,8 @@ fn do_work(state: State, storage: &mut dyn Storage, env: &Env) -> Result<Respons
                         .may_load(storage, &token)
                         .context("Could not load TOTALS")?
                         .unwrap_or_default();
-                    let new_shares =
-                        totals.add_collateral(funds, &PositionCollateral(Collateral::zero()))?;
+                    let token_value = state.load_lp_token_value(storage, &token)?;
+                    let new_shares = totals.add_collateral(funds, token_value)?;
                     crate::state::TOTALS.save(storage, &token, &totals)?;
                     let wallet_info = WalletInfo {
                         token,
@@ -243,7 +243,7 @@ fn compute_lp_token_value(
     let total_shares = totals.shares;
     let one_share_value = total_collateral.checked_div_dec(total_shares.into_decimal256())?;
     let token_value = LpTokenValue {
-        value: one_share_value,
+        value: OneLpTokenValue(one_share_value),
         status: crate::types::LpTokenStatus::Valid {
             timestamp: Timestamp::from(env.block.time),
         },

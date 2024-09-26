@@ -1,8 +1,11 @@
 use crate::{
     prelude::*,
-    types::{MarketInfo, OpenPositionsResp, PositionCollateral, State, TokenResp, Totals},
+    types::{
+        MarketInfo, OneLpTokenValue, OpenPositionsResp, PositionCollateral, State, TokenResp,
+        Totals,
+    },
 };
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{Context, Result};
 use msg::contracts::{
     factory::entry::MarketsResp,
     market::{
@@ -122,6 +125,22 @@ impl<'a> State<'a> {
             token: status.collateral,
         };
         Ok((info, false))
+    }
+
+    pub(crate) fn load_lp_token_value(
+        &self,
+        storage: &mut dyn Storage,
+        token: &Token,
+    ) -> Result<OneLpTokenValue> {
+        let lp_token_value = crate::state::LP_TOKEN_VALUE.key(token).may_load(storage)?;
+        let result = match lp_token_value {
+            Some(lp_token_value) => lp_token_value.value,
+            // Token value is one if it's not computed yet. The only
+            // reason it's not computed yet, is because there would
+            // have been no deposit yet.
+            None => OneLpTokenValue(Collateral::one()),
+        };
+        Ok(result)
     }
 
     pub(crate) fn load_cache_market_info(
@@ -280,24 +299,16 @@ impl Totals {
     pub(crate) fn add_collateral(
         &mut self,
         funds: NonZero<Collateral>,
-        pos: &PositionCollateral,
+        token_value: OneLpTokenValue,
     ) -> Result<NonZero<LpToken>> {
-        let collateral = self.collateral.checked_add(pos.0)?;
-        let new_shares =
-            if (collateral.is_zero() && self.shares.is_zero()) || self.collateral.is_zero() {
-                NonZero::new(LpToken::from_decimal256(funds.into_decimal256()))
-                    .expect("Impossible: NonZero to NonZero produced a 0")
-            } else if collateral.is_zero() || self.shares.is_zero() {
-                bail!("Invalid collateral/shares totals: {self:?}");
-            } else {
-                let new_shares = LpToken::from_decimal256(
-                    funds
-                        .into_decimal256()
-                        .checked_mul(self.shares.into_decimal256())?
-                        .checked_div(self.collateral.into_decimal256())?,
-                );
-                NonZero::new(new_shares).context("new_shares ended up 0")?
-            };
+        let one_collateral_value =
+            Collateral::one().checked_div_dec(token_value.0.into_decimal256())?;
+        let new_shares = LpToken::from_decimal256(
+            one_collateral_value
+                .checked_mul_dec(funds.into_decimal256())?
+                .into_decimal256(),
+        );
+        let new_shares = NonZero::new(new_shares).context("tokens is zero in add_collateral")?;
         self.collateral = self.collateral.checked_add(funds.raw())?;
         self.shares = self.shares.checked_add(new_shares.raw())?;
         Ok(new_shares)
