@@ -150,7 +150,7 @@ impl OneLpTokenValue {
         let new_shares = LpToken::from_decimal256(
             funds
                 .raw()
-                .checked_div_dec(token_value.0.into_decimal256())?
+                .checked_div_dec(self.0.into_decimal256())?
                 .into_decimal256(),
         );
         NonZero::new(new_shares).context("tokens is zero in add_collateral")

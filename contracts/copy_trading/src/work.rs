@@ -19,27 +19,21 @@ pub(crate) fn get_work(state: &State, storage: &dyn Storage) -> Result<WorkResp>
 
     match requires_token {
         RequiresToken::Token { token } => {
-            // Initially there would be no collateral at all. There is no
-            // point trying to compute lp token value if that's the case.
-            let totals = crate::state::TOTALS
-                .may_load(storage, &token)
-                .context("Could not load TOTALS")?
-                .unwrap_or_default();
-            if totals.shares == LpToken::zero() {
-                return Ok(WorkResp::HasWork {
-                    work_description: WorkDescription::ProcessQueueItem {
-                        id: next_queue_position,
-                    },
-                });
-            }
-
             let lp_token_value = crate::state::LP_TOKEN_VALUE.key(&token).may_load(storage)?;
-            if let Some(lp_token_value) = lp_token_value {
-                if lp_token_value.status.valid() {
+            match lp_token_value {
+                Some(lp_token_value) => {
+                    if lp_token_value.status.valid() {
+                        return Ok(WorkResp::HasWork {
+                            work_description: WorkDescription::ProcessQueueItem {
+                                id: next_queue_position,
+                            },
+                        });
+                    }
+                }
+                None => {
+                    // For this token, the value was never in the store.
                     return Ok(WorkResp::HasWork {
-                        work_description: WorkDescription::ProcessQueueItem {
-                            id: next_queue_position,
-                        },
+                        work_description: WorkDescription::ComputeLpTokenValue { token },
                     });
                 }
             }
