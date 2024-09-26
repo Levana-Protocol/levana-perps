@@ -33,7 +33,7 @@ pub struct Config {
     /// Factory we will allow trading on
     pub factory: Addr,
     /// Administrator of the contract. Should be the factory contract
-    /// which initializes this as that will migrate this contract.
+    /// which initializes this.
     pub admin: Addr,
     /// Pending administrator, ready to be accepted, if any.
     pub pending_admin: Option<Addr>,
