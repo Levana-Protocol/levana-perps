@@ -362,7 +362,6 @@ fn compute_dnf_sensitivity(exchanges: Vec<CmcMarketPair>) -> anyhow::Result<DnfR
         .depth_usd_negative_two
         .min(max_volume_exchange.depth_usd_positive_two);
     let dnf = (min_depth_liquidity / market_share) * 25.0;
-    tracing::debug!("DNF: {dnf}");
     let result = DnfResult {
         dnf: DnfInUsd(dnf),
         min_depth_liquidity,

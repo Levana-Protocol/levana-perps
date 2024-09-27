@@ -841,13 +841,10 @@ fn balance_one_sided_market() {
 
 fn do_work(market: &PerpsMarket, lp: &Addr) {
     do_work_optional_collect(market, lp, true);
-    log_status("=== Ran a CT update", market);
 }
 
 fn do_work_optional_collect(market: &PerpsMarket, lp: &Addr, collect_closed: bool) {
     let work = market.query_countertrade_has_work().unwrap();
-
-    println!("Work: {work:?}");
     let (has_deferred_exec, is_close) = match work {
         HasWorkResp::NoWork {} => panic!("do_work when no work is available"),
         HasWorkResp::Work { desc } => match desc {
