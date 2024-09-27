@@ -159,3 +159,4 @@ pub const INSTANTIATION_TIMESTAMP: &str = "ez";
 pub const REFEREES_REVERSE_MAP: &str = "fa";
 pub const REFEREE_COUNT_REVERSE_MAP: &str = "fb";
 pub const REFERRAL_STATS_MAP: &str = "fc";
+pub const FACTORY_MARKET_LAST_ADDED: &str = "fd";

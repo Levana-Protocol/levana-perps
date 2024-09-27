@@ -2059,6 +2059,12 @@ impl PerpsMarket {
         Ok(res)
     }
 
+    pub fn query_factory_raw(&self, key: impl Into<Binary>) -> Result<Option<Vec<u8>>> {
+        let contract_addr = self.app().factory_addr.clone();
+        let result = self.app().wrap().query_wasm_raw(contract_addr, key)?;
+        Ok(result)
+    }
+
     // deliberately use the cw20 msg, not liquidity_token
     pub fn query_liquidity_token<T: DeserializeOwned>(
         &self,

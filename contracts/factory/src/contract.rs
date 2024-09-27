@@ -221,7 +221,7 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response> {
                         market_id,
                         migration_admin,
                     } = reply_get_instantiate_market(ctx.storage)?;
-                    save_market_addr(ctx.storage, &market_id, &addr)?;
+                    save_market_addr(ctx.storage, &market_id, &addr, &state)?;
                     ctx.response.add_event(InstantiateEvent {
                         kind: NewContractKind::Market,
                         market_id: market_id.clone(),

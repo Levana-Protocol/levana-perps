@@ -10,6 +10,9 @@ use super::all_contracts::ALL_CONTRACTS;
 /// Code ID of the market contract
 const MARKET_CODE_ID: Item<u64> = Item::new(namespace::MARKET_CODE_ID);
 
+/// Timestamp when market was added last for this factory
+const MARKET_LAST_ADDED: Item<Option<Timestamp>> = Item::new(namespace::FACTORY_MARKET_LAST_ADDED);
+
 /// The market addresses, keyed by market_id
 pub(crate) const MARKET_ADDRS: Map<&MarketId, Addr> = Map::new(namespace::MARKET_ADDRS);
 
@@ -51,8 +54,10 @@ pub(crate) fn save_market_addr(
     store: &mut dyn Storage,
     market_id: &MarketId,
     addr: &Addr,
+    state: &State,
 ) -> Result<()> {
     MARKET_ADDRS.save(store, market_id, addr)?;
     ALL_CONTRACTS.save(store, addr, &ContractType::Market)?;
+    MARKET_LAST_ADDED.save(store, &Some(Timestamp::from(state.env.block.time)))?;
     Ok(())
 }
