@@ -296,6 +296,7 @@ impl ExecuteMsg {
             // Uses its own auth mechanism internally
             ExecuteMsg::Shutdown { .. } => false,
             ExecuteMsg::AddCopyTrading { .. } => true,
+            ExecuteMsg::SetCopyTradingCodeId { .. } => true,
         }
     }
 }
